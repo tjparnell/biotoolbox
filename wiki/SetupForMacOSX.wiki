@@ -1,0 +1,169 @@
+#summary My own guide for setting up a Mac OS X computer with bioperl and GBrowse for bioinformatics analysis.
+
+=Preparing a Mac OS X computer for bioinformatics analysis using bioperl=
+
+
+
+==Prerequisites==
+	* A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
+	* Some very basic understanding of perl programs, modules, and how to install upgrade perl modules using CPAN. Knowing and writing the Perl language is not necessary.
+	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system, if also more dangerous when you don’t know what you’re doing.
+	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist.
+	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
+
+==First things==
+	#	Install the Developer Tools from Apple. You don’t need all the OS X packages, just the base Unix developer package.
+	#	Install [http://www.finkproject.org/ Fink]. I find it easiest to install third party software using a package manager, which makes installation, upgrading, and removal much easier. An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. Download the binary installer and follow the online directions. Important: If you’ll be running 64 bit programs, you should set up Fink to be 64 bit as well! It should install into `/sw`. Make sure you have your account(s) set up to use Fink by running 
+	{{{
+		/sw/bin/pathsetup.sh
+	}}}
+	# Edit the file `/sw/etc/fink.conf` to include the unstable trees. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. Change the appropriate line to look like the following.
+	{{{
+		Trees: local/main stable/main stable/crypto unstable/main unstable/crypto
+	}}}
+	# Update Fink using the following
+	{{{
+		sudo fink selfupdate
+		fink scanpackages
+		fink index
+	}}}
+	When installing/upgrading many programs through Fink, it will identify prerequisites which are needed and offer to install those as well. Always accept those. This is the wonderful advantage of using a package manager.
+	# Set up CPAN. Run
+	{{{
+		sudo cpan
+	}}}
+	When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under /Library/Perl. You can upgrade system installed modules and they should be installed here and take precedence. 
+	Some basic modules to upgrade/install right away (but probably not absolutely necessary) include
+	{{{
+		CPAN
+		readline
+		YAML
+	}}}
+	
+
+==Install Third party software==
+===Installing MySQL using Fink===
+	# Install MySQL. I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. 
+	{{{
+		sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
+	}}}
+	# To make things easier, I also like to install the MySQL Gui [http://www.mysql.com/downloads/workbench/ Workbench]. 
+	# To start up MySQL, run
+	{{{
+		sudo mysqld_safe –u root &
+	}}}
+	# Set the root password
+	{{{
+		mysqladmin –u root password <password>
+	}}}
+	# Test by starting the client
+	{{{
+		mysql –u root –p
+	}}}
+	# Install the daemon loader for mysql
+	{{{
+		sudo fink install daemonic
+	}}}
+	# Set up MySQL to start up automatically by running
+	{{{
+		sudo daemonic enable mysql
+	}}}
+	Should find the startup file in /Library/StartupItems/
+
+===Installing the GD Libraries===
+	# Install the GD libraries. These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
+	{{{
+		sudo fink install gd2
+	}}}
+	# If you want the latest, greatest bioperl, you’ll also need to install Git. 
+	{{{
+		sudo fink install git
+	}}}
+
+==Install CPAN modules==
+	# There are a number of pre-requisites you can install to make the bioperl installation smoother, as well as modules that are required for several of my programs. I find the easiest way is to install all of these through CPAN. Watch out for prerequisites, and let CPAN install those for you
+	{{{
+		GD
+		GD::Graph
+		GD::Graph::smoothlines
+		GD::SVG
+		SVG
+		CGI
+		DBI
+		DBD::mysql
+		DBD::SQLite
+		Statistics::Descriptive
+		Statistics::Lite
+		Statistics::LineFit
+		Compress::Zlib
+		IO::Zlib
+	}}}
+
+===Install BioPerl===
+	# Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN, which should be adequate for most purposes.
+	{{{
+		CJFIELDS/BioPerl-1.6.1.tar.gz
+	}}}
+	There are dozens of prerequisite modules for bioperl, but many (all?) are not absolutely necessary. I've listed above the ones that I think are the most needed, so you should be able to safely skip most of the prerequisites it lists. However, if you miss one, perl usually does a pretty good job at complaining that a required module is missing, and you can always go back and install it.
+	# Since BioPerl is under continual development, and a number of improvements have been made, the latest bioperl-live distribution may be ideal. You can download it using git
+	{{{
+		git clone git://github.com/bioperl/bioperl-live.git
+	}}}
+	If you download the live version, follow the instructions for installing, but it should go something like this 
+	{{{
+		perl Build.PL
+		./Build test
+		sudo ./Build install
+	}}}
+	The same warnings about prerequisites apply as above.
+	
+==Installing GBrowse==
+	# Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install
+	{{{
+		Bio::Graphics
+		GBrowse
+	}}}
+	It should be safe to accept the default locations for the browser installation files. 
+	# Important! You will need to turn on Apache web server using the Sharing tab of System Preferences.
+	# Also, the default security settings need to be adjusted to allow for GBrowse to work correctly; otherwise I have issues. This may not  be the best fix, as I’m not an Apache expert. In the file `/etc/apache2/httpd.conf`, find the `<Directory />` stanza and comment out the following lines 
+	{{{
+		Order deny,allow
+		Deny from all lines. 
+	}}}
+	Then add the following lines:
+	{{{
+		Order allow,deny
+		Allow from all
+	}}}
+	You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The basic yeast 
+	
+==Installing Samtools==
+[http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
+
+	# Download the source code tarball from [http://sourceforge.net/projects/samtools/files/ here]. Unpack into a working directory.
+	# If you'll be working with 64-bit executables, edit the `Makefile` to un-comment out the `-m64` under CLFAGS. This ensures the program will compile as a 64-bit executable.
+	# Compile by running `make`.
+	# Also compiled razip by executing `make razip`. I'm not entirely sure of the utility of this program (the documentation is not entirely clear), but I included it anway.
+	# Created the directory `/usr/local/samtools` and copied the following into it. 
+		* all contents of the `misc` directory in the source tree
+		* the generated executables `samtools` and `razip`
+		* the information file `samtools.txt`
+	# Copied the headers into `/usr/local/include`
+		* `sam.h`
+		* `sam_header.h`
+		* `bam.h`
+	# Copied the main library `libbam.a` into `/usr/local/lib`
+	# Copied the man file `samtools.1` into `/usr/local/man/man1/`
+	# To make my life a whole lot easier, made symlinks of the executables in `/usr/local/bin` with the following commands
+	{{{
+		cd /usr/local/
+		ln -s samtools/samtools bin/
+		ln -s samtools/samtools.pl bin/
+		ln -s samtools/razip bin/
+	}}}
+	
+==Installing Bio::DB::Bam==
+Once Samtools has been installed, then the bioperl module `Bio::DB::Bam` may be installed. It should automatically find the library and headers you copied into `/usr/local`. You can obtain the latest released version from CPAN.
+
+
+	
