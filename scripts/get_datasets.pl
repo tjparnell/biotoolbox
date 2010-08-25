@@ -1,4 +1,4 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 
 # A script to grab the microarray data from the gbrowse db for promoters
 

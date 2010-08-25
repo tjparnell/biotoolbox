@@ -158,7 +158,7 @@ sub open_db_connection {
 	# determine whether a database name or a file for memory db
 	my $db;
 	if (
-		$database =~ /\.gff3?(?:\.gz)$/ and 
+		$database =~ /\.gff3?(?:\.gz)?$/ and 
 		-e $database
 	) {
 		# it appears database is an actual file
