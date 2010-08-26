@@ -15,56 +15,40 @@ With yeast, the genome is so small that an Illumina lane worth of sequencing wou
 We'll assume you now have your sequencing data in hand.
 
 ==Steps==
-	# If the sequence file contains multiple barcoded genomes, you'll want to first split the file based on the 5' tags, as well as remove the tags. The `split_by_tags.pl` script in the *biotoolbox* package should accomplish this. 
+	# If the sequence file contains multiple barcoded genomes, you'll want to first split the file based on the 5' tags, as well as remove the tags. The `split_by_tags.pl` script in the *biotoolbox* package should accomplish this. This will result in separate files for each strain, with the tag stripped from the sequence.
 	{{{
 		split_by_tags.pl <sequence_file.txt.gz> <tag1> <tag2> ...
-	}}}
-	This will result in separate files for each strain, with the tag stripped from the sequence.
-	
-	# Perform the alignment. While any aligner should work, some are more capable of others. For purposes of identifying sequence variants, I recommend [http://www.novascript.com Novascript]'s novoalign simply because it handles both mismatches and gaps well and is pretty thorough. Although, alignment algorithms continue to improve, so this advice may be out of date.
-	
-	You'll first need to build the index file for the reference genome before using. This is essentially a fast, indexed database of all short reads in the genome. Read the documentation, but it should go like this.
+	}}} 
+	# Perform the alignment. While any aligner should work, some are more capable of others. For purposes of identifying sequence variants, I recommend [http://www.novascript.com Novascript]'s novoalign simply because it handles both mismatches and gaps well and is pretty thorough. Although, alignment algorithms continue to improve, so this advice may be out of date. You'll first need to build the index file for the reference genome before using. This is essentially a fast, indexed database of all short reads in the genome. Read the documentation, but it should go like this.
 	{{{
 		novoindex <index_name> <reference.fa>
 	}}}
-	
 	# Convert the aligned reads to the [http://samtools.sourceforge.net/index.shtml Samtools] binary BAM file format. The BAM format is a convenient, compressed, file format that can be indexed for rapid access and search. The BAM file should be sorted and indexed.
-	
-	# Both steps of aligning and converting to BAM format can be accomplished by running the `novo_wrapper.pl` script in my *biotoolbox* package. Note that this is a simple wrapper with generic options for the programs. Advanced users should do run the individual programs manually.
+	# Both steps of aligning and converting to BAM format can be accomplished by running the `novo_wrapper.pl` script in my *biotoolbox* package. Note that this is a simple wrapper with generic options for the programs. Advanced users should do run the individual programs manually. Read the online help for `novo_wrapper.pl` for the full options. You should get indexed BAM alignment files of your sequence reads. You may give the wrapper multiple input files at a time.
 	{{{
 		novo_wrapper.pl --index /path/to/index sequence.txt.gz
 	}}}
-	Read the online help for `novo_wrapper.pl` for the full options. You should now have indexed BAM alignment files of your sequence reads. You may give the wrapper multiple input files at a time.
-	
-	# Index the original reference genome FASTA file. The fasta file is required for the samtools `pileup` command below.
-	{{{
-		samtools faidx reference.fa
-	}}}
-	
-	# Pileup the reads. This generates the consensus sequence from all of the sequence reads, using the reference genome where there are gaps in read coverage. Read the SamTools documentation for more options.
+	# Pileup the reads and find the sequence variants. This generates the consensus sequence from all of the sequence reads, using the reference genome where there are gaps in read coverage. Read the SamTools documentation for more options. Notice the redirect out to a pileup file.
 	{{{
 		samtools pileup -c -f reference.fa sequence.bam >sequence.pileup
 	}}}
-	Notice the redirect out to a pileup file.
-	
-	# Find the sequence variants. This will identify all of the differences between the sequenced and reference genomes. This uses the `samtools.pl` perl script included with the SamTools distribution. This command also includes a filter to weed out weak calls.
+	# Find the sequence variants. This will identify all of the differences between the sequenced and reference genomes. This uses the `samtools.pl` perl script included with the SamTools distribution. This command also includes a filter to weed out weak calls. The output is a tab-delimited text file that may be viewed if desired.
 	{{{
-		samtools.pl varFilter sequence.pileup | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.flt.pileup
+		samtools.pl varFilter sequence.pileup | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.filtered.pileup
 	}}}
-	
-	# If you have multiple strains that were sequenced together, you can now merge the sequence variations together to identify unique and common variations. This is useful, for example, to identify those SNPs that are in the background but different from the reference genome (every lab strain will be different). Further, it will reduce the number of SNPs that are unique in each strain to help narrow down informative sequence variations (the mutation you're hunting down).
-	You can use the `merge_SNPs.pl` script in the *biotoolbox* package. This will take multiple pileup files (one for each strain), and write out multiple pileup files in accordance to their commonality. For example, two sequenced strains (strA and strB) may yield three files (strA, strB, strA_strB). 
+	# To make things a little easier and avoid intermediate files, you may combine the two above steps into one by taking advantage of pipes. This is a long command that should be entered as one.
 	{{{
-		merge_SNPs.pl sequence1.flt.pileup sequence2.flt.pileup ...
+		samtools pileup -c -f reference.fa sequence.bam | samtools.pl varFilter | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.filtered.pileup
 	}}}
-	
-	# Locate the sequence variants. This is the fun part where we get to identify where the mutations are located. The `locate_SNPs.pl` script in the *biotoolbox* package will help identify which genomic features (genes) overlap the sequence variations, and if they overlap a coding sequence (CDS), what type of codon change would be produced.
+	# If you have multiple strains that were sequenced together, you can now merge the sequence variations together to identify unique and common variations. This is useful, for example, to identify those SNPs that are in the background but different from the reference genome (every lab strain will be different). Further, it will reduce the number of SNPs that are unique in each strain to help narrow down informative sequence variations (the mutation you're hunting down). You can use the `merge_SNPs.pl` script in the *biotoolbox* package to perform this task. This program will take multiple pileup files (one for each strain), and write out multiple pileup files in accordance to their commonality. For example, two sequenced strains (strA and strB) may yield three files (strA, strB, strA_strB). 
+	{{{
+		merge_SNPs.pl sequence1.filtered.pileup sequence2.filtered.pileup ...
+	}}}
+	# Locate the sequence variants. This is the fun part where we get to identify where the mutations are located. The `locate_SNPs.pl` script in the *biotoolbox* package will help identify which genomic features (genes) overlap the sequence variations, and if they overlap a coding sequence (CDS), what type of codon change would be produced. The output will be a tab-delimited text file that may be opened in a spreadsheet program (such as Microsoft Excel). The mutations may be then be sorted and/or filtered to identify the ones of interest.
 	{{{
 		locate_SNPs.pl --db genome_annotation.gff sequence1.pileup
 	}}}
-	This should produce a tab-delimited text file that may be opened in a spreadsheet program (Microsoft Excel). The mutations may be then be sorted and/or filtered to identify the ones of interest.
-	
-	# Viewing the alignments. The GBrowse viewer will accept BAM files to view the alignments. Simply navigate to your favorite candidate gene identified with `locate_SNPs.pl` and check out the sequence variant.
+	# Viewing the alignments. The GBrowse viewer will accept BAM files to view the alignments. Other genome browsers may also accept BAM files. Simply navigate to your favorite candidate gene identified with `locate_SNPs.pl` and check out the sequence variant.
 	
 	
 	
