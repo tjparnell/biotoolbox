@@ -7,7 +7,7 @@
 ==Prerequisites==
 	* A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
 	* Some very basic understanding of perl programs, modules, and how to install upgrade perl modules using CPAN. Knowing and writing the Perl language is not necessary.
-	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system, if also more dangerous when you don’t know what you’re doing.
+	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system. Fortunately, these installations are pretty safe and shouldn't break the system. Simply installing perl modules rarely (if at all possible) breaks the system, particularly with recent versions (earlier versions were another story). Using the Fink (or MacPorts) package manager keeps everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. Finally, anything installed under `/usr/local/` is off-limits to Apple, so again there should be no conflicts with Apple system directories.
 	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist.
 	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
 
@@ -39,11 +39,12 @@
 		readline
 		YAML
 	}}}
+	To install a module under the CPAN shell, type `install <name_of_module>`. Type `h` to get the help menu for additional functions.
 	
 
 ==Install Third party software==
 ===Installing MySQL using Fink===
-	# Install MySQL. I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. 
+	# Install MySQL. I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`.
 	{{{
 		sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
 	}}}
@@ -68,7 +69,7 @@
 	{{{
 		sudo daemonic enable mysql
 	}}}
-	Should find the startup file in /Library/StartupItems/
+	There should now be a startup plist file in `/Library/StartupItems/`.
 
 ===Installing the GD Libraries===
 	# Install the GD libraries. These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
@@ -81,11 +82,9 @@
 	}}}
 
 ==Install CPAN modules==
-	# There are a number of pre-requisites you can install to make the bioperl installation smoother, as well as modules that are required for several of my programs. I find the easiest way is to install all of these through CPAN. Watch out for prerequisites, and let CPAN install those for you
+	# There are a number of pre-requisites you can install to make the bioperl installation smoother, as well as modules that are required for several of my programs. I find the easiest way is to install all of these through CPAN. Watch out for prerequisites, and let CPAN install those for you.
 	{{{
 		GD
-		GD::Graph
-		GD::Graph::smoothlines
 		GD::SVG
 		SVG
 		CGI
@@ -93,10 +92,17 @@
 		DBD::mysql
 		DBD::SQLite
 		Statistics::Descriptive
+	}}}
+	# Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+	{{{
+		GD::Graph
+		GD::Graph::smoothlines
 		Statistics::Lite
 		Statistics::LineFit
 		Compress::Zlib
 		IO::Zlib
+		Config::Simple
+		Pod::Usage
 	}}}
 
 ===Install BioPerl===
@@ -118,7 +124,7 @@
 	The same warnings about prerequisites apply as above.
 	
 ==Installing GBrowse==
-	# Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install
+	# Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
 	{{{
 		Bio::Graphics
 		GBrowse
@@ -135,7 +141,7 @@
 		Order allow,deny
 		Allow from all
 	}}}
-	You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The basic yeast 
+	You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The default yeast genome should come up.
 	
 ==Installing Samtools==
 [http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.

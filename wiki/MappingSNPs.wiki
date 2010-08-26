@@ -1,0 +1,73 @@
+#summary Mapping all sequence variants between two or more strains through next generation sequencing technologies. 
+
+=HOWTO: Mapping unidentified mutations by whole genome sequencing=
+
+Working with yeast strains, it used to be a relatively straight forward approach to map a new mutation. Simply back cross to appropriate strains and genetically map the mutation. Complement the mutation with a genomic library on plasmids. Sequence the complementing plasmids, identify candidate genes, and test again. It would take a good graduate student a couple months; an unlucky (or bad) student upwards of a year.
+
+Enter next generation sequencing technologies. After a clean genomic DNA preparation of your mutant(s), send it off to the local genomics core facility to sequence, and then scan the genome for mutations. Within weeks you have your answer, and most of that time is waiting for your data. 
+
+This HOWTO should help you in this process. Don't forget, you still need to verify your mutant by complementation and linkage.
+
+
+==Set up==
+With yeast, the genome is so small that an Illumina lane worth of sequencing would cover it with ridiculous numbers of reads. It's prudent, therefore, to barcode the multiple libraries from different yeast strains with specific primers that incorporate two or three bases in the 5' end of the read, allowing you to mix multiple libraries in a sequencing lane. The reads from each strain are then pulled out afterwards using the two base barcode tag. While this may not be feasible with larger genomes currently, it is only a matter of time with improvements in sequencing.
+
+We'll assume you now have your sequencing data in hand.
+
+==Steps==
+	# If the sequence file contains multiple barcoded genomes, you'll want to first split the file based on the 5' tags, as well as remove the tags. The `split_by_tags.pl` script in the *biotoolbox* package should accomplish this. 
+	{{{
+		split_by_tags.pl <sequence_file.txt.gz> <tag1> <tag2> ...
+	}}}
+	This will result in separate files for each strain, with the tag stripped from the sequence.
+	
+	# Perform the alignment. While any aligner should work, some are more capable of others. For purposes of identifying sequence variants, I recommend [http://www.novascript.com Novascript]'s novoalign simply because it handles both mismatches and gaps well and is pretty thorough. Although, alignment algorithms continue to improve, so this advice may be out of date.
+	
+	You'll first need to build the index file for the reference genome before using. This is essentially a fast, indexed database of all short reads in the genome. Read the documentation, but it should go like this.
+	{{{
+		novoindex <index_name> <reference.fa>
+	}}}
+	
+	# Convert the aligned reads to the [http://samtools.sourceforge.net/index.shtml Samtools] binary BAM file format. The BAM format is a convenient, compressed, file format that can be indexed for rapid access and search. The BAM file should be sorted and indexed.
+	
+	# Both steps of aligning and converting to BAM format can be accomplished by running the `novo_wrapper.pl` script in my *biotoolbox* package. Note that this is a simple wrapper with generic options for the programs. Advanced users should do run the individual programs manually.
+	{{{
+		novo_wrapper.pl --index /path/to/index sequence.txt.gz
+	}}}
+	Read the online help for `novo_wrapper.pl` for the full options. You should now have indexed BAM alignment files of your sequence reads. You may give the wrapper multiple input files at a time.
+	
+	# Index the original reference genome FASTA file. The fasta file is required for the samtools `pileup` command below.
+	{{{
+		samtools faidx reference.fa
+	}}}
+	
+	# Pileup the reads. This generates the consensus sequence from all of the sequence reads, using the reference genome where there are gaps in read coverage. Read the SamTools documentation for more options.
+	{{{
+		samtools pileup -c -f reference.fa sequence.bam >sequence.pileup
+	}}}
+	Notice the redirect out to a pileup file.
+	
+	# Find the sequence variants. This will identify all of the differences between the sequenced and reference genomes. This uses the `samtools.pl` perl script included with the SamTools distribution. This command also includes a filter to weed out weak calls.
+	{{{
+		samtools.pl varFilter sequence.pileup | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.flt.pileup
+	}}}
+	
+	# If you have multiple strains that were sequenced together, you can now merge the sequence variations together to identify unique and common variations. This is useful, for example, to identify those SNPs that are in the background but different from the reference genome (every lab strain will be different). Further, it will reduce the number of SNPs that are unique in each strain to help narrow down informative sequence variations (the mutation you're hunting down).
+	You can use the `merge_SNPs.pl` script in the *biotoolbox* package. This will take multiple pileup files (one for each strain), and write out multiple pileup files in accordance to their commonality. For example, two sequenced strains (strA and strB) may yield three files (strA, strB, strA_strB). 
+	{{{
+		merge_SNPs.pl sequence1.flt.pileup sequence2.flt.pileup ...
+	}}}
+	
+	# Locate the sequence variants. This is the fun part where we get to identify where the mutations are located. The `locate_SNPs.pl` script in the *biotoolbox* package will help identify which genomic features (genes) overlap the sequence variations, and if they overlap a coding sequence (CDS), what type of codon change would be produced.
+	{{{
+		locate_SNPs.pl --db genome_annotation.gff sequence1.pileup
+	}}}
+	This should produce a tab-delimited text file that may be opened in a spreadsheet program (Microsoft Excel). The mutations may be then be sorted and/or filtered to identify the ones of interest.
+	
+	# Viewing the alignments. The GBrowse viewer will accept BAM files to view the alignments. Simply navigate to your favorite candidate gene identified with `locate_SNPs.pl` and check out the sequence variant.
+	
+	
+	
+	
+	
+
