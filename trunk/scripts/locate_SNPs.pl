@@ -131,10 +131,9 @@ foreach my $infile (@ARGV) {
 		my $snp_feature;
 		my $codon_change;
 		my $segment = $db->segment($chr, $pos, $pos + 1);
-		my @search_types = qw(CDS noncoding_exon ncRNA snRNA snoRNA tRNA);
+		my @search_types = qw(gene ncRNA snRNA snoRNA tRNA);
 		my @features = $segment->features(
 				-type => \@search_types,
-#				-type => 'CDS:SGD',
 		);
 		if (@features) {
 			my @collections;
@@ -155,68 +154,57 @@ foreach my $infile (@ARGV) {
 				$id .= " (" . join(" ", @aliases) . ")" if @aliases;
 				push @collections, $id;
 				
-				# determine codon changes
-				if ($type eq 'CDS') {
+				# identify subfeatures
+				foreach my $subfeat ($feature->get_SeqFeatures) {
+					# the gene feature object may be comprised of subfeatures
+					# we're looking for the CDS subfeature to look for 
+					# codon changes
 					
-					if ($snp_type eq 'substitution') {
-						# this may be a real codon change
+					if (
+						$subfeat->primary_tag eq 'CDS' and
+						$subfeat->overlaps($segment)
+					) {
+						# we have found the specific CDS that overlaps our SNP
 						
-						# get more feature info
-						my $strand = $feature->strand;
-						my $phase = $feature->phase;
-						my $start = $feature->start;
-						my $stop = $feature->stop;
-						
-						# collect the original codon
-						my $codon_segment;
-						my $pos_phase;
-						if ($strand > 0) {
-							# watson or forward strand
-							$pos_phase = ($pos - $start - $phase) % 3;
-							if ($pos_phase == 0) {
-								$codon_segment = $db->segment($chr, $pos, $pos + 2);
-							} elsif ($pos_phase == 1) {
-								$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
-							} elsif ($pos_phase == 2) {
-								$codon_segment = $db->segment($chr, $pos - 2, $pos);
-							}
-						}
-						else {
-							# crick or reverse strand
-							$pos_phase = ($stop - $pos - $phase) % 3;
-							if ($pos_phase == 0) {
-								$codon_segment = $db->segment($chr, $pos + 2, $pos);
-							} elsif ($pos_phase == 1) {
-								$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
-							} elsif ($pos_phase == 2) {
-								$codon_segment = $db->segment($chr, $pos, $pos - 2);
-							}
-						}
-						my $codon = $codon_segment->seq->seq;
-						my $aa = $codontable->translate($codon);
-						
-						# make the substitution into the mutant
-						my @triplet = split //, $codon;
-						$triplet[$pos_phase] = $snp; # change the appropriate codon
-						my $mutant_codon = join q(), @triplet;
-						my $mutant_aa = $codontable->translate($mutant_codon);
-						
-						# report the change
-						if ($aa eq $mutant_aa) {
-							# no change
-							push @codon_changes, "$name: silent";
-						}
-						else {
-							# real change!
-							push @codon_changes, "$name: $aa->$mutant_aa";
+						my $codon_change = determine_codon_change(
+							$snp_type,
+							$snp,
+							$subfeat,
+							$segment,
+						);
+						if ($codon_change) {
+							push @codon_changes, "$name: $codon_change";
 						}
 					}
-					
 					else {
-						# insertion/deletion
-						push @codon_changes, "$name: frameshift";
+						# we haven't found it yet
+						
+						# make sure this feature doesn't have more subfeatures
+						foreach my $subfeat2 ($subfeat->get_SeqFeatures) {
+							# we may be looking at a mRNA feature
+							# so go down one more level to look for CDS
+							
+							if (
+								$subfeat2->primary_tag eq 'CDS' and
+								$subfeat2->overlaps($segment)
+							) {
+								# we have found the specific CDS that overlaps our SNP
+								
+								my $codon_change = determine_codon_change(
+									$snp_type,
+									$snp,
+									$subfeat,
+									$segment,
+								);
+								if ($codon_change) {
+									push @codon_changes, "$name: $codon_change";
+								}
+							}
+						}
 					}
 				}
+				
+				
 			}
 			$snp_feature = join ", ", @collections;
 			$codon_change = join ", ", @codon_changes;
@@ -384,7 +372,85 @@ sub initialize_output_data_structure {
 
 
 
-
+sub determine_codon_change {
+	# determine codon changes in the CDS
+	
+	# get passed arguments
+	my ($snp_type, $snp, $feature, $segment) = @_; 
+	
+	# the return value
+	my $codon_change;
+	
+	# determine the type of change
+	if ($snp_type eq 'substitution') {
+		# this may be a real codon change
+		
+		# get more feature info
+		my $strand = $feature->strand;
+		my $phase = $feature->phase;
+		my $start = $feature->start;
+		my $stop = $feature->stop;
+		
+		# determine the SNP position
+		my $pos = $segment->start;
+		my $chr = $segment->seq_id;
+		
+		# collect the original codon
+		my $codon_segment;
+		my $pos_phase;
+		if ($strand > 0) {
+			# watson or forward strand
+			$pos_phase = ($pos - $start - $phase) % 3;
+			if ($pos_phase == 0) {
+				$codon_segment = $db->segment($chr, $pos, $pos + 2);
+			} 
+			elsif ($pos_phase == 1) {
+				$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
+			} 
+			elsif ($pos_phase == 2) {
+				$codon_segment = $db->segment($chr, $pos - 2, $pos);
+			}
+		}
+		else {
+			# crick or reverse strand
+			$pos_phase = ($stop - $pos - $phase) % 3;
+			if ($pos_phase == 0) {
+				$codon_segment = $db->segment($chr, $pos + 2, $pos);
+			} 
+			elsif ($pos_phase == 1) {
+				$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
+			} 
+			elsif ($pos_phase == 2) {
+				$codon_segment = $db->segment($chr, $pos, $pos - 2);
+			}
+		}
+		my $codon = $codon_segment->seq->seq;
+		my $aa = $codontable->translate($codon);
+		
+		# make the substitution into the mutant
+		my @triplet = split //, $codon;
+		$triplet[$pos_phase] = $snp; # change the appropriate codon
+		my $mutant_codon = join q(), @triplet;
+		my $mutant_aa = $codontable->translate($mutant_codon);
+		
+		# report the change
+		if ($aa eq $mutant_aa) {
+			# no change
+			$codon_change = 'silent';
+		}
+		else {
+			# real change!
+			$codon_change = "$aa->$mutant_aa";
+		}
+	}
+	
+	else {
+		# insertion/deletion
+		$codon_change = 'frameshift';
+	}
+	
+	return $codon_change;
+}
 
 
 
