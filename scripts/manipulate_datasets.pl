@@ -1363,10 +1363,10 @@ sub toss_threshold_function {
 	else {
 		# interactively ask the user
 		if ($direction eq 'above') {
-			print " Enter the maximum threshold value  ";
+			print " Toss values that exceed this value:  ";
 		}
 		else {
-			print " Enter the minimum threshold value  ";
+			print " Toss values that are below this value:  ";
 		}
 		$threshold = <STDIN>;
 		chomp $threshold;
@@ -1397,7 +1397,7 @@ sub toss_threshold_function {
 					# my standard null value, can't verify
 					next;
 				} 
-				elsif ($data_table_ref->[$row][$index] >= $threshold) {
+				elsif ($data_table_ref->[$row][$index] > $threshold) {
 					# this value exceeds the threshold
 					$check++;
 				} 
@@ -1412,7 +1412,7 @@ sub toss_threshold_function {
 					# my standard null value, can't verify
 					next;
 				} 
-				elsif ($data_table_ref->[$row][$index] <= $threshold) {
+				elsif ($data_table_ref->[$row][$index] < $threshold) {
 					# this value exceeds the threshold
 					$check++;
 				} 

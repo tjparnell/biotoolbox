@@ -587,7 +587,7 @@ sub process_region {
 		# first check for dubious orfs
 		# this is specific of course to the source data
 		if ($features[0]->has_tag('orf_classification') ) {
-			for my $i (reverse(0 .. $#features) ) {
+			for (my $i = $#features - 1; $i >= 0; $i -= 1) {
 				# walk through the list and delete any that are dubious
 				# we're working backwards to avoid indexing problems with splice
 				my ($orf_class) = 
