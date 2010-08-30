@@ -12,52 +12,36 @@ use tim_db_helper qw(
 my $dbname = shift @ARGV or die "enter the name of the database following program name\n";
 my $db = open_db_connection($dbname) or die " can't open db\n";
 
-my @sgdf;
-my @pombef;
-my @dataf;
-my @solexaf;
-my @otherf;
-
+# Get the database types
 my $count = 0;
+my %source2type;
 foreach ($db->types) {
-	if (/SGD$/) {
-		push @sgdf, $_;
-	}
-	elsif (/geneDB$/) {
-		push @pombef, $_;
-	}
-	elsif (/data$/) {
-		push @dataf, $_;
-	}
-	elsif (/solexa|illumina/i) {
-		push @solexaf, $_;
+	
+	# the type is essentially method:source
+	# get individual values
+	my $source = $_->source;
+	my $type = $_->method;
+	
+	# store the type in an array under the source
+	if (exists $source2type{$source}) {
+		push @{ $source2type{$source} }, $type;
 	}
 	else {
-		push @otherf, $_;
+		$source2type{$source} = [ ($type) ];
 	}
 	$count++;
 }
-print " found $count feature types in database $dbname\n";
+print " Found $count feature types in database '$dbname'\n";
 
 
-if (@sgdf) {
-	print "These are " . scalar @sgdf . " SGD feature types in the database:\n";
-	foreach (sort {$a cmp $b} @sgdf) { print "  $_\n"}
+# Print the database types by source type
+foreach my $source (sort {$a cmp $b} keys %source2type) {
+	print "  There are ", scalar @{$source2type{$source}}, " feature types ", 
+		"with source '$source'\n";
+	foreach (sort {$a cmp $b} @{$source2type{$source}} ) {
+		print "     $_\n";
+	}
 }
-if (@pombef) {
-	print "These are " . scalar @pombef . " GeneDB feature types in the database:\n";
-	foreach (sort {$a cmp $b} @pombef) { print "  $_\n"}
-}
-if (@dataf) {
-	print "These are " . scalar @dataf . " data feature types in the database:\n";
-	foreach (sort {$a cmp $b} @dataf) { print "  $_\n"}
-}
-if (@solexaf) {
-	print "These are " . scalar @solexaf . " Solexa feature types in the database:\n";
-	foreach (sort {$a cmp $b} @solexaf) { print "  $_\n"}
-}
-if (@otherf) {
-	print "These are " . scalar @otherf . " remaining feature types in the database:\n";
-	foreach (sort {$a cmp $b} @otherf) { print "  $_\n"}
-}
+
+
 print "That's all\n";
