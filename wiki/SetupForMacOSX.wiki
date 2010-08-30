@@ -33,13 +33,16 @@
 		sudo cpan
 	}}}
 	When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under /Library/Perl. You can upgrade system installed modules and they should be installed here and take precedence. 
-	Some basic modules to upgrade/install right away (but probably not absolutely necessary) include
+	Some basic modules to upgrade/install right away (but probably not absolutely necessary) include the following. Enter these commands within the CPAN shell.
 	{{{
-		CPAN
 		readline
 		YAML
+		CPAN
+		Module::Build
+		ExtUtils::MakeMaker
+		ExtUtils::CBuilder
 	}}}
-	To install a module under the CPAN shell, type `install <name_of_module>`. Type `h` to get the help menu for additional functions.
+	To install a module under the CPAN shell, type `install <name_of_module>`. To find a module in the CPAN repository, type `d /keyword/`, where keyword is a regular expression to find the distribution you want. Type `h` to get the help menu for additional functions. 
 	
 
 ==Install Third party software==
@@ -158,18 +161,22 @@
 		* `sam.h`
 		* `sam_header.h`
 		* `bam.h`
+		* `bgzf.h`
+		* `khash.h`
+		* `faidx.h`
 	# Copied the main library `libbam.a` into `/usr/local/lib`
 	# Copied the man file `samtools.1` into `/usr/local/man/man1/`
 	# To make my life a whole lot easier, made symlinks of the executables in `/usr/local/bin` with the following commands
 	{{{
-		cd /usr/local/
-		ln -s samtools/samtools bin/
-		ln -s samtools/samtools.pl bin/
-		ln -s samtools/razip bin/
+		cd /usr/local/bin
+		ln -s /usr/local/samtools/samtools samtools
+		ln -s /usr/local/samtools/samtools.pl samtools.pl
+		ln -s /usr/local/samtools/razip razip
 	}}}
 	
-==Installing Bio::DB::Bam==
-Once Samtools has been installed, then the bioperl module `Bio::DB::Bam` may be installed. It should automatically find the library and headers you copied into `/usr/local`. You can obtain the latest released version from CPAN.
+==Installing Bio::DB::Sam==
+Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
+{{{
 
 
 	
