@@ -6,7 +6,7 @@ use FindBin qw($Bin);
 use Config::Simple;
 use Bio::DB::SeqFeature::Store;
 
-# just in case these aren't installed, the rest of the module will still work
+# just in case these aren't installed, maybe the rest of the module will still work
 eval { use Bio::Graphics::Wiggle; }; 
 eval { use Bio::DB::BigWig; }; # 
 
@@ -41,8 +41,20 @@ our %OPENED_WIGFILES; # opened wigfile objects
 	# oh well, keep it anyway????
 
 # Configuration File import for database info
-our $TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
-	die " Error reading tim_db_helper.cfg configuration file!\n";
+our $TIM_CONFIG;
+if (exists $ENV{'TIM_DB_HELPER'}) {
+	 $TIM_CONFIG = Config::Simple->new($ENV{'TIM_DB_HELPER'}) or 
+		die Config::Simple->error();
+}	
+elsif (-e "$ENV{HOME}/tim_db_helper.cfg") {
+	 $TIM_CONFIG = Config::Simple->new("$ENV{HOME}/tim_db_helper.cfg") or
+	 	die Config::Simple->error();
+}
+else {
+	warn "\n#### Using default configuration file '$Bin/../lib/tim_db_config.cfg'####\n";
+	$TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
+	 	die Config::Simple->error();
+}	
 
 1; # the true statement
 
@@ -94,6 +106,16 @@ more convenient and accessible to identify through the method.
 Historically, this module was initially written to use Bio::DB::GFF for 
 database usage. It has since been re-written to use Bio::DB::SeqFeature::Store.
 
+To accomodate multiple different databases and settings, database 
+configurations are stored in a separate 'tim_db_helper.cfg' file. This is a 
+simple INI style text file that stores various variables, including 
+database connection parameters and feature groups. The file may be located 
+in your home root directory, or located anywhere and referenced in your 
+Environment settings under the key 'TIM_DB_HELPER'. If the file is not 
+found then the default file located in the biotoolbox lib directory is 
+used. See the internal documentation of the tim_db_helper.cfg file for more 
+details. 
+
 Complete usage and examples for the functions are provided below.
 
 =head1 USAGE
@@ -137,7 +159,8 @@ which can be loaded into a small in-memory database.
 
 Pass the name of a relational database or the name of the GFF3 file to be 
 loaded into memory. Other parameters for connecting to the database are 
-stored in a configuration file, C<tim_db_helper.cfg>.
+stored in a configuration file, C<tim_db_helper.cfg>. These include 
+database adaptors, user name, password, etc.
 
 Example:
 
@@ -164,7 +187,7 @@ sub open_db_connection {
 		# it appears database is an actual file
 		
 		# open using a memory adaptor
-		print " Loading file(s) into memory db...\n";
+		print " Loading file into memory database...\n";
 		$db = Bio::DB::SeqFeature::Store->new(
 			-adaptor => 'memory',
 			-gff     => $database,
@@ -175,11 +198,24 @@ sub open_db_connection {
 		# a name of a relational database
 		
 		# open the connection using parameters from the configuration file
+		# we'll try to use database specific parameters first, else use 
+		# the db_default parameters
+		my $adaptor = $TIM_CONFIG->param($database . '.adaptor') || 
+			$TIM_CONFIG->param('default_db.adaptor');
+		my $user = $TIM_CONFIG->param($database . '.user') || 
+			$TIM_CONFIG->param('default_db.user');
+		my $pass = $TIM_CONFIG->param($database . '.pass') ||
+			$TIM_CONFIG->param('default_db.pass');
+		my $dsn = $TIM_CONFIG->param($database . '.dsn_prefix') ||
+			$TIM_CONFIG->param('default_db.dsn_prefix');
+		$dsn .= $database;
+		
+		# establish the database connection
 		$db = Bio::DB::SeqFeature::Store->new(
-			-adaptor => $TIM_CONFIG->param('db.adaptor'),
-			-dsn     => $TIM_CONFIG->param('db.dsn_prefix') . $database,
-			-user    => $TIM_CONFIG->param('db.user'),
-			-pass    => $TIM_CONFIG->param('db.pass'),
+			-adaptor => $adaptor,
+			-dsn     => $dsn,
+			-user    => $user,
+			-pass    => $pass,
 		);
 	}
 	
@@ -241,16 +277,23 @@ sub get_dataset_list {
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
 	my $db; # the database object to be used
+	my $db_name; # the name of the database, for use with config param
 	if ($database) {
 		my $db_ref = ref $database;
 		if ($db_ref =~ /Bio::DB/) {
 			# a db object returns the name of the package
 			# this appears to be a bioperl db object
 			$db = $database;
+			$db_name = $db->{'dbh'}->{'name'}; 
+				# dig through the object internals to identify the original 
+				# name of the database
+				# this should be relatively well documented through DBI
+				# but could break in the future since it's not official API
 		}
 		else {
-			# the name of a database
-			$db = open_db_connection($database);
+			# the name of a database was passed, create a database connection
+			$db_name = $database;
+			$db = open_db_connection($db_name);
 		}
 	}
 	else {
@@ -265,14 +308,26 @@ sub get_dataset_list {
 	# get sources to skip
 		# usually these are features from an official genome authority
 	my %source2skip;
-	foreach ( @{ $TIM_CONFIG->param('sources.exclude') } ) {
+	foreach ($TIM_CONFIG->param($db_name . '.source_exclude') ) {
+		# database specific source exclusions
 		$source2skip{$_} = 1;
 	}
-	
+	unless (keys %source2skip) {
+		# no database specific exclusions, we'll read default then
+		foreach ($TIM_CONFIG->param('default_db.source_exclude') ) {
+			$source2skip{$_} = 1;
+		}
+	}
+		
 	# process the database types
 	my %dataset;
 	my $i = 1;
-	foreach my $type (sort {$a->method cmp $b->method} $db->types) {
+	foreach my $type (
+		map $_->[1],
+		sort {$a->[0] cmp $b->[0]} 
+		map [$_->method, $_],
+		$db->types
+	) {
 		# sort the types asciibetically by method
 		
 		my $source = $type->source;
@@ -372,12 +427,12 @@ sub validate_dataset_list {
 		# we will put these in the hash
 		
 		# first as a method:source string
-		my $type = "$_"; # returns 'method:source'
+		my $type = "$_"; # returns 'primary_tag:source'
 		$datasethash{$type} = 1; # the value is not important here
 		
 		# second, put in the just the method, since we often use that alone
-		my $method = $_->method;
-		$datasethash{$method} = 1;
+		my $primary = $_->primary_tag;
+		$datasethash{$primary} = 1;
 	}
 	
 	# now go through the list of datasets to check the name
@@ -420,10 +475,10 @@ Once the list of genomic features is generated, then data may be collected
 for each item in the list. 
 
 The subroutine will generate and return a data hash as described in 
-tim_file_helper.pm. The data table will have either 4 or 5 columns. 
-'Transcript' features will return SystematicName, Name, Alias, 
-TranscriptClass, and GeneClass. All other features will return 
-SystematicName, Name, Alias, and Class.
+tim_file_helper.pm. The data table will have two or three columns. The 
+feature name and type:source are listed in columns one and two, respectively.
+If the features have an Alias tag, then a third column is included with 
+a comma delimited list of the feature aliases.
 
 The subroutine is passed a reference to an anonymous hash containing the 
 arguments. The keys include
@@ -469,16 +524,23 @@ sub get_new_feature_list {
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
 	my $db; # the database object to be used
+	my $db_name; # the name of the database, for use with config param
 	if (defined $arg_ref->{'db'}) {
 		my $db_ref = ref $arg_ref->{'db'};
 		if ($db_ref =~ /Bio::DB/) {
 			# a db object returns the name of the package
 			# this appears to be a bioperl db object
 			$db = $arg_ref->{'db'};
+			$db_name = $db->{'dbh'}->{'name'}; 
+				# dig through the object internals to identify the original 
+				# name of the database
+				# this should be relatively well documented through DBI
+				# but could break in the future since it's not official API
 		}
 		else {
-			# the name of a database
-			$db = open_db_connection( $arg_ref->{'db'} );
+			# the name of a database was passed, create a database connection
+			$db_name = $arg_ref->{'db'};
+			$db = open_db_connection($db_name);
 		}
 	}
 	else {
@@ -506,14 +568,31 @@ sub get_new_feature_list {
 	# we're keeping the data table separate for the time being for simplicity
 	
 	# begin loading basic metadata information
-	if (ref $arg_ref->{'db'} =~ /Bio::DB/) {
-		$data_hash{'db'} = undef; # can't store an object
-	}
-	else { 
-		$data_hash{'db'} = $arg_ref->{'db'}; # the db name
-	}
+	$data_hash{'db'} = $db_name; # name of the database
 	$data_hash{'feature'} = $arg_ref->{'features'};
 	$data_hash{'gff'} = 0;
+	$data_hash{'number_columns'} = 2;
+	
+	# Generate the table header
+	push @feature_table, [ 
+		'Name', 
+		'Type', 
+	];
+	
+	# Generate column metadata
+	$data_hash{0} = {
+			'name'  => 'Name',
+			'index' => 0,
+	};
+	$data_hash{1} = {
+			'name'  => 'Type',
+			'index' => 1,
+	};
+	
+	# List of types
+	if (scalar @classes > 1) {
+		$data_hash{1}->{'include'} = join(",", @classes);
+	}
 	
 	# Collect the genes from the database
 	print "   Searching for " . join(", ", @classes) . "\n";
@@ -529,201 +608,85 @@ sub get_new_feature_list {
 	print "   Found " . scalar @featurelist . " features in the database.\n";
 	
 	
-	# Collect the features
-	if ($arg_ref->{'features'} =~ /transcript/) {
-		# we are collecting transcript features
+	# Check for aliases
+	for (my $i = 0; $i < 50; $i++) {
+		# we're checking the first 50 features looking for an Alias tag
+		# checking that many because not all features may have the tag
+		# we like to have Aliases, because it makes interpreting gene names
+		# a little easier
+		last unless (defined $featurelist[$i]);
 		
-		# for transcripts only: need a list of gene classes that produce transcripts
-		my @transcript_gene_classes = _features_to_classes('genes');
-		
-		# Generate the table header
-		push @feature_table, [ 
-			'Name', 
-			'Type', 
-			'Parent_name', 
-			'Parent_type',
-		];
-		
-		# Generate column metadata
-		$data_hash{0} = {
-				'name'  => 'Name',
-				'index' => 0,
-		};
-		$data_hash{1} = {
-				'name'  => 'Type',
-				'index' => 1,
-		};
-		$data_hash{2} = {
-				'name'  => 'Parent_name',
-				'index' => 2,
-		};
-		$data_hash{3} = {
-				'name'  => 'Parent_type',
-				'index' => 3,
-		};
-		
-		# List of transcript gene classes
-		if (scalar @transcript_gene_classes > 1) {
-			$data_hash{3}->{'include'} = join(",", @transcript_gene_classes);
-		}
-		
-		# Number of columns
-		$data_hash{'number_columns'} = 4;
-		
-		# Collection Loop
-		foreach my $feature (@featurelist) {
+		if ($featurelist[$i]->has_tag('Alias')) {
 			
-			# skip the mitochondrial genes
-			unless ($mito) { 
-				next if $feature->refseq =~ /^chrm|chrmt/i;
-			}
-			
-			#get the attributes for the gene
-			my %feature_attributes = $feature->attributes(); 
-			# various attributes in my cerevisiae database include 
-				# gene which is the standard name 
-				# Alias 
-				# orf_classification
-				# dbxref
-				# Ontology_term
-				# Note 
-				# TranscriptType 
-				# Extent
-			
-			# Check for complete single transcripts
-			if (exists $feature_attributes{'Extent'}) {
-				unless ($feature_attributes{'Extent'}->[0] eq 'complete') {
-					# only want complete transcripts
-					next;
-				}
-			}
-			if (exists $feature_attributes{'TranscriptType'}) {
-				unless (
-					$feature_attributes{'TranscriptType'}->[0] =~ /single/
-				) {
-					# only want single transcripts: single-orf, single-ncRNA
-					# not multi-transcripts, antisense, etc
-					next;
-				}
-			}
-			
-			# Get basic feature info
-			my $name = $feature->display_name; # 
-			my $type = $feature->type; 
-			
-			# Identify the parent gene
-			my @parent_genes = $db->features(
-				-aliases     => 1,
-				-name        => $name,
-				-types       => \@transcript_gene_classes,
-			);
-			my $parent_name = '.';
-			my $parent_type = '.';
-			foreach my $parent_gene (@parent_genes) {
-				if ($feature->overlaps($parent_gene) ) {
-					# the two features overlap, so we must've found the 
-					# appropriate parent gene
-					$parent_name = $parent_gene->display_name;
-					$parent_type = $parent_gene->type;
-					last;
-				}
-			}
-			
-			# Record information
-			push @feature_table, [ 
-				$name, 
-				$type, 
-				$parent_name, 
-				$parent_type,
-			];
-			
+			# add an Alias column to the data table
+			push @{ $feature_table[0] }, 'Aliases';
+			$data_hash{2} = {
+					'name'  => 'Aliases',
+					'index' => 2,
+			};
+			$data_hash{'number_columns'} = 3;
+			last;
 		}
 	}
 	
-	else {
-		# all other features
+	# Get the list of tag exceptions
+	my $tag_exceptions = $TIM_CONFIG->get_block('exclude_tags');
+	print " found ", scalar keys %{ $tag_exceptions }, " exclude tags in config\n";
+	print "   keys: ", join(", ", keys %{ $tag_exceptions }), "\n";
+	
+	# Process the features
+	FEATURE_COLLECTION_LIST:
+	foreach my $feature (@featurelist) {
 		
-		# Generate the table header
-		push @feature_table, [ 
-			'Name', 
-			'Type', 
-			'Aliases', 
-		];
-		
-		# Generate column metadata
-		$data_hash{0} = {
-				'name'  => 'Name',
-				'index' => 0,
-		};
-		$data_hash{1} = {
-				'name'  => 'Type',
-				'index' => 1,
-		};
-		$data_hash{2} = {
-				'name'  => 'Aliases',
-				'index' => 2,
-		};
-		
-		# List of types
-		if (scalar @classes > 1) {
-			$data_hash{1}->{'include'} = join(",", @classes);
+		# skip the mitochondrial genes
+		unless ($mito) { 
+			next FEATURE_COLLECTION_LIST if 
+				$feature->seq_id =~ /^chrm|chrmt|mt|mit/i;
 		}
 		
-		# Number of columns
-		$data_hash{'number_columns'} = 3;
-		
-		# Collection Loop
-		foreach my $feature (@featurelist) {
-			
-			# skip the mitochondrial genes
-			unless ($mito) { 
-				next if $feature->seq_id =~ /^chrm|chrmt/i;
-			}
-			
-			#get the attributes for the gene
-			my %feature_attributes = $feature->attributes(); 
-			# attributes in my cerevisiae database include 
-				# gene which is the standard name 
-				# Alias 
-				# orf_classification
-				# dbxref
-				# Ontology_term
-				# Note 
-			
-			# cerevisiae ORFs have a Qualifier attribute indicating they are 
-			# either verified, uncharacterized, or dubious
-			# if the database doesn't have this attribute, then all will be kept
-			unless ($arg_ref->{'dubious'}) {
-				# skip the dubious genes unless specifically requested not to skip
-				# first check whether the feature even has this attribute
-				if (exists $feature_attributes{'orf_classification'} ) {
-					# only check if this attribute exists
-					if (@{ $feature_attributes{'orf_classification'} }[0] eq 
-					'Dubious') {
-						# feature is dubious, skip it
-						next;
+		# skip anything that matches the tag exceptions
+		foreach my $key (keys %{ $tag_exceptions }) {
+			if ($feature->has_tag($key)) {
+				# first check that the feature has this tag
+				my @tag_values = $feature->get_tag_values($key);
+				if (ref $tag_exceptions->{$key} eq 'ARRAY') {
+					# there's more than one exception value!
+					# need to check them all
+					foreach my $exception (@{ $tag_exceptions->{$key} }) {
+						if (grep {$_ eq $exception} @tag_values) {
+							next FEATURE_COLLECTION_LIST;
+						}
+					}
+				}
+				else {
+					# single tag exception value
+					if (grep {$_ eq $tag_exceptions->{$key}} @tag_values) {
+						next FEATURE_COLLECTION_LIST;
 					}
 				}
 			}
-			
-			# Get basic feature info
-			my $name = $feature->display_name; # 
-			my $type = $feature->type; 
-			my $alias_list;
-			if (exists $feature_attributes{Alias}) {
-				$alias_list = join " ", @{ $feature_attributes{Alias} };
+		}
+		
+		
+		# Record the feature information
+		my @data = (
+			$feature->display_name, 
+			$feature->type 
+		);
+		
+		# Add alias info if available
+		if (exists $data_hash{2}) {
+			# we only look for Alias info if we have a column for it
+			if ($feature->has_tag('Alias')) {
+				push @data, join(q( ), $feature->get_tag_values('Alias'));
 			}
 			else {
-				$alias_list = '.';
+				push @data, '.'; # internal null value
 			}
-			
-			# Record information
-			push @feature_table, [ 
-				$name, 
-				$type, 
-				$alias_list, 
-			];
-		}		
+		}
+		
+		# Record information
+		push @feature_table, \@data;
 	}
 	
 	
@@ -818,16 +781,23 @@ sub get_new_genome_list {
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
 	my $db; # the database object to be used
+	my $db_name; # the name of the database, for use with config param
 	if (defined $arg_ref->{'db'}) {
 		my $db_ref = ref $arg_ref->{'db'};
 		if ($db_ref =~ /Bio::DB/) {
 			# a db object returns the name of the package
 			# this appears to be a bioperl db object
 			$db = $arg_ref->{'db'};
+			$db_name = $db->{'dbh'}->{'name'}; 
+				# dig through the object internals to identify the original 
+				# name of the database
+				# this should be relatively well documented through DBI
+				# but could break in the future since it's not official API
 		}
 		else {
-			# the name of a database
-			$db = open_db_connection( $arg_ref->{'db'} );
+			# the name of a database was passed, create a database connection
+			$db_name = $arg_ref->{'db'};
+			$db = open_db_connection($db_name);
 		}
 	}
 	else {
@@ -862,12 +832,7 @@ sub get_new_genome_list {
 	# we're keeping the data table separate for the time being for simplicity
 	
 	# Begin loading basic metadata information
-	if (ref $arg_ref->{'db'} =~ /Bio::DB/) {
-		$data_hash{'db'} = undef; # can't store an object
-	}
-	else { 
-		$data_hash{'db'} = $arg_ref->{'db'}; # the db name
-	}
+	$data_hash{'db'} = $db_name; # the db name
 	$data_hash{'feature'} = 'genome';
 	$data_hash{'number_columns'} = 3;
 	$data_hash{'gff'} = 0;
@@ -904,31 +869,36 @@ sub get_new_genome_list {
 		# we're using an elongated pseudo Schwartzian Transform
 	my @temp_chromos;
 	my $mitochr; # special placeholder for the mitochrondrial chromosome
-	my @c = $db->features(-type => 'chromosome');
-			# the gff may have the reference sequences labeled
+	my $ref_seq_type = $TIM_CONFIG->param("$db_name\.reference_sequence_type") ||
+		$TIM_CONFIG->param('default_db.reference_sequence_type');
+			# the annotation gff may have the reference sequences labeled
 			# as various types, such as chromosome, sequence, 
 			# contig, scaffold, etc
+			# this is set in the configuration file
 			# this could pose problems if more than one is present
-			
-			# I use to use Sequence, but now changed to chromosome
-	foreach ( @c ) {
-		my $name = $_->name;
-		if ($name =~ /^chrm|chrmt/i) {
+	foreach ( $db->features(-type => $ref_seq_type) ) {
+		my $name = $_->display_name;
+		my $primary = $_->primary_id;
+			# this should be the database primary ID, used in the database 
+			# schema to identify features loaded from the initial GFF
+			# we're using this for sorting
+		if ($name =~ /^chrm|chrmt|mt|mit/i) {
 			# skip mitochondrial chromosome, invariably named chrM or chrMT
 			$mitochr = $_; # keep it for later in case we want it
 			next;
 		}
-		elsif ($name =~ /chr(\d+)/) {
-			push @temp_chromos, [$1, $_];
-		}
+		push @temp_chromos, [$primary, $_];
 	}
 	my @chromosomes = map $_->[1], sort { $a->[0] <=> $b->[0] } @temp_chromos;
+		# the chromosomes should now be in the same order as they occured
+		# in the original annotation GFF file
 	if (exists $arg_ref->{'mito'} and $arg_ref->{'mito'} and $mitochr) {
 		# push mitochrondrial chromosome at the end of the list if requested
 		push @chromosomes, $mitochr;
 	}
 	unless (@chromosomes) {
-		carp "no chromosomes found! Please check the reference sequence type in the gff db\n";
+		carp " no chromosomes found! Please check the reference sequence type\n" .
+			" in the configuration file and database\n";
 		return;
 	}
 	
@@ -2775,25 +2745,20 @@ The subroutine will return an array consisting of the classes.
 sub _features_to_classes {
 	my $feature = shift;
 	my @types;
-	
-	my %config = $TIM_CONFIG->vars();
-	
-	if (exists $config{"features.$feature"}) {
+		
+	my $alias2types = $TIM_CONFIG->get_block('features');
+	if (exists $alias2types->{$feature} ) {
 		# looks like the feature is an alias for a list of features
-		@types = @{ $config{"features.$feature"} };
+		# defined in the config file
+		@types = @{ $alias2types->{$feature} };
 	}
-	elsif ($feature =~ /\w+:\w+/) { 
-		# An actual Bio::DB::SeqFeature::Store type, comprised of a method:source string
-		# we'll pass these on directly to the originating subroutine
+	else { 
+		# We'll assume this is a specific feature in the database.
+		# It may be provided as type:source or type.
+		# We'll pass these on directly to the originating subroutine
 		# more than one may be passed delimited by commas, but no spaces
 		@types = split /,/, $feature;
 	} 
-	# additional lists can be added here
-	
-	else {
-		# unknown feature
-		carp "unknown feature '$feature'!";
-	}
 	
 	return @types;
 }
