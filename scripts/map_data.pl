@@ -686,7 +686,7 @@ A script to map data relative to and flanking a genomic feature
   
   Options:
   --db <database>
-  --feature <type:source>
+  --feature [type, type:source]
   --in <filename> 
   --out <filename>
   --data <dataset_name>
@@ -721,11 +721,11 @@ Specify the filename of a data table containing the list of
 features to map nucleosomes around. The file must be in the
 'tim_data' format and specify a feature to use.
 
-=item --feature <type:source>
+=item --feature [type, type:source]
 
-Specify the type of feature to map data around. The list 
+Specify the type of feature to map data around. The feature may be 
+listed either as GFF type or GFF type:source. The list 
 of features will be automatically generated from the database. 
-Provide the GFF type:source of the features to collect.
 
 This is optional if the features are defined in the input file.
 

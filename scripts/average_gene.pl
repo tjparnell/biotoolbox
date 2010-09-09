@@ -296,14 +296,6 @@ print " Completed in $timediff minutes\n";
 #### Subroutines #######
 
 
-sub print_help { # subroutine to print the online help documentation
-	print "
- Command line options for $0:
-
-";
-}
-
-
 
 ## Collect the binned data across the gene
 sub collect_binned_data {
@@ -857,7 +849,7 @@ average_gene.pl
   
   Options:
   --db <database>
-  --feature [ gene | transcript ]
+  --feature [type, type:source, alias]
   --out <filename>
   --in <filename> 
   --data <dataset_name>
@@ -893,13 +885,15 @@ features to average. The file must be in the 'tim_data' format and specify
 a feature to use. If not specified, then a new feature list will be 
 generated from the database.
 
-=item --feature <text>
+=item --feature [type, type:source, alias]
 
-Specify the type of feature to average. Required 
-unless loading a tim data input file. Acceptable values include:
-  
-  - gene        Map across an ORF or noncoding RNA
-  - transcript  Map across a single-gene transcript
+Specify the type of feature from which to collect values. This is required 
+for new feature tables. Two types of values may be passed: either a specific 
+feature type present in the database, or an alias to one or more features. 
+The feature may be specified as either type or type:source. Aliases are 
+specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a 
+list of one or more features. More than feature may be included as a 
+comma-delimited list (no commas).
   
 =item --data <text>
 

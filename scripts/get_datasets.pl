@@ -53,7 +53,6 @@ my (  # command line variables
 	$position,
 	$win,
 	$step,
-	$dubious,
 	$gz,
 	$help,
 	$doc,
@@ -80,7 +79,6 @@ GetOptions(
 	'pos=i'      => \$position, # set the relative feature position
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
-	'dubious!'   => \$dubious, # collect dubious genes
 	'gz!'        => \$gz, # compress output file
 	'help'       => \$help, # request help
 	'doc'        => \$doc, # print POD documentation
@@ -328,7 +326,6 @@ sub generate_new_list {
 		return get_new_feature_list( {
 			'db'        => $database,
 			'features'  => $feature,
-			'dubious'   => $dubious,
 		} );
 	}
 }
@@ -633,7 +630,7 @@ get_datasets.pl [--new | --in <filename>] [--options...]
   
   --out filename
   --db name
-  --feature [gene, orf, rna, trna, genome, cen, ars]
+  --feature [type, type:source, alias]
   --method [mean, median, stddev, min, max, range, enumerate]
   --dataset name
   --(no)log
@@ -647,7 +644,6 @@ get_datasets.pl [--new | --in <filename>] [--options...]
   --pos [5 | 3 | m]
   --win integer
   --step integer
-  --(no)dubious
   --(no)gz
   --help
 
@@ -686,31 +682,12 @@ is useful for collecting data from multiple databases.
 =item --feature
 
 Specify the type of feature from which to collect values. This is required 
-for new feature tables. Accepted values include:
-  
-  - gene       All genes, including ORFs, snRNAs, snoRNAs, ncRNAs
-  - orf        Only ORF genes
-  - rna        Only ncRNAs, snRNAs, and snoRNAs
-  - trna       Only tRNAs. Note that, unless specified otherwise,
-               this will also automatically set start and stop 
-               options to -150 and +250 to encompass the gene
-  - genome     Take the entire genome in windows (default is 500 bp,
-               or as defined by the --win option)
-  - cen        Take all centromeres
-  - ars        Take all Autonomously Replicating Sequences
-  - tim_transcript          Transcripts determined by tim using the 
-                            script 'map_transcripts.pl' using 
-  - perrochi_transcript     Transcripts 
-  - miura_transcript        Transcripts 
-  - nagalakshmi_transcript  Transcripts 
-  - method:source  For custom features, the GFF type of the features 
-               may be provided as a comma delimited list, where the 
-               type corresponds to the combined GFF method:source.
-
-Finally, one or more actual Bio::DB::SeqFeature::Store type strings
-comprised of the GFF's method:source elements may be passed, for
-example 'gene:SGD', delimited by commas (no spaces). These will not be
-interpreted but used directly.
+for new feature tables. Two types of values may be passed: either a specific 
+feature type present in the database, or an alias to one or more features. 
+The feature may be specified as either type or type:source. Aliases are 
+specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a 
+list of one or more features. More than feature may be included as a 
+comma-delimited list (no commas).
 
 =item --method
 
@@ -810,12 +787,6 @@ size. The default size is 500 bp.
 
 Optionally indicate the step size when generating a new list of intervals 
 across the genome. The default is equal to the window size.
-
-=item --(no)dubious
-
-When generating a new feature list of ORFs, indicate that ORFs flagged 
-'dubious' should (not) be included. The GFF database must include the attribute 
-'Qualifier'. The default behavior is to not include dubious genes.
 
 =item --(no)gz
 
