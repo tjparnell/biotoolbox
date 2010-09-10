@@ -594,7 +594,7 @@ sub process_region {
 					$features[$i]->get_tag_values('orf_classification');
 				if ($orf_class =~ m/dubious|pseudo/i) {
 					# delete the dubious or pseudogenes
-					splice(@features, $_, 1);
+					splice(@features, $i, 1);
 				}
 			}
 		}
