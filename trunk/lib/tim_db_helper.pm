@@ -631,8 +631,6 @@ sub get_new_feature_list {
 	
 	# Get the list of tag exceptions
 	my $tag_exceptions = $TIM_CONFIG->get_block('exclude_tags');
-	print " found ", scalar keys %{ $tag_exceptions }, " exclude tags in config\n";
-	print "   keys: ", join(", ", keys %{ $tag_exceptions }), "\n";
 	
 	# Process the features
 	FEATURE_COLLECTION_LIST:
@@ -2750,7 +2748,14 @@ sub _features_to_classes {
 	if (exists $alias2types->{$feature} ) {
 		# looks like the feature is an alias for a list of features
 		# defined in the config file
-		@types = @{ $alias2types->{$feature} };
+		if (ref $alias2types->{$feature} eq 'ARRAY') {
+			# there's a list of them
+			@types = @{ $alias2types->{$feature} };
+		}
+		else {
+			# only one
+			$types[0] = $alias2types->{$feature};
+		}
 	}
 	else { 
 		# We'll assume this is a specific feature in the database.
