@@ -427,11 +427,11 @@ sub validate_dataset_list {
 		# we will put these in the hash
 		
 		# first as a method:source string
-		my $type = "$_"; # returns 'primary_tag:source'
+		my $type = "$_"; # returns 'method:source'
 		$datasethash{$type} = 1; # the value is not important here
 		
 		# second, put in the just the method, since we often use that alone
-		my $primary = $_->primary_tag;
+		my $primary = $_->method;
 		$datasethash{$primary} = 1;
 	}
 	
