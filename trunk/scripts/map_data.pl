@@ -5,7 +5,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean sum);
+use Statistics::Lite qw(mean median sum stddevp);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper;
@@ -40,6 +40,7 @@ my (
 	$database, 
 	$dataset, 
 	$feature, 
+	$value_type,
 	$method,
 	$win, 
 	$number,
@@ -59,7 +60,8 @@ GetOptions(
 	'db=s'       => \$database, # database name
 	'data=s'     => \$dataset, # dataset name
 	'feature=s'  => \$feature, # type of feature
-	'method=s'   => \$method, # type of data to collect
+	'value=s'    => \$value_type, # the type of data to collect
+	'method=s'   => \$method, # method to combine data
 	'window=i'   => \$win, # window size
 	'number=i'   => \$number, # number of windows
 	'position=s' => \$position, # indicate relative location of the feature
@@ -115,20 +117,48 @@ unless (defined $log) {
 	$log = 0;
 }
 
+if (defined $value_type) {
+	# check the region method or type of data value to collect
+	unless (
+			$value_type eq 'score' or
+			$value_type eq 'length' or
+			$value_type eq 'count' or
+			$value_type eq 'enumerate'
+	) {
+		die " Unknown data value '$value_type'!\n " . 
+			"Use --help for more information\n";
+	}
+	if ($value_type eq 'enumerate') {
+		$value_type = 'count'; # make it consistent with tim_db_helper
+	}
+}
+else {
+	# default is to take the score
+	print " Collecting default data 'score' values\n";
+	$value_type = 'score';
+}
+
 if (defined $method) {
 	# check the requested method
 	unless (
-			$method eq 'score' or
-			$method eq 'count' or
-			$method eq 'length'
+			$method eq 'mean' or
+			$method eq 'median' or
+			$method eq 'sum' or
+			$method eq 'stddev'
 	) {
 		die " Unknown method '$method'!\n Use --help for more information\n";
 	}
 }
 else {
-	# default method is to take the score
-	print " Using default method of 'score'\n";
-	$method = 'score';
+	# set default method
+	if ($value_type eq 'count') {
+		print " Using default method of 'sum'\n";
+		$method = 'sum';
+	}
+	else {
+		print " Using default method of 'mean'\n";
+		$method = 'mean';
+	}
 }
 
 if (defined $position) {
@@ -356,33 +386,14 @@ sub map_relative_data {
 	}
 	
 	### Identify columns for feature identification
-	my ($name_index, $type_index); # indices for the name and class columns
-		# we need to identify which columns in the feature table are name and class
-		# these should be columns 1 and 3, respectively, but just in case...
-		# and to avoid hard coding index values in case someone changes them
-	{
-		my $i = 0;
-		foreach ( @{ $data_table_ref->[0] } ) {
-			if ($_ =~ m/^name$/i) {
-				$name_index = $i;
-			}
-			elsif ($_ =~ m/^type$/i) {
-				$type_index = $i;
-			}
-			elsif ($_ =~ m/^class$/i) {
-				$type_index = $i;
-			}
-			$i++;
-		}
-		unless (
-			defined $name_index and
-			defined $type_index 
-		) {
-			die 'unable to identify Name and/or Type columns in data table';
-		}
+	my $name_index = find_column_index($main_data_ref, '^name');
+	my $type_index = find_column_index($main_data_ref, 'type');
+	unless (defined $name_index and defined $type_index) {
+		die 'unable to identify Name and/or Type columns in data table';
 	}
+	
 
-	# prepare and annotate the header names and metadata
+	### Prepare and annotate the header names and metadata
 	for (my $start = $startingpoint; $start < $endingpoint; $start += $win) {
 		# we will be progressing from the starting to ending point
 		# in increments of window size
@@ -399,14 +410,15 @@ sub map_relative_data {
 		# set the metadata
 		
 		my %metadata = (
-			'name'    => $new_name,
-			'index'   => $new_index,
-			'start'   => $start,
-			'stop'    => $stop,
-			'win'     => $win,
-			'log2'    => $log,
-			'dataset' => $dataset,
-			'method'  => $method,
+			'name'        => $new_name,
+			'index'       => $new_index,
+			'start'       => $start,
+			'stop'        => $stop,
+			'win'         => $win,
+			'log2'        => $log,
+			'dataset'     => $dataset,
+			'method'      => $method,
+			'value_type'  => $value_type,
 		);
 		if ($position == 5) {
 			$metadata{'relative_position'} = '5prime_end';
@@ -426,7 +438,7 @@ sub map_relative_data {
 		$main_data_ref->{'number_columns'} += 1;
 	}
 	
-	# collect the data
+	### Collect the data
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		
 		# determine the region
@@ -445,7 +457,7 @@ sub map_relative_data {
 				'start'       => $startingpoint,
 				'stop'        => $endingpoint,
 				'position'    => $position,
-				'method'      => $method,
+				'method'      => $value_type,
 		} );
 		
 		# debugging
@@ -482,32 +494,26 @@ sub map_relative_data {
 			
 			# calculate the combined score for the window
 			my $winscore;
-			if ($method eq 'count') {
-				# count will simply sum the values
-				if (@scores) {
-					# we have scores, take the sum
+			if (@scores) {
+				# we have scores, so calculate a value based on the method
+				
+				if ($method eq 'mean') {
+					$winscore = mean(@scores);
+				}
+				elsif ($method eq 'median') {
+					$winscore = median(@scores);
+				}
+				elsif ($method eq 'stddev') {
+					$winscore = stddevp(@scores);
+				}
+				elsif ($method eq 'sum') {
 					$winscore = sum(@scores);
 				}
-				else {
-					# nothing found
-					$winscore = 0;
-				}
-			}
-			else {
-				# both score and length will take the mean value of all the values
-				if (@scores) {
-					# we have scores for the window
-					# take the average score
-					$winscore = mean(@scores); 
-					if ($log) { 
-						# put back in log2 space if necessary
-						$winscore = log($winscore) / log(2);
-					}
-				} 
-				else {
-					# we have no scores for the window
-					# put in a null value
-					$winscore = '.'; 
+				
+				# deal with log2 scores
+				if ($log) { 
+					# put back in log2 space if necessary
+					$winscore = log($winscore) / log(2);
 				}
 			}
 			
@@ -690,7 +696,8 @@ A script to map data relative to and flanking a genomic feature
   --in <filename> 
   --out <filename>
   --data <dataset_name>
-  --method [score | count | length]
+  --value [score | length | count | enumerate]
+  --method [mean | median | stddev | sum]
   --win <integer>
   --num <integer>
   --pos [5 | 3 | m]
@@ -733,22 +740,22 @@ This is optional if the features are defined in the input file.
 
 Specify the name of the microarray data set for which you wish to 
 collect data. If not specified, the data set may be chosen
-interactively from a presented list. The presented list includes all
-database features with the GFF source of 'data'. Alternatively, other
+interactively from a presented list. Alternatively, other
 features may be collected, and should be specified using the type 
 (GFF method:source), especially when collecting alternative data values.
 
-=item --method <method>
+=item --value [score | length | count | enumerate]
 
-Specify the type of data values to collect in each window. The default
-is 'score'. Acceptable values include:
+Specify the type of data value or attribute to collect from the dataset  
+or features for each region. By default, the score is collected. 
+Alternatively, a count of the number of features present in the window, or 
+the length of the features, may be collected.
 
- - score    The microarray dataset scores in each window. The mean value
-            is reported when multiple scores are present in the window.
- - count    The number of data features present within each window. The 
-            sum is reported.
- - length   The mean length of each data feature within the window is 
-            reported.
+=item --method [mean | median | sum | stddev]
+
+Specify the method of combining multiple values within each window. The mean, 
+median, sum, or standard deviation of the values may be reported. The default 
+value is mean for score and length values, or sum for enumerated values.
 
 =item --win <integer>
 
