@@ -574,6 +574,7 @@ sub _verify_method {
 		'max'        => 1, 
 		'range'      => 1,
 		'enumerate'  => 1,
+		'count'      => 1,
 	);
 	# return true if this method exists
 	return $acceptable{$method};
@@ -632,7 +633,7 @@ get_datasets.pl [--in <filename>] [--options...]
   --db <name>
   --feature <type | type:source | alias, ...>
   --dataset <none | name, ...>
-  --method [mean, median, stddev, min, max, range, enumerate]
+  --method [mean, median, stddev, min, max, range, enumerate, count]
   --(no)log
   --strand [none, sense, antisense]
   --extend <integer>
@@ -690,7 +691,7 @@ specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a
 list of one or more features. More than feature may be included as a 
 comma-delimited list (no spaces).
 
-=item --method [mean, median, stddev, min, max, range, enumerate]
+=item --method [mean, median, stddev, min, max, range, enumerate, count]
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -702,6 +703,7 @@ genomic region of the feature. Accepted values include:
   - max
   - range       Returns 'min-max'
   - enumerate   Counts the number of features or dataset points
+  - count       same as enumerate
   
 
 =item --dataset <none | name, ...>

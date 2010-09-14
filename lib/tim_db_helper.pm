@@ -1113,8 +1113,8 @@ arguments. The keys include
               separately by the calling program.
   method =>   The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              mean, median, range, stddev, min, and max. See 
-              _get_segment_score() documentation for more info.
+              mean, median, range, stddev, min, max, and enumerate. 
+              See _get_segment_score() documentation for more info.
   Optional:
   log =>      Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
@@ -1920,8 +1920,8 @@ arguments. The keys include
               separately by the calling program.
   method =>   The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              mean, median, range, stddev, min, and max. See 
-              _get_segment_score() documentation for more info.
+              mean, median, range, stddev, min, max, and enumerate. 
+              See _get_segment_score() documentation for more info.
   Optional:
   log =>      Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
@@ -2292,7 +2292,7 @@ arguments. The keys include
               or none. Default is "none".
   method =>   Indicate which attribute will be returned. Acceptable 
               values include "score", "count", or "length". The  
-              default behavior will be to return the score value.
+              default behavior will be to return the score values.
           	  
 The subroutine will return the hash if successful.
 
@@ -2793,6 +2793,7 @@ defined and presented in this order. These values include
       segment into a single value. Accepted values include
          
          enumerate (count the number of features within the region)
+         count (same as enumerate)
          mean
          median
          min
@@ -2843,7 +2844,7 @@ sub _get_segment_score {
 	); 
 	
 	# Check for the enumeration method
-	if ($method eq 'enumerate') {
+	if ($method eq 'enumerate' or $method eq 'count') {
 		# this is simple, we simply count the number of features
 		my $count = 0; 
 		
