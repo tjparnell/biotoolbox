@@ -35,6 +35,7 @@ my (
 	$score_index,
 	$strand_index,
 	$name_index,
+	$name,
 	$id_index,
 	$source,
 	$type,
@@ -42,6 +43,7 @@ my (
 	$midpoint,
 	$format,
 	$zero_based,
+	$unique,
 	$ask,
 	$version,
 	$gz,
@@ -58,14 +60,15 @@ GetOptions(
 	'stop|end=i'=> \$stop_index, # index of the stop position coloumn
 	'score=i'   => \$score_index, # index for the score column
 	'strand=i'  => \$strand_index, # index for the strand column
-	'name=i'    => \$name_index, # index for the name column
+	'name=s'    => \$name, # index for the name column or the name text
 	'id=i'      => \$id_index, # index for the ID column
 	'source=s'  => \$source, # text to put in the source column
 	'type=s'    => \$type, # test to put in the type column
-	'tag=s'     => \$tag, # comma list of tag column indices
+	'tag|tags=s'=> \$tag, # comma list of tag column indices
 	'midpoint!' => \$midpoint, # boolean to use the midpoint
 	'format=i'  => \$format, # format output to indicated number of places
 	'zero!'     => \$zero_based, # source is 0-based numbering, convert
+	'unique!'   => \$unique, # make the names unique
 	'ask'       => \$ask, # request help in assigning indices
 	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # boolean to compress output file
@@ -199,13 +202,11 @@ if ($ask) {
 		}
 	}
 	
-	# request name index
-	unless (defined $name_index) {
-		print " Enter the index for the feature name column  ";
-		my $in = <STDIN>;
-		if ($in =~ /(\d+)/) {
-			$name_index = $1;
-		}
+	# request name index or text
+	unless (defined $name) {
+		print " Enter the index for the feature name column or the text  ";
+		$name = <STDIN>;
+		chomp $name;
 	}
 	
 	# request name index
@@ -245,6 +246,7 @@ if ($ask) {
 		print " Enter a comma-delimited list of column indices for GFF group tags  ";
 		$tag = <STDIN>;
 		chomp $tag;
+		$tag =~ s/\s+//g; # remove whitespace
 	}
 }
 
@@ -258,12 +260,29 @@ if ($tag) {
 	}
 }
 
-
+# Determine the name index or text
+if (defined $name and $name =~/^\d+$/) {
+	$name_index = $name;
+}
+if ($unique and !defined $name) {
+	die " unable to assign unique feature names without a name index or text!\n";
+}
+if ($unique and !defined $name_index) {
+	# a uniqe name is requested but we don't have an index, yet
+	# so make one
+	$name_index = $metadata_ref->{'number_columns'};
+	$metadata_ref->{$name_index} = {
+		'name'   => 'Name',
+		'index'  => $name_index,
+	};
+	push @{ $metadata_ref->{'column_names'} }, 'Name';
+	$metadata_ref->{'number_columns'} += 1;
+}
 
 
 ### Convert to GFF progressively
 # To avoid exorbitant memory requirements for ginormous files, 
-# we will only convert 1000 lines at time. 
+# we will only convert 50000 lines at time. 
 print " converting to GFF using\n";
 print "  - '", $metadata_ref->{$chr_index}{name}, "' for chromosome\n" 
 	if defined $chr_index;
@@ -275,8 +294,12 @@ print "  - '", $metadata_ref->{$strand_index}{name}, "' for strand\n"
 	if defined $strand_index;
 print "  - '", $metadata_ref->{$score_index}{name}, "' for score\n" 
 	if defined $score_index;
-print "  - '", $metadata_ref->{$name_index}{name}, "' for name\n" 
-	if defined $name_index;
+if (defined $name_index) {
+	print "  - '", $metadata_ref->{$name_index}{name}, "' for name\n" 
+}
+elsif (defined $name) {
+	print "  - '$name' for name\n" 
+}
 print "  - '", $metadata_ref->{$id_index}{name}, "' for ID\n" 
 	if defined $id_index;
 if ($type =~ /^\d+$/ and $type <= $metadata_ref->{'number_columns'}) {
@@ -315,6 +338,10 @@ regenerate_output_data_hash();
 # set output control variables
 my $out_fh; # the output file handle
 my $count = 0; # the number of lines processed before writing output
+my $total_count = 0;
+
+# set unique name counter
+my %unique_name_counter;
 
 # parse through the data lines in the input data file
 while (my $line = $in_fh->getline) {
@@ -329,6 +356,11 @@ while (my $line = $in_fh->getline) {
 	
 	# temporarily write output
 	if ($count == 50000) {
+				
+		# generate unique names if requested
+		if ($unique) {
+			generate_unique_names();
+		}
 		
 		# progressively write out the converted gff data
 		write_gff_data();
@@ -337,6 +369,7 @@ while (my $line = $in_fh->getline) {
 		regenerate_output_data_hash();
 		
 		# reset count
+		$total_count += $count;
 		$count = 0;
 	}
 }
@@ -346,16 +379,22 @@ while (my $line = $in_fh->getline) {
 
 
 ### Write final output
+if ($unique) {
+	generate_unique_names();
+}
 write_gff_data();
-
+$total_count += $count;
 
 
 
 ### Finish
 $in_fh->close;
 $out_fh->close;
-print " Converted input data to GFF file '$outfile'\n";
-
+print " Converted $total_count lines of input data to GFF file '$outfile'\n";
+if ($unique) {
+	print " There were ", scalar keys %unique_name_counter, 
+		" original unique names\n";
+}
 # That's it!
 
 
@@ -393,13 +432,12 @@ sub write_gff_data {
 	# a subroutine to progressively write out the converted gff data
 	
 	# convert to gff
-	convert_genome_data_2_gff_data( {
+	my %arguments = (
 		'data'     => \%output_data,
 		'chromo'   => $chr_index,
 		'start'    => $start_index,
 		'stop'     => $stop_index,
 		'score'    => $score_index,
-		'name'     => $name_index,
 		'strand'   => $strand_index,
 		'source'   => $source,
 		'type'     => $type,
@@ -408,7 +446,21 @@ sub write_gff_data {
 		'tags'     => [ @tag_indices ],
 		'id'       => $id_index,
 		'zero'     => $zero_based,
-	} ) or die " Unable to convert to GFF format!\n";
+	);
+	if ($unique) {
+		# we've generated a new name index
+		$arguments{'name'} = $name_index;
+	}
+	elsif (defined $name_index) {
+		# supplied name index
+		$arguments{'name'} = $name_index;
+	}
+	else {
+		# text name
+		$arguments{'name'} = $name;
+	}
+	convert_genome_data_2_gff_data( \%arguments ) or 
+		die " Unable to convert to GFF format!\n";
 	
 	# format the numbers
 	if (defined $format) {
@@ -483,6 +535,43 @@ sub write_gff_data {
 }
 
 
+sub generate_unique_names {
+	
+	for (my $row = 1; $row <= $output_data{'last_row'}; $row++) {
+		
+		# name scalars
+		my $new_name;
+		my $current; # current name
+		
+		# determine current name
+		if (defined $output_data{'data_table'}->[$row][$name_index]) {
+			$current = $output_data{'data_table'}->[$row][$name_index];
+		}
+		else {
+			$current = $name;
+		}
+			
+		# check uniqueness
+		if (exists $unique_name_counter{$current} ) {
+			# we've encountered this name before
+			# generate a unique name by appending the count number
+			$unique_name_counter{ $current } += 1;
+			$new_name = $current . '.' . 
+				$unique_name_counter{ $current };
+		}
+		else {
+			# first time for this name
+			# record in the hash
+			$new_name = $current;
+			$unique_name_counter{$current} = 0;
+		}
+		
+		# assign the new name
+		$output_data{'data_table'}->[$row][$name_index] = $new_name;
+	}
+
+}
+
 __END__
 
 =head1 NAME
@@ -501,14 +590,15 @@ data2gff.pl [--options...] <filename>
   --stop | --end <column_index>
   --score <column_index>
   --strand <column_index>
-  --name <column_index>
+  --name <text | column_index>
   --id <column_index>
-  --tags <column_indices>
+  --tags <column_index,column_index,...>
   --source <text>
   --type <text | column_index>
   --(no)zero
   --format [0,1,2,3]
   --(no)midpoint
+  --(no)unique
   --out <filename> 
   --version [2,3]
   --(no)gz
@@ -558,9 +648,10 @@ as the score column in the gff data.
 
 =item --name <column_index>
 
-The index of the dataset in the data table to be used 
-as the name of each gff feature. This information will
-be used in the 'group' column.
+Enter either the text that will be shared name among 
+all the features, or the index of the dataset in the data 
+table to be used as the name of each gff feature. This 
+information will be used in the 'group' column.
 
 =item --id <column_index>
 
@@ -617,6 +708,14 @@ A boolean (1 or 0) value to indicate whether the
 midpoint between the actual 'start' and 'stop' values
 should be used instead of the actual values. Default 
 is false.
+
+=item --(no)unique
+
+Indicate whether the feature names should be made unique. A count 
+number is appended to the name of subsequent features to make them 
+unique. This should only be applied to genomic features, and not to 
+genomic data values (microarray data, sequencing data, etc). The 
+default behavior is false (not unique).
 
 =item --out <filename>
 
