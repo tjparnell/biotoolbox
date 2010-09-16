@@ -4,6 +4,7 @@
 
 use strict;
 use Getopt::Long;
+use Pod::Usage;
 use GD::Graph::lines;
 use GD::Graph::bars;
 use Statistics::Lite qw(mean max);
@@ -14,6 +15,16 @@ use tim_file_helper;
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
+### Quick help
+unless (@ARGV) { # when no command line options are present
+	# print SYNOPSIS
+	pod2usage( {
+		'-verbose' => 0, 
+		'-exitval' => 1,
+	} );
+}
+
+
 ### Get command line options
 my (
 	$infile, 
@@ -21,40 +32,63 @@ my (
 	$binnumber,
 	$binsize,
 	$lines,
-	$all,
 	$max,
+	$directory,
 	$help
 );
 my @columns; # an array of the columns (datasets) within in the file to plot
 			 # should be 0-based, may have two datasets comma delimited
-my $directory = 'graphs'; # default value unless otherwise specified
 my $start = 0; # the starting value to calculate the bins
 GetOptions( 
 	'in=s'       => \$infile, # the input file
 	'col=s'      => \@columns, # columns (datasets) to plot
 	'out=s'      => \$out, # output file name
 	'bins=i'     => \$binnumber, # the number of bins to put the data into
-	'binsize=f'  => \$binsize, # the size of each bin
-	'start=i'    => \$start, # the starting value to calculate the bins
-	'lines'      => \$lines, # indicate whether graph should be a linegraph
-	'all'        => \$all, # flag to plot all data sets pairwise
+	'size=f'     => \$binsize, # the size of each bin
+	'min=i'      => \$start, # the starting value to calculate the bins
 	'max=i'      => \$max, # maximum value for x-axis
+	'lines!'     => \$lines, # indicate whether graph should be a linegraph
 	'dir=s'      => \$directory, # optional name of the graph directory
 	'help'       => \$help, # flag to print help
 );
 
 if ($help) {
-	print_help();
-	exit;
+	# print entire POD
+	pod2usage( {
+		'-verbose' => 2,
+		'-exitval' => 1,
+	} );
 }
 
-unless ($infile) {die " Missing input file!\n Please use --help for more information\n"}
-unless ($binnumber and $binsize) {die " Missing bin number and bin size!\n Please use --help for more information\n"}
 
+
+### Check required and default values
+unless ($infile) {
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		die " Missing input file!\n";
+	}
+}
+unless ($binsize) {
+	die " Missing bin size!\n Please use --help for more information\n";
+}
+unless ($binnumber or $max) {
+	die " Either bin number or maximum value must be entered!\n" . 
+		" Please use --help for more information\n";
+}
 unless ($max) {
 	# default value is calculated
 	$max = $start + ($binnumber * $binsize);
 }
+
+
+
+
+
+
+
 
 ####### Main ###########
 
@@ -78,7 +112,8 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 		$name =~ /alias/i or
 		$name =~ /^chr/i or
 		$name =~ /start/i or
-		$name =~ /stop/i
+		$name =~ /stop/i or 
+		$name =~ /type/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -98,6 +133,9 @@ for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
 }
 
 # Prepare output directory
+unless ($directory) {
+	$directory = $main_data_ref->{'basename'} . '_graphs';
+}
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
 }
@@ -117,37 +155,15 @@ else {
 	graph_datasets_interactively();
 }
 
+print " Finished!\n";
+
 	
-##### Subroutines ##########
-## subroutine to print the online help documentation
-sub print_help {
-	print "
- Command line options for $0
 
- Put more detailed info in here. Sometime soon. You lazy pickle.
-  
-  The command line flags and descriptions:
-  --in       Specify the file name for a gene data list containing the
-             microarray data. Generate using the script 'get_datasets.pl'
-  --col      Specify the column number(s) corresponding to the dataset(s) in
-             the file to graph. Number is 0-based index. Use repeatedly for 
-             each dataset to graph. To graph two datasets together on one plot, 
-             use a comma between the numbers. If the column is not specified, 
-             then the program willask interactively which datasets to plot.
-  --bins     Specify the number of bins the data will be grouped into
-  --binsize  Specify the size of each bin. Note that any value above 
-             (bins * binsize) will not be counted.
-  --start    Optionally indicate the starting value that the bins should be
-             generated. Default is 0.
-  --lines    Optionally specify a line graph instead of default bar graph    
-  --max      Optionally specify the maximum X-axis value. Default is calculated
-             from (bins * binsize).
-  --out      Optionally specify the output base filename
-  --dir      Specify an optional name for the output subdirectory name 
-  --help     This help text
 
-";
-}
+
+
+
+########################### Subroutines #######################################
 
 
 
@@ -210,6 +226,9 @@ sub graph_datasets_interactively {
 	
 	# this loop will keep going until no dataset (undefined) is returned
 	while ($answer) {
+		if ($answer eq 'q') {
+			last;
+		}
 		if ($answer =~ /,/) { # two datasets are requested
 			$answer =~ s/\s*//g; 
 			my ($one, $two) = split /,/, $answer;
@@ -231,7 +250,7 @@ sub graph_datasets_interactively {
 				print " One of these numbers is not valid\n";
 			}
 		}
-		print "\n Enter the next set of datasets or push return to exit  ";
+		print "\n Enter the next set of datasets or enter 'q' or nothing to exit  ";
 		$answer = <STDIN>;
 		chomp $answer;
 	}
@@ -256,9 +275,10 @@ sub graph_one {
 	}
 	#print "  found " . scalar @values . " useable values\n";
 	
-	# Add the maximum value to @bins to count everyone
-	my $max_value = max(@values);
-	push @bins, $max_value;
+# 	# Add the maximum value to @bins to ensure we count everyone
+# 	if (max(@values) > max(@bins)) {
+# 		push @bins, max(@values);
+# 	}
 	
 	# Determine the data frequency
 	my $stat = Statistics::Descriptive::Full->new();
@@ -308,15 +328,15 @@ sub graph_two {
 		}
 	}
 	
-	# Add the maximum value to @bins to count everyone
-	my $max1 = max(@values1);
-	my $max2 = max(@values2);
-	if ($max1 >= $max2) {
-		push @bins, $max1;
-	} 
-	else {
-		push @bins, $max2;
-	}
+# 	# Add the maximum value to @bins to count everyone
+# 	my $max1 = max(@values1);
+# 	my $max2 = max(@values2);
+# 	if ($max1 >= $max2) {
+# 		push @bins, $max1;
+# 	} 
+# 	else {
+# 		push @bins, $max2;
+# 	}
 	
 	# Determine the data frequency
 	# we have to first determine which dataset has the biggest max value
@@ -446,6 +466,128 @@ sub graph_this_as_bars {
 	close IMAGE;
 	print "wrote bar graph $filename in directory $directory\n";
 }
+
+
+
+
+
+
+__END__
+
+=head1 NAME
+
+graph_histogram.pl
+
+A script to graph a histogram of a dataset of values
+
+=head1 SYNOPSIS
+
+graph_histogram.pl --bins <integer> --size <integer> <filename> 
+   
+   --in <filename>
+   --col <index>
+   --bins <integer>
+   --size <number>
+   --min <integer>
+   --max <integer>
+   --lines
+   --out <base_filename>
+   --dir <output_directory>
+   --help
+
+=head1 OPTIONS
+
+The command line flags and descriptions:
+
+=over 4
+
+=item --in <filename>
+
+Specify the file name of a previously generated feature dataset.
+The tim data format is preferable, although any other tab-delimited text 
+data formats may be usable. See the file description in L<tim_db_helper.pm>.
+
+=item --col
+
+Specify the column number(s) corresponding to the dataset(s) in
+the file to graph. Number is 0-based index. Use this option repeatedly 
+for each dataset to graph. To graph two datasets together on one plot, 
+use a comma between the numbers. If the column is not specified, 
+then the user may interactively choose which datasets to plot.
+
+=item --bins <integer>
+
+Specify the number of bins or partitions into which the data will be 
+grouped. This argument is optional if --max is provided.
+
+=item --size <number>
+
+Specify the size of each bin or partition. A decimal number may be 
+provided.
+
+=item --min <integer>
+
+Optionally indicate the minimum value of the bins. When generating 
+the list of bins, this is used as the starting value. Default is 0. 
+A negative number may be provided using the format --min=-1. 
+
+=item --max <integer>
+
+Optionally provide the maximum bin value. This argument is optional 
+and is automatically calculated as (bins * size). This argument 
+may also be provided as an alternative to specifying the binsize 
+value, in which case the number of bins is empirically determined.
+
+=item --lines
+
+Optionally specify a line graph to be generated instead of the 
+default vertical bar graph.   
+
+=item --out
+
+Optionally specify the output filename prefix. The default value is 
+"distribution_".
+
+=item --dir
+
+Optionally specify the name of the target directory to place the 
+graphs. The default value is the basename of the input file 
+appended with "_graphs".
+
+=item --help
+
+Print this help documenation
+
+=back
+
+=head1 DESCRIPTION
+
+This program will generate PNG graphic files representing the histogram 
+of the values in one or two datasets. The size of each bin or partition 
+must be provided, as well as either the number of bins or the maximum 
+bin value. The resulting files are written to a subdirectory named after 
+the input file. The files are named after the dataset name (column 
+header) with a prefix. 
+
+=head1 AUTHOR
+
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+
+
+
+
+
+
+
+
+
+
 
 
 
