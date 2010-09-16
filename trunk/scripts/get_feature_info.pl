@@ -32,7 +32,7 @@ my (
 	$infile,
 	$outfile,
 	$database,
-	$attrib,
+	$attrib_request,
 	$gz,
 	$help
 ); 
@@ -40,7 +40,7 @@ my (
 # Command line options
 GetOptions( 
 	'in=s'     => \$infile, # input file
-	'attrib=s' => \$attrib, # attribute
+	'attrib=s' => \$attrib_request, # attribute
 	'out=s'    => \$outfile, # output filename
 	'db=s'     => \$database, # database name
 	'gz!'      => \$gz, # gzip status
@@ -101,14 +101,13 @@ my $db = open_db_connection($database);
 
 ### Determine the attribute to collect
 
-# check and determine the collection subroutine
-my $attrib_method = get_attribute_method();
+# get the attribute list from the user
+my @attribute_list = get_attribute_list_from_user();
 
-# collect the attributes
-collect_attributes_for_list();
+# process the requests
+collect_attributes_for_list(@attribute_list);
 
-# record metadata
-record_metadata();
+
 
 
 
@@ -144,13 +143,25 @@ print " That's it!\n";
 ### Subroutines
 
 
-
-sub get_attribute_method {
-	# a subroutine to get the appropriate subroutine method
+sub get_attribute_list_from_user {
+	# get the list from the user
 	
-	unless ($attrib) {
-		# the attribute was not specified on the command line
-		# we'll collect a list to present to the user in an interactive fashion
+	my @list;
+	
+	# provided by command line argument
+	if ($attrib_request) {
+		
+		# check if there are multiple items in the list
+		if ($attrib_request =~ /,/) {
+			@list = split /,/, $attrib_request;
+		}
+		else {
+			push @list, $attrib_request;
+		}
+	}
+	
+	# request interactively from user
+	else {
 		
 		# get the first feature as an example
 		my @examples = $db->features(
@@ -181,16 +192,29 @@ sub get_attribute_method {
 		}
 		
 		# collect the user response
-		print " Enter the attribute number to collect    ";
+		print " Enter the attribute number(s) to collect, comma delimited   ";
 		my $answer = <STDIN>;
 		chomp $answer;
-		if (exists $index2att{$answer}) {
-			$attrib = $index2att{$answer};
-		}
-		else {
-			die " unknown response!\n";
+		$answer =~ s/\s//g;
+		foreach (split /,/, $answer) {
+			if (exists $index2att{$_}) {
+				push @list, $index2att{$_};
+			}
+			else {
+				warn " unknown response '$_'!\n";
+			}
 		}
 	}
+	
+	return @list;
+}
+
+
+
+sub get_attribute_method {
+	# a subroutine to get the appropriate subroutine method
+	
+	my $attrib = shift;
 	
 	# set the appropriate attribute collection subroutine
 	my $method;
@@ -229,7 +253,15 @@ sub get_attribute_method {
 
 sub collect_attributes_for_list {
 	
-	print " Retrieving $attrib...\n";
+	my @list = @_;
+	
+	# get the attribute method(s)
+	my @methods; # the methods are references to appropriate subroutines
+	foreach (@list) {
+		push @methods, get_attribute_method($_);
+	}
+	
+	print " Retrieving ", join(", ", @list), "\n";
 	my $table = $main_data_ref->{'data_table'}; # shortcut reference
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		my @features = $db->features( 
@@ -239,6 +271,11 @@ sub collect_attributes_for_list {
 		);
 		if (scalar @features == 0) {
 			warn " no features found for '$table->[$row][$name_index]'\n";
+			
+			# record null value(s)
+			foreach (@list) {
+				push @{ $table->[$row] }, '.'; 
+			}
 			next;
 		}
 		elsif (scalar @features > 1) {
@@ -246,10 +283,21 @@ sub collect_attributes_for_list {
 				". Using first one\n";
 		}
 		
-		# get the attribute
- 		push @{ $table->[$row] }, &{ $attrib_method }($features[0]); 
+		# get the attribute(s)
+		for (my $i = 0; $i < scalar @list; $i++) {
+ 			# for each request in the list, we will collect the attribute
+ 			# we'll use the method sub defined in the methods
+ 			# pass both the feature and the name of the attribute
+ 			# only the tag value actually needs the name of the attribute
+ 			push @{ $table->[$row] }, 
+ 				&{ $methods[$i] }($features[0], $list[$i]);
+ 		}
 	}
 	
+	# record the metadata
+	foreach (@list) {
+		record_metadata($_);
+	}
 }
 
 
@@ -306,12 +354,15 @@ sub get_score {
 
 sub get_tag_value {
 	my $feature = shift;
+	my $attrib = shift;
 	my @values = $feature->get_tag_values($attrib);
 	return $values[0];
 }
 
 
+# subroutine to record the metadata for each new attribute dataset
 sub record_metadata {
+	my $attrib = shift;
 	
 	# determine new index
 	my $new_index = $main_data_ref->{'number_columns'};
@@ -355,11 +406,23 @@ A script to feature information from a Bioperl SeqFeature::Store db.
 get_feature_info.pl <filename> 
 
   --in <filename> 
-  --attrib <attribute>
+  --attrib <attribute1,attribute2,...>
   --db <name>
   --out filename
   --(no)gz
   --help
+
+Attributes include:
+   chromo
+   start
+   stop
+   length
+   midpoint
+   strand
+   phase
+   score
+   <tag>
+
 
 =head1 OPTIONS
 
