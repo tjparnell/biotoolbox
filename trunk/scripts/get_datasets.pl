@@ -103,7 +103,12 @@ if ($help) {
 # Check for required values
 my @errors; # collect the error messages here
 unless ($infile) {
-	$new = 1;
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		$new = 1;
+	}
 }
 if ($new) {
 	unless ($outfile) {
@@ -624,7 +629,7 @@ A script to collect genomic datasets from a Bioperl SeqFeature::Store db.
 
 =head1 SYNOPSIS
 
-get_datasets.pl [--in <filename>] [--options...]
+get_datasets.pl [--options...] [<filename>]
   
   Options:
   --new

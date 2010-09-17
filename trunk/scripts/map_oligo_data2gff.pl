@@ -44,18 +44,18 @@ my (
 
 # Command line options
 GetOptions( 
-	'oligo=s'   => \$oligo_file, # the oligo feature file name
-	'data=s'    => \$data_file, # the oligo data file
-	'column=i'  => \$column, # the index of the data column
-	'type=s'    => \$type, # the new gff type
-	'source=s'  => \$source, # the new source
-	'name=s'    => \$name, # the name for the feature
-	'strand!'   => \$strand, # respect or ignore strand information
-	'mid!'      => \$midpoint, # convert positions to midpoint
-	'places=i'  => \$places, # number of digits to format the data number
-	'out=s'     => \$outfile, # the output file name
-	'gz!'       => \$gz, # compress output file with gzip
-	'help'      => \$help # request help
+	'oligo=s'     => \$oligo_file, # the oligo feature file name
+	'data=s'      => \$data_file, # the oligo data file
+	'index|col=i' => \$column, # the index of the data column
+	'type=s'      => \$type, # the new gff type
+	'source=s'    => \$source, # the new source
+	'name=s'      => \$name, # the name for the feature
+	'strand!'     => \$strand, # respect or ignore strand information
+	'mid!'        => \$midpoint, # convert positions to midpoint
+	'places=i'    => \$places, # number of digits to format the data number
+	'out=s'       => \$outfile, # the output file name
+	'gz!'         => \$gz, # compress output file with gzip
+	'help'        => \$help # request help
 );
 
 # Print help
@@ -347,7 +347,7 @@ data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
   Options:
   --oligo <oligo_file.gff>
   --data <oligo_data.txt>
-  --column <column_index>
+  --index <column_index>
   --name <text>
   --type <text>
   --source <text>
@@ -378,11 +378,15 @@ preferably in the tim data format as described in 'tim_file_helper.pm',
 although any format should work. The file may be compressed with gzip. The 
 first column MUST be the oligo or probe unique name or ID.
 
-=item --column <column_index>
+=item --index <column_index>
 
 Specify the data column index in the data file that will be used in the 
 final GFF score column. By default, it lists the column names for the user 
 to interactively select.
+
+=item --col <column_index>
+
+Alias to --index.
 
 =item --name <text>
 

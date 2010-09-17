@@ -1,5 +1,7 @@
 PROGRAM LIST
 
+This is an alphabetical list of the scripts available in the biotoolbox scripts directory.
+
 average_gene.pl
 	Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 	
@@ -93,6 +95,9 @@ merge_SNPs.pl
 my_gff2gff3.pl
 	Convert GFF version 2 files to GFF version 3 files. Useful when transitioning from Bio::DB::GFF to Bio::DB::SeqFeature::Store databases. Fairly specific to my situation.
 	
+novo_wrapper.pl
+	A wrapper program for aligning one or more Illumina or other raw sequencing data using Novocraft's novoalign program. After aligning, it will convert the alignment file to an indexed binary BAM file.
+
 print_feature_types.pl
 	Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 	
@@ -102,6 +107,9 @@ process_agilent.pl
 pull_features.pl
 	Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
 	
+shift_coordinates.pl
+	A program for shifting coordinates, for example from interbase (0-base) to 1-base.
+
 split_bam_by_isize.pl
 	Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
 	
@@ -120,14 +128,16 @@ ucsc_cytoband2gff3.pl
 ucsc_table2gff3.pl
 	A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
 
-wig2gff.pl
-	Convert a text wiggle file into a GFF file. Fixed, variable, and BED style wig files are allowed.
+wig2data.pl
+	Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
 
 
 
 
 
 PROGRAM GROUPS
+
+Lists of programs organized by function.
 
 Microarray
 	process_agilent.pl
