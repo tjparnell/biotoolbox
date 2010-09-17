@@ -33,7 +33,7 @@ Elessar:~ tim$ print_feature_types.pl cerevisiae_20100109
 The feature we are after is gene. To collect the gene features from the database, we can specify `gene`. But what if there are multiple gene features stored in the database from different sources, say refseq and ensembl? We can include the source in the specification, as in `gene:SGD`. This would correspond to the 3rd:2nd columns in the original source GFF annotation file.
 
 To collect the dataset, we use the script `get_datasets.pl`. There are several programs which are capable of generating new feature lists. We won't be collecting a dataset at this moment, so we'll specify no dataset.
-{{{
+<pre>
 Elessar:~ tim$ get_datasets.pl --db cerevisiae_20100109 --feature gene:SGD --data none --out gene_list
 
  A program to collect feature data from the database
@@ -44,10 +44,10 @@ Elessar:~ tim$ get_datasets.pl --db cerevisiae_20100109 --feature gene:SGD --dat
    Kept 5778 features.
  wrote file './gene_list.txt'
  Completed in 0.0 minutes
-}}}
+</pre>
 
 The file that is generated, `gene_list.txt`, is in a tab-delimited text format with special comment lines that I've creatively called a _tim data format_. We can see this format here.
-{{{
+<pre>
 Elessar:~ tim$ head gene_list.txt 
 # Program /Applications/biotoolbox/scripts/get_datasets.pl
 # Database cerevisiae_20100109
@@ -59,13 +59,13 @@ Name	Type	Aliases
 YAL068C	gene:SGD	PAU8
 YAL067W-A	gene:SGD	.
 YAL067C	gene:SGD	SEO1
-}}}
+</pre>
 The comment lines provide metadata regarding which program generated the list, the database used, and the feature type. Additionally, each column or dataset has a metadata line comprised of key=value pairs. At least two metadata keys are required, index and name. The first row of the tab-delimited table are the column headers, and should match the name in the metadata lines.
 
 
 ===Refining the feature list===
 Say that we are interested in only genes from chromosome 2 that are above 2 kb in length (PI's can be very particular in their questions). To collect additional information about our genes, we can use `get_feature_info.pl`. We specify two attributes to collect: chromo(some) and length.
-{{{
+<pre>
 Elessar:~ tim$ get_feature_info.pl --attrib chromo,length gene_list.txt 
 
  This script will get additional information about features
@@ -74,9 +74,9 @@ Elessar:~ tim$ get_feature_info.pl --attrib chromo,length gene_list.txt
  Retrieving chromo, length
  Wrote file './gene_list.txt'
  That's it!
-}}}
+</pre>
 We do not need to specify the database when running this program, as it will automatically get the database name from the input file metadata. We see that two additional columns have been added. 
-{{{
+<pre>
 Elessar:~ tim$ head gene_list.txt 
 # Program /Applications/biotoolbox/scripts/get_datasets.pl
 # Database cerevisiae_20100109
@@ -88,11 +88,11 @@ Elessar:~ tim$ head gene_list.txt
 # Column_5 index=4;name=length
 Name	Type	Aliases	chromo	length
 YAL068C	gene:SGD	PAU8	chr1	363
-}}}
+</pre>
 
 To toss out all genes that fall below 2 kb, we can use the `manipulate_datasets.pl` script. This script provides a convenient interactive mode, where you can select manipulations from a list, select the datasets (columns) from a list, and provide additional arguments. Multiple manipulations may be performed sequentially before writing the file. For this example, though, we will specify the manipulation on the command line, which is limited to only one manipulation at a time. Multiple manipulations should be done either interactively or batch scripted. 
 Here, we will use the toss below manipulation.
-{{{
+<pre>
 Elessar:~ tim$ manipulate_datasets.pl --func below --index 4 --target 2000 gene_list.txt 
 
     A tool for manipulating datafiles
@@ -105,11 +105,11 @@ Elessar:~ tim$ manipulate_datasets.pl --func below --index 4 --target 2000 gene_
  1280 data lines are remaining
  1 manipulations performed
  Wrote datafile ./gene_list.txt
-}}}
+</pre>
 Notice that we specify the column index of 4, which is the fifth column (numbering is 0-based).
 
 To separate the genes based on chromosome, we could use `grep`, but we would lose the metadata. We could also load the file in a competent text editor and manually select the genes, but that could be cumbersome. Another alternative is to use `split_data_file.pl`. While this program was initially designed to split extremely large data files into smaller, manageable files, it can also come in handy here to pull out just chromosome 2 genes. To run the program, we specify the column index that will be used to split the file. Multiple files will then be written, each one containing only the genes with a specific value, in this case chromosome.
-{{{
+<pre>
 Elessar:~ tim$ split_data_file.pl --col 3 gene_list.txt 
 
  This script will split a data file
@@ -132,9 +132,9 @@ Elessar:~ tim$ split_data_file.pl --col 3 gene_list.txt
    wrote 117 lines to file './gene_list#chr15.txt'
    wrote 97 lines to file './gene_list#chr16.txt'
  Split 'gene_list.txt' into 16 files
-}}}
+</pre>
 We now have 16 separate files. More importantly, we have one file with all of the chromosome 2 genes (97 of them). Each file also retains the metadata lines. If we ever want to merge the files back into one file, we can do that as well. 
-{{{
+<pre>
 Elessar:~ tim$ join_data_file.pl gene_list#chr*.txt
 
  This script will join two or more data files
@@ -156,7 +156,7 @@ Elessar:~ tim$ join_data_file.pl gene_list#chr*.txt
  Joining file 'gene_list#chr8.txt'...  1231 data lines merged
  Joining file 'gene_list#chr9.txt'...  1280 data lines merged
  Wrote combined file './gene_list.txt'
-}}}
+</pre>
 
 
 ===Collecting microarray data===
@@ -167,7 +167,7 @@ We'll use `get_datasets.pl` script again to collect the data. The data is stored
 A note about data and *biotoolbox* scripts. I break GFF3 format convention for the datasets by using the GFF type column (column 3) as a unique identifier for datasets. Officially, only Sequence Ontology terms should be used as types, which in this case would be _microarray_probe_. However, it is much more convenient to identify data in the database using the GFF type (and source), than the Name tag (found in column 9 of the GFF file). The Bio::DB::SeqFeature::Store API (fortunately) does not strictly check SO terms. Nevertheless, I apply the same value to both the GFF type (column 3) and Name tag (column 9) to all my data, just in case this is changed in the future.
 
 First we'll collect the H3K4me3 data. We want to constrain the data collection to just the promoter region, say 300 bp upstream of the gene.
-{{{
+<pre>
 Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data Pokholok_H3k4me3_ChIP_44k --log --start=-300 --stop 1 --in gene_list.txt
 
  A program to collect feature data from the database
@@ -177,11 +177,11 @@ Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data Pokholok_H3k4me3_ChIP_44
  in 0.1 minutes
  wrote file './gene_list.txt'
  Completed in 0.1 minutes
-}}}
+</pre>
 We restrict the location to the promoter by specifying the `--start` and `--stop` options. Since the dataset is in the log2 space, I also specify the `--log` option so that the values are properly handled. Unfortunately, the log status of a dataset is not automatically determined, and you should know a priori what space the data is in, log2 or linear. The microarray probe spacing is about 250 bp for this dataset, so we should have on average of 1-2 datapoints in each window. The mean value is automatically taken here, although other methods could be applied using the `--method` option.
 
 Now that we've collected the H3K4me3 data, we now want the H3K36me3 data. We're interested in the 3' half of the gene, but since each gene is a different size, we're unable to specify strict relative bp positions. Therefore, we use the fraction options.
-{{{
+<pre>
 Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data Pokholok_H3k36me3_ChIP_44k --log --fstart 0.5 --fstop 1 --in gene_list.txt
 
  A program to collect feature data from the database
@@ -202,13 +202,13 @@ Elessar:~ tim$ head gene_list.txt
 # Column_5 index=4;name=length;tossed=4497_lines_below_threshold_2000
 # Column_6 dataset=Pokholok_H3k4me3_ChIP_44k;db=sc_public_ma;index=5;log2=1;method=mean;name=Pokholok_H3k4me3_ChIP_44k;start=-300;stop=1;strand=none
 # Column_7 dataset=Pokholok_H3k36me3_ChIP_44k;db=sc_public_ma;fstart=0.5;fstop=1;index=6;limit=1000;log2=1;method=mean;name=Pokholok_H3k36me3_ChIP_44k;strand=none
-}}}
+</pre>
 
 Notice that we now have two additional datasets in our file, and we have metadata lines describing where and how we obtained these datasets.
 
 ===Visualizing the data===
 We first want to check some basic statistics on our datasets. We can use the `manipulate_datasets.pl` script to do this.
-{{{
+<pre>
 Elessar:~ tim$ manipulate_datasets.pl --func stat --index 6 gene_list.txt 
 
     A tool for manipulating datafiles
@@ -235,11 +235,11 @@ Elessar:~ tim$ manipulate_datasets.pl --func stat --index 6 gene_list.txt
      Mode is 1.344
      Sum is 915.577
  No changes written
-}}}
+</pre>
 
 
 Next we want a simple histogram plot of the distribution. We can use the script `graph_histogram.pl` to do this. We see from the statistics above that the data ranges from -1.6 to 2.7. So let's create a histogram from -3 to 3, in 0.2 increments. This would be 30 bins with a bin size of 0.2.
-{{{
+<pre>
 Elessar:~ tim$ graph_histogram.pl --bins 30 --size 0.2 --col 6 --min=-3 gene_list.txt 
 
  This script will plot histograms of value frequencies
@@ -248,14 +248,14 @@ Elessar:~ tim$ graph_histogram.pl --bins 30 --size 0.2 --col 6 --min=-3 gene_lis
  Preparing graph for Pokholok_H3k36me3_ChIP_44k....
 wrote bar graph distribution_Pokholok_H3k36me3_ChIP_44k.png in directory gene_list_graphs
  Finished!
-}}}
+</pre>
 
 Here, we specified the number of bins (30), the bin size (0.2), the starting or minimum bin value (-3), and the dataset index. The script will also allow for datasets to be selected from a list interactively if it's not provided as a command line argument. The output graphic file is written in a subdirectory named after the input file. 
 
 http://biotoolbox.googlecode.com/svn/wiki/distribution_Pokholok_H3k36me3_ChIP_44k.png
 
 Finally, we want to show the correlation between the two datasets. For this we use another script, `graph_data.pl`, which plots a pairwise XY plot between two datasets. 
-{{{
+<pre>
 Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gene_list.txt 
 
  This script will graph correlation plots for two microarry data sets
@@ -263,7 +263,7 @@ Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gen
  Loading data from file gene_list.txt....
  Preparing graph for Pokholok_H3k4me3_ChIP_44k vs. Pokholok_H3k36me3_ChIP_44k....
   Pearson correlation is 0.59, R^2 is 0.34
-}}}
+</pre>
 
 Here, we specify a scatter plot between datasets 5 and 6, with a mininum and a maximum value of -3 and 3, respectively. Simple correlation stats are printed as output in the terminal (r = 0.59, moderately correlated), in the graphic title, and in a text file in the output graph subdirectory.
 
