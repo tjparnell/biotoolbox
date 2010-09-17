@@ -1,0 +1,278 @@
+#summary An example guide to generating a feature list and collecting data from the database.
+
+=HOWTO: Generating a feature list and collecting data=
+
+This is an example guide for collecting features and dataset from a Bio::DB::SeqFeature::Store database housing genomic features and a microarray data set using *biotoolbox* scripts. This presumes that the database is already set up and loaded.
+
+===Notes on running the *biotoolbox* scripts===
+	* All of the scripts are designed to be run from the scripts directory. Most require helper modules found in the lib directory, which the script should be able to find on its own if the directory structure is not changed.
+	* All of the scripts, when run without any arguments, should present a short synopsis of the arguments.
+	* Most of the scripts will provide additional help when run with the `-h` or `--help` arguments. The help is taken from internal POD documentation, which can also be viewed by entering `perldoc <script.pl>`.
+	* A configuration file for defining database arguments, among other things, is included in the lib directory. A custom copy may be placed in the root of your home directory, or specified using an environment variable `TIM_DB_HELPER`.
+
+===Generating a feature list===
+We want to collect a list of genes from the database. First, we need to identify the feature type we want from the database. We can use `print_feature_types.pl` to generate a list of features present in the database. We are using the database _cerevisiae_20100109_
+{{{
+Elessar:~ tim$ print_feature_types.pl cerevisiae_20100109
+ Found 28 feature types in database 'cerevisiae_20100109'
+  There are 2 feature types with source 'Publication'
+     TF_binding_site
+     uORF
+  There are 25 feature types with source 'SGD'
+     ARS
+     CDS
+     LTR_retrotransposon
+     binding_site
+     centromere
+     chromosome
+     external_transcribed_spacer_region
+     five_prime_UTR_intron
+     gene
+     ....
+}}}
+The feature we are after is gene. To collect the gene features from the database, we can specify `gene`. But what if there are multiple gene features stored in the database from different sources, say refseq and ensembl? We can include the source in the specification, as in `gene:SGD`. This would correspond to the 3rd:2nd columns in the original source GFF annotation file.
+
+To collect the dataset, we use the script `get_datasets.pl`. There are several programs which are capable of generating new feature lists. We won't be collecting a dataset at this moment, so we'll specify no dataset.
+{{{
+Elessar:~ tim$ get_datasets.pl --db cerevisiae_20100109 --feature gene:SGD --data none --out gene_list
+
+ A program to collect feature data from the database
+
+ Generating a new feature list from database 'cerevisiae_20100109'...
+   Searching for gene:SGD
+   Found 6607 features in the database.
+   Kept 5778 features.
+ wrote file './gene_list.txt'
+ Completed in 0.0 minutes
+}}}
+
+The file that is generated, `gene_list.txt`, is in a tab-delimited text format with special comment lines that I've creatively called a _tim data format_. We can see this format here.
+{{{
+Elessar:~ tim$ head gene_list.txt 
+# Program /Applications/biotoolbox/scripts/get_datasets.pl
+# Database cerevisiae_20100109
+# Feature gene:SGD
+# Column_1 index=0;name=Name
+# Column_2 index=1;name=Type
+# Column_3 index=2;name=Aliases
+Name	Type	Aliases
+YAL068C	gene:SGD	PAU8
+YAL067W-A	gene:SGD	.
+YAL067C	gene:SGD	SEO1
+}}}
+The comment lines provide metadata regarding which program generated the list, the database used, and the feature type. Additionally, each column or dataset has a metadata line comprised of key=value pairs. At least two metadata keys are required, index and name. The first row of the tab-delimited table are the column headers, and should match the name in the metadata lines.
+
+
+===Refining the feature list===
+Say that we are interested in only genes from chromosome 2 that are above 2 kb in length (PI's can be very particular in their questions). To collect additional information about our genes, we can use `get_feature_info.pl`. We specify two attributes to collect: chromo(some) and length.
+{{{
+Elessar:~ tim$ get_feature_info.pl --attrib chromo,length gene_list.txt 
+
+ This script will get additional information about features
+
+ Loading feature list from 'gene_list.txt'....
+ Retrieving chromo, length
+ Wrote file './gene_list.txt'
+ That's it!
+}}}
+We do not need to specify the database when running this program, as it will automatically get the database name from the input file metadata. We see that two additional columns have been added. 
+{{{
+Elessar:~ tim$ head gene_list.txt 
+# Program /Applications/biotoolbox/scripts/get_datasets.pl
+# Database cerevisiae_20100109
+# Feature gene:SGD
+# Column_1 index=0;name=Name
+# Column_2 index=1;name=Type
+# Column_3 index=2;name=Aliases
+# Column_4 index=3;name=chromo
+# Column_5 index=4;name=length
+Name	Type	Aliases	chromo	length
+YAL068C	gene:SGD	PAU8	chr1	363
+}}}
+
+To toss out all genes that fall below 2 kb, we can use the `manipulate_datasets.pl` script. This script provides a convenient interactive mode, where you can select manipulations from a list, select the datasets (columns) from a list, and provide additional arguments. Multiple manipulations may be performed sequentially before writing the file. For this example, though, we will specify the manipulation on the command line, which is limited to only one manipulation at a time. Multiple manipulations should be done either interactively or batch scripted. 
+Here, we will use the toss below manipulation.
+{{{
+Elessar:~ tim$ manipulate_datasets.pl --func below --index 4 --target 2000 gene_list.txt 
+
+    A tool for manipulating datafiles
+    Loaded 'gene_list.txt' with 5777 data rows and 5 columns
+
+ Executing automatic manipulation with function 'below'
+   using '4' for option index
+   using '2000' for option target
+ 4497 data lines were removed that had values below threshold in length
+ 1280 data lines are remaining
+ 1 manipulations performed
+ Wrote datafile ./gene_list.txt
+}}}
+Notice that we specify the column index of 4, which is the fifth column (numbering is 0-based).
+
+To separate the genes based on chromosome, we could use `grep`, but we would lose the metadata. We could also load the file in a competent text editor and manually select the genes, but that could be cumbersome. Another alternative is to use `split_data_file.pl`. While this program was initially designed to split extremely large data files into smaller, manageable files, it can also come in handy here to pull out just chromosome 2 genes. To run the program, we specify the column index that will be used to split the file. Multiple files will then be written, each one containing only the genes with a specific value, in this case chromosome.
+{{{
+Elessar:~ tim$ split_data_file.pl --col 3 gene_list.txt 
+
+ This script will split a data file
+
+ Splitting file by elements in column 'chromo'...
+   wrote 23 lines to file './gene_list#chr1.txt'
+   wrote 97 lines to file './gene_list#chr2.txt'
+   wrote 27 lines to file './gene_list#chr3.txt'
+   wrote 158 lines to file './gene_list#chr4.txt'
+   wrote 55 lines to file './gene_list#chr5.txt'
+   wrote 27 lines to file './gene_list#chr6.txt'
+   wrote 111 lines to file './gene_list#chr7.txt'
+   wrote 46 lines to file './gene_list#chr8.txt'
+   wrote 49 lines to file './gene_list#chr9.txt'
+   wrote 89 lines to file './gene_list#chr10.txt'
+   wrote 75 lines to file './gene_list#chr11.txt'
+   wrote 130 lines to file './gene_list#chr12.txt'
+   wrote 102 lines to file './gene_list#chr13.txt'
+   wrote 77 lines to file './gene_list#chr14.txt'
+   wrote 117 lines to file './gene_list#chr15.txt'
+   wrote 97 lines to file './gene_list#chr16.txt'
+ Split 'gene_list.txt' into 16 files
+}}}
+We now have 16 separate files. More importantly, we have one file with all of the chromosome 2 genes (97 of them). Each file also retains the metadata lines. If we ever want to merge the files back into one file, we can do that as well. 
+{{{
+Elessar:~ tim$ join_data_file.pl gene_list#chr*.txt
+
+ This script will join two or more data files
+
+ Joining file 'gene_list#chr1.txt'...  23 data lines merged
+ Joining file 'gene_list#chr10.txt'...  112 data lines merged
+ Joining file 'gene_list#chr11.txt'...  187 data lines merged
+ Joining file 'gene_list#chr12.txt'...  317 data lines merged
+ Joining file 'gene_list#chr13.txt'...  419 data lines merged
+ Joining file 'gene_list#chr14.txt'...  496 data lines merged
+ Joining file 'gene_list#chr15.txt'...  613 data lines merged
+ Joining file 'gene_list#chr16.txt'...  710 data lines merged
+ Joining file 'gene_list#chr2.txt'...  807 data lines merged
+ Joining file 'gene_list#chr3.txt'...  834 data lines merged
+ Joining file 'gene_list#chr4.txt'...  992 data lines merged
+ Joining file 'gene_list#chr5.txt'...  1047 data lines merged
+ Joining file 'gene_list#chr6.txt'...  1074 data lines merged
+ Joining file 'gene_list#chr7.txt'...  1185 data lines merged
+ Joining file 'gene_list#chr8.txt'...  1231 data lines merged
+ Joining file 'gene_list#chr9.txt'...  1280 data lines merged
+ Wrote combined file './gene_list.txt'
+}}}
+
+
+===Collecting microarray data===
+Now that we have a gene list, we're ready to collect some data. I come from an epigenetics lab, so we're interested in chromatin modifications. We want to draw a correlation between H3K4me3, a mark of transcription activation found at promoters, with H3K36me3, a mark of past transcription found in the body of the gene.
+
+We'll use `get_datasets.pl` script again to collect the data. The data is stored in a separate database, _sc_public_ma_, so we'll need to explicitly specify that; otherwise, the database listed in the metadata is used. This database have the basic annotation (genes) as well as microarray data from Pokholok et al. (2005), which published genome-wide histone modifications in _S. cerevisiae_.
+
+A note about data and *biotoolbox* scripts. I break GFF3 format convention for the datasets by using the GFF type column (column 3) as a unique identifier for datasets. Officially, only Sequence Ontology terms should be used as types, which in this case would be _microarray_probe_. However, it is much more convenient to identify data in the database using the GFF type (and source), than the Name tag (found in column 9 of the GFF file). The Bio::DB::SeqFeature::Store API (fortunately) does not strictly check SO terms. Nevertheless, I apply the same value to both the GFF type (column 3) and Name tag (column 9) to all my data, just in case this is changed in the future.
+
+First we'll collect the H3K4me3 data. We want to constrain the data collection to just the promoter region, say 300 bp upstream of the gene.
+{{{
+Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data Pokholok_H3k4me3_ChIP_44k --log --start=-300 --stop 1 --in gene_list.txt
+
+ A program to collect feature data from the database
+
+ Loading feature list from file 'gene_list.txt'...
+ Collecting mean data for dataset Pokholok_H3k4me3_ChIP_44k...
+ in 0.1 minutes
+ wrote file './gene_list.txt'
+ Completed in 0.1 minutes
+}}}
+We restrict the location to the promoter by specifying the `--start` and `--stop` options. Since the dataset is in the log2 space, I also specify the `--log` option so that the values are properly handled. Unfortunately, the log status of a dataset is not automatically determined, and you should know a priori what space the data is in, log2 or linear. The microarray probe spacing is about 250 bp for this dataset, so we should have on average of 1-2 datapoints in each window. The mean value is automatically taken here, although other methods could be applied using the `--method` option.
+
+Now that we've collected the H3K4me3 data, we now want the H3K36me3 data. We're interested in the 3' half of the gene, but since each gene is a different size, we're unable to specify strict relative bp positions. Therefore, we use the fraction options.
+{{{
+Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data Pokholok_H3k36me3_ChIP_44k --log --fstart 0.5 --fstop 1 --in gene_list.txt
+
+ A program to collect feature data from the database
+
+ Loading feature list from file 'gene_list.txt'...
+ Collecting mean data for dataset Pokholok_H3k36me3_ChIP_44k...
+ in 0.1 minutes
+ wrote file './gene_list.txt'
+ Completed in 0.1 minutes
+Elessar:~ tim$ head gene_list.txt 
+# Program /Applications/biotoolbox/scripts/get_datasets.pl
+# Database cerevisiae_20100109
+# Feature gene:SGD
+# Column_1 index=0;name=Name
+# Column_2 index=1;name=Type
+# Column_3 index=2;name=Aliases
+# Column_4 index=3;name=chromo
+# Column_5 index=4;name=length;tossed=4497_lines_below_threshold_2000
+# Column_6 dataset=Pokholok_H3k4me3_ChIP_44k;db=sc_public_ma;index=5;log2=1;method=mean;name=Pokholok_H3k4me3_ChIP_44k;start=-300;stop=1;strand=none
+# Column_7 dataset=Pokholok_H3k36me3_ChIP_44k;db=sc_public_ma;fstart=0.5;fstop=1;index=6;limit=1000;log2=1;method=mean;name=Pokholok_H3k36me3_ChIP_44k;strand=none
+}}}
+
+Notice that we now have two additional datasets in our file, and we have metadata lines describing where and how we obtained these datasets.
+
+===Visualizing the data===
+We first want to check some basic statistics on our datasets. We can use the `manipulate_datasets.pl` script to do this.
+{{{
+Elessar:~ tim$ manipulate_datasets.pl --func stat --index 6 gene_list.txt 
+
+    A tool for manipulating datafiles
+    Loaded 'gene_list.txt' with 1280 data rows and 7 columns
+
+ Executing automatic manipulation with function 'stat'
+   using '6' for option index
+  Statistics for dataset index '6'
+    Dataset name is 'Pokholok_H3k36me3_ChIP_44k'
+    'fstart' is '0.5'
+    'db' is 'sc_public_ma'
+    'dataset' is 'Pokholok_H3k36me3_ChIP_44k'
+    'log2' is '1'
+    'fstop' is '1'
+    'strand' is 'none'
+    'limit' is '1000'
+    'method' is 'mean'
+     Count is 1262
+     Mean is 0.725
+     Median is 0.771
+     Standard deviation is 0.566
+     Min is -1.605
+     Max is 2.672
+     Mode is 1.344
+     Sum is 915.577
+ No changes written
+}}}
+
+
+Next we want a simple histogram plot of the distribution. We can use the script `graph_histogram.pl` to do this. We see from the statistics above that the data ranges from -1.6 to 2.7. So let's create a histogram from -3 to 3, in 0.2 increments. This would be 30 bins with a bin size of 0.2.
+{{{
+Elessar:~ tim$ graph_histogram.pl --bins 30 --size 0.2 --col 6 --min=-3 gene_list.txt 
+
+ This script will plot histograms of value frequencies
+
+ Loading data from file gene_list.txt....
+ Preparing graph for Pokholok_H3k36me3_ChIP_44k....
+wrote bar graph distribution_Pokholok_H3k36me3_ChIP_44k.png in directory gene_list_graphs
+ Finished!
+}}}
+
+Here, we specified the number of bins (30), the bin size (0.2), the starting or minimum bin value (-3), and the dataset index. The script will also allow for datasets to be selected from a list interactively if it's not provided as a command line argument. The output graphic file is written in a subdirectory named after the input file. 
+
+http://code.google.com/p/biotoolbox/wiki/distribution_Pokholok_H3k36me3_ChIP_44k.png
+
+Finally, we want to show the correlation between the two datasets. For this we use another script, `graph_data.pl`, which plots a pairwise XY plot between two datasets. 
+{{{
+Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gene_list.txt 
+
+ This script will graph correlation plots for two microarry data sets
+
+ Loading data from file gene_list.txt....
+ Preparing graph for Pokholok_H3k4me3_ChIP_44k vs. Pokholok_H3k36me3_ChIP_44k....
+  Pearson correlation is 0.59, R^2 is 0.34
+}}}
+
+Here, we specify a scatter plot between datasets 5 and 6, with a mininum and a maximum value of -3 and 3, respectively. Simple correlation stats are printed as output in the terminal (r = 0.59, moderately correlated), in the graphic title, and in a text file in the output graph subdirectory.
+
+http://code.google.com/p/biotoolbox/wiki/Pokholok_H3k4me3_ChIP_44k_and_Pokholok_H3k36me3_ChIP_44k.png
+
+While these graphs are not exactly publication quality, they are certainly good enough for lab meeting presentations and interpreting data.
+
+
+
+
+
+
