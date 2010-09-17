@@ -415,8 +415,8 @@ sub find_overlapping_features {
 					$region = $db->segment(
 						-name      => $table->[$row][0],
 						-type      => $table->[$row][1],
-						-start     => $feature->end + $start, 
-						-end       => $feature->end + $stop, 
+						-start     => $feature->end - $stop, 
+						-end       => $feature->end - $start, 
 						-strand    => $feature->strand,
 						-absolute  => 1,
 					);
