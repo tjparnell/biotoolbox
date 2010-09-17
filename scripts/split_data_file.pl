@@ -34,10 +34,10 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # specify the input data file
-	'col=i'     => \$index, # index for the column to use for splitting
-	'gz!'       => \$gz, # compress output files
-	'help'      => \$help # request help
+	'in=s'        => \$infile, # specify the input data file
+	'col|index=i' => \$index, # index for the column to use for splitting
+	'gz!'         => \$gz, # compress output files
+	'help'        => \$help # request help
 );
 
 # Print help
@@ -252,10 +252,10 @@ split_data_file.pl
 
 =head1 SYNOPSIS
 
-split_data_file.pl --col <column_index> <filename>
+split_data_file.pl --index <column_index> <filename>
   
   --in <filename>
-  --col <column_index>
+  --index <column_index>
   --(no)gz
   --help
 
@@ -272,11 +272,15 @@ Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_file_helper.pm', 
 although any format should work. The file may be compressed with gzip.
 
-=item --col <column_index>
+=item --index <column_index>
 
 Provide the index number of the column or dataset 
 containing the values used to split the file. Default 
 index is 0 (first column).
+
+=item --col <column_index>
+
+Alias to --index.
 
 =item --(no)gz
 

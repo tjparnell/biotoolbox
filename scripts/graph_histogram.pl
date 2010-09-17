@@ -40,16 +40,16 @@ my @columns; # an array of the columns (datasets) within in the file to plot
 			 # should be 0-based, may have two datasets comma delimited
 my $start = 0; # the starting value to calculate the bins
 GetOptions( 
-	'in=s'       => \$infile, # the input file
-	'col=s'      => \@columns, # columns (datasets) to plot
-	'out=s'      => \$out, # output file name
-	'bins=i'     => \$binnumber, # the number of bins to put the data into
-	'size=f'     => \$binsize, # the size of each bin
-	'min=i'      => \$start, # the starting value to calculate the bins
-	'max=i'      => \$max, # maximum value for x-axis
-	'lines!'     => \$lines, # indicate whether graph should be a linegraph
-	'dir=s'      => \$directory, # optional name of the graph directory
-	'help'       => \$help, # flag to print help
+	'in=s'        => \$infile, # the input file
+	'index|col=s' => \@columns, # columns (datasets) to plot
+	'out=s'       => \$out, # output file name
+	'bins=i'      => \$binnumber, # the number of bins to put the data into
+	'size=f'      => \$binsize, # the size of each bin
+	'min=i'       => \$start, # the starting value to calculate the bins
+	'max=i'       => \$max, # maximum value for x-axis
+	'lines!'      => \$lines, # indicate whether graph should be a linegraph
+	'dir=s'       => \$directory, # optional name of the graph directory
+	'help'        => \$help, # flag to print help
 );
 
 if ($help) {
@@ -485,7 +485,7 @@ A script to graph a histogram of a dataset of values
 graph_histogram.pl --bins <integer> --size <integer> <filename> 
    
    --in <filename>
-   --col <index>
+   --index <column_index>
    --bins <integer>
    --size <number>
    --min <integer>
@@ -507,13 +507,17 @@ Specify the file name of a previously generated feature dataset.
 The tim data format is preferable, although any other tab-delimited text 
 data formats may be usable. See the file description in L<tim_db_helper.pm>.
 
-=item --col
+=item --index <column_index>
 
 Specify the column number(s) corresponding to the dataset(s) in
 the file to graph. Number is 0-based index. Use this option repeatedly 
 for each dataset to graph. To graph two datasets together on one plot, 
 use a comma between the numbers. If the column is not specified, 
 then the user may interactively choose which datasets to plot.
+
+=item --col <column_index>
+
+Alias to --index.
 
 =item --bins <integer>
 
