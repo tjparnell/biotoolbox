@@ -162,7 +162,7 @@ Elessar:~ tim$ join_data_file.pl gene_list#chr*.txt
 ===Collecting microarray data===
 Now that we have a gene list, we're ready to collect some data. I come from an epigenetics lab, so we're interested in chromatin modifications. We want to draw a correlation between H3K4me3, a mark of transcription activation found at promoters, with H3K36me3, a mark of past transcription found in the body of the gene.
 
-We'll use `get_datasets.pl` script again to collect the data. The data is stored in a separate database, _sc_public_ma_, so we'll need to explicitly specify that; otherwise, the database listed in the metadata is used. This database have the basic annotation (genes) as well as microarray data from Pokholok et al. (2005), which published genome-wide histone modifications in _S. cerevisiae_.
+We'll use `get_datasets.pl` script again to collect the data. The data is stored in a separate database, _sc_public_ma_, so we'll need to explicitly specify that; otherwise, the database listed in the metadata is used. This database have the basic annotation (genes) as well as microarray data from [http://www.ncbi.nlm.nih.gov/pubmed/16122420 Pokholok] et al. (2005), which published genome-wide histone modifications in _S. cerevisiae_.
 
 A note about data and *biotoolbox* scripts. I break GFF3 format convention for the datasets by using the GFF type column (column 3) as a unique identifier for datasets. Officially, only Sequence Ontology terms should be used as types, which in this case would be _microarray_probe_. However, it is much more convenient to identify data in the database using the GFF type (and source), than the Name tag (found in column 9 of the GFF file). The Bio::DB::SeqFeature::Store API (fortunately) does not strictly check SO terms. Nevertheless, I apply the same value to both the GFF type (column 3) and Name tag (column 9) to all my data, just in case this is changed in the future.
 
@@ -252,7 +252,7 @@ wrote bar graph distribution_Pokholok_H3k36me3_ChIP_44k.png in directory gene_li
 
 Here, we specified the number of bins (30), the bin size (0.2), the starting or minimum bin value (-3), and the dataset index. The script will also allow for datasets to be selected from a list interactively if it's not provided as a command line argument. The output graphic file is written in a subdirectory named after the input file. 
 
-http://code.google.com/p/biotoolbox/wiki/distribution_Pokholok_H3k36me3_ChIP_44k.png
+http://biotoolbox.googlecode.com/svn/wiki/distribution_Pokholok_H3k36me3_ChIP_44k.png
 
 Finally, we want to show the correlation between the two datasets. For this we use another script, `graph_data.pl`, which plots a pairwise XY plot between two datasets. 
 {{{
@@ -267,7 +267,7 @@ Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gen
 
 Here, we specify a scatter plot between datasets 5 and 6, with a mininum and a maximum value of -3 and 3, respectively. Simple correlation stats are printed as output in the terminal (r = 0.59, moderately correlated), in the graphic title, and in a text file in the output graph subdirectory.
 
-http://code.google.com/p/biotoolbox/wiki/Pokholok_H3k4me3_ChIP_44k_and_Pokholok_H3k36me3_ChIP_44k.png
+http://biotoolbox.googlecode.com/svn/wiki/Pokholok_H3k4me3_ChIP_44k_and_Pokholok_H3k36me3_ChIP_44k.png
 
 While these graphs are not exactly publication quality, they are certainly good enough for lab meeting presentations and interpreting data.
 
