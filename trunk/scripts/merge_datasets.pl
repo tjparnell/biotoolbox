@@ -375,7 +375,15 @@ sub check_data_tables {
 	) {
 		# Each file has feature type defined, but they're not the same
 		# probably really don't want to combine these
-		die " The feature types for both files don't match! You should reconsider.\n";
+		print " !!! The metadata feature types for both files don't match!!!\n". 
+			"  Do you still want to proceed (y/n)  ";
+		my $prompt = <STDIN>;
+		if ($prompt =~ /^y/i) {
+			print " OK. Continuing anyway\n\n\n";
+		}
+		else {
+			exit " OK. Nothing done\n\n";
+		}
 	}
 	if ( $input_data1_ref->{'last_row'} != $input_data2_ref->{'last_row'} ) {
 		# the number of rows in each data table don't equal

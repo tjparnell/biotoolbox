@@ -498,6 +498,13 @@ sub generate_new_metadata {
 	};
 	$data_ref->{'data_table'}->[0][$name_i] = 'Name';
 	$data_ref->{'number_columns'} += 1;
+	if (defined $start and defined $stop) {
+		$data_ref->{$name_i}{'Start'} = $start;
+		$data_ref->{$name_i}{'Stop'} = $stop;
+	}
+	if (defined $extend) {
+		$data_ref->{$name_i}{'Extend'} = $extend;
+	}
 	
 	# Type column
 	my $type_i = $data_ref->{'number_columns'};
