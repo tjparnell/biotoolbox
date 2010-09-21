@@ -28,6 +28,7 @@ unless (@ARGV) { # when no command line options are present
 ### Get command line options
 my (
 	$infile, 
+	$dataset,
 	$out,
 	$binnumber,
 	$binsize,
@@ -36,12 +37,10 @@ my (
 	$directory,
 	$help
 );
-my @columns; # an array of the columns (datasets) within in the file to plot
-			 # should be 0-based, may have two datasets comma delimited
 my $start = 0; # the starting value to calculate the bins
 GetOptions( 
 	'in=s'        => \$infile, # the input file
-	'index|col=s' => \@columns, # columns (datasets) to plot
+	'index=s'     => \$dataset, # columns (datasets) to plot
 	'out=s'       => \$out, # output file name
 	'bins=i'      => \$binnumber, # the number of bins to put the data into
 	'size=f'      => \$binsize, # the size of each bin
@@ -146,8 +145,9 @@ unless (-e "$directory") {
 ### Get the list of datasets to pairwise compare
 
 # A list of datasets was provided as a file
-if (@columns) {
-	graph_designated_datasets();
+if ($dataset) {
+	my @list = _parse_list($dataset);
+	graph_designated_datasets(@list);
 } 
 
 # Interactive session
@@ -167,6 +167,7 @@ print " Finished!\n";
 
 
 
+
 ## subroutine to graph all the data sets in the loaded data file
 sub graph_all_datasets {
 	
@@ -181,11 +182,11 @@ sub graph_all_datasets {
 
 ## subroutine to graph all the data sets in the loaded data file
 sub graph_designated_datasets {
+	my @columns = @_;
 	foreach (@columns) {
 		# we're plotting two datasets
-		if (/,/) { 
-			s/\s*//g; 
-			my ($one, $two) = split /,/;
+		if (/&/) { 
+			my ($one, $two) = split /&/;
 			if ( 
 				(exists $dataset_by_id{$one}) and 
 				(exists $dataset_by_id{$two}) 
@@ -193,7 +194,7 @@ sub graph_designated_datasets {
 				graph_two("$dataset_by_id{$one}", "$dataset_by_id{$two}");
 			} 
 			else {
-				print " Column numbers $_ is not valid\n";
+				print " Column numbers '$_' is not valid\n";
 			}
 		} 
 		
@@ -203,7 +204,7 @@ sub graph_designated_datasets {
 				graph_one($dataset_by_id{$_});
 			} 
 			else {
-				print " Column number $_ is not valid\n";
+				print " Column number '$_' is not valid\n";
 			}
 		}
 	}
@@ -229,9 +230,9 @@ sub graph_datasets_interactively {
 		if ($answer eq 'q') {
 			last;
 		}
-		if ($answer =~ /,/) { # two datasets are requested
+		if ($answer =~ /,|&/) { # two datasets are requested
 			$answer =~ s/\s*//g; 
-			my ($one, $two) = split /,/, $answer;
+			my ($one, $two) = split /[&,]/, $answer;
 			if ( 
 				(exists $dataset_by_id{$one}) and 
 				(exists $dataset_by_id{$two}) 
@@ -470,6 +471,37 @@ sub graph_this_as_bars {
 
 
 
+sub _parse_list {
+	# this subroutine will parse a string into an array
+	# it is designed for a string of numbers delimited by commas
+	# a range of numbers may be specified using a dash
+	# hence 1,2,5-7 would become an array of 1,2,5,6,7
+	
+	my $string = shift;
+	$string =~ s/\s+//g; 
+	my @list;
+	foreach (split /,/, $string) {
+		# check for a range
+		if (/\-/) { 
+			my ($start, $stop) = split /\-/;
+			# add each item in the range to the list
+			for (my $i = $start; $i <= $stop; $i++) {
+				push @list, $i;
+			}
+			next;
+		} 
+		else {
+			# ordinary number
+			push @list, $_;
+		}
+	}
+	return @list;
+}
+
+
+
+
+
 
 
 __END__
@@ -510,14 +542,15 @@ data formats may be usable. See the file description in L<tim_db_helper.pm>.
 =item --index <column_index>
 
 Specify the column number(s) corresponding to the dataset(s) in
-the file to graph. Number is 0-based index. Use this option repeatedly 
-for each dataset to graph. To graph two datasets together on one plot, 
-use a comma between the numbers. If the column is not specified, 
-then the user may interactively choose which datasets to plot.
+the file to graph. Number is 0-based index. Each dataset should be 
+demarcated by a comma. A range of indices may also be specified using 
+a dash to demarcate the beginning and end of the inclusive range. 
+Two datasets may also be graphed together; these indices should be joined 
+with an ampersand. For example, "2,4-6,5&6" will individually graph 
+datasets 2, 4, 5, 6, and a combination 5 and 6 graph.
 
-=item --col <column_index>
-
-Alias to --index.
+If no dataset indices are specified, then they may be chosen 
+interactively from a list.
 
 =item --bins <integer>
 
