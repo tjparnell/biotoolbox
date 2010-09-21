@@ -5,6 +5,7 @@
 
 use strict;
 use Getopt::Long;
+use Pod::Usage;
 use Statistics::Lite qw(mean median);
 use GD::Graph::smoothlines; # for bezier smoothed line graph
 use FindBin qw($Bin);
@@ -15,20 +16,11 @@ print "\n This script will graph profile plots of genomic data\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
-	print " Usage for $0
-  Required:
-  --in <filename>
-  Optional:
-  --data <X>,<Y>,...
-  --all
-  --(no)cen
-  --(no)log
-  --min <integer>
-  --max <integer>
-  --x <integer>
-  --dir <foldername>
-  --help\n";
-	exit;
+	# print SYNOPSIS
+	pod2usage( {
+		'-verbose' => 0, 
+		'-exitval' => 1,
+	} );
 }
 
 
@@ -37,6 +29,7 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile, 
 	$all, 
+	$data, 
 	$center, 
 	$min, 
 	$max, 
@@ -45,10 +38,9 @@ my (
 	$directory,
 	$help, 
 );
-my @data; # an array of requested datasets to graph
 GetOptions( 
 	'in=s'    => \$infile, # the input file
-	'data=s'  => \@data, # a list of datasets to graph
+	'index=s' => \$data, # a list of datasets to graph
 	'all'     => \$all, # flag to plot all data sets individually
 	'cen!'    => \$center, # flag to center normalize the datasets
 	'min=f'   => \$min, # mininum y axis coordinate
@@ -60,9 +52,15 @@ GetOptions(
 );
 
 if ($help) {
-	print_help();
-	exit;
+	# print entire POD
+	pod2usage( {
+		'-verbose' => 2,
+		'-exitval' => 1,
+	} );
 }
+
+
+##### Check required and default variables
 
 unless ($infile) {
 	if (@ARGV) {
@@ -81,12 +79,11 @@ unless (defined $log) {
 	# default is no log
 	$log = 0;
 }
-unless ($directory) {
-	# generate default directory from input file name
-	$directory = $infile;
-	$directory =~ s/\.gz$//; # remove gz if present
-	$directory =~ s/\.txt$/_graphs/; # replace txt extension with graphs
-}
+
+
+
+
+
 ####### Main ###########
 
 ### Load the file
@@ -119,6 +116,9 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 
 
 # Prepare output directory
+unless ($directory) {
+	$directory = $main_data_ref->{'basename'} . '_graphs';
+}
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
 }
@@ -127,26 +127,41 @@ unless (-e "$directory") {
 ### Get the list of datasets to pairwise compare
 
 # A list of dataset pairs was provided upon execution
-if (@data) {
-	foreach my $set (@data) {
-		my @datasets = _parse_list($set);
-		# validate the indices
-		my $check = -1; # assume all are correct initially
-		foreach (@datasets) {
-			unless (exists $dataset_by_id{$_} ) {
-				$check = $_; # remember the bad one
-				last; # one at a time, please
+if ($data) {
+	my @datasets = _parse_list($data);
+	foreach my $dataset (@datasets) {
+		
+		# check for multiple datasets to be graphed together
+		if ($dataset =~ /&/) {
+			my @list = split /&/, $dataset;
+			my $check = -1; # assume all are correct initially
+			foreach (@list) {
+				unless (exists $dataset_by_id{$_} ) {
+					$check = $_; # remember the bad one
+					last; # one at a time, please
+				}
+			}
+			
+			# graph the datasets
+			if ($check == -1) {
+				# all dataset indexes are valid
+				graph_this(@list);
+			}
+			else {
+				print " The index '$check' is not valid! Nothing graphed\n";
 			}
 		}
 		
-		# graph the datasets
-		if ($check == -1) {
-			# all dataset indexes are valid
-			graph_this(@datasets);
-		}
+		# single dataset
 		else {
-			print " The index '$check' is not valid! Nothing graphed\n";
+			if (exists $dataset_by_id{$dataset}) {
+				graph_this($dataset);
+			}
+			else {
+				print " The index '$dataset' is not valid! Nothing graphed\n";
+			}
 		}
+		
 	}
 }
 
@@ -170,48 +185,6 @@ else {
 
 
 ##### Subroutines ##########
-
-## subroutine to print the online help documentation
-sub print_help {
-	print "
- Command line options for $0
-  This program will graph 
-  
-  THIS NEEDS TO BE UPDATED!!!!!
-  
-  
-  The graphs are generated as 
-  600x400 (width x height) pixel PNG images and written to a subdirectory. 
-  
-  The datasets to be plotted may be specified either on the command line 
-  using the --data argument. If not specified, the program defaults to an 
-  interactive mode and the user may repeatedly select the datasets from a list 
-  of available datasets in the data file. 
-  
-  The command line flags and descriptions:
-  --in       Specify the file name for the input data file. A tim data 
-             formatted file is preferred, but any tab-delimited table text file 
-             is acceptable. The file may be gzipped.
-  --data     Specify the two datasets to plot together. Use the datasets'
-             index (0-based) separated by commas (no spaces), or as a 
-             (start-stop) range. Use the attribute repeatedly to plot multiple 
-             graphs. 
-  --all      Indicate that all available datasets in the input file should be
-             plotted separately. 
-  --(no)log  Dataset values are either in log2 space, or status should be 
-             respected if indicated in the metadata.
-  --cen      Datasets should be median centered before graphing.
-  --min      Specify explicitly the minimum Y axis value. Default is calculated.
-  --max      Specify explicitly the maximum Y axis value. Default is calculated.
-  --x        Specify the 0-based index of the dataset to be used for the 
-             X-axis values. Default is 'Midpoint' or 'Window' datasets.
-  --dir      Specify an optional name for the output subdirectory name. Default
-             is '<filename>_graphs'.
-  --help     This help text
-
-";
-}
-
 
 
 ## Subroutine to interact with user and ask for data set pairs to graph sequentially
@@ -470,6 +443,114 @@ sub _parse_list {
 	return @list;
 }
 
+
+
+
+
+__END__
+
+=head1 NAME
+
+graph_profile.pl
+
+A script to graph values along a specific X-axis
+
+=head1 SYNOPSIS
+
+graph_profile.pl <filename> 
+   
+   --in <filename>
+   --index <index1,index2,...>
+   --all
+   --(no)cen
+   --(no)log
+   --min <integer>
+   --max <integer>
+   --x <integer>
+   --dir <foldername>
+   --help
+
+=head1 OPTIONS
+
+The command line flags and descriptions:
+
+=over 4
+
+=item --in <filename>
+
+Specify the file name of a previously generated feature dataset.
+The tim data format is preferable, although any other tab-delimited text 
+data formats may be usable. See the file description in L<tim_db_helper.pm>.
+
+=item --index <index>
+
+Specify the column number(s) corresponding to the dataset(s) in
+the file to graph. Number is 0-based index. Each dataset should be 
+demarcated by a comma. A range of indices may also be specified using 
+a dash to demarcate the beginning and end of the inclusive range. 
+Multiple datasets to be graphed together should be joined with an ampersand. 
+For example, "2,4-6,5&6" will individually graph datasets 2, 4, 5, 6, 
+and a combination 5 and 6 graph.
+
+If no dataset indices are specified, then they may be chosen 
+interactively from a list.
+
+=item --(no)log
+
+Dataset values are (not) in log2 space, or status should be respected 
+if indicated in the file metadata.
+
+=item --cen
+
+Datasets should be median centered prior to graphing. Useful when 
+graphing multiple datasets together when they have different 
+medians.
+
+=item --min <integer>, --max <integer>
+
+Specify the minimum and/or maximum values for the Y-axis. The default 
+values are automatically determined from the dataset.
+
+=item --x <index>
+
+Specify the index of the X-axis dataset. Unless specified, the program 
+automatically uses the columns labeled 'Midpoint' or 'Window', if 
+present. 
+
+=item --dir
+
+Optionally specify the name of the target directory to place the 
+graphs. The default value is the basename of the input file 
+appended with "_graphs".
+
+=item --help
+
+Print this help documenation
+
+=back
+
+=head1 DESCRIPTION
+
+This program will generate PNG graphic files representing a profile of 
+values plotted along a specific X-axis. For example, plotting values 
+along genomic coordinates or relative positions along a feature. The 
+X-axis values are static and each dataset is plotted against it. One or 
+more datasets may be plotted on a single graph, each in a different 
+color, with a legend printed beneath the graph. The graph is a simple 
+Bezier-smoothed line graph.
+
+The resulting files are written to a subdirectory named after 
+the input file. The files are named after the dataset name (column 
+header) with a prefix. 
+
+=head1 AUTHOR
+
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
 
 
 

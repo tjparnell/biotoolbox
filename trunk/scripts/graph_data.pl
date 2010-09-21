@@ -32,6 +32,7 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile, 
 	$type, 
+	$index,
 	$all, 
 	$norm, 
 	$moving_average,
@@ -46,6 +47,7 @@ my @pairs; # an array of pairs
 GetOptions( 
 	'in=s'    => \$infile, # the input file
 	'type=s'  => \$type, # the type of graph to generate
+	'index=s' => \$index, # a list of x,y pairs to plot
 	'pair=s'  => \@pairs, # the x,y pairs to plot
 	'all'     => \$all, # flag to plot all data sets pairwise
 	'norm!'   => \$norm, # flag to skip percentile normalizing
@@ -67,7 +69,12 @@ if ($help) {
 }
 
 unless ($infile) {
-	die " Missing input file!\n Please use --help for more information\n";
+	if (@ARGV) {
+		$infile = shift @ARGV;
+	}
+	else {
+		die " Missing input file!\n";
+	}
 }
 if ($type) {
 	# check the requested type
@@ -82,7 +89,8 @@ if ($type) {
 	}
 }
 else {
-	die " Missing graph type!\n Pleas use --help for more information\n";
+	$type = 'scatter';
+	print " Using default graph type of 'scatter'\n";
 }
 unless (defined $norm) {
 	# default is no normalization (percent rank)
@@ -157,9 +165,13 @@ my @correlation_output;
 ### Get the list of datasets to pairwise compare
 
 # A list of dataset pairs was provided upon execution
+if ($index) {
+	my @list = split /,/, $index;
+	push @pairs, @list;
+}
 if (@pairs) {
 	foreach my $pair (@pairs) {
-		my ($x, $y) = split /,/, $pair;
+		my ($x, $y) = split /,|&/, $pair;
 		if ( 
 			(exists $dataset_by_id{$x}) and 
 			(exists $dataset_by_id{$y}) 
@@ -264,7 +276,7 @@ sub graph_datasets_interactively {
 	# this loop will keep going until no dataset (undefined) is returned
 	while ($answer) {
 		$answer =~ s/\s*//g;
-		my ($x, $y) = split /,/, $answer;
+		my ($x, $y) = split /,|&/, $answer;
 		if ( 
 			(exists $dataset_by_id{$x}) and 
 			(exists $dataset_by_id{$y}) 
@@ -897,12 +909,13 @@ graph_data.pl
 
 =head1 SYNOPSIS
  
-  graph_data.pl --in <filename> --type <type> [--options]
+  graph_data.pl [--options] <filename>
   
   Options:
   --in <filename>
   --type [scatter | line | smooth]
   --pair <X_index>,<Y_index>
+  --index <X_index&Y_index,...>
   --all
   --ma <window>,<step>
   --(no)norm
@@ -937,14 +950,21 @@ first smoothed using a moving average (--ma option). Finally, a
 B<smooth> graph is the same as a line graph, except the data 
 values are smoothed using a bezier curve function. Note that the 
 bezier smoothing function is not equivalent or as effective 
-as a moving average.
+as a moving average. The default value is a scatter plot.
 
 =item --pair <X_index>,<Y_index>
 
 Specify the two datasets to plot together. Use the datasets'
 index (0-based) expressed as 'X,Y' with no spaces. Use the 
-option repeatedly to plot multiple graphs. If not set, the 
-program runs in an interactive mode.
+option repeatedly to plot multiple graphs. If no datasets are 
+set, then the lists may be selected interactively from a list.
+
+=item --index <X_index&Y_index,...>
+
+An alternative method of specifying the datasets as a 
+comma-delimited list of X&Y datasets, where the X and Y 
+indices are demarcated by an ampersand. If no datasets are 
+set, then the lists may be selected interactively from a list.
 
 =item --all
 
@@ -996,9 +1016,9 @@ Display this help as a POD.
 
 This program will graph pairwise data sets against each other. This is useful 
 for determining correlations between data sets. The graphs are generated as 
-600x600 pixel PNG images and written to a subdirectory. 
+PNG images and written to a subdirectory. 
 
-Four types of graphs may be generated, specified by the --type argument.
+Three types of graphs may be generated, specified by the --type argument.
 
 A scatter plot will plot all pairwise values between two datasets as a 
 point on an X,Y graph. A line representing the linear regression of the 
@@ -1011,9 +1031,9 @@ A smooth plot is a line plot of pairwise values between two datasets and
 smoothed by a bezier curve.
 
 The datasets to be plotted may be specified either on the command line 
-using the --pair argument. If not specified, the program defaults to an 
-interactive mode and the user may repeatedly select the datasets from a list 
-of available datasets in the data file. 
+using the --pair or --index arguments. If not specified, the program 
+defaults to an interactive mode and the user may repeatedly select the 
+datasets from a list of available datasets in the data file. 
 
 The data in the datasets may be manipulated in several ways prior to plotting.
 The data may be converted to a percentile rank, smoothed by a moving average, 
