@@ -184,7 +184,7 @@ index_data_table($main_data_ref) or
 	# we will simply use the basename of the data file
 	# also get the extension for recognizing the file type to use below
 my ($name, $path, $ext) = fileparse($datafile, 
-	qw(.gff .gff.gz .gff3 .gff3.gz .sgr .sgr.gz .bam) );
+	qw(.gff .gff.gz .gff3 .gff3.gz .bed .bed.gz .sgr .sgr.gz .bam) );
 
 # Set metadata
 my $column = $main_data_ref->{'number_columns'};
@@ -218,6 +218,9 @@ $main_data_ref->{'number_columns'} += 1;
 	# determine file type based on extension
 if ($ext =~ /gff/) {
 	get_gff_data();
+} 
+elsif ($ext =~ /bed/) {
+	get_bed_data();
 } 
 elsif ($ext =~ /sgr/) {
 	get_sgr_data();
@@ -346,6 +349,47 @@ sub get_gff_data {
 		if ($line =~ /^#/) {next} # skip comment lines
 		chomp $line;
 		my ($chromo, $start, $stop, $score) = (split /\t/, $line)[0,3,4,5];
+		
+		# process the feature
+		$bin_count += &{$process_feature}(
+			$chromo,
+			$start,
+			$stop,
+			$score
+		);
+		$feature_count++;
+	}
+	
+	$fh->close;
+	print "  $feature_count features loaded, a total of $bin_count bins were modified\n";
+}
+
+
+
+
+sub get_bed_data {
+	print " Collecting features from BED file '$datafile'....\n";
+	
+	# open file io object
+	my $fh = open_to_read_fh($datafile);
+	unless ($fh) {
+		die "unable to open '$datafile': $!";
+	} 
+	
+	# collect the features
+	my $bin_count = 0;
+	my $feature_count = 0;
+	while (my $line = $fh->getline) {
+		if ($line =~ /^#/) {next} # skip comment lines
+		chomp $line;
+		my @data = split /\t/, $line;
+		my ($chromo, $start, $stop) = $data[0,1,2];
+		
+		# the score column is optional
+		my $score;
+		if (defined $data[4]) {
+			$score = $data[4];
+		}
 		
 		# process the feature
 		$bin_count += &{$process_feature}(
@@ -1048,7 +1092,8 @@ The command line flags and descriptions:
 =item --data <filename>
 
 Specify the source genomic data file containing the datapoints to be 
-binned. Supported files include .gff, .sgr, and .bam files. 
+binned. Supported files include .gff, .bed, .sgr, and .bam files. 
+Text files may be gzipped.
 
 =item --in <filename>
 
