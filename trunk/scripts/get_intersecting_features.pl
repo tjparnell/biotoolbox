@@ -14,6 +14,7 @@ use tim_db_helper qw(
 	open_db_connection
 	validate_dataset_list 
 	get_dataset_list 
+	validate_included_feature
 );
 
 
@@ -113,7 +114,7 @@ my $db = open_db_connection($database) ||
 
 
 
-### Identify Features
+### Identify the Features to Search
 if ($search_feature) {
 	# check the requested feature type
 	if ( validate_dataset_list($db, $search_feature) ) {
@@ -579,34 +580,44 @@ sub process_region {
 		my $f = shift @features;
 		
 		# record information
-		$data_ref->{'data_table'}->[$row][$number_i]   = 1;
-		$data_ref->{'data_table'}->[$row][$name_i]     = $f->display_name;
-		$data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
-		$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
-		$data_ref->{'data_table'}->[$row][$distance_i] = 
-			determine_distance($region, $f);
+		if ( validate_included_feature($f) ) {
+			# the feature is ok to use (doesn't have tag to exclude it)
+			$data_ref->{'data_table'}->[$row][$number_i]   = 1;
+			$data_ref->{'data_table'}->[$row][$name_i]     = $f->display_name;
+			$data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
+			$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
+			$data_ref->{'data_table'}->[$row][$distance_i] = 
+				determine_distance($region, $f);
+		}
+		else {
+			# the feature should be excluded
+			process_no_feature(
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+		}
 	}
 	
 	elsif (scalar @features > 1) {
 		# more than one feature
 		# need to identify the most appropriate one
 		
-		# first check for dubious orfs
-		# this is specific of course to the source data
-		if ($features[0]->has_tag('orf_classification') ) {
-			for (my $i = $#features - 1; $i >= 0; $i -= 1) {
-				# walk through the list and delete any that are dubious
-				# we're working backwards to avoid indexing problems with splice
-				my ($orf_class) = 
-					$features[$i]->get_tag_values('orf_classification');
-				if ($orf_class =~ m/dubious|pseudo/i) {
-					# delete the dubious or pseudogenes
-					splice(@features, $i, 1);
-				}
+		# first check for excluded feature tags
+		for (my $i = $#features - 1; $i >= 0; $i -= 1) {
+			# walk through the list and delete any that should be excluded
+			# we're working backwards to avoid indexing problems with splice
+			unless ( validate_included_feature($features[$i]) ) {
+				splice(@features, $i, 1);
 			}
 		}
 		
-		# we'll take the one with the most overlap first
+		
+		# next we'll take the one with the most overlap first
 		my $f;
 		if (scalar @features > 1) {
 			my %overlap2f;
@@ -756,8 +767,6 @@ sub summarize_found_features {
 	printf " $multiple (%.1f%%) reference features intersected with multiple target features\n",
 		(($multiple / $data_ref->{'last_row'}) * 100) if $multiple;
 }
-
-
 
 
 

@@ -1,15 +1,11 @@
 package tim_db_helper;
+
 require Exporter;
 use strict;
 use Carp;
 use FindBin qw($Bin);
 use Config::Simple;
 use Bio::DB::SeqFeature::Store;
-
-# just in case these aren't installed, maybe the rest of the module will still work
-eval { use Bio::Graphics::Wiggle; }; 
-eval { use Bio::DB::BigWig; }; # 
-
 use Statistics::Lite qw(
 	mean
 	median
@@ -19,20 +15,20 @@ use Statistics::Lite qw(
 	stddevp
 );
 
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
-our @EXPORT_OK = qw(
-	open_db_connection
-	get_dataset_list 
-	validate_dataset_list 
-	get_new_feature_list 
-	get_new_genome_list 
-	get_chromo_region_features 
-	get_feature_dataset 
-	get_genome_dataset 
-	get_chromo_region_score 
-	get_region_dataset_hash 
-);
+
+# check whether these optional modules are available
+our $WIGGLE_OK = 0;
+our $BIGWIG_OK = 0;
+eval { 
+	# check for wiggle support
+	use Bio::Graphics::Wiggle;
+	$WIGGLE_OK = 1;
+}; 
+eval { 
+	# check for BigWig support
+	use Bio::DB::BigWig;
+	$BIGWIG_OK = 1;
+}; 
 
 # Hashes of opened file objects
 our %OPENED_WIGFILES; # opened wigfile objects
@@ -54,9 +50,29 @@ else {
 	warn "\n#### Using default configuration file '$Bin/../lib/tim_db_config.cfg'####\n";
 	$TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
 	 	die Config::Simple->error();
-}	
+}
+our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
 
-1; # the true statement
+# Exported names
+our @ISA = qw(Exporter);
+our @EXPORT = qw();
+our @EXPORT_OK = qw(
+	$TIM_CONFIG
+	open_db_connection
+	get_dataset_list 
+	validate_dataset_list 
+	get_new_feature_list 
+	get_new_genome_list 
+	validate_included_feature 
+	get_feature_dataset 
+	get_genome_dataset 
+	get_chromo_region_score 
+	get_region_dataset_hash 
+);
+
+
+# The true statement
+1; 
 
 =head1 NAME
 
@@ -131,7 +147,9 @@ names to export.
   
 
 This will export the indicated subroutine names into the current namespace. 
-Their usage is detailed below .
+Their usage is detailed below. The configuration object may also be imported 
+into the program's namespace as C<$TIM_CONFIG> to allow access to the local 
+database configuration.
 
 
 =over
@@ -629,9 +647,6 @@ sub get_new_feature_list {
 		}
 	}
 	
-	# Get the list of tag exceptions
-	my $tag_exceptions = $TIM_CONFIG->get_block('exclude_tags');
-	
 	# Process the features
 	FEATURE_COLLECTION_LIST:
 	foreach my $feature (@featurelist) {
@@ -643,26 +658,8 @@ sub get_new_feature_list {
 		}
 		
 		# skip anything that matches the tag exceptions
-		foreach my $key (keys %{ $tag_exceptions }) {
-			if ($feature->has_tag($key)) {
-				# first check that the feature has this tag
-				my @tag_values = $feature->get_tag_values($key);
-				if (ref $tag_exceptions->{$key} eq 'ARRAY') {
-					# there's more than one exception value!
-					# need to check them all
-					foreach my $exception (@{ $tag_exceptions->{$key} }) {
-						if (grep {$_ eq $exception} @tag_values) {
-							next FEATURE_COLLECTION_LIST;
-						}
-					}
-				}
-				else {
-					# single tag exception value
-					if (grep {$_ eq $tag_exceptions->{$key}} @tag_values) {
-						next FEATURE_COLLECTION_LIST;
-					}
-				}
-			}
+		unless ( validate_included_feature($feature) ) {
+			next FEATURE_COLLECTION_LIST;
 		}
 		
 		
@@ -933,142 +930,46 @@ sub get_new_genome_list {
 
 
 
-
-
-### Get list of genomic features for a chromosomal region
-
-=item get_chromo_region_features 
-
-This subroutine will retrieve the features of a chromosomal region. The 
-chromosomal region is defined by chromosome, start, and stop. The ORF, RNA, 
-and non-gene chromosomal features are returned.
-
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
-
-  Required:
-  db =>       The name of the database or a reference to an 
-              established database object. 
-  chr =>      The name of the chromosome (reference sequence)
-  start =>    The start position of the region on the chromosome
-  stop =>     The stop position of the region on the chromosome
-
-The subroutine will return an array consisting of three elements, representing
-ORF features, RNA features, and non-gene features. Each element is a scalar 
-string comprised of a list of features, each comprised of "class name",
-separated by comma and space. I suppose I could have returned an array of 
-arrays, but I typically just report the string of features rather than 
-process further.
-
-Example
-
-	my $db_name = 'cerevisiae';
-	my $db = open_db_connection($db_name);
-	my (
-		$orf_feature,
-		$rna_feature,
-		$nongene_feature
-	) = get_chromo_region_features( {
-		'db'    => $db,
-		'chr'   => $chromo,
-		'start' => $start,
-		'stop'  => $stop,
-	} );
-
-
-=cut
-
-sub get_chromo_region_features {
-
-	# retrieve passed values
-	my $arg_ref = shift; 
+sub validate_included_feature {
 	
-	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /Bio::DB/) {
-			# a db object returns the name of the package
-			# this appears to be a bioperl db object
-			$db = $arg_ref->{'db'};
-		}
-		else {
-			# the name of a database
-			$db = open_db_connection( $arg_ref->{'db'} );
-		}
-	}
-	else {
-		carp 'no database name passed!';
-		return;
-	}
-	unless ($db) {
-		carp 'no database connected!';
-		return;
+	# feature to check
+	my $feature = shift;
+	
+	# get the list of feature exclusion tags
+	unless (defined $TAG_EXCEPTIONS) {
+		$TAG_EXCEPTIONS = $TIM_CONFIG->get_block('exclude_tags');
 	}
 	
-	# confirm values
-	unless (
-		$arg_ref->{'chr'} and 
-		$arg_ref->{'start'} and
-		$arg_ref->{'end'}
-	) {
-		carp "one or more genomic region coordinates are missing!";
-		return;
-	};
-	
-	# define the chromosomal region segment
-	my $region = $db->segment(
-			-name  => $arg_ref->{'chr'},
-			-start => $arg_ref->{'start'},
-			-end   => $arg_ref->{'end'},
-	);
-	unless ($region) {
-		carp "unable to define genomic region";
-		return;
-	}
-	
-	# look up genomic features within this region
-	my @classes = _features_to_classes('all');
-	my @features = $region->features(
-		-types => @classes,
-	);
-	
-	# collect the features into the lists
-	my @orf_list;
-	my @rna_list;
-	my @non_gene_list;
-	foreach (@features) {
-		
-		# collect information about the feature
-		my $class = $_->class;
-		my $name = $_->name;
-		
-		# classify the feature
-		if ($class =~ /ORF|gene/i) { 
-			# if this feature is a gene
-			if ($_->attributes('Qualifier') eq 'Dubious') {
-				# skip dubious genes
-				next;
+	# Check the tag exceptions
+	# we will check for the presence of the exception tag
+	# if the feature tag value matches the exception tag value
+	# then the feature should be excluded
+	foreach my $key (keys %{ $TAG_EXCEPTIONS }) {
+		if ($feature->has_tag($key)) {
+			# first check that the feature has this tag
+			my @tag_values = $feature->get_tag_values($key);
+			if (ref $TAG_EXCEPTIONS->{$key} eq 'ARRAY') {
+				# there's more than one exception value!
+				# need to check them all
+				foreach my $exception (@{ $TAG_EXCEPTIONS->{$key} }) {
+					if (grep {$_ eq $exception} @tag_values) {
+						# this feature should be excluded
+						return;
+					}
+				}
 			}
-			push @orf_list, "$class $name";
-		} 
-		elsif ($class =~ /RNA/i) {
-			# if this feature is some sort of RNA gene
-			push @rna_list, "$class $name";
-		} 
-		else { 
-			# otherwise a non-gene feature
-			push @non_gene_list, "$class $name";
+			else {
+				# single tag exception value
+				if (grep {$_ eq $TAG_EXCEPTIONS->{$key}} @tag_values) {
+					# this feature should be excluded
+					return;
+				}
+			}
 		}
 	}
 	
-	# return the list of three scalars
-	return(
-		join(", ", @orf_list),
-		join(", ", @rna_list),
-		join(", ", @non_gene_list),
-	);
+	# if we've made it thus far, the feature is good
+	return 1;
 }
 
 
@@ -3200,6 +3101,12 @@ sub _get_wig_data {
 	# get passed arguments
 	my ($datapoint, $start, $end) = @_;
 	
+	# check that we have wiggle support
+	unless ($WIGGLE_OK) {
+		carp " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
+		return;
+	}
+	
 	# collect wig data
 	my @scores;
 	if ($datapoint->has_tag('wigfile') ) {
@@ -3283,6 +3190,12 @@ sub _get_bigwig_data {
 	
 	# get passed arguments
 	my ($datapoint, $chromo, $start, $end, $position_req) = @_;
+	
+	# check that we have bigwig support
+	unless ($BIGWIG_OK) {
+		carp " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
+		return;
+	}
 	
 	# collect bigwig data
 	my @collected_data;

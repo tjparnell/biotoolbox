@@ -163,29 +163,37 @@ sub get_attribute_list_from_user {
 	# request interactively from user
 	else {
 		
-		# get the first feature as an example
-		my @examples = $db->features(
-			-name     => $main_data_ref->{'data_table'}->[1][$name_index],
-			-type     => $main_data_ref->{'data_table'}->[1][$type_index]
-		);
-		unless (@examples) {
-			die " can't pull the first feature from the database!\n";
-		}
+		# get the list of features to check for examples
 		
-		# get the attributes for this feature
-			# hopefully all the features have the same attributes
-		my %taghash = $examples[0]->attributes();
+		# get the attributes for a sample of features
+		# store the tag keys in an example hash
+		my %tagexamples;
+		for (my $i = 1; $i < 50; $i++) {
+			my @examples = $db->features(
+				-name     => $main_data_ref->{'data_table'}->[$i][$name_index],
+				-type     => $main_data_ref->{'data_table'}->[$i][$type_index]
+			);
+			unless (@examples) {
+				next;
+			}
+			my %taghash = $examples[0]->attributes();
+			foreach (keys %taghash) {
+				$tagexamples{$_} += 1;
+			}
+		}
 		
 		# present list to user
 		print " These are the attributes which may be collected:\n";
 		my $i = 1;
 		my %index2att;
+		# standard attributes for any user
 		foreach ( qw(chromo start stop length midpoint strand phase score) ) {
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
 		}
-		foreach (sort {$a cmp $b} keys %taghash) {
+		# specific attributes for these features
+		foreach (sort {$a cmp $b} keys %tagexamples) {
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
@@ -305,50 +313,50 @@ sub collect_attributes_for_list {
 
 sub get_chromo {
 	my $feature = shift;
-	return $feature->seq_id;
+	return $feature->seq_id || '.';
 }
 
 
 sub get_start {
 	my $feature = shift;
-	return $feature->start;
+	return $feature->start || '.';
 }
 
 
 
 sub get_stop {
 	my $feature = shift;
-	return $feature->end;
+	return $feature->end || '.';
 }
 
 
 sub get_length {
 	my $feature = shift;
-	return $feature->length;
+	return $feature->length || '.';
 }
 
 
 sub get_midpoint {
 	my $feature = shift;
-	return ($feature->start + int( $feature->length / 2) );
+	return ($feature->start + int( $feature->length / 2) ) || '.';
 }
 
 
 sub get_strand {
 	my $feature = shift;
-	return $feature->strand;
+	return $feature->strand || '.';
 }
 
 
 sub get_phase {
 	my $feature = shift;
-	return $feature->phase;
+	return $feature->phase || '.';
 }
 
 
 sub get_score {
 	my $feature = shift;
-	return $feature->score;
+	return $feature->score || '.';
 }
 
 
@@ -356,7 +364,7 @@ sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
 	my @values = $feature->get_tag_values($attrib);
-	return $values[0];
+	return $values[0] || '.';
 }
 
 

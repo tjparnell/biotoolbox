@@ -16,7 +16,6 @@ use tim_db_helper qw(
 	validate_dataset_list
 	get_region_dataset_hash
 	get_chromo_region_score
-	get_chromo_region_features
 );
 use tim_file_helper;
 
@@ -774,39 +773,65 @@ sub get_overlapping_features {
 	for my $i (0..$#windows) {
 		
 		# collect the genomic features in the region
-		my ($orf_list, $rna_list, $non_gene_list) = 
-			get_chromo_region_features( {
-				'db'     => $db,
-				'chr'    => $windows[$i][1],
-				'start'  => $windows[$i][2],
-				'end'    => $windows[$i][3],
-		} );
+		my @features = $db->get_features_by_location(
+			-seq_id    => $windows[$i][1],
+			-start     => $windows[$i][2],
+			-end       => $windows[$i][3],
+		);
+		
+		my (@orf_list, @rna_list, @non_gene_list);
+		foreach my $f (@features) {
+			
+			# collect info
+			my $type = $f->primary_tag;
+			my $name = $f->display_name;
+			
+			# determine which category to put the feature in
+			# this is pretty generic, how useful is this, really?
+			# keeping it this way to avoid breakage and rewrites....
+			if ($type =~ /rna/i) {
+				push @rna_list, "$type $name";
+			}
+			elsif ($type =~ /gene|orf/i) {
+				push @orf_list, "$type $name";
+			}
+			else {
+				push @non_gene_list, "$type $name";
+			}
+		}
+		
 		
 		# tack on the list of features
-		unless ($orf_list) {
-			$orf_list = '.';
+		if (@orf_list) {
+			push @{ $windows[$i] }, join(", ", @orf_list);
 		}
-		unless ($rna_list) {
-			$rna_list = '.';
+		else {
+			push @{ $windows[$i] }, '.';
 		}
-		unless ($non_gene_list) {
-			$non_gene_list = '.';
+		if (@rna_list) {
+			push @{ $windows[$i] }, join(", ", @rna_list);
 		}
-		push @{ $windows[$i] }, $orf_list, $rna_list, $non_gene_list;
+		else {
+			push @{ $windows[$i] }, '.';
+		}
+		if (@non_gene_list) {
+			push @{ $windows[$i] }, join(", ", @non_gene_list);
+		}
+		else {
+			push @{ $windows[$i] }, '.';
+		}
 		# arrays now have $chr, $start, $end, $size, $finalscore,
 		# plus, if requested, $orf_list, $rna_list, $non_gene_list
 		
 		# Record the gene names if requested
 		if ($genes) { 
-			my @orfs = split /, /, $orf_list;
-			foreach (@orfs) {
-				# each gene is 'class name'
+			foreach (@orf_list) {
+				# each item is 'type name'
 				# only keep the name
 				push @genelist, (split / /)[1]; 
 			}
-			my @rnas = split /, /, $rna_list;
-			foreach (@rnas) {
-				# each gene is 'class name'
+			foreach (@rna_list) {
+				# each item is 'type name'
 				# only keep the name
 				push @genelist, (split / /)[1];
 			}
