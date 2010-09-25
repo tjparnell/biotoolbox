@@ -207,9 +207,9 @@ While Jim Kent provides pre-compiled executables, we need the libraries to build
 		sudo mkdir lib
 		sudo mkdir lib/x86_64
 		sudo mkdir inc
-		sudo cp ~/Documents/kent/src/inc/* /usr/local/kent/inc
-		sudo cp ~/Documents/kent/src/lib/x86_64/*.a /usr/local/kent/lib/x86_64
-		sudo cp ~/bin/x86_64/* /usr/local/bin
+		sudo cp ~/Documents/kent/src/inc/`*` /usr/local/kent/inc
+		sudo cp ~/Documents/kent/src/lib/x86_64/`*`.a /usr/local/kent/lib/x86_64
+		sudo cp ~/bin/x86_64/`*` /usr/local/bin
 	</pre>
 	# Finally, you can install the Bio-BigFile Perl module. I've tried through CPAN, but for some reason without much success. However, you can download the source tarball from CPAN and build it from shell prompt. Extract into a working directory and `cd` into it.
 	<pre>
