@@ -32,26 +32,24 @@
 	{{{
 		sudo cpan
 	}}}
-	When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under /Library/Perl. You can upgrade system-installed modules and they should be installed in /Library/Perl and take precedence over those installed in /System/Library/Perl. 
-	Some basic modules to upgrade/install right away (but probably not absolutely necessary) include the following. 
-	{{{
-		readline
-		YAML
-		CPAN
-		Module::Build
-		ExtUtils::MakeMaker
-		ExtUtils::CBuilder
-	}}}
+	When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under `/Library/Perl`. You can upgrade system-installed modules and they should be installed in `/Library/Perl` and take precedence over those installed in `/System/Library/Perl`. 
+	Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
+		* readline
+		* YAML
+		* CPAN
+		* Module::Build
+		* ExtUtils::MakeMaker
+		* ExtUtils::CBuilder
 	To install a module under the CPAN shell, type `install <name_of_module>`. To find a module in the CPAN repository, type `d /keyword/`, where keyword is a regular expression to find the distribution you want. Type `h` to get the help menu for additional functions. 
 	
 
 ==Install Third party software==
 ===Installing MySQL using Fink===
-	# Install MySQL. I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`.
+	# Install MySQL. I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`. To install MySQL through Fink, enter the following:
 	{{{
 		sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
 	}}}
-	# To make things easier, I also like to install the MySQL Gui [http://www.mysql.com/downloads/workbench/ Workbench]. 
+	# To make things easier, I also like to install the MySQL Gui [http://www.mysql.com/downloads/workbench/ Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
 	# To start up MySQL, run
 	{{{
 		sudo mysqld_safe –u root &
@@ -60,7 +58,7 @@
 	{{{
 		mysqladmin –u root password <password>
 	}}}
-	# Test by starting the client
+	# Test by starting the client. Exit the client by typing `exit` at the prompt.
 	{{{
 		mysql –u root –p
 	}}}
@@ -79,34 +77,30 @@
 	{{{
 		sudo fink install gd2
 	}}}
-	# If you want the latest, greatest bioperl, you’ll also need to install Git. 
+	# If you want the latest, greatest bioperl, you’ll also need to install Git. Note that this takes a relatively long time to compile. 
 	{{{
 		sudo fink install git
 	}}}
 
 ==Install CPAN modules==
 	# There are a number of pre-requisites you can install to make the bioperl installation smoother, as well as modules that are required for several of my programs. I find the easiest way is to install all of these through CPAN. Watch out for prerequisites, and let CPAN install those for you.
-	{{{
-		GD
-		GD::SVG
-		SVG
-		CGI
-		DBI
-		DBD::mysql
-		DBD::SQLite
-		Statistics::Descriptive
-	}}}
+		* GD
+		* GD::SVG
+		* SVG
+		* CGI
+		* DBI
+		* DBD::mysql
+		* DBD::SQLite
+		* Statistics::Descriptive
 	# Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
-	{{{
-		GD::Graph
-		GD::Graph::smoothlines
-		Statistics::Lite
-		Statistics::LineFit
-		Compress::Zlib
-		IO::Zlib
-		Config::Simple
-		Pod::Usage
-	}}}
+		* GD::Graph
+		* GD::Graph::smoothlines
+		* Statistics::Lite
+		* Statistics::LineFit
+		* Compress::Zlib
+		* IO::Zlib
+		* Config::Simple
+		* Pod::Usage
 
 ===Install BioPerl===
 	# Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN, which should be adequate for most purposes.
@@ -132,7 +126,7 @@
 		Bio::Graphics
 		GBrowse
 	}}}
-	It should be safe to accept the default locations for the browser installation files. 
+	It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire.
 	# Important! You will need to turn on Apache web server using the Sharing tab of System Preferences.
 	# Also, the default security settings need to be adjusted to allow for GBrowse to work correctly; otherwise I have issues. This may not  be the best fix, as I’m not an Apache expert. In the file `/etc/apache2/httpd.conf`, find the `<Directory />` stanza and comment out the following lines 
 	{{{
@@ -169,13 +163,68 @@
 	# To make my life a whole lot easier, made symlinks of the executables in `/usr/local/bin` with the following commands
 	{{{
 		cd /usr/local/bin
-		ln -s /usr/local/samtools/samtools samtools
-		ln -s /usr/local/samtools/samtools.pl samtools.pl
-		ln -s /usr/local/samtools/razip razip
+		sudo ln -s /usr/local/samtools/samtools samtools
+		sudo ln -s /usr/local/samtools/samtools.pl samtools.pl
+		sudo ln -s /usr/local/samtools/razip razip
 	}}}
 	
 ==Installing Bio::DB::Sam==
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
+
+
+==Installing BigFile Support
+Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
+
+While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here]. 
+
+	# Download Jim Kent's source [http://http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
+	# Set up the environment variables. These are only really needed during compilation, so you can temporarily enter these commands in your terminal session. To make them more permament, add them to your `.profile` or `.bashrc` files in your home directory. The variables below assume a 64-bit Intel machine and that MySQL is installed through Fink, as described above; change as appropriate.
+	{{{
+		export MACHTYPE=x86_64
+		export MYSQLLIBS="/sw/lib/mysqlclient.a -lz -lm"
+		export MYSQLINC="/sw/include/mysql"
+	}}}
+	# First, compile the libraries. While we really only need one (I think), it's easiest to simply compile them all.
+	{{{
+		cd ~/Documents/kent/src/
+		make libs
+	}}}
+	# It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/`. This is a short, but not exhaustive, list of programs that I might recommend.
+		* bedGraphToBigWig
+		* bedToBigBed
+		* bigBedInfo
+		* bigBedSummary
+		* bigBedToBed
+		* bigWigInfo
+		* bigWigSummary
+		* bigWigToBedGraph
+		* bigWigToWig
+		* wigToBedGraph
+		* wigToBigWig
+	# Move the files into appropriate common destinations. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files.
+	{{{
+		sudo mkdir /usr/local/kent_src
+		cd /usr/local/kent_src
+		sudo mkdir lib
+		sudo mkdir lib/x86_64
+		sudo mkdir inc
+		sudo cp ~/Documents/kent/src/inc/* /usr/local/kent/inc
+		sudo cp ~/Documents/kent/src/lib/x86_64/*.a /usr/local/kent/lib/x86_64
+		sudo cp ~/bin/x86_64/* /usr/local/bin
+	}}}
+	# Finally, you can install the Bio-BigFile Perl module. I've tried through CPAN, but for some reason without much success. However, you can download the source tarball from CPAN and build it from shell prompt. Extract into a working directory and `cd` into it.
+	{{{
+		perl Build.PL
+	}}}
+	During the configuration, it will ask for the location of Kent's source tree. It really just needs the headers and libraries, which you've compiled and copied above. Enter the path `/usr/local/kent_src`. It expects the header and library files to be in the same directory structure as the original kent source tree; I don't think the generic `/usr/local/inc` and `/usr/local/lib` directories will work.
+	# Continue with the module installation.
+	{{{
+		./Build
+		./Build test
+		sudo ./Build install
+	}}}
+		
+
 
 
 =Additional Tools=
