@@ -12,8 +12,8 @@
 	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
 
 ==First things==
-	#	Install the Developer Tools from Apple. You don’t need all the OS X packages, just the base Unix developer package.
-	#	Install [http://www.finkproject.org/ Fink]. I find it easiest to install third party software using a package manager, which makes installation, upgrading, and removal much easier. An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. Download the binary installer and follow the online directions. Important: If you’ll be running 64 bit programs, you should set up Fink to be 64 bit as well! It should install into `/sw`. Make sure you have your account(s) set up to use Fink by running 
+	# Install the Developer Tools from Apple. You don’t need all the OS X packages, just the base Unix developer package.
+	# Install [http://www.finkproject.org/ Fink]. I find it easiest to install third party software using a package manager, which makes installation, upgrading, and removal much easier. An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. Download the binary installer and follow the online directions. Important: If you’ll be running 64 bit programs, you should set up Fink to be 64 bit as well! It should install into `/sw`. Make sure you have your account(s) set up to use Fink by running 
 	{{{
 		/sw/bin/pathsetup.sh
 	}}}
@@ -21,26 +21,25 @@
 	{{{
 		Trees: local/main stable/main stable/crypto unstable/main unstable/crypto
 	}}}
-	# Update Fink using the following
+	# Update Fink using the following commands. When installing/upgrading many programs through Fink, it will identify prerequisites which are needed and offer to install those as well. Always accept those. This is the wonderful advantage of using a package manager.
 	{{{
 		sudo fink selfupdate
 		fink scanpackages
 		fink index
 	}}}
-	When installing/upgrading many programs through Fink, it will identify prerequisites which are needed and offer to install those as well. Always accept those. This is the wonderful advantage of using a package manager.
-	# Set up CPAN. Run
+	# Set up CPAN. Run the following command.
 	{{{
 		sudo cpan
 	}}}
-	When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under `/Library/Perl`. You can upgrade system-installed modules and they should be installed in `/Library/Perl` and take precedence over those installed in `/System/Library/Perl`. 
-	Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
+	# When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? There may be things you want to change, such as CPAN mirror sites. All the modules should be installed under `/Library/Perl`. You can upgrade system-installed modules and they should be installed in `/Library/Perl` and take precedence over those installed in `/System/Library/Perl`. 
+	# To install a module under the CPAN shell, type `install <name_of_module>`. To find a module in the CPAN repository, type `d /keyword/`, where keyword is a regular expression to find the distribution you want. Type `h` to get the help menu for additional functions. Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
 		* readline
 		* YAML
 		* CPAN
 		* Module::Build
 		* ExtUtils::MakeMaker
 		* ExtUtils::CBuilder
-	To install a module under the CPAN shell, type `install <name_of_module>`. To find a module in the CPAN repository, type `d /keyword/`, where keyword is a regular expression to find the distribution you want. Type `h` to get the help menu for additional functions. 
+	 
 	
 
 ==Install Third party software==
@@ -70,7 +69,7 @@
 	{{{
 		sudo daemonic enable mysql
 	}}}
-	There should now be a startup plist file in `/Library/StartupItems/`.
+	# There should now be a startup plist file in `/Library/StartupItems/`.
 
 ===Installing the GD Libraries===
 	# Install the GD libraries. These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
@@ -107,18 +106,18 @@
 	{{{
 		CJFIELDS/BioPerl-1.6.1.tar.gz
 	}}}
-	There are dozens of prerequisite modules for bioperl, but many (all?) are not absolutely necessary. I've listed above the ones that I think are the most needed, so you should be able to safely skip most of the prerequisites it lists. However, if you miss one, perl usually does a pretty good job at complaining that a required module is missing, and you can always go back and install it.
+	# There are dozens of prerequisite modules for bioperl, but many (all?) are not absolutely necessary. I've listed above the ones that I think are the most needed, so you should be able to safely skip most of the prerequisites it lists. However, if you miss one, perl usually does a pretty good job at complaining that a required module is missing, and you can always go back and install it.
 	# Since BioPerl is under continual development, and a number of improvements have been made, the latest bioperl-live distribution may be ideal. You can download it using git
 	{{{
 		git clone git://github.com/bioperl/bioperl-live.git
 	}}}
-	If you download the live version, follow the instructions for installing, but it should go something like this 
+	# If you download the live version, follow the instructions for installing, but it should go something like the following. The same warnings about prerequisites apply as above.
 	{{{
 		perl Build.PL
 		./Build test
 		sudo ./Build install
 	}}}
-	The same warnings about prerequisites apply as above.
+
 	
 ==Installing GBrowse==
 	# Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
@@ -126,19 +125,19 @@
 		Bio::Graphics
 		GBrowse
 	}}}
-	It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire.
+	# It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire.
 	# Important! You will need to turn on Apache web server using the Sharing tab of System Preferences.
 	# Also, the default security settings need to be adjusted to allow for GBrowse to work correctly; otherwise I have issues. This may not  be the best fix, as I’m not an Apache expert. In the file `/etc/apache2/httpd.conf`, find the `<Directory />` stanza and comment out the following lines 
 	{{{
 		Order deny,allow
 		Deny from all lines. 
 	}}}
-	Then add the following lines:
+	# Then add the following lines:
 	{{{
 		Order allow,deny
 		Allow from all
 	}}}
-	You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The default yeast genome should come up.
+	# You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The default yeast genome should come up.
 	
 ==Installing Samtools==
 [http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
@@ -168,11 +167,11 @@
 		sudo ln -s /usr/local/samtools/razip razip
 	}}}
 	
-==Installing Bio::DB::Sam==
+==Installing Bio-Samtools==
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
 
 
-==Installing BigFile Support
+==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
 
 While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here]. 
