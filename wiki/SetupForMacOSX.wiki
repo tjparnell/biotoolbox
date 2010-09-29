@@ -14,39 +14,52 @@
 
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
+
 An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. 
+
 To install, download the binary installer and follow the online directions. Note that there is not a binary installer for Mac OS X 10.6 Snow Leopard. For that, you'll need to bootstrap the installation. It's best to follow their [http://www.finkproject.org/download/srcdist.php instructions]. 
-*Important* If you’ll be running 64-bit programs (e.g. default Perl 10.0 under Mac OS X 10.6), you must set up Fink to be 64 bit as well! In the source install, it will ask you this question at the beginning.
-Fink installs into `/sw` directory. This makes it convenient by completely isolating Fink software from the system directories, preventing potential conflicts. MacPorts accomplishes the same thing by installing in `/opt`. 
+
+*Important* If you’ll be running 64-bit programs (e.g. default Perl 10.0 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
+
+Fink installs into the `/sw` directory. This makes it convenient by completely isolating Fink software from the system directories, preventing potential conflicts and overwrites. MacPorts accomplishes the same thing by installing in `/opt`. 
+
 Make sure you have your account(s) set up to use Fink by running 
 <pre>
 	/sw/bin/pathsetup.sh
 </pre>
+
 The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
+
 To enable the unstable tree, edit the file `/sw/etc/fink.conf`. Find the line that begins with "Trees:" edit the line to look like the following.
 <pre>
 	Trees: local/main stable/main stable/crypto unstable/main unstable/crypto
 </pre>
+
 After installing, and optionally setting up unstable trees, update Fink using the following commands. 
 <pre>
 	sudo fink selfupdate
 	fink scanpackages
 	fink index
 </pre>
+
 To find a program to install, run the following command.
 <pre>
 	fink list <program>
 </pre>
+
 To list installed programs, run
 <pre>
 	fink list -i
 </pre>
+
 To install the program you want, run the following command. Fink will identify necessary prerequisites and offer to install those as well. Always accept those. 
 <pre>
 	fink install <program>
 </pre>
+
 You can learn more by running `fink --help`.
 	 
+
 ===Installing MySQL using Fink===
 I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`. To install MySQL through Fink, enter the following:
 <pre>
@@ -59,6 +72,7 @@ To start up MySQL, run
 <pre>
 	sudo mysqld_safe –u root &
 </pre>
+This starts up the MySQL server as a system process in the background. Make sure you have used `sudo` in the past minute or so and authenticate with your password; try running `sudo ls` prior.
 
 Set the root password
 <pre>
@@ -93,9 +107,9 @@ It should also install libjpeg and libpng, along with the appropriate libraries.
 
 
 ===Installing other programs with Fink===	
-If you want the latest, greatest bioperl, you’ll also need to install Git. This is a versioning control system used by some open source projects; another one is SVN, which is part of the Mac OS X system. Note that this takes a relatively long time to compile. 
+If you want the latest, greatest bioperl, you’ll also need to install _Git_. This is a versioning control system used by some open source projects; another one is SVN, which is part of the Mac OS X system. Note that this takes a relatively long time to compile. 
 
-Another useful tool is wget, which is used to download file(s) using http and ftp protocols. 
+Another useful tool is _wget_, which is used to download file(s) using http and ftp protocols. 
 
 Finally, the [http://emboss.sourceforge.net/ EMBOSS] tools is an excellent collection of various useful tools for molecular biology. This, too, can take a while to compile, as there are many dependencies and programs.
 
@@ -131,11 +145,11 @@ Look back through the output for possible clues to the failure. Often times ther
 
 Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed through Fink.
 
-Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64), and many executable programs and libraries include code for all three architectures. However, Perl extensions usually only have one (the one that Perl is currently running), and will complain about the others. You can safely ignore those warnings.
+Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures. However, Perl extensions usually only have one (the one that Perl is currently running), and will complain about the others. You can safely ignore those warnings.
 
-Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (BASH prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. This has occasionally worked for me, for whatever reason. 
+Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
 
-Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically testing your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
+Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically test your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
 
 
 ===Important BioPerl pre-requisites===
@@ -210,12 +224,12 @@ If you'll be working with 64-bit executables, edit the `Makefile` to un-comment 
 
 Compile by running `make`. Also compile razip by executing `make razip`. I'm not entirely sure of the utility of this program (the documentation is not entirely clear), but I included it anway.
 
-Created the directory `/usr/local/samtools` and copied the following into it. 
+Create the directory `/usr/local/samtools` and copy the following into it. 
 	* all contents of the `misc` directory in the source tree
 	* the generated executables `samtools` and `razip`
 	* the information file `samtools.txt`
 
-Copied the headers into `/usr/local/include`
+Copy the headers into `/usr/local/include`
 	* `sam.h`
 	* `sam_header.h`
 	* `bam.h`
@@ -223,9 +237,9 @@ Copied the headers into `/usr/local/include`
 	* `khash.h`
 	* `faidx.h`
 
-Copied the main library `libbam.a` into `/usr/local/lib`
+Copy the main library `libbam.a` into `/usr/local/lib`.
 
-Copied the man file `samtools.1` into `/usr/local/man/man1/`
+Copy the man file `samtools.1` into `/usr/local/man/man1/`
 
 To make my life a whole lot easier, made symlinks of the executables in `/usr/local/bin` with the following commands
 <pre>
@@ -254,13 +268,13 @@ Set up the environment variables. These are only really needed during compilatio
 	export MYSQLINC="/sw/include/mysql"
 </pre>
 
-First, compile the libraries. While we really only need one (I think), it's easiest to simply compile them all.
+First, compile the libraries. While we really only need one (I believe), it's easiest to simply compile them all.
 <pre>
 	cd ~/Documents/kent/src/
 	make libs
 </pre>
 
-It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/`. This is a short, but not exhaustive, list of programs that I might recommend.
+It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/` (assuming a 64-bit machine). This is a short, but not exhaustive, list of programs that I might recommend.
 	* bedGraphToBigWig
 	* bedToBigBed
 	* bigBedInfo
@@ -285,7 +299,7 @@ Move the files into appropriate common destinations. I suppose the entire kent s
 	sudo cp ~/bin/x86_64/`*` /usr/local/bin
 </pre>
 
-Finally, you can install the Bio-BigFile Perl module. I've tried through CPAN, but for some reason without much success. However, you can download the source tarball from CPAN and build it from shell prompt. Extract into a working directory and `cd` into it.
+Finally, you can install the Bio-BigFile Perl module. I've tried through CPAN, but for some reason without much success. However, you can download the source tarball from CPAN and build it from shell prompt, which has worked for me. Extract into a working directory and `cd` into it.
 <pre>
 	perl Build.PL
 </pre>
