@@ -145,7 +145,7 @@ Look back through the output for possible clues to the failure. Often times ther
 
 Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed through Fink.
 
-Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures. However, Perl extensions usually only have one (the one that Perl is currently running), and will complain about the others. You can safely ignore those warnings.
+Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures (Universal Binary). However, libraries built under Fink as well as other compiled libraries will usually only have only one architecture, and the compiler will warn about this. You can safely ignore those warnings.
 
 Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
 
@@ -162,6 +162,7 @@ There are a number of pre-requisites you can install to make the BioPerl install
 	* DBD::mysql
 	* DBD::SQLite
 	* Statistics::Descriptive
+	* Data::Stag
 
 
 ===Additional modules for biotoolbox===
