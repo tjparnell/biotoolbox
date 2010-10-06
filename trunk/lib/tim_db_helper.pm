@@ -742,7 +742,8 @@ arguments. The keys include
               established database object. 
   Optional: 
   win =>      A scalar value containing an integer representing the
-              size of the window in basepairs. Default is 500 bp.
+              size of the window in basepairs. The default value 
+              is defined in tim_db_helper.cfg file.
   step =>     A scalar value containing an integer representing the
               step size for advancing the window across the genome. 
               The default is the window size.
@@ -810,8 +811,10 @@ sub get_new_genome_list {
 		$win = $arg_ref->{'win'};
 	}
 	else {
-		$win = 500;
-		print "  Using default window size 500 bp\n";
+		$win = 
+			$TIM_CONFIG->param("$db_name\.window") ||
+			$TIM_CONFIG->param('default_db.window');
+		print "  Using default window size $win bp\n";
 	}
 	if ($arg_ref->{'step'}) {
 		$step = $arg_ref->{'step'};
@@ -864,7 +867,8 @@ sub get_new_genome_list {
 		# we're using an elongated pseudo Schwartzian Transform
 	my @temp_chromos;
 	my $mitochr; # special placeholder for the mitochrondrial chromosome
-	my $ref_seq_type = $TIM_CONFIG->param("$db_name\.reference_sequence_type") ||
+	my $ref_seq_type = 
+		$TIM_CONFIG->param("$db_name\.reference_sequence_type") ||
 		$TIM_CONFIG->param('default_db.reference_sequence_type');
 			# the annotation gff may have the reference sequences labeled
 			# as various types, such as chromosome, sequence, 
@@ -892,8 +896,8 @@ sub get_new_genome_list {
 		push @chromosomes, $mitochr;
 	}
 	unless (@chromosomes) {
-		carp " no chromosomes found! Please check the reference sequence type\n" .
-			" in the configuration file and database\n";
+		carp " no '$ref_seq_type' features found! Please check the reference\n" .
+			" sequence type in the configuration file and database\n";
 		return;
 	}
 	

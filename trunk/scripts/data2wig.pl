@@ -38,8 +38,9 @@ my (
 	$midpoint,
 	$format,
 	$bigwig,
+	$bw_app_path,
 	$database,
-	$method,
+	$chromo_file,
 	$gz,
 	$help
 );
@@ -56,8 +57,10 @@ GetOptions(
 	'track!'    => \$use_track, # boolean to include a track line
 	'midpoint!' => \$midpoint, # boolean to use the midpoint
 	'format=i'  => \$format, # format output to indicated number of places
-	'bigwig'    => \$bigwig, # generate a binary bigwig file
+	'bigwig|bw' => \$bigwig, # generate a binary bigwig file
 	'db=s'      => \$database, # database for bigwig file generation
+	'chromo=s'  => \$chromo_file, # name of a chromosome file
+	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help # request help
 );
@@ -88,10 +91,6 @@ unless (defined $use_track) {
 		$use_track = 1;
 	}
 }
-if ($bigwig) {
-	eval {use Bio::DB::BigFile};
-	die "can't use bigwig function! $@ \n" if $@;
-}
 
 
 
@@ -121,12 +120,14 @@ unless (defined $chr_index and defined $start_index) {
 }
 
 # identify database if needed
-if ($bigwig and !$database) {
-	if (exists $metadata_ref->{db}) {
-		$database = $metadata_ref->{db};
-	}
-	else {
-		die " No database identified for generating bigwig file!\n";
+if ($bigwig) {
+	unless ($database or $chromo_file) {
+		if (exists $metadata_ref->{db}) {
+			$database = $metadata_ref->{db};
+		}
+		else {
+			die " No database name or chromosome file provided for generating bigwig file!\n";
+		}
 	}
 }
 
@@ -368,48 +369,18 @@ $out_fh->close;
 
 ### Generate BigWig file format
 if ($bigwig) {
+	
 	# requested to continue and generate a binary bigwig file
 	print " temporary wig file '$outfile' generated\n";
 	print " converting to bigwig file....\n";
 	
-	
-	# open database connection
-	my $db = open_db_connection($database) or
-		die " unable to open database to get chromosome lengths!\n";
-	
-	
-	# generate chromosome lengths file
-	my @chromos = $db->features(-type => 'chromosome');
-	unless (@chromos) {
-		die " no chromosome features identified in database!\n";
-	}
-	open FILE, ">chromosome_lengths.txt";
-	foreach (@chromos) {
-		print FILE $_->name, "\t", $_->length, "\n";
-	}
-	close FILE;
-	
-	
-	# generate the bigwig file 
-		# we are using the Bio::DB::BigFile module to generate the 
-		# bigwig file
-		# however, Lincoln notes that this method may be deprecated
-		# in future versions
-		# for the time being we will use this method as it avoids
-		# having to hunt down Jim Kent's utility in the path
-		
-		# we'll use Lincoln's default values, which are slightly
-		# different from Kent's default values in his utility
-		# but I'm not sure the reasoning behind the differences
-	my $bw_file = $outfile;
-	$bw_file =~ s/\.wig$/.bw/;
-	Bio::DB::BigFile->createBigWig(
-		$outfile, 
-		"chromosome_lengths.txt",
-		$bw_file
-	);
-	unlink "chromosome_lengths.txt"; # we don't need this anymore
-	
+	my $bw_file = wig_to_bigwig_conversion( {
+			'wig'       => $outfile,
+			'db'        => $database,
+			'chromo'    => $chromo_file,
+			'bwapppath' => $bw_app_path,
+	} );
+
 	
 	# confirm
 	if (-e $bw_file) {
@@ -452,7 +423,7 @@ data2wig.pl [--options...] <filename>
   --(no)track
   --format [0,1,2,3]
   --(no)midpoint
-  --bigwig
+  --bigwig|--bw
   --db <database>
   --(no)gz
   --help
@@ -531,7 +502,7 @@ Indicate the number of decimal places the score value should
 be formatted. Acceptable values include 0, 1, 2, or 3 places.
 The default is to not format the score value.
 
-=item --bigwig
+=item --bigwig --bw
 
 Indicate that a binary BigWig file should be generated instead of 
 a text wiggle file. A .wig file is first generated, then converted to 
