@@ -1,5 +1,6 @@
 package tim_file_helper;
 
+### modules
 require Exporter;
 use strict;
 use Carp;
@@ -8,6 +9,18 @@ use IO::File;
 use IO::Zlib;
 use Storable qw(store_fd fd_retrieve store retrieve);
 use Statistics::Lite qw(mean min max);
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_db_helper qw($TIM_CONFIG open_db_connection);
+
+# optional modules
+our $BIGFILE_OK = 0;
+eval {
+	use Bio::DB::BigFile;
+	$BIGFILE_OK = 1;
+};
+
+
 
 ### Variables
 # Export
@@ -23,6 +36,7 @@ our @EXPORT = qw(
 	write_summary_data
 	index_data_table
 	find_column_index
+	wig_to_bigwig_conversion
 );
 our @EXPORT_OK = qw(
 );
@@ -2099,13 +2113,13 @@ sub write_summary_data {
 		carp "no arguments passed!";
 		return;
 	}
-	my $datahash_ref =   $argument_ref->{'data'} or undef;
-	my $outfile =        $argument_ref->{'filename'} or undef;
-	my $dataset =        $argument_ref->{'dataset'} or undef;
-	my $startcolumn =    $argument_ref->{'startcolumn'} or undef;
-	my $endcolumn =      $argument_ref->{'endcolumn'} or
-	                     $argument_ref->{'stopcolumn'} or undef;
-	my $log =            $argument_ref->{'log'} or undef;
+	my $datahash_ref =   $argument_ref->{'data'} || undef;
+	my $outfile =        $argument_ref->{'filename'} || undef;
+	my $dataset =        $argument_ref->{'dataset'} || undef;
+	my $startcolumn =    $argument_ref->{'startcolumn'} || undef;
+	my $endcolumn =      $argument_ref->{'endcolumn'} ||
+	                     $argument_ref->{'stopcolumn'} || undef;
+	my $log =            $argument_ref->{'log'} || undef;
 	
 	
 	
@@ -2372,6 +2386,138 @@ sub find_column_index {
 
 
 
+
+
+### Wig to BigWig file conversion
+sub wig_to_bigwig_conversion {
+	
+	# Collect passed arguments
+	my $argument_ref = shift;
+	unless ($argument_ref) {
+		carp "no arguments passed!";
+		return;
+	}
+	
+	# wigfile
+	my $wigfile = $argument_ref->{'wig'} || undef;
+	unless ($wigfile) {
+		carp "no wig file passed!";
+		return;
+	}
+	
+	# chromosome sizes
+		# separate file or a database to get from
+	my $chromo_file = $argument_ref->{'chromo'} || undef;
+	my $database = $argument_ref->{'db'} || undef;
+	unless (defined $chromo_file or defined $database) {
+		carp "no chromosome file or database name passed!";
+		return;
+	}
+	
+	# identify bigwig conversion utility
+		# three different sources to specify the utility
+	my $bw_app_path = 
+		$argument_ref->{'bwapppath'} ||                     # passed argument
+		$TIM_CONFIG->param('applications.wigToBigWig') ||   # config file
+		`which wigToBigWig` ||                              # system path
+		undef;
+	if ($bw_app_path) {
+		print " using $bw_app_path for conversion....\n";
+	}
+	else {
+		if ($BIGFILE_OK) {
+			print " wigToBigWig utility not specified; using Bio::DB::BigFile\n";
+		}
+		else {
+			carp "wigToBigWig utility not found and Bio::DB::BigFile" . 
+				" unavailable.\n No conversions possible\n";
+			return;
+		}
+	}
+	
+	# Generate list of chromosome sizes if necessary
+	unless ($chromo_file) {
+		# a pre-generated list of chromosome sizes was not provided
+		# need to generate one from the database
+		print " generating chromosome file....\n";
+		my $db;
+	
+		# check whether we have an open db object or just name
+		my $db_ref = ref $database;
+		if ($db_ref =~ /Bio::DB/) {
+			# a db object returns the name of the package
+			# this appears to be a bioperl db object
+			$db = $database;
+			# determine the real database name
+			$database = $db->{'dbh'}->{'name'}; 
+		}
+		else {
+			# the name of a database was passed, create a database connection
+			$db = open_db_connection($database);
+			unless ($db) {
+				carp " unable to open a database connection!";
+				return;
+			}
+		}
+		
+		# generate chromosome lengths file
+		my $ref_seq_type = 
+			$TIM_CONFIG->param("$database\.reference_sequence_type") ||
+			$TIM_CONFIG->param('default_db.reference_sequence_type');
+				# the annotation gff may have the reference sequences labeled
+				# as various types, such as chromosome, sequence, 
+				# contig, scaffold, etc
+				# this is set in the configuration file
+				# this could pose problems if more than one is present
+		my @chromos = $db->features(-type => $ref_seq_type);
+		unless (@chromos) {
+			die " no '$ref_seq_type' features identified in database!\n";
+		}
+		my $chrfh = open_to_write_fh("tim_helper_chr_lengths.txt");
+		foreach (@chromos) {
+			print {$chrfh} $_->name, "\t", $_->length, "\n";
+		}
+		$chrfh->close;
+		$chromo_file = "tim_helper_chr_lengths.txt";
+	}
+	
+	# generate the bw file name
+	my $bw_file = $wigfile;
+	$bw_file =~ s/\.wig$/.bw/;
+	
+	# generate the bigwig file 
+	if ($bw_app_path) {
+		# we found Kent's utility
+		# this is arguably the best method for converting
+		# execute
+		print " converting $wigfile to bigWig....\n";
+		system $bw_app_path, '-clip', $wigfile, $chromo_file, $bw_file;
+	}
+	else {
+		# we are using the Bio::DB::BigFile module to generate the 
+		# bigwig file
+		# however, Lincoln notes that this method may be deprecated
+		# in future versions
+		# for the time being we will use this method as it avoids
+		# having to hunt down Jim Kent's utility in the path
+		
+		# we'll use Lincoln's default values, which are slightly
+		# different from Kent's default values in his utility
+		# but I'm not sure the reasoning behind the differences
+		Bio::DB::BigFile->createBigWig(
+			$wigfile, 
+			$chromo_file,
+			$bw_file
+		);
+	}
+	
+	# finish up
+	if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
+		# we no longer need our temp chromosome file
+		unlink $chromo_file;
+	}
+	return $bw_file;
+}
 
 
 
@@ -3137,7 +3283,9 @@ Example
 	
 	my $filename = 'my_data.txt.gz';
 	my $fh = open_to_read_fh($filename);
-	...
+	while (my $line = $fh->getline) {
+		# do something
+	}
 	$fh->close;
 	
 
@@ -3153,6 +3301,10 @@ indicating that the file should be appended. The gzip and append values are
 optional. The compression status may be determined automatically by the 
 presence or absence of the passed filename extension; the default is no 
 compression. The default is also to write a new file and not to append.
+
+If gzip compression is requested, but the filename does not have a '.gz' 
+extension, it will be automatically added. However, the change in file name 
+is not passed back to the originating program; beware!
 
 The subroutine will return a scalar reference to the open filehandle. The 
 filehandle is an IO::Handle object and may be manipulated as such.
@@ -3297,7 +3449,60 @@ Example
 	my $main_data_ref = load_tim_data_file($filename);
 	my $chromo_index = find_column_index($main_data_ref, "^chr|seq");
 	
+=item wig_to_bigwig_conversion()
 
+This subroutine will convert a wig file to a bigWig file. See the UCSC 
+documentation regarding wig (http://genome.ucsc.edu/goldenPath/help/wiggle.html)
+and bigWig (http://genome.ucsc.edu/goldenPath/help/bigWig.html) file formats. 
+It preferentially uses Jim Kent's wigToBigWig utility to perform the 
+conversion, although Lincoln Stein's Bio::DB::BigFile module may alternatively 
+be used. One of these must be present on the system for the conversion to 
+succeed. 
+
+The conversion requires a list of chromosome name and sizes in a simple text 
+file, where each line is comprised of two columns, "<chromosome name> 
+<size in bases>". This file may be specified, or automatically generated if 
+given a Bio::DB database name (preferred to ensure genome version 
+compatibility).
+
+The function returns the name of the bigWig file, which will be the 
+input wig file basename with the extension ".bw". Note that the it does 
+not check for success of writing the bigwig file. Check STDERR for errors 
+in bigwig file generation.
+
+Pass the function an anonymous hash of arguments, including the following:
+
+  Required:
+  wig         => The name of the wig file. 
+  db          => Provide the name of a Bio::DB database or an opened 
+                 database object from which to generate the chromosome 
+                 sizes information.
+  Optional: 
+  chromo      => The name of the chromosome sizes text file, described 
+                 above, as an alternative to providing the database name.
+  bwapppath   => Provide the full path to Jim Kent's wigToBigWig 
+                 utility. This parameter may be defined in the 
+                 configuration file "tim_db_helper.cfg". If it is not 
+                 defined there, then the system environment path is 
+                 searched for the executable. Finally, as a last resort, 
+                 the module Bio::DB::BigFile is used to convert, if 
+                 available.
+
+
+Example
+
+	my $wig_file = 'example_wig';
+	my $bw_file = wig_to_bigwig_conversion( {
+			'wig'   => $wig_file,
+			'db'    => $database,
+	} );
+	if (-e $bw_file) {
+		print " success! wrote bigwig file $bw_file\n";
+		unlink $wig_file; # no longer necessary
+	}
+	else {
+		print " failure! see STDERR for errors\n";
+	};
 
 =back
 

@@ -7,6 +7,9 @@ average_gene.pl
 	
 bam2gff.pl
 	Generate features in GFF file format for each aligned read in a BAM file. It accepts both single-end and paired-end alignments. Alignments may be filtered by various criteria.
+
+bar2wig.pl
+	Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 	
 bed2gff.pl
 	Convert a BED file to a GFF file.
@@ -182,6 +185,7 @@ Finding features
 
 File conversion
 	bam2gff.pl
+	bar2wig.pl
 	bed2gff.pl
 	data2gff.pl
 	data2wig.pl
