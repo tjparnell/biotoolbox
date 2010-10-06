@@ -49,6 +49,7 @@ Lists of programs organized by function.
 
 ===File conversion===
 	* bam2gff.pl
+	* bar2wig.pl
 	* bed2gff.pl
 	* data2gff.pl
 	* data2wig.pl
@@ -82,6 +83,8 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/average_gene.pl average_gene.pl] Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 ====bam2gff.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/bam2gff.pl bam2gff.pl] Generate features in GFF file format for each aligned read in a BAM file. It accepts both single-end and paired-end alignments. Alignments may be filtered by various criteria.
+====bar2wig.pl====
+[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/bar2wig.pl bar2wig.pl] Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 ====bed2gff.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/bed2gff.pl bed2gff.pl] Convert a BED file to a GFF file.
 ====bin_genomic_data.pl====
