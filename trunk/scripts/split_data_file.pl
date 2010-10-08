@@ -28,6 +28,7 @@ unless (@ARGV) {
 my (
 	$infile, 
 	$index,
+	$max,
 	$gz,
 	$help
 );
@@ -36,6 +37,7 @@ my (
 GetOptions( 
 	'in=s'        => \$infile, # specify the input data file
 	'col|index=i' => \$index, # index for the column to use for splitting
+	'max=i'       => \$max, # maximum number of lines per file
 	'gz!'         => \$gz, # compress output files
 	'help'        => \$help # request help
 );
@@ -73,7 +75,6 @@ unless (defined $gz) {
 
 
 
-
 ### Load file
 if ($infile =~ /\.store(?:\.gz)$/) {
 	die "Unable to split a binary store file! convert to text first\n";
@@ -88,6 +89,7 @@ $metadata_ref->{'data_table'} = [];
 
 # add column headers
 push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
+$metadata_ref->{'last_row'} = 0;
 
 
 
@@ -100,11 +102,11 @@ my %written_files; # a hash of the file names written
 	# contiguous in the file
 	# if they're not, then we would be simply re-writing over the 
 	# previous block
-	# instead, we'll remember the files we've written, and re-open that file 
+	# also, we're enforcing a maximum number of lines per file
+	# so we'll remember the files we've written, and re-open that file 
 	# to write the next block of data
 my $previous_value;
 my $split_count = 0;
-my $line_count = 0;
 while (my $line = $in_fh->getline) {
 	
 	# Collect line data and the check value
@@ -122,68 +124,30 @@ while (my $line = $in_fh->getline) {
 		# the same value, so keep in same array
 		
 		push @{ $metadata_ref->{'data_table'} }, [ @data ];
-		$line_count++;
+		$metadata_ref->{'last_row'} += 1;
 	}
 	else {
 		# different value, new data section
 		
-		# update last_row index
-		$metadata_ref->{'last_row'} = 
-			scalar( @{ $metadata_ref->{'data_table'} } ) - 1;
-		
-		# write the current data to file
-		my $outfile = $metadata_ref->{'basename'} . '#' . $previous_value;
-		if (exists $written_files{$outfile}) {
-			# this set of data is part of another block of identical data
-			my $out_fh = open_to_write_fh(
-				$written_files{$outfile},
-				$gz,
-				1
-			) or warn "   unable to re-open file! data lost!\n";
-			
-			# add to the data table
-			for (my $row = 1; $row <= $metadata_ref->{'last_row'}; $row++ ) {
-				# print each data row, skipping the header
-				print {$out_fh} join("\t", 
-					@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
-			}
-			
-			# finish
-			$out_fh->close;
-			print "   wrote $line_count additional lines to file '" . 
-				$written_files{$outfile} . "'\n";
-		}
-		
-		else {
-			# write a new file for this block of data
-			my $success_write = write_tim_data_file( {
-				'data'     => $metadata_ref,
-				'filename' => $outfile,
-				'gz'       => $gz,
-			} );
-			if ($success_write) {
-				print "   wrote $line_count lines to file '$success_write'\n";
-				# remember the file
-				$written_files{$outfile} = $success_write;
-					# these file names may not be identical due to extensions
-			}
-			else {
-				warn "   unable to write $line_count lines!\n";
-			}
-			$split_count++;
-		}
-		
-		# regenerate the data table
-		$metadata_ref->{'data_table'} = [];
-		push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
-		$metadata_ref->{'last_row'} = undef;
+		# write the current data out to file(s)
+		write_current_data_to_file_part($previous_value);
+			# this should automatically clear the previous table data
 		
 		# now add the current row of data
 		push @{ $metadata_ref->{'data_table'} }, [ @data ];
+		$metadata_ref->{'last_row'} += 1;
 		
 		# reset
 		$previous_value = $check_value;
-		$line_count = 1;
+	}
+	
+	# Check the number of lines collected, write if necessary
+	if (defined $max and $metadata_ref->{'last_row'} == $max) {
+		# we've reached the maximum number of data lines for this current 
+		# data block
+		
+		# need to force a data write
+		write_current_data_to_file_part($previous_value);
 	}
 }
 
@@ -191,56 +155,151 @@ while (my $line = $in_fh->getline) {
 $in_fh->close;
 
 # Final write 
-{
-	# update last_row index
-	$metadata_ref->{'last_row'} = 
-		scalar( @{ $metadata_ref->{'data_table'} } ) - 1;
+write_current_data_to_file_part($previous_value);
+
+# report
+print " Split '$infile' into $split_count files\n";
+
+
+
+
+sub write_current_data_to_file_part {
+
+	# get the current value we're working with
+	my $value = shift;
+	my $lines = $metadata_ref->{'last_row'};
 	
-	my $outfile = $metadata_ref->{'basename'} . '#' . $previous_value;
-	if (exists $written_files{$outfile}) {
-		# this set of data is part of another block of identical data
+	# open the file and write
+		# check for a pre-existing file to be added, or start a new one
+	if (defined $written_files{$value}{'file'}) {
+		# we have a current file that is partially written
+		my $file = $written_files{$value}{'file'};
 		my $out_fh = open_to_write_fh(
-			$written_files{$outfile},
+			$file,
 			$gz,
 			1
-		) or warn "   unable to re-open file! data lost!\n";
-		
-		# add to the data table
-		for (my $row = 1; $row <= $metadata_ref->{'last_row'}; $row++ ) {
-			# print each data row, skipping the header
-			print {$out_fh} join("\t", 
-				@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
+		);
+		unless ($out_fh) {
+			warn "   unable to re-open file '$file'! data lost!\n";
+			return;
 		}
 		
-		# finish
-		$out_fh->close;
-		print "   wrote $line_count additional lines to file '" . 
-			$written_files{$outfile} . "'\n";
+		# begin writing the data
+		# determine how many lines we can still write to this file
+		
+		# maximum is defined but we'll have to do two writes
+		if (
+			defined $max and
+			($max - $written_files{$value}{'number'}) < $lines
+		) {
+			# we'll have to do two writes
+			# finish up current, then write the remainder
+			my $limit = $max - $written_files{$value}{'number'};
+			
+			# write the lines up to the current limit
+			for (my $row = 1; $row <= $limit; $row++) {
+				print {$out_fh} join("\t", 
+					@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
+			}
+			$out_fh->close;
+			print "   wrote $limit lines to file '$file'\n";
+			
+			# clear the table contents of the written lines
+			splice( @{ $metadata_ref->{'data_table'} }, 1, $limit );
+			$metadata_ref->{'last_row'} = 
+				scalar @{ $metadata_ref->{'data_table'} } - 1;
+			
+			# we're finished with this file
+			$written_files{$value}{'file'} = undef;
+			$written_files{$value}{'number'} = 0;
+			
+			# now write the remainder
+			write_current_data_to_file_part($value);
+		}
+		
+		# maximum is either not defined, or there is enough room left to write
+		else {
+			# we can write with impunity
+			
+			# write the lines
+			for (my $row = 1; $row <= $lines; $row++) {
+				print {$out_fh} join("\t", 
+					@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
+				
+				# keep track of the number of lines
+				$written_files{$value}{'number'} += 1;
+			}
+			
+			# finished
+			$out_fh->close;
+			print "   wrote $lines lines to file '$file'\n";
+			
+			# clear the table contents
+			splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
+			$metadata_ref->{'last_row'} = 0;
+		}
 	}
 	
 	else {
-		# write a new file for this block of data
-		my $success_write = write_tim_data_file( {
+		# put in a request for a file name
+		request_new_file_name($value);
+		
+		# write the file
+		# this should be within the maximum line limit, so we should be safe
+		my $success = write_tim_data_file( {
 			'data'     => $metadata_ref,
-			'filename' => $outfile,
+			'filename' => $written_files{$value}{'file'},
 			'gz'       => $gz,
 		} );
-		if ($success_write) {
-			print "   wrote $line_count lines to file '$success_write'\n";
-			# remember the file
-			$written_files{$outfile} = $success_write;
-				# these file names may not be identical due to extensions
+		if ($success) {
+			print "   wrote $lines lines to file '$success'\n";
+			# record the number of lines written
+			$written_files{$value}{'number'} = $lines;
 		}
 		else {
-			warn "   unable to write $line_count lines!\n";
+			warn "   unable to write $lines lines! data lost!\n";
 		}
-		$split_count++;
+		
+		# clear the table contents
+		splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
+		$metadata_ref->{'last_row'} = 0;
+		
+		# check whether we've filled up the file
+		if (defined $max and $lines == $max) {
+			$written_files{$value}{'file'} = undef;
+			$written_files{$value}{'number'} = 0;
+		}
 	}
 	
 }
 
-print " Split '$infile' into $split_count files\n";
-
+sub request_new_file_name {
+	# calculate a new file name based on the current check value and part number
+	my $value = shift;
+	my $file = $metadata_ref->{'basename'};
+	$file .= '#' . $value;
+	
+	# add the file part number, if we're working with maximum line files
+	# padded for proper sorting
+	if (defined $max) {
+		if (defined $written_files{$value}{'parts'}) {
+			$written_files{$value}{'parts'} += 1; # increment
+			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
+		}
+		else {
+			$written_files{$value}{'parts'} = 1; # increment
+			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
+		}
+	}
+	
+	# finish the file name
+	$file .= $metadata_ref->{'extension'};
+	$written_files{$value}{'file'} = $file;
+	$written_files{$value}{'number'} = 0;
+	
+	# keept track of the number of files opened
+	$split_count++;
+}
 
 
 
@@ -252,10 +311,11 @@ split_data_file.pl
 
 =head1 SYNOPSIS
 
-split_data_file.pl --index <column_index> <filename>
+split_data_file.pl [--options] <filename>
   
   --in <filename>
   --index <column_index>
+  --max <integer>
   --(no)gz
   --help
 
@@ -282,6 +342,13 @@ index is 0 (first column).
 
 Alias to --index.
 
+=item --max <integer>
+
+Optionally specify the maximum number of data lines to write to each 
+file. Each group of specific value data is written to one or more files. 
+Enter as an integer; underscores may be used as thousands separator, e.g. 
+100_000. 
+
 =item --(no)gz
 
 Indicate whether the output files should be compressed 
@@ -304,13 +371,17 @@ resulting in multiple files representing each chromosome found in the
 original file. The column containing the values to split and group 
 should be indicated; the default is to take the first column. 
 
-NOTE: The program assumes that the file is sorted based on this column; 
-splitting an unsorted file will likely yield numerous, small, and 
-overwritten files with likely data loss.
+If the max argument is set, then each group will be written to one or 
+more files, with each file having no more than the indicated maximum 
+number of data lines. This is useful to keep the file size reasonable, 
+especially when processing the files further and free memory is 
+constrained. A reasonable limit may be 100K or 1M lines.
 
 The resulting files will be named using the basename of the input file, 
 appended with the unique group value (for example, the chromosome name)
-demarcated with a #. Each file will have duplicated and preserved 
+demarcated with a #. If a maximum line limit is set, then the file part 
+number is appended to the basename, padded with zeros to three digits 
+(to assist in sorting). Each file will have duplicated and preserved 
 metadata. The original file is preserved.
 
 This program is intended as the complement to 'join_data_files.pl'.

@@ -789,7 +789,8 @@ use the 5' end, or the start position of unstranded features.
 =item --win <integer>
 
 When generating a new genome interval list, optionally specify the window 
-size. The default size is 500 bp.
+size. The default size is defined in the configuration file, 
+tim_db_helper.cfg.
 
 =item --step <integer>
 

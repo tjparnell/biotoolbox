@@ -901,6 +901,18 @@ sub get_new_genome_list {
 		return;
 	}
 	
+	# Check the potential size of the data array
+	# I'm afraid of collecting too much data that overwhelms available memory
+	my $total_size = 0;
+	foreach my $chrobj (@chromosomes) {
+		$total_size += $chrobj->length;
+	}
+	if ( ($total_size / $win) > 1_000_000) {
+		warn " data array is predicted to be $total_size lines long!\n" . 
+			" this may require considerable amounts of memory\n" .
+			" you may wish to consider using 'generate_genomic_bins.pl'\n";
+	}
+	
 	# Collect the genomic windows
 	print "   Generating $win bp windows in $step bp increments\n";
 	foreach my $chrobj (@chromosomes) {
