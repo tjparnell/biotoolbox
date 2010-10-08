@@ -35,7 +35,7 @@ my (
 	$bar_app_path,
 	$method,
 	$use_track,
-	$shift,
+	$interbase,
 	$bigwig,
 	$database,
 	$chromo_file,
@@ -51,7 +51,7 @@ GetOptions(
 	'barapp=s'  => \$bar_app_path, # path to David's Bar2Gr file
 	'method=s'  => \$method, # method for dealing with duplicate positions
 	'track!'    => \$use_track, # boolean to include a track line
-	'shift!'    => \$shift, # shift from interbase to 1-base numbering scheme
+	'inter!'    => \$interbase, # shift from interbase to 1-base numbering scheme
 	'bw!'       => \$bigwig, # boolean for bigwig output
 	'db=s'      => \$database, # name of database to get chromo info
 	'chromo=s'  => \$chromo_file, # name of a chromosome file
@@ -128,10 +128,10 @@ unless (defined $use_track) {
 		$use_track = 1;
 	}
 }
-unless (defined $shift) {
+unless (defined $interbase) {
 	# the USeq and T2 packages typically use interbase (0-base) format
 	# default is to shift to 1-base format
-	$shift = 1;
+	$interbase = 1;
 }
 
 # identify application paths
@@ -532,7 +532,7 @@ sub process_gr_files {
 				my $newscore = &{$method_sub}(@data);
 				
 				# shift position
-				$position += 1 if $shift;
+				$position += 1 if $interbase;
 				
 				# print
 				print {$wig} "$position\t$newscore\n";
@@ -584,7 +584,7 @@ bar2wig.pl [--options...] <filename>
   --barapp </path/to/Bar2Gr>
   --method [mean | median | sum | max]
   --(no)track
-  --(no)shift
+  --(no)inter
   --bw
   --db <database>
   --chromo <filename>
@@ -633,7 +633,7 @@ requires that the track line is absent. Do not include the track line when
 generating bigWig files manually. The default is to include for wig files 
 (true), and exclude for bigWig files (false).
 
-=item --(no)shift
+=item --(no)inter
 
 Bar files are typically in interbase (0-base) format, whereas wig files are 
 typically 1-base format. Shift (or not) the position by 1 bp. Default is 

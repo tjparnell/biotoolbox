@@ -36,6 +36,7 @@ my (
 	$track_name,
 	$use_track,
 	$midpoint,
+	$interbase,
 	$format,
 	$bigwig,
 	$bw_app_path,
@@ -56,6 +57,7 @@ GetOptions(
 	'name=s'    => \$track_name, # index for the name column
 	'track!'    => \$use_track, # boolean to include a track line
 	'midpoint!' => \$midpoint, # boolean to use the midpoint
+	'inter!'    => \$interbase, # shift from interbase
 	'format=i'  => \$format, # format output to indicated number of places
 	'bigwig|bw' => \$bigwig, # generate a binary bigwig file
 	'db=s'      => \$database, # database for bigwig file generation
@@ -248,6 +250,11 @@ while (my $line = $in_fh->getline) {
 	chomp $line;
 	my @data = split /\t/, $line;
 	
+	# adjust for interbase 0-base coordinates
+	if ($interbase) {
+		$data[$start_index] += 1;
+	}
+	
 	# write definition line if necessary
 	if ($data[$chr_index] ne $current_chr) {
 		# new chromosome, new definition line
@@ -421,6 +428,7 @@ data2wig.pl [--options...] <filename>
   --score <column_index>
   --name <text>
   --(no)track
+  --inter
   --format [0,1,2,3]
   --(no)midpoint
   --bigwig|--bw
@@ -489,6 +497,12 @@ files normally require a track line, but if you will be converting to
 the binary bigwig format, the converter requires no track line. Why it 
 can't simply ignore the line is beyond me. This option is automatically 
 set to false when the --bigwig option is enabled.
+
+=item --inter
+
+Source data is in interbase coordinate (0-base) system. Shift the 
+start position to base coordinate (1-base) system. Wig files are by 
+definition 1-based. Default is false.
 
 =item --(no)midpoint
 
