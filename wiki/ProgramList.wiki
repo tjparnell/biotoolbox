@@ -20,6 +20,7 @@ Lists of programs organized by function.
 ===Data collection===
 	* average_gene.pl
 	* bin_genomic_data.pl
+	* generate_genomic_bins.pl
 	* get_datasets.pl
 	* get_feature_info.pl
 	* map_data.pl
@@ -103,6 +104,8 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/find_enriched_regions.pl find_enriched_regions.pl] Scan across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
 ====find_nucleosome_movement.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/find_nucleosome_movement.pl find_nucleosome_movement.pl] Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
+====generate_genomic_bins.pl====
+[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/generate_genomic_bins.pl generate_genomic_bins.pl] 	Generate a file of genomic bins to be used in data collection. Intended for large genomes, small bin size, and/or low memory environments. It will optionally split the file into managable parts.
 ====get_actual_nuc_sizes.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl] Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 ====get_datasets.pl====
