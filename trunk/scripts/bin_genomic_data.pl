@@ -65,6 +65,7 @@ GetOptions(
 	'span'        => \$span, # assign value across entire feature span
 	'midpoint'    => \$midpoint, # assign value at the feature midpoint
 	'shift=i'     => \$shift, # 3' shift value
+	'interbase!'  => \$interbase, # source is in interbase format
 	'interpolate' => \$interpolate, # interpolate missing data
 	'log!'        => \$log, # values in log2 space
 	'gff'         => \$gffout, # output a gff file
@@ -402,6 +403,11 @@ sub get_bed_data {
 		my @data = split /\t/, $line;
 		my ($chromo, $start, $stop) = $data[0,1,2];
 		
+		# interbase conversion
+		if ($interbase) {
+			$start += 1;
+		}
+		
 		# the score column is optional
 		my $score;
 		if (defined $data[4]) {
@@ -442,6 +448,11 @@ sub get_sgr_data {
 		if ($line =~ /^#/) {next} # skip comment lines
 		chomp $line;
 		my ($chromo, $start, $score) = split /\t/, $line;
+		
+		# interbase conversion
+		if ($interbase) {
+			$start += 1;
+		}
 		
 		# process the feature
 		$bin_count += &{$process_feature}(
@@ -1213,11 +1224,12 @@ A script to bin genomic data into windows
   --paired
   --span
   --midpoint
-  --shift
+  --shift <integer>
+  --interbase
   --interpolate
-  --log
+  --(no)log
   --gff
-  --gz
+  --(no)gz
   --help
 
  
@@ -1298,6 +1310,14 @@ number of bp. This is to account for ChIP-Seq data where the peak
 of tag counts is offset from the actual center of the sequenced 
 fragments. Use a shift value of 1/2 the mean fragment length of the 
 sequencing library.
+
+=item --interbase
+
+Source data is in interbase coordinate (0-base) system. Shift the 
+start position to base coordinate (1-base) system. This only affects 
+BED and SGR source files, which may or may not be in interbase format 
+(the others normally are not if they follow specifications). Default 
+is false. 
 
 =item --interpolate
 
