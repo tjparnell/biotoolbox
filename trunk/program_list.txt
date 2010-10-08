@@ -38,6 +38,9 @@ find_enriched_regions.pl
 find_nucleosome_movement.pl
 	Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
 	
+generate_genomic_bins.pl
+	Generate a file of genomic bins to be used in data collection. Intended for large genomes, small bin size, and/or low memory environments. It will optionally split the file into managable parts.
+
 get_actual_nuc_sizes.pl
 	Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 	
