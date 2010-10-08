@@ -8,18 +8,25 @@ use File::Basename qw(fileparse);
 use IO::File;
 use IO::Zlib;
 use Storable qw(store_fd fd_retrieve store retrieve);
-use Statistics::Lite qw(mean min max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw($TIM_CONFIG open_db_connection);
 
 # optional modules
+our $STATS_OK = 0;
+eval {
+	use Statistics::Lite qw(mean min max);
+	$STATS_OK = 1;
+};
+our $DB_OK = 0;
+eval {
+	use tim_db_helper qw($TIM_CONFIG open_db_connection);
+	$DB_OK = 1;
+};
 our $BIGFILE_OK = 0;
 eval {
 	use Bio::DB::BigFile;
 	$BIGFILE_OK = 1;
 };
-
 
 
 ### Variables
@@ -2107,6 +2114,12 @@ sub open_to_write_fh {
 
 sub write_summary_data {
 	
+	# Check that we have Statistics::Lite loaded
+	unless ($STATS_OK) {
+		carp " Statistics::Lite not loaded! unable to write summary data!";
+		return;
+	}
+	
 	# Collect passed arguments
 	my $argument_ref = shift;
 	unless ($argument_ref) {
@@ -2415,16 +2428,22 @@ sub wig_to_bigwig_conversion {
 	}
 	
 	# identify bigwig conversion utility
-		# three different sources to specify the utility
-	my $bw_app_path = 
-		$argument_ref->{'bwapppath'} ||                     # passed argument
-		$TIM_CONFIG->param('applications.wigToBigWig') ||   # config file
-		`which wigToBigWig` ||                              # system path
-		undef;
-	if ($bw_app_path) {
-		print " using $bw_app_path for conversion....\n";
+	# three different sources to specify the utility
+	# passed argument
+	my $bw_app_path = $argument_ref->{'bwapppath'} || undef;
+	# config file
+	unless ($bw_app_path) {
+		if ($DB_OK) {
+			$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
+				undef;
+		}
 	}
-	else {
+	# system path
+	unless ($bw_app_path) {
+		$bw_app_path = `which wigToBigWig` || undef;
+	}
+	# use Bio::DB::BigFile
+	unless ($bw_app_path) {
 		if ($BIGFILE_OK) {
 			print " wigToBigWig utility not specified; using Bio::DB::BigFile\n";
 		}
@@ -2441,6 +2460,13 @@ sub wig_to_bigwig_conversion {
 		# need to generate one from the database
 		print " generating chromosome file....\n";
 		my $db;
+		
+		# check that we have tim_db_helper loaded
+		unless ($DB_OK) {
+			carp " tim_db_helper not loaded! unable to get chromosome lengths!".
+				"\n No conversion possible\n";
+			return;
+		}
 	
 		# check whether we have an open db object or just name
 		my $db_ref = ref $database;

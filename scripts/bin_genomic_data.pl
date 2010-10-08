@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# A script to bin genomic data from either gff, sgr, or bam files
+# A script to bin genomic data from either gff, wig, sgr, or bam files
 # the data may be counted or statistically combined
 
 use strict;
@@ -184,7 +184,20 @@ index_data_table($main_data_ref) or
 	# we will simply use the basename of the data file
 	# also get the extension for recognizing the file type to use below
 my ($name, $path, $ext) = fileparse($datafile, 
-	qw(.gff .gff.gz .gff3 .gff3.gz .bed .bed.gz .sgr .sgr.gz .bam) );
+	qw(
+		.gff
+		.gff.gz
+		.gff3
+		.gff3.gz
+		.bed
+		.bed.gz
+		.sgr
+		.sgr.gz
+		.wig
+		.wig.gz
+		.bam
+	) 
+);
 
 # Set metadata
 my $column = $main_data_ref->{'number_columns'};
@@ -227,7 +240,11 @@ elsif ($ext =~ /sgr/) {
 } 
 elsif ($ext =~ /bam/) {
 	get_bam_data();
-} else {
+} 
+elsif ($ext =~ /wig/) {
+	get_wig_data();
+} 
+else {
 	die " unknown source file type!\n";
 }
 
@@ -622,6 +639,127 @@ sub get_bam_data {
 
 
 
+sub get_wig_data {
+	print " Collecting features from sgr file '$datafile'....\n";
+	
+	# open file io object
+	my $fh = open_to_read_fh($datafile);
+	unless ($fh) {
+		die "unable to open '$datafile': $!";
+	} 
+	
+	# initialize variables
+	my $bin_count = 0;
+	my $feature_count = 0;
+	my (
+		# reusuable variables
+		$chromo,
+		$fixstart,
+		$step,
+		$span,
+	); 
+	
+	# collect the data
+	while (my $line = $fh->getline) {
+		my $start; # specific line variables
+		my $stop;
+		my $score;
+		
+		# The wiggle file can have 3 different formats: BED format, variable step, 
+		# and fixed step. We need to determine whether each line is a definition
+		# line or a data line, based on the line's contents and/or number of 
+		# elements. The definition lines will fill the reusable variables above
+		# and help in filling out the specific variables.
+		
+		## check the line's contents
+		$line =~ s/[\r\n]+$//; # strip all line endings
+		my @data = split /\s+/, $line;
+		
+		# a track line
+		if ($data[0] =~ /track/i) {
+			# not much useable information in here for us
+		}
+		
+		# a variable step definition line
+		elsif ($data[0] =~ /^variablestep$/i) { 
+			foreach (@data) {
+				if (/chrom=(\w+)/) {$chromo = $1}
+				if (/span=(\w+)/)  {$span = $1}
+			}
+			next;
+		} 
+		
+		# a fixed step definition line
+		elsif ($data[0] =~ /^fixedstep$/i) { 
+			foreach (@data) {
+				if (/chrom=(\w+)/) {$chromo = $1}
+				if (/span=(\w+)/)  {$span = $1}
+				if (/start=(\w+)/) {$fixstart = $1}
+				if (/step=(\w+)/)  {$step = $1}
+			}
+			next;
+		} 
+		
+		# a BED data line
+		elsif (scalar @data == 4) {
+			$chromo = $data[0];
+			$start = $data[1] + 1; # the BED line alone uses 0-based indexing
+			$stop = $data[2];
+			$score = $data[3];
+		} 
+		
+		# a variable step data line
+		elsif (scalar @data == 2) { 
+			unless ($chromo) { 
+				die "Bad formatting! variable step data but chromosome not defined!\n";
+			}
+			$start = $data[0];
+			if ($span) {
+				$stop = $start + $span;
+			} 
+			else {
+				$stop = $start;
+			}
+			$score = $data[1];
+		} 
+		
+		# a fixed step data line
+		elsif (scalar @data == 1) { 
+			unless ($chromo) { 
+				die "Bad formatting! fixed step data but chromosome not defined!\n";
+			}
+			unless ($fixstart) { 
+				die "Bad formatting! fixed step data but start not defined!\n";
+			}
+			unless ($step) { 
+				die "Bad formatting! fixed step data but step not defined!\n";
+			}
+			$start = $fixstart;
+			$fixstart += $step; # prepare for next round
+			if ($span) {
+				$stop = $start + $span;
+			} 
+			else {
+				$stop = $start;
+			}
+			$score = $data[0];
+		}
+		
+		# process the feature
+		$bin_count += &{$process_feature}(
+			$chromo,
+			$start,
+			$stop,
+			$score
+		);
+		$feature_count++;
+	}
+	
+	$fh->close;
+	print "  $feature_count features loaded, a total of $bin_count bins were modified\n";
+	
+
+}
 
 
 
@@ -1092,7 +1230,7 @@ The command line flags and descriptions:
 =item --data <filename>
 
 Specify the source genomic data file containing the datapoints to be 
-binned. Supported files include .gff, .bed, .sgr, and .bam files. 
+binned. Supported files include .gff, .bed, , .wig, .sgr, and .bam files. 
 Text files may be gzipped.
 
 =item --in <filename>
@@ -1194,21 +1332,20 @@ This program will convert genomic data into genomic binned data. The genomic
 bins are generated from the indicated database as segments of the genome of 
 the specified window size. The step size may be optionally specified, or 
 defaults to the window size. The source data may be collected from multiple 
-sources, including GFF, BAM, or SGR files. The data may be collected in one 
-of two ways.
+sources, including GFF, BED, BAM, WIG, or SGR files. The data may be 
+collected in one of two ways.
 
 First, the program can enumerate (or count) features which overlap with a 
-genomic bin. Both sequence tag (BAM file) alignments (both single- and 
-paired-end) and GFF features may be counted. The feature start point, or 
-optionally the midpoint, is used to record the feature. Alternatively, the 
-counts may be enumerated across the entire span of the feature. This will 
-essentially generate a histogram of feature occupancy across the genome. 
+genomic bin. Sequence tag (BAM file) alignments (both single- and 
+paired-end), BED, and GFF features may be counted. The feature start point, 
+or optionally the midpoint, is used to record the feature. Alternatively, the 
+counts may be enumerated across the entire span of the feature when using 
+small (single bp) bins.
 
 Second, the program can statistically combine the scores (values) of features
-that overlap each genomic bin. Feature scores may be collected from either 
-GFF or SGR files. Either the mean or the median value can be recorded for the 
-genomic bin. This is useful, for example, in either increasing or decreasing 
-the effective resolution of tiling microarray data. 
+that overlap each genomic bin. Feature scores may be collected from GFF, BED, 
+WIG, or SGR files. Either the mean or the median value can be recorded for the 
+genomic bin. 
 
 Genomic bins lacking a score may be interpolated from neighboring bins. Up to
 four consecutive non-value bins may interpolated from neighboring bins that
