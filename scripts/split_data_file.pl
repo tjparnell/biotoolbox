@@ -36,7 +36,7 @@ my (
 # Command line options
 GetOptions( 
 	'in=s'        => \$infile, # specify the input data file
-	'col|index=i' => \$index, # index for the column to use for splitting
+	'index|col=i' => \$index, # index for the column to use for splitting
 	'max=i'       => \$max, # maximum number of lines per file
 	'gz!'         => \$gz, # compress output files
 	'help'        => \$help # request help
@@ -58,10 +58,6 @@ if ($help) {
 unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use $0 --help\n";
-}
-unless (defined $index) {
-	# default is to use the first column
-	$index = 0;
 }
 unless (defined $gz) {
 	if ($infile =~ /\.gz$/) {
@@ -92,6 +88,28 @@ push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
 $metadata_ref->{'last_row'} = 0;
 
 
+
+### Identify the column
+# Request the index from the user if necessary
+unless (defined $index) {
+	
+	# present a list to the user
+	print "\n  This is the list of columns in the data file\n";
+	for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
+		print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
+	}
+	
+	# get user response
+	print "  Enter the column index number containing the values to split by   ";
+	my $answer = <STDIN>;
+	chomp $answer;
+	if ($answer =~ /^\d+$/ and exists $metadata_ref->{$answer}) {
+		$index = $answer;
+	}
+	else {
+		die " unknown column index!\n";
+	}
+}
 
 
 
@@ -334,9 +352,9 @@ although any format should work. The file may be compressed with gzip.
 
 =item --index <column_index>
 
-Provide the index number of the column or dataset 
-containing the values used to split the file. Default 
-index is 0 (first column).
+Provide the index number of the column or dataset containing the values 
+used to split the file. If not specified, then the index is requested 
+from the user in an interactive mode.
 
 =item --col <column_index>
 
@@ -369,7 +387,8 @@ written into the same file. A good example is chromosome, where all
 data points for a given chromosome will be written to a separate file, 
 resulting in multiple files representing each chromosome found in the 
 original file. The column containing the values to split and group 
-should be indicated; the default is to take the first column. 
+should be indicated; if the column is not sepcified, it may be 
+selected interactively from a list of column headers. 
 
 If the max argument is set, then each group will be written to one or 
 more files, with each file having no more than the indicated maximum 
