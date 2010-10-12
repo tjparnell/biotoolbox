@@ -122,6 +122,9 @@ split_bam_by_isize.pl
 split_bam_by_strand.pl
 	Split a BAM alignment file into two BAM files based on the strand to which the sequence tag aligns. Useful for RNA-Seq experiments.
 	
+split_by_tags.pl
+	Split a fastq file by barcode tags. Barcodes are short unique sequences incorporated into two or more library preparations; the libraries may then be merged into a single sequencing lane. The sequence reads may then be separated based on the barcode sequence into individual files representing the starting libraries.
+
 split_data_file.pl
 	Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
 	
