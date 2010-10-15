@@ -995,7 +995,17 @@ sub write_tim_data_file {
 			# Write the miscellaneous headers
 			foreach ( @{ $datahash_ref->{'other'} } ) {
 				# write remaining miscellaneous header lines if present
-				print {$fh} $_;
+				unless (/\n$/s) {
+					# append newline if not present
+					$_ .= "\n";
+				}
+				# check for comment character at beginning
+				if (/^# /) {
+					print {$fh} $_;
+				}
+				else {
+					print {$fh} "# " . $_;
+				}
 			}
 		
 			# Write the column metadata headers
