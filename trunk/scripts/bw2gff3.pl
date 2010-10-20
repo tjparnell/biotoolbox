@@ -6,12 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Copy;
-use Cwd 'abs_path';
+use File::Spec;
+use File::Path 'make_path';
 use File::Basename qw(fileparse);
-use Bio::DB::BigWig;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper;
+eval {use Bio::DB::BigWig};
+eval {use Bio::DB::Sam};
 
 print "\n This script will generate a GFF3 file for a bigwig file\n";
 
@@ -33,11 +35,14 @@ my (
 	$path,
 	$source,
 	$type,
-	$strand,
+	$rename,
+	$write_metadata,
+	$write_conf,
 	$help
 );
 my @infiles;
 my @names;
+my @strands;
 
 # Command line options
 GetOptions( 
@@ -46,7 +51,10 @@ GetOptions(
 	'source=s'  => \$source, # the gff source
 	'type=s'    => \$type, # the gff type
 	'name=s'    => \@names, # the gff name 
-	'strand=s'  => \$strand, # indicate the strand for the feature
+	'strand=s'  => \@strands, # indicate the strand for the feature
+	'rename'    => \$rename, # rename the file
+	'set!'      => \$write_metadata, # write a metadata index file for BigWigSet
+	'conf!'     => \$write_conf, # write GBrowse conf stanzas
 	'help'      => \$help # request help
 );
 
@@ -64,8 +72,8 @@ if ($help) {
 ### Check for general required values
 # files
 if (@infiles) {
-	if (scalar @infiles == 1) {
-		# only one file provided, but may be comma delimited list
+	if (scalar @infiles == 1 and $infiles[0] =~ /,/) {
+		# a comma delimited list is provided
 		my $file = shift @infiles;
 		@infiles = split /,/, $file;
 	}
@@ -73,30 +81,79 @@ if (@infiles) {
 else {
 	# file list was provided on the command line
 	@infiles = @ARGV or
-		die "  OOPS! No source data files specified! \n use $0 --help\n";
+		die "  OOPS! No source data files specified! \n use --help\n";
 }
 
 # names
-if (scalar @names == 1) {
-	# only one name provided, but it may be comma delimited list
+if (scalar @names == 1 and $names[0] =~ /,/) {
+	# a comma delimited list is provided
 	my $name = shift @names;
 	@names = split /,/, $name;
+	if (scalar @names != scalar @infiles) {
+		die " unequal number of names (" . scalar(@names) . ") and files (" . 
+			scalar(@infiles) . ") provided!\n";
+	}
 }
 
-# assign gff defaults
-unless ($source) {
-	$source = 'data';
+# strands
+if (scalar @strands == 1 and $strands[0] =~ /,/) {
+	# a separate strand value given for each file as comma delimited list
+	my $strand = shift @strands;
+	@strands = split /,/, $strand;
+	if (scalar @strands != scalar @infiles) {
+		die " unequal number of strands (" . scalar(@strands) . ") and files (" . 
+			scalar(@infiles) . ") provided!\n";
+	}
 }
-if ($strand) {
-	# check the value
-	unless ($strand =~ /^[frwc\.]$/) {
-		die " unknown strand value!\n use $0 --help\n";
+elsif (scalar @strands == 1) {
+	# a single strand value
+	# assign to each input file name
+	my $strand = shift @strands;
+	foreach (@infiles) {
+		push @strands, $strand;
+	}
+}
+if (@strands) {
+	# check the strand values
+	foreach my $strand (@strands) {
+		unless ($strand =~ /^[frwc\.\-\+]$/) {
+			die " unknown strand value '$strand'!\n use --help\n";
+		}
+	}
+}
+
+
+# target directory
+if (defined $path) {
+	$path = File::Spec->canonpath($path);
+	unless (-e $path) {
+		make_path($path) or die "unable to generate target directory: '$path'";
+	}
+	unless (-w $path) {
+		die " target '$path' doesn't seem to be writeable!\n";
 	}
 }
 else {
-	# default
-	$strand = '.';
+	# default is to use the current working directory
+	$path = File::Spec->curdir();
 }
+
+# default source
+unless ($source) {
+	$source = 'data';
+}
+
+
+# prepare metadata and conf output arrays
+	# we'll be dumping the metadata in here for writing later after going 
+	# through all the input files
+	# it will be a simple array of lines to be written (or appended) to a 
+	# metadata index file written to the output file path
+my @metadata;
+	# for the conf array, we'll either be writing individual conf stanzas
+	# for each bigwig file or one stanza for the bigwigset
+my @confdata;
+
 
 
 ### Processing each of the input files
@@ -104,15 +161,13 @@ while (@infiles) {
 	
 	# get infile name
 	my $infile = shift @infiles;
+	print "\n processing '$infile'...\n";
 	
 	
 	### Determine file specific GFF variables
 	# determine input file components
-	my $infile_abs_path = abs_path($infile);
 	my ($infile_basename, $infile_path, $infile_ext) = 
-		fileparse($infile_abs_path, '.bw', '.bigwig', '.bam');
-	#print " path components are\n" .
-	#	"  path: $infile_path\n  basename: $infile_basename\n  extension: $infile_ext\n";
+		fileparse($infile, '.bw', '.bigwig', '.bam');
 	
 	# determine gff name
 	my $name;
@@ -137,36 +192,41 @@ while (@infiles) {
 	}
 	$gfftype =~ s/-|\./_/g; # substitute any dashes or periods with underscores
 	
-	# check path
-	unless ($path) {
-		# use the current infile's path
-		$path = $infile_path;
+	# determine strand
+	my $strand;
+	if (@strands) {
+		$strand =  shift @strands;
 	}
-	unless ($path =~ /\/$/) {
-		# make sure there is a trailing "/" if path was provided
-		# otherwise it's not really recognized as a directory !??
-		# this will most certainly destroy functionality on non-unix machines
-		$path .= '/';
+	else {
+		# default is no strand
+		$strand = '.';
 	}
-	unless (-e $path and -w $path) {
-		die " path '$path' either doesn't exist or is not writeable!\n";
-	}
-	
 	
 	### Generate the GFF data structure
 	# Initialize the data structure
 	my $main_data_ref = initialize_data_structure();
 	
+	# Determine the target file name
+	my $target_basename;
+	if ($rename) {
+		$target_basename = "$source.$name";
+	}
+	else {
+		$target_basename = $infile_basename;
+	}
+	my $target_file = 
+		File::Spec->catfile($path, "$target_basename$infile_ext");
+	
 	# Load the chromosome data
-	my $target_file = $path . "$source.$name" . $infile_ext;
-	print "\n processing '$infile'...\n";
 	if ($infile_ext eq '.bw' or $infile_ext eq '.bigwig') {
 		# source data is a bigwig file
-		collect_chromosomes_from_bigwig($infile, $target_file, $main_data_ref);
+		collect_chromosomes_from_bigwig(
+			$infile, $target_file, $main_data_ref, $strand);
 	}
 	elsif ($infile_ext eq '.bam') {
 		# source data is a bam file
-		collect_chromosomes_from_bam($infile, $target_file, $main_data_ref);
+		collect_chromosomes_from_bam(
+			$infile, $target_file, $main_data_ref, $strand);
 	}
 	else {
 		die " unrecognized input file format!\n";
@@ -209,7 +269,125 @@ while (@infiles) {
 		print "  unable to write output file!\n";
 	}
 	
+	
+	### Add metadata to index file
+	if ($write_metadata) {
+		# we'll be adding all of the input bigwig files to the metadata index
+		
+		# cannot support bam data
+		if ($infile_ext eq '.bam') {next}
+		
+		# add metadata header block
+			# this is the file name in square brackets
+		push @metadata, "[$target_basename$infile_ext]\n";
+		
+		# add metadata
+		push @metadata, "primary_tag  = $gfftype\n";
+		push @metadata, "source       = $source\n";
+		push @metadata, "display_name = $name\n";
+		if ($strand =~ /^f|w|\+|1/) {
+			push @metadata, "strand       = 1\n";
+		}
+		elsif ($strand =~ /^r|c|\-/) {
+			push @metadata, "strand       = -1\n";
+		}
+		push @metadata, "\n"; # empty line to make things purdy
+	}
+	
+	### Write conf stanza data
+	if ($write_conf and !$write_metadata) {
+		# we are using the write metadata boolean variable as an indicator 
+		# of whether to write an individual conf stanza for each bigwig 
+		# file or write a single stanza for the bigwig set
+		
+		# here we write individual stanzas for each bigwig file
+		
+		# add the database stanza
+		push @confdata, "[$target_basename\_db:database]\n";
+		push @confdata, "db_adaptor   = Bio::DB::BigWig\n";
+		push @confdata, "db_args      = -bigwig $target_file\n";
+		
+		# add the basic track stanza
+		push @confdata, "\n[$name]\n";
+		push @confdata, "database     = $target_basename\_db\n";
+		push @confdata, "feature      = summary\n";
+		push @confdata, "glyph        = wiggle_whiskers\n";
+		push @confdata, "graph_type   = boxes\n";
+		push @confdata, "\n";
+	}
 }
+
+
+### Write metadata file
+if ($write_metadata) {
+	my $md_file = File::Spec->catfile($path, 'metadata.index');
+	my $md_fh;
+	if (-e $md_file) {
+		# file already exists!?
+		# append to it
+		$md_fh = open_to_write_fh($md_file, 0, 1) or 
+			die " can't append to metadata index file!\n";
+	}
+	else {
+		# write a new file
+		$md_fh = open_to_write_fh($md_file) or 
+			die " can't write metadata index file!\n";
+	}
+	foreach (@metadata) {
+		print {$md_fh} $_;
+	}
+	$md_fh->close;
+	print " wrote metadata index file '$md_file'\n";
+}
+
+
+
+### write the starter conf data
+if ($write_conf) {
+	# Generate the stanzas for a bigwigset if necessary
+	if ($write_metadata) {
+		# write a conf stanza for the bigwig set
+		
+		# use the last directory name in the target path as the database name
+		my @dirs = File::Spec->splitdir($path);
+		
+		# add the database stanza
+		push @confdata, "[$dirs[-1]\_db:database]\n";
+		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
+		push @confdata, "db_args      = -dir $path\n";
+		
+		# add the basic track stanza
+		push @confdata, "\n[$dirs[-1]]\n";
+		push @confdata, "database     = $dirs[-1]\_db\n";
+		push @confdata, "feature      = $type\n";
+		push @confdata, "glyph        = wiggle_whiskers\n";
+		push @confdata, "graph_type   = boxes\n";
+		push @confdata, "\n";
+	}
+	
+	# write the conf stanza file
+	my $conf_file = 'conf_stanzas.txt';
+	my $conf_fh;
+	if (-e $conf_file) {
+		# file already exists!?
+		# append to it
+		$conf_fh = open_to_write_fh($conf_file, 0, 1) or 
+			die " can't append to GBrowse configuration stanza file!\n";
+	}
+	else {
+		# write a new file
+		$conf_fh = open_to_write_fh($conf_file) or 
+			die " can't write GBrowse configuration stanza file!\n";
+	}
+	foreach (@confdata) {
+		print {$conf_fh} $_;
+	}
+	$conf_fh->close;
+	print " wrote sample GBrowse configuration stanza file '$conf_file'\n";
+}
+print " Finished\n";
+
+
 
 
 
@@ -271,7 +449,7 @@ sub initialize_data_structure {
 
 
 sub collect_chromosomes_from_bigwig {
-	my ($infile, $target_file, $data_ref) = @_;
+	my ($infile, $target_file, $data_ref, $strand) = @_;
 	
 	# adjust the File column name
 	$data_ref->{4}{'name'} = 'bigwigfile';
@@ -309,7 +487,7 @@ sub collect_chromosomes_from_bigwig {
 
 
 sub collect_chromosomes_from_bam {
-	my ($infile, $target_file, $data_ref) = @_;
+	my ($infile, $target_file, $data_ref, $strand) = @_;
 	
 	# adjust the File column name
 	$data_ref->{4}{'name'} = 'bamfile';
@@ -362,7 +540,10 @@ bw2gff3.pl [--options...] <filename1.bw> <filename2.bw> ...
   --source <text>
   --name <text> or <text1,text2,...>
   --type <text>
-  --strand [f r w c]
+  --strand [f|r|w|c|+|-|1|0|-1],...
+  --rename
+  --set
+  --conf
   --help
   
 
@@ -374,16 +555,20 @@ The command line flags and descriptions:
 
 =item --in <filename.bw | filename.bam>
 
-Provide the name(s) of the input bigwig or bam file(s). The list may be 
+Provide the name(s) of the input bigwig. The list may be 
 specified by reiterating the --in option, providing a single comma-delimited 
-list, or simply listing all files after the options (e.g. "data_*.bw").
+list, or simply listing all files after the options (e.g. "data_*.bw"). 
+Limited support is provided for .bam files.
 
 =item --path </destination/path/for/bigwig/files/>
 
-Provide the destination directory name for the bigwig files. This directory 
-should be writeable by the user and readable by all. If the bigwig/bam file 
-is not currently located here, the program will copy the file to this 
-directory for you. The default path is the current path for the input file.
+Provide the destination directory name for the bigwig files. If the
+destination does not exist, then it will created. This directory should be
+writeable by the user and readable by all (or at least the Apache and MySQL
+users). If the input files are not currently located here, they will be
+copied to the directory for you. Note that when generating a BigWigSet, a
+unique directory for just the indicated files should be provided. The
+default path is the current path for the input file.
 
 =item --source <text>
 
@@ -403,10 +588,36 @@ option. The default value to use the input file basename.
 Provide the GFF type for the GFF features for all input files. By default, 
 it re-uses the GFF name. Unique values for each input file is not supported.
 
-=item --strand [f r w c]
+=item --strand [f|r|w|c|+|-|1|0|-1],...
 
 Indicate which strand the feature will be located. Acceptable values include 
-(f)orward, (r)everse, (w)atson, or (c)rick. By default no strand is used. 
+(f)orward, (r)everse, (w)atson, (c)rick, +, -, 1, or -1. By default no strand 
+is used. For mulitple input files with different strands, use the option 
+repeatedly or provide a comma-delimited list. If only one value is provided, 
+it is used for all input files.
+
+=item --rename
+
+Rename the input source file basenames as "$source.$name" when moving to the 
+target directory. This may help in organization and clarity of file listings. 
+Default is false.
+
+=item --set
+
+Indicate that all of the input bigwig files should be part of a BigWigSet,
+which treats all of the bigwig files in the target directory as a single
+database. This is primarily for GBrowse, as biotoolbox scripts (currently)
+don't use the BigWigSet adaptor. A text file is written in the target
+directory with metadata for each bigwig file (feature, source, strand,
+name) as described in Bio::DB::BigWigSet documentation. Additional metadata 
+may be manually added as necessary. The default is false.
+
+=item --conf
+
+Write sample GBrowse database and track configuration stanzas. Each bigwig 
+file will get individual stanzas, unless the --set option is enabled, where 
+a single stanza for the BigWigSet is provided. This is helpful when setting 
+up GBrowse database and configurations. Default is false.
 
 =item --help
 
@@ -417,21 +628,33 @@ Display this POD help.
 =head1 DESCRIPTION
 
 This program will generate a GFF3 file with features representing a 
-bigwig or bam file. The features will encompass the entire length of each 
+bigwig file. The features will encompass the entire length of each 
 chromosome represented in the data file. The name of the data file and its 
 absolute path is stored as a tag value in each feature. This tag value can 
-be used by L<tim_db_helper.pm> to collect data from the file with respect to 
+be used by B<tim_db_helper.pm> to collect data from the file with respect to 
 various locations and features in the database. 
 
-The source data file is copied to the destination directory. The file is 
+The source data file is copied to the destination directory. The file may be 
 renamed as "source.name" so as to avoid confusion when lots of files are 
 dumped into the same directory. 
+
+The bigwig files may also be designated as a BigWigSet, with unique metadata 
+assigned to each file (source, type, name, strand). The BigWigSet may be 
+treated as a single database with multiple bigwig data sources by GBrowse. A 
+metadata index file is written in the target directory as described in 
+Bio::DB::BigWigSet.
 
 Multiple source files may be designated, and each may have its own name. 
 This facilitates multiple file processing.
 
-The generated GFF3 file is generated in the current directory. It use the 
-provided GFF name as the basename for the file.
+The generated GFF3 file is written to the current directory. One GFF file is 
+written for each input file. It uses the provided GFF name as the basename 
+for the file.
+
+Optionally, sample database and track GBrowse configuration stanzas may also be 
+written to the current directory to facilitate setting up GBrowse.
+
+
 
 =head1 AUTHOR
 
