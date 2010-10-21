@@ -3120,7 +3120,6 @@ in the data table will be discarded. Since referenced data is being
 used, any data loss may be significant and unexpected. A normal data file
 should be written first to preserve extraneous data, and the conversion to
 gff data be the last operation done.
-BECAUSE OF THIS, THIS METHOD MAY BE DEPRECATED IN THE FUTURE!!!!
 
 Since the gff data structure requires genomic coordinates, this data must be 
 present as identifiable datasets in the data table and metadata. It looks 
@@ -3148,9 +3147,12 @@ arguments. The keys include
               that contains 'stop' or 'end'.
   score    => The index of the dataset in the data table to be used 
               as the score column in the gff data.
-  name     => The index of the dataset in the data table to be used 
-              as the name of each gff feature. This information will
-              be used in the 'group' column.
+  name     => The name to be used for the GFF features. Pass either 
+              the index of the dataset in the data table that 
+              contains the unique name for each gff feature, or a 
+              text string to be used as the name for all of the 
+              features. This information will be used in the 
+              'group' column.
   strand   => The index of the dataset in the data table to be used
               for strand information. Accepted values might include
               any of the following 'f(orward), r(everse), w(atson),
