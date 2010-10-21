@@ -37,6 +37,7 @@ my (
 	$type,
 	$rename,
 	$write_metadata,
+	$set_name,
 	$write_conf,
 	$help
 );
@@ -54,6 +55,7 @@ GetOptions(
 	'strand=s'  => \@strands, # indicate the strand for the feature
 	'rename'    => \$rename, # rename the file
 	'set!'      => \$write_metadata, # write a metadata index file for BigWigSet
+	'setname=s' => \$set_name, # name for the bigwigset
 	'conf!'     => \$write_conf, # write GBrowse conf stanzas
 	'help'      => \$help # request help
 );
@@ -136,6 +138,14 @@ if (defined $path) {
 else {
 	# default is to use the current working directory
 	$path = File::Spec->curdir();
+}
+
+# my bigwigset name
+unless ($set_name) {
+	# we'll assume that the last directory in the defined path is the 
+	# name we'll use for the set
+	my @dirs = File::Spec->splitdir($path);
+	$set_name = $dirs[-1];
 }
 
 # default source
@@ -252,21 +262,71 @@ while (@infiles) {
 	
 	
 	### Write the GFF3 file
-	my $success = convert_and_write_to_gff_file( {
-		'data'       => $main_data_ref,
-		'filename'   => $name,
-		'version'    => 3,
-		'source'     => $source,
-		'type'       => $gfftype,
-		'name'       => $name,
-		'strand'     => 3,
-		'tags'       => [4],
-	} );
-	if ($success) {
-		print "  wrote GFF3 file '$success'\n";
+	# if we're creating a bigwigset, then we'll be writing a single GFF file
+	# otherwise write individual GFF files for each bigwig file
+	if ($write_metadata) {
+		# writing a single gff file
+		
+		# first convert the data structure to GFF for writing
+		convert_genome_data_2_gff_data( {
+			'data'       => $main_data_ref,
+			'version'    => 3,
+			'source'     => $source,
+			'type'       => $gfftype,
+			'name'       => $name,
+			'strand'     => 3,
+			'tags'       => [4],
+		} ) or die " unable to convert data to GFF format!\n";
+		
+		# write new or append existing GFF file
+		my $gff_file = $set_name . '.gff3';
+		if (-e $gff_file) {
+			# file exists, append to it
+			my $gff_fh = open_to_write_fh($gff_file, 0, 1) or 
+				die " can't append to GFF file!\n";
+			
+			# append the table contents to the file
+			for my $row (1 .. $main_data_ref->{'last_row'}) {
+				print {$gff_fh} join("\t", 
+					@{ $main_data_ref->{'data_table'}->[$row] }), "\n";
+			}
+			$gff_fh->close;
+			print "  appended to GFF3 file '$gff_file'\n";
+		}
+		else {
+			# file doesn't exist, write new one
+			my $success = write_tim_data_file( {
+				'data'       => $main_data_ref,
+				'filename'   => $gff_file,
+			} );
+			if ($success) {
+				print "  wrote GFF3 file '$success'\n";
+			}
+			else {
+				print "  unable to write output file!\n";
+			}
+		}
 	}
 	else {
-		print "  unable to write output file!\n";
+		# writing individual GFF files
+		
+		# convert and write the GFF file
+		my $success = convert_and_write_to_gff_file( {
+			'data'       => $main_data_ref,
+			'filename'   => $name,
+			'version'    => 3,
+			'source'     => $source,
+			'type'       => $gfftype,
+			'name'       => $name,
+			'strand'     => 3,
+			'tags'       => [4],
+		} );
+		if ($success) {
+			print "  wrote GFF3 file '$success'\n";
+		}
+		else {
+			print "  unable to write output file!\n";
+		}
 	}
 	
 	
@@ -348,17 +408,14 @@ if ($write_conf) {
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
-		# use the last directory name in the target path as the database name
-		my @dirs = File::Spec->splitdir($path);
-		
 		# add the database stanza
-		push @confdata, "[$dirs[-1]\_db:database]\n";
+		push @confdata, "[$set_name\_db:database]\n";
 		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
 		push @confdata, "db_args      = -dir $path\n";
 		
 		# add the basic track stanza
-		push @confdata, "\n[$dirs[-1]]\n";
-		push @confdata, "database     = $dirs[-1]\_db\n";
+		push @confdata, "\n[$set_name]\n";
+		push @confdata, "database     = $set_name\_db\n";
 		push @confdata, "feature      = $type\n";
 		push @confdata, "glyph        = wiggle_whiskers\n";
 		push @confdata, "graph_type   = boxes\n";
