@@ -16,7 +16,11 @@ use tim_db_helper qw(
 	get_new_feature_list
 	get_region_dataset_hash
 );
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	write_summary_data
+);
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 

@@ -8,7 +8,10 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 
 print "\n A progam to merge two or more dataset files\n";
 

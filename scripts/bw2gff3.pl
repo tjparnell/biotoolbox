@@ -11,7 +11,15 @@ use File::Path 'make_path';
 use File::Basename qw(fileparse);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
+use tim_file_helper qw(
+	write_tim_data_file
+	open_to_write_fh
+	convert_genome_data_2_gff_data
+	convert_and_write_to_gff_file
+);
 eval {use Bio::DB::BigWig};
 eval {use Bio::DB::Sam};
 
@@ -214,7 +222,14 @@ while (@infiles) {
 	
 	### Generate the GFF data structure
 	# Initialize the data structure
-	my $main_data_ref = initialize_data_structure();
+	my $main_data_ref = generate_tim_data_structure(
+		'bigwig_features',
+		'Chromosome',
+		'Start',
+		'Stop',
+		'Strand',
+		'File'
+	) or die " unable to generate tim data structure!\n";
 	
 	# Determine the target file name
 	my $target_basename;
@@ -450,59 +465,6 @@ print " Finished\n";
 
 
 #############################  Subroutines  ################################
-
-sub initialize_data_structure {
-	
-	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'feature'}        = 'data_features';
-	$datahash{'number_columns'} = 5;
-	
-	# set column metadata
-	$datahash{0} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the start position 
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the stop position
-		'name'     => 'Stop',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		# strand
-		'name'     => 'Strand',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		# Name
-		'name'     => 'File',
-		'index'    => 4,
-	};
-	
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Chromosome
-		Start
-		Stop
-		Strand
-		File
-	) ] );
-	$datahash{'data_table'} = \@data_table;
-	
-	# return the reference to the generated data hash
-	return \%datahash;
-}
-
 
 
 sub collect_chromosomes_from_bigwig {

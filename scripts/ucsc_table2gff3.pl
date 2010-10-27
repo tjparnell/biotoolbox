@@ -20,8 +20,14 @@ use Bio::SeqFeature::Generic;
 use Bio::Tools::GFF;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
-use Data::Dumper;
+use tim_data_helper qw(
+	find_column_index
+);
+use tim_file_helper qw(
+	open_tim_data_file
+	open_to_write_fh
+);
+#use Data::Dumper;
 
 print "\n A script to convert UCSC RefSeq gene tables to GFF3\n\n";
 

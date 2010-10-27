@@ -8,8 +8,18 @@ use Statistics::Lite qw(min max mean stddevp);
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
-use Data::Dumper;
+use tim_data_helper qw(
+	generate_tim_data_structure
+	index_data_table
+	find_column_index
+	format_with_commas
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	convert_and_write_to_gff_file
+);
+#use Data::Dumper;
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 
@@ -175,82 +185,6 @@ if ($gff) {
 ############################# Subroutines #####################################
 
 
-# Initialize the output tim data structure
-sub initialize_output {
-	
-	# the target and reference nucleosome lists
-	my ($target_data, $reference_data) = @_;
-	
-	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'feature'}        = 'nucleosome';
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 8;
-	
-	# set column metadata
-	$datahash{0} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the start position 
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the stop position
-		'name'     => 'Stop',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		# the shift in direction, equivalent to strand
-		'name'     => 'Direction',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		# the length of the shift
-		'name'      => 'Length',
-		'index'     => 4,
-	};
-	$datahash{5} = {
-		# the change in occpuancy
-		'name'     => 'Delta_Occupancy',
-		'index'    => 5,
-	};
-	$datahash{6} = {
-		# the target nucleosome name
-		'name'     => 'Target_ID',
-		'index'    => 6,
-		'file'     => $target_data->{'filename'},
-	};
-	$datahash{7} = {
-		# the reference nucleosome name
-		'name'     => 'Reference_ID',
-		'index'    => 7,
-		'file'     => $reference_data->{'filename'},
-	};
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Chromosome
-		Start
-		Stop
-		Direction
-		Length
-		Delta_Occupancy
-		Target_ID
-		Reference_ID
-	) ] );
-	$datahash{'data_table'} = \@data_table;
-	
-	# return the reference to the generated data hash
-	return \%datahash;
-}
-
 
 
 # Main nucleosome intersection subroutine
@@ -260,7 +194,24 @@ sub intersect_nucs {
 	my ($target_data, $reference_data) = @_;
 	
 	# initialize the output data structure
-	my $out_data = initialize_output($target_data, $reference_data);
+	my $out_data = generate_tim_data_structure(
+		'nucleosome',
+		qw(
+			Chromosome
+			Start
+			Stop
+			Direction
+			Length
+			Delta_Occupancy
+			Target_ID
+			Reference_ID
+		)
+	) or die " unable to generate tim data structure!\n";
+	
+	# add metadata to output data structure
+	$out_data->{6}{'file'} = $target_data->{'filename'}; 
+	$out_data->{7}{'file'} = $reference_data->{'filename'}; 
+		
 	
 	# index the reference data
 	unless ( index_data_table($reference_data, 3000) ) {
@@ -269,23 +220,23 @@ sub intersect_nucs {
 		die " unable to index reference data table for '" . 
 			$reference_data->{filename} . "'\n";
 	}
-	{
-		open FH, ">intersect_dumper.txt";
-		print FH Dumper($reference_data);
-		close FH;
-	}
+# 	{
+# 		open FH, ">intersect_dumper.txt";
+# 		print FH Dumper($reference_data);
+# 		close FH;
+# 	}
 	
 	# identify indices
-	my $t_chromo_i = find_column_index($target_data, '^chr|seq|refseq');
-	my $t_start_i = find_column_index($target_data, 'start');
-	my $t_stop_i = find_column_index($target_data, 'stop|end');
-	my $t_name_i = find_column_index($target_data, 'name|NucleosomeID');
-	my $t_score_i = find_column_index($target_data, 'score|occupancy');
-	my $r_chromo_i = find_column_index($reference_data, '^chr|seq|refseq');
-	my $r_start_i = find_column_index($reference_data, 'start');
-	my $r_stop_i = find_column_index($reference_data, 'stop|end');
-	my $r_name_i = find_column_index($reference_data, 'name|NucleosomeID');
-	my $r_score_i = find_column_index($reference_data, 'score|occupancy');
+	my $t_chromo_i  = find_column_index($target_data, '^chr|seq|refseq');
+	my $t_start_i   = find_column_index($target_data, 'start');
+	my $t_stop_i    = find_column_index($target_data, 'stop|end');
+	my $t_name_i    = find_column_index($target_data, 'name|NucleosomeID');
+	my $t_score_i   = find_column_index($target_data, 'score|occupancy');
+	my $r_chromo_i  = find_column_index($reference_data, '^chr|seq|refseq');
+	my $r_start_i   = find_column_index($reference_data, 'start');
+	my $r_stop_i    = find_column_index($reference_data, 'stop|end');
+	my $r_name_i    = find_column_index($reference_data, 'name|NucleosomeID');
+	my $r_score_i   = find_column_index($reference_data, 'score|occupancy');
 	unless (
 		defined $t_chromo_i and 
 		defined $t_start_i and 
@@ -546,7 +497,8 @@ sub print_statistics {
 	### print the results
 	
 	# total numbers
-	print "\n Identifed $data_ref->{last_row} nucleosome intersections\n";
+	print "\n Identifed " . format_with_commas($data_ref->{last_row}) . 
+		" nucleosome intersections\n";
 	printf "   %.1f%% of target nucleosomes\n", 
 		($number / $target_ref->{'last_row'}) * 100;
 	printf "   %.1f%% of reference nucleosomes\n", 
@@ -555,27 +507,34 @@ sub print_statistics {
 	if ($number) {
 		
 		# number of nucleosome hits
-		printf "  $once (%.1f%%) nucleosomes intersected unique reference nucleosomes\n", 
+		print "  " . format_with_commas($once);
+		printf " (%.1f%%) nucleosomes intersected unique reference nucleosomes\n", 
 			( ($once/$number) * 100 );
 		if ($twice) {
-			printf "  $twice (%.1f%%) intersected the same reference nucleosome twice\n", 
+			print "  " . format_with_commas($twice);
+			printf " (%.1f%%) intersected the same reference nucleosome twice\n", 
 				( ($twice/$number) * 100 );
 		}
 		if ($thrice) {
-			printf "  $thrice (%.1f%%) intersected the same reference nucleosome three times\n", 
+			print "  " . format_with_commas($thrice);
+			printf " (%.1f%%) intersected the same reference nucleosome three times\n", 
 				( ($thrice/$number) * 100 );
 		}
 		if ($more) {
-			printf "  $more (%.1f%%) intersected the same reference nucleosome four or more times\n", 
+			print "  " . format_with_commas($more);
+			printf " (%.1f%%) intersected the same reference nucleosome four or more times\n", 
 				( ($more/$number) * 100 );
 		}
 		
 		# direction
-		printf " $left nucleosomes (%.1f%%) had a leftward shift\n", 
+		print " " . format_with_commas($left);
+		printf " nucleosomes (%.1f%%) had a leftward shift\n", 
 			( ($left/$number) * 100 );
-		printf " $right nucleosomes (%.1f%%) had a rightward shift\n", 
+		print " " . format_with_commas($right);
+		printf " nucleosomes (%.1f%%) had a rightward shift\n", 
 			( ($right/$number) * 100 );
-		printf " $noshift nucleosomes (%.1f%%) had no shift\n", 
+		print " " . format_with_commas($noshift);
+		printf " nucleosomes (%.1f%%) had no shift\n", 
 			( ($noshift/$number) * 100 );
 		print "  The mean shift was ", sprintf( "%.0f", mean(@shifts) ), 
 			" +/- ", sprintf( "%.0f", stddevp(@shifts) ), " bp, range ", 

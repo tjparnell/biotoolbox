@@ -5,11 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Sam;
+eval {use Bio::DB::Sam};
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
-
+use tim_data_helper qw(
+	format_with_commas
+);
+use tim_file_helper qw(
+	open_to_write_fh
+);
 
 ### Quick help
 unless (@ARGV) { 
@@ -272,25 +276,33 @@ sub convert_paired_end_alignments {
 	$gff_out->close; 
 	
 	# print summaries
-	print "\n There were " . add_commas($total_count) . 
+	print "\n There were " . format_with_commas($total_count) . 
 		" total alignment pairs read\n";
 	
-	print "   " . add_commas($undefined_count) . " (". percent_pc($undefined_count) . 
-		") pairs had an undefined (unmapped?) alignment\n" if $undefined_count > 0;
-	print "   " . add_commas($improper_count) . " (". percent_pc($improper_count) . 
+	print "   " . format_with_commas($undefined_count) . " (". 
+		percent_pc($undefined_count) . 
+		") pairs had an undefined (unmapped?) alignment\n" 
+		if $undefined_count > 0;
+	print "   " . format_with_commas($improper_count) . " (". 
+		percent_pc($improper_count) . 
 		") pairs were improper\n" if $improper_count > 0;
-	print "   " . add_commas($diffchromo_count) . " (". percent_pc($diffchromo_count) . 
-		") pairs were split between different chromosomes\n" if $diffchromo_count > 0;
+	print "   " . format_with_commas($diffchromo_count) . " (". 
+		percent_pc($diffchromo_count) . 
+		") pairs were split between different chromosomes\n" 
+		if $diffchromo_count > 0;
 	
-	print "   " . add_commas($non_AT_end_count) . " (". percent_pc($non_AT_end_count) . 
-		") pairs had non-AT ends\n" if $non_AT_end_count > 0;
+	print "   " . format_with_commas($non_AT_end_count) . " (". 
+		percent_pc($non_AT_end_count) . ") pairs had non-AT ends\n" 
+		if $non_AT_end_count > 0;
 	
-	print "   " . add_commas($toosmall_count) . " (". percent_pc($toosmall_count) . 
+	print "   " . format_with_commas($toosmall_count) . " (". 
+		percent_pc($toosmall_count) . 
 		") pairs were below the lowest size $minsize bp\n";
-	print "   " . add_commas($toobig_count) . " (". percent_pc($toobig_count) . 
+	print "   " . format_with_commas($toobig_count) . " (". 
+		percent_pc($toobig_count) . 
 		") pairs were above the highest size $maxsize bp\n";
-	print "   " . add_commas($just_right_count) . " (". percent_pc($just_right_count) . 
-		") pairs were just right\n";
+	print "   " . format_with_commas($just_right_count) . " (". 
+		percent_pc($just_right_count) . ") pairs were just right\n";
 
 }
 
@@ -379,13 +391,15 @@ sub convert_single_end_alignments {
 	$gff_out->close; 
 	
 	# print summaries
-	print "\n There were " . add_commas($total_count) . 
+	print "\n There were " . format_with_commas($total_count) . 
 		" total alignment pairs read\n";
 	
-	print "   " . add_commas($unmapped_count) . " (". percent_pc($unmapped_count) . 
-		") reads were unmapped\n" if $unmapped_count > 0;
-	print "   " . add_commas($mapped_count) . " (". percent_pc($mapped_count) . 
-		") pairs were properly mapped\n" if $mapped_count > 0;
+	print "   " . format_with_commas($unmapped_count) . " (". 
+		percent_pc($unmapped_count) . ") reads were unmapped\n" 
+		if $unmapped_count > 0;
+	print "   " . format_with_commas($mapped_count) . " (". 
+		percent_pc($mapped_count) . ") pairs were properly mapped\n" 
+		if $mapped_count > 0;
 
 }
 
@@ -397,27 +411,6 @@ sub percent_pc {
 	# for calculating the percent of a count out of the total paired read number
 	my $count = shift;
 	return sprintf "%.1f%%", ($count / $total_count) * 100;
-}
-
-sub add_commas {
-	# for formatting a number with commas
-	my $number = shift;
-	my @digits = split //, $number;
-	my @formatted;
-	while (@digits) {
-		if (@digits > 3) {
-			unshift @formatted, pop @digits;
-			unshift @formatted, pop @digits;
-			unshift @formatted, pop @digits;
-			unshift @formatted, ',';
-		}
-		else {
-			while (@digits) {
-				unshift @formatted, pop @digits;
-			}
-		}
-	}
-	return join "", @formatted;
 }
 
 

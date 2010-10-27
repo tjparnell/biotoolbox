@@ -9,12 +9,15 @@ use Pod::Usage;
 use Bio::Range;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
 use tim_db_helper qw(
 	open_db_connection
 	validate_dataset_list 
 	get_dataset_list 
 	validate_included_feature
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
 );
 
 

@@ -7,7 +7,10 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";

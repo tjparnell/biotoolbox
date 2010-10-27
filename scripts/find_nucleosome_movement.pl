@@ -8,13 +8,21 @@ use Pod::Usage;
 use Statistics::Lite qw();
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	generate_tim_data_structure
+	find_column_index
+);
 use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 	validate_dataset_list
 	get_region_dataset_hash
 );
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	convert_and_write_to_gff_file
+);
 
 print "\n This script will identify nucleosome movement\n\n";
 
@@ -113,7 +121,9 @@ unless ($outfile) {
 
 
 # Identify the dataset to use
-validate_or_request_dataset();
+if ($database) {
+	validate_or_request_dataset();
+}
 
 
 # Initialize data structures
@@ -223,69 +233,29 @@ sub validate_or_request_dataset {
 ###### Initialize the primary output data hash
 
 sub initialize_movement_data_hash {
+	# the output data structure for the identified nucleosome movement events
 	
-	# generate the data hash
-	my %datahash;
+	# generate a new data structure
+	my $data = generate_tim_data_structure(
+		'nucleosome_movement',
+		'Chromosome',
+		'Start',
+		'Stop',
+		'Direction',
+		'Score',
+		'EventID',
+	) or die " unable to generate tim data structure!\n";
 	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'db'}             = $database;
-	$datahash{'feature'}        = 'nucleosome_movement';
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 6;
-	
-	# set column metadata
-	$datahash{0} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the start position 
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the stop position
-		'name'     => 'Stop',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		# the direction of movement
-		# this will essentially be recorded as strand in the GFF
-		'name'     => 'Direction',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		# the score position
-		# this will be absolute value of the difference between the two scores
-		'name'     => 'Score',
-		'index'    => 4,
-		'dataset'  => $dataset,
-		'gain'     => $gain,
-		'loss'     => $loss,
-		'delta'    => $delta,
-		'log2'     => 1, # assumed
-	};
-	$datahash{5} = {
-		# a unique ID for the movement
-		'name'     => 'EventID',
-		'index'    => 5,
-	};
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Chromosome
-		Start
-		Stop
-		Direction
-		Score
-		EventID
-	) ] );
-	$datahash{'data_table'} = \@data_table;
+	# add metadata
+	$data->{'db'}           = $database || $source_data_file;
+	$data->{4}{'dataset'}   = $dataset || $source_data_file;
+	$data->{4}{'gain'}      = $gain;
+	$data->{4}{'loss'}      = $loss;
+	$data->{4}{'delta'}     = $delta;
+	$data->{4}{'log2'}      = 1;
 	
 	# return the reference to the generated data hash
-	return \%datahash;
+	return $data;
 }
 
 
@@ -297,40 +267,18 @@ sub initialize_source_data_hash {
 	# and putting it into a standard tim data memory structure
 	# for ease of use and manipulation
 	
-	### Initialize the data structure
-	my %datahash;
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'db'}             = $database;
-	$datahash{'feature'}        = 'microarray_data';
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 3;
+	### Generate a new data structure
+	my $data = generate_tim_data_structure(
+		'microarray_data',
+		'Chromosome',
+		'Start',
+		'Score',
+	) or die " unable to generate tim data structure!\n";
 	
-	# set column metadata
-	$datahash{0} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the start position 
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the score
-		'name'     => 'Score',
-		'index'    => 2,
-		'log2'     => 1, # assumed
-		'dataset'  => $dataset,
-	};
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Chromosome
-		Start
-		Score
-	) ] );
+	# add metadata
+	$data->{'db'}           = $database || $source_data_file;
+	$data->{2}{'dataset'}   = $dataset || $source_data_file;
+	$data->{2}{'log2'}      = 1; # assumed
 	
 	
 	
@@ -378,7 +326,8 @@ sub initialize_source_data_hash {
 			
 			# collect the data from the chromosome
 			foreach my $position (sort {$a <=> $b} keys %chromodata) {
-				push @data_table, [ ($chr, $position, $chromodata{$position} ) ];
+				push @{$data->{'data_table'}}, 
+					[ ($chr, $position, $chromodata{$position} ) ];
 			}
 			print "  ...collected ", scalar keys %chromodata, " values from ", 
 				"chromosome $chr\n";
@@ -404,28 +353,13 @@ sub initialize_source_data_hash {
 		else {
 			# a tim data file
 			# let's hope that the columns are identifiable
-			for (my $i = 0; $i < $input_ref->{'number_columns'}; $i++) {
-				# check the names of each column
-				# looking for chromo, start, stop
-				if ($input_ref->{$i}{'name'} =~ /^chrom|refseq/i) {
-					$chr_index = $i;
-				}
-				elsif ($input_ref->{$i}{'name'} =~ /start|position/i) {
-					$start_index = $i;
-				}
-				elsif ($input_ref->{$i}{'name'} =~ /stop|end/i) {
-					$stop_index = $i;
-				}
-				elsif ($input_ref->{$i}{'name'} =~ /score/i) {
-					$score_index = $i;
-				}
-				elsif ($input_ref->{$i}{'name'} eq $dataset) {
-					$score_index = $i;
-				}
-			}
+			$chr_index = find_column_index($input_ref, '^chr|refseq') || undef;
+			$start_index = find_column_index($input_ref, '^start|pos') || undef;
+			$stop_index = find_column_index($input_ref, '^stop|end') || undef;
+			$score_index = find_column_index($input_ref, "score|$dataset") || undef;
 		}
 		
-		# check that we have the scores
+		# check that we have identified columns
 		unless (
 			defined $chr_index and 
 			defined $start_index 
@@ -455,7 +389,7 @@ sub initialize_source_data_hash {
 				my $position = sprintf "%.0f", 
 					( $indata_ref->[$row][$start_index] / 
 					$indata_ref->[$row][$stop_index] );
-				push @data_table, [ (
+				push @{$data->{'data_table'}}, [ (
 					$indata_ref->[$row][$chr_index],
 					$position,
 					$indata_ref->[$row][$score_index]
@@ -474,7 +408,7 @@ sub initialize_source_data_hash {
 				if ($indata_ref->[$row][$chr_index] =~ /chrm|chrmt/i) {next}
 				
 				# store
-				push @data_table, [ (
+				push @{$data->{'data_table'}}, [ (
 					$indata_ref->[$row][$chr_index],
 					$indata_ref->[$row][$start_index],
 					$indata_ref->[$row][$score_index]
@@ -490,7 +424,7 @@ sub initialize_source_data_hash {
 				if ($indata_ref->[$row][$chr_index] =~ /chrm|chrmt/i) {next}
 				
 				# store
-				push @data_table, [ (
+				push @{$data->{'data_table'}}, [ (
 					$indata_ref->[$row][$chr_index],
 					$indata_ref->[$row][$start_index],
 					$indata_ref->[$row][$score_index]
@@ -506,11 +440,10 @@ sub initialize_source_data_hash {
 	}
 	
 	# Finish the data structure
-	$datahash{'data_table'} = \@data_table;
-	$datahash{'last_row'} = scalar(@data_table) - 1;
+	$data->{'last_row'} = scalar(@{$data->{'data_table'}}) - 1;
 	
 	# Return
-	return \%datahash;
+	return $data;
 }
 
 

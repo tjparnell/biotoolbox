@@ -3,7 +3,6 @@ package tim_db_helper;
 require Exporter;
 use strict;
 use Carp;
-use FindBin qw($Bin);
 use Config::Simple;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
@@ -14,6 +13,9 @@ use Statistics::Lite qw(
 	range
 	stddevp
 );
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_data_helper qw(generate_tim_data_structure);
 
 
 # check whether these optional modules are available
@@ -581,35 +583,23 @@ sub get_new_feature_list {
 	my $mito = $arg_ref->{'mito'} || 0; 
 	
 	# Generate data structures
-	my %data_hash; # the primary data structure that everything will go into
-	my @feature_table; # an array of arrays to put the feature list into
-	# we're keeping the data table separate for the time being for simplicity
+	my $new_data = generate_tim_data_structure(
+		$arg_ref->{'features'},
+		'Name',
+		'Type'
+	);
+	unless ($new_data) {
+		carp " cannot generate tim data structure!\n";
+		return;
+	}
+	my $feature_table = $new_data->{'data_table'}; 
 	
-	# begin loading basic metadata information
-	$data_hash{'db'} = $db_name; # name of the database
-	$data_hash{'feature'} = $arg_ref->{'features'};
-	$data_hash{'gff'} = 0;
-	$data_hash{'number_columns'} = 2;
-	
-	# Generate the table header
-	push @feature_table, [ 
-		'Name', 
-		'Type', 
-	];
-	
-	# Generate column metadata
-	$data_hash{0} = {
-			'name'  => 'Name',
-			'index' => 0,
-	};
-	$data_hash{1} = {
-			'name'  => 'Type',
-			'index' => 1,
-	};
+	# name of the database
+	$new_data->{'db'} = $db_name; 
 	
 	# List of types
 	if (scalar @classes > 1) {
-		$data_hash{1}->{'include'} = join(",", @classes);
+		$new_data->{1}->{'include'} = join(",", @classes);
 	}
 	
 	# Collect the genes from the database
@@ -637,12 +627,12 @@ sub get_new_feature_list {
 		if ($featurelist[$i]->has_tag('Alias')) {
 			
 			# add an Alias column to the data table
-			push @{ $feature_table[0] }, 'Aliases';
-			$data_hash{2} = {
+			push @{ $feature_table->[0] }, 'Aliases';
+			$new_data->{2} = {
 					'name'  => 'Aliases',
 					'index' => 2,
 			};
-			$data_hash{'number_columns'} = 3;
+			$new_data->{'number_columns'} = 3;
 			last;
 		}
 	}
@@ -670,7 +660,7 @@ sub get_new_feature_list {
 		);
 		
 		# Add alias info if available
-		if (exists $data_hash{2}) {
+		if (exists $new_data->{2}) {
 			# we only look for Alias info if we have a column for it
 			if ($feature->has_tag('Alias')) {
 				push @data, join(q( ), $feature->get_tag_values('Alias'));
@@ -681,43 +671,28 @@ sub get_new_feature_list {
 		}
 		
 		# Record information
-		push @feature_table, \@data;
+		push @{$feature_table}, \@data;
+		$new_data->{'last_row'} += 1;
 	}
 	
 	
 	# print result of search
-	print "   Kept " . scalar @feature_table . " features.\n";
+	print "   Kept " . $new_data->{'last_row'} . " features.\n";
 	
 	# sort the table
 	my @feature_table_sorted;
-	my $header = shift @feature_table; # move header
-	if ($arg_ref->{'features'} =~ m/transcript/i) {
-		# sort differently if we're working with transcripts
-		
-		@feature_table_sorted = sort { 
-			# sort first by parent type, then by name
-			( $a->[3] cmp $b->[3] ) and ( $a->[0] cmp $b->[0] )
-		} @feature_table; 
-	}
-	else {
-		# non-transcript sort
-		
-		@feature_table_sorted = sort { 
-			# sort first by type, then by name
-			( $a->[1] cmp $b->[1] ) and ( $a->[0] cmp $b->[0] )
-		} @feature_table; 
-	}
-	undef @feature_table; # empty the original array
+	my $header = shift @{$feature_table}; # move header
+	@feature_table_sorted = sort { 
+		# sort first by type, then by name
+		( $a->[1] cmp $b->[1] ) and ( $a->[0] cmp $b->[0] )
+	} @{$feature_table}; 
 	unshift @feature_table_sorted, $header;
 	
 	# put the feature_table into the data hash
-	$data_hash{'data_table'} = \@feature_table_sorted;
+	$new_data->{'data_table'} = \@feature_table_sorted;
 	
-	# record the last row
-	$data_hash{'last_row'} = scalar @feature_table_sorted - 1;
-	
-	# return the reference to this hash
-	return \%data_hash;
+	# return the new data structure
+	return $new_data;
 }
 
 
@@ -825,39 +800,22 @@ sub get_new_genome_list {
 	
 	
 	# Generate data structures
-	my %data_hash; # the primary data structure that everything will go into
-	my @feature_table; # an array of arrays to put the feature list into
-	# we're keeping the data table separate for the time being for simplicity
+	my $new_data = generate_tim_data_structure(
+		'genome',
+		'Chromosome',
+		'Start',
+		'Stop'
+	);
+	unless ($new_data) {
+		carp " cannot generate tim data structure!\n";
+		return;
+	}
+	my $feature_table = $new_data->{'data_table'}; 
 	
 	# Begin loading basic metadata information
-	$data_hash{'db'} = $db_name; # the db name
-	$data_hash{'feature'} = 'genome';
-	$data_hash{'number_columns'} = 3;
-	$data_hash{'gff'} = 0;
-	
-	# Prepare column metadata
-	# the first three columns are identical regardless of feature type
-	# put column headers at the beginning of the array
-	push @feature_table, [ qw(
-			Chromosome
-			Start
-			Stop
-	) ];
-	# column metadata
-	$data_hash{0} = {
-			'name'  => 'Chromosome',
-			'index' => 0,
-	};
-	$data_hash{1} = {
-			'name'  => 'Start',
-			'index' => 1,
-			'win'   => $win,
-			'step'  => $step,
-	};
-	$data_hash{2} = {
-			'name'  => 'Stop',
-			'index' => 2,
-	};
+	$new_data->{'db'}      = $db_name; # the db name
+	$new_data->{1}{'win'}  = $win; # under the Start metadata
+	$new_data->{1}{'step'} = $step;
 	
 	
 	# Collect the chromosomes from the db
@@ -928,20 +886,15 @@ sub get_new_genome_list {
 			} 
 			
 			# add to the output list
-			push @feature_table, [ $chr, $start, $end,];
+			push @{$feature_table}, [ $chr, $start, $end,];
+			$new_data->{'last_row'}++;
 		}
 	}
-	print "   Kept " . (scalar @feature_table) . " windows.\n";
+	print "   Kept " . $new_data->{'last_row'} . " windows.\n";
 	
 	
-	# Put the feature_table into the data hash
-	$data_hash{'data_table'} = \@feature_table;
-	
-	# Record the last row
-	$data_hash{'last_row'} = scalar @feature_table - 1;
-	
-	# Return the reference to this hash
-	return \%data_hash;
+	# Return the data structure
+	return $new_data;
 }
 
 
@@ -1024,8 +977,8 @@ arguments. The keys include
               spaces.
   data =>     A scalar reference to the data table containing the
               list of features. This should be a reference to the
-              key 'data_table' in the data hash described in 
-              load_tim_data_file(), not to the entire data hash. 
+              key 'data_table' in the data structure described in 
+              tim_data_helper.pm, not to the entire data hash. 
               Note that the column metadata should be updated 
               separately by the calling program.
   method =>   The method used to combine the dataset values found
@@ -1831,8 +1784,8 @@ arguments. The keys include
               spaces.
   data =>     A scalar reference to the data table containing the
               list of features. This should be a reference to the
-              key 'data_table' in the data hash described in 
-              load_tim_data_file(), not to the entire data hash. 
+              key 'data_table' in the data structure described in 
+              tim_data_helper.pm, not to the entire data hash. 
               Note that the column metadata should be updated 
               separately by the calling program.
   method =>   The method used to combine the dataset values found

@@ -11,8 +11,18 @@ use Statistics::Lite qw(mean median sum);
 eval { use Bio::DB::Sam; };
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw(get_new_genome_list);
-use tim_file_helper;
+use tim_data_helper qw(
+	index_data_table
+);
+use tim_db_helper qw(
+	get_new_genome_list
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	open_to_read_fh
+	convert_and_write_to_gff_file
+);
 
 print "\n This script will generate genomic binned data\n\n";
 
@@ -43,6 +53,7 @@ my (
 	$span,
 	$midpoint,
 	$shift,
+	$interbase,
 	$interpolate,
 	$log,
 	$gffout,

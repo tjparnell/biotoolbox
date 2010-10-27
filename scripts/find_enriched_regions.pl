@@ -10,6 +10,9 @@ use Data::Dumper;
 use Bio::Range;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
 use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list 
@@ -17,7 +20,10 @@ use tim_db_helper qw(
 	get_region_dataset_hash
 	get_chromo_region_score
 );
-use tim_file_helper;
+use tim_file_helper qw(
+	write_tim_data_file
+	convert_and_write_to_gff_file
+);
 
 print "\n This script will find enriched regions for a specific microarray data set\n\n";
 
@@ -75,7 +81,7 @@ GetOptions(
 	'sort!'     => \$sort, # sort the windows by score
 	'log!'      => \$log, # dataset is in log2 space
 	'gff'       => \$gff, # write out a gff file
-	'html'      => \$html, # write out a html file with hyperlinks to gbrowse
+#	'html'      => \$html, # write out a html file with hyperlinks to gbrowse
 	'debug'     => \$debug, # limit to chromosome 1 for debugging purposes
 	'help'      => \$help, # print help
 );
@@ -307,7 +313,10 @@ if ($feat) {
 
 ## Generate the final primary data hash
 # this data hash is compatible with the tim data text format described in
-# tim_file_helper.pm
+# tim_data_helper.pm and tim_file_helper.pm
+# converting to this structure makes it easier for writing files 
+# via tim_file_helper
+# can you tell that this was bolted on long after writing the original script?
 my $main_data_ref = generate_main_data_hash();
 unless ($main_data_ref) {
 	die " unable to generate main data hash!\n";
@@ -875,126 +884,105 @@ sub name_the_windows {
 
 
 ### Generate the main data hash compatible with tim_file_helper.pm
+# this is bolted on after writing the main script for compatibility with 
+# tim_file_helper modules
 sub generate_main_data_hash {
 	
-	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'db'}             = $database;
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 6;
-	
-	# define feature depending on type of regions
+	# determine the data feature
+	my $feature;
 	if ($deplete) {
 		# depleted regions
-		$datahash{'feature'} = 'depleted_regions';
+		$feature = 'depleted_regions';
 	}
 	else {
 		# enriched regions
-		$datahash{'feature'} = 'enriched_regions';
+		$feature = 'enriched_regions';
 	}
 	
-	# set column metadata
-	$datahash{0} = {
-		# the window name
-		'name'     => 'WindowID',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the start position 
+	# generate a new data structure
+	my $data = generate_tim_data_structure(
+		$feature,
+		'WindowID',
+		'Chromosome',
+		'Start',
+		'Stop',
+		'Size',
+		'Score',
+	) or die " unable to generate tim data structure!\n";
+	
+	# Add metadata
+	$data->{'db'}             = $database;
+	
+	# window metadata
 		# traditionally with the genome feature datasets, extra pertinant
-		# information regarding the window generation goes here
-		'name'     => 'Start',
-		'index'    => 2,
-		'win'      => $win,
-		'step'     => $step,
-	};
+		# information regarding the window generation goes under the start 
+		# metadata
+	$data->{2}{'win'}      = $win;
+	$data->{2}{'step'}      = $step;
 	if ($trim) {
-		$datahash{2}{'trimmed'} = 1;
+		$data->{2}{'trimmed'} = 1;
 	} else {
-		$datahash{2}{'trimmed'} = 0;
+		$data->{2}{'trimmed'} = 0;
 	}
-	$datahash{3} = {
-		# the stop position
-		'name'     => 'Stop',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		# the size position
-		'name'     => 'Size',
-		'index'    => 4,
-	};
-	$datahash{5} = {
-		# the score position
-		# all parameters associated with the score are going to go here
-		'name'     => 'Score',
-		'index'    => 5,
-		'dataset'  => $dataset,
-		'log2'     => $log,
-		'method'   => $method,
-	};
+	
+	# score metadata
+	$data->{5}{'log2'}      = $log;
+	$data->{5}{'method'}      = $method;
 	if ($threshold) {
-		$datahash{5}{'threshold'} = $threshold;
+		$data->{5}{'threshold'} = $threshold;
 	} else {
-		$datahash{5}{'standard_deviation_limit'} = $sdlimit;
-		$datahash{5}{'threshold'} = $cutoff;
+		$data->{5}{'standard_deviation_limit'} = $sdlimit;
+		$data->{5}{'threshold'} = $cutoff;
 	}
 	
 	# add feature metadata if it was requested
 	if ($feat) {
-		$datahash{6} = {
+		# metadata keys
+		$data->{6} = {
 			# the orf list
 			'name'  => 'ORF_Features',
 			'index' => 6,
 		};
-		$datahash{7} = {
+		$data->{7} = {
 			# the orf list
 			'name'  => 'RNA_Features',
 			'index' => 7,
 		};
-		$datahash{8} = {
+		$data->{8} = {
 			# the orf list
 			'name'  => 'Non-gene_Features',
 			'index' => 8,
 		};
+		
 		# update the number of columns
-		$datahash{'number_columns'} = 9;
+		$data->{'number_columns'} = 9;
+		
 	}
 	
-	# check whether column headers have been added to the @windows array
-	if ($windows[0][0] eq 'WindowID') {
-		# it's already been done
-	}
-	else {
-		# add new empty array for the column headers
-		unshift @windows, [];
-		# add the name to the empty array
-		for (my $i = 0; $i < $datahash{'number_columns'}; $i++) {
-			$windows[0][$i] = $datahash{$i}{'name'};
-		}
+	# add the column headers
+	# the windows array never had column headers, so we'll add them here
+	unshift @windows, []; # put in space for the header
+	# add the names to the row 0 array
+	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+		$windows[0][$i] = $data->{$i}{'name'};
 	}
 	
-	# place the @windows array into the data hash
-	$datahash{'data_table'} = \@windows;
-	
-	# record the index number of the last row
-	#$datahash{'last_row'} = scalar(@windows) - 1;
+	# associate the @windows array with the data table in the structure
+	$data->{'data_table'} = \@windows;
 	
 	# return the reference to the generated data hash
-	return \%datahash;
+	return $data;
 }
 
 
 
 
 ### Write the html output file
+# this is old code for writing an html table file of the hits
+# it worked with GBrowse 1.x, but has not been vetted with GBrowse 2.x and 
+# is unlikely to work with the new browser
+# I'm keeping the code here in case I ever want to revisit it in the future
+# in the meantime, I've deleted references to it in the POD
 sub write_html_file {
 	open HTML, ">$outfile.html";
 	# print the head
@@ -1044,9 +1032,9 @@ sub write_html_file {
 	print HTML "</tr>\n\n";
 	
 	# print the data
-	my $gbrowse = "http://m000237.hci.utah.edu/cgi-bin/gbrowse/$database/?"; # hyperlink to machine & gbrowse
+	my $gbrowse = "http://localhost/cgi-bin/gbrowse/$database/?"; # hyperlink to machine & gbrowse
 	for my $i (0..$#windows) {
-		# http://m000237.hci.utah.edu/cgi-bin/gbrowse/cerevisiae/?name=chr1:137066..145763;enable=RSC_ChIP_ypd_244k;h_region=chr1:142066..143368@lightcyan
+		# http://localhost/cgi-bin/gbrowse/cerevisiae/?name=chr1:137066..145763;enable=RSC_ChIP_ypd_244k;h_region=chr1:142066..143368@lightcyan
 		my $position = "$windows[$i][1]:$windows[$i][2]..$windows[$i][3]"; # chromosome:start-stop
 		
 		# set size of selected region for gbrowse

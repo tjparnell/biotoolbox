@@ -5,13 +5,19 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use GD::Graph::lines; # for the line type graph
-use GD::Graph::mixed; # for the scatter plot
-use GD::Graph::smoothlines; # for bezier smoothed line graph
+eval {
+	use GD::Graph::lines; # for the line type graph
+	use GD::Graph::mixed; # for the scatter plot
+};
+eval {
+	use GD::Graph::smoothlines; # for bezier smoothed line graph
+};
 use Statistics::Descriptive;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+);
 
 print "\n This script will graph correlation plots for two microarry data sets\n\n";
 

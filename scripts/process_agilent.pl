@@ -14,7 +14,9 @@ use Statistics::Descriptive;
 # use GD::Graph::points;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	write_tim_data_file
+);
 
 print "\nA script to process Agilent microarray files\n";
 

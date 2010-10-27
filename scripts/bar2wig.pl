@@ -11,8 +11,12 @@ use Archive::Zip qw( :ERROR_CODES );
 use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
 use tim_db_helper qw($TIM_CONFIG);
+use tim_file_helper qw(
+	open_to_read_fh
+	open_to_write_fh
+	wig_to_bigwig_conversion
+);
 
 print "\n This program will \n";
 

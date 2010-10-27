@@ -8,7 +8,15 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	find_column_index
+);
+use tim_file_helper qw(
+	open_tim_data_file
+	write_tim_data_file
+	open_to_write_fh
+	convert_genome_data_2_gff_data
+);
 
 print "\n This script will convert a data file to a GFF\n\n";
 

@@ -1,20 +1,28 @@
 #!/usr/bin/perl
 
 # A script to map nucleosomes
+
+
 use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(count min max range sum mean stddevp);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
 use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 	validate_dataset_list
 	get_region_dataset_hash
 );
-use tim_file_helper;
-use Data::Dumper;
+use tim_file_helper qw(
+	write_tim_data_file
+	convert_and_write_to_gff_file
+);
+#use Data::Dumper;
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -111,7 +119,27 @@ validate_or_request_dataset();
 
 
 # Initialize data structures
-my $nucleosomes_ref = initialize_nucleosomes_hash();
+my $nucleosomes_ref = generate_tim_data_structure(
+	'nucleosome',
+	qw(
+		Chromosome
+		Start
+		Stop
+		Midpoint
+		NucleosomeID
+		Occupancy
+		Fuzziness
+	)
+) or die " unable to generate tim data structure!\n";
+$nucleosomes_ref->{'db'}               = $database;
+$nucleosomes_ref->{4}{'scan_dataset'}  = $scan_dataset,
+$nucleosomes_ref->{4}{'window'}        = $window;
+$nucleosomes_ref->{4}{'buffer'}        = $buffer;
+$nucleosomes_ref->{4}{'threshold'}     = $thresh;
+$nucleosomes_ref->{5}{'dataset'}       = $tag_dataset;
+$nucleosomes_ref->{5}{'log2'}          = 0;
+$nucleosomes_ref->{6}{'dataset'}       = $tag_dataset;
+$nucleosomes_ref->{6}{'log2'}          = 0;
 
 
 
@@ -262,82 +290,6 @@ sub validate_or_request_dataset {
 
 
 ###### Initialize the primary output data hash
-
-sub initialize_nucleosomes_hash {
-	
-	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'db'}             = $database;
-	$datahash{'feature'}        = 'nucleosome';
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 7;
-	
-	# set column metadata
-	$datahash{0} = {
-		# the chromosome
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		# the start position 
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		# the stop position
-		'name'     => 'Stop',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		# the midpoint position
-		'name'     => 'Midpoint',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		# a unique ID for the movement
-		'name'      => 'NucleosomeID',
-		'index'     => 4,
-		'scan_dataset'  => $scan_dataset,
-		'window'    => $window,
-		'buffer'    => $buffer,
-		'threshold' => $thresh,
-	};
-	$datahash{5} = {
-		# the occupancy of the nucleosome
-		'name'     => 'Occupancy',
-		'index'    => 5,
-		'dataset'  => $tag_dataset,
-		'log2'     => 0, 
-	};
-	$datahash{6} = {
-		# the degree of fuzziness for the nucleosome positioning
-		'name'     => 'Fuzziness',
-		'index'    => 6,
-		'dataset'  => $tag_dataset,
-		'log2'     => 0, 
-	};
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Chromosome
-		Start
-		Stop
-		Midpoint
-		NucleosomeID
-		Occupancy
-		Fuzziness
-	) ] );
-	$datahash{'data_table'} = \@data_table;
-	
-	# return the reference to the generated data hash
-	return \%datahash;
-}
-
-
-
 
 
 ###### Now map those nucleosomes!
