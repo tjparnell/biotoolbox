@@ -7,6 +7,9 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	parse_list
+);
 use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list 
@@ -16,7 +19,10 @@ use tim_db_helper qw(
 	get_feature_dataset 
 	get_genome_dataset 
 );
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 #use Data::Dumper;
 
 
@@ -381,7 +387,7 @@ sub interactive_collect_datasets {
 	
 	# process the user's request for the data set
 	$answer =~ s/\s+//g;
-	@datasets = _parse_list($answer); # split the user requests
+	@datasets = parse_list($answer); # split the user requests
 	
 	EACH_REQUEST:
 	foreach my $data_request (@datasets) {
@@ -585,34 +591,6 @@ sub _verify_method {
 	return $acceptable{$method};
 }
 
-
-# subroutine to parse a list
-sub _parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# ordinary number
-			push @list, $_;
-		}
-	}
-	return @list;
-}
 
 
 

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/perl 
 
 # This script will convert a wiggle track file to a GFF file 
 
@@ -11,7 +11,15 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	open_to_read_fh
+);
+use tim_file_helper qw(
+	write_tim_data_file
+	open_to_read_fh
+	open_to_write_fh
+	convert_genome_data_2_gff_data
+);
 
 print "\n This program will convert wiggle files to a GFF file\n";
 
@@ -93,6 +101,8 @@ my $in_fh = open_to_read_fh($infile) or
 
 
 ### Do the conversion
+
+# prepare output data structure
 
 # initialize variables
 my $out_data_ref = initialize_data_structure();
@@ -272,46 +282,24 @@ print " wrote file '$outfile'\n";
 
 
 sub initialize_data_structure {
-	my %datahash;
+	my $data = generate_tim_data_structure(
+		'wig_data',
+		qw(
+			Chromo
+			Start
+			Stop
+			Score
+		)
+	) or die " unable to generate tim data structure!\n";
 	
-	# populate basics
-	$datahash{'program'}          = $0;
-	$datahash{'gff'}              = 0;
-	$datahash{'number_columns'}   = 4;
-	$datahash{'last_row'}         = 0;
-	
-	# column metadata
-	$datahash{0} = {
-		'name'   => 'Chromo',
-		'index'  => 0,
-	};
-	$datahash{1} = {
-		'name'   => 'Start',
-		'index'  => 1,
-	};
-	$datahash{2} = {
-		'name'   => 'Stop',
-		'index'  => 2,
-	};
-	$datahash{3} = {
-		'name'   => 'Score',
-		'index'  => 3,
-		'original_file' => $infile,
-	};
+	# add metadata
+	$data->{3}{'original_file'} = $infile;
 	if (defined $places) {
-		$datahash{3}{'formatted'} = $places;
+		$out_data_ref->{3}{'formatted'} = $places;
 	}
 	
-	# data table
-	$datahash{'data_table'} = [];
-	push @{ $datahash{'data_table'} }, [ qw(
-		Chromo
-		Start
-		Stop
-		Score
-	) ];
-	
-	return \%datahash;
+	# finished
+	return $data;
 }
 
 

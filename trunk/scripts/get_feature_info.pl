@@ -7,8 +7,16 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw(open_db_connection);
-use tim_file_helper;
+use tim_data_helper qw(
+	find_column_index
+);
+use tim_db_helper qw(
+	open_db_connection
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 
 print "\n This script will get additional information about features\n\n";
 

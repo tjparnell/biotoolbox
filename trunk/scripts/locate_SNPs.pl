@@ -8,10 +8,16 @@ use Pod::Usage;
 use Bio::Tools::CodonTable;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
 use tim_db_helper qw(
 	open_db_connection
 );
-use tim_file_helper;
+use tim_file_helper qw(
+	write_tim_data_file
+	open_to_read_fh
+);
 
 
 
@@ -100,6 +106,24 @@ foreach my $infile (@ARGV) {
 	
 	# initialize data structure
 	my $output = initialize_output_data_structure($infile);
+	my $output = generate_tim_data_structure(
+		'SNPs',
+		qw(
+			Variation_Type
+			Overlapping_Feature
+			Codon_Change
+			Chromosome
+			Start
+			Reference_Base
+			Variation
+			Number_Supporting_Reads
+			Total_Number_Reads
+			Percent_Supporting
+			Consensus_Quality
+			SNP_Quality
+		)
+	) or die " unable to generate tim data structure!\n";
+	$output->{'db'} = $database;
 	
 	my $table = $output->{'data_table'};
 	
@@ -285,90 +309,13 @@ foreach my $infile (@ARGV) {
 	}
 }
 
+# The end
 
 
-sub initialize_output_data_structure {
-	my $filename = shift;
-	
-	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'feature'}        = 'SNPs';
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 12;
-	
-	# set column metadata
-	$datahash{0} = {
-		'name'     => 'Variation_Type',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		'name'     => 'Overlapping_Feature',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		'name'     => 'Codon_Change',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		'name'     => 'Chromosome',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		'name'      => 'Start',
-		'index'     => 4,
-	};
-	$datahash{5} = {
-		'name'     => 'Reference_Base',
-		'index'    => 5,
-	};
-	$datahash{6} = {
-		'name'     => 'Variation',
-		'index'    => 6,
-	};
-	$datahash{7} = {
-		'name'     => 'Number_Supporting_Reads',
-		'index'    => 7,
-	};
-	$datahash{8} = {
-		'name'     => 'Total_Number_Reads',
-		'index'    => 8,
-	};
-	$datahash{9} = {
-		'name'     => 'Percent_Supporting',
-		'index'    => 9,
-	};
-	$datahash{10} = {
-		'name'     => 'Consensus_Quality',
-		'index'    => 10,
-	};
-	$datahash{11} = {
-		'name'     => 'SNP_Quality',
-		'index'    => 11,
-	};
-	
-	# Set the data table
-	my @data_table = ( [ qw(
-		Variation_Type
-		Overlapping_Feature
-		Codon_Change
-		Chromosome
-		Start
-		Reference_Base
-		Variation
-		Number_Supporting_Reads
-		Total_Number_Reads
-		Percent_Supporting
-		Consensus_Quality
-		SNP_Quality
-	) ] );
-	$datahash{'data_table'} = \@data_table;
-	
-	# return the reference to the generated data hash
-	return \%datahash;
-}
+
+
+############# Subroutines #########################
+
 
 
 

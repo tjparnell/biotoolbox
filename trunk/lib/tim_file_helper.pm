@@ -10,6 +10,10 @@ use IO::Zlib;
 use Storable qw(store_fd fd_retrieve store retrieve);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	generate_tim_data_structure
+	find_column_index
+);
 
 # optional modules
 our $STATS_OK = 0;
@@ -33,19 +37,17 @@ eval {
 # Export
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
+);
+our @EXPORT_OK = qw(
 	load_tim_data_file 
 	open_tim_data_file 
 	write_tim_data_file 
-	convert_genome_data_2_gff_data 
-	convert_and_write_to_gff_file
 	open_to_read_fh
 	open_to_write_fh
+	convert_genome_data_2_gff_data 
+	convert_and_write_to_gff_file
 	write_summary_data
-	index_data_table
-	find_column_index
 	wig_to_bigwig_conversion
-);
-our @EXPORT_OK = qw(
 );
 
 # Count for unique GFF3 ID creation
@@ -68,6 +70,7 @@ our @SUFFIX_LIST = qw(
 	.bed.gz
 	.sgr
 	.sgr.gz
+	.kgg
 ); 
 
 
@@ -237,16 +240,17 @@ sub open_tim_data_file {
 	
 	
 	# generate the data hash to store the file metadata into
-	my %inputdata;
-	$inputdata{'filename'} = $filename; # the original filename
-	$inputdata{'basename'} = $basename; # filename basename
-	$inputdata{'extension'} = $extension; # the filename extension
-	$inputdata{'path'} = $path; # the original path
-	$inputdata{'column_names'} = []; # array for the column names
-	$inputdata{'other'} = []; # array of miscellenous header lines
-	$inputdata{'number_columns'} = 0; # the number of columns in the file
-	$inputdata{'gff'} = 0; # boolean to indicate a gff file or not
-	$inputdata{'headers'} = undef; # boolean to indicate column headers present
+	my $inputdata = generate_tim_data_structure(undef);
+	unless ($inputdata) {
+		carp " cannot generate tim data structure!\n";
+		return;
+	}
+	$inputdata->{'filename'} = $filename; # the original filename
+	$inputdata->{'basename'} = $basename; # filename basename
+	$inputdata->{'extension'} = $extension; # the filename extension
+	$inputdata->{'path'} = $path; # the original path
+	$inputdata->{'column_names'} = []; # array for the column names
+	$inputdata->{'headers'} = undef; # boolean to indicate column headers present
 	
 	# read and parse the file
 	# we will ONLY parse the header lines prefixed with a #, as well as the 
@@ -264,22 +268,22 @@ sub open_tim_data_file {
 		
 		# the generating program
 		if ($line =~ m/^# Program (.+)$/) {
-			$inputdata{'program'} = $1;
-			chomp $inputdata{'program'}; # in case it comes through the grep
+			$inputdata->{'program'} = $1;
+			chomp $inputdata->{'program'}; # in case it comes through the grep
 			$header_line_count++;
 		}
 		
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
-			$inputdata{'db'} = $1;
-			chomp $inputdata{'db'};
+			$inputdata->{'db'} = $1;
+			chomp $inputdata->{'db'};
 			$header_line_count++;
 		}
 		
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
-			$inputdata{'feature'} = $1;
-			chomp $inputdata{'feature'};
+			$inputdata->{'feature'} = $1;
+			chomp $inputdata->{'feature'};
 			$header_line_count++;
 		}
 		
@@ -313,17 +317,17 @@ sub open_tim_data_file {
 				# check for pre-existing main metadata hash for this column
 				# for example, gff files will have standard hashes created above
 				# or possibly a badly formatted previous metadata line
-				if (exists $inputdata{$index}) {
+				if (exists $inputdata->{$index}) {
 					# we will simply overwrite the previous metadata hash
 					# harsh, I know, but what to do?
 					# if it was canned metadata for a gff file, that's ok
-					$inputdata{$index} = \%temphash;
+					$inputdata->{$index} = \%temphash;
 				}
 				else {
 					# metadata hash doesn't exist, so we will add it
-					$inputdata{$index} = \%temphash;
+					$inputdata->{$index} = \%temphash;
 					# also update the number of columns
-					$inputdata{'number_columns'} += 1;
+					$inputdata->{'number_columns'} += 1;
 				}
 			} 
 			else {
@@ -337,18 +341,18 @@ sub open_tim_data_file {
 					# the file's metadata line
 					
 					# assign a new index number
-					my $new_index = $inputdata{'number_columns'};
+					my $new_index = $inputdata->{'number_columns'};
 					$temphash{'index'} = $new_index;
 					
 					# check for pre-existing main metadata hash
-					if (exists $inputdata{$new_index}) {
+					if (exists $inputdata->{$new_index}) {
 						# we will simply overwrite the previous metadata hash
-						$inputdata{$new_index} = \%temphash;
+						$inputdata->{$new_index} = \%temphash;
 					}
 					else {
 						# metadata hash doesn't exist, so add it
-						$inputdata{$new_index} = \%temphash;
-						$inputdata{'number_columns'} += 1;
+						$inputdata->{$new_index} = \%temphash;
+						$inputdata->{'number_columns'} += 1;
 					}
 				}
 			}
@@ -360,15 +364,15 @@ sub open_tim_data_file {
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
-			$inputdata{'gff'} = $1;
-			chomp $inputdata{'gff'};
+			$inputdata->{'gff'} = $1;
+			chomp $inputdata->{'gff'};
 			$header_line_count++;
 		}
 		
 		# any other nonstandard header
 		elsif ($line =~ /^#/) {
 			# store in an anonymous array in the inputdata hash
-			push @{ $inputdata{'other'} }, $line;
+			push @{ $inputdata->{'other'} }, $line;
 			$header_line_count++;
 		}
 		
@@ -391,23 +395,23 @@ sub open_tim_data_file {
 				# http://gmod.org/wiki/GFF3
 				
 				# set values
-				$inputdata{'number_columns'} = 9; # supposed to be 9 columns
-				if ($inputdata{'gff'} == 0) { 
+				$inputdata->{'number_columns'} = 9; # supposed to be 9 columns
+				if ($inputdata->{'gff'} == 0) { 
 					# try and determine type based on extension (yeah, right)
 					if ($extension =~ /gtf/) {
-						$inputdata{'gff'} = 2.5;
+						$inputdata->{'gff'} = 2.5;
 					}
 					elsif ($extension =~ /gff3/) {
-						$inputdata{'gff'} = 3;
+						$inputdata->{'gff'} = 3;
 					}
 					else {
 						# likely version 2, never really encounter v. 1
-						$inputdata{'gff'} = 2;
+						$inputdata->{'gff'} = 2;
 					}
 				}
 				
 				# set column names
-				push @{ $inputdata{'column_names'} }, qw(
+				push @{ $inputdata->{'column_names'} }, qw(
 					Chromosome
 					Source
 					Type
@@ -422,45 +426,45 @@ sub open_tim_data_file {
 				# set the metadata for the each column
 					# some of these may already be defined if there was a 
 					# column metadata specific column in the file
-				$inputdata{0} = {
+				$inputdata->{0} = {
 					'name' => 'Chromosome',
 					'index' => 0,
-				} unless exists $inputdata{0};
-				$inputdata{1} = {
+				} unless exists $inputdata->{0};
+				$inputdata->{1} = {
 					'name' => 'Source',
 					'index' => 1,
-				} unless exists $inputdata{1};
-				$inputdata{2} = {
+				} unless exists $inputdata->{1};
+				$inputdata->{2} = {
 					'name' => 'Type',
 					'index' => 2,
-				} unless exists $inputdata{2};
-				$inputdata{3} = {
+				} unless exists $inputdata->{2};
+				$inputdata->{3} = {
 					'name' => 'Start',
 					'index' => 3,
-				} unless exists $inputdata{3};
-				$inputdata{4} = {
+				} unless exists $inputdata->{3};
+				$inputdata->{4} = {
 					'name' => 'Stop',
 					'index' => 4,
-				} unless exists $inputdata{4};
-				$inputdata{5} = {
+				} unless exists $inputdata->{4};
+				$inputdata->{5} = {
 					'name' => 'Score',
 					'index' => 5,
-				} unless exists $inputdata{5};
-				$inputdata{6} = {
+				} unless exists $inputdata->{5};
+				$inputdata->{6} = {
 					'name' => 'Strand',
 					'index' => 6,
-				} unless exists $inputdata{6};
-				$inputdata{7} = {
+				} unless exists $inputdata->{6};
+				$inputdata->{7} = {
 					'name' => 'Phase',
 					'index' => 7,
-				} unless exists $inputdata{7};
-				$inputdata{8} = {
+				} unless exists $inputdata->{7};
+				$inputdata->{8} = {
 					'name' => 'Group',
 					'index' => 8,
-				} unless exists $inputdata{8};
+				} unless exists $inputdata->{8};
 				
 				# set headers flag to false
-				$inputdata{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -479,14 +483,14 @@ sub open_tim_data_file {
 				my @elements = split /\s/, $line;
 					# normally tab-delimited, but the specs are not explicit
 				my $column_count = scalar @elements;
-				$inputdata{'number_columns'} = $column_count; 
+				$inputdata->{'number_columns'} = $column_count; 
 				
 				# Define the columns and metadata
 				if ($column_count >= 3) {
 					# the first three columns are required: chrom start end
 					
 					# set column names
-					push @{ $inputdata{'column_names'} }, qw(
+					push @{ $inputdata->{'column_names'} }, qw(
 						chromo
 						start
 						end
@@ -495,126 +499,126 @@ sub open_tim_data_file {
 					# set the metadata for each column
 						# some of these may already be defined if there was a 
 						# column metadata specific column in the file
-					$inputdata{0} = {
+					$inputdata->{0} = {
 						'name' => 'chromo',
 						'index' => 0,
-					} unless exists $inputdata{0};
-					$inputdata{1} = {
+					} unless exists $inputdata->{0};
+					$inputdata->{1} = {
 						'name' => 'start',
 						'index' => 1,
-					} unless exists $inputdata{1};
-					$inputdata{2} = {
+					} unless exists $inputdata->{1};
+					$inputdata->{2} = {
 						'name' => 'end',
 						'index' => 2,
-					} unless exists $inputdata{2};
+					} unless exists $inputdata->{2};
 				}
 				if ($column_count >= 4) {
 					# name of the bed line feature
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'name';
+					push @{ $inputdata->{'column_names'} }, 'name';
 					
 					# column metadata
-					$inputdata{3} = {
+					$inputdata->{3} = {
 						'name' => 'name',
 						'index' => 3,
-					} unless exists $inputdata{3};
+					} unless exists $inputdata->{3};
 				}	
 				if ($column_count >= 5) {
 					# score of the bed line feature
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'score';
+					push @{ $inputdata->{'column_names'} }, 'score';
 					
 					# column metadata
-					$inputdata{4} = {
+					$inputdata->{4} = {
 						'name' => 'score',
 						'index' => 4,
-					} unless exists $inputdata{4};
+					} unless exists $inputdata->{4};
 				}	
 				if ($column_count >= 6) {
 					# strand of the bed line feature
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'strand';
+					push @{ $inputdata->{'column_names'} }, 'strand';
 					
 					# column metadata
-					$inputdata{5} = {
+					$inputdata->{5} = {
 						'name' => 'strand',
 						'index' => 5,
-					} unless exists $inputdata{5};
+					} unless exists $inputdata->{5};
 				}	
 				if ($column_count >= 7) {
 					# start position for block (exon)
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'thickStart';
+					push @{ $inputdata->{'column_names'} }, 'thickStart';
 					
 					# column metadata
-					$inputdata{6} = {
+					$inputdata->{6} = {
 						'name' => 'thickStart',
 						'index' => 6,
-					} unless exists $inputdata{6};
+					} unless exists $inputdata->{6};
 				}	
 				if ($column_count >= 8) {
 					# end position for block (exon)
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'thickEnd';
+					push @{ $inputdata->{'column_names'} }, 'thickEnd';
 					
 					# column metadata
-					$inputdata{7} = {
+					$inputdata->{7} = {
 						'name' => 'thickEnd',
 						'index' => 7,
-					} unless exists $inputdata{7};
+					} unless exists $inputdata->{7};
 				}	
 				if ($column_count >= 9) {
 					# RGB value of bed feature
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'itemRGB';
+					push @{ $inputdata->{'column_names'} }, 'itemRGB';
 					
 					# column metadata
-					$inputdata{8} = {
+					$inputdata->{8} = {
 						'name' => 'itemRGB',
 						'index' => 8,
-					} unless exists $inputdata{8};
+					} unless exists $inputdata->{8};
 				}	
 				if ($column_count >= 10) {
 					# The number of blocks (exons)
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'blockCount';
+					push @{ $inputdata->{'column_names'} }, 'blockCount';
 					
 					# column metadata
-					$inputdata{9} = {
+					$inputdata->{9} = {
 						'name' => 'blockCount',
 						'index' => 9,
-					} unless exists $inputdata{9};
+					} unless exists $inputdata->{9};
 				}	
 				if ($column_count >= 11) {
 					# The size of the blocks (exons)
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'blockSizes';
+					push @{ $inputdata->{'column_names'} }, 'blockSizes';
 					
 					# column metadata
-					$inputdata{10} = {
+					$inputdata->{10} = {
 						'name' => 'blockSizes',
 						'index' => 10,
-					} unless exists $inputdata{10};
+					} unless exists $inputdata->{10};
 				}	
 				if ($column_count >= 12) {
 					# The start positions of the blocks (exons)
 					
 					# column name
-					push @{ $inputdata{'column_names'} }, 'blockStarts';
+					push @{ $inputdata->{'column_names'} }, 'blockStarts';
 					
 					# column metadata
-					$inputdata{11} = {
+					$inputdata->{11} = {
 						'name' => 'blockStarts',
 						'index' => 11,
-					} unless exists $inputdata{11};
+					} unless exists $inputdata->{11};
 				}	
 				if ($column_count > 12) {
 					# why would there be extra columns in here!!??
@@ -624,19 +628,19 @@ sub open_tim_data_file {
 					# process anyway
 					for (my $i = 11; $i < $column_count; $i++) {
 						# column name
-						push @{ $inputdata{'column_names'} }, 'unknown';
+						push @{ $inputdata->{'column_names'} }, 'unknown';
 						
 						# column metadata
-						$inputdata{$i} = {
+						$inputdata->{$i} = {
 							'name' => 'unknown',
 							'index' => $i,
-						} unless exists $inputdata{$i};
+						} unless exists $inputdata->{$i};
 					}
 				}
 					
 				
 				# set headers flag to false
-				$inputdata{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -649,10 +653,10 @@ sub open_tim_data_file {
 				# importing to binary BAR files used in T2, USeq, and IGB
 				
 				# set values
-				$inputdata{'number_columns'} = 3; # supposed to be 3 columns
+				$inputdata->{'number_columns'} = 3; # supposed to be 3 columns
 				
 				# set column names
-				push @{ $inputdata{'column_names'} }, qw(
+				push @{ $inputdata->{'column_names'} }, qw(
 					Chromo
 					Start
 					Score
@@ -661,21 +665,21 @@ sub open_tim_data_file {
 				# set the metadata for the each column
 					# some of these may already be defined if there was a 
 					# column metadata specific column in the file
-				$inputdata{0} = {
+				$inputdata->{0} = {
 					'name'  => 'Chromo',
 					'index' => 0,
-				} unless exists $inputdata{0};
-				$inputdata{1} = {
+				} unless exists $inputdata->{0};
+				$inputdata->{1} = {
 					'name'  => 'Start',
 					'index' => 1,
-				} unless exists $inputdata{1};
-				$inputdata{2} = {
+				} unless exists $inputdata->{1};
+				$inputdata->{2} = {
 					'name'  => 'Score',
 					'index' => 2,
-				} unless exists $inputdata{2};
+				} unless exists $inputdata->{2};
 				
 				# set headers flag to false
-				$inputdata{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -685,9 +689,9 @@ sub open_tim_data_file {
 				# these will have one comment line marked with #
 				# that really contains the column headers
 			elsif (
-				# !exists $inputdata{0} and
-				scalar @{ $inputdata{'other'} } >= 1 and
-				scalar(split /\t/, $inputdata{'other'}->[-1]) == 
+				# !exists $inputdata->{0} and
+				scalar @{ $inputdata->{'other'} } >= 1 and
+				scalar(split /\t/, $inputdata->{'other'}->[-1]) == 
 					scalar(split /\t/, $line)
 			) {
 				# lots of requirements, but this checks that (column 
@@ -697,25 +701,25 @@ sub open_tim_data_file {
 				# data line
 				
 				# process the real header line
-				my $header_line = pop @{ $inputdata{'other'} };
+				my $header_line = pop @{ $inputdata->{'other'} };
 				chomp $header_line;
 				
 				# generate the metadata
 				my $i = 0;
 				foreach (split /\t/, $header_line) {
-					$inputdata{$i} = { 
+					$inputdata->{$i} = { 
 						'name'   => $_,
 						'index'  => $i,
 					};
-					push @{ $inputdata{'column_names'} }, $_;
+					push @{ $inputdata->{'column_names'} }, $_;
 					$i++;
 				}
-				$inputdata{'number_columns'} = $i;
+				$inputdata->{'number_columns'} = $i;
 				
 				# we do not count the current line as a header
 				
 				# set headers flag to true
-				$inputdata{'headers'} = 1;
+				$inputdata->{'headers'} = 1;
 				
 				last PARSE_HEADER_LOOP;
 			}
@@ -731,17 +735,17 @@ sub open_tim_data_file {
 				# we will define the columns based on
 				for my $i (0..$#namelist) {
 					# confirm that a file metadata exists for this column
-					if (exists $inputdata{$i}) {
-						unless ($namelist[$i] eq $inputdata{$i}->{'name'}) {
+					if (exists $inputdata->{$i}) {
+						unless ($namelist[$i] eq $inputdata->{$i}->{'name'}) {
 							carp "metadata and header names for column $i do not match!";
 							# set the name to match the actual column name
-							$inputdata{$i}->{'name'} = $namelist[$i];
+							$inputdata->{$i}->{'name'} = $namelist[$i];
 						}
 					} 
 					
 					# otherwise be nice and generate it here
 					else {
-						$inputdata{$i} = {
+						$inputdata->{$i} = {
 							'name'  => $namelist[$i],
 							'index' => $i,
 						};
@@ -749,19 +753,19 @@ sub open_tim_data_file {
 				}
 				
 				# check the number of columns
-				if (scalar @namelist != $inputdata{'number_columns'} ) {
+				if (scalar @namelist != $inputdata->{'number_columns'} ) {
 					# adjust to match actual content
-					$inputdata{'number_columns'} = scalar @namelist;
+					$inputdata->{'number_columns'} = scalar @namelist;
 				}
 				
 				# put the column names in the metadata
-				push @{ $inputdata{'column_names'} }, @namelist;
+				push @{ $inputdata->{'column_names'} }, @namelist;
 				
 				# count as a header line
 				$header_line_count++;
 				
 				# set headers flag to true
-				$inputdata{'headers'} = 1;
+				$inputdata->{'headers'} = 1;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -785,7 +789,7 @@ sub open_tim_data_file {
 	}
 	
 	# now return the advanced filehandle and the parsed metadata
-	return ($fh, \%inputdata);
+	return ($fh, $inputdata);
 	
 }
 
@@ -1014,23 +1018,26 @@ sub write_tim_data_file {
 				# index number as the key
 				# we will take each index one at a time in increasing order
 				
+				# some files do not need or tolerate metadata lines, for those 
+				# known files the metadata lines will be skipped
+				
 				# these column metadata lines do not need to be written if they
 				# only have two values, presumably name and index, for files 
 				# that don't normally have column headers, e.g. gff
-				if (
-					(scalar( keys %{ $datahash_ref->{$i} } ) == 2) and
-					$datahash_ref->{'gff'}
-				) {
-					# only two keys are present and it's a gff file
+				if ($datahash_ref->{'extension'} =~ /sgr|kgg/i) {
+					# these do not need metadata
 					next;
 				}
-				elsif (exists $datahash_ref->{'headers'}) {
-					# check whether headers existed in the original file
-					if ($datahash_ref->{'headers'} == 0) {
-						# original file didn't have column headers, so 
-						# column metadata shouldn't be written either
-						next;
-					}
+				elsif (
+					scalar( keys %{ $datahash_ref->{$i} } ) == 2 and
+					$datahash_ref->{'extension'} =~ /g[tf]f|bed/i
+				) {
+					# only two keys are present and it's a gff or bed file
+					# these are standard metadata keys (name, index) and do 
+					# not need to be written
+					# more than two keys suggests an interesting metadata key
+					# so it will be written
+					next;
 				}
 				
 				# we will put each key=value pair into @pairs, listed asciibetically
@@ -1114,6 +1121,140 @@ sub write_tim_data_file {
 	# if we made it this far, it should've been a success!
 	# return the new file name as indication of success
 	return $newname;
+}
+
+
+
+
+
+
+#### Open a file for reading
+
+sub open_to_read_fh {
+	# a simple subroutine to open a filehandle for reading a file
+	
+	# check filename
+	my $file = shift;
+	my $filename = _check_file($file);
+	unless ($filename) {
+		carp " file '$file' does not exist!\n";
+		return;
+	}
+	
+	
+	# check for binary store file
+	if ($filename =~ /\.store(?:\.gz)?$/) {
+		carp " binary store files should not be opened with this subroutine!\n";
+		return;
+	}
+	
+
+	# Open filehandle object as appropriate
+	my $fh; # filehandle
+	if ($filename =~ /\.gz$/i) {
+		# the file is compressed with gzip
+		$fh = IO::Zlib->new;
+	} 
+	else {
+		# the file is uncompressed and space hogging
+		$fh = IO::File->new;
+	}
+	
+	# Open file and return
+	if ($fh->open($filename, "r") ) {
+		return $fh;
+	}
+	else {
+		carp "unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
+}
+
+
+
+
+
+
+#### Open a file for writing
+
+sub open_to_write_fh {
+	# A simple subroutine to open a filehandle for writing a file
+	
+	my ($filename, $gz, $append) = @_;
+	
+	# check filename
+	unless ($filename) {
+		carp " no filename to write!";
+		return;
+	}
+	
+	# check zip status if necessary
+	unless (defined $gz) {
+		# look at filename extension as a clue
+		# in case we're overwriting the input file, keep the zip status
+		if ($filename =~ m/\.gz$/i) {
+			$gz = 1;
+		}
+		else {
+			$gz = 0; # default
+		}
+	}
+	
+	# check file append mode
+	unless (defined $append) {
+		# default is not to append
+		$append = 0;
+	}
+	
+	# determine write mode
+	my $mode;
+	if ($gz and $append) {
+		# append a gzip file
+		$mode = 'ab';
+	}
+	elsif (!$gz and $append) {
+		# append a normal file
+		$mode = 'a';
+	}
+	elsif ($gz and !$append) {
+		# write a new gzip file
+		$mode = 'wb';
+	}
+	else {
+		# write a new normal file
+		$mode = 'w';
+	}
+	
+	
+	# Generate appropriate filehandle object and name
+	my $fh;
+	if ($gz) {
+		# write a space-saving compressed file
+		
+		# add gz extension if necessary
+		unless ($filename =~ m/\.gz$/i) {
+			$filename .= '.gz';
+		}
+		
+		$fh = new IO::Zlib;
+	}
+	else {
+		# write a normal space-hogging file
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}
+	
+	# Open file for writing and return
+	if ($fh->open($filename, $mode) ) {
+		return $fh;
+	}
+	else {
+		carp " unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
 }
 
 
@@ -1515,6 +1656,8 @@ sub convert_genome_data_2_gff_data {
 	# set the gff metadata to write a gff file
 	$input_data_ref->{'gff'} = $gff_version;
 	
+	# set headers to false
+	$input_data_ref->{'headers'} = 0;
 	
 	# success
 	return 1;
@@ -1986,140 +2129,6 @@ sub convert_and_write_to_gff_file {
 
 
 
-
-
-
-#### Open a file for reading
-
-sub open_to_read_fh {
-	# a simple subroutine to open a filehandle for reading a file
-	
-	# check filename
-	my $file = shift;
-	my $filename = _check_file($file);
-	unless ($filename) {
-		carp " file '$file' does not exist!\n";
-		return;
-	}
-	
-	
-	# check for binary store file
-	if ($filename =~ /\.store(?:\.gz)?$/) {
-		carp " binary store files should not be opened with this subroutine!\n";
-		return;
-	}
-	
-
-	# Open filehandle object as appropriate
-	my $fh; # filehandle
-	if ($filename =~ /\.gz$/i) {
-		# the file is compressed with gzip
-		$fh = IO::Zlib->new;
-	} 
-	else {
-		# the file is uncompressed and space hogging
-		$fh = IO::File->new;
-	}
-	
-	# Open file and return
-	if ($fh->open($filename, "r") ) {
-		return $fh;
-	}
-	else {
-		carp "unable to open file '$filename': " . $fh->error . "\n";
-		return;
-	}
-}
-
-
-
-
-
-
-#### Open a file for writing
-
-sub open_to_write_fh {
-	# A simple subroutine to open a filehandle for writing a file
-	
-	my ($filename, $gz, $append) = @_;
-	
-	# check filename
-	unless ($filename) {
-		carp " no filename to write!";
-		return;
-	}
-	
-	# check zip status if necessary
-	unless (defined $gz) {
-		# look at filename extension as a clue
-		# in case we're overwriting the input file, keep the zip status
-		if ($filename =~ m/\.gz$/i) {
-			$gz = 1;
-		}
-		else {
-			$gz = 0; # default
-		}
-	}
-	
-	# check file append mode
-	unless (defined $append) {
-		# default is not to append
-		$append = 0;
-	}
-	
-	# determine write mode
-	my $mode;
-	if ($gz and $append) {
-		# append a gzip file
-		$mode = 'ab';
-	}
-	elsif (!$gz and $append) {
-		# append a normal file
-		$mode = 'a';
-	}
-	elsif ($gz and !$append) {
-		# write a new gzip file
-		$mode = 'wb';
-	}
-	else {
-		# write a new normal file
-		$mode = 'w';
-	}
-	
-	
-	# Generate appropriate filehandle object and name
-	my $fh;
-	if ($gz) {
-		# write a space-saving compressed file
-		
-		# add gz extension if necessary
-		unless ($filename =~ m/\.gz$/i) {
-			$filename .= '.gz';
-		}
-		
-		$fh = new IO::Zlib;
-	}
-	else {
-		# write a normal space-hogging file
-		
-		# strip gz extension if present
-		$filename =~ s/\.gz$//i; 
-		
-		$fh = new IO::File;
-	}
-	
-	# Open file for writing and return
-	if ($fh->open($filename, $mode) ) {
-		return $fh;
-	}
-	else {
-		carp " unable to open file '$filename': " . $fh->error . "\n";
-		return;
-	}
-}
-
-
-
 ### Generate a summary data file
 
 sub write_summary_data {
@@ -2311,100 +2320,6 @@ sub write_summary_data {
 	else {
 		return;
 	}
-}
-
-
-
-#### Index a data table
-sub index_data_table {
-	
-	# get the arguements
-	my ($data_ref, $increment) = @_;
-	
-	# check data structure
-	unless (defined $data_ref) {
-		carp " No data structure passed!";
-		return;
-	}
-	unless ( _verify_data_structure($data_ref) ) {
-		return;
-	}
-	if (exists $data_ref->{'index'}) {
-		warn " data structure is already indexed!\n";
-		return 1;
-	}
-	
-	# check column indices
-	my $chr_index = find_column_index($data_ref, '^chr|seq|refseq');
-	my $start_index = find_column_index($data_ref, '^start');
-	unless (defined $chr_index and $start_index) {
-		carp " unable to find chromosome and start dataset indices!\n";
-		return;
-	}
-	
-	# define increment value
-	unless (defined $increment) {
-		# calculate default value
-		if (exists $data_ref->{$start_index}{'win'}) {
-			# in genome datasets, window size metadata is stored with the 
-			# start position
-			# increment is window size x 20
-			# seems like a reasonable compromise between index size and efficiency
-			$increment = $data_ref->{$start_index}{'win'} * 20;
-		}
-		else {
-			# use some random made-up default value that could be totally 
-			# inappropriate, maybe we should carp a warning instead
-			$increment = 100;
-		}
-	}
-	$data_ref->{'index_increment'} = $increment;
-	
-	# generate index
-	my $table_ref = $data_ref->{'data_table'};
-	my %index;
-	for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
-		
-		# the index will consist of a complex hash structure
-		# the first key will be the chromosome name
-		# the first value will be the second key, and is the integer of 
-		# the start position divided by the increment
-		# the second value will be the row index number 
-		
-		# calculate the index value
-		my $index_value = int( $table_ref->[$row][$start_index] / $increment );
-		
-		# check and insert the index value
-		unless (exists $index{ $table_ref->[$row][$chr_index] }{ $index_value} ) {
-			# insert the current row, which should be the first occurence
-			$index{ $table_ref->[$row][$chr_index] }{ $index_value } = $row;
-		}
-	}
-	
-	# associate the index hash
-	$data_ref->{'index'} = \%index;
-	
-	# success
-	return 1;
-}
-
-
-
-
-### Subroutine to find a column
-sub find_column_index {
-	my ($data_ref, $name) = @_;
-	
-	# walk through each column index
-	my $index;
-	for (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
-		# check the names of each column
-		if ($data_ref->{$i}{'name'} =~ /$name/i) {
-			$index = $i;
-			last;
-		}
-	}
-	return $index;
 }
 
 
@@ -2813,9 +2728,7 @@ When loading GFF files, the header names and metadata are automatically
 generated for conveniance. 
 
 
-
-
-=head2 BINARY REPRESENTATION OF TIM DATA FILE
+=head1 BINARY REPRESENTATION OF TIM DATA FILE
 
 Alternatively, the internal memory data structure may be written and 
 read directly as a binary file using the Storable.pm module, negating 
@@ -2835,133 +2748,6 @@ choice of writing a binary file. By explicitly including the '.store'
 extension in the output filename, the write modules within should 
 then write a binary file.
 
-
-
-
-=head2 INTERNAL DATA STRUCTURE
-
-The file will be parsed into a large complex hash data structure. First level 
-keys will correspond to the file's metadata header lines, plus a few others.
-The top level keys will include the following:
-
-=over 4
-
-=item program
-
-This includes the scalar value from the Program header
-line and represents the name of the program that generated the
-data file.
-
-=item db
-
-This includes the scalar value from the Database header
-line and is the name of the database from which the file data
-was generated.
-
-=item feature
-
-This includes the scalar value from the Feature header
-line and describes the type of features in the data file.
-
-=item gff
-
-This includes a scalar value with a boolean value 
-indicating whether the data was from a GFF file or not. Additionally, 
-if there was a GFF version line in the GFF file, the entire line 
-is stored as the true value.
-
-=item number_columns
-
-This includes an integer representing the total 
-number of columns in the data table. It is automatically calculated
-from the data table and updated each time a column is added.
-
-=item last_row
-
-This represents the integer for the index number (0-based) of the last
-row in the data table. It is calculated automatically from the data 
-table.
-
-=item other
-
-This key points to an anonymous array of additional, unrecognized 
-header lines in the parsed file. For example, metadata from older 
-file formats or general comments not suitable for other locations. 
-The entire line is added to the array, and is rewritten before the 
-column metadata is written. The line ending character is automatically 
-stripped when it is added to this array upon file loading, and 
-automatically added when writing out to a text file.
-
-=item filename
-
-The original filename of the file opened and parsed. Just in case you 
-forgot ;) Joking aside, missing extensions may have been added to the 
-filename by the different functions upon opening (a convenience for 
-users) in the case that they weren't initially provided. The actual 
-complete name will be found here.
-
-=item basename
-
-The base name of the original file name, minus the extension(s). 
-Useful when needing to assign a new file name based on the current 
-file name.
-
-=item extension
-
-The known extension(s) of the original file name. Known extensions 
-currently include '.txt, .store, .gff, .gff3, .bed, .sgr' as well as 
-their gzip equivalents.
-
-=item <column_index_number>
-
-Each column will have a metadata index. Usually this is read from 
-the column's metadata line. The key will be the index number (0-based) 
-of the column. The value will be an anonymous hash consisting of 
-the column metadata. For metadata header lines from a parsed file, these
-will be the key=value pairs listed in the line. There should always 
-be two mandatory keys, 'name' and 'index'. 
-
-=item data_table
-
-This key will point to an anonymous array of arrays, representing the
-tab-delimited data table in the file. The primary array 
-will be row, representing each feature. The secondary array will be 
-the column, representing the descriptive and data elements for each 
-feature. Any value can be looked up by 
-$data_structure_ref->{'data_table'}->[$row][$column]. The first row
-should always contain the column (dataset) names, regardless whether 
-the original data file had dataset names (e.g. GFF or BED files).
-
-=item index
-
-This is an optional index hash to provide faster lookup to specific 
-data table rows for genomic bin features. The index is generated 
-using the index_data_table() function. The index is comprised of 
-another hash data structure, where the first key represents the 
-chromosome name, and the second key represents an index value. 
-The index value is the integer (or whole number rounding down) of 
-the start value divided by the index_increment value. For example, 
-with a genomic bin feature at chr1:10691..10700 and an index_increment
-value of 100, the index value would be {chr1}{106}. The value of 
-that key would be the index number of that row, or more specifically, 
-the row index for the first occurence of that index_value (which 
-would've been genomic bin feature chr1:10601..10610). Hence, the 
-index will get you relatively close to your desired genomic 
-position within the data_table, but you will still need to step 
-through the features (rows) starting at the indexed position 
-until you find the row you want. That should save you a little bit 
-of time, at least. The index is not stored upon writing to a 
-standard tim data text file, but is stored in a binary .store file.
-
-=item index_increment
-
-This is a single number representing the increment value to calculate 
-the index value for the index. It is generated along with the index 
-by the index_data_table() function. The index_increment value is not 
-stored upon writing to a standard tim data text file, but is stored in 
-a binary .store file.
-
-=back
 
 =head1 USAGE
 
@@ -3106,6 +2892,56 @@ Example
 	}
 
 
+=item open_to_read_fh()
+
+This subroutine will open a file for reading. If the passed filename has
+a '.gz' extension, it will appropriately open the file through a gunzip 
+filter.
+
+Pass the subroutine the filename. It will return a scalar reference to the
+open filehandle. The filehandle is an IO::Handle object and may be manipulated
+as such.
+
+Example
+	
+	my $filename = 'my_data.txt.gz';
+	my $fh = open_to_read_fh($filename);
+	while (my $line = $fh->getline) {
+		# do something
+	}
+	$fh->close;
+	
+
+=item open_to_write_fh()
+
+This subroutine will open a file for writing. If the passed filename has
+a '.gz' extension, it will appropriately open the file through a gzip 
+filter.
+
+Pass the subroutine three values: the filename, a boolean value indicating
+whether the file should be compressed with gzip, and a boolean value 
+indicating that the file should be appended. The gzip and append values are
+optional. The compression status may be determined automatically by the 
+presence or absence of the passed filename extension; the default is no 
+compression. The default is also to write a new file and not to append.
+
+If gzip compression is requested, but the filename does not have a '.gz' 
+extension, it will be automatically added. However, the change in file name 
+is not passed back to the originating program; beware!
+
+The subroutine will return a scalar reference to the open filehandle. The 
+filehandle is an IO::Handle object and may be manipulated as such.
+
+Example
+	
+	my $filename = 'my_data.txt.gz';
+	my $gz = 1; # compress output file with gzip
+	my $fh = open_to_write_fh($filename, $gz);
+	# write to new compressed file
+	print {$fh} "something interesting\n";
+	$fh->close;
+	
+
 =item convert_genome_data_2_gff_data()
 
 This subroutine will convert an existing data hash structure as described above
@@ -3208,6 +3044,7 @@ Example
 		}
 	}
 
+
 =item convert_and_write_to_gff_file()
 
 This subroutine will convert a tim data structure as described above into 
@@ -3306,58 +3143,6 @@ Example
 	}
 	
 
-
-=item open_to_read_fh()
-
-This subroutine will open a file for reading. If the passed filename has
-a '.gz' extension, it will appropriately open the file through a gunzip 
-filter.
-
-Pass the subroutine the filename. It will return a scalar reference to the
-open filehandle. The filehandle is an IO::Handle object and may be manipulated
-as such.
-
-Example
-	
-	my $filename = 'my_data.txt.gz';
-	my $fh = open_to_read_fh($filename);
-	while (my $line = $fh->getline) {
-		# do something
-	}
-	$fh->close;
-	
-
-=item open_to_write_fh()
-
-This subroutine will open a file for writing. If the passed filename has
-a '.gz' extension, it will appropriately open the file through a gzip 
-filter.
-
-Pass the subroutine three values: the filename, a boolean value indicating
-whether the file should be compressed with gzip, and a boolean value 
-indicating that the file should be appended. The gzip and append values are
-optional. The compression status may be determined automatically by the 
-presence or absence of the passed filename extension; the default is no 
-compression. The default is also to write a new file and not to append.
-
-If gzip compression is requested, but the filename does not have a '.gz' 
-extension, it will be automatically added. However, the change in file name 
-is not passed back to the originating program; beware!
-
-The subroutine will return a scalar reference to the open filehandle. The 
-filehandle is an IO::Handle object and may be manipulated as such.
-
-Example
-	
-	my $filename = 'my_data.txt.gz';
-	my $gz = 1; # compress output file with gzip
-	my $fh = open_to_write_fh($filename, $gz);
-	# write to new compressed file
-	print {$fh} "something interesting\n";
-	$fh->close;
-	
-
-
 =item write_summary_data()
 
 This subroutine will summarize the data in a data file, generating mean values
@@ -3408,85 +3193,6 @@ Example
 	} );
 
 
-=item index_data_table()
-
-This function creates an index hash for genomic bin features in the 
-data table. Rather than stepping through an entire data table of 
-genomic coordinates looking for a specific chromosome and start 
-feature (or data row), an index may be generated to speed up the 
-search, such that only a tiny portion of the data_table needs to be 
-stepped through to identify the correct feature.
-
-This function generates two additional keys in the tim data structure 
-described above, L</index> and L</index_increment>. Please refer to 
-those items in L<INTERNAL DATA STRUCTURE> for their description and 
-usage.
-
-Pass this subroutine one or two arguments. The first is the reference 
-to the data structure. The optional second argument is an integer 
-value to be used as the index_increment value. This value determines 
-the size and efficiency of the index; small values generate a larger 
-but more efficient index, while large values do the opposite. A 
-balance should be struck between memory consumption and speed. The 
-default value is 20 x the feature window size (determined from the 
-metadata). Therefore, finding the specific genomic coordinate 
-feature should take no more than 20 steps from the indexed position. 
-If successful, the subroutine returns a true value.
-
-Example
-
-	my $main_data_ref = load_tim_data_file($filename);
-	index_data_table($main_data_ref) or 
-		die " unable to index data table!\n";
-	...
-	my $chr = 'chr9';
-	my $start = 123456;
-	my $index_value = 
-		int( $start / $main_data_ref->{index_increment} ); 
-	my $starting_row = $main_data_ref->{index}{$chr}{$index_value};
-	for (
-		my $row = $starting_row;
-		$row <= $main_data_ref->{last_row};
-		$row++
-	) {
-		if (
-			$main_data_ref->{data_table}->[$row][0] eq $chr and
-			$main_data_ref->{data_table}->[$row][1] <= $start and
-			$main_data_ref->{data_table}->[$row][2] >= $start
-		) {
-			# do something
-			# you could stop here, but what if you had overlapping
-			# genomic bins for some odd reason?
-		} elsif (
-			$main_data_ref->{data_table}->[$row][0] ne $chr
-		) {
-			# no longer on same chromosome, stop the loop
-			last;
-		} elsif (
-			$main_data_ref->{data_table}->[$row][1] > $start
-		) {
-			# moved beyond the window, stop the loop
-			last;
-		}
-	}
-		
-=item find_column_index()
-
-This subroutine helps to find the index number of a dataset or column given 
-only the name. This is useful if the file contents are not in a standard 
-order, for example a typical tim data text file instead of a GFF or BED file.
-
-Pass the subroutine two arguments: 1) The reference to the data structure, and 
-2) a scalar text string that represents the name. The string will be used in 
-regular expression pattern, so Perl REGEX notation may be used. The search 
-is performed with the case insensitive flag. The index position of the first 
-match is returned.
-
-Example
-
-	my $main_data_ref = load_tim_data_file($filename);
-	my $chromo_index = find_column_index($main_data_ref, "^chr|seq");
-	
 =item wig_to_bigwig_conversion()
 
 This subroutine will convert a wig file to a bigWig file. See the UCSC 

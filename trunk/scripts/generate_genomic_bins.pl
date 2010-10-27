@@ -10,10 +10,16 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
 use tim_db_helper qw(
 	$TIM_CONFIG
 	open_db_connection
+);
+use tim_file_helper qw(
+	write_tim_data_file
+	open_to_write_fh
 );
 
 print "\n This program will generate a file of genomic bins\n";
@@ -105,7 +111,15 @@ my $db = open_db_connection($database) or
 ### Set up data structure and open file
 
 # new data structure
-my $data_ref = generate_data_structure();
+my $data_ref = generate_tim_data_structure(
+		'genome',
+		'Chromosome',
+		'Start',
+		'Stop',
+) or die " unable to generate tim data structure!\n";
+$data_ref->{'db'}      = $database; # the db name
+$data_ref->{1}{'win'}  = $win; 
+$data_ref->{1}{'step'} = $step; 
 
 # write a tim data file
 my $new_output = write_tim_data_file( {
@@ -167,48 +181,6 @@ print " Finished\n";
 
 
 ########################   Subroutines   ###################################
-
-
-
-sub generate_data_structure {
-	my %data_hash; # the primary data structure that everything will go into
-	my @feature_table; # an array of arrays to put the feature list into
-	
-	# Begin loading basic metadata information
-	$data_hash{'db'} = $database; # the db name
-	$data_hash{'feature'} = 'genome';
-	$data_hash{'number_columns'} = 3;
-	$data_hash{'gff'} = 0;
-	
-	# Prepare column metadata
-	# the first three columns are identical regardless of feature type
-	# put column headers at the beginning of the array
-	push @feature_table, [ qw(
-			Chromosome
-			Start
-			Stop
-	) ];
-	# column metadata
-	$data_hash{0} = {
-			'name'  => 'Chromosome',
-			'index' => 0,
-	};
-	$data_hash{1} = {
-			'name'  => 'Start',
-			'index' => 1,
-			'win'   => $win,
-			'step'  => $step,
-	};
-	$data_hash{2} = {
-			'name'  => 'Stop',
-			'index' => 2,
-	};
-	
-	# associate data table
-	$data_hash{'data_table'} = \@feature_table;
-	
-	return \%data_hash;
-}
 
 
 sub collect_genomic_windows {

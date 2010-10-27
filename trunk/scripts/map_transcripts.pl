@@ -10,8 +10,18 @@ use Pod::Usage;
 use Statistics::Lite qw(:all);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw(open_db_connection get_chromo_region_score);
-use tim_file_helper;
+use tim_data_helper qw(
+	generate_tim_data_structure
+);
+use tim_db_helper qw(
+	open_db_connection 
+	get_chromo_region_score
+);
+use tim_file_helper qw(
+	open_tim_data_file
+	write_tim_data_file
+	convert_and_write_to_gff_file
+);
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -946,94 +956,8 @@ sub calculate_utr_and_extent {
 sub convert_transcripts_to_tim_data_structure {
 	
 	# generate the data hash
-	my %datahash;
-	
-	# populate the standard data hash keys
-	$datahash{'program'}        = $0;
-	$datahash{'db'}             = $database;
-	$datahash{'gff'}            = 0;
-	$datahash{'number_columns'} = 17;
-	$datahash{'feature'}        = 'mapped_transcripts';
-	
-	# set column metadata
-	$datahash{0} = {
-		# the window name
-		'name'     => 'Chromosome',
-		'index'    => 0,
-	};
-	$datahash{1} = {
-		'name'     => 'Start',
-		'index'    => 1,
-	};
-	$datahash{2} = {
-		'name'     => 'End',
-		'index'    => 2,
-	};
-	$datahash{3} = {
-		'name'     => 'Strand',
-		'index'    => 3,
-	};
-	$datahash{4} = {
-		'name'     => 'Size',
-		'index'    => 4,
-	};
-	$datahash{5} = {
-		'name'     => 'Transcript_Type',
-		'index'    => 5,
-	};
-	$datahash{6} = {
-		'name'     => 'GFF_Type',
-		'index'    => 6,
-	};
-	$datahash{7} = {
-		'name'     => 'Sense',
-		'index'    => 7,
-	};
-	$datahash{8} = {
-		'name'     => 'Extent',
-		'index'    => 8,
-	};
-	$datahash{9} = {
-		'name'     => 'Gene_Type',
-		'index'    => 9,
-	};
-	$datahash{10} = {
-		'name'     => 'Gene_Name',
-		'index'    => 10,
-		'tolerance' => $tolerance,
-	};
-	$datahash{11} = {
-		'name'     => 'Expression_Score',
-		'index'    => 11,
-		'threshold' => $threshold,
-		'f_dataset' => $fdata,
-		'r_dataset' => $rdata,
-		'log'      => $log,
-	};
-	$datahash{12} = {
-		'name'     => '5prime_UTR',
-		'index'    => 12,
-	};
-	$datahash{13} = {
-		'name'     => '5prime_UTR_Length',
-		'index'    => 13,
-	};
-	$datahash{14} = {
-		'name'     => '3prime_UTR',
-		'index'    => 14,
-	};
-	$datahash{15} = {
-		'name'     => '3prime_UTR_Length',
-		'index'    => 15,
-	};
-	$datahash{16} = {
-		'name'     => 'Transcription_Fragment',
-		'index'    => 16,
-	};
-	
-	# load the data table
-	my @data_table;
-	push @data_table, [ # column headers
+	my $data = generate_tim_data_structure(
+		'mapped_transcripts',
 		qw(
 			Chromosome
 			Start
@@ -1053,7 +977,17 @@ sub convert_transcripts_to_tim_data_structure {
 			3prime_UTR_Length
 			Transcription_Fragment
 		)
-	];
+	) or die " unable to generate tim data structure!\n";
+	
+	# set metadata
+	$data->{'db'} = $database;
+	$data->{10}{'tolerance'} = $tolerance;
+	$data->{11}{'threshold'} = $threshold;
+	$data->{11}{'f_dataset'} = $fdata;
+	$data->{11}{'r_dataset'} = $rdata;
+	$data->{11}{'log'}       = $log;
+	
+	# load the data table
 	foreach my $cv (sort {$a <=> $b} keys %transcripts) { 
 		# chromo value
 		foreach my $sv (sort {$a <=> $b} keys %{ $transcripts{$cv} } ) { 
@@ -1082,7 +1016,7 @@ sub convert_transcripts_to_tim_data_structure {
 				$gff_type = 'Transcription_fragment';
 			}
 			
-			push @data_table, [ (
+			push @{$data->{'data_table'}}, [ (
 				$transcripts{$cv}{$sv}{chromo},
 				$transcripts{$cv}{$sv}{start},
 				$transcripts{$cv}{$sv}{end},
@@ -1100,15 +1034,13 @@ sub convert_transcripts_to_tim_data_structure {
 				$transcripts{$cv}{$sv}{utr3},
 				$transcripts{$cv}{$sv}{utr3length},
 				$transcripts{$cv}{$sv}{transfrag},
-			) ];	
+			) ];
+			
+			$data->{'last_row'}++;
 		}
 	}
 	
-	# update the structure
-	$datahash{'last_row'} = scalar @data_table - 1;
-	$datahash{'data_table'} = \@data_table;
-	
-	return \%datahash;
+	return $data;
 }
 
 

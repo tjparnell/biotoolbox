@@ -7,10 +7,17 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median);
-use GD::Graph::smoothlines; # for bezier smoothed line graph
+eval {
+	use GD::Graph::smoothlines; # for bezier smoothed line graph
+};
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	parse_list
+);
+use tim_file_helper qw(
+	load_tim_data_file
+);
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -128,7 +135,7 @@ unless (-e "$directory") {
 
 # A list of dataset pairs was provided upon execution
 if ($data) {
-	my @datasets = _parse_list($data);
+	my @datasets = parse_list($data);
 	foreach my $dataset (@datasets) {
 		
 		# check for multiple datasets to be graphed together
@@ -206,7 +213,7 @@ sub graph_datasets_interactively {
 	# this loop will keep going until no dataset (undefined) is returned
 	while ($answer) {
 		$answer =~ s/\s*//g;
-		my @datasets = _parse_list($answer);
+		my @datasets = parse_list($answer);
 		
 		# validate the indices
 		my $check = -1; # assume all are correct initially
@@ -413,36 +420,6 @@ sub graph_this {
 	
 	print " wrote file '$filename'\n";
 }
-
-
-
-sub _parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# ordinary number
-			push @list, $_;
-		}
-	}
-	return @list;
-}
-
 
 
 

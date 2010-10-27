@@ -8,8 +8,14 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
-use tim_db_helper qw(open_db_connection);
+use tim_db_helper qw(
+	open_db_connection
+);
+use tim_file_helper qw(
+	open_tim_data_file
+	open_to_write_fh
+	wig_to_bigwig_conversion
+);
 
 print "\n This script will export a data file to a wig file\n\n";
 

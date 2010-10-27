@@ -8,7 +8,14 @@ use Statistics::Descriptive;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	generate_tim_data_structure
+	parse_list
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 #use Data::Dumper;
 
 print "\n This script will convert a datafile into histogram values\n\n";
@@ -120,7 +127,7 @@ for my $i (1..$binnumber) {
 my @indices; # an array of the indices to convert
 if (defined $index) {
 	# indices defined as command line argument
-	@indices = _parse_list($index);
+	@indices = parse_list($index);
 }
 else {
 	# interactively ask the user
@@ -188,7 +195,7 @@ sub ask_for_index {
 	chomp $answer;
 	
 	# process the answer
-	my @list = _parse_list($answer);
+	my @list = parse_list($answer);
 	
 	# check the answer
 	my $check = 1; # assume all are ok
@@ -210,77 +217,35 @@ sub ask_for_index {
 }
 
 
-### Parse string into list
-sub _parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# ordinary number
-			push @list, $_;
-		}
-	}
-	return @list;
-}
-
-
 ### Prepare the output tim data structure
 sub prepare_output_data_structure {
 	
 	# generate a new data structure
-	my %data = (
-		'program'         => $0,
-		'db'              => '',
-		'feature'         => 'distribution_frequency',
-		'number_columns'  => 2, # Bin, Percentage so far
-		'last_row'        => $binnumber,
-		'gff'             => 0,
-		'data_table'      => [], # empty array
-		'0'               => { (
-								'name'       => 'Bin',
-								'index'      => 0,
-								'start'      => $start,
-								'bin_number' => $binnumber,
-								'bin_size'   => $binsize,
-							 ) },
-		'1'               => { (
-								'name'  => 'Percentage',
-								'index' => 1,
-							 ) },
-	);
+	my $data = generate_tim_data_structure(
+		'distribution_frequency',
+		'Bin',
+		'Percentage',
+	) or die " unable to generate tim data structure!\n";
 	
-	# Put in the header names
-	$data{'data_table'}->[0][0] = 'Bin'; # [row][column]
-	$data{'data_table'}->[0][1] = 'Percentage';
+	# add metadata
+	$data->{0}{'start'}      = $start;
+	$data->{0}{'bin_number'} = $binnumber;
+	$data->{0}{'bin_size'}   = $binsize;
+	
 	
 	# Record the bins
 	for my $row (1..$binnumber) {
-		$data{'data_table'}->[$row][0] = $bins[$row - 1];
+		$data->{'data_table'}->[$row][0] = $bins[$row - 1];
 	}
 	
 	# Generate the percentages
 	for (my $i = 1; $i <= $binnumber; $i++) {
-		my $number = sprintf "%.0f", (100 / $binnumber) * $i;
-		$data{'data_table'}->[$i][1] = $number . '%';
+		$data->{'data_table'}->[$i][1] = 
+			sprintf "%.0f%%", (100 / $binnumber) * $i;
 	}
 	
 	# Return
-	return \%data;
+	return $data;
 }
 
 

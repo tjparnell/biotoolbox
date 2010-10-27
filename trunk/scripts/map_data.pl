@@ -8,7 +8,9 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median sum stddevp);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	find_column_index
+);
 use tim_db_helper qw(
 	validate_dataset_list
 	get_dataset_list
@@ -16,7 +18,12 @@ use tim_db_helper qw(
 	get_new_feature_list
 	get_region_dataset_hash
 );
-use Data::Dumper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	write_summary_data
+);
+#use Data::Dumper;
 
 print "\n This script will map data points relative to a genomic feature\n\n";
 

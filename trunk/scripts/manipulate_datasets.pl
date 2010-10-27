@@ -9,7 +9,14 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	find_column_index
+	parse_list
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present

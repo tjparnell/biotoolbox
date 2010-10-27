@@ -12,7 +12,9 @@ use Bio::SeqFeature::Generic;
 use Bio::Tools::GFF;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	open_to_read_fh
+);
 
 
 print "\n A script to convert UCSC chromInfo tables to GFF3\n\n";

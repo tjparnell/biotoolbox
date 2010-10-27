@@ -7,7 +7,11 @@ use strict;
 use Getopt::Long;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	write_summary_data
+);
 
 print "\n This script will pull out specific features from a data file\n";
 

@@ -9,7 +9,11 @@ use strict;
 use File::Copy;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_file_helper qw(
+	open_tim_data_file
+	write_tim_data_file
+	open_to_write_fh
+);
 
 print "\n This script will convert yeast genomic coordinates\n";
 

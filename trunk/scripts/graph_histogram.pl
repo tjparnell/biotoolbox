@@ -5,13 +5,20 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use GD::Graph::lines;
-use GD::Graph::bars;
+eval {
+	use GD::Graph::lines;
+	use GD::Graph::bars;
+};
 use Statistics::Lite qw(mean max);
 use Statistics::Descriptive;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper;
+use tim_data_helper qw(
+	parse_list
+);
+use tim_file_helper qw(
+	load_tim_data_file
+);
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -146,7 +153,7 @@ unless (-e "$directory") {
 
 # A list of datasets was provided as a file
 if ($dataset) {
-	my @list = _parse_list($dataset);
+	my @list = parse_list($dataset);
 	graph_designated_datasets(@list);
 } 
 
@@ -467,37 +474,6 @@ sub graph_this_as_bars {
 	close IMAGE;
 	print "wrote bar graph $filename in directory $directory\n";
 }
-
-
-
-
-sub _parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# ordinary number
-			push @list, $_;
-		}
-	}
-	return @list;
-}
-
 
 
 
