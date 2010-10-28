@@ -44,7 +44,7 @@ sub generate_tim_data_structure {
 		'feature'        => $feature,
 		'db'             => q(),
 		'gff'            => 0,
-		'number_columns' => scalar(@datasets),
+		'number_columns' => 0,
 		'last_row'       => 0,
 		'headers'        => 1,
 		'other'          => [],
@@ -66,6 +66,8 @@ sub generate_tim_data_structure {
 		
 		# increment number columns
 		$tim_data{'number_columns'} += 1;
+		
+		$index++;
 	}
 	
 	# Finished
