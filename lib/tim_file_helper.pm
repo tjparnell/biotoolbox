@@ -1283,7 +1283,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# chromosome
 	my $chr_index;
-	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} >= 0) {
+	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} =~ /^\d+$/) {
 		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
@@ -1292,7 +1292,7 @@ sub convert_genome_data_2_gff_data {
 		
 	# start position
 	my $start_index;
-	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} >= 0) {
+	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} =~ /^\d+$/) {
 		$start_index = $arg_ref->{'start'};
 	}
 	else {
@@ -1301,7 +1301,7 @@ sub convert_genome_data_2_gff_data {
 		
 	# stop position
 	my $stop_index;
-	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} >= 0) {
+	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} =~ /^\d+$/) {
 		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
@@ -1309,28 +1309,25 @@ sub convert_genome_data_2_gff_data {
 	}
 	
 	# check that we have coordinates
-	unless ( 
-		# check that we have these basic genomic coordinates
-		defined $chr_index and
-		defined $start_index
-	) {
-		carp " unable to identify chromosome, start, and/or stop datasets!";
+	unless ( defined $chr_index ) {
+		carp " unable to identify chromosome index!";
+		return;
+	}
+	unless ( defined $start_index ) {
+		carp " unable to identify start index!";
 		return;
 	}
 	
 	# score
 	my $score_index;
-	if ( 
-		$arg_ref->{'score'} ne q() and
-		$arg_ref->{'score'} >= 0 
-	) {
+	if (exists $arg_ref->{'score'} and $arg_ref->{'score'} =~ /^\d+$/) {
 		$score_index = $arg_ref->{'score'};
 	}
 	
 	# name
 	my $name;
 	my $name_index;
-	if ($arg_ref->{'name'} ne q()) {
+	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
 		if ($arg_ref->{'name'} =~ /^\d+$/) {
 			# name is a single digit, most likely a index
 			$name_index = $arg_ref->{'name'};
@@ -1343,10 +1340,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# strand
 	my $strand_index;
-	if ( 
-		$arg_ref->{'strand'} ne q() and
-		$arg_ref->{'strand'} >= 0 
-	) {
+	if ( exists $arg_ref->{'strand'} and $arg_ref->{'strand'} =~ /^\d+$/ ) {
 		$strand_index = $arg_ref->{'strand'};
 	}
 	
@@ -1362,7 +1356,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# identify the unique ID index
 	my $id_index;
-	if (exists $arg_ref->{'id'} and defined $arg_ref->{'id'} ) {
+	if (exists $arg_ref->{'id'} and $arg_ref->{'id'} =~ /^\d+$/ ) {
 		$id_index = $arg_ref->{'id'} ;
 	}
 	
@@ -1374,7 +1368,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# set default gff data variables
 	my $source;
-	if ($arg_ref->{'source'} ne q() ) {
+	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
 		$source = $arg_ref->{'source'};
 	}
@@ -1383,7 +1377,7 @@ sub convert_genome_data_2_gff_data {
 		$source = 'data';
 	}
 	my ($method, $method_index);
-	if ($arg_ref->{'method'} ne q() ) {
+	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
 		if ($arg_ref->{'method'} =~ /^\d+$/) {
 			# the method looks like a single digit, most likely an index value
@@ -1394,7 +1388,7 @@ sub convert_genome_data_2_gff_data {
 			$method = $arg_ref->{'method'};
 		}
 	}
-	elsif ($arg_ref->{'type'} ne q() ) {
+	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
 		if ($arg_ref->{'type'} =~ /^\d+$/) {
 			# the method looks like a single digit, most likely an index value
@@ -1697,7 +1691,7 @@ sub convert_and_write_to_gff_file {
 	
 	# chromosome
 	my $chr_index;
-	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} >= 0) {
+	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} =~ /^\d+$/) {
 		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
@@ -1706,7 +1700,7 @@ sub convert_and_write_to_gff_file {
 		
 	# start position
 	my $start_index;
-	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} >= 0) {
+	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} =~ /^\d+$/) {
 		$start_index = $arg_ref->{'start'};
 	}
 	else {
@@ -1715,36 +1709,33 @@ sub convert_and_write_to_gff_file {
 		
 	# stop position
 	my $stop_index;
-	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} >= 0) {
+	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} =~ /^\d+$/) {
 		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
 		$stop_index = find_column_index($input_data_ref, 'stop|end');
 	}
 	
-	# score
-	my $score_index;
-	if ( 
-		$arg_ref->{'score'} ne q() and
-		$arg_ref->{'score'} >= 0 
-	) {
-		$score_index = $arg_ref->{'score'};
+	# check that we have coordinates
+	unless ( defined $chr_index ) {
+		carp " unable to identify chromosome index!";
+		return;
+	}
+	unless ( defined $start_index ) {
+		carp " unable to identify start index!";
+		return;
 	}
 	
-	# check that we have coordinates
-	unless ( 
-		# check that we have these basic genomic coordinates
-		defined $chr_index and
-		defined $start_index
-	) {
-		carp " unable to identify chromosome, start, and/or stop datasets!";
-		return;
+	# score
+	my $score_index;
+	if (exists $arg_ref->{'score'} and $arg_ref->{'score'} =~ /^\d+$/) {
+		$score_index = $arg_ref->{'score'};
 	}
 	
 	# name
 	my $name;
 	my $name_index;
-	if ($arg_ref->{'name'} ne q()) {
+	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
 		if ($arg_ref->{'name'} =~ /^\d+$/) {
 			# name is a single digit, most likely a index
 			$name_index = $arg_ref->{'name'};
@@ -1757,10 +1748,7 @@ sub convert_and_write_to_gff_file {
 	
 	# strand
 	my $strand_index;
-	if ( 
-		$arg_ref->{'strand'} ne q() and
-		$arg_ref->{'strand'} >= 0 
-	) {
+	if ( exists $arg_ref->{'strand'} and $arg_ref->{'strand'} =~ /^\d+$/ ) {
 		$strand_index = $arg_ref->{'strand'};
 	}
 	
@@ -1775,15 +1763,15 @@ sub convert_and_write_to_gff_file {
 	
 	# identify the unique ID index
 	my $id_index;
-	if (exists $arg_ref->{'id'} and defined $arg_ref->{'id'} ) {
-		$id_index = $arg_ref->{'id'};
+	if (exists $arg_ref->{'id'} and $arg_ref->{'id'} =~ /^\d+$/ ) {
+		$id_index = $arg_ref->{'id'} ;
 	}
 	
 	
 	
 	## Set default gff data variables
 	my $source;
-	if ($arg_ref->{'source'} ne q() ) {
+	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
 		$source = $arg_ref->{'source'};
 	}
@@ -1793,7 +1781,7 @@ sub convert_and_write_to_gff_file {
 	}
 	
 	my ($method, $method_index);
-	if ($arg_ref->{'method'} ne q() ) {
+	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
 		if ($arg_ref->{'method'} =~ /^\d+$/) {
 			# the method looks like a single digit, most likely an index value
@@ -1804,7 +1792,7 @@ sub convert_and_write_to_gff_file {
 			$method = $arg_ref->{'method'};
 		}
 	}
-	elsif ($arg_ref->{'type'} ne q() ) {
+	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
 		if ($arg_ref->{'type'} =~ /^\d+$/) {
 			# the method looks like a single digit, most likely an index value
