@@ -1567,7 +1567,7 @@ sub convert_genome_data_2_gff_data {
 		foreach (@tag_indices) {
 			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
-				$group .= ';' . $input_data_ref->{$_}{name} . '=' . 
+				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
 					$data_table_ref->[$row][$_];
 			}
 		}
@@ -2102,7 +2102,7 @@ sub convert_and_write_to_gff_file {
 		foreach (@tag_indices) {
 			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
-				$group .= ';' . $input_data_ref->{$_}{name} . '=' . 
+				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
 					$data_table_ref->[$row][$_];
 			}
 		}
@@ -2830,7 +2830,7 @@ Example:
 =item write_tim_data_file()
 
 This subroutine will write out a data file formatted for tim's data files. 
-Both text and binary files may be written. Please refer to L<FORMAT OF 
+Either text or binary files may be written. Please refer to L<FORMAT OF 
 TIM DATA TEXT FILE> and L<BINARY REPRESENTATION OF TIM DATA FILE> for more 
 information regarding the file format. If the 'gff' key is true in the data 
 hash, then a gff file will be written.
@@ -2839,14 +2839,14 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  data     => A scalar reference to the data hash. The data hash 
-              should be generated using subroutines in this module.
-  filename => A scalar value containing the name of the file to 
-              (over)write. If necessary, appropriate extensions are 
-              added (e.g, .store, .txt, .gz, etc). Extensions are 
-              determined from the format, or from pre-existing file
-              extensions.
+  data     => A scalar reference to the tim data structure ad described
+              in B<tim_data_helper.pm>. 
   Optional: 
+  filename => A scalar value containing the name of the file to 
+              write. This value is required for new data files and 
+              optional for overwriting existing files (the filename 
+              stored in the metadata is used). Appropriate extensions 
+              are added (e.g, .store, .txt, .gz, etc) as neccessary. 
   format   => A string to indicate the file format to be written.
               Acceptable values include 'text', 'store', and 'simple'.
               Text files are text in nature, include all metadata, and
