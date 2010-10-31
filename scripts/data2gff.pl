@@ -290,7 +290,7 @@ if ($unique and !defined $name_index) {
 
 ### Convert to GFF progressively
 # To avoid exorbitant memory requirements for ginormous files, 
-# we will only convert 50000 lines at time. 
+# we will only convert 20000 lines at time. 
 print " converting to GFF using\n";
 print "  - '", $metadata_ref->{$chr_index}{name}, "' for chromosome\n" 
 	if defined $chr_index;
@@ -363,7 +363,7 @@ while (my $line = $in_fh->getline) {
 	$count++;
 	
 	# temporarily write output
-	if ($count == 50000) {
+	if ($count == 20000) {
 				
 		# generate unique names if requested
 		if ($unique) {
