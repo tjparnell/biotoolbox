@@ -40,19 +40,19 @@ my (
 	$binnumber,
 	$binsize,
 	$lines,
+	$start,
 	$max,
 	$directory,
 	$help
 );
-my $start = 0; # the starting value to calculate the bins
 GetOptions( 
 	'in=s'        => \$infile, # the input file
 	'index=s'     => \$dataset, # columns (datasets) to plot
 	'out=s'       => \$out, # output file name
 	'bins=i'      => \$binnumber, # the number of bins to put the data into
 	'size=f'      => \$binsize, # the size of each bin
-	'min=i'       => \$start, # the starting value to calculate the bins
-	'max=i'       => \$max, # maximum value for x-axis
+	'min=f'       => \$start, # the starting value to calculate the bins
+	'max=f'       => \$max, # maximum value for x-axis
 	'lines!'      => \$lines, # indicate whether graph should be a linegraph
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
@@ -70,12 +70,8 @@ if ($help) {
 
 ### Check required and default values
 unless ($infile) {
-	if (@ARGV) {
-		$infile = shift @ARGV;
-	}
-	else {
-		die " Missing input file!\n";
-	}
+	$infile = shift @ARGV or
+		die " no input file! use --help for more information\n";
 }
 unless ($binsize) {
 	die " Missing bin size!\n Please use --help for more information\n";
@@ -84,7 +80,10 @@ unless ($binnumber or $max) {
 	die " Either bin number or maximum value must be entered!\n" . 
 		" Please use --help for more information\n";
 }
-unless ($max) {
+unless (defined $start) {
+	$start = 0;
+}
+unless (defined $max) {
 	# default value is calculated
 	$max = $start + ($binnumber * $binsize);
 }
@@ -490,14 +489,14 @@ A script to graph a histogram of a dataset of values
 
 =head1 SYNOPSIS
 
-graph_histogram.pl --bins <integer> --size <integer> <filename> 
+graph_histogram.pl --bins <integer> --size <number> <filename> 
    
    --in <filename>
    --index <column_index>
    --bins <integer>
    --size <number>
-   --min <integer>
-   --max <integer>
+   --min <number>
+   --max <number>
    --lines
    --out <base_filename>
    --dir <output_directory>
@@ -538,13 +537,13 @@ grouped. This argument is optional if --max is provided.
 Specify the size of each bin or partition. A decimal number may be 
 provided.
 
-=item --min <integer>
+=item --min <number>
 
 Optionally indicate the minimum value of the bins. When generating 
 the list of bins, this is used as the starting value. Default is 0. 
 A negative number may be provided using the format --min=-1. 
 
-=item --max <integer>
+=item --max <number>
 
 Optionally provide the maximum bin value. This argument is optional 
 and is automatically calculated as (bins * size). This argument 

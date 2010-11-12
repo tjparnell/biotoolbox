@@ -18,25 +18,27 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(generate_tim_data_structure);
 
 
-# check whether these optional modules are available
+# check for wiggle support
 our $WIGGLE_OK = 0;
-our $BIGWIG_OK = 0;
-eval { 
-	# check for wiggle support
-	use Bio::Graphics::Wiggle;
+eval {
+	require tim_db_helper::wiggle;
+	tim_db_helper::wiggle->import;
+};
+unless ($@) {
 	$WIGGLE_OK = 1;
 }; 
+$@ = undef;
+
+# check for BigWig support
+our $BIGWIG_OK = 0;
 eval { 
-	# check for BigWig support
-	use Bio::DB::BigWig;
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+};
+unless ($@) {
 	$BIGWIG_OK = 1;
 }; 
 
-# Hashes of opened file objects
-our %OPENED_WIGFILES; # opened wigfile objects
-	# in empirical testing, this doesn't really seem to speed things up
-	# like I thought it would
-	# oh well, keep it anyway????
 
 # Configuration File import for database info
 our $TIM_CONFIG;
@@ -49,7 +51,7 @@ elsif (-e "$ENV{HOME}/tim_db_helper.cfg") {
 	 	die Config::Simple->error();
 }
 else {
-	warn "\n#### Using default configuration file '$Bin/../lib/tim_db_config.cfg'####\n";
+	warn "\n#### Using default configuration file\n   '$Bin/../lib/tim_db_config.cfg'\n####\n";
 	$TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
 	 	die Config::Simple->error();
 }
@@ -1950,7 +1952,6 @@ sub get_genome_dataset {
 	}
 	
 	# Finish
-	undef %OPENED_WIGFILES;
 	return 1;
 }
 
@@ -2428,89 +2429,73 @@ sub get_region_dataset_hash {
 	
 	# Collect the score/attributes for each feature
 	my %datahash; # the hash to put the collected data into
-		
-	# Walk through the datapoints
-	foreach my $datapoint (@datapoints) {
 	
-		# Check which data to take based on strand
-		if (
-			$stranded eq 'none' # stranded data not requested
-			or $datapoint->strand == 0 # unstranded data
-			or ( 
-				# sense data
-				$datapoint->strand == $region->strand 
-				and $stranded eq 'sense'
-			) 
-			or (
-				# antisense data
-				$datapoint->strand != $region->strand  
-				and $stranded eq 'antisense'
-			)
-		) {
-			# we have acceptable data to collect
+	# Check for wigfiles
+	if ($datapoints[0]->has_tag('wigfile') ) {
+		# these datapoints point to a binary wig file
+		
+		# first check the method
+		unless ($method eq 'score') {
+			carp " Only scores may be retrieved from wig file data!\n";
+			return;
+		}
+		
+		# collect if possible
+		if ($WIGGLE_OK) {
+			# get the dataset scores using tim_db_helper::wiggle
+			%datahash = collect_wig_position_scores(
+				$region, $stranded, @datapoints);
+		}
+		else {
+			carp " Bio::Graphics::Wiggle is not available for retrieving wigfile data!\n";
+		}
+	}
+	
+	elsif ($datapoints[0]->has_tag('bigwigfile') ) {
+		# these datapoints point to a binary bigwig file
+		
+		# first check the method
+		unless ($method eq 'score') {
+			carp " Only scores may be retrieved from bigwig file data!\n";
+			return;
+		}
+		
+		# collect if possible
+		if ($BIGWIG_OK) {
+			# the system has Bio::DB::BigWig loaded
+			# get the dataset scores
+			%datahash = collect_bigwig_position_scores(
+				$region, $stranded, @datapoints);
+		}
+		else {
+			carp " Bio::DB::BigWig is not available for retrieving wigfile data!\n";
+		}
+	}
+	
+	else {
+		# these datapoints must otherwise represent features in the database
+		# collect score or attributes directly
+		
+		# Walk through the datapoints
+		foreach my $datapoint (@datapoints) {
+		
+			# Check which data to take based on strand
+			if (
+				$stranded eq 'none' # stranded data not requested
+				or $datapoint->strand == 0 # unstranded data
+				or ( 
+					# sense data
+					$datapoint->strand == $region->strand 
+					and $stranded eq 'sense'
+				) 
+				or (
+					# antisense data
+					$datapoint->strand != $region->strand  
+					and $stranded eq 'antisense'
+				)
+			) {
+				# we have acceptable data to collect
 			
-			# First check whether the data is in the database or wig file
-			
-			# Wig file
-			if ($datapoint->has_tag('wigfile') ) {
-				# data is in a wigfile
-				# we'll need to open the file and read the data
-				
-				# this block is pretty identical, but incompatible, with 
-				# the internal subroutine _get_wig_data()
-				# the reason I can't used that subroutine is because I need 
-				# to correlate position with score, and since position is 
-				# not directly encoded in the wigfile, I have to regenerate 
-				# it using the wigfile step
-				
-				# first check the method
-				unless ($method eq 'score') {
-					carp " Only scores may be retrieved from wigfile data!\n";
-					return;
-				}
-				
-				# get the parameters for collecting wig data
-				my $start = $region->start;
-				my $end = $region->end;
-				
-				my @wigdata = _get_wig_data($datapoint, $start, $end);
-				
-				# regenerate position information and put the data in the hash
-				my @wigfiles = $datapoint->get_tag_values('wigfile');
-				my $wig = $OPENED_WIGFILES{ $wigfiles[0] };
-				my $step = $wig->step;
-				my $i = 0;
-				for (my $pos = $start; $pos <= $end; $pos += $step) {
-					if (defined $wigdata[$i]) {
-						$datahash{ $pos } = $wigdata[$i];
-					}
-					$i++;
-				}
-			}
-			
-			# BigWig File
-			elsif ($datapoint->has_tag('bigwigfile') ) {
-				# data is in a BigWig file
-				# we'll need to open the file and read the data
-				
-				# first check the method
-				unless ($method eq 'score') {
-					carp " Only scores may be retrieved from wigfile data!\n";
-					return;
-				}
-				
-				# get the data
-				%datahash = _get_bigwig_data(
-					$datapoint,			# feature
-					$region->seq_id,	# chromo
-					$region->start,		# start
-					$region->end,		# end
-					1 					# request position too 
-				);
-			}
-			
-			# Database
-			else {
 				# data is in the database
 				# much easier to collect
 				
@@ -2774,80 +2759,16 @@ sub _get_segment_score {
 	# Wig Data
 	if ( $datapoints[0]->has_tag('wigfile') ) {
 		# data is in wig format, or at least the first datapoint is
-		# if not all the data is in wig format, we're screwed, 'cus we can't mix
-		# normally this should only return one datapoint (maybe two if stranded) 
-		# the datapoint feature should run across the entire chromosome
-		# but then it's not really a dataPOINT, is it? ;-)
-		# This uses the Bio::Graphics::Wiggle module
 		
-		# need to check for stranded data
-		if ($strandedness eq 'sense') {
-			# collect the sense data
-			
-			# collect region info
-			my $region_strand = $region->strand; 
-			my $start = $region->start;
-			my $end = $region->end;
-			
-			foreach my $datapoint (@datapoints) {
-				my $strand = $datapoint->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					my @s = _get_wig_data($datapoint, $start, $end);
-					foreach (@s) {
-						if (defined $_) {push @scores, $_}
-					}
-				} 
-				elsif ($strand == $region_strand) { 
-					# strand matches the region strand
-					my @s = _get_wig_data($datapoint, $start, $end);
-					foreach (@s) {
-						if (defined $_) {push @scores, $_}
-					}
-				}
-			}
+		# check that we have wiggle support
+		unless ($WIGGLE_OK) {
+			carp " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
+			return;
 		}
-		elsif ($strandedness eq 'antisense') {
-			# collect the antisense data
-			
-			# collect region info
-			my $region_strand = $region->strand; 
-			my $start = $region->start;
-			my $end = $region->end;
-			
-			foreach my $datapoint (@datapoints) {
-				my $strand = $datapoint->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					my @s = _get_wig_data($datapoint, $start, $end);
-					foreach (@s) {
-						if (defined $_) {push @scores, $_}
-					}
-				} 
-				elsif ($strand != $region_strand) { 
-					# strand doesn't match the region strand
-					# that means it must be the opposite strand, so take it
-					my @s = _get_wig_data($datapoint, $start, $end);
-					foreach (@s) {
-						if (defined $_) {push @scores, $_}
-					}
-				}
-			}
-		} 
-		elsif ($strandedness eq 'none' or $strandedness eq 'no') {
-			# strandedness should be ignored for this dataset
-			
-			# collect region info
-			my $start = $region->start;
-			my $end = $region->end;
-			
-			foreach my $datapoint (@datapoints) {
-				my @s = _get_wig_data($datapoint, $start, $end);
-				foreach (@s) {
-					if (defined $_) {push @scores, $_}
-				}
-			}
-		} 
+		
+		# collect the scores using tim_db_helper::wiggle
+		@scores = collect_wig_scores($region, $strandedness, @datapoints);
+		
 	}
 	
 	
@@ -2856,67 +2777,16 @@ sub _get_segment_score {
 		# data is in bigwig format
 		# this uses the Bio::DB::BigWig adaptor
 		
-		# need to check for stranded data
-		if ($strandedness eq 'sense') {
-			# collect the sense data
-			
-			# collect region info
-			my $region_strand = $region->strand; 
-			my $start = $region->start;
-			my $end = $region->end;
-			my $chromo = $region->seq_id;
-			
-			foreach my $datapoint (@datapoints) {
-				my $strand = $datapoint->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					push @scores, _get_bigwig_data(
-						$datapoint, $chromo, $start, $end, 0);
-				} 
-				elsif ($strand == $region_strand) { 
-					# strand matches the region strand
-					push @scores, _get_bigwig_data(
-						$datapoint, $chromo, $start, $end, 0);
-				}
-			}
+		# check that we have bigwig support
+		unless ($BIGWIG_OK) {
+			carp " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
+			return;
 		}
-		elsif ($strandedness eq 'antisense') {
-			# collect the antisense data
-			
-			# collect region info
-			my $region_strand = $region->strand; 
-			my $start = $region->start;
-			my $end = $region->end;
-			my $chromo = $region->seq_id;
-			
-			foreach my $datapoint (@datapoints) {
-				my $strand = $datapoint->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					push @scores, _get_bigwig_data(
-						$datapoint, $chromo, $start, $end, 0);
-				} 
-				elsif ($strand != $region_strand) { 
-					# strand doesn't match the region strand
-					# that means it must be the opposite strand, so take it
-					push @scores, _get_bigwig_data(
-						$datapoint, $chromo, $start, $end, 0);
-				}
-			}
-		} 
-		elsif ($strandedness eq 'none' or $strandedness eq 'no') {
-			# strandedness should be ignored for this dataset
-			
-			# collect region info
-			my $start = $region->start;
-			my $end = $region->end;
-			my $chromo = $region->seq_id;
-			
-			foreach my $datapoint (@datapoints) {
-				push @scores, _get_bigwig_data(
-					$datapoint, $chromo, $start, $end, 0);
-			}
-		} 
+		
+		# collect the scores using tim_db_helper::bigwig
+		@scores = collect_bigwig_scores($region, $strandedness, @datapoints);
+
+		
 	}
 	
 	
@@ -3039,179 +2909,8 @@ sub _get_segment_score {
 }
 
 
-### Internal subroutine to retrieve wig file data
-
-=item _get_wig_data
-
-This internal subroutine is used to collect the dataset scores from a binary 
-wig file that is referenced in the database. A single feature representing the 
-dataset is present across each chromosome. The feature references the location 
-of the binary file representing the dataset scores in an attribute. The file is 
-read using the Bio::Graphics::Wiggle module, and the values extracted from the 
-region of interest. To speed up the program and avoid repetitive opening and 
-closing of the files, the opened wig file object is stored in a global 
-hash in case it is needed again.
-
-The subroutine is passed three arguments in the following order:
-    
-    1) the dataset object for the chromosome, which contains 
-       the 'wigfile' attribute
-    2) the start coordinate of the region of interest
-    3) the end coordinate of the region of interest
-
-The subroutine returns an array of the defined dataset values found within 
-the region of interest.
-
-=cut
 
 
-sub _get_wig_data {
-	
-	# get passed arguments
-	my ($datapoint, $start, $end) = @_;
-	
-	# check that we have wiggle support
-	unless ($WIGGLE_OK) {
-		carp " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
-		return;
-	}
-	
-	# collect wig data
-	my @scores;
-	if ($datapoint->has_tag('wigfile') ) {
-		
-		# get wigfile name
-		my @wigfiles = $datapoint->get_tag_values('wigfile');
-		my $wigfile = shift @wigfiles;
-		
-		# check for opened wigfile
-		my $wig;
-		if (exists $OPENED_WIGFILES{$wigfile} ) {
-			# this file is already opened, use it
-			$wig = $OPENED_WIGFILES{$wigfile};
-		}
-		else {
-			# this file has not been opened yet, open it
-			$wig = Bio::Graphics::Wiggle->new($wigfile,0);
-			unless ($wig) {
-				carp " unable to open data wigfile '$wigfile'";
-				return;
-			}
-			
-			# store the opened object for later use
-			$OPENED_WIGFILES{$wigfile} = $wig;
-		}
-		
-		# adjust as necessary to avoid wig errors
-		if ($start < $wig->start) {
-			# adjust the start position
-			$start = $wig->start;
-		}
-		elsif ($start > $wig->end) {
-			# nothing we can do here, no values
-			return;
-		}
-		if ($end > $wig->end) {
-			# adjust the end position
-			$end = $wig->end;
-		}
-		elsif ($end < $wig->start) {
-			# nothing we can do here, no values
-			return;
-		}
-		
-		# collect the wig values
-		push @scores,  @{ $wig->values($start => $end) };
-	}
-	return @scores;
-}
-
-### Internal subroutine to retrieve wig file data
-
-=item _get_bigwig_data
-
-This internal subroutine is used to collect the dataset scores from a binary 
-BigWig file that is referenced in the database. A single feature representing 
-the dataset is present across each chromosome. The feature references the 
-location of the binary file representing the dataset scores in an attribute. 
-The file is opend and read using the Bio::DB::BigWig module, and the values 
-and their positions are extracted from the region of interest. To speed up 
-the program and avoid repetitive opening and closing of the files, the opened 
-wig file object is stored in a global hash in case it is needed again.
-
-The subroutine is passed four arguments in the following order:
-    
-    1) the dataset object for the chromosome, which contains 
-       the 'bigwigfile' attribute
-    2) the chromosome name of interest
-    3) the start coordinate of the region of interest
-    4) the end coordinate of the region of interest
-    5) boolean value indicating whether position data should be included
-
-The subroutine returns an array. If the position data is requested, the 
-array contains interleaving position and score values suitable for loading 
-into a hash. Otherwise, only score values are included in the array.
-
-
-=cut
-
-sub _get_bigwig_data {
-	
-	# get passed arguments
-	my ($datapoint, $chromo, $start, $end, $position_req) = @_;
-	
-	# check that we have bigwig support
-	unless ($BIGWIG_OK) {
-		carp " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
-		return;
-	}
-	
-	# collect bigwig data
-	my @collected_data;
-	if ($datapoint->has_tag('bigwigfile') ) {
-		
-		# get bigwigfile name
-		my @wigfiles = $datapoint->get_tag_values('bigwigfile');
-		my $wigfile = shift @wigfiles;
-		
-		# check for opened bigwigfile
-		my $wig;
-		if (exists $OPENED_WIGFILES{$wigfile} ) {
-			# this file is already opened, use it
-			$wig = $OPENED_WIGFILES{$wigfile};
-		}
-		else {
-			# this file has not been opened yet, open it
-			$wig = Bio::DB::BigWig->new($wigfile);
-			unless ($wig) {
-				carp " unable to open data BigWig file '$wigfile'";
-				return;
-			}
-			
-			# store the opened object for later use
-			$OPENED_WIGFILES{$wigfile} = $wig;
-		}
-		
-		# collect the features
-		my @features = $wig->get_features_by_location(
-			$chromo, $start, $end);
-		if ($position_req) {
-			# position data is requested to be included
-			foreach (@features) {
-				push @collected_data, $_->start;
-				push @collected_data, $_->score;
-			}
-		}
-		else {
-			# we don't need position data
-			foreach (@features) {
-				push @collected_data, $_->score;
-			}
-		}
-	}
-	
-	return @collected_data;
-}
 
 
 =back
