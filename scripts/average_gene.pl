@@ -6,7 +6,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean);
+use Statistics::Lite qw(mean median sum);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
@@ -44,6 +44,7 @@ my (
 	$database,
 	$dataset,
 	$feature,
+	$method,
 	$strand,
 	$bins,
 	$extension,
@@ -63,6 +64,7 @@ GetOptions(
 	'db=s'        => \$database, # database name
 	'data=s'      => \$dataset, # dataset name
 	'feature=s'   => \$feature, # what type of feature to work with
+	'method=s'    => \$method, # method for collecting the data
 	'strand=s'    => \$strand, # indicate whether stranded data should be taken
 	'bins=i'      => \$bins, # number of bins
 	'ext=i'       => \$extension, # number of bins to extend beyond the feature
@@ -113,6 +115,19 @@ if ($strand) {
 else {
 	$strand = 'none'; # default is no strand information
 }
+if ($method) {
+	unless (
+		$method eq 'mean' or 
+		$method eq 'median' or 
+		$method eq 'sum' or 
+		$method eq 'count'
+	) {
+		die " '$method' is not recognized for method\n Use --help for more information\n";
+	}
+} 
+else {
+	$strand = 'mean'; # default is no strand information
+}
 
 # assign default values
 unless (defined $bins) {
@@ -128,9 +143,15 @@ unless (defined $log) {
 	$log = 0;
 }
 unless (defined $smooth) {
-	# default is to include smoothing
-	$smooth = 1;
+	# default is to not include smoothing
+	$smooth = 0;
 }
+unless (defined $method) {
+	# default is to take the mean
+	$method = 'mean';
+}
+
+
 
 ## Generate or load the dataset
 my $main_data_ref; # reference to the main data structure hash
@@ -239,7 +260,7 @@ if ($raw) {
 	open RAWFILE, ">$outfile\_raw.txt";
 }
 my $db = open_db_connection($database); # Open database connection
-print " Collecting data from $dataset in " . 
+print " Collecting $method data from $dataset in " . 
 	($bins + 2 * $extension) . " bins....\n"; 
 collect_binned_data();
 close RAWFILE;
@@ -455,7 +476,8 @@ sub collect_binned_data {
 					'class'    => $type,
 					'start'    => $startingpoint,
 					'stop'     => $endingpoint,
-					'strand'   => $strand
+					'strand'   => $strand,
+					'method'   => $method eq 'count' ? 'count' : 'score',
 		} );
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
@@ -514,40 +536,67 @@ sub collect_binned_data {
 			}
 			
 			
-			# calculate the mean value
+			# calculate the value
 			my $window_score;
 			if (@scores) {
 				# we have values in the window
 				
-				# convert from log2 if necessary
-				if ($log) {
-					@scores = map { 2 ** $_ } @scores;
+				# combine the scores according to the specified method
+				if ($method eq 'count' or $method eq 'sum') {
+					# either the count or the sum methods require that the 
+					# scores be summed
+					$window_score = sum(@scores);
+					# raw output
+					if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+					
 				}
 				
-				# determine the average score
-				$window_score = mean(@scores); 
-				if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+				else {
+					# method of mean or median to combine the scores
 				
-				# convert back to log if necessary
-				if ($log) {
-					if ($window_score != 0) {
-						$window_score = log($window_score) / log(2);
+					# convert from log2 if necessary
+					if ($log) {
+						@scores = map { 2 ** $_ } @scores;
 					}
-					else {
-						$window_score = '.';
+					
+					# calculate the score appropriately
+					if ($method eq 'mean') {
+						$window_score = mean(@scores); 
+					}
+					elsif ($method eq 'median') {
+						$window_score = median(@scores); 
+					}
+					
+					# raw output
+					if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+					
+					# convert back to log if necessary
+					if ($log) {
+						if ($window_score != 0) {
+							$window_score = log($window_score) / log(2);
+						}
+						else {
+							$window_score = '.';
+						}
 					}
 				}
 			} 
 			else {
 				# no values in this window
-				# no score gets a null symbol
-				$window_score = '.'; 
+				if ($method eq 'count' or $method eq 'sum') {
+					# score gets 0
+					$window_score = 0;
+				}
+				else {
+					# no score gets a null symbol
+					$window_score = '.'; 
+				}
 			}
 			
 			
 			# record the value
 			$data_table_ref->[$row][$column] = $window_score;
-			if ($raw) { print RAWFILE "\t$start: $window_score" }
+			if ($raw) { print RAWFILE "\tscore for $start: $window_score" }
 		}
 		
 		# finish the raw line
@@ -710,102 +759,6 @@ sub go_interpolate_values {
 }
 
 
-### Average the values across all the features to get an average gene
-sub go_sum_values {
-	
-	my @summed_data; # array to store the summed data
-	
-	# store the column header names
-	push @summed_data, [ qw(Window Midpoint Score) ];
-	
-	# we will walk through the columns and take an average for each 
-	# column or window
-	for (
-		my $column = $startcolumn;
-		$column < $main_data_ref->{'number_columns'};
-		$column++
-	) { 
-		
-		# determine the midpoint position of the window
-		my $start = $main_data_ref->{$column}{'start'};
-		my $stop = $main_data_ref->{$column}{'stop'};
-		$start =~ s/\%//; # strip any percentage sign that may be present
-		$stop =~ s/\%//;
-		my $midpoint = mean($start, $stop); 
-		if ($main_data_ref->{$column}{'start'} =~ /\%/) {
-			# add the % if initially present
-			$midpoint . '%';
-		} 
-		
-		
-		# collect the values in the column
-		my @values;
-		for my $row (1..$main_data_ref->{'last_row'}) {
-			my $value = $data_table_ref->[$row][$column];
-			unless ($value eq '.') { 
-				push @values, $value;
-			}
-		}
-		
-		# adjust if log value
-		if ($log) {
-			@values = map { 2 ** $_ } @values;
-		}
-		
-		# determine mean value
-		my $window_mean = mean(@values);
-		if ($log) { 
-			$window_mean = log($window_mean) / log(2);
-		}
-		
-		# push to summed output
-		push @summed_data, [ (
-			$main_data_ref->{$column}{'name'}, 
-			$midpoint, 
-			$window_mean
-		) ];
-	}
-	
-	# Generate a tim_data structure for writing
-	my %summed_data = (
-		'program'         => $0,
-		'db'              => $database,
-		'feature'         => $main_data_ref->{'feature'} . '_averaged_windows',
-		'number_columns'  => 3,
-		'last_row'        => scalar(@summed_data),
-		'0'               => { (
-								'index'   => 0,
-								'name'    => 'Window',
-								'number_features' => $main_data_ref->{'last_row'},
-							 ) },
-		'1'               => { (
-								'index'   => 1,
-								'name'    => 'Midpoint',
-							 ) },
-		'2'               => { (
-								'index'   => 2,
-								'name'    => 'Score',
-								'log2'    => $log,
-								'dataset' => $dataset,
-							 ) },
-		'data_table'      => \@summed_data,
-		'gff'             => 0,
-	);
-	
-	# write summed data
-	my $written_file = write_tim_data_file( {
-		'data'   => \%summed_data,
-		'filename' => $outfile . '_summed',
-	} );
-	if ($written_file) {
-		print " Wrote summary data file $written_file\n";
-	}
-	else {
-		print " Unable to write summary data file!\n";
-	}
-}
-
-
 
 ### Set the metadata for a new data table column (dataset)
 sub _set_metadata {
@@ -820,14 +773,15 @@ sub _set_metadata {
 	
 	# set the metadata using passed and global variables
 	$main_data_ref->{$new_index} = {
-		'name'    => $name,
-		'index'   => $new_index,
-		'start'   => $start,
-		'stop'    => $stop,
-		'log2'    => $log,
-		'dataset' => $dataset,
-		'strand'  => $strand,
-		'bin_size' => $binsize . $unit,
+		'name'      => $name,
+		'index'     => $new_index,
+		'start'     => $start,
+		'stop'      => $stop,
+		'log2'      => $log,
+		'dataset'   => $dataset,
+		'strand'    => $strand,
+		'bin_size'  => $binsize . $unit,
+		'method'    => $method,
 	};
 	
 	# set the column header
@@ -857,12 +811,13 @@ average_gene.pl
   --out <filename>
   --in <filename> 
   --data <dataset_name>
+  --method [mean|median|sum|count]
   --bins <integer>
   --ext <integer>
   --extsize <integer>
   --min <integer>
   --sum
-  --(no)smooth
+  --smooth
   --(no)log
   --help
 
@@ -903,7 +858,17 @@ comma-delimited list (no commas).
 
 Specify the name of the microarray data set for which you wish to 
 collect data. If not specified, the data set may be 
-chosen interactively from a presented list.
+chosen interactively from a presented list. When enumerating features, 
+the features' type or type:source values should be indicated.
+
+=item --method [mean|median|sum|count]
+
+Specify the method of collecting and combining the data into each bin. 
+Three statistical methods for combining score values are allowed: mean, 
+median, and sum. In addition, features may be enumerated or counted 
+within each bin. The defined method does not affect the interpolation or 
+summary functions of the program, only initial data collection. The 
+default method is 'mean'.
 
 =item --bins <integer>
 
@@ -936,10 +901,10 @@ Indicate that the data should be averaged across all features at
 each position, suitable for graphing. A separate text file will be
 written with the suffix '_summed' with the averaged data
 
-=item --(no)smooth
+=item --smooth
 
 Indicate that windows without values should (not) be interpolated
-from neighboring values. The default is true.
+from neighboring values. The default is false.
 
 =item --(no)log
 

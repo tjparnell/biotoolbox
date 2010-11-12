@@ -42,6 +42,7 @@ my (
 	$binnumber,
 	$binsize,
 	$start,
+	$max,
 	$help
 );
 GetOptions( 
@@ -49,8 +50,9 @@ GetOptions(
 	'index=s'    => \$index, # columns (datasets) to plot
 	'out=s'      => \$outfile, # output file name
 	'bins=i'     => \$binnumber, # the number of bins to put the data into
-	'binsize=f'  => \$binsize, # the size of each bin
-	'start=f'    => \$start, # the starting value to calculate the bins
+	'size=f'     => \$binsize, # the size of each bin
+	'min=f'      => \$start, # the starting value to calculate the bins
+	'max=f'      => \$max, # maximum value for x-axis
 	'help'       => \$help, # flag to print help
 ) or die " unknown arguments! use --help for more information\n";
 
@@ -63,15 +65,24 @@ if ($help) {
 }
 
 ### Required values
-unless (defined $infile) {
-	die " no input file! use --help for more information\n";
+unless ($infile) {
+	$infile = shift @ARGV or
+		die " no input file! use --help for more information\n";
 }
-unless (defined $binnumber and defined $binsize) {
-	die " Missing bin number and bin size!\n Please use --help for more information\n";
+unless ($binsize) {
+	die " Missing bin size!\n Please use --help for more information\n";
+}
+unless ($binnumber or $max) {
+	die " Either bin number or maximum value must be entered!\n" . 
+		" Please use --help for more information\n";
 }
 unless (defined $start) {
 	# default value 
 	$start = 0;
+}
+unless (defined $max) {
+	# default value is calculated
+	$max = $start + ($binnumber * $binsize);
 }
 
 
@@ -116,10 +127,10 @@ for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
 
 ### Calculate the Bins
 my @bins; # an array for the bins
-for my $i (1..$binnumber) {
-	push @bins, sprintf("%.2f", $start + ($i * $binsize) );
+for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
+	push @bins, $i;
+	#print "$i ";
 }
-#print " these are the bins ", join(", ", @bins), "\n";
 
 
 
@@ -312,17 +323,15 @@ A script to convert data into a frequency distribution, useful for graphing.
 
 =head1 SYNOPSIS
 
-data2frequency.pl --in <filename> [--options...]
+data2frequency.pl --bins <integer> --size <number> <filename> 
   
-  Required:
   --in <filename>
   --bins <integer>
-  --binsize <number>
-  Optional:
-  --out <filename>
-  --index <list,range>
-  --start <number>
+  --size <number>
+  --index <list|range>
+  --min <number>
   --max <number>
+  --out <filename>
   --help
 
 
@@ -335,23 +344,18 @@ The command line flags and descriptions:
 =item --in <filename>
 
 Specify the file name of a data file. It must be a tab-delimited text file,
-preferably in the tim data format as described in 'tim_file_helper.pm', 
+preferably in the tim data format as described in 'tim_data_helper.pm', 
 although any format should work. The file may be compressed with gzip.
 
 =item --bins <integer>
 
 Specify the number of bins that the data should be placed into.
 
-=item --binsize <integer>
+=item --size <integer>
 
 Specify the size of each bin.
 
-=item --out <filename>
-
-Specify the output file name. The default is to take the input file base name
-and append '_frequency' to it. The file format is a tim data file.
-
-=item --index <list,range>
+=item --index <list|range>
 
 Specify the datasets in the input data file to be converted to a distribution.
 The 0-based column number of the datasets should be provided. Multiple 
@@ -360,17 +364,24 @@ datasets may be provided as a comma-delimited list, as a consecutive list
 datasets are provided, the program will interactively present to the user 
 a list of possible datasets to convert.
 
-=item --start <number>
+=item --min <number>
 
-Specify the start number with which to begin populating the list of 
-distribution values. The default value is 0. Useful for log2 distributions 
-where the minimum value is negative.
+Optionally indicate the minimum value of the bins. When generating 
+the list of bins, this is used as the starting value. Default is 0. 
+Useful for log2 distributions where the minimum value is negative. 
+A negative number may be provided using the format --min=-1. 
 
 =item --max <number>
 
-Specify the maximum distribution value. The default is calculated from the 
-max value of the number of bins multiplied by the binsize. Useful for setting
-a much higher ceiling to capture outlier values.
+Optionally provide the maximum bin value. This argument is optional 
+and is automatically calculated as (bins * size). This argument 
+may also be provided as an alternative to specifying the binsize 
+value, in which case the number of bins is empirically determined.
+
+=item --out <filename>
+
+Specify the output file name. The default is to take the input file base name
+and append '_frequency' to it. The file format is a tim data file.
 
 =item --help
 

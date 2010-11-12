@@ -441,8 +441,8 @@ graph_profile.pl <filename>
    --all
    --(no)cen
    --(no)log
-   --min <integer>
-   --max <integer>
+   --min <number>
+   --max <number>
    --x <integer>
    --dir <foldername>
    --help
@@ -483,7 +483,7 @@ Datasets should be median centered prior to graphing. Useful when
 graphing multiple datasets together when they have different 
 medians.
 
-=item --min <integer>, --max <integer>
+=item --min <number>, --max <number>
 
 Specify the minimum and/or maximum values for the Y-axis. The default 
 values are automatically determined from the dataset.

@@ -11,14 +11,21 @@ use Archive::Zip qw( :ERROR_CODES );
 use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw($TIM_CONFIG);
+use tim_db_helper qw(
+	$TIM_CONFIG
+	open_db_connection
+);
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
-	wig_to_bigwig_conversion
 );
+eval {
+	# check for bigwig file conversion support
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+};
 
-print "\n This program will \n";
+print "\n This program will convert bar files to a wig file\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -118,8 +125,9 @@ unless (defined $bigwig) {
 	$bigwig = 0;
 }
 if ($bigwig) {
-	unless ($database) {
-		die "  Must define a database name to use the bigwig option! see help\n";
+	unless ($database or $chromo_file) {
+		die "  Must define a database name or provide a chromosome file \n" . 
+			"to use the bigwig option! see help\n";
 	}
 }
 unless (defined $use_track) {
@@ -333,7 +341,30 @@ else {
 
 
 ### Convert to bigWig as requested
-if ($bigwig) {
+if ($bigwig and exists &wig_to_bigwig_conversion) {
+	
+	
+	# open database connection if necessary
+	my $db;
+	if ($database) {
+		$db = open_db_connection($database);
+	}
+	
+	# find wigToBigWig utility
+	unless ($bw_app_path) {
+		# check for an entry in the configuration file
+		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
+			undef;
+	}
+	unless ($bw_app_path) {
+		# next check the system path
+		$bw_app_path = `which wigToBigWig` || undef;
+	}
+			
+	# determine reference sequence type
+	my $ref_seq_type = 
+		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
+		$TIM_CONFIG->param('default_db.reference_sequence_type');
 	
 	# perform the conversion
 	foreach my $wigfile (@wigfiles) {
@@ -341,7 +372,8 @@ if ($bigwig) {
 		# conversion
 		my $bw_file = wig_to_bigwig_conversion( {
 				'wig'       => $wigfile,
-				'db'        => $database,
+				'db'        => $db,
+				'seq_type'  => $ref_seq_type,
 				'chromo'    => $chromo_file,
 				'bwapppath' => $bw_app_path,
 		} );
@@ -359,6 +391,11 @@ if ($bigwig) {
 			# we won't delete the wigfile
 		}
 	}
+}
+elsif ($bigwig and !exists &wig_to_bigwig_conversion) {
+	# conversion to bigwig is requested but not supported
+	warn " Support for converting to bigwig format is not available\n" . 
+		" Please convert manually. See documentation for more info\n";
 }
 
 

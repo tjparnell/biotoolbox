@@ -9,13 +9,18 @@ use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
+	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
-	wig_to_bigwig_conversion
 );
+eval {
+	# check for bigwig file conversion support
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+};
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -387,9 +392,41 @@ if ($bigwig) {
 	print " temporary wig file '$outfile' generated\n";
 	print " converting to bigwig file....\n";
 	
+	# check that bigwig conversion is supported
+	unless (exists &wig_to_bigwig_conversion) {
+		warn "\n  Support for converting to bigwig format is not available\n" . 
+			"  Please convert manually. See documentation for more info\n";
+		print " finished\n";
+		exit;
+	}
+	
+	# open database connection if necessary
+	my $db;
+	if ($database) {
+		$db = open_db_connection($database);
+	}
+	
+	# find wigToBigWig utility
+	unless ($bw_app_path) {
+		# check for an entry in the configuration file
+		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
+			undef;
+	}
+	unless ($bw_app_path) {
+		# next check the system path
+		$bw_app_path = `which wigToBigWig` || undef;
+	}
+			
+	# determine reference sequence type
+	my $ref_seq_type = 
+		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
+		$TIM_CONFIG->param('default_db.reference_sequence_type');
+	
+	# perform the conversion
 	my $bw_file = wig_to_bigwig_conversion( {
 			'wig'       => $outfile,
-			'db'        => $database,
+			'db'        => $db,
+			'seq_type'  => $ref_seq_type,
 			'chromo'    => $chromo_file,
 			'bwapppath' => $bw_app_path,
 	} );
@@ -563,7 +600,9 @@ Alternatively, a binary BigWig file may be generated as opposed to a
 text wiggle file. The binary format is preferential to the text version 
 for a variety of reasons, including fast, random access and no loss in 
 data value precision. More information can be found at this location:
-http://genome.ucsc.edu/goldenPath/help/bigWig.html
+http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires 
+BigWig file support, supplied by the biotoolbox module 
+L<tim_db_helper::bigwig>. 
 
 
 =head1 AUTHOR
