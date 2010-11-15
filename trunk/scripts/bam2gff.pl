@@ -438,6 +438,7 @@ bam_2gff.pl [--options] <file.bam>
   --min <integer>
   --max <integer>
   --at
+  --gz
   --help
 
 

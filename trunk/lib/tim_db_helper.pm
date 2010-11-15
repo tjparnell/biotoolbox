@@ -2430,6 +2430,12 @@ sub get_region_dataset_hash {
 	# Collect the score/attributes for each feature
 	my %datahash; # the hash to put the collected data into
 	
+	# Check that we have collected datapoints
+	unless (@datapoints) {
+		# nothing found, return empty handed
+		return %datahash;
+	}
+	
 	# Check for wigfiles
 	if ($datapoints[0]->has_tag('wigfile') ) {
 		# these datapoints point to a binary wig file
