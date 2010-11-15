@@ -523,6 +523,11 @@ sub map_relative_data {
 					$winscore = log($winscore) / log(2);
 				}
 			}
+			else {
+				# no scores
+				# assign a "null" value
+				$winscore = '.';
+			}
 			
 			# put the value into the data table
 			# we're using a push function instead of explicitly assigning 
