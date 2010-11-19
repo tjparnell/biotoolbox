@@ -52,6 +52,8 @@ my (
 	$win, 
 	$number,
 	$position, 
+	$strand,
+	$set_strand,
 	$smooth,
 	$sum,
 	$log,
@@ -72,6 +74,8 @@ GetOptions(
 	'window=i'   => \$win, # window size
 	'number=i'   => \$number, # number of windows
 	'position=s' => \$position, # indicate relative location of the feature
+	'strand=s'   => \$strand, # collected stranded data
+	'set_strand' => \$set_strand, # enforce an artificial strand
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
 	'raw'        => \$raw, # write raw data
@@ -101,7 +105,12 @@ unless ($database or $infile) {
 }
 
 unless ($outfile) {
-	die " You must define an output filename !\n Use --help for more information\n";
+	if ($infile) {
+		$outfile = $infile;
+	}
+	else {
+		die " You must define an output filename !\n Use --help for more information\n";
+	}
 }
 $outfile =~ s/\.txt$//; # strip extension, we'll add it later
 
@@ -183,6 +192,20 @@ if (defined $position) {
 else {
 	# default position to use the 5' end
 	$position = 5;
+}
+
+if (defined $strand) {
+	unless (
+		$strand eq 'sense' or
+		$strand eq 'antisense' or
+		$strand eq 'all'
+	) {
+		die " Unknown strand value '$strand'!\n";
+	}
+}
+else {
+	# default
+	$strand = 'all';
 }
 
 unless (defined $sum) {
@@ -372,7 +395,28 @@ sub generate_a_new_feature_dataset {
 
 ## Collect the nucleosome occupancy data
 sub map_relative_data {
-	# prepare window values
+	
+	### Identify columns for feature identification
+	# name
+	my $name_index = find_column_index($main_data_ref, '^name');
+	unless (defined $name_index) {
+		die 'unable to identify Name column in data table!';
+	}
+	# type
+	my $type_index = find_column_index($main_data_ref, 'type');
+	unless (defined $type_index) {
+		die 'unable to identify Type column in data table!';
+	}
+	# strand if requested
+	my $strand_index;
+	if ($set_strand) {
+		$strand_index = find_column_index($main_data_ref, 'strand');
+		unless (defined $strand_index) {
+			die 'unable to strand column in data table!';
+		}
+	}
+	
+	### Prepare window values
 	my $startingpoint = 0 - ($win * $number); 
 		# default values will give startingpoint of -1000
 	my $endingpoint = $win * $number; 
@@ -392,13 +436,6 @@ sub map_relative_data {
 		print "in $win bp increments...\n";
 	}
 	
-	### Identify columns for feature identification
-	my $name_index = find_column_index($main_data_ref, '^name');
-	my $type_index = find_column_index($main_data_ref, 'type');
-	unless (defined $name_index and defined $type_index) {
-		die 'unable to identify Name and/or Type columns in data table';
-	}
-	
 
 	### Prepare and annotate the header names and metadata
 	for (my $start = $startingpoint; $start < $endingpoint; $start += $win) {
@@ -406,7 +443,29 @@ sub map_relative_data {
 		# in increments of window size
 		
 		# set the stop position
-		my $stop = $start + $win;
+		my $stop = $start + $win - 1;
+		
+		# deal with the pesky 0 value
+		# since we're working with 1-base coordinates, we don't really have 
+		# a real 0 coordinate, so need to skip it as it doesn't really exist
+		my $zero_check;
+		for my $i ($start .. $stop) {
+			$zero_check = 1 if $i == 0;
+		}
+		if ($zero_check) {
+			# adjust the coordinates accordingly
+			if ($start == 0) {
+				$start += 1;
+				$stop += 1;
+			}
+			elsif ($stop == 0) {
+				$stop += 1;
+			}
+			else {
+				# some number in between
+				$stop += 1;
+			}
+		}
 		
 		# set the new index value, which is equivalent to the number of columns
 		my $new_index = $main_data_ref->{'number_columns'};
@@ -435,6 +494,9 @@ sub map_relative_data {
 		}
 		else { # midpoint
 			$metadata{'relative_position'} = 'center';
+		}
+		if ($set_strand) {
+			$metadata{'strand_implied'} = 1;
 		}
 		$main_data_ref->{$new_index} = \%metadata;
 		
@@ -465,6 +527,9 @@ sub map_relative_data {
 				'stop'        => $endingpoint,
 				'position'    => $position,
 				'method'      => $value_type,
+				'strand'      => $strand,
+				'set_strand'  => $set_strand ? 
+								$data_table_ref->[$row][$strand_index] : undef, 
 		} );
 		
 		# debugging
@@ -482,13 +547,13 @@ sub map_relative_data {
 			$column < $main_data_ref->{'number_columns'}; 
 			$column++
 		) {
-			# convert the window coordinates to absolute
+			# get start and stop
 			my $start = $main_data_ref->{$column}{'start'};
 			my $stop = $main_data_ref->{$column}{'stop'};
 			
 			# collect a score at each position in the window
 			my @scores;
-			for (my $n = $start; $n < $stop; $n++) {
+			for (my $n = $start; $n <= $stop; $n++) {
 				# we will walk through the window one bp at a time
 				# look for a score associated with the position
 				push @scores, $regionscores{$n} if exists $regionscores{$n};
@@ -596,98 +661,6 @@ sub go_interpolate_values {
 
 
 
-## generate an average for the dataset
-sub go_sum_values {
-	
-	my @summed_data; # array to store the summed data
-	
-	# store the column header names
-	push @summed_data, [ qw(Window Midpoint Score) ];
-	
-	# we will walk through the columns and take an average for each 
-	# column or window
-	for (
-		my $column = $startcolumn;
-		$column < $main_data_ref->{'number_columns'};
-		$column++
-	) { 
-		
-		# determine the midpoint position of the window
-		my $midpoint = mean(
-			$main_data_ref->{$column}{'start'},	
-			$main_data_ref->{$column}{'stop'},	
-		); 
-		
-		
-		# collect the values in the column
-		my @values;
-		for my $row (1..$main_data_ref->{'last_row'}) {
-			my $value = $data_table_ref->[$row][$column];
-			unless ($value eq '.') { 
-				push @values, $value;
-			}
-		}
-		
-		# adjust if log value
-		if ($log) {
-			@values = map { 2 ** $_ } @values;
-		}
-		
-		# determine mean value
-		my $window_mean = mean(@values);
-		if ($log) { 
-			$window_mean = log($window_mean) / log(2);
-		}
-		
-		# push to summed output
-		push @summed_data, [ (
-			$main_data_ref->{$column}{'name'}, 
-			$midpoint, 
-			$window_mean
-		) ];
-	}
-	
-	# Generate a tim_data structure for writing
-	my %summed_data = (
-		'program'         => $0,
-		'db'              => $database,
-		'feature'         => $main_data_ref->{'feature'} . '_averaged_windows',
-		'number_columns'  => 3,
-		'last_row'        => scalar(@summed_data),
-		'0'               => { (
-								'index'   => 0,
-								'name'    => 'Window',
-								'win'     => $win,
-								'number_features' => $main_data_ref->{'last_row'},
-							 ) },
-		'1'               => { (
-								'index'   => 1,
-								'name'    => 'Midpoint',
-							 ) },
-		'2'               => { (
-								'index'   => 2,
-								'name'    => 'Score',
-								'log2'    => $log,
-								'dataset' => $dataset,
-							 ) },
-		'data_table'      => \@summed_data,
-		'gff'             => 0,
-	);
-	
-	# write summed data
-	my $written_file = write_tim_data_file( {
-		'data'   => \%summed_data,
-		'filename' => $outfile . '_summed',
-	} );
-	if ($written_file) {
-		print " Wrote summary data file $written_file\n";
-	}
-	else {
-		print " Unable to write summary data file!\n";
-	}
-}
-
-
 
 __END__
 
@@ -713,6 +686,8 @@ A script to map data relative to and flanking a genomic feature
   --win <integer>
   --num <integer>
   --pos [5 | 3 | m]
+  --strand [sense | antisense | all]
+  --set_strand
   --(no)sum
   --(no)smooth
   --(no)log
@@ -732,13 +707,16 @@ if the desired database is defined in the input file metadata.
 
 =item --out <filename>
 
-Specify the output file name. 
+Specify the output file name. Required for new files; otherwise, 
+input files will be overwritten unless specified.
 
 =item --in <filename>
 
 Specify the filename of a data table containing the list of 
 features to map nucleosomes around. The file must be in the
-'tim_data' format and specify a feature to use.
+'tim_data' format and specify a feature to use. If an input 
+file is not specified, then a new list of features will be 
+generated from the database.
 
 =item --feature [type, type:source]
 
@@ -788,6 +766,23 @@ use the 5' end, or the start position of unstranded features.
 If the feature "tts" is selected above, the 3' end is 
 automatically selected.
 
+=item --strand [sense | antisense | all]
+
+Specify whether stranded data should be collected for each of the 
+datasets. Either sense or antisense (relative to the feature) data 
+may be collected. The default value is 'all', indicating all 
+data will be collected.
+
+=item --set_strand
+
+For features that are not inherently stranded (strand value of 0), 
+impose an artificial strand for each feature (1 or -1). This will 
+have the effect of enforcing a relative orientation for each feature, 
+or to collected stranded data. This requires the presence a 
+column in the input data file with a name of "strand". Hence, it 
+will not work with newly generated datasets, but only with input 
+data files. Default is false.
+
 =item --(no)sum
 
 Indicate that the data should be averaged across all features at
@@ -814,15 +809,15 @@ Display this help
 
 =head1 DESCRIPTION
 
-This program will report back data mapped relative to a feature. Features
+This program will map data around a genomic feature. Features
 may include the transcription start site (TSS) of a transcript, tRNA gene,
 or some other genomic feature. The data is collected in a series of windows
-flanking the feature start (or end) position. The number and size of
+flanking the feature start, end, or midpoint position. The number and size of
 windows are specified on the command line, or the program will default to
 20 windows (on either side of the feature, 40 total) of 50 bp size. These
 default window settings corresponds to 1 kb on either side of the feature.
-Windows without a value may be interpolated from neigboring values, if
-available.
+Windows without a value may be interpolated (smoothed) from neigboring 
+values, if available.
 
 The default value that is collected is a dataset score (e.g. microarray 
 values). However, other values may be collected, including 'count' or 

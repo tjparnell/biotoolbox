@@ -51,32 +51,29 @@ sub collect_bigwig_scores {
 ### Collect positioned BigWig scores
 sub collect_bigwig_position_scores {
 	
-	# pass the region db object and a scalar indicating whether stranded 
-	# data is to be collected
-	my $region = shift;
-	my $stranded = shift; 
-	
-	# the feature(s) pointing to the wig file(s)
-	my @wig_features = @_;
+	# pass the required information
+	my ($region, $region_strand, $stranded, @wig_features) = @_;
 	
 	# set up hash, position => score
 	my %wig_data;
 	
+	# look at each wigfile
+	# usually there is only one, but for stranded data there may be 
+	# two wigfiles (+ and -), so we'll check each wig file for strand info
 	foreach my $feature (@wig_features) {
 	
 		# Check which data to take based on strand
 		if (
-			$stranded eq 'none' # stranded data not requested
-			or $stranded eq 'no'
-			or $feature->strand == 0 # unstranded data
+			$stranded eq 'all' # stranded data not requested
+			or $region_strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$feature->strand == $region->strand 
+				$region_strand == $feature->strand 
 				and $stranded eq 'sense'
 			) 
 			or (
 				# antisense data
-				$feature->strand != $region->strand  
+				$region_strand != $feature->strand  
 				and $stranded eq 'antisense'
 			)
 		) {
@@ -98,13 +95,12 @@ sub collect_bigwig_position_scores {
 				else {
 					# this file has not been opened yet, open it
 					unless (-e $wigfile) {
-						carp " BigWig file '$wigfile' does not exist!\n";
+						croak " BigWig file '$wigfile' does not exist!\n";
 						return;
 					}
 					$bw = Bio::DB::BigWig->new($wigfile);
 					unless ($bw) {
-						carp " unable to open data BigWig file '$wigfile'";
-						return;
+						croak " unable to open data BigWig file '$wigfile'";
 					}
 					
 					# store the opened object for later use
@@ -306,11 +302,12 @@ The subroutine is passed three or more arguments in the following order:
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
        start, end, and strand methods.
-    2) A scalar value representing the desired strandedness of the data 
+    2) The strand of the original feature (or region), -1, 0, or 1.
+    3) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
-    3) One or more database feature objects that contain the reference 
+    4) One or more database feature objects that contain the reference 
        to the wib file. They should contain the attribute 'wigfile'.
 
 The subroutine returns an array of the defined dataset values found within 
@@ -326,11 +323,12 @@ The subroutine is passed three or more arguments in the following order:
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
        start, end, and strand methods.
-    2) A scalar value representing the desired strandedness of the data 
+    2) The strand of the original feature (or region), -1, 0, or 1.
+    3) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
-    3) One or more database feature objects that contain the reference 
+    4) One or more database feature objects that contain the reference 
        to the .bw file. They should contain the attribute 'bigwigfile'.
 
 The subroutine returns a hash of the defined dataset values found within 
