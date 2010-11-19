@@ -9,6 +9,9 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median sum);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	find_column_index
+);
 use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
@@ -53,6 +56,7 @@ my (
 	$smooth,
 	$sum,
 	$log,
+	$set_strand,
 	$raw,
 	$help
 ); # command line variables
@@ -71,8 +75,9 @@ GetOptions(
 	'extsize=i'   => \$extension_size, # explicit size of extended bins
 	'min=i'       => \$min_length, # minimum feature size
 	'smooth!'     => \$smooth, # do not interpolate over missing values
-	'sum'         => \$sum, # determaine a final average for all the features
+	'sum'         => \$sum, # determine a final average for all the features
 	'log!'        => \$log, # dataset is in log2 space
+	'set_strand'  => \$set_strand, # enforce an artificial strand
 	'raw'         => \$raw, # output raw data
 	'help'        => \$help, # print the help
 );
@@ -107,13 +112,13 @@ if ($strand) {
 	unless (
 		$strand eq 'sense' or 
 		$strand eq 'antisense' or 
-		$strand eq 'none'
+		$strand eq 'all'
 	) {
 		die " '$strand' is not recognized for strand\n Use --help for more information\n";
 	}
 } 
 else {
-	$strand = 'none'; # default is no strand information
+	$strand = 'all'; # default is no strand information
 }
 if ($method) {
 	unless (
@@ -126,7 +131,7 @@ if ($method) {
 	}
 } 
 else {
-	$strand = 'mean'; # default is no strand information
+	$method = 'mean'; # default is no strand information
 }
 
 # assign default values
@@ -385,32 +390,25 @@ sub collect_binned_data {
 	}
 	
 	## Identify columns for feature identification
-	my ($name_index, $type_index); # indices for the name and class columns
-	# we need to identify which columns in the feature table are name and class
-	# these should be columns 1 and 3, respectively, but just in case...
-	# and to avoid hard coding index values in case someone changes them
-	{
-		my $i = 0;
-		foreach ( @{ $data_table_ref->[0] } ) {
-			if ($_ =~ m/^name/i) {
-				$name_index = $i;
-			}
-			elsif ($_ =~ m/^type/i) {
-				$type_index = $i;
-			}
-			elsif ($_ =~ m/^class/i) {
-				$type_index = $i;
-			}
-			$i++;
-		}
-		#print " using columns $name_index for 'name' and $type_index for 'type'\n";
-		unless (
-			defined $name_index and
-			defined $type_index 
-		) {
-			die 'unable to identify Name and/or Class columns in data table';
+	# name
+	my $name_index = find_column_index($main_data_ref, '^name');
+	unless (defined $name_index) {
+		die 'unable to identify Name column in data table!';
+	}
+	# type
+	my $type_index = find_column_index($main_data_ref, 'type');
+	unless (defined $type_index) {
+		die 'unable to identify Type column in data table!';
+	}
+	# strand if requested
+	my $strand_index;
+	if ($set_strand) {
+		$strand_index = find_column_index($main_data_ref, 'strand');
+		unless (defined $strand_index) {
+			die 'unable to strand column in data table!';
 		}
 	}
+	
 	
 	
 	## Collect the data
@@ -473,11 +471,13 @@ sub collect_binned_data {
 					'db'       => $db,
 					'dataset'  => $dataset,
 					'name'     => $name,
-					'class'    => $type,
+					'type'     => $type,
 					'start'    => $startingpoint,
 					'stop'     => $endingpoint,
 					'strand'   => $strand,
 					'method'   => $method eq 'count' ? 'count' : 'score',
+					'set_strand' => $set_strand ? 
+						$data_table_ref->[$row][$strand_index] : undef,
 		} );
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
@@ -783,6 +783,9 @@ sub _set_metadata {
 		'bin_size'  => $binsize . $unit,
 		'method'    => $method,
 	};
+	if ($set_strand) {
+		$main_data_ref->{$new_index}{'strand_implied'} = 1;
+	}
 	
 	# set the column header
 	$data_table_ref->[0][$new_index] = $name;
@@ -816,8 +819,10 @@ average_gene.pl
   --ext <integer>
   --extsize <integer>
   --min <integer>
+  --strand [all|sense|antisense]
   --sum
   --smooth
+  --set_strand
   --(no)log
   --help
 
@@ -895,6 +900,12 @@ length below this value will not be skipped (all bins will have
 null values). This is to avoid having bin sizes below the average 
 microarray tiling distance.
 
+=item --strand [all|sense|antisense]
+
+Specify whether stranded data should be collected. Three values are 
+allowed: all datasets should be collected (default), only sense 
+datasets, or only antisense datasets should be collected.
+
 =item --sum
 
 Indicate that the data should be averaged across all features at
@@ -905,6 +916,16 @@ written with the suffix '_summed' with the averaged data
 
 Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false.
+
+=item --set_strand
+
+For features that are not inherently stranded (strand value of 0), 
+impose an artificial strand for each feature (1 or -1). This will 
+have the effect of enforcing a relative orientation for each feature, 
+or to collected stranded data. This requires the presence a 
+column in the input data file with a name of "strand". Hence, it 
+will not work with newly generated datasets, but only with input 
+data files. Default is false.
 
 =item --(no)log
 

@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# A script to grab the microarray data from the gbrowse db for promoters
+# A script to collect data from the gbrowse db for genomic features
 
 use strict;
 use Getopt::Long;
@@ -41,7 +41,7 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 
 # Initialize values
-my (  # command line variables
+my (  
 	$infile,
 	$new,
 	$outfile,
@@ -59,6 +59,7 @@ my (  # command line variables
 	$position,
 	$win,
 	$step,
+	$set_strand,
 	$gz,
 	$help,
 	$doc,
@@ -85,6 +86,7 @@ GetOptions(
 	'pos=i'      => \$position, # set the relative feature position
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
+	'set_strand' => \$set_strand, # enforce a specific strand
 	'gz!'        => \$gz, # compress output file
 	'help'       => \$help, # request help
 	'doc'        => \$doc, # print POD documentation
@@ -155,14 +157,14 @@ if (defined $strand) {
 	unless (
 		$strand eq 'sense' or 
 		$strand eq 'antisense' or 
-		$strand eq 'none'
+		$strand eq 'all'
 	) {
 		die " unknown strand '$strand'!";
 	}
 } 
 else {
 	# default value
-	$strand = 'none'; 
+	$strand = 'all'; 
 }
 
 if ($fstart and $fstop) {
@@ -485,19 +487,20 @@ sub submit_dataset_request {
 	else {
 		# collecting a dataset for list of features
 		if ( get_feature_dataset( {
-				'data'      => $main_data_ref->{'data_table'},
-				'db'        => $db,
-				'dataset'   => $dataset,
-				'method'    => $method,
-				'strand'    => $strand,
-				'log'       => $logstatus,
-				'extend'    => $extend,
-				'start'     => $start,
-				'stop'      => $stop,
-				'position'  => $position,
-				'fstart'    => $fstart,
-				'fstop'     => $stop,
-				'limit'     => $limit,
+				'data'        => $main_data_ref->{'data_table'},
+				'db'          => $db,
+				'dataset'     => $dataset,
+				'method'      => $method,
+				'strand'      => $strand,
+				'log'         => $logstatus,
+				'extend'      => $extend,
+				'start'       => $start,
+				'stop'        => $stop,
+				'position'    => $position,
+				'fstart'      => $fstart,
+				'fstop'       => $stop,
+				'limit'       => $limit,
+				'set_strand'  => $set_strand,
 			} )
 		) {
 			print " in ";
@@ -565,6 +568,9 @@ sub _record_metadata {
 	if ($database ne $main_data_ref->{'db'}) {
 		$metadata{'db'} = $database;
 	}
+	if ($set_strand) {
+		$metadata{'strand_implied'} = 1;
+	}
 	
 	# place metadata hash into main data structure
 	$main_data_ref->{$new_index} = \%metadata;
@@ -616,9 +622,9 @@ get_datasets.pl [--options...] [<filename>]
   --db <name>
   --feature <type | type:source | alias, ...>
   --dataset <none | name, ...>
-  --method [mean, median, stddev, min, max, range, enumerate, count]
+  --method [mean|median|stddev|min|max|range|enumerate|count]
   --(no)log
-  --strand [none, sense, antisense]
+  --strand [all | sense | antisense]
   --extend <integer>
   --start <integer>
   --stop <integer>
@@ -628,6 +634,7 @@ get_datasets.pl [--options...] [<filename>]
   --pos [5 | 3 | m]
   --win <integer>
   --step <integer>
+  --set_strand
   --(no)gz
   --help
 
@@ -706,15 +713,12 @@ critical for accurately mathematically combining the dataset values in the
 feature's genomic region. It may be determined automatically if the dataset 
 name includes the phrase "log2".
 
-=item --strand [none, sense, antisense]
+=item --strand [all | sense | antisense]
 
-Indicate whether stranded microarray data should be collected. Accepted values 
-include:
-  
-  - none (default)
-  - sense
-  - antisense
-  
+Specify whether stranded data should be collected for each of the 
+datasets. Either sense or antisense (relative to the feature) data 
+may be collected. The default value is 'all', indicating all 
+data will be collected.  
 
 =item --extend <integer>
 
@@ -774,6 +778,16 @@ tim_db_helper.cfg.
 
 Optionally indicate the step size when generating a new list of intervals 
 across the genome. The default is equal to the window size.
+
+=item --set_strand
+
+For features that are not inherently stranded (strand value of 0), 
+impose an artificial strand for each feature (1 or -1). This will 
+have the effect of enforcing a relative orientation for each feature, 
+or to collected stranded data. This requires the presence a 
+column in the input data file with a name of "strand". Hence, it 
+will not work with newly generated datasets, but only with input 
+data files. Default is false.
 
 =item --(no)gz
 

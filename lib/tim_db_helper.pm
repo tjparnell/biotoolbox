@@ -1032,8 +1032,15 @@ arguments. The keys include
               middle of the feature. This option is used only in 
               conjunction with "start" and "stop"  or "fstart" and 
               "fstop" options. The default is "5".
+  set_strand => For those features that are NOT inherently stranded 
+              (strand 0), artificially set the features' strand 
+              values. Pass a true value (1) to assign strand values 
+              to each value. There must be a column in the passed 
+              data table containing the strand values (-1, 0, 1) 
+              and whose header name contains "strand". 
           	  
-The subroutine will return a true value (1) if successful.
+The subroutine will return a true value (1) if successful. It will return 
+nothing and print an error message to STDOUT if not successful.
 
 Examples
 
@@ -1112,7 +1119,7 @@ sub get_feature_dataset {
 			$log = 0;
 		}
 	}
-	my $stranded = $arg_ref->{'strand'} || 'none';
+	my $stranded = $arg_ref->{'strand'} || 'all';
 	my $relative_pos = $arg_ref->{'position'} || 5;
 	my $limit = $arg_ref->{'limit'} || 1000;
 		# this is an arbitrary default value that seems reasonable for
@@ -1125,6 +1132,7 @@ sub get_feature_dataset {
 	my $stop = $arg_ref->{'stop'} || undef;
 	my $fstart = $arg_ref->{'fstart'} || undef;
 	my $fstop = $arg_ref->{'fstop'} || undef;
+	my $set_strand = $arg_ref->{'set_strand'} || 0;
 	
 	
 	
@@ -1155,6 +1163,7 @@ sub get_feature_dataset {
 	# Identify the identifying indexes
 	my $name_index;
 	my $type_index; 
+	my $strand_index;
 	# we need to identify which columns in the feature table are name and class
 	# these should be columns 0 and 1, respectively, but just in case...
 	# and to avoid hard coding index values in case someone changes them
@@ -1167,6 +1176,9 @@ sub get_feature_dataset {
 		}
 		elsif ($data_table_ref->[0][$i] =~ /^type$/i) {
 			$type_index = $i;
+		}
+		if ($set_strand and $data_table_ref->[0][$i] =~ /^strand$/i) {
+			$strand_index = $i;
 		}
 	}
 	unless (defined $name_index and defined $type_index) {
@@ -1213,15 +1225,20 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# now re-define the region based on the extended coordinates
 				# this is regardless of feature orientation
 			my $region = $db->segment( 
-				-name      => $name,
-				-type      => $type,
-				-start     => $feature->start - $extend,
-				-end       => $feature->end + $extend,
-				-strand    => $feature->strand,
-				-absolute  => 1,
+				$feature->seq_id,
+				$feature->start - $extend,
+				$feature->end + $extend,
 			);
 			
 			
@@ -1235,6 +1252,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1272,29 +1290,31 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# now re-define the region based on the extended coordinates
 			# relative to the 3' end
 			my $region;
 			if ($feature->strand >= 0) {
 				# feature is on the forward, watson strand
 				$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->end + $start,
-					-end       => $feature->end + $stop,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->end + $start,
+					$feature->end + $stop,
 				);
 			}
 			elsif ($feature->strand < 0) {
 				# feature is on the reverse, crick strand
 				$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->start - $stop,
-					-end       => $feature->start - $start,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->start - $stop,
+					$feature->start - $start,
 				);
 			}
 
@@ -1309,6 +1329,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1344,6 +1365,14 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# now re-define the region based on the extended coordinates
 			# relative to the 5' end of the feature
 			my $region;
@@ -1351,24 +1380,18 @@ sub get_feature_dataset {
 				# feature is on the forward, watson strand
 			
 				$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->start + $start,
-					-end       => $feature->start + $stop,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->start + $start,
+					$feature->start + $stop,
 				);
 			}
 			elsif ($feature->strand < 0) {
 				# feature is on the reverse, crick strand
 			
 				$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->end - $stop,
-					-end       => $feature->end - $start,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->end - $stop,
+					$feature->end - $start,
 				);
 			}
 			
@@ -1382,6 +1405,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1423,37 +1447,38 @@ sub get_feature_dataset {
 			my $feature = shift @features; 
 			my $length = $feature->length;
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# Define the region
 			my $region;
 			# confirm that feature exceeds our minimum size limit
 			if ($length >= $limit) {
 				# the feature is long enough to fractionate
-				my $relative_start = sprintf "%.0f", 
-									$length * $fstart;
-				my $relative_stop = sprintf "%.0f", 
-									$length * $fstop;
+				my $relative_start = int( ($length * $fstart) + 0.5);
+									
+				my $relative_stop = int( ($length * $fstop) + 0.5);
 				
 				# define relative to the 3' end
 				if ($feature->strand >= 0) {
 					# feature is on the forward, watson strand
 					$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->end + $relative_start,
-					-end       => $feature->end + $relative_stop,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+						$feature->seq_id,
+						$feature->end + $relative_start,
+						$feature->end + $relative_stop,
 					);
 				}
 				elsif ($feature->strand < 0) {
 					# feature is on the reverse, crick strand
 					$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->start - $relative_stop,
-					-end       => $feature->start - $relative_start,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+						$feature->seq_id,
+						$feature->start - $relative_stop,
+						$feature->start - $relative_start,
 					);
 				}
 			}
@@ -1473,6 +1498,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1510,39 +1536,39 @@ sub get_feature_dataset {
 			my $feature = shift @features; 
 			my $length = $feature->length;
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# Define the region
 			my $region;
 			# confirm that feature exceeds our minimum size limit
 			if ($length >= $limit) {
 				# the feature is long enough to fractionate
-				my $relative_start = sprintf "%.0f", 
-									$length * $fstart;
-				my $relative_stop = sprintf "%.0f", 
-									$length * $fstop;
+				my $relative_start = int( ($length * $fstart) + 0.5);
+				my $relative_stop = int( ($length * $fstop) + 0.5);
 				
 				# define relative to the 3' end
 				if ($feature->strand >= 0) {
 					# feature is on the forward, watson strand
 				
 					$region = $db->segment( 
-						-name      => $name,
-						-type      => $type,
-						-start     => $feature->start + $relative_start,
-						-end       => $feature->start + $relative_stop,
-						-strand    => $feature->strand,
-						-absolute  => 1,
+						$feature->seq_id,
+						$feature->start + $relative_start,
+						$feature->start + $relative_stop,
 					);
 				}
 				elsif ($feature->strand < 0) {
 					# feature is on the reverse, crick strand
 				
 					$region = $db->segment( 
-						-name      => $name,
-						-type      => $type,
+						$feature->seq_id,
 						-start     => $feature->end - $relative_stop,
 						-end       => $feature->end - $relative_start,
-						-strand    => $feature->strand,
-						-absolute  => 1,
 					);
 				}
 			}
@@ -1562,6 +1588,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1597,18 +1624,23 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# now re-define the region 
 			# relative to the middle of the feature
 			# strand does not matter here
-			my $middle = ($feature->start + int( $feature->length / 2) );
+			my $middle = ($feature->start + int( ($feature->length / 2) + 0.5));
 			
 			my $region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $middle + $start,
-					-end       => $middle + $stop,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$middle + $start,
+					$middle + $stop,
 			);
 			
 			# confirm region
@@ -1621,6 +1653,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1658,27 +1691,30 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			my $length = $feature->length;
-			my $middle = ($feature->start + int( $length / 2) );
+			my $middle = ($feature->start + int( ($length / 2) + 0.5) );
+			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
 			
 			# Define the region
 			my $region;
 			# confirm that feature exceeds our minimum size limit
 			if ($length >= $limit) {
 				# the feature is long enough to fractionate
-				my $relative_start = sprintf "%.0f", 
-									$length * $fstart;
-				my $relative_stop = sprintf "%.0f", 
-									$length * $fstop;
+				my $relative_start = int( ($length * $fstart) + 0.5);
+				my $relative_stop = int( ($length * $fstop) + 0.5);
 				
 				# define relative to the middle
 				# strand does not matter
 				$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $middle + $relative_start,
-					-end       => $middle + $relative_stop,
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$middle + $relative_start,
+					$middle + $relative_stop,
 				);
 			}
 			else {
@@ -1697,6 +1733,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1729,6 +1766,14 @@ sub get_feature_dataset {
 			}
 			my $feature = shift @features; 
 			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
 			# then establish the segment
 			my $region = $feature->segment(); 
 				# this should automatically take care of strand
@@ -1746,6 +1791,7 @@ sub get_feature_dataset {
 			# pass to internal subroutine to combine dataset values
 			push @{ $data_table_ref->[$i] }, _get_segment_score(
 						$region, 
+						$fstrand,
 						$arg_ref->{'dataset'},
 						$arg_ref->{'method'}, 
 						$stranded, 
@@ -1860,10 +1906,7 @@ sub get_genome_dataset {
 			$log = 0;
 		}
 	}
-	my $stranded = $arg_ref->{'strand'};
-	unless (defined $stranded) {
-		$stranded = 'none';
-	}
+	my $stranded = $arg_ref->{'strand'} || 'all';
 	
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
@@ -1943,6 +1986,7 @@ sub get_genome_dataset {
 		# pass to internal subroutine to combine dataset values
  		push @{ $data_table_ref->[$i] }, _get_segment_score(
 					$region, 
+					0, # no strand
 					$arg_ref->{'dataset'},
 					$arg_ref->{'method'}, 
 					$stranded, 
@@ -1992,10 +2036,6 @@ arguments. The keys include
               phrase 'log2' and set accordingly. This argument is
               critical for accurately mathematically combining 
               dataset values in the region.
-  strand =>   Indicate whether the dataset values from a specific 
-              strand relative to the feature should be collected. 
-              Acceptable values include sense, antisense, no,
-              or none. Default is 'none'.
           	  
 The subroutine will return the region score if successful.
 
@@ -2070,10 +2110,6 @@ sub get_chromo_region_score {
 			$log = 0;
 		}
 	}
-	my $stranded = $arg_ref->{'strand'};
-	unless (defined $stranded) {
-		$stranded = 'none';
-	}
 	
 	# define the chromosomal region segment
 	my $region = $db->segment(
@@ -2090,9 +2126,10 @@ sub get_chromo_region_score {
 	# pass to internal subroutine to combine dataset values
 	return _get_segment_score(
 				$region, 
+				0, # no strand with genomic region
 				$arg_ref->{'dataset'},
 				$arg_ref->{'method'}, 
-				$stranded, 
+				'all',  # all stranded datasets
 				$log,
 	);
 }
@@ -2157,10 +2194,15 @@ arguments. The keys include
               middle of the feature. This option is only used in 
               conjunction with "start" and "stop" options. The 
               default value is "5".
+  set_strand => For those features or regions that are NOT 
+              inherently stranded (strand 0), artificially set the 
+              strand. Three values are accepted: -1, 0, 1. This 
+              will overwrite any pre-existing value (it will not, 
+              however, migrate back to the database).
   strand =>   Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
-              Acceptable values include sense, antisense, no,
-              or none. Default is "none".
+              Acceptable values include sense, antisense, or all.
+              Default is all.
   method =>   Indicate which attribute will be returned. Acceptable 
               values include "score", "count", or "length". The  
               default behavior will be to return the score values.
@@ -2221,22 +2263,15 @@ sub get_region_dataset_hash {
 		carp "the feature name and/or type are missing!";
 		return;
 	};
-	my $stranded = $arg_ref->{'strand'} || 'none';
-	unless (
-		$stranded eq 'none' 
-		or $stranded eq 'sense' 
-		or $stranded eq 'antisense'
-	) {
-		carp "unknown strand value '$stranded'!";
-		return;
-	}
+	my $stranded = $arg_ref->{'strand'} || 'all';
 	my $method = $arg_ref->{'method'} || 'score';
 	my $relative_pos = $arg_ref->{'position'} || 5;
-	
+	my $set_strand = $arg_ref->{'set_strand'} || undef;
 	
 	# Define the chromosomal region segment
 	my $region;
 	my $fstart; # to remember the feature start
+	my $fstrand; # to remember the feature strand
 	if ($arg_ref->{'extend'}) {
 		# if an extension is specified to the feature region
 		# first define the feature
@@ -2253,27 +2288,23 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
-		# record the feature start
-		if ($feature->strand >= 0) {
-			# forward strand
-			$fstart = $feature->start;
+		# change strand if requested
+		if (defined $set_strand) {
+			$feature->strand($set_strand);
 		}
-		else {
-			# reverse strand
-			$fstart = $feature->end;
-		}
+		
+		# record the feature start and strand
+		$fstart = $feature->strand >= 0 ? $feature->start : $feature->end;
+		$fstrand = $feature->strand;
 		
 		# get length
 		my $length = $feature->length;
 		
 		# now re-define the region based on the extended coordinates
 		$region = $db->segment( 
-				-name      => $name,
-				-type      => $type,
-				-start     => $feature->start - $arg_ref->{'extend'},
-				-end       => $feature->end + $arg_ref->{'extend'},
-				-strand    => $feature->strand,
-				-absolute  => 1,
+				$feature->seq_id,
+				$feature->start - $arg_ref->{'extend'},
+				$feature->end + $arg_ref->{'extend'},
 		);
 	} 
 		
@@ -2297,6 +2328,11 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
+		# change strand if requested
+		if (defined $set_strand) {
+			$feature->strand($set_strand);
+		}
+		
 		# next define the region relative to the feature start or end
 		if ($feature->strand >= 0 and $relative_pos == 3) {
 			# feature is on forward, top, watson strand
@@ -2304,14 +2340,12 @@ sub get_region_dataset_hash {
 			
 			# record feature start
 			$fstart = $feature->end;
+			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->end + $arg_ref->{'start'},
-					-end       => $feature->end + $arg_ref->{'stop'},
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->end + $arg_ref->{'start'},
+					$feature->end + $arg_ref->{'stop'},
 			);
 		}
 		elsif ($feature->strand < 0 and $relative_pos == 3) {
@@ -2320,14 +2354,12 @@ sub get_region_dataset_hash {
 			
 			# record feature start
 			$fstart = $feature->start;
+			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->start - $arg_ref->{'stop'},
-					-end       => $feature->start - $arg_ref->{'start'},
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->start - $arg_ref->{'stop'},
+					$feature->start - $arg_ref->{'start'},
 			);
 		}
 		elsif ($feature->strand >= 0 and $relative_pos == 5) {
@@ -2336,14 +2368,12 @@ sub get_region_dataset_hash {
 			
 			# record feature start
 			$fstart = $feature->start;
+			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->start + $arg_ref->{'start'},
-					-end       => $feature->start + $arg_ref->{'stop'},
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->start + $arg_ref->{'start'},
+					$feature->start + $arg_ref->{'stop'},
 			);
 		}
 		elsif ($feature->strand < 0 and $relative_pos == 5) {
@@ -2352,30 +2382,26 @@ sub get_region_dataset_hash {
 			
 			# record feature start
 			$fstart = $feature->end;
+			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $feature->end - $arg_ref->{'stop'},
-					-end       => $feature->end - $arg_ref->{'start'},
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$feature->end - $arg_ref->{'stop'},
+					$feature->end - $arg_ref->{'start'},
 			);
 		}
 		elsif ($relative_pos == 1) {
-			# feature is on any strand
+			# feature can be on any strand
 			# set segment relative to the feature middle
 			
 			# determine the feature midpoint and record it
-			$fstart = $feature->start + sprintf("%.0f", ($feature->length / 2));
+			$fstart = $feature->start + int(($feature->length / 2) + 0.5);
+			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
-					-name      => $name,
-					-type      => $type,
-					-start     => $fstart + $arg_ref->{'start'},
-					-end       => $fstart + $arg_ref->{'stop'},
-					-strand    => $feature->strand,
-					-absolute  => 1,
+					$feature->seq_id,
+					$fstart + $arg_ref->{'start'},
+					$fstart + $arg_ref->{'stop'},
 			);
 		}
 	}
@@ -2396,15 +2422,14 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
-		# record the feature start
-		if ($feature->strand >= 0) {
-			# forward strand
-			$fstart = $feature->start;
+		# change strand if requested
+		if (defined $set_strand) {
+			$feature->strand($set_strand);
 		}
-		else {
-			# reverse strand
-			$fstart = $feature->end;
-		}
+		
+		# record the feature start and strand
+		$fstart = $feature->strand >= 0 ? $feature->start : $feature->end;
+		$fstrand = $feature->strand;
 		
 		# then establish the segment
 		$region = $feature->segment(); 
@@ -2415,7 +2440,8 @@ sub get_region_dataset_hash {
 	}
 	
 	# check region
-	unless ($region) { # print warning if not found
+	unless ($region) { 
+		# print warning if not found
 		carp " Region for '$name' not found!\n";
 		return;
 	}
@@ -2450,10 +2476,11 @@ sub get_region_dataset_hash {
 		if ($WIGGLE_OK) {
 			# get the dataset scores using tim_db_helper::wiggle
 			%datahash = collect_wig_position_scores(
-				$region, $stranded, @datapoints);
+				$region, $fstrand, $stranded, @datapoints);
 		}
 		else {
 			carp " Bio::Graphics::Wiggle is not available for retrieving wigfile data!\n";
+			return;
 		}
 	}
 	
@@ -2471,10 +2498,11 @@ sub get_region_dataset_hash {
 			# the system has Bio::DB::BigWig loaded
 			# get the dataset scores
 			%datahash = collect_bigwig_position_scores(
-				$region, $stranded, @datapoints);
+				$region, $fstrand, $stranded, @datapoints);
 		}
 		else {
 			carp " Bio::DB::BigWig is not available for retrieving wigfile data!\n";
+			return;
 		}
 	}
 	
@@ -2487,16 +2515,16 @@ sub get_region_dataset_hash {
 		
 			# Check which data to take based on strand
 			if (
-				$stranded eq 'none' # stranded data not requested
-				or $datapoint->strand == 0 # unstranded data
+				$stranded eq 'all' # all data is requested
+				or $fstrand == 0 # unstranded data
 				or ( 
 					# sense data
-					$datapoint->strand == $region->strand 
+					$fstrand == $region->strand 
 					and $stranded eq 'sense'
 				) 
 				or (
 					# antisense data
-					$datapoint->strand != $region->strand  
+					$fstrand != $region->strand  
 					and $stranded eq 'antisense'
 				)
 			) {
@@ -2519,6 +2547,7 @@ sub get_region_dataset_hash {
 				}
 				
 				if ($method eq 'score') {
+					# perform addition to force the score to be a scalar value
 					$datahash{$position} = $datapoint->score + 0;
 				}
 				elsif ($method eq 'count') {
@@ -2539,13 +2568,13 @@ sub get_region_dataset_hash {
 		# most downstream applications of this function expect this, and it's
 		# a little easier to work with. Just a little bit, though....
 	my %relative_datahash;
-	if ($region->strand >= 0) {
+	if ($fstrand >= 0) {
 		# forward strand
 		foreach my $position (keys %datahash) {
 			$relative_datahash{ $position - $fstart } = $datahash{$position};
 		}
 	}
-	elsif ($region->strand < 0) {
+	elsif ($fstrand < 0) {
 		# reverse strand
 		foreach my $position (keys %datahash) {
 			$relative_datahash{ $fstart - $position } = $datahash{$position};
@@ -2647,10 +2676,13 @@ defined and presented in this order. These values include
   
   [0] The genomic segment as a gff database object, the establishment 
       of which is the responsibility of the calling subroutine.
-  [1] The dataset name. Multiple datasets may be included, delimited 
+  [1] The strand of the region (or original feature), as the strand is 
+      lost when generating the segment. Acceptable values are 
+      -1, 0, or 1.
+  [2] The dataset name. Multiple datasets may be included, delimited 
       with an ampersand (&). Multiple datasets are merged into one, 
       unless excluded by strand.
-  [2] The method of combining all of the dataset values found in the 
+  [3] The method of combining all of the dataset values found in the 
       segment into a single value. Accepted values include
          
          enumerate (count the number of features within the region)
@@ -2662,7 +2694,7 @@ defined and presented in this order. These values include
          range (returns 'min-max')
          stddev (returns the standard deviation of a population)
          
-  [3] The strandedness of acceptable data. Genomic segments 
+  [4] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
       (e.g. ORF) have a specific strandedness. If the dataset strand 
       does not match the specified criteria for strandedness, then it 
@@ -2671,11 +2703,11 @@ defined and presented in this order. These values include
       strandedness. Currently, only transcription data is stranded. 
       Accepted values include
          
-         sense (take only values with the same strand)
-         antisense (take only values on the opposite strand)
-         none (take all values)
+         sense       take only values on the same strand
+         antisense   take only values on the opposite strand
+         all         take all values
          
-  [4] The log status of the dataset. Many microarray datasets are in 
+  [5] The log status of the dataset. Many microarray datasets are in 
       log2 format, and must be de-logged to perform accurate 
       mathematical calculations, such as mean or median. Supply a 
       boolean (0 or 1) value.
@@ -2692,7 +2724,7 @@ visual marker.
 sub _get_segment_score {
 	
 	# get passed arguments
-	my ($region, $dataset, $method, $strandedness, $log) = @_;
+	my ($region, $region_strand, $dataset, $method, $strandedness, $log) = @_;
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
@@ -2704,6 +2736,7 @@ sub _get_segment_score {
 					-type => [@datasetlist],
 	); 
 	
+	
 	# Check for the enumeration method
 	if ($method eq 'enumerate' or $method eq 'count') {
 		# this is simple, we simply count the number of features
@@ -2712,7 +2745,6 @@ sub _get_segment_score {
 		# check for strandedness
 		if ($strandedness eq 'sense') {
 			# count only those features on the same strand
-			my $region_strand = $region->strand; 
 			
 			# check each datapoint for a match to the region strand
 			foreach (@datapoints) {
@@ -2730,8 +2762,6 @@ sub _get_segment_score {
 		elsif ($strandedness eq 'antisense') {
 			# count the antisense features
 				
-			my $region_strand = $region->strand; 
-		
 			# check each datapoint for a match to the region strand
 			foreach (@datapoints) {
 				my $strand = $_->strand;
@@ -2745,8 +2775,8 @@ sub _get_segment_score {
 				}
 			}
 		} 
-		elsif ($strandedness eq 'none' or $strandedness eq 'no') {
-			# Strandedness should be ignored for this dataset
+		elsif ($strandedness eq 'all') {
+			# all datasets should be taken regardless of strand
 			$count = scalar(@datapoints);
 		} 
 		
@@ -2768,12 +2798,13 @@ sub _get_segment_score {
 		
 		# check that we have wiggle support
 		unless ($WIGGLE_OK) {
-			carp " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
+			croak " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
 			return;
 		}
 		
 		# collect the scores using tim_db_helper::wiggle
-		@scores = collect_wig_scores($region, $strandedness, @datapoints);
+		@scores = collect_wig_scores(
+			$region, $region_strand, $strandedness, @datapoints);
 		
 	}
 	
@@ -2785,12 +2816,13 @@ sub _get_segment_score {
 		
 		# check that we have bigwig support
 		unless ($BIGWIG_OK) {
-			carp " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
+			croak " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
 			return;
 		}
 		
 		# collect the scores using tim_db_helper::bigwig
-		@scores = collect_bigwig_scores($region, $strandedness, @datapoints);
+		@scores = collect_bigwig_scores(
+			$region, $region_strand, $strandedness, @datapoints);
 
 		
 	}
@@ -2805,9 +2837,6 @@ sub _get_segment_score {
 		if ($strandedness eq 'sense') {
 			# take only values that are on the same strand
 			
-			my $region_strand = $region->strand; 
-			# get the absolute (not relative) strand for the region
-		
 			# check each datapoint for a match to the region strand
 			foreach (@datapoints) {
 				my $strand = $_->strand;
@@ -2826,9 +2855,6 @@ sub _get_segment_score {
 		elsif ($strandedness eq 'antisense') {
 			# take the antisense value
 				
-			my $region_strand = $region->strand; 
-			# get the absolute (not relative) strand for the region
-		
 			# check each datapoint for a match to the region strand
 			foreach (@datapoints) {
 				my $strand = $_->strand;
@@ -2843,17 +2869,12 @@ sub _get_segment_score {
 			}
 		} 
 		
-		elsif ($strandedness eq 'none' or $strandedness eq 'no') {
+		elsif ($strandedness eq 'all') {
 			# Strandedness should be ignored for this dataset
 			foreach (@datapoints) {
 				push @scores, $_->score;
 			}
 		} 
-		
-		else {
-			# somehow bad strand value got past our checks
-			croak " unrecognized strand value '$strandedness'!";
-		}
 	}
 	
 	# Determine final region score if we have scores
