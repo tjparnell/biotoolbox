@@ -5,20 +5,17 @@ This is an alphabetical list of the scripts available in the biotoolbox scripts 
 average_gene.pl
 	Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 	
-bam2gff.pl
-	Generate features in GFF file format for each aligned read in a BAM file. It accepts both single-end and paired-end alignments. Alignments may be filtered by various criteria.
+bam2gff_bed.pl
+	Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
 
 bar2wig.pl
 	Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 	
-bed2gff.pl
-	Convert a BED file to a GFF file.
-	
 bin_genomic_data.pl
 	Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
 	
-bw2gff3.pl
-	Given a binary bigwig file, a GFF file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the bigwig file in the host's file system. This allows data to be collected from the Bio::DB database without having to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
+big_file2gff3.pl
+	Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
 	
 convert_yeast_genome_version.pl
 	Convert the genomic coordinates of a data file between different SGD genome versions.
@@ -26,6 +23,9 @@ convert_yeast_genome_version.pl
 data2frequency.pl
 	Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
 	
+data2bed.pl
+	Convert any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
+
 data2gff.pl
 	Convert any data text file into a GFF file, so long as there are genomic coordinates within the file.
 	
@@ -154,9 +154,10 @@ Microarray
 	just_blast_oligos.pl
 
 Illumina sequencing, BAM files
-	bam2gff.pl
+	bam2gff_bed.pl
 	bin_genomic_data.pl
 	get_actual_nuc_sizes.pl
+	novo_wrapper.pl
 	split_bam_by_isize.pl
 	split_bam_by_strand.pl
 
@@ -173,6 +174,7 @@ Dataset manipulation
 	manipulate_datasets.pl
 	merge_datasets.pl
 	pull_features.pl
+	shift_coordinates.pl
 	split_data_file.pl
 
 Data analysis
@@ -190,20 +192,21 @@ Finding features
 	map_transcripts.pl
 
 File conversion
-	bam2gff.pl
+	bam2gff_bed.pl
 	bar2wig.pl
-	bed2gff.pl
+	data2bed.pl
 	data2gff.pl
 	data2wig.pl
 	gff2sgr.pl
 	my_gff2gff3.pl
+	shift_coordinates.pl
 	ucsc_chrom2gff3.pl
 	ucsc_cytoband2gff3.pl
 	ucsc_table2gff3.pl
 	wig2gff.pl
 
 Miscellaneous
-	bw2gff3.pl
+	big_file2gff3.pl
 	convert_yeast_genome_version.pl
 	my_gff2gff3.pl
 	print_feature_types.pl
