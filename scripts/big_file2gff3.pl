@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# a script to generate GFF3 files for bigwig and bam files
+# a script to generate GFF3 files for bigwig, bigbed, and bam files
 
 use strict;
 use Getopt::Long;
@@ -20,10 +20,11 @@ use tim_file_helper qw(
 	convert_genome_data_2_gff_data
 	convert_and_write_to_gff_file
 );
-eval {use Bio::DB::BigWig};
-eval {use Bio::DB::Sam};
+use Bio::DB::BigBed;
+use Bio::DB::BigWig;
+use Bio::DB::Sam;
 
-print "\n This script will generate a GFF3 file for a bigwig file\n";
+print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
 
 ### Quick help
@@ -185,7 +186,8 @@ while (@infiles) {
 	### Determine file specific GFF variables
 	# determine input file components
 	my ($infile_basename, $infile_path, $infile_ext) = 
-		fileparse($infile, '.bw', '.bigwig', '.bam');
+		fileparse($infile, '.bb', '.bw', '.bam');
+		# these correspond to bigbed, bigwig, and bam
 	
 	# determine gff name
 	my $name;
@@ -243,9 +245,14 @@ while (@infiles) {
 		File::Spec->catfile($path, "$target_basename$infile_ext");
 	
 	# Load the chromosome data
-	if ($infile_ext eq '.bw' or $infile_ext eq '.bigwig') {
+	if ($infile_ext eq '.bw') {
 		# source data is a bigwig file
 		collect_chromosomes_from_bigwig(
+			$infile, $target_file, $main_data_ref, $strand);
+	}
+	elsif ($infile_ext eq '.bb') {
+		# source data is a bigbed file
+		collect_chromosomes_from_bigbed(
 			$infile, $target_file, $main_data_ref, $strand);
 	}
 	elsif ($infile_ext eq '.bam') {
@@ -349,8 +356,8 @@ while (@infiles) {
 	if ($write_metadata) {
 		# we'll be adding all of the input bigwig files to the metadata index
 		
-		# cannot support bam data
-		if ($infile_ext eq '.bam') {next}
+		# cannot support bam or bigbed data
+		if ($infile_ext eq '.bam' or $infile_ext eq '.bb') {next}
 		
 		# add metadata header block
 			# this is the file name in square brackets
@@ -372,23 +379,72 @@ while (@infiles) {
 	### Write conf stanza data
 	if ($write_conf and !$write_metadata) {
 		# we are using the write metadata boolean variable as an indicator 
-		# of whether to write an individual conf stanza for each bigwig 
+		# of whether to write an individual conf stanza for each bigfile
 		# file or write a single stanza for the bigwig set
 		
-		# here we write individual stanzas for each bigwig file
+		# here we write individual stanzas for each big file
 		
-		# add the database stanza
-		push @confdata, "[$target_basename\_db:database]\n";
-		push @confdata, "db_adaptor   = Bio::DB::BigWig\n";
-		push @confdata, "db_args      = -bigwig $target_file\n";
+		# stanzas for a bigwig file
+		if ($infile_ext eq '.bw') {
+			# add the database stanza
+			push @confdata, "[$target_basename\_db:database]\n";
+			push @confdata, "db_adaptor   = Bio::DB::BigWig\n";
+			push @confdata, "db_args      = -bigwig $target_file\n";
+			
+			# add the basic track stanza
+			push @confdata, "\n[$name]\n";
+			push @confdata, "database     = $target_basename\_db\n";
+			push @confdata, "feature      = summary\n";
+			push @confdata, "glyph        = wiggle_whiskers\n";
+			push @confdata, "graph_type   = boxes\n";
+			push @confdata, "\n";
+		}
 		
-		# add the basic track stanza
-		push @confdata, "\n[$name]\n";
-		push @confdata, "database     = $target_basename\_db\n";
-		push @confdata, "feature      = summary\n";
-		push @confdata, "glyph        = wiggle_whiskers\n";
-		push @confdata, "graph_type   = boxes\n";
-		push @confdata, "\n";
+		# stanzas for a bigbed file
+		elsif ($infile_ext eq '.bb') {
+			# add the database stanza
+			push @confdata, "[$target_basename\_db:database]\n";
+			push @confdata, "db_adaptor   = Bio::DB::BigBed\n";
+			push @confdata, "db_args      = -bigbed $target_file\n";
+			
+			# add the basic track stanza
+				# this is assuming you want the individual features and not 
+				# binned summary of scores
+				# if you really want that, why don't you go with bigwig?
+			push @confdata, "\n[$name]\n";
+			push @confdata, "database     = $target_basename\_db\n";
+			push @confdata, "feature      = region\n";
+			push @confdata, "glyph        = segments\n";
+			push @confdata, "stranded     = 1\n";
+			push @confdata, "label        = 1\n";
+			
+			push @confdata, "\n";
+		
+		}
+		elsif ($infile_ext eq '.bam') {
+			# add the database stanza
+			push @confdata, "[$target_basename\_db:database]\n";
+			push @confdata, "db_adaptor   = Bio::DB::Sam\n";
+			push @confdata, "db_args      = -bam $target_file\n";
+			push @confdata, "               -fasta <your_fasta_file.fa>\n";
+			
+			# add the basic track stanza
+				# this is assuming single-end alignments
+			push @confdata, "\n[$name]\n";
+			push @confdata, "database       = $target_basename\_db\n";
+			push @confdata, "feature        = match\n";
+			push @confdata, "glyph          = segments\n";
+			push @confdata, "stranded       = 1\n";
+			push @confdata, "label          = 1\n";
+			push @confdata, "draw_target    = 1\n";
+			push @confdata, "show_mismatch  = 1\n";
+			push @confdata, "mismatch_color = red\n";
+			push @confdata, "bgcolor        = blue\n";
+			push @confdata, "fgcolor        = white\n";
+			
+			push @confdata, "\n";
+		
+		}
 	}
 }
 
@@ -399,7 +455,7 @@ if ($write_metadata) {
 	my $md_fh;
 	if (-e $md_file) {
 		# file already exists!?
-		# append to it
+		# append to the file, no compression
 		$md_fh = open_to_write_fh($md_file, 0, 1) or 
 			die " can't append to metadata index file!\n";
 	}
@@ -505,6 +561,47 @@ sub collect_chromosomes_from_bigwig {
 
 
 
+sub collect_chromosomes_from_bigbed {
+	my ($infile, $target_file, $data_ref, $strand) = @_;
+	
+	# adjust the File column name
+	$data_ref->{4}{'name'} = 'bigbedfile';
+	$data_ref->{'data_table'}->[0][4] = 'bigbedfile';
+	
+	# open the bigwig file
+	my $bb = Bio::DB::BigBed->new(-bigbed => $infile) or 
+		die " unable to open bigbed data file!\n";
+	
+	
+	# collect the chromosomes
+		# BigBed.pm doesn't provide handy seq_ids() and length() methods 
+		# like BigWig.pm does....
+		# so we have to fake it using underlying BigFile methods
+	my $chromList = $bb->bb->chromList or 
+		die " unable to collect chromosomes from BigBed BigFile!\n";
+	# this returns an object representing the chromosomes in the BigFile
+	
+	# fill out the data table
+	# this follows an example from BigFile.pm pod
+	for (my $c = $chromList->head; $c; $c = $c->next) {
+		push @{ $data_ref->{'data_table'} }, [ (
+			$c->name,
+			1,
+			$c->size,
+			$strand,
+			$target_file,
+		) ];
+	}
+	
+	# update number
+	$data_ref->{'last_row'} = scalar(@{ $data_ref->{'data_table'} }) - 1;
+	
+	# done
+	$bb = undef;
+}
+
+
+
 sub collect_chromosomes_from_bam {
 	my ($infile, $target_file, $data_ref, $strand) = @_;
 	
@@ -548,14 +645,14 @@ __END__
 
 =head1 NAME
 
-bw2gff3.pl
+big_file2gff3.pl
 
 =head1 SYNOPSIS
 
-bw2gff3.pl [--options...] <filename1.bw> <filename2.bw> ...
+big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   
   --in <file> or <file1,file2,...>
-  --path </destination/path/for/bigwig/files/>
+  --path </destination/path/for/bigfiles/>
   --source <text>
   --name <text> or <text1,text2,...>
   --type <text>
@@ -572,16 +669,18 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --in <filename.bw | filename.bam>
+=item --in <filename.bw | filename.bb | filename.bam>
 
-Provide the name(s) of the input bigwig. The list may be 
-specified by reiterating the --in option, providing a single comma-delimited 
-list, or simply listing all files after the options (e.g. "data_*.bw"). 
-Limited support is provided for .bam files.
+Provide the name(s) of the input BigFiles. Three types of files are 
+supported: BigWig (.bw), BigBed (.bb), or BAM (.bam) files. 
+The list may be specified three ways: by reiterating the 
+--in option, providing a single comma-delimited list, or simply listing 
+all files after the options (e.g. "data_*.bw"). 
 
-=item --path </destination/path/for/bigwig/files/>
 
-Provide the destination directory name for the bigwig files. If the
+=item --path </destination/path/for/bigfiles/>
+
+Provide the destination directory name for the BigFile files. If the
 destination does not exist, then it will created. This directory should be
 writeable by the user and readable by all (or at least the Apache and MySQL
 users). If the input files are not currently located here, they will be
@@ -623,17 +722,17 @@ Default is false.
 
 =item --set
 
-Indicate that all of the input bigwig files should be part of a BigWigSet,
-which treats all of the bigwig files in the target directory as a single
+Indicate that all of the input BigWig files should be part of a BigWigSet,
+which treats all of the BigWig files in the target directory as a single
 database. This is primarily for GBrowse, as biotoolbox scripts (currently)
 don't use the BigWigSet adaptor. A text file is written in the target
-directory with metadata for each bigwig file (feature, source, strand,
+directory with metadata for each BigWig file (feature, source, strand,
 name) as described in Bio::DB::BigWigSet documentation. Additional metadata 
 may be manually added as necessary. The default is false.
 
 =item --conf
 
-Write sample GBrowse database and track configuration stanzas. Each bigwig 
+Write sample GBrowse database and track configuration stanzas. Each BigFile 
 file will get individual stanzas, unless the --set option is enabled, where 
 a single stanza for the BigWigSet is provided. This is helpful when setting 
 up GBrowse database and configurations. Default is false.
@@ -647,17 +746,18 @@ Display this POD help.
 =head1 DESCRIPTION
 
 This program will generate a GFF3 file with features representing a 
-bigwig file. The features will encompass the entire length of each 
-chromosome represented in the data file. The name of the data file and its 
-absolute path is stored as a tag value in each feature. This tag value can 
-be used by B<tim_db_helper.pm> to collect data from the file with respect to 
-various locations and features in the database. 
+BigFile file. Two types of BigFiles are supported: BigWig and BigBed. BAM 
+files are also supported. The generated features will encompass the entire 
+length of each chromosome represented in the data file. The name of the data 
+file and its absolute path is stored as a tag value in each feature. This 
+tag value can be used by B<tim_db_helper.pm> to collect data from the file 
+with respect to various locations and features in the database. 
 
 The source data file is copied to the destination directory. The file may be 
 renamed as "source.name" so as to avoid confusion when lots of files are 
 dumped into the same directory. 
 
-The bigwig files may also be designated as a BigWigSet, with unique metadata 
+The BigWig files may also be designated as a BigWigSet, with unique metadata 
 assigned to each file (source, type, name, strand). The BigWigSet may be 
 treated as a single database with multiple bigwig data sources by GBrowse. A 
 metadata index file is written in the target directory as described in 
@@ -667,8 +767,8 @@ Multiple source files may be designated, and each may have its own name.
 This facilitates multiple file processing.
 
 The generated GFF3 file is written to the current directory. One GFF file is 
-written for each input file. It uses the provided GFF name as the basename 
-for the file.
+written for each input file, or one GFF file for a BigWigSet. It uses the 
+provided GFF name as the basename for the file.
 
 Optionally, sample database and track GBrowse configuration stanzas may also be 
 written to the current directory to facilitate setting up GBrowse.

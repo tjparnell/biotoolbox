@@ -8,6 +8,9 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	find_column_index
+);
 use tim_db_helper qw(
 	$TIM_CONFIG
 	open_db_connection
@@ -114,20 +117,9 @@ unless ($in_fh) {
 }
 
 # identify indices
-my ($chr_index, $start_index, $stop_index);
-for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-	# check the names of each column
-	# looking for chromo, start, stop
-	if ($metadata_ref->{$i}{'name'} =~ /^chrom|refseq/i) {
-		$chr_index = $i;
-	}
-	elsif ($metadata_ref->{$i}{'name'} =~ /start/i) {
-		$start_index = $i;
-	}
-	elsif ($metadata_ref->{$i}{'name'} =~ /stop|end/i) {
-		$stop_index = $i;
-	}
-}
+my $chr_index    = find_column_index($metadata_ref, '^chr|seq|refseq');
+my $start_index  = find_column_index($metadata_ref, 'start');
+my $stop_index   = find_column_index($metadata_ref, 'stop|end');
 unless (defined $chr_index and defined $start_index) {
 	die " No genomic coordinates found in the file!\n";
 }
@@ -433,7 +425,7 @@ if ($bigwig) {
 
 	
 	# confirm
-	if (-e $bw_file) {
+	if ($bw_file) {
 		print " bigwig file '$bw_file' generated\n";
 		unlink $outfile; # remove the wig file
 	}
@@ -475,6 +467,7 @@ data2wig.pl [--options...] <filename>
   --format [0,1,2,3]
   --(no)midpoint
   --bigwig|--bw
+  --chromof <filename>
   --db <database>
   --(no)gz
   --help
@@ -565,12 +558,18 @@ Indicate that a binary BigWig file should be generated instead of
 a text wiggle file. A .wig file is first generated, then converted to 
 a .bw file, and then the .wig file is removed.
 
+=item --chromf <filename>
+
+When converting to a BigWig file, provide a two-column tab-delimited 
+text file containing the chromosome names and their lengths in bp. 
+Alternatively, provide a name of a database, below.
+
 =item --db <database>
 
 Specify the database from which chromosome lengths can be derived when 
 generating a bigwig file. This option is only required when generating 
-bigwig files. It may be supplied from the metadata in the source data 
-file.
+bigwig files. It may also be supplied from the metadata in the source 
+data file.
 
 =item --(no)gz
 

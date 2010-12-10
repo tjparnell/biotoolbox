@@ -7,6 +7,9 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	format_with_commas
+);
 use tim_file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
@@ -126,7 +129,7 @@ while (my $line = $in_fh->getline) {
 	$line_count++;
 }
 $in_fh->close;
-print "$line_count data lines merged\n";
+print " " . format_with_commas($line_count) . " data lines merged\n";
 
 
 
@@ -166,7 +169,7 @@ foreach my $file (@ARGV) {
 	}
 	$file_fh->close;
 	$file_fh = undef;
-	print "$line_count data lines merged\n";
+	print " " . format_with_commas($line_count) . " data lines merged\n";
 }
 
 
