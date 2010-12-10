@@ -65,7 +65,7 @@ sub collect_bigwig_position_scores {
 		# Check which data to take based on strand
 		if (
 			$stranded eq 'all' # stranded data not requested
-			or $region_strand == 0 # unstranded data
+			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
 				$region_strand == $feature->strand 
@@ -222,12 +222,23 @@ sub wig_to_bigwig_conversion {
 		);
 	}
 	
-	# finish up
-	if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
-		# we no longer need our temp chromosome file
-		unlink $chromo_file;
+	# check the result
+	if (-e $bw_file) {
+		# conversion successful
+		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
+			# we no longer need our temp chromosome file
+			unlink $chromo_file;
+		}
+		return $bw_file;
 	}
-	return $bw_file;
+	else {
+		print " Conversion failed. You should try manually and watch for errors\n";
+		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
+			# leave the temp chromosome file as a courtesy
+			print " Leaving temporary chromosome file '$chromo_file'\n";
+		}
+		return;
+	}
 }
 
 
@@ -334,7 +345,8 @@ The subroutine is passed three or more arguments in the following order:
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. Note that only one value is 
 returned per position, regardless of the number of dataset features 
-passed.
+passed. Usually this isn't a problem as only one dataset is examined at a 
+time.
 
 =item wig_to_bigwig_conversion()
 
@@ -360,7 +372,7 @@ in bigwig file generation.
 Pass the function an anonymous hash of arguments, including the following:
 
   Required:
-  wig         => The name of the wig file. 
+  wig         => The name of the wig source file. 
   db          => Provide an opened database object from which to generate 
                  the chromosome sizes information.
   Optional: 
@@ -373,13 +385,8 @@ Pass the function an anonymous hash of arguments, including the following:
   chromo      => The name of the chromosome sizes text file, described 
                  above, as an alternative to providing the database name.
   bwapppath   => Provide the full path to Jim Kent's wigToBigWig 
-                 utility. This parameter may be defined in the 
-                 configuration file "tim_db_helper.cfg". If it is not 
-                 defined there, then the system environment path is 
-                 searched for the executable. Finally, as a last resort, 
-                 the module Bio::DB::BigFile is used to convert, if 
-                 available.
-
+                 utility. This parameter may instead be defined in the 
+                 configuration file "tim_db_helper.cfg". 
 
 Example
 

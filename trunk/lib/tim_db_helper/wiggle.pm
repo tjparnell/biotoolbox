@@ -58,7 +58,7 @@ sub collect_wig_position_scores {
 		# Check which data to take based on strand
 		if (
 			$stranded eq 'all' # stranded data not requested
-			or $region_strand == 0 # unstranded data
+			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
 				$region_strand == $feature->strand 

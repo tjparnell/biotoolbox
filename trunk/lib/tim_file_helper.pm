@@ -38,22 +38,24 @@ our $GFF3_ID_COUNT = 0;
 
 # List of acceptable filename extensions
 	# include gzipped versions, but list uncompressed versions first
+	# need to escape the periods so that they match periods and not 
+	# any character - apparently fileparse() uses a regex
 our @SUFFIX_LIST = qw(
-	.store
-	.store.gz
-	.txt
-	.txt.gz
-	.gff
-	.gff.gz
-	.gtf
-	.gtf.gz
-	.gff3
-	.gff3.gz
-	.bed
-	.bed.gz
-	.sgr
-	.sgr.gz
-	.kgg
+	\.store
+	\.store\.gz
+	\.txt
+	\.txt\.gz
+	\.gff
+	\.gff\.gz
+	\.gtf
+	\.gtf\.gz
+	\.gff3
+	\.gff3\.gz
+	\.bed
+	\.bed\.gz
+	\.sgr
+	\.sgr\.gz
+	\.kgg
 ); 
 
 

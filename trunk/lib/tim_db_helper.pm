@@ -38,6 +38,17 @@ eval {
 unless ($@) {
 	$BIGWIG_OK = 1;
 }; 
+$@ = undef;
+
+# check for BigBed support
+our $BIGBED_OK = 0;
+eval { 
+	require tim_db_helper::bigbed;
+	tim_db_helper::bigbed->import;
+};
+unless ($@) {
+	$BIGBED_OK = 1;
+}; 
 
 
 # Configuration File import for database info
@@ -2479,8 +2490,7 @@ sub get_region_dataset_hash {
 				$region, $fstrand, $stranded, @datapoints);
 		}
 		else {
-			carp " Bio::Graphics::Wiggle is not available for retrieving wigfile data!\n";
-			return;
+			croak " Bio::Graphics::Wiggle is not available for retrieving wig data!\n";
 		}
 	}
 	
@@ -2489,8 +2499,7 @@ sub get_region_dataset_hash {
 		
 		# first check the method
 		unless ($method eq 'score') {
-			carp " Only scores may be retrieved from bigwig file data!\n";
-			return;
+			croak " Only scores may be retrieved from BigWig file data!\n";
 		}
 		
 		# collect if possible
@@ -2501,8 +2510,22 @@ sub get_region_dataset_hash {
 				$region, $fstrand, $stranded, @datapoints);
 		}
 		else {
-			carp " Bio::DB::BigWig is not available for retrieving wigfile data!\n";
-			return;
+			croak " Bio::DB::BigWig is not available for retrieving BigWig data!\n";
+		}
+	}
+	
+	elsif ($datapoints[0]->has_tag('bigbedfile') ) {
+		# these datapoints point to a binary bigbed file
+		
+		# collect if possible
+		if ($BIGBED_OK) {
+			# the system has Bio::DB::BigBed loaded
+			# get the dataset scores
+			%datahash = collect_bigwig_position_scores(
+				$region, $fstrand, $stranded, $method, @datapoints);
+		}
+		else {
+			croak " Bio::DB::BigBed is not available for retrieving BigBed data!\n";
 		}
 	}
 	
@@ -2516,15 +2539,15 @@ sub get_region_dataset_hash {
 			# Check which data to take based on strand
 			if (
 				$stranded eq 'all' # all data is requested
-				or $fstrand == 0 # unstranded data
+				or $datapoint->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$fstrand == $region->strand 
+					$fstrand == $datapoint->strand 
 					and $stranded eq 'sense'
 				) 
 				or (
 					# antisense data
-					$fstrand != $region->strand  
+					$fstrand != $datapoint->strand  
 					and $stranded eq 'antisense'
 				)
 			) {
@@ -2548,15 +2571,24 @@ sub get_region_dataset_hash {
 				
 				if ($method eq 'score') {
 					# perform addition to force the score to be a scalar value
-					$datahash{$position} = $datapoint->score + 0;
+					push @{ $datahash{$position} }, $datapoint->score + 0;
 				}
 				elsif ($method eq 'count') {
 					$datahash{$position} += 1;
 				}
 				elsif ($method eq 'length') {
-					$datahash{$position} = $datapoint->length;
+					push @{ $datahash{$position} }, $datapoint->length;
 				}
 			}
+		}
+	}
+	
+	# combine multiple datapoints at the same position
+	if ($method eq 'score' or $method eq 'length') {
+		# each value is an array of one or more datapoints
+		# we will take the simple mean
+		foreach my $position (keys %datahash) {
+			$datahash{$position} = mean( @{$datahash{$position}} );
 		}
 	}
 	
@@ -2691,7 +2723,7 @@ defined and presented in this order. These values include
          median
          min
          max
-         range (returns 'min-max')
+         range (returns difference between max and min)
          stddev (returns the standard deviation of a population)
          
   [4] The strandedness of acceptable data. Genomic segments 
@@ -2736,55 +2768,8 @@ sub _get_segment_score {
 					-type => [@datasetlist],
 	); 
 	
-	
-	# Check for the enumeration method
-	if ($method eq 'enumerate' or $method eq 'count') {
-		# this is simple, we simply count the number of features
-		my $count = 0; 
-		
-		# check for strandedness
-		if ($strandedness eq 'sense') {
-			# count only those features on the same strand
-			
-			# check each datapoint for a match to the region strand
-			foreach (@datapoints) {
-				my $strand = $_->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					$count++;
-				} 
-				elsif ($strand == $region_strand) { 
-					# strand matches the region strand
-					$count++;
-				}
-			}
-		}
-		elsif ($strandedness eq 'antisense') {
-			# count the antisense features
-				
-			# check each datapoint for a match to the region strand
-			foreach (@datapoints) {
-				my $strand = $_->strand;
-				if ($strand == 0) {
-					# there is no strand - great! - just take it
-					$count++;
-				} elsif ($strand != $region_strand) {
-					# strand doesn't match the region strand
-					# that means it must be the opposite strand, so take it
-					$count++;
-				}
-			}
-		} 
-		elsif ($strandedness eq 'all') {
-			# all datasets should be taken regardless of strand
-			$count = scalar(@datapoints);
-		} 
-		
-		return $count;
-	}
-			
-	# The rest of the subroutine deals with numeric score data
-	unless (@datapoints) {return '.'} # make sure we have datapoints
+	# make sure we have datapoints
+	unless (@datapoints) {return '.'} 
 	
 	# define
 	my @scores; # an array for the dataset values
@@ -2817,7 +2802,6 @@ sub _get_segment_score {
 		# check that we have bigwig support
 		unless ($BIGWIG_OK) {
 			croak " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
-			return;
 		}
 		
 		# collect the scores using tim_db_helper::bigwig
@@ -2828,10 +2812,42 @@ sub _get_segment_score {
 	}
 	
 	
+	# BigBed Data
+	elsif ( $datapoints[0]->has_tag('bigbedfile') ) {
+		# data is in bigbed format
+		# this uses the Bio::DB::BigBed adaptor
+		
+		# check that we have bigbed support
+		unless ($BIGBED_OK) {
+			croak " BigBed support is not enabled. Can't use Bio::DB::BigBed\n";
+		}
+		
+		# check the methods supported
+		my $bb_method;
+		if ($method eq 'count' or $method eq 'enumerate') {
+			$bb_method = 'count';
+		}
+		else {
+			# all other methods assume a score
+			$bb_method = 'score';
+		}
+		
+		# collect the scores using tim_db_helper::bigbed
+		@scores = collect_bigbed_scores(
+			$region, $region_strand, $strandedness, $bb_method, @datapoints);
+
+		
+	}
+	
+	
 	# Database Data
 	else {
 		# Working with data stored in the database
 		# this is more straight forward in collection
+		
+		# we'll store the score value for each found feature
+		# features that don't have score return 'undef', but that'll still be 
+		# added to the array
 		
 		# Check for stranded data
 		if ($strandedness eq 'sense') {
@@ -2877,6 +2893,9 @@ sub _get_segment_score {
 		} 
 	}
 	
+	
+	
+	
 	# Determine final region score if we have scores
 	if (@scores) {
 		# we have dataset values from the region
@@ -2915,6 +2934,14 @@ sub _get_segment_score {
 			# or take the maximum value
 			$region_score = max(@scores);
 		}
+		elsif ($method eq 'count') {
+			# count the number of values
+			$region_score = scalar(@scores);
+		}
+		elsif ($method eq 'enumerate') {
+			# count the number of values
+			$region_score = scalar(@scores);
+		}
 		else {
 			# somehow bad method snuck past our checks
 			croak " unrecognized method '$method'!";
@@ -2928,8 +2955,15 @@ sub _get_segment_score {
 	
 	else {
 		# we have no dataset scores from this region
-		# return a 'null' or non-value
-		$region_score = '.';
+		
+		if ($method eq 'count' or $method eq 'enumerate') {
+			# return zero
+			$region_score = 0;
+		}
+		else {
+			# return a 'null' or non-value
+			$region_score = '.';
+		}
 	}
 	
 	return $region_score;
