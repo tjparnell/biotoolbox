@@ -65,7 +65,7 @@ GetOptions(
 	'inter!'    => \$interbase, # shift from interbase to 1-base numbering scheme
 	'bw!'       => \$bigwig, # boolean for bigwig output
 	'db=s'      => \$database, # name of database to get chromo info
-	'chromo=s'  => \$chromo_file, # name of a chromosome file
+	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
 	'gz!'       => \$gz, # boolean to compress output text file
 	'help'      => \$help # request help
@@ -382,7 +382,7 @@ if ($bigwig and exists &wig_to_bigwig_conversion) {
 		# since we're using an external utility, there's no easy way to 
 		# capture errors, see Bio::DB::BigFile for more info
 		# therefore, we'll simply check for it's existence
-		if (-e $bw_file) {
+		if ($bw_file) {
 			print " Converted '$wigfile' to bigWig '$bw_file'\n";
 			push @to_delete_files, $wigfile; # we no longer need the wig file
 		}
@@ -628,7 +628,7 @@ bar2wig.pl [--options...] <filename>
   --(no)inter
   --bw
   --db <database>
-  --chromo <filename>
+  --chromof <filename>
   --bwapp </path/to/wigToBigWig>
   --(no)gz
   --help
@@ -691,7 +691,7 @@ Specify the name of a Bio::DB database from which to extract chromosome
 names and sizes. This information is required when generating a bigWig 
 file.
 
-=item --chromo <filename>
+=item --chromof <filename>
 
 Alternative to the --db argument, a pre-generated chromosome sizes text 
 file may be specified. This text file should consist of two columns, 

@@ -72,7 +72,7 @@ GetOptions(
 	'ask'       => \$ask, # request help in assigning indices
 	'bigbed|bb' => \$bigbed, # generate a binary bigbed file
 	'db=s'      => \$database, # database for bigbed file generation
-	'chromo=s'  => \$chromo_file, # name of a chromosome file
+	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bbapp=s'   => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help # request help
