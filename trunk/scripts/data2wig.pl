@@ -75,7 +75,7 @@ GetOptions(
 	'format=i'  => \$format, # format output to indicated number of places
 	'bigwig|bw' => \$bigwig, # generate a binary bigwig file
 	'db=s'      => \$database, # database for bigwig file generation
-	'chromo=s'  => \$chromo_file, # name of a chromosome file
+	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help # request help
@@ -558,7 +558,7 @@ Indicate that a binary BigWig file should be generated instead of
 a text wiggle file. A .wig file is first generated, then converted to 
 a .bw file, and then the .wig file is removed.
 
-=item --chromf <filename>
+=item --chromof <filename>
 
 When converting to a BigWig file, provide a two-column tab-delimited 
 text file containing the chromosome names and their lengths in bp. 

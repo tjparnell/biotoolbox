@@ -47,6 +47,9 @@ get_actual_nuc_sizes.pl
 get_datasets.pl
 	The workhorse program for collecting data stored in a Bio::DB database relative to any feature described in the database: genes, promoters, genomic bins, etc. The data is combined in one of a variety of statistical methods.
 	
+get_ensembl_annotation.pl
+	This script will connect to the public Ensembl MySQL database, download the genome annotation for the given species, and write a GFF3 file suitable for loading into a database. The resulting file will have more information than their published GTF file. 
+
 get_feature_info.pl
 	Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
 
@@ -137,6 +140,9 @@ ucsc_cytoband2gff3.pl
 ucsc_table2gff3.pl
 	A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
 
+verify_nucleosome_mapping.pl
+	This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
+
 wig2data.pl
 	Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
 
@@ -149,72 +155,79 @@ PROGRAM GROUPS
 Lists of programs organized by function.
 
 Microarray
-	process_agilent.pl
-	map_oligo_data2gff.pl
-	just_blast_oligos.pl
+	* process_agilent.pl
+	* map_oligo_data2gff.pl
+	* just_blast_oligos.pl
 
 Illumina sequencing, BAM files
-	bam2gff_bed.pl
-	bin_genomic_data.pl
-	get_actual_nuc_sizes.pl
-	novo_wrapper.pl
-	split_bam_by_isize.pl
-	split_bam_by_strand.pl
+	* bam2gff_bed.pl
+	* bin_genomic_data.pl
+	* get_actual_nuc_sizes.pl
+	* novo_wrapper.pl
+	* split_bam_by_isize.pl
+	* split_bam_by_strand.pl
 
 Data collection
-	average_gene.pl
-	bin_genomic_data.pl
-	get_datasets.pl
-	get_feature_info.pl
-	map_data.pl
+	* average_gene.pl
+	* bin_genomic_data.pl
+	* generate_genomic_bins.pl
+	* get_datasets.pl
+	* get_feature_info.pl
+	* map_data.pl
 
 Dataset manipulation
-	data2frequency.pl
-	join_data_file.pl
-	manipulate_datasets.pl
-	merge_datasets.pl
-	pull_features.pl
-	shift_coordinates.pl
-	split_data_file.pl
+	* data2frequency.pl
+	* join_data_file.pl
+	* manipulate_datasets.pl
+	* merge_datasets.pl
+	* pull_features.pl
+	* shift_coordinates.pl
+	* split_data_file.pl
 
 Data analysis
-	data2frequency.pl
-	graph_data.pl
-	graph_histogram.pl
-	graph_profile.pl
-	intersect_nucs.pl
+	* data2frequency.pl
+	* graph_data.pl
+	* graph_histogram.pl
+	* graph_profile.pl
+	* run_cluster.pl
 
 Finding features
-	find_enriched_regions.pl
-	find_nucleosome_movement.pl
-	get_intersecting_features.pl
-	map_nucleosomes.pl
-	map_transcripts.pl
+	* find_enriched_regions.pl
+	* get_intersecting_features.pl
+	* map_transcripts.pl
 
-File conversion
-	bam2gff_bed.pl
-	bar2wig.pl
-	data2bed.pl
-	data2gff.pl
-	data2wig.pl
-	gff2sgr.pl
-	my_gff2gff3.pl
-	shift_coordinates.pl
-	ucsc_chrom2gff3.pl
-	ucsc_cytoband2gff3.pl
-	ucsc_table2gff3.pl
-	wig2gff.pl
+Nucleosome Analysis
+	* find_nucleosome_movement.pl
+	* get_actual_nuc_sizes.pl
+	* intersect_nucs.pl
+	* map_nucleosomes.pl
+	* verify_nucleosome_mapping.pl
+
+File format conversion
+	* bam2gff_bed.pl
+	* bar2wig.pl
+	* data2bed.pl
+	* data2gff.pl
+	* data2wig.pl
+	* gff2sgr.pl
+	* my_gff2gff3.pl
+	* wig2data.pl
 
 Miscellaneous
-	big_file2gff3.pl
-	convert_yeast_genome_version.pl
-	my_gff2gff3.pl
-	print_feature_types.pl
+	* big_file2gff3.pl
+	* convert_yeast_genome_version.pl
+	* my_gff2gff3.pl
+	* print_feature_types.pl
+	* shift_coordinates.pl
+
+Genome annotation
+	* get_ensembl_annotation.pl
+	* ucsc_chrom2gff3.pl
+	* ucsc_cytoband2gff3.pl
+	* ucsc_table2gff3.pl
 
 SNP calling
-	merge_SNPs.pl
-	locate_SNPs.pl
+	* merge_SNPs.pl
+	* locate_SNPs.pl
 
 
-
-	
