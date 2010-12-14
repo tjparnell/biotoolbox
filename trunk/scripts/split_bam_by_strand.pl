@@ -129,6 +129,10 @@ examine each strand separately.
  University of Utah
  Salt Lake City, UT, 84112
 
+This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.  
+
 
 
 
