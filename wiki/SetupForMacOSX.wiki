@@ -175,6 +175,7 @@ Some additional modules that my programs use but are not necessarily required fo
 	* IO::Zlib
 	* Config::Simple
 	* Pod::Usage
+	* Algorithm::Cluster
 
 
 ===Install BioPerl===
@@ -314,7 +315,9 @@ Continue with the module installation.
 	sudo ./Build install
 </pre>
 	
-
+==Ensembl Perl API==
+To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/`. This allows their modules to be found automatically in the normal manner. 
+Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
 
 
 =Additional Tools=

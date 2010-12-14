@@ -39,16 +39,21 @@ Lists of programs organized by function.
 	* graph_data.pl
 	* graph_histogram.pl
 	* graph_profile.pl
-	* intersect_nucs.pl
+	* run_cluster.pl
 
 ===Finding features===
 	* find_enriched_regions.pl
-	* find_nucleosome_movement.pl
 	* get_intersecting_features.pl
-	* map_nucleosomes.pl
 	* map_transcripts.pl
 
-===File conversion===
+===Nucleosome Analysis===
+	* find_nucleosome_movement.pl
+	* get_actual_nuc_sizes.pl
+	* intersect_nucs.pl
+	* map_nucleosomes.pl
+	* verify_nucleosome_mapping.pl
+
+===File format conversion===
 	* bam2gff_bed.pl
 	* bar2wig.pl
 	* data2bed.pl
@@ -56,10 +61,6 @@ Lists of programs organized by function.
 	* data2wig.pl
 	* gff2sgr.pl
 	* my_gff2gff3.pl
-	* shift_coordinates.pl
-	* ucsc_chrom2gff3.pl
-	* ucsc_cytoband2gff3.pl
-	* ucsc_table2gff3.pl
 	* wig2data.pl
 
 ===Miscellaneous===
@@ -67,6 +68,13 @@ Lists of programs organized by function.
 	* convert_yeast_genome_version.pl
 	* my_gff2gff3.pl
 	* print_feature_types.pl
+	* shift_coordinates.pl
+
+===Genome annotation===
+	* get_ensembl_annotation.pl
+	* ucsc_chrom2gff3.pl
+	* ucsc_cytoband2gff3.pl
+	* ucsc_table2gff3.pl
 
 ===SNP calling===
 	* merge_SNPs.pl
@@ -110,6 +118,8 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl] Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 ====get_datasets.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/get_datasets.pl get_datasets.pl] The workhorse program for collecting data stored in a Bio::DB database relative to any feature described in the database: genes, promoters, genomic bins, etc. The data is combined in one of a variety of statistical methods.
+====get_ensembl_annotation.pl====
+[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/get_ensembl_annotation.pl get_ensembl_annotation.pl] This script will connect to the public Ensembl MySQL database, download the genome annotation for the given species, and write a GFF3 file suitable for loading into a database. The resulting file will have more information than their published GTF file. 
 ====get_feature_info.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/get_feature_info.pl get_feature_info.pl] Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
 ====get_intersecting_features.pl====
@@ -154,6 +164,8 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl] Process the raw Agilent data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together.
 ====pull_features.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/pull_features.pl pull_features.pl] Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
+====run_cluster.pl====
+[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/run_cluster.pl run_cluster.pl] This script is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others. 
 ====shift_coordinates.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/shift_coordinates.pl shift_coordinates.pl] A program for shifting coordinates, for example from interbase (0-base) to 1-base.
 ====split_bam_by_isize.pl====
@@ -168,6 +180,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_cytoband2gff3.pl ucsc_cytoband2gff3.pl] A simple script to conver the UCSC cytobands file into a GFF3 file that can be used by the ideogram glyph of GBrowse. Useful with human genome databases where cytobands are annotated.
 ====ucsc_table2gff3.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_table2gff3.pl ucsc_table2gff3.pl] A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
+====verify_nucleosome_mapping.pl====
+[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/verify_nucleosome_mapping.pl verify_nucleosome_mapping.pl] This script will 
+verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 ====wig2data.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/wig2data.pl wig2data.pl] Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
 
