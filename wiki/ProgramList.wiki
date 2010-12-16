@@ -159,11 +159,11 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====novo_wrapper.pl====
 [http://biotoolbox.googlecode.com/svn/wiki/pod/novo_wrapper.pod.html novo_wrapper.pl] A wrapper program for aligning one or more Illumina or other raw sequencing data using Novocraft's novoalign program. After aligning, it will convert the alignment file to an indexed binary BAM file.
 ====print_feature_types.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/print_feature_types.pl print_feature_types.pl] Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
+[http://biotoolbox.googlecode.com/svn/wiki/pod/print_feature_types.pl print_feature_types.pl] Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 ====process_agilent.pl====
 [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl] Process the raw Agilent data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together.
 ====pull_features.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/pull_features.pl pull_features.pl] Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
+[http://biotoolbox.googlecode.com/svn/wiki/pod/pull_features.pl pull_features.pl] Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
 ====run_cluster.pl====
 [http://biotoolbox.googlecode.com/svn/wiki/pod/run_cluster.pod.html run_cluster.pl] This script is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others. 
 ====shift_coordinates.pl====
