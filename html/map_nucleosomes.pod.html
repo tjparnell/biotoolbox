@@ -1,0 +1,210 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>map_nucleosomes.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+	<li><a href="#todo">TODO</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>map_nucleosomes.pl</p>
+<p>A script to map nucleosomes.</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>map_nucleosomes.pl --db &lt;database&gt; --thresh &lt;number&gt; [--options...]</p>
+<pre>
+
+  --db &lt;database_name&gt;
+  --data &lt;dataset_name&gt;
+  --sdata &lt;dataset_name&gt;
+  --tdata &lt;dataset_name&gt;
+  --thesh &lt;number&gt;
+  --win &lt;integer&gt;
+  --buf &lt;integer&gt;
+  --(no)bin
+  --gff
+  --type &lt;gff_type&gt;
+  --source &lt;gff_source&gt;
+  --out &lt;filename&gt;
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the name of the BioPerl gff database to pull the source data.</p>
+</dd>
+<dt><strong><a name="data_sdata_tdata_dataset_name" class="item">--data, --sdata, --tdata &lt;dataset_name&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the name of the dataset containing the nucleosome midpoint
+occupancy data from which to identify nucleosomal positions. For the
+most accurate mapping, the midpoints should be mapped at 1 bp
+resolution, but lower resolutions (5 or 10 bp) should work. Two
+datasets are required, although they may be the same. The first is the
+scan dataset (--sdata), which is used to scan for a potential
+nucleosome. The dataset may be a normalized difference, difference, or
+raw enumerated counts. It may be in log2 space, and does not need to
+be whole integers, as only the maximum value in each window is needed.
+The second dataset is the tag dataset (--tdata) and is used in
+calculating nucleosome statistics, including occupancy and fuzziness.
+The tag dataset must be enumerated counts of nucleosome midpoints and
+be whole integers, whether raw counts or a difference. Negative counts
+from a difference dataset are not counted. Both datasets must be
+identified; alternatively, set both datasets simultaneously to the
+same dataset using --data. If the datasets are not specified on the
+commandline, then they may be interactively chosen from a list from 
+the database.</p>
+</dd>
+<dt><strong><a name="thresh_number" class="item">--thresh &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the minimum score value required to call a nucleosome position. 
+This is only used when scanning the scan dataset.</p>
+</dd>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the window size for which to scan the chromosome. Setting this  
+value too large and overlapping nucleosomes may result, while setting 
+this value too low may miss some nucleosomes. The default value is 150 bp.</p>
+</dd>
+<dt><strong><a name="buf_integer" class="item">--buf &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the buffer size in bp which will be added between the end of the 
+previous found nucleosome and the beginning of the window to scan for the 
+next nucleosome. Setting this value may limit the number of overlapping 
+nucleosomes. Default is 0 bp.</p>
+</dd>
+<dt><strong><a name="no_bin" class="item">--(no)bin</a></strong></dt>
+
+<dd>
+<p>Indicate whether the scan data should be binned in an attempt to find 
+and map a nucleosome midpoint peak. Binning only occurs when a single 
+position fails to pass the threshold value. Bins are generated from 
+three adjacent positions and their values summed. This is helpful for 
+those genomic regions with very few nucleosome reads. The default 
+value is true.</p>
+</dd>
+<dt><strong><a name="gff" class="item">--gff</a></strong></dt>
+
+<dd>
+<p>Indicate whether a GFF file should be written in addition to the standard 
+text data file. The GFF file version is 3. The default value is false.</p>
+</dd>
+<dt><strong><a name="type_gff_type" class="item">--type &lt;gff_type&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the text to be used as the GFF type (or method) used in 
+writing the GFF file. The default value is the name of the scan 
+dataset appended with &quot;_nucleosome&quot;.</p>
+</dd>
+<dt><strong><a name="source_gff_source" class="item">--source &lt;gff_source&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the text to be used as the GFF source used in writing the 
+GFF file. The default value is the name of this program.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the output file name. The default is the name of the scan 
+dataset appended with &quot;_nucleosome&quot;.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation of the script.</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will identify and map the positions of nucleosomes given a 
+dataset of nucleosome occupancy data. The dataset should ideally be 
+enumerated counts of sequenced nucleosomal fragment midpoints, although 
+very high resolution microarray data could also be used in principle.</p>
+<p>Nucleosome calls are made by scanning the chromosomes in windows of 
+specified size (default 150 bp, set with --win option) looking for 
+the maximum peak that exceeds the minimum threshold value. The position 
+of the maximum peak is called as the new nucleosome midpoint. The 
+window is then advanced starting at the previous just-identified nucleosome 
+endpoint, or at the end of the previous window if no nucleosome was 
+identified. This position may be further advanced by setting the 
+buffer value, which inserts space between the previous nucleosome end and 
+the next window. By advancing the window relative to the previously identified 
+nucleosome, the program can adapt to variable nucleosome spacing.</p>
+<p>For genomic regions with few nucleosome reads and no positions that pass the 
+threshold value, the window positions may optionally be binned together to 
+increase sensitivity (see the --bin option).</p>
+<p>Two attributes of each identified nucleosome are calculated, Occupancy and 
+Fuzziness. Occupancy represents the sum of the scores that support the 
+nucleosome position; higher scores indicate a more highly occupied 
+nucleosome. Fuzziness indicates how well all of the scores are aligned in 
+register. The Fuzziness value is the standard deviation of the population 
+of scores from the peak; a high value indicates the nucleosome has a 
+fuzzy or variable position, whereas a low value indicates the nucleosome 
+is highly positioned. For both attributes, the scores are counted in a 
+window representing 1/2 of a nucleosome length (74 bp) centered on the 
+defined nucleosome midpoint. The size of this window is arbitrary but 
+reasonable.</p>
+<p>The identified nucleosomes are set to 147 bp in length, centered at the 
+maximum peak. A second script, <code>get_actual_nuc_sizes.pl</code>, will determine 
+the actual nucleosome sizes based on paired-end reads in a BAM file.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+<p>
+</p>
+<hr />
+<h1><a name="todo">TODO</a></h1>
+
+</body>
+
+</html>

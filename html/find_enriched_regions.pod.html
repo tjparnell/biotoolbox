@@ -1,0 +1,223 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>find_enriched_regions.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>find_enriched_regions.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+
+ find_enriched_regions.pl --db &lt;db_name&gt; [--options]</pre>
+<pre>
+
+  Options:
+  --db &lt;db_name&gt;
+  --data &lt;dataset&gt;
+  --out &lt;filename&gt;
+  --win &lt;integer&gt;
+  --step &lt;integer&gt;
+  --tol &lt;integer&gt;
+  --thresh &lt;number&gt;
+  --sd &lt;number&gt;
+  --median
+  --deplete
+  --(no)trim
+  --(no)sort
+  --(no)feat
+  --(no)log
+  --genes
+  --gff
+  --gz
+  --help</pre>
+<pre>
+ 
+=head1 OPTIONS</pre>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong></dt>
+
+<dd>
+<p>Specify a Bioperl Bio::DB::SeqFeature::Store database. Required.</p>
+</dd>
+<dt><strong><a name="data_dataset" class="item">--data &lt;dataset&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the name of the dataset from which to collect the scores. 
+If not specified, then the data set may be chosen interactively 
+from a presented list.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the output file name. If not specified, then it will be 
+automatically generated from dataset, window, step, and threshold 
+values.</p>
+</dd>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the genomic bin window size in bp. Default value is 250 bp.</p>
+</dd>
+<dt><strong><a name="step_integer" class="item">--step &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the step size for moving the window. Default value is 
+equal to the window size.</p>
+</dd>
+<dt><strong><a name="tol_integer" class="item">--tol &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the tolerance distance when merging windows together. 
+Windows not actually overlapping but within this tolerance 
+distance will actually be merged. Default value is 1/2 the 
+window size.</p>
+</dd>
+<dt><strong><a name="thresh_number" class="item">--thresh &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the window score threshold explicitly rather than calculating
+a threshold based on standard deviations from the mean.</p>
+</dd>
+<dt><strong><a name="sd_number" class="item">--sd &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the multiple of standard deviations above the mean as a
+window score threshold. Default is 1.5 standard deviations. Be 
+quite careful with this method as it attempts to pull all of the 
+datapoints out of the database to calculate the mean and 
+standard deviation - which may be acceptable for limited tiling 
+microarrays but not acceptable for next generation sequencing 
+data with single bp resolution.</p>
+</dd>
+<dt><strong><a name="median" class="item">--median</a></strong></dt>
+
+<dd>
+<p>Indicate that a median score value should be calculated within each
+window rather than the default mean when determining whether the 
+window exceeds the threshold.</p>
+</dd>
+<dt><strong><a name="deplete" class="item">--deplete</a></strong></dt>
+
+<dd>
+<p>Specify whether depleted regions should be reported instead. 
+For example, windows whose scores are 1.5 standard deviations 
+below the mean, rather than above.</p>
+</dd>
+<dt><strong><a name="no_trim" class="item">--(no)trim</a></strong></dt>
+
+<dd>
+<p>Indicate that the merged windows should (not) be trimmed of below 
+threshold scores on the ends of the window. Normally when windows 
+are merged, there may be some data points on the ends of the 
+windows whose scores don't actually pass the threshold, but were 
+included because the entire window mean (or median) exceeded 
+the threshold. This step removes those data points. The default 
+behavior is true.</p>
+</dd>
+<dt><strong><a name="no_feat" class="item">--(no)feat</a></strong></dt>
+
+<dd>
+<p>Indicate that features overlapping the windows should be 
+identified. The default behavior is false.</p>
+</dd>
+<dt><strong><a name="genes" class="item">--genes</a></strong></dt>
+
+<dd>
+<p>Write out a text file containing a list of the found overlapping genes.</p>
+</dd>
+<dt><strong><a name="gff" class="item">--gff</a></strong></dt>
+
+<dd>
+<p>Indicate that a GFF version 3 file should be written out in
+addition to the data text file.</p>
+</dd>
+<dt><strong><a name="no_log" class="item">--(no)log</a></strong></dt>
+
+<dd>
+<p>Flag to indicate that source data is (not) log2, and to calculate 
+accordingly and report as log2 data.</p>
+</dd>
+<dt><strong><a name="gz" class="item">--gz</a></strong></dt>
+
+<dd>
+<p>Compress the output file through gzip.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation.</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will search for regions in the genome that are enriched for a 
+particular data set. It walks through each chromosome using a 
+window of specified size (default 500 bp) and specified step size (default 100
+bp). Data scores within a window that exceed a determined threshold
+will be noted. Adjacent windows are merged and then trimmed on the ends to the
+minimum thresholded window.</p>
+<p>The threshold scores for identifying an enriched region may either be 
+explicitly set or automatically determined from the mean and standard 
+deviation (SD) of the entire collection of datapoints across the genome. 
+This, of course, assumes a normal distribution of datapoint scores, which may 
+or may not be suitable for the particular dataset. Note that the 
+automatic method may not appropriate for very extremely large datasets 
+(e.g. next generation sequencing) as it attempts to calculate the mean and SD 
+on all of the datapoints in the database.</p>
+<p>The program writes out a tim data formatted text file consisting of chromosome, 
+start, stop, score, and overlapping gene or non-gene genomic features. It 
+will optionally write a GFF file.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

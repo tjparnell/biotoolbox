@@ -1,0 +1,176 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>find_nucleosome_movement.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+	<li><a href="#todo">TODO</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>find_nucleosome_movement.pl</p>
+<p>A script to map nucleosome movement based on mononucleosome DNA hybridzed 
+to Agilent cerevisiae 244K arrays.</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>find_nucleosome_movement.pl [--options...]</p>
+<pre>
+
+  --db &lt;database_name&gt;
+  --dataf &lt;filename&gt;
+  --data &lt;dataset_name&gt;
+  --gain &lt;number&gt;
+  --loss &lt;number&gt;
+  --type &lt;gff_type&gt;
+  --source &lt;gff_source&gt;
+  --out &lt;filename&gt;
+  --delta &lt;number&gt;
+  --win &lt;integer&gt;
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the name of the BioPerl gff database to pull the source data.</p>
+</dd>
+<dt><strong><a name="dataf_filename" class="item">--dataf &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the name of a data file containing the dataset. The file 
+should provide genomic coordinates (e.g. GFF file). If more than 
+one dataset is within the file, then the dataset name should be 
+provided.</p>
+</dd>
+<dt><strong><a name="data_dataset_name" class="item">--data &lt;dataset_name&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the name of the dataset containing the nucleosome occupancy data
+from which to identify the movements. The dataset should be a ratio 
+or normalized difference between experimental and control nucleosome 
+occupancies. It is assumed to be in log2 data space.</p>
+</dd>
+<dt><strong><a name="gain_number" class="item">--gain &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the minimum score value required to identify a gain event. 
+Adjacent concordant gain and loss identifies nucleosome movement.</p>
+</dd>
+<dt><strong><a name="loss_number" class="item">--loss &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the minimum score value required to identify a loss event. 
+Adjacent concordant gain and loss identifies nucleosome movement. 
+The loss number is automatically converted to a negative if 
+necessary (assuming the data is in log2 space).</p>
+</dd>
+<dt><strong><a name="type_gff_type" class="item">--type &lt;gff_type&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the text to be used as the GFF type (or method) used in 
+writing the GFF file. It is also used as the base for the event 
+name. The default value is the dataset name appended with 
+'_movement'.</p>
+</dd>
+<dt><strong><a name="source_gff_source" class="item">--source &lt;gff_source&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the text to be used as the GFF source used in writing the 
+GFF file. The default value is the name of this program.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the output file name. The default is to use the type provided.</p>
+</dd>
+<dt><strong><a name="delta_number" class="item">--delta &lt;number&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the minimum absolute difference value to call a nucleosome 
+movement event. The default is the sum of absolute gain and loss 
+values.</p>
+</dd>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the maximum window size in bp to look for adjacent probes when 
+calling nucleosome movement events. The number should be greater than 
+the average microarray probe spacing but less than the length of a 
+nucleosome. The default value is 100 bp.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation of the script.</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will look for nucleosome movement. It was designed explicitly
+to look for shifts in nucleosome occupancy in medium to high resolution
+microarrays, such as the Agilent 244K array for cerevisiae. A nucleosome
+movement event is defined as a concordant gain and loss of nucleosome
+signal (occupancy) at two neighboring probes. The neighboring probes must
+be within a specified window size (default 100 bp). The dataset to be
+scanned should be a log2 ratio or normalized difference between
+experimental and control nucleosome occupancies. Both minimum gain and loss
+values must be met, and optionally the minimum delta value (absolute
+difference between the adjacent probe values).</p>
+<p>A tim data file will be written and a GFF file suitable for 
+loading in GBrowse are written.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+<p>
+</p>
+<hr />
+<h1><a name="todo">TODO</a></h1>
+
+</body>
+
+</html>
