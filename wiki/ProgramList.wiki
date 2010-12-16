@@ -1,5 +1,5 @@
 #summary A summary of the scripts available in *biotoolbox*
-#labels Featured 
+#labels Featured
 
 =Program List=
 
@@ -14,7 +14,7 @@ Convert binary bar data files from David Nix's USeq or T2 package to a more univ
 ====[Pod_bin_genomic_data bin_genomic_data.pl]====
 Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
 ====[Pod_big_file2gff3 big_file2gff3.pl]====
-[Pod_big_file2gff3 big_file2gff3.pl] Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
+Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
 ====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/convert_yeast_genome_version.pl convert_yeast_genome_version.pl]====
 Convert the genomic coordinates of a data file between different SGD genome versions.
 ====[Pod_data2frequency data2frequency.pl]====
@@ -58,7 +58,7 @@ Identifies the overlapping gene and potential codon change associated with seque
 ====[Pod_manipulate_datasets manipulate_datasets.pl]====
 A program to manipulate datasets (columns) in a data file. A wide variety of manipulations may be performed, from re-ordering the columns to mathematically converting the data values to generating ratios between datasets. Multiple functions may be performed interactively or single functions performed automatically by command line options, allowing for easy scripting of manipulations.
 ====[Pod_map_data map_data.pl]====
- Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
+Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
 ====[Pod_map_nucleosomes map_nucleosomes.pl]====
 Similar to find_enriched_regions.pl, but specific for nucleosomes. Given a dataset of nucleosome occupancies, peaks of occupancy data are mapped and assigned to a nucleosome of standard 147 bp size. The next nucleosome occupancy peak is identified relative to the position of the prior identified nucleosome, assuming that nucleosomes are relatively regularly spaced.
 ====[Pod_map_oligo_data2gff map_oligo_data2gff.pl]====
@@ -96,8 +96,7 @@ A simple script to conver the UCSC cytobands file into a GFF3 file that can be u
 ====[Pod_ucsc_table2gff3 ucsc_table2gff3.pl]====
 A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
 ====[Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl]====
-This script will 
-verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
+This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 ====[Pod_wig2data wig2data.pl]====
 Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
 
@@ -177,4 +176,3 @@ Lists of programs organized by function.
 	* convert_yeast_genome_version.pl
 	* [Pod_my_gff2gff3 my_gff2gff3.pl]
 	* [Pod_print_feature_types print_feature_types.pl]
-
