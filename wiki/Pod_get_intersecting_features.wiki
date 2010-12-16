@@ -1,0 +1,123 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME get_intersecting_features.pl==
+{{{
+}}}
+{{{
+}}}
+==SYNOPSIS==
+{{{
+   get_intersecting_features.pl [--options] <filename>
+  }}}
+{{{
+  Options:
+  --in <filename>
+  --db <database>
+  --feature <text>
+  --start <integer>
+  --stop <integer>
+  --extend <integer>
+  --ref [start | mid]
+  --out <filename>
+  --(no)gz
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the file name of a list of reference features to find overlapping  target features. These reference features may be genomic coordinates (chromo, start, stop) or named features (name, type). A tim data formatted file is  best used but other tab delimited text formats may be used.
+__
+  __
+__--db <**database>
+
+__
+  Provide the name of a Bio::DB::!SeqFeature** store database to use when  finding features. If not specified, the database specified in the input file  metadata will be used.
+__
+  __
+__--feature <**text>
+
+__
+  Specify the name of the target features to search for in the database that  intersect with the list of reference features. The type may be a either a  GFF "type" or a "type:method" string. If not specifed, then the database  will be queried for potential GFF types and a list presented to the user to  select one.
+__
+  __
+__--start <**integer>, --stop <**integer>
+
+__
+  Optionally specify the relative start and stop positions from the 5' end (or  start coordinate for non-stranded features) with which to restrict the region  when searching for target features. For example, specify "--start=-200  --stop=0" to restrict to the promoter region of genes. Both positions must  be specified. Default is to take the entire region of the reference feature.
+__
+  __
+__--extend <**integer>
+
+__
+  Optionally specify the number of bp to extend the reference feature's region  on each side. Useful when you have small reference regions and you want to  include a larger search region.
+__
+  __
+__--ref `[`start | mid`]`
+
+__
+  Indicate the reference point from which to calculate the distance between the  reference and target features. The same reference point is used for both  features. Valid options include "start" (or 5' end for stranded features) and  "mid" (for midpoint). Default is "start".
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify a new filename. A standard tim data text file is written.  The default is to rewrite the input file.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether the output file should (not) be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will take a list of reference features and identify  target features which intersect them. The reference features  may be either named features (name and type) or genomic regions (chromosome,  start, stop). By default, the search region for each reference feature is the  entire feature, but may be restricted or expanded in size with appropriate  modifiers (--start, --stop, --extend). The target features are specifed as  specific types.
+
+Several attributes of the found features are appended to the original input  file data. First, the number of  target features are reported. If more than one are found, the feature with  the most overlap with the reference feature is preferentially listed. The name,  type, and strand of the selected target feature is reported. Finally, the  distance from the reference feature to the target feature is reported. The  reference points for measuring the distance is by default the start or 5' end  of the features, or optionally the midpoints.
+
+A standard tim data text file is written.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

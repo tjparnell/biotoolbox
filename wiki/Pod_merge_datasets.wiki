@@ -1,0 +1,74 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+merge_datasets.pl
+
+==SYNOPSIS==
+merge_datasets.pl `[`--options...`]` <**file1> <**file2> ...
+
+{{{
+  Options:
+  --lookup
+  --out <filename> 
+  --(no)gz
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--lookup
+
+__
+  Force the program to merge data by using lookup values in each file.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it uses the first file name.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will merge two or more tab-delimited data files into one file.  Datasets (columns) from each file are interactively chosen and then merged  into an output file. Datasets from the third and subsequent files are  added to the end (rightmost column) of the first two merged files.
+
+The program blindly assumes that rows (features) are equivalent in all of the  datasets if there are an equal number of data rows. However, if there are an  unequal number of data rows, or the user forces by using the --lookup option,  then dataset values are looked up first using specified lookup values before  merging (compare with Excel VLOOKUP function). In this case, the dataset  lookup indices from each file are requested, followed by the order of datasets  to merge. The first index in the order determines which file is dominant,  meaning that all rows from that file are included, and only the rows that  match by lookup value are included from the second file. Null values are  recorded when no match is found in the second file.
+
+After merging, an opportunity for renaming the dataset names is  presented.
+
+{{{
+}}}
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

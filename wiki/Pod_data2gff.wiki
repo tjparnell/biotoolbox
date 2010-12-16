@@ -1,0 +1,186 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+data2gff.pl
+
+==SYNOPSIS==
+data2gff.pl `[`--options...`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --ask
+  --chr <column_index>
+  --start <column_index>
+  --stop | --end <column_index>
+  --score <column_index>
+  --strand <column_index>
+  --name <text | column_index>
+  --id <column_index>
+  --tags <column_index,column_index,...>
+  --source <text>
+  --type <text | column_index>
+  --(no)zero
+  --format [0,1,2,3]
+  --(no)midpoint
+  --(no)unique
+  --out <filename> 
+  --version [2,3]
+  --(no)gz
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip.
+__
+  __
+__--ask
+
+__
+  Indicate that the program should interactively ask for the indices for  feature score, name, and strand. It will present a list of the column  names to choose from. It will also ask for the source, and type or method text strings. Enter nothing for non-relevant columns or to  accept default values.
+__
+  __
+__--chr <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the chromosome or sequence ID column in the gff data.
+__
+  __
+__--start <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the start position column in the gff data.
+__
+  __
+__--start <**column_index> =item --end <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the stop or end position column in the gff data.
+__
+  __
+__--score <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the score column in the gff data.
+__
+  __
+__--name <**column_index>
+
+__
+  Enter either the text that will be shared name among  all the features, or the index of the dataset in the data  table to be used as the name of each gff feature. This  information will be used in the 'group' column.
+__
+  __
+__--id <**column_index>
+
+__
+  The index of the dataset in the data table to be used as the unique ID of each gff feature. This information will be used in the 'group' column of GFF v.3 files  only. The default is to automatically generate a  unique identifier.
+__
+  __
+__--strand <**column_index>
+
+__
+  The index of the dataset in the data table to be used for strand information. Accepted values might include any of the following "f(orward), r(everse), w(atson), c(rick), +, -, 1, -1, 0, .".
+__
+  __
+__--tags <**column_indices>
+
+__
+  Provide a comma delimited list of column indices that contain  values to be included as group tags in the GFF features. The  key will be the column name.
+__
+  __
+__--source <**text>
+
+__
+  A scalar value to be used as the text in the 'source'  column. Default is 'data'.
+__
+  __
+__--type <**text | column_index>
+
+__
+  Enter either a text string to be used as the GFF 'method' or 'type' column, or a column index representing the  feature type when one simply won't due. If not defined,  it will use the name of the dataset used for either the 'score'  or 'name' column, if defined. As a last resort, it  will use the most creative method of 'Experiment'.
+__
+  __
+__--(no)zero
+
+__
+  Indicate whether the source data is in interbase or 0-based  coordinates, as is used with UCSC source data or USeq data  packages. The coordinates will then be converted to 1-based  coordinates, consistent with the rest of bioperl conventions. The default is false (will not convert).
+__
+  __
+__--format `[`0,1,2,3`]`
+
+__
+  Indicate the number of decimal places the score value should be formatted. Acceptable values include 0, 1, 2, or 3 places. Anything else is ignored.
+__
+  __
+__--(no)midpoint
+
+__
+  A boolean (1 or 0) value to indicate whether the  midpoint between the actual 'start' and 'stop' values should be used instead of the actual values. Default  is false.
+__
+  __
+__--(no)unique
+
+__
+  Indicate whether the feature names should be made unique. A count  number is appended to the name of subsequent features to make them  unique. This should only be applied to genomic features, and not to  genomic data values (microarray data, sequencing data, etc). The  default behavior is false (not unique).
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify the name of of the output file. The default is to use  the assigned type value. The '.gff' extension is automatically added if required.
+__
+  __
+__--version `[`2,3`]`
+
+__
+  Specify the GFF version. The default is version 3.
+__
+  __
+__--(no)gz
+
+__
+  Indicate whether the output file should (not) be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will convert a data file into a GFF formatted text file.  Only simple conversions are performed, where each data line is converted  to a single feature. Complex features with parent-child relationships (such  as genes) should be converted with something else.
+
+The source file should have chromosomal coordinates, i.e. chromosome,  start, and (optionally) stop or end coordinates. They may be specified  upon execution or identified automatically. If they are not found, the  GFF conversion will fail.
+
+Additional feature information may be specified using appropriate command-line  arguments, including score values, strand, name, ID, source, type, etc. See  the [Pod_OPTIONS OPTIONS] for more details.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

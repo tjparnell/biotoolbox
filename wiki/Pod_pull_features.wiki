@@ -1,0 +1,120 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+pull_features.pl
+
+==SYNOPSIS==
+pull_features.pl --data <**filename> --list <**filename> --out <**filename>
+
+{{{
+  Options:
+  --data <filename>
+  --list <filename>
+  --out <filename>
+  --dindex <integer>
+  --lindex <integer>
+  --sum
+  --starti <integer>
+  --stopi <integer>
+  --log
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+{{{
+}}}
+__--data
+
+__
+  Specify a tim data formatted input file of genes.
+__
+  __
+__--out
+
+__
+  Specify the output file name.
+__
+  __
+__--list
+
+__
+  Specify the name of a text file containing the feature names or values to look up. The file must contain a column header  that matches a column header name in the data file. Multiple  columns may be present.
+__
+  __
+__--dindex <**integer>
+
+__
+  Specify the index number of the column in the data file  containing the data to look up and match. Automatically determined by matching the header names.
+__
+  __
+__--lindex <**integer>
+
+__
+  Specify the index number of the column in the list file (or  clipboard contents) containing the values to look up and match  if more than one column is present. Defaults to interactively  asking the user.
+__
+  __
+__--sum
+
+__
+  Indicate that the pulled data should be averaged across all  features at each position, suitable for graphing. A separate text  file with '`_`summed' appended to the filename will be written.
+__
+  __
+__--starti <**integer>
+
+__
+  When re-summarizing the pulled data, indicate the start column  index that begins the range of datasets to summarize. Defaults  to the leftmost column without a standard feature description name.
+__
+  __
+__--stopi <**integer>
+
+__
+  When re-summarizing the pulled data, indicate the stop column index the ends the range of datasets to summarize. Defaults to the last or rightmost column.
+__
+  __
+__--log
+
+__
+  The data is in log2 space. Only necessary when re-summarizing the pulled data.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+Given a list of features, this program will pull out those features (rows)  from a datafile (compare to Microsoft Excel's VLOOKUP command). The list  may be provided as either a separate text file or may be grabbed from the  clipbard (note this doesn't work through remote connections!). It will write a new data file containing only those features it found.
+
+The list file may be a simple text file containing the feature names of the  features to pull. The first line should be the column header name and should be identical to the column header name in the data file used in the lookup. If more than one column is present in the list of lookup names, the index  will be requested interactively from the user, or be specified as a command line argument. The same format applies to data in the clipboard; it simply skips the step of writing a separate list file.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

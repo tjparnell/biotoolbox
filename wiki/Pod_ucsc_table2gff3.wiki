@@ -1,0 +1,141 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME ucsc_refseq2gff3.pl==
+{{{
+}}}
+{{{
+}}}
+==SYNOPSIS==
+{{{
+   ucsc_table2gff3.pl [--options] --table <file>
+  }}}
+{{{
+  Options:
+  --table <filename>
+  --status <filename>
+  --sum <filename>
+  --source <text>
+  --(no)parent
+  --(no)valid
+  --out <filename>
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--table <**filename>
+
+__
+  Provide the name of a UCSC gene table. It may be obtained preferably through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have specific columns, including txStart, txEnd, cdsStart, cdsEnd, exonStarts, exonEnds, and others. The conversion may fail if certain columns are not found. The !RefSeq** and ensGene tables should work great. The file may be gzipped.
+__
+  __
+__--status <**filename>
+
+__
+  Optionally provide the name of the !RefSeq** Status file. It may be obtained through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have 3 columns, including 'mrnaAcc', 'status', and 'mol'. It will only really work with !RefSeq** tables. The file may be gzipped.
+__
+  __
+__--sum <**filename>
+
+__
+  Optionally provide the name of the !RefSeq** Summary file. It may be obtained through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have 3 columns, including 'mrnaAcc', 'completeness', and 'summary'. It will only really work with !RefSeq** tables. The file may be gzipped.
+__
+  __
+__--source <**text>
+
+__
+  Optionally provide the text to be used as the GFF source. The default is  'UCSC'.
+__
+  __
+__--(no)parent
+
+__
+  Indicate whether or not transcript features should be linked to a parent  gene feature. While linking the transcript feature to a parent gene feature  may generate a more complete gene object model, the processed_transcript  glyph in GBrowse cannot handle this object. Without linking, two objects will  be present in a !SeqFeature**::Store database, the gene feature (with no  children) and the transcript feature (with exon and UTR children). The  default behavior is false or no linking.
+__
+  __
+__--(no)valid
+
+__
+  Indicate whether or not valid GFF tags should only be included. When the  refSeq Summary and/or refSeq Status files are included, two additional  non-valid GFF tags may be included, 'completeness' as indicated in the  refSeq Summary file, and 'status' in the refSeq Status file. The presence  of these tags may technically invalidate proper GFF structure, but are  tolerated by some programs (including Bio::!SeqFeature**::Store databases)  and may prove useful in analysis. The default value is false or to include  all available tags.
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify a new filename. By default it uses the basename of the  table file.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will convert a UCSC gene table file into a GFF3 format file  suitable for loading into GBrowse. Unlike other simple converters out there,  it will attempt to build complex gene structures with gene, transcripts,  UTRs, and exons. It will attempt to identify non-coding genes as to type  using the gene name as inference. For !RefSeq** tables, it can also use  additional data tables to identify the feature type, gene status, and include gene descriptions.
+
+Files should preferentially be downloaded through the UCSC table browser, if  at all possible, for two good reasons. One, the table browser includes  column headings, allowing for accurate identification of the columns and  verification of the right file. Two, the genes are ordered, or at least  grouped by chromosome, which is not the case with files downloaded from the  FTP site.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

@@ -1,0 +1,121 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+data2gff.pl
+
+A script to convert data into a frequency distribution, useful for graphing.
+
+==SYNOPSIS==
+data2frequency.pl --bins <**integer> --size <**number> <**filename>
+
+{{{
+  --in <filename>
+  --bins <integer>
+  --size <number>
+  --index <list|range>
+  --min <number>
+  --max <number>
+  --out <filename>
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_data_helper.pm',  although any format should work. The file may be compressed with gzip.
+__
+  __
+__--bins <**integer>
+
+__
+  Specify the number of bins that the data should be placed into.
+__
+  __
+__--size <**integer>
+
+__
+  Specify the size of each bin.
+__
+  __
+__--index <**list|range>
+
+__
+  Specify the datasets in the input data file to be converted to a distribution. The 0-based column number of the datasets should be provided. Multiple  datasets may be provided as a comma-delimited list, as a consecutive list  (start-stop), or a combination of both. Do not include spaces! If no  datasets are provided, the program will interactively present to the user  a list of possible datasets to convert.
+__
+  __
+__--min <**number>
+
+__
+  Optionally indicate the minimum value of the bins. When generating  the list of bins, this is used as the starting value. Default is 0.  Useful for log2 distributions where the minimum value is negative.  A negative number may be provided using the format --min=-1.
+__
+  __
+__--max <**number>
+
+__
+  Optionally provide the maximum bin value. This argument is optional  and is automatically calculated as (bins `*` size). This argument  may also be provided as an alternative to specifying the binsize  value, in which case the number of bins is empirically determined.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output file name. The default is to take the input file base name and append '`_`frequency' to it. The file format is a tim data file.
+__
+  __
+__--help
+
+__
+  Display this help
+__
+  __
+{{{
+}}}
+==DESCRIPTION==
+This program will convert a datasets in a data file into a distribution. This may then be used to conveniantly plot a histogram using a program such as  'graph_profile.pl'.
+
+Set the distribution parameters using the --bins and --binsize arguments,  which set the number of bins and the size of each bin, respectively. The  start number and maximum bin value may be optionally set as well.
+
+One or more datasets within the data file may be converted. These may be  specified on the command line or chosen interactively from a list presented  to the user.
+
+A tim data text file will be written as output. The bin values are listed  as the first column, and the number of datapoints within each bin are  listed in subsequent columns for each dataset requested.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

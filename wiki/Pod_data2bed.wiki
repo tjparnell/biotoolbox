@@ -1,0 +1,158 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+data2bed.pl
+
+==SYNOPSIS==
+data2bed.pl `[`--options...`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --ask
+  --chr <column_index>
+  --start <column_index>
+  --stop | --end <column_index>
+  --name <column_index | base_text>
+  --score <column_index>
+  --strand <column_index>
+  --zero
+  --out <filename> 
+  --bigbed | --bb
+  --chromof <filename>
+  --db <database>
+  --bbapp </path/to/bedToBigBed>
+  --(no)gz
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip.
+__
+  __
+__--ask
+
+__
+  Indicate that the program should interactively ask for the indices for  feature data. It will present a list of the column  names to choose from. Enter nothing for non-relevant columns or to  accept default values.
+__
+  __
+__--chr <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the chromosome or sequence ID column in the BED data.
+__
+  __
+__--start <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the start position column in the BED data.
+__
+  __
+__--start <**column_index>
+
+__
+__--end <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the stop or end position column in the BED data.
+__
+  __
+__--score <**column_index>
+
+__
+  The index of the dataset in the data table to be used  as the score column in the BED data.
+__
+  __
+__--name <**column_index | base_text>
+
+__
+  Supply either the index of the column in the data table to  be used as the name column in the BED data, or the base text  to be used when auto-generating unique feature names. The  auto-generated names are in the format 'text_00000001'.
+__
+  __
+__--strand <**column_index>
+
+__
+  The index of the dataset in the data table to be used for strand information. Accepted values might include any of the following "f(orward), r(everse), w(atson), c(rick), +, -, 1, -1, 0, .".
+__
+  __
+__--zero
+
+__
+  Indicate that the source data is already in interbase (0-based)  coordinates and do not need to be converted. By convention, all  !BioPerl** (and, by extension, all biotoolbox) scripts are base  (1-based) coordinates. Default behavior is to convert.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it uses the basename of the input  file.
+__
+  __
+__--bigbed
+
+__
+__--bb
+
+__
+  Indicate that a binary !BigBed** file should be generated instead of  a text BED file. A .bed file is first generated, then converted to  a .bb file, and then the .bed file is removed.
+__
+  __
+__--chromf <**filename>
+
+__
+  When converting to a !BigBed** file, provide a two-column tab-delimited  text file containing the chromosome names and their lengths in bp.  Alternatively, provide a name of a database, below.
+__
+  __
+__--db <**database>
+
+__
+  Specify the database from which chromosome lengths can be derived when  generating a !BigBed** file. This option is only required when generating  !BigBed** files. It may also be supplied from the metadata in the source  data file.
+__
+  __
+__--bbapp </path/to/bedToBigBed>
+
+__
+  Specify the path to the Jim Kent's bedToBigBed conversion utility. The  default is to first check the tim_db_helper.cfg configuration file for  the application path. Failing that, it will search the default  environment path for the utility. If found, it will automatically  execute the utility to convert the bed file.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will convert a tab-delimited data file into a BED file, according to the specifications here http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED. A minimum of three and a maximum of six columns may be generated. Column identification  may be specified on the command line or interactively. GFF source files   have columns automatically identified. All lower-numbered columns must be defined before writing higher-numbered columns. Thin and thick block data are not written. Browser and Track lines are also not written. Following specification, all coordinates are written in interbase (0-based) coordinates. Base (1-based) coordinates (the !BioPerl** standard) will be converted. Score values are not converted, however, to a 1..1000 scale. The biotoolbox script `manipulate_datasets.pl` has tools to do this if required.
+
+An option exists to further convert the BED file to an indexed, binary !BigBed**  format. Jim Kent's bedToBigBed conversion utility must be available, and  either a chromosome definition file or access to a Bio::DB database is required.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
