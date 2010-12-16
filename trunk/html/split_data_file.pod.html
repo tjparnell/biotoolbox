@@ -1,0 +1,136 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>split_data_file.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>split_data_file.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>split_data_file.pl [--options] &lt;filename&gt;</p>
+<pre>
+
+  --in &lt;filename&gt;
+  --index &lt;column_index&gt;
+  --max &lt;integer&gt;
+  --(no)gz
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the file name of a data file. It must be a tab-delimited text file,
+preferably in the tim data format as described in 'tim_file_helper.pm', 
+although any format should work. The file may be compressed with gzip.</p>
+</dd>
+<dt><strong><a name="index_column_index" class="item">--index &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the index number of the column or dataset containing the values 
+used to split the file. If not specified, then the index is requested 
+from the user in an interactive mode.</p>
+</dd>
+<dt><strong><a name="col_column_index" class="item">--col &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>Alias to --index.</p>
+</dd>
+<dt><strong><a name="max_integer" class="item">--max &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify the maximum number of data lines to write to each 
+file. Each group of specific value data is written to one or more files. 
+Enter as an integer; underscores may be used as thousands separator, e.g. 
+100_000.</p>
+</dd>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
+
+<dd>
+<p>Indicate whether the output files should be compressed 
+with gzip. Default behavior is to preserve the compression 
+status of the input file.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will split a data file into multiple files based on common 
+unique values in the data table. All rows with the same value will be 
+written into the same file. A good example is chromosome, where all 
+data points for a given chromosome will be written to a separate file, 
+resulting in multiple files representing each chromosome found in the 
+original file. The column containing the values to split and group 
+should be indicated; if the column is not sepcified, it may be 
+selected interactively from a list of column headers.</p>
+<p>If the max argument is set, then each group will be written to one or 
+more files, with each file having no more than the indicated maximum 
+number of data lines. This is useful to keep the file size reasonable, 
+especially when processing the files further and free memory is 
+constrained. A reasonable limit may be 100K or 1M lines.</p>
+<p>The resulting files will be named using the basename of the input file, 
+appended with the unique group value (for example, the chromosome name)
+demarcated with a #. If a maximum line limit is set, then the file part 
+number is appended to the basename, padded with zeros to three digits 
+(to assist in sorting). Each file will have duplicated and preserved 
+metadata. The original file is preserved.</p>
+<p>This program is intended as the complement to 'join_data_files.pl'.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

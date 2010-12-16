@@ -1,0 +1,160 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>ucsc_table2gff3.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name_ucsc_refseq2gff3_pl">NAME ucsc_refseq2gff3.pl</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name_ucsc_refseq2gff3_pl">NAME ucsc_refseq2gff3.pl</a></h1>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+   ucsc_table2gff3.pl [--options] --table &lt;file&gt;
+  
+  Options:
+  --table &lt;filename&gt;
+  --status &lt;filename&gt;
+  --sum &lt;filename&gt;
+  --source &lt;text&gt;
+  --(no)parent
+  --(no)valid
+  --out &lt;filename&gt;
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="table_filename" class="item">--table &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the name of a UCSC gene table. It may be obtained preferably
+through the UCSC Genome Table Browser, or downloaded from their FTP site.
+The file should have specific columns, including txStart, txEnd, cdsStart,
+cdsEnd, exonStarts, exonEnds, and others. The conversion may fail if
+certain columns are not found. The RefSeq and ensGene tables should work
+great. The file may be gzipped.</p>
+</dd>
+<dt><strong><a name="status_filename" class="item">--status &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally provide the name of the RefSeq Status file. It may be obtained
+through the UCSC Genome Table Browser, or downloaded from their FTP site.
+The file should have 3 columns, including 'mrnaAcc', 'status', and 'mol'.
+It will only really work with RefSeq tables. The file may be gzipped.</p>
+</dd>
+<dt><strong><a name="sum_filename" class="item">--sum &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally provide the name of the RefSeq Summary file. It may be obtained
+through the UCSC Genome Table Browser, or downloaded from their FTP site.
+The file should have 3 columns, including 'mrnaAcc', 'completeness', and
+'summary'. It will only really work with RefSeq tables. The file may be
+gzipped.</p>
+</dd>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally provide the text to be used as the GFF source. The default is 
+'UCSC'.</p>
+</dd>
+<dt><strong><a name="no_parent" class="item">--(no)parent</a></strong></dt>
+
+<dd>
+<p>Indicate whether or not transcript features should be linked to a parent 
+gene feature. While linking the transcript feature to a parent gene feature 
+may generate a more complete gene object model, the processed_transcript 
+glyph in GBrowse cannot handle this object. Without linking, two objects will 
+be present in a SeqFeature::Store database, the gene feature (with no 
+children) and the transcript feature (with exon and UTR children). The 
+default behavior is false or no linking.</p>
+</dd>
+<dt><strong><a name="no_valid" class="item">--(no)valid</a></strong></dt>
+
+<dd>
+<p>Indicate whether or not valid GFF tags should only be included. When the 
+refSeq Summary and/or refSeq Status files are included, two additional 
+non-valid GFF tags may be included, 'completeness' as indicated in the 
+refSeq Summary file, and 'status' in the refSeq Status file. The presence 
+of these tags may technically invalidate proper GFF structure, but are 
+tolerated by some programs (including Bio::SeqFeature::Store databases) 
+and may prove useful in analysis. The default value is false or to include 
+all available tags.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify a new filename. By default it uses the basename of the 
+table file.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will convert a UCSC gene table file into a GFF3 format file 
+suitable for loading into GBrowse. Unlike other simple converters out there, 
+it will attempt to build complex gene structures with gene, transcripts, 
+UTRs, and exons. It will attempt to identify non-coding genes as to type 
+using the gene name as inference. For RefSeq tables, it can also use 
+additional data tables to identify the feature type, gene status, and include
+gene descriptions.</p>
+<p>Files should preferentially be downloaded through the UCSC table browser, if 
+at all possible, for two good reasons. One, the table browser includes 
+column headings, allowing for accurate identification of the columns and 
+verification of the right file. Two, the genes are ordered, or at least 
+grouped by chromosome, which is not the case with files downloaded from the 
+FTP site.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

@@ -1,0 +1,162 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>get_intersecting_features.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name_get_intersecting_features_pl">NAME get_intersecting_features.pl</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name_get_intersecting_features_pl">NAME get_intersecting_features.pl</a></h1>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+   get_intersecting_features.pl [--options] &lt;filename&gt;
+  
+  Options:
+  --in &lt;filename&gt;
+  --db &lt;database&gt;
+  --feature &lt;text&gt;
+  --start &lt;integer&gt;
+  --stop &lt;integer&gt;
+  --extend &lt;integer&gt;
+  --ref [start | mid]
+  --out &lt;filename&gt;
+  --(no)gz
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the file name of a list of reference features to find overlapping 
+target features. These reference features may be genomic coordinates (chromo,
+start, stop) or named features (name, type). A tim data formatted file is 
+best used but other tab delimited text formats may be used.</p>
+</dd>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
+
+<dd>
+<p>Provide the name of a Bio::DB::SeqFeature store database to use when 
+finding features. If not specified, the database specified in the input file 
+metadata will be used.</p>
+</dd>
+<dt><strong><a name="feature_text" class="item">--feature &lt;text&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the name of the target features to search for in the database that 
+intersect with the list of reference features. The type may be a either a 
+GFF &quot;type&quot; or a &quot;type:method&quot; string. If not specifed, then the database 
+will be queried for potential GFF types and a list presented to the user to 
+select one.</p>
+</dd>
+<dt><strong><a name="start_integer_stop_integer" class="item">--start &lt;integer&gt;, --stop &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify the relative start and stop positions from the 5' end (or 
+start coordinate for non-stranded features) with which to restrict the region 
+when searching for target features. For example, specify &quot;--start=-200 
+--stop=0&quot; to restrict to the promoter region of genes. Both positions must 
+be specified. Default is to take the entire region of the reference feature.</p>
+</dd>
+<dt><strong><a name="extend_integer" class="item">--extend &lt;integer&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify the number of bp to extend the reference feature's region 
+on each side. Useful when you have small reference regions and you want to 
+include a larger search region.</p>
+</dd>
+<dt><strong><a name="ref_start_mid" class="item">--ref [start | mid]</a></strong></dt>
+
+<dd>
+<p>Indicate the reference point from which to calculate the distance between the 
+reference and target features. The same reference point is used for both 
+features. Valid options include &quot;start&quot; (or 5' end for stranded features) and 
+&quot;mid&quot; (for midpoint). Default is &quot;start&quot;.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify a new filename. A standard tim data text file is written. 
+The default is to rewrite the input file.</p>
+</dd>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
+
+<dd>
+<p>Specify whether the output file should (not) be compressed with gzip.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will take a list of reference features and identify 
+target features which intersect them. The reference features 
+may be either named features (name and type) or genomic regions (chromosome, 
+start, stop). By default, the search region for each reference feature is the 
+entire feature, but may be restricted or expanded in size with appropriate 
+modifiers (--start, --stop, --extend). The target features are specifed as 
+specific types.</p>
+<p>Several attributes of the found features are appended to the original input 
+file data. First, the number of 
+target features are reported. If more than one are found, the feature with 
+the most overlap with the reference feature is preferentially listed. The name, 
+type, and strand of the selected target feature is reported. Finally, the 
+distance from the reference feature to the target feature is reported. The 
+reference points for measuring the distance is by default the start or 5' end 
+of the features, or optionally the midpoints.</p>
+<p>A standard tim data text file is written.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

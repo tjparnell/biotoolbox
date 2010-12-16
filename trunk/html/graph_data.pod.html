@@ -1,0 +1,202 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>graph_data.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>graph_data.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+
+  graph_data.pl [--options] &lt;filename&gt;</pre>
+<pre>
+
+  Options:
+  --in &lt;filename&gt;
+  --type [scatter | line | smooth]
+  --pair &lt;X_index&gt;,&lt;Y_index&gt;
+  --index &lt;X_index&amp;Y_index,...&gt;
+  --all
+  --ma &lt;window&gt;,&lt;step&gt;
+  --(no)norm
+  --(no)log
+  --min=&lt;value&gt;
+  --max=&lt;value&gt;
+  --dir &lt;foldername&gt;
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the input data file. A tim data formatted file is 
+preferred, although any tabbed delimited text file where 
+datasets are represented as columns will suffice. The file 
+may be gzip'ed.</p>
+</dd>
+<dt><strong><a name="type_scatter_line_smooth" class="item">--type [scatter | line | smooth]</a></strong></dt>
+
+<dd>
+<p>Indicate the type of graph to plot. Three different values are 
+accepted. <strong>Scatter</strong> graphs will plot all pairwise X,Y values and 
+draw a linear regression line through them. <strong>Line</strong> graphs will 
+plot a continuous line connecting all pairwise X,Y data values. 
+With noisy data, the plot will look the best if the values are 
+first smoothed using a moving average (--ma option). Finally, a 
+<strong>smooth</strong> graph is the same as a line graph, except the data 
+values are smoothed using a bezier curve function. Note that the 
+bezier smoothing function is not equivalent or as effective 
+as a moving average. The default value is a scatter plot.</p>
+</dd>
+<dt><strong><a name="pair_x_index_y_index" class="item">--pair &lt;X_index&gt;,&lt;Y_index&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the two datasets to plot together. Use the datasets'
+index (0-based) expressed as 'X,Y' with no spaces. Use the 
+option repeatedly to plot multiple graphs. If no datasets are 
+set, then the lists may be selected interactively from a list.</p>
+</dd>
+<dt><strong><a name="index_x_index_y_index" class="item">--index &lt;X_index&amp;Y_index,...&gt;</a></strong></dt>
+
+<dd>
+<p>An alternative method of specifying the datasets as a 
+comma-delimited list of X&amp;Y datasets, where the X and Y 
+indices are demarcated by an ampersand. If no datasets are 
+set, then the lists may be selected interactively from a list.</p>
+</dd>
+<dt><strong><a name="all" class="item">--all</a></strong></dt>
+
+<dd>
+<p>Indicate that all available datasets in the input file should be
+plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.</p>
+</dd>
+<dt><strong><a name="no_log" class="item">--(no)log</a></strong></dt>
+
+<dd>
+<p>Indicate whether dataset values are in log2 space or not. If set 
+to true and the log2 status is indicated in the metadata, then 
+the metadata status is preserved. Default is false (and metadata 
+ignored).</p>
+</dd>
+<dt><strong><a name="no_norm" class="item">--(no)norm</a></strong></dt>
+
+<dd>
+<p>Datasets should (not) be normalized by converting to percentile 
+rank values (0..1). This is helpful when the two datasets are 
+not in similar scales. Default is false.</p>
+</dd>
+<dt><strong><a name="ma_window_step" class="item">--ma &lt;window&gt;,&lt;step&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the values to smooth the data by moving average. 
+Express the values as 'window,step', no spaces. All Y values 
+within the window are averaged together and plotted 
+against the window midpoint X value. The window position is 
+then incremented by the step size. The step size should be 
+equal or less than the window size. Both values must be 
+real integers. This data manipulation is extremely useful and 
+recommended for noisy datasets.</p>
+</dd>
+<dt><strong><a name="min_value_max_value" class="item">--min=&lt;value&gt;, --max=&lt;value&gt;</a></strong></dt>
+
+<dd>
+<p>Specify explicitly the minimum and/or maximum axis value(s). 
+Default is calculated. Sometimes setting this improves 
+the appearance of the graph. They may be set independently.</p>
+</dd>
+<dt><strong><a name="dir_foldername" class="item">--dir &lt;foldername&gt;</a></strong></dt>
+
+<dd>
+<p>Specify an optional name for the output subdirectory name. Default
+is the input filename base with '_graphs' appended.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display this help as a POD.</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will graph pairwise data sets against each other. This is useful 
+for determining correlations between data sets. The graphs are generated as 
+PNG images and written to a subdirectory.</p>
+<p>Three types of graphs may be generated, specified by the --type argument.</p>
+<p>A scatter plot will plot all pairwise values between two datasets as a 
+point on an X,Y graph. A line representing the linear regression of the 
+two datasets is plotted above the points.</p>
+<p>A line plot will plot the pairwise values between two datasets as a 
+continuous line.</p>
+<p>A smooth plot is a line plot of pairwise values between two datasets and 
+smoothed by a bezier curve.</p>
+<p>The datasets to be plotted may be specified either on the command line 
+using the --pair or --index arguments. If not specified, the program 
+defaults to an interactive mode and the user may repeatedly select the 
+datasets from a list of available datasets in the data file.</p>
+<p>The data in the datasets may be manipulated in several ways prior to plotting.
+The data may be converted to a percentile rank, smoothed by a moving average, 
+converted from log2 values, constrained to minimum and maximum values, etc. 
+See options for details.</p>
+<p>If the graph doesn't look like you expect, and you are not normalizing by 
+converting to a percent rank (--norm), try explicitly setting the --min and 
+--max values. The GD::Graph module tries its best at setting these 
+automatically, but sometimes does funny things, particularly with log2 data 
+that spans 0.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

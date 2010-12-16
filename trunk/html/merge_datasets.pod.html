@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>merge_datasets.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>merge_datasets.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>merge_datasets.pl [--options...] &lt;file1&gt; &lt;file2&gt; ...</p>
+<pre>
+
+  Options:
+  --lookup
+  --out &lt;filename&gt; 
+  --(no)gz
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="lookup" class="item">--lookup</a></strong></dt>
+
+<dd>
+<p>Force the program to merge data by using lookup values in each file.</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the output filename. By default it uses the first file name.</p>
+</dd>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
+
+<dd>
+<p>Specify whether (or not) the output file should be compressed with gzip.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display this POD documentation.</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will merge two or more tab-delimited data files into one file. 
+Datasets (columns) from each file are interactively chosen and then merged 
+into an output file. Datasets from the third and subsequent files are 
+added to the end (rightmost column) of the first two merged files.</p>
+<p>The program blindly assumes that rows (features) are equivalent in all of the 
+datasets if there are an equal number of data rows. However, if there are an 
+unequal number of data rows, or the user forces by using the --lookup option, 
+then dataset values are looked up first using specified lookup values before 
+merging (compare with Excel VLOOKUP function). In this case, the dataset 
+lookup indices from each file are requested, followed by the order of datasets 
+to merge. The first index in the order determines which file is dominant, 
+meaning that all rows from that file are included, and only the rows that 
+match by lookup value are included from the second file. Null values are 
+recorded when no match is found in the second file.</p>
+<p>After merging, an opportunity for renaming the dataset names is 
+presented.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>

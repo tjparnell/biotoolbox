@@ -1,0 +1,248 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>data2gff.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>data2gff.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<p>data2gff.pl [--options...] &lt;filename&gt;</p>
+<pre>
+
+  Options:
+  --in &lt;filename&gt;
+  --ask
+  --chr &lt;column_index&gt;
+  --start &lt;column_index&gt;
+  --stop | --end &lt;column_index&gt;
+  --score &lt;column_index&gt;
+  --strand &lt;column_index&gt;
+  --name &lt;text | column_index&gt;
+  --id &lt;column_index&gt;
+  --tags &lt;column_index,column_index,...&gt;
+  --source &lt;text&gt;
+  --type &lt;text | column_index&gt;
+  --(no)zero
+  --format [0,1,2,3]
+  --(no)midpoint
+  --(no)unique
+  --out &lt;filename&gt; 
+  --version [2,3]
+  --(no)gz
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Specify the file name of a data file. It must be a tab-delimited text file,
+preferably in the tim data format as described in 'tim_file_helper.pm', 
+although any format should work. The file may be compressed with gzip.</p>
+</dd>
+<dt><strong><a name="ask" class="item">--ask</a></strong></dt>
+
+<dd>
+<p>Indicate that the program should interactively ask for the indices for 
+feature score, name, and strand. It will present a list of the column 
+names to choose from. It will also ask for the source, and type
+or method text strings. Enter nothing for non-relevant columns or to 
+accept default values.</p>
+</dd>
+<dt><strong><a name="chr_column_index" class="item">--chr &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used 
+as the chromosome or sequence ID column in the gff data.</p>
+</dd>
+<dt><strong><a name="start_column_index" class="item">--start &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used 
+as the start position column in the gff data.</p>
+</dd>
+<dt><strong><a name="start_column_index_item_end_column_index" class="item">--start &lt;column_index&gt;
+=item --end &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used 
+as the stop or end position column in the gff data.</p>
+</dd>
+<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used 
+as the score column in the gff data.</p>
+</dd>
+<dt><strong><a name="name_column_index" class="item">--name &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>Enter either the text that will be shared name among 
+all the features, or the index of the dataset in the data 
+table to be used as the name of each gff feature. This 
+information will be used in the 'group' column.</p>
+</dd>
+<dt><strong><a name="id_column_index" class="item">--id &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used
+as the unique ID of each gff feature. This information
+will be used in the 'group' column of GFF v.3 files 
+only. The default is to automatically generate a 
+unique identifier.</p>
+</dd>
+<dt><strong><a name="strand_column_index" class="item">--strand &lt;column_index&gt;</a></strong></dt>
+
+<dd>
+<p>The index of the dataset in the data table to be used
+for strand information. Accepted values might include
+any of the following &quot;f(orward), r(everse), w(atson),
+c(rick), +, -, 1, -1, 0, .&quot;.</p>
+</dd>
+<dt><strong><a name="tags_column_indices" class="item">--tags &lt;column_indices&gt;</a></strong></dt>
+
+<dd>
+<p>Provide a comma delimited list of column indices that contain 
+values to be included as group tags in the GFF features. The 
+key will be the column name.</p>
+</dd>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
+
+<dd>
+<p>A scalar value to be used as the text in the 'source' 
+column. Default is 'data'.</p>
+</dd>
+<dt><strong><a name="type_text_column_index" class="item">--type &lt;text | column_index&gt;</a></strong></dt>
+
+<dd>
+<p>Enter either a text string to be used as the GFF 'method'
+or 'type' column, or a column index representing the 
+feature type when one simply won't due. If not defined, 
+it will use the name of the dataset used for either the 'score' 
+or 'name' column, if defined. As a last resort, it 
+will use the most creative method of 'Experiment'.</p>
+</dd>
+<dt><strong><a name="no_zero" class="item">--(no)zero</a></strong></dt>
+
+<dd>
+<p>Indicate whether the source data is in interbase or 0-based 
+coordinates, as is used with UCSC source data or USeq data 
+packages. The coordinates will then be converted to 1-based 
+coordinates, consistent with the rest of bioperl conventions.
+The default is false (will not convert).</p>
+</dd>
+<dt><strong><a name="format_0_1_2_3" class="item">--format [0,1,2,3]</a></strong></dt>
+
+<dd>
+<p>Indicate the number of decimal places the score value should
+be formatted. Acceptable values include 0, 1, 2, or 3 places.
+Anything else is ignored.</p>
+</dd>
+<dt><strong><a name="no_midpoint" class="item">--(no)midpoint</a></strong></dt>
+
+<dd>
+<p>A boolean (1 or 0) value to indicate whether the 
+midpoint between the actual 'start' and 'stop' values
+should be used instead of the actual values. Default 
+is false.</p>
+</dd>
+<dt><strong><a name="no_unique" class="item">--(no)unique</a></strong></dt>
+
+<dd>
+<p>Indicate whether the feature names should be made unique. A count 
+number is appended to the name of subsequent features to make them 
+unique. This should only be applied to genomic features, and not to 
+genomic data values (microarray data, sequencing data, etc). The 
+default behavior is false (not unique).</p>
+</dd>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
+
+<dd>
+<p>Optionally specify the name of of the output file. The default is to use 
+the assigned type value. The '.gff' extension is automatically
+added if required.</p>
+</dd>
+<dt><strong><a name="version_2_3" class="item">--version [2,3]</a></strong></dt>
+
+<dd>
+<p>Specify the GFF version. The default is version 3.</p>
+</dd>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
+
+<dd>
+<p>Indicate whether the output file should (not) be compressed with gzip.</p>
+</dd>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
+
+<dd>
+<p>Display the POD documentation</p>
+</dd>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will convert a data file into a GFF formatted text file. 
+Only simple conversions are performed, where each data line is converted 
+to a single feature. Complex features with parent-child relationships (such 
+as genes) should be converted with something else.</p>
+<p>The source file should have chromosomal coordinates, i.e. chromosome, 
+start, and (optionally) stop or end coordinates. They may be specified 
+upon execution or identified automatically. If they are not found, the 
+GFF conversion will fail.</p>
+<p>Additional feature information may be specified using appropriate command-line 
+arguments, including score values, strand, name, ID, source, type, etc. See 
+the <em>OPTIONS</em> for more details.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>
