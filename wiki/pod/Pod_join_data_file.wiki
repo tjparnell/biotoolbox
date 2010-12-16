@@ -1,0 +1,78 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+join_data_file.pl
+
+==SYNOPSIS==
+join_data_file.pl `[`--options`]` <**file1> <**file2> ...
+
+{{{
+  --out <filename>
+  --(no)gz
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--out <**filename>
+
+__
+  Provide the name of the output file. If the input files were  split using 'split_data_file.pl', then the original base name  may be reconstituted. Otherwise, the user will be asked for  an output file name.
+__
+  __
+__--(no)gz
+
+__
+  Indicate whether the output files should be compressed  with gzip. Default behavior is to preserve the compression  status of the first input file.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will join two or or more data files, essentially concatanating the files but intelligently dealing with the metadata and column headers.  Checks are made to ensure that the number of columns in the subsequent files  match the first file.
+
+The program will not merge datasets from multiple files; see  the program 'merge_datasets.pl' for that.
+
+This program is intended as the complement to 'split_data_files.pl'.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

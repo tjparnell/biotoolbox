@@ -1,0 +1,137 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+graph_data.pl
+
+==SYNOPSIS==
+{{{
+  graph_data.pl [--options] <filename>
+  }}}
+{{{
+  Options:
+  --in <filename>
+  --type [scatter | line | smooth]
+  --pair <X_index>,<Y_index>
+  --index <X_index&Y_index,...>
+  --all
+  --ma <window>,<step>
+  --(no)norm
+  --(no)log
+  --min=<value>
+  --max=<value>
+  --dir <foldername>
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+{{{
+}}}
+__--in <**filename>
+
+__
+  Specify the input data file. A tim data formatted file is  preferred, although any tabbed delimited text file where  datasets are represented as columns will suffice. The file  may be gzip'ed.
+__
+  __
+__--type `[`scatter | line | smooth`]`
+
+__
+  Indicate the type of graph to plot. Three different values are  accepted. _*_Scatter_*_ graphs will plot all pairwise X,Y values and  draw a linear regression line through them. _*_Line_*_ graphs will  plot a continuous line connecting all pairwise X,Y data values.  With noisy data, the plot will look the best if the values are  first smoothed using a moving average (--ma option). Finally, a  _*_smooth_*_ graph is the same as a line graph, except the data  values are smoothed using a bezier curve function. Note that the  bezier smoothing function is not equivalent or as effective  as a moving average. The default value is a scatter plot.
+__
+  __
+__--pair <**X_index>,<**Y_index>
+
+__
+  Specify the two datasets to plot together. Use the datasets' index (0-based) expressed as 'X,Y' with no spaces. Use the  option repeatedly to plot multiple graphs. If no datasets are  set, then the lists may be selected interactively from a list.
+__
+  __
+__--index <**X_index&Y_index,...>
+
+__
+  An alternative method of specifying the datasets as a  comma-delimited list of X&Y datasets, where the X and Y  indices are demarcated by an ampersand. If no datasets are  set, then the lists may be selected interactively from a list.
+__
+  __
+__--all
+
+__
+  Indicate that all available datasets in the input file should be plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.
+__
+  __
+__--(no)log
+
+__
+  Indicate whether dataset values are in log2 space or not. If set  to true and the log2 status is indicated in the metadata, then  the metadata status is preserved. Default is false (and metadata  ignored).
+__
+  __
+__--(no)norm
+
+__
+  Datasets should (not) be normalized by converting to percentile  rank values (0..1). This is helpful when the two datasets are  not in similar scales. Default is false.
+__
+  __
+__--ma <**window>,<**step>
+
+__
+  Specify the values to smooth the data by moving average.  Express the values as 'window,step', no spaces. All Y values  within the window are averaged together and plotted  against the window midpoint X value. The window position is  then incremented by the step size. The step size should be  equal or less than the window size. Both values must be  real integers. This data manipulation is extremely useful and  recommended for noisy datasets.
+__
+  __
+__--min=<**value>, --max=<**value>
+
+__
+  Specify explicitly the minimum and/or maximum axis value(s).  Default is calculated. Sometimes setting this improves  the appearance of the graph. They may be set independently.
+__
+  __
+__--dir <**foldername>
+
+__
+  Specify an optional name for the output subdirectory name. Default is the input filename base with '`_`graphs' appended.
+__
+  __
+__--help
+
+__
+  Display this help as a POD.
+__
+  __
+==DESCRIPTION==
+This program will graph pairwise data sets against each other. This is useful  for determining correlations between data sets. The graphs are generated as  PNG images and written to a subdirectory.
+
+Three types of graphs may be generated, specified by the --type argument.
+
+A scatter plot will plot all pairwise values between two datasets as a  point on an X,Y graph. A line representing the linear regression of the  two datasets is plotted above the points.
+
+A line plot will plot the pairwise values between two datasets as a  continuous line.
+
+A smooth plot is a line plot of pairwise values between two datasets and  smoothed by a bezier curve.
+
+The datasets to be plotted may be specified either on the command line  using the --pair or --index arguments. If not specified, the program  defaults to an interactive mode and the user may repeatedly select the  datasets from a list of available datasets in the data file.
+
+The data in the datasets may be manipulated in several ways prior to plotting. The data may be converted to a percentile rank, smoothed by a moving average,  converted from log2 values, constrained to minimum and maximum values, etc.  See options for details.
+
+If the graph doesn't look like you expect, and you are not normalizing by  converting to a percent rank (--norm), try explicitly setting the --min and  --max values. The GD::Graph module tries its best at setting these  automatically, but sometimes does funny things, particularly with log2 data  that spans 0.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}

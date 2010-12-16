@@ -1,0 +1,127 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+map_oligo_data2gff.pl
+
+==SYNOPSIS==
+data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
+
+{{{
+  Options:
+  --oligo <oligo_file.gff>
+  --data <oligo_data.txt>
+  --index <column_index>
+  --name <text>
+  --type <text>
+  --source <text>
+  --(no)strand
+  --(no)mid
+  --places [0,1,2,3]
+  --out <filename> 
+  --help
+  }}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--oligo <**oligo_file.gff>
+
+__
+  Specify the file name of the oligo probe GFF file. This file should identify  all positions that the probes align to in the genome. It may be either v.2 or  v.3 GFF file, but the oligo probe name or ID must be present in the group  field.
+__
+  __
+__--data <**oligo_data.tx>
+
+__
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip. The  first column MUST be the oligo or probe unique name or ID.
+__
+  __
+__--index <**column_index>
+
+__
+  Specify the data column index in the data file that will be used in the  final GFF score column. By default, it lists the column names for the user  to interactively select.
+__
+  __
+__--col <**column_index>
+
+__
+  Alias to --index.
+__
+  __
+__--name <**text>
+
+__
+  Specify the name of the dataset to be used in the output GFF file. By default  it uses the column name from the data file.
+__
+  __
+__--type <**text>
+
+__
+  Specify the output GFF type or method field value. By default, it uses the name.
+__
+  __
+__--source <**text>
+
+__
+  Specify the output GFF source field value. By default it is 'lab'.
+__
+  __
+__--(no)strand
+
+__
+  Indicate whether the original strand information should (not) be kept from the  original oligo GFF file. The default is false, as most ChIP data is inherently  not stranded.
+__
+  __
+__--(no)mid
+
+__
+  Indicate whether the original position information should (not) be converted  to the midpoint position. The GBrowse xyplot data works best when data is  present at single points (start = end) rather than regions. Default is true.
+__
+  __
+__--places `[`0,1,2,3`]`
+
+__
+  Indicate the number of decimal places the score value should be formatted. The  default is no formatting.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. The default is to use the name value.
+__
+  __
+__--(no)gz
+
+__
+  Indicate whether the output file should (not) be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This script assigns data values for microarray oligo probes to positions in the  genome. It essentially merges the information from a data file, consisting of  unique oligo probe names and data values, with a GFF file referencing the  genomic positions of each microarray oligo probe.
+
+The score value may be formatted, and the GFF type, source, name, and strand  may be set to new values. It will write a GFF v.3 file, regardless of the  source oligo GFF file version.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}

@@ -1,0 +1,165 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+data2wig.pl
+
+A script to convert a generic data file into a wig file.
+
+==SYNOPSIS==
+data2wig.pl `[`--options...`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --out <filename> 
+  --step [fixed,variable]
+  --size <integer>
+  --score <column_index>
+  --name <text>
+  --(no)track
+  --inter
+  --format [0,1,2,3]
+  --(no)midpoint
+  --bigwig|--bw
+  --chromof <filename>
+  --db <database>
+  --(no)gz
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the file name of a data file, with or without the --in flag.  The file may be any tab-delimited text file (preferably in the tim data  format as described in `tim_file_helper.pm`), GFF, SGR, or BED file.  Recognizeable genome coordinate columns should be present, including  chromosome, start, and stop. Data files collected using the 'genome'  windows feature are ideal. The file may be compressed with gzip.
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify the name of of the output file. The track name is  used as default. The '.wig' extension is automatically added if required.
+__
+  __
+__--step `[`fixed,variable`]`
+
+__
+  The type of step progression for the wig file. Two wig formats are available: 'fixedStep' where data points are positioned at equal distances along the  chromosome, and 'variableStep' where data points are not equally spaced  along the chromosome. The 'fixedStep' wig file has one column of data  values (score), while the 'variableStep' wig file has two columns (position and score). If the option is not defined, then the format is  automatically determined from the metadata of the file.
+__
+  __
+__--size <**integer>
+
+__
+  Optionally define the step size in bp for 'fixedStep' wig file. This  value is automatically determined from the table's metadata, if available.  If the --step option is explicitly defined as 'fixed', then the step size  may also be explicitly defined. If this value is not explicitly defined or automatically determined, the variableStep format is used by default.
+__
+  __
+__--score <**column_index>
+
+__
+  Indicate the column index (0-based) of the dataset in the data table  to be used for the score. If a GFF file is used as input, the score column is  automatically selected. If not defined as an option, then the program will interactively ask the user for the column index from a list of available columns.
+__
+  __
+__--name <**text>
+
+__
+  The name of the track defined in the wig file. The default is to use  the name of the chosen score column, or, if the input file is a GFF file,  the base name of the input file.
+__
+  __
+__--(no)track
+
+__
+  Do (not) include the track line at the beginning of the wig file. Wig  files normally require a track line, but if you will be converting to  the binary bigwig format, the converter requires no track line. Why it  can't simply ignore the line is beyond me. This option is automatically  set to false when the --bigwig option is enabled.
+__
+  __
+__--inter
+
+__
+  Source data is in interbase coordinate (0-base) system. Shift the  start position to base coordinate (1-base) system. Wig files are by  definition 1-based. Default is false.
+__
+  __
+__--(no)midpoint
+
+__
+  A boolean value to indicate whether the  midpoint between the actual 'start' and 'stop' values should be used. The default is to use only the 'start' position.
+__
+  __
+__--format `[`0,1,2,3`]`
+
+__
+  Indicate the number of decimal places the score value should be formatted. Acceptable values include 0, 1, 2, or 3 places. The default is to not format the score value.
+__
+  __
+__--bigwig --bw
+
+__
+  Indicate that a binary !BigWig** file should be generated instead of  a text wiggle file. A .wig file is first generated, then converted to  a .bw file, and then the .wig file is removed.
+__
+  __
+__--chromof <**filename>
+
+__
+  When converting to a !BigWig** file, provide a two-column tab-delimited  text file containing the chromosome names and their lengths in bp.  Alternatively, provide a name of a database, below.
+__
+  __
+__--db <**database>
+
+__
+  Specify the database from which chromosome lengths can be derived when  generating a bigwig file. This option is only required when generating  bigwig files. It may also be supplied from the metadata in the source  data file.
+__
+  __
+__--(no)gz
+
+__
+  A boolean value to indicate whether the output wiggle  file should be compressed with gzip.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will convert a data file into a wig formatted text file. This presumes that the data file contains the chromosomal coordinates,  i.e. chromosome, start, and (optionally) stop. If they are not found, the  conversion will fail. The relevant columns should  therefore be labeled 'chromosome', 'start', and 'stop' or 'end'.
+
+The wig file format is specified by documentation supporting the UCSC  Genome Browser and detailed at this location: http://genome.ucsc.edu/goldenPath/help/wiggle.html Two formats are supported, 'fixedStep' and 'variableStep'.
+
+Alternatively, a binary !BigWig** file may be generated as opposed to a  text wiggle file. The binary format is preferential to the text version  for a variety of reasons, including fast, random access and no loss in  data value precision. More information can be found at this location: http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires  !BigWig** file support, supplied by the biotoolbox module  `tim_db_helper::bigwig`.
+
+{{{
+}}}
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
+{{{
+}}}
