@@ -91,7 +91,7 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====average_gene.pl====
 [http://biotoolbox.googlecode.com/svn/trunk/html/average_gene.pod.html average_gene.pl] Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 ====bam2gff_bed.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/bam2gff_bed.pod.html bam2gff_bed.pl] Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
+[Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl] Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
 ====bar2wig.pl====
 [http://biotoolbox.googlecode.com/svn/trunk/html/bar2wig.pod.html bar2wig.pl] Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 ====bin_genomic_data.pl====
