@@ -61,13 +61,12 @@ to Agilent cerevisiae 244K arrays.</p>
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong>
+<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the BioPerl gff database to pull the source data.</p>
 </dd>
-</li>
-<dt><strong><a name="dataf_filename" class="item">--dataf &lt;filename&gt;</a></strong>
+<dt><strong><a name="dataf_filename" class="item">--dataf &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name of a data file containing the dataset. The file 
@@ -75,8 +74,7 @@ should provide genomic coordinates (e.g. GFF file). If more than
 one dataset is within the file, then the dataset name should be 
 provided.</p>
 </dd>
-</li>
-<dt><strong><a name="data_dataset_name" class="item">--data &lt;dataset_name&gt;</a></strong>
+<dt><strong><a name="data_dataset_name" class="item">--data &lt;dataset_name&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name of the dataset containing the nucleosome occupancy data
@@ -84,15 +82,13 @@ from which to identify the movements. The dataset should be a ratio
 or normalized difference between experimental and control nucleosome 
 occupancies. It is assumed to be in log2 data space.</p>
 </dd>
-</li>
-<dt><strong><a name="gain_number" class="item">--gain &lt;number&gt;</a></strong>
+<dt><strong><a name="gain_number" class="item">--gain &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the minimum score value required to identify a gain event. 
 Adjacent concordant gain and loss identifies nucleosome movement.</p>
 </dd>
-</li>
-<dt><strong><a name="loss_number" class="item">--loss &lt;number&gt;</a></strong>
+<dt><strong><a name="loss_number" class="item">--loss &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the minimum score value required to identify a loss event. 
@@ -100,8 +96,7 @@ Adjacent concordant gain and loss identifies nucleosome movement.
 The loss number is automatically converted to a negative if 
 necessary (assuming the data is in log2 space).</p>
 </dd>
-</li>
-<dt><strong><a name="type_gff_type" class="item">--type &lt;gff_type&gt;</a></strong>
+<dt><strong><a name="type_gff_type" class="item">--type &lt;gff_type&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the text to be used as the GFF type (or method) used in 
@@ -109,29 +104,25 @@ writing the GFF file. It is also used as the base for the event
 name. The default value is the dataset name appended with 
 '_movement'.</p>
 </dd>
-</li>
-<dt><strong><a name="source_gff_source" class="item">--source &lt;gff_source&gt;</a></strong>
+<dt><strong><a name="source_gff_source" class="item">--source &lt;gff_source&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the text to be used as the GFF source used in writing the 
 GFF file. The default value is the name of this program.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output file name. The default is to use the type provided.</p>
 </dd>
-</li>
-<dt><strong><a name="delta_number" class="item">--delta &lt;number&gt;</a></strong>
+<dt><strong><a name="delta_number" class="item">--delta &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the minimum absolute difference value to call a nucleosome 
 movement event. The default is the sum of absolute gain and loss 
 values.</p>
 </dd>
-</li>
-<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the maximum window size in bp to look for adjacent probes when 
@@ -139,13 +130,11 @@ calling nucleosome movement events. The number should be greater than
 the average microarray probe spacing but less than the length of a 
 nucleosome. The default value is 100 bp.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation of the script.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

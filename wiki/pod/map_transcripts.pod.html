@@ -62,16 +62,15 @@
 =head1 OPTIONS</pre>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the base output filename for the transcript data file, GFF file, 
 and summary file.</p>
 </dd>
-</li>
-<dt><strong><a name="ffile_filename" class="item">--ffile &lt;filename&gt;</a></strong>
+<dt><strong><a name="ffile_filename" class="item">--ffile &lt;filename&gt;</a></strong></dt>
 
-<dt><strong><a name="rfile_filename" class="item">--rfile &lt;filename&gt;</a></strong>
+<dt><strong><a name="rfile_filename" class="item">--rfile &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the names of eniched regions files representing transcription 
@@ -82,16 +81,14 @@ program using the parameters defined here. Two files should be provided:
 each representing transcription fragments on the forward and reverse 
 strands.</p>
 </dd>
-</li>
-<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong>
+<dt><strong><a name="db_database_name" class="item">--db &lt;database_name&gt;</a></strong></dt>
 
 <dd>
 <p>Specify a Bioperl Bio::DB::SeqFeature::Store database. Required for 
 generating the transcription fragment enriched_regions files. It may 
 be gleaned from the metadata of the provided enriched_region files.</p>
 </dd>
-</li>
-<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the window size in bp to scan the genome for enriched regions. 
@@ -99,15 +96,13 @@ When the find_enriched_regions.pl program is run, trimming is turned
 on so that the final regions are not limited to multiples of 
 window size.</p>
 </dd>
-</li>
-<dt><strong><a name="step_integer" class="item">--step &lt;integer&gt;</a></strong>
+<dt><strong><a name="step_integer" class="item">--step &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the step size in bp for advancing the window across the genome 
 when scanning for enriched regions.</p>
 </dd>
-</li>
-<dt><strong><a name="thresh_number" class="item">--thresh &lt;number&gt;</a></strong>
+<dt><strong><a name="thresh_number" class="item">--thresh &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the threshold value to identify regions that are enriched, 
@@ -115,10 +110,9 @@ i.e. expressed. A relatively low value should be set to ensure
 low expressed transcripts are also included. The value may be gleaned 
 from the metadata in the provided enriched regions files.</p>
 </dd>
-</li>
-<dt><strong><a name="fdata_dataset" class="item">--fdata &lt;dataset&gt;</a></strong>
+<dt><strong><a name="fdata_dataset" class="item">--fdata &lt;dataset&gt;</a></strong></dt>
 
-<dt><strong><a name="rdata_dataset" class="item">--rdata &lt;dataset&gt;</a></strong>
+<dt><strong><a name="rdata_dataset" class="item">--rdata &lt;dataset&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the datasets in the database representing the 
@@ -127,8 +121,7 @@ data is provided separately for each strand; a single dataset with
 both strands of data is not accepted. These may be gleaned from the 
 metadata of the provided enriched regions files.</p>
 </dd>
-</li>
-<dt><strong><a name="tol_integer" class="item">--tol &lt;integer&gt;</a></strong>
+<dt><strong><a name="tol_integer" class="item">--tol &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the tolerance distance in bp with which the ends of a 
@@ -137,8 +130,7 @@ transcription fragment a complete transcript. If the ends
 exceed the tolerance value, then the transcription fragment is 
 labeled as 'overlap'. The default value is 20 bp.</p>
 </dd>
-</li>
-<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong>
+<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Small, spurious transcription fragments may be identified, particularly 
@@ -147,27 +139,23 @@ parameter sets the minimum size of the transcription fragment to
 initiate a search for associated known genes. The default value is 
 100 bp.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gff" class="item">--(no)gff</a></strong>
+<dt><strong><a name="no_gff" class="item">--(no)gff</a></strong></dt>
 
 <dd>
 <p>Indicate whether a GFF file should also be written. A version 3 file 
 is generated. The default is true.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the GFF source value when writing a GFF file. The default 
 value is the name of this program.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

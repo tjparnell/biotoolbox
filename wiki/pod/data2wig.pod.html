@@ -64,7 +64,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a data file, with or without the --in flag. 
@@ -74,15 +74,13 @@ Recognizeable genome coordinate columns should be present, including
 chromosome, start, and stop. Data files collected using the 'genome' 
 windows feature are ideal. The file may be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.</p>
 </dd>
-</li>
-<dt><strong><a name="step_fixed_variable" class="item">--step [fixed,variable]</a></strong>
+<dt><strong><a name="step_fixed_variable" class="item">--step [fixed,variable]</a></strong></dt>
 
 <dd>
 <p>The type of step progression for the wig file. Two wig formats are available:
@@ -93,8 +91,7 @@ values (score), while the 'variableStep' wig file has two columns
 (position and score). If the option is not defined, then the format is 
 automatically determined from the metadata of the file.</p>
 </dd>
-</li>
-<dt><strong><a name="size_integer" class="item">--size &lt;integer&gt;</a></strong>
+<dt><strong><a name="size_integer" class="item">--size &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally define the step size in bp for 'fixedStep' wig file. This 
@@ -104,8 +101,7 @@ may also be explicitly defined. If this value is not explicitly
 defined or automatically determined, the variableStep format is used by
 default.</p>
 </dd>
-</li>
-<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong>
+<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>Indicate the column index (0-based) of the dataset in the data table 
@@ -114,16 +110,14 @@ automatically selected. If not defined as an option, then the program will
 interactively ask the user for the column index from a list of available
 columns.</p>
 </dd>
-</li>
-<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong>
+<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>The name of the track defined in the wig file. The default is to use 
 the name of the chosen score column, or, if the input file is a GFF file, 
 the base name of the input file.</p>
 </dd>
-</li>
-<dt><strong><a name="no_track" class="item">--(no)track</a></strong>
+<dt><strong><a name="no_track" class="item">--(no)track</a></strong></dt>
 
 <dd>
 <p>Do (not) include the track line at the beginning of the wig file. Wig 
@@ -132,48 +126,42 @@ the binary bigwig format, the converter requires no track line. Why it
 can't simply ignore the line is beyond me. This option is automatically 
 set to false when the --bigwig option is enabled.</p>
 </dd>
-</li>
-<dt><strong><a name="inter" class="item">--inter</a></strong>
+<dt><strong><a name="inter" class="item">--inter</a></strong></dt>
 
 <dd>
 <p>Source data is in interbase coordinate (0-base) system. Shift the 
 start position to base coordinate (1-base) system. Wig files are by 
 definition 1-based. Default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="no_midpoint" class="item">--(no)midpoint</a></strong>
+<dt><strong><a name="no_midpoint" class="item">--(no)midpoint</a></strong></dt>
 
 <dd>
 <p>A boolean value to indicate whether the 
 midpoint between the actual 'start' and 'stop' values
 should be used. The default is to use only the 'start' position.</p>
 </dd>
-</li>
-<dt><strong><a name="format_0_1_2_3" class="item">--format [0,1,2,3]</a></strong>
+<dt><strong><a name="format_0_1_2_3" class="item">--format [0,1,2,3]</a></strong></dt>
 
 <dd>
 <p>Indicate the number of decimal places the score value should
 be formatted. Acceptable values include 0, 1, 2, or 3 places.
 The default is to not format the score value.</p>
 </dd>
-</li>
-<dt><strong><a name="bigwig_bw" class="item">--bigwig --bw</a></strong>
+<dt><strong><a name="bigwig_bw" class="item">--bigwig --bw</a></strong></dt>
 
 <dd>
 <p>Indicate that a binary BigWig file should be generated instead of 
 a text wiggle file. A .wig file is first generated, then converted to 
 a .bw file, and then the .wig file is removed.</p>
 </dd>
-</li>
-<dt><strong><a name="chromof_filename" class="item">--chromof &lt;filename&gt;</a></strong>
+<dt><strong><a name="chromof_filename" class="item">--chromof &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>When converting to a BigWig file, provide a two-column tab-delimited 
 text file containing the chromosome names and their lengths in bp. 
 Alternatively, provide a name of a database, below.</p>
 </dd>
-</li>
-<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the database from which chromosome lengths can be derived when 
@@ -181,20 +169,17 @@ generating a bigwig file. This option is only required when generating
 bigwig files. It may also be supplied from the metadata in the source 
 data file.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>A boolean value to indicate whether the output wiggle 
 file should be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

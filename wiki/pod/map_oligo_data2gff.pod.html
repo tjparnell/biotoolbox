@@ -59,7 +59,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="oligo_oligo_file_gff" class="item">--oligo &lt;oligo_file.gff&gt;</a></strong>
+<dt><strong><a name="oligo_oligo_file_gff" class="item">--oligo &lt;oligo_file.gff&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of the oligo probe GFF file. This file should identify 
@@ -67,8 +67,7 @@ all positions that the probes align to in the genome. It may be either v.2 or
 v.3 GFF file, but the oligo probe name or ID must be present in the group 
 field.</p>
 </dd>
-</li>
-<dt><strong><a name="data_oligo_data_tx" class="item">--data &lt;oligo_data.tx&gt;</a></strong>
+<dt><strong><a name="data_oligo_data_tx" class="item">--data &lt;oligo_data.tx&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a data file. It must be a tab-delimited text file,
@@ -76,81 +75,69 @@ preferably in the tim data format as described in 'tim_file_helper.pm',
 although any format should work. The file may be compressed with gzip. The 
 first column MUST be the oligo or probe unique name or ID.</p>
 </dd>
-</li>
-<dt><strong><a name="index_column_index" class="item">--index &lt;column_index&gt;</a></strong>
+<dt><strong><a name="index_column_index" class="item">--index &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the data column index in the data file that will be used in the 
 final GFF score column. By default, it lists the column names for the user 
 to interactively select.</p>
 </dd>
-</li>
-<dt><strong><a name="col_column_index" class="item">--col &lt;column_index&gt;</a></strong>
+<dt><strong><a name="col_column_index" class="item">--col &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>Alias to --index.</p>
 </dd>
-</li>
-<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong>
+<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the dataset to be used in the output GFF file. By default 
 it uses the column name from the data file.</p>
 </dd>
-</li>
-<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong>
+<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output GFF type or method field value. By default, it uses the name.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output GFF source field value. By default it is 'lab'.</p>
 </dd>
-</li>
-<dt><strong><a name="no_strand" class="item">--(no)strand</a></strong>
+<dt><strong><a name="no_strand" class="item">--(no)strand</a></strong></dt>
 
 <dd>
 <p>Indicate whether the original strand information should (not) be kept from the 
 original oligo GFF file. The default is false, as most ChIP data is inherently 
 not stranded.</p>
 </dd>
-</li>
-<dt><strong><a name="no_mid" class="item">--(no)mid</a></strong>
+<dt><strong><a name="no_mid" class="item">--(no)mid</a></strong></dt>
 
 <dd>
 <p>Indicate whether the original position information should (not) be converted 
 to the midpoint position. The GBrowse xyplot data works best when data is 
 present at single points (start = end) rather than regions. Default is true.</p>
 </dd>
-</li>
-<dt><strong><a name="places_0_1_2_3" class="item">--places [0,1,2,3]</a></strong>
+<dt><strong><a name="places_0_1_2_3" class="item">--places [0,1,2,3]</a></strong></dt>
 
 <dd>
 <p>Indicate the number of decimal places the score value should be formatted. The 
 default is no formatting.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output filename. The default is to use the name value.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>Indicate whether the output file should (not) be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

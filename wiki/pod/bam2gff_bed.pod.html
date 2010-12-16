@@ -58,51 +58,45 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a .bam alignment file. The file should be indexed. 
 If not, the program will attempt to automatically index it.</p>
 </dd>
-</li>
-<dt><strong><a name="bed_gff" class="item">--bed | --gff</a></strong>
+<dt><strong><a name="bed_gff" class="item">--bed | --gff</a></strong></dt>
 
 <dd>
 <p>Specify the output file format. Either a BED file (6-columns) or GFF v.3 
 file will be written. The default behavior is to write a BED file.</p>
 </dd>
-</li>
-<dt><strong><a name="pe" class="item">--pe</a></strong>
+<dt><strong><a name="pe" class="item">--pe</a></strong></dt>
 
 <dd>
 <p>Indicate that the BAM data is paired end, and that the generated feature 
 should represent the insert fragment.</p>
 </dd>
-</li>
-<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong>
+<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>For GFF output files, specify the GFF type. The default is to use the 
 input file base name, appended with either '_reads' or '_paired_reads'.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>For GFF output files, specify the source tag. The default is 'Illumina'.</p>
 </dd>
-</li>
-<dt><strong><a name="out" class="item">--out</a></strong>
+<dt><strong><a name="out" class="item">--out</a></strong></dt>
 
 <dd>
 <p>Specify the output file name. The default for GFF output files is to use 
 the GFF type; for BED output files the input file base name is used. A 
 '.bed' extension is added if necessary.</p>
 </dd>
-</li>
-<dt><strong><a name="bigbed" class="item">--bigbed</a></strong>
+<dt><strong><a name="bigbed" class="item">--bigbed</a></strong></dt>
 
-<dt><strong><a name="bb" class="item">--bb</a></strong>
+<dt><strong><a name="bb" class="item">--bb</a></strong></dt>
 
 <dd>
 <p>When generating a BED formatted output file, optionally indicate that 
@@ -110,8 +104,7 @@ a binary BigBed file should be generated instead of a text BED file.
 A .bed file is first generated, then converted to a .bb file, and then 
 the .bed file is removed.</p>
 </dd>
-</li>
-<dt><strong><a name="bbapp_path_to_bedtobigbed" class="item">--bbapp &lt;/path/to/bedToBigBed&gt;</a></strong>
+<dt><strong><a name="bbapp_path_to_bedtobigbed" class="item">--bbapp &lt;/path/to/bedToBigBed&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
@@ -120,19 +113,16 @@ the application path. Failing that, it will search the default
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>Specify whether (or not) the output file should be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this POD documentation.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

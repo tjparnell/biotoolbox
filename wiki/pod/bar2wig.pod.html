@@ -60,30 +60,27 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the input bar file or (more likely) a directory of bar files. 
 The bar files may be zipped (*.bar.zip).</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output filename. By default it uses the base name of the 
 input file or the input directory name. The output file will either 
 have a .wig or .bw file extension.</p>
 </dd>
-</li>
-<dt><strong><a name="barapp_path_to_bar2gr" class="item">--barapp &lt;/path/to/Bar2Gr&gt;</a></strong>
+<dt><strong><a name="barapp_path_to_bar2gr" class="item">--barapp &lt;/path/to/Bar2Gr&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the full path to David Nix's USeq or T2 application Bar2Gr (it 
 is included in both software packages). By default it uses the path 
 defined in the biotoolbox configuration file, tim_db_helper.cfg.</p>
 </dd>
-</li>
-<dt><strong><a name="method_mean_median_sum_max" class="item">--method [mean | median | sum | max]</a></strong>
+<dt><strong><a name="method_mean_median_sum_max" class="item">--method [mean | median | sum | max]</a></strong></dt>
 
 <dd>
 <p>Define the method used to combine multiple data values at a single 
@@ -94,8 +91,7 @@ generation sequencing data). Typically, with microarray data, the values
 should be averaged (mean), while with sequencing data, values should be summed.
 The default method is 'sum'.</p>
 </dd>
-</li>
-<dt><strong><a name="no_track" class="item">--(no)track</a></strong>
+<dt><strong><a name="no_track" class="item">--(no)track</a></strong></dt>
 
 <dd>
 <p>Wig files typically include a track line at the beginning of the file which 
@@ -104,39 +100,34 @@ requires that the track line is absent. Do not include the track line when
 generating bigWig files manually. The default is to include for wig files 
 (true), and exclude for bigWig files (false).</p>
 </dd>
-</li>
-<dt><strong><a name="no_inter" class="item">--(no)inter</a></strong>
+<dt><strong><a name="no_inter" class="item">--(no)inter</a></strong></dt>
 
 <dd>
 <p>Bar files are typically in interbase (0-base) format, whereas wig files are 
 typically 1-base format. Shift (or not) the position by 1 bp. Default is 
 true.</p>
 </dd>
-</li>
-<dt><strong><a name="bw" class="item">--bw</a></strong>
+<dt><strong><a name="bw" class="item">--bw</a></strong></dt>
 
 <dd>
 <p>Flag to indicate that a binary bigWig file should be generated rather than 
 a text wig file.</p>
 </dd>
-</li>
-<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of a Bio::DB database from which to extract chromosome 
 names and sizes. This information is required when generating a bigWig 
 file.</p>
 </dd>
-</li>
-<dt><strong><a name="chromof_filename" class="item">--chromof &lt;filename&gt;</a></strong>
+<dt><strong><a name="chromof_filename" class="item">--chromof &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Alternative to the --db argument, a pre-generated chromosome sizes text 
 file may be specified. This text file should consist of two columns, 
 delimited by whitespace, consisting of the chromosome name and size.</p>
 </dd>
-</li>
-<dt><strong><a name="bwapp_path_to_wigtobigwig" class="item">--bwapp &lt;/path/to/wigToBigWig&gt;</a></strong>
+<dt><strong><a name="bwapp_path_to_wigtobigwig" class="item">--bwapp &lt;/path/to/wigToBigWig&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the full path to Jim Kent's wigToBigWig conversion utility. By 
@@ -146,21 +137,18 @@ the system path is searched for the executable. Finally, failing that,
 it will attempt to use Lincoln Stein's Bio::DB::BigFile module for 
 conversion, if available.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>Specify whether (or not) the output wig file should be compressed with gzip.
 This option does not affect bigWig files, but will affect intermediate 
 wig files.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this POD documentation.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

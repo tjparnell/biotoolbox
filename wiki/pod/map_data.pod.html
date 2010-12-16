@@ -68,21 +68,19 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the BioPerl GFF database to use. This is optional
 if the desired database is defined in the input file metadata.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output file name. Required for new files; otherwise, 
 input files will be overwritten unless specified.</p>
 </dd>
-</li>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the filename of a data table containing the list of 
@@ -91,19 +89,15 @@ features to map nucleosomes around. The file must be in the
 file is not specified, then a new list of features will be 
 generated from the database.</p>
 </dd>
-</li>
-<dt><strong><a name="feature_type_type_source" class="item">--feature [type, type:source]</a></strong>
+<dt><strong><a name="feature_type_type_source" class="item">--feature [type, type:source]</a></strong></dt>
 
 <dd>
 <p>Specify the type of feature to map data around. The feature may be 
 listed either as GFF type or GFF type:source. The list 
 of features will be automatically generated from the database.</p>
-</dd>
-<dd>
 <p>This is optional if the features are defined in the input file.</p>
 </dd>
-</li>
-<dt><strong><a name="data_name" class="item">--data &lt;name&gt;</a></strong>
+<dt><strong><a name="data_name" class="item">--data &lt;name&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the microarray data set for which you wish to 
@@ -112,8 +106,7 @@ interactively from a presented list. Alternatively, other
 features may be collected, and should be specified using the type 
 (GFF method:source), especially when collecting alternative data values.</p>
 </dd>
-</li>
-<dt><strong><a name="value_score_length_count_enumerate" class="item">--value [score | length | count | enumerate]</a></strong>
+<dt><strong><a name="value_score_length_count_enumerate" class="item">--value [score | length | count | enumerate]</a></strong></dt>
 
 <dd>
 <p>Specify the type of data value or attribute to collect from the dataset  
@@ -121,29 +114,25 @@ or features for each region. By default, the score is collected.
 Alternatively, a count of the number of features present in the window, or 
 the length of the features, may be collected.</p>
 </dd>
-</li>
-<dt><strong><a name="method_mean_median_sum_stddev" class="item">--method [mean | median | sum | stddev]</a></strong>
+<dt><strong><a name="method_mean_median_sum_stddev" class="item">--method [mean | median | sum | stddev]</a></strong></dt>
 
 <dd>
 <p>Specify the method of combining multiple values within each window. The mean, 
 median, sum, or standard deviation of the values may be reported. The default 
 value is mean for score and length values, or sum for enumerated values.</p>
 </dd>
-</li>
-<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong>
+<dt><strong><a name="win_integer" class="item">--win &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the window size. Default 50</p>
 </dd>
-</li>
-<dt><strong><a name="num_integer" class="item">--num &lt;integer&gt;</a></strong>
+<dt><strong><a name="num_integer" class="item">--num &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the number of windows on either side of the feature position 
 (total number will be 2 x [num]). Default 20</p>
 </dd>
-</li>
-<dt><strong><a name="pos_5_3_m" class="item">--pos [ 5 | 3 | m ]</a></strong>
+<dt><strong><a name="pos_5_3_m" class="item">--pos [ 5 | 3 | m ]</a></strong></dt>
 
 <dd>
 <p>Indicate the relative position of the feature around which the 
@@ -154,8 +143,7 @@ use the 5' end, or the start position of unstranded features.
 If the feature &quot;tts&quot; is selected above, the 3' end is 
 automatically selected.</p>
 </dd>
-</li>
-<dt><strong><a name="strand_sense_antisense_all" class="item">--strand [sense | antisense | all]</a></strong>
+<dt><strong><a name="strand_sense_antisense_all" class="item">--strand [sense | antisense | all]</a></strong></dt>
 
 <dd>
 <p>Specify whether stranded data should be collected for each of the 
@@ -163,8 +151,7 @@ datasets. Either sense or antisense (relative to the feature) data
 may be collected. The default value is 'all', indicating all 
 data will be collected.</p>
 </dd>
-</li>
-<dt><strong><a name="set_strand" class="item">--set_strand</a></strong>
+<dt><strong><a name="set_strand" class="item">--set_strand</a></strong></dt>
 
 <dd>
 <p>For features that are not inherently stranded (strand value of 0), 
@@ -175,8 +162,7 @@ column in the input data file with a name of &quot;strand&quot;. Hence, it
 will not work with newly generated datasets, but only with input 
 data files. Default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="no_sum" class="item">--(no)sum</a></strong>
+<dt><strong><a name="no_sum" class="item">--(no)sum</a></strong></dt>
 
 <dd>
 <p>Indicate that the data should be averaged across all features at
@@ -184,27 +170,23 @@ each position, suitable for graphing. A separate text file will
 be written with the suffix '_summed' with the averaged data. 
 Default is true.</p>
 </dd>
-</li>
-<dt><strong><a name="no_smooth" class="item">--(no)smooth</a></strong>
+<dt><strong><a name="no_smooth" class="item">--(no)smooth</a></strong></dt>
 
 <dd>
 <p>Indicate that windows without values should (not) be interpolated
 from neighboring values.</p>
 </dd>
-</li>
-<dt><strong><a name="no_log" class="item">--(no)log</a></strong>
+<dt><strong><a name="no_log" class="item">--(no)log</a></strong></dt>
 
 <dd>
 <p>Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this help</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

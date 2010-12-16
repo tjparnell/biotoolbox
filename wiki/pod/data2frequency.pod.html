@@ -56,27 +56,24 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_data_helper.pm', 
 although any format should work. The file may be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="bins_integer" class="item">--bins &lt;integer&gt;</a></strong>
+<dt><strong><a name="bins_integer" class="item">--bins &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the number of bins that the data should be placed into.</p>
 </dd>
-</li>
-<dt><strong><a name="size_integer" class="item">--size &lt;integer&gt;</a></strong>
+<dt><strong><a name="size_integer" class="item">--size &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the size of each bin.</p>
 </dd>
-</li>
-<dt><strong><a name="index_list_range" class="item">--index &lt;list|range&gt;</a></strong>
+<dt><strong><a name="index_list_range" class="item">--index &lt;list|range&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the datasets in the input data file to be converted to a distribution.
@@ -86,8 +83,7 @@ datasets may be provided as a comma-delimited list, as a consecutive list
 datasets are provided, the program will interactively present to the user 
 a list of possible datasets to convert.</p>
 </dd>
-</li>
-<dt><strong><a name="min_number" class="item">--min &lt;number&gt;</a></strong>
+<dt><strong><a name="min_number" class="item">--min &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally indicate the minimum value of the bins. When generating 
@@ -95,8 +91,7 @@ the list of bins, this is used as the starting value. Default is 0.
 Useful for log2 distributions where the minimum value is negative. 
 A negative number may be provided using the format --min=-1.</p>
 </dd>
-</li>
-<dt><strong><a name="max_number" class="item">--max &lt;number&gt;</a></strong>
+<dt><strong><a name="max_number" class="item">--max &lt;number&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally provide the maximum bin value. This argument is optional 
@@ -104,20 +99,17 @@ and is automatically calculated as (bins * size). This argument
 may also be provided as an alternative to specifying the binsize 
 value, in which case the number of bins is empirically determined.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output file name. The default is to take the input file base name
 and append '_frequency' to it. The file format is a tim data file.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this help</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

@@ -55,7 +55,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="table_filename" class="item">--table &lt;filename&gt;</a></strong>
+<dt><strong><a name="table_filename" class="item">--table &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name of a UCSC gene table. It may be obtained preferably
@@ -65,8 +65,7 @@ cdsEnd, exonStarts, exonEnds, and others. The conversion may fail if
 certain columns are not found. The RefSeq and ensGene tables should work
 great. The file may be gzipped.</p>
 </dd>
-</li>
-<dt><strong><a name="status_filename" class="item">--status &lt;filename&gt;</a></strong>
+<dt><strong><a name="status_filename" class="item">--status &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally provide the name of the RefSeq Status file. It may be obtained
@@ -74,8 +73,7 @@ through the UCSC Genome Table Browser, or downloaded from their FTP site.
 The file should have 3 columns, including 'mrnaAcc', 'status', and 'mol'.
 It will only really work with RefSeq tables. The file may be gzipped.</p>
 </dd>
-</li>
-<dt><strong><a name="sum_filename" class="item">--sum &lt;filename&gt;</a></strong>
+<dt><strong><a name="sum_filename" class="item">--sum &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally provide the name of the RefSeq Summary file. It may be obtained
@@ -84,15 +82,13 @@ The file should have 3 columns, including 'mrnaAcc', 'completeness', and
 'summary'. It will only really work with RefSeq tables. The file may be
 gzipped.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally provide the text to be used as the GFF source. The default is 
 'UCSC'.</p>
 </dd>
-</li>
-<dt><strong><a name="no_parent" class="item">--(no)parent</a></strong>
+<dt><strong><a name="no_parent" class="item">--(no)parent</a></strong></dt>
 
 <dd>
 <p>Indicate whether or not transcript features should be linked to a parent 
@@ -103,8 +99,7 @@ be present in a SeqFeature::Store database, the gene feature (with no
 children) and the transcript feature (with exon and UTR children). The 
 default behavior is false or no linking.</p>
 </dd>
-</li>
-<dt><strong><a name="no_valid" class="item">--(no)valid</a></strong>
+<dt><strong><a name="no_valid" class="item">--(no)valid</a></strong></dt>
 
 <dd>
 <p>Indicate whether or not valid GFF tags should only be included. When the 
@@ -116,20 +111,17 @@ tolerated by some programs (including Bio::SeqFeature::Store databases)
 and may prove useful in analysis. The default value is false or to include 
 all available tags.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify a new filename. By default it uses the basename of the 
 table file.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

@@ -55,7 +55,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the input file. The file should be a simple tab-delimited text 
@@ -66,41 +66,34 @@ metadata lines should be exported to a compatible format using the treeview
 function in the <strong>manipulate_datasets.pl</strong> script. A .cdt file generated 
 from this may also be used.</p>
 </dd>
-</li>
-<dt><strong><a name="out_jobname" class="item">--out &lt;jobname&gt;</a></strong>
+<dt><strong><a name="out_jobname" class="item">--out &lt;jobname&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output jobname, which will be the basename of the output files. 
 By default it uses the input base filename.</p>
 </dd>
-</li>
-<dt><strong><a name="num_integer" class="item">--num &lt;integer&gt;</a></strong>
+<dt><strong><a name="num_integer" class="item">--num &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the number of clusters to identify. Default value is 6 – enough to be 
 informative but not overwhelming.</p>
 </dd>
-</li>
-<dt><strong><a name="run_integer" class="item">--run &lt;integer&gt;</a></strong>
+<dt><strong><a name="run_integer" class="item">--run &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Enter the number of times to run the cluster algorithm to find a solution. 
 The default value is 200.</p>
 </dd>
-</li>
-<dt><strong><a name="method_a_m" class="item">--method [a|m]</a></strong>
+<dt><strong><a name="method_a_m" class="item">--method [a|m]</a></strong></dt>
 
 <dd>
 <p>Specify the method of finding the center of a cluster. Two values are 
 allowed, arithmetic mean (a) and median (m). Default is mean.</p>
 </dd>
-</li>
-<dt><strong><a name="dist_c_a_u_x_s_k_e_b" class="item">--dist [c|a|u|x|s|k|e|b]</a></strong>
+<dt><strong><a name="dist_c_a_u_x_s_k_e_b" class="item">--dist [c|a|u|x|s|k|e|b]</a></strong></dt>
 
 <dd>
 <p>Specify the distance function to be used. Several options are available.</p>
-</dd>
-<dd>
 <pre>
 
         c  correlation
@@ -111,19 +104,15 @@ allowed, arithmetic mean (a) and median (m). Default is mean.</p>
         k  Kendall's tau
         e  Euclidean distance
         b  City-block distance</pre>
-</dd>
-<dd>
 <pre>
 
 The default value is 'e', Euclidean distance.</pre>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this POD documentation.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

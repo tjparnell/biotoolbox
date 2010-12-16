@@ -55,7 +55,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_file_bam" class="item">--in &lt;file.bam&gt;</a></strong>
+<dt><strong><a name="in_file_bam" class="item">--in &lt;file.bam&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a binary BAM file as described for Samtools. 
@@ -63,22 +63,19 @@ Use samtools to convert text sam files to binary bam files. The file
 should be indexed; this program should be able to do it for you 
 automatically if it is not (assuming the bam directory is writeable).</p>
 </dd>
-</li>
-<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong>
+<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify the minimum size of fragment to include in the output
 GFF file. The default value is 100 bp.</p>
 </dd>
-</li>
-<dt><strong><a name="max_integer" class="item">--max &lt;integer&gt;</a></strong>
+<dt><strong><a name="max_integer" class="item">--max &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify the maximum size of fragment to include in the output
 GFF file. The default value is 200 bp.</p>
 </dd>
-</li>
-<dt><strong><a name="size_min_max" class="item">--size &lt;min-max&gt;</a></strong>
+<dt><strong><a name="size_min_max" class="item">--size &lt;min-max&gt;</a></strong></dt>
 
 <dd>
 <p>When multiple size ranges are desired, they may be specified using the 
@@ -86,15 +83,13 @@ size option. Define the minimum and maximum size as a range separated by
 a dash (no spaces). Use this option repeatedly for multiple size ranges. 
 The size option takes precedence over the min and max options.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify the base name of the output file. The default is to use 
 base input name. The output file names are appended with '.$min_$max'.</p>
 </dd>
-</li>
-<dt><strong><a name="at" class="item">--at</a></strong>
+<dt><strong><a name="at" class="item">--at</a></strong></dt>
 
 <dd>
 <p>Boolean option to indicate that only fragments whose paired sequence reads 
@@ -103,13 +98,11 @@ Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides;
 this option ensures that the fragment is more likely derived from a MNase 
 cut.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

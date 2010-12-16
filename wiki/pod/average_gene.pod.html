@@ -67,20 +67,18 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the name of the BioPerl SeqFeature::Store database to use. This is 
 optional if the desired database is defined in the input file metadata.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output file name.</p>
 </dd>
-</li>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the filename of a data table containing the list of 
@@ -88,8 +86,7 @@ features to average. The file must be in the 'tim_data' format and specify
 a feature to use. If not specified, then a new feature list will be 
 generated from the database.</p>
 </dd>
-</li>
-<dt><strong><a name="feature_type_type_source_alias" class="item">--feature [type, type:source, alias]</a></strong>
+<dt><strong><a name="feature_type_type_source_alias" class="item">--feature [type, type:source, alias]</a></strong></dt>
 
 <dd>
 <p>Specify the type of feature from which to collect values. This is required 
@@ -99,20 +96,15 @@ The feature may be specified as either type or type:source. Aliases are
 specified in the <code>tim_db_helper.cfg</code> file, and provide a shortcut to a 
 list of one or more features. More than feature may be included as a 
 comma-delimited list (no commas).</p>
-</dd>
-<dd>
 <pre>
 
 =item --data &lt;text&gt;</pre>
-</dd>
-<dd>
 <p>Specify the name of the microarray data set for which you wish to 
 collect data. If not specified, the data set may be 
 chosen interactively from a presented list. When enumerating features, 
 the features' type or type:source values should be indicated.</p>
 </dd>
-</li>
-<dt><strong><a name="method_mean_median_sum_count" class="item">--method [mean|median|sum|count]</a></strong>
+<dt><strong><a name="method_mean_median_sum_count" class="item">--method [mean|median|sum|count]</a></strong></dt>
 
 <dd>
 <p>Specify the method of collecting and combining the data into each bin. 
@@ -122,8 +114,7 @@ within each bin. The defined method does not affect the interpolation or
 summary functions of the program, only initial data collection. The 
 default method is 'mean'.</p>
 </dd>
-</li>
-<dt><strong><a name="bins_integer" class="item">--bins &lt;integer&gt;</a></strong>
+<dt><strong><a name="bins_integer" class="item">--bins &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the number of bins that will be generated over the length 
@@ -131,23 +122,20 @@ of the feature. The size of the feature is a percentage of the
 feature length. The default number is 10, which results in bins of 
 size equal to 10% of the feature length.</p>
 </dd>
-</li>
-<dt><strong><a name="ext_integer" class="item">--ext &lt;integer&gt;</a></strong>
+<dt><strong><a name="ext_integer" class="item">--ext &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the number of extended bins on either side of the feature. 
 The bins are of the same size as determined by the feature 
 length and the --bins value. The default is 0.</p>
 </dd>
-</li>
-<dt><strong><a name="extsize_integer" class="item">--extsize &lt;integer&gt;</a></strong>
+<dt><strong><a name="extsize_integer" class="item">--extsize &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the exact bin size in bp of the extended bins rather than
 using a percentage of feature of length.</p>
 </dd>
-</li>
-<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong>
+<dt><strong><a name="min_integer" class="item">--min &lt;integer&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the minimum feature size to be averaged. Features with a
@@ -155,31 +143,27 @@ length below this value will not be skipped (all bins will have
 null values). This is to avoid having bin sizes below the average 
 microarray tiling distance.</p>
 </dd>
-</li>
-<dt><strong><a name="strand_all_sense_antisense" class="item">--strand [all|sense|antisense]</a></strong>
+<dt><strong><a name="strand_all_sense_antisense" class="item">--strand [all|sense|antisense]</a></strong></dt>
 
 <dd>
 <p>Specify whether stranded data should be collected. Three values are 
 allowed: all datasets should be collected (default), only sense 
 datasets, or only antisense datasets should be collected.</p>
 </dd>
-</li>
-<dt><strong><a name="sum" class="item">--sum</a></strong>
+<dt><strong><a name="sum" class="item">--sum</a></strong></dt>
 
 <dd>
 <p>Indicate that the data should be averaged across all features at
 each position, suitable for graphing. A separate text file will be
 written with the suffix '_summed' with the averaged data</p>
 </dd>
-</li>
-<dt><strong><a name="smooth" class="item">--smooth</a></strong>
+<dt><strong><a name="smooth" class="item">--smooth</a></strong></dt>
 
 <dd>
 <p>Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="set_strand" class="item">--set_strand</a></strong>
+<dt><strong><a name="set_strand" class="item">--set_strand</a></strong></dt>
 
 <dd>
 <p>For features that are not inherently stranded (strand value of 0), 
@@ -190,20 +174,17 @@ column in the input data file with a name of &quot;strand&quot;. Hence, it
 will not work with newly generated datasets, but only with input 
 data files. Default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="no_log" class="item">--(no)log</a></strong>
+<dt><strong><a name="no_log" class="item">--(no)log</a></strong></dt>
 
 <dd>
 <p>Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>This help text.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

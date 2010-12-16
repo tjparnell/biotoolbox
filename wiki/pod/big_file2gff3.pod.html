@@ -57,7 +57,7 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename_bw_filename_bb_filename_bam" class="item">--in &lt;filename.bw | filename.bb | filename.bam&gt;</a></strong>
+<dt><strong><a name="in_filename_bw_filename_bb_filename_bam" class="item">--in &lt;filename.bw | filename.bb | filename.bam&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name(s) of the input BigFiles. Three types of files are 
@@ -66,8 +66,7 @@ The list may be specified three ways: by reiterating the
 --in option, providing a single comma-delimited list, or simply listing 
 all files after the options (e.g. &quot;data_*.bw&quot;).</p>
 </dd>
-</li>
-<dt><strong><a name="path_destination_path_for_bigfiles" class="item">--path &lt;/destination/path/for/bigfiles/&gt;</a></strong>
+<dt><strong><a name="path_destination_path_for_bigfiles" class="item">--path &lt;/destination/path/for/bigfiles/&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the destination directory name for the BigFile files. If the
@@ -78,16 +77,14 @@ copied to the directory for you. Note that when generating a BigWigSet, a
 unique directory for just the indicated files should be provided. The
 default path is the current path for the input file.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name for the GFF feature's source for all of the input value. 
 The default value is &quot;data&quot;. Unique values for each input file is not 
 supported.</p>
 </dd>
-</li>
-<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong>
+<dt><strong><a name="name_text" class="item">--name &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the name(s) for the GFF feature(s). This will be used as the GFF 
@@ -95,15 +92,13 @@ feature's name. A unique name should be provided for each file, and may be
 specified as a single comma-delimited list or by reiterating the --name 
 option. The default value to use the input file basename.</p>
 </dd>
-</li>
-<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong>
+<dt><strong><a name="type_text" class="item">--type &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>Provide the GFF type for the GFF features for all input files. By default, 
 it re-uses the GFF name. Unique values for each input file is not supported.</p>
 </dd>
-</li>
-<dt><strong><a name="strand_f_r_w_c_1_0_1" class="item">--strand [f|r|w|c|+|-|1|0|-1],...</a></strong>
+<dt><strong><a name="strand_f_r_w_c_1_0_1" class="item">--strand [f|r|w|c|+|-|1|0|-1],...</a></strong></dt>
 
 <dd>
 <p>Indicate which strand the feature will be located. Acceptable values include 
@@ -112,16 +107,14 @@ is used. For mulitple input files with different strands, use the option
 repeatedly or provide a comma-delimited list. If only one value is provided, 
 it is used for all input files.</p>
 </dd>
-</li>
-<dt><strong><a name="rename" class="item">--rename</a></strong>
+<dt><strong><a name="rename" class="item">--rename</a></strong></dt>
 
 <dd>
 <p>Rename the input source file basenames as &quot;$source.$name&quot; when moving to the 
 target directory. This may help in organization and clarity of file listings. 
 Default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="set" class="item">--set</a></strong>
+<dt><strong><a name="set" class="item">--set</a></strong></dt>
 
 <dd>
 <p>Indicate that all of the input BigWig files should be part of a BigWigSet,
@@ -132,8 +125,7 @@ directory with metadata for each BigWig file (feature, source, strand,
 name) as described in Bio::DB::BigWigSet documentation. Additional metadata 
 may be manually added as necessary. The default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="conf" class="item">--conf</a></strong>
+<dt><strong><a name="conf" class="item">--conf</a></strong></dt>
 
 <dd>
 <p>Write sample GBrowse database and track configuration stanzas. Each BigFile 
@@ -141,13 +133,11 @@ file will get individual stanzas, unless the --set option is enabled, where
 a single stanza for the BigWigSet is provided. This is helpful when setting 
 up GBrowse database and configurations. Default is false.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this POD help.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

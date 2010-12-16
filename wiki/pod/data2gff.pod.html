@@ -68,15 +68,14 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_file_helper.pm', 
 although any format should work. The file may be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="ask" class="item">--ask</a></strong>
+<dt><strong><a name="ask" class="item">--ask</a></strong></dt>
 
 <dd>
 <p>Indicate that the program should interactively ask for the indices for 
@@ -85,37 +84,32 @@ names to choose from. It will also ask for the source, and type
 or method text strings. Enter nothing for non-relevant columns or to 
 accept default values.</p>
 </dd>
-</li>
-<dt><strong><a name="chr_column_index" class="item">--chr &lt;column_index&gt;</a></strong>
+<dt><strong><a name="chr_column_index" class="item">--chr &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the chromosome or sequence ID column in the gff data.</p>
 </dd>
-</li>
-<dt><strong><a name="start_column_index" class="item">--start &lt;column_index&gt;</a></strong>
+<dt><strong><a name="start_column_index" class="item">--start &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the start position column in the gff data.</p>
 </dd>
-</li>
 <dt><strong><a name="start_column_index_item_end_column_index" class="item">--start &lt;column_index&gt;
-=item --end &lt;column_index&gt;</a></strong>
+=item --end &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the stop or end position column in the gff data.</p>
 </dd>
-</li>
-<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong>
+<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the score column in the gff data.</p>
 </dd>
-</li>
-<dt><strong><a name="name_column_index" class="item">--name &lt;column_index&gt;</a></strong>
+<dt><strong><a name="name_column_index" class="item">--name &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>Enter either the text that will be shared name among 
@@ -123,8 +117,7 @@ all the features, or the index of the dataset in the data
 table to be used as the name of each gff feature. This 
 information will be used in the 'group' column.</p>
 </dd>
-</li>
-<dt><strong><a name="id_column_index" class="item">--id &lt;column_index&gt;</a></strong>
+<dt><strong><a name="id_column_index" class="item">--id &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used
@@ -133,8 +126,7 @@ will be used in the 'group' column of GFF v.3 files
 only. The default is to automatically generate a 
 unique identifier.</p>
 </dd>
-</li>
-<dt><strong><a name="strand_column_index" class="item">--strand &lt;column_index&gt;</a></strong>
+<dt><strong><a name="strand_column_index" class="item">--strand &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used
@@ -142,23 +134,20 @@ for strand information. Accepted values might include
 any of the following &quot;f(orward), r(everse), w(atson),
 c(rick), +, -, 1, -1, 0, .&quot;.</p>
 </dd>
-</li>
-<dt><strong><a name="tags_column_indices" class="item">--tags &lt;column_indices&gt;</a></strong>
+<dt><strong><a name="tags_column_indices" class="item">--tags &lt;column_indices&gt;</a></strong></dt>
 
 <dd>
 <p>Provide a comma delimited list of column indices that contain 
 values to be included as group tags in the GFF features. The 
 key will be the column name.</p>
 </dd>
-</li>
-<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong>
+<dt><strong><a name="source_text" class="item">--source &lt;text&gt;</a></strong></dt>
 
 <dd>
 <p>A scalar value to be used as the text in the 'source' 
 column. Default is 'data'.</p>
 </dd>
-</li>
-<dt><strong><a name="type_text_column_index" class="item">--type &lt;text | column_index&gt;</a></strong>
+<dt><strong><a name="type_text_column_index" class="item">--type &lt;text | column_index&gt;</a></strong></dt>
 
 <dd>
 <p>Enter either a text string to be used as the GFF 'method'
@@ -168,8 +157,7 @@ it will use the name of the dataset used for either the 'score'
 or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.</p>
 </dd>
-</li>
-<dt><strong><a name="no_zero" class="item">--(no)zero</a></strong>
+<dt><strong><a name="no_zero" class="item">--(no)zero</a></strong></dt>
 
 <dd>
 <p>Indicate whether the source data is in interbase or 0-based 
@@ -178,16 +166,14 @@ packages. The coordinates will then be converted to 1-based
 coordinates, consistent with the rest of bioperl conventions.
 The default is false (will not convert).</p>
 </dd>
-</li>
-<dt><strong><a name="format_0_1_2_3" class="item">--format [0,1,2,3]</a></strong>
+<dt><strong><a name="format_0_1_2_3" class="item">--format [0,1,2,3]</a></strong></dt>
 
 <dd>
 <p>Indicate the number of decimal places the score value should
 be formatted. Acceptable values include 0, 1, 2, or 3 places.
 Anything else is ignored.</p>
 </dd>
-</li>
-<dt><strong><a name="no_midpoint" class="item">--(no)midpoint</a></strong>
+<dt><strong><a name="no_midpoint" class="item">--(no)midpoint</a></strong></dt>
 
 <dd>
 <p>A boolean (1 or 0) value to indicate whether the 
@@ -195,8 +181,7 @@ midpoint between the actual 'start' and 'stop' values
 should be used instead of the actual values. Default 
 is false.</p>
 </dd>
-</li>
-<dt><strong><a name="no_unique" class="item">--(no)unique</a></strong>
+<dt><strong><a name="no_unique" class="item">--(no)unique</a></strong></dt>
 
 <dd>
 <p>Indicate whether the feature names should be made unique. A count 
@@ -205,33 +190,28 @@ unique. This should only be applied to genomic features, and not to
 genomic data values (microarray data, sequencing data, etc). The 
 default behavior is false (not unique).</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Optionally specify the name of of the output file. The default is to use 
 the assigned type value. The '.gff' extension is automatically
 added if required.</p>
 </dd>
-</li>
-<dt><strong><a name="version_2_3" class="item">--version [2,3]</a></strong>
+<dt><strong><a name="version_2_3" class="item">--version [2,3]</a></strong></dt>
 
 <dd>
 <p>Specify the GFF version. The default is version 3.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>Indicate whether the output file should (not) be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display the POD documentation</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>

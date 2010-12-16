@@ -64,15 +64,14 @@
 <h1><a name="options">OPTIONS</a></h1>
 <p>The command line flags and descriptions:</p>
 <dl>
-<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong>
+<dt><strong><a name="in_filename" class="item">--in &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_file_helper.pm', 
 although any format should work. The file may be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="ask" class="item">--ask</a></strong>
+<dt><strong><a name="ask" class="item">--ask</a></strong></dt>
 
 <dd>
 <p>Indicate that the program should interactively ask for the indices for 
@@ -80,38 +79,33 @@ feature data. It will present a list of the column
 names to choose from. Enter nothing for non-relevant columns or to 
 accept default values.</p>
 </dd>
-</li>
-<dt><strong><a name="chr_column_index" class="item">--chr &lt;column_index&gt;</a></strong>
+<dt><strong><a name="chr_column_index" class="item">--chr &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the chromosome or sequence ID column in the BED data.</p>
 </dd>
-</li>
-<dt><strong><a name="start_column_index" class="item">--start &lt;column_index&gt;</a></strong>
+<dt><strong><a name="start_column_index" class="item">--start &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the start position column in the BED data.</p>
 </dd>
-</li>
-<dt><strong><a name="start_column_index2" class="item">--start &lt;column_index&gt;</a></strong>
+<dt><strong><a name="start_column_index2" class="item">--start &lt;column_index&gt;</a></strong></dt>
 
-<dt><strong><a name="end_column_index" class="item">--end &lt;column_index&gt;</a></strong>
+<dt><strong><a name="end_column_index" class="item">--end &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the stop or end position column in the BED data.</p>
 </dd>
-</li>
-<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong>
+<dt><strong><a name="score_column_index" class="item">--score &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used 
 as the score column in the BED data.</p>
 </dd>
-</li>
-<dt><strong><a name="name_column_index_base_text" class="item">--name &lt;column_index | base_text&gt;</a></strong>
+<dt><strong><a name="name_column_index_base_text" class="item">--name &lt;column_index | base_text&gt;</a></strong></dt>
 
 <dd>
 <p>Supply either the index of the column in the data table to 
@@ -119,8 +113,7 @@ be used as the name column in the BED data, or the base text
 to be used when auto-generating unique feature names. The 
 auto-generated names are in the format 'text_00000001'.</p>
 </dd>
-</li>
-<dt><strong><a name="strand_column_index" class="item">--strand &lt;column_index&gt;</a></strong>
+<dt><strong><a name="strand_column_index" class="item">--strand &lt;column_index&gt;</a></strong></dt>
 
 <dd>
 <p>The index of the dataset in the data table to be used
@@ -128,8 +121,7 @@ for strand information. Accepted values might include
 any of the following &quot;f(orward), r(everse), w(atson),
 c(rick), +, -, 1, -1, 0, .&quot;.</p>
 </dd>
-</li>
-<dt><strong><a name="zero" class="item">--zero</a></strong>
+<dt><strong><a name="zero" class="item">--zero</a></strong></dt>
 
 <dd>
 <p>Indicate that the source data is already in interbase (0-based) 
@@ -137,33 +129,29 @@ coordinates and do not need to be converted. By convention, all
 BioPerl (and, by extension, all biotoolbox) scripts are base 
 (1-based) coordinates. Default behavior is to convert.</p>
 </dd>
-</li>
-<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong>
+<dt><strong><a name="out_filename" class="item">--out &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the output filename. By default it uses the basename of the input 
 file.</p>
 </dd>
-</li>
-<dt><strong><a name="bigbed" class="item">--bigbed</a></strong>
+<dt><strong><a name="bigbed" class="item">--bigbed</a></strong></dt>
 
-<dt><strong><a name="bb" class="item">--bb</a></strong>
+<dt><strong><a name="bb" class="item">--bb</a></strong></dt>
 
 <dd>
 <p>Indicate that a binary BigBed file should be generated instead of 
 a text BED file. A .bed file is first generated, then converted to 
 a .bb file, and then the .bed file is removed.</p>
 </dd>
-</li>
-<dt><strong><a name="chromf_filename" class="item">--chromf &lt;filename&gt;</a></strong>
+<dt><strong><a name="chromf_filename" class="item">--chromf &lt;filename&gt;</a></strong></dt>
 
 <dd>
 <p>When converting to a BigBed file, provide a two-column tab-delimited 
 text file containing the chromosome names and their lengths in bp. 
 Alternatively, provide a name of a database, below.</p>
 </dd>
-</li>
-<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong>
+<dt><strong><a name="db_database" class="item">--db &lt;database&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the database from which chromosome lengths can be derived when 
@@ -171,8 +159,7 @@ generating a BigBed file. This option is only required when generating
 BigBed files. It may also be supplied from the metadata in the source 
 data file.</p>
 </dd>
-</li>
-<dt><strong><a name="bbapp_path_to_bedtobigbed" class="item">--bbapp &lt;/path/to/bedToBigBed&gt;</a></strong>
+<dt><strong><a name="bbapp_path_to_bedtobigbed" class="item">--bbapp &lt;/path/to/bedToBigBed&gt;</a></strong></dt>
 
 <dd>
 <p>Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
@@ -181,19 +168,16 @@ the application path. Failing that, it will search the default
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.</p>
 </dd>
-</li>
-<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong>
+<dt><strong><a name="no_gz" class="item">--(no)gz</a></strong></dt>
 
 <dd>
 <p>Specify whether (or not) the output file should be compressed with gzip.</p>
 </dd>
-</li>
-<dt><strong><a name="help" class="item">--help</a></strong>
+<dt><strong><a name="help" class="item">--help</a></strong></dt>
 
 <dd>
 <p>Display this POD documentation.</p>
 </dd>
-</li>
 </dl>
 <p>
 </p>
