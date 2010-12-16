@@ -587,7 +587,7 @@ The command line flags and descriptions:
 
 Specify two files of nucleosome lists. The files must contain sorted
 genomic position coordinates for each nucleosome. Supported file formats
-include GFF, BED, or the text data file from L<map_nucleosomes.pl>. The
+include GFF, BED, or the text data file from C<map_nucleosomes.pl>. The
 file with the least number of nucleosomes is automatically designated as
 the target, while the file with the most is designated as the reference
 list.

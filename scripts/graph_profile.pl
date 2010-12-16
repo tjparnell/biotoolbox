@@ -457,7 +457,7 @@ The command line flags and descriptions:
 
 Specify the file name of a previously generated feature dataset.
 The tim data format is preferable, although any other tab-delimited text 
-data formats may be usable. See the file description in L<tim_db_helper.pm>.
+data formats may be usable. See the file description in C<tim_db_helper.pm>.
 
 =item --index <index>
 

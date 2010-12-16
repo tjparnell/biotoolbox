@@ -483,7 +483,7 @@ The command line flags and descriptions:
 
 Specify the file name of a data file, with or without the --in flag. 
 The file may be any tab-delimited text file (preferably in the tim data 
-format as described in L<tim_file_helper.pm>), GFF, SGR, or BED file. 
+format as described in C<tim_file_helper.pm>), GFF, SGR, or BED file. 
 Recognizeable genome coordinate columns should be present, including 
 chromosome, start, and stop. Data files collected using the 'genome' 
 windows feature are ideal. The file may be compressed with gzip.
@@ -601,7 +601,7 @@ for a variety of reasons, including fast, random access and no loss in
 data value precision. More information can be found at this location:
 http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires 
 BigWig file support, supplied by the biotoolbox module 
-L<tim_db_helper::bigwig>. 
+C<tim_db_helper::bigwig>. 
 
 
 =head1 AUTHOR
