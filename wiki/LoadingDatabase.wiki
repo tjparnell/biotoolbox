@@ -1,4 +1,5 @@
 #summary A guide to loading a Bio::DB::SeqFeature::Store with annotation and data
+#labels Featured 
 
 =HOWTO: Loading a Bio::DB::SeqFeature::Store database with annotation and data=
 
@@ -16,19 +17,19 @@ The most important component of the database is the annotation. The annotation s
 
 Ideally, the annotation should be provided in GFF3 format, making loading in the database simple. For example, SGD provides the yeast genome in GFF3 files. Unfortunately, this isn't always the case, as annotation can come in many different flavors.
 
-BioPerl includes some converters. For example, there is a converter for the NCBI GenBank format, genbank2gff3.pl. For files in GTF format (a variation of GFF v.2), there is a GTF to GFF3 [http://www.sequenceontology.org/cgi-bin/converter.cgi converter] available.
+BioPerl includes some converters. For example, there is a converter for the NCBI GenBank format, `genbank2gff3.pl`. For files in GTF format (a variation of GFF v.2), there is a GTF to GFF3 [http://www.sequenceontology.org/cgi-bin/converter.cgi converter] available.
 
 ====Annotation from UCSC====
 Annotation may be downloaded from the UCSC Table Browser in a simple tab-delimited gene table format. It's also possible to download as a GTF, but it is not compatible with the above GTF converter.
 
 The GBrowse distribution provides a script, ucsc_genes2gff.pl, which will convert the gene table. However, it produces fairly simple annotation, and in my experience has some issues. The Chado distribution also includes a different [http://gmod.svn.sourceforge.net/viewvc/gmod/schema/trunk/chado/bin/ucsc_genes2gff.pl?revision=21190&view=markup ucsc_genes2gff.pl] script, which, although I have not used it, appears to produce more complete GFF3 features.
 
-The *biotoolbox* collection also includes a UCSC gene table to GFF3 converter script, [http://biotoolbox.googlecode.com/svn/wiki/pod/ucsc_table2gff3.pod.html ucsc_table2gff3.pl]. While it is somewhat limited, it will produce reasonable annotation using the RefSeq tables. 
+The *biotoolbox* collection also includes a UCSC gene table to GFF3 converter script, [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. While it is somewhat limited, it will produce reasonable annotation using the RefSeq tables. 
 
 ====Annotation from Ensembl====
 Ensembl conveniently provides GTF files for their annotated genomes. However, the information content is limited in the GTF file. Nevertheless, it is compatible with the above GTF to GFF3 converter.
 
-To obtain more complete annotation, there is a *biotoolbox* script, [http://biotoolbox.googlecode.com/svn/wiki/pod/get_ensembl_annotation.pod.html get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
+To obtain more complete annotation, there is a *biotoolbox* script, [Pod_get_ensembl_annotation get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
 
 ===Data Formats===
 Microarray and next-generation sequencing data are usually comprised of a series of genomic coordinates and values. This data can be provided in a number of different file formats.
@@ -55,7 +56,7 @@ Utilized by David Nix's [http://http://timat2.sourceforge.net/ T2] and [http://u
 
 The [http://useq.sourceforge.net/useqArchiveFormat.html useq] archive is an improvement on the bar file, allowing for either annotation, data values, or both to be stored in a compressed archive. 
 
-Neither format is directly supported by BioPerl, GBrowse, or *biotoolbox*. However, there is a *biotoolbox* script, [http://biotoolbox.googlecode.com/svn/wiki/pod/bar2wig.pod.html bar2wig.pl], for converting bar files to wig files. There is also a utility, useq2text, in the USeq package to convert a useq archive into text (6-column BED), from which the data can be converted into one of the other supported formats.
+Neither format is directly supported by BioPerl, GBrowse, or *biotoolbox*. However, there is a *biotoolbox* script, [Pod_bar2wig bar2wig.pl], for converting bar files to wig files. There is also a utility, `useq2text`, in the USeq package to convert a useq archive into text (6-column BED), from which the data can be converted into one of the other supported formats.
 
 ====BAM file====
 While not inherently a data value file format, BAM files represent the alignments from next generation sequencing, and as such, are more of a raw data format. Typically, one is concerned with the coverage of reads over specific genomic features. There are numerous packages for enumerating and processing the number of aligned sequence reads over the genome, including scripts in the *biotoolbox* package.
@@ -65,23 +66,23 @@ There are numerous software packages for low-level processing and normalizing ra
 
 ===Data format conversion===
 There are numerous *biotoolbox* scripts for converting data file formats from one format to another. Many of these will convert any tab-delimited text file into a useable format. Others can convert formats into a tab-delimited text format.
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/data2bed.pod.html data2bed.pl]
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/data2gff.pod.html data2gff.pl]
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/data2wig.pod.html data2wig.pl]
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/bar2wig.pod.html bar2wig.pl]
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/wig2data.pod.html wig2data.pl]
-	* [http://biotoolbox.googlecode.com/svn/wiki/pod/bam2gff_bed.pod.html bam2gff_bed.pl]
+	* [Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]
+	* [Pod_bar2wig bar2wig.pl]
+	* [Pod_data2bed data2bed.pl]
+	* [Pod_data2gff data2gff.pl]
+	* [Pod_data2wig data2wig.pl]
+	* [Pod_wig2data wig2data.pl]
 	
 ===Loading the database===
 The Bio::DB::SeqFeature::Store database is loaded with either GFF3 or Fasta files. Therefore, genomic data in other data formats, e.g. .wig or .bw, must have GFF3 files prepared that reference the actual data files. In these cases, a genomic feature is described, one for each chromosome strand, that has an attribute tag (in the GFF 9th column) describing the location of the binary file in the local file system.
 
 ====wig files====
-The Bio::Graphics modules comes with a Perl script, wiggle2gff3.pl, that is used to prepare a wig file. It first converts the text .wig file into a binary .wib (downsampling the data to 8-bit precision in the process), then generates a GFF3 file that references the .wib files.
+The Bio::Graphics modules comes with a Perl script, `wiggle2gff3.pl`, that is used to prepare a wig file. It first converts the text .wig file into a binary .wib (downsampling the data to 8-bit precision in the process), then generates a GFF3 file that references the .wib files.
 
 ====Big files====
-BigFiles, including BigBed and BigWig, may be referenced using the *biotoolbox* script, [http://biotoolbox.googlecode.com/svn/wiki/pod/big_file2gff3.pod.html big_file2gff3.pl]. BAM files may also be referenced using this script.
+BigFiles, including BigBed and BigWig, may be referenced using the *biotoolbox* script, [Pod_big_file2gff3 big_file2gff3.pl]. BAM files may also be referenced using this script.
 
-Once the GFF3 files are generated, the database may be loaded using the BioPerl provided script, seqfeature_load.pl (or bp_seqfeature_load.pl). 
+Once the GFF3 files are generated, the database may be loaded using the BioPerl provided script, `seqfeature_load.pl` (or `bp_seqfeature_load.pl`). 
 
 
 

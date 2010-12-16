@@ -1,192 +1,180 @@
 #summary A summary of the scripts available in *biotoolbox*
-
-=Program Groups=
-
-Lists of programs organized by function.
-
-===Microarray===
-	* process_agilent.pl
-	* map_oligo_data2gff.pl
-	* just_blast_oligos.pl
-
-===Illumina sequencing, BAM files===
-	* bam2gff_bed.pl
-	* bin_genomic_data.pl
-	* get_actual_nuc_sizes.pl
-	* novo_wrapper.pl
-	* split_bam_by_isize.pl
-	* split_bam_by_strand.pl
-
-===Data collection===
-	* average_gene.pl
-	* bin_genomic_data.pl
-	* generate_genomic_bins.pl
-	* get_datasets.pl
-	* get_feature_info.pl
-	* map_data.pl
-
-===Dataset manipulation===
-	* data2frequency.pl
-	* join_data_file.pl
-	* manipulate_datasets.pl
-	* merge_datasets.pl
-	* pull_features.pl
-	* shift_coordinates.pl
-	* split_data_file.pl
-
-===Data analysis===
-	* data2frequency.pl
-	* graph_data.pl
-	* graph_histogram.pl
-	* graph_profile.pl
-	* run_cluster.pl
-
-===Finding features===
-	* find_enriched_regions.pl
-	* get_intersecting_features.pl
-	* map_transcripts.pl
-
-===Nucleosome Analysis===
-	* find_nucleosome_movement.pl
-	* get_actual_nuc_sizes.pl
-	* intersect_nucs.pl
-	* map_nucleosomes.pl
-	* verify_nucleosome_mapping.pl
-
-===File format conversion===
-	* bam2gff_bed.pl
-	* bar2wig.pl
-	* data2bed.pl
-	* data2gff.pl
-	* data2wig.pl
-	* gff2sgr.pl
-	* my_gff2gff3.pl
-	* wig2data.pl
-
-===Miscellaneous===
-	* big_file2gff3.pl
-	* convert_yeast_genome_version.pl
-	* my_gff2gff3.pl
-	* print_feature_types.pl
-	* shift_coordinates.pl
-
-===Genome annotation===
-	* get_ensembl_annotation.pl
-	* ucsc_chrom2gff3.pl
-	* ucsc_cytoband2gff3.pl
-	* ucsc_table2gff3.pl
-
-===SNP calling===
-	* merge_SNPs.pl
-	* locate_SNPs.pl
-
-
-
-
+#labels Featured 
 
 =Program List=
 
 This is an alphabetical list of the scripts available in the *biotoolbox* scripts directory.
 
-====average_gene.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/average_gene.pod.html average_gene.pl] Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
-====bam2gff_bed.pl====
-[Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl] Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
-====bar2wig.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/bar2wig.pod.html bar2wig.pl] Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
-====bin_genomic_data.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/bin_genomic_data.pod.html bin_genomic_data.pl] Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
-====big_file2gff3.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/big_file2gff3.pod.html big_file2gff3.pl] Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
-====convert_yeast_genome_version.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/convert_yeast_genome_version.pl convert_yeast_genome_version.pl] Convert the genomic coordinates of a data file between different SGD genome versions.
-====data2frequency.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/data2frequency.pod.html data2frequency.pl] Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
-====data2bed.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/data2bed.pod.html data2bed.pl] Convert any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
-====data2gff.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/data2gff.pod.html data2gff.pl] Convert any data text file into a GFF file, so long as there are genomic coordinates within the file.
-====data2wig.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/data2wig.pod.html data2wig.pl] Convert any data text file into into a text wiggle file, so long as it has genomic coordinates. Both fixed and variable step files may be generated depending on the source file coordinates. Alternatively, binary bigwig files may be generated.
-====find_enriched_regions.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/find_enriched_regions.pod.html find_enriched_regions.pl] Scan across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
-====find_nucleosome_movement.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/find_nucleosome_movement.pod.html find_nucleosome_movement.pl] Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
-====generate_genomic_bins.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/generate_genomic_bins.pod.html generate_genomic_bins.pl] 	Generate a file of genomic bins to be used in data collection. Intended for large genomes, small bin size, and/or low memory environments. It will optionally split the file into managable parts.
-====get_actual_nuc_sizes.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/get_actual_nuc_sizes.pod.html get_actual_nuc_sizes.pl] Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
-====get_datasets.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/get_datasets.pod.html get_datasets.pl] The workhorse program for collecting data stored in a Bio::DB database relative to any feature described in the database: genes, promoters, genomic bins, etc. The data is combined in one of a variety of statistical methods.
-====get_ensembl_annotation.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/get_ensembl_annotation.pod.html get_ensembl_annotation.pl] This script will connect to the public Ensembl MySQL database, download the genome annotation for the given species, and write a GFF3 file suitable for loading into a database. The resulting file will have more information than their published GTF file. 
-====get_feature_info.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/get_feature_info.pod.html get_feature_info.pl] Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
-====get_intersecting_features.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/get_intersecting_features.pod.html get_intersecting_features.pl] Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
-====gff2sgr.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/gff2sgr.pl gff2sgr.pl] Convert a GFF file into a simple SGR file (chromosome, position, value).
-====graph_data.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/graph_data.pod.html graph_data.pl] Generate a XY line or scatter plot between two datasets. For scatter plots, a linear regression line is also plotted. Statistics on the correlation between the two datasets are also reported.
-====graph_histogram.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/graph_histogram.pod.html graph_histogram.pl] Generate a histogram plot for one or two datasets. The data is binned into the designated number of bins and the graph plotted. The graph may be a line or bar plot.
-====graph_profile.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/graph_profile.pod.html graph_profile.pl] Generate a graph of data plotted against a specific X-axis, such as genomic coordinates. Useful for plotting data that was collected relative to a specific position, such as a transcription start site. The data is plotted as a smoothed line.
-====intersect_nucs.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/intersect_nucs.pod.html intersect_nucs.pl] A program to intersect two lists of called, identified nucleosomes. Overlapping nucleosomes are identified, and the distance of midpoint movement reported. 
-====join_data_file.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/join_data_file.pod.html join_data_file.pl] Join two or more data files that were split using the split_data_file.pl program. The data files must have equal number of datasets (columns) and identical metadata.
-====just_blast_oligos.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/just_blast_oligos.pl just_blast_oligos.pl] A program to identify the genomic positions of microarray oligo probes by aligning them to the genome using a local copy of NCBI BLAST. Partial hits may be included.
-====locate_SNPs.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/locate_SNPs.pod.html locate_SNPs.pl] Identifies the overlapping gene and potential codon change associated with sequence variations. Uses the list of sequence variants generated by the SamTools' samtools.pl varFilter function.
-====manipulate_datasets.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/manipulate_datasets.pod.html manipulate_datasets.pl] A program to manipulate datasets (columns) in a data file. A wide variety of manipulations may be performed, from re-ordering the columns to mathematically converting the data values to generating ratios between datasets. Multiple functions may be performed interactively or single functions performed automatically by command line options, allowing for easy scripting of manipulations.
-====map_data.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/map_data.pod.html map_data.pl] Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
-====map_nucleosomes.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/map_nucleosomes.pod.html map_nucleosomes.pl] Similar to find_enriched_regions.pl, but specific for nucleosomes. Given a dataset of nucleosome occupancies, peaks of occupancy data are mapped and assigned to a nucleosome of standard 147 bp size. The next nucleosome occupancy peak is identified relative to the position of the prior identified nucleosome, assuming that nucleosomes are relatively regularly spaced.
-====map_oligo_data2gff.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/map_oligo_data2gff.pod.html map_oligo_data2gff.pl] Map the processed microarray oligo data value (for example, from process_agilent.pl) to a genomic coordinate represented by the oligo probe. Probe positions may be mapped using just_blast_oligos.pl or any other alignment program. A GFF file is generated. 
-====map_transcripts.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/map_transcripts.pod.html map_transcripts.pl] Given a dataset of transcriptome data (either RNA-hybridized tiling microarray or RNA-Sequencing), regions of enrichment (transcribed) are associated with annotated ORFs to identify transcription start and stop sites. Introns, alternative splicing, and intron-embedded unique genes are not identified.
-====merge_datasets.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/merge_datasets.pod.html merge_datasets.pl] Merge the datasets (columns) of two or more data files into one file. The datasets may be interactively chosen. Each file must have the same number of features (rows).
-====merge_SNPs.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/merge_SNPs.pod.html merge_SNPs.pl] Takes a two or more lists of sequence variants (as called by SamTools' samtools.pl varFilter function) and identify unique and common variants. Useful for separating strain-specific mutations from background polymorphisms.
-====my_gff2gff3.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/my_gff2gff3.pod.html my_gff2gff3.pl] Convert GFF version 2 files to GFF version 3 files. Useful when transitioning from Bio::DB::GFF to Bio::DB::SeqFeature::Store databases. Fairly specific to my situation.
-====novo_wrapper.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/novo_wrapper.pod.html novo_wrapper.pl] A wrapper program for aligning one or more Illumina or other raw sequencing data using Novocraft's novoalign program. After aligning, it will convert the alignment file to an indexed binary BAM file.
-====print_feature_types.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/print_feature_types.pl print_feature_types.pl] Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
-====process_agilent.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl] Process the raw Agilent data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together.
-====pull_features.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/pull_features.pl pull_features.pl] Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
-====run_cluster.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/run_cluster.pod.html run_cluster.pl] This script is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others. 
-====shift_coordinates.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/shift_coordinates.pl shift_coordinates.pl] A program for shifting coordinates, for example from interbase (0-base) to 1-base.
-====split_bam_by_isize.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/split_bam_by_isize.pod.html split_bam_by_isize.pl] Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
-====split_bam_by_strand.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/split_bam_by_strand.pod.html split_bam_by_strand.pl] Split a BAM alignment file into two BAM files based on the strand to which the sequence tag aligns. Useful for RNA-Seq experiments.
-====split_data_file.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/split_data_file.pod.html split_data_file.pl] Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
-====ucsc_chrom2gff3.pl====
-[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl] Convert the UCSC chromosome information (chomInfo) file into a GFF3 file. This file is necessary for loading into a Bio::SeqFeature::Store database. 
-====ucsc_cytoband2gff3.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/ucsc_cytoband2gff3.pod.html ucsc_cytoband2gff3.pl] A simple script to conver the UCSC cytobands file into a GFF3 file that can be used by the ideogram glyph of GBrowse. Useful with human genome databases where cytobands are annotated.
-====ucsc_table2gff3.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/ucsc_table2gff3.pod.html ucsc_table2gff3.pl] A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
-====verify_nucleosome_mapping.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/verify_nucleosome_mapping.pod.html verify_nucleosome_mapping.pl] This script will 
+====[Pod_average_gene average_gene.pl]====
+Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
+====[Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]====
+Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
+====[Pod_bar2wig bar2wig.pl]====
+Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
+====[Pod_bin_genomic_data bin_genomic_data.pl]====
+Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
+====[Pod_big_file2gff3 big_file2gff3.pl]====
+[Pod_big_file2gff3 big_file2gff3.pl] Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
+====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/convert_yeast_genome_version.pl convert_yeast_genome_version.pl]====
+Convert the genomic coordinates of a data file between different SGD genome versions.
+====[Pod_data2frequency data2frequency.pl]====
+Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
+====[Pod_data2bed data2bed.pl]====
+Convert any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
+====[Pod_data2gff data2gff.pl]====
+Convert any data text file into a GFF file, so long as there are genomic coordinates within the file.
+====[Pod_data2wig data2wig.pl]====
+Convert any data text file into into a text wiggle file, so long as it has genomic coordinates. Both fixed and variable step files may be generated depending on the source file coordinates. Alternatively, binary bigwig files may be generated.
+====[Pod_find_enriched_regions find_enriched_regions.pl]====
+Scan across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
+====[Pod_find_nucleosome_movement find_nucleosome_movement.pl]====
+Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
+====[Pod_generate_genomic_bins generate_genomic_bins.pl]====
+Generate a file of genomic bins to be used in data collection. Intended for large genomes, small bin size, and/or low memory environments. It will optionally split the file into managable parts.
+====[Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]====
+Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
+====[Pod_get_datasets get_datasets.pl]====
+The workhorse program for collecting data stored in a Bio::DB database relative to any feature described in the database: genes, promoters, genomic bins, etc. The data is combined in one of a variety of statistical methods.
+====[Pod_get_ensembl_annotation get_ensembl_annotation.pl]====
+This script will connect to the public Ensembl MySQL database, download the genome annotation for the given species, and write a GFF3 file suitable for loading into a database. The resulting file will have more information than their published GTF file. 
+====[Pod_get_feature_info get_feature_info.pl]====
+Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
+====[Pod_get_intersecting_features get_intersecting_features.pl]====
+Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
+====[Pod_graph_data graph_data.pl]====
+Generate a XY line or scatter plot between two datasets. For scatter plots, a linear regression line is also plotted. Statistics on the correlation between the two datasets are also reported.
+====[Pod_graph_histogram graph_histogram.pl]====
+Generate a histogram plot for one or two datasets. The data is binned into the designated number of bins and the graph plotted. The graph may be a line or bar plot.
+====[Pod_graph_profile graph_profile.pl]====
+Generate a graph of data plotted against a specific X-axis, such as genomic coordinates. Useful for plotting data that was collected relative to a specific position, such as a transcription start site. The data is plotted as a smoothed line.
+====[Pod_intersect_nucs intersect_nucs.pl]====
+A program to intersect two lists of called, identified nucleosomes. Overlapping nucleosomes are identified, and the distance of midpoint movement reported. 
+====[Pod_join_data_file join_data_file.pl]====
+Join two or more data files that were split using the split_data_file.pl program. The data files must have equal number of datasets (columns) and identical metadata.
+====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/just_blast_oligos.pl just_blast_oligos.pl]====
+A program to identify the genomic positions of microarray oligo probes by aligning them to the genome using a local copy of NCBI BLAST. Partial hits may be included.
+====[Pod_locate_SNPs locate_SNPs.pl]====
+Identifies the overlapping gene and potential codon change associated with sequence variations. Uses the list of sequence variants generated by the SamTools' samtools.pl varFilter function.
+====[Pod_manipulate_datasets manipulate_datasets.pl]====
+A program to manipulate datasets (columns) in a data file. A wide variety of manipulations may be performed, from re-ordering the columns to mathematically converting the data values to generating ratios between datasets. Multiple functions may be performed interactively or single functions performed automatically by command line options, allowing for easy scripting of manipulations.
+====[Pod_map_data map_data.pl]====
+ Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
+====[Pod_map_nucleosomes map_nucleosomes.pl]====
+Similar to find_enriched_regions.pl, but specific for nucleosomes. Given a dataset of nucleosome occupancies, peaks of occupancy data are mapped and assigned to a nucleosome of standard 147 bp size. The next nucleosome occupancy peak is identified relative to the position of the prior identified nucleosome, assuming that nucleosomes are relatively regularly spaced.
+====[Pod_map_oligo_data2gff map_oligo_data2gff.pl]====
+Map the processed microarray oligo data value (for example, from process_agilent.pl) to a genomic coordinate represented by the oligo probe. Probe positions may be mapped using just_blast_oligos.pl or any other alignment program. A GFF file is generated. 
+====[Pod_map_transcripts map_transcripts.pl]====
+Given a dataset of transcriptome data (either RNA-hybridized tiling microarray or RNA-Sequencing), regions of enrichment (transcribed) are associated with annotated ORFs to identify transcription start and stop sites. Introns, alternative splicing, and intron-embedded unique genes are not identified.
+====[Pod_merge_datasets merge_datasets.pl]====
+Merge the datasets (columns) of two or more data files into one file. The datasets may be interactively chosen. Each file must have the same number of features (rows).
+====[Pod_merge_SNPs merge_SNPs.pl]====
+Takes a two or more lists of sequence variants (as called by SamTools' samtools.pl varFilter function) and identify unique and common variants. Useful for separating strain-specific mutations from background polymorphisms.
+====[Pod_my_gff2gff3 my_gff2gff3.pl]====
+Convert GFF version 2 files to GFF version 3 files. Useful when transitioning from Bio::DB::GFF to Bio::DB::SeqFeature::Store databases. Fairly specific to my situation.
+====[Pod_novo_wrapper novo_wrapper.pl]====
+A wrapper program for aligning one or more Illumina or other raw sequencing data using Novocraft's novoalign program. After aligning, it will convert the alignment file to an indexed binary BAM file.
+====[Pod_print_feature_types print_feature_types.pl]====
+Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
+====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl]====
+Process the raw Agilent data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together.
+====[Pod_pull_features pull_features.pl]====
+Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
+====[Pod_run_cluster run_cluster.pl]====
+This script is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others. 
+====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/shift_coordinates.pl shift_coordinates.pl]====
+A program for shifting coordinates, for example from interbase (0-base) to 1-base.
+====[Pod_split_bam_by_isize split_bam_by_isize.pl]====
+Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
+====[Pod_split_bam_by_strand split_bam_by_strand.pl]====
+Split a BAM alignment file into two BAM files based on the strand to which the sequence tag aligns. Useful for RNA-Seq experiments.
+====[Pod_split_data_file split_data_file.pl]====
+Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
+====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl]====
+Convert the UCSC chromosome information (chomInfo) file into a GFF3 file. This file is necessary for loading into a Bio::SeqFeature::Store database. 
+====[Pod_ucsc_cytoband2gff3 ucsc_cytoband2gff3.pl]====
+A simple script to conver the UCSC cytobands file into a GFF3 file that can be used by the ideogram glyph of GBrowse. Useful with human genome databases where cytobands are annotated.
+====[Pod_ucsc_table2gff3 ucsc_table2gff3.pl]====
+A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
+====[Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl]====
+This script will 
 verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
-====wig2data.pl====
-[http://biotoolbox.googlecode.com/svn/trunk/html/wig2data.pod.html wig2data.pl] Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
+====[Pod_wig2data wig2data.pl]====
+Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
 
+=Program Groups=
 
+Lists of programs organized by function.
 
+===Data collection===
+	* [Pod_average_gene average_gene.pl]
+	* [Pod_bin_genomic_data bin_genomic_data.pl]
+	* [Pod_generate_genomic_bins generate_genomic_bins.pl]
+	* [Pod_get_datasets get_datasets.pl]
+	* [Pod_get_feature_info get_feature_info.pl]
+	* [Pod_map_data map_data.pl]
 
-	
+===Dataset manipulation===
+	* [Pod_data2frequency data2frequency.pl]
+	* [Pod_join_data_file join_data_file.pl]
+	* [Pod_manipulate_datasets manipulate_datasets.pl]
+	* [Pod_merge_datasets merge_datasets.pl]
+	* [Pod_pull_features pull_features.pl]
+	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/shift_coordinates.pl shift_coordinates.pl]
+	* [Pod_split_data_file split_data_file.pl]
+
+===Data analysis===
+	* [Pod_data2frequency data2frequency.pl]
+	* [Pod_graph_data graph_data.pl]
+	* [Pod_graph_histogram graph_histogram.pl]
+	* [Pod_graph_profile graph_profile.pl]
+	* [Pod_run_cluster run_cluster.pl]
+
+===Finding features===
+	* [Pod_find_enriched_regions find_enriched_regions.pl]
+	* [Pod_get_intersecting_features get_intersecting_features.pl]
+	* [Pod_map_transcripts map_transcripts.pl]
+
+===Nucleosome Analysis===
+	* [Pod_find_nucleosome_movement find_nucleosome_movement.pl]
+	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
+	* [Pod_intersect_nucs intersect_nucs.pl]
+	* [Pod_map_nucleosomes map_nucleosomes.pl]
+	* [Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl]
+
+===Microarray===
+	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/just_blast_oligos.pl just_blast_oligos.pl]
+	* [Pod_map_oligo_data2gff map_oligo_data2gff.pl]
+	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl]
+
+===Illumina sequencing, BAM files===
+	* [Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]
+	* [Pod_bin_genomic_data bin_genomic_data.pl]
+	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
+	* [Pod_novo_wrapper novo_wrapper.pl]
+	* [Pod_split_bam_by_isize split_bam_by_isize.pl]
+	* [Pod_split_bam_by_strand split_bam_by_strand.pl]
+
+===File format conversion===
+	* [Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]
+	* [Pod_bar2wig bar2wig.pl]
+	* [Pod_data2bed data2bed.pl]
+	* [Pod_data2gff data2gff.pl]
+	* [Pod_data2wig data2wig.pl]
+	* [Pod_wig2data wig2data.pl]
+
+===Genome annotation===
+	* [Pod_get_ensembl_annotation get_ensembl_annotation.pl]
+	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl]
+	* [Pod_ucsc_cytoband2gff3 ucsc_cytoband2gff3.pl]
+	* [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]
+
+===SNP calling===
+	* [Pod_locate_SNPs locate_SNPs.pl]
+	* [Pod_merge_SNPs merge_SNPs.pl]
+
+===Miscellaneous===
+	* [Pod_big_file2gff3 big_file2gff3.pl]
+	* convert_yeast_genome_version.pl
+	* [Pod_my_gff2gff3 my_gff2gff3.pl]
+	* [Pod_print_feature_types print_feature_types.pl]
+
