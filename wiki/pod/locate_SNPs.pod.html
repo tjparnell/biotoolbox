@@ -1,0 +1,113 @@
+<?xml version="1.0" ?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+<title>locate_SNPs.pl</title>
+<meta http-equiv="content-type" content="text/html; charset=utf-8" />
+<link rev="made" href="mailto:_postfix@neige.apple.com" />
+</head>
+
+<body style="background-color: white">
+
+
+<!-- INDEX BEGIN -->
+<div name="index">
+<p><a name="__index__"></a></p>
+<!--
+
+<ul>
+
+	<li><a href="#name">NAME</a></li>
+	<li><a href="#synopsis">SYNOPSIS</a></li>
+	<li><a href="#options">OPTIONS</a></li>
+	<li><a href="#description">DESCRIPTION</a></li>
+	<li><a href="#author">AUTHOR</a></li>
+</ul>
+
+-->
+
+
+</div>
+<!-- INDEX END -->
+
+<p>
+</p>
+<h1><a name="name">NAME</a></h1>
+<p>locate_SNPs.pl</p>
+<p>
+</p>
+<hr />
+<h1><a name="synopsis">SYNOPSIS</a></h1>
+<pre>
+
+ locate_SNPs.pl --db &lt;database&gt; &lt;snp_file1&gt; ...</pre>
+<pre>
+
+  Options:
+  --in &lt;snp_file&gt;
+  --db &lt;database&gt;
+  --help</pre>
+<p>
+</p>
+<hr />
+<h1><a name="options">OPTIONS</a></h1>
+<p>The command line flags and descriptions:</p>
+<dl>
+<dt><strong><a name="in_snp_file" class="item">--in &lt;snp_file&gt;</a></strong>
+
+<dd>
+<p>Specify the name(s) of the input SNP file. Multiple files may be 
+specified using multiple --in arguments, with a single --in argument and a 
+comma delimited list, or as a list at the end of all options. The files may 
+kept gzipped; they will automatically be uncompressed.</p>
+</dd>
+</li>
+<dt><strong><a name="db" class="item">--db</a></strong>
+
+<dd>
+<p>Specify the name of a single GFF3 genome annotation file. This is required.
+Ideally, a database would be specified, but I am having difficulty accessing 
+the child CDS features of genes to get at the coding frame to identify 
+codon changes.</p>
+</dd>
+</li>
+<dt><strong><a name="help" class="item">--help</a></strong>
+
+<dd>
+<p>This help text.</p>
+</dd>
+</li>
+</dl>
+<p>
+</p>
+<hr />
+<h1><a name="description">DESCRIPTION</a></h1>
+<p>This program will locate SNPs and other sequence variants and identify 
+which gene the variant is located in, the type of polymorphism (insertion, 
+deletion, substitution), and, if the variant is located within a CDS, whether 
+a codon change is generated.</p>
+<p>The input files should be files generated using the varFilter function of
+the samtools.pl script, included with the SamTools distribution
+<a href="http://samtools.sourceforge.net">http://samtools.sourceforge.net</a>. That script will generate a list of the
+sequence variations that differ from the reference genome. No verification
+of the source file format is performed. The files may be gzipped.</p>
+<p>
+</p>
+<hr />
+<h1><a name="author">AUTHOR</a></h1>
+<pre>
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+</pre>
+<p>This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.</p>
+
+</body>
+
+</html>
