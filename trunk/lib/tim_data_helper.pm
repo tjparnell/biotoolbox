@@ -453,7 +453,7 @@ stepped through to identify the correct feature.
 
 This function generates two additional keys in the tim data structure 
 described above, L</index> and L</index_increment>. Please refer to 
-those items in L<INTERNAL DATA STRUCTURE> for their description and 
+those items in L<TIM DATA STRUCTURE> for their description and 
 usage.
 
 Pass this subroutine one or two arguments. The first is the reference 

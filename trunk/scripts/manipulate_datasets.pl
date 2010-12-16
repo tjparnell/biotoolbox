@@ -3632,8 +3632,8 @@ be called in shell scripts.
 
 Note that the datafile is loaded entirely in memory. For extremely large 
 datafiles, e.g. binned genomic data, it may be best to first split the 
-file into chunks (use L<split_data_file.pl>), perform the manipulations, 
-and recombine the file (use L<join_data_file.pl>). This could be done 
+file into chunks (use C<split_data_file.pl>), perform the manipulations, 
+and recombine the file (use C<join_data_file.pl>). This could be done 
 through a simple shell script.
 
 The program keeps track of the number of manipulations performed, and if 

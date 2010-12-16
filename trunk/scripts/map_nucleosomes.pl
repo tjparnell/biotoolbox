@@ -715,7 +715,7 @@ defined nucleosome midpoint. The size of this window is arbitrary but
 reasonable.
 
 The identified nucleosomes are set to 147 bp in length, centered at the 
-maximum peak. A second script, L<get_actual_nuc_sizes.pl>, will determine 
+maximum peak. A second script, C<get_actual_nuc_sizes.pl>, will determine 
 the actual nucleosome sizes based on paired-end reads in a BAM file.
 
 

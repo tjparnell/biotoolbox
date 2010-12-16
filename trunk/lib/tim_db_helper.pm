@@ -108,8 +108,8 @@ simplest is to store the data directly into the database as the score value
 of the GFF features stored in the database.   Alternatively, the data may
 be stored in a binary wig files and referenced in the attribute tag of the
 data's feature. Two types of wig files are supported: a scaled binary file
-(.wib file) supported by the module L<Bio::Graphics::Wiggle>, and a binary
-BigWig file (.bw file) supported by the module L<Bio::DB::BigWig>. The
+(.wib file) supported by the module C<Bio::Graphics::Wiggle>, and a binary
+BigWig file (.bw file) supported by the module C<Bio::DB::BigWig>. The
 BigWig file format is much preferred as it maintains spatial resolution of
 the original data and does not lose precision by scaling to 8-bit values,
 unlike the .wib file format.
@@ -118,7 +118,7 @@ While these functions may appear to be simply a rehashing of the methods
 and functions in Bio::DB::SeqFeature::Store, they either provide a simpler
 function to often used database methodologies or are designed to work
 intimately with the tim data format file and data structures (see
-L<tim_file_helper.pm>). One key advantage to these functions is the ability
+C<tim_file_helper.pm>). One key advantage to these functions is the ability
 to work with datasets that are stranded (transcriptome data, for example).
 
 A note on the database. While the Bio::DB::SeqFeature::Store database is

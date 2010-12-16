@@ -615,7 +615,7 @@ thick block data are not written. Browser and Track lines are also not
 written. Following specification, all coordinates are written in interbase
 (0-based) coordinates. Base (1-based) coordinates (the BioPerl standard) will
 be converted. Score values are not converted, however, to a 1..1000 scale.
-The biotoolbox script L<manipulate_datasets.pl> has tools to do this if
+The biotoolbox script C<manipulate_datasets.pl> has tools to do this if
 required.
 
 An option exists to further convert the BED file to an indexed, binary BigBed 
