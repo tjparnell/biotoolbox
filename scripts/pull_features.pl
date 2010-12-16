@@ -5,6 +5,7 @@
 
 use strict;
 use Getopt::Long;
+use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
@@ -17,20 +18,12 @@ print "\n This script will pull out specific features from a data file\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
-	print " Usage for $0
-  Required:
-  --data <filename>
-  --list <filename>
-  --out <filename>
-  Optional:
-  --dindex <integer>
-  --lindex <integer>
-  --sum
-  --starti <integer>
-  --stopi <integer>
-  --log
-  --help\n";
-	exit;
+	# when no command line options are present
+	# print SYNOPSIS
+	pod2usage( {
+		'-verbose' => 0, 
+		'-exitval' => 1,
+	} );
 }
 
 
@@ -63,8 +56,11 @@ GetOptions(
 ) or die " a command is wrong! please use --help for more info\n";
 
 if ($help) {
-	print_help();
-	exit;
+	# print entire POD
+	pod2usage( {
+		'-verbose' => 2,
+		'-exitval' => 1,
+	} );
 }
 
 
@@ -236,80 +232,12 @@ else {
 
 
 
-sub print_help { # subroutine to print the online help documentation
-	print "
- Command line options for $0:
-
- Given a list of features, this program will pull out those features (rows) 
- from a datafile (compare to Microsoft Excel's VLOOKUP command). The list 
- may be provided as either a separate text file or may be grabbed from the 
- clipbard (note this doesn't work through remote connections!). It will write
- a new data file containing only those features it found. 
- 
- The list file may be a simple text file containing the feature names of the 
- features to pull. The first line should be the column header name and should
- be identical to the column header name in the data file used in the lookup.
- If more than one column is present in the list of lookup names, the index 
- will be requested interactively from the user, or be specified as a command
- line argument. The same format applies to data in the clipboard; it simply
- skips the step of writing a separate list file.
- 
- The command line arguments include:
- 
-  Required:
-  --data <filename>
-  --list <filename> OR --paste
-  --out <filename>
-  Optional:
-  --dindex <integer>
-  --lindex <integer>
-  --sum
-  --starti <integer>
-  --stopi <integer>
-  --log
-  --help
- 
- The program writes out a standard tim data format file (see tim_file_helper).
-
-  The command line flags and descriptions:
-  Required:
-  --data     Specify a tim data formatted input file of genes.
-  --out      Specify the output file name. 
-  --list     Specify the name of a text file containing the feature names
-             or values to look up. The file must contain a column header 
-             that matches a column header name in the data file. Multiple 
-             columns may be present.
-  Optional:
-  --dindex   Specify the index number of the column in the data file 
-             containing the data to look up and match. Automatically
-             determined by matching the header names.
-  --lindex   Specify the index number of the column in the list file (or 
-             clipboard contents) containing the values to look up and match 
-             if more than one column is present. Defaults to interactively 
-             asking the user.
-  --sum      Indicate that the pulled data should be averaged across all 
-             features at each position, suitable for graphing. A separate text 
-             file with '_summed' appended to the filename will be written.
-  --starti   When re-summarizing the pulled data, indicate the start column 
-             index that begins the range of datasets to summarize. Defaults 
-             to the leftmost column without a standard feature description
-             name.
-  --stopi    When re-summarizing the pulled data, indicate the stop column
-             index the ends the range of datasets to summarize. Defaults
-             to the last or rightmost column.
-  --log      The data is in log2 space. Only necessary when re-summarizing the
-             pulled data.
-  --help     This help text
-
-";
-}
 
 
 
 
 
-
-
+########################   Subroutines   ###################################
 
 
 ### Subroutine to collect list values from a file
@@ -418,6 +346,125 @@ sub collect_list_from_file {
 	return @list;
 }
 
+
+
+
+__END__
+
+=head1 NAME
+
+pull_features.pl
+
+=head1 SYNOPSIS
+
+pull_features.pl --data <filename> --list <filename> --out <filename>
+  
+  Options:
+  --data <filename>
+  --list <filename>
+  --out <filename>
+  --dindex <integer>
+  --lindex <integer>
+  --sum
+  --starti <integer>
+  --stopi <integer>
+  --log
+  --help
+
+
+=head1 OPTIONS
+
+The command line flags and descriptions:
+
+=over 4
+
+
+=item --data
+
+Specify a tim data formatted input file of genes.
+
+=item --out
+
+Specify the output file name. 
+
+=item --list
+
+Specify the name of a text file containing the feature names
+or values to look up. The file must contain a column header 
+that matches a column header name in the data file. Multiple 
+columns may be present.
+
+=item --dindex <integer>
+
+Specify the index number of the column in the data file 
+containing the data to look up and match. Automatically
+determined by matching the header names.
+
+=item --lindex <integer>
+
+Specify the index number of the column in the list file (or 
+clipboard contents) containing the values to look up and match 
+if more than one column is present. Defaults to interactively 
+asking the user.
+
+=item --sum
+
+Indicate that the pulled data should be averaged across all 
+features at each position, suitable for graphing. A separate text 
+file with '_summed' appended to the filename will be written.
+
+=item --starti <integer>
+
+When re-summarizing the pulled data, indicate the start column 
+index that begins the range of datasets to summarize. Defaults 
+to the leftmost column without a standard feature description
+name.
+
+=item --stopi <integer>
+
+When re-summarizing the pulled data, indicate the stop column
+index the ends the range of datasets to summarize. Defaults
+to the last or rightmost column.
+
+=item --log
+
+The data is in log2 space. Only necessary when re-summarizing the
+pulled data.
+
+=item --help
+
+Display this POD documentation.
+
+=back
+
+=head1 DESCRIPTION
+
+Given a list of features, this program will pull out those features (rows) 
+from a datafile (compare to Microsoft Excel's VLOOKUP command). The list 
+may be provided as either a separate text file or may be grabbed from the 
+clipbard (note this doesn't work through remote connections!). It will write
+a new data file containing only those features it found. 
+
+The list file may be a simple text file containing the feature names of the 
+features to pull. The first line should be the column header name and should
+be identical to the column header name in the data file used in the lookup.
+If more than one column is present in the list of lookup names, the index 
+will be requested interactively from the user, or be specified as a command
+line argument. The same format applies to data in the clipboard; it simply
+skips the step of writing a separate list file.
+ 
+=head1 AUTHOR
+
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.  
 
 
 
