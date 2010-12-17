@@ -6,10 +6,9 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
+use File::Spec;
 use Statistics::Lite qw(mean median);
-eval {
-	use GD::Graph::smoothlines; # for bezier smoothed line graph
-};
+use GD::Graph::smoothlines; # for bezier smoothed line graph
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -401,19 +400,14 @@ sub graph_this {
 	# otherwise we let it calculate automatic values
 	
 	
+	# Generate graph file name
+	my $filename =  $graph_name . '_profile.png';
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
 	# Write the graph file
 	my $gd = $graph->plot(\@graph_data) or warn $graph->error;
-	my $filename =  $graph_name . '_profile.png';
-	my $filenumber = 1; # an incremental number to make a unique file name
-	while (-e "$directory/$filename") {
-		# it's possible that re-running the program on the same datasets
-		# will result in the file name and overwriting pre-existing files.
-		# to avoid this, we will check for the existence of a file with the 
-		# proposed filename and append a unique number if necessary
-		$filename = $graph_name . '_profile' . $filenumber . '.png';
-		$filenumber++;
-	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output file!\n";
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
@@ -421,6 +415,29 @@ sub graph_this {
 	print " wrote file '$filename'\n";
 }
 
+
+
+## Make a unique filename
+sub check_file_uniqueness {
+	my ($filename, $extension) = @_;
+	my $number = 1;
+	
+	# check whether the file is unique
+	if (-e "$filename\.$extension") {
+		# file already exists, need to make it unique
+		my $test = $filename . '_' . $number . '.' . $extension;
+		while (-e $test) {
+			$number++;
+			$test = $filename . '_' . $number . '.' . $extension;
+		}
+		# found a unique file name
+		return $test;
+	}
+	else {
+		# filename is good
+		return "$filename\.$extension";
+	}
+}
 
 
 

@@ -5,18 +5,20 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
+use File::Spec;
+use GD::Graph::lines; # for the line type graph
+use GD::Graph::mixed; # for the scatter plot
 eval {
-	use GD::Graph::lines; # for the line type graph
-	use GD::Graph::mixed; # for the scatter plot
-};
-eval {
-	use GD::Graph::smoothlines; # for bezier smoothed line graph
+	# for bezier smoothed line graph, an optional install
+	require GD::Graph::smoothlines; 
+	GD::Graph::smoothlines->import;
 };
 use Statistics::Descriptive;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
 	load_tim_data_file
+	open_to_write_fh
 );
 
 print "\n This script will graph correlation plots for two microarry data sets\n\n";
@@ -207,14 +209,18 @@ else {
 
 # open file
 my $statfile = $main_data_ref->{'basename'} . "_stats.txt";
-if (-e "$directory/$statfile") {
+$statfile = File::Spec->catfile($directory, $statfile);
+my $stat_fh;
+if (-e $statfile) {
 	# if the file exists, append to it
-	open STATFILE, ">>$directory/$statfile" or warn " unable to write $directory/$statfile\n";
+	$stat_fh = open_to_write_fh($statfile, 0, 1) or 
+		warn " unable to write '$statfile'!\n";
 } 
 else {
 	# open a new file
-	open STATFILE, ">$directory/$statfile" or warn " unable to write $directory/$statfile\n";
-	print STATFILE join("\t", qw(
+	$stat_fh = open_to_write_fh($statfile) or 
+		warn " unable to write '$statfile'!\n";
+	$stat_fh->print( join("\t", qw(
 		SourceFile
 		GraphFile
 		GraphType
@@ -225,14 +231,16 @@ else {
 		Slope
 		Pearson_coefficient
 		R^2
-	) ) . "\n"; 
+	) ) . "\n" ) if $stat_fh; 
 }
 
 # print to file
-foreach (@correlation_output) {
-	print STATFILE "$_\n";
+if ($stat_fh) {
+	foreach (@correlation_output) {
+		$stat_fh->print("$_\n");
+	}
+	$stat_fh->close;
 }
-close STATFILE;
 
 
 ### The end of the main program	
@@ -627,15 +635,14 @@ sub graph_scatterplot {
 	}
 	# otherwise we let it calculate automatic values
 		
+	# Generate graph file name
+	my $filename = $xname . '_and_' . $yname;
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	my $filename = $xname . '_and_' . $yname . '.png';
-	my $filenumber = 1; # an incremental number to make a unique file name
-	while (-e "$directory/$filename") {
-		$filename = $xname . '_and_' . $yname . '_' . $filenumber . '.png';
-		$filenumber++;
-	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output image file!\n";
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
@@ -658,12 +665,15 @@ sub graph_scatterplot {
 	# write the graph numbers if requested
 	if ($numbers) {
 		$filename =~ s/png$/txt/; # change the extension
-		open NUMBERS, ">$directory/$filename" or die " Can't open output text file!\n";
-		print NUMBERS "X_Values\tY_Values\tLinear_Regression_Y_Values\n";
-		for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
-			print NUMBERS "$data[0][$i]\t$data[1][$i]\t$data[2][$i]\n";
+		my $fh = open_to_write_fh($filename) or 
+			warn " Can't write numbers output file '$filename'!\n";
+		if ($fh) {
+			$fh->print("X_Values\tY_Values\tLinear_Regression_Y_Values\n");
+			for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
+				$fh->print("$data[0][$i]\t$data[1][$i]\t$data[2][$i]\n");
+			}
+			$fh->close;
 		}
-		close NUMBERS;
 	}
 }
 
@@ -733,15 +743,14 @@ sub graph_line_plot {
 	}
 	# otherwise we let it calculate automatic values
 	
+	# Generate graph file name
+	my $filename = $xname . '_and_' . $yname;
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	my $filename = "$xname" . '_and_' . "$yname" . '.png';
-	my $filenumber = 1; # an incremental number to make a unique file name
-	while (-e "$directory/$filename") {
-		$filename = "$xname" . '_and_' . "$yname" . '_' . $filenumber . '.png';
-		$filenumber++;
-	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output file!\n";
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
@@ -764,12 +773,15 @@ sub graph_line_plot {
 	# write the graph numbers if requested
 	if ($numbers) {
 		$filename =~ s/png$/txt/; # change the extension
-		open NUMBERS, ">$directory/$filename" or die " Can't open output text file!\n";
-		print NUMBERS "X_Values\tY_Values\n";
-		for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
-			print NUMBERS "$data[0][$i]\t$data[1][$i]\n";
+		my $fh = open_to_write_fh($filename) or 
+			warn " Can't write numbers output file '$filename'!\n";
+		if ($fh) {
+			$fh->print("X_Values\tY_Values\n");
+			for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
+				$fh->print("$data[0][$i]\t$data[1][$i]\n");
+			}
+			$fh->close;
 		}
-		close NUMBERS;
 	}
 }
 
@@ -778,7 +790,6 @@ sub graph_line_plot {
 sub graph_smoothed_line_plot {
 	# the passed values
 	my ($xname, $yname, $xref, $yref) = @_;
-	
 	
 	# calculate statistics
 	my ($q, $m, $r, $rsquared) = get_stats($xref, $yref);
@@ -838,15 +849,14 @@ sub graph_smoothed_line_plot {
 	}
 	# otherwise we let it calculate automatic values
 	
+	# Generate graph file name
+	my $filename = $xname . '_and_' . $yname;
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	my $filename = "$xname" . '_and_' . "$yname" . '.png';
-	my $filenumber = 1; # an incremental number to make a unique file name
-	while (-e "$directory/$filename") {
-		$filename = "$xname" . '_and_' . "$yname" . '_' . $filenumber . '.png';
-		$filenumber++;
-	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output file!\n";
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
@@ -869,12 +879,15 @@ sub graph_smoothed_line_plot {
 	# write the graph numbers if requested
 	if ($numbers) {
 		$filename =~ s/png$/txt/; # change the extension
-		open NUMBERS, ">$directory/$filename" or die " Can't open output text file!\n";
-		print NUMBERS "X_Values\tY_Values\n";
-		for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
-			print NUMBERS "$data[0][$i]\t$data[1][$i]\n";
+		my $fh = open_to_write_fh($filename) or 
+			warn " Can't write numbers output file '$filename'!\n";
+		if ($fh) {
+			$fh->print("X_Values\tY_Values\n");
+			for (my $i = 0; $i < scalar @{ $data[0] }; $i++) {
+				$fh->print("$data[0][$i]\t$data[1][$i]\n");
+			}
+			$fh->close;
 		}
-		close NUMBERS;
 	}
 }
 
@@ -901,6 +914,28 @@ sub get_stats {
 	return ($q, $m, $r, $rsquared);
 }
 
+
+## Make a unique filename
+sub check_file_uniqueness {
+	my ($filename, $extension) = @_;
+	my $number = 1;
+	
+	# check whether the file is unique
+	if (-e "$filename\.$extension") {
+		# file already exists, need to make it unique
+		my $test = $filename . '_' . $number . '.' . $extension;
+		while (-e $test) {
+			$number++;
+			$test = $filename . '_' . $number . '.' . $extension;
+		}
+		# found a unique file name
+		return $test;
+	}
+	else {
+		# filename is good
+		return "$filename\.$extension";
+	}
+}
 
 
 
