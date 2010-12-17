@@ -22,7 +22,10 @@ use tim_file_helper qw(
 );
 use Bio::DB::BigBed;
 use Bio::DB::BigWig;
-use Bio::DB::Sam;
+eval {
+	require Bio::DB::Sam;
+	Bio::DB::Sam->import;
+}
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 

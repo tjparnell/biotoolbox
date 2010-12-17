@@ -5,10 +5,9 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-eval {
-	use GD::Graph::lines;
-	use GD::Graph::bars;
-};
+use File::Spec;
+use GD::Graph::lines;
+use GD::Graph::bars;
 use Statistics::Lite qw(mean max);
 use Statistics::Descriptive;
 use FindBin qw($Bin);
@@ -302,10 +301,10 @@ sub graph_one {
 	pop @bins; # remove the maximum that we added
 	my $title = "Distribution of $out $name";
 	if ($lines) {
-		graph_this_as_lines($name, "", $title, \@data);
+		graph_this_as_lines($name, undef, $title, \@data);
 	} 
 	else {
-		graph_this_as_bars($name, "", $title, \@data);
+		graph_this_as_bars($name, undef, $title, \@data);
 	}
 }	
 
@@ -387,7 +386,7 @@ sub graph_this_as_lines {
 	my $graph = GD::Graph::lines->new(600,400);
 	$graph->set(
 		title			=> $title,
-		x_label         => 'values',
+		x_label         => $name2 ? 'values' : "$name1 value", 
 		y_label         => 'number',
 		x_max_value     => $max,
 		x_min_value     => $start,
@@ -415,17 +414,24 @@ sub graph_this_as_lines {
 	if ($out) {
 		$filename = $out;
 		$filename =~ s/\.\w*$//;
-		$filename = $filename . "_$name" . ".png";
+		$filename = $filename . "_$name";
 	} 
 	else {
-		$filename = "distribution_$name" . '.png';
+		$filename = "distribution_$name";
 	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output file!\n";
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
+	open IMAGE, ">$filename" or die " Can't open output '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
-	print "wrote line graph $filename in directory $directory\n";
+	print "wrote line graph '$filename'\n";
 }
+
+
+
+
 
 # Write a bar graph
 sub graph_this_as_bars { 	
@@ -435,7 +441,7 @@ sub graph_this_as_bars {
 	my $graph = GD::Graph::bars->new(600,400);
 	$graph->set(
 		title			=> $title,
-		x_label         => 'values',
+		x_label         => $name2 ? 'values' : "$name1 value",
 		y_label         => 'number',
 		x_number_format	=> "%.1f",
 		#x_tick_number	=> scalar @bins,
@@ -462,19 +468,44 @@ sub graph_this_as_bars {
 	if ($out) {
 		$filename = $out;
 		$filename =~ s/\.\w*$//;
-		$filename = $filename . "_$name" . ".png";
+		$filename = $filename . "_$name";
 	} 
 	else {
-		$filename = "distribution_$name" . '.png';
+		$filename = "distribution_$name";
 	}
-	open IMAGE, ">$directory/$filename" or die " Can't open output file!\n";
+	$filename = File::Spec->catfile($directory, $filename);
+	$filename = check_file_uniqueness($filename, 'png');
+	
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
-	print "wrote bar graph $filename in directory $directory\n";
+	print "wrote bar graph '$filename'\n";
 }
 
 
+
+## Make a unique filename
+sub check_file_uniqueness {
+	my ($filename, $extension) = @_;
+	my $number = 1;
+	
+	# check whether the file is unique
+	if (-e "$filename\.$extension") {
+		# file already exists, need to make it unique
+		my $test = $filename . '_' . $number . '.' . $extension;
+		while (-e $test) {
+			$number++;
+			$test = $filename . '_' . $number . '.' . $extension;
+		}
+		# found a unique file name
+		return $test;
+	}
+	else {
+		# filename is good
+		return "$filename\.$extension";
+	}
+}
 
 
 
