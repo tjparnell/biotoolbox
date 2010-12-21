@@ -2365,6 +2365,9 @@ sub _check_file {
 		# first try adding some common file extensions in case those are missing
 		my $new_filename;
 		foreach my $ext (@SUFFIX_LIST) {
+			$ext =~ s/\\//g; # the list is designed as a regular expression list
+							# with the periods escaped for File::Basename
+							# but we need to un-escape them for this purpose
 			if (-e $filename . $ext) {
 				$new_filename = $filename . $ext;
 				last;
