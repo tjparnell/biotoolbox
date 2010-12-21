@@ -56,9 +56,6 @@ get_feature_info.pl
 get_intersecting_features.pl
 	Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
 
-gff2sgr.pl
-	Convert a GFF file into a simple SGR file (chromosome, position, value).
-	
 graph_data.pl
 	Generate a XY line or scatter plot between two datasets. For scatter plots, a linear regression line is also plotted. Statistics on the correlation between the two datasets are also reported.
 	
@@ -154,20 +151,7 @@ PROGRAM GROUPS
 
 Lists of programs organized by function.
 
-Microarray
-	* process_agilent.pl
-	* map_oligo_data2gff.pl
-	* just_blast_oligos.pl
-
-Illumina sequencing, BAM files
-	* bam2gff_bed.pl
-	* bin_genomic_data.pl
-	* get_actual_nuc_sizes.pl
-	* novo_wrapper.pl
-	* split_bam_by_isize.pl
-	* split_bam_by_strand.pl
-
-Data collection
+===Data collection===
 	* average_gene.pl
 	* bin_genomic_data.pl
 	* generate_genomic_bins.pl
@@ -175,7 +159,7 @@ Data collection
 	* get_feature_info.pl
 	* map_data.pl
 
-Dataset manipulation
+===Dataset manipulation===
 	* data2frequency.pl
 	* join_data_file.pl
 	* manipulate_datasets.pl
@@ -184,50 +168,59 @@ Dataset manipulation
 	* shift_coordinates.pl
 	* split_data_file.pl
 
-Data analysis
+===Data analysis===
 	* data2frequency.pl
 	* graph_data.pl
 	* graph_histogram.pl
 	* graph_profile.pl
 	* run_cluster.pl
 
-Finding features
+===Finding features===
 	* find_enriched_regions.pl
 	* get_intersecting_features.pl
 	* map_transcripts.pl
 
-Nucleosome Analysis
+===Nucleosome Analysis===
 	* find_nucleosome_movement.pl
 	* get_actual_nuc_sizes.pl
 	* intersect_nucs.pl
 	* map_nucleosomes.pl
 	* verify_nucleosome_mapping.pl
 
-File format conversion
+===Microarray===
+	* just_blast_oligos.pl
+	* map_oligo_data2gff.pl
+	* process_agilent.pl
+
+===Illumina sequencing, BAM files===
+	* bam2gff_bed.pl
+	* bin_genomic_data.pl
+	* get_actual_nuc_sizes.pl
+	* novo_wrapper.pl
+	* split_bam_by_isize.pl
+	* split_bam_by_strand.pl
+
+===File format conversion===
 	* bam2gff_bed.pl
 	* bar2wig.pl
 	* data2bed.pl
 	* data2gff.pl
 	* data2wig.pl
-	* gff2sgr.pl
-	* my_gff2gff3.pl
 	* wig2data.pl
 
-Miscellaneous
-	* big_file2gff3.pl
-	* convert_yeast_genome_version.pl
-	* my_gff2gff3.pl
-	* print_feature_types.pl
-	* shift_coordinates.pl
-
-Genome annotation
+===Genome annotation===
 	* get_ensembl_annotation.pl
 	* ucsc_chrom2gff3.pl
 	* ucsc_cytoband2gff3.pl
 	* ucsc_table2gff3.pl
 
-SNP calling
-	* merge_SNPs.pl
+===SNP calling===
 	* locate_SNPs.pl
+	* merge_SNPs.pl
 
+===Miscellaneous===
+	* big_file2gff3.pl
+	* convert_yeast_genome_version.pl
+	* my_gff2gff3.pl
+	* print_feature_types.pl
 

@@ -687,7 +687,7 @@ sub process_no_feature {
 	$data_ref->{'data_table'}->[$row][$number_i]   = 0;
 	$data_ref->{'data_table'}->[$row][$name_i]     = '.';
 	$data_ref->{'data_table'}->[$row][$type_i]     = '.';
-	$data_ref->{'data_table'}->[$row][$strand_i]   = '.';
+	$data_ref->{'data_table'}->[$row][$strand_i]   = 0;
 	$data_ref->{'data_table'}->[$row][$distance_i] = '.';
 
 }

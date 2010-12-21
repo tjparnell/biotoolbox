@@ -25,7 +25,7 @@ use Bio::DB::BigWig;
 eval {
 	require Bio::DB::Sam;
 	Bio::DB::Sam->import;
-}
+};
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
