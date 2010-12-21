@@ -4,6 +4,7 @@
 
 use strict;
 use Pod::Usage;
+use Getopt::Long;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
@@ -102,7 +103,10 @@ print_feature_types.pl
 =head1 SYNOPSIS
 
 print_feature_types.pl <database>
-
+  
+  --db <database>
+  --help
+  
 
 =head1 OPTIONS
 
