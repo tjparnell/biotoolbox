@@ -328,7 +328,7 @@ gene) matches the strand of the wig file data feature, then the data is
 collected.
 
 For loading bigbed files into a Bio::DB database, see the biotoolbox perl 
-script 'bw2gff3.pl'.
+script 'big_filegff3.pl'.
 
 To speed up the program and avoid repetitive opening and 
 closing of the files, the opened bigbed file object is stored in a global 

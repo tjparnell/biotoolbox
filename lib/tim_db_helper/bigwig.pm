@@ -276,7 +276,7 @@ gene) matches the strand of the wig file data feature, then the data is
 collected.
 
 For loading bigwig files into a Bio::DB database, see the biotoolbox perl 
-script 'bw2gff3.pl'.
+script 'big_file2gff3.pl'.
 
 To speed up the program and avoid repetitive opening and 
 closing of the files, the opened bigwig file object is stored in a global 
