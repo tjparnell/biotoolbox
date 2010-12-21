@@ -2521,7 +2521,7 @@ sub get_region_dataset_hash {
 		if ($BIGBED_OK) {
 			# the system has Bio::DB::BigBed loaded
 			# get the dataset scores
-			%datahash = collect_bigwig_position_scores(
+			%datahash = collect_bigbed_position_scores(
 				$region, $fstrand, $stranded, $method, @datapoints);
 		}
 		else {
@@ -2580,15 +2580,6 @@ sub get_region_dataset_hash {
 					push @{ $datahash{$position} }, $datapoint->length;
 				}
 			}
-		}
-	}
-	
-	# combine multiple datapoints at the same position
-	if ($method eq 'score' or $method eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
-		foreach my $position (keys %datahash) {
-			$datahash{$position} = mean( @{$datahash{$position}} );
 		}
 	}
 	
