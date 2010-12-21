@@ -30,7 +30,7 @@ my (
 
 # Command line options
 GetOptions( 
-	'db=s'      => \$infile, # the database name
+	'db=s'      => \$dbname, # the database name
 	'help'      => \$help # request help
 );
 
