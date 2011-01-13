@@ -17,8 +17,6 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --status <filename>
   --sum <filename>
   --source <text>
-  --(no)parent
-  --(no)valid
   --out <filename>
   --help
 }}}
@@ -49,18 +47,6 @@ __
   Optionally provide the text to be used as the GFF source. The default is  'UCSC'.
 __
   __
-__--(no)parent
-
-__
-  Indicate whether or not transcript features should be linked to a parent  gene feature. While linking the transcript feature to a parent gene feature  may generate a more complete gene object model, the processed_transcript  glyph in GBrowse cannot handle this object. Without linking, two objects will  be present in a !SeqFeature**::Store database, the gene feature (with no  children) and the transcript feature (with exon and UTR children). The  default behavior is false or no linking.
-__
-  __
-__--(no)valid
-
-__
-  Indicate whether or not valid GFF tags should only be included. When the  refSeq Summary and/or refSeq Status files are included, two additional  non-valid GFF tags may be included, 'completeness' as indicated in the  refSeq Summary file, and 'status' in the refSeq Status file. The presence  of these tags may technically invalidate proper GFF structure, but are  tolerated by some programs (including Bio::!SeqFeature**::Store databases)  and may prove useful in analysis. The default value is false or to include  all available tags.
-__
-  __
 __--out <**filename>
 
 __
@@ -77,6 +63,8 @@ __
 This program will convert a UCSC gene table file into a GFF3 format file  suitable for loading into GBrowse. Unlike other simple converters out there,  it will attempt to build complex gene structures with gene, transcripts,  UTRs, and exons. It will attempt to identify non-coding genes as to type  using the gene name as inference. For !RefSeq** tables, it can also use  additional data tables to identify the feature type, gene status, and include gene descriptions.
 
 Files should preferentially be downloaded through the UCSC table browser, if  at all possible, for two good reasons. One, the table browser includes  column headings, allowing for accurate identification of the columns and  verification of the right file. Two, the genes are ordered, or at least  grouped by chromosome, which is not the case with files downloaded from the  FTP site.
+
+The program works best with the refGene (!RefSeq** Genes) and ensGene  (Ensembl Genes) tables. Other tables may work, if the appropriate columns  can be identified in the column headings, but your results may vary and  are not guaranteed. UCSC outputs so many different types of tables from  their database that accurate conversions are tricky at best.
 
 {{{
 }}}

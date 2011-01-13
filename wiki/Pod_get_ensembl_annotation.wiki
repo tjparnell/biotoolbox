@@ -15,8 +15,18 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --(no)chromo
   --(no)protein
   --(no)rna
+  --(no)miscrna
+  --(no)snrna
+  --(no)snorna
+  --(no)mirna
+  --(no)rrna
+  --(no)trna
+  --prefix
+  --group <text>
   --host <host.address>
   --user <text>
+  --pass <text>
+  --printdb
   --help
 }}}
 {{{
@@ -27,7 +37,7 @@ The command line flags and descriptions:
 __--species <**text>
 
 __
-  Enter the species name for the database to connect to. Common aliases,  e.g. human, may be acceptable. Check the Ensembl website for the species  databases available.
+  Enter the species name for the database to connect to. Common aliases,  e.g. human, may be acceptable. Check the EnsEMBL website for the species  databases available or print the list using the --printdb option below.
 __
   __
 __--out <**filename>
@@ -51,19 +61,79 @@ __
 __--(no)rna
 
 __
-  Boolean flag to indicate whether or not to collect non-coding RNA genes,  including misc_RNA, snRNA, snoRNA, rRNA, tRNA, miRNA, and piRNA, from  the database. The default is false.
+  Boolean flag to indicate whether or not to collect all non-coding RNA  genes, including misc_RNA, snRNA, snoRNA, rRNA, tRNA, miRNA, and piRNA,  from the database. This option may be superseded by setting the  individual RNA options. For example, setting both --rna and --notrna  will collect all RNA types except tRNAs. The default is false.
+__
+  __
+__--(no)miscrna
+
+__
+  Boolean flag to indicate whether or not to collect miscellenaeous  noncoding RNA genes.
+__
+  __
+__--(no)snrna
+
+__
+  Boolean flag to indicate whether or not to collect small nuclear  RNA (snRNA) genes.
+__
+  __
+__--(no)snorna
+
+__
+  Boolean flag to indicate whether or not to collect small nucleolar  RNA (snoRNA) genes.
+__
+  __
+__--(no)mirna
+
+__
+  Boolean flag to indicate whether or not to collect micro  RNA (miRNA) genes.
+__
+  __
+__--(no)rrna
+
+__
+  Boolean flag to indicate whether or not to collect ribosomal RNA  (rRNA) genes.
+__
+  __
+__--(no)trna
+
+__
+  Boolean flag to indicate whether or not to collect transfer RNA    (tRNA) genes.
+__
+  __
+__--prefix
+
+__
+  Boolean flag to prefix chromosome names with 'chr'. Some people and/or  downstream applications prefer chromosomes to be named as 'chr1'  instead of '1'. Only coordinate systems of type 'chromosome' are  changed, not scaffolds, contigs, etc. Default is false.
+__
+  __
+__--group <**text>
+
+__
+  Specify the name of the database group with which to connect. The default  value is 'core'. See EnsEMBL documentation for more information.
 __
   __
 __--host <**host.address>
 
 __
-  Specify the Internet address of the Ensembl public MySQL database host.  The default value is 'ensembldb.ensembl.org'.
+  Specify the Internet address of the EnsEMBL public MySQL database host.  The default value is 'ensembldb.ensembl.org'.
 __
   __
 __--user <**text>
 
 __
-  Specify the user name to connect as to the public database.  The default value is 'anonymous'.
+  Specify the user name to connect as to the EnsEMBL public database.  The default value is 'anonymous'.
+__
+  __
+__--pass <**text>
+
+__
+  Specify the password to use when connecting to the database. The default  value is none.
+__
+  __
+__--printdb
+
+__
+  Print all of the available database names, species, and groups from the  connected EnsEMBL database. The program will exit after printing the list.
 __
   __
 __--help
@@ -73,7 +143,7 @@ __
 __
   __
 ==DESCRIPTION==
-This program will connect to the public Ensembl MySQL database and  retrieve the latest genome annotation for a given species. It will  generate a GFF3 annotation file suitable for loading into a Bio::DB  database or genome browser. The GFF3 features generated are  multi-level nested gene->mRNA->CDS features. It will optionally  generate features for the top-level sequences (chromosomes, contigs,  scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
+This program will connect to the public EnsEMBL MySQL database and  retrieve the latest genome annotation for a given species. It will  generate a GFF3 annotation file suitable for loading into a Bio::DB  database or genome browser. The GFF3 features generated are  multi-level nested gene->mRNA->CDS features. It will optionally  generate features for the top-level sequences (chromosomes, contigs,  scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
 {{{
 }}}

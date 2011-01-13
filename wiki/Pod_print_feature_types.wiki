@@ -9,6 +9,10 @@ print_feature_types.pl
 print_feature_types.pl <**database>
 
 {{{
+  --db <database>
+  --help
+  }}}
+{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
