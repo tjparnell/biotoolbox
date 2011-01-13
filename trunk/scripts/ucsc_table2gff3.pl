@@ -8,16 +8,16 @@
 # SeqFeatureIO. However, it made the script pretty glacial with all the 
 # excess object overhead, particularly the Ontology stuff
 
-# this version uses much, much, simpler SeqFeature::Generic and Tools::GFF 
+# the second version uses much, much, simpler SeqFeature::Lite and Tools::GFF 
 # and is over 2 orders of magnitude faster than the original
+
+# this third version uses SeqFeature::Lite and is simpler yet
 
 use strict;
 #use warnings;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::Annotation::Comment;
-use Bio::SeqFeature::Generic;
-use Bio::Tools::GFF;
+use Bio::SeqFeature::Lite;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -29,7 +29,7 @@ use tim_file_helper qw(
 );
 #use Data::Dumper;
 
-print "\n A script to convert UCSC RefSeq gene tables to GFF3\n\n";
+print "\n A script to convert UCSC gene tables to GFF3\n\n";
 
 
 
@@ -57,10 +57,8 @@ my (
 	$refseqstatusf,
 	$refseqsumf,
 	$source,
-	$link_parent,
-	$valid_tags,
 	$outfile,
-#	$gz,
+	$gz,
 	$help, 
 );
 GetOptions( 
@@ -68,8 +66,6 @@ GetOptions(
 	'status=s'   => \$refseqstatusf, # the refseqstatus file
 	'sum=s'      => \$refseqsumf, # the refseqsummary file
 	'source=s'   => \$source, # the GFF source
-	'parent!'    => \$link_parent, # link transcript to parent
-	'valid!'     => \$valid_tags, # only include valid tags
 	'out=s'      => \$outfile, # output file name
 #	'gz!'        => \$gz, # compress file
 	'help'       => \$help, # request help
@@ -94,14 +90,6 @@ unless ($genetablef) {
 }
 unless ($source) {
 	$source = 'UCSC';
-}
-unless (defined $link_parent) {
-	# do not link the transcript to the parent gene
-	$link_parent = 0;
-}
-unless (defined $valid_tags) {
-	# include non valid tags too
-	$valid_tags = 0;
 }
 my $start_time = time;
 
@@ -129,19 +117,8 @@ else {
 	# assign default output file
 	$outfile = $gene_metadata->{'basename'} . '.gff';
 }
-my $gff_fh = open_to_write_fh($outfile);
-	# I'm not allowed to open a gzip compressed output file because 
-	# Bio::Tools::GFF will not recognize the file object
-	# I could filter through an external gzip but I need access to the raw
-	# file handle to write comments and directives and Tools::GFF doesn't 
-	# give me that access
-my $gff =Bio::Tools::GFF->new(
-	-fh           => $gff_fh,
-	-gff_version  => 3,
-);
-unless ($gff) {
-	die " unable to open output GFF3 file!\n";
-}
+my $gff_fh = open_to_write_fh($outfile, $gz) or
+	die " unable to open file for writing!\n";
 
 
 
@@ -168,12 +145,10 @@ my (
 
 ### Process the files
 # print comments
-print {$gff_fh} "##gff-version 3\n";
-$gff->{'_first'} = 0; # pretend we've already written the first feature
-					# this avoids writing two gff declaration lines
-print {$gff_fh} "# UCSC gene table file $genetablef\n";
-print {$gff_fh} "# UCSC RefSeq Status file $refseqstatusf\n" if $refseqstatusf;
-print {$gff_fh} "# UCSC RefSeq Summary file $refseqsumf\n" if $refseqsumf;
+$gff_fh->print( "##gff-version 3\n");
+$gff_fh->print( "# UCSC gene table file $genetablef\n");
+$gff_fh->print( "# UCSC RefSeq Status file $refseqstatusf\n") if $refseqstatusf;
+$gff_fh->print( "# UCSC RefSeq Summary file $refseqsumf\n") if $refseqsumf;
 
 print " Converting gene table features....\n";
 my $count = process_gene_table();
@@ -435,7 +410,6 @@ sub process_gene_table {
 	my $other_count       = 0;
 	my %gene2seqf;
 	my %transcript_check;
-	my @letters = qw(A B C D E F G H I J K L M N O P Q S T U V W X Y Z);
 	
 	#### Main Gene Loop
 		# we're not using a defined for loop since we may have to read 
@@ -446,149 +420,52 @@ sub process_gene_table {
 		chomp $line;
 		my $linedata = [ split /\t/, $line ];
 		
-		# check the chromosome
+		
+		
+		
+		#### check the chromosome
 		unless (defined $current_chrom) {
 			$current_chrom = $linedata->[$chr_i];
 		}
 		if ($linedata->[$chr_i] ne $current_chrom) {
 			# moved on to next chromosome
 			
-			# print all of the current genes and clear memory
-			foreach my $id (
-				map $_->[0],
-				sort { $a->[1] <=> $b->[1] }
-				map [$_, $gene2seqf{$_}->start], 
-				keys %gene2seqf
-			) {
-				# first sort all of the genes by start position
-				# count the genes
-				$gene_count++;
-				
-				# count the transcript types
-				foreach ( $gene2seqf{$id}->get_SeqFeatures ) {
-					my $type = $_->primary_tag;
-					if ($type eq 'mRNA') {
-						$mrna_count++;
-					}
-					elsif ($type eq 'pseudogene') {
-						$pseudogene_count++;
-					}
-					elsif ($type eq 'ncRNA') {
-						$ncrna_count++;
-					}
-					elsif ($type eq 'miRNA') {
-						$mirna_count++;
-					}
-					elsif ($type eq 'snRNA') {
-						$snrna_count++;
-					}
-					elsif ($type eq 'snoRNA') {
-						$snorna_count++;
-					}
-					elsif ($type eq 'tRNA') {
-						$trna_count++;
-					}
-					elsif ($type eq 'rRNA') {
-						$rrna_count++;
-					}
-					else {
-						$other_count++;
-					}
-				}
-				
-				# then print the gene seqfeature object
-				print_my_features_and_subfeatures( $gene2seqf{ $id } );
-				
-				# finally, delete the gene seqfeature object
-				delete $gene2seqf{ $id };
-				
-			}
+			# print the current gene list and prepare for next chromosome
+			my $counts = print_current_gene_list(\%gene2seqf);
+			$gene_count       += $counts->[0];
+			$mrna_count       += $counts->[1];
+			$pseudogene_count += $counts->[2];
+			$ncrna_count      += $counts->[3];
+			$mirna_count      += $counts->[4];
+			$snrna_count      += $counts->[5];
+			$snorna_count     += $counts->[6];
+			$trna_count       += $counts->[7];
+			$rrna_count       += $counts->[8];
+			$other_count      += $counts->[9];
 			
-			print {$gff_fh} "###\n"; # directive to close out all previous genes
 			$current_chrom = $linedata->[$chr_i];
 		}
 		
-		# keep track of current gene name
-		my $current_gene = $linedata->[$gene_i];
 		
-		# define the strand, must use 1 or -1
-		my $strand;
-		if ($linedata->[$str_i] eq '+') {
-			# forward
-			$strand = 1;
+		
+		#### Generate the gene object, if necessary
+		my $gene;
+		if (exists $gene2seqf{ $linedata->[$gene_i] }) {
+			# Pull out the gene SeqFeature object for ease of use
+			$gene = $gene2seqf{ $linedata->[$gene_i] };
 		}
+		
 		else {
-			# reverse
-			$strand = -1;
-		}
-		
-		#### Generate the gene object if necessary
-		unless (exists $gene2seqf{ $linedata->[$gene_i] }) {
-		
-			# generate the gene SeqFeature object
-			my $gene = Bio::SeqFeature::Generic->new(
-				-seq_id        => $linedata->[$chr_i],
-				-source        => $source,
-				-start         => $linedata->[$txStart_i] + 1,
-				-end           => $linedata->[$txEnd_i],
-				-strand        => $strand,
-				-frame         => '.',
-				-display_name  => $linedata->[$gene_i],
-				-primary_tag   => 'gene',
-			);
-			
-			
-			# add ID
-			$gene->add_tag_value('ID', 
-				$linedata->[$chr_i] . '_' . $linedata->[$gene_i]);
-				# we are prepending the chromosome name to the gene name to 
-				# ensure this ID is unique in the database
-				# occasionally sections of chromosomes are duplicated and 
-				# treated as a separate chromosome, which could lead to 
-				# gene duplications
-				# for example, in hg18 there is chr6 and chr6_qbl_hap2
-	
-			# add Name, since display_name above doesn't seem to be doing it for me
-			$gene->add_tag_value('Name', $linedata->[$gene_i]);
-	
-			
-			# add status 
-			if (exists $refseqstat->{  $linedata->[$trnscpt_i] } ) {
-				
-				# add the status tag unless we want only pure valid tags
-				unless ($valid_tags) {
-					$gene->add_tag_value('status', 
-						$refseqstat->{ $linedata->[$trnscpt_i] }->[0] );
-				}
-				
-			}
-			
-			# add Note if possible
-			if (
-				exists $refseqsum->{ $linedata->[$trnscpt_i] }
-				and
-				defined $refseqsum->{ $linedata->[$trnscpt_i] }->[1]
-			) {
-				# add the the note
-				my $text = $refseqsum->{ $linedata->[$trnscpt_i] }->[1];
-				my $note = Bio::Annotation::Comment->new( 
-					-text => $text,
-				);
-				$gene->add_tag_value('Note',$note);
-			}
+			# generate new gene SeqFeature object
+			$gene = generate_new_gene($linedata);
 			
 			# Store the gene oject into the gene hash
 			$gene2seqf{ $linedata->[$gene_i] } = $gene;
-			
-		} # finished building the gene object
+		} 
 		
 		
 		
-		#### Process the Transcript
-		
-		# Pull out the gene SeqFeature object
-		my $gene = $gene2seqf{ $linedata->[$gene_i] };
-		
+		#### Update gene information as necessary
 		# check the gene coordinates are current
 		if ($linedata->[$txStart_i] < $gene->start) {
 			# update the txstart position
@@ -614,208 +491,37 @@ sub process_gene_table {
 				
 				# make note if it exists
 				my $text = $refseqsum->{ $linedata->[$trnscpt_i] }->[1];
-				my $note = Bio::Annotation::Comment->new( 
-					-value => $text,
-				);
-				$gene->add_tag_value('Note',$note);;
+				$gene->add_tag_value('Note', $text);;
 			}
-		} # finished with the note
+		} 
 		
 		
 		
-		# build the transcript SeqFeature 
-		my $transcript = Bio::SeqFeature::Generic->new(
-			-seq_id        => $linedata->[$chr_i],
-			-source        => $source,
-			-start         => $linedata->[$txStart_i] + 1,
-			-end           => $linedata->[$txEnd_i],
-			-strand        => $strand,
-			-frame         => '.',
-			-display_name  => $linedata->[$trnscpt_i],
-		);
-		
-		# Attempt to identify the transcript type
-		if (
-			$linedata->[$cdStart_i] == $linedata->[$txEnd_i] and 
-			$linedata->[$cdEnd_i] == $linedata->[$txEnd_i] 
-		) {
-			# there appears to be no coding potential when 
-			# txEnd = cdsStart = cdsEnd
-			# if you'll look, all of the exon phases should also be -1
-			
-			# if we are using a RefSeq gene table, we may be able to infer
-			# some certain types from the gene name
-			
-			# in the mean time, we'll try to deduce from the gene name
-			if ($linedata->[$gene_i] =~ /^LOC\d+/) {
-				# empirical testing seems to suggest that all the noncoding 
-				# genes with a name like LOC123456 are pseudogenes
-				# well, at least with hg18, it may not be true for others
-				$transcript->primary_tag('pseudogene');
-			}
-			elsif ($linedata->[$gene_i] =~ /^mir/i) {
-				# a noncoding gene whose name begins with mir is likely a 
-				# a micro RNA
-				$transcript->primary_tag('miRNA');
-			}
-			elsif ($linedata->[$gene_i] =~ /^snr/i) {
-				# a noncoding gene whose name begins with snr is likely a 
-				# a snRNA
-				$transcript->primary_tag('snRNA');
-			}
-			elsif ($linedata->[$gene_i] =~ /^sno/i) {
-				# a noncoding gene whose name begins with sno is likely a 
-				# a snoRNA
-				$transcript->primary_tag('snoRNA');
-			}
-			else {
-				# a generic ncRNA
-				$transcript->primary_tag('ncRNA');
-			}
-		}
-		else {
-			# the transcript has an identifiable CDS
-			$transcript->primary_tag('mRNA');
-		}
-		
-		
-		# add the parent if requested
-		if ($link_parent) {
-			# adding the parent will actually mess up display of the 
-			# transcript using the process_transcript glyph in GBrowse
-			# so it's best not to link it
-			# It will however be linked to the gene for purposes of this 
-			# script only
-			my ($parent_tag) = $gene->get_tag_values('ID');
-			$transcript->add_tag_value('Parent', $parent_tag);
-		}
-		
-		# add the id
-		{
-			# To add insult to injury, there are sometimes
-			# non-identical transcripts with the same ID!!!!!
-			# so we really have to ensure we have unique transcript IDs
-			
-			# This also occurs sometimes when subsections of a chromosome are 
-			# included as a separate chromosome, for example in hg18 there is
-			# chr6 and chr6_cox_hap1 which have identical genes
-			
-			# generate unique transcript id
-			my $transcript_id = $linedata->[$trnscpt_i];
-			my $i = 0;
-			while (exists $transcript_check{$transcript_id}) {
-				# we'll append a letter to the id until we have a unique id
-				$transcript_id = $linedata->[$trnscpt_i] . $letters[$i];
-				$i++;
-			}
-			
-			# the id is (finally) unique, add it
-			$transcript_check{ $transcript_id } = 1;
-			$transcript->add_tag_value('ID', $transcript_id);
-		}
-			
-			
-		
-		# add the name, since display_name doesn't seem to be working for me
-		$transcript->add_tag_value('Name', $linedata->[$trnscpt_i]);
-		
-		# add extra non-valid tag information
-		unless ($valid_tags) {
-			# add a status for the transcript
-			if (exists $refseqstat->{ $linedata->[$trnscpt_i] } ) {
-				$transcript->add_tag_value('status', 
-					$refseqstat->{ $linedata->[$trnscpt_i] }->[0] );
-			}
-			# add the completeness value for the tag
-			if (exists $refseqsum->{ $linedata->[$trnscpt_i] } ) {
-				$transcript->add_tag_value('completeness', 
-					$refseqsum->{ $linedata->[$trnscpt_i] }->[0] );
-			}
-		}
-		
-		# Add the exons
-		if ($linedata->[$exCount_i] > 1) { 
-			
-			# determine how to process the exons by the feature type 
-			# and the strand orientation
-			
-			if ($transcript->primary_tag eq 'mRNA' and $strand > 0) {
-				# forward strand coding exon
-				process_forward_exons($transcript, $linedata);
-			}
-			elsif ($transcript->primary_tag eq 'mRNA' and $strand < 0) {
-				# reverse strand coding exon
-				process_reverse_exons($transcript, $linedata);
-			}
-			
-			# otherwise assume exons are part of noncoding transcript
-			else {
-				process_noncoding_exons($transcript, $linedata);
-			}
-			
-		}
-		
-		# this transcript is now complete
-		# associate with the gene
-		$gene->add_SeqFeature($transcript);
-		
-	}
+		#### Add the transcript SeqFeature 
+		add_new_transcript($linedata, $gene, \%transcript_check);
+	
+	} # Finished working through the table
 	
 	
 	
 	#### Finished
 	
 	# print all of the current genes
-	foreach my $id (
-		map $_->[0],
-		sort { $a->[1] <=> $b->[1] }
-		map [$_, $gene2seqf{$_}->start], 
-		keys %gene2seqf
-	) {
-		# first sort all of the genes by start position
-		
-		# count the genes
-		$gene_count++;
-		
-		# count the transcript types
-		foreach ( $gene2seqf{$id}->get_SeqFeatures ) {
-			my $type = $_->primary_tag;
-			if ($type eq 'mRNA') {
-				$mrna_count++;
-			}
-			elsif ($type eq 'pseudogene') {
-				$pseudogene_count++;
-			}
-			elsif ($type eq 'ncRNA') {
-				$ncrna_count++;
-			}
-			elsif ($type eq 'miRNA') {
-				$mirna_count++;
-			}
-			elsif ($type eq 'snRNA') {
-				$snrna_count++;
-			}
-			elsif ($type eq 'snoRNA') {
-				$snorna_count++;
-			}
-			elsif ($type eq 'tRNA') {
-				$trna_count++;
-			}
-			elsif ($type eq 'rRNA') {
-				$rrna_count++;
-			}
-			else {
-				$other_count++;
-			}
-		}
-		
-		# then print the gene seqfeature object
-		print_my_features_and_subfeatures( $gene2seqf{ $id } );
-		
-		# finally, delete the gene seqfeature object
-		delete $gene2seqf{ $id };
+	{
+		my $counts = print_current_gene_list(\%gene2seqf);
+		$gene_count       += $counts->[0];
+		$mrna_count       += $counts->[1];
+		$pseudogene_count += $counts->[2];
+		$ncrna_count      += $counts->[3];
+		$mirna_count      += $counts->[4];
+		$snrna_count      += $counts->[5];
+		$snorna_count     += $counts->[6];
+		$trna_count       += $counts->[7];
+		$rrna_count       += $counts->[8];
+		$other_count      += $counts->[9];
 	}
-	print {$gff_fh} "###\n"; # directive to close out all previous genes
+	
+	# return the counts
 	return [
 		$gene_count,
 		$mrna_count,
@@ -832,6 +538,253 @@ sub process_gene_table {
 }
 
 
+sub print_current_gene_list {
+	my $gene2seqf = shift;
+	
+	my $counts = [0,0,0,0,0,0,0,0,0,0];
+	
+	# print all of the current genes and clear memory
+	foreach my $id (
+		map $_->[0],
+		sort { $a->[1] <=> $b->[1] }
+		map [$_, $gene2seqf->{$_}->start], 
+		keys %{ $gene2seqf }
+	) {
+		# first sort all of the genes by start position
+		# count the genes
+		$counts->[0]++;
+		
+		# count the transcript types
+		foreach ( $gene2seqf->{$id}->get_SeqFeatures ) {
+			my $type = $_->primary_tag;
+			if ($type eq 'mRNA') {
+				$counts->[1]++;
+			}
+			elsif ($type eq 'pseudogene') {
+				$counts->[2]++;
+			}
+			elsif ($type eq 'ncRNA') {
+				$counts->[3]++;
+			}
+			elsif ($type eq 'miRNA') {
+				$counts->[4]++;
+			}
+			elsif ($type eq 'snRNA') {
+				$counts->[5]++;
+			}
+			elsif ($type eq 'snoRNA') {
+				$counts->[6]++;
+			}
+			elsif ($type eq 'tRNA') {
+				$counts->[7]++;
+			}
+			elsif ($type eq 'rRNA') {
+				$counts->[8]++;
+			}
+			else {
+				$counts->[9]++;
+			}
+		}
+		
+		# then print the gene seqfeature object
+		$gene2seqf->{$id}->version(3); # set gff version
+		$gff_fh->print( $gene2seqf->{$id}->gff_string(1) . "\n");
+			# the gff_string method is undocumented in the POD, but is a 
+			# valid method. Passing 1 should force a recursive action to 
+			# print parent and children.
+		
+		# finally, delete the gene seqfeature object
+		delete $gene2seqf->{$id};
+		
+	}
+	
+	print {$gff_fh} "###\n"; # directive to close out all previous genes
+	return $counts;
+}
+
+
+
+sub generate_new_gene {
+	my $linedata = shift;
+	
+	# generate the gene SeqFeature object
+	my $gene = Bio::SeqFeature::Lite->new(
+		-seq_id        => $linedata->[$chr_i],
+		-source        => $source,
+		-primary_tag   => 'gene',
+		-start         => $linedata->[$txStart_i] + 1,
+		-end           => $linedata->[$txEnd_i],
+		-strand        => $linedata->[$str_i] eq '+' ? 1 : -1,
+		-phase         => '.',
+		-display_name  => $linedata->[$gene_i],
+		-primary_id    => 
+			$linedata->[$chr_i] . '_' . $linedata->[$gene_i],
+	);
+		# we are prepending the chromosome name to the gene name to 
+		# ensure this ID is unique in the database
+		# occasionally sections of chromosomes are duplicated and 
+		# treated as a separate chromosome, which could lead to 
+		# gene duplications
+		# for example, in hg18 there is chr6 and chr6_qbl_hap2
+	
+	# add status if possible
+	if (exists $refseqstat->{  $linedata->[$trnscpt_i] } ) {
+		$gene->add_tag_value('status', 
+			$refseqstat->{ $linedata->[$trnscpt_i] }->[0] );
+	}
+	
+	# add Note if possible
+	if (
+		exists $refseqsum->{ $linedata->[$trnscpt_i] }
+		and
+		defined $refseqsum->{ $linedata->[$trnscpt_i] }->[1]
+	) {
+		# add the the note
+		my $text = $refseqsum->{ $linedata->[$trnscpt_i] }->[1];
+		$gene->add_tag_value('Note', $text);
+	}
+	
+	return $gene;
+}
+
+
+
+sub add_new_transcript {
+	my ($linedata, $gene, $transcript_check) = @_;
+	
+	# Generate the transcript SeqFeature object
+	my $transcript = Bio::SeqFeature::Lite->new(
+		-seq_id        => $linedata->[$chr_i],
+		-source        => $source,
+		-start         => $linedata->[$txStart_i] + 1,
+		-end           => $linedata->[$txEnd_i],
+		-strand        => $linedata->[$str_i] eq '+' ? 1 : -1,
+		-phase         => '.',
+		-display_name  => $linedata->[$trnscpt_i],
+	);
+	
+	# Attempt to identify the transcript type
+	if (
+		$linedata->[$cdStart_i] == $linedata->[$txEnd_i] and 
+		$linedata->[$cdEnd_i] == $linedata->[$txEnd_i] 
+	) {
+		# there appears to be no coding potential when 
+		# txEnd = cdsStart = cdsEnd
+		# if you'll look, all of the exon phases should also be -1
+		
+		# if we are using a RefSeq gene table, we may be able to infer
+		# some certain types from the gene name
+		
+		# in the mean time, we'll try to deduce from the gene name
+		if ($linedata->[$gene_i] =~ /^LOC\d+/) {
+			# empirical testing seems to suggest that all the noncoding 
+			# genes with a name like LOC123456 are pseudogenes
+			# well, at least with hg18, it may not be true for others
+			$transcript->primary_tag('pseudogene');
+		}
+		if ($linedata->[$gene_i] =~ /^mir/i) {
+			# a noncoding gene whose name begins with mir is likely a 
+			# a micro RNA
+			$transcript->primary_tag('miRNA');
+		}
+		elsif ($linedata->[$gene_i] =~ /^snr/i) {
+			# a noncoding gene whose name begins with snr is likely a 
+			# a snRNA
+			$transcript->primary_tag('snRNA');
+		}
+		elsif ($linedata->[$gene_i] =~ /^sno/i) {
+			# a noncoding gene whose name begins with sno is likely a 
+			# a snoRNA
+			$transcript->primary_tag('snoRNA');
+		}
+		else {
+			# a generic ncRNA
+			$transcript->primary_tag('ncRNA');
+		}
+	}
+	else {
+		# the transcript has an identifiable CDS
+		$transcript->primary_tag('mRNA');
+	}
+	
+	
+	# add the id
+	{
+		# To add insult to injury, there are sometimes
+		# non-identical transcripts with the same ID!!!!!
+		# so we really have to ensure we have unique transcript IDs
+		
+		# This also occurs sometimes when subsections of a chromosome are 
+		# included as a separate chromosome, for example in hg18 there is
+		# chr6 and chr6_cox_hap1 which have identical genes
+		
+		# array of letters to make unique transcript IDs
+		my @letters = qw(A B C D E F G H I J K L M N O P Q S T U V W X Y Z);
+		
+		# generate unique transcript id
+		my $transcript_id = $linedata->[$trnscpt_i];
+		my $i = 0;
+		while (exists $transcript_check->{$transcript_id}) {
+			# we'll append a letter to the id until we have a unique id
+			# hope we don't run out of letters!
+			$transcript_id = $linedata->[$trnscpt_i] . $letters[$i];
+			$i++;
+		}
+		
+		# the id is (finally) unique, add it
+		$transcript_check->{ $transcript_id } = 1;
+		$transcript->primary_id($transcript_id);
+	}
+		
+	
+	# add extra tag information
+	# add gene name as an alias
+	$transcript->add_tag_value('Alias', $gene->display_name);
+	# add a status for the transcript
+	if (exists $refseqstat->{ $linedata->[$trnscpt_i] } ) {
+		$transcript->add_tag_value('status', 
+			$refseqstat->{ $linedata->[$trnscpt_i] }->[0] );
+	}
+	# add the completeness value for the tag
+	if (exists $refseqsum->{ $linedata->[$trnscpt_i] } ) {
+		$transcript->add_tag_value('completeness', 
+			$refseqsum->{ $linedata->[$trnscpt_i] }->[0] );
+	}
+	
+	# Add the exons
+	if ($linedata->[$exCount_i] > 1) { 
+		
+		# determine how to process the exons by the feature type 
+		# and the strand orientation
+		
+		if (
+			$transcript->primary_tag eq 'mRNA' and 
+			$transcript->strand > 0
+		) {
+			# forward strand coding exon
+			process_forward_exons($transcript, $linedata);
+		}
+		elsif (
+			$transcript->primary_tag eq 'mRNA' and 
+			$transcript->strand < 0
+		) {
+			# reverse strand coding exon
+			process_reverse_exons($transcript, $linedata);
+		}
+		
+		# otherwise assume exons are part of noncoding transcript
+		else {
+			process_noncoding_exons($transcript, $linedata);
+		}
+		
+	}
+
+	# this transcript is now complete
+	# associate with the gene
+	$gene->add_SeqFeature($transcript);
+}
+
+
 
 sub process_forward_exons {
 	my ($transcript, $linedata) = @_;
@@ -843,7 +796,7 @@ sub process_forward_exons {
 	
 	# get the exon coordinates
 	my @starts = split /,/, $linedata->[$exStarts_i];
-	my @ends = split /,/, $linedata->[$exEnds_i];
+	my @ends   = split /,/, $linedata->[$exEnds_i];
 	my @phases = split /,/, $linedata->[$exFrames_i];
 	unless (scalar @starts == scalar @ends) {
 		die " source table error! not equal number of exon starts" .
@@ -855,10 +808,12 @@ sub process_forward_exons {
 	# adjust for 0-based
 	@starts = map {$_ + 1} @starts;
 	
-	# get the parent id
-	my ($parent_tag) = $transcript->get_tag_values('ID');
+	# add the exons and start/stop codons
+	add_exons_codons_subfeatures($transcript, \@starts, \@ends, $cdsStart, 
+		$cdsStop);
 	
-	# process the exons
+	
+	# process the exons for cds and utr
 	for (my $i = 0; $i <= $#starts; $i++) {
 		
 		my $exon; # this will be the exon SeqFeature object
@@ -875,13 +830,13 @@ sub process_forward_exons {
 			# we have a 5'UTR
 			
 			# build the utr object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => 1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'five_prime_UTR',
 			);
 			
@@ -899,37 +854,33 @@ sub process_forward_exons {
 			# one for the utr half, other for the cds
 			
 			# build the utr half of the object
-			my $utr_exon = Bio::SeqFeature::Generic->new(
+			my $utr_exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $cdsStart - 1,
 				-strand        => 1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'five_prime_UTR',
+				-primary_id    => $transcript->primary_id . ".$i" . 'u',
+				-display_name  => $transcript->display_name . ".$i" . 'u',
 			);
 			# since we're actually building two objects here, we have to 
 			# complete the process of building the utr object and associate 
 			# it with the transcript object
 			# the cds half of the exon will be finished below
 			
-			# add the utr half id
-			$utr_exon->add_tag_value('ID', $parent_tag . ".$i" . 'u');
-			
-			# add the utr half parent
-			$utr_exon->add_tag_value('Parent', $parent_tag);
-	
 			# associate add the utr half to the parent transcript
 			$transcript->add_SeqFeature($utr_exon);
 			
 			# now build the cds half of the object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $cdsStart,
 				-end           => $ends[$i],
 				-strand        => 1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 		}
@@ -944,13 +895,13 @@ sub process_forward_exons {
 			# this will also work with genes that have no UTRs, where the 
 			# the cdsStart == txStart, and same with End
 			
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => 1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 			
@@ -968,33 +919,29 @@ sub process_forward_exons {
 			# one for the cds half, other for the utr
 			
 			# build the cds half of the object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $cdsStop,
 				-strand        => 1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 			
 			# now build the utr half of the object
-			my $utr_exon = Bio::SeqFeature::Generic->new(
+			my $utr_exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $cdsStop + 1,
 				-end           => $ends[$i],
 				-strand        => 1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'three_prime_UTR',
+				-primary_id    => $transcript->primary_id . ".$i" . 'u',
+				-display_name  => $transcript->display_name . ".$i" . 'u',
 			);
 			
-			# add the utr half id
-			$utr_exon->add_tag_value('ID', $parent_tag . ".$i" . 'u');
-			
-			# add the utr half parent
-			$utr_exon->add_tag_value('Parent', $parent_tag);
-	
 			# associate add the utr half to the parent transcript
 			$transcript->add_SeqFeature($utr_exon);
 		}
@@ -1009,13 +956,13 @@ sub process_forward_exons {
 			# we have a 3'UTR
 			
 			# build the utr object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => 1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'three_prime_UTR',
 			);
 		}
@@ -1030,12 +977,11 @@ sub process_forward_exons {
 		}
 		
 		
-		# add id
-		$exon->add_tag_value('ID', $parent_tag . ".$i");
+		# add id and name to exon
+		$exon->primary_id($transcript->primary_id . ".$i");
+		$exon->name($transcript->display_name . ".$i");
+			# display_name isn't accepting arguments, bug
 		
-		# add parent
-		$exon->add_tag_value('Parent', $parent_tag);
-
 		# associate exon with the parent transcript
 		$transcript->add_SeqFeature($exon);
 		
@@ -1052,12 +998,12 @@ sub process_reverse_exons {
 		
 	# strip trailing comma from exon lists
 	$linedata->[$exStarts_i] =~ s/,$//; 
-	$linedata->[$exEnds_i] =~ s/,$//; 
+	$linedata->[$exEnds_i]   =~ s/,$//; 
 	$linedata->[$exFrames_i] =~ s/,$//;
 	
 	# get the exon coordinates
 	my @starts = split /,/, $linedata->[$exStarts_i];
-	my @ends = split /,/, $linedata->[$exEnds_i];
+	my @ends   = split /,/, $linedata->[$exEnds_i];
 	my @phases = split /,/, $linedata->[$exFrames_i];
 	unless (scalar @starts == scalar @ends) {
 		die " source table error! not equal number of exon starts" .
@@ -1069,10 +1015,11 @@ sub process_reverse_exons {
 	# adjust for 0-based
 	@starts = map {$_ + 1} @starts;
 	
-	# get the parent id
-	my ($parent_tag) = $transcript->get_tag_values('ID');
+	# add the exons and start/stop codons
+	add_exons_codons_subfeatures($transcript, \@starts, \@ends, $cdsStart, 
+		$cdsStop);
 	
-	# process the exons
+	# process the exons for cds and utr
 	for (my $i = 0; $i <= $#starts; $i++) {
 		
 		my $exon; # this will be the exon SeqFeature object
@@ -1089,13 +1036,13 @@ sub process_reverse_exons {
 			# we have a 3'UTR
 			
 			# build the utr object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => -1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'three_prime_UTR',
 			);
 			
@@ -1113,37 +1060,33 @@ sub process_reverse_exons {
 			# one for the utr half, other for the cds
 			
 			# build the utr half of the object
-			my $utr_exon = Bio::SeqFeature::Generic->new(
+			my $utr_exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $cdsStart - 1,
 				-strand        => -1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'three_prime_UTR',
+				-primary_id    => $transcript->primary_id . ".$i" . 'u',
+				-display_name  => $transcript->display_name . ".$i" . 'u',
 			);
 			# since we're actually building two objects here, we have to 
 			# complete the process of building the utr object and associate 
 			# it with the transcript object
 			# the cds half of the exon will be finished below
 			
-			# add the utr half id
-			$utr_exon->add_tag_value('ID', $parent_tag . ".$i" . 'u');
-			
-			# add the utr half parent
-			$utr_exon->add_tag_value('Parent', $parent_tag);
-	
 			# associate add the utr half to the parent transcript
 			$transcript->add_SeqFeature($utr_exon);
 			
 			# now build the cds half of the object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $cdsStart,
 				-end           => $ends[$i],
 				-strand        => -1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 		}
@@ -1158,13 +1101,13 @@ sub process_reverse_exons {
 			# this will also work with genes that have no UTRs, where the 
 			# the cdsStart == txStart, and same with End
 			
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => -1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 			
@@ -1182,33 +1125,29 @@ sub process_reverse_exons {
 			# one for the cds half, other for the utr
 			
 			# build the cds half of the object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $cdsStop,
 				-strand        => -1,
-				-frame         => $phases[$i],
+				-phase         => $phases[$i],
 				-primary_tag   => 'CDS',
 			);
 			
 			# now build the utr half of the object
-			my $utr_exon = Bio::SeqFeature::Generic->new(
+			my $utr_exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $cdsStop + 1,
 				-end           => $ends[$i],
 				-strand        => -1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'five_prime_UTR',
+				-primary_id    => $transcript->primary_id . ".$i" . 'u',
+				-display_name  => $transcript->display_name . ".$i" . 'u',
 			);
 			
-			# add the utr half id
-			$utr_exon->add_tag_value('ID', $parent_tag . ".$i" . 'u');
-			
-			# add the utr half parent
-			$utr_exon->add_tag_value('Parent', $parent_tag);
-	
 			# associate add the utr half to the parent transcript
 			$transcript->add_SeqFeature($utr_exon);
 		}
@@ -1223,13 +1162,13 @@ sub process_reverse_exons {
 			# we have a 5'UTR
 			
 			# build the utr object
-			$exon = Bio::SeqFeature::Generic->new(
+			$exon = Bio::SeqFeature::Lite->new(
 				-seq_id        => $linedata->[$chr_i],
 				-source        => $source,
 				-start         => $starts[$i],
 				-end           => $ends[$i],
 				-strand        => -1,
-				-frame         => '.',
+				-phase         => '.',
 				-primary_tag   => 'five_prime_UTR',
 			);
 		}
@@ -1244,11 +1183,10 @@ sub process_reverse_exons {
 		}
 		
 		
-		# add id
-		$exon->add_tag_value('ID', $parent_tag . ".$i");
-		
-		# add parent
-		$exon->add_tag_value('Parent', $parent_tag);
+		# add id and name to exon
+		$exon->primary_id($transcript->primary_id . ".$i");
+		$exon->name($transcript->display_name . ".$i");
+			# display_name isn't accepting arguments, bug
 
 		# associate exon with the parent transcript
 		$transcript->add_SeqFeature($exon);
@@ -1279,29 +1217,22 @@ sub process_noncoding_exons {
 	# adjust for 0-based
 	@starts = map {$_ + 1} @starts;
 	
-	# get the parent id
-	my ($parent_tag) = $transcript->get_tag_values('ID');
-	
 	# process the exons
 	for (my $i = 0; $i <= $#starts; $i++) {
 		
 		# build the exon SeqFeature object
-		my $exon = Bio::SeqFeature::Generic->new(
+		my $exon = Bio::SeqFeature::Lite->new(
 			-seq_id        => $linedata->[$chr_i],
 			-source        => $source,
 			-start         => $starts[$i],
 			-end           => $ends[$i],
-			-strand        => 1,
-			-frame         => '.',
+			-strand        => $transcript->strand,
+			-phase         => '.',
 			-primary_tag   => 'exon',
+			-primary_id    => $transcript->primary_id . ".exon.$i",
+			-display_name  => $transcript->display_name . ".exon.$i",
 		);
 		
-		# add id
-		$exon->add_tag_value('ID', $parent_tag . ".$i");
-		
-		# add parent
-		$exon->add_tag_value('Parent', $parent_tag);
-
 		# associate exon with the parent transcript
 		$transcript->add_SeqFeature($exon);
 	
@@ -1310,23 +1241,100 @@ sub process_noncoding_exons {
 }
 
 
-
-
-sub print_my_features_and_subfeatures {
-	# Bio::Tools::GFF will not recursively print all subfeatures
-	# so we fake it here
+sub add_exons_codons_subfeatures {
+	my ($transcript, $starts, $ends, $cdsStart, $cdsStop) = @_;
 	
-	my $feat = shift;
-	
-	# print the passed SeqFeature object
-	$gff->write_feature($feat);
-	
-	# print the subfeatures
-	foreach ($feat->get_SeqFeatures) {
-		print_my_features_and_subfeatures($_);
+	# generate the start and stop codons
+	if ($transcript->strand == 1) {
+		# forward strand
+		
+		# start codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'start_codon',
+				-start         => $cdsStart,
+				-end           => $cdsStart + 2,
+				-strand        => 1,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.start_codon',
+				-primary_id    => $transcript->primary_id . '.start_codon',
+			)
+		);
+		
+		# stop codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'stop_codon',
+				-start         => $cdsStop - 2,
+				-end           => $cdsStop,
+				-strand        => 1,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.stop_codon',
+				-primary_id    => $transcript->primary_id . '.stop_codon',
+			)
+		);
 	}
+	
+	else {
+		# reverse strand
+		
+		# stop codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'stop_codon',
+				-start         => $cdsStart,
+				-end           => $cdsStart + 2,
+				-strand        => -1,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.stop_codon',
+				-primary_id    => $transcript->primary_id . '.stop_codon',
+			)
+		);
+		
+		# start codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'start_codon',
+				-start         => $cdsStop - 2,
+				-end           => $cdsStop,
+				-strand        => -1,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.start_codon',
+				-primary_id    => $transcript->primary_id . '.start_codon',
+			)
+		);
+	}
+	
+	# add exons
+	for (my $i = 0; $i < scalar(@$starts); $i++) {
+		
+		# add the exon as a subfeature
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'exon',
+				-start         => $starts->[$i],
+				-end           => $ends->[$i],
+				-strand        => $transcript->strand,
+				-display_name  => $transcript->display_name . ".exon.$i",
+				-primary_id    => $transcript->primary_id . ".exon.$i",
+			)
+		);
+		
+		# we're giving a unique id based on transcript name appended with 
+		# exon and incrementing number
+	}
+	
 }
-
 
 
 
@@ -1348,8 +1356,6 @@ __END__
   --status <filename>
   --sum <filename>
   --source <text>
-  --(no)parent
-  --(no)valid
   --out <filename>
   --help
 
@@ -1388,27 +1394,6 @@ gzipped.
 Optionally provide the text to be used as the GFF source. The default is 
 'UCSC'.
 
-=item --(no)parent
-
-Indicate whether or not transcript features should be linked to a parent 
-gene feature. While linking the transcript feature to a parent gene feature 
-may generate a more complete gene object model, the processed_transcript 
-glyph in GBrowse cannot handle this object. Without linking, two objects will 
-be present in a SeqFeature::Store database, the gene feature (with no 
-children) and the transcript feature (with exon and UTR children). The 
-default behavior is false or no linking.
-
-=item --(no)valid
-
-Indicate whether or not valid GFF tags should only be included. When the 
-refSeq Summary and/or refSeq Status files are included, two additional 
-non-valid GFF tags may be included, 'completeness' as indicated in the 
-refSeq Summary file, and 'status' in the refSeq Status file. The presence 
-of these tags may technically invalidate proper GFF structure, but are 
-tolerated by some programs (including Bio::SeqFeature::Store databases) 
-and may prove useful in analysis. The default value is false or to include 
-all available tags.
-
 =item --out <filename>
 
 Optionally specify a new filename. By default it uses the basename of the 
@@ -1436,6 +1421,12 @@ column headings, allowing for accurate identification of the columns and
 verification of the right file. Two, the genes are ordered, or at least 
 grouped by chromosome, which is not the case with files downloaded from the 
 FTP site. 
+
+The program works best with the refGene (RefSeq Genes) and ensGene 
+(Ensembl Genes) tables. Other tables may work, if the appropriate columns 
+can be identified in the column headings, but your results may vary and 
+are not guaranteed. UCSC outputs so many different types of tables from 
+their database that accurate conversions are tricky at best.
 
 
 =head1 AUTHOR
