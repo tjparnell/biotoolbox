@@ -56,6 +56,9 @@ get_feature_info.pl
 get_intersecting_features.pl
 	Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
 
+gff3_to_ucsc_table.pl
+	Convert a GFF3 file into a UCSC-style gene table, similar to those for refGene or ensGene tables. Useful for programs such as [http://useq.sourceforge.net USeq] which require a gene table. 
+	
 graph_data.pl
 	Generate a XY line or scatter plot between two datasets. For scatter plots, a linear regression line is also plotted. Statistics on the correlation between the two datasets are also reported.
 	
