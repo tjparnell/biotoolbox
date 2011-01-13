@@ -7,7 +7,7 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====[Pod_average_gene average_gene.pl]====
 Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
-====[Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]====
+====[Pod_bam2gff_bed bam2gff_bed.pl]====
 Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
 ====[Pod_bar2wig bar2wig.pl]====
 Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
@@ -148,7 +148,7 @@ Lists of programs organized by function.
 	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/process_agilent.pl process_agilent.pl]
 
 ===Illumina sequencing, BAM files===
-	* [Pod_biotoolbox_scripts_bam2gff_bed_pl bam2gff_bed.pl]
+	* [Pod_bam2gff_bed bam2gff_bed.pl]
 	* [Pod_bin_genomic_data bin_genomic_data.pl]
 	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
 	* [Pod_novo_wrapper novo_wrapper.pl]
