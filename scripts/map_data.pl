@@ -5,7 +5,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean median sum stddevp);
+use Statistics::Lite qw(mean median sum stddevp min max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -139,7 +139,7 @@ if (defined $value_type) {
 			$value_type eq 'score' or
 			$value_type eq 'length' or
 			$value_type eq 'count' or
-			$value_type eq 'enumerate'
+			$value_type eq 'enumerate' # legacy value
 	) {
 		die " Unknown data value '$value_type'!\n " . 
 			"Use --help for more information\n";
@@ -160,6 +160,8 @@ if (defined $method) {
 			$method eq 'mean' or
 			$method eq 'median' or
 			$method eq 'sum' or
+			$method eq 'min' or
+			$method eq 'max' or
 			$method eq 'stddev'
 	) {
 		die " Unknown method '$method'!\n Use --help for more information\n";
@@ -254,13 +256,18 @@ my $startcolumn = $main_data_ref->{'number_columns'};
 
 
 
-## Check for the dataset
-# first retreive the list of microarray data sets from the database
+
+
+## Collect the data
+
+# Open database connection
+my $db = open_db_connection($database);
+unless ($db) {
+	die " no database connection opened!\n";
+}
+
+# Check the dataset
 set_and_verify_dataset();
-
-
-
-## Collect the nucleosome data
 
 my $start_time = time;
 
@@ -269,12 +276,6 @@ if ($raw) {
 	# this is only done if specifically requested
 	print " Preparing raw output file....\n";
 	open RAWFILE, ">$outfile\_raw.txt";
-}
-
-# Open database connection
-my $db = open_db_connection($database);
-unless ($db) {
-	die " no database connection opened!\n";
 }
 
 # Collect the nucleosome occupancy
@@ -347,18 +348,46 @@ print " Completed in $timediff minutes\n";
 ## validate the given dataset, or ask for one
 sub set_and_verify_dataset {
 	if ($dataset) {
-		# validate the given dataset
-		my $bad_dataset = validate_dataset_list($database, $dataset);
-		if ($bad_dataset) {
-			die " The requested dataset $bad_dataset is not valid!\n";
-		}
 		
+		# check for a remote file
+		if ($dataset =~ /^http|ftp/) {
+			# a remote file
+			# should be good, no verification here though
+			return;
+		}
+		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
+			# looks like we have a file 
+			if (-e $dataset) {
+				# file exists
+				$dataset = "file:$dataset";
+				return;
+			}
+			else {
+				# maybe it's a funny named dataset?
+				if (validate_dataset_list($db, $dataset) ) {
+					# returned true, the name of the bad dataset
+					die " The requested file or dataset '$dataset' " . 
+						"neither exists or is valid!\n";
+				}
+			}
+		}
+		else {
+			# must be a database feature type
+		
+			# validate the given dataset
+			my $bad_dataset = validate_dataset_list($db, $dataset);
+			if ($bad_dataset) {
+				die " The requested dataset $bad_dataset is not valid!\n";
+			}
+			return;
+		}
 	} 
+	
 	else {
 		# dataset not specified
 		# present the dataset list to the user and get an answer
-		my %datasethash = get_dataset_list($database);
-		print "\n These are the microarray data sets in the database:\n";
+		my %datasethash = get_dataset_list($db);
+		print "\n These are the available data sets in the database $database:\n";
 		foreach (sort {$a <=> $b} keys %datasethash) {
 			# print out the list of microarray data sets
 			print "  $_\t$datasethash{$_}\n"; 
@@ -372,7 +401,6 @@ sub set_and_verify_dataset {
 		else {
 			die " That number doesn't correspond to a data set!\n";
 		}
-	
 	}
 }
 
@@ -484,7 +512,7 @@ sub map_relative_data {
 			'log2'        => $log,
 			'dataset'     => $dataset,
 			'method'      => $method,
-			'value_type'  => $value_type,
+			'value'       => $value_type,
 		);
 		if ($position == 5) {
 			$metadata{'relative_position'} = '5prime_end';
@@ -526,7 +554,7 @@ sub map_relative_data {
 				'start'       => $startingpoint,
 				'stop'        => $endingpoint,
 				'position'    => $position,
-				'method'      => $value_type,
+				'value'       => $value_type,
 				'strand'      => $strand,
 				'set_strand'  => $set_strand ? 
 								$data_table_ref->[$row][$strand_index] : undef, 
@@ -579,6 +607,12 @@ sub map_relative_data {
 					$winscore = stddevp(@scores);
 				}
 				elsif ($method eq 'sum') {
+					$winscore = sum(@scores);
+				}
+				elsif ($method eq 'min') {
+					$winscore = sum(@scores);
+				}
+				elsif ($method eq 'max') {
 					$winscore = sum(@scores);
 				}
 				
@@ -676,17 +710,17 @@ A script to map data relative to and flanking a genomic feature
  map_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options:
-  --db <database>
+  --db <name|file.gff3>
   --feature [type, type:source]
   --in <filename> 
   --out <filename>
-  --data <dataset_name>
-  --value [score | length | count | enumerate]
-  --method [mean | median | stddev | sum]
+  --data <dataset_name | filename>
+  --method [mean|median|min|max|stddev|sum]
+  --value [score|count|length]
   --win <integer>
   --num <integer>
-  --pos [5 | 3 | m]
-  --strand [sense | antisense | all]
+  --pos [5|3|m]
+  --strand [sense|antisense|all]
   --set_strand
   --(no)sum
   --(no)smooth
@@ -700,10 +734,14 @@ The command line flags and descriptions:
 =over 4
 
 
-=item --db <database>
+=item --db <name|file.gff3>
 
-Specify the name of the BioPerl GFF database to use. This is optional
-if the desired database is defined in the input file metadata.
+Specify the name of the BioPerl SeqFeature::Store database to use as
+source. Alternatively, a single GFF3 file may be loaded into a in-memory
+database. Specifying the database is required for new feature data files.
+For pre-existing input data files, this value may be obtained from the
+input file metadata. However, if provided, it overrides the database listed
+in the file; this is useful for collecting data from multiple databases.
 
 =item --out <filename>
 
@@ -726,26 +764,33 @@ of features will be automatically generated from the database.
 
 This is optional if the features are defined in the input file.
 
-=item --data <name>
+=item --data <dataset_name | filename>
 
-Specify the name of the microarray data set for which you wish to 
+Specify the name of the data set from which you wish to 
 collect data. If not specified, the data set may be chosen
-interactively from a presented list. Alternatively, other
+interactively from a presented list. Other
 features may be collected, and should be specified using the type 
-(GFF method:source), especially when collecting alternative data values.
+(GFF type:source), especially when collecting alternative data values. 
+Alternatively, the name of a data file may be provided. Supported 
+file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
+(.bam). The file may be local or remote.
 
-=item --value [score | length | count | enumerate]
-
-Specify the type of data value or attribute to collect from the dataset  
-or features for each region. By default, the score is collected. 
-Alternatively, a count of the number of features present in the window, or 
-the length of the features, may be collected.
-
-=item --method [mean | median | sum | stddev]
+=item --method [mean|median|min|max|stddev|sum]
 
 Specify the method of combining multiple values within each window. The mean, 
-median, sum, or standard deviation of the values may be reported. The default 
-value is mean for score and length values, or sum for enumerated values.
+median, minimum, maximum, standard deviation, or sum of the values may be 
+reported. The default value is mean for score and length values, or sum for 
+count values.
+
+=item --value [score|count|length]
+
+Optionally specify the type of data value to collect from the dataset or 
+data file. Three values are accepted: score, count, or length. The default 
+value type is score. Note that some data sources only support certain 
+types of data values. Wig and BigWig files only support score and count; 
+BigBed and database features support count and length and optionally 
+score; Bam files support basepair coverage (score), count (number of 
+alignments), and length.
 
 =item --win <integer>
 
@@ -756,7 +801,7 @@ Specify the window size. Default 50
 Specify the number of windows on either side of the feature position 
 (total number will be 2 x [num]). Default 20
 
-=item --pos [ 5 | 3 | m ]
+=item --pos [5|3|m]
 
 Indicate the relative position of the feature around which the 
 data is mapped. Three values are accepted: "5" indicates the 
@@ -766,7 +811,7 @@ use the 5' end, or the start position of unstranded features.
 If the feature "tts" is selected above, the 3' end is 
 automatically selected.
 
-=item --strand [sense | antisense | all]
+=item --strand [sense|antisense|all]
 
 Specify whether stranded data should be collected for each of the 
 datasets. Either sense or antisense (relative to the feature) data 

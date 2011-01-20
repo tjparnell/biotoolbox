@@ -6,7 +6,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean median sum);
+use Statistics::Lite qw(mean median sum min max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -48,6 +48,7 @@ my (
 	$dataset,
 	$feature,
 	$method,
+	$value_type,
 	$strand,
 	$bins,
 	$extension,
@@ -69,6 +70,7 @@ GetOptions(
 	'data=s'      => \$dataset, # dataset name
 	'feature=s'   => \$feature, # what type of feature to work with
 	'method=s'    => \$method, # method for collecting the data
+	'value=s'     => \$value_type, # type of data to collect
 	'strand=s'    => \$strand, # indicate whether stranded data should be taken
 	'bins=i'      => \$bins, # number of bins
 	'ext=i'       => \$extension, # number of bins to extend beyond the feature
@@ -120,18 +122,43 @@ if ($strand) {
 else {
 	$strand = 'all'; # default is no strand information
 }
-if ($method) {
+if (defined $value_type) {
+	# validate the requested value type
+	unless (
+		$value_type eq 'score' or
+		$value_type eq 'count' or
+		$value_type eq 'length'
+	) {
+		die " unknown value type '$value_type'!\n";
+	}
+}
+else {
+	# default value
+	print " Collecting default data 'score' values\n";
+	$value_type = 'score';
+}
+if (defined $method) {
 	unless (
 		$method eq 'mean' or 
 		$method eq 'median' or 
 		$method eq 'sum' or 
+		$method eq 'min' or 
+		$method eq 'max' or 
 		$method eq 'count'
 	) {
 		die " '$method' is not recognized for method\n Use --help for more information\n";
 	}
+	
+	# convenience method, for backwards compatibility
+	if ($method eq 'count') {
+		$method = 'sum';
+		$value_type = 'count';
+	}
 } 
 else {
-	$method = 'mean'; # default is no strand information
+	# default is mean
+	print " Using default method of 'mean'\n";
+	$method = 'mean'; 
 }
 
 # assign default values
@@ -150,10 +177,6 @@ unless (defined $log) {
 unless (defined $smooth) {
 	# default is to not include smoothing
 	$smooth = 0;
-}
-unless (defined $method) {
-	# default is to take the mean
-	$method = 'mean';
 }
 
 
@@ -206,65 +229,22 @@ my $startcolumn = $main_data_ref->{'number_columns'};
 my $data_table_ref = $main_data_ref->{'data_table'};
 
 
+
+## Open database connectin
+my $db = open_db_connection($database);
+
+
+
 ## Check for the dataset
-if ($dataset) {
-	# dataset specified on the command line
-	# validate the given dataset
-	my $bad_dataset = validate_dataset_list($database, $dataset);
-	if ($bad_dataset) {
-		die " The dataset $bad_dataset is not valid!\n";
-	}
-} 
-	
-else {
-	# dataset not specified
-	
-	# present the dataset list to the user 
-	my %datasethash = get_dataset_list($database);
-	print "\n These are the microarray data sets in the database:\n";
-	foreach (sort {$a <=> $b} keys %datasethash) {
-		# print out the list of microarray data sets
-		print "  $_\t$datasethash{$_}\n"; 
-	}
-	
-	# collect response from user
-	print " Enter the number of the data set you would like to analyze.\n" .
-		" Two or more datasets may be combined with a '&'   ";
-	my $answer = <STDIN>;
-	chomp $answer;
-	
-	# parse the user's answer
-	if ($answer =~ /(\d+) \s* [&] \s* (\d+)/x) { 
-		# multiple datasets are to be combined
-		my ($first, $second) = ($1, $2);
-		if (
-			exists $datasethash{$first} and
-			exists $datasethash{$second}
-		) {
-			$dataset = $datasethash{$first} . '&' . $datasethash{$second};
-		} 
-		else {
-			die " One or both numbers don't correspond to a data set!\n";
-		}
-	} 
-	else {
-		if (exists $datasethash{$answer}) {
-			$dataset = $datasethash{$answer};
-		} 
-		else {
-			die " The number doesn't correspond to a data set!\n";
-		}
-	}
-}
-my $start_time = time;
+check_and_verify_dataset();
 
 
 
 ## Collect the binned data
+my $start_time = time;
 if ($raw) {
 	open RAWFILE, ">$outfile\_raw.txt";
 }
-my $db = open_db_connection($database); # Open database connection
 print " Collecting $method data from $dataset in " . 
 	($bins + 2 * $extension) . " bins....\n"; 
 collect_binned_data();
@@ -324,6 +304,88 @@ print " Completed in $timediff minutes\n";
 
 
 #### Subroutines #######
+
+
+sub check_and_verify_dataset {
+	if ($dataset) {
+		# dataset specified on the command line
+		
+		# check for a remote file
+		if ($dataset =~ /^http|ftp/) {
+			# a remote file
+			# should be good, no verification here though
+			return;
+		}
+		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
+			# looks like we have a file 
+			if (-e $dataset) {
+				# file exists
+				$dataset = "file:$dataset";
+				return;
+			}
+			else {
+				# maybe it's a funny named dataset?
+				if (validate_dataset_list($db, $dataset) ) {
+					# returned true, the name of the bad dataset
+					die " The requested file or dataset '$dataset' " . 
+						"neither exists or is valid!\n";
+				}
+			}
+		}
+		else {
+			# must be a database feature type
+		
+			# validate the given dataset
+			my $bad_dataset = validate_dataset_list($db, $dataset);
+			if ($bad_dataset) {
+				die " The requested dataset $bad_dataset is not valid!\n";
+			}
+			return;
+		}
+	} 
+		
+	else {
+		# dataset not specified
+		
+		# present the dataset list to the user 
+		my %datasethash = get_dataset_list($db);
+		print "\n These are the microarray data sets in the database:\n";
+		foreach (sort {$a <=> $b} keys %datasethash) {
+			# print out the list of microarray data sets
+			print "  $_\t$datasethash{$_}\n"; 
+		}
+		
+		# collect response from user
+		print " Enter the number of the data set you would like to analyze.\n" .
+			" Two or more datasets may be combined with a '&'   ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		
+		# parse the user's answer
+		if ($answer =~ /(\d+) \s* [&] \s* (\d+)/x) { 
+			# multiple datasets are to be combined
+			my ($first, $second) = ($1, $2);
+			if (
+				exists $datasethash{$first} and
+				exists $datasethash{$second}
+			) {
+				$dataset = $datasethash{$first} . '&' . $datasethash{$second};
+			} 
+			else {
+				die " One or both numbers don't correspond to a data set!\n";
+			}
+		} 
+		else {
+			if (exists $datasethash{$answer}) {
+				$dataset = $datasethash{$answer};
+			} 
+			else {
+				die " The number doesn't correspond to a data set!\n";
+			}
+		}
+		return;
+	}
+}
 
 
 
@@ -475,7 +537,7 @@ sub collect_binned_data {
 					'start'    => $startingpoint,
 					'stop'     => $endingpoint,
 					'strand'   => $strand,
-					'method'   => $method eq 'count' ? 'count' : 'score',
+					'value'    => $value_type,
 					'set_strand' => $set_strand ? 
 						$data_table_ref->[$row][$strand_index] : undef,
 		} );
@@ -542,7 +604,7 @@ sub collect_binned_data {
 				# we have values in the window
 				
 				# combine the scores according to the specified method
-				if ($method eq 'count' or $method eq 'sum') {
+				if ($method eq 'sum') {
 					# either the count or the sum methods require that the 
 					# scores be summed
 					$window_score = sum(@scores);
@@ -565,6 +627,12 @@ sub collect_binned_data {
 					}
 					elsif ($method eq 'median') {
 						$window_score = median(@scores); 
+					}
+					elsif ($method eq 'min') {
+						$window_score = min(@scores); 
+					}
+					elsif ($method eq 'max') {
+						$window_score = max(@scores); 
 					}
 					
 					# raw output
@@ -782,6 +850,7 @@ sub _set_metadata {
 		'strand'    => $strand,
 		'bin_size'  => $binsize . $unit,
 		'method'    => $method,
+		'value'     => $value_type,
 	};
 	if ($set_strand) {
 		$main_data_ref->{$new_index}{'strand_implied'} = 1;
@@ -809,12 +878,13 @@ average_gene.pl
  average_gene.pl --in <file> --out <file> [--options]
   
   Options:
-  --db <database>
+  --db <name|file.gff3>
   --feature [type, type:source, alias]
   --out <filename>
   --in <filename> 
-  --data <dataset_name>
-  --method [mean|median|sum|count]
+  --data <dataset_name | filename>
+  --method [mean|median|min|max|sum]
+  --value [score|count|length]
   --bins <integer>
   --ext <integer>
   --extsize <integer>
@@ -833,10 +903,14 @@ The command line flags and descriptions:
 =over 4
 
 
-=item --db <database>
+=item --db <name|file.gff3>
 
-Specify the name of the BioPerl SeqFeature::Store database to use. This is 
-optional if the desired database is defined in the input file metadata.
+Specify the name of the BioPerl SeqFeature::Store database to use as
+source. Alternatively, a single GFF3 file may be loaded into a in-memory
+database. Specifying the database is required for new feature data files.
+For pre-existing input data files, this value may be obtained from the
+input file metadata. However, if provided, it overrides the database listed
+in the file; this is useful for collecting data from multiple databases.
 
 =item --out <filename>
 
@@ -859,21 +933,33 @@ specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a
 list of one or more features. More than feature may be included as a 
 comma-delimited list (no commas).
   
-=item --data <text>
+=item --data <dataset_name | filename>
 
 Specify the name of the microarray data set for which you wish to 
 collect data. If not specified, the data set may be 
 chosen interactively from a presented list. When enumerating features, 
 the features' type or type:source values should be indicated.
+Alternatively, the name of a data file may be provided. Supported 
+file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
+(.bam). The file may be local or remote.
 
-=item --method [mean|median|sum|count]
+=item --method [mean|median|min|max|sum]
 
 Specify the method of collecting and combining the data into each bin. 
 Three statistical methods for combining score values are allowed: mean, 
-median, and sum. In addition, features may be enumerated or counted 
-within each bin. The defined method does not affect the interpolation or 
-summary functions of the program, only initial data collection. The 
-default method is 'mean'.
+median, minimum, maximum, and sum. The defined method does not affect 
+the interpolation or summary functions of the program, only initial data 
+collection. The default method is 'mean'.
+
+=item --value [score|count|length]
+
+Optionally specify the type of data value to collect from the dataset or 
+data file. Three values are accepted: score, count, or length. The default 
+value type is score. Note that some data sources only support certain 
+types of data values. Wig and BigWig files only support score and count; 
+BigBed and database features support count and length and optionally 
+score; Bam files support basepair coverage (score), count (number of 
+alignments), and length.
 
 =item --bins <integer>
 
