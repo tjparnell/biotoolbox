@@ -219,11 +219,12 @@ sub _collect_bam_data {
 			
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
-			my @scores = $coverage->coverage;
-			for (my $i = $region->start; $i <= $region->end; $i++) {
-				$bam_data{$i} += shift @scores;
+			if ($coverage) {
+				my @scores = $coverage->coverage;
+				for (my $i = $region->start; $i <= $region->end; $i++) {
+					$bam_data{$i} += shift @scores;
+				}
 			}
-			
 		}
 		
 		else {
