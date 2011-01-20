@@ -9,6 +9,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	parse_list
+	find_column_index
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -48,6 +49,7 @@ my (
 	$database,
 	$feature,
 	$method,
+	$value_type,
 	$log,
 	$strand,
 	$extend,
@@ -65,6 +67,7 @@ my (
 	$doc,
 ); 
 my @datasets; # an array of names of dataset values to be retrieved
+my @datafiles; # a
 
 # Command line options
 GetOptions( 
@@ -74,7 +77,9 @@ GetOptions(
 	'db=s'       => \$database, # database name
 	'feature=s'  => \$feature, # name of genomic feature to analyze
 	'method=s'   => \$method, # method of collecting & reporting data
+	'value=s'    => \$value_type, # type of data to collect
 	'dataset=s'  => \@datasets, # the list of datasets to collect data from
+	'dataf=s'    => \@datafiles, # list of data files to collect data from
 	'log!'       => \$log, # dataset is in log2 space
 	'strand=s'   => \$strand, # indicate strandedness of data
 	'extend=i'   => \$extend, # extend the size of the genomic feature
@@ -115,6 +120,7 @@ unless ($infile) {
 		$infile = shift @ARGV;
 	}
 	else {
+		# we will assume the user wants to make a new file
 		$new = 1;
 	}
 }
@@ -146,10 +152,33 @@ if ($method) {
 	unless ( _verify_method($method) ) {
 		die " unknown method '$method'!";
 	}
+	
+	# set convenience method, for backwards compatibility
+	if ($method eq 'count' or $method eq 'enumerate') {
+		$method = 'sum';
+		$value_type = 'count';
+	}
 }
 else {
 	# set the default to use the mean
+	print " Using default method of 'mean'\n";
 	$method = 'mean';
+}
+
+if (defined $value_type) {
+	# validate the requested value type
+	unless (
+		$value_type eq 'score' or
+		$value_type eq 'count' or
+		$value_type eq 'length'
+	) {
+		die " unknown value type '$value_type'!\n";
+	}
+}
+else {
+	# default value
+	print " Collecting default data 'score' values\n";
+	$value_type = 'score';
 }
 
 if (defined $strand) { 
@@ -240,7 +269,31 @@ if ($new) {
 		$database = $main_data_ref->{'db'};
 	}
 	unless ($feature) {
-		$feature = $main_data_ref->{'feature'};
+		if ( $main_data_ref->{'feature'} ) {
+			# load the feature defined in the file's metadata
+			$feature = $main_data_ref->{'feature'};
+		}
+		else {
+			# the file's metadata doesn't have the feature defined
+			# most likely because the file doesn't have metadata
+			# let's try looking for known column names
+			my $name_i = find_column_index($main_data_ref, "name";
+			my $type_i = find_column_index($main_data_ref, "type";
+			my $chr_i = find_column_index($main_data_ref, "^chr|seq";
+			my $start_i = find_column_index($main_data_ref, "^start";
+			my $stop_i = find_column_index($main_data_ref, "^stop|end";
+			
+			# guess 
+			if (defined $name_i and defined $type_i) {
+				$feature = 'Named feature';
+			}
+			elsif (defined $chr_i and defined $start_i and defined $stop_i) {
+				$feature = 'genome';
+			}
+			else {
+				$feature = 'unknown feature';
+			}
+		}
 	}
 }
 # 
@@ -264,16 +317,39 @@ unless ($db) {
 if (scalar @datasets == 1 and $datasets[0] =~ /,/) {
 	@datasets = split /,/, shift @datasets;
 }
+if (scalar @datafiles == 1 and $datafiles[0] =~ /,/) {
+	@datafiles = split /,/, shift @datafiles;
+}
 
-# collect the datasets
+# collect the data files if provided
+if (@datafiles) {
+	foreach my $file (@datafiles) {
+		# look for transfer protocol
+		if ($file =~ /^(?:ftp|http):/) {
+			# BigWig, BigBed, and Bam files are supposed to be readable
+			# across network transfer protocols
+			# this is handled by the appropriate modules
+			# I have not tested this feature
+			push @datasets, $file;
+		}
+		else {
+			# otherwise a local file
+			push @datasets, "file:$file";
+		}
+	}
+}
+
+
+# Prcoess the provided datasets
 if (@datasets) {
 	# Datasets were requested on the command line, automatic execution
-	unless ($datasets[0] eq 'none') {
-		# we can skip all data collection if the first dataset is 'none'
+	unless (scalar(@datasets) == 1 and $datasets[0] eq 'none') {
+		# we can skip all data collection if the only dataset is 'none'
 		auto_validate_and_collect_datasets();
 	}
+} 
 
-} else {
+else {
 	# Interactively request datasets
 	interactive_collect_datasets();
 }
@@ -344,20 +420,30 @@ sub generate_new_list {
 
 # Automatic dataset collection
 sub auto_validate_and_collect_datasets {
-	# first validate the proffered datasets
-	my $bad_dataset = validate_dataset_list($db, @datasets);
+	# first validate the proffered datasets, and then process
 	
-	if ($bad_dataset) {
-		# there is at least one bad dataset
-		# just refuse to even look up good data data sets and skip the bad
-		# it's easier that way, but not very fair
-		die " The following datasets are not valid: $bad_dataset\n";
-	} 
-	else {
-		# all the datasets appear to be good (nothing returned from validator)
-		# perform the data lookups
-		foreach (@datasets) {
-			submit_dataset_request($_); # process the request
+	foreach my $dataset (@datasets) {
+		# do this one at a time
+		# we need to determine whether the dataset is database feature
+		# or a data file, either local or remote
+		if ($dataset =~ /^(?:http|ftp|file):/) {
+			# data file, either local or remote
+			# no database validation necessary
+			# process the request
+			submit_dataset_request($dataset);
+		}
+		else {
+			# must be a database feature type
+			# validate
+			my $bad = validate_dataset_list($db, $dataset);
+			if ($bad) {
+				warn " The dataset '$dataset' is not valid. Skipping.\n";
+				next;
+			}
+			else {
+				# the dataset is valid
+				submit_dataset_request($dataset);
+			}
 		}
 	}
 }
@@ -460,21 +546,23 @@ sub submit_dataset_request {
 	
 	if ($feature eq 'genome') {
 		# collecting a dataset for genomic intervals
-		if ( get_genome_dataset( {
+		my $column_name = get_genome_dataset( {
 				'data'     => $main_data_ref->{'data_table'},
 				'db'       => $db,
 				'dataset'  => $dataset,
 				'method'   => $method,
 				'strand'   => $strand,
 				'log'      => $logstatus,
-			} )
-		) {
+				'value'    => $value_type,
+		} );
+		
+		if (defined $column_name) {
 			print " in ";
 			printf "%.1f", ( (time - $start_time)/60 ); 
 			print " minutes\n";
 			
 			# record metadata
-			_record_metadata($dataset, $logstatus);
+			_record_metadata($dataset, $column_name, $logstatus);
 		}
 		else {
 			# error messages should have printed from the subroutine
@@ -486,7 +574,7 @@ sub submit_dataset_request {
 	
 	else {
 		# collecting a dataset for list of features
-		if ( get_feature_dataset( {
+		my $column_name = get_feature_dataset( {
 				'data'        => $main_data_ref->{'data_table'},
 				'db'          => $db,
 				'dataset'     => $dataset,
@@ -501,14 +589,15 @@ sub submit_dataset_request {
 				'fstop'       => $stop,
 				'limit'       => $limit,
 				'set_strand'  => $set_strand,
-			} )
-		) {
+				'value'       => $value_type,
+		} );
+		if (defined $column_name) {
 			print " in ";
 			printf "%.1f", ( (time - $start_time)/60 ); 
 			print " minutes\n";
 			
 			# record metadata
-			_record_metadata($dataset, $logstatus);
+			_record_metadata($dataset, $column_name, $logstatus);
 		}
 		else {
 			# error messages should have printed from the subroutine
@@ -521,7 +610,7 @@ sub submit_dataset_request {
 
 # subroutine to record the metadata for a dataset
 sub _record_metadata {
-	my ($dataset, $logstatus) = @_;
+	my ($dataset, $column_name, $logstatus) = @_;
 	
 	# determine new index
 	my $new_index = $main_data_ref->{'number_columns'};
@@ -531,12 +620,13 @@ sub _record_metadata {
 	
 	# generate new metadata hash for this column
 	my %metadata = (
-		'name'     => $dataset,
+		'name'     => $column_name,
 		'dataset'  => $dataset,
 		'index'    => $new_index,
 		'log2'     => $logstatus,
 		'method'   => $method, # global argument for dataset combining
 		'strand'   => $strand, # global argument for strand specificity
+		'value'    => $value_type, # global argument for value type
 	);
 	
 	# populate metadata hash as necessary from global arguments
@@ -590,11 +680,13 @@ sub _verify_method {
 		'min'        => 1,
 		'max'        => 1, 
 		'range'      => 1,
-		'enumerate'  => 1,
+		'sum'        => 1,
 		'count'      => 1,
+		'enumerate'  => 1,
 	);
+	
 	# return true if this method exists
-	return $acceptable{$method};
+	return exists $acceptable{$method};
 }
 
 
@@ -619,19 +711,21 @@ get_datasets.pl [--options...] [<filename>]
   --new
   --in <filename>
   --out filename
-  --db <name>
+  --db <name|file.gff3>
   --feature <type | type:source | alias, ...>
   --dataset <none | name, ...>
-  --method [mean|median|stddev|min|max|range|enumerate|count]
+  --dataf <file1,file2,...>
+  --method [mean|median|stddev|min|max|range|sum]
+  --value [score|count|length]
   --(no)log
-  --strand [all | sense | antisense]
+  --strand [all|sense|antisense]
   --extend <integer>
   --start <integer>
   --stop <integer>
   --fstart <decimal>
   --fstop <decimal>
   --limit <integer>
-  --pos [5 | 3 | m]
+  --pos [5|3|m]
   --win <integer>
   --step <integer>
   --set_strand
@@ -663,13 +757,14 @@ Specify the output file name. Required for new feature tables; optional for
 current files. If this is argument is not specified then the input file is 
 overwritten.
 
-=item --db <name>
+=item --db <name|file.gff3>
 
-Specify the name of the BioPerl gff database to use as source. This is required 
-for new feature data files. For pre-existing input data files, this value 
-may be obtained from the input file metadata. However, if provided, it 
-overrides the database listed in the file; this is useful for collecting data 
-from multiple databases.
+Specify the name of the BioPerl SeqFeature::Store database to use as
+source. Alternatively, a single GFF3 file may be loaded into a in-memory
+database. Specifying the database is required for new feature data files.
+For pre-existing input data files, this value may be obtained from the
+input file metadata. However, if provided, it overrides the database listed
+in the file; this is useful for collecting data from multiple databases.
 
 =item --feature <type | type:source | alias, ...>
 
@@ -681,21 +776,6 @@ specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a
 list of one or more features. More than feature may be included as a 
 comma-delimited list (no spaces).
 
-=item --method [mean, median, stddev, min, max, range, enumerate, count]
-
-Specify the method for combining all of the dataset values within the 
-genomic region of the feature. Accepted values include:
-  
-  - mean        (default)
-  - median
-  - stddev      Standard deviation of the population (within the region)
-  - min
-  - max
-  - range       Returns 'min-max'
-  - enumerate   Counts the number of features or dataset points
-  - count       same as enumerate
-  
-
 =item --dataset <none | name, ...>
 
 Provide the name of the dataset to collect the values. Use this argument 
@@ -705,6 +785,40 @@ specified on the command line, then the program will interactively present a
 list of datasets from the database to select. To force the program to 
 simply write out the list of collected features without collecting data, 
 provide the dataset name of "none".
+
+=item --dataf <file1,file2,...>
+
+Alternative to using datasets stored in the database, a data file may be
+directly referenced and used in the collection of score values. Only data
+formats which directly support chromosome:start..stop searches are supported;
+these currently include BigWig (.bw), BigBed (.bb), and single-end Bam
+(.bam) files. Multiple data files may be specified as a comma delimited
+list. Merging files as a single source is also supported using a "&".
+Remote files should also be accessible by prefixing with the appropriate
+transfer protocol (http: or ftp:).
+
+=item --method [sum|mean|median|stddev|min|max|range]
+
+Specify the method for combining all of the dataset values within the 
+genomic region of the feature. Accepted values include:
+  
+  - sum
+  - mean        (default)
+  - median
+  - stddev      Standard deviation of the population (within the region)
+  - min
+  - max
+  - range       Returns 'min-max'
+  
+=item --value [score|count|length]
+
+Optionally specify the type of data value to collect from the dataset or 
+data file. Three values are accepted: score, count, or length. The default 
+value type is score. Note that some data sources only support certain 
+types of data values. Wig and BigWig files only support score and count; 
+BigBed and database features support count and length and optionally 
+score; Bam files support basepair coverage (score), count (number of 
+alignments), and length.
 
 =item --(no)log
 

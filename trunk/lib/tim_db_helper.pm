@@ -3,9 +3,11 @@ package tim_db_helper;
 require Exporter;
 use strict;
 use Carp;
+use File::Spec;
 use Config::Simple;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
+	sum
 	mean
 	median
 	min
@@ -49,6 +51,18 @@ eval {
 unless ($@) {
 	$BIGBED_OK = 1;
 }; 
+$@ = undef;
+
+# check for Bam support
+our $BAM_OK = 0;
+eval { 
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
+};
+unless ($@) {
+	$BAM_OK = 1;
+}; 
+$@ = undef;
 
 
 # Configuration File import for database info
@@ -425,7 +439,10 @@ Example:
 
 sub validate_dataset_list {
 	my $database = shift;
-	unless (scalar @_ > 0) { die "no datasets to validate!\n"}
+	unless (scalar @_ > 0) { 
+		carp "no datasets to validate!\n";
+		return "no datasets!";
+	}
 	
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
@@ -443,12 +460,12 @@ sub validate_dataset_list {
 		}
 	}
 	else {
-		carp 'no database name passed!';
-		return;
+		carp "no database name passed!\n";
+		return "no database";
 	}
 	unless ($db) {
-		carp 'no database connected!';
-		return;
+		carp "no database connected!\n";
+		return "no database connection!";
 	}
 	
 	# generate a hash of all the data types in the database
@@ -981,56 +998,64 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name(s) of the datasets in the database to be 
-              collected. The name(s) should be verified using the 
+  dataset  => The name of the dataset in the database to be 
+              collected. The name should correspond to a feature 
+              type in the database, either as type or type:source. 
+              The name should be verified using the 
               subroutine validate_dataset_list() prior to passing.
               Multiple datasets may be given, joined by '&', with no
-              spaces.
-  data =>     A scalar reference to the data table containing the
+              spaces. Alternatively, specify a data file name. 
+              A local file should be prefixed with 'file:', while 
+              a remote file should be prefixed with the transfer 
+              protocol (ftp: or http:).
+  data     => A scalar reference to the data table containing the
               list of features. This should be a reference to the
               key 'data_table' in the data structure described in 
               tim_data_helper.pm, not to the entire data hash. 
               Note that the column metadata should be updated 
               separately by the calling program.
-  method =>   The method used to combine the dataset values found
+  method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              mean, median, range, stddev, min, max, and enumerate. 
+              sum, mean, median, range, stddev, min, max, and count. 
               See _get_segment_score() documentation for more info.
   Optional:
-  log =>      Boolean value (1 or 0) indicating whether the dataset 
+  value    => Specify the type of value to collect. Acceptable 
+              values include score, count, or length. The default 
+              value type is score. 
+  log      => Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
               dataset name will be checked for the presence of the 
               phrase 'log2' and set accordingly. This argument is
               critical for accurately mathematically combining 
               dataset values in the region.
-  strand =>   Indicate whether the dataset values from a specific 
+  strand   => Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
               Acceptable values include sense, antisense, no,
               or none. Default is 'none'.
-  extend =>   Indicate an integer value representing the number of 
+  extend   => Indicate an integer value representing the number of 
               bp the feature's region should be extended on both
               sides.
-  start =>    Indicate an integer value representing the start  
+  start    => Indicate an integer value representing the start  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with 'stop'.
-  stop =>     Indicate an integer value representing the stop  
+  stop     => Indicate an integer value representing the stop  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with 'start'.
-  fstart =>   Indicate the fraction of feature length at which the
+  fstart   => Indicate the fraction of feature length at which the
               region will start. The value should be a decimal 
               number and not a whole percentage (this is not 
               verified!). Include a negative sign to force upstream 
               of the reference point. Must be combined with 'fstop'.
-  fstop =>    Indicate the fraction of feature length at which the
+  fstop    => Indicate the fraction of feature length at which the
               region will stop. The value should be a decimal 
               number and not a whole percentage (this is not 
               verified!). Include a negative sign to force upstream 
               of the reference point. Must be combined with 'fstart'.
-  limit =>    Indicate a minimum size of the feature before "fstart" 
+  limit    => Indicate a minimum size of the feature before "fstart" 
               and "fstop" are utilized, otherwise the entire feature 
               is used. Useful to avoid taking a subfraction of very 
               small features that may be below the resolution of the 
@@ -1050,8 +1075,9 @@ arguments. The keys include
               data table containing the strand values (-1, 0, 1) 
               and whose header name contains "strand". 
           	  
-The subroutine will return a true value (1) if successful. It will return 
-nothing and print an error message to STDOUT if not successful.
+The subroutine will return a true value (the new column name) if 
+successful. It will return nothing and print an error message to 
+STDERR if not successful.
 
 Examples
 
@@ -1078,8 +1104,8 @@ Examples
 		'log'     => 1,
 	} );
 	
-	# maximum expression of middle 50% 
-	$dataset='Steinmetz_polyA_actDf&Steinmetz_polyA_actDr';
+	# maximum expression of middle 50%, from bam file
+	$dataset='Steinmetz_polyA.bam';
 	my $success = get_feature_dataset( {
 		'db'      => $db_name,
 		'data'    => $data,
@@ -1116,6 +1142,7 @@ sub get_feature_dataset {
 	
 	
 	# define default values as necessary
+	my $value_type = $arg_ref->{'value'} || 'score';
 	my $log = $arg_ref->{'log'};
 	unless (defined $log) {
 		# we need to know whether we are working with a log2 dataset or not
@@ -1198,7 +1225,18 @@ sub get_feature_dataset {
 	}
 	
 	# generate column name
-	push @{ $data_table_ref->[0] }, $arg_ref->{'dataset'};
+	my $column_name;
+	if ($arg_ref->{'dataset'} =~ /^file|http|ftp/) {
+		# a specified file
+		# we just want the file name, split it from the path
+		(undef, undef, $column_name) = 
+			File::Spec->splitpath($arg_ref->{'dataset'});
+	}
+	else {
+		# a feature type, take as is
+		$column_name = $arg_ref->{'dataset'};
+	}
+	push @{ $data_table_ref->[0] }, $column_name;
 	
 	# number of features in the list
 	my $feat_num = scalar @{ $data_table_ref } - 1; 
@@ -1265,6 +1303,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1342,6 +1381,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1418,6 +1458,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1511,6 +1552,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1601,6 +1643,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1666,6 +1709,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1746,6 +1790,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1804,6 +1849,7 @@ sub get_feature_dataset {
 						$region, 
 						$fstrand,
 						$arg_ref->{'dataset'},
+						$value_type,
 						$arg_ref->{'method'}, 
 						$stranded, 
 						$log,
@@ -1813,7 +1859,7 @@ sub get_feature_dataset {
 	}
 	
 	# Finish
-	return 1;
+	return $column_name;
 }
 
 
@@ -1836,11 +1882,16 @@ arguments. The keys include
   Required:
   db =>       The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name(s) of the datasets in the database to be 
-              collected. The name(s) should be verified using the 
+  dataset =>  The name of the dataset in the database to be 
+              collected. The name should correspond to a feature 
+              type in the database, either as type or type:source. 
+              The name should be verified using the 
               subroutine validate_dataset_list() prior to passing.
               Multiple datasets may be given, joined by '&', with no
-              spaces.
+              spaces. Alternatively, specify a data file name. 
+              A local file should be prefixed with 'file:', while 
+              a remote file should be prefixed with the transfer 
+              protocol (ftp: or http:).
   data =>     A scalar reference to the data table containing the
               list of features. This should be a reference to the
               key 'data_table' in the data structure described in 
@@ -1849,9 +1900,12 @@ arguments. The keys include
               separately by the calling program.
   method =>   The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              mean, median, range, stddev, min, max, and enumerate. 
+              sum, mean, median, range, stddev, min, max, and count. 
               See _get_segment_score() documentation for more info.
   Optional:
+  value    => Specify the type of value to collect. Acceptable 
+              values include score, count, or length. The default 
+              value type is score. 
   log =>      Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
               dataset name will be checked for the presence of the 
@@ -1863,7 +1917,9 @@ arguments. The keys include
               Acceptable values include sense, antisense, no,
               or none. Default is 'none'.
           	  
-The subroutine will return a true value (1) if successful.
+The subroutine will return a true value (the new column name) if 
+successful. It will return nothing and print an error message to 
+STDERR if not successful.
 
 Examples
 
@@ -1903,6 +1959,7 @@ sub get_genome_dataset {
 	
 	
 	# define default values as necessary
+	my $value_type = $arg_ref->{'value'} || 'score';
 	my $log = $arg_ref->{'log'};
 	unless (defined $log) {
 		# we need to know whether we are working with a log2 dataset or not
@@ -1944,8 +2001,18 @@ sub get_genome_dataset {
 	}
 		
 	# generate column name
-	push @{ $data_table_ref->[0] }, $arg_ref->{'dataset'};
-	
+	my $column_name;
+	if ($arg_ref->{'dataset'} =~ /^file|http|ftp/) {
+		# a specified file
+		# we just want the file name, split it from the path
+		(undef, undef, $column_name) = 
+			File::Spec->splitpath($arg_ref->{'dataset'});
+	}
+	else {
+		# a feature type, take as is
+		$column_name = $arg_ref->{'dataset'};
+	}
+	push @{ $data_table_ref->[0] }, $column_name;
 	
 	# Automatically identify column indices
 	my ($chr_index, $start_index, $stop_index); 
@@ -1999,6 +2066,7 @@ sub get_genome_dataset {
 					$region, 
 					0, # no strand
 					$arg_ref->{'dataset'},
+					$value_type,
 					$arg_ref->{'method'}, 
 					$stranded, 
 					$log,
@@ -2007,7 +2075,7 @@ sub get_genome_dataset {
 	}
 	
 	# Finish
-	return 1;
+	return $column_name;
 }
 
 
@@ -2026,14 +2094,23 @@ arguments. The keys include
   Required:
   db =>       The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name(s) of the datasets in the database to be 
-              collected. The name(s) should be verified using the 
+  dataset =>  The name of the dataset in the database to be 
+              collected. The name should correspond to a feature 
+              type in the database, either as type or type:source. 
+              The name should be verified using the 
               subroutine validate_dataset_list() prior to passing.
               Multiple datasets may be given, joined by '&', with no
-              spaces.
+              spaces. Alternatively, specify a data file name. 
+              A local file should be prefixed with 'file:', while 
+              a remote file should be prefixed with the transfer 
+              protocol (ftp: or http:).
+  dataf =>    Specify a supported data file from which to collect 
+              the data, rather than from the database. 
+              Supported file formats include bigwig (.bw), 
+              bigbed (.bb), or BAM (.bam). 
   method =>   The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              'mean', 'median', 'range', 'stddev', 'min', and 'max'. 
+              sum, mean, median, range, stddev, min, and max. 
               See _get_segment_score() documentation for more info.
   chr =>      The name of the chromosome (reference sequence)
   start =>    The start position of the region on the chromosome
@@ -2041,6 +2118,9 @@ arguments. The keys include
   end =>      Alias for stop
   
   Optional:
+  value    => Specify the type of value to collect. Acceptable 
+              values include score, count, or length. The default 
+              value type is score. 
   log =>      Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
               dataset name will be checked for the presence of the 
@@ -2071,6 +2151,12 @@ sub get_chromo_region_score {
 	
 	# retrieve passed values
 	my $arg_ref = shift; 
+	
+	# check the data source
+	unless ($arg_ref->{'dataset'}) {
+		carp " no dataset requested!";
+		return;
+	}
 	
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
@@ -2107,7 +2193,8 @@ sub get_chromo_region_score {
 	};
 	
 	# define default values as necessary
-	my $log = $arg_ref->{'log'};
+	my $value_type = $arg_ref->{'value'} || 'score';
+	my $log = $arg_ref->{'log'} || undef;
 	unless (defined $log) {
 		# we need to know whether we are working with a log2 dataset or not
 		# as it will adversely affect the math!
@@ -2139,6 +2226,7 @@ sub get_chromo_region_score {
 				$region, 
 				0, # no strand with genomic region
 				$arg_ref->{'dataset'},
+				$value_type,
 				$arg_ref->{'method'}, 
 				'all',  # all stranded datasets
 				$log,
@@ -2173,27 +2261,29 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name(s) of the datasets in the database to be 
-              collected. The name(s) should be verified using the 
+  dataset  => The name of the dataset in the database to be 
+              collected. The name should correspond to a feature 
+              type in the database, either as type or type:source. 
+              The name should be verified using the 
               subroutine validate_dataset_list() prior to passing.
-              Multiple datasets may be given, joined by "&", with no
-              spaces. If collecting attributes of features (e.g 
-              "count" or "length"), then the name of the feature 
-              (as either the GFF "type" or 'type:method') should
-              be passed.
-  name =>     The name of the genomic feature.
-  type =>     The type of the genomic feature.
+              Multiple datasets may be given, joined by '&', with no
+              spaces. Alternatively, specify a data file name. 
+              A local file should be prefixed with 'file:', while 
+              a remote file should be prefixed with the transfer 
+              protocol (ftp: or http:).
+  name     => The name of the genomic feature.
+  type     => The type of the genomic feature.
   Optional:
-  extend =>   Indicate an integer value representing the number of 
+  extend   => Indicate an integer value representing the number of 
               bp the feature's region should be extended on both
               sides.
-  start =>    Indicate an integer value representing the start  
+  start    => Indicate an integer value representing the start  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with "stop".
-  stop =>     Indicate an integer value representing the stop  
+  stop     => Indicate an integer value representing the stop  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with "start".
@@ -2210,11 +2300,11 @@ arguments. The keys include
               strand. Three values are accepted: -1, 0, 1. This 
               will overwrite any pre-existing value (it will not, 
               however, migrate back to the database).
-  strand =>   Indicate whether the dataset values from a specific 
+  strand   => Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
               Acceptable values include sense, antisense, or all.
               Default is all.
-  method =>   Indicate which attribute will be returned. Acceptable 
+  value    => Indicate which attribute will be returned. Acceptable 
               values include "score", "count", or "length". The  
               default behavior will be to return the score values.
           	  
@@ -2238,6 +2328,8 @@ sub get_region_dataset_hash {
 	
 	# retrieve passed values
 	my $arg_ref = shift; 
+	
+	### Initialize parameters
 	
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
@@ -2263,6 +2355,11 @@ sub get_region_dataset_hash {
 		return;
 	}
 	
+	# check the data source
+	unless ($arg_ref->{'dataset'}) {
+		carp " no dataset requested!";
+		return;
+	}
 	
 	# confirm options and assign defaults
 	my $name = $arg_ref->{'name'} || undef;
@@ -2275,11 +2372,16 @@ sub get_region_dataset_hash {
 		return;
 	};
 	my $stranded = $arg_ref->{'strand'} || 'all';
-	my $method = $arg_ref->{'method'} || 'score';
+	my $value_type = $arg_ref->{'value'} || 'score';
 	my $relative_pos = $arg_ref->{'position'} || 5;
 	my $set_strand = $arg_ref->{'set_strand'} || undef;
 	
-	# Define the chromosomal region segment
+	
+	
+	
+	
+	### Define the chromosomal region segment
+	
 	my $region;
 	my $fstart; # to remember the feature start
 	my $fstrand; # to remember the feature strand
@@ -2457,133 +2559,203 @@ sub get_region_dataset_hash {
 		return;
 	}
 	
+	
+	
+	
+	### Data collection
+	
+	# Collect the score/attributes for each feature
+	my %datahash; # the hash to put the collected data into
+	
 	# retrieve the list of features/dataset points in the region
 	my @datasetlist = split /[&,]/, $arg_ref->{'dataset'}; 
 		# multiple datasets may be combined into a single search, for example
 		# transcriptome data that is on f and r strands. These are given as
 		# ampersand or comma delimited lists
-	my @datapoints = $region->features(-types => [@datasetlist]); 
 	
-	# Collect the score/attributes for each feature
-	my %datahash; # the hash to put the collected data into
-	
-	# Check that we have collected datapoints
-	unless (@datapoints) {
-		# nothing found, return empty handed
-		return %datahash;
-	}
-	
-	# Check for wigfiles
-	if ($datapoints[0]->has_tag('wigfile') ) {
-		# these datapoints point to a binary wig file
+	# Data source files were provided
+	if ($datasetlist[0] =~ /^file|ftp|http/) {
+				
+		# BigWig file
+		if ($datasetlist[0] =~ /\.bw$/) {
 		
-		# first check the method
-		unless ($method eq 'score') {
-			carp " Only scores may be retrieved from wig file data!\n";
-			return;
-		}
-		
-		# collect if possible
-		if ($WIGGLE_OK) {
-			# get the dataset scores using tim_db_helper::wiggle
-			%datahash = collect_wig_position_scores(
-				$region, $fstrand, $stranded, @datapoints);
-		}
-		else {
-			croak " Bio::Graphics::Wiggle is not available for retrieving wig data!\n";
-		}
-	}
-	
-	elsif ($datapoints[0]->has_tag('bigwigfile') ) {
-		# these datapoints point to a binary bigwig file
-		
-		# first check the method
-		unless ($method eq 'score') {
-			croak " Only scores may be retrieved from BigWig file data!\n";
+			# collect if possible
+			if ($BIGWIG_OK) {
+				# the system has Bio::DB::BigWig loaded
+				# get the dataset scores
+				%datahash = collect_bigwig_position_scores(
+					$region, $fstrand, $stranded, @datasetlist);
+			}
+			else {
+				croak " Bio::DB::BigWig is not available for retrieving BigWig data!\n";
+			}
 		}
 		
-		# collect if possible
-		if ($BIGWIG_OK) {
-			# the system has Bio::DB::BigWig loaded
-			# get the dataset scores
-			%datahash = collect_bigwig_position_scores(
-				$region, $fstrand, $stranded, @datapoints);
-		}
-		else {
-			croak " Bio::DB::BigWig is not available for retrieving BigWig data!\n";
-		}
-	}
-	
-	elsif ($datapoints[0]->has_tag('bigbedfile') ) {
-		# these datapoints point to a binary bigbed file
-		
-		# collect if possible
-		if ($BIGBED_OK) {
-			# the system has Bio::DB::BigBed loaded
-			# get the dataset scores
-			%datahash = collect_bigbed_position_scores(
-				$region, $fstrand, $stranded, $method, @datapoints);
-		}
-		else {
-			croak " Bio::DB::BigBed is not available for retrieving BigBed data!\n";
-		}
-	}
-	
-	else {
-		# these datapoints must otherwise represent features in the database
-		# collect score or attributes directly
-		
-		# Walk through the datapoints
-		foreach my $datapoint (@datapoints) {
-		
-			# Check which data to take based on strand
-			if (
-				$stranded eq 'all' # all data is requested
-				or $datapoint->strand == 0 # unstranded data
-				or ( 
-					# sense data
-					$fstrand == $datapoint->strand 
-					and $stranded eq 'sense'
-				) 
-				or (
-					# antisense data
-					$fstrand != $datapoint->strand  
-					and $stranded eq 'antisense'
-				)
-			) {
-				# we have acceptable data to collect
+		# BigBed file
+		elsif ($datasetlist[0] =~ /\.bb$/) {
 			
-				# data is in the database
-				# much easier to collect
+			# collect if possible
+			if ($BIGBED_OK) {
+				# the system has Bio::DB::BigBed loaded
+				# get the dataset scores
+				%datahash = collect_bigbed_position_scores(
+					$region, $fstrand, $stranded, $value_type, @datasetlist);
+			}
+			else {
+				croak " Bio::DB::BigBed is not available for retrieving BigBed data!\n";
+			}
+		}
+		
+		# Bam file
+		elsif ($datasetlist[0] =~ /\.bam$/) {
+			
+			# collect if possible
+			if ($BAM_OK) {
+				# the system has Bio::DB::Sam loaded
+				# get the dataset scores
+				%datahash = collect_bam_position_scores(
+					$region, $fstrand, $stranded, $value_type, @datasetlist);
+			}
+			else {
+				croak " Bio::DB::Sam is not available for retrieving Bam data!\n";
+			}
+		}
+		
+		# Unsupported file
+		else {
+			croak " Unsupported data file requested!\n";
+		}
+	}
+	
+	# working with database features
+	else {
+		# retrieve the list of features/dataset points in the region
+		my @datapoints = $region->features(-types => [@datasetlist]); 
+		
+		# Check that we have collected datapoints
+		unless (@datapoints) {
+			# nothing found, return empty handed
+			return %datahash;
+		}
+		
+		# Check for wigfiles
+		if ($datapoints[0]->has_tag('wigfile') ) {
+			# these datapoints point to a binary wig file
+			
+			# collect if possible
+			if ($WIGGLE_OK) {
+				# get the dataset scores using tim_db_helper::wiggle
+				%datahash = collect_wig_position_scores(
+					$region, $fstrand, $stranded, @datapoints);
+			}
+			else {
+				croak " Bio::Graphics::Wiggle is not available for retrieving wig data!\n";
+			}
+		}
+		
+		elsif ($datapoints[0]->has_tag('bigwigfile') ) {
+			# these datapoints point to a binary bigwig file
+			
+			# collect if possible
+			if ($BIGWIG_OK) {
+				# the system has Bio::DB::BigWig loaded
+				# get the dataset scores
+				%datahash = collect_bigwig_position_scores(
+					$region, $fstrand, $stranded, @datapoints);
+			}
+			else {
+				croak " Bio::DB::BigWig is not available for retrieving BigWig data!\n";
+			}
+		}
+		
+		elsif ($datapoints[0]->has_tag('bigbedfile') ) {
+			# these datapoints point to a binary bigbed file
+			
+			# collect if possible
+			if ($BIGBED_OK) {
+				# the system has Bio::DB::BigBed loaded
+				# get the dataset scores
+				%datahash = collect_bigbed_position_scores(
+					$region, $fstrand, $stranded, $value_type, @datapoints);
+			}
+			else {
+				croak " Bio::DB::BigBed is not available for retrieving BigBed data!\n";
+			}
+		}
+		
+		elsif ($datapoints[0]->has_tag('bamfile') ) {
+			# these datapoints point to a binary bam file
+			
+			# collect if possible
+			if ($BAM_OK) {
+				# the system has Bio::DB::Sam loaded
+				# get the dataset scores
+				%datahash = collect_bam_position_scores(
+					$region, $fstrand, $stranded, $value_type, @datapoints);
+			}
+			else {
+				croak " Bio::DB::Sam is not available for retrieving Bam data!\n";
+			}
+		}
+		
+		else {
+			# these datapoints must otherwise represent features in the database
+			# collect score or attributes directly
+			
+			# Walk through the datapoints
+			foreach my $datapoint (@datapoints) {
+			
+				# Check which data to take based on strand
+				if (
+					$stranded eq 'all' # all data is requested
+					or $datapoint->strand == 0 # unstranded data
+					or ( 
+						# sense data
+						$fstrand == $datapoint->strand 
+						and $stranded eq 'sense'
+					) 
+					or (
+						# antisense data
+						$fstrand != $datapoint->strand  
+						and $stranded eq 'antisense'
+					)
+				) {
+					# we have acceptable data to collect
 				
-				# determine position to record
-				my $position;
-				if ($datapoint->start == $datapoint->end) {
-					# just one position recorded
-					$position = $datapoint->start;
-				}
-				else {
-					# calculate the midpoint
-					$position = int( 
-						($datapoint->start + $datapoint->end) / 2
-					);
-				}
-				
-				if ($method eq 'score') {
-					# perform addition to force the score to be a scalar value
-					push @{ $datahash{$position} }, $datapoint->score + 0;
-				}
-				elsif ($method eq 'count') {
-					$datahash{$position} += 1;
-				}
-				elsif ($method eq 'length') {
-					push @{ $datahash{$position} }, $datapoint->length;
+					# data is in the database
+					# much easier to collect
+					
+					# determine position to record
+					my $position;
+					if ($datapoint->start == $datapoint->end) {
+						# just one position recorded
+						$position = $datapoint->start;
+					}
+					else {
+						# calculate the midpoint
+						$position = int( 
+							($datapoint->start + $datapoint->end) / 2
+						);
+					}
+					
+					if ($value_type eq 'score') {
+						# perform addition to force the score to be a scalar value
+						push @{ $datahash{$position} }, $datapoint->score + 0;
+					}
+					elsif ($value_type eq 'count') {
+						$datahash{$position} += 1;
+					}
+					elsif ($value_type eq 'length') {
+						push @{ $datahash{$position} }, $datapoint->length;
+					}
 				}
 			}
 		}
 	}
 	
-	# Convert the coordinates to relative positions
+	
+	
+	### Convert the coordinates to relative positions
 		# previous versions of this function that used Bio::DB::GFF returned 
 		# the coordinates as relative positions, e.g. -200..200
 		# to maintain this compatibility we will convert the coordinates to 
@@ -2630,26 +2802,22 @@ single-word description of a category of features into a list of actual
 feature classes in the database. For example, the word 'gene' may include
 all ORFs, snRNAs, snoRNAs, and ncRNAs.
 
-Pass the subroutine the feature category name as a scalar value. Accepted
-values and their associated database classes include the following. Additional
-values and lists could easily be added if necessary.
-  
-  gene (ORF, gene, ncRNA, snRNA, snoRNA)
-  orf (ORF, gene)
-  rna (ncRNA, snRNA, snoRNA)
-  trna (tRNA)
-  cen (centromere)
-  ars (ARS)
-  all (ORF, gene, ncRNA, snRNA, snoRNA, tRNA, rRNA, centromere, ARS, 
-       Promoter, Terminator, long_terminal_repeat, retrotransposon)
-  
-Finally, a Bio::DB::SeqFeature::Store type string consisting of the gff feature's 
-method:source as may be passed and be used. No attempt at validation will 
-be done (if it's not valid, simply no features would be returned from the 
-database). Multiple types may be passed, delimited by commas (no spaces). 
+Pass the subroutine the feature category name as a scalar value. The 
+actual list of feature types will be collected and returned as an array. 
+Multiple values may be passed as a comma-delimited string (no spaces).
 
-The subroutine will return an array consisting of the classes.
+The aliases and feature lists are specified in the tim_db_helper 
+configuration file, tim_db_helper.cfg. Additional lists and aliases 
+may be placed there. The lists are database specific, or they can be 
+added to the default database.
 
+If the passed category name does not match an alias in the config file, 
+then it is assumed to be a feature in the database. No further validation 
+will be done (if it's not valid, simply no features would be returned from 
+the database). 
+
+Also, feature types may be passed as the GFF's method:source, in which case 
+they are assumed to be valid and not checked.
 
 =cut
 
@@ -2689,27 +2857,37 @@ sub _features_to_classes {
 =item _get_segment_score
 
 This internal subroutine is used to collect the dataset scores for an 
-established genomic region. It should transparently work with either 
-data stored directly in the database (using the GFF score value) or 
-stored in a binary wig file (referenced in the database using the 
-parent GFF feature's attribute 'wigfile').
+established genomic region. It works with a variety of data sources. 
 
-It is passed an array of five specific values, all of which must be 
-defined and presented in this order. These values include
+First, the data may be stored directly in the Bio::DB::SeqFeature::Store 
+(using the original GFF score value). Second, the feature may reference 
+a data file as an attribute (e.g., wigfile=/path/to/file.wib). Finally, 
+the name(s) of a data file may be passed from which to collect the data.
+
+The subroutine is passed an array of five specific values, all of which 
+must be defined and presented in this order. These values include
   
   [0] The genomic segment as a gff database object, the establishment 
       of which is the responsibility of the calling subroutine.
   [1] The strand of the region (or original feature), as the strand is 
       lost when generating the segment. Acceptable values are 
       -1, 0, or 1.
-  [2] The dataset name. Multiple datasets may be included, delimited 
-      with an ampersand (&). Multiple datasets are merged into one, 
-      unless excluded by strand.
-  [3] The method of combining all of the dataset values found in the 
+  [2] The dataset name for filename. Multiple datasets may be included, 
+      delimited with an ampersand (&). Multiple datasets are merged into 
+      one, unless excluded by strand. Local data source files should be 
+      prepended with 'file:', while remote data source files should be 
+      prepended with the transfer protocol (http: or ftp:).
+  [3] The data type to be collecting. In most cases, the score value 
+      is used, but others may be collected. Accepted values include
+         
+         score
+         count
+         length
+         
+  [4] The method of combining all of the dataset values found in the 
       segment into a single value. Accepted values include
          
-         enumerate (count the number of features within the region)
-         count (same as enumerate)
+         sum
          mean
          median
          min
@@ -2717,7 +2895,7 @@ defined and presented in this order. These values include
          range (returns difference between max and min)
          stddev (returns the standard deviation of a population)
          
-  [4] The strandedness of acceptable data. Genomic segments 
+  [5] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
       (e.g. ORF) have a specific strandedness. If the dataset strand 
       does not match the specified criteria for strandedness, then it 
@@ -2730,7 +2908,7 @@ defined and presented in this order. These values include
          antisense   take only values on the opposite strand
          all         take all values
          
-  [5] The log status of the dataset. Many microarray datasets are in 
+  [6] The log status of the dataset. Many microarray datasets are in 
       log2 format, and must be de-logged to perform accurate 
       mathematical calculations, such as mean or median. Supply a 
       boolean (0 or 1) value.
@@ -2747,143 +2925,255 @@ visual marker.
 sub _get_segment_score {
 	
 	# get passed arguments
-	my ($region, $region_strand, $dataset, $method, $strandedness, $log) = @_;
+	my (
+		$region, 
+		$region_strand, 
+		$dataset, 
+		$value_type,
+		$method, 
+		$strandedness, 
+		$log
+	) = @_;
+	
+	# define
+	my @scores; # an array for the dataset values
+	my $region_score; # the score for the genomic segment
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
 		# transcriptome data that is on f and r strands. These are given as
 		# ampersand or comma delimited lists
 	
-	# retrieve all datapoints in the region
-	my @datapoints = $region->features(
-					-type => [@datasetlist],
-	); 
-	
-	# make sure we have datapoints
-	unless (@datapoints) {return '.'} 
-	
-	# define
-	my @scores; # an array for the dataset values
-	my $region_score; # the score for the genomic segment
-	
-	# Check whether we're dealing with wig data or database data
-	
-	# Wig Data
-	if ( $datapoints[0]->has_tag('wigfile') ) {
-		# data is in wig format, or at least the first datapoint is
+	# check for data source files
+	if ($datasetlist[0] =~ /^(?:file|http|ftp):/) {
 		
-		# check that we have wiggle support
-		unless ($WIGGLE_OK) {
-			croak " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
-			return;
-		}
+		# collect the data according to file type
 		
-		# collect the scores using tim_db_helper::wiggle
-		@scores = collect_wig_scores(
-			$region, $region_strand, $strandedness, @datapoints);
-		
-	}
-	
-	
-	# BigWig Data
-	elsif ( $datapoints[0]->has_tag('bigwigfile') ) {
-		# data is in bigwig format
-		# this uses the Bio::DB::BigWig adaptor
-		
-		# check that we have bigwig support
-		unless ($BIGWIG_OK) {
-			croak " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
-		}
-		
-		# collect the scores using tim_db_helper::bigwig
-		@scores = collect_bigwig_scores(
-			$region, $region_strand, $strandedness, @datapoints);
-
-		
-	}
-	
-	
-	# BigBed Data
-	elsif ( $datapoints[0]->has_tag('bigbedfile') ) {
-		# data is in bigbed format
-		# this uses the Bio::DB::BigBed adaptor
-		
-		# check that we have bigbed support
-		unless ($BIGBED_OK) {
-			croak " BigBed support is not enabled. Can't use Bio::DB::BigBed\n";
-		}
-		
-		# check the methods supported
-		my $bb_method;
-		if ($method eq 'count' or $method eq 'enumerate') {
-			$bb_method = 'count';
-		}
-		else {
-			# all other methods assume a score
-			$bb_method = 'score';
-		}
-		
-		# collect the scores using tim_db_helper::bigbed
-		@scores = collect_bigbed_scores(
-			$region, $region_strand, $strandedness, $bb_method, @datapoints);
-
-		
-	}
-	
-	
-	# Database Data
-	else {
-		# Working with data stored in the database
-		# this is more straight forward in collection
-		
-		# we'll store the score value for each found feature
-		# features that don't have score return 'undef', but that'll still be 
-		# added to the array
-		
-		# Check for stranded data
-		if ($strandedness eq 'sense') {
-			# take only values that are on the same strand
+		# BigWig Data file
+		if ($datasetlist[0] =~ /\.bw$/i) {
+			# file is in bigwig format
+			# this uses the Bio::DB::BigWig adaptor
 			
-			# check each datapoint for a match to the region strand
-			foreach (@datapoints) {
-				my $strand = $_->strand;
-				if ($strand == 0) { 
-					# there is no strand - great! - just take it
-					push @scores, $_->score;
+			# check that we have bigwig support
+			unless ($BIGWIG_OK) {
+				croak " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
+			}
+			
+			# collect the scores using tim_db_helper::bigwig
+			@scores = collect_bigwig_scores(
+				$region, $region_strand, $strandedness, @datasetlist);
+		}		
+		
+		# BigBed Data file
+		elsif ($datasetlist[0] =~ /\.bb$/i) {
+			# data is in bigbed format
+			# this uses the Bio::DB::BigBed adaptor
+			
+			# check that we have bigbed support
+			unless ($BIGBED_OK) {
+				croak " BigBed support is not enabled. Can't use Bio::DB::BigBed\n";
+			}
+			
+			# collect the scores using tim_db_helper::bigbed
+			@scores = collect_bigbed_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				$value_type, 
+				@datasetlist
+			);
+		}
+		
+		elsif ($datasetlist[0] =~ /\.bam$/i) {
+			# data is in bam format
+			# this uses the Bio::DB::Sam adaptor
+			
+			# check that we have bigbed support
+			unless ($BAM_OK) {
+				croak " Bam support is not enabled. Can't use Bio::DB::Sam\n";
+			}
+			
+			# collect the scores using tim_db_helper::bam
+			@scores = collect_bam_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				$value_type, 
+				@datasetlist
+			);
+		}
+		
+		# Unsupported Data file
+		else {
+			croak " Unsupported file type for file '$datasetlist[0]!\n";
+		}
+		
+	}
+	
+	# otherwise all other data is from the database
+	else {
+	
+	
+		# retrieve all datapoints in the region
+		my @datapoints = $region->features(
+						-type => [@datasetlist],
+		); 
+		
+		# make sure we have datapoints
+		unless (@datapoints) {return '.'} 
+		
+		# Check whether we're dealing with wig data or database data
+		
+		# Wig Data
+		if ( $datapoints[0]->has_tag('wigfile') ) {
+			# data is in wig format, or at least the first datapoint is
+			
+			# check that we have wiggle support
+			unless ($WIGGLE_OK) {
+				croak " Wiggle support is not enabled. Can't use Bio::Graphics::Wiggle\n";
+				return;
+			}
+			
+			# collect the scores using tim_db_helper::wiggle
+			@scores = collect_wig_scores(
+				$region, $region_strand, $strandedness, @datapoints);
+		}
+		
+		
+		# BigWig Data
+		elsif ( $datapoints[0]->has_tag('bigwigfile') ) {
+			# data is in bigwig format
+			# this uses the Bio::DB::BigWig adaptor
+			
+			# check that we have bigwig support
+			unless ($BIGWIG_OK) {
+				croak " BigWig support is not enabled. Can't use Bio::DB::BigWig\n";
+			}
+			
+			# collect the scores using tim_db_helper::bigwig
+			@scores = collect_bigwig_scores(
+				$region, $region_strand, $strandedness, @datapoints);
+		}
+		
+		
+		# BigBed Data
+		elsif ( $datapoints[0]->has_tag('bigbedfile') ) {
+			# data is in bigbed format
+			# this uses the Bio::DB::BigBed adaptor
+			
+			# check that we have bigbed support
+			unless ($BIGBED_OK) {
+				croak " BigBed support is not enabled. Can't use Bio::DB::BigBed\n";
+			}
+			
+			# collect the scores using tim_db_helper::bigbed
+			@scores = collect_bigbed_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				$value_type, 
+				@datapoints
+			);
+		}
+		
+		# Bam Data
+		elsif ( $datapoints[0]->has_tag('bamfile') ) {
+			# data is in bam format
+			# this uses the Bio::DB::Sam adaptor
+			
+			# check that we have bam support
+			unless ($BAM_OK) {
+				croak " Bam support is not enabled. Can't use Bio::DB::Sam\n";
+			}
+			
+			# collect the scores using tim_db_helper::bam
+			@scores = collect_bam_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				$value_type, 
+				@datapoints
+			);
+		}
+		
+		
+		# Database Data
+		else {
+			# Working with data stored in the database
+			# this is more straight forward in collection
+			
+			# we'll store the score value for each found feature
+			# features that don't have score return 'undef', but that'll still be 
+			# added to the array
+			
+			# Check for stranded data
+			if ($strandedness eq 'sense') {
+				# take only values that are on the same strand
+				
+				# check each datapoint for a match to the region strand
+				foreach my $f (@datapoints) {
+					if (
+						$f->strand == 0 or 
+						$f->strand == $region_strand
+					) { 
+						# there is no strand - great! - just take it
+						# or strand matches the region strand
+						if ($value_type eq 'score') {
+							push @scores, $f->score;
+						}
+						elsif ($value_type eq 'count') {
+							push @scores, 1;
+						}
+						elsif ($value_type eq 'length') {
+							push @scores, $f->length;
+						}
+					} 
 				} 
-				elsif ($strand == $region_strand) { 
-					# strand matches the region strand
-					push @scores, $_->score;
+				
+			}
+			
+			elsif ($strandedness eq 'antisense') {
+				# take the antisense value
+					
+				# check each datapoint for a match to the region strand
+				foreach my $f (@datapoints) {
+					my $strand = $_->strand;
+					if (
+						$f->strand == 0 or 
+						$f->strand != $region_strand
+					) { 
+						# there is no strand - great! - just take it
+						# or strand doesn't match the region strand
+						# that means it must be the opposite strand, so take it
+						if ($value_type eq 'score') {
+							push @scores, $f->score;
+						}
+						elsif ($value_type eq 'count') {
+							push @scores, 1;
+						}
+						elsif ($value_type eq 'length') {
+							push @scores, $f->length;
+						}
+					} 
 				}
 			} 
 			
-		}
-		
-		elsif ($strandedness eq 'antisense') {
-			# take the antisense value
-				
-			# check each datapoint for a match to the region strand
-			foreach (@datapoints) {
-				my $strand = $_->strand;
-				if ($strand == 0) {
-					# there is no strand - great! - just take it
-					push @scores, $_->score;
-				} elsif ($strand != $region_strand) {
-					# strand doesn't match the region strand
-					# that means it must be the opposite strand, so take it
-					push @scores, $_->score;
+			elsif ($strandedness eq 'all') {
+				# Strandedness should be ignored for this dataset
+				foreach my $f (@datapoints) {
+					if ($value_type eq 'score') {
+						push @scores, $f->score;
+					}
+					elsif ($value_type eq 'count') {
+						push @scores, 1;
+					}
+					elsif ($value_type eq 'length') {
+						push @scores, $f->length;
+					}
 				}
-			}
-		} 
-		
-		elsif ($strandedness eq 'all') {
-			# Strandedness should be ignored for this dataset
-			foreach (@datapoints) {
-				push @scores, $_->score;
-			}
-		} 
-	}
-	
+			} 
+		}
+	}	
 	
 	
 	
@@ -2929,9 +3219,9 @@ sub _get_segment_score {
 			# count the number of values
 			$region_score = scalar(@scores);
 		}
-		elsif ($method eq 'enumerate') {
-			# count the number of values
-			$region_score = scalar(@scores);
+		elsif ($method eq 'sum') {
+			# sum the number of values
+			$region_score = sum(@scores);
 		}
 		else {
 			# somehow bad method snuck past our checks
@@ -2947,7 +3237,7 @@ sub _get_segment_score {
 	else {
 		# we have no dataset scores from this region
 		
-		if ($method eq 'count' or $method eq 'enumerate') {
+		if ($method eq 'count' or $method eq 'sum') {
 			# return zero
 			$region_score = 0;
 		}

@@ -49,7 +49,7 @@ my (
 	$step,
 	$sdlimit,
 	$threshold,
-	$median,
+	$method,
 	$deplete,
 	$tolerance,
 	$feat,
@@ -72,7 +72,7 @@ GetOptions(
 	'step=i'    => \$step, # step size to move the window along the genome
 	'sd=f'      => \$sdlimit, # the number of standard deviations above mean to set as the threshold
 	'thresh=s'  => \$threshold, # the explicitly given threshold value
-	'median'    => \$median, # use the median value instead of mean
+	'method=s'  => \$method, # method of combining values
 	'deplete'   => \$deplete, # look for depleted regions instead of enriched
 	'tol=i'     => \$tolerance, # tolerance for merging windows
 	'feat!'     => \$feat, # collect feature information
@@ -125,10 +125,10 @@ unless ($threshold) {
 }
 
 # set the method of combining scores
-my $method; 
-if ($median) {
-	# request median from the command line
-	$method = 'median';
+if (defined $method) {
+	unless ($method eq 'mean' or $method eq 'median') {
+		die " unknown method '$method'!\n";
+	}
 } 
 else {
 	#  default is average
@@ -175,46 +175,8 @@ my $db = open_db_connection($database);
 # Finally, walk through the genome looking for enriched windows. These will be
 # stored in the @windows array
 
-# If the dataset is defined, then go with it
-if ($dataset) {
-	# first validate the dataset name
-	my $bad_dataset = validate_dataset_list($database, $dataset);
-	# this will return the name(s) of the bad datasets
-	if ($bad_dataset) {
-		die " The requested dataset $bad_dataset is not valid!\n";
-	} 
-	else {
-		# returning nothing from the subroutine is good
-		print " Using requested data set $dataset....\n";
-	}
-}	
-
-# Otherwise ask for the data set
-else {
-	
-	# Present the data set list to the user and get an answer
-	my %datasethash = get_dataset_list($database); # list of data sets
-	print "\n These are the microarray data sets in the database:\n";
-	foreach (sort {$a <=> $b} keys %datasethash) {
-		# print out the list of microarray data sets
-		print "  $_\t$datasethash{$_}\n"; 
-	}
-	
-	# get answer 
-	print " Enter the number of the data set you would like to analyze  ";
-	my $answer = <STDIN>;
-	chomp $answer;
-	
-	# check answer
-	if (exists $datasethash{$answer}) {
-		$dataset = $datasethash{$answer};
-		print " Using data set $dataset....\n";
-	} 
-	else {
-		die " unknown dataset! You aren't trying more than one, are you?\n";
-	}
-}
-
+# Check or request the dataset
+check_and_verify_dataset();
 
 
 ## Determine the cutoff value
@@ -379,6 +341,74 @@ print "All done!\n\n";
 ############# Subroutines ###################
 
 
+sub check_and_verify_dataset {
+	if ($dataset) {
+		# check for a remote file
+		if ($dataset =~ /^http|ftp/) {
+			# a remote file
+			# should be good, no verification here though
+			return;
+		}
+		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
+			# looks like we have a file 
+			if (-e $dataset) {
+				# file exists
+				$dataset = "file:$dataset";
+				return;
+			}
+			else {
+				# maybe it's a funny named dataset?
+				if (validate_dataset_list($db, $dataset) ) {
+					# returned true, the name of the bad dataset
+					die " The requested file or dataset '$dataset' " . 
+						"neither exists or is valid!\n";
+				}
+			}
+		}
+		else {
+			# must be a database feature type
+		
+			# validate the given dataset
+			my $bad_dataset = validate_dataset_list($db, $dataset);
+			if ($bad_dataset) {
+				die " The requested dataset $bad_dataset is not valid!\n";
+			}
+			else {
+				print " Using requested data set $dataset....\n";
+			}
+			return;
+		}
+	}	
+	
+	# Otherwise ask for the data set
+	else {
+		
+		# Present the data set list to the user and get an answer
+		my %datasethash = get_dataset_list($database); # list of data sets
+		print "\n These are the microarray data sets in the database:\n";
+		foreach (sort {$a <=> $b} keys %datasethash) {
+			# print out the list of microarray data sets
+			print "  $_\t$datasethash{$_}\n"; 
+		}
+		
+		# get answer 
+		print " Enter the number of the data set you would like to analyze  ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		
+		# check answer
+		if (exists $datasethash{$answer}) {
+			$dataset = $datasethash{$answer};
+			print " Using data set $dataset....\n";
+		} 
+		else {
+			die " unknown dataset! You aren't trying more than one, are you?\n";
+		}
+	}
+}
+
+
+
 
 ### Determine the cutoff values for the dataset
 sub go_determine_cutoff {
@@ -456,12 +486,7 @@ sub go_find_enriched_regions {
 	else {
 		print "  Looking for enriched regions ";
 	}
-	if ($median) {
-		print "using window median values\n";
-	} 
-	else {
-		print "using window mean values\n";
-	}
+	print "using window $method values\n";
 	
 	
 	## collect chromosomes and data
@@ -752,7 +777,7 @@ sub get_final_window_score {
 		# arrays now have $chr, $start, $end, $size
 		
 		# re-calculate window score
-		my $new_score  = get_chromo_region_score( {
+		$windows[$i][4] = get_chromo_region_score( {
 				'db'       => $db,
 				'dataset'  => $dataset, 
 				'chr'      => $windows[$i][0],
@@ -762,13 +787,6 @@ sub get_final_window_score {
 				'strand'   => 'no',
 				'log'      => $log,
 		} );
-		if ($new_score) {
-			$windows[$i][4] = $new_score;
-		}
-		else {
-			warn " unable to find regions score for region $windows[$i][0]:" . 
-				 "$windows[$i][1]..$windows[$i][2] at row $i!\n";
-		}
 		
 		# arrays now have $chr, $start, $end, $size, $finalscore
 	}
@@ -1006,11 +1024,7 @@ sub write_html_file {
 	} else {
 		print HTML "Searching for enriched regions<p>\n";
 	}
-	if ($median) {
-		print HTML "Method median<p>\n";
-	} else {
-		print HTML "Method mean<p>\n";
-	}
+	print HTML "Method $method<p>\n";
 	if ($trim) {
 		print HTML "Windows trimmed<p>\n";
 	} else {
@@ -1102,15 +1116,15 @@ find_enriched_regions.pl
  find_enriched_regions.pl --db <db_name> [--options]
  
   Options:
-  --db <db_name>
-  --data <dataset>
+  --db <name|file.gff3>
+  --data <dataset | filename>
   --out <filename>
   --win <integer>
   --step <integer>
   --tol <integer>
   --thresh <number>
   --sd <number>
-  --median
+  --method [mean|median]
   --deplete
   --(no)trim
   --(no)sort
@@ -1130,13 +1144,20 @@ The command line flags and descriptions:
 
 =item --db <database_name>
 
-Specify a Bioperl Bio::DB::SeqFeature::Store database. Required.
+=item --db <name|file.gff3>
 
-=item --data <dataset>
+Specify the name of the BioPerl SeqFeature::Store database to use as
+source. Alternatively, a single GFF3 file may be loaded into a in-memory
+database. 
+
+=item --data <dataset | filename>
 
 Specify the name of the dataset from which to collect the scores. 
 If not specified, then the data set may be chosen interactively 
 from a presented list.
+Alternatively, the name of a data file may be provided. Supported 
+file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
+(.bam). The file may be local or remote.
 
 =item --out <filename>
 
@@ -1175,11 +1196,11 @@ standard deviation - which may be acceptable for limited tiling
 microarrays but not acceptable for next generation sequencing 
 data with single bp resolution.
 
-=item --median
+=item --method [mean|median]
 
-Indicate that a median score value should be calculated within each
-window rather than the default mean when determining whether the 
-window exceeds the threshold.
+Specify the method for combining score values within each window 
+when determining whether the window exceeds the threshold.
+Default method is mean.
 
 =item --deplete
 

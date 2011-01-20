@@ -52,6 +52,9 @@ sub collect_bigwig_scores {
 sub collect_bigwig_position_scores {
 	
 	# pass the required information
+	unless (scalar @_ >= 4) {
+		croak " At least four arguments must be passed to collect BigWig data!\n";
+	}
 	my ($region, $region_strand, $stranded, @wig_features) = @_;
 	
 	# set up hash, position => score
@@ -62,67 +65,100 @@ sub collect_bigwig_position_scores {
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
 	foreach my $feature (@wig_features) {
 	
-		# Check which data to take based on strand
-		if (
-			$stranded eq 'all' # stranded data not requested
-			or $feature->strand == 0 # unstranded data
-			or ( 
-				# sense data
-				$region_strand == $feature->strand 
-				and $stranded eq 'sense'
-			) 
-			or (
-				# antisense data
-				$region_strand != $feature->strand  
-				and $stranded eq 'antisense'
-			)
-		) {
-			# we have acceptable data to collect
+		# Get the name of the bigwig file and check the strand
+		my $wigfile;
+		my $strand_check;
+		
+		if ($feature =~ /^file:(.+)$/) {
+			# the passed feature appears to specify a file
+			$wigfile = $1;
 			
-			# collect from wigfile if present
-			if ($feature->has_tag('bigwigfile') ) {
-				
-				# get wigfile name
-				my @wigfiles = $feature->get_tag_values('bigwigfile');
-				my $wigfile = shift @wigfiles;
-				
-				# check for opened wigfile
-				my $bw;
-				if (exists $OPENED_BIGFILES{$wigfile} ) {
-					# this file is already opened, use it
-					$bw = $OPENED_BIGFILES{$wigfile};
-				}
-				else {
-					# this file has not been opened yet, open it
-					unless (-e $wigfile) {
-						croak " BigWig file '$wigfile' does not exist!\n";
-						return;
-					}
-					$bw = Bio::DB::BigWig->new($wigfile);
-					unless ($bw) {
-						croak " unable to open data BigWig file '$wigfile'";
-					}
-					
-					# store the opened object for later use
-					$OPENED_BIGFILES{$wigfile} = $bw;
-				}
-				
-				# We're not adjusting start and end points as with wig data
-				# because the bigwig file is by default set up to cover the 
-				# entire chromosome (chromosome information is required for 
-				# generating bigwig files)
-				
-				# collect the features and values
-				my @features = $bw->get_features_by_location(
-					$region->seq_id, 
-					$region->start, 
-					$region->end
-				);
-				foreach (@features) {
-					my $pos = $_->start;
-					$wig_data{$pos} = $_->score;
-				}
+			# check the file
+			unless (-e $wigfile) {
+				croak " BigWig file '$wigfile' does not exist!\n";
+				return;
 			}
+			
+			# since it's a passed data file name, we can't check for strand
+			# the bigwig file does not inherently have strand
+			# a BigWigSet may support strand as feature attribute, but 
+			# that's for another day
+			# assume the strand is good, onus on the user
+			$strand_check = 1;
+		}
+		elsif ($feature =~ /^http|ftp/i) {
+			# a remote file
+			# this should be supported by Bio::DB::BigWig
+			$wigfile = $feature;
+			
+			# again, like the local file, can't perform strand check
+			$strand_check = 1;
+		}
+		else {
+			# otherwise we assume the passed feature is a database object
+			
+			# get wigfile name
+			my ($wigfile) = $feature->get_tag_values('bigwigfile');
+			
+			# check strand
+				# database features will support the strand method
+			if (
+				$stranded eq 'all' # stranded data not requested
+				or $feature
+				or $feature->strand == 0 # unstranded data
+				or ( 
+					# sense data
+					$region_strand == $feature->strand 
+					and $stranded eq 'sense'
+				) 
+				or (
+					# antisense data
+					$region_strand != $feature->strand  
+					and $stranded eq 'antisense'
+				)
+			) {
+				$strand_check = 1;
+			}
+		}
+		
+		# confirm that we have acceptable data to collect
+		next unless $strand_check == 1;
+		
+		
+		# Open the BigWig file
+		my $bw;
+		if (exists $OPENED_BIGFILES{$wigfile} ) {
+			# this file is already opened, use it
+			$bw = $OPENED_BIGFILES{$wigfile};
+		}
+		else {
+			# this file has not been opened yet, open it
+			$bw = Bio::DB::BigWig->new($wigfile);
+			unless ($bw) {
+				croak " unable to open data BigWig file '$wigfile'";
+			}
+			
+			# store the opened object for later use
+			$OPENED_BIGFILES{$wigfile} = $bw;
+		}
+		
+		# Collect from bigwig file
+			# We're not adjusting start and end points as with wig data
+			# because the bigwig file is by default set up to cover the 
+			# entire chromosome (chromosome information is required for 
+			# generating bigwig files)
+		
+		# collect the features and values
+		my @features = $bw->get_features_by_location(
+			$region->seq_id, 
+			$region->start, 
+			$region->end
+		);
+		
+		# convert list of values to position => value
+		foreach (@features) {
+			my $pos = $_->start;
+			$wig_data{$pos} = $_->score;
 		}
 	}
 	
@@ -262,18 +298,23 @@ bigwig files.
 =head2 Data collection
 
 This module is used to collect the dataset scores from a binary 
-bigwig file (.bw) that is referenced in the database. Typically, a single 
+bigwig file (.bw). The file may be identified in one of two ways. First,
+it may be referenced in the database. Typically, a single 
 feature representing the dataset is present across each chromosome. The 
 feature should contain an attribute ('bigwigfile') that references the 
-location of the binary file representing the dataset scores. The file is 
-read using the Bio::DB::BigWig module, and the values extracted from the 
-region of interest. 
+location of the binary file representing the dataset scores. Second, 
+the local location of the file may be directly passed to the subroutine. 
+
+In either case, the file is read using the Bio::DB::BigWig module, and 
+the values extracted from the region of interest. 
 
 Scores may be restricted to strand by specifying the desired strandedness. 
 For example, to collect transcription data over a gene, pass the strandedness 
 value 'sense'. If the strand of the region database object (representing the 
-gene) matches the strand of the wig file data feature, then the data is 
-collected.
+gene) matches the strand of the referencing wig file feature, then the data is 
+collected. NOTE that this only works when the bigwig file is referenced through 
+a database; directly referenced bigwig files do not have inherent strand 
+information - all data will be collected!
 
 For loading bigwig files into a Bio::DB database, see the biotoolbox perl 
 script 'big_file2gff3.pl'.
@@ -303,7 +344,7 @@ It will automatically export the name of the subroutines.
 
 =item collect_bigwig_scores
 
-This subroutine will collect only the score values from a binary bigwig file 
+This subroutine will collect only the score values from a binary BigWig file 
 for the specified database region. The positional information of the 
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
@@ -319,14 +360,18 @@ The subroutine is passed three or more arguments in the following order:
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
     4) One or more database feature objects that contain the reference 
-       to the wib file. They should contain the attribute 'wigfile'.
+       to the BigWig file. They should contain the attribute 'bigwigfile'
+       which has the path to the BigWig file. Alternatively, pass one 
+       or more filenames of .bw files. Each filename should be 
+       prefixed with 'file:' to indicate that it is a direct file 
+       reference, and not a database object.
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
 
 =item collect_bigwig_position_scores
 
-This subroutine will collect the score values from a binary wig file 
+This subroutine will collect the score values from a binary BigWig file 
 for the specified database region keyed by position. 
 
 The subroutine is passed three or more arguments in the following order:
@@ -340,7 +385,11 @@ The subroutine is passed three or more arguments in the following order:
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
     4) One or more database feature objects that contain the reference 
-       to the .bw file. They should contain the attribute 'bigwigfile'.
+       to the BigWig file. They should contain the attribute 'bigwigfile'
+       which has the path to the BigWig file. Alternatively, pass one 
+       or more filenames of .bw files. Each filename should be 
+       prefixed with 'file:' to indicate that it is a direct file 
+       reference, and not a database object.
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. Note that only one value is 
@@ -365,7 +414,7 @@ given a Bio::DB database name (preferred to ensure genome version
 compatibility).
 
 The function returns the name of the bigWig file, which will be the 
-input wig file basename with the extension ".bw". Note that the it does 
+input wig file basename with the BigWig ".bw". Note that the it does 
 not check for success of writing the bigwig file. Check STDERR for errors 
 in bigwig file generation.
 
