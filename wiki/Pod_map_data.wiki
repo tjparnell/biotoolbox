@@ -14,17 +14,17 @@ A script to map data relative to and flanking a genomic feature
   }}}
 {{{
   Options:
-  --db <database>
+  --db <name|file.gff3>
   --feature [type, type:source]
   --in <filename> 
   --out <filename>
-  --data <dataset_name>
-  --value [score | length | count | enumerate]
-  --method [mean | median | stddev | sum]
+  --data <dataset_name | filename>
+  --method [mean|median|min|max|stddev|sum]
+  --value [score|count|length]
   --win <integer>
   --num <integer>
-  --pos [5 | 3 | m]
-  --strand [sense | antisense | all]
+  --pos [5|3|m]
+  --strand [sense|antisense|all]
   --set_strand
   --(no)sum
   --(no)smooth
@@ -36,10 +36,10 @@ The command line flags and descriptions:
 
 {{{
 }}}
-__--db <**database>
+__--db <**name|file.gff3>
 
 __
-  Specify the name of the !BioPerl** GFF database to use. This is optional if the desired database is defined in the input file metadata.
+  Specify the name of the !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, a single GFF3 file may be loaded into a in-memory database. Specifying the database is required for new feature data files. For pre-existing input data files, this value may be obtained from the input file metadata. However, if provided, it overrides the database listed in the file; this is useful for collecting data from multiple databases.
 __
   __
 __--out <**filename>
@@ -63,22 +63,22 @@ __
   This is optional if the features are defined in the input file.
 __
   __
-__--data <**name>
+__--data <**dataset_name | filename>
 
 __
-  Specify the name of the microarray data set for which you wish to  collect data. If not specified, the data set may be chosen interactively from a presented list. Alternatively, other features may be collected, and should be specified using the type  (GFF method:source), especially when collecting alternative data values.
+  Specify the name of the data set from which you wish to  collect data. If not specified, the data set may be chosen interactively from a presented list. Other features may be collected, and should be specified using the type  (GFF type:source), especially when collecting alternative data values.  Alternatively, the name of a data file may be provided. Supported  file types include !BigWig** (.bw), !BigBed** (.bb), or single-end Bam  (.bam). The file may be local or remote.
 __
   __
-__--value `[`score | length | count | enumerate`]`
+__--method `[`mean|median|min|max|stddev|sum`]`
 
 __
-  Specify the type of data value or attribute to collect from the dataset   or features for each region. By default, the score is collected.  Alternatively, a count of the number of features present in the window, or  the length of the features, may be collected.
+  Specify the method of combining multiple values within each window. The mean,  median, minimum, maximum, standard deviation, or sum of the values may be  reported. The default value is mean for score and length values, or sum for  count values.
 __
   __
-__--method `[`mean | median | sum | stddev`]`
+__--value `[`score|count|length`]`
 
 __
-  Specify the method of combining multiple values within each window. The mean,  median, sum, or standard deviation of the values may be reported. The default  value is mean for score and length values, or sum for enumerated values.
+  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
 __
   __
 __--win <**integer>
@@ -93,13 +93,13 @@ __
   Specify the number of windows on either side of the feature position  (total number will be 2 x `[`num`]`). Default 20
 __
   __
-__--pos `[` 5 | 3 | m `]`
+__--pos `[`5|3|m`]`
 
 __
   Indicate the relative position of the feature around which the  data is mapped. Three values are accepted: "5" indicates the  5' prime end is used, "3" indicates the 3' end is used, and "m" or "1" indicates the middle of the feature is used. The default is to  use the 5' end, or the start position of unstranded features.  If the feature "tts" is selected above, the 3' end is  automatically selected.
 __
   __
-__--strand `[`sense | antisense | all`]`
+__--strand `[`sense|antisense|all`]`
 
 __
   Specify whether stranded data should be collected for each of the  datasets. Either sense or antisense (relative to the feature) data  may be collected. The default value is 'all', indicating all  data will be collected.

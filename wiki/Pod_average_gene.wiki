@@ -12,12 +12,13 @@ average_gene.pl
   }}}
 {{{
   Options:
-  --db <database>
+  --db <name|file.gff3>
   --feature [type, type:source, alias]
   --out <filename>
   --in <filename> 
-  --data <dataset_name>
-  --method [mean|median|sum|count]
+  --data <dataset_name | filename>
+  --method [mean|median|min|max|sum]
+  --value [score|count|length]
   --bins <integer>
   --ext <integer>
   --extsize <integer>
@@ -34,10 +35,10 @@ The command line flags and descriptions:
 
 {{{
 }}}
-__--db <**database>
+__--db <**name|file.gff3>
 
 __
-  Specify the name of the !BioPerl** !SeqFeature**::Store database to use. This is  optional if the desired database is defined in the input file metadata.
+  Specify the name of the !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, a single GFF3 file may be loaded into a in-memory database. Specifying the database is required for new feature data files. For pre-existing input data files, this value may be obtained from the input file metadata. However, if provided, it overrides the database listed in the file; this is useful for collecting data from multiple databases.
 __
   __
 __--out <**filename>
@@ -58,16 +59,22 @@ __
   Specify the type of feature from which to collect values. This is required  for new feature tables. Two types of values may be passed: either a specific  feature type present in the database, or an alias to one or more features.  The feature may be specified as either type or type:source. Aliases are  specified in the `tim_db_helper.cfg` file, and provide a shortcut to a  list of one or more features. More than feature may be included as a  comma-delimited list (no commas).
 __
   __
-__--data <**text>
+__--data <**dataset_name | filename>
 
 __
-  Specify the name of the microarray data set for which you wish to  collect data. If not specified, the data set may be  chosen interactively from a presented list. When enumerating features,  the features' type or type:source values should be indicated.
+  Specify the name of the microarray data set for which you wish to  collect data. If not specified, the data set may be  chosen interactively from a presented list. When enumerating features,  the features' type or type:source values should be indicated. Alternatively, the name of a data file may be provided. Supported  file types include !BigWig** (.bw), !BigBed** (.bb), or single-end Bam  (.bam). The file may be local or remote.
 __
   __
-__--method `[`mean|median|sum|count`]`
+__--method `[`mean|median|min|max|sum`]`
 
 __
-  Specify the method of collecting and combining the data into each bin.  Three statistical methods for combining score values are allowed: mean,  median, and sum. In addition, features may be enumerated or counted  within each bin. The defined method does not affect the interpolation or  summary functions of the program, only initial data collection. The  default method is 'mean'.
+  Specify the method of collecting and combining the data into each bin.  Three statistical methods for combining score values are allowed: mean,  median, minimum, maximum, and sum. The defined method does not affect  the interpolation or summary functions of the program, only initial data  collection. The default method is 'mean'.
+__
+  __
+__--value `[`score|count|length`]`
+
+__
+  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
 __
   __
 __--bins <**integer>

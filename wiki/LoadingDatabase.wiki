@@ -49,14 +49,14 @@ Like the wig file, the [http://genome.ucsc.edu/goldenPath/help/customTrack.html#
 
 Similar to a bigWig file, the [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file is a compressed, indexed, binary representation of the BED file. 
 
-There is no formal method for importing BED data into a Bio::DB::SeqFeature::Store database. However, BED data can be easily converted into one of the supported formats, including the BigBed format. Like the BigWig file, a BigBed file is referenced in the database.
+There is no formal method for importing BED data into a Bio::DB::SeqFeature::Store database. However, BED data can be easily converted into one of the supported formats, including the BigBed format. Like the BigWig file, a BigBed file may be referenced in the database.
 
 ====BAR and Useq files====
 Utilized by David Nix's [http://http://timat2.sourceforge.net/ T2] and [http://useq.sourceforge.net USeq] packages, as well as the Integrated Genome Browser (IGB), the Bar file is a binary, serialized, floating point data file. A single file represents one chromosome, necessitating a directory of files for a genome. The files are usually compressed with zip. 
 
 The [http://useq.sourceforge.net/useqArchiveFormat.html useq] archive is an improvement on the bar file, allowing for either annotation, data values, or both to be stored in a compressed archive. 
 
-Neither format is directly supported by BioPerl, GBrowse, or *biotoolbox*. However, there is a *biotoolbox* script, [Pod_bar2wig bar2wig.pl], for converting bar files to wig files. There is also a utility, `useq2text`, in the USeq package to convert a useq archive into text (6-column BED), from which the data can be converted into one of the other supported formats.
+Neither format is directly supported by BioPerl, GBrowse, or *biotoolbox*. However, there is a *biotoolbox* script, [Pod_bar2wig bar2wig.pl], for converting bar files to wig files. There is also a utility, `useq2text`, in the USeq package to convert a useq archive into text (6-column BED), from which the data can then be converted into one of the other supported formats.
 
 ====BAM file====
 While not inherently a data value file format, BAM files represent the alignments from next generation sequencing, and as such, are more of a raw data format. Typically, one is concerned with the coverage of reads over specific genomic features. There are numerous packages for enumerating and processing the number of aligned sequence reads over the genome, including scripts in the *biotoolbox* package.
@@ -74,15 +74,17 @@ There are numerous *biotoolbox* scripts for converting data file formats from on
 	* [Pod_wig2data wig2data.pl]
 	
 ===Loading the database===
-The Bio::DB::SeqFeature::Store database is loaded with either GFF3 or Fasta files. Therefore, genomic data in other data formats, e.g. .wig or .bw, must have GFF3 files prepared that reference the actual data files. In these cases, a genomic feature is described, one for each chromosome strand, that has an attribute tag (in the GFF 9th column) describing the location of the binary file in the local file system.
+The Bio::DB::SeqFeature::Store database is loaded with either GFF3 or Fasta files. Therefore, genomic data in other data formats, e.g. .wig or .bw, must have GFF3 files prepared that reference the actual data files. In these cases, a genomic feature is described, one for each chromosome strand, that has an attribute tag (in the GFF 9th column) describing the location of the binary file in the local file system. 
+
+Note that this is not necessarily required for data collection; many *biotoolbox* data collection scripts will now take a direct file reference on the command line without having to reference them from within the database.
 
 ====wig files====
 The Bio::Graphics modules comes with a Perl script, `wiggle2gff3.pl`, that is used to prepare a wig file. It first converts the text .wig file into a binary .wib (downsampling the data to 8-bit precision in the process), then generates a GFF3 file that references the .wib files.
 
 ====Big files====
-BigFiles, including BigBed and BigWig, may be referenced using the *biotoolbox* script, [Pod_big_file2gff3 big_file2gff3.pl]. BAM files may also be referenced using this script.
+BigFiles, including BigBed and BigWig, may be referenced using the *biotoolbox* script, [Pod_big_file2gff3 big_file2gff3.pl]. BAM files may also be referenced using this script. 
 
-Once the GFF3 files are generated, the database may be loaded using the BioPerl provided script, `seqfeature_load.pl` (or `bp_seqfeature_load.pl`). 
+Once the GFF3 files are generated, the SQL database may then be loaded using the BioPerl provided script, `seqfeature_load.pl` (or `bp_seqfeature_load.pl`). Alternatively, if there is only one relatively simple GFF3 annotation file, then an in-memory database may be utilized by the *biotoolbox* data collection scripts without having to load a SQL database. The memory database is slow to load, but extremely fast once loaded. Depending on the size of the GFF3 file, it may consume considerable amounts of RAM.
 
 
 

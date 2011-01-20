@@ -11,15 +11,15 @@ find_enriched_regions.pl
  }}}
 {{{
   Options:
-  --db <db_name>
-  --data <dataset>
+  --db <name|file.gff3>
+  --data <dataset | filename>
   --out <filename>
   --win <integer>
   --step <integer>
   --tol <integer>
   --thresh <number>
   --sd <number>
-  --median
+  --method [mean|median]
   --deplete
   --(no)trim
   --(no)sort
@@ -38,13 +38,16 @@ The command line flags and descriptions:
 __--db <**database_name>
 
 __
-  Specify a Bioperl Bio::DB::!SeqFeature**::Store database. Required.
-__
-  __
-__--data <**dataset>
+__--db <**name|file.gff3>
 
 __
-  Specify the name of the dataset from which to collect the scores.  If not specified, then the data set may be chosen interactively  from a presented list.
+  Specify the name of the !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, a single GFF3 file may be loaded into a in-memory database.
+__
+  __
+__--data <**dataset | filename>
+
+__
+  Specify the name of the dataset from which to collect the scores.  If not specified, then the data set may be chosen interactively  from a presented list. Alternatively, the name of a data file may be provided. Supported  file types include !BigWig** (.bw), !BigBed** (.bb), or single-end Bam  (.bam). The file may be local or remote.
 __
   __
 __--out <**filename>
@@ -83,10 +86,10 @@ __
   Specify the multiple of standard deviations above the mean as a window score threshold. Default is 1.5 standard deviations. Be  quite careful with this method as it attempts to pull all of the  datapoints out of the database to calculate the mean and  standard deviation - which may be acceptable for limited tiling  microarrays but not acceptable for next generation sequencing  data with single bp resolution.
 __
   __
-__--median
+__--method `[`mean|median`]`
 
 __
-  Indicate that a median score value should be calculated within each window rather than the default mean when determining whether the  window exceeds the threshold.
+  Specify the method for combining score values within each window  when determining whether the window exceeds the threshold. Default method is mean.
 __
   __
 __--deplete

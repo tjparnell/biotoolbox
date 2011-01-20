@@ -15,19 +15,21 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --new
   --in <filename>
   --out filename
-  --db <name>
+  --db <name|file.gff3>
   --feature <type | type:source | alias, ...>
   --dataset <none | name, ...>
-  --method [mean|median|stddev|min|max|range|enumerate|count]
+  --dataf <file1,file2,...>
+  --method [mean|median|stddev|min|max|range|sum]
+  --value [score|count|length]
   --(no)log
-  --strand [all | sense | antisense]
+  --strand [all|sense|antisense]
   --extend <integer>
   --start <integer>
   --stop <integer>
   --fstart <decimal>
   --fstop <decimal>
   --limit <integer>
-  --pos [5 | 3 | m]
+  --pos [5|3|m]
   --win <integer>
   --step <integer>
   --set_strand
@@ -57,10 +59,10 @@ __
   Specify the output file name. Required for new feature tables; optional for  current files. If this is argument is not specified then the input file is  overwritten.
 __
   __
-__--db <**name>
+__--db <**name|file.gff3>
 
 __
-  Specify the name of the !BioPerl** gff database to use as source. This is required  for new feature data files. For pre-existing input data files, this value  may be obtained from the input file metadata. However, if provided, it  overrides the database listed in the file; this is useful for collecting data  from multiple databases.
+  Specify the name of the !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, a single GFF3 file may be loaded into a in-memory database. Specifying the database is required for new feature data files. For pre-existing input data files, this value may be obtained from the input file metadata. However, if provided, it overrides the database listed in the file; this is useful for collecting data from multiple databases.
 __
   __
 __--feature <**type | type:source | alias, ...>
@@ -69,28 +71,37 @@ __
   Specify the type of feature from which to collect values. This is required  for new feature tables. Two types of values may be passed: either a specific  feature type present in the database, or an alias to one or more features.  The feature may be specified as either type or type:source. Aliases are  specified in the `tim_db_helper.cfg` file, and provide a shortcut to a  list of one or more features. More than feature may be included as a  comma-delimited list (no spaces).
 __
   __
-__--method `[`mean, median, stddev, min, max, range, enumerate, count`]`
+__--dataset <**none | name, ...>
+
+__
+  Provide the name of the dataset to collect the values. Use this argument  repeatedly for each dataset to be collected. Two or more datasets may be merged into one by delimiting with an "&" (no spaces!). If the dataset is not  specified on the command line, then the program will interactively present a  list of datasets from the database to select. To force the program to  simply write out the list of collected features without collecting data,  provide the dataset name of "none".
+__
+  __
+__--dataf <**file1,file2,...>
+
+__
+  Alternative to using datasets stored in the database, a data file may be directly referenced and used in the collection of score values. Only data formats which directly support chromosome:start..stop searches are supported; these currently include !BigWig** (.bw), !BigBed** (.bb), and single-end Bam (.bam) files. Multiple data files may be specified as a comma delimited list. Merging files as a single source is also supported using a "&". Remote files should also be accessible by prefixing with the appropriate transfer protocol (http: or ftp:).
+__
+  __
+__--method `[`sum|mean|median|stddev|min|max|range`]`
 
 __
   Specify the method for combining all of the dataset values within the  genomic region of the feature. Accepted values include:
 __
   __
 {{{
+  - sum
   - mean        (default)
   - median
   - stddev      Standard deviation of the population (within the region)
   - min
   - max
   - range       Returns 'min-max'
-  - enumerate   Counts the number of features or dataset points
-  - count       same as enumerate
   }}}
-{{{
-}}}
-__--dataset <**none | name, ...>
+__--value `[`score|count|length`]`
 
 __
-  Provide the name of the dataset to collect the values. Use this argument  repeatedly for each dataset to be collected. Two or more datasets may be merged into one by delimiting with an "&" (no spaces!). If the dataset is not  specified on the command line, then the program will interactively present a  list of datasets from the database to select. To force the program to  simply write out the list of collected features without collecting data,  provide the dataset name of "none".
+  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
 __
   __
 __--(no)log

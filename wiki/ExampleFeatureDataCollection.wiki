@@ -160,10 +160,10 @@ Elessar:~ tim$ join_data_file.pl gene_list#chr*.txt
 </pre>
 
 
-===Collecting microarray data===
+===Collecting microarray data from the database===
 Now that we have a gene list, we're ready to collect some data. I come from an epigenetics lab, so we're interested in chromatin modifications. We want to draw a correlation between H3K4me3, a mark of transcription activation found at promoters, with H3K36me3, a mark of past transcription found in the body of the gene.
 
-We'll use [Pod_get_datasets get_datasets.pl] script again to collect the data. The data is stored in a separate database, _sc_public_ma_, so we'll need to explicitly specify that; otherwise, the database listed in the metadata is used. This database have the basic annotation (genes) as well as microarray data from [http://www.ncbi.nlm.nih.gov/pubmed/16122420 Pokholok] et al. (2005), which published genome-wide histone modifications in _S. cerevisiae_.
+We'll use [Pod_get_datasets get_datasets.pl] script again to collect the data. The data is stored in a separate database, _sc_public_ma_, so we'll need to explicitly specify that; otherwise, the database listed in the metadata is used. This database contains the basic annotation (genes) as well as microarray data from [http://www.ncbi.nlm.nih.gov/pubmed/16122420 Pokholok] et al. (2005), which published genome-wide histone modifications in _S. cerevisiae_. Because this dataset was derived from a relatively small tiling microarray with only 44K probes, the data was simply converted to a GFF3 file, with a each probe as a feature and the microarray value recorded as the score, which was then loaded directly into the database. For working with higher density datasets, see below.
 
 A note about data and *biotoolbox* scripts. I break GFF3 format convention for the datasets by using the GFF type column (column 3) as a unique identifier for datasets. Officially, only Sequence Ontology terms should be used as types, which in this case would be _microarray_probe_. However, it is much more convenient to identify data in the database using the GFF type (and source), than the Name tag (found in column 9 of the GFF file). The Bio::DB::SeqFeature::Store API (fortunately) does not strictly check SO terms. Nevertheless, I apply the same value to both the GFF type (column 3) and Name tag (column 9) to all my data, just in case this is changed in the future.
 
@@ -206,6 +206,30 @@ Elessar:~ tim$ head gene_list.txt
 </pre>
 
 Notice that we now have two additional datasets in our file, and we have metadata lines describing where and how we obtained these datasets.
+
+===Collecting high density data===
+
+When working with high density tiling microarray data (up to a few millions of probes) or next generation sequencing (many, many millions of sequence tags), storing the data in a SQL database, while possible, is inefficient. Fortunately, there are binary file formats that allow for quick, random access of the data. These include the [http://genome.ucsc.edu/goldenPath/help/wiggle.html wig] file (for dense quantative data) and [http://samtools.sourceforge.net/ Bam] file (for short sequence alignments). Furthermore, there are improved binary versions of the wig and bed file, the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats. 
+
+Fortunately, there are Perl modules which can read and process these file formats, notably [http://search.cpan.org/search?query=samtools&mode=dist Bio-SamTools] and [http://search.cpan.org/search?query=bigfile&mode=dist Bio-BigFile]. These are also used by GBrowse for visualization of the data across the genome.
+
+The *biotoolbox* data collection scripts can collect data and other values from these files. The files can be referenced in one of two ways. 
+First, a simple GFF3 file may be generated using the script [Pod_big_file2gff3 big_file2gff3.pl] that references the location of the file. This can then be loaded into the database.
+Second, the file may be directly referenced with a command line option when executing the data collection script.
+<pre>
+Elessar:~ tim$ get_datasets.pl --db sc_public_ma --dataf path/to/my/data.bam --log --start=-300 --stop 1 --in gene_list.txt
+
+ A program to collect feature data from the database
+
+ Loading feature list from file 'gene_list.txt'...
+ Collecting mean data for dataset file:path/to/my/data.bam...
+ in 0.1 minutes
+ wrote file './gene_list.txt'
+ Completed in 0.1 minutes
+</pre>
+This is a convenient method for quickly analyzing your data without having to load it into a database first.
+
+There are also numerous *biotoolbox* scripts for converting and manipulating these data formats.
 
 ===Visualizing the data===
 We first want to check some basic statistics on our datasets. We can use the [Pod_manipulate_datasets manipulate_datasets.pl] script to do this.
