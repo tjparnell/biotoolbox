@@ -1,6 +1,8 @@
 PROGRAM LIST
 
-This is an alphabetical list of the scripts available in the biotoolbox scripts directory.
+This is an alphabetical list of the scripts available in the biotoolbox scripts directory. An up to data list of programs may be found online at
+http://code.google.com/p/biotoolbox/wiki/ProgramList
+
 
 average_gene.pl
 	Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
