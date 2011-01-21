@@ -72,20 +72,35 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($binsize) {
-	die " Missing bin size!\n Please use --help for more information\n";
-}
-unless ($binnumber or $max) {
-	die " Either bin number or maximum value must be entered!\n" . 
-		" Please use --help for more information\n";
-}
+
 unless (defined $start) {
-	$start = 0;
+	$start = 0; # default start of 0
+}
+unless (defined $binsize) {
+	if (defined $binnumber and defined $max) {
+		$binsize = ($max - $start) / $binnumber;
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
+}
+unless (defined $binnumber) {
+	if (defined $binsize and defined $max) {
+		$binnumber = int( ($max - $start) / $binsize);
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
 }
 unless (defined $max) {
-	# default value is calculated
-	$max = $start + ($binnumber * $binsize);
+	if (defined $binsize and defined $binnumber) {
+		$max = $start + ($binnumber * $binsize);
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
 }
+		
 
 
 
@@ -561,12 +576,12 @@ interactively from a list.
 =item --bins <integer>
 
 Specify the number of bins or partitions into which the data will be 
-grouped. This argument is optional if --max is provided.
+grouped. This argument is optional if --max and --size are provided.
 
 =item --size <number>
 
 Specify the size of each bin or partition. A decimal number may be 
-provided.
+provided. This argument is optional if --bins and --max are provided.
 
 =item --min <number>
 
@@ -576,10 +591,8 @@ A negative number may be provided using the format --min=-1.
 
 =item --max <number>
 
-Optionally provide the maximum bin value. This argument is optional 
-and is automatically calculated as (bins * size). This argument 
-may also be provided as an alternative to specifying the binsize 
-value, in which case the number of bins is empirically determined.
+Specify the maximum bin value. This argument is optional if --bins 
+and --size are provided.
 
 =item --lines
 

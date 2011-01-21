@@ -56,6 +56,8 @@ be called directly from the bin directory, or it may be added to your
 environment $PATH for easy execution. The programs will likely die prematurely 
 if a required module is not found. Note that the tim_*_helper modules are found in the lib directory, and the perl scripts should be able to find them automatically if you leave the directory structure as is.
 
+There is configuration file that may be customized for your particular installation. The default file is lib/tim_db_helper.cfg. It is a simple INI-style file that is used to set up database connection profiles, feature aliases, helper application locations, etc. The file is intended to be edited by users. There are three locations where the file may be stored: 1) in the lib directory along with the library modules, 2) in the user's home directory, or 3) a custom location defined by the environment variable 'TIM_DB_HELPER'.
+
 All programs are designed to be run from the command line. All require command line options. Executing the program without any options will present a synopsis of the options that are available. Most programs also have a --help option, which will display detailed information about the program and execution (usually by displaying the internal POD). The options are given in the long format (--help, for example), but may be shortened to single letters if the first letter is unique (-h, for example).
 
 All of the programs can be called from a bash or another perl script. Some programs, manipulate_datasets.pl for example, also provide an interactive interface to allow for spontaneous work or when the exact index number or name of the dataset in the file or database is not immediately known.
