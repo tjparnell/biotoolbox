@@ -43,13 +43,13 @@ __
 __--bins <**integer>
 
 __
-  Specify the number of bins or partitions into which the data will be  grouped. This argument is optional if --max is provided.
+  Specify the number of bins or partitions into which the data will be  grouped. This argument is optional if --max and --size are provided.
 __
   __
 __--size <**number>
 
 __
-  Specify the size of each bin or partition. A decimal number may be  provided.
+  Specify the size of each bin or partition. A decimal number may be  provided. This argument is optional if --bins and --max are provided.
 __
   __
 __--min <**number>
@@ -61,7 +61,7 @@ __
 __--max <**number>
 
 __
-  Optionally provide the maximum bin value. This argument is optional  and is automatically calculated as (bins `*` size). This argument  may also be provided as an alternative to specifying the binsize  value, in which case the number of bins is empirically determined.
+  Specify the maximum bin value. This argument is optional if --bins  and --size are provided.
 __
   __
 __--lines
