@@ -1,0 +1,22 @@
+######## biotoolbox revision history #############
+
+v1.3 (svn r104)
+	- Added ability to restrict data collection to exon subfeatures to script get_datasets.pl. Useful for RNA-seq analysis.
+	- Added exon count as attribute to script get_feature_info.pl.
+	- Bug fixes to get_datasets.pl.
+
+v1.2 (svn r98)
+	- Added support for bam files as a data source.
+	- Updated data collection scripts to allow direct referencing of data source files, including bigWig, bigBed, and Bam files, on the command line, without having to reference the files from within the database.
+
+v1.1 (svn r92)
+	- Updated script ucsc_table2gff3.pl to use Bio::SeqFeature::Lite. Now outputs exon and codon features.
+	- Updated script get_ensembl_annotation.pl to collect RNA features from Ensembl as well as generate exon and codon features.
+	- Added script gff3_to_ucsc_table.pl to generate UCSC style refSeq tables from GFF3 formatted data.
+
+v1.0.2 (svn r91)
+	- Bug fixes to libs tim_file_helper and tim_db_helper
+	- Bug fixes to scripts print_feature_types.pl, get_intersecting_features.pl, big_file2gff3.pl, graph_data.pl, graph_histogram.pl, graph_profile.pl
+
+v1.0 (svn r68)
+	- Initial public release of an archive. Previous versions were only available through SVN.
