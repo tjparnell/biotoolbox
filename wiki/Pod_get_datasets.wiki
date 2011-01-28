@@ -23,6 +23,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --value [score|count|length]
   --(no)log
   --strand [all|sense|antisense]
+  --exons
   --extend <integer>
   --start <integer>
   --stop <integer>
@@ -113,7 +114,13 @@ __
 __--strand `[`all | sense | antisense`]`
 
 __
-  Specify whether stranded data should be collected for each of the  datasets. Either sense or antisense (relative to the feature) data  may be collected. The default value is 'all', indicating all  data will be collected.
+  Specify whether stranded data should be collected for each of the  datasets. Either sense or antisense (relative to the feature) data  may be collected. Note that strand is not (currently) supported with  coverage (score) from a BAM file, but count is. The default value is  'all', indicating all data will be collected.
+__
+  __
+__--exons
+
+__
+  Optionally indicate that data should be collected only over the exon  subfeatures of a gene or transcript, rather than the entire gene.  Subfeatures with a primary_tag of exon are preferentially taken. If exons  are not defined, then CDS and UTR subfeatures are used, or the entire  gene or transcript if no appropriate subfeatures are found. Note that the  data collection method is applied twice, once for each subfeature, and then  again on all of the subfeature combined values. Also note that the options  extend, start, stop, fstart, and fstop are ignored. Default is false.
 __
   __
 __--extend <**integer>
@@ -173,7 +180,7 @@ __
 __--set_strand
 
 __
-  For features that are not inherently stranded (strand value of 0),  impose an artificial strand for each feature (1 or -1). This will  have the effect of enforcing a relative orientation for each feature,  or to collected stranded data. This requires the presence a  column in the input data file with a name of "strand". Hence, it  will not work with newly generated datasets, but only with input  data files. Default is false.
+  For features that are not inherently stranded (strand value of 0),  impose an artificial strand for each feature (1 or -1). This will  have the effect of enforcing a relative orientation for each feature,  or to collected stranded data. This requires the presence of a  column in the input data file with a name of "strand". Hence, it  will not work with newly generated datasets, but only with input  data files. Default is false.
 __
   __
 __--(no)gz

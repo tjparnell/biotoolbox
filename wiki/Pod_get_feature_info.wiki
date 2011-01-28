@@ -18,7 +18,7 @@ get_feature_info.pl <**filename>
   --(no)gz
   --help
 }}}
-Attributes include:    chromo    start    stop    length    midpoint    strand    phase    score    <**tag>
+Attributes include:    chromo    start    stop    length    midpoint    strand    phase    score    exons (number of)    <**tag>
 
 {{{
 }}}
@@ -52,6 +52,7 @@ __
    -strand
    -phase
    -score
+   -exons (number of exons, or number of CDS)
 }}}
   If attrib is not specified on the command line, then an interactive list  will be presented to the user for selection. Especially useful when you  can't remember the feature's tag keys in the database.
 __
