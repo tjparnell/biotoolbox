@@ -1074,6 +1074,15 @@ arguments. The keys include
               to each value. There must be a column in the passed 
               data table containing the strand values (-1, 0, 1) 
               and whose header name contains "strand". 
+  subfeature => When set to a true value, the subfeatures of the 
+              feature are identified and values collected for each 
+              one. The subfeature values are then combined and 
+              recorded. Note that the method of combining values is 
+              applied twice: once for each subfeature, and then with 
+              all the subfeatures. Exon subfeatures are 
+              preferentially used first, followed by CDS and UTR 
+              subfeatures. Options extend, start, stop, fstart, and 
+              fstop are ignored.
           	  
 The subroutine will return a true value (the new column name) if 
 successful. It will return nothing and print an error message to 
@@ -1157,20 +1166,21 @@ sub get_feature_dataset {
 			$log = 0;
 		}
 	}
-	my $stranded = $arg_ref->{'strand'} || 'all';
+	my $stranded    = $arg_ref->{'strand'} || 'all';
 	my $relative_pos = $arg_ref->{'position'} || 5;
-	my $limit = $arg_ref->{'limit'} || 1000;
+	my $limit       = $arg_ref->{'limit'} || 1000;
 		# this is an arbitrary default value that seems reasonable for
 		# moderate resolution microarrays
 		# it's only needed if using the fractional start & stop
 	
 	# define other variables from the argument hash
-	my $extend = $arg_ref->{'extend'} || undef;
-	my $start = $arg_ref->{'start'} || undef;
-	my $stop = $arg_ref->{'stop'} || undef;
-	my $fstart = $arg_ref->{'fstart'} || undef;
-	my $fstop = $arg_ref->{'fstop'} || undef;
-	my $set_strand = $arg_ref->{'set_strand'} || 0;
+	my $extend      = $arg_ref->{'extend'} || undef;
+	my $start       = $arg_ref->{'start'} || undef;
+	my $stop        = $arg_ref->{'stop'} || undef;
+	my $fstart      = $arg_ref->{'fstart'} || undef;
+	my $fstop       = $arg_ref->{'fstop'} || undef;
+	my $set_strand  = $arg_ref->{'set_strand'} || 0;
+	my $get_subfeat = $arg_ref->{'subfeature'} || 0;
 	
 	
 	
@@ -1229,8 +1239,15 @@ sub get_feature_dataset {
 	if ($arg_ref->{'dataset'} =~ /^file|http|ftp/) {
 		# a specified file
 		# we just want the file name, split it from the path
-		(undef, undef, $column_name) = 
-			File::Spec->splitpath($arg_ref->{'dataset'});
+		foreach (split /&/, $arg_ref->{'dataset'}) {
+			my (undef, undef, $file_name) = File::Spec->splitpath($_);
+			if ($column_name) {
+				$column_name .= '&' . $file_name;
+			}
+			else {
+				$column_name = $file_name;
+			}
+		}
 	}
 	else {
 		# a feature type, take as is
@@ -1251,7 +1268,168 @@ sub get_feature_dataset {
 	# could have generalized into another subroutine, but that might take 
 	# more effort and overhead
 	
-	if (defined $extend) {
+	if ($get_subfeat) {
+		# subfeatures are requested
+		# we will collect the scores for each subfeature first, then combine
+		# the subfeature scores
+		
+		FEATURE_DATA_COLLECTION:
+		for my $i (1 .. $feat_num) {
+			# collecting feature identification 
+			my $name = $data_table_ref->[$i][$name_index];
+			my $type = $data_table_ref->[$i][$type_index];
+			
+			# first define the the feature
+			my @features = $db->features( 
+					-name  => $name,
+					-type => $type,
+			);
+			if (scalar @features > 1) {
+				# there should only be one feature found
+				# if more, there's redundant or duplicated data in the db
+				# warn the user, this should be fixed
+				warn " Found more than one feature of '$type => $name' in " .
+					"the database!\n Using the first feature only!\n";
+			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
+			my $feature = shift @features; 
+			
+			# reassign strand value if requested
+			if ($set_strand) {
+				$feature->strand($data_table_ref->[$i][$strand_index]);
+			}
+			
+			# get strand
+			my $fstrand = $feature->strand;
+			
+			# separate subfeatures by type
+			my @exons;
+			my @cdss;
+			foreach my $subfeat ($feature->get_SeqFeatures) {
+				if ($subfeat->primary_tag =~ /exon/i) {
+					push @exons, $subfeat;
+				}
+				elsif ($subfeat->primary_tag =~ /utr|untranslated/i) {
+					push @cdss, $subfeat;
+				}
+				elsif ($subfeat->primary_tag =~ /cds/i) {
+					push @cdss, $subfeat;
+				}
+				elsif ($subfeat->primary_tag =~ /rna/i) {
+					# an RNA subfeature, keep going down another level
+					foreach my $f ($subfeat->get_SeqFeatures) {
+						if ($f->primary_tag =~ /exon/i) {
+							push @exons, $f;
+						}
+						elsif ($f->primary_tag =~ /utr|untranslated/i) {
+							push @cdss, $f;
+						}
+						elsif ($f->primary_tag =~ /cds/i) {
+							push @cdss, $f;
+						}
+					}
+				}
+			}
+			
+			# determine which subfeatures to collect
+			my @features_to_check;
+			if (@exons) {
+				@features_to_check = @exons;
+			}
+			elsif (@cdss) {
+				@features_to_check = @cdss;
+			}
+			else {
+				# found neither exons, CDSs, or UTRs
+				# possibly because there were no subfeatures
+				# in this case we just take the whole thing
+				push @features_to_check, $feature;
+			}
+			
+			# collect the subfeature values
+			my @subf_values;
+			foreach my $subfeat (@features_to_check) {
+			
+				# establish the segment
+				my $region = $subfeat->segment(); 
+				
+				# get the score for the subfeature region
+				# pass to internal subroutine to combine dataset values
+				push @subf_values, _get_segment_score(
+							$region, 
+							$fstrand,
+							$arg_ref->{'dataset'},
+							$value_type,
+							$arg_ref->{'method'}, 
+							$stranded, 
+							$log,
+				);
+			}
+			
+			
+			# deal with log2 values if necessary
+			if ($log) {
+				@subf_values = map {2 ** $_} @subf_values;
+			}
+			
+			# collect the final score
+			# we are using subroutines from Statistics::Lite
+			my $parent_score;
+			if ($arg_ref->{'method'} eq 'median') {
+				# take the median value
+				$parent_score = median(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'mean') {
+				# or take the mean value
+				$parent_score = mean(@subf_values);
+			} 
+			elsif ($arg_ref->{'method'} eq 'range') {
+				# or take the range value
+				# this is 'min-max'
+				$parent_score = range(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'stddev') {
+				# or take the standard deviation value
+				# we are using the standard deviation of the population, 
+				# since these are the only scores we are considering
+				$parent_score = stddevp(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'min') {
+				# or take the minimum value
+				$parent_score = min(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'max') {
+				# or take the maximum value
+				$parent_score = max(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'count') {
+				# count the number of values
+				$parent_score = sum(@subf_values);
+			}
+			elsif ($arg_ref->{'method'} eq 'sum') {
+				# sum the number of values
+				$parent_score = sum(@subf_values);
+			}
+			else {
+				# somehow bad method snuck past our checks
+				croak " unrecognized method '$arg_ref->{'method'}'!";
+			}
+		
+			# convert back to log2 if necessary
+			if ($log) { 
+				$parent_score = log($parent_score) / log(2);
+			}
+				
+			# record the final score for the parent feature
+			push @{ $data_table_ref->[$i] }, $parent_score;
+		}	
+		
+	}
+	
+	elsif (defined $extend) {
 		# if an extension is specified to the feature region
 		
 		FEATURE_DATA_COLLECTION:
@@ -1272,6 +1450,10 @@ sub get_feature_dataset {
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
 			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
 			my $feature = shift @features; 
 			
 			# reassign strand value if requested
@@ -1289,13 +1471,6 @@ sub get_feature_dataset {
 				$feature->start - $extend,
 				$feature->end + $extend,
 			);
-			
-			
-			# confirm region
-			unless ($region) { 
-				carp "feature $name at table position $i not found!";
-				next FEATURE_DATA_COLLECTION;
-			}
 			
 			# get the scores for the region
 			# pass to internal subroutine to combine dataset values
@@ -1338,6 +1513,10 @@ sub get_feature_dataset {
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
 			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
 			my $feature = shift @features; 
 			
 			# reassign strand value if requested
@@ -1368,12 +1547,6 @@ sub get_feature_dataset {
 				);
 			}
 
-			
-			# confirm region
-			unless ($region) { 
-				carp "feature $name at table position $i not found!";
-				next FEATURE_DATA_COLLECTION;
-			}
 			
 			# get the scores for the region
 			# pass to internal subroutine to combine dataset values
@@ -1413,6 +1586,10 @@ sub get_feature_dataset {
 				# warn the user, this should be fixed
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
+			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
 			}
 			my $feature = shift @features; 
 			
@@ -1495,6 +1672,10 @@ sub get_feature_dataset {
 				# warn the user, this should be fixed
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
+			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
 			}
 			my $feature = shift @features; 
 			my $length = $feature->length;
@@ -1586,6 +1767,10 @@ sub get_feature_dataset {
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
 			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
 			my $feature = shift @features; 
 			my $length = $feature->length;
 			
@@ -1676,6 +1861,10 @@ sub get_feature_dataset {
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
 			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
 			my $feature = shift @features; 
 			
 			# reassign strand value if requested
@@ -1743,6 +1932,10 @@ sub get_feature_dataset {
 				# warn the user, this should be fixed
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
+			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
 			}
 			my $feature = shift @features; 
 			my $length = $feature->length;
@@ -1820,6 +2013,10 @@ sub get_feature_dataset {
 				warn " Found more than one feature of '$type => $name' in " .
 					"the database!\n Using the first feature only!\n";
 			}
+			elsif (!@features) {
+				carp "feature $name at table position $i not found!";
+				next FEATURE_DATA_COLLECTION;
+			}
 			my $feature = shift @features; 
 			
 			# reassign strand value if requested
@@ -1836,12 +2033,6 @@ sub get_feature_dataset {
 				# we could probably call the segment directly, but want to 
 				# have mechanism in place in case more than one feature was
 				# present
-			
-			# confirm region
-			unless ($region) { 
-				carp "feature $name at table position $i not found!";
-				next FEATURE_DATA_COLLECTION;
-			}
 			
 			# get the scores for the region
 			# pass to internal subroutine to combine dataset values
@@ -2005,8 +2196,15 @@ sub get_genome_dataset {
 	if ($arg_ref->{'dataset'} =~ /^file|http|ftp/) {
 		# a specified file
 		# we just want the file name, split it from the path
-		(undef, undef, $column_name) = 
-			File::Spec->splitpath($arg_ref->{'dataset'});
+		foreach (split /&/, $arg_ref->{'dataset'}) {
+			my (undef, undef, $file_name) = File::Spec->splitpath($_);
+			if ($column_name) {
+				$column_name .= '&' . $file_name;
+			}
+			else {
+				$column_name = $file_name;
+			}
+		}
 	}
 	else {
 		# a feature type, take as is
@@ -2984,6 +3182,7 @@ sub _get_segment_score {
 			);
 		}
 		
+		# BAM data file
 		elsif ($datasetlist[0] =~ /\.bam$/i) {
 			# data is in bam format
 			# this uses the Bio::DB::Sam adaptor

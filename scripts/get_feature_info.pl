@@ -195,7 +195,7 @@ sub get_attribute_list_from_user {
 		my $i = 1;
 		my %index2att;
 		# standard attributes for any user
-		foreach ( qw(chromo start stop length midpoint strand phase score) ) {
+		foreach ( qw(chromo start stop length midpoint strand phase score exons) ) {
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
@@ -257,6 +257,9 @@ sub get_attribute_method {
 	} 
 	elsif ($attrib eq 'score') {
 		$method = \&get_score;
+	} 
+	elsif ($attrib eq 'exons') {
+		$method = \&get_exon_number;
 	} 
 	else {
 		# unrecognized, must be tag key
@@ -368,6 +371,42 @@ sub get_score {
 }
 
 
+sub get_exon_number {
+	my $feature = shift;
+	my $exon_count = 0;
+	my $cds_count = 0;
+	foreach my $f ($feature->get_SeqFeatures) {
+		# count both exons and CDSs
+		if ($f->primary_tag =~ /exon/i) {
+			$exon_count++;
+		}
+		elsif ($f->primary_tag =~ /cds/i) {
+			$cds_count++;
+		}
+		elsif ($f->primary_tag =~ /rna/i) {
+			# an RNA transcript, go one more level
+			foreach my $sf ($f->get_SeqFeatures) {
+				if ($sf->primary_tag =~ /exon/i) {
+					$exon_count++;
+				}
+				elsif ($sf->primary_tag =~ /cds/i) {
+					$cds_count++;
+				}
+			}
+		}
+	}
+	if ($exon_count) {
+		return $exon_count;
+	}
+	elsif ($cds_count) {
+		return $cds_count;
+	}
+	else {
+		return 0;
+	}
+}
+
+
 sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
@@ -437,6 +476,7 @@ Attributes include:
    strand
    phase
    score
+   exons (number of)
    <tag>
 
 
@@ -475,6 +515,7 @@ attributes include the following
    -strand
    -phase
    -score
+   -exons (number of exons, or number of CDS)
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
