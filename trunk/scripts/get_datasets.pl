@@ -52,6 +52,7 @@ my (
 	$value_type,
 	$log,
 	$strand,
+	$subfeature,
 	$extend,
 	$start,
 	$stop,
@@ -82,6 +83,7 @@ GetOptions(
 	'dataf=s'    => \@datafiles, # list of data files to collect data from
 	'log!'       => \$log, # dataset is in log2 space
 	'strand=s'   => \$strand, # indicate strandedness of data
+	'exons!'     => \$subfeature, # indicate to restrict to subfeatures
 	'extend=i'   => \$extend, # extend the size of the genomic feature
 	'start=s'    => \$start, # adjustment to relative start position
 	'stop=s'     => \$stop, # adjustment relative stop position
@@ -277,11 +279,11 @@ if ($new) {
 			# the file's metadata doesn't have the feature defined
 			# most likely because the file doesn't have metadata
 			# let's try looking for known column names
-			my $name_i = find_column_index($main_data_ref, "name";
-			my $type_i = find_column_index($main_data_ref, "type";
-			my $chr_i = find_column_index($main_data_ref, "^chr|seq";
-			my $start_i = find_column_index($main_data_ref, "^start";
-			my $stop_i = find_column_index($main_data_ref, "^stop|end";
+			my $name_i = find_column_index($main_data_ref, "name");
+			my $type_i = find_column_index($main_data_ref, "type");
+			my $chr_i = find_column_index($main_data_ref, "^chr|seq");
+			my $start_i = find_column_index($main_data_ref, "^start");
+			my $stop_i = find_column_index($main_data_ref, "^stop|end");
 			
 			# guess 
 			if (defined $name_i and defined $type_i) {
@@ -334,7 +336,14 @@ if (@datafiles) {
 		}
 		else {
 			# otherwise a local file
-			push @datasets, "file:$file";
+			# check first for combined files with &
+			if ($file =~ /&/) {
+ 				# need to prefix each file name
+ 				push @datasets, join("&", map {"file:$_"} split(/&/, $file) );
+ 			}
+			else {
+				push @datasets, "file:$file";
+			}
 		}
 	}
 }
@@ -590,6 +599,7 @@ sub submit_dataset_request {
 				'limit'       => $limit,
 				'set_strand'  => $set_strand,
 				'value'       => $value_type,
+				'subfeature'  => $subfeature,
 		} );
 		if (defined $column_name) {
 			print " in ";
@@ -654,12 +664,15 @@ sub _record_metadata {
 	if ($limit) {
 		$metadata{'limit'} = $limit;
 	}
+	if ($subfeature) {
+		$metadata{'exons'} = 'yes';
+	}
 	# add database name if different
 	if ($database ne $main_data_ref->{'db'}) {
 		$metadata{'db'} = $database;
 	}
 	if ($set_strand) {
-		$metadata{'strand_implied'} = 1;
+		$metadata{'strand_implied'} = 'yes';
 	}
 	
 	# place metadata hash into main data structure
@@ -719,6 +732,7 @@ get_datasets.pl [--options...] [<filename>]
   --value [score|count|length]
   --(no)log
   --strand [all|sense|antisense]
+  --exons
   --extend <integer>
   --start <integer>
   --stop <integer>
@@ -831,8 +845,20 @@ name includes the phrase "log2".
 
 Specify whether stranded data should be collected for each of the 
 datasets. Either sense or antisense (relative to the feature) data 
-may be collected. The default value is 'all', indicating all 
-data will be collected.  
+may be collected. Note that strand is not (currently) supported with 
+coverage (score) from a BAM file, but count is. The default value is 
+'all', indicating all data will be collected.  
+
+=item --exons
+
+Optionally indicate that data should be collected only over the exon 
+subfeatures of a gene or transcript, rather than the entire gene. 
+Subfeatures with a primary_tag of exon are preferentially taken. If exons 
+are not defined, then CDS and UTR subfeatures are used, or the entire 
+gene or transcript if no appropriate subfeatures are found. Note that the 
+data collection method is applied twice, once for each subfeature, and then 
+again on all of the subfeature combined values. Also note that the options 
+extend, start, stop, fstart, and fstop are ignored. Default is false.
 
 =item --extend <integer>
 
@@ -898,7 +924,7 @@ across the genome. The default is equal to the window size.
 For features that are not inherently stranded (strand value of 0), 
 impose an artificial strand for each feature (1 or -1). This will 
 have the effect of enforcing a relative orientation for each feature, 
-or to collected stranded data. This requires the presence a 
+or to collected stranded data. This requires the presence of a 
 column in the input data file with a name of "strand". Hence, it 
 will not work with newly generated datasets, but only with input 
 data files. Default is false.
