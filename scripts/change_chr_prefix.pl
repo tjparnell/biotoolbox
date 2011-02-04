@@ -115,7 +115,7 @@ elsif ($infile =~ /\.sam(?:\.gz)?$/i) {
 	# a Sam file
 	$final_file = process_sam_file($infile, $outfile);
 }
-elsif ($infile =~ /\.gff3?(?:\.gz)?$/i) {
+elsif ($infile =~ /\.g[t|f]f3?(?:\.gz)?$/i) {
 	# a GFF file
 	$final_file = process_gff_file($infile, $outfile);
 }
@@ -455,16 +455,16 @@ sub process_gff_file {
 		
 		# modify the name as appropriate
 		if ($add_chr) {
-			$outfile =~ s/\.gff3? (?:\.gz)? \Z/_$prefix/xi;
+			$outfile =~ s/\.g[t|f]f3? (?:\.gz)? \Z/_$prefix/xi;
 		}
 		else {
 			# strip prefix
-			$outfile =~ s/\.gff3? (?:\.gz)? \Z/_no$prefix/xi;
+			$outfile =~ s/\.g[t|f]f3? (?:\.gz)? \Z/_no$prefix/xi;
 		}
 	}
-	unless ($outfile =~ /\.gff3? (?:\.gz)? \Z/xi) {
+	unless ($outfile =~ /\.g[t|f]f3? (?:\.gz)? \Z/xi) {
 		# add extension as necessary
-		if ($infile =~ /(\.gff3?) (?:\.gz)? \Z/xi) {
+		if ($infile =~ /(\.g[t|f]f3?) (?:\.gz)? \Z/xi) {
 			# add the same extension as the input file
 			$outfile .= $1;
 		}
