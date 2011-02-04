@@ -8,7 +8,7 @@
 # SeqFeatureIO. However, it made the script pretty glacial with all the 
 # excess object overhead, particularly the Ontology stuff
 
-# the second version uses much, much, simpler SeqFeature::Lite and Tools::GFF 
+# the second version uses much, much, simpler SeqFeature::Generic and Tools::GFF 
 # and is over 2 orders of magnitude faster than the original
 
 # this third version uses SeqFeature::Lite and is simpler yet
@@ -314,7 +314,7 @@ sub identify_indices {
 	my @indices;
 	
 	foreach (
-		['chrom', 2],
+		['chrom', 2], # column name, default index number
 		['strand', 3],
 		['txStart', 4],
 		['txEnd', 5],
@@ -592,6 +592,7 @@ sub print_current_gene_list {
 			# the gff_string method is undocumented in the POD, but is a 
 			# valid method. Passing 1 should force a recursive action to 
 			# print parent and children.
+		#print Dumper($gene2seqf->{$id});
 		
 		# finally, delete the gene seqfeature object
 		delete $gene2seqf->{$id};
@@ -606,6 +607,14 @@ sub print_current_gene_list {
 
 sub generate_new_gene {
 	my $linedata = shift;
+	
+	# make sure we have a gene name
+	# some genes, notably some ncRNA genes, have no gene or name2 entry
+	unless ($linedata->[$gene_i]) {
+		# we'll fake it and assign the transcript name
+		# change it in linedata array to propagate it in downstream code
+		$linedata->[$gene_i] = $linedata->[$trnscpt_i];
+	}
 	
 	# generate the gene SeqFeature object
 	my $gene = Bio::SeqFeature::Lite->new(
@@ -644,6 +653,7 @@ sub generate_new_gene {
 		$gene->add_tag_value('Note', $text);
 	}
 	
+	#print Dumper($gene);
 	return $gene;
 }
 
@@ -1441,28 +1451,3 @@ their database that accurate conversions are tricky at best.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
