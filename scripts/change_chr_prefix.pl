@@ -546,11 +546,12 @@ sub process_fasta_file {
 	
 	# convert the chromosome definition lines
 	while (my $line = $in_fh->getline) {
-		if ($line =~ /\A>(\w+)( ?.*)\z/) { # include line ending
+		if ($line =~ /\A>(\w+)( .+)?([\n\r]+)\z/) { # include line ending
 			my $chr = $1;
 			my $def = $2;
+			my $end = $3;
 			my $new_chr = change_name($chr);
-			$out_fh->print('>' . $new_chr . $def);
+			$out_fh->print('>' . $new_chr . $def . $end);
 		}
 		else {
 			$out_fh->print($line);
