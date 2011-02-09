@@ -1,5 +1,9 @@
 ######## biotoolbox revision history #############
 
+v1.4 (svn r111)
+	- Added script bam2wig.pl for enumerating alignments and writing a wig file of the counts. 
+	- Added script change_chr_prefix.pl for adding or stripping chromosome prefixes from data and annotation files.
+	- Bug fixes to ucsc_table2gff3.pl.
 v1.3 (svn r104)
 	- Added ability to restrict data collection to exon subfeatures to script get_datasets.pl. Useful for RNA-seq analysis.
 	- Added exon count as attribute to script get_feature_info.pl.
