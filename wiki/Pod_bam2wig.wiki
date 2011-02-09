@@ -1,0 +1,136 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+<**name>.pl
+
+==SYNOPSIS==
+<**name>.pl `[`--options...`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --out <filename> 
+  --pos [start|mid|span|coverage]
+  --pe
+  --splice
+  --shift <integer>
+  --strand [f|r]
+  --inter
+  --(no)track
+  --bed
+  --bw
+  --bwapp </path/to/bedGraphToBigWig or /path/to/wigToBigWig>
+  --(no)gz
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the input Bam alignment file. The file should be sorted and  indexed, although it may be indexed automatically
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it uses the base name of the  input file.
+__
+  __
+__--pos `[`start|mid|span|coverage`]`
+
+__
+  Specify the position of the alignment coordinate which should be  recorded. Several positions are accepted: the start (5') position of  the alignment, the midpoint of the alignment, or at all positions  along the length of the alignment (span or coverage). Note that the   span option gives coverage but not a true count of the number of  alignments, unlike start or mid. With paired-end alignments, the  positions are relative to the entire insert fragment defined by two  alignments. The default value is start for single-end and mid for  paired-end alignments.
+__
+  __
+__--pe
+
+__
+  The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be considered.
+__
+  __
+__--splice
+
+__
+  The Bam file single-end alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag.
+__
+  __
+__--shift <**integer>
+
+__
+  Shift the positions of all single-end alignments towards the 3' end by  the indicated number of basepairs. The value should be 1/2 the average  length of the insert library sequenced. Useful for ChIP-Seq applications.
+__
+  __
+__--strand `[`f|r`]`
+
+__
+  Only process those single-end alignments which map to the indicated  strand. Default is to take all alignments regardless of strand.
+__
+  __
+__--inter
+
+__
+  Specify whether or not to record interpolating positions of 0. If  true, a fixedStep wig file (step=1 span=1) is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  The default behavior is to not record empty positions.
+__
+  __
+__--(no)track
+
+__
+  Specify whether or not to include a track line in the wig file. In  general, track lines are not required when further converting to a  !BigWig** file.
+__
+  __
+__--bed
+
+__
+  Specify whether or not to write a bedGraph (chromosome start stop value)  file or a traditional fixedStep or variableStep wiggle file. The  default is false.
+__
+  __
+__--bw
+
+__
+  Specify whether or not the wig file should be further converted into  an indexed, compressed, binary !BigWig** file. The default is false.
+__
+  __
+__--bwapp </path/to/bedGraphToBigWig or /path/to/wigToBigWig>
+
+__
+  Specify the full path to Jim Kent's !BigWig** conversion utility. Two  different utilities may be used, bedGraphToBigWig or wigToBigWig,  depending on the format of the wig file generated. The bedGraphToBigWig  is preferred only because of slightly lower memory overhead. The  default is to search the environment path for the executable.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will enumerate aligned sequence tags and generate a wig,  or optionally !BigWig**, file. Each position in the wig file records the  number of alignments which map to that position. Alignments may be  counted at the start (5') or midpoint positions, or optionally  enumerated at every position across the alignment (resulting in a  coverage map rather than an alignment enumeration). Further, alignments  may be selected according to strand, and the position may be shifted  towards the 3' direction (for ChIP-Seq applications).
+
+Note that the memory consumed by the program is roughly proportional to  the size of the chromosome, particularly for dense read coverage.  The total number of alignments should not matter.
+
+Conversion to a bigWig file requires the installation of Jim Kent's  bedGraphToBigWig or wigToBigWig utilities. Conversion from a  bedGraph file is slightly more memory efficient, and is automatically  chosen if the user does not specify.
+
+More information about wiggle files can be found at  http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at  http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at  http://genome.ucsc.edu/goldenPath/help/bigWig.html.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+

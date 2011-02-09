@@ -9,12 +9,16 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 ====[Pod_bam2gff_bed bam2gff_bed.pl]====
 Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
+====[Pod_bam2wig bam2wig.pl]====
+Enumerates alignments in a BAM file and writes a wig, or BigWig, file representing the tag counts. Alignments may be counted once at either the start or mid position, or across the entire alignment (resulting in a coverage map). It can process single-end, paired-end, and spliced alignments. 
 ====[Pod_bar2wig bar2wig.pl]====
 Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 ====[Pod_bin_genomic_data bin_genomic_data.pl]====
 Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
 ====[Pod_big_file2gff3 big_file2gff3.pl]====
 Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
+====[Pod_change_chr_prefix change_chr_prefix.pl]====
+Changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
 ====[http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/convert_yeast_genome_version.pl convert_yeast_genome_version.pl]====
 Convert the genomic coordinates of a data file between different SGD genome versions.
 ====[Pod_data2frequency data2frequency.pl]====
@@ -149,6 +153,7 @@ Lists of programs organized by function.
 
 ===Illumina sequencing, BAM files===
 	* [Pod_bam2gff_bed bam2gff_bed.pl]
+	* [Pod_bam2wig bam2wig.pl]
 	* [Pod_bin_genomic_data bin_genomic_data.pl]
 	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
 	* [Pod_novo_wrapper novo_wrapper.pl]
@@ -176,6 +181,7 @@ Lists of programs organized by function.
 
 ===Miscellaneous===
 	* [Pod_big_file2gff3 big_file2gff3.pl]
+	* [Pod_change_chr_prefix change_chr_prefix.pl]
 	* convert_yeast_genome_version.pl
 	* [Pod_my_gff2gff3 my_gff2gff3.pl]
 	* [Pod_print_feature_types print_feature_types.pl]
