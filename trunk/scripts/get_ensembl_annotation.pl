@@ -7,10 +7,18 @@ use strict;
 use IO::File;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::EnsEMBL::Registry;
 use Bio::SeqFeature::Lite;
 # use Data::Dumper;
 
+# Check for Bio::EnsEMBL
+my $bio_ensembl = 0;
+eval {
+	require Bio::EnsEMBL::Registry;
+	Bio::EnsEMBL::Registry->import;
+	$bio_ensembl = 1;
+};
+	
+	
 
 
 ### Quick help
@@ -76,6 +84,11 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Check EnsEMBL
+unless ($bio_ensembl) {
+	die " Bio::EnsEMBL modules are not installed. Please see help\n";
 }
 
 
@@ -1208,7 +1221,7 @@ multi-level nested gene->mRNA->CDS features. It will optionally
 generate features for the top-level sequences (chromosomes, contigs, 
 scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
-This program requires Ensembl's Perl API modules to connect to their public 
+This program requires EnsEMBL's Perl API modules to connect to their public 
 MySQL servers. It is not available through CPAN, unfortunately, but you can 
 find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
 
