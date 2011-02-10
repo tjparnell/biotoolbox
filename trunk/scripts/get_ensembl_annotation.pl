@@ -9,6 +9,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Registry;
 use Bio::SeqFeature::Lite;
+use Data::Dumper;
 
 
 
@@ -228,7 +229,7 @@ foreach my $slice (@{ $slices_ref }) {
 	}
 	
 # 	#### DEBUGGING LIMITER ####
-# 	unless ($slice->seq_region_name eq '25') {
+# 	unless ($slice->seq_region_name eq '11') {
 # 		next;
 # 	}
 # 	###########################
@@ -379,8 +380,8 @@ sub process_coding_gene {
 		}
 		
 		# get transcription start/stop
-		my $coding_start = $transcript->coding_region_start;
-		my $coding_stop  = $transcript->coding_region_end;
+		my $coding_start = $transcript->coding_region_start || undef;
+		my $coding_stop  = $transcript->coding_region_end || undef;
 		$phase = 0; # reset phase to zero for all new transcripts
 		
 		# add the exons
@@ -405,6 +406,7 @@ sub process_coding_gene {
 		$gene_sf->add_SeqFeature($trnscpt_sf);
 	}
 	
+	
 	# print the gene feature and its subfeatures
 	$gene_sf->version(3);
 	$gff_fh->print( $gene_sf->gff_string(1) . "\n");
@@ -421,69 +423,77 @@ sub add_exon_codon_subfeatures {
 	if ($trnscpt_sf->strand == 1) {
 		# forward strand
 		
-		# start codon
-		$trnscpt_sf->add_SeqFeature( 
-			Bio::SeqFeature::Lite->new(
-				-seq_id        => $trnscpt_sf->seq_id,
-				-source        => $trnscpt_sf->source,
-				-primary_tag   => 'start_codon',
-				-start         => $coding_start,
-				-end           => $coding_start + 2,
-				-strand        => 1,
-				-phase         => 0,
-				-display_name  => $trnscpt_sf->display_name . '.start_codon',
-				-primary_id    => $trnscpt_sf->display_name . '.start_codon',
-			)
-		);
-		
-		# stop codon
-		$trnscpt_sf->add_SeqFeature( 
-			Bio::SeqFeature::Lite->new(
-				-seq_id        => $trnscpt_sf->seq_id,
-				-source        => $trnscpt_sf->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $coding_stop - 2,
-				-end           => $coding_stop,
-				-strand        => 1,
-				-phase         => 0,
-				-display_name  => $trnscpt_sf->display_name . '.stop_codon',
-				-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
-			)
-		);
+		# in some situations, there may be protein_coding gene transcript
+		# without a coding start or stop !?
+		if (defined $coding_start and defined $coding_stop) {
+			# start codon
+			$trnscpt_sf->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+					-seq_id        => $trnscpt_sf->seq_id,
+					-source        => $trnscpt_sf->source,
+					-primary_tag   => 'start_codon',
+					-start         => $coding_start,
+					-end           => $coding_start + 2,
+					-strand        => 1,
+					-phase         => 0,
+					-display_name  => $trnscpt_sf->display_name . '.start_codon',
+					-primary_id    => $trnscpt_sf->display_name . '.start_codon',
+				)
+			);
+			
+			# stop codon
+			$trnscpt_sf->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+					-seq_id        => $trnscpt_sf->seq_id,
+					-source        => $trnscpt_sf->source,
+					-primary_tag   => 'stop_codon',
+					-start         => $coding_stop - 2,
+					-end           => $coding_stop,
+					-strand        => 1,
+					-phase         => 0,
+					-display_name  => $trnscpt_sf->display_name . '.stop_codon',
+					-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
+				)
+			);
+		}
 	}
 	
 	else {
 		# reverse strand
 		
+		# in some situations, there may be protein_coding gene transcript
+		# without a coding start or stop !?
+		if (defined $coding_start and defined $coding_stop) {
 		# stop codon
-		$trnscpt_sf->add_SeqFeature( 
-			Bio::SeqFeature::Lite->new(
-				-seq_id        => $trnscpt_sf->seq_id,
-				-source        => $trnscpt_sf->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $coding_start,
-				-end           => $coding_start + 2,
-				-strand        => -1,
-				-phase         => 0,
-				-display_name  => $trnscpt_sf->display_name . '.stop_codon',
-				-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
-			)
-		);
-		
-		# start codon
-		$trnscpt_sf->add_SeqFeature( 
-			Bio::SeqFeature::Lite->new(
-				-seq_id        => $trnscpt_sf->seq_id,
-				-source        => $trnscpt_sf->source,
-				-primary_tag   => 'start_codon',
-				-start         => $coding_stop - 2,
-				-end           => $coding_stop,
-				-strand        => -1,
-				-phase         => 0,
-				-display_name  => $trnscpt_sf->display_name . '.start_codon',
-				-primary_id    => $trnscpt_sf->display_name . '.start_codon',
-			)
-		);
+			$trnscpt_sf->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+					-seq_id        => $trnscpt_sf->seq_id,
+					-source        => $trnscpt_sf->source,
+					-primary_tag   => 'stop_codon',
+					-start         => $coding_start,
+					-end           => $coding_start + 2,
+					-strand        => -1,
+					-phase         => 0,
+					-display_name  => $trnscpt_sf->display_name . '.stop_codon',
+					-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
+				)
+			);
+			
+			# start codon
+			$trnscpt_sf->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+					-seq_id        => $trnscpt_sf->seq_id,
+					-source        => $trnscpt_sf->source,
+					-primary_tag   => 'start_codon',
+					-start         => $coding_stop - 2,
+					-end           => $coding_stop,
+					-strand        => -1,
+					-phase         => 0,
+					-display_name  => $trnscpt_sf->display_name . '.start_codon',
+					-primary_id    => $trnscpt_sf->display_name . '.start_codon',
+				)
+			);
+		}
 	}
 	
 	# add exons

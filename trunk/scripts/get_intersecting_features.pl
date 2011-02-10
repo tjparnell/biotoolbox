@@ -205,269 +205,282 @@ sub request_features_from_user {
 sub find_overlapping_features {
 	
 	my ($data_ref, $search_feature) = @_;
-	my $table = $data_ref->{'data_table'};
 	
 	
 	# identify the type of features in the list we're looking up
 	# either genome coordinates or named features
-	my $list_feature_type;
 	if (
 		$data_ref->{0}{'name'} =~ /^chr|seq/i and 
 		$data_ref->{1}{'name'} =~ /start/i and 
 		$data_ref->{2}{'name'} =~ /stop|end/i
 	) {
 		# we're working with genomic coordinates here
-		$list_feature_type = 'genome';
+		print " Input file '$infile' has genomic interval features\n";
+		intersect_genome_features($data_ref, $search_feature);
 	}
 	elsif (
 		$data_ref->{0}{'name'} =~ /name/i and
 		$data_ref->{1}{'name'} =~ /type/i
 	) {
 		# we're working with named features
-		$list_feature_type = 'named';
+		print " Input file '$infile' has named features\n";
+		intersect_named_features($data_ref, $search_feature);
 	}
 	else {
 		# unable to identify
 		die " unable to identify features in source file '$infile'\n Beginning". 
 			" columns are not labeled chr|seq, start, stop|end, or name, type\n";
 	}
-	print " Input file '$infile' has $list_feature_type features\n";
+}
 	
 	
+
+### Working with named features 
+sub intersect_named_features {
+	# Named features 
+	
+	my ($data_ref, $search_feature) = @_;
+	my $table = $data_ref->{'data_table'};
+
 	# prepare new metadata columns 
 	my ($number_i, $name_i, $type_i, $strand_i, $distance_i) = 
 		generate_new_metadata($data_ref);
 	
 	
-	# walk through list of features
-	if ($list_feature_type eq 'genome') {
-		# genomic regions
+	# loop
+	for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
 		
-		# loop
-		for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
-			my $region;
+		# identify feature first
+		my @features = $db->features(
+			-name   => $table->[$row][0],
+			-type   => $table->[$row][1],
+		);
+		my $feature;
+		if (scalar @features == 0) {
+			warn " no features found for $table->[$row][1] " . 
+				"$table->[$row][0]\n";
+			process_no_feature(
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+			next;
+		}
+		elsif (scalar @features > 1) {
+			warn " more than one feature found for $table->[$row][1] " .
+				"$table->[$row][0]; using first one\n";
+			$feature = shift @features;
+		}
+		else {
+			# only one feature - as it should be
+			$feature = shift @features;
+		}
+		
+		# Establish the region based on the found feature
+		my $region;
+		
+		# extend the region
+		if ($extend) {
+			# we're adding an extension on either side of the feature
 			
-			# extend the region
-			if ($extend) {
-				# we're adding an extension on either side of the region
-				
-				# new start
-				my $new_start = $table->[$row][1] - $extend;
-				if ($new_start < 1) {
-					# limit to actual start
-					$new_start = 1;
-				}
-				
-				# new stop
-				my $new_stop = $table->[$row][2] + $extend;
-				my ($chr) = $db->get_features_by_name( $table->[$row][0] );
-				if ($new_stop > $chr->length) {
-					# limit to actual length
-					$new_stop = $chr->length;
-				}
-				
-				# establish region
+			# establish region
+			$region = $db->segment(
+				$feature->seq_id,
+				$feature->start - $extend, 
+				$feature->end + $extend
+			);
+			# this segment will not have a strand, and I can not set it 
+		}
+		
+		# specific relative start, stop from feature 5' position
+		elsif (defined $start and defined $stop) {
+			# we'll adjust the coordinates specifically
+			# this is relative to the start position
+			
+			# establish region based on the feature's orientation
+			if ($feature->strand >= 0) {
+				# Watson strand or unstranded
 				$region = $db->segment(
-					$table->[$row][0], # chromosome
-					$new_start,        # start
-					$new_stop          # stop
+					$feature->seq_id,
+					$feature->start + $start, 
+					$feature->end + $stop
 				);
 			}
-			
-			# specific relative start, stop
-			if (defined $start and defined $stop) {
-				# we'll adjust the coordinates specifically
-				# this is relative to the start position
-				
-				# new start
-				my $new_start = $table->[$row][1] + $start;
-				if ($new_start < 1) {
-					# limit to actual start
-					$new_start = 1;
-				}
-				
-				# new stop
-				my $new_stop = $table->[$row][1] + $stop;
-				
-				# establish region
+			elsif ($feature->strand < 0) {
+				# Crick strand
 				$region = $db->segment(
-					$table->[$row][0], # chromosome
-					$new_start,        # start
-					$new_stop          # stop
+					$feature->seq_id,
+					$feature->end - $stop, 
+					$feature->end - $start
 				);
-			}
-			
-			# default is entire region
-			else {
-				
-				# establish region as is
-				$region = $db->segment(
-					$table->[$row][0], # chromosome
-					$table->[$row][1], # start
-					$table->[$row][2]   # stop
-				);
-			}
-			
-			# check region
-			if ($region) {
-				# succesfully established a region, find features
-				process_region(
-					$region,
-					$search_feature,
-					$data_ref, 
-					$row, 
-					$number_i, 
-					$name_i, 
-					$type_i, 
-					$strand_i, 
-					$distance_i
-				);
-			}
-			else {
-				# no region defined
-				warn " unable to establish region for $table->[$row][0]:" . 
-					"$table->[$row][1]..$table->[$row][2]\n";
-				
-				# fill in table anyway
-				process_no_feature(
-					$data_ref, 
-					$row, 
-					$number_i, 
-					$name_i, 
-					$type_i, 
-					$strand_i, 
-					$distance_i
-				);
-			}
+			}	
+			# this segment will not have a strand, and I can not set it 
 				
 		}
+		
+		# default is entire region
+		else {
+			
+			# establish region as is
+			$region = $feature->segment();
+			# this segment will have strand
+		}
+		
+		# check region
+		if ($region) {
+			# succesfully established a region, find features
+			process_region(
+				$region,
+				$feature->strand, 	# the region may not support strand
+									# so need to pass this separately 
+				$search_feature,
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+		}
+		else {
+			# no region defined
+			warn " unable to establish region for $table->[$row][1] " . 
+				"$table->[$row][0]\n";
+			
+			# fill in table anyway
+			process_no_feature(
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+		}
+	
 	}
 	
-	else {
-		# Named features 
+	# summarize the findings
+	summarize_found_features($data_ref, $number_i);
+}
+
+
+
+### Working with genomic features 
+sub intersect_genome_features {
+	
+	my ($data_ref, $search_feature) = @_;
+	my $table = $data_ref->{'data_table'};
+
+	# prepare new metadata columns 
+	my ($number_i, $name_i, $type_i, $strand_i, $distance_i) = 
+		generate_new_metadata($data_ref);
+	
+	
+	# loop
+	for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
+		my $region;
 		
-		# loop
-		for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
+		# extend the region
+		if ($extend) {
+			# we're adding an extension on either side of the region
 			
-			# identify feature first
-			my @features = $db->features(
-				-name   => $table->[$row][0],
-				-type   => $table->[$row][1],
+			# new start
+			my $new_start = $table->[$row][1] - $extend;
+			if ($new_start < 1) {
+				# limit to actual start
+				$new_start = 1;
+			}
+			
+			# new stop
+			my $new_stop = $table->[$row][2] + $extend;
+			my ($chr) = $db->get_features_by_name( $table->[$row][0] );
+			if ($new_stop > $chr->length) {
+				# limit to actual length
+				$new_stop = $chr->length;
+			}
+			
+			# establish region
+			$region = $db->segment(
+				$table->[$row][0], # chromosome
+				$new_start,        # start
+				$new_stop          # stop
 			);
-			my $feature;
-			if (scalar @features == 0) {
-				warn " no features found for $table->[$row][1] " . 
-					"$table->[$row][0]\n";
-				process_no_feature(
-					$data_ref, 
-					$row, 
-					$number_i, 
-					$name_i, 
-					$type_i, 
-					$strand_i, 
-					$distance_i
-				);
-				next;
-			}
-			elsif (scalar @features > 1) {
-				warn " more than one feature found for $table->[$row][1] " .
-					"$table->[$row][0]; using first one\n";
-				$feature = shift @features;
-			}
-			else {
-				# only one feature - as it should be
-				$feature = shift @features;
-			}
-			
-			# Establish the region based on the found feature
-			my $region;
-			
-			# extend the region
-			if ($extend) {
-				# we're adding an extension on either side of the feature
-				
-				# establish region
-				$region = $db->segment(
-					-name      => $table->[$row][0],
-					-type      => $table->[$row][1],
-					-start     => $feature->start - $extend, 
-					-end       => $feature->end + $extend, 
-					-strand    => $feature->strand,
-					-absolute  => 1,
-				);
-			}
-			
-			# specific relative start, stop from feature 5' position
-			elsif (defined $start and defined $stop) {
-				# we'll adjust the coordinates specifically
-				# this is relative to the start position
-				
-				# establish region based on the feature's orientation
-				if ($feature->strand >= 0) {
-					# Watson strand or unstranded
-					$region = $db->segment(
-						-name      => $table->[$row][0],
-						-type      => $table->[$row][1],
-						-start     => $feature->start + $start, 
-						-end       => $feature->start + $stop, 
-						-strand    => $feature->strand,
-						-absolute  => 1,
-					);
-				}
-				elsif ($feature->strand < 0) {
-					# Crick strand
-					$region = $db->segment(
-						-name      => $table->[$row][0],
-						-type      => $table->[$row][1],
-						-start     => $feature->end - $stop, 
-						-end       => $feature->end - $start, 
-						-strand    => $feature->strand,
-						-absolute  => 1,
-					);
-				}	
-					
-			}
-			
-			# default is entire region
-			else {
-				
-				# establish region as is
-				$region = $feature->segment();
-			}
-			
-			# check region
-			if ($region) {
-				# succesfully established a region, find features
-				process_region(
-					$region,
-					$search_feature,
-					$data_ref, 
-					$row, 
-					$number_i, 
-					$name_i, 
-					$type_i, 
-					$strand_i, 
-					$distance_i
-				);
-			}
-			else {
-				# no region defined
-				warn " unable to establish region for $table->[$row][1] " . 
-					"$table->[$row][0]\n";
-				
-				# fill in table anyway
-				process_no_feature(
-					$data_ref, 
-					$row, 
-					$number_i, 
-					$name_i, 
-					$type_i, 
-					$strand_i, 
-					$distance_i
-				);
-			}
-		
 		}
+		
+		# specific relative start, stop
+		if (defined $start and defined $stop) {
+			# we'll adjust the coordinates specifically
+			# this is relative to the start position
+			
+			# new start
+			my $new_start = $table->[$row][1] + $start;
+			if ($new_start < 1) {
+				# limit to actual start
+				$new_start = 1;
+			}
+			
+			# new stop
+			my $new_stop = $table->[$row][1] + $stop;
+			
+			# establish region
+			$region = $db->segment(
+				$table->[$row][0], # chromosome
+				$new_start,        # start
+				$new_stop          # stop
+			);
+		}
+		
+		# default is entire region
+		else {
+			
+			# establish region as is
+			$region = $db->segment(
+				$table->[$row][0], # chromosome
+				$table->[$row][1], # start
+				$table->[$row][2]   # stop
+			);
+		}
+		
+		# check region
+		if ($region) {
+			# succesfully established a region, find features
+			process_region(
+				$region,
+				0, # region inherently has no strand
+				$search_feature,
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+		}
+		else {
+			# no region defined
+			warn " unable to establish region for $table->[$row][0]:" . 
+				"$table->[$row][1]..$table->[$row][2]\n";
+			
+			# fill in table anyway
+			process_no_feature(
+				$data_ref, 
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i
+			);
+		}
+			
 	}
 	
 	# summarize the findings
@@ -553,8 +566,8 @@ sub generate_new_metadata {
 ### Prepare new columns
 sub process_region {
 	
-	my ($region, $search_feature, $data_ref, $row, $number_i, $name_i, 
-		$type_i, $strand_i, $distance_i) = @_;
+	my ($region, $region_strand, $search_feature, $data_ref, $row, 
+		$number_i, $name_i, $type_i, $strand_i, $distance_i) = @_;
 	
 	# look for the requested features
 	my @features = $region->features(
@@ -590,7 +603,7 @@ sub process_region {
 			$data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
 			$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
 			$data_ref->{'data_table'}->[$row][$distance_i] = 
-				determine_distance($region, $f);
+				determine_distance($region, $region_strand, $f);
 		}
 		else {
 			# the feature should be excluded
@@ -637,7 +650,7 @@ sub process_region {
 				my $a = Bio::Range->new(
 					-start  => $region->start,
 					-end    => $region->end,
-					-strand => $region->strand,
+					-strand => $region_strand,
 				);
 				
 				
@@ -666,7 +679,7 @@ sub process_region {
 		$data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
 		$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
 		$data_ref->{'data_table'}->[$row][$distance_i] = 
-			determine_distance($region, $f);
+			determine_distance($region, $region_strand, $f);
 		
 	}
 	
@@ -699,7 +712,7 @@ sub process_no_feature {
 ### Calculate the distance between target and reference features
 sub determine_distance {
 	
-	my ($reference, $target) = @_;
+	my ($reference, $ref_strand, $target) = @_;
 	
 	# determine distance
 	my $distance;
@@ -708,30 +721,31 @@ sub determine_distance {
 	if ($reference_position eq 'start') {
 		
 		# Calculation dependent on identifying the strand
-		if ($reference->strand >= 0 and $target->strand >= 0) {
+		# basically calculating distance from target 5' end to reference 5' end
+		if ($ref_strand >= 0 and $target->strand >= 0) {
 			# Both are Watson strand or unstranded
 			$distance = $target->start - $reference->start;
 		}
-		elsif ($reference->strand >= 0 and $target->strand < 0) {
+		elsif ($ref_strand >= 0 and $target->strand < 0) {
 			# Reference is Watson, target is Crick
 			$distance = $target->end - $reference->start;
 		}
-		elsif ($reference->strand < 0 and $target->strand >= 0) {
+		elsif ($ref_strand < 0 and $target->strand >= 0) {
 			# Reference is Crick, target is Watson
 			$distance = $target->start - $reference->end;
 		}
-		elsif ($reference->strand < 0 and $target->strand < 0) {
+		elsif ($ref_strand < 0 and $target->strand < 0) {
 			# Both are Crick
 			$distance = $target->end - $reference->end;
 		}
 	}
 	
 	# Calculating the distance between the midpoints
+	# since midpoint is equidistant from 5' and 3' ends, strand doesn't matter
 	elsif ($reference_position eq 'mid') {
-		my $reference_mid = sprintf "%.0f", 
-			($reference->end - $reference->start) / 2;
-		my $feature_mid = sprintf "%.0f", ($target->end - $target->start) / 2;
-		$distance = $feature_mid - $reference_mid;
+		my $reference_mid = ($reference->end + $reference->start) / 2;
+		my $target_mid = ($target->end + $target->start) / 2;
+		$distance = int($target_mid - $reference_mid + 0.5);
 	}
 	
 	return $distance;
