@@ -228,11 +228,11 @@ foreach my $slice (@{ $slices_ref }) {
 		$chr_feature_count++;
 	}
 	
-	#### DEBUGGING LIMITER ####
-	unless ($slice->seq_region_name eq '11') {
-		next;
-	}
-	###########################
+# 	#### DEBUGGING LIMITER ####
+# 	unless ($slice->seq_region_name eq '11') {
+# 		next;
+# 	}
+# 	###########################
 	
 	# collect the protein_coding genes
 	if ($get_protein_genes) {
