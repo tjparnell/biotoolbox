@@ -9,7 +9,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Registry;
 use Bio::SeqFeature::Lite;
-use Data::Dumper;
+# use Data::Dumper;
 
 
 
@@ -228,11 +228,11 @@ foreach my $slice (@{ $slices_ref }) {
 		$chr_feature_count++;
 	}
 	
-# 	#### DEBUGGING LIMITER ####
-# 	unless ($slice->seq_region_name eq '11') {
-# 		next;
-# 	}
-# 	###########################
+	#### DEBUGGING LIMITER ####
+	unless ($slice->seq_region_name eq '11') {
+		next;
+	}
+	###########################
 	
 	# collect the protein_coding genes
 	if ($get_protein_genes) {
@@ -536,8 +536,14 @@ sub process_forward_exons {
 		
 		# we need to determine whether the exon is UTR, CDS, or split both
 		
+		#### No CDS whatsoever ####
+		if (!defined $cdsStart and !defined $cdsStop) {
+			# nothing to write
+			# there should already be an exon written
+		}
+		
 		#### 5'UTR only ####
-		if (
+		elsif (
 			$exon->start < $cdsStart # cdsStart
 			and
 			$exon->end < $cdsStart
@@ -756,8 +762,14 @@ sub process_reverse_exons {
 		
 		# we need to determine whether the exon is UTR, CDS, or split both
 		
+		#### No CDS whatsoever ####
+		if (!defined $cdsStart and !defined $cdsStop) {
+			# nothing to write
+			# there should already be an exon written
+		}
+		
 		#### 3'UTR only ####
-		if (
+		elsif (
 			$exon->start < $cdsStart # cdsStart
 			and
 			$exon->end < $cdsStart
@@ -1196,7 +1208,9 @@ multi-level nested gene->mRNA->CDS features. It will optionally
 generate features for the top-level sequences (chromosomes, contigs, 
 scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
-
+This program requires Ensembl's Perl API modules to connect to their public 
+MySQL servers. It is not available through CPAN, unfortunately, but you can 
+find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
 
 =head1 AUTHOR
 
