@@ -88,7 +88,7 @@ if ($help) {
 
 # Check EnsEMBL
 unless ($bio_ensembl) {
-	die " Bio::EnsEMBL modules are not installed. Please see help\n";
+	die "\n Bio::EnsEMBL modules are not installed. Please see help\n";
 }
 
 
