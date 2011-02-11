@@ -307,7 +307,7 @@ sub intersect_named_features {
 				$region = $db->segment(
 					$feature->seq_id,
 					$feature->start + $start, 
-					$feature->end + $stop
+					$feature->start + $stop
 				);
 			}
 			elsif ($feature->strand < 0) {
