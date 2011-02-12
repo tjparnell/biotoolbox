@@ -130,8 +130,9 @@ sub _collect_bigbed_data {
 			# otherwise we assume the passed feature is a database object
 			
 			# get bedfile name
-			my ($bedfile) = $feature->get_tag_values('bigbedfile');
+			($bedfile) = $feature->get_tag_values('bigbedfile');
 		}
+		croak " no bedfile passed!\n" unless $bedfile;
 		
 		# check for opened bedfile
 		my $bb;
@@ -141,10 +142,9 @@ sub _collect_bigbed_data {
 		}
 		else {
 			# this file has not been opened yet, open it
-			$bb = Bio::DB::BigBed->new($bedfile);
-			unless ($bb) {
+			$bb = Bio::DB::BigBed->new($bedfile) or
 				croak " unable to open data BigBed file '$bedfile'";
-			}
+			
 			
 			# store the opened object for later use
 			$OPENED_BEDFILES{$bedfile} = $bb;

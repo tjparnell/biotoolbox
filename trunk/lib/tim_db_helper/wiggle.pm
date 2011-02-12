@@ -82,6 +82,7 @@ sub collect_wig_position_scores {
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
 				my $wigfile = shift @wigfiles;
+				croak " no wigfile passed!\n" unless $wigfile;
 				
 				# check for opened wigfile
 				my $wig;
