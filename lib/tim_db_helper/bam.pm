@@ -130,9 +130,9 @@ sub _collect_bam_data {
 			# otherwise we assume the passed feature is a database object
 			
 			# get bedfile name
-			my ($bamfile) = $feature->get_tag_values('bamfile');
+			($bamfile) = $feature->get_tag_values('bamfile');
 		}
-		
+		croak " no bamfile specified!\n" unless $bamfile;
 		
 		
 		## Open the Bam File
@@ -143,10 +143,8 @@ sub _collect_bam_data {
 		}
 		else {
 			# this file has not been opened yet, open it
-			$bam = Bio::DB::Sam->new(-bam => $bamfile);
-			unless ($bam) {
+			$bam = Bio::DB::Sam->new(-bam => $bamfile) or
 				croak " unable to open Bam file '$bamfile'";
-			}
 			
 			# store the opened object for later use
 			$OPENED_BAMFILES{$bamfile} = $bam;

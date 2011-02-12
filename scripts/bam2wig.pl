@@ -419,6 +419,7 @@ sub paired_end_callback {
 sub write_wig {
 	my $seq_id = shift;
 	my $seq_length = shift;
+	my $count = 0;
 	
 	# begin writing out the data
 	if ($interpolate) {
@@ -436,6 +437,8 @@ sub write_wig {
 						$data{$i} ||= 0
 					) . "\n"
 				);
+				$count++;
+				delete $data{$i} if exists $data{$i};
 			}
 		}
 		else {
@@ -444,6 +447,8 @@ sub write_wig {
 			for (my $i = 1; $i <= $seq_length; $i++) {
 				my $value = $data{$i} ||= 0;			
 				$outfh->print("$value\n");
+				$count++;
+				delete $data{$i} if exists $data{$i};
 			}
 		}
 	}
@@ -462,6 +467,8 @@ sub write_wig {
 						$data{$i}
 					) . "\n"
 				);
+				$count++;
+				delete $data{$i};
 			}
 		}
 		else {
@@ -469,13 +476,15 @@ sub write_wig {
 			$outfh->print("variablesStep chrom=$seq_id span=1\n");
 			foreach my $i (sort {$a <=> $b} keys %data) {
 				$outfh->print("$i\t$data{$i}\n");
+				$count++;
+				delete $data{$i};
 			}
 		}
 	}
-	print "  " . scalar(keys %data) . " positions were recorded\n";
+	print "  $count positions were recorded\n";
 	
 	# empty the data hash for the next chromosome
-	%data = ();
+	#%data = ();
 }
 
 

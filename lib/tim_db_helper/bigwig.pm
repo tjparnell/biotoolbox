@@ -6,6 +6,7 @@ use strict;
 use Carp;
 use Bio::DB::BigWig;
 use Bio::DB::BigFile;
+use Data::Dumper;
 
 
 # Exported names
@@ -95,10 +96,11 @@ sub collect_bigwig_position_scores {
 			$strand_check = 1;
 		}
 		else {
-			# otherwise we assume the passed feature is a database object
+			# passed feature appears to be a SeqFeature object
 			
 			# get wigfile name
-			my ($wigfile) = $feature->get_tag_values('bigwigfile');
+			($wigfile) = $feature->get_tag_values('bigwigfile') or
+				croak " passed feature '$feature' is not a SeqFeature object!\n";
 			
 			# check strand
 				# database features will support the strand method
@@ -123,7 +125,7 @@ sub collect_bigwig_position_scores {
 		
 		# confirm that we have acceptable data to collect
 		next unless $strand_check == 1;
-		
+		croak " no wigfile passed!\n" unless $wigfile;
 		
 		# Open the BigWig file
 		my $bw;
@@ -133,10 +135,8 @@ sub collect_bigwig_position_scores {
 		}
 		else {
 			# this file has not been opened yet, open it
-			$bw = Bio::DB::BigWig->new($wigfile);
-			unless ($bw) {
+			$bw = Bio::DB::BigWig->new($wigfile) or 
 				croak " unable to open data BigWig file '$wigfile'";
-			}
 			
 			# store the opened object for later use
 			$OPENED_BIGFILES{$wigfile} = $bw;
