@@ -38,6 +38,7 @@ my (
 	$shift,
 	$strand,
 	$interpolate,
+	$log,
 	$track,
 	$bedgraph,
 	$bigwig,
@@ -56,6 +57,7 @@ GetOptions(
 	'shift=i'   => \$shift, # shift coordinates 3'
 	'strand=s'  => \$strand, # select specific strands
 	'inter!'    => \$interpolate, # positions with no count
+	'log=i'     => \$log, # transform count to log scale
 	'track!'    => \$track, # write a track line in the wig file
 	'bed!'      => \$bedgraph, # write a bedgraph rather than wig file
 	'bw!'       => \$bigwig, # generate bigwig file
@@ -173,6 +175,12 @@ if ($bigwig) {
 	}
 }
 
+if ($log) {
+	unless ($log == 2 or $log == 10) {
+		die " requested log base '$log' not supported! Use 2 or 10\n";
+	}
+}
+
 
 
 ### Open files
@@ -277,6 +285,9 @@ sub process_alignments {
 		
 		# process the reads
 		$sam->fetch($seq_id, $callback);
+		
+		# convert to log if requested
+		log_scale_values() if $log;
 		
 		# write current chromo data to wig
 		write_wig($seq_id, $sam->target_len($tid));
@@ -525,16 +536,36 @@ sub convert_to_bigwig {
 }
 
 
+### Convert to log scaling
+sub log_scale_values {
+	
+	# converting all the values to log score
+	if ($log == 2) {
+		# log2 scale
+		foreach my $i (keys %data) {
+			$data{$i} = log($data{$i}) / log(2);
+		}
+	}
+	
+	elsif ($log == 10) {
+		# log10 scale
+		foreach my $i (keys %data) {
+			$data{$i} = log($data{$i}) / log(10);
+		}
+	}
+}
+
+
 
 __END__
 
 =head1 NAME
 
-<name>.pl
+bam2wig.pl
 
 =head1 SYNOPSIS
 
-<name>.pl [--options...] <filename>
+bam2wig.pl [--options...] <filename>
   
   Options:
   --in <filename>
@@ -545,6 +576,7 @@ __END__
   --shift <integer>
   --strand [f|r]
   --inter
+  --log [2|10]
   --(no)track
   --bed
   --bw
@@ -611,6 +643,14 @@ true, a fixedStep wig file (step=1 span=1) is written, otherwise a
 variableStep wig file is written that only records the positions 
 where a tag is found. This will also work with bedGraph output. 
 The default behavior is to not record empty positions.
+
+=item --log [2|10]
+
+Transform the count to a log scale. Specify the base number, 2 or 
+10. Note that positions with a count of 0 are not converted and 
+remain 0, and positions with a count of 1 are converted to a 
+log value of 0. Therefore, only really useful with Bam alignment 
+files with high count numbers. Default is to not transform the count.
 
 =item --(no)track
 
