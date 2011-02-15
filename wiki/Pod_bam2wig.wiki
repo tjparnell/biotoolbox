@@ -12,7 +12,8 @@ bam2wig.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
-  --pos [start|mid|span|coverage]
+  --position [start|mid|span]
+  --coverage
   --pe
   --splice
   --shift <integer>
@@ -43,16 +44,22 @@ __
   Specify the output filename. By default it uses the base name of the  input file.
 __
   __
-__--pos `[`start|mid|span|coverage`]`
+__--position `[`start|mid|span`]`
 
 __
-  Specify the position of the alignment coordinate which should be  recorded. Several positions are accepted: the start (5') position of  the alignment, the midpoint of the alignment, or at all positions  along the length of the alignment (span or coverage). Note that the   span option gives coverage but not a true count of the number of  alignments, unlike start or mid. With paired-end alignments, the  positions are relative to the entire insert fragment defined by two  alignments. The default value is start for single-end and mid for  paired-end alignments.
+  Specify the position of the alignment coordinate which should be  recorded. Several positions are accepted: the start (5') position of  the alignment, the midpoint of the alignment, or at all positions  along the length of the alignment (span). Note that the   span option gives coverage but not a true count of the number of  alignments, unlike start or mid. With paired-end alignments, the  positions are relative to the entire insert fragment defined by two  alignments. The default value is start for single-end and mid for  paired-end alignments.
+__
+  __
+__--coverage
+
+__
+  Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, strand, shift, and  log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, no strand, and no log.
 __
   __
 __--pe
 
 __
-  The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be considered.
+  The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be considered. The default is to  treat all alignments as single-end.
 __
   __
 __--splice
@@ -125,6 +132,8 @@ __
 This program will enumerate aligned sequence tags and generate a wig,  or optionally !BigWig**, file. Each position in the wig file records the  number of alignments which map to that position. Alignments may be  counted at the start (5') or midpoint positions, or optionally  enumerated at every position across the alignment (resulting in a  coverage map rather than an alignment enumeration). Further, alignments  may be selected according to strand, and the position may be shifted  towards the 3' direction (for ChIP-Seq applications).
 
 Note that the memory consumed by the program is roughly proportional to  the size of the chromosome, particularly for dense read coverage.  The total number of alignments should not matter.
+
+Counting and processing the alignments is a lengthy process, and may  require multiple hours for large numbers, especially for splices. A  simple coverage map should be much faster to calculate, but loses the  options of selecting strand or shifting coordinates.
 
 Conversion to a bigWig file requires the installation of Jim Kent's  bedGraphToBigWig or wigToBigWig utilities. Conversion from a  bedGraph file is slightly more memory efficient, and is automatically  chosen if the user does not specify.
 
