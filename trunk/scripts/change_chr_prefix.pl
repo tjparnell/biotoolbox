@@ -109,7 +109,7 @@ my $time = time;
 # convert according to type
 if ($infile =~ /\.bam$/i) {
 	# a Bam alignment file
-	$final_file = finalprocess_bam_file($infile, $outfile);
+	$final_file = process_bam_file($infile, $outfile);
 }
 elsif ($infile =~ /\.sam(?:\.gz)?$/i) {
 	# a Sam file
