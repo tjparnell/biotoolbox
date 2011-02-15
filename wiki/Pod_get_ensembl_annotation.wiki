@@ -145,10 +145,8 @@ __
 ==DESCRIPTION==
 This program will connect to the public EnsEMBL MySQL database and  retrieve the latest genome annotation for a given species. It will  generate a GFF3 annotation file suitable for loading into a Bio::DB  database or genome browser. The GFF3 features generated are  multi-level nested gene->mRNA->CDS features. It will optionally  generate features for the top-level sequences (chromosomes, contigs,  scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
-{{{
-}}}
-{{{
-}}}
+This program requires EnsEMBL's Perl API modules to connect to their public  MySQL servers. It is not available through CPAN, unfortunately, but you can  find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
