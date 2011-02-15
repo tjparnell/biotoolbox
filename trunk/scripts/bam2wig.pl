@@ -33,6 +33,7 @@ my (
 	$infile,
 	$outfile,
 	$position,
+	$use_coverage,
 	$paired,
 	$splice,
 	$shift,
@@ -51,7 +52,8 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # the solexa data file
 	'out=s'     => \$outfile, # name of output file 
-	'pos=s'     => \$position, # define position
+	'position=s'=> \$position, # define position
+	'coverage!' => \$use_coverage, # calculate coverage
 	'pe!'       => \$paired, # paired-end alignments
 	'splice!'   => \$splice, # split splices
 	'shift=i'   => \$shift, # shift coordinates 3'
@@ -94,8 +96,9 @@ if ($position) {
 	elsif ($position eq 'span') {
 		$use_span = 1;
 	}
-	elsif ($position eq 'coverage') {
-		$use_span = 1;
+	elsif ($position eq 'coverage') { 
+		# for backwards compatibility
+		$use_coverage = 1;
 	}
 	else {
 		die " unrecognized position value '$position'! see help\n";
@@ -190,6 +193,8 @@ my $sam = Bio::DB::Sam->new(
 	-autoindex  => 1,
 	-split      => $splice,
 ) or die " unable to open input bam file '$infile'!\n";
+my $bam = $sam->bam;
+my $index = $sam->bam_index;
 
 # output file
 my $outfh = open_wig_file();
@@ -202,7 +207,11 @@ my $outfh = open_wig_file();
 my %data; 
 
 # process according to type of data collected and alignment type
-if ($paired) {
+if ($use_coverage) {
+	# special, speedy, low-level, single-bp coverage 
+	process_bam_coverage();
+}
+elsif ($paired) {
 	# paired end alignments require special callback
 	process_alignments( \&paired_end_callback );
 }
@@ -263,8 +272,67 @@ sub open_wig_file {
 ### Collect alignment coverage
 sub process_bam_coverage {
 	# using the low level bam coverage method, not strand specific
-	# not doing this for now
 	
+	# loop through the chromosomes
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# each chromosome is internally represented in the bam file as 
+		
+		# get sequence info
+		my $seq_length = $sam->target_len($tid);
+		my $seq_id = $sam->target_name($tid);
+		print " Converting reads on $seq_id...";
+		
+		# prepare definition line for fixedStep
+		unless ($bedgraph) {
+			$outfh->print("fixedStep chrom=$seq_id start=1 step=1 span=1\n");
+		}
+		
+		# walk through the chromosome
+		my $count = 0;
+		my $dump = 50000;
+		for (my $start = 0; $start < $seq_length; $start += $dump) {
+			
+			# the low level interface works with 0-base indexing
+			my $end = $start + $dump -1;
+			$end = $seq_length if $end > $seq_length;
+			
+			# using the low level interface for a little more performance
+			# we're not binning, asking for 1 bp resolution
+			my $coverage = $index->coverage(
+				$bam,
+				$tid,
+				$start,
+				$end
+			);
+			
+			# now dump the coverage out to file
+			# we're skipping the %data hash and write_wig() functions
+			# to eke out more performance
+			if ($bedgraph) {
+				# we're writing a bedgraph file
+				for (my $i = 0; $i < scalar(@{ $coverage }); $i++) {
+					$outfh->print( 
+						join("\t",
+							$seq_id,
+							$start + $i, 
+							$start + $i + 1, 
+							$coverage->[$i]
+						) . "\n"
+					);
+					$count++;
+				}
+			}
+			else {
+				# we're writing a fixed step file
+				for (my $i = 0; $i < scalar(@{ $coverage }); $i++) {
+					my $value = $coverage->[$i];			
+					$outfh->print($coverage->[$i] . "\n");
+					$count++;
+				}
+			}
+		}
+		print "  $count positions were recorded\n";
+	}
 }
 
 
@@ -570,7 +638,8 @@ bam2wig.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
-  --pos [start|mid|span|coverage]
+  --position [start|mid|span]
+  --coverage
   --pe
   --splice
   --shift <integer>
@@ -601,22 +670,31 @@ indexed, although it may be indexed automatically
 Specify the output filename. By default it uses the base name of the 
 input file.
 
-=item --pos [start|mid|span|coverage]
+=item --position [start|mid|span]
 
 Specify the position of the alignment coordinate which should be 
 recorded. Several positions are accepted: the start (5') position of 
 the alignment, the midpoint of the alignment, or at all positions 
-along the length of the alignment (span or coverage). Note that the  
+along the length of the alignment (span). Note that the  
 span option gives coverage but not a true count of the number of 
 alignments, unlike start or mid. With paired-end alignments, the 
 positions are relative to the entire insert fragment defined by two 
 alignments. The default value is start for single-end and mid for 
 paired-end alignments.
 
+=item --coverage
+
+Calculate the coverage of the alignments over the genome at single 
+base pair resolution. This ignores the position, strand, shift, and 
+log options. It uses faster low level interfaces to the Bam file to 
+eke out performance. It is equivalent to specifying --position=span, 
+--inter, no strand, and no log.
+
 =item --pe
 
 The Bam file consists of paired-end alignments, and only properly 
-mapped pairs of alignments will be considered. 
+mapped pairs of alignments will be considered. The default is to 
+treat all alignments as single-end.
 
 =item --splice
 
@@ -702,7 +780,12 @@ towards the 3' direction (for ChIP-Seq applications).
 
 Note that the memory consumed by the program is roughly proportional to 
 the size of the chromosome, particularly for dense read coverage. 
-The total number of alignments should not matter.
+The total number of alignments should not matter. 
+
+Counting and processing the alignments is a lengthy process, and may 
+require multiple hours for large numbers, especially for splices. A 
+simple coverage map should be much faster to calculate, but loses the 
+options of selecting strand or shifting coordinates.
 
 Conversion to a bigWig file requires the installation of Jim Kent's 
 bedGraphToBigWig or wigToBigWig utilities. Conversion from a 
