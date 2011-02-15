@@ -1,9 +1,16 @@
 ######## biotoolbox revision history #############
 
+v1.4.1 (svn r119)
+	- Fixed bug with get_ensembl_annotation.pl where a protein_coding gene encoding a transcript lacking a CDS will write inappropriate coordinates. These transcripts will not write start_codon, stop_codon, or CDS subfeatures.
+	- Fixed bug with script get_intersecting_features.pl where selecting regions with a start, stop modifier was not being selected properly.
+	- Fixed bug with tim_db_helper modules that prevented working with source data files specified in a database feature
+	- Added log transformation of count in script bam2wig.pl
+
 v1.4 (svn r111)
 	- Added script bam2wig.pl for enumerating alignments and writing a wig file of the counts. 
 	- Added script change_chr_prefix.pl for adding or stripping chromosome prefixes from data and annotation files.
 	- Bug fixes to ucsc_table2gff3.pl.
+
 v1.3 (svn r104)
 	- Added ability to restrict data collection to exon subfeatures to script get_datasets.pl. Useful for RNA-seq analysis.
 	- Added exon count as attribute to script get_feature_info.pl.
