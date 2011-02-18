@@ -13,6 +13,7 @@ our @EXPORT = qw(
 );
 our @EXPORT_OK = qw(
 	generate_tim_data_structure
+	verify_data_structure
 	index_data_table
 	find_column_index
 	parse_list
@@ -78,6 +79,75 @@ sub generate_tim_data_structure {
 
 
 
+### Subroutine to check for missing required values in the data hash
+sub verify_data_structure {
+	my $datahash_ref = shift;
+	
+	# check for data table
+	unless (
+		defined $datahash_ref->{'data_table'} and 
+		ref $datahash_ref->{'data_table'} eq 'ARRAY'
+	) {
+		carp " No data table in passed data structure!";
+		return;
+	}
+	
+	# check for column index
+	if (defined $datahash_ref->{'number_columns'}) {
+		my $number = scalar @{ $datahash_ref->{'data_table'}->[0] };
+		if ($datahash_ref->{'number_columns'} != $number) {
+			warn " number of data columns [$number] doesn't match " . 
+				"metadata value [" . $datahash_ref->{'number_columns'} . "]!\n";
+			# fix it for them
+			$datahash_ref->{'number_columns'} = $number;
+		}
+	}
+	else {
+		$datahash_ref->{'number_columns'} = 
+			scalar @{ $datahash_ref->{'data_table'}->[0] };
+	}
+	
+	# check metadata
+	for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+		unless (
+			$datahash_ref->{$i}{'name'} eq 
+			$datahash_ref->{'data_table'}->[0][$i]
+		) {
+			carp " incorrect or missing metadata! Column header names don't" . 
+				" match metadata name values\n";
+			return;
+		}
+	}
+	
+	# check for last row index
+	if (defined $datahash_ref->{'last_row'}) {
+		my $number = scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
+		if ($datahash_ref->{'last_row'} != $number) {
+			warn " data table last_row index [$number] doesn't match " . 
+				"metadata value [" . $datahash_ref->{'last_row'} . "]!\n";
+			# fix it for them
+			$datahash_ref->{'last_row'} = $number;
+		}
+	}
+	else {
+		# define it for them
+		$datahash_ref->{'last_row'} = 
+			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
+	}
+	
+	# check for gff 
+	unless (defined $datahash_ref->{'gff'}) {
+		# default value
+		$datahash_ref->{'gff'} = 0;
+	}
+	
+	return 1;
+}
+
+
+
+
+
 #### Index a data table
 sub index_data_table {
 	
@@ -89,7 +159,7 @@ sub index_data_table {
 		carp " No data structure passed!";
 		return;
 	}
-	unless ( _verify_data_structure($data_ref) ) {
+	unless ( verify_data_structure($data_ref) ) {
 		return;
 	}
 	if (exists $data_ref->{'index'}) {
@@ -441,6 +511,18 @@ Example
 		Start
 		Stop
 	));
+
+=item verify_data_structure()
+
+This subroutine verifies the data structure. It checks items such as the
+presence of the data table array, the number of columns in the data table
+and metadata, the metadata index of the last row, the presence of basic
+metadata and verification of dataset names for each column, and the status
+of the gff value. It will automatically correct some simple errors, and
+complain about others.
+
+Pass the data structure reference. It will return 1 if successfully 
+verified, or false if not.
 
 =item index_data_table()
 

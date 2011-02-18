@@ -13,6 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
+	verify_data_structure
 	find_column_index
 );
 
@@ -104,7 +105,7 @@ sub load_tim_data_file {
 		}
 		
 		# check file
-		unless (_verify_data_structure($inputdata_ref) ) {
+		unless (verify_data_structure($inputdata_ref) ) {
 			carp "badly formatted data file!";
 			return;
 		}
@@ -804,7 +805,7 @@ sub write_tim_data_file {
 		carp "no data to write!\n";
 		return;
 	}
-	unless (_verify_data_structure($datahash_ref) ) {
+	unless (verify_data_structure($datahash_ref) ) {
 		carp "bad data structure!";
 		return;
 	}
@@ -1267,7 +1268,7 @@ sub convert_genome_data_2_gff_data {
 		return;
 	}
 	my $input_data_ref = $arg_ref->{'data'};
-	unless (_verify_data_structure($input_data_ref) ) {
+	unless (verify_data_structure($input_data_ref) ) {
 		carp "bad data structure!";
 		return;
 	}
@@ -1673,7 +1674,7 @@ sub convert_and_write_to_gff_file {
 		carp "no data structure passed!";
 		return;
 	}
-	unless (_verify_data_structure($input_data_ref) ) {
+	unless (verify_data_structure($input_data_ref) ) {
 		carp "bad data structure!";
 		return;
 	}
@@ -2132,7 +2133,7 @@ sub write_summary_data {
 	unless (defined $datahash_ref) {
 		carp "no data structure passed!\n";
 	}
-	unless (_verify_data_structure($datahash_ref) ) {
+	unless (verify_data_structure($datahash_ref) ) {
 		carp "bad data structure!";
 		return;
 	}
@@ -2282,72 +2283,6 @@ sub write_summary_data {
 
 
 
-
-
-### Internal subroutine to check for missing required values in the data hash
-sub _verify_data_structure {
-	my $datahash_ref = shift;
-	
-	# check for data table
-	unless (
-		defined $datahash_ref->{'data_table'} and 
-		ref $datahash_ref->{'data_table'} eq 'ARRAY'
-	) {
-		carp " No data table in passed data structure!";
-		return;
-	}
-	
-	# check for column index
-	if (defined $datahash_ref->{'number_columns'}) {
-		my $number = scalar @{ $datahash_ref->{'data_table'}->[0] };
-		if ($datahash_ref->{'number_columns'} != $number) {
-			warn " number of data columns [$number] doesn't match " . 
-				"metadata value [" . $datahash_ref->{'number_columns'} . "]!\n";
-			# fix it for them
-			$datahash_ref->{'number_columns'} = $number;
-		}
-	}
-	else {
-		$datahash_ref->{'number_columns'} = 
-			scalar @{ $datahash_ref->{'data_table'}->[0] };
-	}
-	
-	# check metadata
-	for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-		unless (
-			$datahash_ref->{$i}{'name'} eq 
-			$datahash_ref->{'data_table'}->[0][$i]
-		) {
-			carp " incorrect or missing metadata! Column header names don't" . 
-				" match metadata name values\n";
-			return;
-		}
-	}
-	
-	# check for last row index
-	if (defined $datahash_ref->{'last_row'}) {
-		my $number = scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
-		if ($datahash_ref->{'last_row'} != $number) {
-			warn " data table last_row index [$number] doesn't match " . 
-				"metadata value [" . $datahash_ref->{'last_row'} . "]!\n";
-			# fix it for them
-			$datahash_ref->{'last_row'} = $number;
-		}
-	}
-	else {
-		# define it for them
-		$datahash_ref->{'last_row'} = 
-			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
-	}
-	
-	# check for gff 
-	unless (defined $datahash_ref->{'gff'}) {
-		# default value
-		$datahash_ref->{'gff'} = 0;
-	}
-	
-	return 1;
-}
 
 
 ### Internal subroutine to check for file existance
@@ -3013,16 +2948,6 @@ Example
 These are internally used subroutines and are not exported for general usage.
 
 =over
-
-=item _verify_data_structure
-
-This subroutine verifies the data structure that is passed to an argument, 
-particularly the write subroutines. It checks items such as the presence of 
-the data table array, the number of columns in the data table and metadata, 
-the metadata index of the last row, the presence of basic metadata and 
-verification of dataset names for each column, and the status of the gff 
-value. It will automatically correct some simple errors, and complain 
-about others. Serious errors prevent proper execution.
 
 =item _check_file
 
