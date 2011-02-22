@@ -9,6 +9,7 @@ use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
+	open_tim_data_file
 	load_tim_data_file
 	write_tim_data_file
 	write_summary_data
@@ -81,150 +82,31 @@ unless (defined $listfile) {
 
 
 ### Load datafile
+my %data_table_elements;
 print " Loading data file '$datafile'...\n";
-my $main_data_ref = load_tim_data_file($datafile);
-unless ($main_data_ref) {
-	die " No data loaded!\n";
-}
+my $main_data_ref = load_data_table_file();
 
 
 
 ### Load the list of specified values
-
-# we will load the list of gene names into a hash
-my %request;
 print " Collecting lookup values from file '$listfile'...\n";
-%request = collect_list_from_file();
-
-unless (%request) {
-	die " list of lookup values is empty!\n";
-}
-#print " found ". keys(%request) . " lookup values\n";
-
-
-
-
-### Determine the dataset index
-if ($data_index == -0.5) { # the default 'null' value
-	# we must ask the user
-	
-	# print the headers
-	print "\n There are multiple columns in the data file.\n";
-	for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
-		print "   $i\t$main_data_ref->{$i}{name}\n";
-	}
-	
-	# process the answer
-	print " Enter the number of the column with the gene names to match   ";
-	my $answer = <STDIN>;
-	chomp $answer;
-	
-	# check answer and return
-	if (exists $main_data_ref->{$answer}) {
-		# answer appears to be a column index
-		$data_index = $answer;
-	}
-	else {
-		die " Invalid response!\n";
-	}
-}
-
+my @requests = collect_list_from_file();
 
 
 
 ### Pull out the desired features
 print " Pulling features...\n";
-my @new_data_table; # the new data table with the pulled features
-
-# We will walk through the original data table and lookup the value in the
-# request hash. If it exists, copy the feature to the new data table.
-
-# first copy the header row
-push @new_data_table, [ @{ $main_data_ref->{'data_table'}->[0] } ];
-
-# then the rest of the rows
-foreach my $row ( @{ $main_data_ref->{'data_table'} } ) {
-	my $lookup_value = $row->[$data_index];
-	if (exists $request{ $lookup_value }) {
-		# this row is in the requested list
-		# copy to new table
-		push @new_data_table, [ @{$row} ];
-		# record the find
-		$request{ $lookup_value } += 1;
-	}
-}
-
-# Assign the new data table to the main data structure, replacing the old
-$main_data_ref->{'data_table'} = \@new_data_table;
-# re-calculate the last row index
-$main_data_ref->{'last_row'} = scalar @new_data_table - 1;
-
-# calculate the number of finds
-my $found = 0;
-my $multiples = 0;
-my $notfound = 0;
-foreach (keys %request) {
-	if ($request{$_} == 0) {
-		# not found
-		$notfound++;
-	}
-	elsif ($request{$_} == 1) {
-		# found once
-		$found++;
-	}
-	elsif ($request{$_} > 1) {
-		# found more than once
-		$multiples++;
-	}
-}
+my ($found_count, $notfound_count) = pull_requested_features();
 
 
 
-### Write out the new data file
-if ($found > 0) {
-	# features were found, so let's write the new file
-	
-	# Print summary
-	print "  $found features were found and pulled\n";
-	if ($notfound > 0) {
-		print "  $notfound features were not found\n";
+### Write the output files
+if ($found_count) {
+	print "  $found_count features were found and pulled\n";
+	if ($notfound_count > 0) {
+		print "  $notfound_count features were not found\n";
 	}
-	if ($multiples > 0) {
-		print "  $multiples features were found more than once!!!!\n";
-	}
-	
-	# Write the file
-	my $write_results = write_tim_data_file( {
-		'data'      => $main_data_ref,
-		'filename'  => $outfile,
-	} );
-	# report write results
-	if ($write_results) {
-		print "  Wrote new datafile '$outfile'\n";
-	}
-	else {
-		print "  Unable to write datafile '$outfile'!!!\n";
-	}
-	
-	# Summarize the pulled data
-	if ($sum) {
-		print " Generating final summed data...\n";
-		my $sumfile = write_summary_data( {
-			'data'         => $main_data_ref,
-			'filename'     => $outfile,
-			'startcolumn'  => $startcolumn,
-			'endcolumn'    => $stopcolumn,
-			'log'          => $log,
-		} );
-		if ($sumfile) {
-			print "  Wrote summary file '$sumfile'\n";
-		}
-		else {
-			print "  Unable to write summary file!\n";
-		}
-	}
-	
-
+	write_files();
 }
 else {
 	print "  Nothing found! Nothing to write!\n";
@@ -234,10 +116,66 @@ else {
 
 
 
-
-
-
 ########################   Subroutines   ###################################
+
+### Subroutine to collect data values from a file
+sub load_data_table_file {
+	
+	# Open the data file and load the metadata
+	my ($data_fh, $data_ref) = open_tim_data_file($datafile) or 
+		die " unable to open data file '$datafile'!\n";
+	
+	# Determine the dataset index for the lookup values
+	if ($data_index == -0.5) { # the default 'null' value
+		# we must ask the user
+		
+		# print the headers
+		print "\n There are multiple columns in the data file.\n";
+		for (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
+			print "   $i\t$data_ref->{$i}{name}\n";
+		}
+		
+		# process the answer
+		print " Enter the number of the column with the gene names to match   ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		
+		# check answer and return
+		if (exists $data_ref->{$answer}) {
+			# answer appears to be a column index
+			$data_index = $answer;
+		}
+		else {
+			die " Invalid response!\n";
+		}
+	}
+	
+	# load the data file contents into the data_table_elements hash
+	# the keys are the dataset lookup values 
+	# the values will be the data table row
+	while (my $line = $data_fh->getline) {
+		chomp $line;
+		my @linedata = split /\t/, $line;
+		
+		# store line data
+		# data_table_elements hash is global
+		my $value = $linedata[$data_index] || undef;
+		unless ($value) {
+			warn "lookup value is not defined at line $.!\n";
+			next;
+		}
+		if (exists $data_table_elements{$value}) {
+			warn "lookup value '$value' from data table is not unique!\n" . 
+				" Data loss is imminent!\n";
+		}
+		$data_table_elements{$value} = \@linedata;
+	}
+	
+	# Finished loading data table into hash
+	$data_fh->close;
+	return $data_ref;
+}
+
 
 
 ### Subroutine to collect list values from a file
@@ -289,7 +227,6 @@ sub collect_list_from_file {
 		for (my $row = 1; $row <= $list_data_ref->{'last_row'}; $row++) {
 			if ($list_data_ref->{'data_table'}->[$row][1] == $list_index) {
 				push @list, $list_data_ref->{'data_table'}->[$row][0];
-				push @list, 0; # this will become the value in the request hash
 			}
 		}
 	}
@@ -337,7 +274,6 @@ sub collect_list_from_file {
 		for (my $row = 1; $row < $list_data_ref->{'last_row'}; $row++) {
 			# add the value in the $list_index column to the list array
 			push @list, $list_data_ref->{'data_table'}->[$row][$list_index];
-			push @list, 0;
 		}
 		
 	}
@@ -346,6 +282,79 @@ sub collect_list_from_file {
 	return @list;
 }
 
+
+
+### Subroutine to pull the requested features
+sub pull_requested_features {
+
+	my @new_data_table; # the new data table with the pulled features
+	
+	# We will walk through the request list and pull the requested features
+	# from the global %data_table_elements hash and put it into the new table
+	
+	# first copy the header row
+	push @new_data_table, $main_data_ref->{'column_names'};
+	
+	# then the rest of the rows
+	my $found = 0;
+	my $notfound = 0;
+	foreach my $lookup (@requests) {
+		if ( exists $data_table_elements{$lookup} ) {
+			# we have this value from the data table
+			# copy to new table
+			push @new_data_table, $data_table_elements{$lookup};
+			$found++;
+		}
+		else {
+			# we don't have this requested feature
+			$notfound++;
+		}
+	}
+	
+	# Assign the new data table to the main data structure, replacing the old
+	$main_data_ref->{'data_table'} = \@new_data_table;
+	
+	# re-calculate the last row index
+	$main_data_ref->{'last_row'} = scalar @new_data_table - 1;
+	
+	return ($found, $notfound);
+}	
+
+
+
+### Subroutine to write the output files
+sub write_files {
+	# Write the file
+	my $write_results = write_tim_data_file( {
+		'data'      => $main_data_ref,
+		'filename'  => $outfile,
+	} );
+	# report write results
+	if ($write_results) {
+		print "  Wrote new datafile '$outfile'\n";
+	}
+	else {
+		print "  Unable to write datafile '$outfile'!!!\n";
+	}
+	
+	# Summarize the pulled data
+	if ($sum) {
+		print " Generating final summed data...\n";
+		my $sumfile = write_summary_data( {
+			'data'         => $main_data_ref,
+			'filename'     => $outfile,
+			'startcolumn'  => $startcolumn,
+			'endcolumn'    => $stopcolumn,
+			'log'          => $log,
+		} );
+		if ($sumfile) {
+			print "  Wrote summary file '$sumfile'\n";
+		}
+		else {
+			print "  Unable to write summary file!\n";
+		}
+	}
+}
 
 
 
@@ -392,20 +401,22 @@ Specify the output file name.
 Specify the name of a text file containing the feature names
 or values to look up. The file must contain a column header 
 that matches a column header name in the data file. Multiple 
-columns may be present.
+columns may be present. A .kgg file (from a Cluster k-means 
+analysis) may also be provided.
 
 =item --dindex <integer>
 
 Specify the index number of the column in the data file 
-containing the data to look up and match. Automatically
-determined by matching the header names.
+containing the data to look up and match. Defaults to 
+interactively asking the user.
 
 =item --lindex <integer>
 
-Specify the index number of the column in the list file (or 
-clipboard contents) containing the values to look up and match 
-if more than one column is present. Defaults to interactively 
-asking the user.
+Specify the index number of the column in the list file 
+containing the values to look up and match if more than one 
+column is present. If a k-means Cluster file (.kgg) is 
+provided, then specify the gene cluster number to use. Defaults to 
+interactively asking the user.
 
 =item --sum
 
@@ -439,19 +450,19 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-Given a list of features, this program will pull out those features (rows) 
-from a datafile (compare to Microsoft Excel's VLOOKUP command). The list 
-may be provided as either a separate text file or may be grabbed from the 
-clipbard (note this doesn't work through remote connections!). It will write
-a new data file containing only those features it found. 
+Given a list of requested feature IDs, this program will pull out those 
+features (rows) from a datafile (compare to Microsoft Excel's VLOOKUP 
+command). The list is provided as a separate text file. The program will 
+write a new data file containing only those features it found and in the 
+same order as the request list. 
 
 The list file may be a simple text file containing the feature names of the 
-features to pull. The first line should be the column header name and should
-be identical to the column header name in the data file used in the lookup.
-If more than one column is present in the list of lookup names, the index 
-will be requested interactively from the user, or be specified as a command
-line argument. The same format applies to data in the clipboard; it simply
-skips the step of writing a separate list file.
+features to pull. If more than one column is present in the list of lookup 
+names, the index will be requested interactively from the user, or be 
+specified as a command line argument. 
+
+Alternatively, it will also accept a k-means Cluster gene file (.kgg 
+extension) and all genes from the specified cluster number will be pulled. 
  
 =head1 AUTHOR
 
