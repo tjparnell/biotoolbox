@@ -148,7 +148,10 @@ unless (defined $interbase) {
 
 # identify application paths
 my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
-unless (defined $java) {
+if (defined $java) {
+	chomp $java; # the which command will have a newline character
+}
+else {
 	die " unable to identify java executable!\n";
 }
 unless ($bar_app_path) {
@@ -519,7 +522,7 @@ sub process_gr_files {
 	
 	# write track line
 	if ($use_track) {
-		print {$wig} "track type=wiggle_0 name=$name\n";
+		$wig->print( "track type=wiggle_0 name=$name\n");
 	}
 	
 	
@@ -529,7 +532,7 @@ sub process_gr_files {
 		# first identify the chromosome
 		# this is encoded in the gr file as the first element of the file name
 		my $chr;
-		if ($file =~ /(chr[\da-zA-Z]+)/) {
+		if ($file =~ /^( (?:chr)? [\d a-z A-Z]+ )/x) {
 			$chr = $1;
 		}
 		else {
@@ -546,7 +549,7 @@ sub process_gr_files {
 		}
 		
 		# write the definition line
-		print {$wig} "variableStep chrom=$chr\n";
+		$wig->print("variableStep chrom=$chr\n");
 		
 		# set reusuable variables
 		my @data;
@@ -575,8 +578,12 @@ sub process_gr_files {
 				# shift position
 				$position += 1 if $interbase;
 				
+				# check for negative or zero positions, which are not tolerated
+				# especially when converting to bigwig
+				next if $position <= 0;
+				
 				# print
-				print {$wig} "$position\t$newscore\n";
+				$wig->print( "$position\t$newscore\n");
 				
 				# reset
 				$position = $pos;
@@ -591,7 +598,7 @@ sub process_gr_files {
 			my $newscore = &{$method_sub}(@data);
 			
 			# print
-			print {$wig} "$position\t$newscore\n";
+			$wig->print( "$position\t$newscore\n");
 		}
 		
 		# close the gr file
