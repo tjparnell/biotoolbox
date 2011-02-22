@@ -43,19 +43,19 @@ __
 __--list
 
 __
-  Specify the name of a text file containing the feature names or values to look up. The file must contain a column header  that matches a column header name in the data file. Multiple  columns may be present.
+  Specify the name of a text file containing the feature names or values to look up. The file must contain a column header  that matches a column header name in the data file. Multiple  columns may be present. A .kgg file (from a Cluster k-means  analysis) may also be provided.
 __
   __
 __--dindex <**integer>
 
 __
-  Specify the index number of the column in the data file  containing the data to look up and match. Automatically determined by matching the header names.
+  Specify the index number of the column in the data file  containing the data to look up and match. Defaults to  interactively asking the user.
 __
   __
 __--lindex <**integer>
 
 __
-  Specify the index number of the column in the list file (or  clipboard contents) containing the values to look up and match  if more than one column is present. Defaults to interactively  asking the user.
+  Specify the index number of the column in the list file  containing the values to look up and match if more than one  column is present. If a k-means Cluster file (.kgg) is  provided, then specify the gene cluster number to use. Defaults to  interactively asking the user.
 __
   __
 __--sum
@@ -89,9 +89,11 @@ __
 __
   __
 ==DESCRIPTION==
-Given a list of features, this program will pull out those features (rows)  from a datafile (compare to Microsoft Excel's VLOOKUP command). The list  may be provided as either a separate text file or may be grabbed from the  clipbard (note this doesn't work through remote connections!). It will write a new data file containing only those features it found.
+Given a list of requested feature IDs, this program will pull out those  features (rows) from a datafile (compare to Microsoft Excel's VLOOKUP  command). The list is provided as a separate text file. The program will  write a new data file containing only those features it found and in the  same order as the request list.
 
-The list file may be a simple text file containing the feature names of the  features to pull. The first line should be the column header name and should be identical to the column header name in the data file used in the lookup. If more than one column is present in the list of lookup names, the index  will be requested interactively from the user, or be specified as a command line argument. The same format applies to data in the clipboard; it simply skips the step of writing a separate list file.
+The list file may be a simple text file containing the feature names of the  features to pull. If more than one column is present in the list of lookup  names, the index will be requested interactively from the user, or be  specified as a command line argument.
+
+Alternatively, it will also accept a k-means Cluster gene file (.kgg  extension) and all genes from the specified cluster number will be pulled.
 
 ==AUTHOR==
 {{{
