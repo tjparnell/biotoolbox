@@ -103,16 +103,16 @@ if (-d $infile) {
 # default values
 my $method_sub;
 if ($method eq 'mean') {
-	$method_sub = \&mean();
+	$method_sub = \&mean;
 }
 elsif ($method eq 'median') {
-	$method_sub = \&median();
+	$method_sub = \&median;
 }
 elsif ($method eq 'sum') {
-	$method_sub = \&sum();
+	$method_sub = \&sum;
 }
 elsif ($method eq 'max') {
-	$method_sub = \&max();
+	$method_sub = \&max;
 }
 else {
 	$method = 'sum';
@@ -249,26 +249,23 @@ if ($input_is_dir) {
 		if ($file =~ /\.gr$/) {
 			# we have a gr file
 			
-			# generate a path
-			my $path = File::Spec->catfile($infile, $file);
-			
 			# identify the strand, if present
 			# strand is usually denoted as _+_ or _-_
 			if ($file =~ /_\+_/) {
 				# forward strand
-				push @f_files, $path;
+				push @f_files, $file;
 			}
 			elsif ($file =~ /_\-_/) {
 				# reverse strand
-				push @r_files, $path;
+				push @r_files, $file;
 			}
 			else {
 				# no apparent strand
-				push @n_files, $path;
+				push @n_files, $file;
 			}
 			
 			# remember for cleanup
-			push @to_delete_files, $path;
+			push @to_delete_files, File::Spec->catfile($infile, $file);
 		}
 	}
 	$dir->close;
@@ -302,7 +299,7 @@ else {
 	# a single file
 	
 	# generate the gr file name
-	my $grfile = $infile;
+	my (undef, $path, $grfile) = File::Spec->splitpath($infile);
 	$grfile =~ s/\.zip$//;
 	$grfile =~ s/\.bar$/.gr/; # exchange extension
 	
@@ -314,7 +311,7 @@ else {
 	# process according to strand
 	if ($infile =~ /_\+_/) {
 		# forward strand
-		my $wigfile = process_gr_files('forward', $infile, $grfile);
+		my $wigfile = process_gr_files('forward', $path, $grfile);
 		if (defined $wigfile) {
 			push @wigfiles, $wigfile;
 			print " generated wig file '$wigfile'\n";
@@ -322,7 +319,7 @@ else {
 	}
 	elsif ($infile =~ /_\-_/) {
 		# forward strand
-		my $wigfile = process_gr_files('reverse', $infile, $grfile);
+		my $wigfile = process_gr_files('reverse', $path, $grfile);
 		if (defined $wigfile) {
 			push @wigfiles, $wigfile;
 			print " generated wig file '$wigfile'\n";
@@ -330,7 +327,7 @@ else {
 	}
 	else {
 		# forward strand
-		my $wigfile = process_gr_files('none', $infile, $grfile);
+		my $wigfile = process_gr_files('none', $path, $grfile);
 		if (defined $wigfile) {
 			push @wigfiles, $wigfile;
 			print " generated wig file '$wigfile'\n";
@@ -338,7 +335,7 @@ else {
 	}
 	
 	# remember file names
-	push @to_delete_files, $grfile;
+	push @to_delete_files, File::Spec->catfile($path, $grfile);
 }
 
 
@@ -467,18 +464,16 @@ sub process_gr_files {
 	my $path = shift @_;
 	my @grfiles = @_;
 	
-	# determine base name for output file
+	# determine base name for the output file
 	my $name;
 	if ($outfile) {
-		
 		# user specified base name
 		$name = $outfile;
 	}
 	else {
-		
-		# automatically determine base name from input
+		# automatically determine base name from the input file or directory
 		if ($input_is_dir) {
-			# specified path is a directory
+			# specified input path is a directory
 			# need to identify the last element
 			my @directories = File::Spec->splitdir($path);
 			while (@directories) {
@@ -492,9 +487,10 @@ sub process_gr_files {
 			}
 		}
 		else {
-			# specified path is a file
+			# specified input path is a file
 			# need to extract the filename
-			my ($volume,$directory,$file) = File::Spec->splitpath($path);
+			# we'll use the original infile as the gr_file is too hard
+			my ($volume,$directory,$file) = File::Spec->splitpath($infile);
 			$file =~ s/\.bar(?:\.zip)?$//; # strip extensions
 			$name = $file;
 		}
@@ -542,7 +538,8 @@ sub process_gr_files {
 		}
 		
 		# open the file
-		my $gr_fh = open_to_read_fh($file);
+		my $filepath = File::Spec->catfile($path, $file);
+		my $gr_fh = open_to_read_fh($filepath);
 		unless ($gr_fh) {
 			warn " unable to open input gr file! nothing done!\n";
 			next;
