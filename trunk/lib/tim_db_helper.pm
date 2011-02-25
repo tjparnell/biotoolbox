@@ -76,7 +76,7 @@ elsif (-e "$ENV{HOME}/tim_db_helper.cfg") {
 	 	die Config::Simple->error();
 }
 else {
-	warn "\n#### Using default configuration file\n   '$Bin/../lib/tim_db_config.cfg'\n####\n";
+	warn "\n#### Using default configuration file:\n   '$Bin/../lib/tim_db_config.cfg'\n####\n";
 	$TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
 	 	die Config::Simple->error();
 }
@@ -252,10 +252,21 @@ sub open_db_connection {
 		my $user = $TIM_CONFIG->param($database . '.user') || 
 			$TIM_CONFIG->param('default_db.user');
 		my $pass = $TIM_CONFIG->param($database . '.pass') ||
-			$TIM_CONFIG->param('default_db.pass');
-		my $dsn = $TIM_CONFIG->param($database . '.dsn_prefix') ||
-			$TIM_CONFIG->param('default_db.dsn_prefix');
-		$dsn .= $database;
+			$TIM_CONFIG->param('default_db.pass') || undef;
+		
+		# check for empty passwords
+		# config::simple passes an empty array when nothing was defined
+		if (ref $pass eq 'ARRAY' and scalar @$pass == 0) {$pass = undef}
+		
+		# set up the dsn
+		# it can be specifically defined
+		my $dsn = $TIM_CONFIG->param($database . '.dsn') || undef;
+		unless (defined $dsn) {
+			# or dsn can be generated with the dsn_prefix
+			$dsn = $TIM_CONFIG->param($database . '.dsn_prefix') || 
+				$TIM_CONFIG->param('default_db.dsn_prefix');
+			$dsn .= $database;
+		}
 		
 		# establish the database connection
 		$db = Bio::DB::SeqFeature::Store->new(

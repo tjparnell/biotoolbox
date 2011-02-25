@@ -55,18 +55,16 @@ while (my $alignment = $in_bam->read1() ) {
 		next;
 	}
 	
-	# forward strand
-	if ($alignment->reversed) {
-		# I know, this seems counterintuitive at first, but empirical analysis
-		# says otherwise
-		$f_bam->write1($alignment);
-		$f_count++;
-	}
-	
 	# reverse strand
-	else {
+	if ($alignment->reversed) {
 		$r_bam->write1($alignment);
 		$r_count++;
+	}
+	
+	# forward strand
+	else {
+		$f_bam->write1($alignment);
+		$f_count++;
 	}
 }
 
