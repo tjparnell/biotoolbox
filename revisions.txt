@@ -1,5 +1,11 @@
 ######## biotoolbox revision history #############
 
+v1.4.2 (svn r129)
+	- Added fast low level coverage function to the script bam2wig.pl
+	- Fixed script pull_features.pl to keep the order of features in the list file.
+	- Fixed script bar2wig.pl to correctly identify the chromosome name.
+	- Various bug fixes to the database library helper tim_db_helper.pm.
+
 v1.4.1 (svn r119)
 	- Fixed bug with get_ensembl_annotation.pl where a protein_coding gene encoding a transcript lacking a CDS will write inappropriate coordinates. These transcripts will not write start_codon, stop_codon, or CDS subfeatures.
 	- Fixed bug with script get_intersecting_features.pl where selecting regions with a start, stop modifier was not being selected properly.
