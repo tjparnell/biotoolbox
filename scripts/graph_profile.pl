@@ -401,7 +401,7 @@ sub graph_this {
 	
 	
 	# Generate graph file name
-	my $filename =  $graph_name . '_profile.png';
+	my $filename =  $graph_name . '_profile';
 	$filename = File::Spec->catfile($directory, $filename);
 	$filename = check_file_uniqueness($filename, 'png');
 	

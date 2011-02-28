@@ -2766,7 +2766,19 @@ sub export_treeview_function {
 	# this is a specialized function to export a datafile into a format 
 	# compatible with the Treeview program
 	
-	print " Preparing export for Treeview program\n";
+	print " Preparing export for Treeview and Cluster analysis\n";
+	
+	# First check for previous modifications
+	if ($modification) {
+		print " There are existing unsaved changes to the data. Do you want to\n";
+		print " save these first before making changes required for exporting?".
+			"y or n   ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		if ($answer =~ /^y/i) {
+			rewrite_function();
+		}
+	}
 	
 	# we need one unique name column, and a range of data columns
 	# the rest will be deleted
@@ -2784,6 +2796,7 @@ sub export_treeview_function {
 	# the first index in the datasets array should be the name column
 	# the remaining are datasets to be centered
 	my $name_index = shift @datasets;
+	print " median centering datasets....\n";
 	center_function(@datasets);
 	
 	# put the name index back
@@ -2817,8 +2830,10 @@ sub export_treeview_function {
 	export_function();
 	
 	
-	### Finally, reset modification so that these changes are not overwrite 
-	# the original data file
+	### Finally, reset the modification status 
+	# We don't to record these changes upon exit as they are specific to 
+	# exporting for treeview, any pre-existing changes should have been 
+	# saved earlier
 	$modification = 0;
 	return;
 }
