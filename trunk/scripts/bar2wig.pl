@@ -46,7 +46,6 @@ my (
 	$bar_app_path,
 	$method,
 	$use_track,
-	$interbase,
 	$bigwig,
 	$database,
 	$chromo_file,
@@ -62,7 +61,6 @@ GetOptions(
 	'barapp=s'  => \$bar_app_path, # path to David's Bar2Gr file
 	'method=s'  => \$method, # method for dealing with duplicate positions
 	'track!'    => \$use_track, # boolean to include a track line
-	'inter!'    => \$interbase, # shift from interbase to 1-base numbering scheme
 	'bw!'       => \$bigwig, # boolean for bigwig output
 	'db=s'      => \$database, # name of database to get chromo info
 	'chromof=s' => \$chromo_file, # name of a chromosome file
@@ -90,6 +88,7 @@ unless ($infile) {
 		die "  No source data file specified! see help\n";
 }
 
+
 # confirm directory
 unless (-e $infile and -r $infile) {
 	die "  input does not exist or is not readable!\n";
@@ -100,7 +99,7 @@ if (-d $infile) {
 	$input_is_dir = 1;
 }
 
-# default values
+# assign method subroutine
 my $method_sub;
 if ($method eq 'mean') {
 	$method_sub = \&mean;
@@ -114,10 +113,7 @@ elsif ($method eq 'sum') {
 elsif ($method eq 'max') {
 	$method_sub = \&max;
 }
-else {
-	$method = 'sum';
-	$method_sub = \&sum;
-}
+
 unless (defined $gz) {
 	$gz = 0;
 }
@@ -232,6 +228,7 @@ system $java, '-Xmx1500M', '-jar', $bar_app_path, '-f', $infile;
 
 ### Process the gr files
 my @wigfiles;
+print " writing wig file...\n";
 
 # A directory of files
 if ($input_is_dir) {
@@ -569,11 +566,16 @@ sub process_gr_files {
 				# we've moved to another position
 				# time to write the data
 				
+				# check that we have a method sub
+				die " no method assigned for combining multiple values at " . 
+					"identical positions!\n see help\n" 
+					unless defined $method_sub;
+				
 				# combine score values
 				my $newscore = &{$method_sub}(@data);
 				
 				# shift position
-				$position += 1 if $interbase;
+				$position += 1;
 				
 				# check for negative or zero positions, which are not tolerated
 				# especially when converting to bigwig
@@ -629,7 +631,6 @@ bar2wig.pl [--options...] <filename>
   --barapp </path/to/Bar2Gr>
   --method [mean | median | sum | max]
   --(no)track
-  --(no)inter
   --bw
   --db <database>
   --chromof <filename>
@@ -677,12 +678,6 @@ defines the appearance. However, conversion of a wig file to bigWig
 requires that the track line is absent. Do not include the track line when 
 generating bigWig files manually. The default is to include for wig files 
 (true), and exclude for bigWig files (false).
-
-=item --(no)inter
-
-Bar files are typically in interbase (0-base) format, whereas wig files are 
-typically 1-base format. Shift (or not) the position by 1 bp. Default is 
-true.
 
 =item --bw
 
