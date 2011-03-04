@@ -562,8 +562,8 @@ sub process_gr_files {
 				# time to write the data
 				
 				# check that we have a method sub
-				die " no method assigned for combining multiple values at " . 
-					"identical positions!\n see help\n" 
+				die " uh oh! This bar file has multiple values at identical " . 
+					"positions!\n Please define --method. See help for more info\n" 
 					unless defined $method_sub;
 				
 				# combine score values
@@ -662,9 +662,9 @@ Define the method used to combine multiple data values at a single
 position. Bar files can frequently have one or more values at a single 
 position, usually due to either multiple identical oligo probes (microarray 
 data) or multiple sequence tags aligning to the same position (next 
-generation sequencing data). Typically, with microarray data, the values 
-should be averaged (mean), while with sequencing data, values should be summed.
-The default method is 'sum'.
+generation sequencing data). Typically, with FDR or microarray data, 
+the mean or max value should be taken, while bar files representing 
+sequence tag PointData should be summed.
 
 =item --(no)track
 

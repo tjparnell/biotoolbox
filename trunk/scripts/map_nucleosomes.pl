@@ -102,7 +102,7 @@ unless ($buffer) {
 	$buffer = 0;
 }
 unless (defined $bin) {
-	$bin = 1;
+	$bin = 0;
 }
 
 
@@ -347,7 +347,7 @@ sub map_nucleosomes {
 			# determine the window stop position
 			my $win_stop = $position + $window - 1;
 			
-			# collect the window scores
+			# collect the window scanning scores
 			my %window_pos2score = get_region_dataset_hash( {
 					'db'       => $db,
 					'dataset'  => $scan_dataset,
@@ -406,10 +406,24 @@ sub map_nucleosomes {
 			if ($peak_score >= $thresh) {
 				# we know there is a peak within this window, now must find it
 				
+				# collect the tag scores for the window
+				# the scan data scores may not be reliable, as the statistical 
+				# method used to identify peaks may not directly correspond to
+				# the actual peak of tags, which is what we really want
+				# this is true for False Discovery Rate scores
+				my %window_pos2tags = get_region_dataset_hash( {
+						'db'       => $db,
+						'dataset'  => $tag_dataset,
+						'name'     => $chr_name,
+						'type'     => $chr_type,
+						'start'    => $position,
+						'stop'     => $win_stop,
+						'method'   => 'score',
+				} );
 				# get all of the positions that correspond to that peak value
 				my @peak_positions;
-				foreach (sort {$a <=> $b} keys %window_pos2score) {
-					if ($window_pos2score{$_} == $peak_score) {
+				foreach (sort {$a <=> $b} keys %window_pos2tags) {
+					if ($window_pos2tags{$_} == $peak_score) {
 						push @peak_positions, $_;
 					}
 				}
@@ -426,25 +440,22 @@ sub map_nucleosomes {
 					if (range(@peak_positions) <= 10) {
 						# the range between the peaks is 10 bp or less
 						# 10 bp is totally arbitrary but reasonable
-						$peak_position = sprintf "%.0f", mean(@peak_positions);
+						$peak_position = int( mean(@peak_positions) + 0.5);
 					}
 					
 					else {
 						# they are too far apart, separate nucleosomes?
 						# we'll take the one closest to the middle of the range
 						my %best;
+						my $window_midpoint =  
+									int( ( ($position + $win_stop) / 2) + 0.5);
 						foreach (reverse @peak_positions) {
 							# we're reversing the order to take the rightmost
 							# position first
 							# that way if the positions are equidistant and the 
 							# key gets overwritten, we'll take the leftmost 
 							# position
-							$best{ 
-								# we are calculating the absolute distance 
-								# from the window midpoint
-								abs( $_ - sprintf("%.0f", 
-									($position + $win_stop) / 2) ) 
-							} = $_;
+							$best{ abs( $_ -  $window_midpoint ) } = $_;
 						}
 						
 						# take the closest to the middle position
@@ -525,7 +536,7 @@ sub map_nucleosomes {
 					# not quite following Pugh's example, we will name the 
 					# nucleosome based on chromosome number and midpoint 
 					# position (instead of start position)
-				$chr_name =~ /^(?:chr)(.+)/i;
+				$chr_name =~ /^(?:chr)?(.+)$/i;
 				my $nuc_name = 'N'. $1 . ':' . $peak_position;
 				
 				# Record the nucleosome information
@@ -603,28 +614,18 @@ The command line flags and descriptions:
 
 =item --db <database_name>
 
-Specify the name of the BioPerl gff database to pull the source data.
+Specify the name of the BioPerl gff database to pull the source data. 
 
 =item --data, --sdata, --tdata <dataset_name>
 
-Provide the name of the dataset containing the nucleosome midpoint
-occupancy data from which to identify nucleosomal positions. For the
-most accurate mapping, the midpoints should be mapped at 1 bp
-resolution, but lower resolutions (5 or 10 bp) should work. Two
-datasets are required, although they may be the same. The first is the
-scan dataset (--sdata), which is used to scan for a potential
-nucleosome. The dataset may be a normalized difference, difference, or
-raw enumerated counts. It may be in log2 space, and does not need to
-be whole integers, as only the maximum value in each window is needed.
-The second dataset is the tag dataset (--tdata) and is used in
-calculating nucleosome statistics, including occupancy and fuzziness.
-The tag dataset must be enumerated counts of nucleosome midpoints and
-be whole integers, whether raw counts or a difference. Negative counts
-from a difference dataset are not counted. Both datasets must be
-identified; alternatively, set both datasets simultaneously to the
-same dataset using --data. If the datasets are not specified on the
-commandline, then they may be interactively chosen from a list from 
-the database.
+Provide the name of the dataset(s) containing the nucleosome midpoint
+occupancy data from which to identify nucleosomal positions. Two 
+datasets are required, the scan dataset (--sdata) and the tag dataset 
+(--tdata). The same dataset could be used for both; in which case 
+set both to the same using the --data option. See the DESCRIPTION for 
+details regarding the datasets. If the datasets are not specified on 
+the commandline, then they may be interactively chosen from a list 
+from the database.
 
 =item --thresh <number>
 
@@ -644,14 +645,14 @@ previous found nucleosome and the beginning of the window to scan for the
 next nucleosome. Setting this value may limit the number of overlapping 
 nucleosomes. Default is 0 bp.
 
-=item --(no)bin
+=item --bin
 
 Indicate whether the scan data should be binned in an attempt to find 
 and map a nucleosome midpoint peak. Binning only occurs when a single 
 position fails to pass the threshold value. Bins are generated from 
-three adjacent positions and their values summed. This is helpful for 
-those genomic regions with very few nucleosome reads. The default 
-value is true.
+three adjacent positions and their values summed. This may help  
+those genomic regions with very few nucleosome reads. The default is 
+to not bin the scan data.
 
 =item --gff
 
@@ -698,12 +699,29 @@ buffer value, which inserts space between the previous nucleosome end and
 the next window. By advancing the window relative to the previously identified 
 nucleosome, the program can adapt to variable nucleosome spacing. 
 
+Two datasets must be provided for the mapping, although the same could be  
+used for both functions. The datasets should represent sequenced nucleosome 
+fragment midpoints. For the most accurate mapping, the midpoints 
+should be mapped at 1 bp resolution, but lower resolutions (5 or 10 bp) 
+could work. 
+
+The scan dataset (--sdata) is used to scan for a potential
+nucleosome. The dataset may be a simple difference, normalized difference, 
+P-value, False Discovery Rate, or simply raw enumerated counts. Probability 
+scores should be converted using -10Log10(P) for proper interpretation. 
+
+The tag dataset (--tdata) is used for calculating nucleosome statistics, 
+including the precise nucleosome midpoint peak, occupancy, and fuzziness.
+The tag dataset must be enumerated counts of nucleosome midpoints and
+be whole integers, whether raw counts or a simple difference. Negative counts
+from a difference dataset are not counted. 
+
 For genomic regions with few nucleosome reads and no positions that pass the 
 threshold value, the window positions may optionally be binned together to 
 increase sensitivity (see the --bin option).
 
 Two attributes of each identified nucleosome are calculated, Occupancy and 
-Fuzziness. Occupancy represents the sum of the scores that support the 
+Fuzziness. Occupancy represents the sum of the tag counts that support the 
 nucleosome position; higher scores indicate a more highly occupied 
 nucleosome. Fuzziness indicates how well all of the scores are aligned in 
 register. The Fuzziness value is the standard deviation of the population 
