@@ -136,11 +136,6 @@ unless (defined $use_track) {
 		$use_track = 1;
 	}
 }
-unless (defined $interbase) {
-	# the USeq and T2 packages typically use interbase (0-base) format
-	# default is to shift to 1-base format
-	$interbase = 1;
-}
 
 # identify application paths
 my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
