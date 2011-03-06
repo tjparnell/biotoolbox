@@ -380,15 +380,16 @@ while (@infiles) {
 	}
 	
 	### Write conf stanza data
-	if ($write_conf and !$write_metadata) {
-		# we are using the write metadata boolean variable as an indicator 
-		# of whether to write an individual conf stanza for each bigfile
-		# file or write a single stanza for the bigwig set
+	if ($write_conf) {
 		
 		# here we write individual stanzas for each big file
 		
-		# stanzas for a bigwig file
-		if ($infile_ext eq '.bw') {
+		# stanzas for a single bigwig files
+		if ($infile_ext eq '.bw' and !$write_metadata) {
+			# we are using the write metadata boolean variable as an indicator 
+			# of whether to write an individual conf stanza for each bigfile
+			# file or write a single stanza for the bigwig set
+			
 			# add the database stanza
 			push @confdata, "[$target_basename\_db:database]\n";
 			push @confdata, "db_adaptor   = Bio::DB::BigWig\n";
@@ -400,6 +401,23 @@ while (@infiles) {
 			push @confdata, "feature      = summary\n";
 			push @confdata, "glyph        = wiggle_whiskers\n";
 			push @confdata, "graph_type   = boxes\n";
+			push @confdata, "autoscale    = local\n";
+			push @confdata, "height       = 50\n";
+			push @confdata, "key          = $name\n";
+			push @confdata, "\n";
+		}
+		
+		# stanzas for a bigwig set
+		elsif ($infile_ext eq '.bw' and $write_metadata) {
+			# add the basic track stanza
+			push @confdata, "\n[$name]\n";
+			push @confdata, "database     = $set_name\_db\n";
+			push @confdata, "feature      = $name\n";
+			push @confdata, "glyph        = wiggle_whiskers\n";
+			push @confdata, "graph_type   = boxes\n";
+			push @confdata, "autoscale    = local\n";
+			push @confdata, "height       = 50\n";
+			push @confdata, "key          = $name\n";
 			push @confdata, "\n";
 		}
 		
@@ -482,18 +500,11 @@ if ($write_conf) {
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
-		# add the database stanza
-		push @confdata, "[$set_name\_db:database]\n";
-		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
-		push @confdata, "db_args      = -dir $path\n";
-		
-		# add the basic track stanza
-		push @confdata, "\n[$set_name]\n";
-		push @confdata, "database     = $set_name\_db\n";
-		push @confdata, "feature      = $type\n";
-		push @confdata, "glyph        = wiggle_whiskers\n";
-		push @confdata, "graph_type   = boxes\n";
-		push @confdata, "\n";
+		# add the database stanza, in reverse order
+		unshift @confdata, "               -feature_type summary\n\n";
+		unshift @confdata, "db_args      = -dir $path\n";
+		unshift @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
+		unshift @confdata, "[$set_name\_db:database]\n";
 	}
 	
 	# write the conf stanza file

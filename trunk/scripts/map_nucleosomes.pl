@@ -156,6 +156,7 @@ if ($debug) {
 
 # Output
 # a tim data file
+exit unless $found_nucs;
 unless ($outfile) {
 	$outfile = $scan_dataset . '_nucleosome';
 }
@@ -366,10 +367,17 @@ sub map_nucleosomes {
 				print DEBUG_FH "\n";
 			}
 			
-			# double check whether we actually have a valid nucleosome peak
+			# check whether we actually have a valid nucleosome peak
 			# if not, then try again after binning the data
-			my $peak_score = max(values %window_pos2score);
-			if ($peak_score < $thresh and $bin) {
+			my $found_peak = 0; 
+			my $window_scan_max = max(values %window_pos2score);
+			
+			if ( $window_scan_max >= $thresh) {
+				# we have a peak that passes the threshold
+				# yeah, a nucleosome
+				$found_peak = 1;
+			}
+			elsif ($window_scan_max < $thresh and $bin) {
 				# no obvious peak, so we will try binning to find a peak
 				
 				my %binned_pos2score;
@@ -387,9 +395,11 @@ sub map_nucleosomes {
 				}
 				
 				# look again for a peak
-				$peak_score = max(values %binned_pos2score);
-				if ($peak_score >= $thresh) {
+				$window_scan_max = max(values %binned_pos2score);
+				if ($window_scan_max >= $thresh) {
 					# we found one
+					$found_peak = 1;
+					
 					# reassign position2score hash
 					%window_pos2score = %binned_pos2score;
 					if ($debug) {
@@ -400,10 +410,16 @@ sub map_nucleosomes {
 					}
 				}
 			}
+			else {
+				# no peak
+				$position += $window;
+				next;
+			}
+			
 			
 			# identify the peak position
 			my $peak_position;
-			if ($peak_score >= $thresh) {
+			if ($found_peak) {
 				# we know there is a peak within this window, now must find it
 				
 				# collect the tag scores for the window
@@ -420,13 +436,16 @@ sub map_nucleosomes {
 						'stop'     => $win_stop,
 						'method'   => 'score',
 				} );
+				
 				# get all of the positions that correspond to that peak value
+				my $tag_peak_value = max(values %window_pos2tags);
 				my @peak_positions;
 				foreach (sort {$a <=> $b} keys %window_pos2tags) {
-					if ($window_pos2tags{$_} == $peak_score) {
+					if ($window_pos2tags{$_} == $tag_peak_value) {
 						push @peak_positions, $_;
 					}
 				}
+				
 				# now identify the best peak position, ideally this is just one
 				if (scalar @peak_positions == 1) {
 					# one peak makes this easy
@@ -470,7 +489,7 @@ sub map_nucleosomes {
 			
 			# process the peak if found
 			if (defined $peak_position) {
-				# we have a nucleosome!
+				# we have a defined nucleosome position!
 				
 				# Determine the fuzziness of this nucleosome
 					# This is essentially the standard deviation of the counts
@@ -483,6 +502,8 @@ sub map_nucleosomes {
 					# new found nucleosome peak.
 					# arbitrarily collecting 50 bp worth of scores from each
 					# side of the peak
+					# we can't use the previously collected tag scores because
+					# the nucleosome peak may have been at the edge of the window
 				my %nucleosome_pos2score = get_region_dataset_hash( {
 					'db'       => $db,
 					'dataset'  => $tag_dataset,
@@ -563,8 +584,6 @@ sub map_nucleosomes {
 			else {
 				# no nucleosome found, move on to next window
 				$position += $window;
-				#print "    found no nucleosome\n";
-				#print "  new position is $position\n";
 			}
 		}
 	}
