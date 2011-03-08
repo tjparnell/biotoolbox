@@ -396,8 +396,8 @@ sub open_tim_data_file {
 					}
 				}
 				
-				# set column names
-				push @{ $inputdata->{'column_names'} }, qw(
+				# a list of gff column names
+				my @gff_names = qw(
 					Chromosome
 					Source
 					Type
@@ -412,42 +412,16 @@ sub open_tim_data_file {
 				# set the metadata for the each column
 					# some of these may already be defined if there was a 
 					# column metadata specific column in the file
-				$inputdata->{0} = {
-					'name' => 'Chromosome',
-					'index' => 0,
-				} unless exists $inputdata->{0};
-				$inputdata->{1} = {
-					'name' => 'Source',
-					'index' => 1,
-				} unless exists $inputdata->{1};
-				$inputdata->{2} = {
-					'name' => 'Type',
-					'index' => 2,
-				} unless exists $inputdata->{2};
-				$inputdata->{3} = {
-					'name' => 'Start',
-					'index' => 3,
-				} unless exists $inputdata->{3};
-				$inputdata->{4} = {
-					'name' => 'Stop',
-					'index' => 4,
-				} unless exists $inputdata->{4};
-				$inputdata->{5} = {
-					'name' => 'Score',
-					'index' => 5,
-				} unless exists $inputdata->{5};
-				$inputdata->{6} = {
-					'name' => 'Strand',
-					'index' => 6,
-				} unless exists $inputdata->{6};
-				$inputdata->{7} = {
-					'name' => 'Phase',
-					'index' => 7,
-				} unless exists $inputdata->{7};
-				$inputdata->{8} = {
-					'name' => 'Group',
-					'index' => 8,
-				} unless exists $inputdata->{8};
+				for (my $i = 0; $i < 9; $i++) {
+					# loop for each column
+					# set name unless it already has one from metadata
+					$inputdata->{$i}{'name'} = $gff_names[$i] unless 
+						exists $inputdata->{$i}{'name'};
+					$inputdata->{$i}{'index'} = $i;
+					# assign the name to the column header
+					$inputdata->{'column_names'}->[$i] = 
+						$inputdata->{$i}{'name'};
+				}
 				
 				# set headers flag to false
 				$inputdata->{'headers'} = 0;
@@ -476,136 +450,144 @@ sub open_tim_data_file {
 					# the first three columns are required: chrom start end
 					
 					# set column names
-					push @{ $inputdata->{'column_names'} }, qw(
-						chromo
-						start
-						end
+					my @bed_names = qw(
+						Chromosome
+						Start
+						End
 					);
 					
 					# set the metadata for each column
 						# some of these may already be defined if there was a 
 						# column metadata specific column in the file
-					$inputdata->{0} = {
-						'name' => 'chromo',
-						'index' => 0,
-					} unless exists $inputdata->{0};
-					$inputdata->{1} = {
-						'name' => 'start',
-						'index' => 1,
-					} unless exists $inputdata->{1};
-					$inputdata->{2} = {
-						'name' => 'end',
-						'index' => 2,
-					} unless exists $inputdata->{2};
+					for (my $i = 0; $i < 3; $i++) {
+						# loop for each column
+						# set name unless it already has one from metadata
+						$inputdata->{$i}{'name'} = $bed_names[$i] unless 
+							exists $inputdata->{$i}{'name'};
+						$inputdata->{$i}{'index'} = $i;
+						# assign the name to the column header
+						$inputdata->{'column_names'}->[$i] = 
+							$inputdata->{$i}{'name'};
+					}
 				}
+				
 				if ($column_count >= 4) {
 					# name of the bed line feature
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'name';
-					
 					# column metadata
-					$inputdata->{3} = {
-						'name' => 'name',
-						'index' => 3,
-					} unless exists $inputdata->{3};
+					$inputdata->{3}{'name'} = 'Name' unless 
+						exists $inputdata->{3}{'name'};
+					$inputdata->{3}{'index'} = 3;
+					
+					# column header name
+					$inputdata->{'column_names'}->[3] = 
+						$inputdata->{3}{'name'};
 				}	
+				
 				if ($column_count >= 5) {
 					# score of the bed line feature
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'score';
-					
 					# column metadata
-					$inputdata->{4} = {
-						'name' => 'score',
-						'index' => 4,
-					} unless exists $inputdata->{4};
+					$inputdata->{4}{'name'} = 'Score' unless 
+						exists $inputdata->{4}{'name'};
+					$inputdata->{4}{'index'} = 4;
+					
+					# column header name
+					$inputdata->{'column_names'}->[4] = 
+						$inputdata->{4}{'name'};
 				}	
+				
 				if ($column_count >= 6) {
 					# strand of the bed line feature
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'strand';
-					
 					# column metadata
-					$inputdata->{5} = {
-						'name' => 'strand',
-						'index' => 5,
-					} unless exists $inputdata->{5};
+					$inputdata->{5}{'name'} = 'Strand' unless 
+						exists $inputdata->{5}{'name'};
+					$inputdata->{5}{'index'} = 5;
+					
+					# column header name
+					$inputdata->{'column_names'}->[5] = 
+						$inputdata->{5}{'name'};
 				}	
+				
 				if ($column_count >= 7) {
 					# start position for block (exon)
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'thickStart';
-					
 					# column metadata
-					$inputdata->{6} = {
-						'name' => 'thickStart',
-						'index' => 6,
-					} unless exists $inputdata->{6};
+					$inputdata->{6}{'name'} = 'thickStart' unless 
+						exists $inputdata->{6}{'name'};
+					$inputdata->{6}{'index'} = 6;
+					
+					# column header name
+					$inputdata->{'column_names'}->[6] = 
+						$inputdata->{6}{'name'};
 				}	
+				
 				if ($column_count >= 8) {
 					# end position for block (exon)
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'thickEnd';
-					
 					# column metadata
-					$inputdata->{7} = {
-						'name' => 'thickEnd',
-						'index' => 7,
-					} unless exists $inputdata->{7};
+					$inputdata->{7}{'name'} = 'thickEnd' unless 
+						exists $inputdata->{7}{'name'};
+					$inputdata->{7}{'index'} = 7;
+					
+					# column header name
+					$inputdata->{'column_names'}->[7] = 
+						$inputdata->{7}{'name'};
 				}	
+				
 				if ($column_count >= 9) {
 					# RGB value of bed feature
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'itemRGB';
-					
 					# column metadata
-					$inputdata->{8} = {
-						'name' => 'itemRGB',
-						'index' => 8,
-					} unless exists $inputdata->{8};
+					$inputdata->{8}{'name'} = 'itemRGB' unless 
+						exists $inputdata->{8}{'name'};
+					$inputdata->{8}{'index'} = 8;
+					
+					# column header name
+					$inputdata->{'column_names'}->[8] = 
+						$inputdata->{8}{'name'};
 				}	
+				
 				if ($column_count >= 10) {
 					# The number of blocks (exons)
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'blockCount';
-					
 					# column metadata
-					$inputdata->{9} = {
-						'name' => 'blockCount',
-						'index' => 9,
-					} unless exists $inputdata->{9};
+					$inputdata->{9}{'name'} = 'blockCount' unless 
+						exists $inputdata->{9}{'name'};
+					$inputdata->{9}{'index'} = 9;
+					
+					# column header name
+					$inputdata->{'column_names'}->[9] = 
+						$inputdata->{9}{'name'};
 				}	
+				
 				if ($column_count >= 11) {
 					# The size of the blocks (exons)
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'blockSizes';
-					
 					# column metadata
-					$inputdata->{10} = {
-						'name' => 'blockSizes',
-						'index' => 10,
-					} unless exists $inputdata->{10};
+					$inputdata->{10}{'name'} = 'blockSizes' unless 
+						exists $inputdata->{10}{'name'};
+					$inputdata->{10}{'index'} = 10;
+					
+					# column header name
+					$inputdata->{'column_names'}->[10] = 
+						$inputdata->{10}{'name'};
 				}	
+				
 				if ($column_count >= 12) {
 					# The start positions of the blocks (exons)
 					
-					# column name
-					push @{ $inputdata->{'column_names'} }, 'blockStarts';
-					
 					# column metadata
-					$inputdata->{11} = {
-						'name' => 'blockStarts',
-						'index' => 11,
-					} unless exists $inputdata->{11};
+					$inputdata->{11}{'name'} = 'blockStarts' unless 
+						exists $inputdata->{11}{'name'};
+					$inputdata->{11}{'index'} = 11;
+					
+					# column header name
+					$inputdata->{'column_names'}->[11] = 
+						$inputdata->{11}{'name'};
 				}	
+				
 				if ($column_count > 12) {
 					# why would there be extra columns in here!!??
 					
@@ -613,17 +595,20 @@ sub open_tim_data_file {
 					
 					# process anyway
 					for (my $i = 11; $i < $column_count; $i++) {
-						# column name
-						push @{ $inputdata->{'column_names'} }, 'unknown';
-						
 						# column metadata
-						$inputdata->{$i} = {
-							'name' => 'unknown',
-							'index' => $i,
-						} unless exists $inputdata->{$i};
+						$inputdata->{$i}{'name'} = "Column_$i" unless 
+							exists $inputdata->{$i}{'name'};
+						$inputdata->{$i}{'index'} = $i;
+						
+						# column header name
+						$inputdata->{'column_names'}->[$i] = 
+							$inputdata->{$i}{'name'};
 					}
 				}
-					
+				
+				else {
+					die " BED file '$filename' doesn't have at least 3 columns!\n";
+				}
 				
 				# set headers flag to false
 				$inputdata->{'headers'} = 0;

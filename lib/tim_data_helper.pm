@@ -113,8 +113,10 @@ sub verify_data_structure {
 			$datahash_ref->{$i}{'name'} eq 
 			$datahash_ref->{'data_table'}->[0][$i]
 		) {
-			carp " incorrect or missing metadata! Column header names don't" . 
-				" match metadata name values\n";
+			carp " incorrect or missing metadata!\n  Column header names don't" 
+				. " match metadata name values for index $i\n" . 
+				"  compare '" . $datahash_ref->{$i}{'name'} . "' with '" .
+				$datahash_ref->{'data_table'}->[0][$i] . "'\n";
 			return;
 		}
 	}
