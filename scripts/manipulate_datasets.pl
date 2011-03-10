@@ -205,12 +205,12 @@ sub print_menu {
 		"  e  C(e)nter normalize feature datapoints \n" .
 		"  w  Generate a ne(w) column with a single identical value\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
-		"  w  Re(w)rite the file\n" .
-		"  T  Export for (T)reeview\n" .
+		"  W  Re(W)rite the file\n" .
+		"  T  Export for (T)reeview or Cluster analysis\n" .
 		"  h  (h)elp\n" .
 		"  q  (q)uit\n" 
 	;
-	# unused letters: C E F G H iI jJ kK L M O Q S t V w X yY 
+	# unused letters: C E F G H iI jJ kK L M O Q S t V X yY 
 	# m is not listed here but is for the menu
 	return; # return 0, nothing done
 }
@@ -273,7 +273,8 @@ sub interactive_execution {
 	# interact with the user to perform an unlimited number of executions
 	
 	# Ask for the function
-	print " Which function would you like to perform? (press m for menu)  ";
+	print " Functions are chosen by character. Use m for menu or h for help\n";
+	print " Enter the symbol for the function you would like to perform   ";
 	my $response = <STDIN>;
 	chomp $response;
 	while ($response) {
@@ -294,7 +295,7 @@ sub interactive_execution {
 			};
 			
 			# prepare for the next function
-			print " Which function is next? (type m for menu)  ";
+			print " Which function is next? [or (m)enu, (h)elp, (q)uit]  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
