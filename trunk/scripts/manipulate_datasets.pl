@@ -203,13 +203,14 @@ sub print_menu {
 		"  v  Di(v)ide \n" .
 		"  u  S(u)btract\n" . 
 		"  e  C(e)nter normalize feature datapoints \n" .
+		"  w  Generate a ne(w) column with a single identical value\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
-		"  W  Re(W)rite the file\n" .
+		"  w  Re(w)rite the file\n" .
 		"  T  Export for (T)reeview\n" .
 		"  h  (h)elp\n" .
 		"  q  (q)uit\n" 
 	;
-	# unused letters: C E F G H iI jJ kK L M O Q S t V wW X yY 
+	# unused letters: C E F G H iI jJ kK L M O Q S t V w X yY 
 	# m is not listed here but is for the menu
 	return; # return 0, nothing done
 }
@@ -2902,6 +2903,57 @@ sub center_function {
 }
 
 
+sub new_column_function {
+	# this will generate a new dataset
+	
+	# request column name
+	my $name;
+	if (defined $opt_name) {
+		# command line option
+		$name = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the name for the new column   ";
+		$name = <STDIN>;
+		chomp $name;
+	}
+	
+	# request value
+	my $value;
+	if (defined $opt_target) {
+		# command line option
+		$value = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the common value to be assigned in the new column   ";
+		$value = <STDIN>;
+		chomp $value;
+	}
+	
+	# generate the new dataset metadata
+	# the new index position is equivalent to the number of columns
+	my $new_position = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$new_position} = {
+		'name'    => $name,
+		'index'   => $new_position,
+	};
+	$data_table_ref->[0][$new_position] = $name;
+	$main_data_ref->{'number_columns'} += 1;
+	
+	# fill in the dataset
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		$data_table_ref->[$row][$new_position] = $value;
+	}
+	
+	# done
+	print " Added new dataset '$name' at index $new_position with value '$value'\n";
+	return 1;
+}
+
+
+
 sub subsample_function {
 	# this will subsample the datasets to a target sum
 	
@@ -3078,6 +3130,7 @@ sub _get_letter_to_function_hash {
 		'v' => "divide",
 		'u' => "subtract",
 		'e' => "center",
+		'w' => "new",
 		'x' => "export",
 		'W' => "rewrite",
 		'T' => "treeview",
@@ -3118,6 +3171,7 @@ sub _get_function_to_subroutine_hash {
 		'divide'     => \&division_function,
 		'subtract'   => \&subtract_function,
 		'center'     => \&center_function,
+		'new'        => \&new_column_function,
 		'export'     => \&export_function,
 		'rewrite'    => \&rewrite_function,
 		'treeview'   => \&export_treeview_function,
@@ -3524,6 +3578,7 @@ other required options. These functions include the following.
   reorder
   delete
   rename
+  number
   sort
   gsort
   null
@@ -3543,10 +3598,11 @@ other required options. These functions include the following.
   normdiff
   divide
   subtract
-  export
-  treeview
-  rewrite
   center
+  new
+  export
+  rewrite
+  treeview
 
 Refer to the FUNCTIONS section for details.
 
@@ -3572,7 +3628,7 @@ for the same thing.
 
 =item --target <string> or <number>
 
-Specify the target value when used with multiple functions, including the 
+Specify the target value when using various functions, including the 
 'scale', 'subtract', 'divide', and 'format' functions. Please refer to the 
 function description for more information.
 
@@ -3866,6 +3922,14 @@ Center normalize the datapoints in a row by subtracting the mean or
 median of the datapoints. The range of datasets is requested or 
 provided by the --index option. Old values are replaced by new 
 values. This is useful for visualizing data as a heat map, for example.
+
+=item B<new> (menu option 'w')
+
+Generate a new dataset (column) which contains an identical value for 
+each datapoint (row). The value may be either requested interactively or 
+supplied using the --target option. This function may be useful for 
+assigning a common value to all of the data points before joining the 
+data file with another.
 
 =item B<export> (menu option 'x')
 
