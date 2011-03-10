@@ -2911,7 +2911,7 @@ sub new_column_function {
 	my $name;
 	if (defined $opt_name) {
 		# command line option
-		$name = $opt_target;
+		$name = $opt_name;
 	}
 	else {
 		# interactively ask the user
