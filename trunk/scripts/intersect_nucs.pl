@@ -375,7 +375,7 @@ sub intersect_nucs {
 		
 		}
 		else {
-			print " no index for $t->[$trow][$t_chromo_i] -> $lookup\n";
+			# print " no index for $t->[$trow][$t_chromo_i] -> $lookup\n";
 		}
 		
 	} # finished intersecting

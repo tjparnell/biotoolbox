@@ -243,7 +243,7 @@ sub intersect_named_features {
 	my $table = $data_ref->{'data_table'};
 
 	# prepare new metadata columns 
-	my ($number_i, $name_i, $type_i, $strand_i, $distance_i) = 
+	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
 		generate_new_metadata($data_ref);
 	
 	
@@ -266,7 +266,8 @@ sub intersect_named_features {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i,
+				$overlap_i,
 			);
 			next;
 		}
@@ -344,7 +345,8 @@ sub intersect_named_features {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i, 
+				$overlap_i
 			);
 		}
 		else {
@@ -360,7 +362,8 @@ sub intersect_named_features {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i,
+				$overlap_i,
 			);
 		}
 	
@@ -379,7 +382,7 @@ sub intersect_genome_features {
 	my $table = $data_ref->{'data_table'};
 
 	# prepare new metadata columns 
-	my ($number_i, $name_i, $type_i, $strand_i, $distance_i) = 
+	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
 		generate_new_metadata($data_ref);
 	
 	
@@ -461,7 +464,8 @@ sub intersect_genome_features {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i, 
+				$overlap_i
 			);
 		}
 		else {
@@ -477,7 +481,8 @@ sub intersect_genome_features {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i, 
+				$overlap_i
 			);
 		}
 			
@@ -555,10 +560,19 @@ sub generate_new_metadata {
 	$data_ref->{'number_columns'} += 1;
 			
 	
-	# add extra metadata
+	# Overlap column
+	my $overlap_i = $data_ref->{'number_columns'};
+	$data_ref->{$overlap_i} = {
+		'index'        => $overlap_i,
+		'name'         => 'Overlap',
+		'intersection' => $data_ref->{'feature'},
+		'reference'    => $reference_position,
+	};
+	$data_ref->{'data_table'}->[0][$overlap_i] = 'Overlap';
+	$data_ref->{'number_columns'} += 1;
 	
 	
-	return ($number_i, $name_i, $type_i, $strand_i, $distance_i);
+	return ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i);
 }
 
 
@@ -567,7 +581,7 @@ sub generate_new_metadata {
 sub process_region {
 	
 	my ($region, $region_strand, $search_feature, $data_ref, $row, 
-		$number_i, $name_i, $type_i, $strand_i, $distance_i) = @_;
+		$number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = @_;
 	
 	# look for the requested features
 	my @features = $region->features(
@@ -587,7 +601,8 @@ sub process_region {
 			$name_i, 
 			$type_i, 
 			$strand_i, 
-			$distance_i
+			$distance_i,
+			$overlap_i,
 		);
 	}
 	
@@ -604,6 +619,8 @@ sub process_region {
 			$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
 			$data_ref->{'data_table'}->[$row][$distance_i] = 
 				determine_distance($region, $region_strand, $f);
+			$data_ref->{'data_table'}->[$row][$overlap_i] = 
+				determine_overlap($region, $region_strand, $f);
 		}
 		else {
 			# the feature should be excluded
@@ -614,7 +631,8 @@ sub process_region {
 				$name_i, 
 				$type_i, 
 				$strand_i, 
-				$distance_i
+				$distance_i,
+				$overlap_i,
 			);
 		}
 	}
@@ -638,24 +656,7 @@ sub process_region {
 		if (scalar @features > 1) {
 			my %overlap2f;
 			foreach (@features) {
-				
-				# apparently, using Bio::RangeI methods on $region doesn't 
-				# work, intersection and overlap_extent fail to give proper 
-				# end values, just returns "-end"
-				
-				# the workaround is to create a new simple Bio::Range object 
-				# using the coordinates from $region, and then determine the 
-				# overlap between it and the list of found target features in $_
-				
-				my $a = Bio::Range->new(
-					-start  => $region->start,
-					-end    => $region->end,
-					-strand => $region_strand,
-				);
-				
-				
-				my $int = $a->intersection($_);
-				my $overlap = $int->length;
+				my $overlap = determine_overlap($region, $region_strand, $_);
 				$overlap2f{$overlap} = $_;
 				# this may overwrite if two or more features have identical 
 				# amounts of overlap, but we'll simply use that as a means 
@@ -680,6 +681,8 @@ sub process_region {
 		$data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
 		$data_ref->{'data_table'}->[$row][$distance_i] = 
 			determine_distance($region, $region_strand, $f);
+		$data_ref->{'data_table'}->[$row][$overlap_i] = 
+			determine_overlap($region, $region_strand, $f);
 		
 	}
 	
@@ -694,14 +697,15 @@ sub process_region {
 ### Fill in data table with null data
 sub process_no_feature {
 	
-	my ($data_ref, $row, $number_i, $name_i, $type_i, $strand_i, $distance_i) =
-		@_;
+	my ($data_ref, $row, $number_i, $name_i, $type_i, $strand_i, 
+		$distance_i, $overlap_i) = @_;
 
 	$data_ref->{'data_table'}->[$row][$number_i]   = 0;
 	$data_ref->{'data_table'}->[$row][$name_i]     = '.';
 	$data_ref->{'data_table'}->[$row][$type_i]     = '.';
 	$data_ref->{'data_table'}->[$row][$strand_i]   = 0;
 	$data_ref->{'data_table'}->[$row][$distance_i] = '.';
+	$data_ref->{'data_table'}->[$row][$overlap_i] = '.';
 
 }
 
@@ -752,6 +756,28 @@ sub determine_distance {
 }
 
 
+
+### Calculate the overlap between target and reference features
+sub determine_overlap {
+	my ($reference, $ref_strand, $target) = @_;
+	
+	# apparently, using Bio::RangeI methods on a region doesn't 
+	# work (what!!!!????), intersection and overlap_extent fail to 
+	# give proper end values, just returns "-end"
+	
+	# the workaround is to create a new simple Bio::Range object 
+	# using the coordinates from the reference region, and then determine the 
+	# overlap between it and the target feature
+	my $a = Bio::Range->new(
+		-start  => $reference->start,
+		-end    => $reference->end,
+		-strand => $ref_strand,
+	);
+	
+	# find the overlap
+	my $int = $a->intersection($target);
+	return $int->length;
+}
 
 
 
@@ -891,7 +917,9 @@ the most overlap with the reference feature is preferentially listed. The name,
 type, and strand of the selected target feature is reported. Finally, the 
 distance from the reference feature to the target feature is reported. The 
 reference points for measuring the distance is by default the start or 5' end 
-of the features, or optionally the midpoints.
+of the features, or optionally the midpoints. Note that the distance 
+measurement is relative to the coordinates after adjustment with the --start, 
+--stop, and --extend options.
 
 A standard tim data text file is written.
 
