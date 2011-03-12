@@ -12,7 +12,6 @@ use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
-	open_to_read_fh
 );
 use tim_file_helper qw(
 	write_tim_data_file
@@ -374,11 +373,11 @@ sub write_progressive_data {
 __END__
 =head1 NAME
 
-wig2gff.pl
+wig2data.pl
 
 =head1 SYNOPSIS
 
-wig2gff.pl [--options...] <filename>
+wig2data.pl [--options...] <filename>
   
   Options:
   --in <filename>
