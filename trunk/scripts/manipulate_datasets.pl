@@ -102,7 +102,7 @@ print "    Loaded '$infile' with ", $main_data_ref->{'last_row'},
 
 ### Initialize more variables
 # parse the requested index string in to an array of indices
-my @opt_indices = _parse_list($opt_index);
+my @opt_indices = parse_list($opt_index);
 
 # initialize modification count
 my $modification = 0; 
@@ -202,6 +202,8 @@ sub print_menu {
 		"  z  Generate a normali(z)ed difference between two datasets\n" .
 		"  v  Di(v)ide \n" .
 		"  u  S(u)btract\n" . 
+		"  i  Convert data to s(i)gned data according to strand\n" .
+		"  t  Merge s(t)randed datasets into one\n" .
 		"  e  C(e)nter normalize feature datapoints \n" .
 		"  w  Generate a ne(w) column with a single identical value\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
@@ -210,7 +212,7 @@ sub print_menu {
 		"  h  (h)elp\n" .
 		"  q  (q)uit\n" 
 	;
-	# unused letters: C E F G H iI jJ kK L M O Q S t V X yY 
+	# unused letters: C E F G H I jJ kK L M O Q S V X yY 
 	# m is not listed here but is for the menu
 	return; # return 0, nothing done
 }
@@ -1481,7 +1483,7 @@ sub log2_function {
 	# this subroutine will convert dataset values to log2 space
 	
 	# request datasets
-	my @indices = &_request_indices(
+	my @indices = _request_indices(
 		" Enter the index number(s) of the dataset(s) to convert to log2  "
 	);
 	unless (@indices) {
@@ -2624,21 +2626,240 @@ sub division_function {
 
 
 
+sub convert_strand_to_sign {
+	# this subroutine will convert one dataset to a signed dataset according to 
+	# strand information
+	
+	# request dataset
+	my $index = _request_index(
+		" Enter the dataset index to convert to signed data   ");
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
+		return;
+	}
+	
+	# identify the strand index
+	my $strand_i = find_column_index($main_data_ref, 'strand|direction');
+	unless (defined $strand_i) {
+		# can't find it? ask the user
+		$strand_i = _request_index(
+			" Enter the index for the strand information column   ");
+		if ($strand_i == -1) {
+			warn " unknown strand index number. nothing done\n";
+			return;
+		}
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	# proceed with the conversions
+	my $change_count = 0;
+	if ($placement eq 'r' or $placement eq 'R') { 
+		# Replace the current dataset
+		
+		# perform sign conversion
+		for my $row (1..$main_data_ref->{'last_row'}) {
+			# walk through each value in the table
+			
+			# check the value contents and process appropriately
+			if ($data_table_ref->[$row][$index] == 0) { 
+				# zero is inherently unsigned, skip
+				next;
+			} 
+			elsif ($data_table_ref->[$row][$index] eq '.') {
+				# a null value, do nothing
+				next;
+			} 
+			else {
+				# a presumed numeric value, change the sign
+				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+					# looks like it is reverse: (minus), (r)everse, (c)rick
+					# then prepend data value with a (minus)
+					$data_table_ref->[$row][$index] = 
+						-($data_table_ref->[$row][$index]);
+					$change_count++;
+				}
+				elsif ($data_table_ref->[$row][$strand_i] !~ /^+|1|f|w|0|\./i) {
+					warn " unrecognized strand symbol for data row $row!\n";
+					# do nothing for these
+				}
+				else {
+					# do nothing for forward or no strand
+				}
+			}
+		}
+		
+		# update metadata
+		$main_data_ref->{$index}{'strand'} = 'signed';
+		
+		# print conclusion
+		print " $change_count $main_data_ref->{$index}{'name'} reverse strand" .
+			" values' sign was changed\n";
+	}
+	
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Generate a new dataset
+
+		# the new index position is equivalent to the number of columns
+		my $new_index = $main_data_ref->{'number_columns'};
+		
+		# perform sign conversion
+		for my $row (1..$main_data_ref->{'last_row'}) {
+			# walk through each value in the table
+			
+			# check the value contents and process appropriately
+			if ($data_table_ref->[$row][$index] == 0) { 
+				# zero is inherently unsigned, skip
+				$data_table_ref->[$row][$new_index] = 0;
+			} 
+			elsif ($data_table_ref->[$row][$index] eq '.') {
+				# a null value, do nothing
+				$data_table_ref->[$row][$new_index] = '.';
+			} 
+			else {
+				# a presumed numeric value, change the sign
+				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+					# looks like it is reverse: (minus), (r)everse, (c)rick
+					# then prepend data value with a (minus)
+					$data_table_ref->[$row][$new_index] = 
+						-($data_table_ref->[$row][$index]);
+					$change_count++;
+				}
+				elsif ($data_table_ref->[$row][$strand_i] =~ /^+|1|f|w|0|\./i) {
+					# forward or no strand, simply copy as is
+					$data_table_ref->[$row][$new_index] = 
+						$data_table_ref->[$row][$index];
+				}
+				else {
+					warn " unrecognized strand symbol for data row $row!\n";
+					# go ahead and copy the data
+					$data_table_ref->[$row][$new_index] = 
+						$data_table_ref->[$row][$index];
+				}
+			}
+		}
+		
+		# annotate new metadata
+		my $new_name = $main_data_ref->{$index}{'name'} . '_signed';
+		_generate_new_metadata(
+			$index,
+			$new_index,
+			'strand',
+			'signed',
+			$new_name,
+		);
+		
+		# print conclusion
+		print " $change_count $main_data_ref->{$index}{'name'} reverse strand" .
+			" values' sign was changed and recorded as a new dataset\n";
+	}
+	else {
+		# Unknown placement
+		warn " sign conversion NOT done; unknown placement request\n";
+		return; # can't proceed with any index
+	}
+	
+	# done
+	return 1;
+}
+
+
+
+sub merge_stranded_data {
+	# this subroutine will merge two datasets representing forward and reverse
+	# into one signed dataset
+
+	# request datasets
+	my @indices = _request_indices(
+		" Enter the forward, reverse strand datasets to merge   "
+	);
+	unless (@indices) {
+		warn " unknown index number(s). nothing done\n";
+		return;
+	}
+	unless (scalar @indices == 2) {
+		warn " two indices must be provided! nothing done\n";
+		return;
+	}
+	my ($f_index, $r_index) = @indices;
+	
+	# the new index position is equivalent to the number of columns
+	my $new = $main_data_ref->{'number_columns'};
+	
+	# calculate the numbers for each line
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		# check all the possibilities
+		
+		if (
+			$data_table_ref->[$row][$f_index] =~ /^[0|\.]$/ and
+			$data_table_ref->[$row][$r_index] =~ /^[0|\.]$/
+		) {
+			# both datasets either have zero or no data
+			# use forward dataset as the default
+			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
+			warn "  $row both are zero or null, using forward\n";
+		}
+		
+		elsif (
+			$data_table_ref->[$row][$f_index] =~ /^[0|\.]$/ and
+			$data_table_ref->[$row][$r_index] !~ /^[0|\.]$/
+		) {
+			# forward dataset only has zero or no data
+			# use reverse dataset, reversing sign
+			$data_table_ref->[$row][$new] = 
+				-($data_table_ref->[$row][$r_index]);
+			warn "  $row forward only, using reverse\n";
+		}
+		
+		elsif (
+			$data_table_ref->[$row][$f_index] !~ /^[0|\.]$/ and
+			$data_table_ref->[$row][$r_index] =~ /^[0|\.]$/
+		) {
+			# reverse dataset only has zero or no data
+			# use forward dataset 
+			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
+			warn "  $row reverse only, using forward\n";
+		}
+		
+		else {
+			# both datasets have data
+			# perform simple subtraction
+			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index] - 
+				$data_table_ref->[$row][$r_index];
+			warn "  $row both, calculating diff\n";
+		}
+	}
+	
+	# annotate new metadata
+	my $new_name = $main_data_ref->{$f_index}{'name'} . '_&_' .
+		$main_data_ref->{$r_index}{'name'} . '_merged';
+	_generate_new_metadata(
+		$f_index,
+		$new,
+		'strand',
+		'signed',
+		$new_name,
+	);
+		
+	# finished
+	print " $main_data_ref->{$f_index}{name} and $main_data_ref->{$r_index}{name}" .
+		" stranded datasets were merged as signed data and" .
+		" recorded as a new dataset\n";
+	return 1;
+}
+
+
+
 sub number_function {
 	# This subroutine will number the datapoints or lines
 	
 	# request dataset
-	my $index;
-	if (defined $opt_index) {
-		$index = $opt_index;
-	}
-	else {
-		my $line = " The numbers will be entered as a dataset in front of " . 
-			"which current dataset?\n Enter nothing to place the numbers " .
-			"at the end.    ";
-		$index = _request_index($line);
-		# a return of -1 indicates the numbers will be put at the end
-	}
+	my $line = " The numbers will be entered as a dataset in front of " . 
+		"which current dataset?\n Enter nothing to place the numbers " .
+		"at the end.    ";
+	my $index = _request_index($line);
+	# a return of -1 indicates the numbers will be put at the end
 	
 	# number the datasets
 	# we'll put the numbers at the end for now
@@ -3130,6 +3351,8 @@ sub _get_letter_to_function_hash {
 		'z' => "normdiff",
 		'v' => "divide",
 		'u' => "subtract",
+		'i' => "strandsign",
+		't' => "mergestrand",
 		'e' => "center",
 		'w' => "new",
 		'x' => "export",
@@ -3147,37 +3370,39 @@ sub _get_function_to_subroutine_hash {
 	# the key is the function name
 	# the value is a scalar reference to the subroutine
 	my %hash = (
-		'stat'       => \&print_statistics_function,
-		'reorder'    => \&reorder_function,
-		'delete'     => \&delete_function,
-		'rename'     => \&rename_function,
-		'number'     => \&number_function,
-		'sort'       => \&sort_function,
-		'gsort'      => \&genomic_sort_function,
-		'null'       => \&toss_nulls_function,
-		'duplicate'  => \&toss_duplicates_function,
-		'above'      => \&toss_above_threshold_function,
-		'below'      => \&toss_below_threshold_function,
-		'scale'      => \&median_scale_function,
-		'pr'         => \&percentile_rank_function,
-		'zscore'     => \&zscore_function,
-		'log2'       => \&log2_function,
-		'delog2'     => \&delog2_function,
-		'format'     => \&format_function,
-		'combine'    => \&combine_function,
-		'subsample'  => \&subsample_function,
-		'ratio'      => \&ratio_function,
-		'diff'       => \&difference_function,
-		'normdiff'   => \&normalized_difference_function,
-		'divide'     => \&division_function,
-		'subtract'   => \&subtract_function,
-		'center'     => \&center_function,
-		'new'        => \&new_column_function,
-		'export'     => \&export_function,
-		'rewrite'    => \&rewrite_function,
-		'treeview'   => \&export_treeview_function,
-		'help'       => \&print_online_help,
-		'menu'       => \&print_menu,
+		'stat'        => \&print_statistics_function,
+		'reorder'     => \&reorder_function,
+		'delete'      => \&delete_function,
+		'rename'      => \&rename_function,
+		'number'      => \&number_function,
+		'sort'        => \&sort_function,
+		'gsort'       => \&genomic_sort_function,
+		'null'        => \&toss_nulls_function,
+		'duplicate'   => \&toss_duplicates_function,
+		'above'       => \&toss_above_threshold_function,
+		'below'       => \&toss_below_threshold_function,
+		'scale'       => \&median_scale_function,
+		'pr'          => \&percentile_rank_function,
+		'zscore'      => \&zscore_function,
+		'log2'        => \&log2_function,
+		'delog2'      => \&delog2_function,
+		'format'      => \&format_function,
+		'combine'     => \&combine_function,
+		'subsample'   => \&subsample_function,
+		'ratio'       => \&ratio_function,
+		'diff'        => \&difference_function,
+		'normdiff'    => \&normalized_difference_function,
+		'divide'      => \&division_function,
+		'subtract'    => \&subtract_function,
+		'strandsign'  => \&convert_strand_to_sign,
+		'mergestrand' => \&merge_stranded_data,
+		'center'      => \&center_function,
+		'new'         => \&new_column_function,
+		'export'      => \&export_function,
+		'rewrite'     => \&rewrite_function,
+		'treeview'    => \&export_treeview_function,
+		'help'        => \&print_online_help,
+		'menu'        => \&print_menu,
 	);
 	return %hash;
 }
@@ -3257,7 +3482,7 @@ sub _request_indices {
 		print $line; # print the user prompt
 		my $response = <STDIN>;
 		chomp $response;
-		@indices = _parse_list($response); 
+		@indices = parse_list($response); 
 	}
 	
 	# check the list of indices
@@ -3288,35 +3513,6 @@ sub _request_placement {
 	return $placement;
 }
 
-
-
-
-sub _parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# ordinary number
-			push @list, $_;
-		}
-	}
-	return @list;
-}
 
 
 
@@ -3599,6 +3795,8 @@ other required options. These functions include the following.
   normdiff
   divide
   subtract
+  strandsign
+  mergestrand
   center
   new
   export
@@ -3916,6 +4114,27 @@ Divide a value from a dataset. A real number may be supplied, or the words
 values of the dataset. The dataset may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
+
+=item B<strandsign> (menu option 'i')
+
+Convert a dataset's values to signed data according to strand. Forward 
+strand data is positive, and reverse strand is negative. This function 
+may not be appropriate with logarithmic or other datasets that include 
+negative values. Provide the index of a single dataset to convert. A 
+second dataset should provide the strand information and be labeled 
+with a name that includes either 'strand' or 'direction'. Strand 
+information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded 
+data may overwrite the data or written to a new dataset.
+
+=item B<mergestrand> (menu option 't')
+
+Merge two stranded datasets into a single new dataset, with the forward 
+dataset represented as a positive value, and the reverse dataset as a 
+negative value. Datapoints which contain values on both strands are 
+recorded as a simple difference (forward - reverse). This function may 
+not be appropriate with logarithmic or other datasets that include 
+negative values. Provide the indices of the two datasets as forward, 
+reverse. Metadata is not checked for validity. 
 
 =item B<center> (menu option 'e')
 
