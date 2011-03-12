@@ -9,6 +9,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
+	parse_list
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -153,19 +154,14 @@ print " That's it!\n";
 
 sub get_attribute_list_from_user {
 	# get the list from the user
+	# either as a command line option or interactively
 	
 	my @list;
 	
 	# provided by command line argument
 	if ($attrib_request) {
-		
-		# check if there are multiple items in the list
-		if ($attrib_request =~ /,/) {
-			@list = split /,/, $attrib_request;
-		}
-		else {
-			push @list, $attrib_request;
-		}
+		@list = split /,/, $attrib_request;
+		# 
 	}
 	
 	# request interactively from user
@@ -208,11 +204,13 @@ sub get_attribute_list_from_user {
 		}
 		
 		# collect the user response
-		print " Enter the attribute number(s) to collect, comma delimited   ";
+		print " Enter the attribute number(s) to collect, comma-delimited or range  ";
 		my $answer = <STDIN>;
 		chomp $answer;
-		$answer =~ s/\s//g;
-		foreach (split /,/, $answer) {
+		my @answers = parse_list($answer);
+		
+		# check the answers
+		foreach (@answers) {
 			if (exists $index2att{$_}) {
 				push @list, $index2att{$_};
 			}
