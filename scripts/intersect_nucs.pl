@@ -43,6 +43,7 @@ my (
 	$infile1,
 	$infile2,
 	$outfile,
+	$set_strand,
 	$gff,
 	$type,
 	$source,
@@ -52,14 +53,15 @@ my (
 
 # Command line options
 GetOptions( 
-	'in1=s'    => \$infile1, # input file one
-	'in2=s'    => \$infile2, # input file two
-	'out=s'    => \$outfile, # output filename
-	'gff!'     => \$gff, # output gff file
-	'type=s'   => \$type, # the gff type
-	'source=s' => \$source, # the gff source
-	'gz!'      => \$gz, # gzip status
-	'help'     => \$help, # help
+	'in1=s'      => \$infile1, # input file one
+	'in2=s'      => \$infile2, # input file two
+	'out=s'      => \$outfile, # output filename
+	'set_strand' => \$set_strand, # artificially enforce a strand for target
+	'gff!'       => \$gff, # output gff file
+	'type=s'     => \$type, # the gff type
+	'source=s'   => \$source, # the gff source
+	'gz!'        => \$gz, # gzip status
+	'help'       => \$help, # help
 );
 
 
@@ -248,6 +250,19 @@ sub intersect_nucs {
 		die " unable to identify one or more required indexs in the source files!\n";
 	}
 	
+	# set the strand for the target nucleosomes if requested
+	my $t_strand_i;
+	if ($set_strand) {
+		$t_strand_i   = find_column_index($target_data, 'strand');
+		
+		# skip strand if we can't find it
+		unless (defined $t_strand_i) {
+			warn " unable to identify strand column for target nucleosome file"
+				. " \n   '" . $target_data->{filename} . "'! ignoring strand\n";
+			$set_strand = 0;
+		}
+	}
+	
 	
 	# begin intersection
 	my $t = $target_data->{'data_table'};
@@ -300,24 +315,88 @@ sub intersect_nucs {
 						( $r->[$rrow][$r_start_i] + $r->[$rrow][$r_stop_i] )/2;
 					
 					# determine extent and coordinates of overlap
-					my $length = abs($t_mid - $r_mid);
-					my ($direction, $start, $stop);
-					if ($t_mid == $r_mid) {
-						$direction = '.';
-						$start = $t_mid;
-						$stop = $t_mid;
+					# according to implied strand
+					my ($length, $direction, $start, $stop);
+					if ($set_strand) {
+						# implied strand
+						
+						if ($t->[$trow][$t_strand_i] =~ /^1|\+|f|w/i) {
+							# target is forward strand
+							# no need to flip coordinates
+							
+							$length = $t_mid - $r_mid;
+							if ($t_mid == $r_mid) {
+								$direction = '.';
+								$start = $t_mid;
+								$stop = $t_mid;
+							}
+							elsif ($t_mid < $r_mid) {
+								# leftward shift in position
+								$direction = 'r';
+								$start = $t_mid;
+								$stop = $r_mid;
+							}
+							elsif ($t_mid > $r_mid) {
+								# rightward shift in position
+								$direction = 'f';
+								$start = $r_mid;
+								$stop = $t_mid;
+							}
+						}
+						
+						elsif ($t->[$trow][$t_strand_i] =~ /^\-|r|c/i) {
+							# target is reverse strand
+							# we will essentially flip the coordinates around 
+							
+							$length = -($t_mid - $r_mid);
+							if ($t_mid == $r_mid) {
+								$direction = '.';
+								$start = $t_mid;
+								$stop = $t_mid;
+							}
+							elsif ($t_mid < $r_mid) {
+								# leftward becomes rightward shift in position
+								$direction = 'f';
+								$start = $r_mid;
+								$stop = $t_mid;
+							}
+							elsif ($t_mid > $r_mid) {
+								# rightward becomes leftward shift in position
+								$direction = 'r';
+								$start = $t_mid;
+								$stop = $r_mid;
+							}
+						}
+						
+						else {
+							# huh!!!????
+							die " unrecgnizable strand symbol '" . 
+								$t->[$trow][$t_strand_i] . "' at target data" .
+								" row $trow!\n";
+						}
 					}
-					elsif ($t_mid < $r_mid) {
-						# leftward shift in position
-						$direction = 'r';
-						$start = $t_mid;
-						$stop = $r_mid;
-					}
-					elsif ($t_mid > $r_mid) {
-						# rightward shift in position
-						$direction = 'f';
-						$start = $r_mid;
-						$stop = $t_mid;
+					
+					else {
+						# no strand implied
+						
+						$length = $t_mid - $r_mid;
+						if ($t_mid == $r_mid) {
+							$direction = '.';
+							$start = $t_mid;
+							$stop = $t_mid;
+						}
+						elsif ($t_mid < $r_mid) {
+							# leftward shift in position
+							$direction = 'r';
+							$start = $t_mid;
+							$stop = $r_mid;
+						}
+						elsif ($t_mid > $r_mid) {
+							# rightward shift in position
+							$direction = 'f';
+							$start = $r_mid;
+							$stop = $t_mid;
+						}
 					}
 					
 					# determine names if available
@@ -568,6 +647,7 @@ intersect_nucs.pl [--options...] <filename_1> <filename_2>
   
   --in1 <filename1>
   --in2 <filename2>
+  --set_strand
   --out <filename>
   --gff
   --type <gff_type>
@@ -587,10 +667,18 @@ The command line flags and descriptions:
 
 Specify two files of nucleosome lists. The files must contain sorted
 genomic position coordinates for each nucleosome. Supported file formats
-include GFF, BED, or the text data file from C<map_nucleosomes.pl>. The
+include any text data file with chromosome, start, stop, and name. The
 file with the least number of nucleosomes is automatically designated as
 the target, while the file with the most is designated as the reference
-list.
+list. When files with equivalent numbers are provided, the first file 
+is target.
+
+=item --set_strand
+
+Force the target nucleosomes to be considered as stranded. This enforces 
+an orientation and affects the direction of any reported nucleosome shift. 
+A column with a label including 'strand' is required in the target file. 
+The default is false.
 
 =item --out <filename>
 
@@ -632,6 +720,10 @@ The program will output a tim data text file of the intersections, which
 include the start and stop points that indicate the positions and extent of
 the midpoint shift, the direction of shift, and the name of the
 intersecting nucleosomes. Optionally a GFF file may also be written as well.
+
+The target nucleosomes may have strand optionally imposed. This is useful 
+when working with nucleosomes that are associated with stranded genomic 
+features, for example, nucleosomes flanking a transcription start site.
 
 A summary and statistics of the intersection are printed to standard output 
 upon completion.
