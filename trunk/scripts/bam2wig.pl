@@ -552,7 +552,7 @@ sub write_wig {
 		}
 		else {
 			# we're writing a variable step file
-			$outfh->print("variablesStep chrom=$seq_id span=1\n");
+			$outfh->print("variableStep chrom=$seq_id span=1\n");
 			foreach my $i (sort {$a <=> $b} keys %data) {
 				$outfh->print("$i\t$data{$i}\n");
 				$count++;
