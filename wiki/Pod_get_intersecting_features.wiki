@@ -84,7 +84,7 @@ __
 ==DESCRIPTION==
 This program will take a list of reference features and identify  target features which intersect them. The reference features  may be either named features (name and type) or genomic regions (chromosome,  start, stop). By default, the search region for each reference feature is the  entire feature, but may be restricted or expanded in size with appropriate  modifiers (--start, --stop, --extend). The target features are specifed as  specific types.
 
-Several attributes of the found features are appended to the original input  file data. First, the number of  target features are reported. If more than one are found, the feature with  the most overlap with the reference feature is preferentially listed. The name,  type, and strand of the selected target feature is reported. Finally, the  distance from the reference feature to the target feature is reported. The  reference points for measuring the distance is by default the start or 5' end  of the features, or optionally the midpoints.
+Several attributes of the found features are appended to the original input  file data. First, the number of  target features are reported. If more than one are found, the feature with  the most overlap with the reference feature is preferentially listed. The name,  type, and strand of the selected target feature is reported. Finally, the  distance from the reference feature to the target feature is reported. The  reference points for measuring the distance is by default the start or 5' end  of the features, or optionally the midpoints. Note that the distance  measurement is relative to the coordinates after adjustment with the --start,  --stop, and --extend options.
 
 A standard tim data text file is written.
 

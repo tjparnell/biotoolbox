@@ -15,7 +15,6 @@ bar2wig.pl `[`--options...`]` <**filename>
   --barapp </path/to/Bar2Gr>
   --method [mean | median | sum | max]
   --(no)track
-  --(no)inter
   --bw
   --db <database>
   --chromof <filename>
@@ -47,19 +46,13 @@ __
 __--method `[`mean | median | sum | max`]`
 
 __
-  Define the method used to combine multiple data values at a single  position. Bar files can frequently have one or more values at a single  position, usually due to either multiple identical oligo probes (microarray  data) or multiple sequence tags aligning to the same position (next  generation sequencing data). Typically, with microarray data, the values  should be averaged (mean), while with sequencing data, values should be summed. The default method is 'sum'.
+  Define the method used to combine multiple data values at a single  position. Bar files can frequently have one or more values at a single  position, usually due to either multiple identical oligo probes (microarray  data) or multiple sequence tags aligning to the same position (next  generation sequencing data). Typically, with FDR or microarray data,  the mean or max value should be taken, while bar files representing  sequence tag !PointData** should be summed.
 __
   __
 __--(no)track
 
 __
   Wig files typically include a track line at the beginning of the file which  defines the appearance. However, conversion of a wig file to bigWig  requires that the track line is absent. Do not include the track line when  generating bigWig files manually. The default is to include for wig files  (true), and exclude for bigWig files (false).
-__
-  __
-__--(no)inter
-
-__
-  Bar files are typically in interbase (0-base) format, whereas wig files are  typically 1-base format. Shift (or not) the position by 1 bp. Default is  true.
 __
   __
 __--bw

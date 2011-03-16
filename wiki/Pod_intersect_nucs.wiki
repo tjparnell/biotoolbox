@@ -13,6 +13,7 @@ intersect_nucs.pl `[`--options...`]` <**filename_1> <**filename_2>
 {{{
   --in1 <filename1>
   --in2 <filename2>
+  --set_strand
   --out <filename>
   --gff
   --type <gff_type>
@@ -30,7 +31,13 @@ The command line flags and descriptions:
 __--in1 <**filename>, --in2 <**filename>
 
 __
-  Specify two files of nucleosome lists. The files must contain sorted genomic position coordinates for each nucleosome. Supported file formats include GFF, BED, or the text data file from `map_nucleosomes.pl`. The file with the least number of nucleosomes is automatically designated as the target, while the file with the most is designated as the reference list.
+  Specify two files of nucleosome lists. The files must contain sorted genomic position coordinates for each nucleosome. Supported file formats include any text data file with chromosome, start, stop, and name. The file with the least number of nucleosomes is automatically designated as the target, while the file with the most is designated as the reference list. When files with equivalent numbers are provided, the first file  is target.
+__
+  __
+__--set_strand
+
+__
+  Force the target nucleosomes to be considered as stranded. This enforces  an orientation and affects the direction of any reported nucleosome shift.  A column with a label including 'strand' is required in the target file.  The default is false.
 __
   __
 __--out <**filename>
@@ -67,6 +74,8 @@ __
 This program will intersect two lists of nucleosomes. It will identify which  nucleosomes overlap, the direction and extent of shift of their midpoints,  and the delta change of the occupancy (or score value). The file with the  least number of nucleosomes is automatically designated as the target list,  and the file with the most number is designated as the reference list. The  reference file, at least, must be sorted in genomic order; otherwise,  intersection will yield undesirable results.
 
 The program will output a tim data text file of the intersections, which include the start and stop points that indicate the positions and extent of the midpoint shift, the direction of shift, and the name of the intersecting nucleosomes. Optionally a GFF file may also be written as well.
+
+The target nucleosomes may have strand optionally imposed. This is useful  when working with nucleosomes that are associated with stranded genomic  features, for example, nucleosomes flanking a transcription start site.
 
 A summary and statistics of the intersection are printed to standard output  upon completion.
 

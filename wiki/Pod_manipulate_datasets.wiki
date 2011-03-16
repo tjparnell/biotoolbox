@@ -61,6 +61,7 @@ __
   reorder
   delete
   rename
+  number
   sort
   gsort
   null
@@ -80,10 +81,13 @@ __
   normdiff
   divide
   subtract
-  export
-  treeview
-  rewrite
+  strandsign
+  mergestrand
   center
+  new
+  export
+  rewrite
+  treeview
 }}}
   Refer to the FUNCTIONS section for details.
 __
@@ -109,7 +113,7 @@ __
 __--target <**string> or <**number>
 
 __
-  Specify the target value when used with multiple functions, including the  'scale', 'subtract', 'divide', and 'format' functions. Please refer to the  function description for more information.
+  Specify the target value when using various functions, including the  'scale', 'subtract', 'divide', and 'format' functions. Please refer to the  function description for more information.
 __
   __
 __--place `[`r | n`]`
@@ -339,10 +343,28 @@ __
   Divide a value from a dataset. A real number may be supplied, or the words 'mean' or 'median' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
 __
   __
+_*_strandsign_*_ (menu option 'i')
+
+__
+  Convert a dataset's values to signed data according to strand. Forward  strand data is positive, and reverse strand is negative. This function  may not be appropriate with logarithmic or other datasets that include  negative values. Provide the index of a single dataset to convert. A  second dataset should provide the strand information and be labeled  with a name that includes either 'strand' or 'direction'. Strand  information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded  data may overwrite the data or written to a new dataset.
+__
+  __
+_*_mergestrand_*_ (menu option 't')
+
+__
+  Merge two stranded datasets into a single new dataset, with the forward  dataset represented as a positive value, and the reverse dataset as a  negative value. Datapoints which contain values on both strands are  recorded as a simple difference (forward - reverse). This function may  not be appropriate with logarithmic or other datasets that include  negative values. Provide the indices of the two datasets as forward,  reverse. Metadata is not checked for validity.
+__
+  __
 _*_center_*_ (menu option 'e')
 
 __
   Center normalize the datapoints in a row by subtracting the mean or median of the datapoints. The range of datasets is requested or  provided by the --index option. Old values are replaced by new  values. This is useful for visualizing data as a heat map, for example.
+__
+  __
+_*_new_*_ (menu option 'w')
+
+__
+  Generate a new dataset (column) which contains an identical value for  each datapoint (row). The value may be either requested interactively or  supplied using the --target option. This function may be useful for  assigning a common value to all of the data points before joining the  data file with another.
 __
   __
 _*_export_*_ (menu option 'x')
