@@ -1,5 +1,15 @@
 ######## biotoolbox revision history #############
 
+v1.4.3 (svn r144)
+	- Changed script bar2wig.pl to require method for combining values and removed interbase option
+	- Updated peak indentification in script map_nucleosomes.pl to use the tag dataset and not the scan dataset
+	- Updated script big_file2gff3.pl to produce more useful conf files with BigWigSets
+	- Added overlap data column to ouput of script get_intersecting_features.pl and added --set_strand option to enforce directionality
+	- Added three new functions to script manipulate_datasets.pl, including new column, strandsign, and mergestrand
+	- Fixed script wig2data.pl so it works now
+	- Updated script get_feature_info.pl to parse an attribute list from the command line
+	- Improved handling of metadata when opening tim data files
+
 v1.4.2 (svn r129)
 	- Added fast low level coverage function to the script bam2wig.pl
 	- Fixed script pull_features.pl to keep the order of features in the list file.
