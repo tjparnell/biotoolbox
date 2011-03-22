@@ -2959,6 +2959,18 @@ sub get_region_dataset_hash {
 					}
 				}
 			}
+			
+			# post-process the collected values 
+			# combine multiple values recorded at the same position
+			if ($value_type eq 'score' or $value_type eq 'length') {
+				# each 'value' is an array of one or more scores or lengths 
+				# from the datapoints collected above
+				# we will take the simple mean
+				foreach my $position (keys %datahash) {
+					$datahash{$position} = mean( @{$datahash{$position}} );
+				}
+			}
+			
 		}
 	}
 	
