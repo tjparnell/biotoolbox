@@ -12,6 +12,9 @@ use lib "$Bin/../lib";
 use tim_file_helper qw(
 	open_to_write_fh
 );
+use tim_data_helper qw(
+	format_with_commas
+);
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -39,6 +42,7 @@ my (
 	$shift,
 	$strand,
 	$interpolate,
+	$rpm,
 	$log,
 	$track,
 	$bedgraph,
@@ -59,6 +63,7 @@ GetOptions(
 	'shift=i'   => \$shift, # shift coordinates 3'
 	'strand=s'  => \$strand, # select specific strands
 	'inter!'    => \$interpolate, # positions with no count
+	'rpm!'      => \$rpm, # calculate reads per million
 	'log=i'     => \$log, # transform count to log scale
 	'track!'    => \$track, # write a track line in the wig file
 	'bed!'      => \$bedgraph, # write a bedgraph rather than wig file
@@ -199,6 +204,16 @@ my $index = $sam->bam_index;
 # output file
 my $outfh = open_wig_file();
 
+
+
+### Calculate Total read numbers
+my $total_read_number = 0;
+if ($rpm) {
+	# this is only required when calculating reads per million
+	print " Calculating total number of aligned fragments....\n";
+	sum_total_alignments();
+	print "   ", format_with_commas($total_read_number), " mapped fragments\n";
+}
 
 
 
@@ -354,8 +369,11 @@ sub process_alignments {
 		# process the reads
 		$sam->fetch($seq_id, $callback);
 		
+		# convert to reads per million if requested
+		convert_to_rpm() if $rpm;
+		
 		# convert to log if requested
-		log_scale_values() if $log;
+		convert_to_log() if $log;
 		
 		# write current chromo data to wig
 		write_wig($seq_id, $sam->target_len($tid));
@@ -538,15 +556,18 @@ sub write_wig {
 		if ($bedgraph) {
 			# we're writing a bedgraph file
 			foreach my $i (sort {$a <=> $b} keys %data) {
-				$outfh->print( 
-					join("\t",
-						$seq_id,
-						$i - 1, # bedgraphs are 0-based
-						$i,
-						$data{$i}
-					) . "\n"
-				);
-				$count++;
+				# only process properly positioned data
+				if ($i > 0 and $i < $seq_length) {
+					$outfh->print( 
+						join("\t",
+							$seq_id,
+							$i - 1, # bedgraphs are 0-based
+							$i,
+							$data{$i}
+						) . "\n"
+					);
+					$count++;
+				}
 				delete $data{$i};
 			}
 		}
@@ -554,13 +575,16 @@ sub write_wig {
 			# we're writing a variable step file
 			$outfh->print("variableStep chrom=$seq_id span=1\n");
 			foreach my $i (sort {$a <=> $b} keys %data) {
-				$outfh->print("$i\t$data{$i}\n");
-				$count++;
+				# only process properly positioned data
+				if ($i > 0 and $i < $seq_length) {
+					$outfh->print("$i\t$data{$i}\n");
+					$count++;
+				}
 				delete $data{$i};
 			}
 		}
 	}
-	print "  $count positions were recorded\n";
+	print "  ", format_with_commas($count), " positions were recorded\n";
 	
 	# empty the data hash for the next chromosome
 	#%data = ();
@@ -605,12 +629,13 @@ sub convert_to_bigwig {
 
 
 ### Convert to log scaling
-sub log_scale_values {
+sub convert_to_log {
 	
 	# converting all the values to log score
 	if ($log == 2) {
 		# log2 scale
 		foreach my $i (keys %data) {
+			next if $data{$i} == 0;
 			$data{$i} = log($data{$i}) / log(2);
 		}
 	}
@@ -618,8 +643,69 @@ sub log_scale_values {
 	elsif ($log == 10) {
 		# log10 scale
 		foreach my $i (keys %data) {
+			next if $data{$i} == 0;
 			$data{$i} = log($data{$i}) / log(10);
 		}
+	}
+}
+
+
+### Determine total number of alignments
+sub sum_total_alignments {
+	# we need to determine the total number of mapped alignments
+	
+	# loop through the chromosomes
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# each chromosome is internally represented in the bam file as 
+		# a numeric target identifier
+		# we can easily convert this to an actual sequence name
+		# we will force the conversion to go one chromosome at a time
+		
+		# sequence name
+		my $seq_id = $sam->target_name($tid);
+		
+		# process the reads according to single or paired-end
+		# paired end alignments
+		if ($paired) {
+			$sam->fetch($seq_id, 
+				sub {
+					my $a = shift;
+					
+					# check paired alignment
+					return if $a->unmapped;
+					return unless $a->proper_pair;
+					
+					# we're only counting forward reads of a pair 
+					return if $a->strand != 1; 
+					
+					# count this fragment
+					$total_read_number++;
+				}
+			);
+		}
+		
+		# single end alignments
+		else {
+			$sam->fetch($seq_id, 
+				sub {
+					my $a = shift;
+					
+					# check paired alignment
+					return if $a->unmapped;
+					
+					# count this fragment
+					$total_read_number++;
+				}
+			);
+		}
+	}
+}
+
+
+### Convert to reads per million
+sub convert_to_rpm {
+	foreach my $i (keys %data) {
+		$data{$i} = ($data{$i} * 1000000) / $total_read_number;
 	}
 }
 
@@ -645,6 +731,7 @@ bam2wig.pl [--options...] <filename>
   --shift <integer>
   --strand [f|r]
   --inter
+  --rpm
   --log [2|10]
   --(no)track
   --bed
@@ -688,7 +775,7 @@ Calculate the coverage of the alignments over the genome at single
 base pair resolution. This ignores the position, strand, shift, and 
 log options. It uses faster low level interfaces to the Bam file to 
 eke out performance. It is equivalent to specifying --position=span, 
---inter, no strand, and no log.
+--inter, no strand, no rpm, and no log.
 
 =item --pe
 
@@ -707,7 +794,8 @@ alignment as a separate tag.
 
 Shift the positions of all single-end alignments towards the 3' end by 
 the indicated number of basepairs. The value should be 1/2 the average 
-length of the insert library sequenced. Useful for ChIP-Seq applications.
+length of the insert library sequenced. Useful for ChIP-Seq applications. 
+Positions outside the chromosome length are not recorded.
 
 =item --strand [f|r]
 
@@ -721,6 +809,13 @@ true, a fixedStep wig file (step=1 span=1) is written, otherwise a
 variableStep wig file is written that only records the positions 
 where a tag is found. This will also work with bedGraph output. 
 The default behavior is to not record empty positions.
+
+=item --rpm
+
+Convert the data to Reads (or Fragments) Per Million. This is useful 
+for comparing read coverage between different datasets. This conversion 
+is applied before converting to log, if requested. The default is no 
+conversion.
 
 =item --log [2|10]
 
