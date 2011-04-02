@@ -41,6 +41,7 @@ unless (@ARGV) { # when no command line options are present
 # Initialize values
 my (
 	$database,
+	$featurelist,
 	$help,
 ); # command line variables
 my @infiles; 
@@ -50,6 +51,7 @@ my @infiles;
 GetOptions( 
 	'in=s'        => \@infiles, # input file(s)
 	'db=s'        => \$database, # the name of the database to use
+	'features=s'  => \$featurelist, # list of features to look for
 	'help'        => \$help, # print the help
 );
 
@@ -86,6 +88,14 @@ unless ($database) {
 	die " Must define a database name or GFF3 annotation file!\n";
 }
 
+# search features
+my @search_types;
+if ($featurelist) {
+	@search_types = split /,/, $featurelist;
+}
+else {
+	@search_types = qw(gene ncRNA snRNA snoRNA tRNA);
+}
 
 
 
@@ -105,7 +115,6 @@ my $codontable = Bio::Tools::CodonTable->new() or
 foreach my $infile (@ARGV) {
 	
 	# initialize data structure
-	my $output = initialize_output_data_structure($infile);
 	my $output = generate_tim_data_structure(
 		'SNPs',
 		qw(
@@ -155,7 +164,10 @@ foreach my $infile (@ARGV) {
 		my $snp_feature;
 		my $codon_change;
 		my $segment = $db->segment($chr, $pos, $pos + 1);
-		my @search_types = qw(gene ncRNA snRNA snoRNA tRNA);
+		unless (defined $segment) {
+			warn "  unable to find segment for '$chr:$pos'!\n";
+			next;
+		}
 		my @features = $segment->features(
 				-type => \@search_types,
 		);
@@ -291,6 +303,8 @@ foreach my $infile (@ARGV) {
 	unshift @sorted_table, $header;
 	$output->{'data_table'} = \@sorted_table; # replace the table reference
 	
+	# update the number of records
+	$output->{'last_row'} = scalar(@sorted_table) - 1;
 		
 	# write the output
 	my $outfile = $infile;
@@ -416,6 +430,7 @@ locate_SNPs.pl
   Options:
   --in <snp_file>
   --db <database>
+  --features type1,type2,...
   --help
 
 =head1 OPTIONS
@@ -433,10 +448,18 @@ kept gzipped; they will automatically be uncompressed.
 
 =item --db
 
-Specify the name of a single GFF3 genome annotation file. This is required.
-Ideally, a database would be specified, but I am having difficulty accessing 
-the child CDS features of genes to get at the coding frame to identify 
-codon changes.
+Specify the name of a Bio::DB::SeqFeature::Store database that contains the 
+genome annotation and sequence. Alternatively, a single GFF3 genome 
+annotation file may be provided, in which case it is loaded in memory.
+This is required.
+
+=item --features type1,type2,...
+
+Provide a comma-delimited list (no spaces) of the GFF feature types of the 
+genes to intersect with the SNPs. Complex gene structures (gene->mRNA->CDS) 
+should be able to be parsed to look for amino-acid changes. If a list is 
+not provided, the default list will then include gene, ncRNA, snRNA, snoRNA,
+and tRNA.
 
 =item --help
 
