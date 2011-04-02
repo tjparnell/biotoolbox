@@ -19,6 +19,7 @@ bam2wig.pl `[`--options...`]` <**filename>
   --shift <integer>
   --strand [f|r]
   --inter
+  --rpm
   --log [2|10]
   --(no)track
   --bed
@@ -53,7 +54,7 @@ __
 __--coverage
 
 __
-  Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, strand, shift, and  log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, no strand, and no log.
+  Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, strand, shift, and  log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, no strand, no rpm, and no log.
 __
   __
 __--pe
@@ -71,7 +72,7 @@ __
 __--shift <**integer>
 
 __
-  Shift the positions of all single-end alignments towards the 3' end by  the indicated number of basepairs. The value should be 1/2 the average  length of the insert library sequenced. Useful for ChIP-Seq applications.
+  Shift the positions of all single-end alignments towards the 3' end by  the indicated number of basepairs. The value should be 1/2 the average  length of the insert library sequenced. Useful for ChIP-Seq applications.  Positions outside the chromosome length are not recorded.
 __
   __
 __--strand `[`f|r`]`
@@ -84,6 +85,12 @@ __--inter
 
 __
   Specify whether or not to record interpolating positions of 0. If  true, a fixedStep wig file (step=1 span=1) is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  The default behavior is to not record empty positions.
+__
+  __
+__--rpm
+
+__
+  Convert the data to Reads (or Fragments) Per Million. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. The default is no  conversion.
 __
   __
 __--log `[`2|10`]`
