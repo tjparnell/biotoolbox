@@ -47,8 +47,9 @@ sub collect_bam_scores {
 	my @values;
 	if ($method eq 'length') {
 		# each hash value is an array of one or more datapoints
+		# dump them all into the final values array
 		foreach my $position (keys %bam_data) {
-			push @values, mean( @{ $bam_data{$position} } );
+			push @values, @{ $bam_data{$position} ;
 		}
 	}
 	else {
@@ -287,13 +288,15 @@ tim_db_helper::bam
 =head1 DESCRIPTION
 
 This module is used to collect the dataset scores from a binary 
-bam file (.bam). The file may be identified in one of two ways. First,
-it may be referenced in the database. Typically, a single 
-feature representing the dataset is present across each chromosome. The 
+bam file (.bam) of alignments. The bam file may be identified in one of 
+multiple ways. First, a local file may be specified directly by prefixing 
+the file name with "file:", for example "file:/my/path/to/file.bam". 
+Second, a remote file may be specifie with a URL, for example 
+"http://my.server.com/path/file.bam". Third, the bam file may be referenced 
+in the database. Typically, a single feature representing the dataset is 
+present across each chromosome. The 
 feature should contain an attribute ('bamfile') that references the 
-location of the binary file representing the alignments. Second, 
-the local location of the file may be directly passed to the subroutine. 
-
+location of the binary file representing the alignments. 
 In either case, the file is read using the Bio::DB::Sam module, and 
 the values extracted from the region of interest. 
 
@@ -309,12 +312,11 @@ If stranded coverage is desired, the best solution is to split the bam file
 into two files according to alignment strand using the biotoolbox script 
 'split_bam_by_strand.pl'. 
 
-Currently, paired-end bam files are treated as single-end files. If paired-end 
-alignments are to be analyzed, they should be processed into another format 
-(BigWig or BigBed).
-
-For loading bam files into a Bio::DB database, see the biotoolbox perl 
-script 'big_filegff3.pl'.
+Currently, paired-end bam files are treated as single-end files. There are 
+some limitations regarding working with paired-end alignments that don't 
+work well (search, strand, length, etc). If paired-end alignments are to 
+be analyzed, they should be processed into another format (BigWig or BigBed). 
+See the biotoolbox scripts 'bam2gff_bed.pl' or 'bam2wig.pl' for solutions.
 
 To speed up the program and avoid repetitive opening and 
 closing of the files, the opened bam file object is stored in a global 
@@ -343,7 +345,9 @@ The subroutine is passed five or more arguments in the following order:
     
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
+       start, end, and strand methods. Alternatively, a bam file may 
+       also be directly specified, prefixed with "file:", "http://", or 
+       "ftp://".
     2) The strand of the original feature (or region), -1, 0, or 1.
     3) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
@@ -375,7 +379,9 @@ The subroutine is passed five or more arguments in the following order:
     
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
+       start, end, and strand methods. Alternatively, a bam file may 
+       also be directly specified, prefixed with "file:", "http://", or 
+       "ftp://".
     2) The strand of the original feature (or region), -1, 0, or 1.
     3) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 

@@ -433,8 +433,8 @@ fragment lengths.
 
 Optionally specify the window size when searching for corresponding 
 sequence alignment pairs. The window is determined as the mapped nucleosome 
-midpoint +/- the specified value. The default value is the calculated 
-fuzziness value determined when mapping the nucleosome.
+midpoint +/- one half of the specified value. The default value is the 
+calculated fuzziness value determined when mapping the nucleosome.
 
 =item --at
 
