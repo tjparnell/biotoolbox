@@ -42,7 +42,6 @@ my (
 	$outfile,
 	$database,
 	$attrib_request,
-	$subfeature_only,
 	$gz,
 	$help
 ); 
@@ -53,7 +52,6 @@ GetOptions(
 	'attrib=s' => \$attrib_request, # attribute
 	'out=s'    => \$outfile, # output filename
 	'db=s'     => \$database, # database name
-	'exons!'   => \$subfeature_only, # indicate to restrict to subfeatures
 	'gz!'      => \$gz, # gzip status
 	'help'     => \$help, # help
 );
@@ -163,7 +161,6 @@ sub get_attribute_list_from_user {
 	# provided by command line argument
 	if ($attrib_request) {
 		@list = split /,/, $attrib_request;
-		# 
 	}
 	
 	# request interactively from user
@@ -194,8 +191,8 @@ sub get_attribute_list_from_user {
 		my %index2att;
 		# standard attributes for any user
 		foreach ( 
-			qw(chromo start stop length midpoint strand phase score 
-				exon_number parent
+			qw(chromo start stop midpoint length strand phase score 
+				exon_count transcript_length parent
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -247,11 +244,14 @@ sub get_attribute_method {
 	elsif ($attrib eq 'stop') {
 		$method = \&get_stop;
 	} 
+	elsif ($attrib eq 'midpoint') {
+		$method = \&get_midpoint;
+	} 
 	elsif ($attrib eq 'length') {
 		$method = \&get_length;
 	} 
-	elsif ($attrib eq 'midpoint') {
-		$method = \&get_midpoint;
+	elsif ($attrib eq 'transcript_length') {
+		$method = \&get_transcript_length;
 	} 
 	elsif ($attrib eq 'strand') {
 		$method = \&get_strand;
@@ -262,7 +262,7 @@ sub get_attribute_method {
 	elsif ($attrib eq 'score') {
 		$method = \&get_score;
 	} 
-	elsif ($attrib eq 'exons' or $attrib eq 'exon_number') {
+	elsif ($attrib eq 'exon_count') {
 		$method = \&get_exon_number;
 	} 
 	elsif ($attrib eq 'parent') {
@@ -350,33 +350,31 @@ sub get_stop {
 
 sub get_length {
 	my $feature = shift;
-	# check to see whether user requested exon subfeatures
-	if ($subfeature_only) {
-		# only measuring exon subfeatures
-		my $exon_total = 0;
-		my $cds_total  = 0;
-		foreach my $subf ( $feature->get_SeqFeatures() ) {
-			# feature may consist of multiple subfeature types
-			# we're only interested in the exon subfeatures, or if those don't
-			# exist, then the CDS subfeatures
-			# ignore all other subfeatures
-			
-			# exon subfeature
-			if ($subf->primary_tag eq 'exon') {
-				$exon_total += $subf->length;
-			}
-			# cds subfeature
-			elsif ($subf->primary_tag eq 'CDS') {
-				$cds_total += $subf->length;
-			}
+	return $feature->length || '.';
+}
+
+
+sub get_transcript_length {
+	my $feature = shift;
+	my $exon_total = 0;
+	my $cds_total  = 0;
+	foreach my $subf ( $feature->get_SeqFeatures() ) {
+		# feature may consist of multiple subfeature types
+		# we're only interested in the exon subfeatures, or if those don't
+		# exist, then the CDS subfeatures
+		# ignore all other subfeatures
+		
+		# exon subfeature
+		if ($subf->primary_tag eq 'exon') {
+			$exon_total += $subf->length;
 		}
-		# return most appropriate number
-		return $exon_total > 0 ? $exon_total : $cds_total;
+		# cds subfeature
+		elsif ($subf->primary_tag eq 'CDS') {
+			$cds_total += $subf->length;
+		}
 	}
-	else {
-		# take the entire feature length
-		return $feature->length || '.';
-	}
+	# return most appropriate number
+	return $exon_total > 0 ? $exon_total : $cds_total;
 }
 
 
@@ -428,15 +426,17 @@ sub get_exon_number {
 			}
 		}
 	}
-	if ($exon_count) {
-		return $exon_count;
-	}
-	elsif ($cds_count) {
-		return $cds_count;
-	}
-	else {
-		return 0;
-	}
+	# return exon_count if non-zero, else return cds_count, zero or non-zero
+	return $exon_count ? $exon_count : $cds_count;
+# 	if ($exon_count) {
+# 		return $exon_count;
+# 	}
+# 	elsif ($cds_count) {
+# 		return $cds_count;
+# 	}
+# 	else {
+# 		return 0;
+# 	}
 }
 
 
@@ -485,9 +485,6 @@ sub get_tag_value {
 sub record_metadata {
 	my $attrib = shift;
 	
-	# kludge to rename exon attribute
-	$attrib = 'exon_number' if $attrib eq 'exons';
-	
 	# determine new index
 	my $new_index = $main_data_ref->{'number_columns'};
 	# remember that the index counting is 0-based, so the new index is 
@@ -532,7 +529,6 @@ get_feature_info.pl <filename>
   --in <filename> 
   --db <name>
   --attrib <attribute1,attribute2,...>
-  --exons
   --out filename
   --(no)gz
   --help
@@ -541,12 +537,13 @@ Attributes include:
    chromo
    start
    stop
-   length
    midpoint
+   length
    strand
    phase
    score
-   exons (number of)
+   exon_count
+   transcript_length (sum of exon lengths)
    parent (name)
    <tag>
 
@@ -581,25 +578,19 @@ attributes include the following
    -chromo
    -start
    -stop
-   -length
    -midpoint
+   -length
    -strand
    -phase
    -score
-   -exons (number of exons, or number of CDS subfeatures)
+   -exon_count (number of exons, or CDS, subfeatures)
+   -transcript_length
    -parent (name)
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
 can't remember the feature's tag keys in the database.
    
-=item --exons
-
-Restrict feature collection to exon (or CDS) subfeatures. Currently only 
-applicable when collecting the length attribute, where the length of the 
-transcript (sum of all exon lengths) is reported rather than the entire 
-gene length.
-
 =item --out <filename>
 
 Optionally specify an alternate output file name. The default is to 
@@ -636,9 +627,4 @@ field of the original source GFF file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-=head1 TODO
-
-Finish the coding!
 
