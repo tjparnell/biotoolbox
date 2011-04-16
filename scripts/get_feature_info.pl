@@ -42,6 +42,7 @@ my (
 	$outfile,
 	$database,
 	$attrib_request,
+	$subfeature_only,
 	$gz,
 	$help
 ); 
@@ -52,6 +53,7 @@ GetOptions(
 	'attrib=s' => \$attrib_request, # attribute
 	'out=s'    => \$outfile, # output filename
 	'db=s'     => \$database, # database name
+	'exons!'   => \$subfeature_only, # indicate to restrict to subfeatures
 	'gz!'      => \$gz, # gzip status
 	'help'     => \$help, # help
 );
@@ -259,6 +261,9 @@ sub get_attribute_method {
 	elsif ($attrib eq 'exons') {
 		$method = \&get_exon_number;
 	} 
+	elsif ($attrib eq 'parent') {
+		$method = \&get_parent;
+	} 
 	else {
 		# unrecognized, must be tag key
 		$method = \&get_tag_value;
@@ -341,7 +346,33 @@ sub get_stop {
 
 sub get_length {
 	my $feature = shift;
-	return $feature->length || '.';
+	# check to see whether user requested exon subfeatures
+	if ($subfeature_only) {
+		# only measuring exon subfeatures
+		my $exon_total = 0;
+		my $cds_total  = 0;
+		foreach my $subf ( $feature->get_SeqFeatures() ) {
+			# feature may consist of multiple subfeature types
+			# we're only interested in the exon subfeatures, or if those don't
+			# exist, then the CDS subfeatures
+			# ignore all other subfeatures
+			
+			# exon subfeature
+			if ($subf->primary_tag eq 'exon') {
+				$exon_total += $subf->length;
+			}
+			# cds subfeature
+			elsif ($subf->primary_tag eq 'CDS') {
+				$cds_total += $subf->length;
+			}
+		}
+		# return most appropriate number
+		return $exon_total > 0 ? $exon_total : $cds_total;
+	}
+	else {
+		# take the entire feature length
+		return $feature->length || '.';
+	}
 }
 
 
@@ -405,11 +436,37 @@ sub get_exon_number {
 }
 
 
+sub get_parent {
+	my $feature = shift;
+	if ($feature->has_tag('parent_id')) {
+		# feature has a parent
+		my ($parent_id) = $feature->get_tag_values('parent_id');
+		my $parent = $db->get_feature_by_id($parent_id);
+		if ($parent) {
+			return $parent->display_name;
+		}
+		else {
+# 			warn " can't find a parent with id '$parent_id' for " . 
+# 				$feature->display_name . "!\n";
+			return '.';
+		}
+	}
+	else {
+		return '.';
+	}
+}
+
+
 sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
-	my @values = $feature->get_tag_values($attrib);
-	return $values[0] || '.';
+	if ($feature->has_tag($attrib)) {
+		my @values = $feature->get_tag_values($attrib);
+		return join(';', @values) || '.';
+	}
+	else {
+		return '.';
+	}
 }
 
 
@@ -459,8 +516,9 @@ A script to feature information from a Bioperl SeqFeature::Store db.
 get_feature_info.pl <filename> 
 
   --in <filename> 
-  --attrib <attribute1,attribute2,...>
   --db <name>
+  --attrib <attribute1,attribute2,...>
+  --exons
   --out filename
   --(no)gz
   --help
@@ -475,6 +533,7 @@ Attributes include:
    phase
    score
    exons (number of)
+   parent (name)
    <tag>
 
 
@@ -513,12 +572,20 @@ attributes include the following
    -strand
    -phase
    -score
-   -exons (number of exons, or number of CDS)
+   -exons (number of exons, or number of CDS subfeatures)
+   -parent (name)
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
 can't remember the feature's tag keys in the database.
    
+=item --exons
+
+Restrict feature collection to exon (or CDS) subfeatures. Currently only 
+applicable when collecting the length attribute, where the length of the 
+transcript (sum of all exon lengths) is reported rather than the entire 
+gene length.
+
 =item --out <filename>
 
 Optionally specify an alternate output file name. The default is to 
