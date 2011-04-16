@@ -193,7 +193,11 @@ sub get_attribute_list_from_user {
 		my $i = 1;
 		my %index2att;
 		# standard attributes for any user
-		foreach ( qw(chromo start stop length midpoint strand phase score exons) ) {
+		foreach ( 
+			qw(chromo start stop length midpoint strand phase score 
+				exon_number parent
+			) 
+		) {
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
@@ -258,7 +262,7 @@ sub get_attribute_method {
 	elsif ($attrib eq 'score') {
 		$method = \&get_score;
 	} 
-	elsif ($attrib eq 'exons') {
+	elsif ($attrib eq 'exons' or $attrib eq 'exon_number') {
 		$method = \&get_exon_number;
 	} 
 	elsif ($attrib eq 'parent') {
@@ -441,13 +445,20 @@ sub get_parent {
 	if ($feature->has_tag('parent_id')) {
 		# feature has a parent
 		my ($parent_id) = $feature->get_tag_values('parent_id');
-		my $parent = $db->get_feature_by_id($parent_id);
-		if ($parent) {
+		# unfortunately we have to do a slow lookup through the database 
+		# using the attribute load_id
+		# this seems to be the only way to get to the parent name
+		my @parents = $db->get_features_by_attribute('load_id' => $parent_id);
+		if (@parents) {
+			my $parent = shift @parents;
+			if (@parents) {
+				warn " more than feature found with load_id $parent_id!\n";
+			}
 			return $parent->display_name;
 		}
 		else {
-# 			warn " can't find a parent with id '$parent_id' for " . 
-# 				$feature->display_name . "!\n";
+			warn " can't find a parent with load_id '$parent_id' for " . 
+				$feature->display_name . "!\n";
 			return '.';
 		}
 	}
@@ -473,6 +484,9 @@ sub get_tag_value {
 # subroutine to record the metadata for each new attribute dataset
 sub record_metadata {
 	my $attrib = shift;
+	
+	# kludge to rename exon attribute
+	$attrib = 'exon_number' if $attrib eq 'exons';
 	
 	# determine new index
 	my $new_index = $main_data_ref->{'number_columns'};
