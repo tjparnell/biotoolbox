@@ -252,9 +252,8 @@ sub collect_nuc_sizes {
 		my ($start, $end);
 		if ($winsize) {
 			# window size explicitly defined
-			# add/subtract 1/2 of window size from the midpoint
-			$start = $midpoint - int($winsize / 2);
-			$end = $midpoint + int($winsize / 2);
+			$start = $midpoint - $winsize;
+			$end = $midpoint + $winsize;
 		}
 		else {
 			# we'll use the fuzziness value
@@ -433,7 +432,7 @@ fragment lengths.
 
 Optionally specify the window size when searching for corresponding 
 sequence alignment pairs. The window is determined as the mapped nucleosome 
-midpoint +/- one half of the specified value. The default value is the 
+midpoint +/- the specified value. The default value is the 
 calculated fuzziness value determined when mapping the nucleosome.
 
 =item --at
