@@ -201,13 +201,17 @@ database configuration.
 
 This module will open a connection to the Bioperl SeqFeature Store 
 database. It returns an object that represents the connection. The database 
-may either be a relational database (e.g. MySQL database) or a GFF3 file 
-which can be loaded into a small in-memory database.
+may either be a relational database (e.g. MySQL database), a SQLite 
+database file (file.sqlite), or a GFF3 file (file.gff) that can be loaded 
+into an in-memory database.
 
-Pass the name of a relational database or the name of the GFF3 file to be 
-loaded into memory. Other parameters for connecting to the database are 
-stored in a configuration file, C<tim_db_helper.cfg>. These include 
-database adaptors, user name, password, etc.
+Pass the name of a relational database, the path to a SQLite database file, 
+or the path to a GFF3 file. The GFF3 may be compressed. 
+
+Parameters for connecting to the database are stored in a configuration 
+file, C<tim_db_helper.cfg>. These include database adaptors, user name, 
+password, etc. Information regarding the configuration file may be found 
+within the file itself. 
 
 Example:
 
@@ -225,15 +229,12 @@ sub open_db_connection {
 		return;
 	}
 	
-	# determine whether a database name or a file for memory db
 	my $db;
-	if (
-		$database =~ /\.gff3?(?:\.gz)?$/ and 
-		-e $database
-	) {
-		# it appears database is an actual file
-		
-		# open using a memory adaptor
+	# determine type of database to connect to
+	
+	# a single gff3 file that we can load into memory
+	if ($database =~ /\.gff3?(?:\.gz)?$/i and -e $database) {
+		# open gff3 file using a memory adaptor
 		print " Loading file into memory database...\n";
 		$db = Bio::DB::SeqFeature::Store->new(
 			-adaptor => 'memory',
@@ -241,9 +242,17 @@ sub open_db_connection {
 		);
 	}
 	
+	# a SQLite database
+	elsif ($database =~ /\.sqlite$/i and -e $database) {
+		# open using SQLite adaptor
+		$db = Bio::DB::SeqFeature::Store->new(
+			-adaptor  => 'DBI::SQLite',
+			-dsn      => $database,
+		);
+	}
+	
+	# name of a database
 	else {
-		# a name of a relational database
-		
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
 		# the db_default parameters
