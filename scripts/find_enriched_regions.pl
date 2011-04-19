@@ -7,6 +7,7 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median stddevp);
 use Pod::Usage;
 use Data::Dumper;
+use File::Basename qw(fileparse);
 use Bio::Range;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -19,6 +20,7 @@ use tim_db_helper qw(
 	validate_dataset_list
 	get_region_dataset_hash
 	get_chromo_region_score
+	$TIM_CONFIG
 );
 use tim_file_helper qw(
 	write_tim_data_file
@@ -176,7 +178,12 @@ my $db = open_db_connection($database);
 # stored in the @windows array
 
 # Check or request the dataset
-check_and_verify_dataset();
+my $dataset_name = check_and_verify_dataset();
+
+# Generate output file name if necessary
+unless ($outfile) {
+	$outfile = "$dataset_name\_w$win\_s$step\_t$threshold";
+}
 
 
 ## Determine the cutoff value
@@ -288,9 +295,6 @@ unless ($main_data_ref) {
 
 ## Print the output
 # write standard output data file
-unless ($outfile) {
-	$outfile = "$dataset\_w$win\_s$step\_t$threshold";
-}
 my $write_success = write_tim_data_file( {
 	'data'     => $main_data_ref,
 	'filename' => $outfile,
@@ -344,17 +348,21 @@ print "All done!\n\n";
 sub check_and_verify_dataset {
 	if ($dataset) {
 		# check for a remote file
-		if ($dataset =~ /^http|ftp/) {
+		if ($dataset =~ /^(?:http|ftp):\/\/(.+)$/) {
 			# a remote file
-			# should be good, no verification here though
-			return;
+			# no test for validity, we'll find out later when we try to use it
+			# use the file's basename as the dataset name
+			my ($basename, undef, undef) = fileparse($1, qw(\.bb \.bw \.bam));
+			return $basename;
 		}
 		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
 			# looks like we have a file 
 			if (-e $dataset) {
 				# file exists
+				my ($basename, undef, undef) = fileparse($dataset, 
+					qw(\.bb \.bw \.bam));
 				$dataset = "file:$dataset";
-				return;
+				return $basename;
 			}
 			else {
 				# maybe it's a funny named dataset?
@@ -363,6 +371,7 @@ sub check_and_verify_dataset {
 					die " The requested file or dataset '$dataset' " . 
 						"neither exists or is valid!\n";
 				}
+				return $dataset;
 			}
 		}
 		else {
@@ -376,7 +385,7 @@ sub check_and_verify_dataset {
 			else {
 				print " Using requested data set $dataset....\n";
 			}
-			return;
+			return $dataset;
 		}
 	}	
 	
@@ -428,7 +437,7 @@ sub go_determine_cutoff {
 	}
 	
 	# collect statistics on the chromosome
-	print " Sampling '$dataset' values across chromosome '" . 
+	print " Sampling '$dataset_name' values across chromosome '" . 
 		$chromosomes[$n]->name . "'...\n";
 	my $mean = get_chromo_region_score( {
 		'db'           => $db,
@@ -440,7 +449,7 @@ sub go_determine_cutoff {
 		'log'          => $log,
 	} );
 	unless ($mean) { 
-		die " unable to determine mean value '$dataset'!\n";
+		die " unable to determine mean value for '$dataset'!\n";
 	}
 	my $stdev = get_chromo_region_score( {
 		'db'           => $db,
@@ -452,7 +461,7 @@ sub go_determine_cutoff {
 		'log'          => $log,
 	} );
 	unless ($stdev) { 
-		die " unable to determine stdev value '$dataset'!\n";
+		die " unable to determine stdev value for '$dataset'!\n";
 	}
 	print "   the mean value is $mean and standard deviation $stdev\n";
 	
@@ -491,27 +500,20 @@ sub go_find_enriched_regions {
 	
 	## collect chromosomes and data
 	# get list of chromosomes
-	my @chromosomes = $db->features(-type => 'chromosome'); 
+	my $seq_reference_type = 
+		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
+		$TIM_CONFIG->param('default_db.reference_sequence_type');
+	my @chromosomes = $db->features(-type => $seq_reference_type); 
 	unless (@chromosomes) {
-		die " unable to identify chromosome sequences in the database!\n" .
-			" check the GFF3 type of your reference sequences\n";
+		die " unable to identify reference sequences of type " . 
+			"'$seq_reference_type' in the database!\n";
 	}
 	
 	# walk through each chromosome
-	foreach my $chrobj (
-		# trying a Schwartzian transformation here
-		map $_->[0],
-		sort { $a->[1] <=> $b->[1] }
-		map [$_, ($_->name =~ /(\d+)/)[0] ], 
-		@chromosomes
-	) {
-		# sort chromosomes by increasing number
-		# we're using RE to pull out the digit number in the chromosome name
-		# and sorting increasingly by it
+	foreach my $chrobj (@chromosomes) {
 		
 		# chromosome name
-		my $chr = $chrobj->name; # this is actually returning an object, why????
-		$chr = "$chr"; # force as string
+		my $chr = $chrobj->display_name; 
 		
 		# skip mitochrondrial chromosome
 		if ($chr =~ /chrm|chrmt/i) {next};
@@ -526,7 +528,7 @@ sub go_find_enriched_regions {
 		
 		# collect the dataset values for the current chromosome
 		# store in a hash the position (key) and values
-		print "  Searching chromosome $chr....\n";
+		print "  Searching $seq_reference_type $chr....\n";
 		
 		# walk windows along the chromosome and find enriched windows
 		my $length = $chrobj->stop; # length of the chromosome
@@ -890,7 +892,7 @@ sub sort_data_by_final_score {
 sub name_the_windows {
 	my $count = 1;
 	foreach (@windows) {
-		my $name = $dataset . '_win' . $count;
+		my $name = $dataset_name . '_win' . $count;
 		unshift @{ $_ }, $name;
 		$count++;
 	}
@@ -929,14 +931,14 @@ sub generate_main_data_hash {
 	) or die " unable to generate tim data structure!\n";
 	
 	# Add metadata
-	$data->{'db'}             = $database;
+	$data->{'db'} = $database;
 	
 	# window metadata
 		# traditionally with the genome feature datasets, extra pertinant
 		# information regarding the window generation goes under the start 
 		# metadata
-	$data->{2}{'win'}      = $win;
-	$data->{2}{'step'}      = $step;
+	$data->{2}{'win'} = $win;
+	$data->{2}{'step'} = $step;
 	if ($trim) {
 		$data->{2}{'trimmed'} = 1;
 	} else {
@@ -944,8 +946,9 @@ sub generate_main_data_hash {
 	}
 	
 	# score metadata
-	$data->{5}{'log2'}      = $log;
-	$data->{5}{'method'}      = $method;
+	$data->{5}{'log2'} = $log;
+	$data->{5}{'method'} = $method;
+	$data->{5}{'dataset'} = $dataset;
 	if ($threshold) {
 		$data->{5}{'threshold'} = $threshold;
 	} else {
@@ -987,6 +990,9 @@ sub generate_main_data_hash {
 	
 	# associate the @windows array with the data table in the structure
 	$data->{'data_table'} = \@windows;
+	
+	# update last row
+	$data->{'last_row'} = scalar(@windows) - 1;
 	
 	# return the reference to the generated data hash
 	return $data;

@@ -2322,10 +2322,6 @@ arguments. The keys include
               A local file should be prefixed with 'file:', while 
               a remote file should be prefixed with the transfer 
               protocol (ftp: or http:).
-  dataf =>    Specify a supported data file from which to collect 
-              the data, rather than from the database. 
-              Supported file formats include bigwig (.bw), 
-              bigbed (.bb), or BAM (.bam). 
   method =>   The method used to combine the dataset values found
               in the defined region. Acceptable values include 
               sum, mean, median, range, stddev, min, and max. 
