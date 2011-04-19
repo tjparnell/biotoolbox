@@ -8,6 +8,7 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(:all);
+use File::Basename qw(fileparse);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -98,7 +99,7 @@ $outfile =~ s/\.txt$//; # remove pre-existing extension if exists
 unless ($ffile and $rfile) {
 	# we will need to generate window data if it's not specified
 	# in which case we need parameters
-	unless ($database and $win and $threshold and $fdata and $rdata) {
+	unless ($database and $win and defined $threshold and $fdata and $rdata) {
 		die " One or more of the search parameters (db, win, step, thresh, " .
 			"fdata, rdata) are missing!\n";
 	}
@@ -138,7 +139,7 @@ unless (defined $log) {
 my %transcripts; # a hash of all the transcription fragments (enriched windows)
 my %sensetranscripts; # a hash of gene names with associated sense transfrags
 my %antisensetranscripts; # a hash of gene names with associated antisense transfrags
-
+my ($fdata_name, $rdata_name); # basename for the datasets
 
 # open raw output file if asked
 if ($raw) {
@@ -159,13 +160,26 @@ else {
 	# generate enriched regions
 	print " No forward strand data file specified. Generating new data by\n" .
 		"  running 'find_enriched_regions.pl' script...\n";
-	$ffile = "$fdata\_w$win\_s$step\_t$threshold\_f.txt";
+	
+	# need to generate the file name
+	unless ($fdata_name) {
+		($fdata, $fdata_name) = check_dataset($fdata);
+	}
+	$ffile = "$fdata_name\_w$win\_s$step\_t$threshold\_f.txt";
+	
 	# find_enriched_regions.pl should be found at the same location
 	my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
-	$find_enriched_program .= " --db $database --data $fdata --out $ffile" . 
-		" --win $win --step $step --nofeat --thresh $threshold --median --trim";
+	$find_enriched_program .= " --db $database --out $ffile --win $win" . 
+		" --step $step --nofeat --thresh $threshold --method median --trim";
+	if ($fdata =~ /^file:(.+)$/) {
+		$find_enriched_program .= " --data $1";
+	}
+	else {
+		$find_enriched_program .= " --data $fdata";
+	}
 	$find_enriched_program .= ' --log' if $log;
 		
+	# execute
 	!system "$find_enriched_program" or
 			die "can't launch '$find_enriched_program'\n"; 
 			# successful run of program will return 0, not 1, 
@@ -180,12 +194,26 @@ else {
 	# generate enriched regions
 	print " No reverse strand data file specified. Generating new data by\n" .
 		"  running find_enriched_regions.pl script...";
-	$rfile = "$rdata\_w$win\_s$step\_t$threshold\_r.txt";
+	
+	# need to generate the file name
+	unless ($rdata_name) {
+		($rdata, $rdata_name) = check_dataset($rdata);
+	}
+	$rfile = "$rdata_name\_w$win\_s$step\_t$threshold\_r.txt";
+	
+	# find_enriched_regions.pl should be found at the same location
 	my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
-	$find_enriched_program .= " --db $database --data $rdata --out $rfile" . 
-		" --win $win --step $step --nofeat --thresh $threshold --median --trim";
+	$find_enriched_program .= " --db $database --out $rfile --win $win" . 
+		" --step $step --nofeat --thresh $threshold --method median --trim";
+	if ($rdata =~ /^file:(.+)$/) {
+		$find_enriched_program .= " --data $1";
+	}
+	else {
+		$find_enriched_program .= " --data $rdata";
+	}
 	$find_enriched_program .= ' --log' if $log;
 	
+	# execute
 	!system "$find_enriched_program " or
 			die "can't launch '$find_enriched_program'\n";
 			# successful run of program will return 0, not 1, 
@@ -193,11 +221,11 @@ else {
 }
 
 # Loading the enriched regions transcript data
-my $fcount = load_regions($ffile, 1); # load the transcripts and return the count
+my $fcount = load_regions($ffile, 1); # load the f regions and return the count
 print " Loading enriched regions transcript data...\n";
 print "  loaded $fcount forward transcripts\n";
 
-my $rcount = load_regions($rfile, -1); # now map the transcripts and return the count
+my $rcount = load_regions($rfile, -1); # load the r regions and return the count
 print "  loaded $rcount forward transcripts\n";
 
 # open database connection
@@ -303,6 +331,49 @@ print "All done!\n";
 
 ##### Subroutines #######
 
+sub check_dataset {
+	my $data = shift;
+	
+	# a remote file
+	if ($data =~ /^(?:http|ftp):\/\/(.+)$/) {
+		# no test for validity, we'll find out later when we try to use it
+		# use the file's basename as the dataset name
+		my ($basename, undef, undef) = fileparse($1, qw(\.bb \.bw \.bam));
+		return ($data, $basename);
+	}
+	
+	# local file
+	elsif ($data =~ /^file:(.+)$/) {
+		# a local file
+		unless (-e $1) {
+			die " requested dataset file $1 does not exist!\n";
+		}
+		my ($basename, undef, undef) = fileparse($data, 
+			qw(\.bb \.bw \.bam));
+		return ($data, $basename);
+	}
+	
+	# local file or database feature
+	elsif ($data =~ /\.(?:bw|bb|bam)$/i) {
+		# check if we have a file 
+		if (-e $data) {
+			# file exists
+			my ($basename, undef, undef) = fileparse($data, 
+				qw(\.bb \.bw \.bam));
+			return ("file:$data", $basename);
+		}
+		else {
+			# maybe it's a funny named dataset?
+			if (validate_dataset_list($db, $data) ) {
+				# returned true, the name of the bad dataset
+				die " The requested file or dataset '$data' " . 
+					"neither exists or is valid!\n";
+			}
+			return ($data, $data);
+		}
+	}
+}
+
 
 sub load_regions {
 	my ($filename, $strand) = @_;
@@ -325,10 +396,16 @@ sub load_regions {
 	if (!$fdata and $strand == 1) {
 		# forward dataset
 		$fdata = $metadata_ref->{5}{dataset};
+		unless ($fdata_name) {
+			($fdata, $fdata_name) = check_dataset($fdata);
+		}
 	}
 	if (!$rdata and $strand == -1) {
 		# reverse dataset
 		$rdata = $metadata_ref->{5}{dataset};
+		unless ($rdata_name) {
+			($rdata, $rdata_name) = check_dataset($rdata);
+		}
 	}
 	unless (defined $database) {
 		# define database
@@ -456,7 +533,7 @@ sub identify_transcripts {
 						foreach (@repeatlist) {
 							push @namelist, $_->name;
 							push @typelist, $_->type;
-							if ($_->abs_strand == $strand) {
+							if ($_->strand == $strand) {
 								# check the strand of the feature; if more 
 								# than one, unlikely to be opposite
 								$sense = 'sense';
@@ -497,7 +574,7 @@ sub identify_transcripts {
 					my $rna = shift @rnalist;
 					$name = $rna->name;
 					$type = $rna->type;
-					if ($rna->abs_strand == $strand) {
+					if ($rna->strand == $strand) {
 						$sense = 'sense';
 					} else {
 						$sense = 'anti-sense';
@@ -512,9 +589,9 @@ sub identify_transcripts {
 					
 					# check whether the genes are all on the same strand or not
 					my $check;
-					my $current = $rnalist[0]->abs_strand;
+					my $current = $rnalist[0]->strand;
 					for my $i (1..$#rnalist) {
-						if ($rnalist[$i]->abs_strand == $current) {
+						if ($rnalist[$i]->strand == $current) {
 							$check = 'same';
 						} else {
 							$check = 'different';
@@ -546,7 +623,7 @@ sub identify_transcripts {
 						# multiple genes not all on same strand
 						# in this case only take the sense gene
 						foreach (@rnalist) {
-							if ($_->abs_strand == $strand) {
+							if ($_->strand == $strand) {
 								# only take the gene(s) on the sense strand
 								push @namelist, $_->name;
 								push @typelist, $_->type;
@@ -580,7 +657,7 @@ sub identify_transcripts {
 				my $orf = shift @orflist;
 				$name = $orf->name;
 				$type = $orf->type;
-				if ($orf->abs_strand == $strand) {
+				if ($orf->strand == $strand) {
 					$sense = 'sense';
 				} 
 				else {
@@ -1158,8 +1235,8 @@ map_transcripts.pl --db <name> --win <i> --step <i> --fdata <name>
   --win <integer>
   --step <integer>
   --thresh <number>
-  --fdata <dataset>
-  --rdata <dataset>
+  --fdata <dataset | filename>
+  --rdata <dataset | filename>
   --tol <integer>
   --min <integer>
   --(no)gff
@@ -1220,10 +1297,15 @@ from the metadata in the provided enriched regions files.
 =item --rdata <dataset>
 
 Specify the name of the datasets in the database representing the 
-individual forward and reverse transcription data. Usually this 
-data is provided separately for each strand; a single dataset with 
-both strands of data is not accepted. These may be gleaned from the 
-metadata of the provided enriched regions files.
+individual forward and reverse transcription data. Alternatively, 
+the paths of data files may be provided. Supported formats include 
+Bam (.bam), BigBed (.bb), or BigWig (.bw). Files may be local or 
+remote (http:// or ftp://). Usually this data is provided separately 
+for each strand; a single dataset with both strands of data is not 
+accepted. For Bam or BigBed files that support strand, they should be 
+separated into two separate files based on strand. If not provided, 
+the values may be obtained from the metadata of the provided 
+enriched regions files. 
 
 =item --tol <integer>
 
