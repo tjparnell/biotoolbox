@@ -49,7 +49,7 @@ sub collect_bam_scores {
 		# each hash value is an array of one or more datapoints
 		# dump them all into the final values array
 		foreach my $position (keys %bam_data) {
-			push @values, @{ $bam_data{$position} ;
+			push @values, @{ $bam_data{$position} };
 		}
 	}
 	else {
