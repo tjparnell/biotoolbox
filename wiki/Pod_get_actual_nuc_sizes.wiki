@@ -55,7 +55,7 @@ __
 __--win <**integer>
 
 __
-  Optionally specify the window size when searching for corresponding  sequence alignment pairs. The window is determined as the mapped nucleosome  midpoint +/- the specified value. The default value is the calculated  fuzziness value determined when mapping the nucleosome.
+  Optionally specify the window size when searching for corresponding  sequence alignment pairs. The window is determined as the mapped nucleosome  midpoint +/- the specified value. The default value is the  calculated fuzziness value determined when mapping the nucleosome.
 __
   __
 __--at

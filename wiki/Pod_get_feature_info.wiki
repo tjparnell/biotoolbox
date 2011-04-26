@@ -12,13 +12,13 @@ get_feature_info.pl <**filename>
 
 {{{
   --in <filename> 
-  --attrib <attribute1,attribute2,...>
   --db <name>
+  --attrib <attribute1,attribute2,...>
   --out filename
   --(no)gz
   --help
 }}}
-Attributes include:    chromo    start    stop    length    midpoint    strand    phase    score    exons (number of)    <**tag>
+Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
 
 {{{
 }}}
@@ -47,12 +47,14 @@ __
    -chromo
    -start
    -stop
-   -length
    -midpoint
+   -length
    -strand
    -phase
    -score
-   -exons (number of exons, or number of CDS)
+   -exon_count (number of exons, or CDS, subfeatures)
+   -transcript_length
+   -parent (name)
 }}}
   If attrib is not specified on the command line, then an interactive list  will be presented to the user for selection. Especially useful when you  can't remember the feature's tag keys in the database.
 __
@@ -88,9 +90,4 @@ This program will collect attributes for a list of features from the database.  
  Salt Lake City, UT, 84112
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
-
-{{{
-}}}
-==TODO==
-Finish the coding!
 

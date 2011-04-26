@@ -21,8 +21,8 @@ map_transcripts.pl --db <**name> --win <**i> --step <**i> --fdata <**name>  --rd
   --win <integer>
   --step <integer>
   --thresh <number>
-  --fdata <dataset>
-  --rdata <dataset>
+  --fdata <dataset | filename>
+  --rdata <dataset | filename>
   --tol <integer>
   --min <integer>
   --(no)gff
@@ -79,7 +79,7 @@ __
 __--rdata <**dataset>
 
 __
-  Specify the name of the datasets in the database representing the  individual forward and reverse transcription data. Usually this  data is provided separately for each strand; a single dataset with  both strands of data is not accepted. These may be gleaned from the  metadata of the provided enriched regions files.
+  Specify the name of the datasets in the database representing the  individual forward and reverse transcription data. Alternatively,  the paths of data files may be provided. Supported formats include  Bam (.bam), !BigBed** (.bb), or !BigWig** (.bw). Files may be local or  remote (http:// or ftp://). Usually this data is provided separately  for each strand; a single dataset with both strands of data is not  accepted. For Bam or !BigBed** files that support strand, they should be  separated into two separate files based on strand. If not provided,  the values may be obtained from the metadata of the provided  enriched regions files.
 __
   __
 __--tol <**integer>
