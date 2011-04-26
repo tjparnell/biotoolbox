@@ -120,8 +120,16 @@ unless ($in_fh) {
 my $chr_index    = find_column_index($metadata_ref, '^chr|seq|refseq');
 my $start_index  = find_column_index($metadata_ref, 'start');
 my $stop_index   = find_column_index($metadata_ref, 'stop|end');
-unless (defined $chr_index and defined $start_index) {
-	die " No genomic coordinates found in the file!\n";
+unless (defined $start_index) {
+	# no start? how about a midpoint? position?
+	$start_index = find_column_index($metadata_ref, 'midpoint|mid|position');
+	unless (defined $start_index) {
+		# still nothing found, fail
+		die " No start, midpoint, or position coordinate column found in the file!\n";
+	}
+}
+unless (defined $chr_index) {
+	die " No chromosome or sequence ID column found in the file!\n";
 }
 
 # identify database if needed
