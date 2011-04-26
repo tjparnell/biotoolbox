@@ -1,5 +1,13 @@
 ######## biotoolbox revision history #############
 
+v1.4.4 (svn r162)
+	- Added reads per million option to script bam2wig.pl
+	- Added parent, exon, and transcript_length attributes to script get_feature_info.pl
+	- Updated scripts find_enriched_regions.pl and map_transcripts.pl to work with with standalone data files (BigWig, BigBed, Bam)
+	- Added configuration, description, and capabilities to working with SQLite database files in tim_db_helper
+	- Added midpoint as acceptable coordinate in script data2wig.pl
+	- Bug fixes to script locate_SNPs.pl and bam2wig.pl; library tim_db_helper::bam
+
 v1.4.3 (svn r144)
 	- Changed script bar2wig.pl to require method for combining values and removed interbase option
 	- Updated peak indentification in script map_nucleosomes.pl to use the tag dataset and not the scan dataset
