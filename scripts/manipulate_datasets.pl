@@ -210,10 +210,11 @@ sub print_menu {
 		"  W  Re(W)rite the file\n" .
 		"  T  Export for (T)reeview or Cluster analysis\n" .
 		"  h  (h)elp\n" .
-		"  q  (q)uit\n" 
+		"  q  (q)uit, saving changes if necessary\n" .
+		"  Q  (Q)uit without saving changes\n"
+		#  m  print this (m)enu
 	;
-	# unused letters: C E F G H I jJ kK L M O Q S V X yY 
-	# m is not listed here but is for the menu
+	# unused letters: C E F G H I jJ kK L M O S V X yY 
 	return; # return 0, nothing done
 }
 
@@ -284,7 +285,14 @@ sub interactive_execution {
 			# first check that the letter corresponds to a function
 			
 			# if the response is quit
-			if ($response eq 'q') {
+			if ($response eq 'Q') {
+				# quit without saving changes
+				$modification = 0; # pretend we never made changes
+				$response = undef;
+				next;
+			}
+			elsif ($response eq 'q') {
+				# quit, saving changes if necessary
 				$response = undef;
 				next;
 			}
@@ -2161,78 +2169,82 @@ sub difference_function {
 	}
 	
 	# Check for log2 status
-	if (
-		(
-			exists $main_data_ref->{$experiment_index}{'log2'} and
-			$main_data_ref->{$experiment_index}{'log2'} == 1
-		)
-		or
-		(
-			exists $main_data_ref->{$control_index}{'log2'} and
-			$main_data_ref->{$control_index}{'log2'} == 1
-		)
-	) {
-		# one or both datasets are in the log2 space
-		# we cannot proceed with log2 datasets
-		warn " one or both datasets are in log2 space; cannot proceed\n";
-		return;
-	}
+# 	if (
+# 		(
+# 			exists $main_data_ref->{$experiment_index}{'log2'} and
+# 			$main_data_ref->{$experiment_index}{'log2'} == 1
+# 		)
+# 		or
+# 		(
+# 			exists $main_data_ref->{$control_index}{'log2'} and
+# 			$main_data_ref->{$control_index}{'log2'} == 1
+# 		)
+# 	) {
+# 		# one or both datasets are in the log2 space
+# 		# we cannot proceed with log2 datasets
+# 		warn " one or both datasets are in log2 space; cannot proceed\n";
+# 		return;
+# 	}
+
+# we're eliminating the automatic assumption of working with enumerated 
+# data sets that must be subsampled prior to generating a difference
+# opens this function to working with more kinds of data
 	
-	## Perform sub sampling as necessary
-		# Since we are generating a difference between two datasets of counts
-		# we want to have equal numbers of counts, i.e. equal sums
-		# The easiest and fairest way to do this is to subsample the larger
-		# dataset so they are equal
-	# Get statistics
-	print " checking statistics....\n";
-	my %experiment_stats = _get_statistics_hash($experiment_index, 'y');
-	my %control_stats = _get_statistics_hash($control_index, 'y');
-	unless (%experiment_stats and %control_stats) {
-		warn " unable to get statistics on datasets; nothing done\n";
-		return;
-	}
-	# Check sums
-	my $subsampled; # remember which dataset was subsampled
-	my $subsampled_index; # index of the subsampled dataset
-	if ($experiment_stats{'sum'} == $control_stats{'sum'}) {
-		# the sums are equal, we can continue
-		$subsampled = -1;
-	}
-	elsif ($experiment_stats{'sum'} > $control_stats{'sum'}) {
-		# numerator dataset has higher sum, subsample it
-		my $new_numerator = _subsample_dataset(
-			$experiment_index, 
-			$experiment_stats{'sum'},
-			$control_stats{'sum'}
-		);
-		if (defined $new_numerator) {
-			$subsampled = $experiment_index; # remember which one was subsampled
-			$experiment_index = $new_numerator; # assign new position
-			$subsampled_index = $new_numerator;
-		}
-		else {
-			warn " unable to sub sample dataset '$experiment_index'; nothing done\n";
-			return;
-		}
-	}
-	elsif ($experiment_stats{'sum'} < $control_stats{'sum'}) {
-		# denominator dataset has higher sum, subsample it
-		my $new_denominator = _subsample_dataset(
-			$control_index, 
-			$control_stats{'sum'},
-			$experiment_stats{'sum'}
-		);
-		if (defined $new_denominator) {
-			$subsampled = $control_index; # remember which one was subsampled
-			$control_index = $new_denominator; # assign new position
-			$subsampled_index = $new_denominator;
-		}
-		else {
-			warn " unable to sub sample dataset '$control_index'; nothing done\n";
-			return;
-		}
-	}
-	
+# 	## Perform sub sampling as necessary
+# 		# Since we are generating a difference between two datasets of counts
+# 		# we want to have equal numbers of counts, i.e. equal sums
+# 		# The easiest and fairest way to do this is to subsample the larger
+# 		# dataset so they are equal
+# 	# Get statistics
+# 	print " checking statistics....\n";
+# 	my %experiment_stats = _get_statistics_hash($experiment_index, 'y');
+# 	my %control_stats = _get_statistics_hash($control_index, 'y');
+# 	unless (%experiment_stats and %control_stats) {
+# 		warn " unable to get statistics on datasets; nothing done\n";
+# 		return;
+# 	}
+# 	# Check sums
+# 	my $subsampled; # remember which dataset was subsampled
+# 	my $subsampled_index; # index of the subsampled dataset
+# 	if ($experiment_stats{'sum'} == $control_stats{'sum'}) {
+# 		# the sums are equal, we can continue
+# 		$subsampled = -1;
+# 	}
+# 	elsif ($experiment_stats{'sum'} > $control_stats{'sum'}) {
+# 		# numerator dataset has higher sum, subsample it
+# 		my $new_numerator = _subsample_dataset(
+# 			$experiment_index, 
+# 			$experiment_stats{'sum'},
+# 			$control_stats{'sum'}
+# 		);
+# 		if (defined $new_numerator) {
+# 			$subsampled = $experiment_index; # remember which one was subsampled
+# 			$experiment_index = $new_numerator; # assign new position
+# 			$subsampled_index = $new_numerator;
+# 		}
+# 		else {
+# 			warn " unable to sub sample dataset '$experiment_index'; nothing done\n";
+# 			return;
+# 		}
+# 	}
+# 	elsif ($experiment_stats{'sum'} < $control_stats{'sum'}) {
+# 		# denominator dataset has higher sum, subsample it
+# 		my $new_denominator = _subsample_dataset(
+# 			$control_index, 
+# 			$control_stats{'sum'},
+# 			$experiment_stats{'sum'}
+# 		);
+# 		if (defined $new_denominator) {
+# 			$subsampled = $control_index; # remember which one was subsampled
+# 			$control_index = $new_denominator; # assign new position
+# 			$subsampled_index = $new_denominator;
+# 		}
+# 		else {
+# 			warn " unable to sub sample dataset '$control_index'; nothing done\n";
+# 			return;
+# 		}
+# 	}
+# 	
 	
 	# the new index position is equivalent to the number of columns
 	my $new_position = $main_data_ref->{'number_columns'};
@@ -2284,12 +2296,12 @@ sub difference_function {
 	elsif ($normalization) {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_normdiff';
-		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
+#		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	else {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_diff';
-		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
+#		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	
 	# Determine the new method for the dataset's metadata
@@ -2322,16 +2334,16 @@ sub difference_function {
 	}
 	
 	# Delete the duplicate sub-sampled dataset
-	if ($subsampled != -1) {
-		# sub sampling was performed
-		
-		# record metadata
-		$main_data_ref->{$new_position}{'subsampled'} = 
-			$main_data_ref->{$subsampled}{'name'};
-		
-		# delete the temporary subsampled dataset
-		delete_function($subsampled_index);
-	}	
+# 	if ($subsampled != -1) {
+# 		# sub sampling was performed
+# 		
+# 		# record metadata
+# 		$main_data_ref->{$new_position}{'subsampled'} = 
+# 			$main_data_ref->{$subsampled}{'name'};
+# 		
+# 		# delete the temporary subsampled dataset
+# 		delete_function($subsampled_index);
+# 	}	
 	
 	return 1;
 }
@@ -2399,8 +2411,8 @@ sub subtract_function {
 		$subtractor = $stathash{'mean'};
 		print " subtracting mean value $subtractor\n";
 	} 
-	elsif ($value =~ /^-?\d+\.?\d*$/) { 
-		# a numeric value
+	elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+		# a numeric value, allowing for negatives, decimals, exponents
 		$subtractor = $value;
 	} 
 	else {
@@ -2535,8 +2547,8 @@ sub division_function {
 		$divisor = $stathash{'mean'};
 		print " dividing by mean value $divisor\n";
 	} 
-	elsif ($value =~ /^-?\d+\.?\d*$/) { 
-		# a numeric value
+	elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+		# a numeric value, allowing for negatives, decimals, exponents
 		$divisor = $value;
 	} 
 	else {
@@ -3360,6 +3372,7 @@ sub _get_letter_to_function_hash {
 		'T' => "treeview",
 		'h' => "help",
 		'q' => "quit",
+		'Q' => "quit",
 		'm' => "menu",
 	);
 	return %hash;
@@ -4047,9 +4060,9 @@ new dataset.
 
 =item B<subsample> (menu option 'U')
 
-Subsample a dataset. Datapoints within a dataset are chosen randomly
-and the values reduced by one until the target sum is reached. This is
-useful for working with enumerated datasets, e.g. tag counts from
+Subsample an enumerated dataset. Datapoints within a dataset are chosen 
+randomlyand the values reduced by one until the target sum is reached. 
+This assumes an enumerated dataset, e.g. tag counts from
 Next-gen sequencing, where the sum of tags from two or more datasets
 must be normalized to each other. This function assumes that the data
 are positive integers; log2 datasets will not be used. Provide a
@@ -4072,12 +4085,9 @@ asked of the user.
 A simple difference is generated between two existing datasets. The 
 values in the 'control' dataset are simply subtracted from the 
 values in the 'experimental' dataset and recorded as a new dataset.
-Prior to calculation, the sums of the two datasets are checked for 
-equality, and, if not equal, the larger dataset is sub-sampled to 
-match the smaller dataset. This function should be applied only to 
-enumerated data sets (e.g. Illumina sequence tags) and not to 
-microarray value data sets; it will not function on datasets in the 
-log2 space. The indices for the experimental and control datasets 
+For enumerated datasets (e.g. tag counts from Next Generation 
+Sequencing), the datasets should be subsampled to equalize the sums 
+of the two datasets. The indices for the experimental and control datasets 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
@@ -4088,12 +4098,9 @@ The difference between 'control' and 'experimental' dataset values
 is divided by the square root of the sum (an approximation of the 
 standard deviation). This is supposed to yield fewer false positives
 than a simple difference (see Nix et al, BMC Bioinformatics, 2008).
-Prior to calculation, the sums of the two datasets are checked for 
-equality, and, if not equal, the larger dataset is sub-sampled to 
-match the smaller dataset. This function should be applied only to 
-enumerated data sets (e.g. Illumina sequence tags) and not to 
-microarray value data sets; it will not function on datasets in the 
-log2 space. The indices for the experimental and control datasets 
+For enumerated datasets (e.g. tag counts from Next Generation 
+Sequencing), the datasets should be subsampled to equalize the sums 
+of the two datasets. The indices for the experimental and control datasets 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
