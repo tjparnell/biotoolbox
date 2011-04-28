@@ -50,6 +50,13 @@ my (
 	$x_max,
 	$y_min,
 	$y_max,
+	$x_ticks,
+	$y_ticks,
+	$ticks,
+	$x_format,
+	$y_format,
+	$format,
+	$places,
 	$log,
 	$directory,
 	$numbers,
@@ -57,23 +64,29 @@ my (
 );
 my @pairs; # an array of pairs
 GetOptions( 
-	'in=s'    => \$infile, # the input file
-	'type=s'  => \$type, # the type of graph to generate
-	'index=s' => \$index, # a list of x,y pairs to plot
-	'pair=s'  => \@pairs, # the x,y pairs to plot
-	'all'     => \$all, # flag to plot all data sets pairwise
-	'norm!'   => \$norm, # flag to skip percentile normalizing
-	'ma=s'    => \$moving_average, # window, setp values for moving average
-	'min=f'   => \$min, # mininum axis coordinate
-	'max=f'   => \$max, # maximum axis coordinate
-	'xmin=f'  => \$x_min, # minimum x axis coordinate
-	'ymin=f'  => \$y_min, # minimum y axis coordinate
-	'xmax=f'  => \$x_max, # maximum x axis coordinate
-	'ymax=f'  => \$y_max, # maximum y axis coordinate
-	'log!'    => \$log, # values are in log, respect log status
-	'dir=s'   => \$directory, # optional name of the graph directory
-	'numbers' => \$numbers, # print the graph numbers in addition to the graph
-	'help'    => \$help, # flag to print help
+	'in=s'      => \$infile, # the input file
+	'type=s'    => \$type, # the type of graph to generate
+	'index=s'   => \$index, # a list of x,y pairs to plot
+	'pair=s'    => \@pairs, # the x,y pairs to plot
+	'all'       => \$all, # flag to plot all data sets pairwise
+	'norm!'     => \$norm, # flag to skip percentile normalizing
+	'ma=s'      => \$moving_average, # window, setp values for moving average
+	'min=f'     => \$min, # mininum axis coordinate
+	'max=f'     => \$max, # maximum axis coordinate
+	'xmin=f'    => \$x_min, # minimum x axis coordinate
+	'ymin=f'    => \$y_min, # minimum y axis coordinate
+	'xmax=f'    => \$x_max, # maximum x axis coordinate
+	'ymax=f'    => \$y_max, # maximum y axis coordinate
+	'ticks=i'   => \$ticks, # the number of major axes ticks
+	'xticks=i'  => \$x_ticks, # the number o major x axis ticks
+	'yticks=i'  => \$y_ticks, # the number o major y axis ticks
+	'format=i'  => \$format, # number of places to format tick labels
+	'xformat=i' => \$x_format, # number of places to format x axis tick labels
+	'yformat=i' => \$y_format, # number of places to format y axis tick labels
+	'log!'      => \$log, # values are in log, respect log status
+	'dir=s'     => \$directory, # optional name of the graph directory
+	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
+	'help'      => \$help, # flag to print help
 );
 
 if ($help) {
@@ -84,6 +97,8 @@ if ($help) {
 	} );
 }
 
+
+### check requirements
 unless ($infile) {
 	if (@ARGV) {
 		$infile = shift @ARGV;
@@ -92,6 +107,9 @@ unless ($infile) {
 		die " Missing input file!\n";
 	}
 }
+
+
+### set defaults
 if ($type) {
 	# check the requested type
 	my %accepted_types = (
@@ -133,6 +151,18 @@ if (defined $max) {
 	unless (defined $y_max) {
 		$y_max = $max;
 	}
+}
+unless (defined $x_ticks) {
+	$x_ticks = defined $ticks ? $ticks : 4;
+}
+unless (defined $y_ticks) {
+	$y_ticks = defined $ticks ? $ticks : 4;
+}
+unless (defined $x_format) {
+	$x_format = defined $format ? $format : 0;
+}
+unless (defined $y_format) {
+	$y_format = defined $format ? $format : 0;
 }
 
 
@@ -617,50 +647,17 @@ sub graph_scatterplot {
 		x_label			=> $xname,
 		y_label			=> $yname,
 		title			=> $title,
-		
+		transparent		=> 0,
 		markers			=> [1],
 		marker_size		=> 1,
 		line_types		=> [1],
 		line_width		=> 1,
-		
-		x_tick_number	=> 4,
-		y_tick_number	=> 4,
-		x_number_format	=> "%.2f",
-		y_number_format => "%.2f",
-		x_label_position => 0.5,
-		
-		transparent		=> 0,
 		dclrs			=> [qw(lblue red)],
-	
 	) or warn $graph->error;
 	
-	# set min max values on the graph
-	if ($norm) { 
-		# explicitly set the axis values if the data was normalized
-		$graph->set(
-			y_min_value		=> 0,
-			y_max_value		=> 1,
-			x_min_value		=> 0,
-			x_max_value		=> 1
-		) or warn $graph->error;
-	} 
-	else {
-		# set each x,y minimum and maximum value if user defined
-		if (defined $x_min) {
-			$graph->set(x_min_value => $x_min) or warn $graph->error;
-		}
-		if (defined $y_min) {
-			$graph->set(y_min_value => $y_min) or warn $graph->error;
-		}
-		if (defined $x_max) {
-			$graph->set(x_max_value => $x_max) or warn $graph->error;
-		}
-		if (defined $y_max) {
-			$graph->set(y_max_value => $y_max) or warn $graph->error;
-		}
-	}
-	# otherwise we let it calculate automatic values
-		
+	# set axes
+	set_graph_axes($graph);
+	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
 	$filename = File::Spec->catfile($directory, $filename);
@@ -732,43 +729,12 @@ sub graph_line_plot {
 		x_label			=> $xtitle,
 		y_label			=> $ytitle,
 		title			=> $title,
-		
-		x_tick_number	=> 4,
-		y_tick_number	=> 4,
 		y_long_ticks	=> 1,
-		x_number_format	=> "%.2f",
-		y_number_format => "%.2f",
-		x_label_position => 0.5,
-		
 		transparent		=> 0,
 	) or warn $graph->error;
 	
-	# set min max values on the graph
-	if ($norm) { 
-		# explicitly set the axis values if the data was normalized
-		$graph->set(
-			y_min_value		=> 0,
-			y_max_value		=> 1,
-			x_min_value		=> 0,
-			x_max_value		=> 1
-		) or warn $graph->error;
-	} 
-	else {
-		# set each x,y minimum and maximum value if user defined
-		if (defined $x_min) {
-			$graph->set(x_min_value => $x_min) or warn $graph->error;
-		}
-		if (defined $y_min) {
-			$graph->set(y_min_value => $y_min) or warn $graph->error;
-		}
-		if (defined $x_max) {
-			$graph->set(x_max_value => $x_max) or warn $graph->error;
-		}
-		if (defined $y_max) {
-			$graph->set(y_max_value => $y_max) or warn $graph->error;
-		}
-	}
-	# otherwise we let it calculate automatic values
+	# set axes
+	set_graph_axes($graph);
 	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
@@ -839,43 +805,12 @@ sub graph_smoothed_line_plot {
 		x_label			=> $xtitle,
 		y_label			=> $ytitle,
 		title			=> $title,
-		
-		x_tick_number	=> 4,
-		y_tick_number	=> 4,
 		y_long_ticks	=> 1,
-		x_number_format	=> "%.2f",
-		y_number_format => "%.2f",
-		x_label_position => 0.5,
-		
 		transparent		=> 0,
 	) or warn $graph->error;
 	
-	# set min max values on the graph
-	if ($norm) { 
-		# explicitly set the axis values if the data was normalized
-		$graph->set(
-			y_min_value		=> 0,
-			y_max_value		=> 1,
-			x_min_value		=> 0,
-			x_max_value		=> 1
-		) or warn $graph->error;
-	} 
-	else {
-		# set each x,y minimum and maximum value if user defined
-		if (defined $x_min) {
-			$graph->set(x_min_value => $x_min) or warn $graph->error;
-		}
-		if (defined $y_min) {
-			$graph->set(y_min_value => $y_min) or warn $graph->error;
-		}
-		if (defined $x_max) {
-			$graph->set(x_max_value => $x_max) or warn $graph->error;
-		}
-		if (defined $y_max) {
-			$graph->set(y_max_value => $y_max) or warn $graph->error;
-		}
-	}
-	# otherwise we let it calculate automatic values
+	# set axes
+	set_graph_axes($graph);
 	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
@@ -918,6 +853,50 @@ sub graph_smoothed_line_plot {
 		}
 	}
 }
+
+
+## Set some generic axis options regardless of graph type
+sub set_graph_axes {
+	my $graph = shift;
+	
+	# set ticks and label number format
+	$graph->set(
+		x_tick_number	=> $x_ticks,
+		y_tick_number	=> $y_ticks,
+		x_number_format	=> '%.' . $x_format . 'f', # "%.2f",
+		y_number_format => '%.' . $y_format . 'f',
+		x_label_position => 0.5,
+	) or warn $graph->error;
+	
+	
+	# set min max values on the graph
+	if ($norm) { 
+		# explicitly set the axis values if the data was normalized
+		$graph->set(
+			y_min_value		=> 0,
+			y_max_value		=> 1,
+			x_min_value		=> 0,
+			x_max_value		=> 1
+		) or warn $graph->error;
+	} 
+	else {
+		# set each x,y minimum and maximum value if user defined
+		if (defined $x_min) {
+			$graph->set(x_min_value => $x_min) or warn $graph->error;
+		}
+		if (defined $y_min) {
+			$graph->set(y_min_value => $y_min) or warn $graph->error;
+		}
+		if (defined $x_max) {
+			$graph->set(x_max_value => $x_max) or warn $graph->error;
+		}
+		if (defined $y_max) {
+			$graph->set(y_max_value => $y_max) or warn $graph->error;
+		}
+	}
+	# otherwise we let it calculate automatic values
+}
+
 
 
 ## Determine statistics and perform linear regression on the data
@@ -995,6 +974,12 @@ graph_data.pl
   --max=<value>
   --xmax=<value>
   --ymax=<value>
+  --ticks <integer>
+  --xticks <integer>
+  --yticks <integer>
+  --format <integer>
+  --xformat <integer>
+  --yformat <integer>
   --dir <foldername>
   --help
 
@@ -1087,6 +1072,26 @@ option. The default is automatically calculated.
 Specify explicitly the maximum values for either the X or Y axes. 
 Both may be set independently or to the same value with the --max 
 option. The default is automatically calculated.
+
+=item --ticks <integer>
+
+=item --xticks <integer>
+
+=item --yticks <integer>
+
+Specify explicitly the number of major ticks for either the X or Y axes. 
+Both may be set independently or to the same value with the --ticks 
+option. The default is 4.
+
+=item --format <integer>
+
+=item --xformat <integer>
+
+=item --yformat <integer>
+
+Specify explicitly the number of decimal places to format the labels 
+for the major axes' ticks. Both may be set independently or to the same 
+value with the --format option. The default is 0.
 
 =item --dir <foldername>
 
