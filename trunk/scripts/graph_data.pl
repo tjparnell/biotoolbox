@@ -46,6 +46,10 @@ my (
 	$moving_average,
 	$min, 
 	$max, 
+	$x_min,
+	$x_max,
+	$y_min,
+	$y_max,
 	$log,
 	$directory,
 	$numbers,
@@ -60,8 +64,12 @@ GetOptions(
 	'all'     => \$all, # flag to plot all data sets pairwise
 	'norm!'   => \$norm, # flag to skip percentile normalizing
 	'ma=s'    => \$moving_average, # window, setp values for moving average
-	'min=i'   => \$min, # mininum axis coordinate
-	'max=i'   => \$max, # maximum axis coordinate
+	'min=f'   => \$min, # mininum axis coordinate
+	'max=f'   => \$max, # maximum axis coordinate
+	'xmin=f'  => \$x_min, # minimum x axis coordinate
+	'ymin=f'  => \$y_min, # minimum y axis coordinate
+	'xmax=f'  => \$x_max, # maximum x axis coordinate
+	'ymax=f'  => \$y_max, # maximum y axis coordinate
 	'log!'    => \$log, # values are in log, respect log status
 	'dir=s'   => \$directory, # optional name of the graph directory
 	'numbers' => \$numbers, # print the graph numbers in addition to the graph
@@ -108,7 +116,24 @@ unless (defined $log) {
 	# default is no log
 	$log = 0;
 }
-
+if (defined $min) {
+	# assign general minimum value to specific axes
+	unless (defined $x_min) {
+		$x_min = $min;
+	}
+	unless (defined $y_min) {
+		$y_min = $min;
+	}
+}
+if (defined $max) {
+	# assign general maximum value to specific axes
+	unless (defined $x_max) {
+		$x_max = $max;
+	}
+	unless (defined $y_max) {
+		$y_max = $max;
+	}
+}
 
 
 
@@ -619,18 +644,19 @@ sub graph_scatterplot {
 			x_max_value		=> 1
 		) or warn $graph->error;
 	} 
-	elsif (defined $min or defined $max) {
-		if (defined $min) {
-			$graph->set(
-				y_min_value => $min,
-				x_min_value => $min,
-			) or warn $graph->error;
+	else {
+		# set each x,y minimum and maximum value if user defined
+		if (defined $x_min) {
+			$graph->set(x_min_value => $x_min) or warn $graph->error;
 		}
-		if (defined $max) {
-			$graph->set(
-				y_max_value => $max,
-				x_max_value => $max,
-			) or warn $graph->error;
+		if (defined $y_min) {
+			$graph->set(y_min_value => $y_min) or warn $graph->error;
+		}
+		if (defined $x_max) {
+			$graph->set(x_max_value => $x_max) or warn $graph->error;
+		}
+		if (defined $y_max) {
+			$graph->set(y_max_value => $y_max) or warn $graph->error;
 		}
 	}
 	# otherwise we let it calculate automatic values
@@ -727,18 +753,19 @@ sub graph_line_plot {
 			x_max_value		=> 1
 		) or warn $graph->error;
 	} 
-	elsif (defined $min or defined $max) {
-		if (defined $min) {
-			$graph->set(
-				y_min_value => $min,
-				x_min_value => $min,
-			) or warn $graph->error;
+	else {
+		# set each x,y minimum and maximum value if user defined
+		if (defined $x_min) {
+			$graph->set(x_min_value => $x_min) or warn $graph->error;
 		}
-		if (defined $max) {
-			$graph->set(
-				y_max_value => $max,
-				x_max_value => $max,
-			) or warn $graph->error;
+		if (defined $y_min) {
+			$graph->set(y_min_value => $y_min) or warn $graph->error;
+		}
+		if (defined $x_max) {
+			$graph->set(x_max_value => $x_max) or warn $graph->error;
+		}
+		if (defined $y_max) {
+			$graph->set(y_max_value => $y_max) or warn $graph->error;
 		}
 	}
 	# otherwise we let it calculate automatic values
@@ -833,18 +860,19 @@ sub graph_smoothed_line_plot {
 			x_max_value		=> 1
 		) or warn $graph->error;
 	} 
-	elsif (defined $min or defined $max) {
-		if (defined $min) {
-			$graph->set(
-				y_min_value => $min,
-				x_min_value => $min,
-			) or warn $graph->error;
+	else {
+		# set each x,y minimum and maximum value if user defined
+		if (defined $x_min) {
+			$graph->set(x_min_value => $x_min) or warn $graph->error;
 		}
-		if (defined $max) {
-			$graph->set(
-				y_max_value => $max,
-				x_max_value => $max,
-			) or warn $graph->error;
+		if (defined $y_min) {
+			$graph->set(y_min_value => $y_min) or warn $graph->error;
+		}
+		if (defined $x_max) {
+			$graph->set(x_max_value => $x_max) or warn $graph->error;
+		}
+		if (defined $y_max) {
+			$graph->set(y_max_value => $y_max) or warn $graph->error;
 		}
 	}
 	# otherwise we let it calculate automatic values
@@ -962,7 +990,11 @@ graph_data.pl
   --(no)norm
   --(no)log
   --min=<value>
+  --xmin=<value>
+  --ymin=<value>
   --max=<value>
+  --xmax=<value>
+  --ymax=<value>
   --dir <foldername>
   --help
 
@@ -1036,11 +1068,25 @@ equal or less than the window size. Both values must be
 real integers. This data manipulation is extremely useful and 
 recommended for noisy datasets.
 
-=item --min=<value>, --max=<value>
+=item --min=<value>
 
-Specify explicitly the minimum and/or maximum axis value(s). 
-Default is calculated. Sometimes setting this improves 
-the appearance of the graph. They may be set independently.
+=item --xmin=<value>
+
+=item --ymin=<value>
+
+Specify explicitly the minimum values for either the X or Y axes. 
+Both may be set independently or to the same value with the --min 
+option. The default is automatically calculated.
+
+=item --max=<value>
+
+=item --xmax=<value>
+
+=item --ymax=<value>
+
+Specify explicitly the maximum values for either the X or Y axes. 
+Both may be set independently or to the same value with the --max 
+option. The default is automatically calculated.
 
 =item --dir <foldername>
 
