@@ -8,7 +8,6 @@ use Pod::Usage;
 use File::Spec;
 use GD::Graph::lines;
 use GD::Graph::bars;
-use Statistics::Lite qw(mean max);
 use Statistics::Descriptive;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -41,6 +40,11 @@ my (
 	$lines,
 	$start,
 	$max,
+	$y_max,
+	$y_ticks,
+	$x_skip,
+	$x_offset,
+	$x_format,
 	$directory,
 	$help
 );
@@ -53,6 +57,11 @@ GetOptions(
 	'min=f'       => \$start, # the starting value to calculate the bins
 	'max=f'       => \$max, # maximum value for x-axis
 	'lines!'      => \$lines, # indicate whether graph should be a linegraph
+	'ymax=i'      => \$y_max, # maximum value on y axis
+	'yticks=i'    => \$y_ticks, # number of ticks on y axis
+	'skip=i'      => \$x_skip, # number of ticks to skip on x axis
+	'offset=i'    => \$x_offset, # skip number of x axis ticks before labeling
+	'format=i'    => \$x_format, # format decimal numbers of x axis
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
 );
@@ -100,8 +109,18 @@ unless (defined $max) {
 		die " need to specify at least two of bins, binsize, or max! see help\n";
 	}
 }
-		
-
+unless (defined $x_skip) {
+	$x_skip = 4;
+}
+unless (defined $x_format) {
+	$x_format = 0;
+}
+unless (defined $x_offset) {
+	$x_offset = 0;
+}
+unless (defined $y_ticks) {
+	$y_ticks = 4;
+}
 
 
 
@@ -146,10 +165,12 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 
 # determine the bins for the frequency distribution
 my @bins; # an array for the bins
-for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
+#print " the bins are:\n ";
+for (my $i = $start; $i <= $max; $i += $binsize) {
 	push @bins, $i;
 	#print "$i ";
 }
+#print "\n";
 
 # Prepare output directory
 unless ($directory) {
@@ -296,11 +317,6 @@ sub graph_one {
 	}
 	#print "  found " . scalar @values . " useable values\n";
 	
-# 	# Add the maximum value to @bins to ensure we count everyone
-# 	if (max(@values) > max(@bins)) {
-# 		push @bins, max(@values);
-# 	}
-	
 	# Determine the data frequency
 	my $stat = Statistics::Descriptive::Full->new();
 	$stat->add_data(@values);
@@ -308,7 +324,7 @@ sub graph_one {
 	my @yvalue; # an array of arrays for the graph data
 	foreach (sort {$a <=> $b} keys %frequency) {
 		push @yvalue, $frequency{$_};
-		#print "   x $_ , y $frequency{$_}\n"; # print values to check
+		# print "   x $_ , y $frequency{$_}\n"; # print values to check
 	}
 	my @data = ( [@bins], [@yvalue] );
 	
@@ -348,16 +364,6 @@ sub graph_two {
 			push @values2, $value2; # put into the values array
 		}
 	}
-	
-# 	# Add the maximum value to @bins to count everyone
-# 	my $max1 = max(@values1);
-# 	my $max2 = max(@values2);
-# 	if ($max1 >= $max2) {
-# 		push @bins, $max1;
-# 	} 
-# 	else {
-# 		push @bins, $max2;
-# 	}
 	
 	# Determine the data frequency
 	# we have to first determine which dataset has the biggest max value
@@ -405,13 +411,11 @@ sub graph_this_as_lines {
 		y_label         => 'number',
 		x_max_value     => $max,
 		x_min_value     => $start,
-		x_number_format	=> "%.1f",
 		x_tick_number	=> scalar @bins,
-		x_label_skip    => 4,
-		y_long_ticks	=> 1,
-		transparent		=> 0,
-		
 	) or warn $graph->error;
+	
+	# set axes
+	set_graph_axes($graph);
 	
 	# options for two datasets
 	if ($name2) {
@@ -458,14 +462,11 @@ sub graph_this_as_bars {
 		title			=> $title,
 		x_label         => $name2 ? 'values' : "$name1 value",
 		y_label         => 'number',
-		x_number_format	=> "%.1f",
-		#x_tick_number	=> scalar @bins,
 		bar_spacing     => 2,
-		x_label_skip    => 4,
-		y_long_ticks	=> 1,
-		transparent		=> 0,
-		
 	) or warn $graph->error;
+	
+	# set axes
+	set_graph_axes($graph);
 	
 	# options for two datasets
 	if ($name2) {
@@ -499,6 +500,26 @@ sub graph_this_as_bars {
 }
 
 
+## Set some generic axis options regardless of graph type
+sub set_graph_axes {
+	my $graph = shift;
+	
+	# set ticks and label number format
+	$graph->set(
+		x_label_skip    => $x_skip,
+		x_tick_offset   => $x_offset,
+		x_number_format	=> '%.' . $x_format . 'f', # "%.2f"
+		y_tick_number	=> $y_ticks,
+		y_long_ticks	=> 1,
+		transparent		=> 0,
+	) or warn $graph->error;
+	
+	# set y axis maximum
+	if ($y_max) {
+		$graph->set(y_max_value => $y_max) or warn $graph->error;
+	}
+}	
+	
 
 ## Make a unique filename
 sub check_file_uniqueness {
@@ -536,6 +557,8 @@ A script to graph a histogram of a dataset of values
 =head1 SYNOPSIS
 
 graph_histogram.pl --bins <integer> --size <number> <filename> 
+graph_histogram.pl --bins <integer> --max <number> <filename> 
+graph_histogram.pl --size <number> --max <number> <filename> 
    
    --in <filename>
    --index <column_index>
@@ -543,6 +566,11 @@ graph_histogram.pl --bins <integer> --size <number> <filename>
    --size <number>
    --min <number>
    --max <number>
+   --ymax <integer>
+   --yticks <integer>
+   --skip <integer>
+   --offset <integer>
+   --format <integer>
    --lines
    --out <base_filename>
    --dir <output_directory>
@@ -593,6 +621,31 @@ A negative number may be provided using the format --min=-1.
 
 Specify the maximum bin value. This argument is optional if --bins 
 and --size are provided.
+
+=item --ymax <integer>
+
+Specify the maximum Y axis value. The default is automatically determined.
+
+=item --yticks <integer>
+
+Specify explicitly the number of major ticks for the Y axes. 
+The default is 4.
+
+=item --skip <integer>
+
+Specify the ordinal number of X axis major ticks to label. This 
+avoids overlapping labels. The default is 4 (every 4th tick is labeled).
+
+=item --offset <integer>
+
+Specify the number of X axis ticks to skip at the beginning before starting 
+to label them. This may help in adjusting the look of the graph. The 
+default is 0.
+
+=item --format <integer>
+
+Specify the number of decimal places the X axis labels should be formatted. 
+The default is 0.
 
 =item --lines
 
