@@ -59,6 +59,7 @@ my (
 	$places,
 	$log,
 	$directory,
+	$out,
 	$numbers,
 	$help, 
 );
@@ -85,6 +86,7 @@ GetOptions(
 	'yformat=i' => \$y_format, # number of places to format y axis tick labels
 	'log!'      => \$log, # values are in log, respect log status
 	'dir=s'     => \$directory, # optional name of the graph directory
+	'out=s'     => \$out, # output file name
 	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
 	'help'      => \$help, # flag to print help
 );
@@ -660,6 +662,10 @@ sub graph_scatterplot {
 	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
+	if ($out) {
+		# add output prefix if requested
+		$filename = $out . '_' . $filename;
+	}
 	$filename = File::Spec->catfile($directory, $filename);
 	$filename = check_file_uniqueness($filename, 'png');
 	
@@ -738,6 +744,10 @@ sub graph_line_plot {
 	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
+	if ($out) {
+		# add output prefix if requested
+		$filename = $out . '_' . $filename;
+	}
 	$filename = File::Spec->catfile($directory, $filename);
 	$filename = check_file_uniqueness($filename, 'png');
 	
@@ -814,6 +824,10 @@ sub graph_smoothed_line_plot {
 	
 	# Generate graph file name
 	my $filename = $xname . '_and_' . $yname;
+	if ($out) {
+		# add output prefix if requested
+		$filename = $out . '_' . $filename;
+	}
 	$filename = File::Spec->catfile($directory, $filename);
 	$filename = check_file_uniqueness($filename, 'png');
 	
@@ -980,6 +994,7 @@ graph_data.pl
   --format <integer>
   --xformat <integer>
   --yformat <integer>
+  --out <base_filename>
   --dir <foldername>
   --help
 
@@ -1092,6 +1107,10 @@ option. The default is 4.
 Specify explicitly the number of decimal places to format the labels 
 for the major axes' ticks. Both may be set independently or to the same 
 value with the --format option. The default is 0.
+
+=item --out <base_filename>
+
+Optionally specify the output filename prefix.
 
 =item --dir <foldername>
 
