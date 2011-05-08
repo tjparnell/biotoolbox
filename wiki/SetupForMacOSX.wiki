@@ -15,7 +15,7 @@
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
 
-An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. 
+An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. One other thing to keep in mind is that Fink tries to use many of the default Mac OS X libraries and executables whenever possible, whereas MacPorts sometimes wants to install everything on its own. This creates duplicates in your system, for example duplicate Perl installations. This can be good in that you get a newer version, but more complicated because you have to keep track of which version is executed.
 
 To install, download the binary installer and follow the online directions. Note that there is not a binary installer for Mac OS X 10.6 Snow Leopard. For that, you'll need to bootstrap the installation. It's best to follow their [http://www.finkproject.org/download/srcdist.php instructions]. 
 
@@ -59,9 +59,21 @@ To install the program you want, run the following command. Fink will identify n
 
 You can learn more by running `fink --help`.
 	 
+==Installing a database==
+GBrowse as well as many of the biotoolbox programs require genome annotation to be put into a database. There are several choices.
 
-===Installing MySQL using Fink===
-I use MySQL as the database backend, but PostGreSQL could also be used, if you prefer. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`. To install MySQL through Fink, enter the following:
+SQLite is a lightweight database system that stores all of the database tables in a single file. It's reasonably fast and easy to manage - one file per database. This is already installed in Mac OS X, although you will need to install the appropriate Perl modules to use it.
+
+MySQL is a commonly used open source database that can be used from small databases to large enterprise databases. It uses a daemon to handle multiple simultaneous connections and read/write transactions. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`. 
+
+PostGreSQL is another alternative open source database with capabilities similar to MySQL. I don't personally have any experience with it, but it is supported by BioPerl.
+
+
+
+===Installing MySQL===
+You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So if you have to install from source and compile the executable for your machine, you might as well save a little effort and go through Fink to handle the compilation for you.
+
+To install MySQL through Fink, enter the following:
 <pre>
 	sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
 </pre>
@@ -97,8 +109,14 @@ Set up MySQL to start up automatically by running
 There should now be a startup plist file in `/Library/StartupItems/`.
 
 
-===Installing GD Libraries with Fink===
-These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. Begin by running
+===Installing GD Libraries===
+These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
+
+You can install GD from [https://bitbucket.org/pierrejoye/gd-libgd/overview source], but note that you'll also have to install a number of other dependencies first.
+
+Another alternative is to download Mac OS X binaries compiled by a member of the GMOD team, which you can find [http://sourceforge.net/projects/gmod/files/Generic%20Genome%20Browser/libgd-MacOSX/ here]. This should work well.
+
+The third approach, and one that I favor, is to install them through Fink. Begin by running
 <pre>
 	sudo fink install gd2
 </pre>
@@ -106,12 +124,12 @@ These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing
 It should also install libjpeg and libpng, along with the appropriate libraries.
 
 
+
+
 ===Installing other programs with Fink===	
-If you want the latest, greatest bioperl, you’ll also need to install _Git_. This is a versioning control system used by some open source projects; another one is SVN, which is part of the Mac OS X system. Note that this takes a relatively long time to compile. 
+There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
 
-Another useful tool is _wget_, which is used to download file(s) using http and ftp protocols. 
-
-Finally, the [http://emboss.sourceforge.net/ EMBOSS] tools is an excellent collection of various useful tools for molecular biology. This, too, can take a while to compile, as there are many dependencies and programs.
+Another generally useful tool is _wget_, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
 
 
 ==Installing Perl modules through CPAN==
@@ -138,12 +156,12 @@ Some basic modules to upgrade or install right away (but probably not absolutely
 	* ExtUtils::MakeMaker
 
 
-===Trouble shooting	Perl module installaton===
+===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
 
 Look back through the output for possible clues to the failure. Often times there is a missing prerequisite module (or version) that wasn't caught. Look for an error that complains about not finding XXX in @INC. Install the missing prereq and try again.
 
-Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed through Fink.
+Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed (see above).
 
 Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures (Universal Binary). However, libraries built under Fink as well as other compiled libraries will usually only have only one architecture, and the compiler will warn about this. You can safely ignore those warnings.
 
@@ -179,16 +197,13 @@ Some additional modules that my programs use but are not necessarily required fo
 
 
 ===Install BioPerl===
-Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`CJFIELDS/BioPerl-1.6.1.tar.gz`), which should be adequate for most purposes, or install bioperl-live, the latest greatest version.
+Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`CJFIELDS/BioPerl-1.6.900.tar.gz`), which should be adequate for most purposes.
 
 There are dozens of prerequisite modules for bioperl, but many (all?) are not absolutely necessary. I've listed above the ones that I think are the most needed, so you should be able to safely skip most of the prerequisites it lists. However, if you miss one, perl usually does a pretty good job at complaining that a required module is missing, and you can always go back and install it.
 
-Since BioPerl is under continual development, and a number of improvements have been made, the latest bioperl-live distribution may be ideal. You can download it using git (installed through Fink, above).
-<pre>
-	git clone git://github.com/bioperl/bioperl-live.git
-</pre>
+Since BioPerl is under continual development, and a number of improvements have been made, the latest bioperl-live distribution may be ideal. 
 
-If you download the live version, follow the instructions for installing, but it should go something like the following. The same warnings about prerequisites apply as above.
+If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/master bioperl version], follow the instructions for installing, but it should go something like the following. The same warnings about prerequisites apply as above.
 <pre>
 	perl Build.PL
 	./Build test
@@ -224,33 +239,26 @@ Download the source code tarball from [http://sourceforge.net/projects/samtools/
 
 If you'll be working with 64-bit executables, edit the `Makefile` to un-comment out the `-m64` under CLFAGS. This ensures the program will compile as a 64-bit executable.
 
-Compile by running `make`. Also compile razip by executing `make razip`. I'm not entirely sure of the utility of this program (the documentation is not entirely clear), but I included it anway.
+Compile by running `make`. Also compile razip by executing `make razip`. 
 
-Create the directory `/usr/local/samtools` and copy the following into it. 
-	* all contents of the `misc` directory in the source tree
-	* the generated executables `samtools` and `razip`
-	* the information file `samtools.txt`
-
-Copy the headers into `/usr/local/include`
-	* `sam.h`
-	* `sam_header.h`
-	* `bam.h`
-	* `bgzf.h`
-	* `khash.h`
-	* `faidx.h`
-
-Copy the main library `libbam.a` into `/usr/local/lib`.
-
-Copy the man file `samtools.1` into `/usr/local/man/man1/`
-
-To make my life a whole lot easier, made symlinks of the executables in `/usr/local/bin` with the following commands
+To make samtools generally accessible to all the users on the machine, move the samtools folder to `/usr/local/`. Since samtools is under continuous development, I'll append the version number to the folder name. Then, to make navigation easier, I'll create a symbolic link to the latest version directory to a general name. For example,
 <pre>
-	cd /usr/local/bin
-	sudo ln -s /usr/local/samtools/samtools samtools
-	sudo ln -s /usr/local/samtools/samtools.pl samtools.pl
-	sudo ln -s /usr/local/samtools/razip razip
+	sudo cp samtools /usr/local/samtools-v0.1.18
+	cd /usr/local/
+	sudo ln -s samtools-v0.1.18 samtools
 </pre>
-	
+Now I can always reference `/usr/local/samtools/` and it will point to the latest version directory. When a new version comes out, I install it side by side, and then simply update the `/usr/local/samtools` symlink.
+
+To install the Bio-Samtools module (see below), you'll need to put the libraries in an accessible location. Rather than copying the appropriate files, and then doing it again and again with each new version, we can simplify using symlinks.
+<pre>
+	sudo ln -s /usr/local/samtools/*.h /usr/local/include/
+	sudo ln -s /usr/local/samtools/libbam.a /usr/local/lib/
+	sudo ln -s /usr/local/samtools/samtools.1 /usr/local/share/man/man1/
+	sudo ln -s /usr/local/samtools/samtools /usr/local/bin/
+	sudo ln -s /usr/local/samtools/razip /usr/local/bin/
+</pre>
+This also copies the executables into the `/usr/local/bin/` directory for easy access through the path.
+
 
 ==Installing Bio-Samtools==
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
