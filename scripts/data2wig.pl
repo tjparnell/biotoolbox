@@ -257,14 +257,10 @@ if ($use_track) {
 ### Start the conversion 
 print " converting '" . $metadata_ref->{$score_index}{'name'} . "'....\n";
 my $current_chr; # current chromosome
+my $previous_pos; # previous position to avoid duplicates in wig file
 while (my $line = $in_fh->getline) {
 	chomp $line;
 	my @data = split /\t/, $line;
-	
-	# adjust for interbase 0-base coordinates
-	if ($interbase) {
-		$data[$start_index] += 1;
-	}
 	
 	# write definition line if necessary
 	if ($data[$chr_index] ne $current_chr) {
@@ -306,8 +302,14 @@ while (my $line = $in_fh->getline) {
 		
 		# reset the current chromosome
 		$current_chr = $data[$chr_index];
+		$previous_pos = undef;
 	}
 	
+	
+	# adjust for interbase 0-base coordinates
+	if ($interbase) {
+		$data[$start_index] += 1;
+	}
 	
 	# adjust score formatting as requested
 	my $score;
@@ -375,7 +377,20 @@ while (my $line = $in_fh->getline) {
 			$position = $data[$start_index];
 		}
 		
+		# check for proper position
+		if (defined $previous_pos) {
+			if ($position == $previous_pos) {
+				warn " skipping duplicate position $position at " . 
+					"$data[$chr_index]:$data[$start_index]\n";
+				next;
+			}
+			elsif ($position < $previous_pos) {
+				die " file is not sorted by increasing position!\n";
+			}
+		}
+	
 		print {$out_fh} "$position $score\n";
+		$previous_pos = $position;
 	}
 }
 

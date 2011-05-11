@@ -259,7 +259,7 @@ sub wig_to_bigwig_conversion {
 	}
 	
 	# check the result
-	if (-e $bw_file) {
+	if (-s $bw_file) {
 		# conversion successful
 		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
 			# we no longer need our temp chromosome file
