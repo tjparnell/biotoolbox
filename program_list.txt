@@ -148,6 +148,9 @@ ucsc_cytoband2gff3.pl
 ucsc_table2gff3.pl
 	A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
 
+useq2bigfile.pl
+	A program to convert a USeq archive from David Nix's USeq software package into a bigfile, either bigWig or bigBed. This is essentially a wrapper around David Nix's USeq2Text exporter and Jim Kent's wig, bedgraph, or bed converters. The intermediate text file is parsed for anomalies and rewritten into the appropriate format for conversion.
+
 verify_nucleosome_mapping.pl
 	This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 
@@ -218,6 +221,7 @@ Lists of programs organized by function.
 	* data2bed.pl
 	* data2gff.pl
 	* data2wig.pl
+	* useq2bigfile.pl
 	* wig2data.pl
 
 ===Genome annotation===
