@@ -150,6 +150,7 @@ if (defined $path) {
 else {
 	# default is to use the current working directory
 	$path = File::Spec->curdir();
+	$path = File::Spec->rel2abs($path);
 }
 
 # my bigwigset name
