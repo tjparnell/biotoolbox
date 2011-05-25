@@ -229,8 +229,9 @@ sub wig_to_bigwig_conversion {
 	}
 	
 	# generate the bw file name
+	# we can substitute one of three possible names for bw
 	my $bw_file = $wigfile;
-	$bw_file =~ s/\.wig$/.bw/;
+	$bw_file =~ s/\.(?:bed|bedgraph|wig)$/.bw/;
 	
 	# generate the bigwig file 
 	if ($bw_app_path) {
@@ -238,7 +239,16 @@ sub wig_to_bigwig_conversion {
 		# this is arguably the best method for converting
 		# execute
 		print " converting $wigfile to bigWig....\n";
-		system $bw_app_path, '-clip', $wigfile, $chromo_file, $bw_file;
+		if ($bw_app_path =~ /wigToBigWig$/) {
+			# include the -clip option in case there are any positions 
+			# out of bounds of the chromosome
+			# it will just warn instead of fail
+			system $bw_app_path, '-clip', $wigfile, $chromo_file, $bw_file;
+		}
+		elsif ($bw_app_path =~ /bedGraphToBigWig$/) {
+			# this doesn't have the -clip option, too bad
+			system $bw_app_path, $wigfile, $chromo_file, $bw_file;
+		}
 	}
 	else {
 		# we are using the Bio::DB::BigFile module to generate the 
@@ -259,7 +269,7 @@ sub wig_to_bigwig_conversion {
 	}
 	
 	# check the result
-	if (-s $bw_file) {
+	if (-e $bw_file and -s $bw_file) {
 		# conversion successful
 		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
 			# we no longer need our temp chromosome file
@@ -268,10 +278,14 @@ sub wig_to_bigwig_conversion {
 		return $bw_file;
 	}
 	else {
-		print " Conversion failed. You should try manually and watch for errors\n";
+		warn " Conversion failed. You should try manually and watch for errors\n";
+		if (-e $bw_file) {
+			# 0-byte file was created
+			unlink $bw_file;
+		}
 		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
 			# leave the temp chromosome file as a courtesy
-			print " Leaving temporary chromosome file '$chromo_file'\n";
+			warn " Leaving temporary chromosome file '$chromo_file'\n";
 		}
 		return;
 	}

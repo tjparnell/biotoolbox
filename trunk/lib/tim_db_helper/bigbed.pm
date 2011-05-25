@@ -287,7 +287,7 @@ sub bed_to_bigbed_conversion {
 	system $bb_app_path, $bedfile, $chromo_file, $bb_file;
 	
 	# check the result
-	if (-s $bb_file) {
+	if (-e $bb_file and -s $bb_file) {
 		# conversion successful
 		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
 			# we no longer need our temp chromosome file
@@ -297,6 +297,10 @@ sub bed_to_bigbed_conversion {
 	}
 	else {
 		print " Conversion failed. You should try manually and watch for errors\n";
+		if (-e $bb_file) {
+			# 0-byte file was created
+			unlink $bb_file;
+		}
 		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
 			# leave the temp chromosome file as a courtesy
 			print " Leaving temporary chromosome file '$chromo_file'\n";
