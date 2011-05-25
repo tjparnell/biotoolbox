@@ -20,7 +20,18 @@ graph_data.pl
   --(no)norm
   --(no)log
   --min=<value>
+  --xmin=<value>
+  --ymin=<value>
   --max=<value>
+  --xmax=<value>
+  --ymax=<value>
+  --ticks <integer>
+  --xticks <integer>
+  --yticks <integer>
+  --format <integer>
+  --xformat <integer>
+  --yformat <integer>
+  --out <base_filename>
   --dir <foldername>
   --help
 }}}
@@ -77,10 +88,58 @@ __
   Specify the values to smooth the data by moving average.  Express the values as 'window,step', no spaces. All Y values  within the window are averaged together and plotted  against the window midpoint X value. The window position is  then incremented by the step size. The step size should be  equal or less than the window size. Both values must be  real integers. This data manipulation is extremely useful and  recommended for noisy datasets.
 __
   __
-__--min=<**value>, --max=<**value>
+__--min=<**value>
 
 __
-  Specify explicitly the minimum and/or maximum axis value(s).  Default is calculated. Sometimes setting this improves  the appearance of the graph. They may be set independently.
+__--xmin=<**value>
+
+__
+__--ymin=<**value>
+
+__
+  Specify explicitly the minimum values for either the X or Y axes.  Both may be set independently or to the same value with the --min  option. The default is automatically calculated.
+__
+  __
+__--max=<**value>
+
+__
+__--xmax=<**value>
+
+__
+__--ymax=<**value>
+
+__
+  Specify explicitly the maximum values for either the X or Y axes.  Both may be set independently or to the same value with the --max  option. The default is automatically calculated.
+__
+  __
+__--ticks <**integer>
+
+__
+__--xticks <**integer>
+
+__
+__--yticks <**integer>
+
+__
+  Specify explicitly the number of major ticks for either the X or Y axes.  Both may be set independently or to the same value with the --ticks  option. The default is 4.
+__
+  __
+__--format <**integer>
+
+__
+__--xformat <**integer>
+
+__
+__--yformat <**integer>
+
+__
+  Specify explicitly the number of decimal places to format the labels  for the major axes' ticks. Both may be set independently or to the same  value with the --format option. The default is 0.
+__
+  __
+__--out <**base_filename>
+
+__
+  Optionally specify the output filename prefix.
 __
   __
 __--dir <**foldername>

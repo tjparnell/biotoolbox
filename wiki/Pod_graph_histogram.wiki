@@ -8,7 +8,7 @@ graph_histogram.pl
 A script to graph a histogram of a dataset of values
 
 ==SYNOPSIS==
-graph_histogram.pl --bins <**integer> --size <**number> <**filename>
+graph_histogram.pl --bins <**integer> --size <**number> <**filename>  graph_histogram.pl --bins <**integer> --max <**number> <**filename>  graph_histogram.pl --size <**number> --max <**number> <**filename>
 
 {{{
    --in <filename>
@@ -17,6 +17,11 @@ graph_histogram.pl --bins <**integer> --size <**number> <**filename>
    --size <number>
    --min <number>
    --max <number>
+   --ymax <integer>
+   --yticks <integer>
+   --skip <integer>
+   --offset <integer>
+   --format <integer>
    --lines
    --out <base_filename>
    --dir <output_directory>
@@ -62,6 +67,36 @@ __--max <**number>
 
 __
   Specify the maximum bin value. This argument is optional if --bins  and --size are provided.
+__
+  __
+__--ymax <**integer>
+
+__
+  Specify the maximum Y axis value. The default is automatically determined.
+__
+  __
+__--yticks <**integer>
+
+__
+  Specify explicitly the number of major ticks for the Y axes.  The default is 4.
+__
+  __
+__--skip <**integer>
+
+__
+  Specify the ordinal number of X axis major ticks to label. This  avoids overlapping labels. The default is 4 (every 4th tick is labeled).
+__
+  __
+__--offset <**integer>
+
+__
+  Specify the number of X axis ticks to skip at the beginning before starting  to label them. This may help in adjusting the look of the graph. The  default is 0.
+__
+  __
+__--format <**integer>
+
+__
+  Specify the number of decimal places the X axis labels should be formatted.  The default is 0.
 __
   __
 __--lines

@@ -306,7 +306,7 @@ __
 _*_subsample_*_ (menu option 'U')
 
 __
-  Subsample a dataset. Datapoints within a dataset are chosen randomly and the values reduced by one until the target sum is reached. This is useful for working with enumerated datasets, e.g. tag counts from Next-gen sequencing, where the sum of tags from two or more datasets must be normalized to each other. This function assumes that the data are positive integers; log2 datasets will not be used. Provide a target sum to reach using the --target option. If this number is less than or equal to the number of datasets in the file, then it is assumed to be an index number and the sum of that dataset will be used as the target. The subsampled dataset is always added as new dataset.
+  Subsample an enumerated dataset. Datapoints within a dataset are chosen  randomlyand the values reduced by one until the target sum is reached.  This assumes an enumerated dataset, e.g. tag counts from Next-gen sequencing, where the sum of tags from two or more datasets must be normalized to each other. This function assumes that the data are positive integers; log2 datasets will not be used. Provide a target sum to reach using the --target option. If this number is less than or equal to the number of datasets in the file, then it is assumed to be an index number and the sum of that dataset will be used as the target. The subsampled dataset is always added as new dataset.
 __
   __
 _*_ratio_*_ (menu option 'r')
@@ -318,13 +318,13 @@ __
 _*_diff_*_ (menu option 'd')
 
 __
-  A simple difference is generated between two existing datasets. The  values in the 'control' dataset are simply subtracted from the  values in the 'experimental' dataset and recorded as a new dataset. Prior to calculation, the sums of the two datasets are checked for  equality, and, if not equal, the larger dataset is sub-sampled to  match the smaller dataset. This function should be applied only to  enumerated data sets (e.g. Illumina sequence tags) and not to  microarray value data sets; it will not function on datasets in the  log2 space. The indices for the experimental and control datasets  may either requested from the user or supplied by the --exp and  --con command line options.
+  A simple difference is generated between two existing datasets. The  values in the 'control' dataset are simply subtracted from the  values in the 'experimental' dataset and recorded as a new dataset. For enumerated datasets (e.g. tag counts from Next Generation  Sequencing), the datasets should be subsampled to equalize the sums  of the two datasets. The indices for the experimental and control datasets  may either requested from the user or supplied by the --exp and  --con command line options.
 __
   __
 _*_normdiff_*_ (menu option 'z')
 
 __
-  A normalized difference is generated between two existing datasets.  The difference between 'control' and 'experimental' dataset values  is divided by the square root of the sum (an approximation of the  standard deviation). This is supposed to yield fewer false positives than a simple difference (see Nix et al, BMC Bioinformatics, 2008). Prior to calculation, the sums of the two datasets are checked for  equality, and, if not equal, the larger dataset is sub-sampled to  match the smaller dataset. This function should be applied only to  enumerated data sets (e.g. Illumina sequence tags) and not to  microarray value data sets; it will not function on datasets in the  log2 space. The indices for the experimental and control datasets  may either requested from the user or supplied by the --exp and  --con command line options.
+  A normalized difference is generated between two existing datasets.  The difference between 'control' and 'experimental' dataset values  is divided by the square root of the sum (an approximation of the  standard deviation). This is supposed to yield fewer false positives than a simple difference (see Nix et al, BMC Bioinformatics, 2008). For enumerated datasets (e.g. tag counts from Next Generation  Sequencing), the datasets should be subsampled to equalize the sums  of the two datasets. The indices for the experimental and control datasets  may either requested from the user or supplied by the --exp and  --con command line options.
 __
   __
 {{{
