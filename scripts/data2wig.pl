@@ -12,13 +12,13 @@ use tim_data_helper qw(
 	find_column_index
 );
 use tim_db_helper qw(
-	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
+use tim_db_helper::config;
 eval {
 	# check for bigwig file conversion support
 	require tim_db_helper::bigwig;

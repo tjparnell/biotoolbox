@@ -14,13 +14,13 @@ use tim_data_helper qw(
 	generate_tim_data_structure
 );
 use tim_db_helper qw(
-	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
+use tim_db_helper::config;
 
 print "\n This program will generate a file of genomic bins\n";
 
@@ -293,7 +293,7 @@ Specify the name of the BioPerl gff database to use as source. This is required.
 =item --win <integer>
 
 Optionally specify the window size. The default size is defined in the
-configuration file, tim_db_helper.cfg.
+configuration file, biotoolbox.cfg.
 
 =item --step <integer>
 

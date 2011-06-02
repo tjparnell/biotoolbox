@@ -12,13 +12,13 @@ use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
-	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+use tim_db_helper::config;
 eval {
 	# check for bigwig file conversion support
 	require tim_db_helper::bigwig;
@@ -654,7 +654,7 @@ have a .wig or .bw file extension.
 
 Specify the full path to David Nix's USeq or T2 application Bar2Gr (it 
 is included in both software packages). By default it uses the path 
-defined in the biotoolbox configuration file, tim_db_helper.cfg.
+defined in the biotoolbox configuration file, biotoolbox.cfg.
 
 =item --method [mean | median | sum | max]
 
@@ -695,7 +695,7 @@ delimited by whitespace, consisting of the chromosome name and size.
 
 Specify the full path to Jim Kent's wigToBigWig conversion utility. By 
 default it uses the path defined in the biotoolbox configuration file, 
-tim_db_helper.cfg. If it is not defined here or in the config file, then 
+biotoolbox.cfg. If it is not defined here or in the config file, then 
 the system path is searched for the executable. Finally, failing that, 
 it will attempt to use Lincoln Stein's Bio::DB::BigFile module for 
 conversion, if available.

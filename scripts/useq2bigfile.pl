@@ -10,13 +10,13 @@ use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
-	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+use tim_db_helper::config;
 use tim_db_helper::bigwig;
 use tim_db_helper::bigbed;
 
@@ -879,7 +879,7 @@ SQLite database file may also be provided.
 
 Specify the path to the appropriate BigFile converter application. Supported 
 applications include wigToBigWig, bedGraphToBigWig, and bedToBigBed. These 
-may be obtained from UCSC. The default is check the tim_db_helper.cfg 
+may be obtained from UCSC. The default is check the biotoolbox.cfg 
 configuration file, followed by the default environment path using the 
 'which' command. The appropriate utility is selected based on the selected 
 output format. When generating bigWig files, the bedGraph source format can 
@@ -888,7 +888,7 @@ be specified using the --gr option.
 =item --useqapp </path/to/USeq2Text>
 
 Specify the path to David Nix's USeq2Text application, part of the USeq 
-package. The default is check the tim_db_helper.cfg configuration file.
+package. The default is check the biotoolbox.cfg configuration file.
 
 =item --out <filename>
 

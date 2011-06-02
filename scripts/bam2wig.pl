@@ -15,6 +15,7 @@ use tim_file_helper qw(
 use tim_data_helper qw(
 	format_with_commas
 );
+use tim_db_helper::config;
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -156,30 +157,53 @@ if ($bigwig) {
 	# check for the app
 	unless ($bwapp) {
 		# check the environment path for Kent's conversion utilities
-		# we prefer bedGraph over wig, because of reports that it takes
-		# less memory
-		$bwapp = `which bedGraphToBigWig` || `which wigToBigWig` || undef;
+		# we prefer over wig over bedgraph, even though it has higher 
+		# memory requirements, the file size is smaller but this can 
+		# easily overcome using the bedgraph option, 
+		if ($bedgraph) {
+			$bwapp = 
+				$TIM_CONFIG->param('applications.bedGraphToBigWig') || undef;
+			
+			# try looking in the environment path using external which 
+			unless ($bwapp) {
+				$bwapp = `which bedGraphToBigWig`;
+				chomp $bwapp;
+			}
+			
+			# can't find anything
+			unless ($bwapp) {
+				die " unable to find bedGraphToBigWig utility! see help\n";
+			}
+		}
+		else {
+			$bwapp = 
+				$TIM_CONFIG->param('applications.wigToBigWig') || undef;
+			
+			# try looking in the environment path using external which 
+			unless ($bwapp) {
+				$bwapp = `which wigToBigWig`;
+				chomp $bwapp;
+			}
+			
+			# can't find anything
+			unless ($bwapp) {
+				die " unable to find wigToBigWig utility! see help\n";
+			}
+		}	
 		
 		# check executable
-		if ($bwapp) {
-			# the which command returns with a newline
+		if ($bwapp =~ /ToBigWig$/) {
+			# looks good
+			# remove newline just in case we used the which command
 			chomp $bwapp;
+			# make sure we don't write a track
+			$track = 0;
 		}
 		else {
 			warn " Unable to find bigWig conversion utility!\n" .
 				" Generating wig file only\n";
 			$bigwig = 0;
 		}
-	}
-	
-	# check which conversion utility we're using
-	if ($bwapp =~ /bedGraphToBigWig/) {
-		$bedgraph = 1; # note this overrules user options
-		$track = 0;
-	}
-	elsif ($bwapp =~ /wigToBigWig/) {
-		$bedgraph = 0; # note this overrules user options
-		$track = 0;
 	}
 }
 
@@ -736,7 +760,7 @@ bam2wig.pl [--options...] <filename>
   --(no)track
   --bed
   --bw
-  --bwapp </path/to/bedGraphToBigWig or /path/to/wigToBigWig>
+  --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --(no)gz
   --help
 
@@ -846,9 +870,10 @@ an indexed, compressed, binary BigWig file. The default is false.
 
 Specify the full path to Jim Kent's BigWig conversion utility. Two 
 different utilities may be used, bedGraphToBigWig or wigToBigWig, 
-depending on the format of the wig file generated. The bedGraphToBigWig 
-is preferred only because of slightly lower memory overhead. The 
-default is to search the environment path for the executable.
+depending on the format of the wig file generated. The wigToBigWig 
+is preferred only because smaller file sizes are produced, but with 
+slightly higher memory requirements. The application paths may be 
+set in the biotoolbox.cfg file.
 
 =item --(no)gz
 
@@ -884,8 +909,8 @@ options of selecting strand or shifting coordinates.
 
 Conversion to a bigWig file requires the installation of Jim Kent's 
 bedGraphToBigWig or wigToBigWig utilities. Conversion from a 
-bedGraph file is slightly more memory efficient, and is automatically 
-chosen if the user does not specify. 
+bedGraph file is slightly more memory efficient, but at the expense of 
+larger file sizes.
 
 More information about wiggle files can be found at 
 http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at 

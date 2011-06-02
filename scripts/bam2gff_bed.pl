@@ -555,7 +555,7 @@ the .bed file is removed.
 =item --bbapp </path/to/bedToBigBed>
 
 Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
-default is to first check the tim_db_helper.cfg configuration file for 
+default is to first check the biotoolbox.cfg configuration file for 
 the application path. Failing that, it will search the default 
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.

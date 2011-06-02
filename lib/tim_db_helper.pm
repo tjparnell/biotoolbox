@@ -1,7 +1,7 @@
 package tim_db_helper;
 
-require Exporter;
 use strict;
+require Exporter;
 use Carp;
 use File::Spec;
 use Config::Simple;
@@ -18,7 +18,7 @@ use Statistics::Lite qw(
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(generate_tim_data_structure);
-
+use tim_db_helper::config;
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -65,28 +65,12 @@ unless ($@) {
 $@ = undef;
 
 
-# Configuration File import for database info
-our $TIM_CONFIG;
-if (exists $ENV{'TIM_DB_HELPER'}) {
-	 $TIM_CONFIG = Config::Simple->new($ENV{'TIM_DB_HELPER'}) or 
-		die Config::Simple->error();
-}	
-elsif (-e "$ENV{HOME}/tim_db_helper.cfg") {
-	 $TIM_CONFIG = Config::Simple->new("$ENV{HOME}/tim_db_helper.cfg") or
-	 	die Config::Simple->error();
-}
-else {
-	warn "\n#### Using default configuration file:\n   '$Bin/../lib/tim_db_config.cfg'\n####\n";
-	$TIM_CONFIG = Config::Simple->new("$Bin/../lib/tim_db_helper.cfg") or 
-	 	die Config::Simple->error();
-}
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
 
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw();
 our @EXPORT_OK = qw(
-	$TIM_CONFIG
 	open_db_connection
 	get_dataset_list 
 	validate_dataset_list 
@@ -151,16 +135,6 @@ more convenient and accessible to identify through the method.
 Historically, this module was initially written to use Bio::DB::GFF for 
 database usage. It has since been re-written to use Bio::DB::SeqFeature::Store.
 
-To accomodate multiple different databases and settings, database 
-configurations are stored in a separate 'tim_db_helper.cfg' file. This is a 
-simple INI style text file that stores various variables, including 
-database connection parameters and feature groups. The file may be located 
-in your home root directory, or located anywhere and referenced in your 
-Environment settings under the key 'TIM_DB_HELPER'. If the file is not 
-found then the default file located in the biotoolbox lib directory is 
-used. See the internal documentation of the tim_db_helper.cfg file for more 
-details. 
-
 Complete usage and examples for the functions are provided below.
 
 =head1 USAGE
@@ -209,7 +183,7 @@ Pass the name of a relational database, the path to a SQLite database file,
 or the path to a GFF3 file. The GFF3 may be compressed. 
 
 Parameters for connecting to the database are stored in a configuration 
-file, C<tim_db_helper.cfg>. These include database adaptors, user name, 
+file, C<biotoolbox.cfg>. These include database adaptors, user name, 
 password, etc. Information regarding the configuration file may be found 
 within the file itself. 
 
@@ -314,7 +288,7 @@ Pass either the name of the database or an established database object.
 
 By default, the list of feature types are filtered by the source. Features 
 whose source are listed in the C<source_exclude> array of the 
-C<tim_db_helper.cfg> file are excluded from the final hash. These usually 
+C<biotoolbox.cfg> file are excluded from the final hash. These usually 
 include sources from official genomic authorities, such as 'SGD', 'GeneDB', 
 'UCSC', 'Ensembl', etc. In this way, only special features (e.g. microarray 
 datasets) are included in the list.
@@ -768,7 +742,7 @@ arguments. The keys include
   Optional: 
   win =>      A scalar value containing an integer representing the
               size of the window in basepairs. The default value 
-              is defined in tim_db_helper.cfg file.
+              is defined in biotoolbox.cfg file.
   step =>     A scalar value containing an integer representing the
               step size for advancing the window across the genome. 
               The default is the window size.
@@ -3033,7 +3007,7 @@ actual list of feature types will be collected and returned as an array.
 Multiple values may be passed as a comma-delimited string (no spaces).
 
 The aliases and feature lists are specified in the tim_db_helper 
-configuration file, tim_db_helper.cfg. Additional lists and aliases 
+configuration file, biotoolbox.cfg. Additional lists and aliases 
 may be placed there. The lists are database specific, or they can be 
 added to the default database.
 

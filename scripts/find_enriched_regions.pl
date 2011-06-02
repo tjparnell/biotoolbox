@@ -20,12 +20,12 @@ use tim_db_helper qw(
 	validate_dataset_list
 	get_region_dataset_hash
 	get_chromo_region_score
-	$TIM_CONFIG
 );
 use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
+use tim_db_helper::config;
 
 print "\n This script will find enriched regions for a specific microarray data set\n\n";
 
