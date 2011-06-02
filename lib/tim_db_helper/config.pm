@@ -72,6 +72,12 @@ The file is intended to be edited by the user for their custom installation.
 The file is a simple INI style text file. Documentation on the format may 
 be found within the file itself.
 
+=head1 USAGE
+
+The module exports a single Config::Simple object representing the 
+biotoolbox settings in the configuration file. Please refer to the 
+documentation for Config::Simple for usage.
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
