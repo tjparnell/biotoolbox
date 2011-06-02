@@ -929,7 +929,7 @@ Specify the type of feature from which to collect values. This is required
 for new feature tables. Two types of values may be passed: either a specific 
 feature type present in the database, or an alias to one or more features. 
 The feature may be specified as either type or type:source. Aliases are 
-specified in the C<tim_db_helper.cfg> file, and provide a shortcut to a 
+specified in the C<biotoolbox.cfg> file, and provide a shortcut to a 
 list of one or more features. More than feature may be included as a 
 comma-delimited list (no commas).
   

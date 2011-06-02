@@ -11,13 +11,13 @@ use tim_data_helper qw(
 	find_column_index
 );
 use tim_db_helper qw(
-	$TIM_CONFIG
 	open_db_connection
 );
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
+use tim_db_helper::config;
 eval {
 	# check for bigbed file conversion support
 	require tim_db_helper::bigbed;
@@ -587,7 +587,7 @@ data file.
 =item --bbapp </path/to/bedToBigBed>
 
 Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
-default is to first check the tim_db_helper.cfg configuration file for 
+default is to first check the biotoolbox.cfg configuration file for 
 the application path. Failing that, it will search the default 
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.

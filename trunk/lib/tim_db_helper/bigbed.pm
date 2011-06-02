@@ -464,13 +464,13 @@ Pass the function an anonymous hash of arguments, including the following:
                  This is typically "chromosome", but could also be 
                  "sequence", "scaffold", "contig", etc. The default 
                  value is "chromosome". This value may be provided by 
-                 checking the entry in tim_db_helper.cfg configuration 
+                 checking the entry in biotoolbox.cfg configuration 
                  file.
   chromo      => The name of the chromosome sizes text file, described 
                  above, as an alternative to providing the database name.
   bbapppath   => Provide the full path to Jim Kent's bedToBigBed  
                  utility. This parameter may instead be defined in the 
-                 configuration file "tim_db_helper.cfg". 
+                 configuration file "biotoolbox.cfg". 
 
 Example
 
