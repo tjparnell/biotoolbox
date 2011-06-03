@@ -21,6 +21,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+use tim_db_helper::config;
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -187,7 +188,9 @@ sub process_bam_file {
 		OPEN => 0
 	);
 	
-	my $samtools = `which samtools`; # checking the path
+	# look for the samtools application
+	my $samtools = $TIM_CONFIG->param('applications.samtools') || 
+		`which samtools` || undef; # check config and the path
 	if ($samtools) {
 		# samtools was found in the path, yeah!
 		chomp $samtools;
