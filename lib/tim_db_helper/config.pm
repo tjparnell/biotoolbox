@@ -43,6 +43,10 @@ else {
 	 	croak Config::Simple->error();
 }
 
+unless ($TIM_CONFIG) {
+	croak "Can't find biotoolbox.cfg configuration file!\n";
+}
+
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw($TIM_CONFIG);

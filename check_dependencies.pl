@@ -1,6 +1,7 @@
 #!/usr/bin/perl
 
-require Cwd;
+use strict;
+use Cwd;
 require CPAN;
 
 # get current working directory
@@ -17,7 +18,7 @@ foreach ( get_list_of_modules() ) {
 	my $mod = CPAN::Shell->expand("Module", $module_name);
 	
 	# check for it
-	printf " checking for %-30s", $module_name; #1.006900 but CPAN has 1.006901
+	printf " checking for %-30s", $module_name; 
 	if ($mod->uptodate) {
 		# true, it is up to date
 		print " up to date\n";
@@ -77,7 +78,7 @@ if (@install_list) {
 	print "I can now help you install missing dependencies if you wish\n\n" 
 }
 else {
-	print "Everything is up to date. You're good to go!\n";
+	print "Everything is up to date. You are good to go!\n";
 	exit;
 }
 
@@ -89,7 +90,6 @@ foreach my $mod (@install_list) {
 	print "  Install $file? y/n   ";
 	my $answer = <STDIN>;
 	if ($answer =~ /^y/i) {
-		print "   Installing....\n";
 		$mod->install;
 		print "\n#####################\n\n"
 	}
@@ -97,7 +97,7 @@ foreach my $mod (@install_list) {
 	# change back to current directory in case CPAN moved us
 	chdir $current;
 }
-print " You're now good to go!\n";
+print " You are now good to go!\n";
 
 
 
@@ -164,7 +164,7 @@ qq(  Optional, but required for working with Next Generation Sequencing BAM
 )
 		],
 		['Bio::Graphics::Browser2', 
-qq(  Optional, but recommended for Genome Browsing
+qq(  Optional, but recommended for genome browsing
 )
 		],
 	);

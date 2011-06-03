@@ -14,6 +14,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	open_to_write_fh
 );
+use tim_db_helper::config;
 eval {
 	# check for bigbed file conversion support
 	require tim_db_helper::bigbed;
@@ -260,20 +261,11 @@ if ($bed and $bigbed) {
 	}
 	
 	
-	# generate chromosome sizes file from BAM data
-	my $chromo_fh = open_to_write_fh('chromosome_sizes.txt');
-	for my $tid (0 .. $sam->n_targets - 1) {
-		my $seq_id = $sam->target_name($tid);
-		my $length = $sam->target_len($tid);
-		$chromo_fh->print("$seq_id\t$length\n");
-	}
-	$chromo_fh->close;
-	
-	
 	# find bedToBigBed utility
 	unless ($bb_app_path) {
-		# check the system path
-		$bb_app_path = `which bedToBigBed` || undef;
+		# check the config or system path
+		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
+			`which bedToBigBed` || undef;
 		chomp $bb_app_path if $bb_app_path;
 	}
 	unless ($bb_app_path) {
@@ -284,6 +276,16 @@ if ($bed and $bigbed) {
 	}
 		
 			
+	# generate chromosome sizes file from BAM data
+	my $chromo_fh = open_to_write_fh('chromosome_sizes.txt');
+	for my $tid (0 .. $sam->n_targets - 1) {
+		my $seq_id = $sam->target_name($tid);
+		my $length = $sam->target_len($tid);
+		$chromo_fh->print("$seq_id\t$length\n");
+	}
+	$chromo_fh->close;
+	
+	
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
