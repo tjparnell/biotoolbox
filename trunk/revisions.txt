@@ -1,5 +1,17 @@
 ######## biotoolbox revision history #############
 
+v1.5 (svn r184)
+	- Added script useq2bigfile.pl for converting USeq archives
+	- Added script check_dependencies.pl for assisting in checking for Perl module dependencies. It will help install the latest versions through CPAN
+	- Changed the biotoolbox configuration file from lib/tim_db_helper.cfg to biotoolbox.cfg in the root directory.
+	- Moved the biotoolbox configuration loader into a separate module as lib/tim_db_helper/config.pm. This avoids requiring installing BioPerl and loading all of tim_db_helper.pm when it may not be necessary.
+	- Updated numerous scripts to reflect changes with the biotoolbox configuration loader.
+	- added axes labeling options to scripts graph_data.pl and graph_histogram.pl
+	- fixed bug in handling bed files in library tim_file_helper
+	- minor fixes in script data2wig.pl
+	- improved working with bigfile conversions
+	- fixed minor bug in script big_file2gff3.pl when leaving files in the current directory
+
 v1.4.4 (svn r162)
 	- Added reads per million option to script bam2wig.pl
 	- Added parent, exon, and transcript_length attributes to script get_feature_info.pl
