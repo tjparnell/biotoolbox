@@ -2,8 +2,6 @@
 
 =Preparing a Mac OS X computer for bioinformatics analysis using bioperl=
 
-
-
 ==Prerequisites==
 	* A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
 	* Some very basic understanding of perl programs, modules, and how to install upgrade perl modules using CPAN. Knowing and writing the Perl language is not necessary.
@@ -68,8 +66,6 @@ MySQL is a commonly used open source database that can be used from small databa
 
 PostGreSQL is another alternative open source database with capabilities similar to MySQL. I don't personally have any experience with it, but it is supported by BioPerl.
 
-
-
 ===Installing MySQL===
 You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So if you have to install from source and compile the executable for your machine, you might as well save a little effort and go through Fink to handle the compilation for you.
 
@@ -108,7 +104,6 @@ Set up MySQL to start up automatically by running
 
 There should now be a startup plist file in `/Library/StartupItems/`.
 
-
 ===Installing GD Libraries===
 These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
 
@@ -123,14 +118,10 @@ The third approach, and one that I favor, is to install them through Fink. Begin
 
 It should also install libjpeg and libpng, along with the appropriate libraries.
 
-
-
-
 ===Installing other programs with Fink===	
 There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
 
 Another generally useful tool is _wget_, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
-
 
 ==Installing Perl modules through CPAN==
 The [http://search.cpan.org/ Comprehensive Perl Archive Network] is an extensive repository of Perl modules. If you're faced with a difficult job of coding some project, chances are that someone else has either done it for you, or at least written some code that will make the job easier. There are thousands of Perl modules in CPAN, some of which are just right for you.
@@ -155,7 +146,6 @@ Some basic modules to upgrade or install right away (but probably not absolutely
 	* Module::Build
 	* ExtUtils::MakeMaker
 
-
 ===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
 
@@ -169,69 +159,40 @@ Sometimes, making or building a Perl module under the CPAN shell just doesn't wo
 
 Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically test your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
 
-
-===Important BioPerl pre-requisites===
-There are a number of pre-requisites you can install to make the BioPerl installation smoother, as well as modules that are required for several of my programs. Installing BioPerl directly should take care of these prerequisites for you, but I find the easiest way is to install all of these through CPAN. Watch out for prerequisites, and let CPAN install those for you.
-	* GD
-	* GD::SVG
-	* SVG
-	* CGI
-	* DBI
-	* DBD::mysql
-	* DBD::SQLite
-	* Statistics::Descriptive
-	* Data::Stag
-
-
-===Additional modules for biotoolbox===
-Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
-	* GD::Graph
-	* GD::Graph::smoothlines
-	* Statistics::Lite
-	* Statistics::LineFit
-	* Compress::Zlib
-	* IO::Zlib
-	* Config::Simple
-	* Pod::Usage
-	* Algorithm::Cluster
-
-
 ===Install BioPerl===
-Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`CJFIELDS/BioPerl-1.6.900.tar.gz`), which should be adequate for most purposes.
+Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`C/CJ/CJFIELDS/BioPerl-1.6.901.tar.gz`), which should be adequate for most purposes, or obtain the latest development version from GitHub. 
 
-There are dozens of prerequisite modules for bioperl, but many (all?) are not absolutely necessary. I've listed above the ones that I think are the most needed, so you should be able to safely skip most of the prerequisites it lists. However, if you miss one, perl usually does a pretty good job at complaining that a required module is missing, and you can always go back and install it.
+There are dozens of prerequisite modules for bioperl, but many are not absolutely necessary. If you install through CPAN, which is the easiest method, it should be able to automatically install the prerequisites for you. You can select which ones you want to install. 
 
-Since BioPerl is under continual development, and a number of improvements have been made, the latest bioperl-live distribution may be ideal. 
-
-If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/master bioperl version], follow the instructions for installing, but it should go something like the following. The same warnings about prerequisites apply as above.
+If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/master bioperl version], follow the instructions for installing, but it should go something like the following. Note that you will have to install the prerequisites manually before building bioperl.
 <pre>
 	perl Build.PL
 	./Build test
 	sudo ./Build install
 </pre>
 
-	
+===Additional modules for biotoolbox===
+There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script `check_dependencies.pl`, located in the biotoolbox root directory. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use.Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+
 ==Installing GBrowse==
 Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
 	* Bio::Graphics
 	* GBrowse
 
-It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire.
+It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire. These are the settings that I use personally; it only deviates from default for the tmp folder (don't ask me why - it's a long story).
+	* conf => /etc/gbrowse2
+	* htdocs => /Library/Webserver/Documents/gbrowse2
+	* cgibin => /Library/Webserver/CGI-Executables/gb2
+	* wwwuser => _www
+	* persistent => /var/lib/gbrowse2
+	* databases => /var/lib/gbrowse2/databases
+	* tmp => /var/tmp/gbrowse2
+	* apachemodules => /usr/lib/apache/modules
 
-*Important!* You will need to turn on Apache web server using the Sharing tab of System Preferences.
+After installation, the installer should set the permissions appropriately for the persistant and tmp directories. Be sure to check those manually in the terminal (`ls -l`); sometimes they need to be fixed.
 
-Also, the default security settings need to be adjusted to allow for GBrowse to work correctly; otherwise I have issues. This may not  be the best fix, as I’m not an Apache expert. In the file `/etc/apache2/httpd.conf`, find the `<Directory />` stanza and comment out the following lines 
-<pre>
-	Order deny,allow
-	Deny from all lines. 
-</pre>
-Then add the following lines:
-<pre>
-	Order allow,deny
-	Allow from all
-</pre>
-You should be able to test GBrowse by navigating to http://localhost/cgi-bin/gb2/gbrowse The default yeast genome should come up.
-	
+*Important!* You will need to turn on Apache web server using the Sharing tab of System Preferences. From the command line, you can enter `sudo apachectl start`. To restart Apache, for example after upgrading GBrowse, enter `sudo apachectl graceful`. The GBrowse installer script tries to restart Apache for you, but the command doesn't work on Mac OS X (it's Linux specific), so you'll have to do it manually.
+
 ==Installing Samtools==
 [http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
 
@@ -259,10 +220,8 @@ To install the Bio-Samtools module (see below), you'll need to put the libraries
 </pre>
 This also copies the executables into the `/usr/local/bin/` directory for easy access through the path.
 
-
 ==Installing Bio-Samtools==
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
-
 
 ==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
@@ -326,7 +285,6 @@ Continue with the module installation.
 ==Ensembl Perl API==
 To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/`. This allows their modules to be found automatically in the normal manner. 
 Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
-
 
 =Additional Tools=
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or biotoolbox. These are simply programs that I have found to be helpful in my own work.

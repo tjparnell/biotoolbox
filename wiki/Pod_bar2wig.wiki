@@ -40,7 +40,7 @@ __
 __--barapp </path/to/!Bar2Gr**>
 
 __
-  Specify the full path to David Nix's USeq or T2 application !Bar2Gr** (it  is included in both software packages). By default it uses the path  defined in the biotoolbox configuration file, tim_db_helper.cfg.
+  Specify the full path to David Nix's USeq or T2 application !Bar2Gr** (it  is included in both software packages). By default it uses the path  defined in the biotoolbox configuration file, biotoolbox.cfg.
 __
   __
 __--method `[`mean | median | sum | max`]`
@@ -76,7 +76,7 @@ __
 __--bwapp </path/to/wigToBigWig>
 
 __
-  Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  tim_db_helper.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable. Finally, failing that,  it will attempt to use Lincoln Stein's Bio::DB::!BigFile** module for  conversion, if available.
+  Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  biotoolbox.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable. Finally, failing that,  it will attempt to use Lincoln Stein's Bio::DB::!BigFile** module for  conversion, if available.
 __
   __
 __--(no)gz

@@ -74,13 +74,13 @@ __
 __--bigapp </path/to/bigFileConverter>
 
 __
-  Specify the path to the appropriate !BigFile** converter application. Supported  applications include wigToBigWig, bedGraphToBigWig, and bedToBigBed. These  may be obtained from UCSC. The default is check the tim_db_helper.cfg  configuration file, followed by the default environment path using the  'which' command. The appropriate utility is selected based on the selected  output format. When generating bigWig files, the bedGraph source format can  be specified using the --gr option.
+  Specify the path to the appropriate !BigFile** converter application. Supported  applications include wigToBigWig, bedGraphToBigWig, and bedToBigBed. These  may be obtained from UCSC. The default is check the biotoolbox.cfg  configuration file, followed by the default environment path using the  'which' command. The appropriate utility is selected based on the selected  output format. When generating bigWig files, the bedGraph source format can  be specified using the --gr option.
 __
   __
 __--useqapp </path/to/USeq2Text>
 
 __
-  Specify the path to David Nix's USeq2Text application, part of the USeq  package. The default is check the tim_db_helper.cfg configuration file.
+  Specify the path to David Nix's USeq2Text application, part of the USeq  package. The default is check the biotoolbox.cfg configuration file.
 __
   __
 __--out <**filename>

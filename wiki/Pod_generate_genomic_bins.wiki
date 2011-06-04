@@ -34,7 +34,7 @@ __
 __--win <**integer>
 
 __
-  Optionally specify the window size. The default size is defined in the configuration file, tim_db_helper.cfg.
+  Optionally specify the window size. The default size is defined in the configuration file, biotoolbox.cfg.
 __
   __
 __--step <**integer>

@@ -24,7 +24,7 @@ bam2wig.pl `[`--options...`]` <**filename>
   --(no)track
   --bed
   --bw
-  --bwapp </path/to/bedGraphToBigWig or /path/to/wigToBigWig>
+  --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --(no)gz
   --help
 }}}
@@ -120,7 +120,7 @@ __
 __--bwapp </path/to/bedGraphToBigWig or /path/to/wigToBigWig>
 
 __
-  Specify the full path to Jim Kent's !BigWig** conversion utility. Two  different utilities may be used, bedGraphToBigWig or wigToBigWig,  depending on the format of the wig file generated. The bedGraphToBigWig  is preferred only because of slightly lower memory overhead. The  default is to search the environment path for the executable.
+  Specify the full path to Jim Kent's !BigWig** conversion utility. Two  different utilities may be used, bedGraphToBigWig or wigToBigWig,  depending on the format of the wig file generated. The wigToBigWig  is preferred only because smaller file sizes are produced, but with  slightly higher memory requirements. The application paths may be  set in the biotoolbox.cfg file.
 __
   __
 __--(no)gz
@@ -142,7 +142,7 @@ Note that the memory consumed by the program is roughly proportional to  the siz
 
 Counting and processing the alignments is a lengthy process, and may  require multiple hours for large numbers, especially for splices. A  simple coverage map should be much faster to calculate, but loses the  options of selecting strand or shifting coordinates.
 
-Conversion to a bigWig file requires the installation of Jim Kent's  bedGraphToBigWig or wigToBigWig utilities. Conversion from a  bedGraph file is slightly more memory efficient, and is automatically  chosen if the user does not specify.
+Conversion to a bigWig file requires the installation of Jim Kent's  bedGraphToBigWig or wigToBigWig utilities. Conversion from a  bedGraph file is slightly more memory efficient, but at the expense of  larger file sizes.
 
 More information about wiggle files can be found at  http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at  http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at  http://genome.ucsc.edu/goldenPath/help/bigWig.html.
 
