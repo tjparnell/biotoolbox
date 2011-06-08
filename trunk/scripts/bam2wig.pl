@@ -42,6 +42,7 @@ my (
 	$splice,
 	$shift,
 	$strand,
+	$min_mapq,
 	$interpolate,
 	$rpm,
 	$log,
@@ -63,7 +64,8 @@ GetOptions(
 	'splice!'   => \$splice, # split splices
 	'shift=i'   => \$shift, # shift coordinates 3'
 	'strand=s'  => \$strand, # select specific strands
-	'inter!'    => \$interpolate, # positions with no count
+	'qual=i'    => \$min_mapq, # minimum mapping quality
+	'inter|fix!'=> \$interpolate, # positions with no count
 	'rpm!'      => \$rpm, # calculate reads per million
 	'log=i'     => \$log, # transform count to log scale
 	'track!'    => \$track, # write a track line in the wig file
@@ -134,6 +136,13 @@ if ($strand) {
 }
 
 $shift = 0 unless defined $shift;
+
+if (defined $min_mapq) {
+	die " quality score must be < 255!\n" if $min_mapq > 255;
+}
+else {
+	$min_mapq = 0;
+}
 
 unless ($outfile) {
 	$outfile = $infile;
@@ -420,11 +429,14 @@ sub single_end_callback {
 		return if $a->unmapped;
 	}
 	
+	# check mapping quality
+	return if $a->qual < $min_mapq;
+	
 	# collect alignment data
 	my $start  = $a->start;
 	my $end    = $a->end;
 	my $strand = $a->strand;
-	next unless $start; # for some reason the alignment doesn't have a start?
+	return unless $start; # for some reason the alignment doesn't have a start?
 	
 	# check strand
 	if ($forward or $reverse) {
@@ -508,6 +520,13 @@ sub paired_end_callback {
 	# we only need to process one of the two pairs, 
 	# so only take the left (forward strand) read
 	return unless $a->strand == 1;
+	
+	# check mapping quality
+		# yes, this only checks the forward strand alignment, but using the 
+		# fetch method (for performance reasons) doesn't allow checking both 
+		# alignments simultaneously
+		# it's a sacrifice
+	return if $a->qual < $min_mapq;
 	
 	# collect alignment data
 	my $start  = $a->start;
@@ -754,7 +773,8 @@ bam2wig.pl [--options...] <filename>
   --splice
   --shift <integer>
   --strand [f|r]
-  --inter
+  --qual <integer>
+  --inter|fix
   --rpm
   --log [2|10]
   --(no)track
@@ -826,7 +846,18 @@ Positions outside the chromosome length are not recorded.
 Only process those single-end alignments which map to the indicated 
 strand. Default is to take all alignments regardless of strand.
 
+=item --qual <integer>
+
+Set a minimum mapping quality score of alignments to count. The mapping
+quality score is a posterior probability that the alignment was mapped
+incorrectly, and reported as a -10Log10(P) value, rounded to the nearest
+integer (range 0..255). Higher numbers are more stringent. For performance
+reasons, when counting paired-end reads, only the left alignment is
+checked. The default value is 0 (accept everything).
+
 =item --inter
+
+=item --fix
 
 Specify whether or not to record interpolating positions of 0. If 
 true, a fixedStep wig file (step=1 span=1) is written, otherwise a 
