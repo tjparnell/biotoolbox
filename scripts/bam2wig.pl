@@ -144,6 +144,10 @@ else {
 	$min_mapq = 0;
 }
 
+unless (defined $splice) {
+	$splice = 0;
+}
+
 unless ($outfile) {
 	$outfile = $infile;
 	$outfile =~ s/\.bam$//;
@@ -373,13 +377,12 @@ sub process_bam_coverage {
 			else {
 				# we're writing a fixed step file
 				for (my $i = 0; $i < scalar(@{ $coverage }); $i++) {
-					my $value = $coverage->[$i];			
 					$outfh->print($coverage->[$i] . "\n");
 					$count++;
 				}
 			}
 		}
-		print "  $count positions were recorded\n";
+		print "  ", format_with_commas($count), " positions were recorded\n";
 	}
 }
 
@@ -717,6 +720,7 @@ sub sum_total_alignments {
 					# check paired alignment
 					return if $a->unmapped;
 					return unless $a->proper_pair;
+					return if $a->qual < $min_mapq;
 					
 					# we're only counting forward reads of a pair 
 					return if $a->strand != 1; 
@@ -735,6 +739,7 @@ sub sum_total_alignments {
 					
 					# check paired alignment
 					return if $a->unmapped;
+					return if $a->qual < $min_mapq;
 					
 					# count this fragment
 					$total_read_number++;
@@ -816,10 +821,10 @@ paired-end alignments.
 =item --coverage
 
 Calculate the coverage of the alignments over the genome at single 
-base pair resolution. This ignores the position, strand, shift, and 
-log options. It uses faster low level interfaces to the Bam file to 
+base pair resolution. This ignores the position, quality, strand, shift, 
+and log options. It uses faster low level interfaces to the Bam file to 
 eke out performance. It is equivalent to specifying --position=span, 
---inter, no strand, no rpm, and no log.
+--inter, minimum quality of 0, no strand, no rpm, and no log.
 
 =item --pe
 
@@ -829,7 +834,7 @@ treat all alignments as single-end.
 
 =item --splice
 
-The Bam file single-end alignments may contain splices, where the 
+The Bam file alignments may contain splices, where the 
 read is split between two separate alignments. This is most common 
 with splice junctions from RNA-Seq data. In this case, treat each 
 alignment as a separate tag. 
@@ -867,7 +872,7 @@ The default behavior is to not record empty positions.
 
 =item --rpm
 
-Convert the data to Reads (or Fragments) Per Million. This is useful 
+Convert the data to Reads (or Fragments) Per Million mapped. This is useful 
 for comparing read coverage between different datasets. This conversion 
 is applied before converting to log, if requested. The default is no 
 conversion.
