@@ -788,7 +788,8 @@ feature type present in the database, or an alias to one or more features.
 The feature may be specified as either type or type:source. Aliases are 
 specified in the C<biotoolbox.cfg> file, and provide a shortcut to a 
 list of one or more features. More than feature may be included as a 
-comma-delimited list (no spaces).
+comma-delimited list (no spaces). To collect genomic intervals (or regions) 
+simply specify 'genome' as the feature type.
 
 =item --dataset <none | name, ...>
 
@@ -910,9 +911,9 @@ use the 5' end, or the start position of unstranded features.
 
 =item --win <integer>
 
-When generating a new genome interval list, optionally specify the window 
-size. The default size is defined in the configuration file, 
-biotoolbox.cfg.
+When generating a new genome interval list (feature type 'genome'), 
+optionally specify the window size. The default size is defined in the 
+configuration file, biotoolbox.cfg. 
 
 =item --step <integer>
 
