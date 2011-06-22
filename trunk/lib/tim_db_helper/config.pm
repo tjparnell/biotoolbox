@@ -25,7 +25,7 @@ elsif (-e "$ENV{HOME}/biotoolbox.cfg") {
 
 # the old environment variable was TIM_DB_HELPER
 # check for that just in case
-if (exists $ENV{'TIM_DB_HELPER'}) {
+elsif (exists $ENV{'TIM_DB_HELPER'}) {
 	 $TIM_CONFIG = Config::Simple->new($ENV{'TIM_DB_HELPER'}) or 
 		croak Config::Simple->error();
 }	
