@@ -332,26 +332,7 @@ sub process_single_end {
 	my $end    = $a->end;
 	my $name   = $a->display_name;
 	my $strand = $a->strand == 1 ? '+' : '-';
-	
-	# determine score from the CIGAR string
-		# since we're writing a 6-column BED file, we need a score value
-		# there is no inherent single score value with the alignment, so we'll 
-		# make one up - the percentage of matched bases in the alignment
-		# it's a reasonable one to make up
-	my $cigar_ref = $a->cigar_array;
-	my $match_count = 0;
-	foreach (@{ $cigar_ref }) {
-		# each element in this array is a reference to a two element array
-		# the first element is the CIGAR operation
-		# the second element is the count for the operation
-		if ($_->[0] eq 'M') {
-			# a match operation
-			$match_count += $_->[1];
-		}
-	}
-	# calculate the percent match out of the original query length
-	# format to whole intergers 0..100
-	my $score = int( ( ($match_count / $a->query->length) + 0.005) * 100);
+	my $score  = $a->qual;
 	
 	# write out the feature
 	&{$write_feature}(
@@ -382,12 +363,12 @@ sub process_paired_end {
 	my $seq    = $a->seq_id;
 	my $start  = $a->start;
 	my $name   = $a->display_name;
-	my $isize  = $a->isize; # insert size
+	my $score  = $a->qual;
 	
 	# calculate end
 		# I occasionally get errors if I call mate_end method
 		# rather trust the reported insert size listed in the original bam file
-	my $end = $start + $isize - 1;
+	my $end = $start + $a->isize - 1;
 	
 	# write out the feature
 	&{$write_feature}(
@@ -395,7 +376,7 @@ sub process_paired_end {
 		$start,
 		$end,
 		$name,
-		$isize, # using insert size as the score value
+		$score, 
 		'+' # technically no strand, but treat it as forward strand
 	);
 }
@@ -579,10 +560,11 @@ BED or GFF formatted feature file. For BED output, a 6-column BED file is
 generated. For GFF output, a v.3 GFF file is generated. In both cases, the
 alignment name, strand, and a score value is recorded.
 
-Both single- and paired-end alignments may be converted. For single-end 
-alignments, the generated score is the percent of matched bases (1-100).
-For paired-end alignments, the genomic coordinates of the entire insert 
-fragment is recorded. The length of the insert is recorded as the score.
+Both single- and paired-end alignments may be converted. For paired-end 
+alignments, the genomic coordinates of the entire insert fragment is recorded. 
+
+The mapping quality score is recorded as the GFF or BED score. For paired-end 
+alignments, only the left score is recorded for efficiency.
 
 For BED files, coordinates are adjusted to interbase format, according to 
 the specification.
