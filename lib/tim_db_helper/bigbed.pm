@@ -191,6 +191,13 @@ sub _collect_bigbed_data {
 					);
 				}
 				
+				# check the position
+				next unless (
+					# want to avoid those whose midpoint are not technically 
+					# within the region of interest
+					$position >= $region->start and $position <= $region->end
+				);
+				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
 				if ($method eq 'score') {
