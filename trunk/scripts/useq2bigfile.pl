@@ -9,13 +9,11 @@ use File::Temp;
 use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw(
-	open_db_connection
-);
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+# use tim_db_helper has moved down below and is loaded on demand
 use tim_db_helper::config;
 use tim_db_helper::bigwig;
 use tim_db_helper::bigbed;
@@ -91,7 +89,7 @@ unless ($to_bw or $to_bb) {
 	die " must specify either a BigBed or BigWig format! see help\n";
 }
 unless ($database or $chromo_file) {
-	die " either a chromosome file or database with chromosome information is required!\n";
+	die " either a chromosome file or database is required! see help\n";
 }
 
 # determine the method subroutine
@@ -360,6 +358,15 @@ sub get_chromosome_sizes {
 	
 	# from database
 	elsif ($database) {
+		
+		# load my modules
+		eval {
+			use tim_db_helper qw(open_db_connection);
+		};
+		if ($@) {
+			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
+		}
+		
 		
 		# open connection
 		my $db = open_db_connection($database) or 
