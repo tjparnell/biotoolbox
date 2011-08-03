@@ -11,13 +11,11 @@ use Archive::Zip qw( :ERROR_CODES );
 use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_db_helper qw(
-	open_db_connection
-);
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+# use tim_db_helper has moved down below and is loaded on demand
 use tim_db_helper::config;
 eval {
 	# check for bigwig file conversion support
@@ -290,18 +288,36 @@ if ($input_is_dir) {
 else {
 	# a single file
 	
-	# generate the gr file name
-	my (undef, $path, $grfile) = File::Spec->splitpath($infile);
-	$grfile =~ s/\.zip$//;
-	$grfile =~ s/\.bar$/.gr/; # exchange extension
+	# identify the gr file
+	# we need to open up the parent directory of the input file and look for 
+	# an appropriate matching gr file
+	# we can't do a simple extension exchange since Bar2Gr will write the 
+	# genome version into the file name, and we don't know what that could be
+	my $grfile;
+	my (undef, $path, $original_file) = File::Spec->splitpath($infile);
+	unless ($path) {
+		$path = File::Spec->curdir; 
+		# if it can't find a path we assume it's current
+	}
+	$original_file =~ s/\.bar(?:\.zip)?$//; # strip known extensions
+	my $dir = new DirHandle $path;
+	foreach my $file ($dir->read) {
+		if ($file =~ /\.gr$/ and $file =~ /$original_file/) {
+			# found the corresponding gr file
+			$grfile = $file;
+			# no need to go on
+			last;
+		}
+	}
+	$dir->close;
 	
 	# confirm gr file existence
-	unless (-e $grfile) {
+	unless (-e File::Spec->catfile($path, $grfile) ) {
 		die " unable to find converted file '$grfile'!\n";
 	}
 	
 	# process according to strand
-	if ($infile =~ /_\+_/) {
+	if ($grfile =~ /_\+_/) {
 		# forward strand
 		my $wigfile = process_gr_files('forward', $path, $grfile);
 		if (defined $wigfile) {
@@ -309,7 +325,7 @@ else {
 			print " generated wig file '$wigfile'\n";
 		}
 	}
-	elsif ($infile =~ /_\-_/) {
+	elsif ($grfile =~ /_\-_/) {
 		# forward strand
 		my $wigfile = process_gr_files('reverse', $path, $grfile);
 		if (defined $wigfile) {
@@ -339,7 +355,15 @@ if ($bigwig and exists &wig_to_bigwig_conversion) {
 	# open database connection if necessary
 	my $db;
 	if ($database) {
-		$db = open_db_connection($database);
+		eval {
+			use tim_db_helper qw(open_db_connection);
+		};
+		if ($@) {
+			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
+		}
+		else {
+			$db = open_db_connection($database);
+		}
 	}
 	
 	# find wigToBigWig utility
@@ -542,18 +566,18 @@ sub process_gr_files {
 		
 		# set reusuable variables
 		my @data;
-		my $position;
+		my $current_pos;
 		
 		# collect first line, load into variables
 		my $firstline = $gr_fh->getline;
 		chomp $firstline;
-		($position, $data[0]) = split /\t/, $firstline;
+		($current_pos, $data[0]) = split /\t/, $firstline;
 		
 		# collect subsequent lines
 		while (my $line = $gr_fh->getline) {
 			chomp $line;
 			my ($pos, $score) = split /\t/, $line;
-			if ($position == $pos) {
+			if ($current_pos == $pos) {
 				# another score value for the current position
 				push @data, $score;
 			}
@@ -561,38 +585,61 @@ sub process_gr_files {
 				# we've moved to another position
 				# time to write the data
 				
+				# combine values is necessary
+				my $newscore;
+				if (scalar @data > 1) {
+				
+					# check that we have a method sub
+					die " uh oh! This bar file has multiple values at identical " . 
+						"positions!\n Please define --method. See help for more info\n" 
+						unless defined $method_sub;
+					
+					# combine score values
+					$newscore = &{$method_sub}(@data);
+				}
+				else {
+					# only one value
+					$newscore = $data[0];
+				}
+					
+				# shift position, since wig files are 1-based and 
+				# gr files are 0-based
+				$current_pos += 1;
+				
+				# check for negative or zero positions, which are not tolerated
+				# especially when converting to bigwig
+				next if $current_pos <= 0;
+				
+				# print
+				$wig->print( "$current_pos\t$newscore\n");
+				
+				# reset to new current position
+				$current_pos = $pos;
+				@data = ($score);
+			}
+		}
+		
+		# final write if necessary
+		if (@data) {
+			# combine values is necessary
+			my $newscore;
+			if (scalar @data > 1) {
+			
 				# check that we have a method sub
 				die " uh oh! This bar file has multiple values at identical " . 
 					"positions!\n Please define --method. See help for more info\n" 
 					unless defined $method_sub;
 				
 				# combine score values
-				my $newscore = &{$method_sub}(@data);
-				
-				# shift position
-				$position += 1;
-				
-				# check for negative or zero positions, which are not tolerated
-				# especially when converting to bigwig
-				next if $position <= 0;
-				
-				# print
-				$wig->print( "$position\t$newscore\n");
-				
-				# reset
-				$position = $pos;
-				@data = q();
-				push @data, $score;
+				$newscore = &{$method_sub}(@data);
 			}
-		}
-		
-		# final write if necessary
-		if (@data) {
-			# combine score values
-			my $newscore = &{$method_sub}(@data);
+			else {
+				# only one value
+				$newscore = $data[0];
+			}
 			
 			# print
-			$wig->print( "$position\t$newscore\n");
+			$wig->print( "$current_pos\t$newscore\n");
 		}
 		
 		# close the gr file
