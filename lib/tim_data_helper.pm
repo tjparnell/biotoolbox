@@ -372,10 +372,10 @@ line and describes the type of features in the data file.
 
 =item gff
 
-This includes a scalar value with a boolean value 
-indicating whether the data was from a GFF file or not. Additionally, 
-if there was a GFF version line in the GFF file, the entire line 
-is stored as the true value.
+This includes a scalar value of the source GFF file version, obtained 
+from either the GFF file pragma or the file extension. 
+The default value is 0 (not a GFF file). As such, it may be treated 
+as a boolean value.
 
 =item number_columns
 

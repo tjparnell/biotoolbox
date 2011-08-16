@@ -182,7 +182,7 @@ my $out = open_to_write_fh($outfile, $gz) or
 # write metadata
 if ($gff) {
 	# print headers for GFF file
-	$out->print("##gff_version 3\n");
+	$out->print("##gff-version 3\n");
 	$out->print("# Program $0\n");
 	$out->print("# Converted from source file $infile\n");
 }
@@ -215,7 +215,7 @@ else {
 # Initialize output variables
 my $data_count = 0;
 my @output_data;
-
+my %gff_ids; # a hash to make unique identifiers
 
 
 
@@ -394,6 +394,21 @@ sub write_gff_feature {
 		# $score,
 		# $strand
 	
+	# generate unique ID
+	my $id = $_[3]; # id will start off same as the name
+	if (exists $gff_ids{$id}) {
+		# must be duplicate alignment for this sequence read
+		# we will need to make it unique
+		# increment the counter by one
+		$gff_ids{$id}++;
+		# and then append this digit to the name to make a unique id
+		$id = $id . '.' . $gff_ids{$id};
+	}
+	else {
+		# record this name to check in the future
+		$gff_ids{$id} = 0;
+	}
+	
 	# generate GFF fields
 	push @output_data, [ (
 		$_[0],
@@ -404,7 +419,7 @@ sub write_gff_feature {
 		$_[4],
 		$_[5],
 		'.', # phase
-		"Name=$_[3]"
+		"ID=$id; Name=$_[3]"
 	) ];
 	
 	# increment counter
@@ -570,8 +585,7 @@ For BED files, coordinates are adjusted to interbase format, according to
 the specification.
 
 An option exists to further convert the BED file to an indexed, binary BigBed 
-format. Jim Kent's bedToBigBed conversion utility must be available, and 
-either a chromosome definition file or access to a Bio::DB database is required.
+format. Jim Kent's bedToBigBed conversion utility must be available.
 
 =head1 AUTHOR
 

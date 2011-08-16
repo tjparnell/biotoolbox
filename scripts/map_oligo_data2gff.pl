@@ -83,7 +83,7 @@ my ($oligo_data_ref, $oligo_metadata) = load_microarray_data();
 
 ### Define default data
 unless ($name) {
-	$name = $oligo_metadata->{'name'};
+	$name = $oligo_metadata->{$column}{'name'};
 }
 unless ($type) {
 	$type = $name;
@@ -152,20 +152,6 @@ if (scalar keys %{ $oligo_metadata } > 2) {
 $oligo_feature_ref->{5}{'source_data_file'} = $data_file;
 $oligo_feature_ref->{5}{'formatted_places'} = $places if defined $places;
 
-# identify gff version
-my $gff_version;
-if ($oligo_feature_ref->{gff} =~ /1|2/) {
-	# gff version 1 or 2
-	$gff_version = 2;
-}
-elsif ($oligo_feature_ref->{gff} =~ /3/) {
-	# gff version 3
-	$gff_version = 3;
-}
-else {
-	# what the ....?
-	die " unknown gff version in oligo file!\n";
-}
 
 
 # Walk through the data
@@ -177,20 +163,22 @@ for (my $row = 1; $row <= $oligo_feature_ref->{last_row}; $row++) {
 	
 	# first need to identify the oligo name
 	my $oligo_name;
-	if ($gff_version == 2) {
+	if ($oligo_feature_ref->{gff} == 3) {
+		# gff version 3 file
+		my %stuff = split /\s?[;=]\s?/, $table->[$row][8];
+			# attempt to split both key=value pairs and multiple pairs
+			# simultaneously
+		#print "  row $row has " . join(", ", keys %stuff) . "\n";
+		$oligo_name = $stuff{'Name'}; 
+			# we will use the name instead of the ID since the ID may have 
+			# unique identifier numbers appended to it for multicopy oligos
+	}
+	else {
+		# assume gff version 2????
 		my @stuff = split /\s*;\s*/, $table->[$row][8];
 		my ($class, $id) = split / /, $stuff[0];
 		$id =~ s/"//g; # strip any quotation marks
 		$oligo_name = $id;
-	}
-	else {
-		# gff version 3
-		my %stuff = split /\s*[;=]\s*/, $table->[$row][8];
-			# attempt to split both key=value pairs and multiple pairs
-			# simultaneously
-		$oligo_name = $stuff{'Name'}; 
-			# we will use the name instead of the ID since the ID may have 
-			# unique identifier numbers appended to it for multicopy oligos
 	}
 	
 	if (exists $oligo_data_ref->{$oligo_name}) {
@@ -294,7 +282,7 @@ sub load_microarray_data {
 		# print the headers
 		print "\n These are the columns in the data file.\n";
 		for (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
-			print "   $i\tdata_ref->{$i}{name}\n";
+			print "   $i\t$data_ref->{$i}{name}\n";
 		}
 		
 		# process the answer
@@ -322,6 +310,7 @@ sub load_microarray_data {
 		$hash{ $data_ref->{data_table}->[$row][0] } = 
 			$data_ref->{data_table}->[$row][$column];
 	}
+	print " loaded " . scalar(keys %hash) . " microarray probe values from '$data_file'\n";
 	
 	# return
 	my %metadata = %{ $data_ref->{$column} };
