@@ -1,5 +1,12 @@
 ######## biotoolbox revision history #############
 
+v1.5.1 (svn r193)
+	- Fixed critical bug in script bar2wig.pl where values from multiple postions were not combined properly. Also fixed bug with processing a single bar file.
+	- Removed required dependencies of bioperl for scripts bar2wig.pl and useq2bigfile.pl
+	- Fixed small bug in tim_db_helper::bigbed library to ensure positions were withing the region of interest
+	- Added mapping quality filter and other improvements to script bam2wig.pl
+	- Changed score reporting to record mapping quality in script bam2gff_bed.pl
+
 v1.5 (svn r184)
 	- Added script useq2bigfile.pl for converting USeq archives
 	- Added script check_dependencies.pl for assisting in checking for Perl module dependencies. It will help install the latest versions through CPAN
