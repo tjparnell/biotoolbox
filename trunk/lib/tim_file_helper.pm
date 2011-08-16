@@ -1841,7 +1841,7 @@ sub convert_and_write_to_gff_file {
 	my $output_gff = open_to_write_fh($filename, $gz);
 	
 	# write basic headers
-	print {$output_gff} "##gff_version $gff_version\n";
+	print {$output_gff} "##gff-version $gff_version\n";
 	if (exists $input_data_ref->{'filename'}) {
 		# record the original file name for reference
 		print {$output_gff} "# Exported from file '", 

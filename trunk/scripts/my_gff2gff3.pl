@@ -72,7 +72,7 @@ foreach my $infile (@ARGV) {
 		warn "\n input file must be a gff file!\n";
 		next;
 	}
-	if ($metadata_ref->{gff} =~ /3/) {
+	if ($metadata_ref->{gff} == 3) {
 		warn "\n the input file is already version 3!\n";
 		next;
 	}
