@@ -90,7 +90,9 @@ __
 ==DESCRIPTION==
 This program will convert alignments in a BAM formatted file into either a BED or GFF formatted feature file. For BED output, a 6-column BED file is generated. For GFF output, a v.3 GFF file is generated. In both cases, the alignment name, strand, and a score value is recorded.
 
-Both single- and paired-end alignments may be converted. For single-end  alignments, the generated score is the percent of matched bases (1-100). For paired-end alignments, the genomic coordinates of the entire insert  fragment is recorded. The length of the insert is recorded as the score.
+Both single- and paired-end alignments may be converted. For paired-end  alignments, the genomic coordinates of the entire insert fragment is recorded.
+
+The mapping quality score is recorded as the GFF or BED score. For paired-end  alignments, only the left score is recorded for efficiency.
 
 For BED files, coordinates are adjusted to interbase format, according to  the specification.
 

@@ -60,7 +60,7 @@ __
   The index of the dataset in the data table to be used  as the start position column in the gff data.
 __
   __
-__--start <**column_index> =item --end <**column_index>
+__--stop <**column_index> =item --end <**column_index>
 
 __
   The index of the dataset in the data table to be used  as the stop or end position column in the gff data.

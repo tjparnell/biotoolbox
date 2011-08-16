@@ -18,7 +18,8 @@ bam2wig.pl `[`--options...`]` <**filename>
   --splice
   --shift <integer>
   --strand [f|r]
-  --inter
+  --qual <integer>
+  --inter|fix
   --rpm
   --log [2|10]
   --(no)track
@@ -54,7 +55,7 @@ __
 __--coverage
 
 __
-  Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, strand, shift, and  log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, no strand, no rpm, and no log.
+  Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, quality, strand, shift,  and log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, minimum quality of 0, no strand, no rpm, and no log.
 __
   __
 __--pe
@@ -66,7 +67,7 @@ __
 __--splice
 
 __
-  The Bam file single-end alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag.
+  The Bam file alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag.
 __
   __
 __--shift <**integer>
@@ -81,7 +82,16 @@ __
   Only process those single-end alignments which map to the indicated  strand. Default is to take all alignments regardless of strand.
 __
   __
+__--qual <**integer>
+
+__
+  Set a minimum mapping quality score of alignments to count. The mapping quality score is a posterior probability that the alignment was mapped incorrectly, and reported as a -10Log10(P) value, rounded to the nearest integer (range 0..255). Higher numbers are more stringent. For performance reasons, when counting paired-end reads, only the left alignment is checked. The default value is 0 (accept everything).
+__
+  __
 __--inter
+
+__
+__--fix
 
 __
   Specify whether or not to record interpolating positions of 0. If  true, a fixedStep wig file (step=1 span=1) is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  The default behavior is to not record empty positions.
@@ -90,7 +100,7 @@ __
 __--rpm
 
 __
-  Convert the data to Reads (or Fragments) Per Million. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. The default is no  conversion.
+  Convert the data to Reads (or Fragments) Per Million mapped. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. The default is no  conversion.
 __
   __
 __--log `[`2|10`]`

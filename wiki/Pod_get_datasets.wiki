@@ -69,7 +69,7 @@ __
 __--feature <**type | type:source | alias, ...>
 
 __
-  Specify the type of feature from which to collect values. This is required  for new feature tables. Two types of values may be passed: either a specific  feature type present in the database, or an alias to one or more features.  The feature may be specified as either type or type:source. Aliases are  specified in the `biotoolbox.cfg` file, and provide a shortcut to a  list of one or more features. More than feature may be included as a  comma-delimited list (no spaces).
+  Specify the type of feature from which to collect values. This is required  for new feature tables. Two types of values may be passed: either a specific  feature type present in the database, or an alias to one or more features.  The feature may be specified as either type or type:source. Aliases are  specified in the `biotoolbox.cfg` file, and provide a shortcut to a  list of one or more features. More than feature may be included as a  comma-delimited list (no spaces). To collect genomic intervals (or regions)  simply specify 'genome' as the feature type.
 __
   __
 __--dataset <**none | name, ...>
@@ -168,7 +168,7 @@ __
 __--win <**integer>
 
 __
-  When generating a new genome interval list, optionally specify the window  size. The default size is defined in the configuration file,  biotoolbox.cfg.
+  When generating a new genome interval list (feature type 'genome'),  optionally specify the window size. The default size is defined in the  configuration file, biotoolbox.cfg.
 __
   __
 __--step <**integer>
