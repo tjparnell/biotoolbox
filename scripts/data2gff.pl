@@ -643,7 +643,7 @@ as the chromosome or sequence ID column in the gff data.
 The index of the dataset in the data table to be used 
 as the start position column in the gff data.
 
-=item --start <column_index>
+=item --stop <column_index>
 =item --end <column_index>
 
 The index of the dataset in the data table to be used 
