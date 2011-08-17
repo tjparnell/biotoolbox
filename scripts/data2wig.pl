@@ -487,18 +487,20 @@ sub convert_to_variableStep {
 			else {
 				# more than one score
 				
-				# check for log status
-				if ($log2) {
-					@scores = map {2 ** $_} @scores;
-				}
-				
 				# combine the scores if possible
 				if ($method_sub) {
-					my $new_score = &{$method_sub}(@scores);
+					my $new_score;
 					if ($log2) {
-						# convert back to log2
-						$new_score = log($new_score) / log(2);
+						# convert to log2 first
+						@scores = map {2 ** $_} @scores;
+						# combine and convert back to log2
+						$new_score = log( &{$method_sub}(@scores) ) / log(2);
 					}
+					else {
+						$new_score = &{$method_sub}(@scores);
+					}
+					
+					# print the combined score
 					$out_fh->print("$previous_pos $new_score\n");
 				}
 				else {
