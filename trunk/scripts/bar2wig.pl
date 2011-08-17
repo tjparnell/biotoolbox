@@ -43,6 +43,7 @@ my (
 	$outfile,
 	$bar_app_path,
 	$method,
+	$log2,
 	$use_track,
 	$bigwig,
 	$database,
@@ -58,6 +59,7 @@ GetOptions(
 	'out=s'     => \$outfile, # name of output file 
 	'barapp=s'  => \$bar_app_path, # path to David's Bar2Gr file
 	'method=s'  => \$method, # method for dealing with duplicate positions
+	'log!'      => \$log2, # data is in log2 format
 	'track!'    => \$use_track, # boolean to include a track line
 	'bw!'       => \$bigwig, # boolean for bigwig output
 	'db=s'      => \$database, # name of database to get chromo info
@@ -594,8 +596,16 @@ sub process_gr_files {
 						"positions!\n Please define --method. See help for more info\n" 
 						unless defined $method_sub;
 					
-					# combine score values
-					$newscore = &{$method_sub}(@data);
+					# check for log status
+					if ($log2) {
+						@data = map {2 ** $_} @data;
+						# combine score values
+						$newscore = log( &{$method_sub}(@data) ) / log(2);
+					}
+					else {
+						# combine score values
+						$newscore = &{$method_sub}(@data);
+					}
 				}
 				else {
 					# only one value
@@ -630,8 +640,16 @@ sub process_gr_files {
 					"positions!\n Please define --method. See help for more info\n" 
 					unless defined $method_sub;
 				
-				# combine score values
-				$newscore = &{$method_sub}(@data);
+				# check for log status
+				if ($log2) {
+					@data = map {2 ** $_} @data;
+					# combine score values
+					$newscore = log( &{$method_sub}(@data) ) / log(2);
+				}
+				else {
+					# combine score values
+					$newscore = &{$method_sub}(@data);
+				}
 			}
 			else {
 				# only one value
@@ -672,6 +690,7 @@ bar2wig.pl [--options...] <filename>
   --out <filename> 
   --barapp </path/to/Bar2Gr>
   --method [mean | median | sum | max]
+  --(no)log
   --(no)track
   --bw
   --db <database>
@@ -712,6 +731,12 @@ data) or multiple sequence tags aligning to the same position (next
 generation sequencing data). Typically, with FDR or microarray data, 
 the mean or max value should be taken, while bar files representing 
 sequence tag PointData should be summed.
+
+=item --(no)log
+
+If multiple data values need to be combined at a single identical 
+position, indicate whether the data is in log2 space or not. This 
+affects the mathematics behind the combination method.
 
 =item --(no)track
 
