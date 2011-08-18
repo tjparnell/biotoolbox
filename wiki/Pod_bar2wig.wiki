@@ -14,6 +14,7 @@ bar2wig.pl `[`--options...`]` <**filename>
   --out <filename> 
   --barapp </path/to/Bar2Gr>
   --method [mean | median | sum | max]
+  --(no)log
   --(no)track
   --bw
   --db <database>
@@ -47,6 +48,12 @@ __--method `[`mean | median | sum | max`]`
 
 __
   Define the method used to combine multiple data values at a single  position. Bar files can frequently have one or more values at a single  position, usually due to either multiple identical oligo probes (microarray  data) or multiple sequence tags aligning to the same position (next  generation sequencing data). Typically, with FDR or microarray data,  the mean or max value should be taken, while bar files representing  sequence tag !PointData** should be summed.
+__
+  __
+__--(no)log
+
+__
+  If multiple data values need to be combined at a single identical  position, indicate whether the data is in log2 space or not. This  affects the mathematics behind the combination method.
 __
   __
 __--(no)track

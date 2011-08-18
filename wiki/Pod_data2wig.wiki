@@ -14,14 +14,16 @@ data2wig.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
-  --step [fixed,variable]
+  --step [fixed | variable]
   --size <integer>
   --score <column_index>
   --name <text>
   --(no)track
+  --(no)mid
   --inter
-  --format [0,1,2,3]
-  --(no)midpoint
+  --format [0 | 1 | 2 | 3]
+  --method [mean | median | sum | max]
+  --(no)log
   --bigwig|--bw
   --chromof <filename>
   --db <database>
@@ -45,7 +47,7 @@ __
   Optionally specify the name of of the output file. The track name is  used as default. The '.wig' extension is automatically added if required.
 __
   __
-__--step `[`fixed,variable`]`
+__--step `[`fixed | variable`]`
 
 __
   The type of step progression for the wig file. Two wig formats are available: 'fixedStep' where data points are positioned at equal distances along the  chromosome, and 'variableStep' where data points are not equally spaced  along the chromosome. The 'fixedStep' wig file has one column of data  values (score), while the 'variableStep' wig file has two columns (position and score). If the option is not defined, then the format is  automatically determined from the metadata of the file.
@@ -75,25 +77,40 @@ __
   Do (not) include the track line at the beginning of the wig file. Wig  files normally require a track line, but if you will be converting to  the binary bigwig format, the converter requires no track line. Why it  can't simply ignore the line is beyond me. This option is automatically  set to false when the --bigwig option is enabled.
 __
   __
+__--(no)mid
+
+__
+  A boolean value to indicate whether the  midpoint between the actual 'start' and 'stop' values should be used. The default is to use only the 'start' position.
+__
+  __
 __--inter
 
 __
   Source data is in interbase coordinate (0-base) system. Shift the  start position to base coordinate (1-base) system. Wig files are by  definition 1-based. Default is false.
 __
   __
-__--(no)midpoint
-
-__
-  A boolean value to indicate whether the  midpoint between the actual 'start' and 'stop' values should be used. The default is to use only the 'start' position.
-__
-  __
-__--format `[`0,1,2,3`]`
+__--format `[`0 | 1 | 2 | 3`]`
 
 __
   Indicate the number of decimal places the score value should be formatted. Acceptable values include 0, 1, 2, or 3 places. The default is to not format the score value.
 __
   __
-__--bigwig --bw
+__--method `[`mean | median | sum | max`]`
+
+__
+  Define the method used to combine multiple data values at a single  position. Wig files do not tolerate multiple identical positions.
+__
+  __
+__--(no)log
+
+__
+  If multiple data values need to be combined at a single identical  position, indicate whether the data is in log2 space or not. This  affects the mathematics behind the combination method.
+__
+  __
+__--bigwig
+
+__
+__--bw
 
 __
   Indicate that a binary !BigWig** file should be generated instead of  a text wiggle file. A .wig file is first generated, then converted to  a .bw file, and then the .wig file is removed.
@@ -124,11 +141,13 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a data file into a wig formatted text file. This presumes that the data file contains the chromosomal coordinates,  i.e. chromosome, start, and (optionally) stop. If they are not found, the  conversion will fail. The relevant columns should  therefore be labeled 'chromosome', 'start', and 'stop' or 'end'.
+This program will convert any tab-delimited data text file into a wiggle  formatted text file. This requires that the file contains not only the  scores bu also chromosomal coordinates, i.e. chromosome, start, and  (optionally) stop. The program should automatically detect these  columns (if appropriately labeled) or they can be specified. An option  exists to use the midpoint of a region, e.g. microarray probe.
 
 The wig file format is specified by documentation supporting the UCSC  Genome Browser and detailed at this location: http://genome.ucsc.edu/goldenPath/help/wiggle.html Two formats are supported, 'fixedStep' and 'variableStep'.
 
-Alternatively, a binary !BigWig** file may be generated as opposed to a  text wiggle file. The binary format is preferential to the text version  for a variety of reasons, including fast, random access and no loss in  data value precision. More information can be found at this location: http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires  !BigWig** file support, supplied by the biotoolbox module  `tim_db_helper::bigwig`.
+Wiggle files cannot tolerate multiple datapoints at the same identical  position, e.g. multiple microarray probes matching a repetitive sequence.  An option exists to mathematically combine these positions into one value.
+
+A binary !BigWig** file may also be further generated from the   text wiggle file. The binary format is preferential to the text version  for a variety of reasons, including fast, random access and no loss in  data value precision. More information can be found at this location: http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires  !BigWig** file support, supplied by the biotoolbox module  `tim_db_helper::bigwig`.
 
 {{{
 }}}

@@ -96,7 +96,7 @@ The mapping quality score is recorded as the GFF or BED score. For paired-end  a
 
 For BED files, coordinates are adjusted to interbase format, according to  the specification.
 
-An option exists to further convert the BED file to an indexed, binary !BigBed**  format. Jim Kent's bedToBigBed conversion utility must be available, and  either a chromosome definition file or access to a Bio::DB database is required.
+An option exists to further convert the BED file to an indexed, binary !BigBed**  format. Jim Kent's bedToBigBed conversion utility must be available.
 
 ==AUTHOR==
 {{{
