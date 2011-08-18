@@ -15,6 +15,7 @@ useq2bigfile.pl --bw|bb `[`--options`]` <**filename.useq>
   --bb
   --gr
   --method [mean|median|sum|max]
+  --(no)log
   --strand [f|r]
   --chromof <chromosome_sizes_filename>
   --db <database>
@@ -50,7 +51,13 @@ __
 __--method `[`mean|median|sum|max`]`
 
 __
-  Specify the method for dealing with multiple values at identical positions.  USeq and Bar files tolerate multiple values at identical positions, but Wig  and !BigWig** files do not. Hence, the values at these positions must be combined  mathematically. This does not apply to !BigBed** files. The default is to take  the mean value.
+  Specify the method for dealing with multiple values at identical positions.  USeq and Bar files tolerate multiple values at identical positions, but Wig  and !BigWig** files do not. Hence, the values at these positions must be combined  mathematically. This does not apply to !BigBed** files.
+__
+  __
+__--(no)log
+
+__
+  If multiple data values need to be combined at a single identical  position, indicate whether the data is in log2 space or not. This  affects the mathematics behind the combination method.
 __
   __
 __--strand `[`f|r`]`
