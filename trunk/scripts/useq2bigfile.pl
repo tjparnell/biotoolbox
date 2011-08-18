@@ -41,6 +41,7 @@ my (
 	$to_bb,
 	$bedgraph,
 	$method,
+	$log2,
 	$strand,
 	$database,
 	$chromo_file,
@@ -58,6 +59,7 @@ GetOptions(
 	'bb'        => \$to_bb, # generate bigbed file
 	'gr!'       => \$bedgraph, # write a bedgraph file instead of wig
 	'method=s'  => \$method, # method for combining duplicate lines
+	'log!'      => \$log2, # data is in log2 format
 	'strand=s'  => \$strand, # take a specific strand
 	'db=s'      => \$database, # name of database to get chromo info
 	'chromof=s' => \$chromo_file, # name of a chromosome file
@@ -193,24 +195,18 @@ else {
 
 
 sub determine_method_sub {
-	my $method_sub;
 	if ($method eq 'mean') {
-		$method_sub = \&mean;
+		return \&mean;
 	}
 	elsif ($method eq 'median') {
-		$method_sub = \&median;
+		return \&median;
 	}
 	elsif ($method eq 'sum') {
-		$method_sub = \&sum;
+		return \&sum;
 	}
 	elsif ($method eq 'max') {
-		$method_sub = \&max;
+		return \&max;
 	}
-	else {
-		print " using default method of mean for duplicate values\n";
-		$method_sub = \&mean;
-	}
-	return $method_sub;
 }
 
 
@@ -480,7 +476,23 @@ sub convert_to_bedgraph {
 				# get the score for the previous position(s)
 				my $score;
 				if (scalar @scores > 1) {
-					$score = &{$method_sub}(@scores);
+					if ($method_sub) {
+						# we must have a combination subroutine defined
+						if ($log2) {
+							# convert to log2 first
+							@scores = map {2 ** $_} @scores;
+							# combine and convert back to log2
+							$score = log( &{$method_sub}(@scores) ) / log(2);
+						}
+						else {
+							$score = &{$method_sub}(@scores);
+						}
+					}
+					else {
+						die " there are " . scalar(@scores) . " scores for " . 
+							"position $data[0]:$data[1]..$data[2]!!!!\n" .
+							" Please define a combination method!!! see help\n";
+					}
 				}
 				else {
 					$score = shift @scores;
@@ -605,7 +617,23 @@ sub convert_to_wig {
 				# get the score for the previous position(s)
 				my $score;
 				if (scalar @scores > 1) {
-					$score = &{$method_sub}(@scores);
+					if ($method_sub) {
+						# we must have a combination subroutine defined
+						if ($log2) {
+							# convert to log2 first
+							@scores = map {2 ** $_} @scores;
+							# combine and convert back to log2
+							$score = log( &{$method_sub}(@scores) ) / log(2);
+						}
+						else {
+							$score = &{$method_sub}(@scores);
+						}
+					}
+					else {
+						die " there are " . scalar(@scores) . " scores for " . 
+							"position $data[0]:$data[1]..$data[2]!!!!\n" .
+							" Please define a combination method!!! see help\n";
+					}
 				}
 				else {
 					$score = shift @scores;
@@ -822,6 +850,7 @@ useq2bigfile.pl --bw|bb [--options] <filename.useq>
   --bb
   --gr
   --method [mean|median|sum|max]
+  --(no)log
   --strand [f|r]
   --chromof <chromosome_sizes_filename>
   --db <database>
@@ -860,8 +889,13 @@ midpoint position), in which case the application wigToBigWig is used instead.
 Specify the method for dealing with multiple values at identical positions. 
 USeq and Bar files tolerate multiple values at identical positions, but Wig 
 and BigWig files do not. Hence, the values at these positions must be combined 
-mathematically. This does not apply to BigBed files. The default is to take 
-the mean value.
+mathematically. This does not apply to BigBed files. 
+
+=item --(no)log
+
+If multiple data values need to be combined at a single identical 
+position, indicate whether the data is in log2 space or not. This 
+affects the mathematics behind the combination method.
 
 =item --strand [f|r]
 
