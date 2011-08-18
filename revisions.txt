@@ -1,5 +1,12 @@
 ######## biotoolbox revision history #############
 
+v1.5.2 (svn r200)
+	- Updated several scripts and libraries to fix bugs in handling GFF version numbers and pragmas.
+	- Added unique IDs to the gff3 output from bam2gff_bed.pl
+	- Added option to deal with multiple values at identical positions in the script data2wig.pl
+	- Added support for log2 values when combining multiple values at identical postions in scripts data2wig.pl, bar2wig.pl, and useq2bigfile.pl.
+	- Retired the outdated script just_blast_oligos.pl.
+
 v1.5.1 (svn r193)
 	- Fixed critical bug in script bar2wig.pl where values from multiple postions were not combined properly. Also fixed bug with processing a single bar file.
 	- Removed required dependencies of bioperl for scripts bar2wig.pl and useq2bigfile.pl
