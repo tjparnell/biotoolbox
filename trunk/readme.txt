@@ -31,12 +31,6 @@ version 5.10.0 has been tested. 64-bit executable is desireable but not
 required, if only because some of the data files can get particularly
 large, leading to out-of-memory errors with 32-bit Perl.
 
-No install 
-There is no installation script or compilation required. The scripts are
-designed to be run as is from the scripts directory. Biotoolbox-specific
-libraries are included in the lib directory and should be automatically
-found if the directory structure is maintained.
-
 Dependencies 
 Several different Perl modules are required for specific programs to work.
 To check for these dependencies, run the script 'check_dependencies.pl'
@@ -49,6 +43,15 @@ and enter the password.
 Note that not all of modules are required. The best way to find out if a
 dependency is absolutely required is to try running the desired script.
 Perl will appropriately complain if it can't find the module.
+
+No install 
+There is no installation script or compilation required. The scripts are
+designed to be run as is from the scripts directory. Biotoolbox-specific
+libraries are included in the lib directory and should be automatically
+found if the directory structure is maintained. The biotoolbox libraries 
+were not intended for general consumption (they do not have a friendly 
+object-oriented API), but they are fully documented in case someone dares 
+to use them.
 
 Mac OS X 
 Since I work primarily on Mac OS X, I have compiled a a HowTo for
@@ -63,15 +66,14 @@ USAGE
 
 Configuration 
 There is a configuration file that may be customized for your particular
-installation. The default file is lib/biotoolbox.cfg. It is a simple
+installation. The default file is biotoolbox.cfg. It is a simple
 INI-style file that is used to set up database connection profiles, feature
 aliases, helper application locations, etc. The file is intended to be
 edited by users. More documentation can be found within the file itself.
 
-There are three locations where the file may be stored: 1) in the lib
-directory along with the library modules, 2) in the user's home root
-directory, or 3) a custom location defined by the environment variable
-'BIOTOOLBOX'.
+There are three locations where the file may be stored: 1) in the biotoolbox 
+root directory, 2) in the user's home root directory, or 3) a custom 
+location defined by the environment variable 'BIOTOOLBOX'.
 
 Execution 
 All biotoolbox scripts are designed to be run from the command line or
@@ -104,6 +106,21 @@ the metadata into the filename. The metadata lines are dispensible in most
 cases, and can be safely deleted before importing the file into another
 program, such as Excel. More detailed information can be found in the POD
 documentation of tim_file_helper.pm or online.
+
+
+
+
+UPDATES AND FIXES
+
+The biotoolbox scripts are under continual development by the author. The 
+latest distribution may be downloaded from the project website at 
+http://code.google.com/p/biotoolbox/. 
+
+The latest bugfixes and updates may also be obtained through SVN.
+
+Please contact the author for bugs. Feature requests are also accepted, 
+within time constraints. Contact information is at the project website.
+
 
 
 
