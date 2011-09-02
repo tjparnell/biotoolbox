@@ -38,8 +38,8 @@ my (
 	$outfile,
 	$position,
 	$use_coverage,
-	$paired,
 	$splice,
+	$paired,
 	$shift,
 	$strand,
 	$min_mapq,
@@ -60,8 +60,8 @@ GetOptions(
 	'out=s'     => \$outfile, # name of output file 
 	'position=s'=> \$position, # define position
 	'coverage!' => \$use_coverage, # calculate coverage
+	'splice|split!'   => \$splice, # split splices
 	'pe!'       => \$paired, # paired-end alignments
-	'splice!'   => \$splice, # split splices
 	'shift=i'   => \$shift, # shift coordinates 3'
 	'strand=s'  => \$strand, # select specific strands
 	'qual=i'    => \$min_mapq, # minimum mapping quality
@@ -263,13 +263,13 @@ if ($use_coverage) {
 	# special, speedy, low-level, single-bp coverage 
 	process_bam_coverage();
 }
-elsif ($paired) {
-	# paired end alignments require special callback
-	process_alignments( \&paired_end_callback );
-}
 elsif ($splice) {
 	# single end alignments with splices require special callback
 	process_alignments( \&single_end_spliced_callback );
+}
+elsif ($paired) {
+	# paired end alignments require special callback
+	process_alignments( \&paired_end_callback );
 }
 else {
 	# single end alignments
@@ -420,20 +420,20 @@ sub process_alignments {
 ### Callback for processing single-end alignments
 sub single_end_callback {
 	my $a = shift;
-	my $mapped = shift; # if true then no need to check if it's been mapped
+	my $checked = shift; # if true then no need to check alignment
 						# only relevent when called from 
 						# single_end_spliced_callback()
 	
 	# check alignment
-	unless ($mapped) {
+	unless ($checked) {
 		# subfeatures from split splices are not full AlignWrapper objects
-		# so they don't have this method
+		# so they can't be checked for alignment or mapping quality scores
 		# skip this test in that case, as the parent was already checked
+		
+		# check if mapped and mapping quality
 		return if $a->unmapped;
+		return if $a->qual < $min_mapq;
 	}
-	
-	# check mapping quality
-	return if $a->qual < $min_mapq;
 	
 	# collect alignment data
 	my $start  = $a->start;
@@ -493,6 +493,9 @@ sub single_end_spliced_callback {
 	
 	# check alignment
 	return if $a->unmapped;
+	
+	# check mapping quality
+	return if $a->qual < $min_mapq;
 	
 	# check for subfeatures
 	my @subfeatures = $a->get_SeqFeatures;
@@ -774,8 +777,8 @@ bam2wig.pl [--options...] <filename>
   --out <filename> 
   --position [start|mid|span]
   --coverage
+  --splice|split
   --pe
-  --splice
   --shift <integer>
   --strand [f|r]
   --qual <integer>
@@ -826,18 +829,22 @@ and log options. It uses faster low level interfaces to the Bam file to
 eke out performance. It is equivalent to specifying --position=span, 
 --inter, minimum quality of 0, no strand, no rpm, and no log.
 
+=item --splice
+
+=item --split
+
+The Bam file alignments may contain splices, where the 
+read is split between two separate alignments. This is most common 
+with splice junctions from RNA-Seq data. In this case, treat each 
+alignment as a separate tag. This only works with single-end alignments. 
+Paired-end spliced alignments are currently treated as single-end 
+spliced alignments.
+
 =item --pe
 
 The Bam file consists of paired-end alignments, and only properly 
 mapped pairs of alignments will be considered. The default is to 
 treat all alignments as single-end.
-
-=item --splice
-
-The Bam file alignments may contain splices, where the 
-read is split between two separate alignments. This is most common 
-with splice junctions from RNA-Seq data. In this case, treat each 
-alignment as a separate tag. 
 
 =item --shift <integer>
 
@@ -864,8 +871,8 @@ checked. The default value is 0 (accept everything).
 
 =item --fix
 
-Specify whether or not to record interpolating positions of 0. If 
-true, a fixedStep wig file (step=1 span=1) is written, otherwise a 
+Specify whether or not to record interpolating positions with count of 0. 
+If true, a fixedStep wig file (step=1 span=1) is written, otherwise a 
 variableStep wig file is written that only records the positions 
 where a tag is found. This will also work with bedGraph output. 
 The default behavior is to not record empty positions.
