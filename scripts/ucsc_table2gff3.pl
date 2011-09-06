@@ -467,9 +467,9 @@ sub process_gene_table {
 		
 		#### Update gene information as necessary
 		# check the gene coordinates are current
-		if ($linedata->[$txStart_i] < $gene->start) {
+		if ( ($linedata->[$txStart_i] + 1) < $gene->start) {
 			# update the txstart position
-			$gene->start( $linedata->[$txStart_i] );
+			$gene->start( $linedata->[$txStart_i] + 1 );
 		}
 		if ($linedata->[$txEnd_i] > $gene->end) {
 			# update the txstop position
