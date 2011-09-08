@@ -1,17 +1,7 @@
 #!/usr/bin/perl
 
 # convert ucsc refseq table file to gff3
-# why am I doing this anyway???? for fun, experience, completeness....
-# the other options out there are extremely limited....
 
-# the original version of this script used SeqFeature::Annotated and 
-# SeqFeatureIO. However, it made the script pretty glacial with all the 
-# excess object overhead, particularly the Ontology stuff
-
-# the second version uses much, much, simpler SeqFeature::Generic and Tools::GFF 
-# and is over 2 orders of magnitude faster than the original
-
-# this third version uses SeqFeature::Lite and is simpler yet
 
 use strict;
 #use warnings;
@@ -431,6 +421,7 @@ sub process_gene_table {
 			# moved on to next chromosome
 			
 			# print the current gene list and prepare for next chromosome
+			print " writing ", scalar keys %gene2seqf, " genes for chromosome $current_chrom\n";
 			my $counts = print_current_gene_list(\%gene2seqf);
 			$gene_count       += $counts->[0];
 			$mrna_count       += $counts->[1];
@@ -444,15 +435,16 @@ sub process_gene_table {
 			$other_count      += $counts->[9];
 			
 			$current_chrom = $linedata->[$chr_i];
+			%gene2seqf = ();
 		}
 		
 		
 		
 		#### Generate the gene object, if necessary
 		my $gene;
-		if (exists $gene2seqf{ $linedata->[$gene_i] }) {
+		if (exists $gene2seqf{ lc $linedata->[$gene_i] }) {
 			# Pull out the gene SeqFeature object for ease of use
-			$gene = $gene2seqf{ $linedata->[$gene_i] };
+			$gene = $gene2seqf{ lc $linedata->[$gene_i] };
 		}
 		
 		else {
@@ -460,7 +452,7 @@ sub process_gene_table {
 			$gene = generate_new_gene($linedata);
 			
 			# Store the gene oject into the gene hash
-			$gene2seqf{ $linedata->[$gene_i] } = $gene;
+			$gene2seqf{ lc $linedata->[$gene_i] } = $gene;
 		} 
 		
 		
@@ -508,6 +500,7 @@ sub process_gene_table {
 	
 	# print all of the current genes
 	{
+		print " writing ", scalar keys %gene2seqf, " genes for chromosome $current_chrom\n";
 		my $counts = print_current_gene_list(\%gene2seqf);
 		$gene_count       += $counts->[0];
 		$mrna_count       += $counts->[1];
@@ -591,15 +584,11 @@ sub print_current_gene_list {
 		$gff_fh->print( $gene2seqf->{$id}->gff_string(1) . "\n");
 			# the gff_string method is undocumented in the POD, but is a 
 			# valid method. Passing 1 should force a recursive action to 
-			# print parent and children.
-		#print Dumper($gene2seqf->{$id});
-		
-		# finally, delete the gene seqfeature object
-		delete $gene2seqf->{$id};
+			# print both parent and children.
 		
 	}
 	
-	print {$gff_fh} "###\n"; # directive to close out all previous genes
+	$gff_fh->print("###\n"); # directive to close out all previous genes
 	return $counts;
 }
 
@@ -1349,11 +1338,9 @@ sub add_exons_codons_subfeatures {
 
 
 
-
-
 __END__
 
-=head1 NAME ucsc_refseq2gff3.pl
+=head1 NAME ucsc_table2gff3.pl
 
 
 
@@ -1381,7 +1368,7 @@ Provide the name of a UCSC gene table. It may be obtained preferably
 through the UCSC Genome Table Browser, or downloaded from their FTP site.
 The file should have specific columns, including txStart, txEnd, cdsStart,
 cdsEnd, exonStarts, exonEnds, and others. The conversion may fail if
-certain columns are not found. The RefSeq and ensGene tables should work
+certain columns are not found. The refSeq and ensGene tables should work
 great. The file may be gzipped.
 
 =item --status <filename>
@@ -1438,6 +1425,11 @@ can be identified in the column headings, but your results may vary and
 are not guaranteed. UCSC outputs so many different types of tables from 
 their database that accurate conversions are tricky at best.
 
+Note that with some tables (notably very large ones), there may be an 
+insidious bug that arises which creates an infinite loop preventing completion. 
+I have not been able to track it down (there isn't a reliable trigger). One 
+workaround is to split the file and repeat the conversion on the fragments. 
+See L<split_data_file.pl> and L<join_data_file.pl> for help.
 
 =head1 AUTHOR
 
