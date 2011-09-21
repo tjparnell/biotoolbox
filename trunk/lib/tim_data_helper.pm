@@ -286,7 +286,7 @@ sub format_with_commas {
 	my $number = shift;
 	if ($number =~ /[^\d,\-\.]/) {
 		carp " the string contains characters that can't be parsed\n";
-		return;
+		return $number;
 	}
 	
 	# check for decimals
