@@ -45,6 +45,7 @@ sub generate_tim_data_structure {
 		'feature'        => $feature,
 		'db'             => q(),
 		'gff'            => 0,
+		'bed'            => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
 		'headers'        => 1,
@@ -137,10 +138,180 @@ sub verify_data_structure {
 			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
 	}
 	
-	# check for gff 
-	unless (defined $datahash_ref->{'gff'}) {
-		# default value
-		$datahash_ref->{'gff'} = 0;
+	# check for proper gff structure
+	if ($datahash_ref->{'gff'}) {
+		# if any of these checks fail, we will reset the gff version to 
+		# the default of 0, or no gff
+		my $gff_check = 1; # start with assumption it is true
+		
+		# check number of columns
+		if ($datahash_ref->{'number_columns'} != 9) {
+			$gff_check = 0;
+		}
+		
+		# check column indices
+		if (
+			exists $datahash_ref->{0} and
+			$datahash_ref->{0}{'name'} !~ 
+			m/^chr|chromo|seq|refseq|ref_seq|seq|seq_id/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{1} and
+			$datahash_ref->{1}{'name'} !~ m/^source/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{2} and
+			$datahash_ref->{2}{'name'} !~ m/^type/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{3} and
+			$datahash_ref->{3}{'name'} !~ m/^start/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{4} and
+			$datahash_ref->{4}{'name'} !~ m/^stop|end/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{5} and
+			$datahash_ref->{5}{'name'} !~ m/^score|value/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{6} and
+			$datahash_ref->{6}{'name'} !~ m/^strand/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{7} and
+			$datahash_ref->{7}{'name'} !~ m/^phase/i
+		) {
+			$gff_check = 0;
+		}
+		if (
+			exists $datahash_ref->{8} and
+			$datahash_ref->{8}{'name'} !~ m/^group|attribute/i
+		) {
+			$gff_check = 0;
+		}
+		
+		# update gff value as necessary
+		if ($gff_check == 0) {
+			$datahash_ref->{'gff'} = 0;
+			$datahash_ref->{'headers'} = 1;
+		}
+	}
+	
+	# check for proper BED structure
+	if ($datahash_ref->{'bed'}) {
+		# if any of these checks fail, we will reset the bed flag to 0
+		# to make it not a bed file format
+		my $bed_check = 1; # start with assumption it is correct
+		
+		# check number of columns
+		if (
+			$datahash_ref->{'number_columns'} < 3 and 
+			$datahash_ref->{'number_columns'} > 12 
+		) {
+			$bed_check = 0;
+		}
+		
+		# check column index names
+		# we're assuming these names are derived from tim_file_helper or 
+		# something like it
+		if (
+			exists $datahash_ref->{0} and
+			$datahash_ref->{0}{'name'} !~ 
+			m/^chr|chromo|seq|refseq|ref_seq|seq|seq_id/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{1} and
+			$datahash_ref->{1}{'name'} !~ m/^start/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{2} and
+			$datahash_ref->{2}{'name'} !~ m/^stop|end/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{3} and
+			$datahash_ref->{3}{'name'} !~ m/^name|id/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{4} and
+			$datahash_ref->{4}{'name'} !~ m/^score|value/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{5} and
+			$datahash_ref->{5}{'name'} !~ m/^strand/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{6} and
+			$datahash_ref->{6}{'name'} !~ m/^thickstart/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{7} and
+			$datahash_ref->{7}{'name'} !~ m/^thickend/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{8} and
+			$datahash_ref->{8}{'name'} !~ m/^itemrgb/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{9} and
+			$datahash_ref->{9}{'name'} !~ m/^blockcount/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{10} and
+			$datahash_ref->{10}{'name'} !~ m/^blocksizes/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $datahash_ref->{11} and
+			$datahash_ref->{11}{'name'} !~ m/^blockstarts/i
+		) {
+			$bed_check = 0;
+		}
+		
+		# reset the BED tag value as appropriate
+		if ($bed_check) {
+			$datahash_ref->{'bed'} = $datahash_ref->{'number_columns'};
+		}
+		else {
+			$datahash_ref->{'bed'} = 0;
+			$datahash_ref->{'headers'} = 1;
+		}
 	}
 	
 	return 1;
@@ -377,6 +548,13 @@ from either the GFF file pragma or the file extension.
 The default value is 0 (not a GFF file). As such, it may be treated 
 as a boolean value.
 
+=item bed
+
+If the source file is a BED file, then this tag value is set to the 
+number of columns in the original BED file, an integer of 3 to 12. 
+The default value is 0 (not a BED file). As such, it may be treated 
+as a boolean value.
+
 =item number_columns
 
 This includes an integer representing the total 
@@ -519,9 +697,11 @@ Example
 This subroutine verifies the data structure. It checks items such as the
 presence of the data table array, the number of columns in the data table
 and metadata, the metadata index of the last row, the presence of basic
-metadata and verification of dataset names for each column, and the status
-of the gff value. It will automatically correct some simple errors, and
-complain about others.
+metadata, and verification of dataset names for each column. For data 
+structures with the GFF or BED tags set to true, it will verify the 
+format, including column number and column names; if a check fails, it 
+will reset the GFF or BED key to false. It will automatically correct 
+some simple errors, and complain about others.
 
 Pass the data structure reference. It will return 1 if successfully 
 verified, or false if not.

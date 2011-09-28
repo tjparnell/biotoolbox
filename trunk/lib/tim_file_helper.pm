@@ -169,6 +169,15 @@ sub load_tim_data_file {
 			push @datatable, [ @linedata ];
 		}
 		
+		# convert 0-based starts to 1-base for BED source files
+		if ($inputdata_ref->{'bed'}) {
+			for (my $row = 1; $row < scalar @datatable; $row++) {
+				# add 1 to each start position
+				$datatable[$row][1] += 1;
+			}
+			$inputdata_ref->{1}{'base'} = 1;
+		}
+		
 		# associate the data table with the data hash
 		$inputdata_ref->{'data_table'} = \@datatable;
 		
@@ -426,6 +435,11 @@ sub open_tim_data_file {
 				# set headers flag to false
 				$inputdata->{'headers'} = 0;
 				
+				# set the feature type
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'genome';
+				}
+				
 				# end this loop
 				last PARSE_HEADER_LOOP;
 			}
@@ -440,10 +454,11 @@ sub open_tim_data_file {
 				# http://genome.ucsc.edu/FAQ/FAQformat#format1
 				
 				# first determine the number of columns we're working
-				my @elements = split /\s/, $line;
+				my @elements = split /\s+/, $line;
 					# normally tab-delimited, but the specs are not explicit
 				my $column_count = scalar @elements;
 				$inputdata->{'number_columns'} = $column_count; 
+				$inputdata->{'bed'} = $column_count;
 				
 				# Define the columns and metadata
 				if ($column_count >= 3) {
@@ -610,6 +625,11 @@ sub open_tim_data_file {
 				# less than 3 columns!???
 				else {
 					die " BED file '$filename' doesn't have at least 3 columns!\n";
+				}
+				
+				# set the feature type
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'genome';
 				}
 				
 				# set headers flag to false
@@ -782,10 +802,10 @@ sub write_tim_data_file {
 		carp "no arguments passed!";
 		return;
 	}
-	my $datahash_ref = $argument_ref->{'data'} || undef;
-	my $filename = $argument_ref->{'filename'} || undef;
-	my $gz = $argument_ref->{'gz'} || undef;
-	my $format = $argument_ref->{'format'} || undef;
+	my $datahash_ref = $argument_ref->{'data'}     || undef;
+	my $filename     = $argument_ref->{'filename'} || undef;
+	my $gz           = $argument_ref->{'gz'}       || undef;
+	my $format       = $argument_ref->{'format'}   || undef;
 	
 	unless (defined $datahash_ref) {
 		# we need data to write
@@ -825,16 +845,52 @@ sub write_tim_data_file {
 		}
 		
 		# a gff file
-		elsif (
-			$datahash_ref->{'gff'} and 
-			$datahash_ref->{'number_columns'} == 9
-		) {
+		elsif ($datahash_ref->{'gff'}) {
 			$extension = '.gff';
+			
+			# for GFF3 files only
+			if ($datahash_ref->{'gff'} == 3) {
+				$extension .= '3';
+			}
 		} 
+		
+		# a bed file
+		elsif ($datahash_ref->{'bed'}) {
+			$extension = '.bed';
+		}
 		
 		# original file had an extension, re-use it
 		elsif (exists $datahash_ref->{'extension'}) {
-			$extension = $datahash_ref->{'extension'};
+			
+			# structure is gff
+			if ($datahash_ref->{'extension'} =~ /gff/) {
+				
+				# check to see that we still have a valid gff structure
+				if ($datahash_ref->{'gff'}) {
+					$extension = $datahash_ref->{'extension'};
+				}
+				else {
+					# not valid gff, write a txt file
+					$extension = '.txt';
+				}
+			}
+			
+			# structure is bed
+			elsif ($datahash_ref->{'extension'} =~ /bed/) {
+				# check to see that we still have a valid bed structure
+				if ($datahash_ref->{'bed'}) {
+					$extension = $datahash_ref->{'extension'};
+				}
+				else {
+					# not valid bed, write a txt file
+					$extension = '.txt';
+				}
+			}
+			
+			# unstructured format
+			else {
+				$extension = $datahash_ref->{'extension'};
+			}
 		}
 		
 		# normal data text file
@@ -858,22 +914,6 @@ sub write_tim_data_file {
 			elsif ($extension =~ /sgr/) {
 				# sgr is simple format, no headers 
 				$format = 'simple';
-			}
-			elsif ($extension =~ /bed/) {
-				# bed is simple format, no headers 
-				$format = 'simple';
-			}
-			elsif ($extension =~ /g[tf]f/) {
-				# gff has no headers, but allows comment lines
-				# this has a special exception later when writing text
-				unless (
-					exists $datahash_ref->{'gff'} and 
-					$datahash_ref->{'gff'} > 0
-				) {
-					# set this to true
-					$datahash_ref->{'gff'} = 2; # default version?
-				}
-				$format = 'text'; #
 			}
 			else {
 				# everything else is text
@@ -952,36 +992,42 @@ sub write_tim_data_file {
 			# write gff statement if gff format
 			if ($datahash_ref->{'gff'}) {
 				# write gff statement
-				print {$fh} "##gff-version $datahash_ref->{gff}\n";
+				$fh->print("##gff-version $datahash_ref->{gff}\n");
 			}
 			
 			# Write the primary headers
-			if ($datahash_ref->{'program'}) {
-				# write program header if present
-				print {$fh} '# Program ' . $datahash_ref->{'program'} . "\n";
-			}
-			if ($datahash_ref->{'db'}) {
-				# write database header if present
-				print {$fh} '# Database ' . $datahash_ref->{'db'} . "\n";
-			}
-			if ($datahash_ref->{'feature'}) {
-				# write feature header if present
-				print {$fh} '# Feature ' . $datahash_ref->{'feature'} . "\n";
+			unless ($extension =~ m/gff|bed|sgr|kgg/) {
+				# we only write these for text files, not gff or bed files
+				
+				if ($datahash_ref->{'program'}) {
+					# write program header if present
+					$fh->print('# Program ' . $datahash_ref->{'program'} . "\n");
+				}
+				if ($datahash_ref->{'db'}) {
+					# write database header if present
+					$fh->print('# Database ' . $datahash_ref->{'db'} . "\n");
+				}
+				if ($datahash_ref->{'feature'}) {
+					# write feature header if present
+					$fh->print('# Feature ' . $datahash_ref->{'feature'} . "\n");
+				}
 			}
 			
 			# Write the miscellaneous headers
 			foreach ( @{ $datahash_ref->{'other'} } ) {
 				# write remaining miscellaneous header lines if present
+				# we do this for all files
+				
 				unless (/\n$/s) {
 					# append newline if not present
 					$_ .= "\n";
 				}
 				# check for comment character at beginning
 				if (/^# /) {
-					print {$fh} $_;
+					$fh->print($_);
 				}
 				else {
-					print {$fh} "# " . $_;
+					$fh->print("# " . $_);
 				}
 			}
 		
@@ -1003,7 +1049,7 @@ sub write_tim_data_file {
 				}
 				elsif (
 					scalar( keys %{ $datahash_ref->{$i} } ) == 2 and
-					$datahash_ref->{'extension'} =~ /gtf|gff|bed/i
+					$extension =~ /gtf|gff|bed/i
 				) {
 					# only two keys are present and it's a gff or bed file
 					# these are standard metadata keys (name, index) and do 
@@ -1029,30 +1075,17 @@ sub write_tim_data_file {
 				# into a single string.
 				# The column identifier is comprised of the word 'Column' and the
 				# the index number + 1 (shift to 1-based counting) joined by '_'.
-				print {$fh} "# Column_", $i+1, " ", join(";", @pairs), "\n";
+				$fh->print("# Column_", $i+1, " ", join(";", @pairs), "\n");
 			}
 		}
 		
 		
 		# Write the table column headers
-			# we'll check the boolean value of whether headers existed
-		if (exists $datahash_ref->{'headers'}) {
-			if ($datahash_ref->{'headers'}) {
-				# table headers existed in original source file, 
-				# and they should be written again
-				print {$fh} 
-					join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n";
-			}
-		}
-		else {
-			# doesn't look like the datahash came from a loaded file
-			# print headers dependent on file type
-			unless ($extension =~ /g[tf]f|sgr|bed/) {
-				# these special files do not use headers
-				# everything else writes the header
-				print {$fh} 
-					join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n";
-			}
+		if ($datahash_ref->{'headers'}) {
+			# table headers existed in original source file, 
+			# and they should be written again
+			$fh->print( 
+				join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
 		}
 			
 		
@@ -1072,7 +1105,7 @@ sub write_tim_data_file {
 						push @linedata, $_;
 					}
 				}
-				print {$fh} join("\t", @linedata) . "\n";
+				$fh->print(join("\t", @linedata) . "\n");
 			}
 		}
 		
@@ -1082,8 +1115,8 @@ sub write_tim_data_file {
 				# we will step though the data_table array one row at a time
 				# we will join each row's array of elements into a string to print
 				# using a tab-delimited format
-				print {$fh} 
-					join("\t", @{ $datahash_ref->{'data_table'}[$i] }), "\n";
+				$fh->print( 
+					join("\t", @{ $datahash_ref->{'data_table'}[$i] }), "\n");
 			}
 		}
 		
@@ -2673,7 +2706,7 @@ Example
 	my $gz = 1; # compress output file with gzip
 	my $fh = open_to_write_fh($filename, $gz);
 	# write to new compressed file
-	print {$fh} "something interesting\n";
+	$fh->print("something interesting\n");
 	$fh->close;
 	
 
