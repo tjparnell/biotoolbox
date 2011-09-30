@@ -865,11 +865,11 @@ sub merge_multi_transfrags {
 	# generate score for the reason
 	my $score = sprintf "%.3f", get_chromo_region_score( {
 				'db'      => $db,
-				'chr'     => $transcripts{$pcv}{$psv}{chromo},
+				'chromo'  => $transcripts{$pcv}{$psv}{chromo},
 				'start'   => $start,
 				'end'     => $stop,
 				'method'  => 'median',
-				'strand'  => 'no', # force it to look at only this dataset (inherently stranded)
+				'stranded' => 'all', # force it to look at only this dataset (inherently stranded)
 				'dataset' => # assign the appropriate dataset based on strand
 					$transcripts{$pcv}{$psv}{strand} == 1 ? $fdata : $rdata,
 				'log'     => $log,

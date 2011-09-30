@@ -165,7 +165,7 @@ sub verify_data_structure {
 		}
 		if (
 			exists $datahash_ref->{2} and
-			$datahash_ref->{2}{'name'} !~ m/^type/i
+			$datahash_ref->{2}{'name'} !~ m/^type|method/i
 		) {
 			$gff_check = 0;
 		}

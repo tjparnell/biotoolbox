@@ -560,7 +560,7 @@ sub submit_dataset_request {
 				'db'       => $db,
 				'dataset'  => $dataset,
 				'method'   => $method,
-				'strand'   => $strand,
+				'stranded' => $strand,
 				'log'      => $logstatus,
 				'value'    => $value_type,
 		} );
@@ -588,7 +588,7 @@ sub submit_dataset_request {
 				'db'          => $db,
 				'dataset'     => $dataset,
 				'method'      => $method,
-				'strand'      => $strand,
+				'stranded'    => $strand,
 				'log'         => $logstatus,
 				'extend'      => $extend,
 				'start'       => $start,

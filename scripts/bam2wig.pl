@@ -6,7 +6,6 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Sam;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
@@ -16,6 +15,11 @@ use tim_data_helper qw(
 	format_with_commas
 );
 use tim_db_helper::config;
+eval {
+	# check for bam support
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
+};
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -230,11 +234,13 @@ if ($log) {
 
 ### Open files
 # Bam file
-my $sam = Bio::DB::Sam->new(
-	-bam        => $infile,
-	-autoindex  => 1,
-	-split      => $splice,
-) or die " unable to open input bam file '$infile'!\n";
+unless (exists &open_bam_db) {
+	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+}
+my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
+$sam->split_splices($splice);
+
+# low level bam and index
 my $bam = $sam->bam;
 my $index = $sam->bam_index;
 

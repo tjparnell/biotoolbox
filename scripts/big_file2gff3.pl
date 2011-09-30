@@ -18,13 +18,20 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 	convert_genome_data_2_gff_data
-	convert_and_write_to_gff_file
 );
-use Bio::DB::BigBed;
-use Bio::DB::BigWig;
 eval {
-	require Bio::DB::Sam;
-	Bio::DB::Sam->import;
+	# check for bigWig support
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+	
+	# check for bigBed support
+	require tim_db_helper::bigbed;
+	tim_db_helper::bigbed->import;
+};
+eval {
+	# check for bam support
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
 };
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
@@ -48,6 +55,7 @@ my (
 	$source,
 	$type,
 	$rename,
+	$include_chromo,
 	$write_metadata,
 	$set_name,
 	$write_conf,
@@ -66,6 +74,7 @@ GetOptions(
 	'name=s'    => \@names, # the gff name 
 	'strand=s'  => \@strands, # indicate the strand for the feature
 	'rename'    => \$rename, # rename the file
+	'chromo'    => \$include_chromo, # include chromosomes in GFF
 	'set!'      => \$write_metadata, # write a metadata index file for BigWigSet
 	'setname=s' => \$set_name, # name for the bigwigset
 	'conf!'     => \$write_conf, # write GBrowse conf stanzas
@@ -176,6 +185,10 @@ my @metadata;
 	# for the conf array, we'll either be writing individual conf stanzas
 	# for each bigwig file or one stanza for the bigwigset
 my @confdata;
+	# if user wants chromosome features included in the GFF3 file,
+	# this information will be added in here
+my @chromodata;
+my $chromo_check = 0;
 
 
 
@@ -268,6 +281,14 @@ while (@infiles) {
 		die " unrecognized input file format!\n";
 	}
 	
+	# check that we have stored the chromosome information
+	if ($include_chromo) {
+		unless ($chromo_check) {
+			# chromosome information should automatically have been loaded
+			# from the collect_chromosomes_from_xxx subs
+			$chromo_check = 1;
+		}
+	}
 	
 	### Move the Input files
 	if (-e $target_file) {
@@ -288,64 +309,59 @@ while (@infiles) {
 	
 	
 	### Write the GFF3 file
-	# if we're creating a bigwigset, then we'll be writing a single GFF file
-	# otherwise write individual GFF files for each bigwig file
+	
+	# set the output gff file name
+	my $gff_file;
 	if ($write_metadata) {
-		# writing a single gff file
+		$gff_file = "$set_name\.gff3";
+	} else {
+		$gff_file = "$name\.gff3";
+	}
+	
+	# convert the data structure to GFF for writing
+	convert_genome_data_2_gff_data( {
+		'data'       => $main_data_ref,
+		'version'    => 3,
+		'source'     => $source,
+		'type'       => $gfftype,
+		'name'       => $name,
+		'strand'     => 3,
+		'tags'       => [4],
+	} ) or die " unable to convert data to GFF format!\n";
+	
+	# write new or append existing GFF file
+	if (-e $gff_file) {
+		# file exists, append to it
+		my $gff_fh = open_to_write_fh($gff_file, 0, 1) or 
+			die " can't append to GFF file!\n";
 		
-		# first convert the data structure to GFF for writing
-		convert_genome_data_2_gff_data( {
-			'data'       => $main_data_ref,
-			'version'    => 3,
-			'source'     => $source,
-			'type'       => $gfftype,
-			'name'       => $name,
-			'strand'     => 3,
-			'tags'       => [4],
-		} ) or die " unable to convert data to GFF format!\n";
-		
-		# write new or append existing GFF file
-		my $gff_file = $set_name . '.gff3';
-		if (-e $gff_file) {
-			# file exists, append to it
-			my $gff_fh = open_to_write_fh($gff_file, 0, 1) or 
-				die " can't append to GFF file!\n";
-			
-			# append the table contents to the file
-			for my $row (1 .. $main_data_ref->{'last_row'}) {
-				print {$gff_fh} join("\t", 
-					@{ $main_data_ref->{'data_table'}->[$row] }), "\n";
-			}
-			$gff_fh->close;
-			print "  appended to GFF3 file '$gff_file'\n";
+		# append the table contents to the file
+		for my $row (1 .. $main_data_ref->{'last_row'}) {
+			print {$gff_fh} join("\t", 
+				@{ $main_data_ref->{'data_table'}->[$row] }), "\n";
 		}
-		else {
-			# file doesn't exist, write new one
-			my $success = write_tim_data_file( {
-				'data'       => $main_data_ref,
-				'filename'   => $gff_file,
-			} );
-			if ($success) {
-				print "  wrote GFF3 file '$success'\n";
-			}
-			else {
-				print "  unable to write output file!\n";
-			}
-		}
+		$gff_fh->close;
+		print "  appended to GFF3 file '$gff_file'\n";
 	}
 	else {
-		# writing individual GFF files
+		# file doesn't exist, write new one
 		
-		# convert and write the GFF file
-		my $success = convert_and_write_to_gff_file( {
+		# prepend the chromosome information if requested
+		if ($include_chromo) {
+			# insert the chromosome gff information into the now-converted
+			# gff data table
+			splice(
+				@{ $main_data_ref->{'data_table'} },
+				1,
+				0,
+				@chromodata
+			);
+			$main_data_ref->{'last_row'} += scalar(@chromodata);
+		}
+		
+		my $success = write_tim_data_file( {
 			'data'       => $main_data_ref,
-			'filename'   => $name,
-			'version'    => 3,
-			'source'     => $source,
-			'type'       => $gfftype,
-			'name'       => $name,
-			'strand'     => 3,
-			'tags'       => [4],
+			'filename'   => $gff_file,
 		} );
 		if ($success) {
 			print "  wrote GFF3 file '$success'\n";
@@ -376,6 +392,10 @@ while (@infiles) {
 		}
 		elsif ($strand =~ /^r|c|\-/) {
 			push @metadata, "strand       = -1\n";
+		}
+		else {
+			# in case user wants to change it later
+			push @metadata, "strand       = 0\n";
 		}
 		push @metadata, "\n"; # empty line to make things purdy
 	}
@@ -546,8 +566,11 @@ sub collect_chromosomes_from_bigwig {
 	$data_ref->{'data_table'}->[0][4] = 'bigwigfile';
 	
 	# open the bigwig file
-	my $wig = Bio::DB::BigWig->new(-bigwig => $infile) or 
-		die " unable to open bigwig data file!\n";
+	unless (exists &open_bigwig_db) {
+		die " unable to load BigWig file support! Is Bio::DB::BigWig installed?\n"; 
+	}
+	my $wig = open_bigwig_db($infile) or 
+		die " unable to open bigwig file '$infile'!\n";
 	
 	
 	# collect the chromosomes
@@ -570,8 +593,25 @@ sub collect_chromosomes_from_bigwig {
 	# update
 	$data_ref->{'last_row'} = scalar(@seq_ids);
 	
-	# done
-	undef $wig;
+	# record chromosome information
+	if ($include_chromo and !$chromo_check) {
+		foreach my $seq_id (@seq_ids) {
+			push @chromodata, [ 
+				(
+					$seq_id,
+					'.',
+					'chromosome',
+					1,
+					$wig->length($seq_id),
+					'.',
+					'.',
+					'.',
+					"Name=$seq_id;ID=$seq_id",
+				)
+			];
+		}
+		$chromo_check = 1;
+	}
 }
 
 
@@ -583,10 +623,12 @@ sub collect_chromosomes_from_bigbed {
 	$data_ref->{4}{'name'} = 'bigbedfile';
 	$data_ref->{'data_table'}->[0][4] = 'bigbedfile';
 	
-	# open the bigwig file
-	my $bb = Bio::DB::BigBed->new(-bigbed => $infile) or 
-		die " unable to open bigbed data file!\n";
-	
+	# open the bigbed file
+	unless (exists &open_bigbed_db) {
+		die " unable to load BigBed file support! Is Bio::DB::BigBed installed?\n"; 
+	}
+	my $bb = open_bigbed_db($infile) or 
+		die " unable to open bigbed file '$infile'!\n";
 	
 	# collect the chromosomes
 		# BigBed.pm doesn't provide handy seq_ids() and length() methods 
@@ -611,8 +653,26 @@ sub collect_chromosomes_from_bigbed {
 	# update number
 	$data_ref->{'last_row'} = scalar(@{ $data_ref->{'data_table'} }) - 1;
 	
-	# done
-	$bb = undef;
+	# record chromosome information
+	if ($include_chromo and !$chromo_check) {
+		for (my $c = $chromList->head; $c; $c = $c->next) {
+			my $seq_id = $c->name;
+			push @chromodata, [
+				(
+					$seq_id,
+					'.',
+					'chromosome',
+					1,
+					$c->size,
+					'.',
+					'.',
+					'.',
+					"Name=$seq_id;ID=$seq_id",
+				)
+			];
+		}
+		$chromo_check = 1;
+	}
 }
 
 
@@ -625,9 +685,11 @@ sub collect_chromosomes_from_bam {
 	$data_ref->{'data_table'}->[0][4] = 'bamfile';
 	
 	# open the bam file
-	my $sam = Bio::DB::Sam->new(-bam => $infile) or 
-		die " unable to open bam data file!\n";
-	
+	unless (exists &open_bam_db) {
+		die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+	}
+	my $sam = open_bam_db($infile) or 
+		die " unable to open bam file '$infile'!\n";
 	
 	# collect the chromosomes
 	my $seq_num = $sam->n_targets;
@@ -649,8 +711,26 @@ sub collect_chromosomes_from_bam {
 	# update
 	$data_ref->{'last_row'} = $seq_num;
 	
-	# done
-	undef $sam;
+	# record chromosome information
+	if ($include_chromo and !$chromo_check) {
+		foreach my $tid (0 .. ($seq_num - 1) ) {
+			my $seq_id = $sam->target_name($tid);
+			push @chromodata, [
+				(
+					$seq_id,
+					'.',
+					'chromosome',
+					1,
+					$sam->target_len($tid),
+					'.',
+					'.',
+					'.',
+					"Name=$seq_id;ID=$seq_id",
+				)
+			];
+		}
+		$chromo_check = 1;
+	}
 }
 
 
@@ -672,6 +752,7 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --name <text> or <text1,text2,...>
   --type <text>
   --strand [f|r|w|c|+|-|1|0|-1],...
+  --chromo 
   --rename
   --set
   --conf
@@ -728,6 +809,12 @@ Indicate which strand the feature will be located. Acceptable values include
 is used. For mulitple input files with different strands, use the option 
 repeatedly or provide a comma-delimited list. If only one value is provided, 
 it is used for all input files.
+
+=item --chromo
+
+Include chromosome features in the output GFF3 file. These are necessary 
+to make a complete GFF3 file compatible for loading into a Bio::DB database 
+when chromosome information is not provided elsewhere.
 
 =item --rename
 

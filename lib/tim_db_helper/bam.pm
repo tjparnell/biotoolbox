@@ -13,6 +13,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	collect_bam_scores
 	collect_bam_position_scores
+	open_bam_db
 );
 
 # Hashes of opened file objects
@@ -144,7 +145,7 @@ sub _collect_bam_data {
 		}
 		else {
 			# this file has not been opened yet, open it
-			$bam = Bio::DB::Sam->new(-bam => $bamfile) or
+			$bam = open_bam_db($bamfile) or
 				croak " unable to open Bam file '$bamfile'";
 			
 			# store the opened object for later use
@@ -274,6 +275,22 @@ sub _collect_bam_data {
 	# return collected data
 	return %bam_data;
 }
+
+
+### Open a bigWig database connection
+sub open_bam_db {
+	
+	my $path = shift;
+	
+	# open the database connection 
+	my $db = Bio::DB::Sam->new(
+			-bam         => $path,
+			-autoindex   => 1,
+	) or carp " can't open Bam database!\n";
+	
+	return $db;
+}
+
 
 
 __END__
@@ -406,6 +423,12 @@ the region of interest keyed by position. The feature midpoint is used
 as the key position. When multiple features are found at the same 
 position, a simple mean (for length data methods) or sum 
 (for count methods) is returned.
+
+=item open_bam_db()
+
+This subroutine will open a Bam database connection. Pass either the 
+local path to a Bam file (.bam extension) or the URL of a remote Bam 
+file. It will return the opened database object.
 
 =back
 

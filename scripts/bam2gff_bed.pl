@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Sam;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -15,6 +14,11 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 use tim_db_helper::config;
+eval {
+	# check for bam support
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
+};
 eval {
 	# check for bigbed file conversion support
 	require tim_db_helper::bigbed;
@@ -151,10 +155,10 @@ if ($bed and $bigbed and $gz) {
 
 ### Load the BAM file
 print " Opening bam file....\n";
-my $sam = Bio::DB::Sam->new( 
-	-bam        => $infile,
-	-autoindex  => 1,
-) or die " unable to open bam file '$infile'!\n";
+unless (exists &open_bam_db) {
+	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+}
+my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
 
 
 

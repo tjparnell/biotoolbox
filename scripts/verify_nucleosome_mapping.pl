@@ -149,8 +149,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	my %nuc_data = get_region_dataset_hash( {
 		'db'         => $db,
 		'dataset'    => $dataset,
-		'name'       => $table->[$row][$chrom_i],
-		'type'       => 'chromosome',          # this shouldn't be hardcoded
+		'chromo'     => $table->[$row][$chrom_i],
 		'start'      => $table->[$row][$mid_i] - 50,
 		'stop'       => $table->[$row][$mid_i] + 50,
 	});

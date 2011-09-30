@@ -225,7 +225,55 @@ sub open_db_connection {
 		);
 	}
 	
-	# name of a database
+	# a Bam database
+	elsif ($database =~ /\.bam$/i) {
+		# open using BigWig adaptor
+		if ($BAM_OK) {
+			$db = open_bam_db($database);
+		}
+		else {
+			carp " Bam database cannot be loaded because\n" . 
+				" Bio::DB::Sam is not installed\n";
+		}
+	}
+	
+	# a BigBed database
+	elsif ($database =~ /\.bb$/i) {
+		# open using BigBed adaptor
+		if ($BIGBED_OK) {
+			$db = open_bigbed_db($database);
+		}
+		else {
+			carp " BigBed database cannot be loaded because\n" . 
+				" Bio::DB::BigBed is not installed\n";
+		}
+	}
+	
+	# a BigWig database
+	elsif ($database =~ /\.bw$/i) {
+		# open using BigWig adaptor
+		if ($BIGWIG_OK) {
+			$db = open_bigwig_db($database);
+		}
+		else {
+			carp " BigWig database cannot be loaded because\n" . 
+				" Bio::DB::BigWig is not installed\n";
+		}
+	}
+	
+	# a directory, presumably of bigwig files
+	elsif (-e $database and -d $database) {
+		# open using BigWigSet adaptor
+		if ($BIGWIG_OK) {
+			$db = open_bigwigset_db($database);
+		}
+		else {
+			carp " Presumed BigWigSet database cannot be loaded because\n" . 
+				" Bio::DB::BigWigSet is not installed\n";
+		}
+	}
+	
+	# otherwise a name of a database
 	else {
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
@@ -528,7 +576,7 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
   features => A scalar value containing a name representing the 
               type(s) of feature(s) to collect. This name will be 
@@ -536,10 +584,10 @@ arguments. The keys include
               _features_to_classes(). Refer to that documentation for 
               a list of appropriate features.
   Optional: 
-  mito =>     A boolean value (1 or 0) indicating whether features
+  mito     => A boolean value (1 or 0) indicating whether features
               from the mitochrondrial genome should be included.
               The default value is false.
-  dubious =>  A boolean value (1 or 0) indicating whether genes 
+  dubious  => A boolean value (1 or 0) indicating whether genes 
               flagged in the database as 'dubious' should be 
               included. The default is false (not kept).
 
@@ -737,16 +785,16 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
   Optional: 
-  win =>      A scalar value containing an integer representing the
+  win      => A scalar value containing an integer representing the
               size of the window in basepairs. The default value 
               is defined in biotoolbox.cfg file.
-  step =>     A scalar value containing an integer representing the
+  step     => A scalar value containing an integer representing the
               step size for advancing the window across the genome. 
               The default is the window size.
-  mito =>     A boolean value (1 or 0) indicating whether features
+  mito     => A boolean value (1 or 0) indicating whether features
               from the mitochrondrial genome should be included.
               The default value is false.
 
@@ -779,15 +827,34 @@ sub get_new_genome_list {
 	my $db_name; # the name of the database, for use with config param
 	if (defined $arg_ref->{'db'}) {
 		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /Bio::DB/) {
-			# a db object returns the name of the package
-			# this appears to be a bioperl db object
+		if ($db_ref =~ m/^Bio::DB::SeqFeature::Store/) {
+			# a Seqfeature store database object
 			$db = $arg_ref->{'db'};
 			$db_name = $db->{'dbh'}->{'name'}; 
 				# dig through the object internals to identify the original 
 				# name of the database
 				# this should be relatively well documented through DBI
 				# but could break in the future since it's not official API
+		}
+		elsif ($db_ref eq 'Bio::DB::BigWig') {
+			# a BigWig database
+			$db = $arg_ref->{'db'};
+			# we can't get the original file name
+		}
+		elsif ($db_ref eq 'Bio::DB::BigWigSet') {
+			# a BigWigSet database
+			$db = $arg_ref->{'db'};
+			# we can't get the original file name
+		}
+		elsif ($db_ref eq 'Bio::DB::BigBed') {
+			# a BigBed database
+			$db = $arg_ref->{'db'};
+			# we can't get the original file name
+		}
+		elsif ($db_ref eq 'Bio::DB::Sam') {
+			# a Bam database
+			$db = $arg_ref->{'db'};
+			$db_name = $db->{'bam_path'};
 		}
 		else {
 			# the name of a database was passed, create a database connection
@@ -842,64 +909,44 @@ sub get_new_genome_list {
 	$new_data->{1}{'step'} = $step;
 	
 	
-	# Collect the chromosomes from the db
-		# sort the chromosomes
-		# this only works with numbered chromosomes, not Roman numerals
-		# additionally skip mitochrondiral chromosome named as chrm or chrmt
-		# we're using an elongated pseudo Schwartzian Transform
-	my @temp_chromos;
-	my $mitochr; # special placeholder for the mitochrondrial chromosome
-	my $ref_seq_type = 
-		$TIM_CONFIG->param("$db_name\.reference_sequence_type") ||
-		$TIM_CONFIG->param('default_db.reference_sequence_type');
-			# the annotation gff may have the reference sequences labeled
-			# as various types, such as chromosome, sequence, 
-			# contig, scaffold, etc
-			# this is set in the configuration file
-			# this could pose problems if more than one is present
-	foreach ( $db->features(-type => $ref_seq_type) ) {
-		my $name = $_->display_name;
-		my $primary = $_->primary_id;
-			# this should be the database primary ID, used in the database 
-			# schema to identify features loaded from the initial GFF
-			# we're using this for sorting
-		if ($name =~ /^chrm|chrmt|mt|mit/i) {
-			# skip mitochondrial chromosome, invariably named chrM or chrMT
-			$mitochr = $_; # keep it for later in case we want it
-			next;
-		}
-		push @temp_chromos, [$primary, $_];
+	
+	# Collect the chromosomes
+	if (ref $db eq 'Bio::DB::BigWigSet') {
+		# BigWigSet databases are the only databases that don't 
+		# support the seq_ids method
+		# instead we have to look at one of the bigwigs in the set
+		my $bw_file = ($db->bigwigs)[0];
+		$db = open_db_connection($bw_file);
 	}
-	my @chromosomes = map $_->[1], sort { $a->[0] <=> $b->[0] } @temp_chromos;
-		# the chromosomes should now be in the same order as they occured
-		# in the original annotation GFF file
-	if (exists $arg_ref->{'mito'} and $arg_ref->{'mito'} and $mitochr) {
-		# push mitochrondrial chromosome at the end of the list if requested
-		push @chromosomes, $mitochr;
-	}
+	my @chromosomes = $db->seq_ids;
 	unless (@chromosomes) {
-		carp " no '$ref_seq_type' features found! Please check the reference\n" .
-			" sequence type in the configuration file and database\n";
+		carp " no sequence IDs were found in the database!\n";
 		return;
 	}
 	
-	# Check the potential size of the data array
-	# I'm afraid of collecting too much data that overwhelms available memory
-	my $total_size = 0;
-	foreach my $chrobj (@chromosomes) {
-		$total_size += $chrobj->length;
-	}
-	if ( ($total_size / $win) > 1_000_000) {
-		warn " data array is predicted to be $total_size lines long!\n" . 
-			" this may require considerable amounts of memory\n" .
-			" you may wish to consider using 'generate_genomic_bins.pl'\n";
-	}
 	
 	# Collect the genomic windows
 	print "   Generating $win bp windows in $step bp increments\n";
-	foreach my $chrobj (@chromosomes) {
-		my $chr = $chrobj->name; # chromosome name
-		my $length = $chrobj->length;
+	foreach my $chr (@chromosomes) {
+		
+		# check for mitochondrial chromosome
+		if ($chr =~ /^chrm|chrmt|mt|mit/i) {
+			# the mitochondrial chromosome, invariably named chrM or chrMT
+			# or some such variant
+			
+			# skip if it was requested
+			if (exists $arg_ref->{'mito'} and $arg_ref->{'mito'} ) {
+				next;
+			}
+		}
+		
+		# generate a segment representing the chromosome
+		# this should default to the beginning and end of the chromosome
+		my $segment = $db->segment($chr);
+		
+		# get the chromosome length
+		my $length = $segment->length;
+		
 		for (my $start = 1; $start <= $length; $start += $step) {
 			# set the end point
 			my $end = $start + $win - 1; 
@@ -915,7 +962,6 @@ sub get_new_genome_list {
 		}
 	}
 	print "   Kept " . $new_data->{'last_row'} . " windows.\n";
-	
 	
 	# Return the data structure
 	return $new_data;
@@ -1024,10 +1070,10 @@ arguments. The keys include
               phrase 'log2' and set accordingly. This argument is
               critical for accurately mathematically combining 
               dataset values in the region.
-  strand   => Indicate whether the dataset values from a specific 
+  stranded => Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
-              Acceptable values include sense, antisense, no,
-              or none. Default is 'none'.
+              Acceptable values include sense, antisense, or all.
+              Default is 'all'.
   extend   => Indicate an integer value representing the number of 
               bp the feature's region should be extended on both
               sides.
@@ -1116,7 +1162,7 @@ Examples
 		'dataset' => $dataset,
 		'fstart'  => 0.25,
 		'fstop'   => 0.75,
-		'strand'  => 'sense',
+		'stranded' => 'sense',
 	} );
 	
 
@@ -1160,21 +1206,21 @@ sub get_feature_dataset {
 			$log = 0;
 		}
 	}
-	my $stranded    = $arg_ref->{'strand'} || 'all';
-	my $relative_pos = $arg_ref->{'position'} || 5;
-	my $limit       = $arg_ref->{'limit'} || 1000;
+	my $stranded     = $arg_ref->{'stranded'}   || 'all';
+	my $relative_pos = $arg_ref->{'position'}   || 5;
+	my $limit        = $arg_ref->{'limit'}      || 1000;
 		# this is an arbitrary default value that seems reasonable for
 		# moderate resolution microarrays
 		# it's only needed if using the fractional start & stop
 	
 	# define other variables from the argument hash
-	my $extend      = $arg_ref->{'extend'} || undef;
-	my $start       = $arg_ref->{'start'} || undef;
-	my $stop        = $arg_ref->{'stop'} || undef;
-	my $fstart      = $arg_ref->{'fstart'} || undef;
-	my $fstop       = $arg_ref->{'fstop'} || undef;
-	my $set_strand  = $arg_ref->{'set_strand'} || 0;
-	my $get_subfeat = $arg_ref->{'subfeature'} || 0;
+	my $extend      = $arg_ref->{'extend'}      || undef;
+	my $start       = $arg_ref->{'start'}       || undef;
+	my $stop        = $arg_ref->{'stop'}        || undef;
+	my $fstart      = $arg_ref->{'fstart'}      || undef;
+	my $fstop       = $arg_ref->{'fstop'}       || undef;
+	my $set_strand  = $arg_ref->{'set_strand'}  || 0;
+	my $get_subfeat = $arg_ref->{'subfeature'}  || 0;
 	
 	
 	
@@ -1213,10 +1259,7 @@ sub get_feature_dataset {
 		if ($data_table_ref->[0][$i] =~ /^name$/i) {
 			$name_index = $i;
 		}
-		elsif ($data_table_ref->[0][$i] =~ /^class$/i) {
-			$type_index = $i;
-		}
-		elsif ($data_table_ref->[0][$i] =~ /^type$/i) {
+		elsif ($data_table_ref->[0][$i] =~ /^type|class$/i) {
 			$type_index = $i;
 		}
 		if ($set_strand and $data_table_ref->[0][$i] =~ /^strand$/i) {
@@ -2065,9 +2108,9 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name of the dataset in the database to be 
+  dataset  => The name of the dataset in the database to be 
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
               The name should be verified using the 
@@ -2077,13 +2120,13 @@ arguments. The keys include
               A local file should be prefixed with 'file:', while 
               a remote file should be prefixed with the transfer 
               protocol (ftp: or http:).
-  data =>     A scalar reference to the data table containing the
+  data     => A scalar reference to the data table containing the
               list of features. This should be a reference to the
               key 'data_table' in the data structure described in 
               tim_data_helper.pm, not to the entire data hash. 
               Note that the column metadata should be updated 
               separately by the calling program.
-  method =>   The method used to combine the dataset values found
+  method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
               sum, mean, median, range, stddev, min, max, and count. 
               See _get_segment_score() documentation for more info.
@@ -2091,16 +2134,16 @@ arguments. The keys include
   value    => Specify the type of value to collect. Acceptable 
               values include score, count, or length. The default 
               value type is score. 
-  log =>      Boolean value (1 or 0) indicating whether the dataset 
+  log      => Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
               dataset name will be checked for the presence of the 
               phrase 'log2' and set accordingly. This argument is
               critical for accurately mathematically combining 
               dataset values in the region.
-  strand =>   Indicate whether the dataset values from a specific 
+  stranded => Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
-              Acceptable values include sense, antisense, no,
-              or none. Default is 'none'.
+              Acceptable values include sense, antisense, or all.
+              Default is 'all'.
           	  
 The subroutine will return a true value (the new column name) if 
 successful. It will return nothing and print an error message to 
@@ -2159,7 +2202,7 @@ sub get_genome_dataset {
 			$log = 0;
 		}
 	}
-	my $stranded = $arg_ref->{'strand'} || 'all';
+	my $stranded = $arg_ref->{'stranded'} || 'all';
 	
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
@@ -2207,21 +2250,24 @@ sub get_genome_dataset {
 	push @{ $data_table_ref->[0] }, $column_name;
 	
 	# Automatically identify column indices
-	my ($chr_index, $start_index, $stop_index); 
+	my ($chr_index, $start_index, $stop_index, $strand_index); 
 	# we need to identify which columns in the feature table are for 
 	# chromosome, start, and stop. these should be columns 0, 1, and 2,
 	# respectively, but just in case...
 	# and to avoid hard coding index values in case someone changes them
 	for (my $i = 0; $i < scalar @{ $data_table_ref->[0] }; $i++ ) {
-		if ($data_table_ref->[0][$i] =~ /^chr/i) {
+		if ($data_table_ref->[0][$i] =~ /^chr|seq|ref/i) {
 			# we may only be using
 			$chr_index = $i;
 		}
 		elsif ($data_table_ref->[0][$i] =~ /^start$/i) {
 			$start_index = $i;
 		}
-		elsif ($data_table_ref->[0][$i] =~ /^stop$/i) {
+		elsif ($data_table_ref->[0][$i] =~ /^stop|end$/i) {
 			$stop_index = $i;
+		}
+		elsif ($data_table_ref->[0][$i] =~ /^strand$/i) {
+			$strand_index = $i;
 		}
 	}
 	unless (
@@ -2238,10 +2284,11 @@ sub get_genome_dataset {
 		
 		# define the region
 		my $region = $db->segment( 
-					-name  => $data_table_ref->[$i][$chr_index],
-					-start => $data_table_ref->[$i][$start_index],
-					-end   => $data_table_ref->[$i][$stop_index],
+					-seq_id  => $data_table_ref->[$i][$chr_index],
+					-start   => $data_table_ref->[$i][$start_index],
+					-end     => $data_table_ref->[$i][$stop_index],
 		);
+		my $region_strand = $data_table_ref->[$i][$strand_index] || 0;
 		
 		# print warning if not found
 		unless ($region) { 
@@ -2256,7 +2303,7 @@ sub get_genome_dataset {
 		# pass to internal subroutine to combine dataset values
  		push @{ $data_table_ref->[$i] }, _get_segment_score(
 					$region, 
-					0, # no strand
+					$region_strand, # no strand
 					$arg_ref->{'dataset'},
 					$value_type,
 					$arg_ref->{'method'}, 
@@ -2284,9 +2331,9 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db =>       The name of the database or a reference to an 
+  db       => The name of the database or a reference to an 
               established database object. 
-  dataset =>  The name of the dataset in the database to be 
+  dataset  => The name of the dataset in the database to be 
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
               The name should be verified using the 
@@ -2296,26 +2343,32 @@ arguments. The keys include
               A local file should be prefixed with 'file:', while 
               a remote file should be prefixed with the transfer 
               protocol (ftp: or http:).
-  method =>   The method used to combine the dataset values found
+  method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
               sum, mean, median, range, stddev, min, and max. 
               See _get_segment_score() documentation for more info.
-  chr =>      The name of the chromosome (reference sequence)
-  start =>    The start position of the region on the chromosome
-  stop =>     The stop position of the region on the chromosome
-  end =>      Alias for stop
+  chromo   => The name of the chromosome (reference sequence)
+  start    => The start position of the region on the chromosome
+  stop     => The stop position of the region on the chromosome
+  end      => Alias for stop
   
   Optional:
+  strand   => The strand of the region (-1, 0, or 1) on the 
+              chromosome. The default is 0, or unstranded.
   value    => Specify the type of value to collect. Acceptable 
               values include score, count, or length. The default 
               value type is score. 
-  log =>      Boolean value (1 or 0) indicating whether the dataset 
+  log      => Boolean value (1 or 0) indicating whether the dataset 
               values are in log2 space or not. If undefined, the 
               dataset name will be checked for the presence of the 
               phrase 'log2' and set accordingly. This argument is
               critical for accurately mathematically combining 
               dataset values in the region.
-          	  
+  stranded => Indicate whether the dataset values from a specific 
+              strand relative to the feature should be collected. 
+              Acceptable values include sense, antisense, or all.
+              Default is 'all'.
+         	  
 The subroutine will return the region score if successful.
 
 Examples
@@ -2375,6 +2428,7 @@ sub get_chromo_region_score {
 		|| undef;
 	my $start = $arg_ref->{'start'} || undef;
 	my $stop = $arg_ref->{'stop'} || $arg_ref->{'end'} || undef;
+	my $strand = $arg_ref->{'strand'} || 0;
 	unless ($chromo and $start and $stop) {
 		carp "one or more genomic region coordinates are missing!";
 		return;
@@ -2382,6 +2436,7 @@ sub get_chromo_region_score {
 	
 	# define default values as necessary
 	my $value_type = $arg_ref->{'value'} || 'score';
+	my $stranded = $arg_ref->{'stranded'} || 'all';
 	my $log = $arg_ref->{'log'} || undef;
 	unless (defined $log) {
 		# we need to know whether we are working with a log2 dataset or not
@@ -2412,11 +2467,11 @@ sub get_chromo_region_score {
 	# pass to internal subroutine to combine dataset values
 	return _get_segment_score(
 				$region, 
-				0, # no strand with genomic region
+				$strand, 
 				$arg_ref->{'dataset'},
 				$value_type,
 				$arg_ref->{'method'}, 
-				'all',  # all stranded datasets
+				$stranded,  
 				$log,
 	);
 }
@@ -2464,17 +2519,21 @@ arguments. The keys include
   name     => The name of the genomic feature.
   type     => The type of the genomic feature.
   Optional:
-  extend   => Indicate an integer value representing the number of 
-              bp the feature's region should be extended on both
-              sides.
+  chromo   => The chromosome or sequence name (seq_id). This may be 
+              used instead of name and type to specify a genomic 
+              segment. This must be used with start and stop options, 
+              and optionally strand options.
   start    => Indicate an integer value representing the start  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with "stop".
-  stop     => Indicate an integer value representing the stop  
+  stop|end => Indicate an integer value representing the stop  
               position of the region relative to the feature start.
               Use a negative value to begin upstream of the feature.
               Must be combined with "start".
+  extend   => Indicate an integer value representing the number of 
+              bp the feature's region should be extended on both
+              sides.
   position => Indicate the relative position of the feature from 
               which the "start" and "stop" positions are calculated.
               Three values are accepted: "5", which denotes the 
@@ -2483,12 +2542,12 @@ arguments. The keys include
               middle of the feature. This option is only used in 
               conjunction with "start" and "stop" options. The 
               default value is "5".
-  set_strand => For those features or regions that are NOT 
+  strand   => For those features or regions that are NOT 
               inherently stranded (strand 0), artificially set the 
               strand. Three values are accepted: -1, 0, 1. This 
               will overwrite any pre-existing value (it will not, 
               however, migrate back to the database).
-  strand   => Indicate whether the dataset values from a specific 
+  stranded => Indicate whether the dataset values from a specific 
               strand relative to the feature should be collected. 
               Acceptable values include sense, antisense, or all.
               Default is all.
@@ -2549,20 +2608,25 @@ sub get_region_dataset_hash {
 		return;
 	}
 	
-	# confirm options and assign defaults
-	my $name = $arg_ref->{'name'} || undef;
-	my $type = $arg_ref->{'type'} || $arg_ref->{'class'} || undef;
+	# confirm options and check we have what we need 
+	my $name   = $arg_ref->{'name'}   || undef;
+	my $type   = $arg_ref->{'type'}   || undef;
+	my $chromo = $arg_ref->{'chromo'} || undef;
+	my $start  = $arg_ref->{'start'}  || undef;
+	my $stop   = $arg_ref->{'stop'}   || $arg_ref->{'end'} || undef;
+	my $strand = $arg_ref->{'strand'} || 0;
 	unless (
-		defined $name and 
-		defined $type 
+		(defined $name and defined $type) or 
+		(defined $chromo and defined $start and defined $stop)
 	) {
-		carp "the feature name and/or type are missing!";
+		carp "the feature name and type or genomic coordinates are missing!";
 		return;
 	};
-	my $stranded = $arg_ref->{'strand'} || 'all';
-	my $value_type = $arg_ref->{'value'} || 'score';
-	my $relative_pos = $arg_ref->{'position'} || 5;
-	my $set_strand = $arg_ref->{'set_strand'} || undef;
+	
+	# assign defaults
+	my $stranded       = $arg_ref->{'stranded'} || 'all';
+	my $value_type     = $arg_ref->{'value'}    || 'score';
+	my $relative_pos   = $arg_ref->{'position'} || 5;
 	
 	
 	
@@ -2573,7 +2637,13 @@ sub get_region_dataset_hash {
 	my $region;
 	my $fstart; # to remember the feature start
 	my $fstrand; # to remember the feature strand
-	if ($arg_ref->{'extend'}) {
+	
+	# Extend a named database feature
+	if (
+		defined $name and 
+		defined $type and 
+		$arg_ref->{'extend'}
+	) {
 		# if an extension is specified to the feature region
 		# first define the feature
 		my @features = $db->features( 
@@ -2590,8 +2660,8 @@ sub get_region_dataset_hash {
 		my $feature = shift @features; 
 		
 		# change strand if requested
-		if (defined $set_strand) {
-			$feature->strand($set_strand);
+		if (defined $strand) {
+			$feature->strand($strand);
 		}
 		
 		# record the feature start and strand
@@ -2609,11 +2679,13 @@ sub get_region_dataset_hash {
 		);
 	} 
 		
+	# Specific start and stop coordinates of a named database feature
 	elsif (
-			defined $arg_ref->{'start'} and 
-			defined $arg_ref->{'stop'}
+			defined $name and
+			defined $type and 
+			defined $start and
+			defined $stop
 	) {
-		# if specific start and stop coordinates are requested
 		
 		# first define the feature to get endpoints
 		my @features = $db->features( 
@@ -2630,8 +2702,8 @@ sub get_region_dataset_hash {
 		my $feature = shift @features; 
 		
 		# change strand if requested
-		if (defined $set_strand) {
-			$feature->strand($set_strand);
+		if (defined $strand) {
+			$feature->strand($strand);
 		}
 		
 		# next define the region relative to the feature start or end
@@ -2645,8 +2717,8 @@ sub get_region_dataset_hash {
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$feature->end + $arg_ref->{'start'},
-					$feature->end + $arg_ref->{'stop'},
+					$feature->end + $start,
+					$feature->end + $stop,
 			);
 		}
 		elsif ($feature->strand < 0 and $relative_pos == 3) {
@@ -2659,8 +2731,8 @@ sub get_region_dataset_hash {
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$feature->start - $arg_ref->{'stop'},
-					$feature->start - $arg_ref->{'start'},
+					$feature->start - $stop,
+					$feature->start - $start,
 			);
 		}
 		elsif ($feature->strand >= 0 and $relative_pos == 5) {
@@ -2673,8 +2745,8 @@ sub get_region_dataset_hash {
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$feature->start + $arg_ref->{'start'},
-					$feature->start + $arg_ref->{'stop'},
+					$feature->start + $start,
+					$feature->start + $stop,
 			);
 		}
 		elsif ($feature->strand < 0 and $relative_pos == 5) {
@@ -2687,8 +2759,8 @@ sub get_region_dataset_hash {
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$feature->end - $arg_ref->{'stop'},
-					$feature->end - $arg_ref->{'start'},
+					$feature->end - $stop,
+					$feature->end - $start,
 			);
 		}
 		elsif ($relative_pos == 1) {
@@ -2701,15 +2773,17 @@ sub get_region_dataset_hash {
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$fstart + $arg_ref->{'start'},
-					$fstart + $arg_ref->{'stop'},
+					$fstart + $start,
+					$fstart + $stop,
 			);
 		}
 	}
 	
-	else {
-		# default is to simply take the whole gene region
-		# first get the feature
+	# an entire named database feature
+	elsif (
+		defined $name and 
+		defined $type
+	) {
 		my @features = $db->features( 
 				-name  => $name,
 				-type => $type,
@@ -2724,8 +2798,8 @@ sub get_region_dataset_hash {
 		my $feature = shift @features; 
 		
 		# change strand if requested
-		if (defined $set_strand) {
-			$feature->strand($set_strand);
+		if (defined $strand) {
+			$feature->strand($strand);
 		}
 		
 		# record the feature start and strand
@@ -2738,6 +2812,28 @@ sub get_region_dataset_hash {
 			# we could probably call the segment directly, but want to 
 			# have mechanism in place in case more than one feature was
 			# present
+	}
+	
+	# a genomic region
+	elsif (
+		defined $chromo and
+		defined $start and 
+		defined $stop
+	) {
+		
+		# generate region
+		$region = $db->segment($chromo, $start, $stop);
+		
+		# adjust strand if necessary
+		if ($strand) {
+			$region->strand($strand);
+		}
+		
+		# record the feature start and strand
+		$fstart = $start;
+		$fstrand = $strand;
+		
+		
 	}
 	
 	# check region
@@ -3145,7 +3241,7 @@ sub _get_segment_score {
 		# ampersand or comma delimited lists
 	
 	# check for data source files
-	if ($datasetlist[0] =~ /^(?:file|http|ftp):/) {
+	if ($datasetlist[0] =~ /^file|http|ftp/) {
 		
 		# collect the data according to file type
 		

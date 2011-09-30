@@ -1442,7 +1442,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# relabel the data table headers
 	$data_table_ref->[0] = [ 
-		qw( RefSeq Source Method Start Stop Score Strand Phase Group) 
+		qw( Chromosome Source Type Start Stop Score Strand Phase Group) 
 	];
 	
 	# re-write the data table
@@ -1623,7 +1623,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# define new metadata
 	$input_data_ref->{0} = {
-		'name'  => 'RefSeq',
+		'name'  => 'Chromosome',
 		'index' => 0,
 	};
 	$input_data_ref->{1} = {
@@ -1631,7 +1631,7 @@ sub convert_genome_data_2_gff_data {
 		'index' => 1,
 	};
 	$input_data_ref->{2} = {
-		'name'  => 'Method',
+		'name'  => 'Type',
 		'index' => 2,
 	};
 	$input_data_ref->{3} = $start_metadata_ref;

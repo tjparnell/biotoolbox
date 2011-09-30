@@ -8,7 +8,6 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
 use Statistics::Lite qw(mean median sum);
-eval { use Bio::DB::Sam; };
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -23,6 +22,12 @@ use tim_file_helper qw(
 	open_to_read_fh
 	convert_and_write_to_gff_file
 );
+eval {
+	# check for bam support
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
+};
+
 
 print "\n This script will generate genomic binned data\n\n";
 
@@ -487,7 +492,10 @@ sub get_bam_data {
 	print " Collecting features from BAM file '$datafile'....\n";
 	
 	# open bam io object
-	my $sam = Bio::DB::Sam->new( -bam => $datafile) or 
+	unless (exists &open_bam_db) {
+		die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+	}
+	my $sam = open_bam_db($datafile) or 
 		die " unable to open BAM file '$datafile'!\n";
 	
 	# initialize counts

@@ -313,22 +313,20 @@ sub map_nucleosomes {
 	my $found_nucleosomes = 0;
 	
 	# Walk through each chromosome
-	my @chromosomes = $db->features(
-		-type   => 'chromosome',
-	) or die " unable to find 'chromosome' features in database!\n";
+	my @chromosomes = $db->seq_ids or 
+		die " unable to find sequences in database!\n";
 	foreach my $chromo (@chromosomes) {
 		
-		# Establish basic chromo info
-		my $chr_name = $chromo->name;
-		my $chr_length = $chromo->length;
-		my $chr_type = $chromo->type;
-		
 		# skip mitochrondrial chromosome
-		if ($chr_name =~ /chrm|chrmt/i) {next}
+		if ($chromo =~ /chrm|chrmt/i) {next}
+		
+		# get chromosome length
+		my $chr_segment = $db->segment($chromo);
+		my $chr_length = $chr_segment->length;
 		
 		# Limit to one chromosome if debug
 		if ($debug) {
-			if ($chr_name eq 'chr2') {
+			if ($chromo eq 'chr2') {
 				# normally chromosomes are returned in order
 				# this should force only chr1 to be done
 				last;
@@ -339,7 +337,7 @@ sub map_nucleosomes {
 		}
 		
 		# Progress report
-		print " Scanning chromosome $chr_name....\n";
+		print " Scanning chromosome $chromo....\n";
 		
 		# Move along the chromosome
 		my $position = 1;
@@ -352,14 +350,13 @@ sub map_nucleosomes {
 			my %window_pos2score = get_region_dataset_hash( {
 					'db'       => $db,
 					'dataset'  => $scan_dataset,
-					'name'     => $chr_name,
-					'type'     => $chr_type,
+					'chromo'   => $chromo,
 					'start'    => $position,
 					'stop'     => $win_stop,
 					'method'   => 'score',
 			} );
 			if ($debug) {
-				print DEBUG_FH "### Window $chr_name:$position..$win_stop\n";
+				print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
 				print DEBUG_FH "  Window scores:\n  ";
 				foreach (sort {$a <=> $b} keys %window_pos2score) {
 					print DEBUG_FH "$_:$window_pos2score{$_}, ";
@@ -430,8 +427,7 @@ sub map_nucleosomes {
 				my %window_pos2tags = get_region_dataset_hash( {
 						'db'       => $db,
 						'dataset'  => $tag_dataset,
-						'name'     => $chr_name,
-						'type'     => $chr_type,
+						'chromo'   => $chromo,
 						'start'    => $position,
 						'stop'     => $win_stop,
 						'method'   => 'score',
@@ -507,8 +503,7 @@ sub map_nucleosomes {
 				my %nucleosome_pos2score = get_region_dataset_hash( {
 					'db'       => $db,
 					'dataset'  => $tag_dataset,
-					'name'     => $chr_name,
-					'type'     => $chr_type,
+					'chromo'   => $chromo,
 					'start'    => $peak_position - 50,
 					'stop'     => $peak_position + 50,
 					'method'   => 'score',
@@ -557,12 +552,12 @@ sub map_nucleosomes {
 					# not quite following Pugh's example, we will name the 
 					# nucleosome based on chromosome number and midpoint 
 					# position (instead of start position)
-				$chr_name =~ /^(?:chr)?(.+)$/i;
+				$chromo =~ /^(?:chr)?(.+)$/i;
 				my $nuc_name = 'N'. $1 . ':' . $peak_position;
 				
 				# Record the nucleosome information
 				push @{ $nucleosomes_ref->{'data_table'} }, [
-					$chr_name,
+					$chromo,
 					$nuc_start,
 					$nuc_stop,
 					$peak_position,
