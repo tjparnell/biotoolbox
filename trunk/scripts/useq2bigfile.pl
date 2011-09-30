@@ -15,8 +15,15 @@ use tim_file_helper qw(
 );
 # use tim_db_helper has moved down below and is loaded on demand
 use tim_db_helper::config;
-use tim_db_helper::bigwig;
-use tim_db_helper::bigbed;
+eval {
+	# check for bigWig support
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+	
+	# check for bigBed support
+	require tim_db_helper::bigbed;
+	tim_db_helper::bigbed->import;
+};
 
 
 print "\n This program will convert a useq archive to a bigwig/bigbed file\n\n";

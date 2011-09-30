@@ -443,7 +443,7 @@ sub go_determine_cutoff {
 		'db'           => $db,
 		'dataset'      => $dataset,
 		'method'       => 'mean',
-		'chr'          => $chromosomes[$n]->name,
+		'chromo'       => $chromosomes[$n]->name,
 		'start'        => 1,
 		'stop'         => $chromosomes[$n]->length,
 		'log'          => $log,
@@ -455,7 +455,7 @@ sub go_determine_cutoff {
 		'db'           => $db,
 		'dataset'      => $dataset,
 		'method'       => 'stddev',
-		'chr'          => $chromosomes[$n]->name,
+		'chromo'       => $chromosomes[$n]->name,
 		'start'        => 1,
 		'stop'         => $chromosomes[$n]->length,
 		'log'          => $log,
@@ -546,7 +546,7 @@ sub go_find_enriched_regions {
 				'db'         => $db,
 				'dataset'    => $dataset,
 				'method'     => $method,
-				'chr'        => $chr,
+				'chromo'     => $chr,
 				'start'      => $start,
 				'stop'       => $end,
 				'log'        => $log,
@@ -671,8 +671,7 @@ sub go_trim_windows {
 		my %pos2score = get_region_dataset_hash( {
 			'db'       => $db,
 			'dataset'  => $dataset,
-			'name'     => $window->[0],
-			'type'     => 'chromosome',
+			'chromo'   => $window->[0],
 			'start'    => $start,
 			'stop'     => $stop,
 		} );
@@ -782,11 +781,10 @@ sub get_final_window_score {
 		$windows[$i][4] = get_chromo_region_score( {
 				'db'       => $db,
 				'dataset'  => $dataset, 
-				'chr'      => $windows[$i][0],
+				'chromo'   => $windows[$i][0],
 				'start'    => $windows[$i][1],
 				'stop'     => $windows[$i][2],
 				'method'   => $method,
-				'strand'   => 'no',
 				'log'      => $log,
 		} );
 		

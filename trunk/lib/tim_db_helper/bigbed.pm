@@ -14,6 +14,7 @@ our @EXPORT = qw(
 	collect_bigbed_scores
 	collect_bigbed_position_scores
 	bed_to_bigbed_conversion
+	open_bigbed_db
 );
 
 # Hashes of opened file objects
@@ -142,7 +143,7 @@ sub _collect_bigbed_data {
 		}
 		else {
 			# this file has not been opened yet, open it
-			$bb = Bio::DB::BigBed->new($bedfile) or
+			$bb = open_bigbed_db($bedfile) or
 				croak " unable to open data BigBed file '$bedfile'";
 			
 			
@@ -314,6 +315,20 @@ sub bed_to_bigbed_conversion {
 		}
 		return;
 	}
+}
+
+
+
+### Open a bigBed database connection
+sub open_bigbed_db {
+	
+	my $path = shift;
+	
+	# open the database connection 
+	my $db = Bio::DB::BigBed->new($path) or 
+		carp " can't open BigBed database!\n";
+	
+	return $db;
 }
 
 
@@ -493,6 +508,12 @@ Example
 	else {
 		print " failure! see STDERR for errors\n";
 	};
+
+=item open_bigbed_db()
+
+This subroutine will open a BigBed database connection. Pass either the 
+local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
+file. It will return the opened database object.
 
 =back
 

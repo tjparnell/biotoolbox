@@ -7,7 +7,6 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean stddevp median min max);
-eval {use Bio::DB::Sam};
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
@@ -15,6 +14,11 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
+eval {
+	# check for bam support
+	require tim_db_helper::bam;
+	tim_db_helper::bam->import;
+};
 
 
 print "\n A script to get exact nucleosome fragment sizes from a bam file\n\n";
@@ -91,10 +95,10 @@ unless (
 }
 
 # BAM file
-my $sam = Bio::DB::Sam->new( 
-	-bam        => $bamfile,
-	-autoindex  => 1,
-) or die " unable to open input bam file '$bamfile'!\n";
+unless (exists &open_bam_db) {
+	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+}
+my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
 
 
 

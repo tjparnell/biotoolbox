@@ -293,34 +293,26 @@ sub initialize_source_data_hash {
 			die " unable to connect to database!\n";
 		
 		# get list of chromosomes
-		my @chromosomes = $db->features(-type => 'chromosome'); 
+		my @chromosomes = $db->seq_ids; 
 		
 		# walk through each chromosome
-		foreach my $chrobj (
-			# trying a Schwartzian transformation here
-			map $_->[0],
-			sort { $a->[1] <=> $b->[1] }
-			map [$_, ($_->name =~ /(\d+)/)[0] ], 
-			@chromosomes
-		) {
-			# sort chromosomes by increasing number
-			# we're using RE to pull out the digit number in the chromosome name
-			# and sorting increasingly by it
-			
-			# chromosome name
-			my $chr = $chrobj->name; # this is actually returning an object, why????
-			$chr = "$chr"; # force as string
+		foreach my $chr (@chromosomes) {
 			
 			# skip mitochondrial chromosome
 			if ($chr =~ /chrm|chrmt/i) {next}
+			
+			# get the length
+			my $segment = $db->segment($chr);
+			my $length  = $segment->length;
 			
 			# collect the dataset values for the current chromosome
 			# store in a hash the position (key) and values
 			my %chromodata = get_region_dataset_hash( {
 				'db'       => $db,
 				'dataset'  => $dataset,
-				'name'     => $chr,
-				'type'    => 'chromosome',
+				'chromo'   => $chr,
+				'start'    => 1,
+				'stop'     => $length,
 			} ) or die " no data collected for chromosome $chr!";
 			# chromdata is organized as position => score
 			
