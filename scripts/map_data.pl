@@ -12,9 +12,8 @@ use tim_data_helper qw(
 	find_column_index
 );
 use tim_db_helper qw(
-	validate_dataset_list
-	get_dataset_list
 	open_db_connection
+	process_and_verify_dataset
 	get_new_feature_list
 	get_region_dataset_hash
 );
@@ -267,7 +266,11 @@ unless ($db) {
 }
 
 # Check the dataset
-set_and_verify_dataset();
+$dataset = process_and_verify_dataset( {
+	'db'      => $db,
+	'dataset' => $dataset,
+	'single'  => 1,
+} );
 
 my $start_time = time;
 
@@ -345,66 +348,6 @@ print " Completed in $timediff minutes\n";
 #### Subroutines #######
 
 
-## validate the given dataset, or ask for one
-sub set_and_verify_dataset {
-	if ($dataset) {
-		
-		# check for a remote file
-		if ($dataset =~ /^http|ftp/) {
-			# a remote file
-			# should be good, no verification here though
-			return;
-		}
-		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
-			# looks like we have a file 
-			if (-e $dataset) {
-				# file exists
-				$dataset = "file:$dataset";
-				return;
-			}
-			else {
-				# maybe it's a funny named dataset?
-				if (validate_dataset_list($db, $dataset) ) {
-					# returned true, the name of the bad dataset
-					die " The requested file or dataset '$dataset' " . 
-						"neither exists or is valid!\n";
-				}
-			}
-		}
-		else {
-			# must be a database feature type
-		
-			# validate the given dataset
-			my $bad_dataset = validate_dataset_list($db, $dataset);
-			if ($bad_dataset) {
-				die " The requested dataset $bad_dataset is not valid!\n";
-			}
-			return;
-		}
-	} 
-	
-	else {
-		# dataset not specified
-		# present the dataset list to the user and get an answer
-		my %datasethash = get_dataset_list($db);
-		print "\n These are the available data sets in the database $database:\n";
-		foreach (sort {$a <=> $b} keys %datasethash) {
-			# print out the list of microarray data sets
-			print "  $_\t$datasethash{$_}\n"; 
-		}
-		print " Enter the number of the data set you would like to analyze  ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		if (exists $datasethash{$answer}) {
-			$dataset = $datasethash{$answer};
-		} 
-		else {
-			die " That number doesn't correspond to a data set!\n";
-		}
-	}
-}
-
-
 
 ## generate a feature dataset if one was not loaded
 sub generate_a_new_feature_dataset {
@@ -444,6 +387,9 @@ sub map_relative_data {
 		}
 	}
 	
+	
+	
+	
 	### Prepare window values
 	my $startingpoint = 0 - ($win * $number); 
 		# default values will give startingpoint of -1000
@@ -465,6 +411,8 @@ sub map_relative_data {
 	}
 	
 
+	
+	
 	### Prepare and annotate the header names and metadata
 	for (my $start = $startingpoint; $start < $endingpoint; $start += $win) {
 		# we will be progressing from the starting to ending point
@@ -534,6 +482,9 @@ sub map_relative_data {
 		# update number of columns
 		$main_data_ref->{'number_columns'} += 1;
 	}
+	
+	
+	
 	
 	### Collect the data
 	for my $row (1..$main_data_ref->{'last_row'}) {

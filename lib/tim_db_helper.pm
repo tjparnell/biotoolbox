@@ -16,7 +16,10 @@ use Statistics::Lite qw(
 );
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_data_helper qw(generate_tim_data_structure);
+use tim_data_helper qw(
+	generate_tim_data_structure 
+	parse_list
+);
 use tim_db_helper::config;
 
 # check for wiggle support
@@ -73,6 +76,7 @@ our @EXPORT_OK = qw(
 	open_db_connection
 	get_dataset_list 
 	validate_dataset_list 
+	process_and_verify_dataset 
 	get_new_feature_list 
 	get_new_genome_list 
 	validate_included_feature 
@@ -465,10 +469,7 @@ sub get_dataset_list {
 		my %types;
 		foreach my $file (keys %{ $metadata }) {
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
-				if (
-					$attribute eq 'primary_tag' or
-					$attribute eq 'type'
-				) {
+				if ($attribute =~ m/^primary_tag|type|method$/i) {
 					$types{ $metadata->{$file}{$attribute} } += 1;
 				}
 			}
@@ -529,6 +530,7 @@ Example:
 
 =cut
 
+
 sub validate_dataset_list {
 	my $database = shift;
 	
@@ -570,6 +572,249 @@ sub validate_dataset_list {
 	# return the name of bad datasets
 	return join(", ", @baddatasets);
 }
+
+
+
+### Process and verify a dataset
+
+=item process_and_verify_dataset()
+
+This subroutine will process a dataset list if offered, or present a list 
+of possible datasets to be chosen by the user. It will verify that the 
+dataset exists, either in the presented database, or if a local file that 
+the file exists and is readable. For file-based datasets, it will prepend 
+the 'file:' prefix that is necessary for the get dataset or score 
+methods in tim_db_helper.
+
+To use this subroutine, pass an anonymous array with the following keys 
+and values. Not every key is required.
+
+  db       => The name of the database or a reference to an 
+              established BioPerl database object. 
+  dataset  => Pass either a single dataset name as a scalar or an 
+              anonymous array reference of a list of dataset names. 
+              These may have been provided as a command line option and 
+              need to be verified. If nothing is passed, then a list of 
+              possible datasets will be presented to the user to be 
+              chosen.
+  prompt   => Provide a phrase to be prompted to the user to help in 
+              selecting datasets from the list. If none is provided, a 
+              generic prompt will be used.
+  single   => A Boolean value (1 or 0) indicating whether only a single 
+              dataset is allowed when selecting datasets from a 
+              presented list. If true, only one dataset choice is 
+              accepted. If false, one or more dataset choices are 
+              allowed.
+
+The subroutine will return a list of the accepted datasets. It will print 
+bad dataset names to standard error.
+
+=cut
+
+sub process_and_verify_dataset {
+	
+	# Retrieve passed values
+	my $arg_ref = shift; # the passed argument values as a hash reference
+	
+	# Check for single option
+	my $single = 0;
+	if (exists $arg_ref->{'single'} and $arg_ref->{'single'}) {
+		$single = 1;
+	}
+	
+	# Check database
+	my $db; # the database object to be used
+	if (defined $arg_ref->{'db'}) {
+		my $db_ref = ref $arg_ref->{'db'};
+		if ($db_ref =~ /^Bio::DB/) {
+			$db = $arg_ref->{'db'};
+		}
+		else {
+			# the name of a database was passed, create a database connection
+			$db = open_db_connection( $arg_ref->{'db'} );
+		}
+	}
+	
+	# Initialize main output arrays
+	my @good_datasets;
+	my @bad_datasets;
+	
+	# Check provided datasets
+	if (exists $arg_ref->{'dataset'} and defined $arg_ref->{'dataset'}) {
+		
+		my @list;
+		# check if it's an anonymous array of datasets
+		if (ref $arg_ref->{'dataset'} eq 'ARRAY') {
+			@list = @{ $arg_ref->{'dataset'} };
+		}
+		else {
+			push @list, $arg_ref->{'dataset'};
+		}
+		
+		# check for multiple comma-delimited datasets
+		my @datasets;
+		foreach my $item (@list) {
+			if ($item =~ /,/) {
+				# this one has a comma, therefore it has more than dataset
+				push @datasets, split(/,/, $item);
+			}
+			else {
+				# a singleton
+				push @datasets, $item;
+			}
+		}
+		
+		# now verify the datasets
+		foreach my $dataset (@datasets) {
+			
+			# check for a remote file
+			if ($dataset =~ /^(?: http | ftp) .+ \. (?: bam | bw | bb) $/xi) {
+				# a remote file
+				# assume it is good, no verification here though
+				# it will either work or won't work
+				push @good_datasets, $dataset;
+			}
+			
+			# a local file
+			elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
+				# presume we have a local bigfile or aligment file
+				
+				# what if we have merged datasets????????? tough toenails?????
+				
+				if (-e $dataset) {
+					# file exists
+					push @good_datasets, "file:$dataset";
+				}
+				else {
+					# file doesn't exist!
+					push @bad_datasets, $dataset;
+				}
+			}
+			
+			# a feature type in a database
+			else {
+				# must be a database feature type
+			
+				# check for a database
+				unless ($db) {
+					carp " dataset '$dataset' is a presumed database feature ",
+						"but no database was passed!\n";
+					return;
+				}
+				
+				# validate the given dataset
+				my $bad = validate_dataset_list($db, $dataset);
+				if ($bad) {
+					push @bad_datasets, $dataset;
+				}
+				else {
+					push @good_datasets, $dataset;
+				}
+			}
+		}
+	}
+	
+	# User must select datasets
+	else {
+		# dataset not specified
+		# present the dataset list to the user and get an answer
+		
+		# check for a database
+		unless ($db) {
+			carp " no database provided to select datasets!\n";
+			return;
+		}
+				
+		# get the dataset list
+		my %datasethash = get_dataset_list($db);
+		
+		# present the list
+		print "\n These are the available data sets in the database:\n";
+		foreach (sort {$a <=> $b} keys %datasethash) {
+			# print out the list of microarray data sets
+			print "  $_\t$datasethash{$_}\n"; 
+		}
+		
+		# prompt the user
+		if ($arg_ref->{'prompt'}) {
+			# provided custom prompt
+			print $arg_ref->{'prompt'};
+		}
+		else {
+			# generic prompt
+			print " Enter the number of the data set you would like to analyze  ";
+		}
+		
+		# get answer from the user
+		my $answer = <STDIN>;
+		chomp $answer;
+		my @answer_list = parse_list($answer);
+		
+		# take the first one if requested
+		if ($single) {
+			unless (scalar @answer_list == 1) {
+				splice(@answer_list, 1);
+			}
+		}
+		
+		# verify the answer list
+		foreach my $answer (@answer_list) {
+			
+			# check for merged datasets
+			if ($answer =~ /&/) {
+				# a merged dataset
+				my @list = split /&/, $answer;
+				my $check = 1;
+				
+				# check all are good
+				foreach (@list) {
+					unless (exists $datasethash{$_}) {
+						$check = 0;
+					}
+				}
+				
+				# if all are good
+				if ($check) {
+					push @good_datasets, 
+						join( "&", map { $datasethash{$_} } @list);
+				}
+				else {
+					push @bad_datasets, $answer;
+				}
+			}
+			
+			else {
+				# a single dataset
+				# check if it is good
+				
+				if (exists $datasethash{$answer}) {
+					push @good_datasets, $datasethash{$answer};
+				} 
+				else {
+					push @bad_datasets, $datasethash{$answer};
+				}
+			}
+		}
+	}
+	
+	# Print bad results
+	if (@bad_datasets) {
+		print " The following datasets could not be verified:\n";
+		foreach (@bad_datasets) {
+			print "      $_\n";
+		}
+	}
+	
+	# Return good results
+	if ($single) {
+		return $good_datasets[0];
+	}
+	else {
+		return @good_datasets;
+	}
+}
+
+
 
 
 
@@ -2869,6 +3114,12 @@ sub get_region_dataset_hash {
 		$fstrand = $strand;
 	}
 	
+	# or else something is wrong
+	else {
+		croak " programming error! not enough information provided to" .
+			" identify database feature!\n";
+	}
+	
 	
 	# check region
 	unless ($region) { 
@@ -3175,10 +3426,10 @@ sub _get_segment_score {
 		# the method depends on the database type
 		my @datapoints;
 		my $region_type = ref $region;
-		if ($region_type =~ m/SeqFeature::Store/) {
+		if ($region_type =~ m/^Bio::DB::SeqFeature/) {
 			@datapoints = $region->features(-primary_tag => [@datasetlist]);
 		}
-		elsif ($region_type =~ m/BigWigSet/) {
+		elsif ($region_type =~ m/^Bio::DB::BigWigSet/) {
 			# calling features from a BigWigSet::Segment object
 			# doesn't accept named arguments, just the type list
 			@datapoints = $region->features( [@datasetlist] );

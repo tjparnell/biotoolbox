@@ -16,8 +16,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list 
-	validate_dataset_list
+	process_and_verify_dataset
 	get_region_dataset_hash
 	get_chromo_region_score
 );
@@ -178,7 +177,22 @@ my $db = open_db_connection($database);
 # stored in the @windows array
 
 # Check or request the dataset
-my $dataset_name = check_and_verify_dataset();
+$dataset = process_and_verify_dataset( {
+	'db'      => $db,
+	'dataset' => $dataset,
+	'single'  => 1,
+} );
+
+# get a simplified dataset name
+my $dataset_name;
+if ($dataset =~ /^ (?: http | ftp | file ) : \/* (.+) \. (?: bb | bw | bam ) $/xi) {
+	# use the file's basename as the dataset name
+	$dataset_name = $1;
+}
+else {
+	# a database feature
+	$dataset_name = $dataset;
+}
 
 # Generate output file name if necessary
 unless ($outfile) {
@@ -345,93 +359,19 @@ print "All done!\n\n";
 ############# Subroutines ###################
 
 
-sub check_and_verify_dataset {
-	if ($dataset) {
-		# check for a remote file
-		if ($dataset =~ /^(?:http|ftp):\/\/(.+)$/) {
-			# a remote file
-			# no test for validity, we'll find out later when we try to use it
-			# use the file's basename as the dataset name
-			my ($basename, undef, undef) = fileparse($1, qw(\.bb \.bw \.bam));
-			return $basename;
-		}
-		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
-			# looks like we have a file 
-			if (-e $dataset) {
-				# file exists
-				my ($basename, undef, undef) = fileparse($dataset, 
-					qw(\.bb \.bw \.bam));
-				$dataset = "file:$dataset";
-				return $basename;
-			}
-			else {
-				# maybe it's a funny named dataset?
-				if (validate_dataset_list($db, $dataset) ) {
-					# returned true, the name of the bad dataset
-					die " The requested file or dataset '$dataset' " . 
-						"neither exists or is valid!\n";
-				}
-				return $dataset;
-			}
-		}
-		else {
-			# must be a database feature type
-		
-			# validate the given dataset
-			my $bad_dataset = validate_dataset_list($db, $dataset);
-			if ($bad_dataset) {
-				die " The requested dataset $bad_dataset is not valid!\n";
-			}
-			else {
-				print " Using requested data set $dataset....\n";
-			}
-			return $dataset;
-		}
-	}	
-	
-	# Otherwise ask for the data set
-	else {
-		
-		# Present the data set list to the user and get an answer
-		my %datasethash = get_dataset_list($database); # list of data sets
-		print "\n These are the microarray data sets in the database:\n";
-		foreach (sort {$a <=> $b} keys %datasethash) {
-			# print out the list of microarray data sets
-			print "  $_\t$datasethash{$_}\n"; 
-		}
-		
-		# get answer 
-		print " Enter the number of the data set you would like to analyze  ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		
-		# check answer
-		if (exists $datasethash{$answer}) {
-			$dataset = $datasethash{$answer};
-			print " Using data set $dataset....\n";
-		} 
-		else {
-			die " unknown dataset! You aren't trying more than one, are you?\n";
-		}
-	}
-}
-
-
-
 
 ### Determine the cutoff values for the dataset
 sub go_determine_cutoff {
 	
 	# collect sample of values from the dataset
-	my @chromosomes = $db->features(-type => 'chromosome'); 
+	my @chromosomes = $db->seq_ids; 
 	unless (@chromosomes) {
-		die " unable to identify chromosome sequences in the database!\n" .
-			" check the GFF3 type of your reference sequences\n";
+		die " unable to identify chromosome sequences in the database!\n";
 	}
 	
 	# select chromosome randomly
 	my $n = rand (scalar @chromosomes);
-	while ($chromosomes[$n]->name =~ /chrm/) {
+	while ($chromosomes[$n]->name =~ /chrm|chrmt|chrmt|NA/i) {
 		# avoid that mitochrondrial chromosome like the plague!
 		$n = rand (scalar @chromosomes);
 	}
@@ -443,7 +383,7 @@ sub go_determine_cutoff {
 		'db'           => $db,
 		'dataset'      => $dataset,
 		'method'       => 'mean',
-		'chromo'       => $chromosomes[$n]->name,
+		'chromo'       => $chromosomes[$n],
 		'start'        => 1,
 		'stop'         => $chromosomes[$n]->length,
 		'log'          => $log,
@@ -455,7 +395,7 @@ sub go_determine_cutoff {
 		'db'           => $db,
 		'dataset'      => $dataset,
 		'method'       => 'stddev',
-		'chromo'       => $chromosomes[$n]->name,
+		'chromo'       => $chromosomes[$n],
 		'start'        => 1,
 		'stop'         => $chromosomes[$n]->length,
 		'log'          => $log,
