@@ -14,8 +14,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list
-	validate_dataset_list
+	process_and_verify_dataset
 	get_new_feature_list
 	get_region_dataset_hash
 );
@@ -236,7 +235,12 @@ my $db = open_db_connection($database);
 
 
 ## Check for the dataset
-check_and_verify_dataset();
+$dataset = process_and_verify_dataset( {
+	'db'      => $db,
+	'dataset' => $dataset,
+	'single'  => 1,
+} );
+
 
 
 
@@ -304,88 +308,6 @@ print " Completed in $timediff minutes\n";
 
 
 #### Subroutines #######
-
-
-sub check_and_verify_dataset {
-	if ($dataset) {
-		# dataset specified on the command line
-		
-		# check for a remote file
-		if ($dataset =~ /^http|ftp/) {
-			# a remote file
-			# should be good, no verification here though
-			return;
-		}
-		elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
-			# looks like we have a file 
-			if (-e $dataset) {
-				# file exists
-				$dataset = "file:$dataset";
-				return;
-			}
-			else {
-				# maybe it's a funny named dataset?
-				if (validate_dataset_list($db, $dataset) ) {
-					# returned true, the name of the bad dataset
-					die " The requested file or dataset '$dataset' " . 
-						"neither exists or is valid!\n";
-				}
-			}
-		}
-		else {
-			# must be a database feature type
-		
-			# validate the given dataset
-			my $bad_dataset = validate_dataset_list($db, $dataset);
-			if ($bad_dataset) {
-				die " The requested dataset $bad_dataset is not valid!\n";
-			}
-			return;
-		}
-	} 
-		
-	else {
-		# dataset not specified
-		
-		# present the dataset list to the user 
-		my %datasethash = get_dataset_list($db);
-		print "\n These are the microarray data sets in the database:\n";
-		foreach (sort {$a <=> $b} keys %datasethash) {
-			# print out the list of microarray data sets
-			print "  $_\t$datasethash{$_}\n"; 
-		}
-		
-		# collect response from user
-		print " Enter the number of the data set you would like to analyze.\n" .
-			" Two or more datasets may be combined with a '&'   ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		
-		# parse the user's answer
-		if ($answer =~ /(\d+) \s* [&] \s* (\d+)/x) { 
-			# multiple datasets are to be combined
-			my ($first, $second) = ($1, $2);
-			if (
-				exists $datasethash{$first} and
-				exists $datasethash{$second}
-			) {
-				$dataset = $datasethash{$first} . '&' . $datasethash{$second};
-			} 
-			else {
-				die " One or both numbers don't correspond to a data set!\n";
-			}
-		} 
-		else {
-			if (exists $datasethash{$answer}) {
-				$dataset = $datasethash{$answer};
-			} 
-			else {
-				die " The number doesn't correspond to a data set!\n";
-			}
-		}
-		return;
-	}
-}
 
 
 
