@@ -2834,6 +2834,11 @@ arguments. The keys include
   value    => Indicate which attribute will be returned. Acceptable 
               values include "score", "count", or "length". The  
               default behavior will be to return the score values.
+  avoid    => Boolean value to indicate that other features of the 
+              same type should be avoided. This only works if name 
+              and type was provided. Any positioned scores which 
+              overlap the other feature(s) are not returned. The 
+              default is false (return all values).
           	  
 The subroutine will return the hash if successful.
 
@@ -3147,6 +3152,42 @@ sub get_region_dataset_hash {
 		$stranded, 
 		0, # log value
 	);
+	
+	
+	### Check for conflicting features
+	if (exists $arg_ref->{'avoid'} and $arg_ref->{'avoid'} and $type) {
+		# we need to look for any potential overlapping features of the 
+		# same type and remove those scores
+		
+		# get the overlapping features of the same type
+		my @overlap_features = $region->features(-type => $type);
+		if (scalar @overlap_features >= 2) {
+			# there are more than one feature of the same type in this 
+			# region
+			# one is undoubtedly the one we're working with
+			# the others are not what we want and therefore need to be 
+			# avoided
+			foreach my $feat (@overlap_features) {
+				
+				# skip the one we want
+				next if ($feat->display_name eq $name);
+				
+				# now eliminate those scores which overlap this feature
+				foreach my $position (keys %datahash) {
+					
+					# delete the scored position if it overlaps with 
+					# the offending feature
+					if (
+						$position >= $feat->start and
+						$position <= $feat->end
+					) {
+						delete $datahash{$position};
+					}
+				}
+			}
+		}
+		
+	}
 	
 	
 	
