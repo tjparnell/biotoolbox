@@ -53,6 +53,7 @@ my (
 	$position, 
 	$strand,
 	$set_strand,
+	$avoid,
 	$smooth,
 	$sum,
 	$log,
@@ -75,6 +76,7 @@ GetOptions(
 	'position=s' => \$position, # indicate relative location of the feature
 	'strand=s'   => \$strand, # collected stranded data
 	'set_strand' => \$set_strand, # enforce an artificial strand
+	'avoid!'     => \$avoid, # avoid conflicting features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
 	'raw'        => \$raw, # write raw data
@@ -509,6 +511,7 @@ sub map_relative_data {
 				'strand'      => $strand,
 				'set_strand'  => $set_strand ? 
 								$data_table_ref->[$row][$strand_index] : undef, 
+				'avoid'       => $avoid,
 		} );
 		
 		# debugging
@@ -673,6 +676,7 @@ A script to map data relative to and flanking a genomic feature
   --pos [5|3|m]
   --strand [sense|antisense|all]
   --set_strand
+  --(no)avoid
   --(no)sum
   --(no)smooth
   --(no)log
@@ -778,6 +782,15 @@ or to collected stranded data. This requires the presence a
 column in the input data file with a name of "strand". Hence, it 
 will not work with newly generated datasets, but only with input 
 data files. Default is false.
+
+=item --(no)avoid
+
+Indicate whether features of the same type should be avoided when 
+calculating values in a window. Each window is checked for 
+overlapping features of the same type; if the window does overlap 
+another feature of the same type, no value is reported for the 
+window. The default is false (return all values regardless of 
+overlap).
 
 =item --(no)sum
 
