@@ -549,7 +549,21 @@ sub validate_dataset_list {
 	return unless %dataset_list; # no need to continue if we don't have a list
 	
 	# transform dataset list hash into something more useable
-	my %dataset_checklist = map {$_ => 1} values %dataset_list;
+	my %dataset_checklist;
+	foreach my $item (values %dataset_list) {
+		# store the gff type into our dataset checklist
+		$dataset_checklist{$item} = 1; # the value is unimportant
+		
+		# break the gff type into type:source
+		if ($item =~ /^([\w\-]+):.+/) {
+			# store the actual type or method, ignore source
+			$dataset_checklist{$1} = 1;
+		}
+	}
+	unless (%dataset_checklist) {
+		carp "database has no features to validate against!\n";
+		return;
+	}
 	
 	
 	# now go through the list of datasets to check the name
