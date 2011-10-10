@@ -8,6 +8,7 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(generate_tim_data_structure);
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
@@ -132,7 +133,6 @@ if ($file_written) {
 else {
 	print " No file written!\n";
 }
-
 
 
 
@@ -625,20 +625,18 @@ sub check_data_tables {
 sub initialize_output_data_structure {
 	my $data_ref = shift;
 	
-	my %output_data;
-	# we'll use the default values from file1 
-	$output_data{'program'} = $data_ref->{'program'} or '';
-	$output_data{'feature'} = $data_ref->{'feature'} or '';
-	$output_data{'db'} = $data_ref->{'db'} or '';
-	$output_data{'filename'} = $data_ref->{'filename'}; # borrow file name
-	$output_data{'last_row'} = $data_ref->{'last_row'}; # should be identical
-
-	# assign other values
-	$output_data{'gff'} = 0; # this will no longer be a gff file
-	$output_data{'number_columns'} = 0; # no datasets yet
-	$output_data{'data_table'} = []; # empty array to be filled
+	# generate brand new output data structure
+	my $output_data = generate_tim_data_structure(
+		$data_ref->{'feature'}, # re-use the same feature as file1
+	);
 	
-	return \%output_data;
+	# we'll re-use the values from file1 
+	$output_data->{'program'}   = $data_ref->{'program'};
+	$output_data->{'db'}        = $data_ref->{'db'};
+	$output_data->{'filename'}  = $data_ref->{'filename'}; # borrow file name
+	$output_data->{'last_row'}  = $data_ref->{'last_row'}; # should be identical
+
+	return $output_data;
 }
 
 
