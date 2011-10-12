@@ -2577,27 +2577,34 @@ sub get_genome_dataset {
 	for my $i (1..$n) {
 		
 		# define the region
-		my $region = $db->segment( 
+		my @regions = $db->segment( 
 					-seq_id  => $data_table_ref->[$i][$chr_index],
 					-start   => $data_table_ref->[$i][$start_index],
 					-end     => $data_table_ref->[$i][$stop_index],
 		);
-		my $region_strand = $data_table_ref->[$i][$strand_index] || 0;
 		
-		# print warning if not found
-		unless ($region) { 
-			my $error = "Window at table position $i, chromosome " .
-					$data_table_ref->[$i][$chr_index] . " position " .
-					$data_table_ref->[$i][$start_index] . " not found!";
-			carp "$error";
+		# print warning if necessary
+		if (scalar @regions > 1) { 
+			carp " multiple regions found for ", 
+				$data_table_ref->[$i][$chr_index], ':', 
+				$data_table_ref->[$i][$start_index], '..', 
+				$data_table_ref->[$i][$stop_index],
+				"! using first one\n";
+		}
+		elsif (scalar @regions == 0) {
+			carp " no regions found for ", 
+				$data_table_ref->[$i][$chr_index], ':', 
+				$data_table_ref->[$i][$start_index], '..', 
+				$data_table_ref->[$i][$stop_index], "!";
+			push @{ $data_table_ref->[$i] }, '.';
 			next;
 		}
  		
  		# get the scores for the region
 		# pass to internal subroutine to combine dataset values
  		push @{ $data_table_ref->[$i] }, _get_segment_score(
-					$region, 
-					$region_strand, # no strand
+					$regions[0], 
+					$data_table_ref->[$i][$strand_index] || 0, # region strand
 					$arg_ref->{'dataset'},
 					$value_type,
 					$arg_ref->{'method'}, 
