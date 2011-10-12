@@ -411,14 +411,16 @@ sub get_dataset_list {
 	# get sources to skip
 		# usually these are features from an official genome authority
 	my %source2skip;
-	foreach ($TIM_CONFIG->param($db_name . '.source_exclude') ) {
-		# database specific source exclusions
-		$source2skip{$_} = 1;
-	}
-	unless (keys %source2skip) {
-		# no database specific exclusions, we'll read default then
-		foreach ($TIM_CONFIG->param('default_db.source_exclude') ) {
+	unless ($use_all_features) {
+		foreach ($TIM_CONFIG->param($db_name . '.source_exclude') ) {
+			# database specific source exclusions
 			$source2skip{$_} = 1;
+		}
+		unless (keys %source2skip) {
+			# no database specific exclusions, we'll read default then
+			foreach ($TIM_CONFIG->param('default_db.source_exclude') ) {
+				$source2skip{$_} = 1;
+			}
 		}
 	}
 		
@@ -440,18 +442,11 @@ sub get_dataset_list {
 			my $source = $type->source;
 			
 			# add the type to the list
-			if ($use_all_features) {
-				# all types should be added to the list
+			# check and skip unwanted sources
+			unless (exists $source2skip{$source}) {
+				# keep if it's not on the unwanted list
 				$dataset{$i} = $type;
 				$i++;
-			}
-			else {
-				# check and skip unwanted sources
-				unless (exists $source2skip{$source}) {
-					# keep if it's not on the unwanted list
-					$dataset{$i} = $type;
-					$i++;
-				}
 			}
 		}
 	}
@@ -545,7 +540,9 @@ sub validate_dataset_list {
 	}
 	
 	# collect a list of available datasets
-	my %dataset_list = get_dataset_list($database);
+	my %dataset_list = get_dataset_list($database, 1);
+		# the 1 forces get_dataset_list to collect all feature types
+		# without filtering
 	return unless %dataset_list; # no need to continue if we don't have a list
 	
 	# transform dataset list hash into something more useable
@@ -2501,8 +2498,8 @@ sub get_genome_dataset {
 	# Open a db connection 
 	# determine whether we have just a database name or an opened object
 	my $db; # the database object to be used
+	my $db_ref = ref $arg_ref->{'db'};
 	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
 		if ($db_ref =~ /Bio::DB/) {
 			# a db object returns the name of the package
 			# this appears to be a bioperl db object
@@ -2521,6 +2518,7 @@ sub get_genome_dataset {
 		carp 'no database connected!';
 		return;
 	}
+	$db_ref = ref $db;
 		
 	# generate column name
 	my $column_name;
@@ -2573,19 +2571,27 @@ sub get_genome_dataset {
 		return;
 	}
 	
-	my $n = scalar @{$data_table_ref} - 1;
-	for my $i (1..$n) {
+	# Loop through the genomic regions
+	for (my $i = 1; $i < scalar @{$data_table_ref}; $i++) {
+		
 		
 		# define the region
 		my @regions = $db->segment( 
-					-seq_id  => $data_table_ref->[$i][$chr_index],
-					-start   => $data_table_ref->[$i][$start_index],
-					-end     => $data_table_ref->[$i][$stop_index],
+					$data_table_ref->[$i][$chr_index],     # seq_id name
+					$data_table_ref->[$i][$start_index],   # start
+					$data_table_ref->[$i][$stop_index],    # end
 		);
+			# it's possible to return more than one region, either because
+			# the chromosomes are duplicated in the database source GFF3 
+			# files, or there are genes or features with names identical to 
+			# the chromosome name - for example there are genes in the 
+			# UCSC xenoRefGene collection named CHR11. ARGH!!!!!
+			# the first one is usually the right one, though, assuming 
+			# the chromosomes were loaded first in the database
 		
 		# print warning if necessary
 		if (scalar @regions > 1) { 
-			carp " multiple regions found for ", 
+			carp " found ", scalar(@regions), " regions found for ", 
 				$data_table_ref->[$i][$chr_index], ':', 
 				$data_table_ref->[$i][$start_index], '..', 
 				$data_table_ref->[$i][$stop_index],
@@ -2595,12 +2601,14 @@ sub get_genome_dataset {
 			carp " no regions found for ", 
 				$data_table_ref->[$i][$chr_index], ':', 
 				$data_table_ref->[$i][$start_index], '..', 
-				$data_table_ref->[$i][$stop_index], "!";
+				$data_table_ref->[$i][$stop_index], "!\n";
+			
+			# write a null value in the data table
 			push @{ $data_table_ref->[$i] }, '.';
 			next;
 		}
  		
- 		# get the scores for the region
+		# get the scores for the region
 		# pass to internal subroutine to combine dataset values
  		push @{ $data_table_ref->[$i] }, _get_segment_score(
 					$regions[0], 
@@ -2611,7 +2619,7 @@ sub get_genome_dataset {
 					$stranded, 
 					$log,
 		);
-
+		
 	}
 	
 	# Finish
@@ -3182,10 +3190,10 @@ sub get_region_dataset_hash {
 		
 		# get the overlapping features of the same type
 		my @overlap_features = $region->features(-type => $type);
-		if (scalar @overlap_features >= 2) {
-			# there are more than one feature of the same type in this 
+		if (@overlap_features) {
+			# there are one or more feature of the same type in this 
 			# region
-			# one is undoubtedly the one we're working with
+			# one of them is likely the one we're working with
 			# the others are not what we want and therefore need to be 
 			# avoided
 			foreach my $feat (@overlap_features) {
@@ -3396,7 +3404,6 @@ sub _get_segment_score {
 	
 	# define
 	my %pos2data; # hash of positions to scores
-	my $region_score; # the score for the genomic segment
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
@@ -3503,7 +3510,16 @@ sub _get_segment_score {
 		# Check that we have collected datapoints
 		unless (@datapoints) {
 			# nothing found, return empty handed
-			return %pos2data;
+			if ($method eq 'index') {
+				return %pos2data;
+			}
+			elsif ($method eq 'sum' or $method eq 'count') {
+				return 0;
+			}
+			else {
+				# internal null value
+				return '.';
+			}
 		}
 		
 		# Check whether we're dealing with wig data or database data
@@ -3608,6 +3624,7 @@ sub _get_segment_score {
 				# Check which data to take based on strand
 				if (
 					$strandedness eq 'all' # all data is requested
+					or $region_strand == 0 # region is unstranded
 					or $datapoint->strand == 0 # unstranded data
 					or ( 
 						# sense data
