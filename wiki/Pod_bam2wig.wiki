@@ -14,8 +14,8 @@ bam2wig.pl `[`--options...`]` <**filename>
   --out <filename> 
   --position [start|mid|span]
   --coverage
+  --splice|split
   --pe
-  --splice
   --shift <integer>
   --strand [f|r]
   --qual <integer>
@@ -58,16 +58,19 @@ __
   Calculate the coverage of the alignments over the genome at single  base pair resolution. This ignores the position, quality, strand, shift,  and log options. It uses faster low level interfaces to the Bam file to  eke out performance. It is equivalent to specifying --position=span,  --inter, minimum quality of 0, no strand, no rpm, and no log.
 __
   __
+__--splice
+
+__
+__--split
+
+__
+  The Bam file alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag. This only works with single-end alignments.  Paired-end spliced alignments are currently treated as single-end  spliced alignments.
+__
+  __
 __--pe
 
 __
   The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be considered. The default is to  treat all alignments as single-end.
-__
-  __
-__--splice
-
-__
-  The Bam file alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag.
 __
   __
 __--shift <**integer>
@@ -94,7 +97,7 @@ __
 __--fix
 
 __
-  Specify whether or not to record interpolating positions of 0. If  true, a fixedStep wig file (step=1 span=1) is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  The default behavior is to not record empty positions.
+  Specify whether or not to record interpolating positions with count of 0.  If true, a fixedStep wig file (step=1 span=1) is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  The default behavior is to not record empty positions.
 __
   __
 __--rpm

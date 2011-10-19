@@ -2,55 +2,128 @@
 #labels ManPage
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
-==NAME ucsc_refseq2gff3.pl==
+==NAME ucsc_table2gff3.pl==
 {{{
 }}}
 {{{
 }}}
 ==SYNOPSIS==
 {{{
-   ucsc_table2gff3.pl [--options] --table <file>
+   ucsc_table2gff3.pl --ftp <text> --db <text>
+   }}}
+{{{
+   ucsc_table2gff3.pl [--options] --table <filename>
   }}}
 {{{
   Options:
+  --ftp [refgene|ensgene|xenorefgene|known|all]
+  --db <text>
+  --host <text>
   --table <filename>
   --status <filename>
   --sum <filename>
+  --kgxref <filename>
+  --chromo <filename>
   --source <text>
-  --out <filename>
+  --(no)chr
+  --(no)gene
+  --(no)cds
+  --(no)utr
+  --(no)codon
+  --(no)gz
   --help
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
 
+__--ftp `[`refgene|ensgene|xenorefgene|known|all`]`
+
+__
+  Request that the current indicated tables and supporting files be  downloaded from UCSC via FTP. Four different tables may be downloaded,  including refGene, ensGene, xenoRefGene mRNA gene prediction tables, and  the UCSC known gene table (if available). Specify all to download all  four tables.
+__
+  __
+__--db <**text>
+
+__
+  Specify the genome version database from which to download the requested  table files. See <[http://genome.ucsc.edu/FAQ/FAQreleases.html]> for a  current list of available UCSC genomes. Examples included hg19, mm9, and  danRer7.
+__
+  __
+__--host <**text>
+
+__
+  Optionally provide the host FTP address for downloading the current  gene table files. The default is 'hgdownload.cse.ucsc.edu'.
+__
+  __
 __--table <**filename>
 
 __
-  Provide the name of a UCSC gene table. It may be obtained preferably through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have specific columns, including txStart, txEnd, cdsStart, cdsEnd, exonStarts, exonEnds, and others. The conversion may fail if certain columns are not found. The !RefSeq** and ensGene tables should work great. The file may be gzipped.
+  Provide the name of a UCSC gene or gene prediction table. Tables known  to work include the refGene, ensGene, xenoRefGene, and UCSC knownGene  tables. The file may be gzipped. When converting multiple tables, use  this option repeatedly for each table.
 __
   __
 __--status <**filename>
 
 __
-  Optionally provide the name of the !RefSeq** Status file. It may be obtained through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have 3 columns, including 'mrnaAcc', 'status', and 'mol'. It will only really work with !RefSeq** tables. The file may be gzipped.
+  Optionally provide the name of the refSeqStatus table file. This file  provides additional information for the refSeq-based gene prediction  tables, including refGene, xenoRefGene, and knownGene tables. The  file may be gzipped.
 __
   __
 __--sum <**filename>
 
 __
-  Optionally provide the name of the !RefSeq** Summary file. It may be obtained through the UCSC Genome Table Browser, or downloaded from their FTP site. The file should have 3 columns, including 'mrnaAcc', 'completeness', and 'summary'. It will only really work with !RefSeq** tables. The file may be gzipped.
+  Optionally provide the name of the refSeqSummary file. This file  provides additional information for the refSeq-based gene prediction  tables, including refGene, xenoRefGene, and knownGene tables. The  file may be gzipped.
+__
+  __
+__--kgxref <**filename>
+
+__
+  Optionally provide the name of the kgXref file. This file  provides additional information for the UCSC knownGene gene table. The file may be gzipped.
+__
+  __
+__--chromo <**filename>
+
+__
+  Optionally provide the name of the chromInfo text file. Chromosome  and/or scaffold features will then be written at the beginning of the  output GFF file (when processing a single table) or written as a  separate file (when processing multiple tables). The file may be gzipped.
 __
   __
 __--source <**text>
 
 __
-  Optionally provide the text to be used as the GFF source. The default is  'UCSC'.
+  Optionally provide the text to be used as the GFF source. The default is  automatically derived from the source table file name, if recognized, or  'UCSC' if not recognized.
 __
   __
-__--out <**filename>
+__--(no)chr
 
 __
-  Optionally specify a new filename. By default it uses the basename of the  table file.
+  When downloading the current gene tables from UCSC using the --ftp  option, indicate whether (or not) to include the chromInfo table.  The default is true.
+__
+  __
+__--(no)gene
+
+__
+  Specify whether (or not) to assemble mRNA transcripts into genes. This  will create the canonical gene->mRNA->(exon,CDS) heirarchical structure.  Otherwise, mRNA transcripts are kept independent. The gene names, when  available, are always associated with transcripts through the Alias tag.  The default is true.
+__
+  __
+__--no(cds)
+
+__
+  Specify whether (or not) to include CDS features in the output GFF file.  The default is true.
+__
+  __
+__--(no)utr
+
+__
+  Specify whether (or not) to include three_prime_utr and five_prime_utr  features in the transcript heirarchy. If not defined, the GFF interpreter  must infer the UTRs from the CDS and exon features. The default is true.
+__
+  __
+__--(no)codon
+
+__
+  Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is false.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether the output file should be compressed with gzip.
 __
   __
 __--help
@@ -60,14 +133,14 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a UCSC gene table file into a GFF3 format file  suitable for loading into GBrowse. Unlike other simple converters out there,  it will attempt to build complex gene structures with gene, transcripts,  UTRs, and exons. It will attempt to identify non-coding genes as to type  using the gene name as inference. For !RefSeq** tables, it can also use  additional data tables to identify the feature type, gene status, and include gene descriptions.
+This program will convert a UCSC gene or gene prediction table file into a GFF3 format file. It will build canonical gene->transcript->`[`exon, CDS, UTR`]` heirarchical structures. It will attempt to identify non-coding genes as to type using the gene name as inference. Various additional informational attributes may also be included with the gene and transcript features, which are derived from supporting table files.
 
-Files should preferentially be downloaded through the UCSC table browser, if  at all possible, for two good reasons. One, the table browser includes  column headings, allowing for accurate identification of the columns and  verification of the right file. Two, the genes are ordered, or at least  grouped by chromosome, which is not the case with files downloaded from the  FTP site.
+Four table files are supported. Gene prediction tables, including refGene,  xenoRefGene, and ensGene, are supported. The UCSC knownGene gene table, if  available, is also supported. Supporting tables include refSeqStatus,  refSeqSummary, and kgXref.
 
-The program works best with the refGene (!RefSeq** Genes) and ensGene  (Ensembl Genes) tables. Other tables may work, if the appropriate columns  can be identified in the column headings, but your results may vary and  are not guaranteed. UCSC outputs so many different types of tables from  their database that accurate conversions are tricky at best.
+The latest table files may be automatically downloaded using FTP from  UCSC or other host. Since these files are periodically updated, this may  be the best option. Alternatively, individual files may be specified  through command line options. Files may be obtained manually through FTP,  HTTP, or the UCSC Table Browser.
 
-{{{
-}}}
+If provided, chromosome and/or scaffold features may also be written to a  GFF file. If only one table is being converted, then the chromosome features  are prepended to the GFF file; otherwise, a separate chromosome GFF file is  written.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
