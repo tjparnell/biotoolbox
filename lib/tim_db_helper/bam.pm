@@ -283,12 +283,21 @@ sub open_bam_db {
 	my $path = shift;
 	
 	# open the database connection 
-	my $db = Bio::DB::Sam->new(
-			-bam         => $path,
-			-autoindex   => 1,
-	) or carp " can't open Bam database!\n";
+	my $db;
+	eval {
+		$db = Bio::DB::Sam->new(
+				-bam         => $path,
+				-autoindex   => 1,
+		);
+	};
 	
-	return $db;
+	if ($db) {
+		return $db;
+	}
+	else {
+		carp " ERROR: can't open BAM file '$path'!\n";
+		return;
+	}
 }
 
 
