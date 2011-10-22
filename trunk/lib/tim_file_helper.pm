@@ -437,7 +437,7 @@ sub open_tim_data_file {
 				
 				# set the feature type
 				unless (defined $inputdata->{'feature'}) {
-					$inputdata->{'feature'} = 'genome';
+					$inputdata->{'feature'} = 'region';
 				}
 				
 				# end this loop
@@ -629,7 +629,7 @@ sub open_tim_data_file {
 				
 				# set the feature type
 				unless (defined $inputdata->{'feature'}) {
-					$inputdata->{'feature'} = 'genome';
+					$inputdata->{'feature'} = 'region';
 				}
 				
 				# set headers flag to false
@@ -673,6 +673,11 @@ sub open_tim_data_file {
 				
 				# set headers flag to false
 				$inputdata->{'headers'} = 0;
+				
+				# set the feature type
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'region';
+				}
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -1662,6 +1667,9 @@ sub convert_genome_data_2_gff_data {
 	# set the gff metadata to write a gff file
 	$input_data_ref->{'gff'} = $gff_version;
 	
+	# reset feature
+	$input_data_ref->{'feature'} = 'region';
+	
 	# set headers to false
 	$input_data_ref->{'headers'} = 0;
 	
@@ -2224,9 +2232,8 @@ sub write_summary_data {
 	
 	
 	# Prepare array to store the summed data
-	my $summed_feature = $datahash_ref->{'feature'} . '_averaged_windows';
 	my $summed_data = generate_tim_data_structure(
-		$summed_feature, 
+		'averaged_windows', 
 		qw(
 			Window
 			Midpoint

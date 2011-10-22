@@ -136,9 +136,6 @@ split_by_tags.pl
 split_data_file.pl
 	Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
 	
-ucsc_chrom2gff3.pl
-	Convert the UCSC chromosome information (chomInfo) file into a GFF3 file. This file is necessary for loading into a Bio::SeqFeature::Store database. 
-
 ucsc_cytoband2gff3.pl
 	A simple script to conver the UCSC cytobands file into a GFF3 file that can be used by the ideogram glyph of GBrowse. Useful with human genome databases where cytobands are annotated.
 	
@@ -222,7 +219,6 @@ Lists of programs organized by function.
 
 ===Genome annotation===
 	* get_ensembl_annotation.pl
-	* ucsc_chrom2gff3.pl
 	* ucsc_cytoband2gff3.pl
 	* ucsc_table2gff3.pl
 

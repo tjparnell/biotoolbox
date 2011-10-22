@@ -1,5 +1,11 @@
 ######## biotoolbox revision history #############
 
+v1.5.3 (svn r205)
+	- Fixed bug in script bam2wig.pl that prevented spliced alignments from being properly checked and recorded. 
+	- Fixed numerous bugs in script ucsc_table2gff3.pl, including a bug where the gene start coordinate may not be updated from interbase to base, and not accurately converting the CDS phase
+	- Added new features to the script ucsc_table2gff3.pl, including automatic table retrieval through FTP from UCSC to greatly simplify conversion, adding support for knownGene and xenoRefGene tables, customizing the type of features to output, properly handling features with duplicate names by creating unique IDs, and optionally including chromosome information in the output GFF3 file
+	- Deleted the now redundant script ucsc_chrom2gff3.pl
+
 v1.5.2 (svn r200)
 	- Updated several scripts and libraries to fix bugs in handling GFF version numbers and pragmas.
 	- Added unique IDs to the gff3 output from bam2gff_bed.pl

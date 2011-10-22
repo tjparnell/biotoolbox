@@ -179,22 +179,27 @@ database configuration.
 This module will open a connection to the Bioperl SeqFeature Store 
 database. It returns an object that represents the connection. The database 
 may either be a relational database (e.g. MySQL database), a SQLite 
-database file (file.sqlite), or a GFF3 file (file.gff) that can be loaded 
-into an in-memory database.
+database file (file.sqlite), a GFF3 file (file.gff) that can be loaded 
+into an in-memory database, a Bam file (.bam), a bigWig file (file.bw), a 
+bigBed file (file.bb), or a directory of bigWig files (a BigWigSet database).
+Bam, bigWig, and bigBed files may be either local or remote (FTP or HTTP).
 
-Pass the name of a relational database, the path to a SQLite database file, 
-or the path to a GFF3 file. The GFF3 may be compressed. 
+Parameters for connecting to a relational database are stored in a 
+configuration file, C<biotoolbox.cfg>. These include database adaptors, 
+user name, password, etc. Information regarding the configuration file may 
+be found within the file itself. 
 
-Parameters for connecting to the database are stored in a configuration 
-file, C<biotoolbox.cfg>. These include database adaptors, user name, 
-password, etc. Information regarding the configuration file may be found 
-within the file itself. 
+Pass the name of a relational database or the path of the database file to 
+the subroutine. The opened database object is returned. If it fails, then 
+an error message should be generated and nothing is returned.
 
 Example:
 
 	my $db_name = 'cerevisiae';
 	my $db = open_db_connection($db_name);
-
+	
+	my $file = 'file.bam';
+	my $db = open_db_connection($file);
 
 
 =cut
@@ -206,78 +211,147 @@ sub open_db_connection {
 		return;
 	}
 	
-	my $db;
 	# determine type of database to connect to
+	my $db;
+	my $error;
 	
-	# a single gff3 file that we can load into memory
-	if ($database =~ /\.gff3?(?:\.gz)?$/i and -e $database) {
-		# open gff3 file using a memory adaptor
-		print " Loading file into memory database...\n";
-		$db = Bio::DB::SeqFeature::Store->new(
-			-adaptor => 'memory',
-			-gff     => $database,
-		);
+	# check if it is a local file
+	if (-e $database) {
+		
+		# check that it is readable
+		unless (-r _) {
+			carp " file '$database' is not readable!\n";
+			return;
+		}
+		
+		# a single gff3 file that we can load into memory
+		if ($database =~ /\.gff3?(?:\.gz)?$/i) {
+			# open gff3 file using a memory adaptor
+			print " Loading file into memory database...\n";
+			eval {
+				$db = Bio::DB::SeqFeature::Store->new(
+					-adaptor => 'memory',
+					-gff     => $database,
+				);
+			};
+			unless ($db) {
+				$error = " ERROR: could not load file '$database' into memory!\n";
+			}
+		}
+		
+		# a SQLite database
+		elsif ($database =~ /\.(?:sqlite|db)$/i) {
+			# open using SQLite adaptor
+			$db = Bio::DB::SeqFeature::Store->new(
+				-adaptor  => 'DBI::SQLite',
+				-dsn      => $database,
+			);
+		}
+		
+		# a Bam database
+		elsif ($database =~ /\.bam$/i) {
+			# open using BigWig adaptor
+			if ($BAM_OK) {
+				$db = open_bam_db($database);
+			}
+			else {
+				$error = " Bam database cannot be loaded because\n" . 
+					" Bio::DB::Sam is not installed\n";
+			}
+		}
+		
+		# a BigBed database
+		elsif ($database =~ /\.bb$/i) {
+			# open using BigBed adaptor
+			if ($BIGBED_OK) {
+				$db = open_bigbed_db($database);
+			}
+			else {
+				$error = " BigBed database cannot be loaded because\n" . 
+					" Bio::DB::BigBed is not installed\n";
+			}
+		}
+		
+		# a BigWig database
+		elsif ($database =~ /\.bw$/i) {
+			# open using BigWig adaptor
+			if ($BIGWIG_OK) {
+				$db = open_bigwig_db($database);
+			}
+			else {
+				$error = " BigWig database cannot be loaded because\n" . 
+					" Bio::DB::BigWig is not installed\n";
+			}
+		}
+		
+		# a directory, presumably of bigwig files
+		elsif (-d $database) {
+			# open using BigWigSet adaptor
+			if ($BIGWIG_OK) {
+				$db = open_bigwigset_db($database);
+			}
+			else {
+				$error = " Presumed BigWigSet database cannot be loaded because\n" . 
+					" Bio::DB::BigWigSet is not installed\n";
+			}
+		}
 	}
 	
-	# a SQLite database
-	elsif ($database =~ /\.sqlite$/i and -e $database) {
-		# open using SQLite adaptor
-		$db = Bio::DB::SeqFeature::Store->new(
-			-adaptor  => 'DBI::SQLite',
-			-dsn      => $database,
-		);
+	# a remote file
+	elsif ($database =~ /^http|ftp/i) {
+		
+		# a remote Bam database
+		if ($database =~ /\.bam$/i) {
+			# open using BigWig adaptor
+			if ($BAM_OK) {
+				$db = open_bam_db($database);
+			}
+			else {
+				$error = " Bam database cannot be loaded because\n" . 
+					" Bio::DB::Sam is not installed\n";
+			}
+		}
+		
+		# a remote BigBed database
+		elsif ($database =~ /\.bb$/i) {
+			# open using BigBed adaptor
+			if ($BIGBED_OK) {
+				$db = open_bigbed_db($database);
+			}
+			else {
+				$error = " BigBed database cannot be loaded because\n" . 
+					" Bio::DB::BigBed is not installed\n";
+			}
+		}
+		
+		# a remote BigWig database
+		elsif ($database =~ /\.bw$/i) {
+			# open using BigWig adaptor
+			if ($BIGWIG_OK) {
+				$db = open_bigwig_db($database);
+			}
+			else {
+				$error = " BigWig database cannot be loaded because\n" . 
+					" Bio::DB::BigWig is not installed\n";
+			}
+		}
+		
+		# a remote directory, presumably of bigwig files
+		elsif (-d $database) {
+			# open using BigWigSet adaptor
+			if ($BIGWIG_OK) {
+				$db = open_bigwigset_db($database);
+			}
+			else {
+				$error = " Presumed BigWigSet database cannot be loaded because\n" . 
+					" Bio::DB::BigWigSet is not installed\n";
+			}
+		}
+	
 	}
 	
-	# a Bam database
-	elsif ($database =~ /\.bam$/i) {
-		# open using BigWig adaptor
-		if ($BAM_OK) {
-			$db = open_bam_db($database);
-		}
-		else {
-			carp " Bam database cannot be loaded because\n" . 
-				" Bio::DB::Sam is not installed\n";
-		}
-	}
-	
-	# a BigBed database
-	elsif ($database =~ /\.bb$/i) {
-		# open using BigBed adaptor
-		if ($BIGBED_OK) {
-			$db = open_bigbed_db($database);
-		}
-		else {
-			carp " BigBed database cannot be loaded because\n" . 
-				" Bio::DB::BigBed is not installed\n";
-		}
-	}
-	
-	# a BigWig database
-	elsif ($database =~ /\.bw$/i) {
-		# open using BigWig adaptor
-		if ($BIGWIG_OK) {
-			$db = open_bigwig_db($database);
-		}
-		else {
-			carp " BigWig database cannot be loaded because\n" . 
-				" Bio::DB::BigWig is not installed\n";
-		}
-	}
-	
-	# a directory, presumably of bigwig files
-	elsif (-e $database and -d $database) {
-		# open using BigWigSet adaptor
-		if ($BIGWIG_OK) {
-			$db = open_bigwigset_db($database);
-		}
-		else {
-			carp " Presumed BigWigSet database cannot be loaded because\n" . 
-				" Bio::DB::BigWigSet is not installed\n";
-		}
-	}
-	
-	# otherwise a name of a database
-	else {
+	# otherwise assume name of a database
+	unless ($db) {
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
 		# the db_default parameters
@@ -303,12 +377,18 @@ sub open_db_connection {
 		}
 		
 		# establish the database connection
-		$db = Bio::DB::SeqFeature::Store->new(
-			-adaptor => $adaptor,
-			-dsn     => $dsn,
-			-user    => $user,
-			-pass    => $pass,
-		);
+		eval {
+			$db = Bio::DB::SeqFeature::Store->new(
+				-adaptor => $adaptor,
+				-dsn     => $dsn,
+				-user    => $user,
+				-pass    => $pass,
+			);
+		};
+		
+		unless ($db) {
+			$error .= " ERROR: no $adaptor database of name $database was found!\n";
+		}
 	}
 	
 	# conditional return
@@ -316,7 +396,8 @@ sub open_db_connection {
 		return $db;
 	} 
 	else {
-		carp 'unable to establish a database connection!';
+		$error .= " unable to establish a database connection!\n";
+		carp $error;
 		return;
 	}
 }
@@ -590,18 +671,25 @@ sub validate_dataset_list {
 
 =item process_and_verify_dataset()
 
-This subroutine will process a dataset list if offered, or present a list 
-of possible datasets to be chosen by the user. It will verify that the 
+This subroutine will process a dataset list. It will verify that the 
 dataset exists, either in the presented database, or if a local file that 
 the file exists and is readable. For file-based datasets, it will prepend 
 the 'file:' prefix that is necessary for the get dataset or score 
 methods in tim_db_helper.
 
+If no dataset names are passed, then an interactive list will be 
+presented to the user for selection. The list will include features 
+present in the database for the user to select. One or more features 
+may be selected. If the single dataset option is set to true, then only 
+one feature is accepted. The user response is validated before 
+returning the list. 
+
 To use this subroutine, pass an anonymous array with the following keys 
 and values. Not every key is required.
 
   db       => The name of the database or a reference to an 
-              established BioPerl database object. 
+              established BioPerl database object. Typically, a 
+              Bio::DB::SeqFeature::Store database is used.
   dataset  => Pass either a single dataset name as a scalar or an 
               anonymous array reference of a list of dataset names. 
               These may have been provided as a command line option and 

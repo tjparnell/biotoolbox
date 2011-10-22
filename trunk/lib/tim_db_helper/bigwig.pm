@@ -331,11 +331,18 @@ sub open_bigwig_db {
 	my $path = shift;
 	
 	# open the database connection 
-	my $db = Bio::DB::BigWig->new(
-			-bigwig         => $path,
-	) or carp " can't open BigWig database!\n";
+	my $db;
+	eval {
+		$db = Bio::DB::BigWig->new( -bigwig => $path);
+	};
 	
-	return $db;
+	if ($db) {
+		return $db;
+	}
+	else {
+		carp " ERROR: can't open BigWig file '$path'!\n";
+		return;
+	}
 }
 
 
@@ -349,12 +356,21 @@ sub open_bigwigset_db {
 	# open the database connection 
 	# we're using the region feature type because that's what the rest of 
 	# tim_db_helper modules expect and work with
-	my $db = Bio::DB::BigWigSet->new(
-			-dir            => $directory,
-			-feature_type   => 'region',
-	) or carp " can't open BigWigSet database!\n";
+	my $db;
+	eval {
+		$db = Bio::DB::BigWigSet->new(
+				-dir            => $directory,
+				-feature_type   => 'region',
+		);
+	};
 	
-	return $db;
+	if ($db) {
+		return $db;
+	}
+	else {
+		carp " ERROR: can't open BigWigSet directory '$directory'!\n";
+		return;
+	}
 }
 
 

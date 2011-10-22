@@ -325,10 +325,16 @@ sub open_bigbed_db {
 	my $path = shift;
 	
 	# open the database connection 
-	my $db = Bio::DB::BigBed->new($path) or 
-		carp " can't open BigBed database!\n";
+	my $db;
+	eval { $db = Bio::DB::BigBed->new($path); };
 	
-	return $db;
+	if ($db) {
+		return $db;
+	}
+	else {
+		carp " ERROR: can't open BigBed file '$path'!\n";
+		return;
+	}
 }
 
 
