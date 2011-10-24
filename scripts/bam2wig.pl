@@ -254,7 +254,7 @@ my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
 	print " Calculating total number of aligned fragments....\n";
-	sum_total_alignments();
+	$total_read_number = sum_total_alignments($sam, $min_mapq, $paired);
 	print "   ", format_with_commas($total_read_number), " mapped fragments\n";
 }
 
@@ -700,60 +700,6 @@ sub convert_to_log {
 		foreach my $i (keys %data) {
 			next if $data{$i} == 0;
 			$data{$i} = log($data{$i}) / log(10);
-		}
-	}
-}
-
-
-### Determine total number of alignments
-sub sum_total_alignments {
-	# we need to determine the total number of mapped alignments
-	
-	# loop through the chromosomes
-	for my $tid (0 .. $sam->n_targets - 1) {
-		# each chromosome is internally represented in the bam file as 
-		# a numeric target identifier
-		# we can easily convert this to an actual sequence name
-		# we will force the conversion to go one chromosome at a time
-		
-		# sequence name
-		my $seq_id = $sam->target_name($tid);
-		
-		# process the reads according to single or paired-end
-		# paired end alignments
-		if ($paired) {
-			$sam->fetch($seq_id, 
-				sub {
-					my $a = shift;
-					
-					# check paired alignment
-					return if $a->unmapped;
-					return unless $a->proper_pair;
-					return if $a->qual < $min_mapq;
-					
-					# we're only counting forward reads of a pair 
-					return if $a->strand != 1; 
-					
-					# count this fragment
-					$total_read_number++;
-				}
-			);
-		}
-		
-		# single end alignments
-		else {
-			$sam->fetch($seq_id, 
-				sub {
-					my $a = shift;
-					
-					# check paired alignment
-					return if $a->unmapped;
-					return if $a->qual < $min_mapq;
-					
-					# count this fragment
-					$total_read_number++;
-				}
-			);
 		}
 	}
 }

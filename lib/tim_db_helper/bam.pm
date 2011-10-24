@@ -14,6 +14,7 @@ our @EXPORT = qw(
 	collect_bam_scores
 	collect_bam_position_scores
 	open_bam_db
+	sum_total_alignments
 );
 
 # Hashes of opened file objects
@@ -109,7 +110,7 @@ sub _collect_bam_data {
 	# usually there is only one, but there may be more than one
 	foreach my $feature (@bam_features) {
 	
-		## Get the name of the bigbed file
+		## Get the name of the bam file
 		my $bamfile;
 		
 		if ($feature =~ /^file:(.+)$/) {
@@ -302,6 +303,91 @@ sub open_bam_db {
 
 
 
+### Determine total number of alignments in a bam file
+sub sum_total_alignments {
+	
+	# Passed arguments;
+	my $sam_file = shift;
+	my $min_mapq = shift || 0; # by default we take all alignments
+	my $paired   = shift || 0; # by default we assume all alignments are single-end
+	unless ($sam_file) {
+		carp " no Bam file or bam db object passed!\n";
+		return;
+	}
+	
+	
+	# Open Bam file if necessary
+	my $sam;
+	my $sam_ref = ref $sam_file;
+	if ($sam_ref =~ /Bio::DB::Sam/) {
+		# we have an opened sam db object
+		$sam = $sam_file;
+	}
+	else {
+		# we have a name of a sam file
+		$sam = open_bam_db($sam_file);
+		return unless ($sam);
+	}
+	
+	# Count the number of alignments
+	my $total_read_number = 0;
+	
+	# loop through the chromosomes
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# each chromosome is internally represented in the bam file as 
+		# a numeric target identifier
+		# we can easily convert this to an actual sequence name
+		# we will force the conversion to go one chromosome at a time
+		
+		# sequence name
+		my $seq_id = $sam->target_name($tid);
+		
+		# process the reads according to single or paired-end
+		# paired end alignments
+		if ($paired) {
+			$sam->fetch($seq_id, 
+				sub {
+					my $a = shift;
+					
+					# check paired alignment
+					return if $a->unmapped;
+					return unless $a->proper_pair;
+					return if $a->qual < $min_mapq;
+					
+					# we're only counting forward reads of a pair 
+					return if $a->strand != 1; 
+					
+					# count this fragment
+					$total_read_number++;
+				}
+			);
+		}
+		
+		# single end alignments
+		else {
+			$sam->fetch($seq_id, 
+				sub {
+					my $a = shift;
+					
+					# check paired alignment
+					return if $a->unmapped;
+					return if $a->qual < $min_mapq;
+					
+					# count this fragment
+					$total_read_number++;
+				}
+			);
+		}
+	}
+	
+	# done
+	return $total_read_number;
+}
+
+
+
+
+
 __END__
 
 
@@ -438,6 +524,22 @@ position, a simple mean (for length data methods) or sum
 This subroutine will open a Bam database connection. Pass either the 
 local path to a Bam file (.bam extension) or the URL of a remote Bam 
 file. It will return the opened database object.
+
+=item sum_total_alignments()
+
+This subroutine will sum the total number of properly mapped alignments 
+in a bam file. Pass the subroutine one to three arguments. 
+    
+    1) The name of the Bam file which should be counted. Alternatively,  
+       an opened Bio::DB::Sam object may also be given. Required.
+    2) Optionally pass the minimum mapping quality of the reads to be 
+       counted. The default is 0, or all alignments are counted.
+    3) Optionally pass a boolean value (1 or 0) indicating whether 
+       the Bam file represents paired-end alignments. Only proper 
+       alignment pairs are counted. The default is to treat all 
+       alignments as single-end.
+       
+The subrouting will return the number of alignments.
 
 =back
 
