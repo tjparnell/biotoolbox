@@ -606,7 +606,7 @@ sub open_tim_data_file {
 					if ($column_count > 12) {
 						# why would there be extra columns in here!!??
 						
-						warn " BED file '$filename' has too many columns! Bad formatting?\n";
+						carp " BED file '$filename' has too many columns! Bad formatting?\n";
 						
 						# process anyway
 						for (my $i = 11; $i < $column_count; $i++) {
@@ -624,7 +624,8 @@ sub open_tim_data_file {
 				
 				# less than 3 columns!???
 				else {
-					die " BED file '$filename' doesn't have at least 3 columns!\n";
+					croak " BED file '$filename' doesn't have at least 3 columns!\n";
+					return;
 				}
 				
 				# set the feature type
@@ -956,6 +957,24 @@ sub write_tim_data_file {
 	
 	# generate the new filename
 	my $newname = $path . $name . $extension;
+	
+	
+	# Convert base to interbase coordinates if necessary
+	if ($extension =~ /\.bed/i and $datahash_ref->{'bed'} > 0) {
+		# we are writing a confirmed bed file 
+		if (
+			exists $datahash_ref->{1}{'base'} and 
+			$datahash_ref->{1}{'base'} == 1
+		) {
+			# the start coordinates are in base format
+			# need to convert back to interbase
+			for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
+				# subtract 1 to each start position
+				$datahash_ref->{'data_table'}->[$row][1] -= 1;
+			}
+			delete $datahash_ref->{1}{'base'};
+		}
+	}
 	
 	
 	# Write file based on the format
