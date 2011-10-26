@@ -540,6 +540,20 @@ sub paired_end_callback {
 		# it's a sacrifice
 	return if $a->qual < $min_mapq;
 	
+	# check strand
+	if ($forward or $reverse) {
+		# stranded data is wanted
+		# normally proper paired-end alignments are inherently not stranded
+		# but in the case of paired-end RNA-Seq, we do want strand
+		# The TopHat aligner records this information as a BAM record 
+		# attribute under the flag XS
+		my $strand = $a->get_tag_values('XS');
+		
+		# do nothing if strand is not what we want
+		return if ($forward and $strand eq '-');
+		return if ($reverse and $strand eq '+');
+	}
+	
 	# collect alignment data
 	my $start  = $a->start;
 	my $isize  = $a->isize; # insert size
