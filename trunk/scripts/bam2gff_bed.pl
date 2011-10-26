@@ -374,6 +374,14 @@ sub process_paired_end {
 		# rather trust the reported insert size listed in the original bam file
 	my $end = $start + $a->isize - 1;
 	
+	# identify strand if possible
+	# this is for paired-end RNA-Seq data aligned by TopHat, which records
+	# the original strand in a BAM record attribute under the flag XS
+	# this is either + or -
+	# the default value will be +, as the proper paired-end fragments 
+	# don't have inherent strand
+	my $strand = $a->get_tag_values('XS') || '+';
+	
 	# write out the feature
 	&{$write_feature}(
 		$seq,
@@ -381,7 +389,7 @@ sub process_paired_end {
 		$end,
 		$name,
 		$score, 
-		'+' # technically no strand, but treat it as forward strand
+		$strand
 	);
 }
 
