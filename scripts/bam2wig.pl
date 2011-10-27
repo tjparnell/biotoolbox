@@ -152,6 +152,14 @@ unless (defined $splice) {
 	$splice = 0;
 }
 
+if ($paired and $splice) {
+	# kind of redundant to have spliced reads with paired-end alignments
+	# plus this poses problems with the bam adaptor - getting substr errors
+	# in Bio::DB::Bam::AlignWrapper
+	warn " disabling splices with paired-end reads\n";
+	$splice = 0;
+}
+
 unless ($outfile) {
 	$outfile = $infile;
 	$outfile =~ s/\.bam$//;
@@ -822,7 +830,9 @@ Positions outside the chromosome length are not recorded.
 =item --strand [f|r]
 
 Only process those single-end alignments which map to the indicated 
-strand. Default is to take all alignments regardless of strand.
+strand. For paired-end RNA-Seq alignments that were generated with 
+TopHat, the XS attribute is honored for strand information. 
+The default is to take all alignments regardless of strand.
 
 =item --qual <integer>
 
@@ -912,7 +922,7 @@ the size of the chromosome, particularly for dense read coverage.
 The total number of alignments should not matter. 
 
 Counting and processing the alignments is a lengthy process, and may 
-require multiple hours for large numbers, especially for splices. A 
+require a long time for large numbers, especially for splices. A 
 simple coverage map should be much faster to calculate, but loses the 
 options of selecting strand or shifting coordinates.
 
