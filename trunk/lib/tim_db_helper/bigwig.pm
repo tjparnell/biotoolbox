@@ -329,6 +329,7 @@ sub wig_to_bigwig_conversion {
 sub open_bigwig_db {
 	
 	my $path = shift;
+	$path =~ s/^file://; # clean up file prefix if present
 	
 	# open the database connection 
 	my $db;

@@ -14,7 +14,7 @@ our @EXPORT = qw(
 	collect_bam_scores
 	collect_bam_position_scores
 	open_bam_db
-	sum_total_alignments
+	sum_total_bam_alignments
 );
 
 # Hashes of opened file objects
@@ -282,6 +282,7 @@ sub _collect_bam_data {
 sub open_bam_db {
 	
 	my $path = shift;
+	$path =~ s/^file://; # clean up file prefix if present
 	
 	# open the database connection 
 	my $db;
@@ -304,7 +305,7 @@ sub open_bam_db {
 
 
 ### Determine total number of alignments in a bam file
-sub sum_total_alignments {
+sub sum_total_bam_alignments {
 	
 	# Passed arguments;
 	my $sam_file = shift;
@@ -525,7 +526,7 @@ This subroutine will open a Bam database connection. Pass either the
 local path to a Bam file (.bam extension) or the URL of a remote Bam 
 file. It will return the opened database object.
 
-=item sum_total_alignments()
+=item sum_total_bam_alignments()
 
 This subroutine will sum the total number of properly mapped alignments 
 in a bam file. Pass the subroutine one to three arguments. 

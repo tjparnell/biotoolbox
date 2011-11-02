@@ -262,7 +262,7 @@ my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
 	print " Calculating total number of aligned fragments....\n";
-	$total_read_number = sum_total_alignments($sam, $min_mapq, $paired);
+	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired);
 	print "   ", format_with_commas($total_read_number), " mapped fragments\n";
 }
 

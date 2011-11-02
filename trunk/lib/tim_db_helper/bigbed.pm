@@ -323,6 +323,7 @@ sub bed_to_bigbed_conversion {
 sub open_bigbed_db {
 	
 	my $path = shift;
+	$path =~ s/^file://; # clean up file prefix if present
 	
 	# open the database connection 
 	my $db;
@@ -337,6 +338,44 @@ sub open_bigbed_db {
 	}
 }
 
+
+
+### Sum the total number of features in the bigBed file
+sub sum_total_bigbed_features {
+	
+	# Passed arguments;
+	my $bb_file = shift;
+	unless ($bb_file) {
+		carp " no BigBed file or BigBed db object passed!\n";
+		return;
+	}
+	
+	
+	# Open BigBed file if necessary
+	my $bed;
+	my $bb_ref = ref $bb_file;
+	if ($bb_ref =~ /Bio::DB::BigBed/) {
+		# we have an opened bigbed db object
+		$bed = $bb_file;
+	}
+	else {
+		# we have a name of a sam file
+		$bed = open_bigbed_db($bb_file);
+		return unless ($bed);
+	}
+	
+	# Count the number of alignments
+	my $total_read_number = 0;
+	
+	# loop through the chromosomes
+	my @chroms = $bed->features(-type => 'bin');
+	for my $c (@chroms) {
+		# continually sum the number of bed features for each chromosome
+		$total_read_number += $c->score->{validCount};
+	}
+	
+	return $total_read_number;
+}
 
 
 
@@ -520,6 +559,17 @@ Example
 This subroutine will open a BigBed database connection. Pass either the 
 local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
 file. It will return the opened database object.
+
+=item sum_total_bigbed_features()
+
+This subroutine will sum the total number of bed features present in a 
+BigBed file. This may be useful, for example, in calculating fragments 
+(reads) per million mapped values when the bigbed file represents 
+sequence alignments.
+
+Pass either the name of a bigBed file (.bb), either local or remote, or an 
+opened BigBed database object. A scalar value of the total number of features 
+is returned.
 
 =back
 

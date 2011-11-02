@@ -66,8 +66,9 @@ unless ($@) {
 }; 
 $@ = undef;
 
-
+# define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
+our %total_read_number; # for rpm calculations
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -465,10 +466,6 @@ sub get_dataset_list {
 				# this should be relatively well documented through DBI
 				# but could break in the future since it's not official API
 		}
-		elsif ($db_ref eq 'Bio::DB::BigWigSet') {
-			# a BigWigSet database
-			$db = $database;
-		}
 		elsif ($db_ref =~ /^Bio::DB/) {
 			# some other unsupported database
 			$db = $database;
@@ -778,14 +775,25 @@ sub process_and_verify_dataset {
 			elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
 				# presume we have a local bigfile or aligment file
 				
-				# what if we have merged datasets????????? tough toenails?????
-				
-				if (-e $dataset) {
-					# file exists
-					push @good_datasets, "file:$dataset";
+				# user may have requested two or more files to be merged
+				# these should be combined with an ampersand
+				# check each one 
+				my @files;
+				foreach my $file (split /\&/, $dataset) {
+					if (-e $file) {
+						# file exists
+						push @files, "file:$file";
+					}
+					else {
+						# file doesn't exist! can't use this set of files
+						@files = ();
+						last;
+					}
+				}
+				if (@files) {
+					push @good_datasets, join("&", @files);
 				}
 				else {
-					# file doesn't exist!
 					push @bad_datasets, $dataset;
 				}
 			}
@@ -2742,7 +2750,7 @@ arguments. The keys include
               protocol (ftp: or http:).
   method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              sum, mean, median, range, stddev, min, and max. 
+              sum, mean, median, range, stddev, min, max, and rpm. 
               See _get_segment_score() documentation for more info.
   chromo   => The name of the chromosome (reference sequence)
   start    => The start position of the region on the chromosome
@@ -3449,6 +3457,8 @@ must be defined and presented in this order. These values include
          range (returns difference between max and min)
          stddev (returns the standard deviation of a population)
          indexed (returns hash of postion => score)
+         rpm (returns reads per million mapped, only valid with 
+              bam and bigbed databases)
          
   [5] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
@@ -3492,6 +3502,7 @@ sub _get_segment_score {
 	
 	# define
 	my %pos2data; # hash of positions to scores
+	my $dataset_type; # remember what type of database the data is from
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
@@ -3517,6 +3528,7 @@ sub _get_segment_score {
 					$strandedness, 
 					@datasetlist
 				);
+				$dataset_type = 'bw';
 			}
 			else {
 				croak " BigWig support is not enabled! " . 
@@ -3539,6 +3551,7 @@ sub _get_segment_score {
 					$value_type, 
 					@datasetlist
 				);
+				$dataset_type = 'bb';
 			}
 			else {
 				croak " BigBed support is not enabled! " . 
@@ -3561,6 +3574,7 @@ sub _get_segment_score {
 					$value_type, 
 					@datasetlist
 				);
+				$dataset_type = 'bam';
 			}
 			else {
 				croak " Bam support is not enabled! " . 
@@ -3626,6 +3640,7 @@ sub _get_segment_score {
 					$strandedness, 
 					@datapoints
 				);
+				$dataset_type = 'wig';
 			}
 			else {
 				croak " Wiggle support is not enabled! " . 
@@ -3648,6 +3663,7 @@ sub _get_segment_score {
 					$strandedness, 
 					@datapoints
 				);
+				$dataset_type = 'bw';
 			}
 			else {
 				croak " BigWig support is not enabled! " . 
@@ -3671,6 +3687,7 @@ sub _get_segment_score {
 					$value_type,
 					@datapoints
 				);
+				$dataset_type = 'bb';
 			}
 			else {
 				croak " BigBed support is not enabled! " . 
@@ -3693,6 +3710,7 @@ sub _get_segment_score {
 					$value_type,
 					@datapoints
 				);
+				$dataset_type = 'bam';
 			}
 			else {
 				croak " Bam support is not enabled! " . 
@@ -3768,6 +3786,8 @@ sub _get_segment_score {
 				}
 			}
 			
+			
+			$dataset_type = 'db';
 			
 		} # end database feature score collection
 	
@@ -3849,6 +3869,43 @@ sub _get_segment_score {
 		elsif ($method eq 'sum') {
 			# sum the number of values
 			$region_score = sum(@scores);
+		}
+		elsif ($method eq 'rpm') {
+			# convert to reads per million mapped
+			# this is only supported by bam and bigbed db, checked above
+			if ($dataset_type eq 'bam') {
+				# a bam database
+				
+				# total the number of reads if necessary
+				unless (exists $total_read_number{$dataset} ) {
+					$total_read_number{$dataset} = 
+						sum_total_bam_alignments($dataset);
+				}
+				
+				# calculate the rpm
+				$region_score = 
+					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
+			}
+			
+			elsif ($dataset_type eq 'bb') {
+				# a bigbed database
+				
+				# total the number of reads if necessary
+				unless (exists $total_read_number{$dataset} ) {
+					$total_read_number{$dataset} = 
+						sum_total_bigbed_features($dataset);
+				}
+				
+				# calculate the rpm
+				$region_score = 
+					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
+			}
+			
+			else {
+				# this dataset doesn't support rpm methods
+				# use the sum method instead
+				$region_score = sum(@scores);
+			}
 		}
 		else {
 			# somehow bad method snuck past our checks
