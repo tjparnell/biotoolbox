@@ -15,6 +15,7 @@ our @EXPORT = qw(
 	collect_bigbed_position_scores
 	bed_to_bigbed_conversion
 	open_bigbed_db
+	sum_total_bigbed_features
 );
 
 # Hashes of opened file objects
