@@ -371,14 +371,14 @@ sub go_determine_cutoff {
 	
 	# select chromosome randomly
 	my $n = rand (scalar @chromosomes);
-	while ($chromosomes[$n]->name =~ /chrm|chrmt|chrmt|NA/i) {
+	while ($chromosomes[$n]->display_name =~ /chrm|chrmt|chrmt|NA/i) {
 		# avoid that mitochrondrial chromosome like the plague!
 		$n = rand (scalar @chromosomes);
 	}
 	
 	# collect statistics on the chromosome
 	print " Sampling '$dataset_name' values across chromosome '" . 
-		$chromosomes[$n]->name . "'...\n";
+		$chromosomes[$n]->display_name . "'...\n";
 	my $mean = get_chromo_region_score( {
 		'db'           => $db,
 		'dataset'      => $dataset,
