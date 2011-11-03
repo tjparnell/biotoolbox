@@ -254,18 +254,34 @@ sub _collect_bam_data {
 			}
 			
 			# process the alignments
+				# want to avoid those whose midpoint are not technically 
+				# within the region of interest
 			if ($method eq 'count') {
 				foreach my $a (@alignments) {
 					# enumerate at the alignment's midpoint
 					my $position = int( ( ($a->start + $a->end) / 2) + 0.5);
-					$bam_data{$position} += 1;
+					
+					# check that the midpoint is within the requested region
+					if (
+						$position >= $region->start and 
+						$position <= $region->end
+					) {
+						$bam_data{$position} += 1;
+					}
 				}
 			}
 			elsif ($method eq 'length') {
 				foreach my $a (@alignments) {
 					# record length at the alignment's midpoint
 					my $position = int( ( ($a->start + $a->end) / 2) + 0.5);
-					push @{ $bam_data{$position} }, ($a->end - $a->start + 1);
+					
+					# check that the midpoint is within the requested region
+					if (
+						$position >= $region->start and 
+						$position <= $region->end
+					) {
+						push @{ $bam_data{$position} }, $a->length;
+					}
 				}
 			}
 		
