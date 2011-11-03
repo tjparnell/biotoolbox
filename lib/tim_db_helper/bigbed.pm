@@ -369,10 +369,20 @@ sub sum_total_bigbed_features {
 	my $total_read_number = 0;
 	
 	# loop through the chromosomes
-	my @chroms = $bed->features(-type => 'bin');
-	for my $c (@chroms) {
-		# continually sum the number of bed features for each chromosome
-		$total_read_number += $c->score->{validCount};
+	my @chroms = $bed->seq_ids;
+	foreach my $chrom (@chroms) {
+		
+		# use an iterator to speed things up
+		my $iterator = $bed->features(
+			-seq_id    => $chrom,
+			-iterator  => 1,
+		);
+		
+		# count the number of bed features we go through
+		while (my $f = $iterator->next_seq) {
+			# we don't actually do anything with them
+			$total_read_number++;
+		}
 	}
 	
 	return $total_read_number;

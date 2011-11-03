@@ -3882,6 +3882,7 @@ sub _get_segment_score {
 				unless (exists $total_read_number{$dataset} ) {
 					$total_read_number{$dataset} = 
 						sum_total_bam_alignments($dataset);
+					print "\n [total alignments $total_read_number{$dataset}]\n";
 				}
 				
 				# calculate the rpm
@@ -3896,6 +3897,7 @@ sub _get_segment_score {
 				unless (exists $total_read_number{$dataset} ) {
 					$total_read_number{$dataset} = 
 						sum_total_bigbed_features($dataset);
+					print "\n [total features $total_read_number{$dataset}]\n";
 				}
 				
 				# calculate the rpm
