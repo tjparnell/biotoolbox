@@ -713,10 +713,21 @@ sub process_and_verify_dataset {
 	my $arg_ref = shift; # the passed argument values as a hash reference
 	
 	# Check for single option
-	my $single = 0;
-	if (exists $arg_ref->{'single'} and $arg_ref->{'single'}) {
-		$single = 1;
+	my $single = $arg_ref->{'single'} || 0;
+	
+	# Collect the datasets
+	my @datasets;
+	if (exists $arg_ref->{'dataset'} and defined $arg_ref->{'dataset'}) {
+		
+		# check if it's an anonymous array of datasets
+		if (ref $arg_ref->{'dataset'} eq 'ARRAY') {
+			@datasets = @{ $arg_ref->{'dataset'} };
+		}
+		else {
+			push @datasets, $arg_ref->{'dataset'};
+		}
 	}
+	
 	
 	# Check database
 	my $db; # the database object to be used
@@ -736,32 +747,23 @@ sub process_and_verify_dataset {
 	my @bad_datasets;
 	
 	# Check provided datasets
-	if (exists $arg_ref->{'dataset'} and defined $arg_ref->{'dataset'}) {
-		
-		my @list;
-		# check if it's an anonymous array of datasets
-		if (ref $arg_ref->{'dataset'} eq 'ARRAY') {
-			@list = @{ $arg_ref->{'dataset'} };
-		}
-		else {
-			push @list, $arg_ref->{'dataset'};
-		}
+	if (@datasets) {
 		
 		# check for multiple comma-delimited datasets
-		my @datasets;
-		foreach my $item (@list) {
+		my @list_to_check;
+		foreach my $item (@datasets) {
 			if ($item =~ /,/) {
 				# this one has a comma, therefore it has more than dataset
-				push @datasets, split(/,/, $item);
+				push @list_to_check, split(/,/, $item);
 			}
 			else {
 				# a singleton
-				push @datasets, $item;
+				push @list_to_check, $item;
 			}
 		}
 		
 		# now verify the datasets
-		foreach my $dataset (@datasets) {
+		foreach my $dataset (@list_to_check) {
 			
 			# check for a remote file
 			if ($dataset =~ /^(?: http | ftp) .+ \. (?: bam | bw | bb) $/xi) {
