@@ -40,6 +40,7 @@ my (
 	$min, 
 	$max, 
 	$x_index,
+	$dcolor,
 	$log,
 	$directory,
 	$help, 
@@ -52,6 +53,7 @@ GetOptions(
 	'min=f'   => \$min, # mininum y axis coordinate
 	'max=f'   => \$max, # maximum y axis coordinate
 	'x=i'     => \$x_index, # index of the X-axis values
+	'color=s' => \$dcolor, # data colors
 	'log!'    => \$log, # values are in log, respect log status
 	'dir=s'   => \$directory, # optional name of the graph directory
 	'help'    => \$help, # flag to print help
@@ -127,6 +129,13 @@ unless ($directory) {
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
+}
+
+
+# check colors
+my @colors;
+if (defined $dcolor) {
+	@colors = split /,/, $dcolor;
 }
 
 
@@ -389,6 +398,19 @@ sub graph_this {
 	$graph->set_x_axis_font(GD::gdSmallFont) or warn $graph->error;
 	$graph->set_y_axis_font(GD::gdSmallFont) or warn $graph->error;
 	
+	# Set the color if specified
+	if (@colors) {
+		if (scalar @colors >= scalar @datasets) {
+			# user must have set at least the number of colors that we 
+			# datasets
+			# we are not checking names, presume GD::Graph will do 
+			# that for us and complain as necessary
+			$graph->set( 'dclrs' => \@colors ) or warn $graph->error;
+		}
+		else {
+			warn " not enough colors provided! using default\n";
+		}
+	}
 	
 	# Set min max values on the graph if explicitly defined
 	if (defined $min) {
@@ -461,6 +483,7 @@ graph_profile.pl <filename>
    --min <number>
    --max <number>
    --x <integer>
+   --color <name,name,...>
    --dir <foldername>
    --help
 
@@ -510,6 +533,12 @@ values are automatically determined from the dataset.
 Specify the index of the X-axis dataset. Unless specified, the program 
 automatically uses the columns labeled 'Midpoint' or 'Window', if 
 present. 
+
+=item --color <name,name,...>
+
+Optionally specify the colors for the data lines. The default set 
+is lred, lgreen, lblue, lyellow, lpurple, cyan, and lorange. See the 
+documentation for L<GD::Graph::colour> for a complete list.
 
 =item --dir
 

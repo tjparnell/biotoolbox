@@ -283,7 +283,7 @@ if ($raw) {
 	open RAWFILE, ">$outfile\_raw.txt";
 }
 
-# Collect the nucleosome occupancy
+# Collect the relative data
 map_relative_data();
 
 # Close the raw file if it was opened
@@ -385,7 +385,7 @@ sub map_relative_data {
 	if ($set_strand) {
 		$strand_index = find_column_index($main_data_ref, 'strand');
 		unless (defined $strand_index) {
-			die 'unable to strand column in data table!';
+			die 'unable to find strand column in data table!';
 		}
 	}
 	
