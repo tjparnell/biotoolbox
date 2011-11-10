@@ -104,7 +104,7 @@ foreach my $infile (@ARGV) {
 		# Write the miscellaneous headers
 		foreach ( @{ $metadata_ref->{'other'} } ) {
 			# write remaining miscellaneous header lines if present
-			print {$out_fh} $_ . "\n";
+			print {$out_fh} $_;
 		}
 		
 		# Write the column metadata headers

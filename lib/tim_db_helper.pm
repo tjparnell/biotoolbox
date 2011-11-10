@@ -78,6 +78,7 @@ our @EXPORT_OK = qw(
 	get_dataset_list 
 	validate_dataset_list 
 	process_and_verify_dataset 
+	check_dataset_for_rpm_support 
 	get_new_feature_list 
 	get_new_genome_list 
 	validate_included_feature 
@@ -925,6 +926,175 @@ sub process_and_verify_dataset {
 
 
 
+### Process and verify a dataset
+
+=item check_dataset_for_rpm_support()
+
+This subroutine will check a dataset for RPM, or Reads Per Million mapped, 
+support. Only two types of database files support this, Bam files and 
+BigBed files. If the dataset is either one of these, or the name of a 
+database feature which points to one of these files, then it will 
+calculate the total number of mapped alignments (Bam file) or features 
+(BigBed file). It will return this total number. If the dataset does 
+not support RPM (because it is not a Bam or BigBed file, for example), 
+then it will return undefined.
+
+Pass this subroutine one or two values. The first is the name of the 
+dataset. Ideally it should be validated using process_and_verify_dataset() 
+and have an appropriate prefix (file, http, or ftp). If it does not 
+have a prefix, then it is assumed to be a database feature. The second 
+passed feature is the name of a BioPerl database or an opened database 
+object. This database will be checked for the indicated dataset, and 
+the first returned feature checked for an attribute pointing to a 
+supported file.
+
+=cut
+
+sub check_dataset_for_rpm_support {
+	
+	# get passed dataset and databases
+	my $dataset = shift;
+	my $database = shift;
+	
+	# check that we haven't done this already
+	
+	
+	# Check the dataset to see if supports RPM or RPKM method
+	# if so, then calculate the total number of reads
+	# this uses the global variable $rpkm_read_sum
+	my $rpm_read_sum;
+	
+	if (exists $total_read_number{$dataset}) {
+		# this dataset has already been summed
+		# no need to do it again
+		
+		$rpm_read_sum = $total_read_number{$dataset};
+	}
+	
+	elsif ($dataset =~ /\.bam$/) {
+		# a bam file dataset
+		
+		if ($BAM_OK) {
+			# tim_db_helper::bam was loaded ok
+			# sum the number of reads in the dataset
+			$rpm_read_sum = sum_total_bam_alignments($dataset);
+		}
+		else {
+			carp " Bam support is not available! " . 
+				"Is Bio::DB::Sam installed?\n";
+			return;
+		}
+	}
+	
+	elsif ($dataset =~ /\.bb$/) {
+		# a bigbed file dataset
+		
+		if ($BIGBED_OK) {
+			# tim_db_helper::bigbed was loaded ok
+			# sum the number of features in the dataset
+			$rpm_read_sum = sum_total_bigbed_features($dataset);
+		}
+		else {
+			carp " BigBed support is not available! " . 
+				"Is Bio::DB::BigBed installed?\n";
+			return;
+		}
+	}
+	
+	elsif ($dataset !~ /^file|ftp|http/i) {
+		# a database feature
+		# this feature might point to a bam or bigbed file
+		
+		# Check the database
+		my $db; # the database object to be used
+		if (defined $database) {
+			my $db_ref = ref $database;
+			if ($db_ref =~ /^Bio::DB/) {
+				$db = $database;
+			}
+			else {
+				# the name of a database was passed, create a database connection
+				$db = open_db_connection($database);
+				unless ($db) {
+					carp " No database to check feature '$dataset' for RPM support!\n";
+					return;
+				}
+			}
+		}
+		else {
+			carp " No database to check feature '$dataset' for RPM support!\n";
+			return;
+		}
+		
+		# get a sample of the features from the database
+		my @features;
+		if ($dataset =~ /&/) {
+			# in case we have a combined datasets
+			@features = $db->features(-type => [ split /&/, $dataset ]);
+		}
+		else {
+			@features = $db->features(-type => $dataset);
+		}
+		unless (@features) {
+			 # no feature found
+			 # basically nothing to do
+			 return;
+		}
+		
+		# look for the database file in the attributes
+		if ($features[0]->has_tag('bamfile')) {
+			# specifying a bam file
+			my ($bamfile) = $features[0]->get_tag_values('bamfile');
+			
+			if ($BAM_OK) {
+				# tim_db_helper::bam was loaded ok
+				# sum the number of reads in the dataset
+				$rpm_read_sum = sum_total_bam_alignments($bamfile);
+			}
+			else {
+				carp " Bam support is not available! " . 
+					"Is Bio::DB::Sam installed?\n";
+				return;
+			}
+		}
+		
+		elsif ($features[0]->has_tag('bigbedfile')) {
+			# specifying a bigbed file
+			my ($bedfile) = $features[0]->get_tag_values('bigbedfile');
+			
+			if ($BIGBED_OK) {
+				# tim_db_helper::bigbed was loaded ok
+				# sum the number of features in the dataset
+				$rpm_read_sum = sum_total_bigbed_features($bedfile);
+			}
+			else {
+				carp " BigBed support is not available! " . 
+					"Is Bio::DB::BigBed installed?\n";
+				return;
+			}
+		}
+		
+		else {
+			# can't find an appropriate dataset
+			# nothing to do
+			return;
+		}
+	}
+	
+	else {
+		# some other non-supported dataset
+		return;
+	}
+	
+	# return the sum value if we've made it this far
+	$total_read_number{$dataset} = $rpm_read_sum;
+	return $rpm_read_sum;
+}
+
+
+
+
+
 
 
 ################################################################################
@@ -1629,7 +1799,7 @@ arguments. The keys include
               which the "start" and "stop" positions are calculated.
               Three values are accepted: "5", which denotes the 
               5' end of the feature, "3" which denotes the 
-              3' end of the feature, or "1" which denotes the 
+              3' end of the feature, or "4" which denotes the 
               middle of the feature. This option is only used in 
               conjunction with "start" and "stop" options. The 
               default value is "5".
@@ -1859,7 +2029,7 @@ sub get_region_dataset_hash {
 					$feature->end - $start,
 			);
 		}
-		elsif ($relative_pos == 1) {
+		elsif ($relative_pos == 4) {
 			# feature can be on any strand
 			# set segment relative to the feature middle
 			
@@ -1926,7 +2096,7 @@ sub get_region_dataset_hash {
 		}
 		
 		# record the feature start and strand
-		$fstart = $start;
+		$fstart = $strand >= 0 ? $start : $stop;
 		$fstrand = $strand;
 	}
 	
