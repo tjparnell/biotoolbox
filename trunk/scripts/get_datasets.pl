@@ -25,6 +25,7 @@ use tim_data_helper qw(
 use tim_db_helper qw(
 	open_db_connection
 	process_and_verify_dataset
+	check_dataset_for_rpm_support
 	get_new_feature_list 
 	get_new_genome_list 
 	get_chromo_region_score
@@ -34,8 +35,6 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-eval {use tim_db_helper::bam};
-eval {use tim_db_helper::bigbed};
 
 
 print "\n A program to collect feature data from the database\n\n";
@@ -197,10 +196,12 @@ my $db = open_db_connection($database) or
 	die " unable to establish database connection to '$database'!\n";
 
 # Check the datasets
-@datasets = process_and_verify_dataset( {
-	'db'      => $db,
-	'dataset' => [ @datasets ],
-} );
+unless ($datasets[0] eq 'none') {
+	@datasets = process_and_verify_dataset( {
+		'db'      => $db,
+		'dataset' => [ @datasets ],
+	} );
+}
 
 # Identify the feature data indices
 my ($name_i, $type_i, $chromo_i, $start_i, $stop_i, $strand_i) = get_columns();
@@ -218,7 +219,7 @@ unless (@datasets) {
 	exit;
 }
 foreach my $dataset (@datasets) {
-	next if $dataset eq 'none';
+	last if $dataset eq 'none';
 	print " Collecting $value_type $method from dataset '$dataset'...";
 	collect_dataset($dataset);
 	printf " in %.1f minutes\n", (time - $start_time)/60;
@@ -560,10 +561,17 @@ sub collect_dataset {
 			# check if we're doing RPKM
 			if ($method =~ /^rpk?m$/) {
 				# check that we have an appropriate dataset
-				check_dataset_for_rpm_support($dataset);
+				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $db);
+				unless ($rpkm_read_sum) {
+					warn " $method method requested but not supported for " .
+						"dataset '$dataset'\n using summed count instead\n";
+					$method = 'sum'; 
+						# this could negatively impact any subsequent datasets
+				}
 			}
 			
 			get_subfeature_dataset($dataset, $index);
+			$rpkm_read_sum = 0; # reset for next dataset
 		}
 		
 		elsif (defined $extend) {
@@ -1457,105 +1465,6 @@ sub record_metadata {
 	return $new_index;
 }
 
-
-sub check_dataset_for_rpm_support {
-	
-	my $dataset = shift;
-	
-	# Check the dataset to see if supports RPM or RPKM method
-	# if so, then calculate the total number of reads
-	# this uses the global variable $rpkm_read_sum
-	
-	if ($dataset =~ /\.bam$/) {
-		# a bam file dataset
-		
-		if (exists &sum_total_bam_alignments) {
-			# tim_db_helper::bam was loaded ok
-			# sum the number of reads in the dataset
-			print "\n Summing the number of alignments for $method....\n";
-			$rpkm_read_sum = sum_total_bam_alignments($dataset);
-		}
-		else {
-			die " Bam support is not available! " . 
-				"Is Bio::DB::Sam installed?\n";
-		}
-	}
-	
-	elsif ($dataset =~ /\.bb$/) {
-		# a bigbed file dataset
-		
-		if (exists &sum_total_bigbed_features) {
-			# tim_db_helper::bigbed was loaded ok
-			# sum the number of features in the dataset
-			$rpkm_read_sum = sum_total_bigbed_features($dataset);
-		}
-		else {
-			die " BigBed support is not available! " . 
-				"Is Bio::DB::BigBed installed?\n";
-		}
-	}
-	
-	elsif ($dataset !~ /^file|ftp|http/i) {
-		# a database feature
-		# this feature might point to a bam or bigbed file
-		
-		# get a sample of the features from the database
-		my @features;
-		if ($dataset =~ /&/) {
-			# in case we have a combined datasets
-			@features = $db->features(-type => [ split /&/, $dataset ]);
-		}
-		else {
-			@features = $db->features(-type => $dataset);
-		}
-		unless (@features) {
-			die " unable to get feature $dataset from database!\n";
-		}
-		
-		# look for the database file in the attributes
-		if ($features[0]->has_tag('bamfile')) {
-			# specifying a bam file
-			my ($bamfile) = $feature->get_tag_values('bamfile');
-			
-			if (exists &sum_total_bam_alignments) {
-				# tim_db_helper::bam was loaded ok
-				# sum the number of reads in the dataset
-				print " Summing the number of alignments for $method....\n";
-				$rpkm_read_sum = sum_total_bam_alignments($bamfile);
-			}
-			else {
-				die " Bam support is not available! " . 
-					"Is Bio::DB::Sam installed?\n";
-			}
-		}
-		
-		elsif ($features[0]->has_tag('bigbedfile')) {
-			# specifying a bigbed file
-			my ($bedfile) = $feature->get_tag_values('bigbedfile');
-			
-			if (exists &sum_total_bigbed_features) {
-				# tim_db_helper::bigbed was loaded ok
-				# sum the number of features in the dataset
-				$rpkm_read_sum = sum_total_bigbed_features($bedfile);
-			}
-			else {
-				die " BigBed support is not available! " . 
-					"Is Bio::DB::BigBed installed?\n";
-			}
-		}
-		
-		else {
-			# can't find 
-			die " unable to find a supporting Bam or BigBed " .
-				"file with dataset '$dataset' for method $method!\n";
-		}
-	}
-	
-	else {
-		# some other non-supported dataset
-		die " The method $method is not supported by this dataset!\n";
-	}
-}
 
 
 

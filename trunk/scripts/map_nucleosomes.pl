@@ -353,7 +353,7 @@ sub map_nucleosomes {
 					'chromo'   => $chromo,
 					'start'    => $position,
 					'stop'     => $win_stop,
-					'method'   => 'score',
+					'value'    => 'score',
 			} );
 			if ($debug) {
 				print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
@@ -430,7 +430,7 @@ sub map_nucleosomes {
 						'chromo'   => $chromo,
 						'start'    => $position,
 						'stop'     => $win_stop,
-						'method'   => 'score',
+						'value'    => 'score',
 				} );
 				
 				# get all of the positions that correspond to that peak value
@@ -506,7 +506,7 @@ sub map_nucleosomes {
 					'chromo'   => $chromo,
 					'start'    => $peak_position - 50,
 					'stop'     => $peak_position + 50,
-					'method'   => 'score',
+					'value'    => 'score',
 				} );
 				my @nucleosome_positions;
 				for (my $i = -37; $i <= 37; $i++) {
