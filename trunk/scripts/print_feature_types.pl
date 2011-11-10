@@ -9,6 +9,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
 	open_db_connection
+	get_dataset_list
 );
 
 ### Quick help
@@ -55,25 +56,36 @@ unless ($dbname) {
 
 
 
-# Open database
-my $db = open_db_connection($dbname) or die " can't open db\n";
-
-# Get the database types
+# Initialize
 my $count = 0;
 my %source2type;
-foreach ($db->types) {
+
+# Get the features
+my %types = get_dataset_list($dbname, 'all');
+	# this returns a hash where key is a unique number and the value
+	# is the actual gff type
 	
-	# the type is essentially method:source
-	# get individual values
-	my $source = $_->source;
-	my $type = $_->method;
+foreach my $type (values %types) {
+	
+	# each type is usually comprised of primary_tag:source_tag
+	# although sometimes it is just the primary_tag
+	
+	# get individual tags
+	my ($primary, $source);
+	if ($type =~ /:/) {
+		($primary, $source) = split /:/, $type;
+	}
+	else {
+		$primary = $type;
+		$source  = 'NONE';
+	}
 	
 	# store the type in an array under the source
 	if (exists $source2type{$source}) {
-		push @{ $source2type{$source} }, $type;
+		push @{ $source2type{$source} }, $primary;
 	}
 	else {
-		$source2type{$source} = [ ($type) ];
+		$source2type{$source} = [ ($primary) ];
 	}
 	$count++;
 }

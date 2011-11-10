@@ -536,14 +536,35 @@ sub get_dataset_list {
 		
 		# since a BigWigSet database has very few types, and they are all
 		# data sources and not features, there is no need to filter the list
-		
+				
 		# collect
 		my %types;
 		foreach my $file (keys %{ $metadata }) {
+			# get the type for each file
+			my ($primary, $source, $type);
+			
+			# get the appropriate tags
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
-				if ($attribute =~ m/^primary_tag|type|method$/i) {
-					$types{ $metadata->{$file}{$attribute} } += 1;
+				if ($attribute =~ m/^primary_tag|method$/i) {
+					$primary = $metadata->{$file}{$attribute};
 				}
+				elsif ($attribute =~ m/^source/i) {
+					$source = $metadata->{$file}{$attribute};
+				}
+				elsif ($attribute =~ m/^type/i) {
+					$type = $metadata->{$file}{$attribute};
+				}
+			}
+				
+			# assemble the type
+			if ($primary and $source) {
+				$types{ "$primary:$source" } += 1;
+			}
+			elsif ($type) {
+				$types{ $type } += 1;
+			}
+			elsif ($primary) {
+				$types{ $primary } += 1;
 			}
 		}
 		
