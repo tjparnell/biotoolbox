@@ -165,7 +165,7 @@ sub process_gff_file_to_table {
 			}
 			
 			# process the features
-			if ($type eq 'gene') {
+			if ($type eq 'gene' or $type eq 'pseudogene') {
 				# a gene object, we will need to process it's transcript subfeatures
 				
 				# process the gene object
@@ -277,6 +277,8 @@ sub process_gene {
 	# we need to process the child subfeature transcripts
 	# these should be the first level subfeatures
 	# walk through each one
+	my $transcript_success = 0;
+	my $cds_count = 0;
 	foreach my $subfeat ($gene->get_SeqFeatures) {
 		
 		# check the type, and process accordingly
@@ -293,6 +295,8 @@ sub process_gene {
 			
 			# process the transcript
 			process_transcript($ucsc, $subfeat);
+			
+			$transcript_success++;
 		}
 		
 		elsif ($type =~ /rna/i) {
@@ -307,6 +311,8 @@ sub process_gene {
 			
 			# process the transcript
 			process_nc_transcript($ucsc, $subfeat);
+			
+			$transcript_success++;
 		}
 		
 		elsif ($type eq 'exon') {
@@ -319,13 +325,33 @@ sub process_gene {
 			next;
 		}
 		
+		elsif ($type eq 'CDS') {
+			# there is a CDS feature in this gene
+			# no RNA transcript defined
+			# presumed gene transcript is gene -> CDS
+			$cds_count++;
+		}
+		
 		else {
 			# catchall for unrecognized feature types
 			# record and warn at end
 			$unknowns{$type} += 1;
 			next;
 		}
+	}
+	
+	# check that we have made a RNA transcript
+	if (!$transcript_success and $cds_count) {
+		# if not, make a presumed transcript from any CDSs
 		
+		# initialize the gene table line structure
+		my $ucsc = initialize_transcript($gene);
+		
+		# identify a second name from the gene
+		collect_second_name($ucsc, $gene);
+		
+		# assume the gene is a transcript and process as such
+		process_transcript($ucsc, $gene);
 	}
 }
 
@@ -346,7 +372,7 @@ sub collect_second_name {
 		my @names = $feature->get_tag_values('Name');
 		$ucsc->{'name2'} = $names[0];
 	}
-	else {
+	elsif ($feature->has_tag('ID')) {
 		# Or at the very least the ID, it does have an ID, right?
 		my @IDs = $feature->get_tag_values('ID');
 		$ucsc->{'name2'} = $IDs[0];
@@ -458,6 +484,9 @@ sub process_nc_transcript {
 	# print the transcript
 	print_table_item($ucsc);
 }
+
+
+
 
 
 
@@ -808,20 +837,38 @@ sub collect_top_features {
 		
 		chomp $line;
 		
-		# check the gff version
+		# process comment and pragma lines
 		if ($line =~ /^##gff-version (\d)$/) {
+			# version pragma, check it
 			unless ($1 == 3) {
 				die " Input GFF file is not version 3!\n" ;
 			}
 			next;
 		}
+		elsif ($line =~ /^###/) {
+			# close features directive line, 
+			# all subfeatures have been loaded for this chromosome/scaffold
+			last;
+		}
+		elsif ($line =~ /^##FASTA$/) {
+			# FASTA pragma
+			# go no further
+			last;
+		}
+		elsif ($line =~ /^#/) {
+			# some other unrecognized pragma or a comment line
+			# skip
+			next;
+		}
+		elsif ($line =~ /^>/) {
+			# fasta header line, skip
+			next;
+		}
+		elsif ($line =~ /^[agctn]+$/i) {
+			# fasta sequence, skip
+			next;
+		}
 		
-		# skip comment lines
-		next if $line =~ /^# /; 
-		
-		# close features directive line, all subfeatures have been loaded for 
-		# this chromosome/scaffold
-		last if $line =~ /^###/;
 		
 		# generate the SeqFeature object for this GFF line
 		my $feature = Bio::SeqFeature::Generic->new();
@@ -829,13 +876,22 @@ sub collect_top_features {
 		$gff->from_gff_string($feature, $line);
 		
 		# process the feature
-		my ($id) = $feature->get_tag_values('ID');
-		if (exists $loaded{$id}) {
-			die " Feature ID '$id' occurs more than once in file!\n";
-		} 
-		else {
-			$loaded{$id} = $feature;
+		my $id; # get the tag
+		if ($feature->has_tag('ID')) {
+			# a proper feature has a ID
+			($id) = $feature->get_tag_values('ID');
+			
+			# this ID should be unique in the GFF file
+			# complain if it isn't
+			if (exists $loaded{$id}) {
+				die " Feature ID '$id' occurs more than once in file!\n";
+			} 
+			else {
+				$loaded{$id} = $feature;
+			}
 		}
+			# if the feature didn't have an ID, we'll just assume it is
+			# a child of another feature, otherwise it may get lost
 		
 		# look for parents and children
 		if ($feature->has_tag('Parent')) {
