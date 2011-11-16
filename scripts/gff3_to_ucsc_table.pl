@@ -377,6 +377,10 @@ sub collect_second_name {
 		my @IDs = $feature->get_tag_values('ID');
 		$ucsc->{'name2'} = $IDs[0];
 	}
+	else {
+		# when all else fails use the main name
+		$ucsc->{'name2'} = $ucsc->{'name'};
+	}
 }
 
 
@@ -448,6 +452,11 @@ sub process_nc_transcript {
 	$ucsc->{'cdsStart'} = $transcript->end; # no cds, so set to end
 	$ucsc->{'cdsEnd'}   = $transcript->end;
 	
+	# identify a second name from the transcript if necessary
+	unless (defined $ucsc->{'name2'}) {
+		collect_second_name($ucsc, $transcript);
+	}
+		
 	# Get the subfeatures of the transcript
 	# these should be non-coding exons
 	my @subfeatures = $transcript->get_SeqFeatures;
