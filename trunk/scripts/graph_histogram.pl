@@ -145,13 +145,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'};
 	if (
 		# check column header names for gene or window attribute information
-		$name =~ /name/i or 
-		$name =~ /class/i or
-		$name =~ /alias/i or
-		$name =~ /^chr/i or
-		$name =~ /start/i or
-		$name =~ /stop/i or 
-		$name =~ /type/i
+		$name =~ /^name|id|alias|chr|ref|start|stop|end|strand|type|class/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -165,12 +159,9 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 
 # determine the bins for the frequency distribution
 my @bins; # an array for the bins
-#print " the bins are:\n ";
 for (my $i = $start; $i <= $max; $i += $binsize) {
 	push @bins, $i;
-	#print "$i ";
 }
-#print "\n";
 
 # Prepare output directory
 unless ($directory) {
@@ -326,10 +317,11 @@ sub graph_one {
 		push @yvalue, $frequency{$_};
 		# print "   x $_ , y $frequency{$_}\n"; # print values to check
 	}
-	my @data = ( [@bins], [@yvalue] );
+	my $string = '%.' . $x_format . 'f';
+	my @xlabels = map { sprintf $string, $_ } @bins;
+	my @data = ( [@xlabels], [@yvalue] );
 	
 	# Now (finally) prepare the graph
-	pop @bins; # remove the maximum that we added
 	my $title = "Distribution of $out $name";
 	if ($lines) {
 		graph_this_as_lines($name, undef, $title, \@data);
@@ -384,10 +376,11 @@ sub graph_two {
 		push @yvalue2, $frequency{$_};
 	}
 	
-	my @data = ( \@bins, \@yvalue1, \@yvalue2 );
+	my $string = '%.' . $x_format . 'f';
+	my @xlabels = map { sprintf $string, $_ } @bins;
+	my @data = ( \@xlabels, \@yvalue1, \@yvalue2 );
 	
 	# Now (finally) prepare the graph
-	pop @bins; # remove the maximum that we added
 	my $title = "Distributions of $out $name1 & $name2";
 	if ($lines) {
 		graph_this_as_lines($name1, $name2, $title, \@data);
