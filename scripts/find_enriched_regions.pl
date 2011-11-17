@@ -144,7 +144,7 @@ unless (defined $log) {
 
 # set trimming default
 unless (defined $trim) {
-	$trim = 1;
+	$trim = 0;
 }
 
 
@@ -616,10 +616,15 @@ sub go_trim_windows {
 			'chromo'   => $window->[0],
 			'start'    => $start,
 			'stop'     => $stop,
+			'absolute' => 1,
 		} );
 		unless (%pos2score) {
 			# we should be able to! this region has to have scores!
 			die " unable to generate value hash for window $window->[0]:$start..$stop!\n";
+		}
+		if ($debug) {
+			print " window $start..$stop scores at ", 
+				join(",", sort {$a <=> $b} keys %pos2score), "\n";
 		}
 		
 		# de-log if necessary
@@ -1162,7 +1167,7 @@ are merged, there may be some data points on the ends of the
 windows whose scores don't actually pass the threshold, but were 
 included because the entire window mean (or median) exceeded 
 the threshold. This step removes those data points. The default 
-behavior is true.
+behavior is false (notrim).
 
 =item --(no)feat
 

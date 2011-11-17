@@ -1782,6 +1782,13 @@ may be returned, or the lengths of the found dataset features. When
 lengths are used, the midpoint position of the feature is used in the
 returned hash rather than the start position.
 
+The returned hash is keyed by relative coordinates and their scores. For 
+example, requesting a region from -200 to +200 of a feature (using the 
+start and stop options, below) will return a hash whose keys are relative 
+to the feature start position, i.e. the keys will >= -200 and <= 200. 
+Absolute coordinates relative to the reference sequence or chromosome 
+may be optionally returned instead.
+
 The subroutine is passed a reference to an anonymous hash containing the 
 arguments. The keys include
 
@@ -1841,6 +1848,9 @@ arguments. The keys include
               and type was provided. Any positioned scores which 
               overlap the other feature(s) are not returned. The 
               default is false (return all values).
+  absolute => Boolean value to indicate that absolute coordinates 
+              should be returned, instead of transforming to 
+              relative coordinates, which is the default.
           	  
 The subroutine will return the hash if successful.
 
@@ -2200,23 +2210,29 @@ sub get_region_dataset_hash {
 		# relative positions
 		# most downstream applications of this function expect this, and it's
 		# a little easier to work with. Just a little bit, though....
-	my %relative_datahash;
-	if ($fstrand >= 0) {
-		# forward strand
-		foreach my $position (keys %datahash) {
-			$relative_datahash{ $position - $fstart } = $datahash{$position};
-		}
+	if (exists $arg_ref->{'absolute'} and $arg_ref->{'absolute'}) {
+		# do not convert to relative positions
+		return %datahash;
 	}
-	elsif ($fstrand < 0) {
-		# reverse strand
-		foreach my $position (keys %datahash) {
-			$relative_datahash{ $fstart - $position } = $datahash{$position};
+	else {
+		my %relative_datahash;
+		if ($fstrand >= 0) {
+			# forward strand
+			foreach my $position (keys %datahash) {
+				$relative_datahash{ $position - $fstart } = $datahash{$position};
+			}
 		}
+		elsif ($fstrand < 0) {
+			# reverse strand
+			foreach my $position (keys %datahash) {
+				$relative_datahash{ $fstart - $position } = $datahash{$position};
+			}
+		}
+		
+		# return the collected dataset hash
+		return %relative_datahash;
 	}
-
 	
-	# return the collected dataset hash
-	return %relative_datahash;
 }
 
 
