@@ -545,12 +545,12 @@ sub process_gr_files {
 		
 		# first identify the chromosome
 		# this is encoded in the gr file as the first element of the file name
-		my $chr = $file;
-		$chr =~ s/\.gr$//; # strip extension
-		$chr =~ s/_[\+\-]_//; # strip any strand indicator that may be present
-		# anything remaining should the chromosomes
-		unless ($chr) {
-			warn " unable to identify chromosome name for '$file'!\n" . 
+		my $chr;
+		if ($file =~ /^( (?:chr)? [\d a-z A-Z \-]+ )/x) {
+			$chr = $1;
+		}
+		else {
+			warn " unable to identify chromosome by regex in file name for '$file'!\n" . 
 				" nothing written!\n";
 			next;
 		}
