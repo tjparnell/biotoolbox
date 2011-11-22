@@ -41,11 +41,12 @@ my (
 	$infile, 
 	$outfile,
 	$paired_end,
-	$type, 
-	$source,
 	$gff,
 	$bed,
 	$bigbed,
+	$type, 
+	$source,
+	$random_strand,
 	$bb_app_path,
 	$gz,
 	$help, 
@@ -56,9 +57,10 @@ GetOptions(
 	'pe'         => \$paired_end, # bam is paired end reads
 	'gff'        => \$gff, # output a GFF v.3 file
 	'bed'        => \$bed, # ouput a BED file
+	'bigbed|bb'  => \$bigbed, # generate a binary bigbed file
 	'type=s'     => \$type, # the GFF type or method
 	'source=s'   => \$source, # GFF source field
-	'bigbed|bb'  => \$bigbed, # generate a binary bigbed file
+	'randstr'    => \$random_strand, # assign strand randomly
 	'bbapp=s'    => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'        => \$gz, # gzip the output file
 	'help'       => \$help, # request help
@@ -90,11 +92,14 @@ unless ($infile =~ /\.bam$/) {
 }
 
 # output type
-if ($gff and $bed) {
+if (($gff and $bed) or ($gff and $bigbed)) {
 	die " Can not, must not, specify both GFF and BED simultaneously!\n";
 }
-unless ($gff or $bed) {
+unless ($gff or $bed or $bigbed) {
 	print " Generating default BED formatted file\n";
+	$bed = 1;
+}
+if ($bigbed) {
 	$bed = 1;
 }
 
@@ -140,9 +145,9 @@ unless ($outfile) {
 
 # default is no compression
 unless (defined $gz) {
-	$gz = 0;
+	$gz = 1;
 }
-if ($bed and $bigbed and $gz) {
+if ($bigbed and $gz) {
 	# enforce no compression if wanting to write bigbed file
 	warn " compression not allowed when converting to BigBed format\n";
 	$gz = 0; 
@@ -190,7 +195,7 @@ if ($gff) {
 	$out->print("# Program $0\n");
 	$out->print("# Converted from source file $infile\n");
 }
-else {
+elsif ($bed and !$bigbed) {
 	# bed file
 	$out->print("# Program $0\n");
 	$out->print("# Converted from source file $infile\n");
@@ -371,16 +376,28 @@ sub process_paired_end {
 	
 	# calculate end
 		# I occasionally get errors if I call mate_end method
-		# rather trust the reported insert size listed in the original bam file
+		# just use the reported insert size listed in the original bam file
 	my $end = $start + $a->isize - 1;
 	
 	# identify strand if possible
-	# this is for paired-end RNA-Seq data aligned by TopHat, which records
-	# the original strand in a BAM record attribute under the flag XS
-	# this is either + or -
-	# the default value will be +, as the proper paired-end fragments 
-	# don't have inherent strand
-	my $strand = $a->get_tag_values('XS') || '+';
+	my $strand;
+	if ($random_strand) {
+		if ( rand(1) > 0.5 ) {
+			$strand = '+';
+		}
+		else {
+			$strand = '-';
+		}
+	}
+	else {
+		# this is for paired-end RNA-Seq data aligned by TopHat, which records
+		# the original strand in a BAM record attribute under the flag XS
+		# this is either + or -
+		
+		# the default value will be +, as the proper paired-end fragments 
+		# don't have inherent strand
+		$strand = $a->get_tag_values('XS') || '+';
+	}
 	
 	# write out the feature
 	&{$write_feature}(
@@ -507,12 +524,12 @@ bam2gff_bed.pl [--options...] <filename>
   
   Options:
   --in <filename>
-  --bed | --gff
+  --bed | --gff | --bigbed | --bb
   --pe
   --type <text>
   --source <text>
+  --randstr
   --out <filename> 
-  --bigbed | --bb
   --bbapp </path/to/bedToBigBed>
   --(no)gz
   --help
@@ -528,10 +545,19 @@ The command line flags and descriptions:
 Specify the file name of a .bam alignment file. The file should be indexed. 
 If not, the program will attempt to automatically index it.
 
-=item --bed | --gff
+=item --bed
+
+=item --gff
+
+=item --bigbed
+
+=item --bb
 
 Specify the output file format. Either a BED file (6-columns) or GFF v.3 
-file will be written. The default behavior is to write a BED file.
+file will be written. You can also specify a bigBed format (bigbed or bb), 
+where a BED text file will first be generated and then automatically 
+converted to a compressed, binary BigBed file. The default behavior is to 
+write a BED file.
 
 =item --pe
 
@@ -547,20 +573,16 @@ input file base name, appended with either '_reads' or '_paired_reads'.
 
 For GFF output files, specify the source tag. The default is 'Illumina'.
 
+=item --randstr
+
+For paired-end Bam files, specify that the strand of the alignment be 
+randomly assigned to either the forward or reverse strand.
+
 =item --out
 
 Specify the output file name. The default for GFF output files is to use 
 the GFF type; for BED output files the input file base name is used. A 
 '.bed' extension is added if necessary.
-
-=item --bigbed
-
-=item --bb
-
-When generating a BED formatted output file, optionally indicate that 
-a binary BigBed file should be generated instead of a text BED file. 
-A .bed file is first generated, then converted to a .bb file, and then 
-the .bed file is removed.
 
 =item --bbapp </path/to/bedToBigBed>
 
@@ -592,6 +614,12 @@ alignments, the genomic coordinates of the entire insert fragment is recorded.
 
 The mapping quality score is recorded as the GFF or BED score. For paired-end 
 alignments, only the left score is recorded for efficiency.
+
+The strand information is retained from the original alignment, except for 
+proper paired-end alignments. For paired-end alignments, the TopHat-specific 
+attribute XS is searched, and, if found, is used for the strand. Otherwise, 
+all features default to the forward strand. An option is available to 
+randomly assign a strand to paired-end features.
 
 For BED files, coordinates are adjusted to interbase format, according to 
 the specification.
