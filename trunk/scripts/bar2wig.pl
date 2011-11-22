@@ -379,11 +379,6 @@ if ($bigwig and exists &wig_to_bigwig_conversion) {
 		$bw_app_path = `which wigToBigWig` || undef;
 	}
 			
-	# determine reference sequence type
-	my $ref_seq_type = 
-		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
-		$TIM_CONFIG->param('default_db.reference_sequence_type');
-	
 	# perform the conversion
 	foreach my $wigfile (@wigfiles) {
 		
@@ -391,7 +386,6 @@ if ($bigwig and exists &wig_to_bigwig_conversion) {
 		my $bw_file = wig_to_bigwig_conversion( {
 				'wig'       => $wigfile,
 				'db'        => $db,
-				'seq_type'  => $ref_seq_type,
 				'chromo'    => $chromo_file,
 				'bwapppath' => $bw_app_path,
 		} );

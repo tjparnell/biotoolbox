@@ -256,7 +256,7 @@ sub bed_to_bigbed_conversion {
 		# need to generate one from the database
 		print " generating chromosome file....\n";
 		
-		# check that we have tim_db_helper loaded
+		# check that we a specified database
 		my $db = $argument_ref->{'db'} || undef;
 		unless ($db) {
 			carp " database or chromosome file not specified! " . 
@@ -264,26 +264,21 @@ sub bed_to_bigbed_conversion {
 			return;
 		};
 		
-		# determine reference sequence type
-		my $ref_seq_type = $argument_ref->{'seq_type'} || 'chromosome';
-			# the annotation gff may have the reference sequences labeled
-			# as various types, such as chromosome, sequence, 
-			# contig, scaffold, etc
-			# this is set in the configuration file
-			# this could pose problems if more than one is present
-		
 		# generate chromosome lengths file
-		my @chromos = $db->features(-type => $ref_seq_type);
+		my @chromos = $db->seq_ids;
 		unless (@chromos) {
-			die " no '$ref_seq_type' features identified in database!\n";
+			carp " no chromosome sequences identified in database!\n";
+			return;
 		}
 		open CHR_FILE, ">tim_helper_chr_lengths.txt";
-		foreach (@chromos) {
-			print CHR_FILE $_->name, "\t", $_->length, "\n";
+		foreach my $chr (@chromos) {
+			my $segment = $db->segment($chr);
+			print CHR_FILE "$chr\t", $segment->length, "\n";
 		}
 		close CHR_FILE;
 		$chromo_file = "tim_helper_chr_lengths.txt";
 	}
+	
 	
 	# generate the bw file name
 	my $bb_file = $bedfile;
@@ -538,12 +533,6 @@ Pass the function an anonymous hash of arguments, including the following:
   db          => Provide an opened database object from which to generate 
                  the chromosome sizes information.
   Optional: 
-  seq_type    => The GFF type of the reference sequence in the database. 
-                 This is typically "chromosome", but could also be 
-                 "sequence", "scaffold", "contig", etc. The default 
-                 value is "chromosome". This value may be provided by 
-                 checking the entry in biotoolbox.cfg configuration 
-                 file.
   chromo      => The name of the chromosome sizes text file, described 
                  above, as an alternative to providing the database name.
   bbapppath   => Provide the full path to Jim Kent's bedToBigBed  
