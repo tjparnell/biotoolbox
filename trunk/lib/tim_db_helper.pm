@@ -1150,9 +1150,6 @@ arguments. The keys include
               _features_to_classes(). Refer to that documentation for 
               a list of appropriate features.
   Optional: 
-  mito     => A boolean value (1 or 0) indicating whether features
-              from the mitochrondrial genome should be included.
-              The default value is false.
   dubious  => A boolean value (1 or 0) indicating whether genes 
               flagged in the database as 'dubious' should be 
               included. The default is false (not kept).
@@ -1166,7 +1163,6 @@ Example
 	my %data = get_new_feature_list( {
 		'db'        => $db_name,
 		'features'  => 'genes',
-		'mito'      => 0,
 		'dubious'   => 0,
 	} );
 
@@ -1228,9 +1224,6 @@ sub get_new_feature_list {
 		return;
 	}
 	
-	# Check for including mitochondrial genes
-	my $mito = $arg_ref->{'mito'} || 0; 
-	
 	# Generate data structures
 	my $new_data = generate_tim_data_structure(
 		$arg_ref->{'features'},
@@ -1265,6 +1258,12 @@ sub get_new_feature_list {
 	print "   Found " . scalar @featurelist . " features in the database.\n";
 	
 	
+	# Get the names of chromosomes to avoid
+	my @excluded_chromosomes = 
+			$TIM_CONFIG->param("$db_name\.chromosome_exclude") ||
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
+	
+	
 	# Check for aliases
 	for (my $i = 0; $i < 50; $i++) {
 		# we're checking the first 50 or so features looking for an Alias tag
@@ -1291,10 +1290,11 @@ sub get_new_feature_list {
 	FEATURE_COLLECTION_LIST:
 	foreach my $feature (@featurelist) {
 		
-		# skip the mitochondrial genes
-		unless ($mito) { 
-			next FEATURE_COLLECTION_LIST if 
-				$feature->seq_id =~ /^chrm|chrmt|mt|mit/i;
+		# skip genes from excluded chromosomes
+		foreach (@excluded_chromosomes) {
+			if ($feature->seq_id eq $_) {
+				next FEATURE_COLLECTION_LIST;
+			}
 		}
 		
 		# skip anything that matches the tag exceptions
@@ -1372,9 +1372,6 @@ arguments. The keys include
   step     => A scalar value containing an integer representing the
               step size for advancing the window across the genome. 
               The default is the window size.
-  mito     => A boolean value (1 or 0) indicating whether features
-              from the mitochrondrial genome should be included.
-              The default value is false.
 
 The subroutine will return a reference to the data hash. It will print 
 status messages to STDOUT. 
@@ -1388,7 +1385,6 @@ Example
 		'db'        => $db_name,
 		'win'       => $window_size,
 		'step'      => $step_size,
-		'mito'      => 1,
 	} );
 
 
@@ -1503,20 +1499,26 @@ sub get_new_genome_list {
 	}
 	
 	
+	# Get the names of chromosomes to avoid
+	my @excluded_chromosomes = 
+			$TIM_CONFIG->param("$db_name\.chromosome_exclude") ||
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
+
+	
+	
 	# Collect the genomic windows
 	print "   Generating $win bp windows in $step bp increments\n";
 	foreach my $chr (@chromosomes) {
 		
-		# check for mitochondrial chromosome
-		if ($chr =~ /^chrm|chrmt|mt|mit/i) {
-			# the mitochondrial chromosome, invariably named chrM or chrMT
-			# or some such variant
-			
-			# skip if it was requested
-			if (exists $arg_ref->{'mito'} and $arg_ref->{'mito'} ) {
-				next;
+		# check for excluded chromosomes
+		my $skip = 0;
+		foreach (@excluded_chromosomes) {
+			if ($chr eq $_) {
+				$skip = 1;
+				last;
 			}
 		}
+		next if $skip;
 		
 		# generate a segment representing the chromosome
 		# this should default to the beginning and end of the chromosome
