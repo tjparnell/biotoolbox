@@ -442,24 +442,28 @@ sub go_find_enriched_regions {
 	
 	## collect chromosomes and data
 	# get list of chromosomes
-	my $seq_reference_type = 
-		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
-		$TIM_CONFIG->param('default_db.reference_sequence_type');
-	my @chromosomes = $db->features(-type => $seq_reference_type); 
+	my @chromosomes = $db->seq_ids; 
 	unless (@chromosomes) {
-		die " unable to identify reference sequences of type " . 
-			"'$seq_reference_type' in the database!\n";
+		die " unable to retrieve chromosomes from the database!\n";
 	}
+	# Get the names of chromosomes to avoid
+	my @excluded_chromosomes = 
+			$TIM_CONFIG->param("$database\.chromosome_exclude") ||
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
+	
 	
 	# walk through each chromosome
-	foreach my $chrobj (@chromosomes) {
+	foreach my $chr (@chromosomes) {
 		
-		# chromosome name
-		my $chr = $chrobj->display_name; 
-		
-		# skip mitochrondrial chromosome
-		if ($chr =~ /chrm|chrmt/i) {next};
-		
+		# check for excluded chromosomes
+		my $skip_chr = 0;
+		foreach (@excluded_chromosomes) {
+			if ($chr eq $_) {
+				$skip_chr = 1;
+				last;
+			}
+		}
+		next if $skip_chr;
 		
 		# START DEBUGGING # 
 		if ($debug) {
@@ -470,10 +474,13 @@ sub go_find_enriched_regions {
 		
 		# collect the dataset values for the current chromosome
 		# store in a hash the position (key) and values
-		print "  Searching $seq_reference_type $chr....\n";
+		print "  Searching $chr....\n";
+		
+		# chromosome object
+		my $chrobj = $db->segment($chr); 
 		
 		# walk windows along the chromosome and find enriched windows
-		my $length = $chrobj->stop; # length of the chromosome
+		my $length = $chrobj->length; # length of the chromosome
 		$chrom2length{$chr} = $length; # remember this length for later
 		for (my $start = 1; $start < $length; $start += $step) {
 			# define the window to look in

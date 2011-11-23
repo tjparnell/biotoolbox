@@ -139,9 +139,8 @@ my $out_fh = open_to_write_fh($new_output, $gz, 1) or
 
 
 ### Collect the windows
-unless ( collect_genomic_windows() ) {
-	die " bin generation failed!\n";
-}
+collect_genomic_windows();
+
 # finished
 $out_fh->close;
 
@@ -187,51 +186,32 @@ sub collect_genomic_windows {
 	# this is essentially copy and pasted from tim_db_helper::get_new_genome_list
 	
 	# Collect the chromosomes from the db
-		# sort the chromosomes
-		# this only works with numbered chromosomes, not Roman numerals
-		# additionally skip mitochrondiral chromosome named as chrm or chrmt
-		# we're using an elongated pseudo Schwartzian Transform
-	my @temp_chromos;
-	my $mitochr; # special placeholder for the mitochrondrial chromosome
-	my $ref_seq_type = 
-		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
-		$TIM_CONFIG->param('default_db.reference_sequence_type');
-			# the annotation gff may have the reference sequences labeled
-			# as various types, such as chromosome, sequence, 
-			# contig, scaffold, etc
-			# this is set in the configuration file
-			# this could pose problems if more than one is present
-	foreach ( $db->features(-type => $ref_seq_type) ) {
-		my $name = $_->display_name;
-		my $primary = $_->primary_id;
-			# this should be the database primary ID, used in the database 
-			# schema to identify features loaded from the initial GFF
-			# we're using this for sorting
-		if ($name =~ /^chrm|chrmt|mt|mit/i) {
-			# skip mitochondrial chromosome, invariably named chrM or chrMT
-			$mitochr = $_; # keep it for later in case we want it
-			next;
-		}
-		push @temp_chromos, [$primary, $_];
-	}
-	my @chromosomes = map $_->[1], sort { $a->[0] <=> $b->[0] } @temp_chromos;
-		# the chromosomes should now be in the same order as they occured
-		# in the original annotation GFF file
-	if ($keep_mito and $mitochr) {
-		# push mitochrondrial chromosome at the end of the list if requested
-		push @chromosomes, $mitochr;
-	}
+	my @chromosomes = $db->seq_ids; 
 	unless (@chromosomes) {
-		warn " no '$ref_seq_type' features found! Please check the reference\n" .
-			" sequence type in the configuration file and database\n";
-		return;
+		die " unable to retrieve chromosomes from the database!\n";
 	}
+	
+	# Get the names of chromosomes to avoid
+	my @excluded_chromosomes = 
+			$TIM_CONFIG->param("$database\.chromosome_exclude") ||
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
 	
 	# Collect the genomic windows
 	print "   Generating $win bp windows in $step bp increments\n";
 	my $count = 0;
-	foreach my $chrobj (@chromosomes) {
-		my $chr = $chrobj->name; # chromosome name
+	foreach my $chr (@chromosomes) {
+		
+		# check for excluded chromosomes
+		my $skip_chr = 0;
+		foreach (@excluded_chromosomes) {
+			if ($chr eq $_) {
+				$skip_chr = 1;
+				last;
+			}
+		}
+		next if $skip_chr;
+		
+		my $chrobj = $db->segment($chr);
 		my $length = $chrobj->length;
 		for (my $start = 1; $start <= $length; $start += $step) {
 			# set the end point
@@ -248,7 +228,6 @@ sub collect_genomic_windows {
 		}
 	}
 	print "  Collected $count genomic windows\n";
-	return 1;
 }
 
 

@@ -375,22 +375,16 @@ sub get_chromosome_sizes {
 		my $db = open_db_connection($database) or 
 			die " unable to open database connection to '$database'!\n";
 		
-		# determine reference sequence type
-		my $ref_seq_type = 
-			$TIM_CONFIG->param("$database\.reference_sequence_type") ||
-			$TIM_CONFIG->param('default_db.reference_sequence_type') ||
-			'chromosome'; # relatively safe default
-		
 		# collect the reference sequences
-		my @chromos = $db->features(-type => $ref_seq_type);
+		my @chromos = $db->seq_ids;
 		unless (@chromos) {
-			die " no '$ref_seq_type' features identified in database!\n";
+			die " no chromosomes identified in database!\n";
 		}
 		
 		# collect lengths
-		foreach (@chromos) {
-			my $chr = $_->name;
-			my $size = $_->length;
+		foreach my $chr (@chromos) {
+			my $chrobj = $db->segment($chr);
+			my $size = $chrobj->length;
 			$sizes{$chr} = $size;
 		}
 		
