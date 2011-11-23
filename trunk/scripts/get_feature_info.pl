@@ -172,6 +172,8 @@ sub get_attribute_list_from_user {
 		# store the tag keys in an example hash
 		my %tagexamples;
 		for (my $i = 1; $i < 50; $i++) {
+			last if $i == $main_data_ref->{'last_row'};
+			
 			my @examples = $db->features(
 				-name     => $main_data_ref->{'data_table'}->[$i][$name_index],
 				-type     => $main_data_ref->{'data_table'}->[$i][$type_index]
