@@ -128,7 +128,8 @@ The command line flags and descriptions:
 
 =item --db <database>
 
-Specify the name of the Bio::DB::SeqFeature::Store database.
+Specify the name of a Bio::DB::SeqFeature::Store database, or a BigWigSet 
+directory.
 
 =item --help
 
@@ -141,6 +142,9 @@ Display this POD documentation.
 This program will print a list of all of the known feature types present 
 in a Bio::DB::SeqFeature::Store database. The types are organized into 
 groups by their source tag.
+
+BigWigSet databases, comprised of a directory of BigWig files and a 
+metadata file, are also supported.
 
 =head1 AUTHOR
 
