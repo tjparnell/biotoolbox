@@ -253,6 +253,29 @@ elsif (
 	$name_index   = 8 unless defined $name_index;
 }
 
+# otherwise attempt to identify indices automatically
+else {
+	unless (defined $chr_index) {
+		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
+	}
+	unless (defined $start_index) {
+		$start_index = find_column_index($metadata_ref, '^start');
+	}
+	unless (defined $stop_index) {
+		$stop_index = find_column_index($metadata_ref, 'stop|end');
+	}
+	unless (defined $stop_index) {
+		$stop_index = find_column_index($metadata_ref, 'stop|end');
+	}
+	unless (defined $strand_index) {
+		$strand_index = find_column_index($metadata_ref, 'strand');
+	}
+	unless (defined $name_index) {
+		$name_index = find_column_index($metadata_ref, 'name|ID');
+	}
+}
+
+
 
 # confirm indices
 unless (defined $chr_index and defined $start_index and defined $stop_index) {
@@ -438,16 +461,10 @@ if ($bigbed) {
 	}
 		
 			
-	# determine reference sequence type
-	my $ref_seq_type = 
-		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
-		$TIM_CONFIG->param('default_db.reference_sequence_type');
-	
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
 			'db'        => $db,
-			'seq_type'  => $ref_seq_type,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
 	} );
