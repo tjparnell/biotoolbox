@@ -53,7 +53,6 @@ unless (@ARGV) {
 my (
 	$path,
 	$source,
-	$type,
 	$rename,
 	$include_chromo,
 	$write_metadata,
@@ -62,15 +61,17 @@ my (
 	$help
 );
 my @infiles;
+my @types;
 my @names;
 my @strands;
+
 
 # Command line options
 GetOptions( 
 	'in=s'      => \@infiles, # name of input files
 	'path=s'    => \$path, # path to move the bigwig file
 	'source=s'  => \$source, # the gff source
-	'type=s'    => \$type, # the gff type
+	'type=s'    => \@types, # the gff type
 	'name=s'    => \@names, # the gff name 
 	'strand=s'  => \@strands, # indicate the strand for the feature
 	'rename'    => \$rename, # rename the file
@@ -105,6 +106,17 @@ else {
 	# file list was provided on the command line
 	@infiles = @ARGV or
 		die "  OOPS! No source data files specified! \n use --help\n";
+}
+
+# types
+if (scalar @types == 1 and $types[0] =~ /,/) {
+	# a comma delimited list is provided
+	my $type = shift @types;
+	@types = split /,/, $type;
+	if (scalar @types != scalar @infiles) {
+		die " unequal number of types (" . scalar(@types) . ") and files (" . 
+			scalar(@infiles) . ") provided!\n";
+	}
 }
 
 # names
@@ -148,6 +160,7 @@ if (@strands) {
 
 # target directory
 if (defined $path) {
+	$path = File::Spec->rel2abs($path);
 	$path = File::Spec->canonpath($path);
 	unless (-e $path) {
 		make_path($path) or die "unable to generate target directory: '$path'";
@@ -177,18 +190,23 @@ unless ($source) {
 
 
 # prepare metadata and conf output arrays
+my @metadata;
 	# we'll be dumping the metadata in here for writing later after going 
 	# through all the input files
 	# it will be a simple array of lines to be written (or appended) to a 
 	# metadata index file written to the output file path
-my @metadata;
-	# for the conf array, we'll either be writing individual conf stanzas
-	# for each bigwig file or one stanza for the bigwigset
 my @confdata;
+	# for the conf array, we'll either be writing individual GBrowse 
+	# conf stanzas for each bigwig and bam file or one stanza for the bigwigset
+my @chromodata;
 	# if user wants chromosome features included in the GFF3 file,
 	# this information will be added in here
-my @chromodata;
+my @subtracks;
+	# for bigwigset databases, we'll defer writing the GBrowse conf stanzas 
+	# until we've processed all of the bigwig files, and then we'll write a 
+	# subtrack table in one bigwigset stanza
 my $chromo_check = 0;
+	# remember whether we've written the chromosome GFF3 lines as requested
 
 
 
@@ -205,6 +223,10 @@ while (@infiles) {
 	my ($infile_basename, $infile_path, $infile_ext) = 
 		fileparse($infile, '.bb', '.bw', '.bam');
 		# these correspond to bigbed, bigwig, and bam
+	unless ($infile_ext) {
+		warn "   unrecognized file type!\n";
+		next;
+	}
 	
 	# determine gff name
 	my $name;
@@ -216,16 +238,18 @@ while (@infiles) {
 		# default is to use the base name
 		$name = $infile_basename;
 	}
-	$name =~ s/-|\./_/g; # substitute any dashes or periods with underscores
+	$name =~ s/[_\.\-]?sort(?:ed)?//i; # remove the sorted name if present
+	$name =~ s/_|\./ /g; # substitute any underscores or periods with spaces
+	
 	
 	# determine gff type
 	my $gfftype;
-	if ($type) {
-		$gfftype = $type;
+	if (@types) {
+		$gfftype = shift @types;
 	}
 	else {
 		# default to use the name
-		$gfftype = $name;
+		$gfftype = $infile_basename;
 	}
 	$gfftype =~ s/-|\./_/g; # substitute any dashes or periods with underscores
 	
@@ -253,7 +277,7 @@ while (@infiles) {
 	# Determine the target file name
 	my $target_basename;
 	if ($rename) {
-		$target_basename = "$source.$name";
+		$target_basename = "$source.$gfftype";
 	}
 	else {
 		$target_basename = $infile_basename;
@@ -277,9 +301,6 @@ while (@infiles) {
 		collect_chromosomes_from_bam(
 			$infile, $target_file, $main_data_ref, $strand);
 	}
-	else {
-		die " unrecognized input file format!\n";
-	}
 	
 	# check that we have stored the chromosome information
 	if ($include_chromo) {
@@ -289,6 +310,7 @@ while (@infiles) {
 			$chromo_check = 1;
 		}
 	}
+	
 	
 	### Move the Input files
 	if (-e $target_file) {
@@ -315,7 +337,7 @@ while (@infiles) {
 	if ($write_metadata) {
 		$gff_file = "$set_name\.gff3";
 	} else {
-		$gff_file = "$name\.gff3";
+		$gff_file = "$gfftype\.gff3";
 	}
 	
 	# convert the data structure to GFF for writing
@@ -373,11 +395,8 @@ while (@infiles) {
 	
 	
 	### Add metadata to index file
-	if ($write_metadata) {
+	if ($write_metadata and $infile_ext eq '.bw') {
 		# we'll be adding all of the input bigwig files to the metadata index
-		
-		# cannot support bam or bigbed data
-		if ($infile_ext eq '.bam' or $infile_ext eq '.bb') {next}
 		
 		# add metadata header block
 			# this is the file name in square brackets
@@ -412,40 +431,37 @@ while (@infiles) {
 			# file or write a single stanza for the bigwig set
 			
 			# add the database stanza
-			push @confdata, "[$target_basename\_db:database]\n";
+			push @confdata, "[$source\_$target_basename\_db:database]\n";
 			push @confdata, "db_adaptor   = Bio::DB::BigWig\n";
 			push @confdata, "db_args      = -bigwig $target_file\n";
 			
 			# add the basic track stanza
-			push @confdata, "\n[$name]\n";
-			push @confdata, "database     = $target_basename\_db\n";
+			push @confdata, "[$source\_$name]\n";
+			push @confdata, "database     = $source\_$target_basename\_db\n";
 			push @confdata, "feature      = summary\n";
 			push @confdata, "glyph        = wiggle_whiskers\n";
 			push @confdata, "graph_type   = boxes\n";
-			push @confdata, "autoscale    = local\n";
+			push @confdata, "autoscale    = global_clipped\n";
+			push @confdata, "# min_score  = 0\n";
+			push @confdata, "# max_score  = 50\n";
 			push @confdata, "height       = 50\n";
 			push @confdata, "key          = $name\n";
-			push @confdata, "\n";
+			push @confdata, "category     = $set_name\n";
+			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
+			push @confdata, "\n\n";
 		}
 		
 		# stanzas for a bigwig set
 		elsif ($infile_ext eq '.bw' and $write_metadata) {
-			# add the basic track stanza
-			push @confdata, "\n[$name]\n";
-			push @confdata, "database     = $set_name\_db\n";
-			push @confdata, "feature      = $name\n";
-			push @confdata, "glyph        = wiggle_whiskers\n";
-			push @confdata, "graph_type   = boxes\n";
-			push @confdata, "autoscale    = local\n";
-			push @confdata, "height       = 50\n";
-			push @confdata, "key          = $name\n";
-			push @confdata, "\n";
+			# store information for this bigwig to generate subtrack
+			# tables later
+			push @subtracks, [$gfftype, $name];
 		}
 		
 		# stanzas for a bigbed file
 		elsif ($infile_ext eq '.bb') {
 			# add the database stanza
-			push @confdata, "[$target_basename\_db:database]\n";
+			push @confdata, "[$source\_$target_basename\_db:database]\n";
 			push @confdata, "db_adaptor   = Bio::DB::BigBed\n";
 			push @confdata, "db_args      = -bigbed $target_file\n";
 			
@@ -453,27 +469,30 @@ while (@infiles) {
 				# this is assuming you want the individual features and not 
 				# binned summary of scores
 				# if you really want that, why don't you go with bigwig?
-			push @confdata, "\n[$name]\n";
-			push @confdata, "database     = $target_basename\_db\n";
+			push @confdata, "[$source\_$name]\n";
+			push @confdata, "database     = $source\_$target_basename\_db\n";
 			push @confdata, "feature      = region\n";
 			push @confdata, "glyph        = segments\n";
 			push @confdata, "stranded     = 1\n";
 			push @confdata, "label        = 1\n";
+			push @confdata, "key          = $name\n";
+			push @confdata, "category     = $set_name\n";
+			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
 			
-			push @confdata, "\n";
+			push @confdata, "\n\n";
 		
 		}
 		elsif ($infile_ext eq '.bam') {
 			# add the database stanza
-			push @confdata, "[$target_basename\_db:database]\n";
-			push @confdata, "db_adaptor   = Bio::DB::Sam\n";
-			push @confdata, "db_args      = -bam $target_file\n";
-			push @confdata, "               -fasta <your_fasta_file.fa>\n";
+			push @confdata, "[$source\_$target_basename\_db:database]\n";
+			push @confdata, "db_adaptor     = Bio::DB::Sam\n";
+			push @confdata, "db_args        = -bam $target_file\n";
+			push @confdata, "#                -fasta /path/to/your/fasta_file.fa\n";
 			
-			# add the basic track stanza
+			# add the segments track stanza
 				# this is assuming single-end alignments
-			push @confdata, "\n[$name]\n";
-			push @confdata, "database       = $target_basename\_db\n";
+			push @confdata, "[$source\_$name]\n";
+			push @confdata, "database       = $source\_$target_basename\_db\n";
 			push @confdata, "feature        = match\n";
 			push @confdata, "glyph          = segments\n";
 			push @confdata, "stranded       = 1\n";
@@ -483,8 +502,22 @@ while (@infiles) {
 			push @confdata, "mismatch_color = red\n";
 			push @confdata, "bgcolor        = blue\n";
 			push @confdata, "fgcolor        = white\n";
-			
+			push @confdata, "key            = $name\n";
+			push @confdata, "category       = $set_name\n";
+			push @confdata, "citation       = Data file $infile_basename$infile_ext\n";
 			push @confdata, "\n";
+			
+			# add the coverage track stanza
+				# semantic zooming for above 1000 bp
+			push @confdata, "[$source\_$name:1001]\n";
+			push @confdata, "feature        = coverage\n";
+			push @confdata, "glyph          = wiggle_xyplot\n";
+			push @confdata, "graph_type     = boxes\n";
+			push @confdata, "autoscale      = local\n";
+			push @confdata, "# min_score      = 0\n";
+			push @confdata, "# max_score      = 50\n";
+			push @confdata, "height         = 50\n";
+			push @confdata, "\n\n";
 		
 		}
 	}
@@ -517,15 +550,64 @@ if ($write_metadata) {
 
 ### write the starter conf data
 if ($write_conf) {
+	
+	
 	# Generate the stanzas for a bigwigset if necessary
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
 		# add the database stanza, in reverse order
-		unshift @confdata, "               -feature_type summary\n\n";
-		unshift @confdata, "db_args      = -dir $path\n";
-		unshift @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
-		unshift @confdata, "[$set_name\_db:database]\n";
+		push @confdata, "[$source\_$set_name\_db:database]\n";
+		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
+		push @confdata, "db_args      = -dir $path\n";
+		push @confdata, "               -feature_type summary\n\n";
+		
+		# generate the conf stanzas 
+		push @confdata, "[$source\_$set_name]\n";
+		push @confdata, "database     = $source\_$set_name\_db\n";
+		push @confdata, "feature      = " . 
+			# using the gfftype
+			join(" ", map {$_->[0]} @subtracks) . "\n";
+		push @confdata, "subtrack select = Feature primary_tag\n";
+		for my $i (0 .. $#subtracks) {
+			# subtrack table using the name
+			if ($i == 0) {
+				push @confdata, "subtrack table = " . 
+					":\"$subtracks[$i][1]\" $subtracks[$i][0] ;\n";
+			}
+			else {
+				push @confdata, "               " . 
+					":\"$subtracks[$i][1]\" $subtracks[$i][0] ;\n";
+			}
+		}
+		for my $i (0 .. $#subtracks) {
+			# subtrack select labels
+			# just to try and prettify the names a little, not really necessary
+			if ($i == 0) {
+				push @confdata, "subtrack select labels = " . 
+					"$subtracks[$i][0] \"$subtracks[$i][1]\" ;\n";
+			}
+			else {
+				push @confdata, "               " . 
+					"$subtracks[$i][0] \"$subtracks[$i][1]\" ;\n";
+			}
+		}
+		push @confdata, "glyph        = wiggle_whiskers\n";
+		push @confdata, "graph_type   = boxes\n";
+		push @confdata, "autoscale    = global_clipped\n";
+		push @confdata, "height       = 50\n";
+		push @confdata, "scale        = right\n";
+		push @confdata, "# min_score  = 0\n";
+		push @confdata, "# max_score  = 50\n";
+		push @confdata, "label        = 0\n";
+		push @confdata, "group_label  = 1\n";
+		push @confdata, "group_label_position = top\n";
+		my $key = $set_name;
+		$key =~ s/_/ /g;
+		push @confdata, "key          = $key\n";
+		push @confdata, "category     = $set_name\n";
+		push @confdata, "citation     = Data file collection from $set_name\n";
+		push @confdata, "\n\n";
 	}
 	
 	# write the conf stanza file
@@ -750,11 +832,12 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --path </destination/path/for/bigfiles/>
   --source <text>
   --name <text> or <text1,text2,...>
-  --type <text>
+  --type <text> or <text1,text2,...>
   --strand [f|r|w|c|+|-|1|0|-1],...
   --chromo 
   --rename
   --set
+  --setname <text>
   --conf
   --help
   
@@ -795,12 +878,14 @@ supported.
 Provide the name(s) for the GFF feature(s). This will be used as the GFF 
 feature's name. A unique name should be provided for each file, and may be 
 specified as a single comma-delimited list or by reiterating the --name 
-option. The default value to use the input file basename.
+option. The default value is to use the input file basename.
 
 =item --type <text>
 
-Provide the GFF type for the GFF features for all input files. By default, 
-it re-uses the GFF name. Unique values for each input file is not supported.
+Provide the GFF type for the GFF features for all input files. A unique 
+type should be provided for each file, and may be specified as a single 
+comma-delimited list or by reiterating the --type option. By default, 
+it re-uses the GFF name. 
 
 =item --strand [f|r|w|c|+|-|1|0|-1],...
 
@@ -826,18 +911,24 @@ Default is false.
 
 Indicate that all of the input BigWig files should be part of a BigWigSet,
 which treats all of the BigWig files in the target directory as a single
-database. This is primarily for GBrowse, as biotoolbox scripts (currently)
-don't use the BigWigSet adaptor. A text file is written in the target
-directory with metadata for each BigWig file (feature, source, strand,
-name) as described in Bio::DB::BigWigSet documentation. Additional metadata 
-may be manually added as necessary. The default is false.
+database. A text file is written in the target directory with metadata for 
+each BigWig file (feature, source, strand, name) as described in the 
+Bio::DB::BigWigSet documentation. Additional metadata may be manually 
+added if desired. The default is false.
+
+=item --setname <text>
+
+Optionally specify the name for the BigWigSet track when writing the 
+GBrowse configuration stanza. It is also used as the basename for the 
+GFF3 file. The default is to use the name of the last directory in the 
+target path.
 
 =item --conf
 
 Write sample GBrowse database and track configuration stanzas. Each BigFile 
 file will get individual stanzas, unless the --set option is enabled, where 
-a single stanza for the BigWigSet is provided. This is helpful when setting 
-up GBrowse database and configurations. Default is false.
+a single stanza with subtracks for the BigWigSet is generated. This is 
+helpful when setting up GBrowse database and configurations. Default is false.
 
 =item --help
 
@@ -873,7 +964,9 @@ written for each input file, or one GFF file for a BigWigSet. It uses the
 provided GFF name as the basename for the file.
 
 Optionally, sample database and track GBrowse configuration stanzas may also be 
-written to the current directory to facilitate setting up GBrowse.
+written to the current directory to facilitate setting up GBrowse. If a 
+BigWigSet database is requested, then the track stanza will be set up with 
+subtrack tables representing each BigWig file. 
 
 
 
