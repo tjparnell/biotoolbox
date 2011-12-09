@@ -1913,7 +1913,7 @@ sub get_region_dataset_hash {
 	my $chromo = $arg_ref->{'chromo'} || undef;
 	my $start  = $arg_ref->{'start'}  || undef;
 	my $stop   = $arg_ref->{'stop'}   || $arg_ref->{'end'} || undef;
-	my $strand = $arg_ref->{'strand'} || 0;
+	my $strand = $arg_ref->{'strand'} || undef;
 	unless (
 		(defined $name and defined $type) or 
 		(defined $chromo and defined $start and defined $stop)
@@ -1934,7 +1934,7 @@ sub get_region_dataset_hash {
 	### Define the chromosomal region segment
 	
 	my $region;
-	my $fstart; # to remember the feature start
+	my $fref_pos; # to remember the feature reference position
 	my $fstrand; # to remember the feature strand
 	
 	# Extend a named database feature
@@ -1963,12 +1963,24 @@ sub get_region_dataset_hash {
 			$feature->strand($strand);
 		}
 		
-		# record the feature start and strand
-		$fstart = $feature->strand >= 0 ? $feature->start : $feature->end;
+		# record the feature reference position and strand
+		if ($relative_pos == 5 and $feature->strand >= 0) {
+			$fref_pos = $feature->start;
+		}
+		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+			$fref_pos = $feature->end;
+		}
+		elsif ($relative_pos == 5 and $feature->strand < 0) {
+			$fref_pos = $feature->end;
+		}
+		elsif ($relative_pos == 3 and $feature->strand < 0) {
+			$fref_pos = $feature->start;
+		}
+		elsif ($relative_pos == 4) {
+			# strand doesn't matter here
+			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
+		}
 		$fstrand = $feature->strand;
-		
-		# get length
-		my $length = $feature->length;
 		
 		# now re-define the region based on the extended coordinates
 		$region = $db->segment( 
@@ -2006,40 +2018,12 @@ sub get_region_dataset_hash {
 		}
 		
 		# next define the region relative to the feature start or end
-		if ($feature->strand >= 0 and $relative_pos == 3) {
-			# feature is on forward, top, watson strand
-			# set segment relative to the 3' end
-			
-			# record feature start
-			$fstart = $feature->end;
-			$fstrand = $feature->strand;
-			
-			$region = $db->segment( 
-					$feature->seq_id,
-					$feature->end + $start,
-					$feature->end + $stop,
-			);
-		}
-		elsif ($feature->strand < 0 and $relative_pos == 3) {
-			# feature is on reverse, bottom, crick strand
-			# set segment relative to the 3' end
-			
-			# record feature start
-			$fstart = $feature->start;
-			$fstrand = $feature->strand;
-			
-			$region = $db->segment( 
-					$feature->seq_id,
-					$feature->start - $stop,
-					$feature->start - $start,
-			);
-		}
-		elsif ($feature->strand >= 0 and $relative_pos == 5) {
+		if ($relative_pos == 5 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 5' end
 			
-			# record feature start
-			$fstart = $feature->start;
+			# record feature relative position
+			$fref_pos = $feature->start;
 			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
@@ -2048,12 +2032,12 @@ sub get_region_dataset_hash {
 					$feature->start + $stop,
 			);
 		}
-		elsif ($feature->strand < 0 and $relative_pos == 5) {
+		elsif ($relative_pos == 5 and $feature->strand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 5' end
 			
-			# record feature start
-			$fstart = $feature->end;
+			# record feature relative position
+			$fref_pos = $feature->end;
 			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
@@ -2062,18 +2046,46 @@ sub get_region_dataset_hash {
 					$feature->end - $start,
 			);
 		}
+		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+			# feature is on forward, top, watson strand
+			# set segment relative to the 3' end
+			
+			# record feature start
+			$fref_pos = $feature->end;
+			$fstrand = $feature->strand;
+			
+			$region = $db->segment( 
+					$feature->seq_id,
+					$feature->end + $start,
+					$feature->end + $stop,
+			);
+		}
+		elsif ($relative_pos == 3 and $feature->strand < 0) {
+			# feature is on reverse, bottom, crick strand
+			# set segment relative to the 3' end
+			
+			# record feature start
+			$fref_pos = $feature->start;
+			$fstrand = $feature->strand;
+			
+			$region = $db->segment( 
+					$feature->seq_id,
+					$feature->start - $stop,
+					$feature->start - $start,
+			);
+		}
 		elsif ($relative_pos == 4) {
 			# feature can be on any strand
 			# set segment relative to the feature middle
 			
 			# determine the feature midpoint and record it
-			$fstart = $feature->start + int(($feature->length / 2) + 0.5);
+			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 			$fstrand = $feature->strand;
 			
 			$region = $db->segment( 
 					$feature->seq_id,
-					$fstart + $start,
-					$fstart + $stop,
+					$fref_pos + $start,
+					$fref_pos + $stop,
 			);
 		}
 	}
@@ -2101,8 +2113,23 @@ sub get_region_dataset_hash {
 			$feature->strand($strand);
 		}
 		
-		# record the feature start and strand
-		$fstart = $feature->strand >= 0 ? $feature->start : $feature->end;
+		# record the feature reference position and strand
+		if ($relative_pos == 5 and $feature->strand >= 0) {
+			$fref_pos = $feature->start;
+		}
+		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+			$fref_pos = $feature->end;
+		}
+		elsif ($relative_pos == 5 and $feature->strand < 0) {
+			$fref_pos = $feature->end;
+		}
+		elsif ($relative_pos == 3 and $feature->strand < 0) {
+			$fref_pos = $feature->start;
+		}
+		elsif ($relative_pos == 4) {
+			# strand doesn't matter here
+			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
+		}
 		$fstrand = $feature->strand;
 		
 		# then establish the segment
@@ -2124,12 +2151,31 @@ sub get_region_dataset_hash {
 		$region = $db->segment($chromo, $start, $stop);
 		
 		# adjust strand if necessary
-		if ($strand) {
+		if (defined $strand) {
 			$region->strand($strand);
 		}
+		else {
+			# default top strand
+			$strand = 1;
+		}
 		
-		# record the feature start and strand
-		$fstart = $strand >= 0 ? $start : $stop;
+		# record the feature reference position and strand
+		if ($relative_pos == 5 and $strand >= 0) {
+			$fref_pos = $start;
+		}
+		elsif ($relative_pos == 3 and $strand >= 0) {
+			$fref_pos = $stop;
+		}
+		elsif ($relative_pos == 5 and $strand < 0) {
+			$fref_pos = $stop;
+		}
+		elsif ($relative_pos == 3 and $strand < 0) {
+			$fref_pos = $start;
+		}
+		elsif ($relative_pos == 4) {
+			# strand doesn't matter here
+			$fref_pos = $start + int(($region->length / 2) + 0.5);
+		}
 		$fstrand = $strand;
 	}
 	
@@ -2221,13 +2267,15 @@ sub get_region_dataset_hash {
 		if ($fstrand >= 0) {
 			# forward strand
 			foreach my $position (keys %datahash) {
-				$relative_datahash{ $position - $fstart } = $datahash{$position};
+				# relative position is real position - reference
+				$relative_datahash{ $position - $fref_pos } = $datahash{$position};
 			}
 		}
 		elsif ($fstrand < 0) {
 			# reverse strand
 			foreach my $position (keys %datahash) {
-				$relative_datahash{ $fstart - $position } = $datahash{$position};
+				# the relative position is -(real position - reference)
+				$relative_datahash{ $fref_pos - $position } = $datahash{$position};
 			}
 		}
 		
