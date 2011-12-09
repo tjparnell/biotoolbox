@@ -251,7 +251,7 @@ while (@infiles) {
 		# default to use the name
 		$gfftype = $infile_basename;
 	}
-	$gfftype =~ s/-|\./_/g; # substitute any dashes or periods with underscores
+	$gfftype =~ s/[\-\.\s]+/_/g; # substitute dashes, periods, spaces with underscores
 	
 	# determine strand
 	my $strand;
@@ -570,14 +570,19 @@ if ($write_conf) {
 			join(" ", map {$_->[0]} @subtracks) . "\n";
 		push @confdata, "subtrack select = Feature primary_tag\n";
 		for my $i (0 .. $#subtracks) {
-			# subtrack table using the name
+			# create subtrack table 
+			# each item has gfftype and name in anon array
+			# use the name as the label, it could have spaces
+			# the gfftype will have no whitespace
 			if ($i == 0) {
 				push @confdata, "subtrack table = " . 
-					":\"$subtracks[$i][1]\" $subtracks[$i][0] ;\n";
+					":\"$subtracks[$i][1]\" $subtracks[$i][0] " . 
+					"=$subtracks[$i][0] ;\n";
 			}
 			else {
 				push @confdata, "               " . 
-					":\"$subtracks[$i][1]\" $subtracks[$i][0] ;\n";
+					":\"$subtracks[$i][1]\" $subtracks[$i][0] " . 
+					"=$subtracks[$i][0] ;\n";
 			}
 		}
 		for my $i (0 .. $#subtracks) {
@@ -594,11 +599,11 @@ if ($write_conf) {
 		}
 		push @confdata, "glyph        = wiggle_whiskers\n";
 		push @confdata, "graph_type   = boxes\n";
-		push @confdata, "autoscale    = global_clipped\n";
 		push @confdata, "height       = 50\n";
 		push @confdata, "scale        = right\n";
 		push @confdata, "# min_score  = 0\n";
 		push @confdata, "# max_score  = 50\n";
+		push @confdata, "autoscale    = global_clipped\n";
 		push @confdata, "label        = 0\n";
 		push @confdata, "group_label  = 1\n";
 		push @confdata, "group_label_position = top\n";
