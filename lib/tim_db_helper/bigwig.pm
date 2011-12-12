@@ -351,19 +351,20 @@ sub open_bigwigset_db {
 	# open the database connection 
 	# we're using the region feature type because that's what the rest of 
 	# tim_db_helper modules expect and work with
-	my $db;
-	eval {
-		$db = Bio::DB::BigWigSet->new(
+	my $bws = Bio::DB::BigWigSet->new(
 				-dir            => $directory,
 				-feature_type   => 'region',
-		);
-	};
+	);
 	
-	if ($db) {
-		return $db;
+	# check that we haven't just opened a new empty bigwigset object
+	my @paths = $bws->bigwigs;
+	
+	if (@paths) {
+		# we have bigwig files, must be a valid bigwigset directory
+		return $bws;
 	}
 	else {
-		carp " ERROR: can't open BigWigSet directory '$directory'!\n";
+		warn " ERROR: can't open BigWigSet directory '$directory'!\n";
 		return;
 	}
 }
