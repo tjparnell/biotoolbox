@@ -82,7 +82,7 @@ sub collect_wig_position_scores {
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
 				my $wigfile = shift @wigfiles;
-				croak " no wigfile passed!\n" unless $wigfile;
+				confess " no wigfile passed!\n" unless $wigfile;
 				
 				# check for opened wigfile
 				my $wig;
@@ -93,11 +93,11 @@ sub collect_wig_position_scores {
 				else {
 					# this file has not been opened yet, open it
 					unless (-e $wigfile) {
-						croak " Binary wiggle file '$wigfile' does not exist!\n";
+						confess " Binary wiggle file '$wigfile' does not exist!\n";
 					}
 					$wig = Bio::Graphics::Wiggle->new($wigfile,0);
 					unless ($wig) {
-						croak " unable to open data wigfile '$wigfile'";
+						confess " unable to open data wigfile '$wigfile'";
 					}
 					
 					# store the opened object for later use

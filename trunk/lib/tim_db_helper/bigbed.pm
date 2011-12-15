@@ -96,7 +96,7 @@ sub _collect_bigbed_data {
 	
 	# pass the required information
 	unless (scalar @_ >= 5) {
-		croak " At least five arguments must be passed to collect BigBed data!\n";
+		confess " At least five arguments must be passed to collect BigBed data!\n";
 	}
 	my ($region, $region_strand, $stranded, $method, @bed_features) = @_;
 		# method can be score, count, or length
@@ -118,7 +118,7 @@ sub _collect_bigbed_data {
 			
 			# check the file
 			unless (-e $bedfile) {
-				croak " BigBed file '$bedfile' does not exist!\n";
+				confess " BigBed file '$bedfile' does not exist!\n";
 				return;
 			}
 		}
@@ -134,7 +134,7 @@ sub _collect_bigbed_data {
 			# get bedfile name
 			($bedfile) = $feature->get_tag_values('bigbedfile');
 		}
-		croak " no bedfile passed!\n" unless $bedfile;
+		confess " no bedfile passed!\n" unless $bedfile;
 		
 		# check for opened bedfile
 		my $bb;
@@ -145,7 +145,7 @@ sub _collect_bigbed_data {
 		else {
 			# this file has not been opened yet, open it
 			$bb = open_bigbed_db($bedfile) or
-				croak " unable to open data BigBed file '$bedfile'";
+				confess " unable to open data BigBed file '$bedfile'";
 			
 			
 			# store the opened object for later use

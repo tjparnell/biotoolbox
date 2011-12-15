@@ -2181,7 +2181,7 @@ sub get_region_dataset_hash {
 	
 	# or else something is wrong
 	else {
-		croak " programming error! not enough information provided to" .
+		confess " programming error! not enough information provided to" .
 			" identify database feature!\n";
 	}
 	
@@ -2527,7 +2527,7 @@ sub _get_segment_score {
 		
 		# Unsupported Data file
 		else {
-			croak " Unsupported file type for file '$datasetlist[0]!\n";
+			confess " Unsupported file type for file '$datasetlist[0]!\n";
 		}
 		
 	}
@@ -2549,7 +2549,7 @@ sub _get_segment_score {
 			@datapoints = $region->features( [@datasetlist] );
 		}
 		else {
-			croak " unsupported database region object $region_type!\n";
+			confess " unsupported database region object $region_type!\n";
 		}
 		
 		# Check that we have collected datapoints
@@ -2858,7 +2858,7 @@ sub _get_segment_score {
 		}
 		else {
 			# somehow bad method snuck past our checks
-			croak " unrecognized method '$method'!";
+			confess " unrecognized method '$method'!";
 		}
 	
 		# convert back to log2 if necessary

@@ -98,7 +98,7 @@ sub _collect_bam_data {
 	
 	# pass the required information
 	unless (scalar @_ >= 5) {
-		croak " At least five arguments must be passed to collect Bam data!\n";
+		confess " At least five arguments must be passed to collect Bam data!\n";
 	}
 	my ($region, $region_strand, $stranded, $method, @bam_features) = @_;
 		# method can be score, count, or length
@@ -119,7 +119,7 @@ sub _collect_bam_data {
 			
 			# check file
 			unless (-e $bamfile) {
-				croak " Bam file '$bamfile' does not exist!\n";
+				confess " Bam file '$bamfile' does not exist!\n";
 				return;
 			}
 		}
@@ -135,7 +135,7 @@ sub _collect_bam_data {
 			# get bedfile name
 			($bamfile) = $feature->get_tag_values('bamfile');
 		}
-		croak " no bamfile specified!\n" unless $bamfile;
+		confess " no bamfile specified!\n" unless $bamfile;
 		
 		
 		## Open the Bam File
@@ -147,7 +147,7 @@ sub _collect_bam_data {
 		else {
 			# this file has not been opened yet, open it
 			$bam = open_bam_db($bamfile) or
-				croak " unable to open Bam file '$bamfile'";
+				confess " unable to open Bam file '$bamfile'";
 			
 			# store the opened object for later use
 			$OPENED_BAMFILES{$bamfile} = $bam;

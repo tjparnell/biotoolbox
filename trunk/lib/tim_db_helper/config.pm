@@ -14,37 +14,37 @@ our $TIM_CONFIG;
 # check for environment variable
 if (exists $ENV{'BIOTOOLBOX'}) {
 	 $TIM_CONFIG = Config::Simple->new($ENV{'BIOTOOLBOX'}) or 
-		croak Config::Simple->error();
+		confess Config::Simple->error();
 }	
 
 # check for file in home directory
 elsif (-e "$ENV{HOME}/biotoolbox.cfg") {
 	 $TIM_CONFIG = Config::Simple->new("$ENV{HOME}/biotoolbox.cfg") or
-	 	croak Config::Simple->error();
+	 	confess Config::Simple->error();
 }
 
 # the old environment variable was TIM_DB_HELPER
 # check for that just in case
 elsif (exists $ENV{'TIM_DB_HELPER'}) {
 	 $TIM_CONFIG = Config::Simple->new($ENV{'TIM_DB_HELPER'}) or 
-		croak Config::Simple->error();
+		confess Config::Simple->error();
 }	
 
 # the old file name that I used to use was tim_db_helper.cfg
 # check for that just in case
 elsif (-e "$ENV{HOME}/tim_db_helper.cfg") {
 	 $TIM_CONFIG = Config::Simple->new("$ENV{HOME}/tim_db_helper.cfg") or
-	 	croak Config::Simple->error();
+	 	confess Config::Simple->error();
 }
 
 # finally, when all else fails, just use the supplied default
 else {
 	$TIM_CONFIG = Config::Simple->new("$Bin/../biotoolbox.cfg") or 
-	 	croak Config::Simple->error();
+	 	confess Config::Simple->error();
 }
 
 unless ($TIM_CONFIG) {
-	croak "Can't find biotoolbox.cfg configuration file!\n";
+	confess "Can't find biotoolbox.cfg configuration file!\n";
 }
 
 # Exported names

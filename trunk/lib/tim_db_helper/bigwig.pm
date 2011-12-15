@@ -56,7 +56,7 @@ sub collect_bigwig_position_scores {
 	
 	# pass the required information
 	unless (scalar @_ >= 4) {
-		croak " At least four arguments must be passed to collect BigWig data!\n";
+		confess " At least four arguments must be passed to collect BigWig data!\n";
 	}
 	my ($region, $region_strand, $stranded, @wig_features) = @_;
 	
@@ -107,7 +107,7 @@ sub collect_bigwig_position_scores {
 				
 				# check the file
 				unless (-e $wigfile) {
-					croak " BigWig file '$wigfile' does not exist!\n";
+					confess " BigWig file '$wigfile' does not exist!\n";
 					return;
 				}
 				
@@ -131,7 +131,7 @@ sub collect_bigwig_position_scores {
 				
 				# get wigfile name
 				($wigfile) = $feature->get_tag_values('bigwigfile') or
-					croak " passed feature '$feature' is not a SeqFeature object!\n";
+					confess " passed feature '$feature' is not a SeqFeature object!\n";
 				
 				# check strand
 					# database features will support the strand method
@@ -155,7 +155,7 @@ sub collect_bigwig_position_scores {
 			
 			# confirm that we have acceptable data to collect
 			next unless $strand_check == 1;
-			croak " no wigfile passed!\n" unless $wigfile;
+			confess " no wigfile passed!\n" unless $wigfile;
 			
 			# Open the BigWig file
 			my $bw;
@@ -166,7 +166,7 @@ sub collect_bigwig_position_scores {
 			else {
 				# this file has not been opened yet, open it
 				$bw = open_bigwig_db($wigfile) or 
-					croak " unable to open data BigWig file '$wigfile'";
+					confess " unable to open data BigWig file '$wigfile'";
 				
 				# store the opened object for later use
 				$OPENED_BIGFILES{$wigfile} = $bw;
