@@ -6,7 +6,7 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean median sum min max);
+use Statistics::Lite qw(mean median sum min max stddev);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -17,6 +17,7 @@ use tim_db_helper qw(
 	process_and_verify_dataset
 	get_new_feature_list
 	get_region_dataset_hash
+	check_dataset_for_rpm_support
 );
 use tim_file_helper qw(
 	load_tim_data_file
@@ -48,7 +49,7 @@ my (
 	$feature,
 	$method,
 	$value_type,
-	$strand,
+	$stranded,
 	$bins,
 	$extension,
 	$extension_size,
@@ -70,7 +71,7 @@ GetOptions(
 	'feature=s'   => \$feature, # what type of feature to work with
 	'method=s'    => \$method, # method for collecting the data
 	'value=s'     => \$value_type, # type of data to collect
-	'strand=s'    => \$strand, # indicate whether stranded data should be taken
+	'strand=s'    => \$stranded, # indicate whether stranded data should be taken
 	'bins=i'      => \$bins, # number of bins
 	'ext=i'       => \$extension, # number of bins to extend beyond the feature
 	'extsize=i'   => \$extension_size, # explicit size of extended bins
@@ -95,32 +96,37 @@ if ($help) {
 
 
 
-## Check for required values
-unless ($outfile) {
-	die " You must define an output filename !\n Use --help for more information\n";
-}
-unless ($feature or $infile) {
-	# the feature must be defined
-	# a tim data file used as an input file would also define one
-	die " You must define a feature!\n Use --help for more information\n";
-}
+### Check for required values
+
 unless ($database or $infile) {
 	# a database must be defined
 	# a tim data file used as an input file would also define one
 	die " You must define a database or input file!\n";
 }
-if ($strand) {
+
+unless ($feature or $infile) {
+	# the feature must be defined
+	# a tim data file used as an input file would also define one
+	die " You must define a feature!\n Use --help for more information\n";
+}
+
+unless ($outfile) {
+	die " You must define an output filename !\n Use --help for more information\n";
+}
+
+if ($stranded) {
 	unless (
-		$strand eq 'sense' or 
-		$strand eq 'antisense' or 
-		$strand eq 'all'
+		$stranded eq 'sense' or 
+		$stranded eq 'antisense' or 
+		$stranded eq 'all'
 	) {
-		die " '$strand' is not recognized for strand\n Use --help for more information\n";
+		die " '$stranded' is not recognized for strand\n Use --help for more information\n";
 	}
 } 
 else {
-	$strand = 'all'; # default is no strand information
+	$stranded = 'all'; # default is no strand information
 }
+
 if (defined $value_type) {
 	# validate the requested value type
 	unless (
@@ -136,6 +142,7 @@ else {
 	print " Collecting default data 'score' values\n";
 	$value_type = 'score';
 }
+
 if (defined $method) {
 	unless (
 		$method eq 'mean' or 
@@ -143,21 +150,25 @@ if (defined $method) {
 		$method eq 'sum' or 
 		$method eq 'min' or 
 		$method eq 'max' or 
-		$method eq 'count'
+		$method eq 'stddev' or
+		$method eq 'rpm'
 	) {
 		die " '$method' is not recognized for method\n Use --help for more information\n";
 	}
 	
-	# convenience method, for backwards compatibility
-	if ($method eq 'count') {
-		$method = 'sum';
+	if ($method eq 'rpm') {
+		# make sure we collect the right values
 		$value_type = 'count';
 	}
 } 
 else {
-	# default is mean
-	print " Using default method of 'mean'\n";
-	$method = 'mean'; 
+	# set default method
+	if ($value_type eq 'count') {
+		$method = 'sum';
+	}
+	else {
+		$method = 'mean';
+	}
 }
 
 # assign default values
@@ -165,14 +176,17 @@ unless (defined $bins) {
 	# dividing gene into 10 (10%) bins seems reasonable to me
 	$bins = 10;
 } 
+
 unless (defined $extension) {
 	# default is no extension
 	$extension = 0;
 }
+
 unless (defined $log) {
 	# default is that data is not in log 2
 	$log = 0;
 }
+
 unless (defined $smooth) {
 	# default is to not include smoothing
 	$smooth = 0;
@@ -180,48 +194,33 @@ unless (defined $smooth) {
 
 
 
-## Generate or load the dataset
-my $main_data_ref; # reference to the main data structure hash
+
+### Generate or load the dataset
+my $main_data_ref; # a reference to the main data structure
 if ($infile) {
-	# load a pre-existing data file
-	print " Loading file $infile....\n";
+	# load the gene dataset from existing file
+	print " Loading feature set from file $infile....\n";
 	$main_data_ref = load_tim_data_file($infile);
 	
-	# check
-	unless ($main_data_ref) {
-		die " No file data loaded! Nothing done!\n";
+	# update program name
+	unless ($main_data_ref->{'program'} eq $0) {
+		$main_data_ref->{'program'} = $0;
 	}
 	
 	# define database if necessary
 	unless ($database) {
 		$database = $main_data_ref->{'db'};
 	}
-	# define feature if necessary
-	unless ($feature) {
-		$feature = $main_data_ref->{'feature'};
-	}
-	# update program name
-	unless ($main_data_ref->{'program'} eq $0) {
-		$main_data_ref->{'program'} = $0;
-	}
 } 
 else {
-	# generate a new data file
-	print " Generating new feature list....\n";
-	$main_data_ref = get_new_feature_list( {
-		'db'       => $database,
-		'features' => $feature,
-		'dubious'  => 1, # skip dubious genes
-	} );
-	
-	# check
-	unless ($main_data_ref) {
-		die " No feature data generated! Nothing done!\n";
-	}
-	
-	# define the program
-	$main_data_ref->{'program'} = $0;
+	# we will start a new file with a new dataset
+	generate_a_new_feature_dataset();
 }
+unless ($main_data_ref) {
+	# check for data
+	die " No data loaded! Nothing to do!\n";
+}
+
 # the number of columns already in the data array
 my $startcolumn = $main_data_ref->{'number_columns'}; 
 # set the reference to the data table
@@ -229,8 +228,30 @@ my $data_table_ref = $main_data_ref->{'data_table'};
 
 
 
-## Open database connectin
-my $db = open_db_connection($database);
+
+
+### Open database connection
+unless ($database) {
+	# define the database 
+	if ( $main_data_ref->{'db'} ) {
+		# from the input file if possible
+		$database = $main_data_ref->{'db'};
+	}
+	elsif ($dataset) {
+		# or use the dataset if possible
+		$database = $dataset;
+	}
+	else {
+		die " You must define a database or dataset!\n" . 
+			" Use --help for more information\n";
+	}
+}
+my $db = open_db_connection($database) or
+	die " unable to open database '$database'!\n";
+
+
+
+
 
 
 
@@ -240,6 +261,21 @@ $dataset = process_and_verify_dataset( {
 	'dataset' => $dataset,
 	'single'  => 1,
 } );
+
+# Check the RPM method if necessary
+my $rpm_read_sum;
+if ($method eq 'rpm') {
+	print " Checking RPM support for dataset '$dataset'...\n";
+	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $db);
+	if ($rpm_read_sum) {
+		printf " %s total features\n", format_with_commas($rpm_read_sum);
+	}
+	else {
+		die " RPM method not supported! Try something else\n";
+	}
+}
+
+
 
 
 
@@ -302,12 +338,24 @@ else {
 }
 
 # print completion
-my $timediff = sprintf "%.1f", (time - $start_time)/60;
-print " Completed in $timediff minutes\n";
+printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 
 
 #### Subroutines #######
+
+## generate a feature dataset if one was not loaded
+sub generate_a_new_feature_dataset {
+	# a subroutine to generate a new feature dataset
+	
+	$main_data_ref = get_new_feature_list( {
+			'db'       => $database,
+			'features' => $feature,
+	} );
+	
+	# set the current program
+	$main_data_ref->{'program'} = $0;
+}
 
 
 
@@ -316,83 +364,56 @@ sub collect_binned_data {
 	
 	## Prepare the metadata and header names
 	my $binsize = (100/$bins); 
-	# the size of the bin in percentage units, default would be 10%
-	# each bin will be titled the starting and ending point for that bin in 
-	# percentage units
-	# for example, -20..-10,-10..0,0..10,10..20
+	prepare_bins($binsize);
 	
-	# if $extension is defined, then it will add the appropriate flanking bins,
-	# otherwise it should skip them 
-	
-	# bin(s) on 5' flank
-	if ($extension) {
-		# 5' bins are requested
-		if ($extension_size) {
-			# extended bins should be of specific bp size
-			for (my $i = $extension; $i > 0; $i--) { 
-				my $start = 0 - ($extension_size * $i);
-				my $stop = 0 - ($extension_size * ($i - 1));
-				_set_metadata($start, $stop, $extension_size, 'bp');
-			}
-		}
-		else {
-			# extended bin size will be based on feature length
-			for (my $i = $extension; $i > 0; $i--) { 
-				my $start = 0 - ($binsize * $i);
-				my $stop = 0 - ($binsize * ($i - 1));
-				_set_metadata($start . '%', $stop . '%', $binsize, '%');
-			}
-		}
-	}
-	
-	# bins over the gene body
-	for (my $i = 0; $i < $bins; $i++) { 
-		my $start = ($i * $binsize );
-		my $stop = ($i + 1) * $binsize;
-		_set_metadata($start . '%', $stop . '%', $binsize, '%');
-	}
-	
-	# bin(s) on 3' flank
-	if ($extension) {
-		# 5' bins are requested
-		if ($extension_size) {
-			# extended bins should be of specific bp size
-			for (my $i = 0; $i < $extension; $i++) { 
-				my $start = ($extension_size * $i);
-				my $stop = ($extension_size * ($i + 1));
-				_set_metadata($start, $stop, $extension_size, 'bp');
-			}
-		}
-		else {
-			# extended bin size will be based on feature length
-			for (my $i = 0; $i < $extension; $i++) { 
-				my $start = 100 + ($binsize * $i);
-				my $stop = 100 + ($binsize * ($i + 1));
-				_set_metadata($start . '%', $stop . '%', $binsize, '%');
-			}
-		}
-	}
 	
 	## Identify columns for feature identification
-	# name
-	my $name_index = find_column_index($main_data_ref, '^name');
-	unless (defined $name_index) {
-		die 'unable to identify Name column in data table!';
-	}
-	# type
-	my $type_index = find_column_index($main_data_ref, 'type');
-	unless (defined $type_index) {
-		die 'unable to identify Type column in data table!';
-	}
-	# strand if requested
-	my $strand_index;
-	if ($set_strand) {
-		$strand_index = find_column_index($main_data_ref, 'strand');
-		unless (defined $strand_index) {
-			die 'unable to strand column in data table!';
-		}
+	my $name = find_column_index($main_data_ref, '^name|id');
+	
+	my $type = find_column_index($main_data_ref, '^type|class');
+	
+	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
+	
+	my $start = find_column_index($main_data_ref, '^start|position');
+	
+	my $stop = find_column_index($main_data_ref, '^stop|end');
+	
+	my $strand = find_column_index($main_data_ref, '^strand');
+	
+	
+	
+	## Select the appropriate method for data collection
+	if (
+		defined $name and
+		defined $type
+	) {
+		# using named features
+		collect_binned_data_for_features(
+			$binsize, $name, $type, $strand);
 	}
 	
+	elsif (
+		defined $start and
+		defined $stop  and
+		defined $chromo
+	) {
+		# using genome segments
+		collect_binned_data_for_regions(
+			$binsize, $chromo, $start, $stop, $strand);
+	}
+	
+	else {
+		die " Unable to identify columns with feature identifiers!\n" .
+			" File must have Name and Type, or Chromo, Start, Stop columns\n";
+	}
+}	
+
+
+
+sub collect_binned_data_for_features {	
+	
+	## Passed data
+	my ($binsize, $name_index, $type_index, $strand_index) = @_;
 	
 	
 	## Collect the data
@@ -440,27 +461,32 @@ sub collect_binned_data {
 			next;
 		}
 		
-		# the starting and ending points will be calculated from the number of
-		# extensions, the binsize (multiply by 0.01 to get fraction), and the gene
-		# length. No extensions should give just the length of the gene.
-		# Remember that these end points will be relative to the feature, not
-		# the chromosome!
-		my $startingpoint = sprintf "%.0f", 
-			( 0 - ($extension * $binsize * 0.01 * $length) +1 );
-		my $endingpoint = sprintf "%.0f", 
-			( $length + ($extension * $binsize * 0.01 * $length) );
+		# calculate the actual extension in bp
+		# this is determined from the extension_size or the feature length
+		# and multiplied by the number of extensions requested
+		my $extra;
+		if ($extension) {
+			if ($extension_size) {
+				# extension is specific bp in size
+				$extra = $extension_size * $extension;
+			}
+			else {
+				# extension is dependent on feature length
+				$extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
+			}
+		}
+		
 		
 		# collect the region scores
 		my %regionscores = get_region_dataset_hash( {
-					'db'       => $db,
-					'dataset'  => $dataset,
-					'name'     => $name,
-					'type'     => $type,
-					'start'    => $startingpoint,
-					'stop'     => $endingpoint,
-					'strand'   => $strand,
-					'value'    => $value_type,
-					'set_strand' => $set_strand ? 
+					'db'        => $db,
+					'dataset'   => $dataset,
+					'value'     => $value_type,
+					'name'      => $name,
+					'type'      => $type,
+					'extend'    => $extra,
+					'stranded'  => $stranded,
+					'strand'    => $set_strand ? 
 						$data_table_ref->[$row][$strand_index] : undef,
 		} );
 		if ($raw) {
@@ -469,130 +495,247 @@ sub collect_binned_data {
 			}
 		}
 		
-		# assign the scores to the bins in the region
-		my $stepsize = sprintf "%.0f", $binsize * 0.01 * $length;
-			# this converts the binsize from a percentage to actual bp length
-		for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
-			# we will step through each data column, representing each window (bin)
-			# across the feature's region
-			# any scores within this window will be collected and the mean 
-			# value reported
-			
-			# convert the window start and stop coordinates (as percentages) to
-			# actual bp
-			# this depends on whether the binsize is explicitly defined in bp or
-			# is a fraction of the feature length
-			my ($start, $stop);
-			if ($main_data_ref->{$column}{'bin_size'} =~ /bp$/) {
-				# the bin size is explicitly defined
-				
-				# the start and stop points are relative to either the feature
-				# start (always 0) or the end (the feature length), depending
-				# upon whether the 5' or 3' end of the feature
-				
-				# determine this by the sign of the start position
-				if ($main_data_ref->{$column}{'start'} < 0) {
-					# the start position is less than 0, implying the 5' end
-					# the reference position will be the feature start, or 0
-					$start = $main_data_ref->{$column}{'start'};
-					$stop = $main_data_ref->{$column}{'stop'};
-				}
-				else {
-					# the start position is greather than 0, implying the 3' end
-					# the reference position will be the feature end, or length
-					$start = $main_data_ref->{$column}{'start'} + $length;
-					$stop = $main_data_ref->{$column}{'stop'} + $length;
-				}
-			}
-			else {
-				# otherwise the bin size is based on feature length
-				$start = sprintf "%.0f", ( 
-					$main_data_ref->{$column}{'start'} * 0.01 * $length) + 1;
-				$stop = sprintf "%.0f", ( 
-					$main_data_ref->{$column}{'stop'} * 0.01 * $length);
-			}
-			
-			# collect the scores for this window
-			my @scores;
-			for (my $n = $start; $n <= $stop; $n++) {
-				# we will walk through each bp in the window looking for a score
-				push @scores, $regionscores{$n} if exists $regionscores{$n};
-			}
-			
-			
-			# calculate the value
-			my $window_score;
-			if (@scores) {
-				# we have values in the window
-				
-				# combine the scores according to the specified method
-				if ($method eq 'sum') {
-					# either the count or the sum methods require that the 
-					# scores be summed
-					$window_score = sum(@scores);
-					# raw output
-					if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
-					
-				}
-				
-				else {
-					# method of mean or median to combine the scores
-				
-					# convert from log2 if necessary
-					if ($log) {
-						@scores = map { 2 ** $_ } @scores;
-					}
-					
-					# calculate the score appropriately
-					if ($method eq 'mean') {
-						$window_score = mean(@scores); 
-					}
-					elsif ($method eq 'median') {
-						$window_score = median(@scores); 
-					}
-					elsif ($method eq 'min') {
-						$window_score = min(@scores); 
-					}
-					elsif ($method eq 'max') {
-						$window_score = max(@scores); 
-					}
-					
-					# raw output
-					if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
-					
-					# convert back to log if necessary
-					if ($log) {
-						if ($window_score != 0) {
-							$window_score = log($window_score) / log(2);
-						}
-						else {
-							$window_score = '.';
-						}
-					}
-				}
-			} 
-			else {
-				# no values in this window
-				if ($method eq 'count' or $method eq 'sum') {
-					# score gets 0
-					$window_score = 0;
-				}
-				else {
-					# no score gets a null symbol
-					$window_score = '.'; 
-				}
-			}
-			
-			
-			# record the value
-			$data_table_ref->[$row][$column] = $window_score;
-			if ($raw) { print RAWFILE "\tscore for $start: $window_score" }
-		}
-		
-		# finish the raw line
-		if ($raw) { print RAWFILE "\n" }
+		# record the scores for each bin
+		record_the_bin_values($row, $length, \%regionscores);
 	}	
 }
+
+
+
+sub collect_binned_data_for_regions {
+	
+	## Passed data
+	my ($binsize, $chromo_index, $start_index, $stop_index, $strand_index) = @_;
+	
+	
+	## Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		# walk through each feature
+		
+		# identify the coordinates
+		my $chromo = $data_table_ref->[$row][$chromo_index]; 
+		my $start  = $data_table_ref->[$row][$start_index]; 
+		my $stop   = $data_table_ref->[$row][$stop_index]; 
+		my $strand = $data_table_ref->[$row][$strand_index] || 1; # default +1
+		
+		# start printing raw data
+		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
+		
+		# determine the segment length
+		my $length = $stop - $start + 1;
+		
+		# check the length
+		if (defined $min_length and $length < $min_length) {
+			# this feature is too short to divided into bins
+			# we will skip this feature
+			
+			# but first, put in null values
+			for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
+				$data_table_ref->[$row][$column] = '.';
+			}
+			
+			# move on to next feature
+			next;
+		}
+		
+		# the starting and ending points will be calculated from the number of
+		# extensions, the binsize (multiply by 0.01 to get fraction), and the gene
+		# length. No extensions should give just the length of the gene.
+		my ($startingpoint, $endingpoint);
+		if ($extension_size) {
+			# extension is specific bp in size
+			my $extra = $extension_size * $binsize;
+			$startingpoint = int( $start - $extra + 0.5 );
+			$endingpoint   = int( $stop + $extra + 0.5 );
+		}
+		else {
+			# extension is dependent on feature length
+			my $extra = $extension * $binsize * 0.01 * $length;
+			$startingpoint = int( $start - $extra + 0.5);
+			$endingpoint   = int( $stop + $extra + 0.5);
+		}
+		
+		# collect the region scores
+		my %regionscores = get_region_dataset_hash( {
+					'db'       => $db,
+					'dataset'  => $dataset,
+					'value'    => $value_type,
+					'chromo'   => $chromo,
+					'start'    => $startingpoint,
+					'stop'     => $endingpoint,
+					'absolute' => 1,
+					'stranded' => $stranded,
+					'strand'   => $strand,
+		} );
+		if ($raw) {
+			foreach (sort {$a <=> $b} keys %regionscores) {
+				print RAWFILE "\tdb: $regionscores{$_} \@ $_";
+			}
+		}
+		
+		# convert absolute scores to relative scores
+		# must be done here because we have the original coordinates
+		my %relative_scores;
+		if ($strand >= 0) {
+			# forward strand
+			foreach my $pos (keys %regionscores) {
+				$relative_scores{ $pos - $start } = $regionscores{$pos};
+			}
+		}
+		else {
+			# reverse strand
+			foreach my $pos (keys %regionscores) {
+				$relative_scores{ $stop - $pos } = $regionscores{$pos};
+			}
+		}
+		
+		# record the scores for each bin
+		record_the_bin_values($row, $length, \%relative_scores);
+		
+	}
+}
+
+
+
+sub record_the_bin_values {
+	
+	# get the passed values
+	my ($row, $length, $regionscores) = @_;
+	
+	
+	# assign the scores to the bins in the region
+	for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
+		# we will step through each data column, representing each window (bin)
+		# across the feature's region
+		# any scores within this window will be collected and the mean 
+		# value reported
+		
+		# convert the window start and stop coordinates (as percentages) to
+		# actual bp
+		# this depends on whether the binsize is explicitly defined in bp or
+		# is a fraction of the feature length
+		my ($start, $stop);
+		if ($main_data_ref->{$column}{'bin_size'} =~ /bp$/) {
+			# the bin size is explicitly defined
+			
+			# the start and stop points are relative to either the feature
+			# start (always 0) or the end (the feature length), depending
+			# upon whether the 5' or 3' end of the feature
+			
+			# determine this by the sign of the start position
+			if ($main_data_ref->{$column}{'start'} < 0) {
+				# the start position is less than 0, implying the 5' end
+				# the reference position will be the feature start, or 0
+				$start = $main_data_ref->{$column}{'start'};
+				$stop = $main_data_ref->{$column}{'stop'};
+			}
+			else {
+				# the start position is greather than 0, implying the 3' end
+				# the reference position will be the feature end, or length
+				$start = $main_data_ref->{$column}{'start'} + $length;
+				$stop = $main_data_ref->{$column}{'stop'} + $length;
+			}
+		}
+		else {
+			# otherwise the bin size is based on feature length
+			$start = sprintf "%.0f", ( 
+				$main_data_ref->{$column}{'start'} * 0.01 * $length) + 1;
+			$stop = sprintf "%.0f", ( 
+				$main_data_ref->{$column}{'stop'} * 0.01 * $length);
+		}
+		
+		# collect the scores for this window
+		my @scores;
+		for (my $n = $start; $n <= $stop; $n++) {
+			# we will walk through each bp in the window looking for a score
+			push @scores, $regionscores->{$n} if exists $regionscores->{$n};
+		}
+		
+		
+		# calculate the value
+		my $window_score;
+		if (@scores) {
+			# we have values in the window
+			
+			# combine the scores according to the specified method
+			if ($method eq 'sum') {
+				# either the count or the sum methods require that the 
+				# scores be summed
+				$window_score = sum(@scores);
+				# raw output
+				if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+				
+			}
+			
+			else {
+				# method of mean or median to combine the scores
+			
+				# convert from log2 if necessary
+				if ($log) {
+					@scores = map { 2 ** $_ } @scores;
+				}
+				
+				# calculate the score appropriately
+				if ($method eq 'mean') {
+					$window_score = mean(@scores); 
+				}
+				elsif ($method eq 'median') {
+					$window_score = median(@scores); 
+				}
+				elsif ($method eq 'min') {
+					$window_score = min(@scores); 
+				}
+				elsif ($method eq 'max') {
+					$window_score = max(@scores); 
+				}
+				elsif ($method eq 'sum') {
+					$window_score = sum(@scores);
+				}
+				elsif ($method eq 'stddev') {
+					$window_score = stddev(@scores);
+				}
+				elsif ($method eq 'rpm') {
+					$window_score = ( sum(@scores) * 1000000 ) / $rpm_read_sum;
+				}
+				
+				# raw output
+				if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+				
+				# convert back to log if necessary
+				if ($log) {
+					if ($window_score != 0) {
+						$window_score = log($window_score) / log(2);
+					}
+					else {
+						$window_score = '.';
+					}
+				}
+			}
+		} 
+		else {
+			# no values in this window
+			if ($method eq 'sum' or $method eq 'rpm') {
+				# score gets 0
+				$window_score = 0;
+			}
+			else {
+				# no score gets a null symbol
+				$window_score = '.'; 
+			}
+		}
+		
+		
+		# record the value
+		$data_table_ref->[$row][$column] = $window_score;
+		if ($raw) { print RAWFILE "\tscore for col $column start $start: $window_score" }
+	}
+	
+	# finish the raw line
+	if ($raw) { print RAWFILE "\n" }
+
+}
+
+
 
 
 
@@ -749,6 +892,71 @@ sub go_interpolate_values {
 }
 
 
+### Prepare all of the bin columns and their metadata
+sub prepare_bins {
+	
+	my $binsize = shift;
+	
+	# the size of the bin in percentage units, default would be 10%
+	# each bin will be titled the starting and ending point for that bin in 
+	# percentage units
+	# for example, -20..-10,-10..0,0..10,10..20
+	
+	# if $extension is defined, then it will add the appropriate flanking bins,
+	# otherwise it should skip them 
+	
+	# bin(s) on 5' flank
+	if ($extension) {
+		# 5' bins are requested
+		if ($extension_size) {
+			# extended bins should be of specific bp size
+			for (my $i = $extension; $i > 0; $i--) { 
+				my $start = 0 - ($extension_size * $i);
+				my $stop = 0 - ($extension_size * ($i - 1));
+				_set_metadata($start, $stop, $extension_size, 'bp');
+			}
+		}
+		else {
+			# extended bin size will be based on feature length
+			for (my $i = $extension; $i > 0; $i--) { 
+				my $start = 0 - ($binsize * $i);
+				my $stop = 0 - ($binsize * ($i - 1));
+				_set_metadata($start, $stop, $binsize, '%');
+			}
+		}
+	}
+	
+	# bins over the gene body
+	for (my $i = 0; $i < $bins; $i++) { 
+		my $start = ($i * $binsize );
+		my $stop = ($i + 1) * $binsize;
+		_set_metadata($start, $stop, $binsize, '%');
+	}
+	
+	# bin(s) on 3' flank
+	if ($extension) {
+		# 5' bins are requested
+		if ($extension_size) {
+			# extended bins should be of specific bp size
+			for (my $i = 0; $i < $extension; $i++) { 
+				my $start = ($extension_size * $i);
+				my $stop = ($extension_size * ($i + 1));
+				_set_metadata($start, $stop, $extension_size, 'bp');
+			}
+		}
+		else {
+			# extended bin size will be based on feature length
+			for (my $i = 0; $i < $extension; $i++) { 
+				my $start = 100 + ($binsize * $i);
+				my $stop = 100 + ($binsize * ($i + 1));
+				_set_metadata($start, $stop, $binsize, '%');
+			}
+		}
+	}
+}
+
+
+
 
 ### Set the metadata for a new data table column (dataset)
 sub _set_metadata {
@@ -769,7 +977,7 @@ sub _set_metadata {
 		'stop'      => $stop,
 		'log2'      => $log,
 		'dataset'   => $dataset,
-		'strand'    => $strand,
+		'strand'    => $stranded,
 		'bin_size'  => $binsize . $unit,
 		'method'    => $method,
 		'value'     => $value_type,
@@ -788,6 +996,7 @@ sub _set_metadata {
 
 
 
+
 __END__
 
 =head1 NAME
@@ -800,12 +1009,12 @@ average_gene.pl
  average_gene.pl --in <file> --out <file> [--options]
   
   Options:
-  --db <name|file.gff3>
-  --feature [type, type:source, alias]
-  --out <filename>
   --in <filename> 
+  --out <filename>
+  --db <name | filename>
+  --feature <type | type:source | alias>,...
   --data <dataset_name | filename>
-  --method [mean|median|min|max|sum]
+  --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
   --value [score|count|length]
   --bins <integer>
   --ext <integer>
@@ -824,54 +1033,71 @@ The command line flags and descriptions:
 
 =over 4
 
+=item --in <filename>
 
-=item --db <name|file.gff3>
-
-Specify the name of the BioPerl SeqFeature::Store database to use as
-source. Alternatively, a single GFF3 file may be loaded into a in-memory
-database. Specifying the database is required for new feature data files.
-For pre-existing input data files, this value may be obtained from the
-input file metadata. However, if provided, it overrides the database listed
-in the file; this is useful for collecting data from multiple databases.
+Specify an input file containing either a list of database features or 
+genomic coordinates for which to collect data. The file should be a 
+tab-delimited text file, one row per feature, with columns representing 
+feature identifiers, attributes, coordinates, and/or data values. The 
+first row should be column headers. Bed files are acceptable, as are 
+text files generated with this program.
 
 =item --out <filename>
 
 Specify the output file name. 
 
-=item --in <filename>
+=item --db <name | filename>
 
-Specify the filename of a data table containing the list of 
-features to average. The file must be in the 'tim_data' format and specify 
-a feature to use. If not specified, then a new feature list will be 
-generated from the database.
+Specify the name of a BioPerl SeqFeature::Store database to use as
+source. Alternatively, an appropriate single file database file may be 
+provided. Acceptable databases may include a single GFF3 file (.gff or 
+.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
+SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
+(see Bio::DB::BigWigSet). Specifying the database is required for new 
+feature data files. For pre-existing input data files, this value may be 
+obtained from the input file metadata. However, if provided, it overrides 
+the database specified in the file; this is useful for collecting data 
+from multiple databases.
 
-=item --feature [type, type:source, alias]
+=item --feature <type | type:source | alias>,...
 
 Specify the type of feature from which to collect values. This is required 
-for new feature tables. Two types of values may be passed: either a specific 
-feature type present in the database, or an alias to one or more features. 
-The feature may be specified as either type or type:source. Aliases are 
-specified in the C<biotoolbox.cfg> file, and provide a shortcut to a 
-list of one or more features. More than feature may be included as a 
-comma-delimited list (no commas).
+only for new feature tables. Three types of values may be passed: the 
+feature type, feature type and source expressed as 'type:source', or an 
+alias to one or more feature types. Aliases are specified in the 
+C<biotoolbox.cfg> file and provide a shortcut to a list of one or more 
+database features. More than one feature may be included as a 
+comma-delimited list (no spaces). 
   
 =item --data <dataset_name | filename>
 
-Specify the name of the microarray data set for which you wish to 
-collect data. If not specified, the data set may be 
-chosen interactively from a presented list. When enumerating features, 
-the features' type or type:source values should be indicated.
-Alternatively, the name of a data file may be provided. Supported 
-file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
-(.bam). The file may be local or remote.
+Provide the name of the dataset to collect the values. If no 
+dataset is specified on the command line, then the program will 
+interactively present a list of datasets from the database to select. 
 
-=item --method [mean|median|min|max|sum]
+The dataset may be a feature type in a BioPerl Bio::DB::SeqFeature::Store 
+or Bio::DB::BigWigSet database. Provide either the feature type or 
+type:source. The feature may point to another data file whose path is 
+stored in the feature's attribute tag (for example a binary 
+Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the 
+features' scores may be used in data collection.
 
-Specify the method of collecting and combining the data into each bin. 
-Three statistical methods for combining score values are allowed: mean, 
-median, minimum, maximum, and sum. The defined method does not affect 
-the interpolation or summary functions of the program, only initial data 
-collection. The default method is 'mean'.
+Alternatively, the dataset may be a database file, including bigWig (.bw), 
+bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
+remote (specified with a http: or ftp: prefix).
+
+=item --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
+
+Specify the method for combining all of the dataset values within the 
+genomic region of the feature. Accepted values include:
+  
+  - mean        (default)
+  - median
+  - sum
+  - stddev      Standard deviation of the population (within the region)
+  - min
+  - max
+  - rpm         Reads Per Million mapped, for Bam and BigBed only
 
 =item --value [score|count|length]
 
@@ -906,7 +1132,7 @@ using a percentage of feature of length.
 Specify the minimum feature size to be averaged. Features with a
 length below this value will not be skipped (all bins will have
 null values). This is to avoid having bin sizes below the average 
-microarray tiling distance.
+microarray tiling distance. The default is undefined (no limit).
 
 =item --strand [all|sense|antisense]
 
@@ -918,7 +1144,8 @@ datasets, or only antisense datasets should be collected.
 
 Indicate that the data should be averaged across all features at
 each position, suitable for graphing. A separate text file will be
-written with the suffix '_summed' with the averaged data
+written with the suffix '_summed' with the averaged data. The default 
+is false.
 
 =item --smooth
 
@@ -948,15 +1175,15 @@ This help text.
 
 =head1 DESCRIPTION
 
-This program will collect data across a gene body into bins to generate an
-'average' gene summary. It is used to determine if there is a spatial 
-distribution preference for the dataset over gene bodies. The number of bins
-may be specified as a command argument (default 10). Additionally, extra bins 
-may be extended on either side of the gene (default 0 on either side). The bin 
-size is determined as a percentage of gene length.
+This program will collect data across a gene or feature body into numerous 
+percentile bins to. It is used to determine if there is a spatial 
+distribution preference for the dataset over gene bodies. The number 
+of bins may be specified as a command argument (default 10). Additionally, 
+extra bins may be extended on either side of the gene (default 0 on either 
+side). The bin size is determined as a percentage of gene length.
 
-The program writes out a tim data formatted text file.
-
+The program writes out a tim data formatted text file. It will also 
+optionally generate a "summed" or average profile for all of the features. 
 
 =head1 AUTHOR
 
