@@ -94,7 +94,7 @@ sub load_tim_data_file {
 			# we're opening a standard globtype filehandle for compatibility
 			# with Storable.pm
 			
-			open *FILE, "gunzip -c $filename |" or croak "unable to open gunzip -c $filename";
+			open *FILE, "gunzip -c $filename |" or confess "unable to open gunzip -c $filename";
 			$inputdata_ref = fd_retrieve(\*FILE);
 			close FILE;
 		}
@@ -624,7 +624,7 @@ sub open_tim_data_file {
 				
 				# less than 3 columns!???
 				else {
-					croak " BED file '$filename' doesn't have at least 3 columns!\n";
+					confess " BED file '$filename' doesn't have at least 3 columns!\n";
 					return;
 				}
 				
@@ -986,7 +986,7 @@ sub write_tim_data_file {
 			# we're opening the file using a standard globtype file handle
 			# to make it compatible with Storable.pm
 			
-			open *FILE, "| gzip >$newname " or croak "unable to open gzip $newname";
+			open *FILE, "| gzip >$newname " or confess "unable to open gzip $newname";
 			store_fd($datahash_ref, \*FILE);
 			close FILE;
 		}
