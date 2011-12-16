@@ -15,8 +15,9 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
+my $VERSION = '1.0.2';
 
-print "\n This script will join two or more data files\n\n";
+print "\n This script will concatenate two or more data files\n\n";
 
 
 ### Quick help
@@ -35,15 +36,17 @@ unless (@ARGV) {
 my (
 	$outfile,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
 GetOptions( 
 	'out=s'     => \$outfile, # specify the input data file
 	'gz!'       => \$gz, # compress output files
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -52,6 +55,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script join_data_file.pl, version $VERSION\n\n";
+	exit;
 }
 
 

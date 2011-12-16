@@ -24,6 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
+my $VERSION = '1.5.9';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -59,7 +60,8 @@ my (
 	$log,
 	$set_strand,
 	$raw,
-	$help
+	$help,
+	$print_version,
 ); # command line variables
 
 ## Command line options
@@ -82,7 +84,8 @@ GetOptions(
 	'set_strand'  => \$set_strand, # enforce an artificial strand
 	'raw'         => \$raw, # output raw data
 	'help'        => \$help, # print the help
-);
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -92,6 +95,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script average_gene.pl, version $VERSION\n\n";
+	exit;
 }
 
 

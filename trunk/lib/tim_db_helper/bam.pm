@@ -6,6 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
+our $VERSION = '1.5.9';
 
 
 # Exported names

@@ -35,9 +35,10 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.7';
 
 
-print "\n A program to collect feature data from the database\n\n";
+print "\n A program to collect data for a list of features\n\n";
 
 
 ### Display quick help
@@ -75,7 +76,7 @@ my (
 	$set_strand,
 	$gz,
 	$help,
-	$doc,
+	$print_version,
 ); 
 my @datasets; # an array of names of dataset values to be retrieved
 
@@ -104,8 +105,8 @@ GetOptions(
 	'set_strand' => \$set_strand, # enforce a specific strand
 	'gz!'        => \$gz, # compress output file
 	'help'       => \$help, # request help
-	'doc'        => \$doc, # print POD documentation
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # print help if requested
 if ($help) {
@@ -114,6 +115,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script get_datasets.pl, version $VERSION\n\n";
+	exit;
 }
 
 

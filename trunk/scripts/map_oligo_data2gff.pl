@@ -11,6 +11,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.2';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -41,7 +42,8 @@ my (
 	$places,
 	$outfile,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 
@@ -58,8 +60,9 @@ GetOptions(
 	'places=i'    => \$places, # number of digits to format the data number
 	'out=s'       => \$outfile, # the output file name
 	'gz!'         => \$gz, # compress output file with gzip
-	'help'        => \$help # request help
-);
+	'help'        => \$help, # request help
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -69,6 +72,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script map_oligo_data2gff.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 ### Check for required values
 unless ($oligo_file and $data_file) {

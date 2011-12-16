@@ -3,6 +3,7 @@
 use strict;
 use Cwd;
 require CPAN;
+my $VERSION = '1.5.0';
 
 # get current working directory
 my $current = Cwd::cwd();

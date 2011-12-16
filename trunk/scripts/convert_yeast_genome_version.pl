@@ -14,6 +14,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
+my $VERSION = '1.0.0';
 
 print "\n This script will convert yeast genomic coordinates\n";
 

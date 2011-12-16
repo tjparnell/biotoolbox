@@ -6,8 +6,9 @@
 use strict;
 use IO::File;
 use IO::Zlib;
+my $VERSION = '1.0.2';
 
-print "\nA script to identify unique and common SNPs between multiple strains\n\n";
+print "\n A script to identify unique and common SNPs between multiple strains\n\n";
 
 
 

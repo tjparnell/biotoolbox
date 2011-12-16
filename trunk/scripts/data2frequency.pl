@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-#use Data::Dumper;
+my $VERSION = '1.0.2';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -43,7 +43,8 @@ my (
 	$binsize,
 	$start,
 	$max,
-	$help
+	$help,
+	$print_version,
 );
 GetOptions( 
 	'in=s'       => \$infile, # the input file
@@ -54,7 +55,8 @@ GetOptions(
 	'min=f'      => \$start, # the starting value to calculate the bins
 	'max=f'      => \$max, # maximum value for x-axis
 	'help'       => \$help, # flag to print help
-) or die " unknown arguments! use --help for more information\n";
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
 	# print entire POD
@@ -63,6 +65,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script data2frequency.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 ### Required values
 unless ($infile) {

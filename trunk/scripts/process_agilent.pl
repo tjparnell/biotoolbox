@@ -17,8 +17,9 @@ use lib "$Bin/../lib";
 use tim_file_helper qw(
 	write_tim_data_file
 );
+my $VERSION = '1.0.0';
 
-print "\nA script to process Agilent microarray files\n";
+print "\n A script to process Agilent microarray files\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -51,7 +52,8 @@ my (
 	$quant,
 	$log,
 	$processed,
-	$help
+	$help,
+	$print_version,
 );
 my @in_files;
 GetOptions( 
@@ -66,9 +68,19 @@ GetOptions(
 	'log!'       => \$log, # convert to log2
 	'processed'  => \$processed, # use processed values rather than raw
 	'help'       => \$help, # print help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
-if ($help) { &help; exit }
+if ($help) {
+	help(); 
+	exit;
+}
+# Print version
+if ($print_version) {
+	print " Biotoolbox script process_agilent.pl, version $VERSION\n\n";
+	exit;
+}
+
 unless (@in_files or $in_file_list) {die " No input file name(s) specified! use --help\n"};
 unless ($outfile) {die " No output file name specified! use --help\n"};
 unless ($ch_ratio or $in_file_list) {die " No channel ratio specified! use --help\n"};

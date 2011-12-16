@@ -20,8 +20,9 @@ use tim_file_helper qw(
 	load_tim_data_file
 	open_to_write_fh
 );
+my $VERSION = '1.5.0';
 
-print "\n This script will graph correlation plots for two microarry data sets\n\n";
+print "\n This script will graph correlation plots for two data sets\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -61,7 +62,8 @@ my (
 	$directory,
 	$out,
 	$numbers,
-	$help, 
+	$help,
+	$print_version,
 );
 my @pairs; # an array of pairs
 GetOptions( 
@@ -89,7 +91,8 @@ GetOptions(
 	'out=s'     => \$out, # output file name
 	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
 	'help'      => \$help, # flag to print help
-);
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
 	# print entire POD
@@ -98,6 +101,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script graph_data.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 ### check requirements

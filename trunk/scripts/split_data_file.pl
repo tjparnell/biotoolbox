@@ -12,8 +12,9 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
+my $VERSION = '1.0.2';
 
-print "\n This script will split a data file\n\n";
+print "\n This script will split a data file by features\n\n";
 
 
 ### Quick help
@@ -34,7 +35,8 @@ my (
 	$index,
 	$max,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -43,8 +45,9 @@ GetOptions(
 	'index|col=i' => \$index, # index for the column to use for splitting
 	'max=i'       => \$max, # maximum number of lines per file
 	'gz!'         => \$gz, # compress output files
-	'help'        => \$help # request help
-);
+	'help'        => \$help, # request help
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -54,6 +57,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script split_data_file.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

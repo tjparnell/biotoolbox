@@ -18,10 +18,11 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_read_fh
 );
+my $VERSION = '1.4.4';
 
 
 
-print "A script to identify the location of SNPs\n";
+print "\n A script to locate SNPs and identify codon changes\n\n";
 
 
 
@@ -43,6 +44,7 @@ my (
 	$database,
 	$featurelist,
 	$help,
+	$print_version,
 ); # command line variables
 my @infiles; 
 
@@ -53,7 +55,8 @@ GetOptions(
 	'db=s'        => \$database, # the name of the database to use
 	'features=s'  => \$featurelist, # list of features to look for
 	'help'        => \$help, # print the help
-);
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -63,6 +66,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script locate_SNPs.pl, version $VERSION\n\n";
+	exit;
 }
 
 

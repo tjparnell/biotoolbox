@@ -13,6 +13,7 @@ use Pod::Usage;
 use IO::File;
 use Bio::Tools::GFF;
 use Bio::SeqFeature::Generic;
+my $VERSION = '1.5.8';
 
 #use Data::Dumper;
 
@@ -35,15 +36,17 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
 GetOptions( 
 	'in=s'      => \$infile, # the gff3 data file
 	'out=s'     => \$outfile, # name of output file 
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -52,6 +55,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script gff3_to_ucsc_table.pl, version $VERSION\n\n";
+	exit;
 }
 
 

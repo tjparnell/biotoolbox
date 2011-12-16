@@ -17,6 +17,11 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.0';
+
+print "\n A tool for manipulating datasets in data files\n";
+
+
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -44,7 +49,7 @@ my ( # command line option variables
 	$opt_log, 
 	$gz, 
 	$help,
-	$doc,
+	$print_version,
 );
 
 # Command line options
@@ -63,7 +68,8 @@ GetOptions(
 	'log!'      => \$opt_log, # data values are in log2 space
 	'gz!'       => \$gz, # write gzipped data file
 	'help'      => \$help, # request help
-) or die " unknown command line options!\n";
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Get file name
 unless ($infile) {
@@ -80,14 +86,18 @@ if ($help) {
 	} );
 }
 
+# Print version
+if ($print_version) {
+	print " Biotoolbox script manipulate_datasets.pl, version $VERSION\n\n";
+	exit;
+}
+
+
 ### Check for required values
 unless ($infile) {
 	die "No file name supplied!";
 }
 
-
-### Print Greeting
-print "\n    A tool for manipulating datafiles\n";
 
 
 ### Load file

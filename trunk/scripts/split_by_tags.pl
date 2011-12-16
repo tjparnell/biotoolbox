@@ -7,6 +7,7 @@ use strict;
 use File::Basename qw(fileparse);
 use Bio::SeqIO;
 use Bio::Seq::Quality;
+my $VERSION = '1.0.2';
 
 print "\n A script to split a fastq file based on barcode tags\n\n";
 

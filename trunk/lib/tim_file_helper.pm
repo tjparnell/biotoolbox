@@ -16,6 +16,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
+our $VERSION = '1.5.9';
 
 
 ### Variables

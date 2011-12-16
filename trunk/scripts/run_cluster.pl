@@ -7,8 +7,9 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
 use Algorithm::Cluster::Record;
+my $VERSION = '1.0.2';
 
-print "\n This program will run the k-means cluster analysis\n";
+print "\n A script to run the k-means cluster analysis\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -30,7 +31,8 @@ my (
 	$runs,
 	$method,
 	$distribution,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -41,8 +43,9 @@ GetOptions(
 	'run=i'     => \$runs, # the number of runs to perform the
 	'method=s'  => \$method, # the method to perform
 	'dist=s'    => \$distribution, # similiarity metric of measuring distance
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -52,6 +55,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script run_cluster.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

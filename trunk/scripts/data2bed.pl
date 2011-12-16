@@ -23,6 +23,7 @@ eval {
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
 };
+my $VERSION = '1.5.8';
 
 print "\n This program will write a BED file\n";
 
@@ -55,7 +56,8 @@ my (
 	$database,
 	$chromo_file,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -75,8 +77,9 @@ GetOptions(
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bbapp=s'   => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -85,6 +88,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script data2bed.pl, version $VERSION\n\n";
+	exit;
 }
 
 

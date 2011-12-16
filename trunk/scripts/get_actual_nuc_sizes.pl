@@ -19,9 +19,10 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
+my $VERSION = '1.5.4';
 
 
-print "\n A script to get exact nucleosome fragment sizes from a bam file\n\n";
+print "\n A script to get exact nucleosome fragment sizes from a Bam file\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -46,7 +47,8 @@ my (
 	$type,
 	$source,
 	$outfile,
-	$help, 
+	$help,
+	$print_version,
 );
 GetOptions( 
 	'in=s'       => \$infile, # the input nucleosome data file
@@ -60,7 +62,8 @@ GetOptions(
 	'source=s'   => \$source, # the GFF source
 	'out=s'      => \$outfile, # output file name
 	'help'       => \$help, # request help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -69,6 +72,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script get_actual_nuc_sizes.pl, version $VERSION\n\n";
+	exit;
 }
 
 

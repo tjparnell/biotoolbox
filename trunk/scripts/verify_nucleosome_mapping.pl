@@ -17,8 +17,9 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.4';
 
-print "\n This program will verify the mapping of nucleosomes\n";
+print "\n This program will verify the mapping of nucleosomes\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -35,14 +36,16 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my (
 	$infile,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
 GetOptions( 
 	'in=s'      => \$infile, # the solexa data file
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -52,6 +55,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script verify_nucleosome_mapping.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

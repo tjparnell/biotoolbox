@@ -1,5 +1,69 @@
 ######## biotoolbox revision history #############
 
+v1.5.9 (svn r247)
+	- updated script big_file2gff3.pl to generate BigWigSet conf stanzas with subtracks, also more thorough conf stanzas
+	- added additional axis formatting options to script graph_profile.pl
+	- fixed critical error in library tim_db_helper where relative coordinates were not correctly reported in function get_region_dataset_hash()
+	- improved handling of opening a bigwigset database in library tim_db_helper::bigwig
+	- major overhaul of script average_gene.pl to work with bed files, add new methods including rpm support, and general much-needed reorganization
+	- improved error messaging in biotoolbox libraries by using confess instead of croak
+	- reorganize the order of checking for the biotoolbox configuration in tim_db_helper::config
+
+v1.5.8 (svn r240) (not released)
+	- fix some bugs with script graph_histogram.pl concerning the bins and their labels
+	- updated script gff3_to_ucsc_table.pl to work with gene models without transcripts and fix bugs handling comments and pragmas
+	- fixed bug with trimming windows in script find_enriched_regions.pl by including absolute option to get_region_dataset_hash() function in library tim_db_helper
+	- added option to randomly assign strand for paired-end features to script bam2gff_bed.pl
+	- fix chromosome regex issue with non-standard chromosome names in script bar2wig.pl
+	- updated methods to get chromosome sizes in libraries tim_db_helper::bigwig and tim_db_helper::bigbed
+	- added new parameter chromosome_exclude in configuration file biotoolbox.cfg, which allows specific chromosomes to be excluded when generating new feature or genomic interval lists
+	- removed all references to key reference_sequence_type from config file biotoolbox.cfg and associated scripts
+	- updated chromosome reference, and added logic to automatically identify column indices in script data2bed.pl
+	- updated several scripts to use seq_ids to retrieve chromosome lists
+	- fixed bug in script get_feature_info.pl where short feature lists would cause a failure when generating a list of possible attributes from sample features
+	
+v1.5.7 (svn r227) (not released)
+	- major overhaul of script get_datasets.pl
+	- removed subs get_feature_dataset() and get_genome_dataset() from library tim_db_helper, functionality moved to script get_datasets.pl
+	- added data color options to script graph_profile.pl
+	- completely updated script map_data.pl to work with chromosome segments rather than named features, and added rpm support
+	- added new sub to check datasets for rpm support in library tim_db_helper
+	- fixed bug when specifying no datasets in script get_datasets.pl
+	- improved support for BigWigSet databases in library tim_db_helper and script print_feature_types.pl
+	
+v1.5.6 (svn r223) (not released)
+	- added rpm method to score functions in library tim_db_helper
+	- minor bug fixes and adjustments to help rpm method in tim_db_helper bigwig, bigbed, and bam libraries
+	- minor bug fix in script find_enriched_regions.pl
+	- fixed export bug in library tim_db_helper::bigbed
+	- fixed bug in library tim_db_helper sub process_and_verify_dataset() where new datasets would never be prompted
+	- corrected the method for counting bed features in library tim_db_helper::bigbed
+	- fixed alignment collection to only take alignments with midpoint positions within the requested region in library tim_db_helper::bam
+	
+v1.5.5 (svn r219) (not released)
+	- added new avoid option to method get_region_dataset_hash() in library tim_db_helper
+	- updated script map_data.pl to use get_region_dataset_hash()
+	- fixed bug in method validate_dataset_list() in library tim_db_helper
+	- fixed bug in script merge_datasets.pl where table headers may not be written properly
+	- fixed bug in tim_db_helper::get_genome_dataset() if more than one segment was found
+	- made numerous improvements in opening db connections in library tim_db_helper
+	- made changes to assigning feature type when opening certain files in library tim_file_helper
+	- fixed bug in library tim_db_helper where bed file coordinates were not written out in interbase
+	- moved the sum_total_alignments() subroutine from the script bam2wig.pl to the library tim_db_helper::bam
+	- added support for stranded paired-end RNA-Seq bam files aligned with TopHat which use the XS attribute to record strand information in scripts bam2wig.pl and bam2gff_bed.pl
+	- disabled splices on paired-end bam files in script bam2wig.pl
+	
+v1.5.4 (svn r209) (not released)
+	- added more explicit support for bed files in the tim_file_helper and tim_data_helper libraries, including data structure verification, interbase to base conversion, and metadata handling
+	- generalized bam and bigfile database handling to tim_db_helper libraries
+	- simplified generating genomic windows in tim_db_helper
+	-improved handling of collecting data from bigfile databases in tim_db_helper libraries
+	- added chromosome feature output to script big_file2gff3.pl
+	- updated numerous scripts to reflect tim_db_helper changes; general code cleanup
+	- further simplification and code cleanup of library tim_db_helper, including database and dataset list verification, and removing redundant code in collecting dataset values
+	- added new subroutine process_and_verify_dataset() to library tim_db_helper
+	- updated scripts average_gene.pl, find_enriched_regions.pl, and map_data.pl to use the new sub process_and_verify_dataset()
+	
 v1.5.3 (svn r205)
 	- Fixed bug in script bam2wig.pl that prevented spliced alignments from being properly checked and recorded. 
 	- Fixed numerous bugs in script ucsc_table2gff3.pl, including a bug where the gene start coordinate may not be updated from interbase to base, and not accurately converting the CDS phase

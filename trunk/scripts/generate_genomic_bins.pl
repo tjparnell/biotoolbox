@@ -21,6 +21,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 use tim_db_helper::config;
+my $VERSION = '1.5.8';
 
 print "\n This program will generate a file of genomic bins\n";
 
@@ -46,7 +47,8 @@ my (
 	$max,
 	$outfile,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -59,8 +61,9 @@ GetOptions(
 	'max=i'     => \$max, # maximum number of lines per split file part
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -69,6 +72,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script generate_genomic_bins.pl, version $VERSION\n\n";
+	exit;
 }
 
 

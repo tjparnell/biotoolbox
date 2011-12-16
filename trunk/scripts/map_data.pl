@@ -24,6 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
+my $VERSION = '1.5.7';
 
 print "\n This script will map data points relative to a genomic feature\n\n";
 
@@ -59,7 +60,8 @@ my (
 	$sum,
 	$log,
 	$gz,
-	$help
+	$help,
+	$print_version,
 ); # command line variables
 
 ## Command line options
@@ -82,7 +84,8 @@ GetOptions(
 	'log!'       => \$log, # data is in log2 space
 	'gz!'        => \$gz, # compress the output file
 	'help'       => \$help, # print help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -92,6 +95,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script map_data.pl, version $VERSION\n\n";
+	exit;
 }
 
 

@@ -24,6 +24,7 @@ eval {
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
 };
+my $VERSION = '1.5.8';
 
 
 print "\n This program will convert a useq archive to a bigwig/bigbed file\n\n";
@@ -55,7 +56,8 @@ my (
 	$useq_app_path,
 	$big_app_path,
 	$java_app_path,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -72,8 +74,9 @@ GetOptions(
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bigapp=s'  => \$big_app_path, # path to bigfile conversion utility
 	'useqapp=s' => \$useq_app_path, # path to useq2text jar file
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -83,6 +86,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script useq2bigfile.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

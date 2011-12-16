@@ -19,6 +19,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
+my $VERSION = '1.4.3';
 #use Data::Dumper;
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
@@ -48,7 +49,8 @@ my (
 	$type,
 	$source,
 	$gz,
-	$help
+	$help,
+	$print_version,
 ); 
 
 # Command line options
@@ -62,7 +64,8 @@ GetOptions(
 	'source=s'   => \$source, # the gff source
 	'gz!'        => \$gz, # gzip status
 	'help'       => \$help, # help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -73,6 +76,14 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script intersect_nucs.pl, version $VERSION\n\n";
+	exit;
+}
+
+
 
 # Check for required values
 unless ($infile1 and $infile2) {
