@@ -43,9 +43,6 @@ data2wig.pl
 find_enriched_regions.pl
 	Scan across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
 	
-find_nucleosome_movement.pl
-	Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
-	
 get_actual_nuc_sizes.pl
 	Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 	
@@ -168,7 +165,6 @@ Lists of programs organized by function.
 	* map_transcripts.pl
 
 ===Nucleosome Analysis===
-	* find_nucleosome_movement.pl
 	* get_actual_nuc_sizes.pl
 	* intersect_nucs.pl
 	* map_nucleosomes.pl
