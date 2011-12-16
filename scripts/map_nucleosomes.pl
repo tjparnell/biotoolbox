@@ -23,6 +23,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
+my $VERSION = '1.5.7';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -53,6 +54,7 @@ my (
 	$type,
 	$source,
 	$help,
+	$print_version,
 	$debug
 ); # command line variables
 
@@ -71,8 +73,9 @@ GetOptions(
 	'type=s'   => \$type, # the GFF type for the movement
 	'source=s' => \$source, # the GFF source for the movement
 	'help'     => \$help, # print help
+	'version'  => \$print_version, # print the version
 	'debug'    => \$debug, # a limiter to help debug my program
-) or die " unknown arguments! use --help\n";
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -83,6 +86,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script map_nucleosomes.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 # Check for Requirements
 unless ($database) {

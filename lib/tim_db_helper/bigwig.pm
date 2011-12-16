@@ -7,6 +7,7 @@ use Carp;
 use Bio::DB::BigWig;
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
+our $VERSION = '1.5.9';
 
 
 # Exported names

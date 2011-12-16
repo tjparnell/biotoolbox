@@ -17,6 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+my $VERSION = '1.5.3';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -51,7 +52,8 @@ my (
 	$do_utr,
 	$do_codon,
 	$gz,
-	$help, 
+	$help,
+	$print_version,
 );
 my @genetables;
 GetOptions( 
@@ -71,7 +73,8 @@ GetOptions(
 	'codon!'     => \$do_codon, # include start & stop codons in output
 	'gz!'        => \$gz, # compress file
 	'help'       => \$help, # request help
-) or die " unrecognized options! use --help\n";
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -80,6 +83,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n\n";
+	exit;
 }
 
 

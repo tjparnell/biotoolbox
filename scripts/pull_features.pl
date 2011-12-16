@@ -14,8 +14,9 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
+my $VERSION = '1.4.2';
 
-print "\n This script will pull out specific features from a data file\n";
+print "\n A script to pull out specific features from a data file\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -38,7 +39,8 @@ my (
 	$startcolumn,
 	$stopcolumn,
 	$log,
-	$help, 
+	$help,
+	$print_version,
 );
 my ($data_index, $list_index) = (-0.5, -0.5); # default 'null' values
 	# I can't use 0 or a real null that could be interpreted as 0
@@ -54,7 +56,8 @@ GetOptions(
 	'stopi=i'    => \$stopcolumn, # index of column to stop summarizing
 	'log!'       => \$log, # values are in log, respect log status
 	'help'       => \$help, # flag to print help
-) or die " a command is wrong! please use --help for more info\n";
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
 	# print entire POD
@@ -63,6 +66,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script pull_features.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 ### Check for required values

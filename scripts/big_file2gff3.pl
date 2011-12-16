@@ -33,6 +33,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
+my $VERSION = '1.5.9';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -58,7 +59,8 @@ my (
 	$write_metadata,
 	$set_name,
 	$write_conf,
-	$help
+	$help,
+	$print_version,
 );
 my @infiles;
 my @types;
@@ -79,8 +81,9 @@ GetOptions(
 	'set!'      => \$write_metadata, # write a metadata index file for BigWigSet
 	'setname=s' => \$set_name, # name for the bigwigset
 	'conf!'     => \$write_conf, # write GBrowse conf stanzas
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -89,6 +92,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script big_file2gff3.pl, version $VERSION\n\n";
+	exit;
 }
 
 

@@ -18,6 +18,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
+my $VERSION = '1.5.9';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -49,7 +50,8 @@ my (
 	$y_format,
 	$y_ticks,
 	$directory,
-	$help, 
+	$help,
+	$print_version,
 );
 GetOptions( 
 	'in=s'        => \$infile, # the input file
@@ -68,7 +70,8 @@ GetOptions(
 	'ytick=i'     => \$y_ticks, # number of ticks on y axis
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
-);
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
 	# print entire POD
@@ -77,6 +80,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script graph_profile.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 ##### Check required and default variables

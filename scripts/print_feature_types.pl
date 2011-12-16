@@ -11,6 +11,10 @@ use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
+my $VERSION = '1.5.8';
+
+print "\n A script to print all available feature types in a database\n\n";
+
 
 ### Quick help
 unless (@ARGV) { 
@@ -27,14 +31,16 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my (
 	$dbname,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
 GetOptions( 
 	'db=s'      => \$dbname, # the database name
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -44,6 +50,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script print_feature_types.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

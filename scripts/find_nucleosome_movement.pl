@@ -23,6 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
+my $VERSION = '1.5.4';
 
 print "\n This script will identify nucleosome movement\n\n";
 
@@ -50,7 +51,8 @@ my (
 	$loss,
 	$delta,
 	$win,
-	$help
+	$help,
+	$print_version,
 ); # command line variables
 
 # Command line options
@@ -66,7 +68,8 @@ GetOptions(
 	'delta=f'  => \$delta, # the minimum difference between the gain and loss values
 	'win=i'    => \$win, # size of the window to scan the genome
 	'help'     => \$help, # print help
-) or die " unknown arguments! use --help\n";
+	'version'  => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -77,6 +80,14 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script find_nucleosome_movement.pl, version $VERSION\n\n";
+	exit;
+}
+
+
 
 # Check for Requirements
 unless ($database or $source_data_file) {

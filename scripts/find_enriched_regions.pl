@@ -25,8 +25,9 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 use tim_db_helper::config;
+my $VERSION = '1.5.8';
 
-print "\n This script will find enriched regions for a specific microarray data set\n\n";
+print "\n This script will find enriched regions for a specific data set\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -61,6 +62,7 @@ my (
 	$html,
 	$gff,
 	$help,
+	$print_version,
 	$debug,
 ); # command line variables
 
@@ -85,7 +87,8 @@ GetOptions(
 #	'html'      => \$html, # write out a html file with hyperlinks to gbrowse
 	'debug'     => \$debug, # limit to chromosome 1 for debugging purposes
 	'help'      => \$help, # print help
-);
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -96,6 +99,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script find_enriched_regions.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 # Check for required flags and assign undefined variables default values
 unless ($database) {

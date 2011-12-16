@@ -24,6 +24,11 @@ eval {
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
 };
+my $VERSION = '1.5.8';
+
+
+print "\n A script to convert Bam alignments to GFF or BED files\n\n";
+
 
 ### Quick help
 unless (@ARGV) { 
@@ -49,7 +54,8 @@ my (
 	$random_strand,
 	$bb_app_path,
 	$gz,
-	$help, 
+	$help,
+	$print_version,
 );
 GetOptions( 
 	'in=s'       => \$infile, # the input bam file path
@@ -64,7 +70,8 @@ GetOptions(
 	'bbapp=s'    => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'        => \$gz, # gzip the output file
 	'help'       => \$help, # request help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -73,6 +80,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script bam2gff_bed.pl, version $VERSION\n\n";
+	exit;
 }
 
 

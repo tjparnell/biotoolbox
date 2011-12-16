@@ -17,6 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
+my $VERSION = '1.5.8';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -46,7 +47,8 @@ my (
 	$x_offset,
 	$x_format,
 	$directory,
-	$help
+	$help,
+	$print_version,
 );
 GetOptions( 
 	'in=s'        => \$infile, # the input file
@@ -64,7 +66,8 @@ GetOptions(
 	'format=i'    => \$x_format, # format decimal numbers of x axis
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
-);
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
 	# print entire POD
@@ -73,6 +76,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script graph_histogram.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

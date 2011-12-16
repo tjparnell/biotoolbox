@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-
+our $VERSION = '1.5.4';
 
 
 

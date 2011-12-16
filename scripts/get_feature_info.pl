@@ -18,8 +18,9 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.8';
 
-print "\n This script will get additional information about features\n\n";
+print "\n This script will collect information for a list of features\n\n";
 
 
 
@@ -43,7 +44,8 @@ my (
 	$database,
 	$attrib_request,
 	$gz,
-	$help
+	$help,
+	$print_version,
 ); 
 
 # Command line options
@@ -54,7 +56,8 @@ GetOptions(
 	'db=s'     => \$database, # database name
 	'gz!'      => \$gz, # gzip status
 	'help'     => \$help, # help
-);
+	'version'  => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -65,6 +68,14 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script get_feature_info.pl, version $VERSION\n\n";
+	exit;
+}
+
+
 
 # Check for required values
 unless ($infile) {

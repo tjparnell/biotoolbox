@@ -22,6 +22,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
+my $VERSION = '1.5.8';
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -50,7 +51,8 @@ my (
 	$chromo_file,
 	$bw_app_path,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -66,8 +68,9 @@ GetOptions(
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
 	'gz!'       => \$gz, # boolean to compress output text file
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -78,7 +81,11 @@ if ($help) {
 	} );
 }
 
-
+# Print version
+if ($print_version) {
+	print " Biotoolbox script bar2wig.pl, version $VERSION\n\n";
+	exit;
+}
 
 
 

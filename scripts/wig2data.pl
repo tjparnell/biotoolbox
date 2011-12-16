@@ -20,8 +20,9 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
+my $VERSION = '1.4.3';
 
-print "\n This program will convert wiggle files to a tabbed text file\n";
+print "\n This program will convert wiggle files to a tabbed text file\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -46,7 +47,8 @@ my (
 	$midpoint,
 	$version,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -60,8 +62,10 @@ GetOptions(
 	'midpoint!' => \$midpoint, # use midpoint instead of start and stop
 	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+
 
 # Print help
 if ($help) {
@@ -71,6 +75,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script wig2data.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

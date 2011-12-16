@@ -23,6 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
+my $VERSION = '1.5.4';
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -56,6 +57,7 @@ my (
 	$source,
 	$raw,
 	$help,
+	$print_version,
 ); 
 
 # Command line options
@@ -76,7 +78,8 @@ GetOptions(
 	'source=s'    => \$source, # the gff source
 	'raw'         => \$raw, # indicate a raw file should be written for debug purposes
 	'help'        => \$help, # print help
-) or die " unknown options!\n";
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -87,6 +90,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script map_transcripts.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

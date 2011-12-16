@@ -7,6 +7,7 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::DB::Sam;
+my $VERSION = '1.0.2';
 
 
 print "\n A script to split a paired-end bam file by insert sizes\n\n";
@@ -29,7 +30,8 @@ my (
 	$minsize, 
 	$maxsize, 
 	$AT_ends,
-	$help, 
+	$help,
+	$print_version,
 );
 my @size_list;
 GetOptions( 
@@ -40,7 +42,8 @@ GetOptions(
 	'size=s'     => \@size_list, # a list of sizes to select
 	'at'         => \$AT_ends, # discard non-AT ends
 	'help'       => \$help, # request help
-);
+	'version'    => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -50,6 +53,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script split_bam_by_isize.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

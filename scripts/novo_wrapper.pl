@@ -8,6 +8,7 @@ use Getopt::Long;
 use File::Spec;
 use File::Copy;
 use File::Basename qw(fileparse);
+my $VERSION = '1.0.2';
 
 
 print "\n This script is a wrapper for the Novoaligner program\n\n";
@@ -35,6 +36,7 @@ my (
 	$illumina,
 	$tmpdir,
 	$help,
+	$print_version,
 ); # command line variables
 
 
@@ -49,7 +51,8 @@ GetOptions(
 	'il!'         => \$illumina, # sequence is Illumina 1.3 format
 	'temp=s'      => \$tmpdir, # the temp directory
 	'help'        => \$help, # print the help
-);
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
 # Print help
@@ -60,6 +63,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script novo_wrapper.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

@@ -17,8 +17,9 @@ eval {
 	Bio::EnsEMBL::Registry->import;
 	$bio_ensembl = 1;
 };
+my $VERSION = '1.4.1';
 	
-	
+print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
 
 ### Quick help
@@ -52,7 +53,8 @@ my (
 	$prefix,
 	$outfile,
 	$printdb,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -74,8 +76,9 @@ GetOptions(
 	'prefix!'   => \$prefix, # prefix chromosome names with chr
 	'out=s'     => \$outfile, # name of output file 
 	'printdb'   => \$printdb, # print all of the available databases
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -85,6 +88,14 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script get_ensembl_annotation.pl, version $VERSION\n\n";
+	exit;
+}
+
+
 
 # Check EnsEMBL
 unless ($bio_ensembl) {

@@ -27,6 +27,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
+my $VERSION = '1.5.4';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -63,7 +64,8 @@ my (
 	$log,
 	$gffout,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 
@@ -86,8 +88,9 @@ GetOptions(
 	'log!'        => \$log, # values in log2 space
 	'gff'         => \$gffout, # output a gff file
 	'gz!'         => \$gz, # compress output
-	'help'        => \$help # request help
-);
+	'help'        => \$help, # request help
+	'version'     => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -96,6 +99,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script bin_genomic_data.pl, version $VERSION\n\n";
+	exit;
 }
 
 

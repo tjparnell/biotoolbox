@@ -22,6 +22,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 use tim_db_helper::config;
+my $VERSION = '1.5.0';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -47,7 +48,8 @@ my (
 	$do_contigs,
 	$prefix,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -59,8 +61,9 @@ GetOptions(
 	'contig!'   => \$do_contigs, # prefix on contigs too
 	'prefix=s'  => \$prefix, # the actual prefix
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -69,6 +72,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script change_chr_prefix.pl, version $VERSION\n\n";
+	exit;
 }
 
 

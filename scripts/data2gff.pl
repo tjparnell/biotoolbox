@@ -17,6 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
+my $VERSION = '1.5.1';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -55,7 +56,8 @@ my (
 	$ask,
 	$version,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 
@@ -80,8 +82,9 @@ GetOptions(
 	'ask'       => \$ask, # request help in assigning indices
 	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # boolean to compress output file
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -90,6 +93,12 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script data2gff.pl, version $VERSION\n\n";
+	exit;
 }
 
 

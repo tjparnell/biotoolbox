@@ -13,8 +13,9 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+my $VERSION = '1.5.5';
 
-print "\n A progam to merge two or more dataset files\n";
+print "\n A progam to merge datasets from two files\n";
 
 
 # Print help
@@ -32,7 +33,8 @@ my (
 	$lookup,
 	$outfile,
 	$gz,
-	$help
+	$help,
+	$print_version,
 );
 
 # Command line options
@@ -40,8 +42,9 @@ GetOptions(
 	'lookup!'   => \$lookup, # force merging by value lookup
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help # request help
-);
+	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
+) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
 if ($help) {
@@ -51,6 +54,13 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script merge_datasets.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 
 

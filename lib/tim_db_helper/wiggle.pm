@@ -5,6 +5,7 @@ require Exporter;
 use strict;
 use Carp;
 use Bio::Graphics::Wiggle;
+our $VERSION = '1.5.9';
 
 
 # Exported names

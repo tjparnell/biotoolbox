@@ -21,6 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
+our $VERSION = '1.5.9';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -65,6 +66,8 @@ unless ($@) {
 	$BAM_OK = 1;
 }; 
 $@ = undef;
+
+
 
 # define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
