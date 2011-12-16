@@ -849,7 +849,7 @@ __END__
 
 =head1 NAME
 
-useq2bigfile.pl
+useq2bigfile.pl (DEPRECATED)
 
 =head1 SYNOPSIS
 
@@ -953,6 +953,10 @@ Display this POD documentation.
 =back
 
 =head1 DESCRIPTION
+
+NOTE: This program is deprecated. David now includes a USeq2UCSCBig App in 
+the USeq package. Furthermore, the USeq2Text App generates a different 
+output that is currently incompatible with this script. Such is progress.
 
 This program will convert a USeq archive into a Big file format, either
 bigWig or bigBed. This program is essentially a wrapper around two other

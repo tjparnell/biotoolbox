@@ -46,9 +46,6 @@ find_enriched_regions.pl
 find_nucleosome_movement.pl
 	Given a dataset of ratios between two nucleosome occupancies, nucleosome movements are identified by adjoining loss/gain events.
 	
-generate_genomic_bins.pl
-	Generate a file of genomic bins to be used in data collection. Intended for large genomes, small bin size, and/or low memory environments. It will optionally split the file into managable parts.
-
 get_actual_nuc_sizes.pl
 	Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 	
@@ -88,7 +85,7 @@ locate_SNPs.pl
 manipulate_datasets.pl
 	A program to manipulate datasets (columns) in a data file. A wide variety of manipulations may be performed, from re-ordering the columns to mathematically converting the data values to generating ratios between datasets. Multiple functions may be performed interactively or single functions performed automatically by command line options, allowing for easy scripting of manipulations.
 	
-map_data.pl
+map_relative_data.pl
 	Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
 	
 map_nucleosomes.pl
@@ -106,12 +103,6 @@ merge_datasets.pl
 merge_SNPs.pl
 	Takes a two or more lists of sequence variants (as called by SamTools' samtools.pl varFilter function) and identify unique and common variants. Useful for separating strain-specific mutations from background polymorphisms.
 
-my_gff2gff3.pl
-	Convert GFF version 2 files to GFF version 3 files. Useful when transitioning from Bio::DB::GFF to Bio::DB::SeqFeature::Store databases. Fairly specific to my situation.
-	
-novo_wrapper.pl
-	A wrapper program for aligning one or more Illumina or other raw sequencing data using Novocraft's novoalign program. After aligning, it will convert the alignment file to an indexed binary BAM file.
-
 print_feature_types.pl
 	Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 	
@@ -121,18 +112,9 @@ process_agilent.pl
 pull_features.pl
 	Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
 	
-shift_coordinates.pl
-	A program for shifting coordinates, for example from interbase (0-base) to 1-base.
-
 split_bam_by_isize.pl
 	Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
 	
-split_bam_by_strand.pl
-	Split a BAM alignment file into two BAM files based on the strand to which the sequence tag aligns. Useful for RNA-Seq experiments.
-	
-split_by_tags.pl
-	Split a fastq file by barcode tags. Barcodes are short unique sequences incorporated into two or more library preparations; the libraries may then be merged into a single sequencing lane. The sequence reads may then be separated based on the barcode sequence into individual files representing the starting libraries.
-
 split_data_file.pl
 	Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
 	
@@ -141,9 +123,6 @@ ucsc_cytoband2gff3.pl
 	
 ucsc_table2gff3.pl
 	A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
-
-useq2bigfile.pl
-	A program to convert a USeq archive from David Nix's USeq software package into a bigfile, either bigWig or bigBed. This is essentially a wrapper around David Nix's USeq2Text exporter and Jim Kent's wig, bedgraph, or bed converters. The intermediate text file is parsed for anomalies and rewritten into the appropriate format for conversion.
 
 verify_nucleosome_mapping.pl
 	This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
@@ -165,7 +144,7 @@ Lists of programs organized by function.
 	* generate_genomic_bins.pl
 	* get_datasets.pl
 	* get_feature_info.pl
-	* map_data.pl
+	* map_relative_data.pl
 
 ===Dataset manipulation===
 	* data2frequency.pl
@@ -204,9 +183,7 @@ Lists of programs organized by function.
 	* bam2wig.pl
 	* bin_genomic_data.pl
 	* get_actual_nuc_sizes.pl
-	* novo_wrapper.pl
 	* split_bam_by_isize.pl
-	* split_bam_by_strand.pl
 
 ===File format conversion===
 	* bam2gff_bed.pl
@@ -214,7 +191,6 @@ Lists of programs organized by function.
 	* data2bed.pl
 	* data2gff.pl
 	* data2wig.pl
-	* useq2bigfile.pl
 	* wig2data.pl
 
 ===Genome annotation===
@@ -229,6 +205,5 @@ Lists of programs organized by function.
 ===Miscellaneous===
 	* big_file2gff3.pl
 	* convert_yeast_genome_version.pl
-	* my_gff2gff3.pl
 	* print_feature_types.pl
 
