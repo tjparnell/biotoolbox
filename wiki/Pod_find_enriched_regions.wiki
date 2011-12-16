@@ -101,7 +101,7 @@ __
 __--(no)trim
 
 __
-  Indicate that the merged windows should (not) be trimmed of below  threshold scores on the ends of the window. Normally when windows  are merged, there may be some data points on the ends of the  windows whose scores don't actually pass the threshold, but were  included because the entire window mean (or median) exceeded  the threshold. This step removes those data points. The default  behavior is true.
+  Indicate that the merged windows should (not) be trimmed of below  threshold scores on the ends of the window. Normally when windows  are merged, there may be some data points on the ends of the  windows whose scores don't actually pass the threshold, but were  included because the entire window mean (or median) exceeded  the threshold. This step removes those data points. The default  behavior is false (notrim).
 __
   __
 __--(no)feat

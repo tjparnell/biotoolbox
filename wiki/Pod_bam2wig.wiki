@@ -82,7 +82,7 @@ __
 __--strand `[`f|r`]`
 
 __
-  Only process those single-end alignments which map to the indicated  strand. Default is to take all alignments regardless of strand.
+  Only process those single-end alignments which map to the indicated  strand. For paired-end RNA-Seq alignments that were generated with  !TopHat**, the XS attribute is honored for strand information.  The default is to take all alignments regardless of strand.
 __
   __
 __--qual <**integer>
@@ -153,7 +153,7 @@ This program will enumerate aligned sequence tags and generate a wig,  or option
 
 Note that the memory consumed by the program is roughly proportional to  the size of the chromosome, particularly for dense read coverage.  The total number of alignments should not matter.
 
-Counting and processing the alignments is a lengthy process, and may  require multiple hours for large numbers, especially for splices. A  simple coverage map should be much faster to calculate, but loses the  options of selecting strand or shifting coordinates.
+Counting and processing the alignments is a lengthy process, and may  require a long time for large numbers, especially for splices. A  simple coverage map should be much faster to calculate, but loses the  options of selecting strand or shifting coordinates.
 
 Conversion to a bigWig file requires the installation of Jim Kent's  bedGraphToBigWig or wigToBigWig utilities. Conversion from a  bedGraph file is slightly more memory efficient, but at the expense of  larger file sizes.
 

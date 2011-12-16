@@ -12,12 +12,12 @@ average_gene.pl
   }}}
 {{{
   Options:
-  --db <name|file.gff3>
-  --feature [type, type:source, alias]
-  --out <filename>
   --in <filename> 
+  --out <filename>
+  --db <name | filename>
+  --feature <type | type:source | alias>,...
   --data <dataset_name | filename>
-  --method [mean|median|min|max|sum]
+  --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
   --value [score|count|length]
   --bins <integer>
   --ext <integer>
@@ -33,12 +33,10 @@ average_gene.pl
 ==OPTIONS==
 The command line flags and descriptions:
 
-{{{
-}}}
-__--db <**name|file.gff3>
+__--in <**filename>
 
 __
-  Specify the name of the !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, a single GFF3 file may be loaded into a in-memory database. Specifying the database is required for new feature data files. For pre-existing input data files, this value may be obtained from the input file metadata. However, if provided, it overrides the database listed in the file; this is useful for collecting data from multiple databases.
+  Specify an input file containing either a list of database features or  genomic coordinates for which to collect data. The file should be a  tab-delimited text file, one row per feature, with columns representing  feature identifiers, attributes, coordinates, and/or data values. The  first row should be column headers. Bed files are acceptable, as are  text files generated with this program.
 __
   __
 __--out <**filename>
@@ -47,30 +45,45 @@ __
   Specify the output file name.
 __
   __
-__--in <**filename>
+__--db <**name | filename>
 
 __
-  Specify the filename of a data table containing the list of  features to average. The file must be in the 'tim_data' format and specify  a feature to use. If not specified, then a new feature list will be  generated from the database.
+  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, an appropriate single file database file may be  provided. Acceptable databases may include a single GFF3 file (.gff or  .gff3) to be loaded into an in-memory database, a pre-loaded !BioPerl**  !SeqFeature**::Store SQLite file (.sqlite or .db), or a !BigWigSet** directory  (see Bio::DB::!BigWigSet**). Specifying the database is required for new  feature data files. For pre-existing input data files, this value may be  obtained from the input file metadata. However, if provided, it overrides  the database specified in the file; this is useful for collecting data  from multiple databases.
 __
   __
-__--feature `[`type, type:source, alias`]`
+__--feature <**type | type:source | alias>,...
 
 __
-  Specify the type of feature from which to collect values. This is required  for new feature tables. Two types of values may be passed: either a specific  feature type present in the database, or an alias to one or more features.  The feature may be specified as either type or type:source. Aliases are  specified in the `biotoolbox.cfg` file, and provide a shortcut to a  list of one or more features. More than feature may be included as a  comma-delimited list (no commas).
+  Specify the type of feature from which to collect values. This is required  only for new feature tables. Three types of values may be passed: the  feature type, feature type and source expressed as 'type:source', or an  alias to one or more feature types. Aliases are specified in the  `biotoolbox.cfg` file and provide a shortcut to a list of one or more  database features. More than one feature may be included as a  comma-delimited list (no spaces).
 __
   __
 __--data <**dataset_name | filename>
 
 __
-  Specify the name of the microarray data set for which you wish to  collect data. If not specified, the data set may be  chosen interactively from a presented list. When enumerating features,  the features' type or type:source values should be indicated. Alternatively, the name of a data file may be provided. Supported  file types include !BigWig** (.bw), !BigBed** (.bb), or single-end Bam  (.bam). The file may be local or remote.
+  Provide the name of the dataset to collect the values. If no  dataset is specified on the command line, then the program will  interactively present a list of datasets from the database to select.
 __
   __
-__--method `[`mean|median|min|max|sum`]`
+  The dataset may be a feature type in a !BioPerl** Bio::DB::!SeqFeature**::Store  or Bio::DB::!BigWigSet** database. Provide either the feature type or  type:source. The feature may point to another data file whose path is  stored in the feature's attribute tag (for example a binary  Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the  features' scores may be used in data collection.
+__
+  __
+  Alternatively, the dataset may be a database file, including bigWig (.bw),  bigBed (.bb), or Bam alignment (.bam) files. The files may be local or  remote (specified with a http: or ftp: prefix).
+__
+  __
+__--method `[`mean|median|stddev|min|max|range|sum|rpm|rpkm`]`
 
 __
-  Specify the method of collecting and combining the data into each bin.  Three statistical methods for combining score values are allowed: mean,  median, minimum, maximum, and sum. The defined method does not affect  the interpolation or summary functions of the program, only initial data  collection. The default method is 'mean'.
+  Specify the method for combining all of the dataset values within the  genomic region of the feature. Accepted values include:
 __
   __
+{{{
+  - mean        (default)
+  - median
+  - sum
+  - stddev      Standard deviation of the population (within the region)
+  - min
+  - max
+  - rpm         Reads Per Million mapped, for Bam and BigBed only
+}}}
 __--value `[`score|count|length`]`
 
 __
@@ -98,7 +111,7 @@ __
 __--min <**integer>
 
 __
-  Specify the minimum feature size to be averaged. Features with a length below this value will not be skipped (all bins will have null values). This is to avoid having bin sizes below the average  microarray tiling distance.
+  Specify the minimum feature size to be averaged. Features with a length below this value will not be skipped (all bins will have null values). This is to avoid having bin sizes below the average  microarray tiling distance. The default is undefined (no limit).
 __
   __
 __--strand `[`all|sense|antisense`]`
@@ -110,7 +123,7 @@ __
 __--sum
 
 __
-  Indicate that the data should be averaged across all features at each position, suitable for graphing. A separate text file will be written with the suffix '`_`summed' with the averaged data
+  Indicate that the data should be averaged across all features at each position, suitable for graphing. A separate text file will be written with the suffix '`_`summed' with the averaged data. The default  is false.
 __
   __
 __--smooth
@@ -138,12 +151,10 @@ __
 __
   __
 ==DESCRIPTION==
-This program will collect data across a gene body into bins to generate an 'average' gene summary. It is used to determine if there is a spatial  distribution preference for the dataset over gene bodies. The number of bins may be specified as a command argument (default 10). Additionally, extra bins  may be extended on either side of the gene (default 0 on either side). The bin  size is determined as a percentage of gene length.
+This program will collect data across a gene or feature body into numerous  percentile bins to. It is used to determine if there is a spatial  distribution preference for the dataset over gene bodies. The number  of bins may be specified as a command argument (default 10). Additionally,  extra bins may be extended on either side of the gene (default 0 on either  side). The bin size is determined as a percentage of gene length.
 
-The program writes out a tim data formatted text file.
+The program writes out a tim data formatted text file. It will also  optionally generate a "summed" or average profile for all of the features.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD

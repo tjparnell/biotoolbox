@@ -16,9 +16,15 @@ graph_profile.pl <**filename>
    --all
    --(no)cen
    --(no)log
+   --xindex <index>
+   --skip <integer>
+   --offset <integer>
+   --xformat <integer>
    --min <number>
    --max <number>
-   --x <integer>
+   --yformat <integer>
+   --ytick <integer>
+   --color <name,name,...>
    --dir <foldername>
    --help
 }}}
@@ -40,28 +46,73 @@ __
   If no dataset indices are specified, then they may be chosen  interactively from a list.
 __
   __
+__--all
+
+__
+  Automatically graph all available datasets present in the file.
+__
+  __
+__--(no)cen
+
+__
+  Datasets should (not) be median centered prior to graphing. Useful when  graphing multiple datasets together when they have different medians.
+__
+  __
 __--(no)log
 
 __
   Dataset values are (not) in log2 space, or status should be respected  if indicated in the file metadata.
 __
   __
-__--cen
+__--xindex <**index>
 
 __
-  Datasets should be median centered prior to graphing. Useful when  graphing multiple datasets together when they have different  medians.
+  Specify the column index of the X-axis dataset. Unless specified, the  program automatically uses the columns labeled 'Midpoint' or 'Window',  if present.
 __
   __
-__--min <**number>, --max <**number>
+__--skip <**integer>
+
+__
+  Specify the ordinal number of X axis major ticks to label. This  avoids overlapping labels. The default is 1 (every tick is labeled).
+__
+  __
+__--offset <**integer>
+
+__
+  Specify the number of X axis ticks to skip at the beginning before starting  to label them. This may help in adjusting the look of the graph. The  default is 0.
+__
+  __
+__--xformat <**integer>
+
+__
+  Specify the number of decimal places the X axis labels should be formatted.  The default is undefined (no formatting).
+__
+  __
+__--min <**number>
+
+__
+__--max <**number>
 
 __
   Specify the minimum and/or maximum values for the Y-axis. The default  values are automatically determined from the dataset.
 __
   __
-__--x <**index>
+__--yformat <**integer>
 
 __
-  Specify the index of the X-axis dataset. Unless specified, the program  automatically uses the columns labeled 'Midpoint' or 'Window', if  present.
+  Specify the number of decimal places the Y axis labels should be formatted.  The default is undefined (no formatting).
+__
+  __
+__--ytick <**integer>
+
+__
+  Specify explicitly the number of major ticks for the Y axes.  The default is 8.
+__
+  __
+__--color <**name,name,...>
+
+__
+  Optionally specify the colors for the data lines. The default set  is lred, lgreen, lblue, lyellow, lpurple, cyan, and lorange. See the  documentation for [Pod_GD_Graph_colour GD::Graph::colour] for a complete list.
 __
   __
 __--dir

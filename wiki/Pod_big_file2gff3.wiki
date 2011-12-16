@@ -13,10 +13,12 @@ big_file2gff3.pl `[`--options...`]` <**filename1.bw> <**filename2.bb> ...
   --path </destination/path/for/bigfiles/>
   --source <text>
   --name <text> or <text1,text2,...>
-  --type <text>
+  --type <text> or <text1,text2,...>
   --strand [f|r|w|c|+|-|1|0|-1],...
+  --chromo 
   --rename
   --set
+  --setname <text>
   --conf
   --help
   }}}
@@ -48,19 +50,25 @@ __
 __--name <**text>
 
 __
-  Provide the name(s) for the GFF feature(s). This will be used as the GFF  feature's name. A unique name should be provided for each file, and may be  specified as a single comma-delimited list or by reiterating the --name  option. The default value to use the input file basename.
+  Provide the name(s) for the GFF feature(s). This will be used as the GFF  feature's name. A unique name should be provided for each file, and may be  specified as a single comma-delimited list or by reiterating the --name  option. The default value is to use the input file basename.
 __
   __
 __--type <**text>
 
 __
-  Provide the GFF type for the GFF features for all input files. By default,  it re-uses the GFF name. Unique values for each input file is not supported.
+  Provide the GFF type for the GFF features for all input files. A unique  type should be provided for each file, and may be specified as a single  comma-delimited list or by reiterating the --type option. By default,  it re-uses the GFF name.
 __
   __
 __--strand `[`f|r|w|c|+|-|1|0|-1`]`,...
 
 __
   Indicate which strand the feature will be located. Acceptable values include  (f)orward, (r)everse, (w)atson, (c)rick, +, -, 1, or -1. By default no strand  is used. For mulitple input files with different strands, use the option  repeatedly or provide a comma-delimited list. If only one value is provided,  it is used for all input files.
+__
+  __
+__--chromo
+
+__
+  Include chromosome features in the output GFF3 file. These are necessary  to make a complete GFF3 file compatible for loading into a Bio::DB database  when chromosome information is not provided elsewhere.
 __
   __
 __--rename
@@ -72,13 +80,19 @@ __
 __--set
 
 __
-  Indicate that all of the input !BigWig** files should be part of a !BigWigSet**, which treats all of the !BigWig** files in the target directory as a single database. This is primarily for GBrowse, as biotoolbox scripts (currently) don't use the !BigWigSet** adaptor. A text file is written in the target directory with metadata for each !BigWig** file (feature, source, strand, name) as described in Bio::DB::!BigWigSet** documentation. Additional metadata  may be manually added as necessary. The default is false.
+  Indicate that all of the input !BigWig** files should be part of a !BigWigSet**, which treats all of the !BigWig** files in the target directory as a single database. A text file is written in the target directory with metadata for  each !BigWig** file (feature, source, strand, name) as described in the  Bio::DB::!BigWigSet** documentation. Additional metadata may be manually  added if desired. The default is false.
+__
+  __
+__--setname <**text>
+
+__
+  Optionally specify the name for the !BigWigSet** track when writing the  GBrowse configuration stanza. It is also used as the basename for the  GFF3 file. The default is to use the name of the last directory in the  target path.
 __
   __
 __--conf
 
 __
-  Write sample GBrowse database and track configuration stanzas. Each !BigFile**  file will get individual stanzas, unless the --set option is enabled, where  a single stanza for the !BigWigSet** is provided. This is helpful when setting  up GBrowse database and configurations. Default is false.
+  Write sample GBrowse database and track configuration stanzas. Each !BigFile**  file will get individual stanzas, unless the --set option is enabled, where  a single stanza with subtracks for the !BigWigSet** is generated. This is  helpful when setting up GBrowse database and configurations. Default is false.
 __
   __
 __--help
@@ -98,7 +112,7 @@ Multiple source files may be designated, and each may have its own name.  This f
 
 The generated GFF3 file is written to the current directory. One GFF file is  written for each input file, or one GFF file for a !BigWigSet**. It uses the  provided GFF name as the basename for the file.
 
-Optionally, sample database and track GBrowse configuration stanzas may also be  written to the current directory to facilitate setting up GBrowse.
+Optionally, sample database and track GBrowse configuration stanzas may also be  written to the current directory to facilitate setting up GBrowse. If a  !BigWigSet** database is requested, then the track stanza will be set up with  subtrack tables representing each !BigWig** file.
 
 {{{
 }}}

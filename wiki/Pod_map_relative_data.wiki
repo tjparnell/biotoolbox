@@ -19,13 +19,14 @@ A script to map data relative to and flanking a genomic feature
   --in <filename> 
   --out <filename>
   --data <dataset_name | filename>
-  --method [mean|median|min|max|stddev|sum]
+  --method [mean|median|min|max|stddev|sum|rpm]
   --value [score|count|length]
   --win <integer>
   --num <integer>
   --pos [5|3|m]
   --strand [sense|antisense|all]
   --set_strand
+  --(no)avoid
   --(no)sum
   --(no)smooth
   --(no)log
@@ -69,7 +70,7 @@ __
   Specify the name of the data set from which you wish to  collect data. If not specified, the data set may be chosen interactively from a presented list. Other features may be collected, and should be specified using the type  (GFF type:source), especially when collecting alternative data values.  Alternatively, the name of a data file may be provided. Supported  file types include !BigWig** (.bw), !BigBed** (.bb), or single-end Bam  (.bam). The file may be local or remote.
 __
   __
-__--method `[`mean|median|min|max|stddev|sum`]`
+__--method `[`mean|median|min|max|stddev|sum|rpm`]`
 
 __
   Specify the method of combining multiple values within each window. The mean,  median, minimum, maximum, standard deviation, or sum of the values may be  reported. The default value is mean for score and length values, or sum for  count values.
@@ -109,6 +110,12 @@ __--set_strand
 
 __
   For features that are not inherently stranded (strand value of 0),  impose an artificial strand for each feature (1 or -1). This will  have the effect of enforcing a relative orientation for each feature,  or to collected stranded data. This requires the presence a  column in the input data file with a name of "strand". Hence, it  will not work with newly generated datasets, but only with input  data files. Default is false.
+__
+  __
+__--(no)avoid
+
+__
+  Indicate whether features of the same type should be avoided when  calculating values in a window. Each window is checked for  overlapping features of the same type; if the window does overlap  another feature of the same type, no value is reported for the  window. The default is false (return all values regardless of  overlap).
 __
   __
 __--(no)sum

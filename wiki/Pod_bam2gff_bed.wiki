@@ -11,12 +11,12 @@ bam2gff_bed.pl `[`--options...`]` <**filename>
 {{{
   Options:
   --in <filename>
-  --bed | --gff
+  --bed | --gff | --bigbed | --bb
   --pe
   --type <text>
   --source <text>
+  --randstr
   --out <filename> 
-  --bigbed | --bb
   --bbapp </path/to/bedToBigBed>
   --(no)gz
   --help
@@ -30,10 +30,19 @@ __
   Specify the file name of a .bam alignment file. The file should be indexed.  If not, the program will attempt to automatically index it.
 __
   __
-__--bed | --gff
+__--bed
 
 __
-  Specify the output file format. Either a BED file (6-columns) or GFF v.3  file will be written. The default behavior is to write a BED file.
+__--gff
+
+__
+__--bigbed
+
+__
+__--bb
+
+__
+  Specify the output file format. Either a BED file (6-columns) or GFF v.3  file will be written. You can also specify a bigBed format (bigbed or bb),  where a BED text file will first be generated and then automatically  converted to a compressed, binary !BigBed** file. The default behavior is to  write a BED file.
 __
   __
 __--pe
@@ -54,19 +63,16 @@ __
   For GFF output files, specify the source tag. The default is 'Illumina'.
 __
   __
+__--randstr
+
+__
+  For paired-end Bam files, specify that the strand of the alignment be  randomly assigned to either the forward or reverse strand.
+__
+  __
 __--out
 
 __
   Specify the output file name. The default for GFF output files is to use  the GFF type; for BED output files the input file base name is used. A  '.bed' extension is added if necessary.
-__
-  __
-__--bigbed
-
-__
-__--bb
-
-__
-  When generating a BED formatted output file, optionally indicate that  a binary !BigBed** file should be generated instead of a text BED file.  A .bed file is first generated, then converted to a .bb file, and then  the .bed file is removed.
 __
   __
 __--bbapp </path/to/bedToBigBed>
@@ -93,6 +99,8 @@ This program will convert alignments in a BAM formatted file into either a BED o
 Both single- and paired-end alignments may be converted. For paired-end  alignments, the genomic coordinates of the entire insert fragment is recorded.
 
 The mapping quality score is recorded as the GFF or BED score. For paired-end  alignments, only the left score is recorded for efficiency.
+
+The strand information is retained from the original alignment, except for  proper paired-end alignments. For paired-end alignments, the !TopHat**-specific  attribute XS is searched, and, if found, is used for the strand. Otherwise,  all features default to the forward strand. An option is available to  randomly assign a strand to paired-end features.
 
 For BED files, coordinates are adjusted to interbase format, according to  the specification.
 
