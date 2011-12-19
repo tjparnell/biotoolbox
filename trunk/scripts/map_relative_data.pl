@@ -903,6 +903,7 @@ A script to map data relative to and flanking a genomic feature
   --(no)sum
   --(no)smooth
   --(no)log
+  --version
   --help
 
 =head1 OPTIONS
@@ -1031,6 +1032,10 @@ from neighboring values.
 
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

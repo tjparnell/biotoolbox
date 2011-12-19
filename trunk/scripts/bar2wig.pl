@@ -698,6 +698,7 @@ bar2wig.pl [--options...] <filename>
   --chromof <filename>
   --bwapp </path/to/wigToBigWig>
   --(no)gz
+  --version
   --help
 
 =head1 OPTIONS
@@ -778,6 +779,10 @@ conversion, if available.
 Specify whether (or not) the output wig file should be compressed with gzip.
 This option does not affect bigWig files, but will affect intermediate 
 wig files.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

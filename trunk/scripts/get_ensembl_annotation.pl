@@ -1115,6 +1115,7 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --user <text>
   --pass <text>
   --printdb
+  --version
   --help
 
 
@@ -1215,6 +1216,10 @@ value is none.
 
 Print all of the available database names, species, and groups from the 
 connected EnsEMBL database. The program will exit after printing the list.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

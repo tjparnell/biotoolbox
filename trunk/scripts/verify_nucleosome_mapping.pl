@@ -259,6 +259,7 @@ __END__
   --in <filename>
   --out <filename> 
   --(no)gz
+  --version
   --help
 
 
@@ -273,6 +274,10 @@ The command line flags and descriptions:
 Specify the input file. The program expects the output data file from 
 the biotoolbox script 'map_nucleosomes.pl'. The file may be compressed 
 with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

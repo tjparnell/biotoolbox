@@ -3761,6 +3761,7 @@ manipulate_datasets.pl [--options ...] <input_filename>
   --out <filename>
   --(no)log
   --(no)gz
+  --version
   --help
   --doc
 
@@ -3904,6 +3905,10 @@ recorded in the dataset metadata.
 Indicate whether the output file should (not) be compressed. The appropriate extension will be 
 added. If this option is not specified, then the compression status of the input file will be 
 preserved.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

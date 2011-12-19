@@ -544,6 +544,7 @@ get_feature_info.pl <filename>
   --attrib <attribute1,attribute2,...>
   --out filename
   --(no)gz
+  --version
   --help
 
 Attributes include:
@@ -614,6 +615,10 @@ overwrite the input file.
 Indicate whether the output file should (not) be compressed by gzip. 
 If compressed, the extension '.gz' is appended to the filename. If a compressed 
 file is opened, the compression status is preserved unless specified otherwise.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

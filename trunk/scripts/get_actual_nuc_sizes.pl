@@ -411,6 +411,7 @@ get_actual_nuc_sizes.pl
   --type <gff_type>
   --source <gff_source>
   --out <filename>
+  --version
   --help
 
 
@@ -475,6 +476,10 @@ GFF file. The default value is the name of this program.
 =item --out <filename>
 
 Provide a new output file name. By default it overwrites the input file.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

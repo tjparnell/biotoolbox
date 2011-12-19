@@ -619,6 +619,7 @@ data2gff.pl [--options...] <filename>
   --out <filename> 
   --version [2,3]
   --(no)gz
+  --version
   --help
 
 
@@ -747,6 +748,10 @@ Specify the GFF version. The default is version 3.
 =item --(no)gz
 
 Indicate whether the output file should (not) be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

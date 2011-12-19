@@ -203,6 +203,7 @@ join_data_file.pl [--options] <file1> <file2> ...
   
   --out <filename>
   --(no)gz
+  --version
   --help
 
 
@@ -224,6 +225,10 @@ an output file name.
 Indicate whether the output files should be compressed 
 with gzip. Default behavior is to preserve the compression 
 status of the first input file.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

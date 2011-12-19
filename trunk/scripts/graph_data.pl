@@ -1006,6 +1006,7 @@ graph_data.pl
   --yformat <integer>
   --out <base_filename>
   --dir <foldername>
+  --version
   --help
 
 =head1 OPTIONS
@@ -1126,6 +1127,10 @@ Optionally specify the output filename prefix.
 
 Specify an optional name for the output subdirectory name. Default
 is the input filename base with '_graphs' appended.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

@@ -794,6 +794,7 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   --lookup
   --out <filename> 
   --(no)gz
+  --version
   --help
 
 
@@ -814,6 +815,10 @@ Specify the output filename. By default it uses the first file name.
 =item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

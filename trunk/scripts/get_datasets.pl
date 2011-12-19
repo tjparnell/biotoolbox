@@ -1512,6 +1512,7 @@ get_datasets.pl [--options...] [<filename>]
   --step <integer>
   --set_strand
   --(no)gz
+  --version
   --help
 
 
@@ -1723,9 +1724,13 @@ Indicate whether the output file should (not) be compressed by gzip.
 If compressed, the extension '.gz' is appended to the filename. If a compressed 
 file is opened, the compression status is preserved unless specified otherwise.
 
+=item --version
+
+Print the version number.
+
 =item --help
 
-Display the complete POD documentation for this program.
+Display the POD documentation for this program.
 
 =back
 

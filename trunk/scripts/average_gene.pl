@@ -1034,6 +1034,7 @@ average_gene.pl
   --smooth
   --set_strand
   --(no)log
+  --version
   --help
 
 =head1 OPTIONS
@@ -1175,6 +1176,10 @@ data files. Default is false.
 
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

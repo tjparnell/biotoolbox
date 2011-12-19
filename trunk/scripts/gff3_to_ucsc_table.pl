@@ -981,6 +981,7 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
+  --version
   --help
 
 
@@ -998,6 +999,10 @@ Specify the input GFF3 file. The file should not be compressed with gzip.
 
 Specify the output filename. By default it uses input file base name 
 appened with '_refseq.txt'.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

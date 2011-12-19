@@ -577,7 +577,8 @@ graph_histogram.pl --size <number> --max <number> <filename>
    --lines
    --out <base_filename>
    --dir <output_directory>
-   --help
+   --version
+  --help
 
 =head1 OPTIONS
 
@@ -665,6 +666,10 @@ Optionally specify the output filename prefix. The default value is
 Optionally specify the name of the target directory to place the 
 graphs. The default value is the basename of the input file 
 appended with "_graphs".
+
+=item --version
+
+Print the version number.
 
 =item --help
 

@@ -401,6 +401,7 @@ wig2data.pl [--options...] <filename>
   --(no)midpoint
   --version [2,3]
   --(no)gz
+  --version
   --help
 
 
@@ -456,6 +457,10 @@ Specify the GFF version. The default is version 3.
 =item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

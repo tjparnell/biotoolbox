@@ -773,6 +773,7 @@ bam2wig.pl [--options...] <filename>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --(no)gz
+  --version
   --help
 
 
@@ -908,6 +909,10 @@ set in the biotoolbox.cfg file.
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
 requested.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

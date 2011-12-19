@@ -1412,6 +1412,7 @@ __END__
   --(no)utr
   --(no)codon
   --(no)gz
+  --version
   --help
 
 =head1 OPTIONS
@@ -1513,6 +1514,10 @@ in the transcript heirarchy. The default is false.
 =item --(no)gz
 
 Specify whether the output file should be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

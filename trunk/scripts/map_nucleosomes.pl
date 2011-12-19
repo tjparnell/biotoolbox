@@ -626,6 +626,7 @@ map_nucleosomes.pl --db <database> --thresh <number> [--options...]
   --type <gff_type>
   --source <gff_source>
   --out <filename>
+  --version
   --help
 
 
@@ -698,6 +699,10 @@ GFF file. The default value is the name of this program.
 
 Specify the output file name. The default is the name of the scan 
 dataset appended with "_nucleosome".
+
+=item --version
+
+Print the version number.
 
 =item --help
 

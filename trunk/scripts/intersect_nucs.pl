@@ -664,6 +664,7 @@ intersect_nucs.pl [--options...] <filename_1> <filename_2>
   --type <gff_type>
   --source <gff_source>
   --(no)gz
+  --version
   --help
 
 
@@ -710,6 +711,10 @@ writing the GFF file. The default value is "nucleosome_intersection".
 
 Provide the text to be used as the GFF source used in writing the 
 GFF file. The default value is the name of this program.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

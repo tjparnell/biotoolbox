@@ -655,6 +655,7 @@ change_chr_prefix.pl [--add | --strip] [--options...] <filename>
   --prefix <text>
   --(no)contig
   --(no)gz
+  --version
   --help
 
 
@@ -696,6 +697,10 @@ in the renaming process. These are recognized by the text 'contig',
 =item --(no)gz
 
 Specify whether (or not) the output text file should be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

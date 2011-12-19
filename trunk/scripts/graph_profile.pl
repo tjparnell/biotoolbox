@@ -535,7 +535,8 @@ graph_profile.pl <filename>
    --ytick <integer>
    --color <name,name,...>
    --dir <foldername>
-   --help
+   --version
+  --help
 
 =head1 OPTIONS
 
@@ -626,6 +627,10 @@ documentation for L<GD::Graph::colour> for a complete list.
 Optionally specify the name of the target directory to place the 
 graphs. The default value is the basename of the input file 
 appended with "_graphs".
+
+=item --version
+
+Print the version number.
 
 =item --help
 

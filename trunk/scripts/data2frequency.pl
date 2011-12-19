@@ -341,6 +341,7 @@ data2frequency.pl --bins <integer> --size <number> <filename>
   --min <number>
   --max <number>
   --out <filename>
+  --version
   --help
 
 
@@ -391,6 +392,10 @@ value, in which case the number of bins is empirically determined.
 
 Specify the output file name. The default is to take the input file base name
 and append '_frequency' to it. The file format is a tim data file.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

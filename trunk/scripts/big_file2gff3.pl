@@ -853,6 +853,7 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --set
   --setname <text>
   --conf
+  --version
   --help
   
 
@@ -943,6 +944,10 @@ Write sample GBrowse database and track configuration stanzas. Each BigFile
 file will get individual stanzas, unless the --set option is enabled, where 
 a single stanza with subtracks for the BigWigSet is generated. This is 
 helpful when setting up GBrowse database and configurations. Default is false.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

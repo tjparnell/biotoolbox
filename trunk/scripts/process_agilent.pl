@@ -35,6 +35,7 @@ unless (@ARGV) { # when no command line options are present
   --(no)norm
   --(no)log
   --processed
+  --version
   --help\n";
 	exit;
 }
@@ -285,6 +286,7 @@ Command line options for process_agilent.pl
   --separate Quantile normalize experiment and control channels separately
   --nonorm   Do NOT quantile normalize
   --log      Convert values to log base 2
+  --version
   --help     This help text
   ";
 }

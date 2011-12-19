@@ -153,6 +153,7 @@ run_cluster.pl [--options...] <filename>
   --run <integer>
   --method [a|m]
   --dist [c|a|u|x|s|k|e|b]
+  --version
   --help
 
 
@@ -206,6 +207,10 @@ Specify the distance function to be used. Several options are available.
 	b  City-block distance
 	
 The default value is 'e', Euclidean distance.
+
+=item --version
+
+Print the version number.
 
 =item --help
 
