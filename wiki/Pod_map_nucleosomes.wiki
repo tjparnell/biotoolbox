@@ -23,6 +23,7 @@ map_nucleosomes.pl --db <**database> --thresh <**number> `[`--options...`]`
   --type <gff_type>
   --source <gff_source>
   --out <filename>
+  --version
   --help
 }}}
 {{{
@@ -90,6 +91,12 @@ __--out <**filename>
 
 __
   Specify the output file name. The default is the name of the scan  dataset appended with "`_`nucleosome".
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

@@ -16,6 +16,7 @@ split_bam_paired_by_size.pl `[`--options`]` <**file.bam>
   --size <min-max>
   --out <filename>
   --at
+  --version
   --help
 }}}
 {{{
@@ -57,6 +58,12 @@ __--at
 
 __
   Boolean option to indicate that only fragments whose paired sequence reads  end in a `[`AT`]` nucleotide should be included in the output GFF file.  Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides;  this option ensures that the fragment is more likely derived from a MNase  cut.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

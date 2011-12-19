@@ -21,6 +21,7 @@ get_actual_nuc_sizes.pl
   --type <gff_type>
   --source <gff_source>
   --out <filename>
+  --version
   --help
 }}}
 {{{
@@ -86,6 +87,12 @@ __--out <**filename>
 
 __
   Provide a new output file name. By default it overwrites the input file.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

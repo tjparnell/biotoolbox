@@ -34,6 +34,7 @@ A script to bin genomic data into windows
   --(no)log
   --gff
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -146,6 +147,12 @@ __--gz
 
 __
   Compress the output file through gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

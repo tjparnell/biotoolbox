@@ -13,6 +13,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --in <filename>
   --out <filename> 
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -24,6 +25,12 @@ __--in <**filename>
 
 __
   Specify the input file. The program expects the output data file from  the biotoolbox script 'map_nucleosomes.pl'. The file may be compressed  with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

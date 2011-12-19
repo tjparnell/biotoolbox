@@ -20,6 +20,7 @@ data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
+  --version
   --help
   }}}
 {{{
@@ -97,6 +98,12 @@ __--(no)gz
 
 __
   Indicate whether the output file should (not) be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

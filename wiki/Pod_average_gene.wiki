@@ -28,6 +28,7 @@ average_gene.pl
   --smooth
   --set_strand
   --(no)log
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -142,6 +143,12 @@ __--(no)log
 
 __
   Dataset values are (not) in log2 space and should be treated  accordingly. Output values will be in the same space.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

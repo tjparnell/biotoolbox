@@ -16,6 +16,7 @@ run_cluster.pl `[`--options...`]` <**filename>
   --run <integer>
   --method [a|m]
   --dist [c|a|u|x|s|k|e|b]
+  --version
   --help
 }}}
 {{{
@@ -70,6 +71,12 @@ __
 	b  City-block distance
 	}}}
   The default value is 'e', Euclidean distance.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

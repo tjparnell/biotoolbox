@@ -27,6 +27,7 @@ bam2wig.pl `[`--options...`]` <**filename>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -140,6 +141,12 @@ __--(no)gz
 
 __
   Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

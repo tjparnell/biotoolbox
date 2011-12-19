@@ -30,6 +30,7 @@ A script to map data relative to and flanking a genomic feature
   --(no)sum
   --(no)smooth
   --(no)log
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -134,6 +135,12 @@ __--(no)log
 
 __
   Dataset values are (not) in log2 space and should be treated  accordingly. Output values will be in the same space.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

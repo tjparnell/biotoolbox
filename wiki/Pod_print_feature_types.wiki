@@ -10,6 +10,7 @@ print_feature_types.pl <**database>
 
 {{{
   --db <database>
+  --version
   --help
   }}}
 {{{
@@ -21,6 +22,12 @@ __--db <**database>
 
 __
   Specify the name of a Bio::DB::!SeqFeature**::Store database, or a !BigWigSet**  directory.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

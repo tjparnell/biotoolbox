@@ -19,6 +19,7 @@ pull_features.pl --data <**filename> --list <**filename> --out <**filename>
   --starti <integer>
   --stopi <integer>
   --log
+  --version
   --help
 }}}
 {{{
@@ -80,6 +81,12 @@ __--log
 
 __
   The data is in log2 space. Only necessary when re-summarizing the pulled data.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

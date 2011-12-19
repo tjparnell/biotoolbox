@@ -16,6 +16,7 @@ wig2data.pl `[`--options...`]` <**filename>
   --(no)midpoint
   --version [2,3]
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -75,6 +76,12 @@ __--(no)gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

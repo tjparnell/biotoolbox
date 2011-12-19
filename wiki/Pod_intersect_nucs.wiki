@@ -19,6 +19,7 @@ intersect_nucs.pl `[`--options...`]` <**filename_1> <**filename_2>
   --type <gff_type>
   --source <gff_source>
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -62,6 +63,12 @@ __--source <**gff_source>
 
 __
   Provide the text to be used as the GFF source used in writing the  GFF file. The default value is the name of this program.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

@@ -28,6 +28,7 @@ data2wig.pl `[`--options...`]` <**filename>
   --chromof <filename>
   --db <database>
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -132,6 +133,12 @@ __--(no)gz
 
 __
   A boolean value to indicate whether the output wiggle  file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

@@ -22,6 +22,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --ref [start | mid]
   --out <filename>
   --(no)gz
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -73,6 +74,12 @@ __--(no)gz
 
 __
   Specify whether the output file should (not) be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

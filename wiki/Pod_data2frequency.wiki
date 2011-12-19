@@ -18,6 +18,7 @@ data2frequency.pl --bins <**integer> --size <**number> <**filename>
   --min <number>
   --max <number>
   --out <filename>
+  --version
   --help
 }}}
 {{{
@@ -65,6 +66,12 @@ __--out <**filename>
 
 __
   Specify the output file name. The default is to take the input file base name and append '`_`frequency' to it. The file format is a tim data file.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

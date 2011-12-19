@@ -25,7 +25,8 @@ graph_histogram.pl --bins <**integer> --size <**number> <**filename>  graph_hist
    --lines
    --out <base_filename>
    --dir <output_directory>
-   --help
+   --version
+  --help
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -115,6 +116,12 @@ __--dir
 
 __
   Optionally specify the name of the target directory to place the  graphs. The default value is the basename of the input file  appended with "`_`graphs".
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

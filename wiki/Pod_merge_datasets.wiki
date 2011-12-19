@@ -13,6 +13,7 @@ merge_datasets.pl `[`--options...`]` <**file1> <**file2> ...
   --lookup
   --out <filename> 
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -36,6 +37,12 @@ __--(no)gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

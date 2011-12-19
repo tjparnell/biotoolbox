@@ -29,6 +29,7 @@ data2gff.pl `[`--options...`]` <**filename>
   --out <filename> 
   --version [2,3]
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -148,6 +149,12 @@ __--(no)gz
 
 __
   Indicate whether the output file should (not) be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

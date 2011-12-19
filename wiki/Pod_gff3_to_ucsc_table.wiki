@@ -12,6 +12,7 @@ gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
+  --version
   --help
 }}}
 {{{
@@ -29,6 +30,12 @@ __--out <**filename>
 
 __
   Specify the output filename. By default it uses input file base name  appened with '`_`refseq.txt'.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

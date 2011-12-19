@@ -16,6 +16,7 @@ get_feature_info.pl <**filename>
   --attrib <attribute1,attribute2,...>
   --out filename
   --(no)gz
+  --version
   --help
 }}}
 Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
@@ -69,6 +70,12 @@ __--(no)gz
 
 __
   Indicate whether the output file should (not) be compressed by gzip.  If compressed, the extension '.gz' is appended to the filename. If a compressed  file is opened, the compression status is preserved unless specified otherwise.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

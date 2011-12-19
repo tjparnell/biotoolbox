@@ -13,6 +13,7 @@ split_data_file.pl `[`--options`]` <**filename>
   --index <column_index>
   --max <integer>
   --(no)gz
+  --version
   --help
 }}}
 {{{
@@ -48,6 +49,12 @@ __--(no)gz
 
 __
   Indicate whether the output files should be compressed  with gzip. Default behavior is to preserve the compression  status of the input file.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

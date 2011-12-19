@@ -33,6 +33,7 @@ graph_data.pl
   --yformat <integer>
   --out <base_filename>
   --dir <foldername>
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -146,6 +147,12 @@ __--dir <**foldername>
 
 __
   Specify an optional name for the output subdirectory name. Default is the input filename base with '`_`graphs' appended.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

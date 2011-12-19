@@ -21,6 +21,7 @@ bar2wig.pl `[`--options...`]` <**filename>
   --chromof <filename>
   --bwapp </path/to/wigToBigWig>
   --(no)gz
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -90,6 +91,12 @@ __--(no)gz
 
 __
   Specify whether (or not) the output wig file should be compressed with gzip. This option does not affect bigWig files, but will affect intermediate  wig files.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

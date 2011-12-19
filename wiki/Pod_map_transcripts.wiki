@@ -27,6 +27,7 @@ map_transcripts.pl --db <**name> --win <**i> --step <**i> --fdata <**name>  --rd
   --min <integer>
   --(no)gff
   --source <text>
+  --version
   --help
 }}}
 {{{
@@ -104,6 +105,12 @@ __--source <**text>
 
 __
   Specify the GFF source value when writing a GFF file. The default  value is the name of this program.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help

@@ -27,6 +27,7 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --user <text>
   --pass <text>
   --printdb
+  --version
   --help
 }}}
 {{{
@@ -134,6 +135,12 @@ __--printdb
 
 __
   Print all of the available database names, species, and groups from the  connected EnsEMBL database. The program will exit after printing the list.
+__
+  __
+__--version
+
+__
+  Print the version number.
 __
   __
 __--help
