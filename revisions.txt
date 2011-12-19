@@ -1,5 +1,8 @@
 ######## biotoolbox revision history #############
 
+v.1.6.1 (svn r258)
+	- updated the online documentation for all perl scripts to include the version option
+
 v1.6.0 (svn r253)
 	- added version numbers and reporting to all perl scripts and modules
 	- retired a number of outdated scripts
