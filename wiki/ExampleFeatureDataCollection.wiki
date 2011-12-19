@@ -3,13 +3,13 @@
 
 =HOWTO: Generating a feature list and collecting data=
 
-This is an example guide for collecting features and dataset from a Bio::DB::SeqFeature::Store database housing genomic features and a microarray data set using *biotoolbox* scripts. This presumes that the database is already set up and loaded.
+This is an example guide for collecting features and dataset from a Bio::DB::SeqFeature::Store database housing genomic features and a microarray data set using *biotoolbox* scripts. This presumes that the database is already set up and loaded. You can read more about [LoadingDatabase loading a database].
 
 ===Notes on running the *biotoolbox* scripts===
 	* All of the scripts are designed to be run from the scripts directory. Most require helper modules found in the lib directory, which the script should be able to find on its own if the directory structure is not changed.
 	* All of the scripts, when run without any arguments, should present a short synopsis of the arguments.
 	* Most of the scripts will provide additional help when run with the `-h` or `--help` arguments. The help is taken from internal POD documentation, which can also be viewed by entering `perldoc <script.pl>`.
-	* A configuration file for defining database arguments, among other things, is included in the lib directory. A custom copy may be placed in the root of your home directory, or specified using an environment variable `TIM_DB_HELPER`.
+	* A configuration file, `biotoolbox.cfg`, for defining database arguments, among other things, is included in the *biotoolbox* root directory. A custom copy may be placed in the root of your home directory, or specified using an environment variable `BIOTOOLBOX`.
 
 ===Generating a feature list===
 We want to collect a list of genes from the database. First, we need to identify the feature type we want from the database. We can use [Pod_print_feature_types print_feature_types.pl] to generate a list of features present in the database. We are using the database _cerevisiae_20100109_
@@ -217,7 +217,7 @@ The *biotoolbox* data collection scripts can collect data and other values from 
 First, a simple GFF3 file may be generated using the script [Pod_big_file2gff3 big_file2gff3.pl] that references the location of the file. This can then be loaded into the database.
 Second, the file may be directly referenced with a command line option when executing the data collection script.
 <pre>
-Elessar:~ tim$ get_datasets.pl --db sc_public_ma --dataf path/to/my/data.bam --log --start=-300 --stop 1 --in gene_list.txt
+Elessar:~ tim$ get_datasets.pl --db sc_public_ma --data path/to/my/data.bam --log --start=-300 --stop 1 --in gene_list.txt
 
  A program to collect feature data from the database
 
