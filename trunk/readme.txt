@@ -138,6 +138,9 @@ http://code.google.com/p/biotoolbox/wiki/DataFileFormats
 Example Data collection
 http://code.google.com/p/biotoolbox/wiki/ExampleFeatureDataCollection
 
+Example working with Next Generation Sequencing Data
+http://code.google.com/p/biotoolbox/wiki/ExampleNextGenerationSequencing
+
 Explanation of the text data report format
 http://code.google.com/p/biotoolbox/wiki/TimDataFormat
 
