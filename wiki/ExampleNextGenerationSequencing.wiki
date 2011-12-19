@@ -1,7 +1,7 @@
 #summary An example guide to working with Next Generation Sequencing data
 #labels Featured 
 
-=HOWTO: Generating a feature list and collecting data=
+=HOWTO: Working with Next Generation Sequencing data=
 
 This is an example guide for collecting data from next generation sequencing experiments. These are usually short sequence tags, sequenced by the millions in a parallel fashion, representing genomic DNA, cDNA from RNA, or ChIP. In these cases, we want to associate the number of sequence tags with specific genomic annotation, usually genes. For example, what is the expression level of a gene (how many sequenced cDNA fragments align to that gene?) or where does a transcription factor occupy (how many ChIP DNA fragments associate with a gene promoter?). 
 
