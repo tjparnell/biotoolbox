@@ -192,11 +192,17 @@ None
 
 =head1 DESCRIPTION
 
-This program will check for module dependencies used by the biotoolbox 
+This program will check for Perl module dependencies used by the biotoolbox 
 scripts. It will check for the installed version and the current version 
 in CPAN. For missing or out of date modules, it will offer to install them 
-through CPAN.
+through CPAN. Note that any dependencies may not be handled well, and you 
+may wish to decline and install manually through CPAN.
 
+If your Perl modules are located in system-owned directories, you may need to 
+execute this script with root privilages. Or, if you prefer, check what is 
+missing with this program and then install manually with root privilages.
+
+This will require that CPAN is properly configured (proxies, mirrors, etc.).
 
 =head1 AUTHOR
 
