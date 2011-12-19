@@ -520,6 +520,7 @@ data2bed.pl [--options...] <filename>
   --db <database>
   --bbapp </path/to/bedToBigBed>
   --(no)gz
+  --version
   --help
 
 =head1 OPTIONS
@@ -621,6 +622,10 @@ execute the utility to convert the bed file.
 =item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

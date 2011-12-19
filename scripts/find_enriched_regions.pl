@@ -1101,6 +1101,7 @@ find_enriched_regions.pl
   --genes
   --gff
   --gz
+  --version
   --help
 
  
@@ -1208,6 +1209,10 @@ accordingly and report as log2 data.
 =item --gz
 
 Compress the output file through gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

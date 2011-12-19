@@ -1251,6 +1251,7 @@ map_transcripts.pl --db <name> --win <i> --step <i> --fdata <name>
   --min <integer>
   --(no)gff
   --source <text>
+  --version
   --help
 
  
@@ -1342,6 +1343,10 @@ is generated. The default is true.
 
 Specify the GFF source value when writing a GFF file. The default 
 value is the name of this program.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

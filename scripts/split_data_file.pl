@@ -349,6 +349,7 @@ split_data_file.pl [--options] <filename>
   --index <column_index>
   --max <integer>
   --(no)gz
+  --version
   --help
 
 
@@ -386,6 +387,10 @@ Enter as an integer; underscores may be used as thousands separator, e.g.
 Indicate whether the output files should be compressed 
 with gzip. Default behavior is to preserve the compression 
 status of the input file.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

@@ -130,6 +130,7 @@ print_feature_types.pl
 print_feature_types.pl <database>
   
   --db <database>
+  --version
   --help
   
 
@@ -143,6 +144,10 @@ The command line flags and descriptions:
 
 Specify the name of a Bio::DB::SeqFeature::Store database, or a BigWigSet 
 directory.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

@@ -440,6 +440,7 @@ locate_SNPs.pl
   --in <snp_file>
   --db <database>
   --features type1,type2,...
+  --version
   --help
 
 =head1 OPTIONS
@@ -469,6 +470,10 @@ genes to intersect with the SNPs. Complex gene structures (gene->mRNA->CDS)
 should be able to be parsed to look for amino-acid changes. If a list is 
 not provided, the default list will then include gene, ncRNA, snRNA, snoRNA,
 and tRNA.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

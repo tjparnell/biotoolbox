@@ -372,6 +372,7 @@ split_bam_paired_by_size.pl [--options] <file.bam>
   --size <min-max>
   --out <filename>
   --at
+  --version
   --help
 
 
@@ -417,6 +418,10 @@ end in a [AT] nucleotide should be included in the output GFF file.
 Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides; 
 this option ensures that the fragment is more likely derived from a MNase 
 cut.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

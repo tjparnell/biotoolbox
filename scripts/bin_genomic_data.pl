@@ -1258,6 +1258,7 @@ A script to bin genomic data into windows
   --(no)log
   --gff
   --(no)gz
+  --version
   --help
 
  
@@ -1366,6 +1367,10 @@ Write a new gff output file instead of a normal tim data file.
 =item --gz
 
 Compress the output file through gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

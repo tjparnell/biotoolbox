@@ -845,6 +845,7 @@ __END__
   --ref [start | mid]
   --out <filename>
   --(no)gz
+  --version
   --help
 
 =head1 OPTIONS
@@ -903,6 +904,10 @@ The default is to rewrite the input file.
 =item --(no)gz
 
 Specify whether the output file should (not) be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

@@ -388,6 +388,7 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
   --starti <integer>
   --stopi <integer>
   --log
+  --version
   --help
 
 
@@ -451,6 +452,10 @@ to the last or rightmost column.
 
 The data is in log2 space. Only necessary when re-summarizing the
 pulled data.
+
+=item --version
+
+Print the version number.
 
 =item --help
 

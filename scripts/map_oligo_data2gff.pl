@@ -357,6 +357,7 @@ data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
+  --version
   --help
   
 
@@ -427,6 +428,10 @@ Specify the output filename. The default is to use the name value.
 =item --(no)gz
 
 Indicate whether the output file should (not) be compressed with gzip.
+
+=item --version
+
+Print the version number.
 
 =item --help
 
