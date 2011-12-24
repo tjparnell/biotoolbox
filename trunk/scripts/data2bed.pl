@@ -10,9 +10,7 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 );
-use tim_db_helper qw(
-	open_db_connection
-);
+# use tim_db_helper has moved down below and is loaded on demand
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
@@ -23,7 +21,7 @@ eval {
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
 };
-my $VERSION = '1.5.8';
+my $VERSION = '1.6.2';
 
 print "\n This program will write a BED file\n";
 
@@ -310,8 +308,15 @@ print "  - '", $metadata_ref->{$strand_index}{name}, "' for strand\n"
 
 # open output file handle
 unless ($outfile) {
-	$outfile = $metadata_ref->{'basename'} . '.bed';
-	$outfile .= '.gz' if $gz;
+	$outfile = $metadata_ref->{'basename'};
+}
+unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
+	# check for .bed extension and add if necessary
+	$outfile .= '.bed';
+}
+if ($gz and $outfile !~ /\.gz$/i) {
+	# add gz extension as necessary
+	$outfile .= '.gz';
 }
 my $out_fh = open_to_write_fh($outfile, $gz) or 
 	die " unable to open output file for writing!\n";
@@ -323,7 +328,6 @@ unless ($bigbed) {
 
 # parse through the data lines in the input data file
 my $count = 0; # the number of lines processed
-my $strand_warning = 0; # warning for strand of 0
 while (my $line = $in_fh->getline) {
 	
 	# Get the line data
@@ -343,6 +347,7 @@ while (my $line = $in_fh->getline) {
 		push @bed, $data[$start_index] - 1;
 		push @bed, $data[$stop_index];
 	}
+	$bed[1] = 0 if ($bed[1] < 0); # prevent negative coordinates !?
 	
 	# Convert the name 
 		# the name index could either be a simple one-word element
@@ -356,7 +361,7 @@ while (my $line = $in_fh->getline) {
 		my @groups = split / ?; ?/, $data[$name_index]; 
 		foreach my $element (@groups) {
 			my ($key, $value) = split / ?= ?/, $element;
-			if ($key =~ /^name$/i) {
+			if ($key =~ /^name$/i) { # this should be case sensitive, but just in case
 				push @bed, $value;
 				last;
 			}
@@ -400,21 +405,9 @@ while (my $line = $in_fh->getline) {
 			# reverse, minus, crick
 			push @bed, '-';
 		}
-		elsif ($value =~ m/\A [0 \.]/xi) {
-			# zero, period
-			push @bed, '0';
-		}
 		else {
-			# unidentified, assume it's non-stranded
-			push @bed, '0';
-		}
-		
-		# print warning
-		if ($bed[5] eq '0') {
-			unless ($strand_warning) {
-				warn "   Using non-standard feature strand value of 0 at input data line ", $count + 1, "\n";
-				$strand_warning = 1;
-			}
+			# unidentified, assume it's forward strand
+			push @bed, '+';
 		}
 	}
 	
@@ -437,6 +430,24 @@ if ($bigbed) {
 	print " wrote $count lines to temporary bed file '$outfile'\n";
 	print " converting to bigbed file....\n";
 	
+	# find bedToBigBed utility
+	unless ($bb_app_path) {
+		# check for an entry in the configuration file
+		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
+			undef;
+	}
+	unless ($bb_app_path) {
+		# next check the system path
+		$bb_app_path = `which bedToBigBed` || undef;
+		chomp $bb_app_path if $bb_app_path;
+	}
+	unless ($bb_app_path) {
+		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
+			"  See documentation for more info\n";
+		print " finished\n";
+		exit;
+	}
+		
 	# check that bigbed conversion is supported
 	unless (exists &bed_to_bigbed_conversion) {
 		warn "\n  Support for converting to bigbed format is not available\n" . 
@@ -449,26 +460,17 @@ if ($bigbed) {
 	# open database connection if necessary
 	my $db;
 	if ($database) {
-		$db = open_db_connection($database);
+		eval {
+			use tim_db_helper qw(open_db_connection);
+		};
+		if ($@) {
+			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
+		}
+		else {
+			$db = open_db_connection($database);
+		}
 	}
 	
-	# find bedToBigBed utility
-	unless ($bb_app_path) {
-		# check for an entry in the configuration file
-		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
-			undef;
-	}
-	unless ($bb_app_path) {
-		# next check the system path
-		$bb_app_path = `which bedToBigBed` || undef;
-	}
-	unless ($bb_app_path) {
-		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
-			"  See documentation for more info\n";
-		print " finished\n";
-		exit;
-	}
-		
 			
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion( {
@@ -569,7 +571,9 @@ as the score column in the BED data.
 Supply either the index of the column in the data table to 
 be used as the name column in the BED data, or the base text 
 to be used when auto-generating unique feature names. The 
-auto-generated names are in the format 'text_00000001'.
+auto-generated names are in the format 'text_00000001'. 
+If the source file is GFF3, it will automatically extract the 
+Name attribute.
 
 =item --strand <column_index>
 
