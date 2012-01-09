@@ -344,7 +344,7 @@ map_oligo_data2gff.pl
 
 =head1 SYNOPSIS
 
-data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
+map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
   
   Options:
   --oligo <oligo_file.gff>
@@ -357,6 +357,7 @@ data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
+  --gz
   --version
   --help
   
