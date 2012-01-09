@@ -46,6 +46,7 @@ my (
 	$outfile,
 	$step,
 	$step_size,
+	$span,
 	$chr_index,
 	$start_index,
 	$stop_index,
@@ -73,10 +74,11 @@ GetOptions(
 	'out=s'     => \$outfile, # name of output gff file 
 	'step=s'    => \$step, # wig step method
 	'size=i'    => \$step_size, # wig step size
+	'span=i'    => \$span, # the wig span size
 	'chr=i'     => \$chr_index, # index for the chromosome column
 	'start=i'   => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
-	'score=i'   => \$score_index, # index for the score column
+	'index|score=i' => \$score_index, # index for the score column
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
 	'mid!'      => \$midpoint, # boolean to use the midpoint
@@ -395,8 +397,12 @@ sub convert_to_fixedStep {
 			my $start = calculate_position(@data);
 			
 			# print definition line
-			print {$out_fh} 'fixedStep chrom=' . $data[$chr_index] . ' start=' .
-				$start . ' step=' . $step_size . "\n";
+			my $definition = 'fixedStep chrom=' . $data[$chr_index] .
+				 ' start=' . $start . ' step=' . $step_size;
+			if ($span > 1) {
+				$definition .= " span=$span";
+			}
+			$out_fh->print("$definition\n");
 				
 			
 			# reset the current chromosome
@@ -420,7 +426,7 @@ sub convert_to_fixedStep {
 		}
 		
 		# write fixed data line
-		print {$out_fh} "$score\n";
+		$out_fh->print("$score\n");
 	}
 }
 
@@ -436,7 +442,11 @@ sub convert_to_variableStep {
 		# write definition line if necessary
 		if ($data[$chr_index] ne $current_chr) {
 			# new chromosome, new definition line
-			print {$out_fh} 'variableStep chrom=' . $data[$chr_index] . "\n";
+			my $definition = 'variableStep chrom=' . $data[$chr_index];
+			if ($span > 1) {
+				$definition .= " span=$span";
+			}
+			$out_fh->print("$definition\n");
 			
 			# reset the current chromosome
 			$current_chr = $data[$chr_index];
@@ -654,7 +664,8 @@ data2wig.pl [--options...] <filename>
   --out <filename> 
   --step [fixed | variable]
   --size <integer>
-  --score <column_index>
+  --span <integer>
+  --index <column_index>
   --name <text>
   --(no)track
   --(no)mid
@@ -708,6 +719,16 @@ If the --step option is explicitly defined as 'fixed', then the step size
 may also be explicitly defined. If this value is not explicitly
 defined or automatically determined, the variableStep format is used by
 default.
+
+=item --span <integer>
+
+Optionally indicate the size of the region in bp to which the data value 
+should be assigned. The same size is assigned to all data values in the 
+wig file. This is useful, for example, with microarray data where all of 
+the oligo probes are the same length and you wish to assign the value 
+across the oligo rather than the midpoint. The default is inherently 1 bp. 
+
+=item --index <column_index>
 
 =item --score <column_index>
 
