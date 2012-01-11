@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.0.2';
+my $VERSION = '1.6.2';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -191,6 +191,10 @@ write_current_data_to_file_part($previous_value);
 
 # report
 print " Split '$infile' into $split_count files\n";
+foreach my $value (sort {$a cmp $b} keys %written_files) {
+	print "  wrote $written_files{$value}{total} lines in " . 
+		"$written_files{$value}{parts} file(s) for '$value'\n";
+}
 
 
 
@@ -206,15 +210,7 @@ sub write_current_data_to_file_part {
 	if (defined $written_files{$value}{'file'}) {
 		# we have a current file that is partially written
 		my $file = $written_files{$value}{'file'};
-		my $out_fh = open_to_write_fh(
-			$file,
-			$gz,
-			1
-		);
-		unless ($out_fh) {
-			warn "   unable to re-open file '$file'! data lost!\n";
-			return;
-		}
+		my $out_fh = $written_files{$value}{'fh'};
 		
 		# begin writing the data
 		# determine how many lines we can still write to this file
@@ -230,11 +226,12 @@ sub write_current_data_to_file_part {
 			
 			# write the lines up to the current limit
 			for (my $row = 1; $row <= $limit; $row++) {
-				print {$out_fh} join("\t", 
-					@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
+				$out_fh->print(
+					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
+				"\n");
 			}
 			$out_fh->close;
-			print "   wrote $limit lines to file '$file'\n";
+			$written_files{$value}{'total'} += $limit;
 			
 			# clear the table contents of the written lines
 			splice( @{ $metadata_ref->{'data_table'} }, 1, $limit );
@@ -242,7 +239,8 @@ sub write_current_data_to_file_part {
 				scalar @{ $metadata_ref->{'data_table'} } - 1;
 			
 			# we're finished with this file
-			$written_files{$value}{'file'} = undef;
+			$written_files{$value}{'file'}   = undef;
+			$written_files{$value}{'fh'}     = undef;
 			$written_files{$value}{'number'} = 0;
 			
 			# now write the remainder
@@ -255,16 +253,17 @@ sub write_current_data_to_file_part {
 			
 			# write the lines
 			for (my $row = 1; $row <= $lines; $row++) {
-				print {$out_fh} join("\t", 
-					@{ $metadata_ref->{'data_table'}->[$row] } ) . "\n";
+				$out_fh->print(
+					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
+				"\n");
 				
 				# keep track of the number of lines
 				$written_files{$value}{'number'} += 1;
+				$written_files{$value}{'total'} += 1;
 			}
 			
 			# finished
 			$out_fh->close;
-			print "   wrote $lines lines to file '$file'\n";
 			
 			# clear the table contents
 			splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
@@ -284,9 +283,9 @@ sub write_current_data_to_file_part {
 			'gz'       => $gz,
 		} );
 		if ($success) {
-			print "   wrote $lines lines to file '$success'\n";
 			# record the number of lines written
-			$written_files{$value}{'number'} = $lines;
+			$written_files{$value}{'number'} += $lines;
+			$written_files{$value}{'total'} += $lines;
 		}
 		else {
 			warn "   unable to write $lines lines! data lost!\n";
@@ -301,6 +300,14 @@ sub write_current_data_to_file_part {
 			$written_files{$value}{'file'} = undef;
 			$written_files{$value}{'number'} = 0;
 		}
+		else {
+			# reopen the file for future writing
+			$written_files{$value}{'fh'} = open_to_write_fh(
+				$written_files{$value}{'file'},
+				$gz,
+				1
+			);
+		}
 	}
 	
 }
@@ -308,8 +315,9 @@ sub write_current_data_to_file_part {
 sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
 	my $value = shift;
-	my $file = $metadata_ref->{'basename'};
-	$file .= '#' . $value;
+	my $filename_value = $value;
+	$filename_value =~ s/[\:\|\\\/]+/_/g; # replace unsafe characters
+	my $file = $metadata_ref->{'basename'} . '#' . $filename_value;
 	
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
@@ -319,15 +327,24 @@ sub request_new_file_name {
 			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
 		}
 		else {
-			$written_files{$value}{'parts'} = 1; # increment
+			$written_files{$value}{'parts'} = 1; # initial
 			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
 		}
+	}
+	else {
+		# only 1 part is necessary
+		$written_files{$value}{'parts'} = 1;
 	}
 	
 	# finish the file name
 	$file .= $metadata_ref->{'extension'};
-	$written_files{$value}{'file'} = $file;
+	$written_files{$value}{'file'}   = $file;
 	$written_files{$value}{'number'} = 0;
+	
+	# check the total
+	unless (exists $written_files{$value}{'total'}) {
+		$written_files{$value}{'total'}  = 0;
+	}
 	
 	# keept track of the number of files opened
 	$split_count++;
@@ -367,13 +384,11 @@ although any format should work. The file may be compressed with gzip.
 
 =item --index <column_index>
 
+=item --col <column_index>
+
 Provide the index number of the column or dataset containing the values 
 used to split the file. If not specified, then the index is requested 
 from the user in an interactive mode.
-
-=item --col <column_index>
-
-Alias to --index.
 
 =item --max <integer>
 
