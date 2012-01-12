@@ -3,7 +3,7 @@ package tim_file_helper;
 ### modules
 require Exporter;
 use strict;
-use Carp;
+use Carp qw(carp cluck confess);
 use File::Basename qw(fileparse);
 use IO::File;
 use IO::Zlib;
@@ -16,7 +16,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.5.9';
+our $VERSION = '1.6.2';
 
 
 ### Variables
@@ -107,7 +107,7 @@ sub load_tim_data_file {
 		
 		# check file
 		unless (verify_data_structure($inputdata_ref) ) {
-			carp "badly formatted data file!";
+			cluck "badly formatted data file!";
 			return;
 		}
 		
@@ -238,7 +238,7 @@ sub open_tim_data_file {
 	# generate the data hash to store the file metadata into
 	my $inputdata = generate_tim_data_structure(undef);
 	unless ($inputdata) {
-		carp " cannot generate tim data structure!\n";
+		cluck " cannot generate tim data structure!\n";
 		return;
 	}
 	$inputdata->{'filename'} = $filename; # the original filename
@@ -284,31 +284,47 @@ sub open_tim_data_file {
 		}
 		
 		# column or dataset specific information
-		elsif ($line =~ m/^# Column/) {
-			my %temphash; # a temporary hash to put the column metadata into
-			my $index; # to record the column index
+		elsif ($line =~ m/^# Column_(\d+)/) {
+			# the column number will become the index number
+			# it should be 0-based
+				# but it may be 1-based
+				# if the metadata includes an index key, then this number is 
+				# 1-based and the index key value is the real 0-based number
+			my $index = -1; # not a real index number
+			$index    = $1; # capture this from grep above
 			
 			# strip the Column metadata identifier
 			my $metadataline = $line; # to avoid manipulating $line
 			chomp $metadataline;
 			$metadataline =~ s/^# Column_\d+ //; 
-			# this follows the syntax from write_tim_data_file()
-			# the digits represent the column index + 1
 			
 			# break up the column metadata
+			my %temphash; # a temporary hash to put the column metadata into
 			foreach (split /;/, $metadataline) {
 				my ($key, $value) = split /=/;
 				if ($key eq 'index') {
-					# record the index value
-					$index = $value;
+					if ($index != $value) {
+						# the index value obtained from the Column number
+						# above is not correct - it was 1-based and we 
+						# need 0-based
+						# the value from the metadata index key will be 
+						# correct, so we will use that
+						$index = $value;
+					}
 				}
 				# store the key & value
 				$temphash{$key} = $value;
 			}
 			
+			# create a index metadata key if not already present
+			# the rest of biotoolbox may expect this to be present
+			unless (exists $temphash{'index'}) {
+				$temphash{'index'} = $index;
+			}
+			
 			# store the column metadata hash into the main data hash
 			# use the index as the key
-			if (defined $index) {
+			if ($index >= 0) {
 				# index was defined in the file's metadata
 				# check for pre-existing main metadata hash for this column
 				# for example, gff files will have standard hashes created above
@@ -424,10 +440,12 @@ sub open_tim_data_file {
 					# column metadata specific column in the file
 				for (my $i = 0; $i < 9; $i++) {
 					# loop for each column
-					# set name unless it already has one from metadata
-					$inputdata->{$i}{'name'} = $gff_names[$i] unless 
-						exists $inputdata->{$i}{'name'};
-					$inputdata->{$i}{'index'} = $i;
+					# set metadata unless it's already loaded
+					unless (exists $inputdata->{$i}) {
+						$inputdata->{$i}{'name'}  = $gff_names[$i];
+						$inputdata->{$i}{'index'} = $i;
+						$inputdata->{$i}{'AUTO'}  = 3;
+					}
 					# assign the name to the column header
 					$inputdata->{'column_names'}->[$i] = 
 						$inputdata->{$i}{'name'};
@@ -478,9 +496,11 @@ sub open_tim_data_file {
 					for (my $i = 0; $i < 3; $i++) {
 						# loop for each column
 						# set name unless it already has one from metadata
-						$inputdata->{$i}{'name'} = $bed_names[$i] unless 
-							exists $inputdata->{$i}{'name'};
-						$inputdata->{$i}{'index'} = $i;
+						unless (exists $inputdata->{$i}) {
+							$inputdata->{$i}{'name'}  = $bed_names[$i];
+							$inputdata->{$i}{'index'} = $i;
+							$inputdata->{$i}{'AUTO'}  = 3;
+						}
 						# assign the name to the column header
 						$inputdata->{'column_names'}->[$i] = 
 							$inputdata->{$i}{'name'};
@@ -491,9 +511,11 @@ sub open_tim_data_file {
 						# name of the bed line feature
 						
 						# column metadata
-						$inputdata->{3}{'name'} = 'Name' unless 
-							exists $inputdata->{3}{'name'};
-						$inputdata->{3}{'index'} = 3;
+						unless (exists $inputdata->{3}) {
+							$inputdata->{3}{'name'}  = 'Name';
+							$inputdata->{3}{'index'} = 3;
+							$inputdata->{3}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[3] = 
@@ -504,9 +526,11 @@ sub open_tim_data_file {
 						# score of the bed line feature
 						
 						# column metadata
-						$inputdata->{4}{'name'} = 'Score' unless 
-							exists $inputdata->{4}{'name'};
-						$inputdata->{4}{'index'} = 4;
+						unless (exists $inputdata->{4}) {
+							$inputdata->{4}{'name'}  = 'Score';
+							$inputdata->{4}{'index'} = 4;
+							$inputdata->{4}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[4] = 
@@ -517,9 +541,11 @@ sub open_tim_data_file {
 						# strand of the bed line feature
 						
 						# column metadata
-						$inputdata->{5}{'name'} = 'Strand' unless 
-							exists $inputdata->{5}{'name'};
-						$inputdata->{5}{'index'} = 5;
+						unless (exists $inputdata->{5}) {
+							$inputdata->{5}{'name'}  = 'Strand';
+							$inputdata->{5}{'index'} = 5;
+							$inputdata->{5}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[5] = 
@@ -530,9 +556,11 @@ sub open_tim_data_file {
 						# start position for block (exon)
 						
 						# column metadata
-						$inputdata->{6}{'name'} = 'thickStart' unless 
-							exists $inputdata->{6}{'name'};
-						$inputdata->{6}{'index'} = 6;
+						unless (exists $inputdata->{6}) {
+							$inputdata->{6}{'name'}  = 'thickStart';
+							$inputdata->{6}{'index'} = 6;
+							$inputdata->{6}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[6] = 
@@ -543,9 +571,11 @@ sub open_tim_data_file {
 						# end position for block (exon)
 						
 						# column metadata
-						$inputdata->{7}{'name'} = 'thickEnd' unless 
-							exists $inputdata->{7}{'name'};
-						$inputdata->{7}{'index'} = 7;
+						unless (exists $inputdata->{7}) {
+							$inputdata->{7}{'name'}  = 'thickEnd';
+							$inputdata->{7}{'index'} = 7;
+							$inputdata->{7}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[7] = 
@@ -556,9 +586,11 @@ sub open_tim_data_file {
 						# RGB value of bed feature
 						
 						# column metadata
-						$inputdata->{8}{'name'} = 'itemRGB' unless 
-							exists $inputdata->{8}{'name'};
-						$inputdata->{8}{'index'} = 8;
+						unless (exists $inputdata->{8}) {
+							$inputdata->{8}{'name'}  = 'itemRGB';
+							$inputdata->{8}{'index'} = 8;
+							$inputdata->{8}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[8] = 
@@ -569,9 +601,11 @@ sub open_tim_data_file {
 						# The number of blocks (exons)
 						
 						# column metadata
-						$inputdata->{9}{'name'} = 'blockCount' unless 
-							exists $inputdata->{9}{'name'};
-						$inputdata->{9}{'index'} = 9;
+						unless (exists $inputdata->{9}) {
+							$inputdata->{9}{'name'}  = 'blockCount';
+							$inputdata->{9}{'index'} = 9;
+							$inputdata->{9}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[9] = 
@@ -582,9 +616,11 @@ sub open_tim_data_file {
 						# The size of the blocks (exons)
 						
 						# column metadata
-						$inputdata->{10}{'name'} = 'blockSizes' unless 
-							exists $inputdata->{10}{'name'};
-						$inputdata->{10}{'index'} = 10;
+						unless (exists $inputdata->{10}) {
+							$inputdata->{10}{'name'}  = 'blockSizes';
+							$inputdata->{10}{'index'} = 10;
+							$inputdata->{10}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[10] = 
@@ -595,9 +631,11 @@ sub open_tim_data_file {
 						# The start positions of the blocks (exons)
 						
 						# column metadata
-						$inputdata->{11}{'name'} = 'blockStarts' unless 
-							exists $inputdata->{11}{'name'};
-						$inputdata->{11}{'index'} = 11;
+						unless (exists $inputdata->{11}) {
+							$inputdata->{11}{'name'}  = 'blockStarts';
+							$inputdata->{11}{'index'} = 11;
+							$inputdata->{11}{'AUTO'}  = 3;
+						}
 						
 						# column header name
 						$inputdata->{'column_names'}->[11] = 
@@ -612,9 +650,11 @@ sub open_tim_data_file {
 						# process anyway
 						for (my $i = 11; $i < $column_count; $i++) {
 							# column metadata
-							$inputdata->{$i}{'name'} = "Column_$i" unless 
-								exists $inputdata->{$i}{'name'};
-							$inputdata->{$i}{'index'} = $i;
+							unless (exists $inputdata->{$i}) {
+								$inputdata->{$i}{'name'}  = "Column_$i";
+								$inputdata->{$i}{'index'} = $i;
+								$inputdata->{$i}{'AUTO'}  = 3;
+							}
 							
 							# column header name
 							$inputdata->{'column_names'}->[$i] = 
@@ -625,7 +665,7 @@ sub open_tim_data_file {
 				
 				# less than 3 columns!???
 				else {
-					confess " BED file '$filename' doesn't have at least 3 columns!\n";
+					carp " BED file '$filename' doesn't have at least 3 columns!\n";
 					return;
 				}
 				
@@ -663,14 +703,17 @@ sub open_tim_data_file {
 				$inputdata->{0} = {
 					'name'  => 'Chromo',
 					'index' => 0,
+					'AUTO'  => 3,
 				} unless exists $inputdata->{0};
 				$inputdata->{1} = {
 					'name'  => 'Start',
 					'index' => 1,
+					'AUTO'  => 3,
 				} unless exists $inputdata->{1};
 				$inputdata->{2} = {
 					'name'  => 'Score',
 					'index' => 2,
+					'AUTO'  => 3,
 				} unless exists $inputdata->{2};
 				
 				# set headers flag to false
@@ -710,6 +753,7 @@ sub open_tim_data_file {
 					$inputdata->{$i} = { 
 						'name'   => $_,
 						'index'  => $i,
+						'AUTO'   => 3,
 					};
 					push @{ $inputdata->{'column_names'} }, $_;
 					$i++;
@@ -737,7 +781,7 @@ sub open_tim_data_file {
 					# confirm that a file metadata exists for this column
 					if (exists $inputdata->{$i}) {
 						unless ($namelist[$i] eq $inputdata->{$i}->{'name'}) {
-							carp "metadata and header names for column $i do not match!";
+							cluck "metadata and header names for column $i do not match!";
 							# set the name to match the actual column name
 							$inputdata->{$i}->{'name'} = $namelist[$i];
 						}
@@ -748,6 +792,7 @@ sub open_tim_data_file {
 						$inputdata->{$i} = {
 							'name'  => $namelist[$i],
 							'index' => $i,
+							'AUTO'  => 3,
 						};
 					}
 				}
@@ -806,7 +851,7 @@ sub write_tim_data_file {
 	# collect passed arguments
 	my $argument_ref = shift;
 	unless ($argument_ref) {
-		carp "no arguments passed!";
+		cluck "no arguments passed!";
 		return;
 	}
 	my $datahash_ref = $argument_ref->{'data'}     || undef;
@@ -816,11 +861,11 @@ sub write_tim_data_file {
 	
 	unless (defined $datahash_ref) {
 		# we need data to write
-		carp "no data to write!\n";
+		cluck "no data to write!\n";
 		return;
 	}
 	unless (verify_data_structure($datahash_ref) ) {
-		carp "bad data structure!";
+		cluck "bad data structure!";
 		return;
 	}
 	
@@ -835,7 +880,7 @@ sub write_tim_data_file {
 		}
 		else {
 			# complain about no file name
-			carp "no filename given!\n";
+			cluck "no filename given!\n";
 			return;
 		}
 	}
@@ -1073,34 +1118,43 @@ sub write_tim_data_file {
 					next;
 				}
 				elsif (
-					scalar( keys %{ $datahash_ref->{$i} } ) == 2 and
-					$extension =~ /gtf|gff|bed/i
+					exists $datahash_ref->{$i}{'AUTO'} and
+					scalar( keys %{ $datahash_ref->{$i} } ) == 
+						$datahash_ref->{$i}{'AUTO'}
 				) {
-					# only two keys are present and it's a gff or bed file
-					# these are standard metadata keys (name, index) and do 
-					# not need to be written
-					# more than two keys suggests an interesting metadata key
-					# so it will be written
+					# some of the metadata values were autogenerated and 
+					# we have the same number of keys as were autogenerated
+					# no need to write these
+					next;
+				}
+				elsif (
+					$datahash_ref->{'extension'} =~ /gff|bed/i and
+					scalar( keys %{ $datahash_ref->{$i} } ) == 2
+				) {
+					# only two metadata keys exist, name and index
+					# GFF and BED files do not these to be written
+					# so skip
 					next;
 				}
 				
 				# we will put each key=value pair into @pairs, listed asciibetically
 				my @pairs; # an array of the key value pairs from the metadata hash
-				# put name and index first
+				# put name first
+				# we are no longer writing the index number
 				push @pairs, 'name=' . $datahash_ref->{$i}{'name'};
-				push @pairs, 'index=' . $datahash_ref->{$i}{'index'};
 				# put remainder in alphabetical order
 				foreach (sort {$a cmp $b} keys %{ $datahash_ref->{$i} } ) {
-					next if $_ eq 'name';
-					next if $_ eq 'index';
+					next if $_ eq 'name'; # already written
+					next if $_ eq 'index'; # internal use only
+					next if $_ eq 'AUTO'; # internal use only
 					push @pairs,  $_ . '=' . $datahash_ref->{$i}{$_};
 				}
 				
-				# Finally write the header line, joining the pairs with a semi-colon
-				# into a single string.
-				# The column identifier is comprised of the word 'Column' and the
-				# the index number + 1 (shift to 1-based counting) joined by '_'.
-				$fh->print("# Column_", $i+1, " ", join(";", @pairs), "\n");
+				# Finally write the header line, joining the pairs with a 
+				# semi-colon into a single string.
+				# The column identifier is comprised of the word 'Column' 
+				# and the index number joined by '_'.
+				$fh->print("# Column_$i ", join(";", @pairs), "\n");
 			}
 		}
 		
@@ -1309,12 +1363,12 @@ sub convert_genome_data_2_gff_data {
 	# get passed arguments
 	my $arg_ref = shift;
 	unless ($arg_ref) {
-		carp "no arguments passed!";
+		cluck "no arguments passed!";
 		return;
 	}
 	my $input_data_ref = $arg_ref->{'data'};
 	unless (verify_data_structure($input_data_ref) ) {
-		carp "bad data structure!";
+		cluck "bad data structure!";
 		return;
 	}
 	
@@ -1347,11 +1401,11 @@ sub convert_genome_data_2_gff_data {
 	
 	# check that we have coordinates
 	unless ( defined $chr_index ) {
-		carp " unable to identify chromosome index!";
+		cluck " unable to identify chromosome index!";
 		return;
 	}
 	unless ( defined $start_index ) {
-		carp " unable to identify start index!";
+		cluck " unable to identify start index!";
 		return;
 	}
 	
@@ -1712,18 +1766,18 @@ sub convert_and_write_to_gff_file {
 	# get passed arguments
 	my $arg_ref = shift;
 	unless ($arg_ref) {
-		carp "no arguments passed!";
+		cluck "no arguments passed!";
 		return;
 	}
 	
 	# basics
 	my $input_data_ref = $arg_ref->{'data'};
 	unless ($input_data_ref) {
-		carp "no data structure passed!";
+		cluck "no data structure passed!";
 		return;
 	}
 	unless (verify_data_structure($input_data_ref) ) {
-		carp "bad data structure!";
+		cluck "bad data structure!";
 		return;
 	}
 	# reference to the data table
@@ -1758,11 +1812,11 @@ sub convert_and_write_to_gff_file {
 	
 	# check that we have coordinates
 	unless ( defined $chr_index ) {
-		carp " unable to identify chromosome index!";
+		cluck " unable to identify chromosome index!";
 		return;
 	}
 	unless ( defined $start_index ) {
-		carp " unable to identify start index!";
+		cluck " unable to identify start index!";
 		return;
 	}
 	
@@ -1920,14 +1974,14 @@ sub convert_and_write_to_gff_file {
 		# check the chromosome metadata
 		if (scalar( keys %{ $input_data_ref->{$chr_index} } ) > 2) {
 			# chromosome has extra keys of info
-			print {$output_gff} "# Column_1 ";
+			print {$output_gff} "# Column_0 ";
 			my @pairs;
 			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$chr_index} } ) {
 				if ($_ eq 'index') {
-					push @pairs, "index=0";
+					next;
 				}
 				elsif ($_ eq 'name') {
-					push @pairs, "name=RefSeq";
+					push @pairs, "name=Chromosome";
 				}
 				else {
 					push @pairs,  $_ . '=' . $input_data_ref->{$chr_index}{$_};
@@ -1939,11 +1993,11 @@ sub convert_and_write_to_gff_file {
 		# check the start metadata
 		if (scalar( keys %{ $input_data_ref->{$start_index} } ) > 2) {
 			# start has extra keys of info
-			print {$output_gff} "# Column_4 ";
+			print {$output_gff} "# Column_3 ";
 			my @pairs;
 			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$start_index} } ) {
 				if ($_ eq 'index') {
-					push @pairs, "index=3";
+					next;
 				}
 				elsif ($_ eq 'name') {
 					push @pairs, "name=Start";
@@ -1961,11 +2015,11 @@ sub convert_and_write_to_gff_file {
 			scalar( keys %{ $input_data_ref->{$score_index} } ) > 2
 		) {
 			# score has extra keys of info
-			print {$output_gff} "# Column_6 ";
+			print {$output_gff} "# Column_5 ";
 			my @pairs;
 			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$score_index} } ) {
 				if ($_ eq 'index') {
-					push @pairs, "index=5";
+					next;
 				}
 				elsif ($_ eq 'name') {
 					push @pairs, "name=Score";
@@ -1983,11 +2037,11 @@ sub convert_and_write_to_gff_file {
 			scalar( keys %{ $input_data_ref->{$name_index} } ) > 2
 		) {
 			# score has extra keys of info
-			print {$output_gff} "# Column_9 ";
+			print {$output_gff} "# Column_8 ";
 			my @pairs;
 			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$name_index} } ) {
 				if ($_ eq 'index') {
-					push @pairs, "index=8";
+					next;
 				}
 				elsif ($_ eq 'name') {
 					push @pairs, "name=Group";
@@ -2164,7 +2218,7 @@ sub write_summary_data {
 	# Collect passed arguments
 	my $argument_ref = shift;
 	unless ($argument_ref) {
-		carp "no arguments passed!";
+		cluck "no arguments passed!";
 		return;
 	}
 	my $datahash_ref =   $argument_ref->{'data'} || undef;
@@ -2179,10 +2233,11 @@ sub write_summary_data {
 	
 	# Check required values
 	unless (defined $datahash_ref) {
-		carp "no data structure passed!\n";
+		cluck "no data structure passed!\n";
+		return;
 	}
 	unless (verify_data_structure($datahash_ref) ) {
-		carp "bad data structure!";
+		cluck "bad data structure!";
 		return;
 	}
 	unless (defined $outfile) {
@@ -2191,7 +2246,7 @@ sub write_summary_data {
 			$outfile = $datahash_ref->{'basename'};
 		}
 		else {
-			carp "no filename passed to write_summary_data!\n";
+			cluck "no filename passed to write_summary_data!\n";
 			return;
 		}
 	}
@@ -2381,6 +2436,35 @@ __END__
 
 tim_file_helper
 
+=head1 SYNOPSIS
+
+  use tim_file_helper qw(
+    load_tim_data_file
+    write_tim_data_file
+    open_to_read_fh
+    open_to_write_fh
+  );
+  
+  my $input_data = load_tim_data_file($file) or die "can't open file!";
+  
+  my ($fh, $metadata) = open_tim_data_file($file) or die;
+  
+  while (my $line = $fh->getline) {
+    ...
+  }
+  
+  my $input_fh = open_to_read_fh($file);
+  
+  my $output_fh = open_to_write_fh($file);
+  
+  my $output_fh = open_to_write_fh($file, $gz, $append);
+  
+  my $success = write_tim_data_file( {
+    data       => $data,
+    filename   => $file,
+    gz         => $gz,
+  } );
+
 =head1 DESCRIPTION
 
 These are general file helper subroutines to work with data text files, 
@@ -2444,15 +2528,15 @@ includes the whole path of the executable.
 
 The next header lines include column specific metadata. Each column 
 will have a separate header line, specified initially by the word 
-'Column', followed by an underscore and the column number (1-based). 
+'Column', followed by an underscore and the column number (0-based). 
 Following this is a series of 'key=value' pairs separated by ';'. 
 Spaces are generally not allowed. Obviously '=' or ';' are not 
 allowed or they will interfere with the parsing. The metadata 
 describes how and where the data was collected. Additionally, any 
 modifications performed on the data are also recorded here. The only 
-two keys that are required are the first two, 'name' and 'index'. If
-the file being read does not contain metadata, then it will be generated
-with these two basic keys.
+key that is required is 'name'. 
+If the file being read does not contain metadata, then it will be auto 
+generated with basic metadata.
 
 =back
 
@@ -2463,10 +2547,6 @@ A list of standard column header keys is below, but is not exhaustive.
 =item name
 
 The name of the column. This should be identical to the table header.
-
-=item index
-
-The 0-based index number of the column.
 
 =item database
 
