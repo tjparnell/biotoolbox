@@ -16,8 +16,9 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
+	write_summary_data
 );
-my $VERSION = '1.5.0';
+my $VERSION = '1.6.2';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -216,6 +217,7 @@ sub print_menu {
 		"  t  Merge s(t)randed datasets into one\n" .
 		"  e  C(e)nter normalize feature datapoints \n" .
 		"  w  Generate a ne(w) column with a single identical value\n" .
+		"  y  Write out a summar(y) file of the data\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
 		"  W  Re(W)rite the file\n" .
 		"  T  Export for (T)reeview or Cluster analysis\n" .
@@ -2953,6 +2955,56 @@ sub number_function {
 
 
 
+sub write_summary_function {
+	# this will write out a summary file of the data
+	
+	# determine indices to summarize
+	my ($startcolumn, $stopcolumn);
+	unless ($function) {
+		# request indices only when running interactively and not automatically
+		($startcolumn, $stopcolumn) = _request_indices(
+			" Enter the starting and/or ending indices of the datasets to summarize\n". 
+			" Or nothing for automatic detection     "
+		);
+	}
+	
+	# determine the export file name
+	my $outfilename;
+	if (defined $outfile) {
+		# use the outfile name specified on the command line
+		# note that this could be overwritten later if $modification > 0
+		# but to allow for automated execution, we can't ask the user
+		# for verification
+		print " using summary file name '$outfile'\n";
+		$outfilename = $outfile;
+	}
+	else {
+		# generate a new name based on the input base name
+		$outfilename = $main_data_ref->{'basename'} . '_summary';
+	}
+	
+	# write the summary
+	my $sumfile = write_summary_data( {
+		'data'         => $main_data_ref,
+		'filename'     => $outfilename,
+		'startcolumn'  => $startcolumn,
+		'endcolumn'    => $stopcolumn,
+		'log'          => $opt_log,
+	} );
+	
+	# report outcome
+	if ($sumfile) {
+		print " wrote summary file '$sumfile'\n";
+	}
+	else {
+		print " unable to write summary file!\n";
+	}
+	
+	# since no changes have been made to the data structure, return 0
+	return;
+}
+
+
 sub export_function {
 	# this will export the file into an even simpler text format
 	
@@ -3377,6 +3429,7 @@ sub _get_letter_to_function_hash {
 		't' => "mergestrand",
 		'e' => "center",
 		'w' => "new",
+		'y' => "summary",
 		'x' => "export",
 		'W' => "rewrite",
 		'T' => "treeview",
@@ -3421,6 +3474,7 @@ sub _get_function_to_subroutine_hash {
 		'mergestrand' => \&merge_stranded_data,
 		'center'      => \&center_function,
 		'new'         => \&new_column_function,
+		'summary'     => \&write_summary_function,
 		'export'      => \&export_function,
 		'rewrite'     => \&rewrite_function,
 		'treeview'    => \&export_treeview_function,
