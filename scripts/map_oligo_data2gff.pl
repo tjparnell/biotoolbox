@@ -7,11 +7,15 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(
+	find_column_index
+);
 use tim_file_helper qw(
 	load_tim_data_file
+	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.5.2';
+my $VERSION = '1.6.2';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -87,13 +91,13 @@ unless ($oligo_file and $data_file) {
 
 
 ### Load Oligo data file
-my ($oligo_data_ref, $oligo_metadata) = load_microarray_data();
+my ($oligo_data_ref, $oligo_data_metadata) = load_microarray_data();
 
 
 
 ### Define default data
 unless ($name) {
-	$name = $oligo_metadata->{$column}{'name'};
+	$name = $oligo_data_metadata->{$column}{'name'};
 }
 unless ($type) {
 	$type = $name;
@@ -151,11 +155,13 @@ unless ($oligo_feature_ref->{gff}) {
 	# group column
 
 # check metadata
-if (scalar keys %{ $oligo_metadata } > 2) {
+if (scalar keys %{ $oligo_data_metadata->{$column} } > 2) {
 	# there appears to be more than the basic data in here
 	
 	# replace the metadata
-	$oligo_feature_ref->{5} = $oligo_metadata; # replace the hash data
+	$oligo_feature_ref->{5} = $oligo_data_metadata->{$column}; 
+		# replace the hash data
+		# and update the info
 	$oligo_feature_ref->{5}{name} = 'Score';
 	$oligo_feature_ref->{5}{index} = 5;
 }
@@ -284,7 +290,7 @@ else {
 sub load_microarray_data {
 	
 	# open the data file
-	my $data_ref = load_tim_data_file($data_file) or 
+	my ($data_fh, $data_ref) = open_tim_data_file($data_file) or 
 		die " Unable to open oligo data file '$data_file'!\n";
 	
 	# Determine the column of microarray data
@@ -309,25 +315,32 @@ sub load_microarray_data {
 			die " Invalid response!\n";
 		}
 	}
-	# we are going to assume that the first column is the microarray 
-	# oligo unique identifier or name
 	
+	# identify the probe ID column index
+	my $probe_i = find_column_index($data_ref, "probe|oligo|id");
 	
 	# Load the microarray values data into a hash
 	my %hash;
-	foreach my $row (1 .. $data_ref->{'last_row'}) {
-		# we are assuming the first column is the oligo id
-		$hash{ $data_ref->{data_table}->[$row][0] } = 
-			$data_ref->{data_table}->[$row][$column];
+	while (my $line = $data_fh->getline) {
+		
+		# process line
+		chomp $line;
+		my @data = split /\t/, $line;
+		
+		# check that the probe is unique
+		if (exists $hash{ $data[$probe_i] } ) {
+			warn " Probe '" . $data[$probe_i] . 
+				"' exists more than once! Using first value only\n";
+		}
+		else {
+			$hash{ $data[$probe_i] } = $data[$column];
+		}
 	}
+	$data_fh->close;
 	print " loaded " . scalar(keys %hash) . " microarray probe values from '$data_file'\n";
 	
 	# return
-	my %metadata = %{ $data_ref->{$column} };
-		# the metadata is simply the metadata hash for this column from the 
-		# data file
-	undef $data_ref;
-	return (\%hash, \%metadata);
+	return (\%hash, $data_ref);
 }
 
 
