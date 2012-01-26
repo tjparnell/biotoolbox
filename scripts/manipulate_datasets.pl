@@ -3799,11 +3799,11 @@ manipulate_datasets.pl [--options ...] <input_filename>
 
   Options:
   --in <input_filename>
-  --func [stat | reorder | delete | rename | sort | gsort | null | 
-          duplicate | above | below | scale | pr | zscore | log2 | 
-          delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | divide | subtract | export | treeview | 
-          rewrite | center]
+  --func [stat | reorder | delete | rename | number | sort | gsort | 
+          null | duplicate | above | below | scale | pr | zscore | 
+          log2 | delog2 | format | combine | subsample | ratio | diff | 
+          normdiff | divide | subtract | strandsign | mergestrand | 
+          center | new | summary | export | rewrite | treeview]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -3877,6 +3877,7 @@ other required options. These functions include the following.
   mergestrand
   center
   new
+  summary
   export
   rewrite
   treeview
@@ -4174,6 +4175,14 @@ may either requested from the user or supplied by the --exp and
 --con command line options. 
 
 
+=item B<divide> (menu option 'v')
+
+Divide a value from a dataset. A real number may be supplied, or the words
+'mean' or 'median' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
 =item B<subtract> (menu option 'u')
 
 Subtract a value from a dataset. A real number may be supplied, or the words
@@ -4182,14 +4191,6 @@ values of the dataset. The dataset may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
 
-
-=item B<divide> (menu option 'v')
-
-Divide a value from a dataset. A real number may be supplied, or the words
-'mean' or 'median' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
 
 =item B<strandsign> (menu option 'i')
 
@@ -4226,6 +4227,19 @@ each datapoint (row). The value may be either requested interactively or
 supplied using the --target option. This function may be useful for 
 assigning a common value to all of the data points before joining the 
 data file with another.
+
+=item B<summary> (menu option 'y')
+
+Write out a summary of collected windowed data file, in which the mean 
+for each of the data columns is calculated, transposed (columns become 
+rows), and written to a new data file. This is essentially identical to 
+the summary function from the biotoolbox analysis scripts 
+L<map_relative_data.pl> and L<pull_features.pl>. It assumes that each 
+dataset has start and stop metadata. In automatic mode it will summarize 
+all available datasets; in interactive mode, it will request the start 
+and ending datasets. By default, a new file using the input file base 
+name appended with '_summary' is written, or a filename may be specified 
+using the --out option.
 
 =item B<export> (menu option 'x')
 
