@@ -1425,7 +1425,7 @@ sub convert_genome_data_2_gff_data {
 		}
 		else {
 			# name is likely a string
-			$name = $arg_ref->{'name'};
+			$name = _escape( $arg_ref->{'name'} );
 		}
 	}
 	
@@ -1627,7 +1627,8 @@ sub convert_genome_data_2_gff_data {
 			# define and record the GFF Name
 			if (defined $name_index) {
 				# a name is provided for each feature
-				$group .= 'Name=' . $data_table_ref->[$row][$name_index];
+				$group .= 'Name=' . _escape( 
+					$data_table_ref->[$row][$name_index] );
 			}
 			elsif (defined $name) {
 				# a name string was explicitly defined
@@ -1653,7 +1654,7 @@ sub convert_genome_data_2_gff_data {
 			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
 				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
-					$data_table_ref->[$row][$_];
+					_escape( $data_table_ref->[$row][$_] );
 			}
 		}
 		
@@ -1704,36 +1705,51 @@ sub convert_genome_data_2_gff_data {
 	$input_data_ref->{0} = {
 		'name'  => 'Chromosome',
 		'index' => 0,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{1} = {
 		'name'  => 'Source',
 		'index' => 1,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{2} = {
 		'name'  => 'Type',
 		'index' => 2,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{3} = $start_metadata_ref;
 	$input_data_ref->{3}{'name'} = 'Start';
 	$input_data_ref->{3}{'index'} = 3;
+	if (keys %{ $input_data_ref->{3} } == 2) {
+		$input_data_ref->{3}{'AUTO'} = 3;
+	}
 	$input_data_ref->{4} = {
 		'name'  => 'Stop',
 		'index' => 4,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{5} = $score_metadata_ref;
 	$input_data_ref->{5}{'name'} = 'Score';
 	$input_data_ref->{5}{'index'} = 5;
+	if (keys %{ $input_data_ref->{5} } == 2) {
+		$input_data_ref->{5}{'AUTO'} = 3;
+	}
 	$input_data_ref->{6} = {
 		'name'  => 'Strand',
 		'index' => 6,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{7} = {
 		'name'  => 'Phase',
 		'index' => 7,
+		'AUTO'  => 3,
 	};
 	$input_data_ref->{8} = $group_metadata_ref;
 	$input_data_ref->{8}{'name'} = 'Group';
 	$input_data_ref->{8}{'index'} = 8;
+	if (keys %{ $input_data_ref->{8} } == 2) {
+		$input_data_ref->{8}{'AUTO'} = 3;
+	}
 	
 	# reset the number of columns
 	$input_data_ref->{'number_columns'} = 9;
@@ -1836,7 +1852,7 @@ sub convert_and_write_to_gff_file {
 		}
 		else {
 			# name is likely a string
-			$name = $arg_ref->{'name'};
+			$name = _escape( $arg_ref->{'name'} );
 		}
 	}
 	
@@ -2155,7 +2171,8 @@ sub convert_and_write_to_gff_file {
 			# define and record the GFF Name
 			if (defined $name_index) {
 				# a name is provided for each feature
-				$group .= 'Name=' . $data_table_ref->[$row][$name_index];
+				$group .= 'Name=' . _escape( 
+					$data_table_ref->[$row][$name_index] );
 			}
 			elsif (defined $name) {
 				# a name string was explicitly defined
@@ -2185,7 +2202,7 @@ sub convert_and_write_to_gff_file {
 			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
 				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
-					$data_table_ref->[$row][$_];
+					_escape( $data_table_ref->[$row][$_] );
 			}
 		}
 		
@@ -2427,6 +2444,13 @@ sub _check_file {
 }
 
 
+### Internal subroutine to escape special characters for GFF3 files
+sub _escape {
+	my $string = shift;
+	# this magic incantation was borrowed from Bio::Tools::GFF
+	$string =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+	return $string;
+}
 
 
 
