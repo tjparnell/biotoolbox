@@ -10,10 +10,16 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use IO::File;
 use Bio::Tools::GFF;
 use Bio::SeqFeature::Generic;
-my $VERSION = '1.5.8';
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_file_helper qw(
+	open_to_read_fh
+	open_to_write_fh
+);
+
+my $VERSION = '1.6.2';
 
 #use Data::Dumper;
 
@@ -36,6 +42,8 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
+	$bin,
+	$gz,
 	$help,
 	$print_version,
 );
@@ -44,6 +52,8 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # the gff3 data file
 	'out=s'     => \$outfile, # name of output file 
+	'bin!'      => \$bin, # ucsc specific bin column
+	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -70,7 +80,7 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($infile =~ /\.gff3?$/i) {
+unless ($infile =~ /\.gff 3? (?: \.gz )? $/xi) {
 	die " input file doesn't have a gff extension! Is this a GFF3 file?\n";
 }
 
@@ -83,27 +93,34 @@ if ($outfile) {
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff3?$/_ucsc_genetable.txt/;
+	$outfile =~ s/\.gff 3? (?: \.gz )? $/_ucsc_genetable.txt/xi;
+}
+unless (defined $gz) {
+	# mimic the input file as far as compression is concerned
+	$gz = 1 if $infile =~ m/\.gz$/i;
 }
 
-
+unless (defined $bin) {
+	$bin = 0;
+}
 
 
 ### Open the input and ouput files
 # Open the input GFF file
-my $in_fh = new IO::File $infile, 'r';
-unless ($in_fh) {
+my $in_fh = open_to_read_fh($infile) or 
 	die " unable to open input file '$infile'!\n";
-}
 
 # Open the output gene table file
-my $outfh = new IO::File $outfile, 'w';
-unless ($outfh) {
+my $outfh = open_to_write_fh($outfile, $gz) or 
 	die " unable to open file handle for '$outfile'!\n";
-}
 
 # Print headers
-$outfh->print("#bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
+if ($bin) {
+	$outfh->print("#bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
+}
+else {
+	$outfh->print("#name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
+}
 
 
 
@@ -202,7 +219,7 @@ sub process_gff_file_to_table {
 				process_nc_transcript($ucsc_transcript, $feature);
 			}
 			
-			elsif ($type =~ /transcript/) {
+			elsif ($type =~ /transcript/i) {
 				# we'll assume this is a protein_coding transcript?
 				# hopefully noncoding transcripts will be caught earlier
 				
@@ -809,9 +826,12 @@ sub print_table_item {
 	
 	### We finally print
 	#print Dumper($ucsc);
-	my $string = join("\t", (
+	my $string;
+	if ($bin) {
+		$string = "0\t";
+	}
+	$string .= join("\t", (
 	# bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames
-		0, # bin is for UCSC internal db use, just use a dummy number here
 		$ucsc->{'name'},
 		$ucsc->{'chr'},
 		$ucsc->{'strand'},
@@ -851,6 +871,14 @@ sub collect_top_features {
 	# the subroutine and continue to subsequently read the file
 	# we will continue to read the file until we either reach the file end
 	# or we reach a close features directive (###)
+	
+	# Each line will be processed into a SeqFeature object, and then checked 
+	# for parentage. Child objects with a Parent tag will be appropriately 
+	# associated with its parent, or put into an orphanage. Any orphans 
+	# left will be checked a final time for parents; if a parent can't be 
+	# found, it will be lost. Features without a parent are assumed to be 
+	# top-level features.
+	
 	while (my $line = $in_fh->getline) {
 		
 		chomp $line;
@@ -891,6 +919,8 @@ sub collect_top_features {
 		# generate the SeqFeature object for this GFF line
 		my $feature = Bio::SeqFeature::Generic->new();
 			# sorry, we can't use SeqFeature::Lite, no frame method
+			# we will use the Bio::Tools::GFF line processor to 
+			# process the line into the SeqFeature object
 		$gff->from_gff_string($feature, $line);
 		
 		# process the feature
@@ -981,6 +1011,8 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
+  --bin
+  --gz
   --version
   --help
 
@@ -993,12 +1025,24 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the input GFF3 file. The file should not be compressed with gzip.
+Specify the input GFF3 file. The file may be compressed with gzip.
 
 =item --out <filename>
 
 Specify the output filename. By default it uses input file base name 
-appened with '_refseq.txt'.
+appened with '_ucsc_genetable.txt'.
+
+=item --(no)bin
+
+Specify whether the UCSC table-specific column bin should be included as 
+the first column in the table. This column is reserved for internal 
+UCSC database use, and, if included here, will simply be populated with 
+0s. The default behavior is to not include it.
+
+=item --(no)gz
+
+Specify whether (or not) the output file should be compressed with gzip. 
+The default is to mimic the status of the input file
 
 =item --version
 
@@ -1022,7 +1066,7 @@ transcript features in the GFF3 file. This assumes the standard
 parent->child relationship using the primary tags of 
 gene -> mRNA -> [CDS, five_prime_utr, three_prime_utr]. 
 Additional features (exon, start_codon, stop_codon, transcript) 
-will be safely ignored. 
+will be safely ignored.  
 
 It will also process non-coding transcripts, including all non-coding 
 RNAs; all subfeatures of non-coding RNAs will be considered as exons.
@@ -1031,10 +1075,11 @@ The cdsStartStat and cdsEndStat fields are populated depending on
 whether five- or three-prime UTRs exist; this may or may not reflect 
 the actual status according to UCSC. 
 
-The bin field is reserved for internal UCSC database use; it is 
-automatically filled with a generic 0 in the output file.
-
-
+For very large GFF3 files, it is helpful to include close feature 
+directive pragmas (lines with ###) after the annotation for each 
+reference sequence (see the GFF3 specification at 
+http://www.sequenceontology.org/resources/gff3.html). Fasta sequence 
+in the GFF3 file is ignored.
 
 =head1 AUTHOR
 
