@@ -903,6 +903,7 @@ A script to map data relative to and flanking a genomic feature
   --(no)sum
   --(no)smooth
   --(no)log
+  --gz
   --version
   --help
 
@@ -1032,6 +1033,10 @@ from neighboring values.
 
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.
+
+=item --(no)gz
+
+Specify whether (or not) the output file should be compressed with gzip.
 
 =item --version
 

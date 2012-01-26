@@ -1614,6 +1614,7 @@ process_microarray.pl --recipe <file>
   --separate
   --(no)log
   --processed
+  --gz
   --version
   --help
 
