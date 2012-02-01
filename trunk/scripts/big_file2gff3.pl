@@ -33,7 +33,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.5.9';
+my $VERSION = '1.6.2';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -169,8 +169,18 @@ if (@strands) {
 
 # target directory
 if (defined $path) {
+	
+	# clean up path as necessary
 	$path = File::Spec->rel2abs($path);
 	$path = File::Spec->canonpath($path);
+	
+	# add the set name to the path to make a subdirectory
+	if ($set_name) {
+		unless ($path =~ m/$set_name$/) {
+			$path = File::Spec->catdir($path, $set_name);
+		}
+	}
+	
 	unless (-e $path) {
 		make_path($path) or die "unable to generate target directory: '$path'";
 	}
@@ -879,7 +889,7 @@ destination does not exist, then it will created. This directory should be
 writeable by the user and readable by all (or at least the Apache and MySQL
 users). If the input files are not currently located here, they will be
 copied to the directory for you. Note that when generating a BigWigSet, a
-unique directory for just the indicated files should be provided. The
+subdirectory with the set name (option --setname) will be made for you. The
 default path is the current path for the input file.
 
 =item --source <text>
@@ -935,8 +945,9 @@ added if desired. The default is false.
 
 Optionally specify the name for the BigWigSet track when writing the 
 GBrowse configuration stanza. It is also used as the basename for the 
-GFF3 file. The default is to use the name of the last directory in the 
-target path.
+GFF3 file, as well as the name of the new subdirectory in the target path 
+for use as the BigWigSet directory. The default is to use the name of 
+the last directory in the target path.
 
 =item --conf
 
