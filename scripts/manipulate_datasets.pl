@@ -2380,11 +2380,11 @@ sub normalized_difference_function {
 sub subtract_function {
 	# Subtract a specific value from each datapoint value in a dataset
 	
-	# request dataset
-	my $line = " Enter the index number of the dataset to subtract  ";
-	my $index = _request_index($line);
-	if ($index == -1) {
-		warn " unknown index number. nothing done\n";
+	# request datasets
+	my $line = " Enter the index number(s) of the dataset(s) to subtract  ";
+	my @indices = _request_indices($line);
+	unless (@indices) {
+		warn " no valid indices. nothing done\n";
 		return;
 	}
 	
@@ -2401,114 +2401,121 @@ sub subtract_function {
 		chomp $value;
 	}
 	
-	# determine the actual value to subtract
-	my $subtractor; # the actual number to subtract
-	if ($value =~ /median/i) { 
-		# use dataset median
-		my %stathash = _get_statistics_hash($index);
-		unless (%stathash) { 
-			warn " unable to get statistics! nothing done\n";
-			return;
-		}
-		$subtractor = $stathash{'median'};
-		print " subtracting median value $subtractor\n";
-	} 
-	elsif ($value =~ /mean/i) { 
-		# use dataset mean
-		my %stathash = _get_statistics_hash($index);
-		unless (%stathash) { 
-			warn " unable to get statistics! nothing done\n";
-			return;
-		}
-		$subtractor = $stathash{'mean'};
-		print " subtracting mean value $subtractor\n";
-	} 
-	elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
-		# a numeric value, allowing for negatives, decimals, exponents
-		$subtractor = $value;
-	} 
-	else {
-		warn " unrecognized value; nothing done\n";
-		return;
-	}
-	
 	# request placement
 	my $placement = _request_placement();
 	
 	
-	# generate subtraction product
-	my $count = 0; # failed count  
-	if ($placement eq 'r' or $placement eq 'R') {
-		# Replace the contents of the original dataset
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
 		
-		for my $i (1..$main_data_ref->{'last_row'}) {
-			# check for valid numbers
-			if ($data_table_ref->[$i][$index] eq '.') {
-				$count++;
-				next;
-			} else {
-				$data_table_ref->[$i][$index] = 
-					($data_table_ref->[$i][$index] - $subtractor);
+		# determine the actual value to subtract
+		my $subtractor; # the actual number to subtract
+		if ($value =~ /median/i) { 
+			# use dataset median
+			my %stathash = _get_statistics_hash($index);
+			unless (%stathash) { 
+				warn " unable to get statistics! nothing done\n";
+				return;
 			}
-		}
-		
-		# update metadata
-		$main_data_ref->{$index}{'subtract'} = $value;
-		
-		# print conclusion
-		print " $value was subtracted from dataset $main_data_ref->{$index}{'name'}\n";
-	} 
-	
-	elsif ($placement eq 'n' or $placement eq 'N') {
-		# Generate a new dataset
-		
-		# the new index position is equivalent to the number of columns
-		my $new_position = $main_data_ref->{'number_columns'};
-		
-		# calculate new values
-		for my $i (1..$main_data_ref->{'last_row'}) {
-			# check for valid numbers
-			if ($data_table_ref->[$i][$index] eq '.') {
-				$data_table_ref->[$i][$new_position] = '.';
-				$count++;
-			} else {
-				$data_table_ref->[$i][$new_position] = 
-					($data_table_ref->[$i][$index] - $subtractor);
+			$subtractor = $stathash{'median'};
+			print " subtracting median value $subtractor\n";
+		} 
+		elsif ($value =~ /mean/i) { 
+			# use dataset mean
+			my %stathash = _get_statistics_hash($index);
+			unless (%stathash) { 
+				warn " unable to get statistics! nothing done\n";
+				return;
 			}
-		}
-		
-		# copy the medadata hash and annotate
-		my $new_name;
-		if ($function and $opt_name) {
-			# automatic execution and new name was specifically given 
-			$new_name = $opt_name;
-		}
+			$subtractor = $stathash{'mean'};
+			print " subtracting mean value $subtractor\n";
+		} 
+		elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+			# a numeric value, allowing for negatives, decimals, exponents
+			$subtractor = $value;
+		} 
 		else {
-			$new_name = $main_data_ref->{$index}{'name'} . "-$value";
+			warn " unrecognized value; nothing done\n";
+			return;
 		}
-		_generate_new_metadata(
-			$index,
-			$new_position,
-			'subtract',
-			$value,
-			$new_name,
-		);
 		
-		# print conclusion
-		print " value '$value' was subtracted from dataset $main_data_ref->{$index}{'name'}" 
-			. " and generated as a new dataset\n";
-	} 
-	
-	else {
-		warn " subtraction NOT done; unknown placement request\n";
-		return;
+		# generate subtraction product
+		my $count = 0; # failed count  
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					$count++;
+					next;
+				} else {
+					$data_table_ref->[$i][$index] = 
+						($data_table_ref->[$i][$index] - $subtractor);
+				}
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'subtract'} = $value;
+			
+			# print conclusion
+			print " $value was subtracted from dataset $main_data_ref->{$index}{'name'}\n";
+			$dataset_modification_count++;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					$data_table_ref->[$i][$new_position] = '.';
+					$count++;
+				} else {
+					$data_table_ref->[$i][$new_position] = 
+						($data_table_ref->[$i][$index] - $subtractor);
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "-$value";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'subtract',
+				$value,
+				$new_name,
+			);
+			
+			# print conclusion
+			print " value '$value' was subtracted from dataset $main_data_ref->{$index}{'name'}" 
+				. " and generated as a new dataset\n";
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " subtraction NOT done; unknown placement request\n";
+		}
+		
+		if ($count > 0) {
+			print " $count datapoints could not be subtracted\n";
+		}
 	}
 	
-	if ($count > 0) {
-		print " $count datapoints could not be subtracted\n";
-	}
-	
-	return 1;
+	# done 
+	return $dataset_modification_count;
 }
 
 
@@ -2517,10 +2524,10 @@ sub division_function {
 	# Divide each datapoint value in a dataset by a specific value
 	
 	# request dataset
-	my $line = " Enter the index number of the dataset to divide  ";
-	my $index = _request_index($line);
-	if ($index == -1) {
-		warn " unknown index number. nothing done\n";
+	my $line = " Enter the index number(s) of the dataset(s) to divide  ";
+	my @indices = _request_indices($line);
+	unless (@indices) {
+		warn " no valid indices. nothing done\n";
 		return;
 	}
 	
@@ -2537,115 +2544,124 @@ sub division_function {
 		chomp $value;
 	}
 	
-	# determine the actual value to dvidie by
-	my $divisor; # the actual number to divide by
-	if ($value =~ /median/i) { 
-		# use dataset median
-		my %stathash = _get_statistics_hash($index);
-		unless (%stathash) { 
-			warn " unable to get statistics! nothing done\n";
-			return;
-		}
-		$divisor = $stathash{'median'};
-		print " dividing by median value $divisor\n";
-	} 
-	elsif ($value =~ /mean/i) { 
-		# use dataset mean
-		my %stathash = _get_statistics_hash($index);
-		unless (%stathash) { 
-			warn " unable to get statistics! nothing done\n";
-			return;
-		}
-		$divisor = $stathash{'mean'};
-		print " dividing by mean value $divisor\n";
-	} 
-	elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
-		# a numeric value, allowing for negatives, decimals, exponents
-		$divisor = $value;
-	} 
-	else {
-		warn " unrecognized value; nothing done\n";
-		return;
-	}
-	
 	# request placement
 	my $placement = _request_placement();
 	
 	
-	# generate subtraction product
-	my $count = 0; # failed count  
-	if ($placement eq 'r' or $placement eq 'R') {
-		# Replace the contents of the original dataset
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
 		
-		for my $i (1..$main_data_ref->{'last_row'}) {
-			# check for valid numbers
-			if ($data_table_ref->[$i][$index] eq '.') {
-				$count++;
-				next;
-			} else {
-				$data_table_ref->[$i][$index] = 
-					($data_table_ref->[$i][$index] / $divisor);
+		# determine the actual value to divide by
+		my $divisor; # the actual number to divide by
+		if ($value =~ /median/i) { 
+			# use dataset median
+			my %stathash = _get_statistics_hash($index);
+			unless (%stathash) { 
+				warn " unable to get statistics! nothing done\n";
+				return;
 			}
-		}
-		
-		# update metadata
-		$main_data_ref->{$index}{'divide'} = $value;
-		
-		# print conclusion
-		print " dataset $main_data_ref->{$index}{'name'} was divided by value "
-			. "'$value'\n";
-	} 
-	
-	elsif ($placement eq 'n' or $placement eq 'N') {
-		# Generate a new dataset
-		
-		# the new index position is equivalent to the number of columns
-		my $new_position = $main_data_ref->{'number_columns'};
-		
-		# calculate new values
-		for my $i (1..$main_data_ref->{'last_row'}) {
-			# check for valid numbers
-			if ($data_table_ref->[$i][$index] eq '.') {
-				$data_table_ref->[$i][$new_position] = '.';
-				$count++;
-			} else {
-				$data_table_ref->[$i][$new_position] = 
-					($data_table_ref->[$i][$index] / $divisor);
+			$divisor = $stathash{'median'};
+			print " dividing by median value $divisor\n";
+		} 
+		elsif ($value =~ /mean/i) { 
+			# use dataset mean
+			my %stathash = _get_statistics_hash($index);
+			unless (%stathash) { 
+				warn " unable to get statistics! nothing done\n";
+				return;
 			}
-		}
-		
-		# copy the medadata hash and annotate
-		my $new_name;
-		if ($function and $opt_name) {
-			# automatic execution and new name was specifically given 
-			$new_name = $opt_name;
-		}
+			$divisor = $stathash{'mean'};
+			print " dividing by mean value $divisor\n";
+		} 
+		elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+			# a numeric value, allowing for negatives, decimals, exponents
+			$divisor = $value;
+		} 
 		else {
-			$new_name = $main_data_ref->{$index}{'name'} . "/$value";
+			warn " unrecognized value; nothing done\n";
+			return;
 		}
-		_generate_new_metadata(
-			$index,
-			$new_position,
-			'divide',
-			$value,
-			$new_name,
-		);
 		
-		# print conclusion
-		print " dataset $main_data_ref->{$index}{'name'} was divided by value " 
-			. "'$value' and generated as a new dataset\n";
-	} 
-	
-	else {
-		warn " division NOT done; unknown placement request\n";
-		return;
+		
+		# generate subtraction product
+		my $count = 0; # failed count  
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					$count++;
+					next;
+				} else {
+					$data_table_ref->[$i][$index] = 
+						($data_table_ref->[$i][$index] / $divisor);
+				}
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'divide'} = $value;
+			
+			# print conclusion
+			print " dataset $main_data_ref->{$index}{'name'} was divided by value "
+				. "'$value'\n";
+			$dataset_modification_count++;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					$data_table_ref->[$i][$new_position] = '.';
+					$count++;
+				} else {
+					$data_table_ref->[$i][$new_position] = 
+						($data_table_ref->[$i][$index] / $divisor);
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "/$value";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'divide',
+				$value,
+				$new_name,
+			);
+			
+			# print conclusion
+			print " dataset $main_data_ref->{$index}{'name'} was divided by value " 
+				. "'$value' and generated as a new dataset\n";
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " division NOT done; unknown placement request\n";
+			return;
+		}
+		
+		if ($count > 0) {
+			print " $count datapoints could not be divided\n";
+		}
 	}
 	
-	if ($count > 0) {
-		print " $count datapoints could not be divided\n";
-	}
-	
-	return 1;
+	# done
+	return $dataset_modification_count;
 }
 
 
