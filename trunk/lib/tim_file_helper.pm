@@ -2259,8 +2259,10 @@ sub write_summary_data {
 	}
 	unless (defined $outfile) {
 		if (defined $datahash_ref->{'basename'}) {
-			# use the opened file's basename if it exists
-			$outfile = $datahash_ref->{'basename'};
+			# use the opened file's filename if it exists
+			# prepend the path if it exists
+			# the extension will be added later
+			$outfile = $datahash_ref->{'path'} . $datahash_ref->{'basename'};
 		}
 		else {
 			cluck "no filename passed to write_summary_data!\n";
