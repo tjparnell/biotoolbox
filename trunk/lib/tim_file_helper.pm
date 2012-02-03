@@ -2313,24 +2313,25 @@ sub write_summary_data {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) should be the same 
 		# in all the columns
-		$dataset = $datahash_ref->{$startcolumn}{'dataset'};
+		$dataset = $datahash_ref->{$startcolumn}{'dataset'} || 'data_scores';
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
 		# same in all
-		$log = $datahash_ref->{$startcolumn}{'log2'};
+		$log = $datahash_ref->{$startcolumn}{'log2'} || 0;
 	}
-		
 	
+	# Prepare score column name
+		# we will use the basename of the output file name to make it 
+		# easier in downstream applications
+	my ($data_name, undef, undef) = fileparse($outfile, @SUFFIX_LIST);
 	
 	# Prepare array to store the summed data
 	my $summed_data = generate_tim_data_structure(
 		'averaged_windows', 
-		qw(
-			Window
-			Midpoint
-			Score
-		)
+		'Window',
+		'Midpoint',
+		$data_name
 	);
 	$summed_data->{'db'} = $datahash_ref->{'database'};
 	$summed_data->{0}{'number_features'} = $datahash_ref->{'last_row'};

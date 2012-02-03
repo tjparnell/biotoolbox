@@ -2984,25 +2984,10 @@ sub write_summary_function {
 		);
 	}
 	
-	# determine the export file name
-	my $outfilename;
-	if (defined $outfile) {
-		# use the outfile name specified on the command line
-		# note that this could be overwritten later if $modification > 0
-		# but to allow for automated execution, we can't ask the user
-		# for verification
-		print " using summary file name '$outfile'\n";
-		$outfilename = $outfile;
-	}
-	else {
-		# generate a new name based on the input base name
-		$outfilename = $main_data_ref->{'basename'} . '_summary';
-	}
-	
 	# write the summary
 	my $sumfile = write_summary_data( {
 		'data'         => $main_data_ref,
-		'filename'     => $outfilename,
+		'filename'     => $outfile,
 		'startcolumn'  => $startcolumn,
 		'endcolumn'    => $stopcolumn,
 		'log'          => $opt_log,
