@@ -215,14 +215,18 @@ if ($ask) {
 	
 	# request name index or text
 	unless (defined $name) {
+		my $suggestion = find_column_index($metadata_ref, 'name|ID');
 		print " Enter the index for the feature name column or\n" . 
-			"   the base text for auto-generated names   ";
+			"   the base text for auto-generated names [$suggestion]  ";
 		my $in = <STDIN>;
 		if ($in =~ /^(\d+)$/) {
 			$name_index = $1;
 		}
 		elsif ($in =~ /(\w+)/) {
 			$name_base = $1;
+		}
+		elsif (defined $suggestion) {
+			$name_index = $suggestion;
 		}
 	}
 	
@@ -237,10 +241,14 @@ if ($ask) {
 	
 	# request strand index
 	unless (defined $strand_index) {
-		print " Enter the index for the feature strand column  ";
+		my $suggestion = find_column_index($metadata_ref, 'strand');
+		print " Enter the index for the feature strand column [$suggestion]  ";
 		my $in = <STDIN>;
 		if ($in =~ /(\d+)/) {
 			$strand_index = $1;
+		}
+		elsif (defined $suggestion) {
+			$strand_index = $suggestion;
 		}
 	}
 }
@@ -373,14 +381,16 @@ while (my $line = $in_fh->getline) {
 	}
 	elsif (defined $name_base) {
 		# auto-generate the names
-		push @bed, $name_base . '_' . sprintf("%08d", $count);
+		push @bed, $name_base . '_' . $count;
+	}
+	elsif (defined $score_index or defined $strand_index) {
+		# user is requesting subsequent columns
+		# so we must auto-generate the name
+		push @bed, "region_$count";
 	}
 	
 	# Convert the score
-	if (
-		(defined $name_index or defined $name_base) and 
-		defined $score_index
-	) {
+	if (defined $score_index) {
 		if ($data[$score_index] eq '.') {
 			# bed files don't accept null values
 			push @bed, '0';
@@ -389,13 +399,14 @@ while (my $line = $in_fh->getline) {
 			push @bed, $data[$score_index];
 		}
 	}
+	elsif (defined $strand_index) {
+		# user is requesting strand index
+		# so we must auto-generate a fake score value
+		push @bed, '1';
+	}
 	
 	# Convert the strand
-	if (
-		(defined $name_index or defined $name_base) and 
-		defined $score_index and 
-		defined $strand_index
-	) {
+	if (defined $strand_index) {
 		my $value = $data[$strand_index];
 		if ($value =~ m/\A [f \+ 1 w]/xi) {
 			# forward, plus, one, watson
@@ -535,7 +546,8 @@ The command line flags and descriptions:
 
 Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_file_helper.pm', 
-although any format should work. The file may be compressed with gzip.
+although any format should work. The file may be compressed with gzip. 
+Sam files will not work, see L<bam2gff_bed.pl> for that.
 
 =item --ask
 
@@ -641,17 +653,27 @@ Display this POD documentation.
 
 This program will convert a tab-delimited data file into a BED file,
 according to the specifications here
-http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED. A minimum of
-three and a maximum of six columns may be generated. Column identification 
-may be specified on the command line or interactively. GFF source files  
-have columns automatically identified. All lower-numbered
-columns must be defined before writing higher-numbered columns. Thin and
-thick block data are not written. Browser and Track lines are also not
-written. Following specification, all coordinates are written in interbase
-(0-based) coordinates. Base (1-based) coordinates (the BioPerl standard) will
-be converted. Score values are not converted, however, to a 1..1000 scale.
-The biotoolbox script C<manipulate_datasets.pl> has tools to do this if
-required.
+L<http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED>. A minimum 
+of three and a maximum of six columns may be generated. Thin and
+thick block data (columns greater than 6) are not written. 
+
+Column identification may be specified on the command line, chosen 
+interactively, or automatically determined from the column headers. GFF 
+source files should have columns automatically identified. 
+
+All lower-numbered columns must be defined before writing higher-numbered 
+columns, as per the specification. Dummy data may be filled in for 
+Name and/or Score if a higher column is requested. 
+
+Browser and Track lines are not written. 
+
+Following specification, all coordinates are written in interbase
+(0-based) coordinates. Base (1-based) coordinates (the BioPerl standard) 
+will be converted. 
+
+Score values should be integers within the range 1..1000. Score values 
+are not converted in this script. However, the biotoolbox script 
+L<manipulate_datasets.pl> has tools to do this if required.
 
 An option exists to further convert the BED file to an indexed, binary BigBed 
 format. Jim Kent's bedToBigBed conversion utility must be available, and 
