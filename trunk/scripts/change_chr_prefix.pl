@@ -7,6 +7,19 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Temp qw( tempfile );
 
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_data_helper qw(
+	find_column_index
+);
+use tim_file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	open_to_read_fh
+	open_to_write_fh
+);
+use tim_db_helper::config;
+
 # check for Bam support
 my $bam_support = 0;
 eval {
@@ -14,15 +27,7 @@ eval {
 	$bam_support = 1;
 };
 
-# biotoolbox library
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
-	open_to_read_fh
-	open_to_write_fh
-);
-use tim_db_helper::config;
-my $VERSION = '1.5.0';
+my $VERSION = '1.6.2';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -384,7 +389,7 @@ sub process_sam_file {
 		else {
 			my @data = split /\t/, $line;
 			$data[2] = change_name($data[2]);
-			$newline = join("\t", $line);
+			$newline = join("\t", @data);
 		}
 		
 		# write the line to output
@@ -488,8 +493,32 @@ sub process_gff_file {
 	# convert the chromosome names
 	while (my $line = $in_fh->getline) {
 		
-		if ($line =~ /\A#/) {
-			# comment lines, leave as is
+		if ($line =~ /\A##sequence\-region/) {
+			# sequence region pragma
+			my @data = split /\s+/, $line;
+			# the spec doesn't specify the delimiters, but obviously whitespace
+			# we should four elements in the data array
+			# pragma seqid start end
+			
+			# change and write out
+			$data[1] = change_name($data[1]);
+			$out_fh->print( join(" ", @data) ); # using space as delimiter
+		}
+		elsif ($line =~ /\A#/) {
+			# comment or other pragma line, leave as is
+			$out_fh->print($line);
+		}
+		elsif ($line =~ /\A>/) {
+			# a fasta header
+			# pull out the chromosome name from the RE
+			if ($line =~ /\A>([\w\d\-\_]+)/) {
+				my $chromo = $1;
+				my $newchromo = change_name($chromo);
+				$line =~ s/$chromo/$newchromo/;
+			}
+			else {
+				warn " unrecognized fasta line not changed: $line";
+			}
 			$out_fh->print($line);
 		}
 		elsif ($line !~ /\t/) {
@@ -504,7 +533,7 @@ sub process_gff_file {
 			$data[0] = change_name($old_chr);
 			
 			# check chromosome lines
-			if ($data[2] =~ /chromosome/i) {
+			if ($data[2] =~ /chromosome|sequence|contig/i) {
 				# need to change Name and ID tags
 				$data[8] =~ s/Name=$old_chr/Name=$data[0]/;
 				$data[8] =~ s/ID=$old_chr/ID=$data[0]/;
@@ -522,8 +551,52 @@ sub process_gff_file {
 
 sub process_text_file {
 	print "\n Processing a non-standard Text file....\n";
-	die "\n currently unsupported! complain to Tim\n";
-
+	
+	my ($infile, $outfile) = @_;
+	
+	# open files
+	my $in_data = load_tim_data_file($infile) or 
+		die " can't open input file!\n";
+	
+	# find the chromosome column
+	my $chr_i = find_column_index($in_data, "^chr|seq|ref");
+	unless (defined $chr_i) {
+		die " unable to find chromosome column via header names!\n";
+	}
+	
+	# change the chromosome
+	for (my $row = 1; $row <= $in_data->{'last_row'}; $row++) {
+		# update
+		$in_data->{'data_table'}->[$row][$chr_i] = change_name( 
+			$in_data->{'data_table'}->[$row][$chr_i] );
+	}
+	
+	# update metadata
+	$in_data->{$chr_i}{"prefix_$prefix"} = $add_chr ? 'added' : 'stripped';
+	
+	# check output file
+	unless ($outfile) {
+		# generate output file name
+		$outfile = $in_data->{'basename'};
+		
+		# modify the name as appropriate
+		if ($add_chr) {
+			$outfile .= "_$prefix";
+		}
+		else {
+			# strip prefix
+			$outfile .= "_no$prefix";
+		}
+	}
+	
+	# write out the file
+	my $success = write_tim_data_file( {
+		'data'      => $in_data,
+		'gz'        => $gz,
+		'filename'  => $outfile,
+	} );
+	
+	return $success;
 }
 
 
