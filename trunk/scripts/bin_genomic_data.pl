@@ -27,7 +27,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.5.4';
+my $VERSION = '1.6.2';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -59,7 +59,6 @@ my (
 	$span,
 	$midpoint,
 	$shift,
-	$interbase,
 	$interpolate,
 	$log,
 	$gffout,
@@ -83,7 +82,6 @@ GetOptions(
 	'span'        => \$span, # assign value across entire feature span
 	'midpoint'    => \$midpoint, # assign value at the feature midpoint
 	'shift=i'     => \$shift, # 3' shift value
-	'interbase!'  => \$interbase, # source is in interbase format
 	'interpolate' => \$interpolate, # interpolate missing data
 	'log!'        => \$log, # values in log2 space
 	'gff'         => \$gffout, # output a gff file
@@ -211,17 +209,17 @@ index_data_table($main_data_ref) or
 	# also get the extension for recognizing the file type to use below
 my ($name, $path, $ext) = fileparse($datafile, 
 	qw(
-		.gff
-		.gff.gz
-		.gff3
-		.gff3.gz
-		.bed
-		.bed.gz
-		.sgr
-		.sgr.gz
-		.wig
-		.wig.gz
-		.bam
+		\.gff
+		\.gff\.gz
+		\.gff3
+		\.gff3\.gz
+		\.bed
+		\.bed\.gz
+		\.sgr
+		\.sgr\.gz
+		\.wig
+		\.wig\.gz
+		\.bam
 	) 
 );
 
@@ -426,24 +424,21 @@ sub get_bed_data {
 		if ($line =~ /^#/) {next} # skip comment lines
 		chomp $line;
 		my @data = split /\t/, $line;
-		my ($chromo, $start, $stop) = $data[0,1,2];
 		
-		# interbase conversion
-		if ($interbase) {
-			$start += 1;
-		}
+		# interbase conversion of start
+		$data[1] += 1;
 		
 		# the score column is optional
 		my $score;
-		if (defined $data[4]) {
+		if (scalar @data >= 5) {
 			$score = $data[4];
 		}
 		
 		# process the feature
 		$bin_count += &{$process_feature}(
-			$chromo,
-			$start,
-			$stop,
+			$data[0],
+			$data[1],
+			$data[2],
 			$score
 		);
 		$feature_count++;
@@ -473,11 +468,6 @@ sub get_sgr_data {
 		if ($line =~ /^#/) {next} # skip comment lines
 		chomp $line;
 		my ($chromo, $start, $score) = split /\t/, $line;
-		
-		# interbase conversion
-		if ($interbase) {
-			$start += 1;
-		}
 		
 		# process the feature
 		$bin_count += &{$process_feature}(
@@ -1253,7 +1243,6 @@ A script to bin genomic data into windows
   --span
   --midpoint
   --shift <integer>
-  --interbase
   --interpolate
   --(no)log
   --gff
@@ -1339,14 +1328,6 @@ number of bp. This is to account for ChIP-Seq data where the peak
 of tag counts is offset from the actual center of the sequenced 
 fragments. Use a shift value of 1/2 the mean fragment length of the 
 sequencing library.
-
-=item --interbase
-
-Source data is in interbase coordinate (0-base) system. Shift the 
-start position to base coordinate (1-base) system. This only affects 
-BED and SGR source files, which may or may not be in interbase format 
-(the others normally are not if they follow specifications). Default 
-is false. 
 
 =item --interpolate
 
