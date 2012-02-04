@@ -367,12 +367,31 @@ while (my $line = $in_fh->getline) {
 		# split the groups column into elements
 		# semi-colon delimited, space optional
 		my @groups = split / ?; ?/, $data[$name_index]; 
+		my ($name, $id); # one of two possible attributes to use
 		foreach my $element (@groups) {
 			my ($key, $value) = split / ?= ?/, $element;
-			if ($key =~ /^name$/i) { # this should be case sensitive, but just in case
-				push @bed, $value;
-				last;
+			# check keys
+			# this should be case sensitive, but just in case
+			if ($key =~ /^name$/i) { 
+				$name = $value;
 			}
+			elsif ($key =~ /^id$/i) {
+				$id = $value;
+			}
+			last if ($name and $id);
+		}
+		
+		# assign the bed feature name
+		if ($name) {
+			push @bed, $name;
+		}
+		elsif ($id) {
+			push @bed, $id;
+		}
+		else {
+			# nothing found
+			# autogenerate something
+			push @bed, "region_$count";
 		}
 	}
 	elsif (defined $name_index) {
