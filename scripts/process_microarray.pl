@@ -1663,7 +1663,7 @@ Optionally specify the filename of a text file containing a list of control
 probe ID names to which all the rest of the probes will be normalized 
 against. The control probe median value will be used as the scaling target. 
 
-=iten --(no)norm
+=item --(no)norm
 
 Optionally indicate whether to quantile normalize (or not) the values  
 between microarray sets. The default is true (quantile normalize values).
