@@ -24,9 +24,10 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.5.7';
+my $VERSION = '1.6.2';
 
-print "\n This script will map data points relative to a genomic feature\n\n";
+print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
+  
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -877,9 +878,7 @@ __END__
 
 =head1 NAME
 
-map_data.pl
-
-A script to map data relative to and flanking a genomic feature
+get_relative_data.pl
 
 =head1 SYNOPSIS
  
@@ -913,15 +912,18 @@ The command line flags and descriptions:
 
 =over 4
 
+=item --db <name | filename>
 
-=item --db <name|file.gff3>
-
-Specify the name of the BioPerl SeqFeature::Store database to use as
-source. Alternatively, a single GFF3 file may be loaded into a in-memory
-database. Specifying the database is required for new feature data files.
-For pre-existing input data files, this value may be obtained from the
-input file metadata. However, if provided, it overrides the database listed
-in the file; this is useful for collecting data from multiple databases.
+Specify the name of a BioPerl SeqFeature::Store database to use as
+source. Alternatively, an appropriate single file database file may be 
+provided. Acceptable databases may include a single GFF3 file (.gff or 
+.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
+SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
+(see Bio::DB::BigWigSet). Specifying the database is required for new 
+feature data files. For pre-existing input data files, this value may be 
+obtained from the input file metadata. However, if provided, it overrides 
+the database specified in the file; this is useful for collecting data 
+from multiple databases.
 
 =item --out <filename>
 
@@ -930,11 +932,12 @@ input files will be overwritten unless specified.
 
 =item --in <filename>
 
-Specify the filename of a data table containing the list of 
-features to map nucleosomes around. The file must be in the
-'tim_data' format and specify a feature to use. If an input 
-file is not specified, then a new list of features will be 
-generated from the database.
+Specify an input file containing either a list of database features or 
+genomic coordinates for which to map data around. The file should be a 
+tab-delimited text file, one row per feature, with columns representing 
+feature identifiers, attributes, coordinates, and/or data values. The 
+first row should be column headers. Bed files are acceptable, as are 
+text files generated with other biotoolbox programs.
 
 =item --feature [type, type:source]
 
@@ -965,31 +968,30 @@ count values.
 =item --value [score|count|length]
 
 Optionally specify the type of data value to collect from the dataset or 
-data file. Three values are accepted: score, count, or length. The default 
-value type is score. Note that some data sources only support certain 
-types of data values. Wig and BigWig files only support score and count; 
-BigBed and database features support count and length and optionally 
-score; Bam files support basepair coverage (score), count (number of 
-alignments), and length.
+data file. Three values are accepted: score, count, or length. Note that 
+some data sources only support certain types of data values. Wig and 
+BigWig files only support score and count; BigBed and database features 
+support count and length and optionally score; Bam files support basepair 
+coverage (score), count (number of alignments), and length. The default 
+value type is score. 
 
 =item --win <integer>
 
-Specify the window size. Default 50
+Specify the window size. The default is 50 bp.
 
 =item --num <integer>
 
 Specify the number of windows on either side of the feature position 
-(total number will be 2 x [num]). Default 20
+(total number will be 2 x [num]). The default is 20, or 1 kb on either 
+side of the reference position if the default window size is used.
 
 =item --pos [5|3|m]
 
 Indicate the relative position of the feature around which the 
 data is mapped. Three values are accepted: "5" indicates the 
-5' prime end is used, "3" indicates the 3' end is used, and "m" or "1"
+5' prime end is used, "3" indicates the 3' end is used, and "m" or "4"
 indicates the middle of the feature is used. The default is to 
 use the 5' end, or the start position of unstranded features. 
-If the feature "tts" is selected above, the 3' end is 
-automatically selected.
 
 =item --strand [sense|antisense|all]
 
@@ -1022,17 +1024,18 @@ overlap).
 Indicate that the data should be averaged across all features at
 each position, suitable for graphing. A separate text file will 
 be written with the suffix '_summed' with the averaged data. 
-Default is true.
+Default is true (sum).
 
 =item --(no)smooth
 
 Indicate that windows without values should (not) be interpolated
-from neighboring values.
+from neighboring values. The default is false (nosmooth).
 
 =item --(no)log
 
 Dataset values are (not) in log2 space and should be treated 
-accordingly. Output values will be in the same space.
+accordingly. Output values will be in the same space. The default is 
+false (nolog).
 
 =item --(no)gz
 
@@ -1046,27 +1049,35 @@ Print the version number.
 
 Display this help
 
-
 =back
 
 =head1 DESCRIPTION
 
-This program will map data around a genomic feature. Features
-may include the transcription start site (TSS) of a transcript, tRNA gene,
-or some other genomic feature. The data is collected in a series of windows
-flanking the feature start, end, or midpoint position. The number and size of
-windows are specified on the command line, or the program will default to
-20 windows (on either side of the feature, 40 total) of 50 bp size. These
-default window settings corresponds to 1 kb on either side of the feature.
-Windows without a value may be interpolated (smoothed) from neigboring 
-values, if available.
+This program will collect data around a relative coordinate of a genomic 
+feature or region. The data is collected in a series of windows flanking the 
+feature start (5' position for stranded features), end (3' position), or 
+the midpoint position. The number and size of windows are specified via 
+command line arguments, or the program will default to 20 windows on both 
+sides of the relative position (40 total) of 50 bp size, corresponding to 
+2 kb total (+/- 1 kb). Windows without a value may be interpolated 
+(smoothed) from neigboring values, if available.
 
 The default value that is collected is a dataset score (e.g. microarray 
 values). However, other values may be collected, including 'count' or 
 'length'. Use the --method argument to collect alternative values.
 
-The program writes out a tim data formatted text file.
+Stranded data may be collected. If the feature does not have an inherent 
+strand, one may be specified to enforce stranded collection or a particular 
+orientation. 
 
+When features overlap, or the collection windows of one feature overlaps 
+with another feature, then data may be ignored and not collected (--avoid).
+
+The program writes out a tim data formatted text file. It will also 
+generate a '*_summed.txt' file, in which each the mean value of all 
+features for each window is generated and written as a data row. This 
+summed data may be graphed using the biotoolbox script L<graph_profile.pl> 
+or merged with other summed data sets for comparison.
 
 =head1 AUTHOR
 
@@ -1080,9 +1091,4 @@ The program writes out a tim data formatted text file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
 
