@@ -176,7 +176,7 @@ if (defined $path) {
 	
 	# add the set name to the path to make a subdirectory
 	if ($set_name) {
-		unless ($path =~ m/$set_name$/) {
+		unless ($path =~ m/$set_name\Z/) {
 			$path = File::Spec->catdir($path, $set_name);
 		}
 	}
@@ -258,7 +258,10 @@ while (@infiles) {
 		$name = $infile_basename;
 	}
 	$name =~ s/[_\.\-]?sort(?:ed)?//i; # remove the sorted name if present
-	$name =~ s/_|\./ /g; # substitute any underscores or periods with spaces
+	
+	# generate a display name without underscores, periods
+	my $display_name = $name;
+	$display_name =~ s/_|\./ /g; # substitute any underscores or periods with spaces
 	
 	
 	# determine gff type
@@ -424,7 +427,7 @@ while (@infiles) {
 		# add metadata
 		push @metadata, "primary_tag  = $gfftype\n";
 		push @metadata, "source       = $source\n";
-		push @metadata, "display_name = $name\n";
+		push @metadata, "display_name = $display_name\n";
 		if ($strand =~ /^f|w|\+|1/) {
 			push @metadata, "strand       = 1\n";
 		}
@@ -464,7 +467,7 @@ while (@infiles) {
 			push @confdata, "# min_score  = 0\n";
 			push @confdata, "# max_score  = 50\n";
 			push @confdata, "height       = 50\n";
-			push @confdata, "key          = $name\n";
+			push @confdata, "key          = $display_name\n";
 			push @confdata, "category     = $set_name\n";
 			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
 			push @confdata, "\n\n";
@@ -494,7 +497,7 @@ while (@infiles) {
 			push @confdata, "glyph        = segments\n";
 			push @confdata, "stranded     = 1\n";
 			push @confdata, "label        = 1\n";
-			push @confdata, "key          = $name\n";
+			push @confdata, "key          = $display_name\n";
 			push @confdata, "category     = $set_name\n";
 			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
 			
@@ -521,7 +524,7 @@ while (@infiles) {
 			push @confdata, "mismatch_color = red\n";
 			push @confdata, "bgcolor        = blue\n";
 			push @confdata, "fgcolor        = white\n";
-			push @confdata, "key            = $name\n";
+			push @confdata, "key            = $display_name\n";
 			push @confdata, "category       = $set_name\n";
 			push @confdata, "citation       = Data file $infile_basename$infile_ext\n";
 			push @confdata, "\n";
