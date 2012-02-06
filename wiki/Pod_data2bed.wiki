@@ -34,7 +34,7 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip.
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip.  Sam files will not work, see [Pod_bam2gff_bed_pl bam2gff_bed.pl] for that.
 __
   __
 __--ask
@@ -73,7 +73,7 @@ __
 __--name <**column_index | base_text>
 
 __
-  Supply either the index of the column in the data table to  be used as the name column in the BED data, or the base text  to be used when auto-generating unique feature names. The  auto-generated names are in the format 'text_00000001'.
+  Supply either the index of the column in the data table to  be used as the name column in the BED data, or the base text  to be used when auto-generating unique feature names. The  auto-generated names are in the format 'text_00000001'.  If the source file is GFF3, it will automatically extract the  Name attribute.
 __
   __
 __--strand <**column_index>
@@ -140,7 +140,17 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a tab-delimited data file into a BED file, according to the specifications here http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED. A minimum of three and a maximum of six columns may be generated. Column identification  may be specified on the command line or interactively. GFF source files   have columns automatically identified. All lower-numbered columns must be defined before writing higher-numbered columns. Thin and thick block data are not written. Browser and Track lines are also not written. Following specification, all coordinates are written in interbase (0-based) coordinates. Base (1-based) coordinates (the !BioPerl** standard) will be converted. Score values are not converted, however, to a 1..1000 scale. The biotoolbox script `manipulate_datasets.pl` has tools to do this if required.
+This program will convert a tab-delimited data file into a BED file, according to the specifications here <[http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED]>. A minimum  of three and a maximum of six columns may be generated. Thin and thick block data (columns greater than 6) are not written.
+
+Column identification may be specified on the command line, chosen  interactively, or automatically determined from the column headers. GFF  source files should have columns automatically identified.
+
+All lower-numbered columns must be defined before writing higher-numbered  columns, as per the specification. Dummy data may be filled in for  Name and/or Score if a higher column is requested.
+
+Browser and Track lines are not written.
+
+Following specification, all coordinates are written in interbase (0-based) coordinates. Base (1-based) coordinates (the !BioPerl** standard)  will be converted.
+
+Score values should be integers within the range 1..1000. Score values  are not converted in this script. However, the biotoolbox script  [Pod_manipulate_datasets_pl manipulate_datasets.pl] has tools to do this if required.
 
 An option exists to further convert the BED file to an indexed, binary !BigBed**  format. Jim Kent's bedToBigBed conversion utility must be available, and  either a chromosome definition file or access to a Bio::DB database is required.
 

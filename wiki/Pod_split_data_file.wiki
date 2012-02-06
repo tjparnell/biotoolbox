@@ -30,13 +30,10 @@ __
 __--index <**column_index>
 
 __
-  Provide the index number of the column or dataset containing the values  used to split the file. If not specified, then the index is requested  from the user in an interactive mode.
-__
-  __
 __--col <**column_index>
 
 __
-  Alias to --index.
+  Provide the index number of the column or dataset containing the values  used to split the file. If not specified, then the index is requested  from the user in an interactive mode.
 __
   __
 __--max <**integer>

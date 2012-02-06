@@ -6,7 +6,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 map_oligo_data2gff.pl
 
 ==SYNOPSIS==
-data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
+map_oligo_data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
 
 {{{
   Options:
@@ -20,6 +20,7 @@ data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
+  --gz
   --version
   --help
   }}}

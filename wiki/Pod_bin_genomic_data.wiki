@@ -29,7 +29,6 @@ A script to bin genomic data into windows
   --span
   --midpoint
   --shift <integer>
-  --interbase
   --interpolate
   --(no)log
   --gff
@@ -117,12 +116,6 @@ __--shift <**integer>
 
 __
   For stranded single-end alignments from a bam data file, the start  position may be shifted in the 3' direction by the indicated  number of bp. This is to account for ChIP-Seq data where the peak  of tag counts is offset from the actual center of the sequenced  fragments. Use a shift value of 1/2 the mean fragment length of the  sequencing library.
-__
-  __
-__--interbase
-
-__
-  Source data is in interbase coordinate (0-base) system. Shift the  start position to base coordinate (1-base) system. This only affects  BED and SGR source files, which may or may not be in interbase format  (the others normally are not if they follow specifications). Default  is false.
 __
   __
 __--interpolate

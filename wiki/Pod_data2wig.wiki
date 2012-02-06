@@ -16,7 +16,8 @@ data2wig.pl `[`--options...`]` <**filename>
   --out <filename> 
   --step [fixed | variable]
   --size <integer>
-  --score <column_index>
+  --span <integer>
+  --index <column_index>
   --name <text>
   --(no)track
   --(no)mid
@@ -60,6 +61,15 @@ __
   Optionally define the step size in bp for 'fixedStep' wig file. This  value is automatically determined from the table's metadata, if available.  If the --step option is explicitly defined as 'fixed', then the step size  may also be explicitly defined. If this value is not explicitly defined or automatically determined, the variableStep format is used by default.
 __
   __
+__--span <**integer>
+
+__
+  Optionally indicate the size of the region in bp to which the data value  should be assigned. The same size is assigned to all data values in the  wig file. This is useful, for example, with microarray data where all of  the oligo probes are the same length and you wish to assign the value  across the oligo rather than the midpoint. The default is inherently 1 bp.
+__
+  __
+__--index <**column_index>
+
+__
 __--score <**column_index>
 
 __

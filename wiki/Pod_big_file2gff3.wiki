@@ -39,7 +39,7 @@ __
 __--path </destination/path/for/bigfiles/>
 
 __
-  Provide the destination directory name for the !BigFile** files. If the destination does not exist, then it will created. This directory should be writeable by the user and readable by all (or at least the Apache and MySQL users). If the input files are not currently located here, they will be copied to the directory for you. Note that when generating a !BigWigSet**, a unique directory for just the indicated files should be provided. The default path is the current path for the input file.
+  Provide the destination directory name for the !BigFile** files. If the destination does not exist, then it will created. This directory should be writeable by the user and readable by all (or at least the Apache and MySQL users). If the input files are not currently located here, they will be copied to the directory for you. Note that when generating a !BigWigSet**, a subdirectory with the set name (option --setname) will be made for you. The default path is the current path for the input file.
 __
   __
 __--source <**text>
@@ -87,7 +87,7 @@ __
 __--setname <**text>
 
 __
-  Optionally specify the name for the !BigWigSet** track when writing the  GBrowse configuration stanza. It is also used as the basename for the  GFF3 file. The default is to use the name of the last directory in the  target path.
+  Optionally specify the name for the !BigWigSet** track when writing the  GBrowse configuration stanza. It is also used as the basename for the  GFF3 file, as well as the name of the new subdirectory in the target path  for use as the !BigWigSet** directory. The default is to use the name of  the last directory in the target path.
 __
   __
 __--conf

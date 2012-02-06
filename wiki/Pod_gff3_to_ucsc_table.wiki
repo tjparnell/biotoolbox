@@ -12,6 +12,8 @@ gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
+  --bin
+  --gz
   --version
   --help
 }}}
@@ -23,13 +25,25 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the input GFF3 file. The file should not be compressed with gzip.
+  Specify the input GFF3 file. The file may be compressed with gzip.
 __
   __
 __--out <**filename>
 
 __
-  Specify the output filename. By default it uses input file base name  appened with '`_`refseq.txt'.
+  Specify the output filename. By default it uses input file base name  appened with '`_`ucsc_genetable.txt'.
+__
+  __
+__--(no)bin
+
+__
+  Specify whether the UCSC table-specific column bin should be included as  the first column in the table. This column is reserved for internal  UCSC database use, and, if included here, will simply be populated with  0s. The default behavior is to not include it.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.  The default is to mimic the status of the input file
 __
   __
 __--version
@@ -53,12 +67,8 @@ It will also process non-coding transcripts, including all non-coding  RNAs; all
 
 The cdsStartStat and cdsEndStat fields are populated depending on  whether five- or three-prime UTRs exist; this may or may not reflect  the actual status according to UCSC.
 
-The bin field is reserved for internal UCSC database use; it is  automatically filled with a generic 0 in the output file.
+For very large GFF3 files, it is helpful to include close feature  directive pragmas (lines with ###) after the annotation for each  reference sequence (see the GFF3 specification at  http://www.sequenceontology.org/resources/gff3.html). Fasta sequence  in the GFF3 file is ignored.
 
-{{{
-}}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD

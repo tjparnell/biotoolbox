@@ -13,11 +13,11 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
 {{{
   Options:
   --in <input_filename>
-  --func [stat | reorder | delete | rename | sort | gsort | null | 
-          duplicate | above | below | scale | pr | zscore | log2 | 
-          delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | divide | subtract | export | treeview | 
-          rewrite | center]
+  --func [stat | reorder | delete | rename | number | sort | gsort | 
+          null | duplicate | above | below | scale | pr | zscore | 
+          log2 | delog2 | format | combine | subsample | ratio | diff | 
+          normdiff | divide | subtract | strandsign | mergestrand | 
+          center | new | summary | export | rewrite | treeview]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -86,6 +86,7 @@ __
   mergestrand
   center
   new
+  summary
   export
   rewrite
   treeview
@@ -336,6 +337,12 @@ __
   __
 {{{
 }}}
+_*_divide_*_ (menu option 'v')
+
+__
+  Divide a value from a dataset. A real number may be supplied, or the words 'mean' or 'median' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
+__
+  __
 _*_subtract_*_ (menu option 'u')
 
 __
@@ -344,12 +351,6 @@ __
   __
 {{{
 }}}
-_*_divide_*_ (menu option 'v')
-
-__
-  Divide a value from a dataset. A real number may be supplied, or the words 'mean' or 'median' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
-__
-  __
 _*_strandsign_*_ (menu option 'i')
 
 __
@@ -372,6 +373,12 @@ _*_new_*_ (menu option 'w')
 
 __
   Generate a new dataset (column) which contains an identical value for  each datapoint (row). The value may be either requested interactively or  supplied using the --target option. This function may be useful for  assigning a common value to all of the data points before joining the  data file with another.
+__
+  __
+_*_summary_*_ (menu option 'y')
+
+__
+  Write out a summary of collected windowed data file, in which the mean  for each of the data columns is calculated, transposed (columns become  rows), and written to a new data file. This is essentially identical to  the summary function from the biotoolbox analysis scripts  [Pod_map_relative_data_pl map_relative_data.pl] and [Pod_pull_features_pl pull_features.pl]. It assumes that each  dataset has start and stop metadata. In automatic mode it will summarize  all available datasets; in interactive mode, it will request the start  and ending datasets. By default, a new file using the input file base  name appended with '`_`summary' is written, or a filename may be specified  using the --out option.
 __
   __
 _*_export_*_ (menu option 'x')
