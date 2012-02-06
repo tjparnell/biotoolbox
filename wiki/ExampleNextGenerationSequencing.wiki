@@ -59,9 +59,9 @@ First, we could use [Pod_get_datasets get_datasets.pl] as above, but restrict th
 Elessar:~ tim$ ./biotoolbox/scripts/get_datasets.pl --db hg19 --feature gene --data /path/to/my/data.bam --method mean --value count --start=-500 --stop=500 --out gene_promoter_count
 </pre>
 
-Alternatively, we could collect windowed data across the promoter to finely map the data to a specific location within the promoter. For this, we will use [Pod_map_relative_data map_relative_data.pl]. This program will collect data in windows or bins relative to a specific feature. We will specify the same region around the TSS (-500..+500), but in ten 50 bp windows on either side (20 total). 
+Alternatively, we could collect windowed data across the promoter to finely map the data to a specific location within the promoter. For this, we will use [Pod_get_relative_data get_relative_data.pl]. This program will collect data in windows or bins relative to a specific feature. We will specify the same region around the TSS (-500..+500), but in ten 50 bp windows on either side (20 total). 
 <pre>
-Elessar:~ tim$ ./biotoolbox/scripts/map_relative_data.pl --db hg19 --feature gene --data /path/to/my/data.bam --method mean --value score --num 10 --bin 50 --out gene_promoter_count
+Elessar:~ tim$ ./biotoolbox/scripts/get_relative_data.pl --db hg19 --feature gene --data /path/to/my/data.bam --method mean --value score --num 10 --bin 50 --out gene_promoter_count
 </pre>
 
 Notice here we switched to using basepair coverage (`score`) and a method of `mean` for each window. The output file will now contain twenty columns of data, each labeled with the coordinates of the window. The program defaults to using the 5' end of the feature as the relative position, but we could easily change this to the midpoint or 3' end.
