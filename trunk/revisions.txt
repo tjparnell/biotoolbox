@@ -1,7 +1,24 @@
 ######## biotoolbox revision history #############
 
+v.1.6.2 (svn r282)
+	- Fixed bugs in script data2bed.pl that prevented a bigBed file from being generated. Also improved autodetection of data columns and allowed for dummy data to be inserted in lower column data when writing higher column data. Also added ability to use either the GFF Name or ID attribute as the Bed feature name.
+	- Added span option to script data2wig.pl when making wig files.
+	- Renamed script process_agilent.pl to process_microarray.pl. Completely restructured internal data to accomodate multi-slide arrays and other file formats, including NimbleGen and GenePix.
+	- Removed annoying verbose output from script split_data_file.pl and improved efficiency.
+	- Stopped writing index keys in the metadata of tim data file formats. Index is now automatically calculated and retained internally. Also avoids writing metadata automatically if it wasn't present in the first place.
+	- Added summary export function to script manipulate_datasets.pl. This replicates the summary option from script get_relative_data.pl.
+	- Added multi-column support to the subtract and division functions in script manipulate_datasets.pl.
+	- Minor bug fixes and improvements to script map_oligo_data2gff.pl.
+	- Improved script gff3_to_ucsc_table.pl to handle gzip files and make the UCSC bin column optional.
+	- Added character escaping when generating GFF3 files.
+	- Improved handling of BigWigSet directories in script big_file2gff3.pl where the set name is used as the final subdirectory in the target path. Also improved name handling.
+	- Fixed bug in writing Sam files in script change_chr_prefix.pl. Also added increased support for pragmas and fasta sequences in GFF3 files, and support for non-standard text files.
+	- Changed the score column name to the more meaningful outfile basename when writing summary files.
+	- Fixed data collection from Bed files in script bin_genomic_data.pl.
+	- Renamed script map_relative_data.pl to get_relative_data.pl; updated the POD to be more helpful.
+
 v.1.6.1 (svn r258)
-	- updated the online documentation for all perl scripts to include the version option
+	- updated the inline documentation for all perl scripts to include the version option
 
 v1.6.0 (svn r253)
 	- added version numbers and reporting to all perl scripts and modules
