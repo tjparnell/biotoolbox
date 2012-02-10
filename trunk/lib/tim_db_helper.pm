@@ -2,7 +2,7 @@ package tim_db_helper;
 
 use strict;
 require Exporter;
-use Carp;
+use Carp qw(carp cluck croak confess);
 use File::Spec;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.5.9';
+our $VERSION = '1.6.3';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -210,7 +210,7 @@ Example:
 sub open_db_connection {
 	my $database = shift;
 	unless ($database) {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	
@@ -480,7 +480,7 @@ sub get_dataset_list {
 		}
 	}
 	else {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	unless ($db) {
@@ -632,7 +632,7 @@ sub validate_dataset_list {
 	
 	# verify passed data
 	unless ($database) {
-		carp "no database passed!\n";
+		cluck "no database passed!\n";
 		return;
 	}
 	unless (scalar @_ > 0) { 
@@ -829,7 +829,7 @@ sub process_and_verify_dataset {
 			
 				# check for a database
 				unless ($db) {
-					carp " dataset '$dataset' is a presumed database feature ",
+					cluck " dataset '$dataset' is a presumed database feature ",
 						"but no database was passed!\n";
 					return;
 				}
@@ -853,7 +853,7 @@ sub process_and_verify_dataset {
 		
 		# check for a database
 		unless ($db) {
-			carp " no database provided to select datasets!\n";
+			cluck " no database provided to select datasets!\n";
 			return;
 		}
 				
@@ -1204,7 +1204,7 @@ sub get_new_feature_list {
 		}
 	}
 	else {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	
@@ -1234,7 +1234,7 @@ sub get_new_feature_list {
 		'Type'
 	);
 	unless ($new_data) {
-		carp " cannot generate tim data structure!\n";
+		cluck " cannot generate tim data structure!\n";
 		return;
 	}
 	my $feature_table = $new_data->{'data_table'}; 
@@ -1442,7 +1442,7 @@ sub get_new_genome_list {
 		}
 	}
 	else {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	unless ($db) {
@@ -1477,7 +1477,7 @@ sub get_new_genome_list {
 		'Stop'
 	);
 	unless ($new_data) {
-		carp " cannot generate tim data structure!\n";
+		cluck " cannot generate tim data structure!\n";
 		return;
 	}
 	my $feature_table = $new_data->{'data_table'}; 
@@ -1683,7 +1683,7 @@ sub get_chromo_region_score {
 	
 	# check the data source
 	unless ($arg_ref->{'dataset'}) {
-		carp " no dataset requested!";
+		cluck " no dataset requested!";
 		return;
 	}
 	
@@ -1703,7 +1703,7 @@ sub get_chromo_region_score {
 		}
 	}
 	else {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	unless ($db) {
@@ -1718,7 +1718,7 @@ sub get_chromo_region_score {
 	my $stop = $arg_ref->{'stop'} || $arg_ref->{'end'} || undef;
 	my $strand = $arg_ref->{'strand'} || 0;
 	unless ($chromo and $start and $stop) {
-		carp "one or more genomic region coordinates are missing!";
+		cluck "one or more genomic region coordinates are missing!";
 		return;
 	};
 	
@@ -1753,8 +1753,18 @@ sub get_chromo_region_score {
 		$region = shift @regions;
 	}
 	elsif (scalar @regions > 1) {
-		carp " " . scalar @regions . " regions found for $chromo:$start..$stop! Taking first\n";
-		$region = shift @regions;
+		# attempt to take the correct one
+		foreach (@regions) {
+			if ($_->seq_id eq $chromo) {
+				$region = $_;
+				last;
+			}
+		}
+		unless ($region) {
+			carp " " . scalar @regions . 
+				" regions found for $chromo:$start..$stop! Skipping!\n";
+			return;
+		}
 	}
 	else {
 		# print warning if nothing found
@@ -1908,7 +1918,7 @@ sub get_region_dataset_hash {
 		}
 	}
 	else {
-		carp 'no database name passed!';
+		cluck 'no database name passed!';
 		return;
 	}
 	unless ($db) {
@@ -1918,7 +1928,7 @@ sub get_region_dataset_hash {
 	
 	# check the data source
 	unless ($arg_ref->{'dataset'}) {
-		carp " no dataset requested!";
+		cluck " no dataset requested!";
 		return;
 	}
 	
@@ -1933,7 +1943,7 @@ sub get_region_dataset_hash {
 		(defined $name and defined $type) or 
 		(defined $chromo and defined $start and defined $stop)
 	) {
-		carp "the feature name and type or genomic coordinates are missing!";
+		cluck "the feature name and type or genomic coordinates are missing!";
 		return;
 	};
 	
@@ -2208,12 +2218,27 @@ sub get_region_dataset_hash {
 	}
 	elsif (scalar @regions > 1) {
 		if ($name and $type) {
+			# multiple features with same name, how to choose?
+			# just take the first one
 			carp " " . scalar @regions . " regions found for $type feature $name! Taking first\n";
+			$region = shift @regions;
 		}
 		else {
-			carp " " . scalar @regions . " regions found for $chromo:$start..$stop! Taking first\n";
+			# genomic coordinates were used 
+			# attempt to pick exact match
+			foreach (@regions) {
+				if ($_->seq_id eq $chromo) {
+					$region = $_;
+					last;
+				}
+			}
+			unless ($region) {
+				# didn't find the exact match above!?
+				carp " " . scalar @regions . 
+					" regions found for $chromo:$start..$stop! Skipping!\n";
+				return;
+			}
 		}
-		$region = shift @regions;
 	}
 	else {
 		# print warning if nothing found
@@ -2251,6 +2276,7 @@ sub get_region_dataset_hash {
 			# there are one or more feature of the same type in this 
 			# region
 			# one of them is likely the one we're working with
+			# but not necessarily - user may be looking outside original feature
 			# the others are not what we want and therefore need to be 
 			# avoided
 			foreach my $feat (@overlap_features) {
@@ -2584,7 +2610,10 @@ sub _get_segment_score {
 			if ($method eq 'index') {
 				return %pos2data;
 			}
-			elsif ($method eq 'sum' or $method eq 'count') {
+			elsif ($method eq 'sum') {
+				return 0;
+			}
+			elsif ($method eq 'count') { 
 				return 0;
 			}
 			else {
@@ -2793,7 +2822,10 @@ sub _get_segment_score {
 		
 		# check that we have scores
 		unless (@scores) {
-			if ($method eq 'sum' or $method eq 'count') {
+			if ($method eq 'sum') { 
+				return 0;
+			}
+			elsif ($method eq 'count') { 
 				return 0;
 			}
 			else {
