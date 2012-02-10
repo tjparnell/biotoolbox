@@ -1263,8 +1263,12 @@ sub get_new_feature_list {
 	
 	# Get the names of chromosomes to avoid
 	my @excluded_chromosomes = 
-			$TIM_CONFIG->param("$db_name\.chromosome_exclude") ||
+		$TIM_CONFIG->param("$db_name\.chromosome_exclude");
+	unless (@excluded_chromosomes) {
+		@excluded_chromosomes = 
 			$TIM_CONFIG->param('default_db.chromosome_exclude');
+	}
+	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 	
 	
 	# Check for aliases
@@ -1294,10 +1298,8 @@ sub get_new_feature_list {
 	foreach my $feature (@featurelist) {
 		
 		# skip genes from excluded chromosomes
-		foreach (@excluded_chromosomes) {
-			if ($feature->seq_id eq $_) {
-				next FEATURE_COLLECTION_LIST;
-			}
+		if (exists $excluded_chr_lookup{ $feature->seq_id } ) {
+			next FEATURE_COLLECTION_LIST;
 		}
 		
 		# skip anything that matches the tag exceptions
@@ -1504,8 +1506,12 @@ sub get_new_genome_list {
 	
 	# Get the names of chromosomes to avoid
 	my @excluded_chromosomes = 
-			$TIM_CONFIG->param("$db_name\.chromosome_exclude") ||
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
+		$TIM_CONFIG->param("$db_name\.chromosome_exclude");
+	unless (@excluded_chromosomes) {
+		@excluded_chromosomes = 
+			TIM_CONFIG->param('default_db.chromosome_exclude');
+	}
+	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 
 	
 	
@@ -1514,14 +1520,9 @@ sub get_new_genome_list {
 	foreach my $chr (@chromosomes) {
 		
 		# check for excluded chromosomes
-		my $skip = 0;
-		foreach (@excluded_chromosomes) {
-			if ($chr eq $_) {
-				$skip = 1;
-				last;
-			}
+		if (exists $excluded_chr_lookup{ $chr } ) {
+			next;
 		}
-		next if $skip;
 		
 		# generate a segment representing the chromosome
 		# this should default to the beginning and end of the chromosome
@@ -1740,13 +1741,24 @@ sub get_chromo_region_score {
 	}
 	
 	# define the chromosomal region segment
-	my $region = $db->segment(
+	my @regions = $db->segment(
 			$chromo,  
 			$start, 
 			$stop, 
 	);
-	unless ($region) {
-		carp "unable to define genomic region";
+	
+	# check region
+	my $region;
+	if (scalar @regions == 1) {
+		$region = shift @regions;
+	}
+	elsif (scalar @regions > 1) {
+		carp " " . scalar @regions . " regions found for $chromo:$start..$stop! Taking first\n";
+		$region = shift @regions;
+	}
+	else {
+		# print warning if nothing found
+		carp " Region $chromo:$start..$stop not found!\n";
 		return;
 	}
 		
@@ -1936,7 +1948,7 @@ sub get_region_dataset_hash {
 	
 	### Define the chromosomal region segment
 	
-	my $region;
+	my @regions;
 	my $fref_pos; # to remember the feature reference position
 	my $fstrand; # to remember the feature strand
 	
@@ -1986,7 +1998,7 @@ sub get_region_dataset_hash {
 		$fstrand = $feature->strand;
 		
 		# now re-define the region based on the extended coordinates
-		$region = $db->segment( 
+		@regions = $db->segment( 
 				$feature->seq_id,
 				$feature->start - $arg_ref->{'extend'},
 				$feature->end + $arg_ref->{'extend'},
@@ -2029,7 +2041,7 @@ sub get_region_dataset_hash {
 			$fref_pos = $feature->start;
 			$fstrand = $feature->strand;
 			
-			$region = $db->segment( 
+			@regions = $db->segment( 
 					$feature->seq_id,
 					$feature->start + $start,
 					$feature->start + $stop,
@@ -2043,7 +2055,7 @@ sub get_region_dataset_hash {
 			$fref_pos = $feature->end;
 			$fstrand = $feature->strand;
 			
-			$region = $db->segment( 
+			@regions = $db->segment( 
 					$feature->seq_id,
 					$feature->end - $stop,
 					$feature->end - $start,
@@ -2057,7 +2069,7 @@ sub get_region_dataset_hash {
 			$fref_pos = $feature->end;
 			$fstrand = $feature->strand;
 			
-			$region = $db->segment( 
+			@regions = $db->segment( 
 					$feature->seq_id,
 					$feature->end + $start,
 					$feature->end + $stop,
@@ -2071,7 +2083,7 @@ sub get_region_dataset_hash {
 			$fref_pos = $feature->start;
 			$fstrand = $feature->strand;
 			
-			$region = $db->segment( 
+			@regions = $db->segment( 
 					$feature->seq_id,
 					$feature->start - $stop,
 					$feature->start - $start,
@@ -2085,7 +2097,7 @@ sub get_region_dataset_hash {
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 			$fstrand = $feature->strand;
 			
-			$region = $db->segment( 
+			@regions = $db->segment( 
 					$feature->seq_id,
 					$fref_pos + $start,
 					$fref_pos + $stop,
@@ -2136,7 +2148,7 @@ sub get_region_dataset_hash {
 		$fstrand = $feature->strand;
 		
 		# then establish the segment
-		$region = $feature->segment(); 
+		@regions = $feature->segment(); 
 			# this should automatically take care of strand
 			# we could probably call the segment directly, but want to 
 			# have mechanism in place in case more than one feature was
@@ -2151,11 +2163,11 @@ sub get_region_dataset_hash {
 	) {
 		
 		# generate region
-		$region = $db->segment($chromo, $start, $stop);
+		@regions = $db->segment($chromo, $start, $stop);
 		
 		# adjust strand if necessary
-		if (defined $strand) {
-			$region->strand($strand);
+		if (@regions and defined $strand) {
+			$regions[0]->strand($strand);
 		}
 		else {
 			# default top strand
@@ -2177,7 +2189,7 @@ sub get_region_dataset_hash {
 		}
 		elsif ($relative_pos == 4) {
 			# strand doesn't matter here
-			$fref_pos = $start + int(($region->length / 2) + 0.5);
+			$fref_pos = $start + int( ( ($stop - $start + 1) / 2) + 0.5);
 		}
 		$fstrand = $strand;
 	}
@@ -2190,16 +2202,27 @@ sub get_region_dataset_hash {
 	
 	
 	# check region
-	unless ($region) { 
-		# print warning if nothing found
-		my $error;
+	my $region;
+	if (scalar @regions == 1) {
+		$region = shift @regions;
+	}
+	elsif (scalar @regions > 1) {
 		if ($name and $type) {
-			$error = " Region for $type feature '$name' not found!\n";
+			carp " " . scalar @regions . " regions found for $type feature $name! Taking first\n";
 		}
 		else {
-			$error = " Region $chromo:$start..$stop not found!\n";
+			carp " " . scalar @regions . " regions found for $chromo:$start..$stop! Taking first\n";
 		}
-		carp $error;
+		$region = shift @regions;
+	}
+	else {
+		# print warning if nothing found
+		if ($name and $type) {
+			carp " Region for $type feature '$name' not found!\n";
+		}
+		else {
+			carp " Region $chromo:$start..$stop not found!\n";
+		}
 		return;
 	}
 	
