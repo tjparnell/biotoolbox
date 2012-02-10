@@ -35,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.5.7';
+my $VERSION = '1.6.3';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -616,8 +616,7 @@ sub get_genome_dataset {
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -630,8 +629,12 @@ sub get_genome_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -650,8 +653,7 @@ sub get_extended_genome_dataset {
 		my $stop  = $main_data_ref->{'data_table'}->[$row][$stop_i]  + $extend;
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -664,8 +666,12 @@ sub get_extended_genome_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -712,8 +718,7 @@ sub get_adjusted_genome_dataset {
 		}
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -726,8 +731,12 @@ sub get_adjusted_genome_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -768,8 +777,7 @@ sub get_fractionated_genome_dataset {
 		}
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -782,8 +790,12 @@ sub get_fractionated_genome_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -833,8 +845,7 @@ sub get_feature_dataset {
 		
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -846,8 +857,12 @@ sub get_feature_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -896,8 +911,7 @@ sub get_extended_feature_dataset {
 		}
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -909,8 +923,12 @@ sub get_extended_feature_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -1013,8 +1031,7 @@ sub get_adjusted_feature_dataset {
 		
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1026,8 +1043,12 @@ sub get_adjusted_feature_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
@@ -1141,8 +1162,7 @@ sub get_fractionated_feature_dataset {
 		
 		
 		# get region score
-		$main_data_ref->{'data_table'}->[$row][$index] =
-			get_chromo_region_score( {
+		my $score = get_chromo_region_score( {
 				'db'        => $db,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1154,8 +1174,12 @@ sub get_fractionated_feature_dataset {
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
 			} 
-		) || '.';
-		# this should return a value, otherwise we record an internal null
+		);
+		unless (defined $score) {
+			# this should return a value, otherwise we record an internal null
+			$score = '.';
+		}
+		$main_data_ref->{'data_table'}->[$row][$index] = $score;
 	}
 }
 
