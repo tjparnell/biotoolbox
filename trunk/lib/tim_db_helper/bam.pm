@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
-our $VERSION = '1.5.9';
+our $VERSION = '1.6.3';
 
 
 # Exported names
@@ -23,6 +23,13 @@ our %OPENED_BAMFILES; # opened bam file objects
 	# in empirical testing, this doesn't really seem to speed things up
 	# like I thought it would
 	# oh well, keep it anyway????
+
+# Hash of Bigfile chromosomes
+our %BAM_CHROMOS;
+	# sometimes user may request a chromosome that's not in the bigfile
+	# that could lead to an exception
+	# we will record the chromosomes list in this hash
+	# $BAM_CHROMOS{bigfile}{chromos}
 
 
 # The true statement
@@ -113,6 +120,7 @@ sub _collect_bam_data {
 	
 		## Get the name of the bam file
 		my $bamfile;
+		my $feature_ref = ref $feature;
 		
 		if ($feature =~ /^file:(.+)$/) {
 			# the passed feature appears to specify a file
@@ -130,13 +138,26 @@ sub _collect_bam_data {
 			# this should be supported by Bio::DB::Sam
 			$bamfile = $feature;
 		}
-		else {
-			# otherwise we assume the passed feature is a database object
+		elsif ($feature_ref =~ /^Bio::DB/) {
+			# passed feature could be a Bio::DB::* seqfeature object
 			
-			# get bedfile name
-			($bamfile) = $feature->get_tag_values('bamfile');
+			# get bamfile name
+			if ($feature->has_tag('bamfile')) {
+				($bamfile) = $feature->get_tag_values('bamfile');
+			}
+			else {
+				confess " passed $feature_ref feature '$feature'" . 
+					" does not have a bigwig attribute!\n";
+			}
 		}
-		confess " no bamfile specified!\n" unless $bamfile;
+		else {
+			confess " unrecognized feature '$feature'!\n";
+		}
+		
+		# check for bamfile
+		unless ($bamfile) {
+			confess " no bam file specified for feature '$feature'!\n";
+		}
 		
 		
 		## Open the Bam File
@@ -152,8 +173,15 @@ sub _collect_bam_data {
 			
 			# store the opened object for later use
 			$OPENED_BAMFILES{$bamfile} = $bam;
+				
+			# collect the chromosomes for this bam
+			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
 		}
 			
+		# first check that the chromosome is present
+		unless (exists $BAM_CHROMOS{$bamfile}{$region->seq_id}) {
+			next;
+		}
 		
 		# Set the code to filter alignments based on strand 
 		my $filter;

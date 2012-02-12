@@ -1958,7 +1958,7 @@ sub get_region_dataset_hash {
 	
 	### Define the chromosomal region segment
 	
-	my @regions;
+	my $region;
 	my $fref_pos; # to remember the feature reference position
 	my $fstrand; # to remember the feature strand
 	
@@ -2008,11 +2008,31 @@ sub get_region_dataset_hash {
 		$fstrand = $feature->strand;
 		
 		# now re-define the region based on the extended coordinates
-		@regions = $db->segment( 
+		# there is a possibility that poorly constructed databases may 
+		# return multiple segments!? deal with this contingency
+		my @regions = $db->segment( 
 				$feature->seq_id,
 				$feature->start - $arg_ref->{'extend'},
 				$feature->end + $arg_ref->{'extend'},
 		);
+		
+		# check region
+		if (scalar @regions == 1) {
+			$region = shift @regions;
+		}
+		elsif (scalar @regions > 1) {
+			foreach (@regions) {
+				if ($_->seq_id eq $feature->seq_id) {
+					$region = $_;
+					last;
+				}
+			}
+		}
+		unless ($region) {
+			# didn't find the exact match above!?
+			carp " could not define chromosomal segment based on $type $name!\n";
+			return;
+		}
 	} 
 		
 	# Specific start and stop coordinates of a named database feature
@@ -2042,7 +2062,11 @@ sub get_region_dataset_hash {
 			$feature->strand($strand);
 		}
 		
-		# next define the region relative to the feature start or end
+		# now define the region based on the relative coordinates
+		# there is a possibility that poorly constructed databases may 
+		# return multiple segments!? deal with this contingency
+		my @regions;
+		
 		if ($relative_pos == 5 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 5' end
@@ -2113,6 +2137,24 @@ sub get_region_dataset_hash {
 					$fref_pos + $stop,
 			);
 		}
+		
+		# check region
+		if (scalar @regions == 1) {
+			$region = shift @regions;
+		}
+		elsif (scalar @regions > 1) {
+			foreach (@regions) {
+				if ($_->seq_id eq $feature->seq_id) {
+					$region = $_;
+					last;
+				}
+			}
+		}
+		unless ($region) {
+			# didn't find the exact match above!?
+			carp " could not define chromosomal segment based on $type $name!\n";
+			return;
+		}
 	}
 	
 	# an entire named database feature
@@ -2158,11 +2200,31 @@ sub get_region_dataset_hash {
 		$fstrand = $feature->strand;
 		
 		# then establish the segment
-		@regions = $feature->segment(); 
+		my @regions = $feature->segment(); 
 			# this should automatically take care of strand
 			# we could probably call the segment directly, but want to 
 			# have mechanism in place in case more than one feature was
 			# present
+			# there is a possibility that poorly constructed databases may 
+			# return multiple segments!? deal with this contingency
+		
+		# check region
+		if (scalar @regions == 1) {
+			$region = shift @regions;
+		}
+		elsif (scalar @regions > 1) {
+			foreach (@regions) {
+				if ($_->seq_id eq $feature->seq_id) {
+					$region = $_;
+					last;
+				}
+			}
+		}
+		unless ($region) {
+			# didn't find the exact match above!?
+			carp " could not define chromosomal segment based on $type $name!\n";
+			return;
+		}
 	}
 	
 	# a genomic region
@@ -2173,11 +2235,31 @@ sub get_region_dataset_hash {
 	) {
 		
 		# generate region
-		@regions = $db->segment($chromo, $start, $stop);
+		# there is a possibility that poorly constructed databases may 
+		# return multiple segments!? deal with this contingency
+		my @regions = $db->segment($chromo, $start, $stop);
+		
+		# check region
+		if (scalar @regions == 1) {
+			$region = shift @regions;
+		}
+		elsif (scalar @regions > 1) {
+			foreach (@regions) {
+				if ($_->seq_id eq $chromo) {
+					$region = $_;
+					last;
+				}
+			}
+		}
+		unless ($region) {
+			# didn't find the exact match above!?
+			carp " could not define chromosomal segment based on $chromo\:$start\..$stop!\n";
+			return;
+		}
 		
 		# adjust strand if necessary
-		if (@regions and defined $strand) {
-			$regions[0]->strand($strand);
+		if (defined $strand) {
+			$region->strand($strand);
 		}
 		else {
 			# default top strand
@@ -2210,47 +2292,11 @@ sub get_region_dataset_hash {
 			" identify database feature!\n";
 	}
 	
-	
-	# check region
-	my $region;
-	if (scalar @regions == 1) {
-		$region = shift @regions;
+	# one last check of region
+	unless (defined $region) {
+		cluck " could not define region! arguments:\n" . 
+			join("\n", map {"$_ => $arg_ref->{$_}\n"} keys %$arg_ref) . "\n";
 	}
-	elsif (scalar @regions > 1) {
-		if ($name and $type) {
-			# multiple features with same name, how to choose?
-			# just take the first one
-			carp " " . scalar @regions . " regions found for $type feature $name! Taking first\n";
-			$region = shift @regions;
-		}
-		else {
-			# genomic coordinates were used 
-			# attempt to pick exact match
-			foreach (@regions) {
-				if ($_->seq_id eq $chromo) {
-					$region = $_;
-					last;
-				}
-			}
-			unless ($region) {
-				# didn't find the exact match above!?
-				carp " " . scalar @regions . 
-					" regions found for $chromo:$start..$stop! Skipping!\n";
-				return;
-			}
-		}
-	}
-	else {
-		# print warning if nothing found
-		if ($name and $type) {
-			carp " Region for $type feature '$name' not found!\n";
-		}
-		else {
-			carp " Region $chromo:$start..$stop not found!\n";
-		}
-		return;
-	}
-	
 	
 	
 	### Data collection
@@ -2629,20 +2675,52 @@ sub _get_segment_score {
 		if ( $datapoints[0]->has_tag('wigfile') ) {
 			# data is in wig format, or at least the first datapoint is
 			
-			# check that we have wiggle support
-			if ($WIGGLE_OK) {
-				# get the dataset scores using tim_db_helper::wiggle
-				%pos2data = collect_wig_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					@datapoints
-				);
-				$dataset_type = 'wig';
+			# determine the type of wigfile
+			my ($wigfile) = $datapoints[0]->get_tag_values('wigfile');
+			
+			if ($wigfile =~ /\.wib$/) {
+				# data is in old-style binary wiggle format
+				# based on the Bio::Graphics::Wiggle adaptor
+				
+				# check that we have wiggle support
+				if ($WIGGLE_OK) {
+					# get the dataset scores using tim_db_helper::wiggle
+					%pos2data = collect_wig_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@datapoints
+					);
+					$dataset_type = 'wig';
+				}
+				else {
+					croak " Wiggle support is not enabled! " . 
+						"Is Bio::Graphics::Wiggle installed?\n";
+				}
+			}
+			elsif ($wigfile =~ /\.bw$/) {
+				# data is in bigwig format
+				# this uses the Bio::DB::BigWig adaptor
+				
+				# check that we have bigwig support
+				if ($BIGWIG_OK) {
+					# get the dataset scores using tim_db_helper::bigwig
+					%pos2data = collect_bigwig_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@datapoints
+					);
+					$dataset_type = 'bw';
+				}
+				else {
+					croak " BigWig support is not enabled! " . 
+						"Is Bio::DB::BigWig installed?\n";
+				}
 			}
 			else {
-				croak " Wiggle support is not enabled! " . 
-					"Is Bio::Graphics::Wiggle installed?\n";
+				croak " Unrecognized wigfile attribute '$wigfile'!" . 
+					" Unable to continue!\n";
 			}
 		}
 		
