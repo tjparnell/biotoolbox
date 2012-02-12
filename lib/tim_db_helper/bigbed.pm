@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.5.9';
+our $VERSION = '1.6.3';
 
 
 # Exported names
@@ -25,6 +25,12 @@ our %OPENED_BEDFILES; # opened bigbed file objects
 	# like I thought it would
 	# oh well, keep it anyway????
 
+# Hash of Bigfile chromosomes
+our %BIGBED_CHROMOS;
+	# sometimes user may request a chromosome that's not in the bigfile
+	# that could lead to an exception
+	# we will record the chromosomes list in this hash
+	# $BIGBED_CHROMOS{bigfile}{chromos}
 
 # The true statement
 1; 
@@ -112,6 +118,7 @@ sub _collect_bigbed_data {
 	
 		# Get the name of the bigbed file
 		my $bedfile;
+		my $feature_ref = ref $feature;
 		
 		if ($feature =~ /^file:(.+)$/) {
 			# the passed feature appears to specify a file
@@ -129,13 +136,23 @@ sub _collect_bigbed_data {
 			# this should be supported by Bio::DB::BigBed
 			$bedfile = $feature;
 		}
-		else {
-			# otherwise we assume the passed feature is a database object
+		elsif ($feature_ref =~ /^Bio::DB/) {
+			# passed feature could be a Bio::DB::* seqfeature object
 			
 			# get bedfile name
-			($bedfile) = $feature->get_tag_values('bigbedfile');
+			if ($feature->has_tag('bigbedfile')) {
+				($bedfile) = $feature->get_tag_values('bigbedfile');
+			}
+			else {
+				confess " passed $feature_ref feature '$feature'" . 
+					" does not have a bigbed attribute!\n";
+			}
 		}
-		confess " no bedfile passed!\n" unless $bedfile;
+		
+		# check for bedfile
+		unless ($bedfile) {
+			confess " no bigBed file specified for feature '$feature'!\n";
+		}
 		
 		# check for opened bedfile
 		my $bb;
@@ -148,11 +165,18 @@ sub _collect_bigbed_data {
 			$bb = open_bigbed_db($bedfile) or
 				confess " unable to open data BigBed file '$bedfile'";
 			
-			
 			# store the opened object for later use
 			$OPENED_BEDFILES{$bedfile} = $bb;
+				
+			# collect the chromosomes for this bigwig
+			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
 		}
 			
+		# first check that the chromosome is present
+		unless (exists $BIGBED_CHROMOS{$bedfile}{$region->seq_id}) {
+			next;
+		}
+		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
 			-seq_id   => $region->seq_id, 

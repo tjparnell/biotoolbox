@@ -7,7 +7,7 @@ use Carp;
 use Bio::DB::BigWig;
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.5.9';
+our $VERSION = '1.6.3';
 
 
 # Exported names
@@ -27,6 +27,12 @@ our %OPENED_BIGFILES; # opened bigwig file objects
 	# like I thought it would
 	# oh well, keep it anyway????
 
+# Hash of Bigfile chromosomes
+our %BIGWIG_CHROMOS;
+	# sometimes user may request a chromosome that's not in the bigfile
+	# that could lead to an exception
+	# we will record the chromosomes list in this hash
+	# $BIGWIG_CHROMOS{bigfile}{chromos}
 
 # The true statement
 1; 
@@ -64,136 +70,132 @@ sub collect_bigwig_position_scores {
 	# initialize 
 	my %wig_data; # hash of position => score
 	
+	# The region object passed to us should be from any Bio::DB database
+	# we will open a bigwig db connection for each of the features passed to us
+	# and collect the data corresponding to the region coordinates
+	# there is usually only one bigwig feature sent, but there may be 
+	# more to combine data
+	foreach my $feature (@wig_features) {
 	
-	# Open a bigwig database object to collect the data
-	# the region object passed to us might be from a BigWig database 
-	# or it could be from a Bio::DB::SeqFeature::Store database
-	# we can directly use the former, but if the latter then we need to open
-	# a bigwig db connection
-	# also, if there are more than one bigwig features to work with, then we 
-	# will need to open them individually
-	
-	# region object is from BigWig database
-	if (
-		scalar @wig_features == 1 and
-		ref $region eq 'Bio::DB::BigFile::Segment'
-	) {
-		# since bigwig files do not store strand information
-		# we cannot check for strand information
+		# Get the name of the bigwig file and check the strand
+		my $wigfile;
+		my $strand_check;
+		my $feature_ref = ref $feature;
 		
-		# collect the features from this region
-		my @features = $region->features('region');
+		if ($feature =~ /^file:(.+)$/) {
+			# the passed feature appears to specify a file
+			$wigfile = $1;
+			
+			# check the file
+			unless (-e $wigfile) {
+				confess " BigWig file '$wigfile' does not exist!\n";
+				return;
+			}
+			
+			# since it's a passed data file name, we can't check for strand
+			# the bigwig file does not inherently have strand
+			# assume the strand is good, onus on the user
+			$strand_check = 1;
+		}
+		elsif ($feature =~ /^http|ftp/i) {
+			# a remote file
+			# this should be supported by Bio::DB::BigWig
+			$wigfile = $feature;
+			
+			# again, like the local file, can't perform strand check
+			$strand_check = 1;
+		}
+		elsif ($feature_ref =~ /^Bio::DB/) {
+			# passed feature could be a Bio::DB::* seqfeature object
+			
+			# get wigfile name
+			if ($feature->has_tag('wigfile')) {
+				($wigfile) = $feature->get_tag_values('wigfile');
+			}
+			elsif ($feature->has_tag('bigwigfile')) {
+				($wigfile) = $feature->get_tag_values('bigwigfile');
+			}
+			else {
+				confess " passed $feature_ref feature '$feature'" . 
+					" does not have a bigwig attribute!\n";
+			}
+			unless ($wigfile) {
+				confess " passed $feature_ref feature '$feature'" . 
+					" has an empty bigwig attribute!\n";
+			}
+			
+			# check strand
+				# database features will support the strand method
+			if (
+				$stranded eq 'all' # stranded data not requested
+				or $feature->strand == 0 # unstranded data
+				or ( 
+					# sense data
+					$region_strand == $feature->strand 
+					and $stranded eq 'sense'
+				) 
+				or (
+					# antisense data
+					$region_strand != $feature->strand  
+					and $stranded eq 'antisense'
+				)
+			) {
+				$strand_check = 1;
+			}
+		}
+		else {
+			confess " unrecognized feature '$feature'!\n";
+		}
+		
+		# confirm that we have acceptable data to collect
+		next unless $strand_check == 1;
+		unless ($wigfile) {
+			confess " no bigwig file specified for feature '$feature'!\n";
+		}
+		
+		# Open the BigWig file
+		my $bw;
+		if (exists $OPENED_BIGFILES{$wigfile} ) {
+			# this file is already opened, use it
+			$bw = $OPENED_BIGFILES{$wigfile};
+		}
+		else {
+			# this file has not been opened yet, open it
+			$bw = open_bigwig_db($wigfile) or 
+				confess " unable to open data BigWig file '$wigfile'";
+			
+			# store the opened object for later use
+			$OPENED_BIGFILES{$wigfile} = $bw;
+			
+			# collect the chromosomes for this bigwig
+			%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
+		}
+		
+		# Collect from bigwig file
+			# We're not adjusting start and end points as with wig data
+			# because the bigwig file is by default set up to cover the 
+			# entire chromosome (chromosome information is required for 
+			# generating bigwig files)
+		
+		# first check that the chromosome is present
+		unless (exists $BIGWIG_CHROMOS{$wigfile}{$region->seq_id}) {
+			next;
+		}
+		
+		# collect the features and values
+		my @features = $bw->get_features_by_location(
+			$region->seq_id, 
+			$region->start, 
+			$region->end
+		);
 		
 		# convert list of values to position => value
 		foreach (@features) {
 			my $pos = $_->start;
 			$wig_data{$pos} = $_->score;
 		}
-	}
 	
-	# region is not from BigWig database or there are multiple bigwig features
-	else {
-		
-		# there is usually only one bigwig feature sent, but there may be 
-		# more to combine data
-		foreach my $feature (@wig_features) {
-		
-			# Get the name of the bigwig file and check the strand
-			my $wigfile;
-			my $strand_check;
-			
-			if ($feature =~ /^file:(.+)$/) {
-				# the passed feature appears to specify a file
-				$wigfile = $1;
-				
-				# check the file
-				unless (-e $wigfile) {
-					confess " BigWig file '$wigfile' does not exist!\n";
-					return;
-				}
-				
-				# since it's a passed data file name, we can't check for strand
-				# the bigwig file does not inherently have strand
-				# a BigWigSet may support strand as feature attribute, but 
-				# that's for another day
-				# assume the strand is good, onus on the user
-				$strand_check = 1;
-			}
-			elsif ($feature =~ /^http|ftp/i) {
-				# a remote file
-				# this should be supported by Bio::DB::BigWig
-				$wigfile = $feature;
-				
-				# again, like the local file, can't perform strand check
-				$strand_check = 1;
-			}
-			else {
-				# passed feature could be a SeqFeature object
-				
-				# get wigfile name
-				($wigfile) = $feature->get_tag_values('bigwigfile') or
-					confess " passed feature '$feature' is not a SeqFeature object!\n";
-				
-				# check strand
-					# database features will support the strand method
-				if (
-					$stranded eq 'all' # stranded data not requested
-					or $feature->strand == 0 # unstranded data
-					or ( 
-						# sense data
-						$region_strand == $feature->strand 
-						and $stranded eq 'sense'
-					) 
-					or (
-						# antisense data
-						$region_strand != $feature->strand  
-						and $stranded eq 'antisense'
-					)
-				) {
-					$strand_check = 1;
-				}
-			}
-			
-			# confirm that we have acceptable data to collect
-			next unless $strand_check == 1;
-			confess " no wigfile passed!\n" unless $wigfile;
-			
-			# Open the BigWig file
-			my $bw;
-			if (exists $OPENED_BIGFILES{$wigfile} ) {
-				# this file is already opened, use it
-				$bw = $OPENED_BIGFILES{$wigfile};
-			}
-			else {
-				# this file has not been opened yet, open it
-				$bw = open_bigwig_db($wigfile) or 
-					confess " unable to open data BigWig file '$wigfile'";
-				
-				# store the opened object for later use
-				$OPENED_BIGFILES{$wigfile} = $bw;
-			}
-			
-			# Collect from bigwig file
-				# We're not adjusting start and end points as with wig data
-				# because the bigwig file is by default set up to cover the 
-				# entire chromosome (chromosome information is required for 
-				# generating bigwig files)
-			
-			# collect the features and values
-			my @features = $bw->get_features_by_location(
-				$region->seq_id, 
-				$region->start, 
-				$region->end
-			);
-			
-			# convert list of values to position => value
-			foreach (@features) {
-				my $pos = $_->start;
-				$wig_data{$pos} = $_->score;
-			}
-		
-		} # end of foreach loop
-	}
+	} # end of foreach loop
 	
 	# return collected data
 	return %wig_data;
