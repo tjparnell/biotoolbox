@@ -1509,7 +1509,7 @@ sub get_new_genome_list {
 		$TIM_CONFIG->param("$db_name\.chromosome_exclude");
 	unless (@excluded_chromosomes) {
 		@excluded_chromosomes = 
-			TIM_CONFIG->param('default_db.chromosome_exclude');
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
 	}
 	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 
