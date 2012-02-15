@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.5.4';
+our $VERSION = '1.6.3';
 
 
 
@@ -425,6 +425,7 @@ sub parse_list {
 	# hence 1,2,5-7 would become an array of 1,2,5,6,7
 	
 	my $string = shift;
+	return unless $string;
 	if ($string =~ /[^\d,\-\s\&]/) {
 		carp " the string contains characters that can't be parsed\n";
 		return;
