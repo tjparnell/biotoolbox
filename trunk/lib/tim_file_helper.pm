@@ -16,7 +16,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.6.2';
+our $VERSION = '1.6.3';
 
 
 ### Variables
@@ -731,12 +731,7 @@ sub open_tim_data_file {
 			# Data table files from UCSC Table Browser
 				# these will have one comment line marked with #
 				# that really contains the column headers
-			elsif (
-				# !exists $inputdata->{0} and
-				scalar @{ $inputdata->{'other'} } >= 1 and
-				scalar(split /\t/, $inputdata->{'other'}->[-1]) == 
-					scalar(split /\t/, $line)
-			) {
+			elsif ( _commented_header_line($inputdata, $line) ) {
 				# lots of requirements, but this checks that (column 
 				# metadata has not already been loaded), there is at least one 
 				# unknown comment line, and that the last comment line is 
@@ -1113,7 +1108,10 @@ sub write_tim_data_file {
 				# these column metadata lines do not need to be written if they
 				# only have two values, presumably name and index, for files 
 				# that don't normally have column headers, e.g. gff
-				if ($datahash_ref->{'extension'} =~ /sgr|kgg/i) {
+				if (
+					exists $datahash_ref->{'extension'} and
+					$datahash_ref->{'extension'} =~ /sgr|kgg/i
+				) {
 					# these do not need metadata
 					next;
 				}
@@ -2280,22 +2278,29 @@ sub write_summary_data {
 		my @acceptable_indices; # array of acceptable indices
 		my %skip = (
 			# these are example names generated from subs in tim_db_helper.pm
-			'SystematicName'  => 1,
-			'Name'            => 1,
-			'Alias'           => 1,
-			'Aliases'         => 1,
-			'Type'            => 1,
-			'Class'           => 1,
-			'GeneClass'       => 1,
-			'Chromosome'      => 1,
-			'Start'           => 1,
-			'Stop'            => 1,
-			'Gene'            => 1,
+			'systematicname'  => 1,
+			'name'            => 1,
+			'id'              => 1,
+			'alias'           => 1,
+			'aliases'         => 1,
+			'type'            => 1,
+			'class'           => 1,
+			'geneclass'       => 1,
+			'chromosome'      => 1,
+			'chromo'          => 1,
+			'seq_id'          => 1,
+			'seqid'           => 1,
+			'start'           => 1,
+			'stop'            => 1,
+			'end'             => 1,
+			'gene'            => 1,
+			'strand'          => 1,
+			'length'          => 1,
 		);
 		
 		# walk through the dataset names
 		for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-			unless (exists $skip{ $datahash_ref->{$i}{'name'} } ) {
+			unless (exists $skip{ lc $datahash_ref->{$i}{'name'} } ) {
 				# if the dataset name is not in the hash of skip names
 				push @acceptable_indices, $i;
 			}
@@ -2453,6 +2458,28 @@ sub _escape {
 	# this magic incantation was borrowed from Bio::Tools::GFF
 	$string =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 	return $string;
+}
+
+
+### Internal subroutine to check if a comment line contains headers
+sub _commented_header_line {
+	my ($inputdata, $line) = @_;
+	
+	# prepare arrays from the other lines and current line
+	my @commentdata;
+	if ( scalar @{ $inputdata->{'other'} } >= 1 ) {
+		# take the last line in the other array
+		@commentdata = split /\t/, $inputdata->{'other'}->[-1];
+	}
+	my @linedata = split /\t/, $line;
+	
+	# check if the counts are equal
+	if (scalar @commentdata == scalar @linedata) {
+		return 1;
+	}
+	else {
+		return 0;
+	}
 }
 
 
