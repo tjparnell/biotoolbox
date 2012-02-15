@@ -1,5 +1,13 @@
 ######## biotoolbox revision history #############
 
+v.1.6.3 (svn r293)
+	- Added knownGene as a source in script ucsc_table2gff3.pl
+	- Improved handling of the chromosome exclusion list in library tim_db_helper
+	- Fixed bug where an exception could occur if multiple genomic regions on different chromosomes are returned from a database query. Included logic to help identify the appropriate intended chromosome.
+	- Fixed bug where an exception and crash could occur if the query chromosome is not present in a bigWig, bigBed, or Bam file when collecting data. Chromosome names are now checked prior to query.
+	- Fixed bug in script get_datasets.pl where a null value is returned instead of 0 when using the method of sum.
+	- Removed several minor bugs that could generate non-fatal Perl warnings
+
 v.1.6.2 (svn r282)
 	- Fixed bugs in script data2bed.pl that prevented a bigBed file from being generated. Also improved autodetection of data columns and allowed for dummy data to be inserted in lower column data when writing higher column data. Also added ability to use either the GFF Name or ID attribute as the Bed feature name.
 	- Added span option to script data2wig.pl when making wig files.
