@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.6.2';
+my $VERSION = '1.6.3';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -384,6 +384,9 @@ sub print_statistics_function {
 				next; # skip the index
 			}
 			elsif ($key eq 'name') {
+				next; # skip the name, it's been done
+			}
+			elsif ($key eq 'AUTO') {
 				next; # skip the name, it's been done
 			}
 			else {
@@ -2713,14 +2716,14 @@ sub convert_strand_to_sign {
 			} 
 			else {
 				# a presumed numeric value, change the sign
-				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+				if ($data_table_ref->[$row][$strand_i] =~ /^\-|r|c/i) {
 					# looks like it is reverse: (minus), (r)everse, (c)rick
 					# then prepend data value with a (minus)
 					$data_table_ref->[$row][$index] = 
 						-($data_table_ref->[$row][$index]);
 					$change_count++;
 				}
-				elsif ($data_table_ref->[$row][$strand_i] !~ /^+|1|f|w|0|\./i) {
+				elsif ($data_table_ref->[$row][$strand_i] !~ /^\+|1|f|w|0|\./i) {
 					warn " unrecognized strand symbol for data row $row!\n";
 					# do nothing for these
 				}
@@ -2759,14 +2762,14 @@ sub convert_strand_to_sign {
 			} 
 			else {
 				# a presumed numeric value, change the sign
-				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+				if ($data_table_ref->[$row][$strand_i] =~ /^\-|r|c/i) {
 					# looks like it is reverse: (minus), (r)everse, (c)rick
 					# then prepend data value with a (minus)
 					$data_table_ref->[$row][$new_index] = 
 						-($data_table_ref->[$row][$index]);
 					$change_count++;
 				}
-				elsif ($data_table_ref->[$row][$strand_i] =~ /^+|1|f|w|0|\./i) {
+				elsif ($data_table_ref->[$row][$strand_i] =~ /^\+|1|f|w|0|\./i) {
 					# forward or no strand, simply copy as is
 					$data_table_ref->[$row][$new_index] = 
 						$data_table_ref->[$row][$index];
@@ -3304,7 +3307,7 @@ sub subsample_function {
 			$target = $target_stats{'sum'};
 		}
 		else {
-			" nothing done\n";
+			warn " nothing done\n";
 			return;
 		}
 	}
