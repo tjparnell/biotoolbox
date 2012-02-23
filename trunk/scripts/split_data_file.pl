@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.6.2';
+my $VERSION = '1.6.4';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -286,6 +286,9 @@ sub write_current_data_to_file_part {
 			# record the number of lines written
 			$written_files{$value}{'number'} += $lines;
 			$written_files{$value}{'total'} += $lines;
+			
+			# update the file name in case it was changed by the write method
+			$written_files{$value}{'file'} = $success;
 		}
 		else {
 			warn "   unable to write $lines lines! data lost!\n";
