@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.6.3';
+my $VERSION = '1.6.4';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1130,8 +1130,9 @@ sub genomic_sort_function {
 		}
 		
 		# put the dataline into the appropriate temporary hash
-		if ($data_table_ref->[$row][$chromo_i] =~ /(\d+)/) {
+		if ($data_table_ref->[$row][$chromo_i] =~ /^(?:chr)?(\d+)$/) {
 			# dealing with a numeric chromosome name
+			# restricting to either chr2 or just 2 but not 2-micron
 			my $chromovalue = $1;
 			while (exists $num_datahash{$chromovalue}{$startvalue}) { 
 				# if another item already exists at this location
