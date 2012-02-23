@@ -16,7 +16,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.6.3';
+our $VERSION = '1.6.4';
 
 
 ### Variables
@@ -851,8 +851,8 @@ sub write_tim_data_file {
 	}
 	my $datahash_ref = $argument_ref->{'data'}     || undef;
 	my $filename     = $argument_ref->{'filename'} || undef;
-	my $gz           = $argument_ref->{'gz'}       || undef;
 	my $format       = $argument_ref->{'format'}   || undef;
+	my $gz           = $argument_ref->{'gz'};
 	
 	unless (defined $datahash_ref) {
 		# we need data to write
@@ -2397,6 +2397,7 @@ sub write_summary_data {
 	my $written_file = write_tim_data_file( {
 		'data'      => $summed_data,
 		'filename'  => $outfile . '_summed',
+		'gz'        => 0,
 	} );
 	
 	# Return

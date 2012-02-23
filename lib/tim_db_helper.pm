@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.6.3';
+our $VERSION = '1.6.4';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
