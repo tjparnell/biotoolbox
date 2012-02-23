@@ -367,7 +367,7 @@ sub open_bigwigset_db {
 		return $bws;
 	}
 	else {
-		warn " ERROR: can't open BigWigSet directory '$directory'!\n";
+		carp " ERROR: can't open BigWigSet directory '$directory'!\n";
 		return;
 	}
 }
