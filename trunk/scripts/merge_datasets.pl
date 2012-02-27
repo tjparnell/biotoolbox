@@ -13,7 +13,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.5.5';
+my $VERSION = '1.6.4';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -216,7 +216,7 @@ sub merge_two_datasets {
 				# copy the metadata
 				copy_metadata($input_data1_ref, $request);
 			} 
-			elsif ($request =~ /^[a-z]$/i) {
+			elsif ($request =~ /^[a-z]+$/i) {
 				# a letter indicates a dataset from file2
 				
 				# first convert back to number
@@ -232,7 +232,7 @@ sub merge_two_datasets {
 				copy_metadata($input_data2_ref, $number);
 			} 
 			else {
-				die " unrecognized  symbol '$request' in request! nothing done!\n";
+				die " unrecognized symbol '$request' in request! nothing done!\n";
 			}
 		}
 	
@@ -250,7 +250,7 @@ sub merge_two_datasets_by_lookup {
 		request_indices_and_order($input_data1_ref, $input_data2_ref);
 	
 	# rearrange as necessary to make the first data structure dominant
-	if ($order[0] =~ /[a-z]/i) {
+	if ($order[0] =~ /[a-z]+/i) {
 		# it looks like the user wants the second file to be dominant
 		# the dominant file is where we'll be taking all of the values
 		
@@ -322,7 +322,7 @@ sub merge_two_datasets_by_lookup {
 			copy_metadata($input_data1_ref, $request);
 		} 
 		
-		elsif ($request =~ /[a-z]/i) {
+		elsif ($request =~ /[a-z]+/i) {
 			# a letter indicates a dataset from file2
 			# we will have to perform the lookup here
 			
@@ -479,7 +479,7 @@ sub request_indices_and_order {
 	print " Enter the lookup value column index for second file   ";
 	$index2 = <STDIN>;
 	chomp $index2;
-	unless ($index2 =~ /^[a-z]$/i) { 
+	unless ($index2 =~ /^[a-z]+$/i) { 
 		# check that it's valid
 		die " unknown index value!\n";
 	}
@@ -528,7 +528,7 @@ sub parse_list {
 				}
 			} 
 			
-			elsif ($item =~ /^([a-z])\-([a-z])$/) {
+			elsif ($item =~ /^([a-z]+)\-([a-z]+)$/) {
 				# range does not contain numbers, so must be from file2
 				for (my $i = $number_of{$1}; $i <= $number_of{$2}; $i++) {
 					# we will loop through from specified start to stop
@@ -732,7 +732,59 @@ sub get_letters {
 		22 => 'w',
 		23 => 'x',
 		24 => 'y',
-		25 => 'z'
+		25 => 'z',
+		26 => 'aa',
+		27 => 'bb',
+		28 => 'cc',
+		29 => 'dd',
+		30 => 'ee',
+		31 => 'ff',
+		32 => 'gg',
+		33 => 'hh',
+		34 => 'ii',
+		35 => 'jj',
+		36 => 'kk',
+		37 => 'll',
+		38 => 'mm',
+		39 => 'nn',
+		40 => 'oo',
+		41 => 'pp',
+		42 => 'qq',
+		43 => 'rr',
+		44 => 'ss',
+		45 => 'tt',
+		46 => 'uu',
+		47 => 'vv',
+		48 => 'ww',
+		49 => 'xx',
+		50 => 'yy',
+		51 => 'zz',
+		52 => 'aaa',
+		53 => 'bbb',
+		54 => 'ccc',
+		55 => 'ddd',
+		56 => 'eee',
+		57 => 'fff',
+		58 => 'ggg',
+		59 => 'hhh',
+		60 => 'iii',
+		61 => 'jjj',
+		62 => 'kkk',
+		63 => 'lll',
+		64 => 'mmm',
+		65 => 'nnn',
+		66 => 'ooo',
+		67 => 'ppp',
+		68 => 'qqq',
+		69 => 'rrr',
+		70 => 'sss',
+		71 => 'ttt',
+		72 => 'uuu',
+		73 => 'vvv',
+		74 => 'www',
+		75 => 'xxx',
+		76 => 'yyy',
+		77 => 'zzz',
 	);
 	return %hash;
 }
@@ -766,7 +818,59 @@ sub get_numbers {
 		'w' => 22,
 		'x' => 23,
 		'y' => 24,
-		'z' => 25
+		'z' => 25,
+		'aa' => 26,
+		'bb' => 27,
+		'cc' => 28,
+		'dd' => 29,
+		'ee' => 30,
+		'ff' => 31,
+		'gg' => 32,
+		'hh' => 33,
+		'ii' => 34,
+		'jj' => 35,
+		'kk' => 36,
+		'll' => 37,
+		'mm' => 38,
+		'nn' => 39,
+		'oo' => 40,
+		'pp' => 41,
+		'qq' => 42,
+		'rr' => 43,
+		'ss' => 44,
+		'tt' => 45,
+		'uu' => 46,
+		'vv' => 47,
+		'ww' => 48,
+		'xx' => 49,
+		'yy' => 50,
+		'zz' => 51,
+		'aaa' => 52,
+		'bbb' => 53,
+		'ccc' => 54,
+		'ddd' => 55,
+		'eee' => 56,
+		'fff' => 57,
+		'ggg' => 58,
+		'hhh' => 59,
+		'iii' => 60,
+		'jjj' => 61,
+		'kkk' => 62,
+		'lll' => 63,
+		'mmm' => 64,
+		'nnn' => 65,
+		'ooo' => 66,
+		'ppp' => 67,
+		'qqq' => 68,
+		'rrr' => 69,
+		'sss' => 70,
+		'ttt' => 71,
+		'uuu' => 72,
+		'vvv' => 73,
+		'www' => 74,
+		'xxx' => 75,
+		'yyy' => 76,
+		'zzz' => 77,
 	);
 	return %hash;
 }
