@@ -200,6 +200,8 @@ sub print_menu {
 		"  P  Toss data lines with du(P)licate values\n" .
 		"  A  Toss data lines with values (A)bove threshold\n" .
 		"  B  Toss data lines with values (B)elow threshold\n" .
+		"  I  Set a m(I)nimum value\n" .
+		"  X  Set a ma(X)imum value\n" .
 		"  s  Median (s)cale a dataset\n" .
 		"  p  (p)ercentile rank convert a dataset\n" .
 		"  Z  Generate (Z)-score values of a dataset\n" .
@@ -226,7 +228,7 @@ sub print_menu {
 		"  Q  (Q)uit without saving changes\n"
 		#  m  print this (m)enu
 	;
-	# unused letters: C E F G H I jJ kK L M O S V X yY 
+	# unused letters: C E F G H jJ kK L M O S V yY 
 	return; # return 0, nothing done
 }
 
@@ -1500,6 +1502,246 @@ sub toss_threshold_function {
 
 
 
+sub minimum_function {
+	# Set a minimum value
+	
+	# request datasets
+	my $line = " Enter the index number(s) of the dataset(s) to reset minimum values  ";
+	my @indices = _request_indices($line);
+	unless (@indices) {
+		warn " no valid indices. nothing done\n";
+		return;
+	}
+	
+	# request value
+	my $value;
+	if (defined $opt_target) {
+		# command line option
+		$value = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the minimum value to accept  ";
+		$value = <STDIN>;
+		chomp $value;
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
+		
+		# number of resets we do
+		my $count  = 0; 
+		my $failed = 0;
+		
+		# reset minimum values
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, nothing to do
+					next;
+				} 
+				elsif ($data_table_ref->[$i][$index] < $value) {
+					# current value below minimum value
+					# change it in situ
+					$data_table_ref->[$i][$index] = $value;
+					$count++;
+				}
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'minimum_value'} = $value;
+			
+			# print conclusion
+			print " $count values were reset for dataset $main_data_ref->{$index}{'name'}\n";
+			$dataset_modification_count++ if $count;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, nothing to do
+					$data_table_ref->[$i][$new_position] = '.';
+				} 
+				elsif ($data_table_ref->[$i][$index] < $value) {
+					# current value below minimum value
+					$data_table_ref->[$i][$new_position] = $value;
+					$count++;
+				} 
+				else {
+					# acceptable
+					$data_table_ref->[$i][$new_position] = 
+						$data_table_ref->[$i][$index];
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "_minimum_reset";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'minimum_value',
+				$value,
+				$new_name,
+			);
+			
+			# print conclusion
+			print " $count values were reset for dataset $main_data_ref->{$index}{'name'}" 
+				. " and generated as a new dataset\n";
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " minimum value NOT reset; unknown placement request\n";
+		}
+	}
+	
+	# done 
+	return $dataset_modification_count;
+}
+
+
+
+
+sub maximum_function {
+	# Set a maximum value
+	
+	# request datasets
+	my $line = " Enter the index number(s) of the dataset(s) to reset maximum values  ";
+	my @indices = _request_indices($line);
+	unless (@indices) {
+		warn " no valid indices. nothing done\n";
+		return;
+	}
+	
+	# request value
+	my $value;
+	if (defined $opt_target) {
+		# command line option
+		$value = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the maximum value to accept  ";
+		$value = <STDIN>;
+		chomp $value;
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
+		
+		# number of resets we do
+		my $count  = 0; 
+		
+		# reset maximum values
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, nothing to do
+					next;
+				} 
+				elsif ($data_table_ref->[$i][$index] > $value) {
+					# current value below maximum value
+					# change it in situ
+					$data_table_ref->[$i][$index] = $value;
+					$count++;
+				}
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'maximum_value'} = $value;
+			
+			# print conclusion
+			print " $count values were reset for dataset $main_data_ref->{$index}{'name'}\n";
+			$dataset_modification_count++ if $count;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, nothing to do
+					$data_table_ref->[$i][$new_position] = '.';
+				} 
+				elsif ($data_table_ref->[$i][$index] > $value) {
+					# current value below maximum value
+					$data_table_ref->[$i][$new_position] = $value;
+					$count++;
+				} 
+				else {
+					# acceptable
+					$data_table_ref->[$i][$new_position] = 
+						$data_table_ref->[$i][$index];
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "_maximum_reset";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'maximum_value',
+				$value,
+				$new_name,
+			);
+			
+			# print conclusion
+			print " $count values were reset for dataset $main_data_ref->{$index}{'name'}" 
+				. " and generated as a new dataset\n";
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " maximum value NOT reset; unknown placement request\n";
+		}
+	}
+	
+	# done 
+	return $dataset_modification_count;
+}
+
 
 
 
@@ -1968,7 +2210,7 @@ sub combine_function {
 	$main_data_ref->{$new_position}{'name'} = $new_name;
 	$data_table_ref->[0][$new_position] = $new_name;
 	$main_data_ref->{$new_position}{'index'} = $new_position;
-	$main_data_ref->{$new_position}{'method'} = "combined_by_$method";
+	$main_data_ref->{$new_position}{'combine_method'} = $method;
 	$main_data_ref->{$new_position}{'log2'} = $log if defined $log;
 	$main_data_ref->{$new_position}{'datasets'} = join(',', 
 		map { $main_data_ref->{$_}{'name'} } @indices);
@@ -2980,7 +3222,18 @@ sub write_summary_function {
 	
 	# determine indices to summarize
 	my ($startcolumn, $stopcolumn);
-	unless ($function) {
+	if ($function) {
+		# running under automatic mode
+		# check if user supplied indices
+		if (scalar @opt_indices >= 2) {
+			# assume contiguous indices, use the first and last one
+			# it may also be simply the start and stop indices
+			$startcolumn = $opt_indices[0];
+			$stopcolumn  = $opt_indices[-1];
+		}
+		# otherwise the summary module will automatically deduce the columns
+	}
+	else {
 		# request indices only when running interactively and not automatically
 		($startcolumn, $stopcolumn) = _request_indices(
 			" Enter the starting and/or ending indices of the datasets to summarize\n". 
@@ -3417,6 +3670,8 @@ sub _get_letter_to_function_hash {
 		'P' => "duplicate",
 		'A' => "above",
 		'B' => "below",
+		'I' => "minimum",
+		'X' => "maximum",
 		's' => "scale",
 		'p' => "pr",
 		'Z' => "zscore",
@@ -3462,6 +3717,8 @@ sub _get_function_to_subroutine_hash {
 		'duplicate'   => \&toss_duplicates_function,
 		'above'       => \&toss_above_threshold_function,
 		'below'       => \&toss_below_threshold_function,
+		'minimum'     => \&minimum_function,
+		'maximum'     => \&maximum_function,
 		'scale'       => \&median_scale_function,
 		'pr'          => \&percentile_rank_function,
 		'zscore'      => \&zscore_function,
@@ -3805,10 +4062,11 @@ manipulate_datasets.pl [--options ...] <input_filename>
   Options:
   --in <input_filename>
   --func [stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | scale | pr | zscore | 
-          log2 | delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | divide | subtract | strandsign | mergestrand | 
-          center | new | summary | export | rewrite | treeview]
+          null | duplicate | above | below | minimum | maximum | 
+          scale | pr | zscore | log2 | delog2 | format | combine | 
+          subsample | ratio | diff | normdiff | divide | subtract | 
+          strandsign | mergestrand | center | new | summary | 
+          export | rewrite | treeview]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -3865,6 +4123,8 @@ other required options. These functions include the following.
   duplicate
   above
   below
+  minimum
+  maximum
   scale
   pr
   zscore
@@ -3922,7 +4182,9 @@ or 'n'):
   
   - (r)eplace the original dataset with the new one
   - add as a (n)ew dataset
-  
+
+Defaults to new placement when executed automatically using the --func 
+option, or prompts the user when executed interactively.
 
 =item --except [y | n]
 
@@ -4080,6 +4342,20 @@ Toss datapoints with values that are below a certain threshold value.
 One or more datasets may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
+
+=item B<minimum> (menu option 'I')
+
+Reset datapoints whose values are less than a specified minimum 
+value to the minimum value. One or more datasets may be selected 
+to reset values to the minimum. The minimum value may be requested 
+interactively or specified with the --target option. 
+
+=item B<maximum> (menu option 'X')
+
+Reset datapoints whose values are greater than a specified maximum 
+value to the maximum value. One or more datasets may be selected 
+to reset values to the maximum. The maximum value may be requested 
+interactively or specified with the --target option. 
 
 =item B<scale> (menu option 's')
 
@@ -4240,11 +4516,13 @@ for each of the data columns is calculated, transposed (columns become
 rows), and written to a new data file. This is essentially identical to 
 the summary function from the biotoolbox analysis scripts 
 L<map_relative_data.pl> and L<pull_features.pl>. It assumes that each 
-dataset has start and stop metadata. In automatic mode it will summarize 
-all available datasets; in interactive mode, it will request the start 
-and ending datasets. By default, a new file using the input file base 
-name appended with '_summary' is written, or a filename may be specified 
-using the --out option.
+dataset has start and stop metadata. The program will automatically 
+identify available datasets to summarize based on their name. In 
+interactive mode, it will request the contiguous range of start and 
+ending datasets to summarize. The contiguous datasets may also be 
+indicated using the --index option. By default, a new file using the 
+input file base name appended with '_summary' is written, or a 
+filename may be specified using the --out option.
 
 =item B<export> (menu option 'x')
 
