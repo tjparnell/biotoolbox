@@ -3,10 +3,9 @@ package tim_file_helper;
 ### modules
 require Exporter;
 use strict;
-use Carp qw(carp cluck confess);
+use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use IO::File;
-use IO::Zlib;
 use Storable qw(store_fd fd_retrieve store retrieve);
 use Statistics::Lite qw(mean min);
 use FindBin qw($Bin);
@@ -17,6 +16,16 @@ use tim_data_helper qw(
 	find_column_index
 );
 our $VERSION = '1.6.4';
+
+# check for IO gzip support
+our $GZIP_OK = 0;
+eval {
+	use IO::Zlib;
+};
+unless ($@) {
+	$GZIP_OK = 1;
+}; 
+$@ = undef;
 
 
 ### Variables
@@ -224,7 +233,7 @@ sub open_tim_data_file {
 	
 	# check for Storable files
 	if ($extension =~ /store/i) {
-		carp " stored files should be opened with tim_file_helper::load_tim_data_file";
+		cluck " stored files should be opened with tim_file_helper::load_tim_data_file";
 		return;
 	}
 	
@@ -987,13 +996,36 @@ sub write_tim_data_file {
 	
 	# adjust gzip extension as necessary
 	if ($gz) {
-		# add gz extension if necessary
-		unless ($extension =~ m/\.gz$/i) {
-			$extension .= '.gz';
+		# requesting gzip compression
+		
+		# check for support
+		if ($GZIP_OK) {
+			# it is there
+			# add gz extension if necessary
+			unless ($extension =~ m/\.gz$/i) {
+				$extension .= '.gz';
+			}
+		}
+		else {
+			# support is not there
+			unless ($format eq 'store') {
+				# we are excepting the binary store format
+				# because that uses an external gzip
+				
+				# complain to user
+				carp " IO::ZLIB is not installed for gz support! writing non-compressed file\n";
+				
+				# reset gzip
+				$gz = 0;
+				
+				# strip gz extension if present
+				$extension =~ s/\.gz$//i; 
+			}
 		}
 	}
 	else {
-		$extension =~ s/\.gz$//i; # strip gz extension if present
+		# strip gz extension if present
+		$extension =~ s/\.gz$//i; 
 	}
 	
 	# generate the new filename
@@ -1240,10 +1272,15 @@ sub open_to_read_fh {
 
 	# Open filehandle object as appropriate
 	my $fh; # filehandle
-	if ($filename =~ /\.gz$/i) {
+	if ($filename =~ /\.gz$/i and $GZIP_OK) {
 		# the file is compressed with gzip
 		$fh = IO::Zlib->new;
 	} 
+	elsif ($filename =~ /\.gz$/i and !$GZIP_OK) {
+		# gzip file support is not installed
+		croak " gzipped files are not supported!\n" .
+			" Either gunzip $filename or install IO::Zlib\n";
+	}
 	else {
 		# the file is uncompressed and space hogging
 		$fh = IO::File->new;
@@ -1317,7 +1354,7 @@ sub open_to_write_fh {
 	
 	# Generate appropriate filehandle object and name
 	my $fh;
-	if ($gz) {
+	if ($gz and $GZIP_OK) {
 		# write a space-saving compressed file
 		
 		# add gz extension if necessary
@@ -1327,6 +1364,16 @@ sub open_to_write_fh {
 		
 		$fh = new IO::Zlib;
 	}
+	elsif ($gz and !$GZIP_OK) {
+		# we wanted to write a compressed file but support is not there
+		
+		carp " IO::ZLIB not installed for gz support! writing non-compressed file\n";
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}	
 	else {
 		# write a normal space-hogging file
 		
@@ -1966,7 +2013,7 @@ sub convert_and_write_to_gff_file {
 	}
 	
 	# open the file for writing 
-	my $gz = $arg_ref->{'gz'} || 0;
+	my $gz = $arg_ref->{'gz'};
 	my $output_gff = open_to_write_fh($filename, $gz);
 	
 	# write basic headers

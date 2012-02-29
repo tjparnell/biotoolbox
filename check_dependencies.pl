@@ -3,7 +3,7 @@
 use strict;
 use Cwd;
 require CPAN;
-my $VERSION = '1.5.0';
+my $VERSION = '1.6.4';
 
 # get current working directory
 my $current = Cwd::cwd();
@@ -76,7 +76,16 @@ else {
 # offer to install
 print "\n\n";
 if (@install_list) {
-	print "I can now help you install missing dependencies if you wish\n\n" 
+	print "Would you like me to help install missing dependencies? y or n  "; 
+	my $answer = <STDIN>;
+	if ($answer =~ /^n/i) {
+		print "OK. Here is a list of the missing dependencies I found\n";
+		foreach my $mod (@install_list) {
+			my $file = $mod->cpan_file;
+			print " $file\n";
+		}
+		exit;
+	}
 }
 else {
 	print "Everything is up to date. You are good to go!\n";
@@ -84,6 +93,7 @@ else {
 }
 
 # installation
+my $not_installed = 0;
 foreach my $mod (@install_list) {
 	my $file = $mod->cpan_file;
 	
@@ -91,14 +101,25 @@ foreach my $mod (@install_list) {
 	print "  Install $file? y/n   ";
 	my $answer = <STDIN>;
 	if ($answer =~ /^y/i) {
-		$mod->install;
+		CPAN::Shell->install($file);
 		print "\n#####################\n\n"
+	}
+	else {
+		$not_installed++;
 	}
 	
 	# change back to current directory in case CPAN moved us
 	chdir $current;
 }
-print " You are now good to go!\n";
+
+# finished
+if ($not_installed) {
+	print " $not_installed recommended dependencies were not installed\n";
+	print " Some biotoolbox programs may not work properly\n";
+}
+else {
+	print " You should be good to go!\n";
+}
 
 
 
@@ -110,8 +131,8 @@ sub get_list_of_modules {
 qq(  Required for biotoolbox configuration file
 )
 		],
-		['Archive::Zip', 
-qq(  Required for script bar2wig.pl
+		['IO::Zlib', 
+qq(  Required for reading and writing gzipped files
 )
 		],
 		['Statistics::Lite', 
@@ -119,15 +140,31 @@ qq(  Required for numerous analysis programs
 )
 		],
 		['Statistics::Descriptive', 
-qq( Required for some analysis and graphing scripts
+qq(  Required for some analysis and graphing scripts
+)
+		],
+		['Bio::Root::Version', 
+qq(  Required for BioPerl database functions, data analysis, and GFF3 conversions
+)
+		],
+		['GD', 
+qq(  Optional, required for graphing scripts. Requires GD2 libraries to be installed
 )
 		],
 		['GD::Graph', 
-qq(  Required for graphing scripts
+qq(  Optional, required for graphing scripts
 )
 		],
 		['GD::Graph::smoothlines', 
-qq(  Optional, for graphing smooth bezier curve graphs
+qq(  Optional, required for graphing smooth bezier curve graphs
+)
+		],
+		['Archive::Zip', 
+qq(  Optional, required only for script bar2wig.pl
+)
+		],
+		['Algorithm::Cluster', 
+qq(  Optional, required only for the script run_cluster.pl
 )
 		],
 		['DBI', 
@@ -142,30 +179,14 @@ qq(  Optional, but required for interacting with MySQL databases
 qq(  Optional, but required for interacting with SQLite databases
 )
 		],
-		['Bio::Root::Version', 
-qq(  Required for BioPerl database functions, data analysis, and GFF3 conversions
-)
-		],
-		['Algorithm::Cluster', 
-qq(  Optional, required only for the script run_cluster.pl
-)
-		],
-		['Bio::Graphics', 
-qq(  Optional, but required for working with wig files and GBrowse
-)
-		],
-		['Bio::DB::BigFile', 
-qq(  Optional, but required and highly recommended for working with bigWig and 
-  bigBed files. Requires building Jim Kent's source tree and executables.
-)
-		],
 		['Bio::DB::Sam', 
 qq(  Optional, but required for working with Next Generation Sequencing BAM 
   data files. Requires building the SamTools C libraries.
 )
 		],
-		['Bio::Graphics::Browser2', 
-qq(  Optional, but recommended for genome browsing
+		['Bio::DB::BigFile', 
+qq(  Optional, but required and highly recommended for working with bigWig and 
+  bigBed files. Requires building Jim Kent's source tree and executables.
 )
 		],
 	);
