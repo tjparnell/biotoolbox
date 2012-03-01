@@ -1,4 +1,5 @@
 #summary A new users guide for installing biotoolbox and its prerequisites.
+#labels Featured 
 
 =Installing bioperl and other prerequisites for biotoolbox=
 
@@ -178,7 +179,7 @@ You'll first need to compile the libraries used with big files. You can follow t
 
 Next, install Bio-BigFile using the CPAN Shell. During installation, it will need to know the location of the kent/src/ directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
 
-You may encounter the same error as with samtools above regarding "-fPIC". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC to the line. Save, `make clean`, and `make` again. 
+You may encounter the same error as with samtools above regarding "-fPIC". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, `make clean`, and `make` again. 
 
 Now that you have Bio-BigFile installed, you should go ahead and compile some of the useful utilities for converting and working with bigFiles. Enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. Enter each one separately, and execute `make`. It will compile the executable, and install it in `~/bin/i686` (or whatever your machine type is). Here is a list I would recommend.
 	* `wigToBigWig`
