@@ -1,6 +1,80 @@
 #summary A summary of the scripts available in *biotoolbox*
 #labels Featured
 
+=Program Groups=
+
+Lists of programs organized by function.
+
+===Data collection===
+	* [Pod_average_gene average_gene.pl]
+	* [Pod_bin_genomic_data bin_genomic_data.pl]
+	* [Pod_generate_genomic_bins generate_genomic_bins.pl]
+	* [Pod_get_datasets get_datasets.pl]
+	* [Pod_get_feature_info get_feature_info.pl]
+	* [Pod_get_relative_data get_relative_data.pl]
+
+===Dataset manipulation===
+	* [Pod_data2frequency data2frequency.pl]
+	* [Pod_join_data_file join_data_file.pl]
+	* [Pod_manipulate_datasets manipulate_datasets.pl]
+	* [Pod_merge_datasets merge_datasets.pl]
+	* [Pod_pull_features pull_features.pl]
+	* [Pod_split_data_file split_data_file.pl]
+
+===Data analysis===
+	* [Pod_data2frequency data2frequency.pl]
+	* [Pod_graph_data graph_data.pl]
+	* [Pod_graph_histogram graph_histogram.pl]
+	* [Pod_graph_profile graph_profile.pl]
+	* [Pod_run_cluster run_cluster.pl]
+
+===Finding features===
+	* [Pod_find_enriched_regions find_enriched_regions.pl]
+	* [Pod_get_intersecting_features get_intersecting_features.pl]
+	* [Pod_map_transcripts map_transcripts.pl]
+
+===Nucleosome Analysis===
+	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
+	* [Pod_intersect_nucs intersect_nucs.pl]
+	* [Pod_map_nucleosomes map_nucleosomes.pl]
+	* [Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl]
+
+===Microarray===
+	* [Pod_map_oligo_data2gff map_oligo_data2gff.pl]
+	* [Pod_process_microarray process_microarray.pl]
+
+===Illumina sequencing, BAM files===
+	* [Pod_bam2gff_bed bam2gff_bed.pl]
+	* [Pod_bam2wig bam2wig.pl]
+	* [Pod_bin_genomic_data bin_genomic_data.pl]
+	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
+	* [Pod_split_bam_by_isize split_bam_by_isize.pl]
+
+===File format conversion===
+	* [Pod_bam2gff_bed_pl bam2gff_bed.pl]
+	* [Pod_bar2wig bar2wig.pl]
+	* [Pod_data2bed data2bed.pl]
+	* [Pod_data2gff data2gff.pl]
+	* [Pod_data2wig data2wig.pl]
+	* [Pod_wig2data wig2data.pl]
+
+===Genome annotation===
+	* [Pod_get_ensembl_annotation get_ensembl_annotation.pl]
+	* [Pod_gff3_to_ucsc_table gff3_to_ucsc_table.pl]
+	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl]
+	* [Pod_ucsc_cytoband2gff3 ucsc_cytoband2gff3.pl]
+	* [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]
+
+===SNP calling===
+	* [Pod_locate_SNPs locate_SNPs.pl]
+	* [Pod_merge_SNPs merge_SNPs.pl]
+
+===Miscellaneous===
+	* [Pod_big_file2gff3 big_file2gff3.pl]
+	* [Pod_change_chr_prefix change_chr_prefix.pl]
+	* convert_yeast_genome_version.pl
+	* [Pod_print_feature_types print_feature_types.pl]
+
 =Program List=
 
 This is an alphabetical list of the scripts available in the *biotoolbox* scripts directory.
@@ -89,77 +163,3 @@ A program to convert a gene table from UCSC into a GFF3 file suitable for loadin
 This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 ====[Pod_wig2data wig2data.pl]====
 Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
-
-=Program Groups=
-
-Lists of programs organized by function.
-
-===Data collection===
-	* [Pod_average_gene average_gene.pl]
-	* [Pod_bin_genomic_data bin_genomic_data.pl]
-	* [Pod_generate_genomic_bins generate_genomic_bins.pl]
-	* [Pod_get_datasets get_datasets.pl]
-	* [Pod_get_feature_info get_feature_info.pl]
-	* [Pod_get_relative_data get_relative_data.pl]
-
-===Dataset manipulation===
-	* [Pod_data2frequency data2frequency.pl]
-	* [Pod_join_data_file join_data_file.pl]
-	* [Pod_manipulate_datasets manipulate_datasets.pl]
-	* [Pod_merge_datasets merge_datasets.pl]
-	* [Pod_pull_features pull_features.pl]
-	* [Pod_split_data_file split_data_file.pl]
-
-===Data analysis===
-	* [Pod_data2frequency data2frequency.pl]
-	* [Pod_graph_data graph_data.pl]
-	* [Pod_graph_histogram graph_histogram.pl]
-	* [Pod_graph_profile graph_profile.pl]
-	* [Pod_run_cluster run_cluster.pl]
-
-===Finding features===
-	* [Pod_find_enriched_regions find_enriched_regions.pl]
-	* [Pod_get_intersecting_features get_intersecting_features.pl]
-	* [Pod_map_transcripts map_transcripts.pl]
-
-===Nucleosome Analysis===
-	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
-	* [Pod_intersect_nucs intersect_nucs.pl]
-	* [Pod_map_nucleosomes map_nucleosomes.pl]
-	* [Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl]
-
-===Microarray===
-	* [Pod_map_oligo_data2gff map_oligo_data2gff.pl]
-	* [Pod_process_microarray process_microarray.pl]
-
-===Illumina sequencing, BAM files===
-	* [Pod_bam2gff_bed bam2gff_bed.pl]
-	* [Pod_bam2wig bam2wig.pl]
-	* [Pod_bin_genomic_data bin_genomic_data.pl]
-	* [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl]
-	* [Pod_split_bam_by_isize split_bam_by_isize.pl]
-
-===File format conversion===
-	* [Pod_bam2gff_bed_pl bam2gff_bed.pl]
-	* [Pod_bar2wig bar2wig.pl]
-	* [Pod_data2bed data2bed.pl]
-	* [Pod_data2gff data2gff.pl]
-	* [Pod_data2wig data2wig.pl]
-	* [Pod_wig2data wig2data.pl]
-
-===Genome annotation===
-	* [Pod_get_ensembl_annotation get_ensembl_annotation.pl]
-	* [Pod_gff3_to_ucsc_table gff3_to_ucsc_table.pl]
-	* [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl]
-	* [Pod_ucsc_cytoband2gff3 ucsc_cytoband2gff3.pl]
-	* [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]
-
-===SNP calling===
-	* [Pod_locate_SNPs locate_SNPs.pl]
-	* [Pod_merge_SNPs merge_SNPs.pl]
-
-===Miscellaneous===
-	* [Pod_big_file2gff3 big_file2gff3.pl]
-	* [Pod_change_chr_prefix change_chr_prefix.pl]
-	* convert_yeast_genome_version.pl
-	* [Pod_print_feature_types print_feature_types.pl]
