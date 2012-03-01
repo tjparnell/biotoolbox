@@ -137,10 +137,39 @@ CPAN shell will keep its files in one directory, by default `~/.cpan`. I usually
 
 All the modules should be installed under `/Library/Perl`. As of Mac OS X 10.6 (or was it 10.5.something?), upgrades of system-installed modules should be installed in `/Library/Perl/Updates`, thus avoiding conflicts and changes to `/System/Library/Perl`; these upgrades should take precedence over those installed in the system library. 
 
-Once in the CPAN shell, installing a module is as simple as typing `install <name_of_module>`. To find a module in the CPAN repository, type `d /keyword/`, where keyword is a regular expression to find the distribution you want. Type `h` to get the help menu for additional functions. 
+Here is an extremely simplified primer for working with the CPAN Shell. You can also look at the inline help by typing `h` at the CPAN Shell prompt.
+
+You can search for modules by entering this command
+<pre>
+	m /something/
+</pre>
+
+You can also search for a distribution.
+<pre>
+	d /something/
+</pre>
+
+You can install a module or distribution this way
+<pre>
+	install some::module
+</pre>
+
+Or by specifying the exact version file
+<pre>
+	install SOMEBODY/SomeModule-1.0.1.tar.gz
+</pre>
+
+It's possible that CPAN will detect prerequisites for your module. If so, it will attempt to prepend their installation before installing your requested module. Just say yes to those.
+
+If the module was installed properly, you should find something like 
+<pre>
+	/usr/bin/make install -- OK
+</pre>
+somewhere near the end of all the text that goes by. If you see `NOT OK`, then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
 
 Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
 	* readline
+	* Term::ReadKey
 	* YAML
 	* CPAN
 	* Module::Build
@@ -172,26 +201,30 @@ If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/
 </pre>
 
 ===Additional modules for biotoolbox===
-There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script `check_dependencies.pl`, located in the biotoolbox root directory. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use.Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script [Pod_check_dependencies check_dependencies.pl], located in the biotoolbox root directory. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+	* Config::Simple
+	* IO::Zlib
+	* Statistics::Lite
+	* Statistics::Descriptive
+	* Archive::Zip
+	* Algorithm::Cluster
+	* DBI
+	* DBD::SQLite
+	* DBD::mysql
+	* GD
+	* GD::Graph
+	* GD::Graph::smoothlines
 
 ==Installing GBrowse==
 Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
 	* Bio::Graphics
 	* GBrowse
 
-It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire. These are the settings that I use personally; it only deviates from default for the tmp folder (don't ask me why - it's a long story).
-	* conf => /etc/gbrowse2
-	* htdocs => /Library/Webserver/Documents/gbrowse2
-	* cgibin => /Library/Webserver/CGI-Executables/gb2
-	* wwwuser => _www
-	* persistent => /var/lib/gbrowse2
-	* databases => /var/lib/gbrowse2/databases
-	* tmp => /var/tmp/gbrowse2
-	* apachemodules => /usr/lib/apache/modules
+It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire. 
 
 After installation, the installer should set the permissions appropriately for the persistant and tmp directories. Be sure to check those manually in the terminal (`ls -l`); sometimes they need to be fixed.
 
-*Important!* You will need to turn on Apache web server using the Sharing tab of System Preferences. From the command line, you can enter `sudo apachectl start`. To restart Apache, for example after upgrading GBrowse, enter `sudo apachectl graceful`. The GBrowse installer script tries to restart Apache for you, but the command doesn't work on Mac OS X (it's Linux specific), so you'll have to do it manually.
+*Important!* You will need to turn on Apache web server. You can use the Sharing tab of System Preferences, or from the command line enter `sudo apachectl start`. To restart Apache, for example after upgrading GBrowse, enter `sudo apachectl graceful`. The GBrowse installer script tries to restart Apache for you, but the command doesn't work on Mac OS X (it's Linux specific), so you'll have to do it manually.
 
 ==Installing Samtools==
 [http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
@@ -230,17 +263,12 @@ While Jim Kent provides pre-compiled executables, we need the libraries to build
 
 Download Jim Kent's source [http://http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
 
-Set up the environment variables. These are only really needed during compilation, so you can temporarily enter these commands in your terminal session. To make them more permament, add them to your `.profile` or `.bashrc` files in your home directory. The variables below assume a 64-bit Intel machine and that MySQL is installed through Fink, as described above; change as appropriate.
+Set up the environment variables. These are needed during both library compilation and building the Perl modules later. You can temporarily enter these commands in your current terminal session. To make them more permament, add them to your `.profile` or `.bashrc` files in your home directory. The variables below assume a 64-bit Intel machine; change as appropriate.
 <pre>
 	export MACHTYPE=x86_64
-	export MYSQLLIBS="/sw/lib/mysqlclient.a -lz -lm"
-	export MYSQLINC="/sw/include/mysql"
-</pre>
-
-First, compile the libraries. While we really only need one (I believe), it's easiest to simply compile them all.
-<pre>
-	cd ~/Documents/kent/src/
-	make libs
+	cd kent/src/lib
+	make
+	cd ..
 </pre>
 
 It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/` (assuming a 64-bit machine). This is a short, but not exhaustive, list of programs that I might recommend.
@@ -259,24 +287,17 @@ It's also useful to compile utilities that work with the bigWig and bigBed files
 Move the files into appropriate common destinations. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files.
 <pre>
 	sudo mkdir /usr/local/kent_src
-	cd /usr/local/kent_src
-	sudo mkdir lib
-	sudo mkdir lib/x86_64
-	sudo mkdir inc
-	sudo cp ~/Documents/kent/src/inc/`*` /usr/local/kent/inc
-	sudo cp ~/Documents/kent/src/lib/x86_64/`*`.a /usr/local/kent/lib/x86_64
+	sudo cp -r ~/Documents/kent/src/inc /usr/local/kent_src/
+	sudo cp -r ~/Documents/kent/src/lib /usr/local/kent_src/
+	export KENT_SRC=/usr/local/kent_src
 	sudo cp ~/bin/x86_64/`*` /usr/local/bin
 </pre>
 
-Finally, you can install the Bio-BigFile Perl module. I've tried through CPAN, but for some reason without much success. However, you can download the source tarball from CPAN and build it from shell prompt, which has worked for me. Extract into a working directory and `cd` into it.
+Finally, you can install the Bio-BigFile Perl module. Note that if you install through the CPAN Shell as root using `sudo`, your environment variables won't carry over to the root session. One solution is to set them again as root.
+
+A simpler alternative is to compile the module as non-root, then install as root. Download the source tarball from CPAN and extract it into a working directory, then `cd` into it. Follow the instructions below for building it. If your MACH_TYPE and KENT_SRC environment variables are properly set, things should go well.
 <pre>
 	perl Build.PL
-</pre>
-
-During the configuration, it will ask for the location of Kent's source tree. It really just needs the headers and libraries, which you've compiled and copied above. Enter the path `/usr/local/kent_src`. It expects the header and library files to be in the same directory structure as the original kent source tree; I don't think the generic `/usr/local/inc` and `/usr/local/lib` directories will work.
-
-Continue with the module installation.
-<pre>
 	./Build
 	./Build test
 	sudo ./Build install

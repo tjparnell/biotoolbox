@@ -14,10 +14,11 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
   Options:
   --in <input_filename>
   --func [stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | scale | pr | zscore | 
-          log2 | delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | divide | subtract | strandsign | mergestrand | 
-          center | new | summary | export | rewrite | treeview]
+          null | duplicate | above | below | minimum | maximum | 
+          scale | pr | zscore | log2 | delog2 | format | combine | 
+          subsample | ratio | diff | normdiff | divide | subtract | 
+          strandsign | mergestrand | center | new | summary | 
+          export | rewrite | treeview]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -69,6 +70,8 @@ __
   duplicate
   above
   below
+  minimum
+  maximum
   scale
   pr
   zscore
@@ -127,9 +130,10 @@ __
 {{{
   - (r)eplace the original dataset with the new one
   - add as a (n)ew dataset
-  }}}
-{{{
 }}}
+  Defaults to new placement when executed automatically using the --func  option, or prompts the user when executed interactively.
+__
+  __
 __--except `[`y | n`]`
 
 __
@@ -269,6 +273,18 @@ __
   Toss datapoints with values that are below a certain threshold value.  One or more datasets may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
 __
   __
+_*_minimum_*_ (menu option 'I')
+
+__
+  Reset datapoints whose values are less than a specified minimum  value to the minimum value. One or more datasets may be selected  to reset values to the minimum. The minimum value may be requested  interactively or specified with the --target option.
+__
+  __
+_*_maximum_*_ (menu option 'X')
+
+__
+  Reset datapoints whose values are greater than a specified maximum  value to the maximum value. One or more datasets may be selected  to reset values to the maximum. The maximum value may be requested  interactively or specified with the --target option.
+__
+  __
 _*_scale_*_ (menu option 's')
 
 __
@@ -378,7 +394,7 @@ __
 _*_summary_*_ (menu option 'y')
 
 __
-  Write out a summary of collected windowed data file, in which the mean  for each of the data columns is calculated, transposed (columns become  rows), and written to a new data file. This is essentially identical to  the summary function from the biotoolbox analysis scripts  [Pod_map_relative_data_pl map_relative_data.pl] and [Pod_pull_features_pl pull_features.pl]. It assumes that each  dataset has start and stop metadata. In automatic mode it will summarize  all available datasets; in interactive mode, it will request the start  and ending datasets. By default, a new file using the input file base  name appended with '`_`summary' is written, or a filename may be specified  using the --out option.
+  Write out a summary of collected windowed data file, in which the mean  for each of the data columns is calculated, transposed (columns become  rows), and written to a new data file. This is essentially identical to  the summary function from the biotoolbox analysis scripts  [Pod_map_relative_data_pl map_relative_data.pl] and [Pod_pull_features_pl pull_features.pl]. It assumes that each  dataset has start and stop metadata. The program will automatically  identify available datasets to summarize based on their name. In  interactive mode, it will request the contiguous range of start and  ending datasets to summarize. The contiguous datasets may also be  indicated using the --index option. By default, a new file using the  input file base name appended with '`_`summary' is written, or a  filename may be specified using the --out option.
 __
   __
 _*_export_*_ (menu option 'x')
