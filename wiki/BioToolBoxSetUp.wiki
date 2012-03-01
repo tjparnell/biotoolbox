@@ -81,13 +81,13 @@ If the module was installed properly, you should find something like
 somewhere near the end of all the text that goes by. If you see `NOT OK`, then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
 
 Try installing a few modules. Here are some basic ones to try first
-	* readline
-	* Term::ReadKey
-	* YAML
-	* Digest::SHA
-	* CPAN
-	* Module::Build
-	* ExtUtils::MakeMaker
+	* `readline`
+	* `Term::ReadKey`
+	* `YAML`
+	* `Digest::SHA`
+	* `CPAN`
+	* `Module::Build`
+	* `ExtUtils::MakeMaker`
 
 ==biotoolbox prerequisite modules==
 Now that you have some basic Perl modules installed, let's go for some others that are required for some or all of the *biotoolbox* programs. There are two ways to install these.
@@ -95,12 +95,12 @@ Now that you have some basic Perl modules installed, let's go for some others th
 First, you can run the [Pod_check_dependencies check_dependencies.pl] script in the root directory of the *biotoolbox* package. This will use CPAN to check for known dependencies, compare them with what is available from CPAN, and offer to install them for you. Note that dependencies may need to be taken care of manually.
 
 Second, you can install them manually through the CPAN shell. Here is a list of basic requirements.
-	* Config::Simple
-	* IO::Zlib
-	* Statistics::Lite
-	* Statistics::Descriptive
-	* Archive::Zip
-	* Algorithm::Cluster
+	* `Config::Simple`
+	* `IO::Zlib`
+	* `Statistics::Lite`
+	* `Statistics::Descriptive`
+	* `Archive::Zip`
+	* `Algorithm::Cluster`
 
 Not all of the modules are required. Only the first one is absolutely required, the next three are important for most modules, and the last two are required for specific modules. 
 
@@ -110,10 +110,10 @@ If you intend to use a database for storing genome annotation, then a relational
 If it's not installed already, most Linux distributions and Mac OS X versions have packages or installers available to install one or more of these database systems on your computer, usually as a system-wide service. You'll have to look elsewhere for help on installing one. Be sure to also install the associated developer files or package, which include the libraries and header files necessary for installing the Perl modules. 
 
 Once a database is installed, you can then install the appropriate Perl module drivers. The DBI module is required, and the subsequent ones are specific for your chosen database. 
-	* DBI
-	* DBD::SQLite
-	* DBD::mysql
-	* DBD::Pg
+	* `DBI`
+	* `DBD::SQLite`
+	* `DBD::mysql`
+	* `DBD::Pg`
 
 If you do not need or want to install a database, that's OK too. Most *biotoolbox* programs happily take BED style input files with genomic coordinates, rather than retrieving coordinates from genomic annotation stored in the database.
 
@@ -132,9 +132,9 @@ There are a few *biotoolbox* scripts that allow you to generate simple plots or 
 If the GD libraries are not installed already (most Linux distributions should have them), you can readily obtain them through your package manager. For Mac OS X, you'll have to install from source (good luck), use [http://www.finkproject.org/ Fink], or obtain pre-compiled packages from [http://sourceforge.net/projects/gmod/files/Generic%20Genome%20Browser/libgd-MacOSX/ here]. 
 
 Once the GD libraries are installed, you can then install the GD Perl modules using the CPAN Shell. 
-	* GD
-	* GD::Graph
-	* GD::Graph::smoothlines
+	* `GD`
+	* `GD::Graph`
+	* `GD::Graph::smoothlines`
 
 ==Installing Sam/Bam file support==
 To work with next generation sequencing data, you'll need to install [http://samtools.sourceforge.net samtools] and the corresponding Perl module [http://search.cpan.org/dist/Bio-SamTools/ Bio-SamTools]. This will allow you to use the ubiquitous Bam file format in conversions and analysis.
@@ -147,7 +147,7 @@ Next, compile the program.
 <pre>
 	make
 	make razip
-<\pre>
+</pre>
 
 The samtools `make` does not include test or install methods. For a system-wide installation, I will copy the `samtools-0.1.x` folder to `\usr\local\`, and generate symlinks to the executables `samtools` and `razip` into `\usr\local\bin\`, as well as symlink the man page `samtools.1` into the appropriate Man page directory. For a local home directory, just place the directory someplace easily accessible where you won't lose it. I'll also create symlinks to the executables in my home `~\bin` directory for quick access. 
 
@@ -158,7 +158,7 @@ One error you may or may not encounter is regarding shared libraries, and errors
 	make clean
 	make
 	make razip
-<\pre>
+</pre>
 Repeat the Bio-Samtools installation (you may need to issue the clean command from within CPAN Shell). It should work now.
 
 ==Installing bigWig and bigBed support==
@@ -174,21 +174,21 @@ You'll first need to compile the libraries used with big files. You can follow t
 	cd lib/
 	make
 	cd ..
-<\pre>
+</pre>
 
 Next, install Bio-BigFile using the CPAN Shell. During installation, it will need to know the location of the kent/src/ directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
 
 You may encounter the same error as with samtools above regarding "-fPIC". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC to the line. Save, `make clean`, and `make` again. 
 
 Now that you have Bio-BigFile installed, you should go ahead and compile some of the useful utilities for converting and working with bigFiles. Enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. Enter each one separately, and execute `make`. It will compile the executable, and install it in `~/bin/i686` (or whatever your machine type is). Here is a list I would recommend.
-	* wigToBigWig
-	* bedGraphToBigWig
-	* bedToBigBed
-	* bigWigInfo
-	* bigBedInfo
-	* bigWigToWig
-	* bigWigToBedGraph
-	* bigBedToBed
+	* `wigToBigWig`
+	* `bedGraphToBigWig`
+	* `bedToBigBed`
+	* `bigWigInfo`
+	* `bigBedInfo`
+	* `bigWigToWig`
+	* `bigWigToBedGraph`
+	* `bigBedToBed`
 
 ==Installing support for legacy wig files==
 There are a number of reasons to go with binary bigWig files over the original wiggle implementation, but if you have legacy data, *biotoolbox* will work with it. The legacy adaptor is [http://search.cpan.org/perldoc?Bio::Graphics::Wiggle Bio::Graphics::Wiggle], and was developed as part of the [http://gmod.org/wiki/GBrowse GBrowse] browser. The associated Perl script, [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl], is part of GBrowse and will take as input a text wiggle file (.wig) and generate binary files (.wib) referenced by a GFF3 file. This GFF3 file, in turn, will need to be loaded in a Bio::DB::SeqFeature::Store database.

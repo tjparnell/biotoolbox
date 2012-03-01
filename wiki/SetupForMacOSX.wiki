@@ -168,12 +168,12 @@ If the module was installed properly, you should find something like
 somewhere near the end of all the text that goes by. If you see `NOT OK`, then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
 
 Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
-	* readline
-	* Term::ReadKey
-	* YAML
-	* CPAN
-	* Module::Build
-	* ExtUtils::MakeMaker
+	* `readline`
+	* `Term::ReadKey`
+	* `YAML`
+	* `CPAN`
+	* `Module::Build`
+	* `ExtUtils::MakeMaker`
 
 ===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
@@ -202,18 +202,18 @@ If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/
 
 ===Additional modules for biotoolbox===
 There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script [Pod_check_dependencies check_dependencies.pl], located in the biotoolbox root directory. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
-	* Config::Simple
-	* IO::Zlib
-	* Statistics::Lite
-	* Statistics::Descriptive
-	* Archive::Zip
-	* Algorithm::Cluster
-	* DBI
-	* DBD::SQLite
-	* DBD::mysql
-	* GD
-	* GD::Graph
-	* GD::Graph::smoothlines
+	* `Config::Simple`
+	* `IO::Zlib`
+	* `Statistics::Lite`
+	* `Statistics::Descriptive`
+	* `Archive::Zip`
+	* `Algorithm::Cluster`
+	* `DBI`
+	* `DBD::SQLite`
+	* `DBD::mysql`
+	* `GD`
+	* `GD::Graph`
+	* `GD::Graph::smoothlines`
 
 ==Installing GBrowse==
 Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
@@ -272,17 +272,17 @@ Set up the environment variables. These are needed during both library compilati
 </pre>
 
 It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/` (assuming a 64-bit machine). This is a short, but not exhaustive, list of programs that I might recommend.
-	* bedGraphToBigWig
-	* bedToBigBed
-	* bigBedInfo
-	* bigBedSummary
-	* bigBedToBed
-	* bigWigInfo
-	* bigWigSummary
-	* bigWigToBedGraph
-	* bigWigToWig
-	* wigToBedGraph
-	* wigToBigWig
+	* `bedGraphToBigWig`
+	* `bedToBigBed`
+	* `bigBedInfo`
+	* `bigBedSummary`
+	* `bigBedToBed`
+	* `bigWigInfo`
+	* `bigWigSummary`
+	* `bigWigToBedGraph`
+	* `bigWigToWig`
+	* `wigToBedGraph`
+	* `wigToBigWig`
 
 Move the files into appropriate common destinations. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files.
 <pre>
