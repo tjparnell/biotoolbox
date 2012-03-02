@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.5.8';
+my $VERSION = '1.6.4';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -205,7 +205,7 @@ sub get_attribute_list_from_user {
 		# standard attributes for any user
 		foreach ( 
 			qw(chromo start stop midpoint length strand phase score 
-				exon_count transcript_length parent
+				rna_count exon_count transcript_length parent
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -274,6 +274,9 @@ sub get_attribute_method {
 	} 
 	elsif ($attrib eq 'score') {
 		$method = \&get_score;
+	} 
+	elsif ($attrib eq 'rna_count') {
+		$method = \&get_rna_number;
 	} 
 	elsif ($attrib eq 'exon_count') {
 		$method = \&get_exon_number;
@@ -415,6 +418,19 @@ sub get_score {
 }
 
 
+sub get_rna_number {
+	my $feature = shift;
+	my $rna_count = 0;
+	foreach my $f ($feature->get_SeqFeatures) {
+		if ($f->primary_tag =~ /rna/i) {
+			# an RNA transcript
+			$rna_count++;
+		}
+	}
+	return $rna_count;
+}
+
+
 sub get_exon_number {
 	my $feature = shift;
 	my $exon_count = 0;
@@ -441,15 +457,6 @@ sub get_exon_number {
 	}
 	# return exon_count if non-zero, else return cds_count, zero or non-zero
 	return $exon_count ? $exon_count : $cds_count;
-# 	if ($exon_count) {
-# 		return $exon_count;
-# 	}
-# 	elsif ($cds_count) {
-# 		return $cds_count;
-# 	}
-# 	else {
-# 		return 0;
-# 	}
 }
 
 
@@ -556,6 +563,7 @@ Attributes include:
    strand
    phase
    score
+   rna_count
    exon_count
    transcript_length (sum of exon lengths)
    parent (name)
@@ -597,6 +605,7 @@ attributes include the following
    -strand
    -phase
    -score
+   -rna_count (number of RNA subfeatures)
    -exon_count (number of exons, or CDS, subfeatures)
    -transcript_length
    -parent (name)
