@@ -12,6 +12,13 @@ Lists of programs organized by function.
 	* [ProgramList#get_feature_info.pl get_feature_info.pl]
 	* [ProgramList#get_relative_data.pl get_relative_data.pl]
 
+===Data analysis===
+	* [ProgramList#data2frequency.pl data2frequency.pl]
+	* [ProgramList#graph_data.pl graph_data.pl]
+	* [ProgramList#graph_histogram.pl graph_histogram.pl]
+	* [ProgramList#graph_profile.pl graph_profile.pl]
+	* [ProgramList#run_cluster.pl run_cluster.pl]
+
 ===Dataset manipulation===
 	* [ProgramList#data2frequency.pl data2frequency.pl]
 	* [ProgramList#join_data_file.pl join_data_file.pl]
@@ -20,17 +27,32 @@ Lists of programs organized by function.
 	* [ProgramList#pull_features.pl pull_features.pl]
 	* [ProgramList#split_data_file.pl split_data_file.pl]
 
-===Data analysis===
-	* [ProgramList#data2frequency.pl data2frequency.pl]
-	* [ProgramList#graph_data.pl graph_data.pl]
-	* [ProgramList#graph_histogram.pl graph_histogram.pl]
-	* [ProgramList#graph_profile.pl graph_profile.pl]
-	* [ProgramList#run_cluster.pl run_cluster.pl]
+===File format conversion===
+	* [ProgramList#bam2gff_bed.pl bam2gff_bed.pl]
+	* [ProgramList#bar2wig.pl bar2wig.pl]
+	* [ProgramList#bam2wig.pl bam2wig.pl]
+	* [ProgramList#data2bed.pl data2bed.pl]
+	* [ProgramList#data2gff.pl data2gff.pl]
+	* [ProgramList#data2wig.pl data2wig.pl]
+	* [ProgramList#wig2data.pl wig2data.pl]
 
 ===Finding features===
 	* [ProgramList#find_enriched_regions.pl find_enriched_regions.pl]
 	* [ProgramList#get_intersecting_features.pl get_intersecting_features.pl]
 	* [ProgramList#map_transcripts.pl map_transcripts.pl]
+
+===Genome annotation===
+	* [ProgramList#get_ensembl_annotation.pl get_ensembl_annotation.pl]
+	* [ProgramList#gff3_to_ucsc_table.pl gff3_to_ucsc_table.pl]
+	* [ProgramList#ucsc_cytoband2gff3.pl ucsc_cytoband2gff3.pl]
+	* [ProgramList#ucsc_table2gff3.pl ucsc_table2gff3.pl]
+
+===Illumina sequencing, BAM files===
+	* [ProgramList#bam2gff_bed.pl bam2gff_bed.pl]
+	* [ProgramList#bam2wig.pl bam2wig.pl]
+	* [ProgramList#bin_genomic_data.pl bin_genomic_data.pl]
+	* [ProgramList#get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl]
+	* [ProgramList#split_bam_by_isize.pl split_bam_by_isize.pl]
 
 ===Nucleosome Analysis===
 	* [ProgramList#get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl]
@@ -41,28 +63,6 @@ Lists of programs organized by function.
 ===Microarray===
 	* [ProgramList#map_oligo_data2gff.pl map_oligo_data2gff.pl]
 	* [ProgramList#process_microarray.pl process_microarray.pl]
-
-===Illumina sequencing, BAM files===
-	* [ProgramList#bam2gff_bed.pl bam2gff_bed.pl]
-	* [ProgramList#bam2wig.pl bam2wig.pl]
-	* [ProgramList#bin_genomic_data.pl bin_genomic_data.pl]
-	* [ProgramList#get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl]
-	* [ProgramList#split_bam_by_isize.pl split_bam_by_isize.pl]
-
-===File format conversion===
-	* [ProgramList#bam2gff_bed.pl bam2gff_bed.pl]
-	* [ProgramList#bar2wig.pl bar2wig.pl]
-	* [ProgramList#data2bed.pl data2bed.pl]
-	* [ProgramList#data2gff.pl data2gff.pl]
-	* [ProgramList#data2wig.pl data2wig.pl]
-	* [ProgramList#wig2data.pl wig2data.pl]
-
-===Genome annotation===
-	* [ProgramList#get_ensembl_annotation.pl get_ensembl_annotation.pl]
-	* [ProgramList#gff3_to_ucsc_table.pl gff3_to_ucsc_table.pl]
-	* [ProgramList#ucsc_chrom2gff3.pl ucsc_chrom2gff3.pl]
-	* [ProgramList#ucsc_cytoband2gff3.pl ucsc_cytoband2gff3.pl]
-	* [ProgramList#ucsc_table2gff3.pl ucsc_table2gff3.pl]
 
 ===SNP calling===
 	* [ProgramList#locate_SNPs.pl locate_SNPs.pl]
