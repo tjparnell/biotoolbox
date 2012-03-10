@@ -143,6 +143,10 @@ qq(  Required for numerous analysis programs
 qq(  Required for some analysis and graphing scripts
 )
 		],
+		['Statistics::LineFit', 
+qq(  Required for bam2wig.pl script
+)
+		],
 		['Bio::Root::Version', 
 qq(  Required for BioPerl database functions, data analysis, and GFF3 conversions
 )
