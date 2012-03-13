@@ -8,38 +8,46 @@
 	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system. Fortunately, these installations are pretty safe and shouldn't break the system. Simply installing perl modules rarely (if at all possible) breaks the system, particularly with recent versions (earlier versions were another story). Using the Fink (or MacPorts) package manager keeps everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. Finally, anything installed under `/usr/local/` is off-limits to Apple, so again there should be no conflicts with Apple system directories.
 	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist.
 	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
-	* This may (or may not) be obvious, but you'll need to install the Developer Tools from Apple. This can be found under the Optional Installs folder on the OS X Installation Disc. It may also be downloaded from Apple's [http://developer.apple.com/ Developer site]. You only really need to install the base and Unix development tools, unless you also intend to write Cocoa or iPhone Apps. 
+	* This may (or may not) be obvious, but you'll need to install the Developer Tools from Apple. For Snow Leopard 10.6, this can be found under the Optional Installs folder on the OS X Installation Disc. For Lion 10.7 or later, you'll need to download XCode from Apple's Mac App Store. You only really need to install the base and Unix development tools, unless you also intend to write Cocoa or iPhone Apps. 
+
+==Updated notes for OS X 10.7 Lion==
+These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
+	# First, you'll need to install XCode from Apple's Mac App Store. When you first run XCode, immediately go into preferences (after dismissing the splash welcome screen) and cancel and turn off automatic package and documentation downloads (unless you want them, of course, for you iPhone App development). It will save you a few GB of disk space.... Next, select the Command Line Tools to install them. These are essential to proceed with the installations below. You'll need to authenticate with your (free) Apple Developer Account. 
+	# Second, if you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site.
+	# Third, Fink no longer maintains separate source trees under the 10.7 distribution.
+	# Fourth, the default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, and if you upgrade from 10.6 all your modules will still be in the Perl5.10 branch. You can pick one of two options. Re-install all of your favorite modules under the new default version Perl5.12, or permanently set the version of Perl that you want to use. Look up the man page for perl for details on setting the version.
 
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
 
 An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. One other thing to keep in mind is that Fink tries to use many of the default Mac OS X libraries and executables whenever possible, whereas MacPorts sometimes wants to install everything on its own. This creates duplicates in your system, for example duplicate Perl installations. This can be good in that you get a newer version, but more complicated because you have to keep track of which version is executed.
 
-To install, download the binary installer and follow the online directions. Note that there is not a binary installer for Mac OS X 10.6 Snow Leopard. For that, you'll need to bootstrap the installation. It's best to follow their [http://www.finkproject.org/download/srcdist.php instructions]. 
+To install, it's best to follow their [http://www.finkproject.org/download/srcdist.php instructions]. In general, run the following commands after downloading, extracting, and moving into the fink directory.
+<pre>
+	sudo ./bootstrap
+	/sw/bin/pathsetup.sh
+	sudo fink selfupdate
+	sudo fink index -f
+</pre>
 
-*Important* If you’ll be running 64-bit programs (e.g. default Perl 10.0 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
+*Important for Mac OS X 10.6* If you’ll be running 64-bit programs (e.g. default Perl 5.10 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
 
 Fink installs into the `/sw` directory. This makes it convenient by completely isolating Fink software from the system directories, preventing potential conflicts and overwrites. MacPorts accomplishes the same thing by installing in `/opt`. 
 
-Make sure you have your account(s) set up to use Fink by running 
+For every user account on the computer, each user must run the following command just once to set up the Fink environment and use the programs installed through Fink. 
 <pre>
 	/sw/bin/pathsetup.sh
 </pre>
 
-The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
+====Setting up Fink source trees====
+*Note: separate source trees are no longer valid for 10.7 installations; Lion users can skip this* The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
 
 To enable the unstable tree, edit the file `/sw/etc/fink.conf`. Find the line that begins with "Trees:" edit the line to look like the following.
 <pre>
 	Trees: local/main stable/main stable/crypto unstable/main unstable/crypto
 </pre>
 
-After installing, and optionally setting up unstable trees, update Fink using the following commands. 
-<pre>
-	sudo fink selfupdate
-	fink scanpackages
-	fink index
-</pre>
-
+====Using Fink====
 To find a program to install, run the following command.
 <pre>
 	fink list <program>
@@ -126,14 +134,14 @@ Another generally useful tool is _wget_, which can be used to download file(s) u
 ==Installing Perl modules through CPAN==
 The [http://search.cpan.org/ Comprehensive Perl Archive Network] is an extensive repository of Perl modules. If you're faced with a difficult job of coding some project, chances are that someone else has either done it for you, or at least written some code that will make the job easier. There are thousands of Perl modules in CPAN, some of which are just right for you.
 
-While it's possible to download any module's source code from CPAN and install it manually, there is an easier way using a package manager. To use the the CPAN shell, run the following command
+While it's possible to download any module's source code from CPAN and install it manually, there is an easier way using a package manager. To use the the CPAN Shell, run the following command
 <pre>
 	sudo cpan
 </pre>
 
 When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? (according to Larry Wall, the original author of the Perl language). There may be things you want to change, such as CPAN mirror sites. Also, set both Make and Build arguments to uninstall previous versions when possible.
 
-CPAN shell will keep its files in one directory, by default `~/.cpan`. I usually set this `/usr/local/cpan` to make it available to other users.
+CPAN shell will keep its files in one directory, by default `~/.cpan`. I usually set this to `/usr/local/cpan` to put it in a more generic location.
 
 All the modules should be installed under `/Library/Perl`. As of Mac OS X 10.6 (or was it 10.5.something?), upgrades of system-installed modules should be installed in `/Library/Perl/Updates`, thus avoiding conflicts and changes to `/System/Library/Perl`; these upgrades should take precedence over those installed in the system library. 
 
@@ -215,6 +223,8 @@ There are a few additional modules that are required by the biotoolbox scripts. 
 	* `GD::Graph`
 	* `GD::Graph::smoothlines`
 
+Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring errors), and everything seems to still work. 
+
 ==Installing GBrowse==
 Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
 	* Bio::Graphics
@@ -259,7 +269,7 @@ Once Samtools has been installed, then the Bio-Samtools module (which includes `
 ==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
 
-While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here]. 
+While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
 
 Download Jim Kent's source [http://http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
 
@@ -304,7 +314,7 @@ A simpler alternative is to compile the module as non-root, then install as root
 </pre>
 	
 ==Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/`. This allows their modules to be found automatically in the normal manner. 
+To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
 Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
 
 =Additional Tools=

@@ -10,8 +10,8 @@ This guide assumes a few things.
 	* First, you have access to a unix-based computer, including Linux and Mac OS X. Windows users may need to explore other options (a new [http://store.apple.com computer], a new dual-boot [http://www.ubuntu.com/ operating system], etc.)
 	* Second, you have relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
 	* Third, Perl is installed on your machine. Almost every unix-based computer should have it installed, at least in some basic form. The biotoolbox programs have been tested with Perl versions 5.8.8 and 5.10.0. I assume anything > 5.8 should work. It's also useful to know whether it is 32-bit or 64-bit executable. 64-bit is preferred, if only because you avoid out-of-memory errors when working with large datasets. Run `perl -v` to find out the version and bit-ness. Familiarity with Perl is helpful, insofar as installing modules through CPAN, but Perl programming skills are not a requirement.
-	* Finally, you'll need to have GNU C compiler (GCC) installed for compiling software from source code. Most Linux distributions should already have this installed; if not, it's easily obtainable using your favorite package manager. On Mac OS X, you'll need to install the Developer Tools from Apple.
-	* Mac users may wish to look more closely at my other guide, [SetupForMacOSX Set up for Mac OS X].
+	* Finally, you'll need to have GNU C compiler (GCC) installed for compiling software from source code. Most Linux distributions should already have this installed; if not, it's easily obtainable using your favorite package manager. On Mac OS X, you'll need to install the Developer Tools from your installation disc or XCode from the Mac App Store. Be sure to include the command line tools from within XCode.
+	* Mac users may wish to look more closely at my other guide, [SetupForMacOSX Set up for Mac OS X], although this guide will mostly work as well.
 
 ==Local or Root==
 If you are an administrator on the computer, then you can install bioperl and other Perl modules in the system directories for multiple users. This can sometimes make things easier and avoids multiple installations. However, it's easier to break something, especially if you're not sure what you are doing.
@@ -41,7 +41,7 @@ Now you just need to set up your environment. This is assuming you're using the 
 If you look at your `.bashrc` file, you should find you've just added the above line to the end of the file. This will take care of setting up environment variables so that everytime you log in, you will use your own Perl libraries and not the system libraries. You should log out and back in for this to take effect. Then run `env` to print out your environment variables and confirm them.
 
 ==Installing Perl Modules==
-This assumes you now have a Perl environment set up, either locally (see above), system-wide through the operating system's libraries (root access), or a separate Perl installation (either local or root). Remember, if you're working with a system library, you should prepend the command with `sudo` to grant root access. 
+This assumes you now have a Perl environment set up, either locally (see above), system-wide through the operating system's libraries (root access), or a separate Perl installation (either local or root). Remember, if you're working with a system library, you should prepend commands with `sudo` to grant root access. 
 
 The safest way to start the CPAN shell is through this command
 <pre>
@@ -136,6 +136,8 @@ Once the GD libraries are installed, you can then install the GD Perl modules us
 	* `GD`
 	* `GD::Graph`
 	* `GD::Graph::smoothlines`
+
+Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring errors), and everything seems to still work. 
 
 ==Installing Sam/Bam file support==
 To work with next generation sequencing data, you'll need to install [http://samtools.sourceforge.net samtools] and the corresponding Perl module [http://search.cpan.org/dist/Bio-SamTools/ Bio-SamTools]. This will allow you to use the ubiquitous Bam file format in conversions and analysis.
