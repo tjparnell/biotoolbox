@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.6.3';
+my $VERSION = '1.6.4';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -44,6 +44,8 @@ my (
 	$do_chromo,
 	$refseqstatusf,
 	$refseqsumf,
+	$ensemblnamef,
+	$ensemblsourcef,
 	$kgxreff,
 	$chromof,
 	$user_source,
@@ -65,6 +67,8 @@ GetOptions(
 	'status=s'   => \$refseqstatusf, # the refseqstatus file
 	'sum=s'      => \$refseqsumf, # the refseqsummary file
 	'kgxref=s'   => \$kgxreff, # the kgXref info file
+	'ensname=s'  => \$ensemblnamef, # the ensemblToGeneName file
+	'enssrc=s'   => \$ensemblsourcef, # the ensemblSource file
 	'chromo=s'   => \$chromof, # a chromosome file
 	'source=s'   => \$user_source, # user provided source
 	'gene!'      => \$do_gene, # include genes in output
@@ -135,7 +139,7 @@ if ($ftp_file) {
 	
 	# push file names into appropriate variables
 	foreach my $file (@files) {
-		if ($file =~ /gene/i) {
+		if ($file =~ /refgene|ensgene|knowngene/i) {
 			push @genetables, $file;
 		}
 		elsif ($file =~ /summary/i) {
@@ -143,6 +147,12 @@ if ($ftp_file) {
 		}
 		elsif ($file =~ /status/i) {
 			$refseqstatusf = $file;
+		}
+		elsif ($file =~ /ensembltogene/i) {
+			$ensemblnamef = $file;
+		}
+		elsif ($file =~ /ensemblsource/i) {
+			$ensemblsourcef = $file;
 		}
 		elsif ($file =~ /kgxref/i) {
 			$kgxreff = $file;
@@ -159,17 +169,24 @@ if ($ftp_file) {
 ### Process the gene tables
 
 # input accessory files
-my $refseqsum  = load_refseq_extra_data('summary');
+	# the load_extra_data() will read the appropriate file, if available,
+	# and return the hash of the data
+	# it is generic for handling multiple data types
+	# pass the type of table we're working with
+my $refseqsum   = load_extra_data('summary');
 
-my $refseqstat = load_refseq_extra_data('status');
+my $refseqstat  = load_extra_data('status');
 
-my $kgxref     = load_refseq_extra_data('kgxref');
+my $kgxref      = load_extra_data('kgxref');
+
+my $ensembldata = load_extra_ensembl_data();
+
 
 # initialize globals
-my $chromosome_done = 0;
-my $source;
+my $chromosome_done = 0; # boolean indicating chromosomes are written
+my $source; # a re-usable global, may change depending on input table
 
-# walk through the intput tables
+# walk through the input tables
 foreach my $file (@genetables) {
 	
 	# open output file
@@ -278,42 +295,64 @@ exit;
 
 sub fetch_files_by_ftp {
 	
+	
+	# generate ftp request list
+	my @ftp_files;
+	if ($ftp_file eq 'all') {
+		@ftp_files = qw(
+			refgene
+			ensgene
+			xenorefgene
+			known
+		);
+	}
+	elsif ($ftp_file =~ /,/) {
+		@ftp_files = split /,/, $ftp_file;
+	}
+	else {
+		push @ftp_files, $ftp_file;
+	}
+	
 	# generate list of files
 	my @files;
-	if ($ftp_file =~ m/^xeno/i) {
-		@files = qw(
-			xenoRefGene.txt.gz 
-			refSeqStatus.txt.gz 
-			refSeqSummary.txt.gz
-		);
+	foreach my $item (@ftp_files) {
+		if ($item =~ m/^xeno/i) {
+			push @files, qw(
+				xenoRefGene.txt.gz 
+				refSeqStatus.txt.gz 
+				refSeqSummary.txt.gz
+			);
+		}
+		elsif ($item =~ m/refgene/i) {
+			push @files, qw(
+				refGene.txt.gz 
+				refSeqStatus.txt.gz 
+				refSeqSummary.txt.gz
+			);
+		}
+		elsif ($item =~ m/ensgene/i) {
+			push @files, qw(
+				ensGene.txt.gz 
+				ensemblToGeneName.txt.gz
+				ensemblSource.txt.gz
+			);
+		}
+		elsif ($item =~ m/known/i) {
+			push @files, qw(
+				knownGene.txt.gz 
+				kgXref.txt.gz 
+			);
+		}
 	}
-	elsif ($ftp_file =~ m/refgene/i) {
-		@files = qw(
-			refGene.txt.gz 
-			refSeqStatus.txt.gz 
-			refSeqSummary.txt.gz
-		);
-	}
-	elsif ($ftp_file =~ m/ensgene/i) {
-		push @files, 'ensGene.txt.gz';
-	}
-	elsif ($ftp_file =~ m/known/i) {
-		@files = qw(
-			knownGene.txt.gz 
-			kgXref.txt.gz 
-		);
-	}
-	elsif ($ftp_file =~ m/all/i) {
-		@files = qw(
-			refGene.txt.gz
-			xenoRefGene.txt.gz 
-			refSeqStatus.txt.gz 
-			refSeqSummary.txt.gz
-			ensGene.txt.gz
-			knownGene.txt.gz
-			kgXref.txt.gz
-		);
-	}
+	# this might seem convulated....
+	# but we're putting all the file names in a single array
+	# instead of specific global variables
+	# to make retrieving through FTP a little easier
+	# plus, not all files may be available for each species, e.g. knownGene
+	# we also rename the files after downloading them
+	
+	# we will sort out the list of downloaded files later and assign them 
+	# to specific global filename variables
 	
 	# add chromosome file if requested
 	if ($do_chromo) {
@@ -357,9 +396,17 @@ sub fetch_files_by_ftp {
 
 
 
-sub load_refseq_extra_data {
+sub load_extra_data {
+	# this will load extra tables of information into hash tables
+	# this includes tables of descriptive information, such as 
+	# status, summaries, common gene names, etc.
 	
-	# initialize 
+	# this sub is designed to be generic to be reusable for multiple 
+	# data files
+	
+	# identify the appropriate file to use based on the type of 
+	# table information being loaded
+	# the file name should've been provided by command line or ftp
 	my $type = shift;
 	my %data;
 	my $file;
@@ -372,6 +419,9 @@ sub load_refseq_extra_data {
 	elsif ($type eq 'kgxref') {
 		$file = $kgxreff;
 	}
+	
+	# the appropriate data table file wasn't provided for the requested 
+	# data table, return an empty hash
 	return \%data unless defined $file;
 	
 	# load file
@@ -380,11 +430,14 @@ sub load_refseq_extra_data {
 	
 	# load into hash
 	while (my $line = $fh->getline) {
-		chomp $line;
-		next if ($line =~ /^#/);
 		
 		# process line
+		chomp $line;
+		next if ($line =~ /^#/);
 		my @line_data = split /\t/, $line;
+		
+		# the unique id should be the first element in the array
+		# take it off the array, since it doesn't need to be stored there too
 		my $id = shift @line_data;
 		
 		# check for duplicate lines
@@ -422,8 +475,88 @@ sub load_refseq_extra_data {
 	# 5	refseq	 RefSeq ID
 	# 6	protAcc	 NCBI protein Accession number
 	# 7	description	Description
+	
+	### ensemblToGeneName table
+	# 0 Ensembl transcript ID
+	# 1 gene name
+}
 
 
+sub load_extra_ensembl_data {
+	# we will combine the ensemblToGeneName and ensemblSource data tables
+	# into a single hash keyed by the ensGene transcript ID
+	# Both tables are very simple two columns, so just trying to conserve
+	# memory by combining them
+	
+	# initialize
+	my %data;
+		# key will be the ensembl transcript id
+		# value will be anonymous array of [name, source]
+	
+	# load ensemblToGeneName first
+	if ($ensemblnamef) {
+		
+		# open file
+		my $fh = open_to_read_fh($ensemblnamef) or 
+			die " unable to open file '$ensemblsourcef'!\n";
+		
+		# load into hash
+		my $count = 0;
+		while (my $line = $fh->getline) {
+			
+			# process line
+			chomp $line;
+			next if ($line =~ /^#/);
+			my @line_data = split /\t/, $line;
+			if (scalar @line_data != 2) {
+				die " file $ensemblnamef doesn't seem right!? Line has " .
+					scalar @line_data . " elements!\n";
+			}
+			
+			# store data into hash
+			$data{ $line_data[0] }->[0] = $line_data[1];
+			$count++;
+		}
+		
+		# finish
+		print " Loaded ", format_with_commas($count), 
+			" names from file '$ensemblnamef'\n";
+		$fh->close;
+	}
+	
+	# load ensemblSource second
+	if ($ensemblsourcef) {
+	
+		# open file
+		my $fh = open_to_read_fh($ensemblsourcef) or 
+			die " unable to open file '$ensemblsourcef'!\n";
+		
+		# load into hash
+		my $count = 0;
+		while (my $line = $fh->getline) {
+			
+			# process line
+			chomp $line;
+			next if ($line =~ /^#/);
+			my @line_data = split /\t/, $line;
+			if (scalar @line_data != 2) {
+				die " file $ensemblsourcef doesn't seem right!? Line has " .
+					scalar @line_data . " elements!\n";
+			}
+			
+			# store data into hash
+			$data{ $line_data[0] }->[1] = $line_data[1];
+			$count++;
+		}
+		
+		# finish
+		print " Loaded ", format_with_commas($count), 
+			" transcript types from file '$ensemblsourcef'\n";
+		$fh->close;
+	}
+	
+	# done
+	return \%data;
 }
 
 
@@ -465,7 +598,7 @@ sub process_line_data {
 	# don't forget to convert start from 0 to 1-based coordinates
 	
 	if (scalar @linedata == 16) {
-		# a gene prediction table, e.g. refGene, ensGened, xenoRefGene
+		# a gene prediction table, e.g. refGene, ensGene, xenoRefGene
 		
 		# 0  bin
 		# 1  name
@@ -501,7 +634,7 @@ sub process_line_data {
 		$data{completeness} = $refseqsum->{ $linedata[1] }->[0] || undef;
 	}
 	elsif (scalar @linedata == 12) {
-		# a known gene table
+		# a knownGene table
 		
 		# 0 name	known gene identifier
 		# 1 chrom	Reference sequence chromosome or scaffold
@@ -730,33 +863,71 @@ sub process_gene_table {
 sub generate_new_gene {
 	my ($linedata, $id2counts) = @_;
 	
-	# make sure we have a gene name
-	# some genes, notably some ncRNA genes, have no gene or name2 entry
-	unless ($linedata->{name2}) {
+	# Set the gene name
+	# in most cases this will be the name2 item from the gene table
+	# except for some ncRNA and ensGene transcripts
+	my ($id, $name, $alias);
+	if ($linedata->{name} =~ /^ENSDART/i) {
+		# an ensGene transcript, look up the common name if possible
+		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
+			
+			# use the name2 value as the id, usually ENSDARG identifier
+			$id    = $linedata->{name2};
+			
+			# use the common name as the gene name
+			$name  = $ensembldata->{ $linedata->{name} }->[0];
+		}
+		else {
+			# use the name2 value for both
+			$id    = $linedata->{name2};
+			$name  = $linedata->{name2};
+		}
+	}
+	elsif (!defined $linedata->{name2}) {
+		# some genes, notably some ncRNA genes, have no gene or name2 entry
 		# we'll fake it and assign the transcript name
 		# change it in linedata hash to propagate it in downstream code
 		$linedata->{name2} = $linedata->{name};
+		$name = $linedata->{name};
+		$id   = $linedata->{name};
+	}
+	else {
+		# default for everything else
+		$name = $linedata->{name2};
+		$id   = $linedata->{name2};
 	}
 	
-	# Uniqueify the gene ID
-	my ($id, $name, $alias);
-	if (exists $id2counts->{ lc $linedata->{name2} }) {
+	# Uniqueify the gene ID and name
+	if (exists $id2counts->{ lc $name }) {
 		# we've encountered this transcript ID before
 		
-		# now need to make ID unique by appending a number
-		$id    = $linedata->{name2} . '.' . 
-				$id2counts->{ lc $linedata->{name2} };
-		$name  = $id;
-		$alias = $linedata->{name2};
+		# the original name should become the alias
+		$alias = $name;
+		
+		# then make name unique by appending a number
+		$name = $name . '.' . $id2counts->{ lc $name };
+		
+		# reset the id
+		if ($linedata->{name} =~ /^ENSDART/i) {
+			# special case for ensGene transcripts
+			# the id, from the name2 value, should already be unique
+			# this is usually a ENSDARG identifier
+			# nothing to do here
+		}
+		else {
+			# everyone else
+			# set the id to the unique name too
+			$id = $name;
+		}
 		
 		# remember this one
-		$id2counts->{ lc $linedata->{name2} } += 1;
+		# using alias value because that was the original name
+		$id2counts->{ lc $alias } += 1;
 	}
 	else {
 		# this is the first transcript with this id
-		$id = $linedata->{name2};
-		$name = $linedata->{name2};
-		$id2counts->{lc $id} = 1;
+		# set the id counter
+		$id2counts->{lc $name} = 1;
 	}
 	
 	
@@ -778,7 +949,13 @@ sub generate_new_gene {
 	if (defined $alias) {
 		$gene->add_tag_value('Alias', $alias);
 	}
-		
+	
+	# add the original ENSDARG identifier as an Alias in addition to ID
+	# for ensGene transcripts
+	if ($linedata->{name} =~ /^ENSDART/i) {
+		$gene->add_tag_value('Alias', $linedata->{name2});
+	}
+	
 	# add status if possible
 	if (defined $linedata->{status} ) {
 		$gene->add_tag_value( 'status', $linedata->{status} );
@@ -861,17 +1038,29 @@ sub generate_new_transcript {
 		# txEnd = cdsStart = cdsEnd
 		# if you'll look, all of the exon phases should also be -1
 		
-		# if we are using a RefSeq gene table, we may be able to infer
-		# some certain types from the gene name
+		# check if we have a ensGene transcript, we may have the type
+		if (
+			$linedata->{name} =~ /^ENSDART/i and 
+			defined $ensembldata->{ $linedata->{name} }->[1]
+		) {
+			# this is a ensGene transcript
+			
+			# these should be fairly typical standards
+			# snRNA, rRNA, pseudogene, etc
+			$transcript->primary_tag( 
+				$ensembldata->{ $linedata->{name} }->[1] );
+		}
 		
-		# in the mean time, we'll try to deduce from the gene name
-		if ($linedata->{name2} =~ /^LOC\d+/) {
+		# otherwise, we may be able to infer some certain 
+		# types from the gene name
+		
+		elsif ($linedata->{name2} =~ /^LOC\d+/) {
 			# empirical testing seems to suggest that all the noncoding 
 			# genes with a name like LOC123456 are pseudogenes
 			# well, at least with hg18, it may not be true for others
 			$transcript->primary_tag('pseudogene');
 		}
-		if ($linedata->{name2} =~ /^mir/i) {
+		elsif ($linedata->{name2} =~ /^mir/i) {
 			# a noncoding gene whose name begins with mir is likely a 
 			# a micro RNA
 			$transcript->primary_tag('miRNA');
@@ -896,6 +1085,17 @@ sub generate_new_transcript {
 		$transcript->primary_tag('mRNA');
 	}
 	
+	
+	# add the Ensembl Gene name if it is an ensGene transcript
+	if ($linedata->{name} =~ /^ENSDART/i) {
+		# if we have loaded the EnsemblGeneName data hash
+		# we should be able to find the real gene name
+		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
+			# we will put the common gene name as an alias
+			$transcript->add_tag_value('Alias', 
+				$ensembldata->{ $linedata->{name} }->[0] );
+		}
+	}
 	
 	# add original transcript name as an alias
 	if (defined $alias) {
@@ -1406,6 +1606,8 @@ __END__
   --table <filename>
   --status <filename>
   --sum <filename>
+  --ensname <filename>
+  --enssrc <filename>
   --kgxref <filename>
   --chromo <filename>
   --source <text>
@@ -1430,7 +1632,7 @@ Request that the current indicated tables and supporting files be
 downloaded from UCSC via FTP. Four different tables may be downloaded, 
 including refGene, ensGene, xenoRefGene mRNA gene prediction tables, and 
 the UCSC known gene table (if available). Specify all to download all 
-four tables.
+four tables. A comma delimited list may also be provided.
 
 =item --db <text>
 
@@ -1465,6 +1667,19 @@ provides additional information for the refSeq-based gene prediction
 tables, including refGene, xenoRefGene, and knownGene tables. The 
 file may be gzipped.
 
+=item --ensname <filename>
+
+Optionally provide the name of the ensemblToGeneName file. This file 
+provides a key to translate the Ensembl unique gene identifier to the 
+common gene name. The file may be gzipped.
+
+=item --enssrc <filename>
+
+Optionally provide the name of the ensemblSource file. This file 
+provides a key to translate the Ensembl unique gene identifier to the 
+type of transcript, provided by Ensembl as the source. The file may be 
+gzipped.
+
 =item --kgxref <filename>
 
 Optionally provide the name of the kgXref file. This file 
@@ -1494,7 +1709,7 @@ The default is true.
 
 Specify whether (or not) to assemble mRNA transcripts into genes. This 
 will create the canonical gene->mRNA->(exon,CDS) heirarchical structure. 
-Otherwise, mRNA transcripts are kept independent. The gene names, when 
+Otherwise, mRNA transcripts are kept independent. The gene name, when 
 available, are always associated with transcripts through the Alias tag. 
 The default is true.
 
@@ -1540,7 +1755,7 @@ features, which are derived from supporting table files.
 Four table files are supported. Gene prediction tables, including refGene, 
 xenoRefGene, and ensGene, are supported. The UCSC knownGene gene table, if 
 available, is also supported. Supporting tables include refSeqStatus, 
-refSeqSummary, and kgXref. 
+refSeqSummary, ensemblToGeneName, ensemblSource, and kgXref. 
 
 The latest table files may be automatically downloaded using FTP from 
 UCSC or other host. Since these files are periodically updated, this may 
