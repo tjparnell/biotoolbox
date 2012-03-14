@@ -13,9 +13,8 @@
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
 	# First, you'll need to install XCode from Apple's Mac App Store. When you first run XCode, immediately go into preferences (after dismissing the splash welcome screen) and cancel and turn off automatic package and documentation downloads (unless you want them, of course, for you iPhone App development). It will save you a few GB of disk space.... Next, select the Command Line Tools to install them. These are essential to proceed with the installations below. You'll need to authenticate with your (free) Apple Developer Account. 
-	# Second, if you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site.
-	# Third, Fink no longer maintains separate source trees under the 10.7 distribution.
-	# Fourth, the default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, and if you upgrade from 10.6 all your modules will still be in the Perl5.10 branch. You can pick one of two options. Re-install all of your favorite modules under the new default version Perl5.12, or permanently set the version of Perl that you want to use. Look up the man page for perl for details on setting the version.
+	# Second, the default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries].
+	# Third, if you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
 
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
@@ -40,7 +39,7 @@ For every user account on the computer, each user must run the following command
 </pre>
 
 ====Setting up Fink source trees====
-*Note: separate source trees are no longer valid for 10.7 installations; Lion users can skip this* The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
+*Note:* separate source trees are no longer valid for 10.7 installations; Lion users can skip this. The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
 
 To enable the unstable tree, edit the file `/sw/etc/fink.conf`. Find the line that begins with "Trees:" edit the line to look like the following.
 <pre>
