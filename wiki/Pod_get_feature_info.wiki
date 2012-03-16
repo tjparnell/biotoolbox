@@ -19,7 +19,7 @@ get_feature_info.pl <**filename>
   --version
   --help
 }}}
-Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
+Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    rna_count    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
 
 {{{
 }}}
@@ -53,6 +53,7 @@ __
    -strand
    -phase
    -score
+   -rna_count (number of RNA subfeatures)
    -exon_count (number of exons, or CDS, subfeatures)
    -transcript_length
    -parent (name)
