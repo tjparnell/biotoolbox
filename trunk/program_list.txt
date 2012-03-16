@@ -1,7 +1,82 @@
+An up to data list of programs may be found online at
+http://code.google.com/p/biotoolbox/wiki/ProgramList
+
+PROGRAM GROUPS
+
+Lists of programs organized by function.
+
+===Data collection===
+	* average_gene.pl
+	* bin_genomic_data.pl
+	* get_datasets.pl
+	* get_feature_info.pl
+	* get_relative_data.pl
+
+===Data analysis===
+	* data2frequency.pl
+	* graph_data.pl
+	* graph_histogram.pl
+	* graph_profile.pl
+	* run_cluster.pl
+
+===Dataset manipulation===
+	* data2frequency.pl
+	* join_data_file.pl
+	* manipulate_datasets.pl
+	* merge_datasets.pl
+	* pull_features.pl
+	* split_data_file.pl
+
+===File format conversion===
+	* bam2gff_bed.pl
+	* bar2wig.pl
+	* data2bed.pl
+	* data2gff.pl
+	* data2wig.pl
+	* wig2data.pl
+
+===Finding features===
+	* find_enriched_regions.pl
+	* get_intersecting_features.pl
+	* map_transcripts.pl
+
+===Genome annotation===
+	* get_ensembl_annotation.pl
+	* gff3_to_ucsc_table.pl
+	* ucsc_cytoband2gff3.pl
+	* ucsc_table2gff3.pl
+
+===Illumina sequencing, BAM files===
+	* bam2gff_bed.pl
+	* bam2wig.pl
+	* bin_genomic_data.pl
+	* get_actual_nuc_sizes.pl
+	* split_bam_by_isize.pl
+
+===Nucleosome Analysis===
+	* get_actual_nuc_sizes.pl
+	* intersect_nucs.pl
+	* map_nucleosomes.pl
+	* verify_nucleosome_mapping.pl
+
+===Microarray===
+	* map_oligo_data2gff.pl
+	* process_microarray.pl
+
+===SNP calling===
+	* locate_SNPs.pl
+	* merge_SNPs.pl
+
+===Miscellaneous===
+	* big_file2gff3.pl
+	* change_chr_prefix.pl
+	* print_feature_types.pl
+
+
+
 PROGRAM LIST
 
-This is an alphabetical list of the scripts available in the biotoolbox scripts directory. An up to data list of programs may be found online at
-http://code.google.com/p/biotoolbox/wiki/ProgramList
+An alphabetical list of the scripts available in the biotoolbox suite.
 
 
 average_gene.pl
@@ -25,9 +100,6 @@ big_file2gff3.pl
 change_chr_prefix.pl
 	Changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
 
-convert_yeast_genome_version.pl
-	Convert the genomic coordinates of a data file between different SGD genome versions.
-	
 data2frequency.pl
 	Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
 	
@@ -109,6 +181,9 @@ process_microarray.pl
 pull_features.pl
 	Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
 	
+run_cluster.pl
+	run_cluster.pl is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others.
+
 split_bam_by_isize.pl
 	Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
 	
@@ -126,80 +201,3 @@ verify_nucleosome_mapping.pl
 
 wig2data.pl
 	Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
-
-
-
-
-
-PROGRAM GROUPS
-
-Lists of programs organized by function.
-
-===Data collection===
-	* average_gene.pl
-	* bin_genomic_data.pl
-	* generate_genomic_bins.pl
-	* get_datasets.pl
-	* get_feature_info.pl
-	* get_relative_data.pl
-
-===Dataset manipulation===
-	* data2frequency.pl
-	* join_data_file.pl
-	* manipulate_datasets.pl
-	* merge_datasets.pl
-	* pull_features.pl
-	* shift_coordinates.pl
-	* split_data_file.pl
-
-===Data analysis===
-	* data2frequency.pl
-	* graph_data.pl
-	* graph_histogram.pl
-	* graph_profile.pl
-	* run_cluster.pl
-
-===Finding features===
-	* find_enriched_regions.pl
-	* get_intersecting_features.pl
-	* map_transcripts.pl
-
-===Nucleosome Analysis===
-	* get_actual_nuc_sizes.pl
-	* intersect_nucs.pl
-	* map_nucleosomes.pl
-	* verify_nucleosome_mapping.pl
-
-===Microarray===
-	* map_oligo_data2gff.pl
-	* process_microarray.pl
-
-===Illumina sequencing, BAM files===
-	* bam2gff_bed.pl
-	* bam2wig.pl
-	* bin_genomic_data.pl
-	* get_actual_nuc_sizes.pl
-	* split_bam_by_isize.pl
-
-===File format conversion===
-	* bam2gff_bed.pl
-	* bar2wig.pl
-	* data2bed.pl
-	* data2gff.pl
-	* data2wig.pl
-	* wig2data.pl
-
-===Genome annotation===
-	* get_ensembl_annotation.pl
-	* ucsc_cytoband2gff3.pl
-	* ucsc_table2gff3.pl
-
-===SNP calling===
-	* locate_SNPs.pl
-	* merge_SNPs.pl
-
-===Miscellaneous===
-	* big_file2gff3.pl
-	* convert_yeast_genome_version.pl
-	* print_feature_types.pl
-
