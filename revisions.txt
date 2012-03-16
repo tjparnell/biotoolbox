@@ -1,5 +1,19 @@
 ######## biotoolbox revision history #############
 
+v.1.6.4 (svn r314)
+	- Major update to script bam2wig.pl to reduce memory consumption by writing incremental portions. The strand option is now a boolean option, and when enabled, automatically writes both strands simultaneously. The binning of read counts into windows of user-selected size is now possible. The optimal shift value for ChIP-Seq data can now be empically determined from the reads using a statistical method.
+	- Added additional support for UCSC ensGene tables by including ensemblToGeneName and ensemblSource supplemental tables in script ucsc_table2gff2.pl. The common gene name is now included in the output GFF3 file.
+	- Added rna_count function to script get_feature_info.pl
+	- Added minimum and maximum value functions to script manipulate_datasets.pl
+	- Included a range option when generating a summary file in script manipulate_datasets.pl
+	- Improved the regular expression matching of the chromosome name when sorting by genomic coordinates in the script manipulate_datasets.pl
+	- Increased the number of available letters when requesting indices from the second file in script merge_datasets.pl
+	- Updated script check_dependencies.pl to handle missing dependencies more gracefully
+	- Updated error handling of missing Perl module dependencies, including IO::Zlib
+	- Fixed bug where the default chromosome exclusion list in biotoolbox.cfg wasn't being used when generating a new genome interval list
+	- Fixed bug where where a script might ignore the --nogz option when the original file was gzipped
+	- Fixed bug in script split_data_file.pl where a filename may get out of sync with what was requested and what is written
+
 v.1.6.3 (svn r293)
 	- Added knownGene as a source in script ucsc_table2gff3.pl
 	- Improved handling of the chromosome exclusion list in library tim_db_helper
