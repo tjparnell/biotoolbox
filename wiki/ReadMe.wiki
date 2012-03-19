@@ -1,4 +1,4 @@
-#summary A new users guide for installing biotoolbox and its prerequisites.
+#summary The ReadMe file for biotoolbox.
 #labels Featured 
 
 =README for BioToolBox=
@@ -14,8 +14,6 @@ These are a collection of various perl script programs for processing, convertin
 	* Processing raw microarray files
 	* Simple processing of Next Generation Sequencing alignment files
 	* Precise mapping of nucleosomes from paired-end sequencing
-
-
 
 ==Installation==
 
@@ -68,22 +66,21 @@ Please contact the author for bugs. Feature requests are also accepted, within t
 
 ==Online Documentation==
 
-* [BioToolBoxSetUp Setting] up a computer for BioToolBox
-
-* Setting up [SetupForMacOSX Mac OS X] for bioinformatics
-
-* Up to date list of BioToolBox [ProgramList programs]
-
-* Setting up a Bio::DB::SeqFeature::Store [LoadingDatabase database]
-
-* Description of supported data [DataFileFormats file formats]
-
-* Example Data [ExampleFeatureDataCollection collection]
-
-* Example working with [ExampleNextGenerationSequencing Next Generation Sequencing] Data
-
-* Explanation of the text data [TimDataFormat report format]
-
-* [MappingSNPs Mapping SNPs]
-
+	* [BioToolBoxSetUp Setting] up a computer for BioToolBox
+	
+	* Setting up [SetupForMacOSX Mac OS X] for bioinformatics
+	
+	* Up to date list of BioToolBox [ProgramList programs]
+	
+	* Setting up a Bio::DB::SeqFeature::Store [LoadingDatabase database]
+	
+	* Description of supported data [DataFileFormats file formats]
+	
+	* Example Data [ExampleFeatureDataCollection collection]
+	
+	* Example working with [ExampleNextGenerationSequencing Next Generation Sequencing] Data
+	
+	* Explanation of the text data [TimDataFormat report format]
+	
+	* [MappingSNPs Mapping SNPs]
 
