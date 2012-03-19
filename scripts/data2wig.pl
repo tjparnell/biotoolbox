@@ -23,7 +23,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
-my $VERSION = '1.5.8';
+my $VERSION = '1.6.5';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -305,11 +305,22 @@ sub check_step {
 	elsif ($step eq 'fixed') {
 		# double check that the data file supports this
 		# assign the step size as necessary
-		if ( exists $metadata_ref->{$start_index}{'step'} ) {
-			$step_size = $metadata_ref->{$start_index}{'step'};
+		if (exists $metadata_ref->{$start_index}{'step'} ) {
+			if (defined $step_size) {
+				if ($step_size != $metadata_ref->{$start_index}{'step'}) {
+					warn " Requested step size $step_size does not match" .
+						" metadata step size " . 
+						$metadata_ref->{$start_index}{'step'} . "!\n" .
+						" Accurate wig file is not guaranteed!\n";
+				}
+			}
+			else {
+				# define it from the metadata
+				$step_size = $metadata_ref->{$start_index}{'step'};
+			}
 		}
-		else {
-			warn " no step size indicated for 'fixedStep' wig file! Using 'variableStep'\n";
+		elsif (!defined $step_size) {
+			warn " Fixed step size not defined by user or metadata! Using 'variableStep'\n";
 			$step = 'variable';
 		}
 	}
@@ -324,6 +335,11 @@ sub check_step {
 			print " Automatically generating 'variableStep' wig....\n";
 			$step = 'variable';
 		}
+	}
+	
+	# check the span
+	unless ($span) {
+		$span = 1;
 	}
 }
 
@@ -379,7 +395,11 @@ sub set_method_sub {
 
 
 sub convert_to_fixedStep {
+	
+	# keep track of current chromosome name and length
 	my $current_chr; # current chromosome
+	
+	# walk through the data file
 	while (my $line = $in_fh->getline) {
 		chomp $line;
 		my @data = split /\t/, $line;
@@ -425,6 +445,18 @@ sub convert_to_fixedStep {
 			$score = format_score($score);
 		}
 		
+		# check we haven't gone over the chromosome end
+		# we assume the last interval would accurately record the chromosome end
+		if ( defined $stop_index ) {
+			if ( ($data[$start_index] + $step_size - 1) > $data[$stop_index]) {
+				# size is too big
+				# we will not write this last data point
+				# we may have some data loss at the end of the chromosome
+				#warn " $current_chr clipped at $data[$stop_index]\n";
+				next;
+			}
+		}
+		
 		# write fixed data line
 		$out_fh->print("$score\n");
 	}
@@ -441,6 +473,41 @@ sub convert_to_variableStep {
 		
 		# write definition line if necessary
 		if ($data[$chr_index] ne $current_chr) {
+			
+			# first check and write orphan scores
+			# this might happen if there was only one score on the entire chr
+			if (@scores) {
+				if (scalar @scores == 1) {
+					# print the one score
+					$out_fh->print("$previous_pos $scores[0]\n");
+				}
+				else {
+					# more than one score
+					
+					# combine the scores if possible
+					if ($method_sub) {
+						my $new_score;
+						if ($log2) {
+							# convert to log2 first
+							@scores = map {2 ** $_} @scores;
+							# combine and convert back to log2
+							$new_score = log( &{$method_sub}(@scores) ) / log(2);
+						}
+						else {
+							$new_score = &{$method_sub}(@scores);
+						}
+						
+						# print the combined score
+						$out_fh->print("$previous_pos $new_score\n");
+					}
+					else {
+						die " there are " . scalar(@scores) . " scores for " . 
+							"position $current_chr $previous_pos!!!!\n" .
+							" Please define a combination method!!! see help\n";
+					}
+				}
+			}
+			
 			# new chromosome, new definition line
 			my $definition = 'variableStep chrom=' . $data[$chr_index];
 			if ($span > 1) {
@@ -451,6 +518,7 @@ sub convert_to_variableStep {
 			# reset the current chromosome
 			$current_chr = $data[$chr_index];
 			$previous_pos = undef;
+			@scores = ();
 		}
 		
 		
