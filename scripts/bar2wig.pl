@@ -22,7 +22,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
-my $VERSION = '1.5.8';
+my $VERSION = '1.6.5';
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -106,6 +106,22 @@ if (-d $infile) {
 	$input_is_dir = 1;
 }
 
+# identify essential application paths
+my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
+if (defined $java) {
+	chomp $java; # the which command will have a newline character
+}
+else {
+	die " unable to identify java executable!\n";
+}
+unless ($bar_app_path) {
+	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
+}
+unless ($bar_app_path =~ /bar2gr$/) {
+	die "  Must define the path to the USeq or T2 java application Bar2Gr! see help\n";
+}
+
+
 # assign method subroutine
 my $method_sub;
 if ($method eq 'mean') {
@@ -143,22 +159,6 @@ unless (defined $use_track) {
 		$use_track = 1;
 	}
 }
-
-# identify application paths
-my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
-if (defined $java) {
-	chomp $java; # the which command will have a newline character
-}
-else {
-	die " unable to identify java executable!\n";
-}
-unless ($bar_app_path) {
-	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
-	unless ($bar_app_path) {
-		die "  Must define the path to the USeq/T2 java application Bar2Gr! see help\n";
-	}
-}
-
 
 
 
@@ -819,6 +819,11 @@ processed into one or more wig (or bigWig) files. Stranded data (denoted
 by _+_ and _-_ in the bar file names) is written to two stranded output 
 files, appended with either '_f' or '_r' to the basename. The wig files 
 are in variableStep format.
+
+You may find the latest version of the USeq package, which contains the 
+Bar2Gr Java application, at http://sourceforge.net/projects/useq/. Specify 
+the path to the Bar2Gr file in the USeq/Apps directory. You may record this
+information in the BioToolBox configuration file biotoolbox.cfg.
 
 Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or 
 Lincoln Stein's Bio::DB::BigFile support.
