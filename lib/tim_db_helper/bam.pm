@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
-our $VERSION = '1.6.3';
+our $VERSION = '1.7.0';
 
 
 # Exported names
@@ -44,33 +44,9 @@ our %BAM_CHROMOS;
 ### Collect Bam scores only
 sub collect_bam_scores {
 	
-	# we will collect positioned values but
-	# only return the values
-	
-	# grab the method from the passed arguments
-	my $method = $_[3];
-	
-	# collect the raw data
-	my %bam_data = _collect_bam_data(@_);
-	
-	# combine multiple datapoints at the same position
-	my @values;
-	if ($method eq 'length') {
-		# each hash value is an array of one or more datapoints
-		# dump them all into the final values array
-		foreach my $position (keys %bam_data) {
-			push @values, @{ $bam_data{$position} };
-		}
-	}
-	else {
-		# score (coverage) or count
-		# each value is a count
-		@values = values %bam_data;
-	}
-	
-	# return collected data
-	return @values;
-	
+	# set the do_index boolean to false
+	# return the scores
+	return _collect_bam_data(0, @_);
 }
 
 
@@ -79,11 +55,12 @@ sub collect_bam_scores {
 ### Collect positioned Bam scores
 sub collect_bam_position_scores {
 	
+	# collect the raw data
+	# set the do_index boolean to true
+	my %bam_data = _collect_bam_data(1, @_);
+	
 	# grab the method from the passed arguments
 	my $method = $_[3];
-	
-	# collect the raw data
-	my %bam_data = _collect_bam_data(@_);
 	
 	# combine multiple datapoints at the same position
 	if ($method eq 'length') {
@@ -108,58 +85,25 @@ sub _collect_bam_data {
 	unless (scalar @_ >= 5) {
 		confess " At least five arguments must be passed to collect Bam data!\n";
 	}
-	my ($region, $region_strand, $stranded, $method, @bam_features) = @_;
+	my (
+		$do_index, 
+		$region, 
+		$region_strand, 
+		$stranded, 
+		$value_type, 
+		@bam_features
+	) = @_;
 		# method can be score, count, or length
 	
-	# set up hash, either position => count or position => [scores]
-	my %bam_data;
+	# initialize score structures
+	# which one is used depends on the $do_index boolean variable
+	my %pos2data; # either position => count or position => [scores]
+	my @scores; # just scores
 	
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	foreach my $feature (@bam_features) {
+	foreach my $bamfile (@bam_features) {
 	
-		## Get the name of the bam file
-		my $bamfile;
-		my $feature_ref = ref $feature;
-		
-		if ($feature =~ /^file:(.+)$/) {
-			# the passed feature appears to specify a file
-			$bamfile = $1;
-			
-			# check file
-			unless (-e $bamfile) {
-				confess " Bam file '$bamfile' does not exist!\n";
-				return;
-			}
-		}
-		elsif ($feature =~ /^http|ftp/i) {
-			# a remote file
-			
-			# this should be supported by Bio::DB::Sam
-			$bamfile = $feature;
-		}
-		elsif ($feature_ref =~ /^Bio::DB/) {
-			# passed feature could be a Bio::DB::* seqfeature object
-			
-			# get bamfile name
-			if ($feature->has_tag('bamfile')) {
-				($bamfile) = $feature->get_tag_values('bamfile');
-			}
-			else {
-				confess " passed $feature_ref feature '$feature'" . 
-					" does not have a bigwig attribute!\n";
-			}
-		}
-		else {
-			confess " unrecognized feature '$feature'!\n";
-		}
-		
-		# check for bamfile
-		unless ($bamfile) {
-			confess " no bam file specified for feature '$feature'!\n";
-		}
-		
-		
 		## Open the Bam File
 		my $bam;
 		if (exists $OPENED_BAMFILES{$bamfile} ) {
@@ -183,7 +127,8 @@ sub _collect_bam_data {
 			next;
 		}
 		
-		# Set the code to filter alignments based on strand 
+		
+		## Set the code to filter alignments based on strand 
 		my $filter;
 		if ($stranded eq 'sense' and $region_strand == 1) {
 			$filter = sub {
@@ -217,8 +162,12 @@ sub _collect_bam_data {
 		}
 		
 		
-		## Collect the data according to the requested method
-		if ($method eq 'score') {
+		## Collect the data according to the requested value type
+		# we will either use simple coverage (score method) or
+		# process the actual alignments (count or length)
+		
+		## Coverage
+		if ($value_type eq 'score') {
 			# collecting scores, or in this case, basepair coverage of 
 			# alignments over the requested region
 			
@@ -250,76 +199,117 @@ sub _collect_bam_data {
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
 			if ($coverage) {
-				my @scores = $coverage->coverage;
-				for (my $i = $region->start; $i <= $region->end; $i++) {
-					$bam_data{$i} += shift @scores;
+				@scores = $coverage->coverage;
+				
+				# check whether we need to index the scores
+				if ($do_index) {
+					for (my $i = $region->start; $i <= $region->end; $i++) {
+						# move the scores into the position score hash
+						$pos2data{$i} += shift @scores;
+					}
 				}
 			}
 		}
 		
+		
+		## Alignments
 		else {
 			# either collecting counts or length
 			# working with actual alignments
 			
-			my @alignments;
+			# get the alignments in a stream
+			my $iterator;
 			if ($stranded eq 'sense' or $stranded eq 'antisense') {
-				
-				@alignments = $bam->features(
+				# include the filter subroutine
+				$iterator = $bam->features(
 					-type     => 'match',
 					-seq_id   => $region->seq_id,
 					-start    => $region->start,
 					-end      => $region->end,
 					-filter   => $filter,
+					-iterator => 1,
 				);
 			}
 			else {
 				# no stranded data wanted
-				@alignments = $bam->features(
+				$iterator = $bam->features(
 					-type     => 'match',
 					-seq_id   => $region->seq_id,
 					-start    => $region->start,
 					-end      => $region->end,
+					-iterator => 1,
 				);
 			}
 			
 			# process the alignments
 				# want to avoid those whose midpoint are not technically 
 				# within the region of interest
-			if ($method eq 'count') {
-				foreach my $a (@alignments) {
-					# enumerate at the alignment's midpoint
-					my $position = int( ( ($a->start + $a->end) / 2) + 0.5);
-					
-					# check that the midpoint is within the requested region
-					if (
-						$position >= $region->start and 
-						$position <= $region->end
-					) {
-						$bam_data{$position} += 1;
+			if ($do_index) {
+				# record position and score
+				
+				if ($value_type eq 'count') {
+					while (my $a = $iterator->next_seq) {
+						
+						# enumerate at the alignment's midpoint
+						my $position = 
+							int( ( ($a->start + $a->end) / 2) + 0.5);
+						
+						# check midpoint is within the requested region
+						if (
+							$position >= $region->start and 
+							$position <= $region->end
+						) {
+							$pos2data{$position} += 1;
+						}
+					}
+				}
+				elsif ($value_type eq 'length') {
+					while (my $a = $iterator->next_seq) {
+						
+						# record length at the alignment's midpoint
+						my $position = 
+							int( ( ($a->start + $a->end) / 2) + 0.5);
+						
+						# check midpoint is within the requested region
+						if (
+							$position >= $region->start and 
+							$position <= $region->end
+						) {
+							push @{ $pos2data{$position} }, $a->length;
+						}
 					}
 				}
 			}
-			elsif ($method eq 'length') {
-				foreach my $a (@alignments) {
-					# record length at the alignment's midpoint
-					my $position = int( ( ($a->start + $a->end) / 2) + 0.5);
-					
-					# check that the midpoint is within the requested region
-					if (
-						$position >= $region->start and 
-						$position <= $region->end
-					) {
-						push @{ $bam_data{$position} }, $a->length;
+			
+			else {
+				# record scores only, no position
+				
+				if ($value_type eq 'count') {
+					while (my $a = $iterator->next_seq) {
+						# enumerate 
+						push @scores, 1;
 					}
 				}
+				elsif ($value_type eq 'length') {
+					while (my $a = $iterator->next_seq) {
+						# record length
+						push @scores, $a->length;
+					}
+				}
+			
 			}
 		
 		}
 	}
 
 	
-	# return collected data
-	return %bam_data;
+	## Return collected data
+	if ($do_index) {
+		return %pos2data;
+	}
+	else {
+		return @scores;
+	}
 }
 
 
@@ -327,19 +317,30 @@ sub _collect_bam_data {
 sub open_bam_db {
 	
 	my $path = shift;
-	$path =~ s/^file://; # clean up file prefix if present
 	
+	# Check local for local file
+	if ($path =~ m/^file:(.)$/) {
+		# clean up the path, take only the file name
+		$path = $1;
+		
+		unless (-e $path) {
+			carp " Bam file '$path' does not exist!\n";
+			return;
+		}
+	}
+		
 	# open the database connection 
-	my $db;
+	my $sam;
 	eval {
-		$db = Bio::DB::Sam->new(
+		$sam = Bio::DB::Sam->new(
 				-bam         => $path,
 				-autoindex   => 1,
 		);
 	};
 	
-	if ($db) {
-		return $db;
+	# done
+	if ($sam) {
+		return $sam;
 	}
 	else {
 		carp " ERROR: can't open BAM file '$path'!\n";
@@ -433,7 +434,6 @@ sub sum_total_bam_alignments {
 
 
 
-
 __END__
 
 
@@ -465,10 +465,6 @@ coverage of alignments over the region of interest, does not currently support
 stranded data collection (as of this writing). However, enumerating 
 alignments (count method) and collecting alignment lengths do support 
 stranded data collection.
-
-If stranded coverage is desired, the best solution is to split the bam file 
-into two files according to alignment strand using the biotoolbox script 
-'split_bam_by_strand.pl'. 
 
 Currently, paired-end bam files are treated as single-end files. There are 
 some limitations regarding working with paired-end alignments that don't 
@@ -585,7 +581,7 @@ in a bam file. Pass the subroutine one to three arguments.
        alignment pairs are counted. The default is to treat all 
        alignments as single-end.
        
-The subrouting will return the number of alignments.
+The subroutine will return the number of alignments.
 
 =back
 

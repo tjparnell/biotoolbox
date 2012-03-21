@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.6.3';
+our $VERSION = '1.7.0';
 
 
 # Exported names
@@ -44,31 +44,82 @@ our %BIGBED_CHROMOS;
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
 	
-	# we will collect positioned values but
-	# only return the values
+	# pass the required information
+	unless (scalar @_ >= 5) {
+		confess " At least five arguments must be passed to collect BigBed data!\n";
+	}
+	my ($region, $region_strand, $stranded, $method, @bed_features) = @_;
+		# method can be score, count, or length
 	
-	# grab the method from the passed arguments
-	my $method = $_[3];
+	# initialize the score array
+	# this will record score, count, or lengths per the method
+	my @scores;
 	
-	# collect the raw data
-	my %bed_data = _collect_bigbed_data(@_);
+	# look at each bedfile
+	# usually there is only one, but for stranded data there may be 
+	# two bedfiles (+ and -), so we'll check each wig file for strand info
+	foreach my $bedfile (@bed_features) {
 	
-	# combine multiple datapoints at the same position
-	my @values;
-	if ($method eq 'score' or $method eq 'length') {
-		# each value is an array of one or more datapoints
-		foreach my $position (keys %bed_data) {
-			push @values, mean( @{ $bed_data{$position} } );
+		# check for local file
+		$bedfile =~ s/^file://;
+		# check the file
+		unless (-e $bedfile) {
+			confess " BigBed file '$bedfile' does not exist!\n";
+			return;
+		}
+		
+		# check for opened bedfile
+		my $bb = _open_my_bigbed($bedfile);
+			
+		# first check that the chromosome is present
+		unless (exists $BIGBED_CHROMOS{$bedfile}{$region->seq_id}) {
+			next;
+		}
+		
+		# collect the features overlapping the region
+		my $bb_stream = $bb->features(
+			-seq_id   => $region->seq_id, 
+			-start    => $region->start, 
+			-end      => $region->end,
+			-iterator => 1,
+		);
+		
+		# process each feature
+		while (my $bed = $bb_stream->next_seq) {
+			
+			# First check whether the strand is acceptable
+			if (
+				$stranded eq 'all' # all data is requested
+				or $bed->strand == 0 # unstranded data
+				or ( 
+					# sense data
+					$region_strand == $bed->strand 
+					and $stranded eq 'sense'
+				) 
+				or (
+					# antisense data
+					$region_strand != $bed->strand  
+					and $stranded eq 'antisense'
+				)
+			) {
+				# we have acceptable data to collect
+			
+				# store the appropriate datapoint
+				if ($method eq 'score') {
+					push @scores, $bed->score;
+				}
+				elsif ($method eq 'count') {
+					push @scores, 1;
+				}
+				elsif ($method eq 'length') {
+					push @scores, $bed->length;
+				}
+			}
 		}
 	}
-	elsif ($method eq 'count') {
-		# each value is a count
-		@values = values %bed_data;
-	}
-	
+
 	# return collected data
-	return @values;
-	
+	return @scores;
 }
 
 
@@ -76,30 +127,6 @@ sub collect_bigbed_scores {
 
 ### Collect positioned BigBed scores
 sub collect_bigbed_position_scores {
-	
-	# grab the method from the passed arguments
-	my $method = $_[3];
-	
-	# collect the raw data
-	my %bed_data = _collect_bigbed_data(@_);
-	
-	# combine multiple datapoints at the same position
-	if ($method eq 'score' or $method eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
-		foreach my $position (keys %bed_data) {
-			$bed_data{$position} = mean( @{$bed_data{$position}} );
-		}
-	}
-	
-	# return collected data
-	return %bed_data;
-}
-
-
-
-### Actual collection of scores
-sub _collect_bigbed_data {
 	
 	# pass the required information
 	unless (scalar @_ >= 5) {
@@ -114,63 +141,18 @@ sub _collect_bigbed_data {
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
 	# two bedfiles (+ and -), so we'll check each wig file for strand info
-	foreach my $feature (@bed_features) {
+	foreach my $bedfile (@bed_features) {
 	
-		# Get the name of the bigbed file
-		my $bedfile;
-		my $feature_ref = ref $feature;
-		
-		if ($feature =~ /^file:(.+)$/) {
-			# the passed feature appears to specify a file
-			$bedfile = $1;
-			
-			# check the file
-			unless (-e $bedfile) {
-				confess " BigBed file '$bedfile' does not exist!\n";
-				return;
-			}
-		}
-		elsif ($feature =~ /^http|ftp/i) {
-			# a remote file
-			
-			# this should be supported by Bio::DB::BigBed
-			$bedfile = $feature;
-		}
-		elsif ($feature_ref =~ /^Bio::DB/) {
-			# passed feature could be a Bio::DB::* seqfeature object
-			
-			# get bedfile name
-			if ($feature->has_tag('bigbedfile')) {
-				($bedfile) = $feature->get_tag_values('bigbedfile');
-			}
-			else {
-				confess " passed $feature_ref feature '$feature'" . 
-					" does not have a bigbed attribute!\n";
-			}
-		}
-		
-		# check for bedfile
-		unless ($bedfile) {
-			confess " no bigBed file specified for feature '$feature'!\n";
+		# check for local file
+		$bedfile =~ s/^file://;
+		# check the file
+		unless (-e $bedfile) {
+			confess " BigBed file '$bedfile' does not exist!\n";
+			return;
 		}
 		
 		# check for opened bedfile
-		my $bb;
-		if (exists $OPENED_BEDFILES{$bedfile} ) {
-			# this file is already opened, use it
-			$bb = $OPENED_BEDFILES{$bedfile};
-		}
-		else {
-			# this file has not been opened yet, open it
-			$bb = open_bigbed_db($bedfile) or
-				confess " unable to open data BigBed file '$bedfile'";
-			
-			# store the opened object for later use
-			$OPENED_BEDFILES{$bedfile} = $bb;
-				
-			# collect the chromosomes for this bigwig
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
+		my $bb = _open_my_bigbed($bedfile);
 			
 		# first check that the chromosome is present
 		unless (exists $BIGBED_CHROMOS{$bedfile}{$region->seq_id}) {
@@ -243,6 +225,14 @@ sub _collect_bigbed_data {
 		}
 	}
 
+	# combine multiple datapoints at the same position
+	if ($method eq 'score' or $method eq 'length') {
+		# each value is an array of one or more datapoints
+		# we will take the simple mean
+		foreach my $position (keys %bed_data) {
+			$bed_data{$position} = mean( @{$bed_data{$position}} );
+		}
+	}
 	
 	# return collected data
 	return %bed_data;
@@ -407,6 +397,35 @@ sub sum_total_bigbed_features {
 	
 	return $total_read_number;
 }
+
+
+
+### Internal subroutine for opening a bigbed file 
+# for personal use only
+sub _open_my_bigbed {
+	my $bedfile = shift;
+	my $bb;
+	
+	# check whether the file has been opened or not
+	if (exists $OPENED_BEDFILES{$bedfile} ) {
+		# this file is already opened, use it
+		$bb = $OPENED_BEDFILES{$bedfile};
+	}
+	else {
+		# this file has not been opened yet, open it
+		$bb = open_bigbed_db($bedfile) or 
+			confess " unable to open data BigBed file '$bedfile'";
+		
+		# store the opened object for later use
+		$OPENED_BEDFILES{$bedfile} = $bb;
+		
+		# collect the chromosomes for this bigbed
+		%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
+	}
+	
+	return $bb;
+}
+
 
 
 

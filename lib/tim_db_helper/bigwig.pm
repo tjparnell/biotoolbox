@@ -4,17 +4,22 @@ package tim_db_helper::bigwig;
 require Exporter;
 use strict;
 use Carp;
-use Bio::DB::BigWig;
+use Statistics::Lite qw(min max mean);
+use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.6.3';
+our $VERSION = '1.7.0';
 
 
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
+	collect_bigwig_score
 	collect_bigwig_scores
 	collect_bigwig_position_scores
+	collect_bigwigset_score
+	collect_bigwigset_scores
+	collect_bigwigset_position_scores
 	wig_to_bigwig_conversion
 	open_bigwig_db
 	open_bigwigset_db
@@ -41,18 +46,108 @@ our %BIGWIG_CHROMOS;
 
 ### Modules ###
 
+### Collect single BigWig score
+sub collect_bigwig_score {
+	
+	# Pass the required information
+	unless (scalar @_ >= 5) {
+		confess " At least four arguments must be passed to collect BigWig data!\n";
+	}
+	my ($region, $region_strand, $stranded, $method, @wig_files) = @_;
+	
+	# Confirm the method 
+	unless ($method =~ /^min|max|mean|count|sum|stddev$/) {
+		confess " can not use method $method!\n";
+	}
+	
+	# Collecting summary features
+	# we will collect a summary object for each requested wig feature  
+	my @summaries;
+	
+	# Walk through each requested feature
+	# There is likely only one
+	foreach my $wig (@wig_files) {
+		
+		# open a new db object
+		my $bw = _open_my_bigwig($wig);
+		
+		# first check that the chromosome is present
+		if (exists $BIGWIG_CHROMOS{$wig}{$region->seq_id}) {
+			my (@features) = $bw->features(
+				-seq_id    => $region->seq_id,
+				-start     => $region->start,
+				-end       => $region->end,
+				-type      => 'summary',
+			);
+			
+			# check
+			confess(' BigWig database returned ' . scalar(@features) . 
+				'summary features! Expected only 1!\n') 
+				if scalar(@features) > 1;
+			
+			# keep the summary
+			push @summaries, $features[0]->score;
+		}
+	}
+	
+	# now process the summary features
+	return _process_summaries($method, @summaries);
+}
 
 
-### Collect BigWig scores only
+
+
+
+### Collect multiple BigWig scores
 sub collect_bigwig_scores {
 	
-	# we will actually call collect_bigwig_position_scores()
-	# but only return the values
+	# pass the required information
+	unless (scalar @_ >= 4) {
+		confess " At least four arguments must be passed to collect BigWig data!\n";
+	}
+	my ($region, $region_strand, $stranded, @wig_features) = @_;
 	
-	my %wig_data = collect_bigwig_position_scores(@_);
+	# initialize 
+	my @scores; 
 	
-	# return the values
-	return values %wig_data;
+	# The region object passed to us should be from any Bio::DB database
+	# we will open a bigwig db connection for each of the features passed to us
+	# and collect the data corresponding to the region coordinates
+	# there is usually only one bigwig feature sent, but there may be 
+	# more to combine data
+	foreach my $wigfile (@wig_features) {
+	
+		# Check local files
+		$wigfile =~ s/^file://;
+		unless (-e $wigfile) {
+			confess " BigWig file '$wigfile' does not exist!\n";
+			return;
+		}
+		
+		# Open the BigWig file
+		my $bw = _open_my_bigwig($wigfile);
+		
+		# first check that the chromosome is present
+		unless (exists $BIGWIG_CHROMOS{$wigfile}{$region->seq_id}) {
+			next;
+		}
+		
+		# initialize a feature stream for this segment
+		my $iterator = $bw->features(
+			-seq_id     => $region->seq_id,
+			-start      => $region->start,
+			-end        => $region->end,
+			-iterator   => 1,
+		);
+		
+		# collect the scores
+		while (my $f = $iterator->next_seq) {
+			push @scores, $f->score;
+		}
+	} 
+	
+	# return collected data
+	return @scores;
 }
 
 
@@ -68,108 +163,25 @@ sub collect_bigwig_position_scores {
 	my ($region, $region_strand, $stranded, @wig_features) = @_;
 	
 	# initialize 
-	my %wig_data; # hash of position => score
+	my %pos2data; # hash of position => score
+	my %duplicates; # hash of duplicate positions, position => number
 	
 	# The region object passed to us should be from any Bio::DB database
 	# we will open a bigwig db connection for each of the features passed to us
 	# and collect the data corresponding to the region coordinates
 	# there is usually only one bigwig feature sent, but there may be 
 	# more to combine data
-	foreach my $feature (@wig_features) {
+	foreach my $wigfile (@wig_features) {
 	
-		# Get the name of the bigwig file and check the strand
-		my $wigfile;
-		my $strand_check;
-		my $feature_ref = ref $feature;
-		
-		if ($feature =~ /^file:(.+)$/) {
-			# the passed feature appears to specify a file
-			$wigfile = $1;
-			
-			# check the file
-			unless (-e $wigfile) {
-				confess " BigWig file '$wigfile' does not exist!\n";
-				return;
-			}
-			
-			# since it's a passed data file name, we can't check for strand
-			# the bigwig file does not inherently have strand
-			# assume the strand is good, onus on the user
-			$strand_check = 1;
-		}
-		elsif ($feature =~ /^http|ftp/i) {
-			# a remote file
-			# this should be supported by Bio::DB::BigWig
-			$wigfile = $feature;
-			
-			# again, like the local file, can't perform strand check
-			$strand_check = 1;
-		}
-		elsif ($feature_ref =~ /^Bio::DB/) {
-			# passed feature could be a Bio::DB::* seqfeature object
-			
-			# get wigfile name
-			if ($feature->has_tag('wigfile')) {
-				($wigfile) = $feature->get_tag_values('wigfile');
-			}
-			elsif ($feature->has_tag('bigwigfile')) {
-				($wigfile) = $feature->get_tag_values('bigwigfile');
-			}
-			else {
-				confess " passed $feature_ref feature '$feature'" . 
-					" does not have a bigwig attribute!\n";
-			}
-			unless ($wigfile) {
-				confess " passed $feature_ref feature '$feature'" . 
-					" has an empty bigwig attribute!\n";
-			}
-			
-			# check strand
-				# database features will support the strand method
-			if (
-				$stranded eq 'all' # stranded data not requested
-				or $feature->strand == 0 # unstranded data
-				or ( 
-					# sense data
-					$region_strand == $feature->strand 
-					and $stranded eq 'sense'
-				) 
-				or (
-					# antisense data
-					$region_strand != $feature->strand  
-					and $stranded eq 'antisense'
-				)
-			) {
-				$strand_check = 1;
-			}
-		}
-		else {
-			confess " unrecognized feature '$feature'!\n";
-		}
-		
-		# confirm that we have acceptable data to collect
-		next unless $strand_check == 1;
-		unless ($wigfile) {
-			confess " no bigwig file specified for feature '$feature'!\n";
+		# Check local files
+		$wigfile =~ s/^file://;
+		unless (-e $wigfile) {
+			confess " BigWig file '$wigfile' does not exist!\n";
+			return;
 		}
 		
 		# Open the BigWig file
-		my $bw;
-		if (exists $OPENED_BIGFILES{$wigfile} ) {
-			# this file is already opened, use it
-			$bw = $OPENED_BIGFILES{$wigfile};
-		}
-		else {
-			# this file has not been opened yet, open it
-			$bw = open_bigwig_db($wigfile) or 
-				confess " unable to open data BigWig file '$wigfile'";
-			
-			# store the opened object for later use
-			$OPENED_BIGFILES{$wigfile} = $bw;
-			
-			# collect the chromosomes for this bigwig
-			%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
-		}
+		my $bw = _open_my_bigwig($wigfile);
 		
 		# Collect from bigwig file
 			# We're not adjusting start and end points as with wig data
@@ -182,23 +194,297 @@ sub collect_bigwig_position_scores {
 			next;
 		}
 		
-		# collect the features and values
-		my @features = $bw->get_features_by_location(
-			$region->seq_id, 
-			$region->start, 
-			$region->end
+		# initialize a feature stream for this segment
+		my $iterator = $bw->features(
+			-seq_id     => $region->seq_id,
+			-start      => $region->start,
+			-end        => $region->end,
+			-iterator   => 1,
 		);
 		
-		# convert list of values to position => value
-		foreach (@features) {
-			my $pos = $_->start;
-			$wig_data{$pos} = $_->score;
+		# collect the scores
+		while (my $f = $iterator->next_seq) {
+			# process the feature
+			_process_position_score_feature($f, \%pos2data, \%duplicates);
 		}
+	} 
 	
-	} # end of foreach loop
+	# check for duplicate positions
+	if (%duplicates) {
+		_remove_duplicate_positions(\%pos2data, \%duplicates);
+	}
 	
 	# return collected data
-	return %wig_data;
+	return %pos2data;
+}
+
+
+
+sub collect_bigwigset_score {
+	
+	# Pass the required information
+	unless (scalar @_ >= 5) {
+		confess " At least four arguments must be passed to collect BigWig data!\n";
+	}
+	my ($region, $region_strand, $stranded, $method, @types) = @_;
+	
+	# Confirm the method 
+	unless ($method =~ /^min|max|mean|count|sum|stddev$/) {
+		confess " can not use method $method!\n";
+	}
+	
+	# Reset the feature_type to collect from the database
+	# this is normally set to region when we opened the bigwigset db
+	# we now want summary feature_type
+	# but the BigWigSet::Segment object doesn't inherit this method
+	# so we'll cheat and expose the parent BigWigSet database object
+	# and change it there
+	# NOTE: This may break in the future!!!!!!
+	$region->{bws}->feature_type('summary');
+	
+	# Collecting summary features
+	# we will collect a summary object for each requested wig feature  
+	my @summaries;
+	
+	# Work through all the requested feature types
+	# the BigWigSet feature request doesn't work well with multiple features
+	# so we'll do them one at a time
+	foreach my $type (@types) {
+	
+		# Collect the summary features
+		$type =~ s/:.+//; # strip the source if present
+			# features method only works with primary_tag, not full 
+			# primary_tag:source type
+		my @features = $region->features($type);
+			# since we're collecting summary features, we will only get one 
+			# per bigwig file that matches the request
+			# no need for a seqfeature stream
+		
+		# Determine which features to take based on strandedness
+		
+		# Stranded features
+		if (
+			$region_strand != 0 and
+			($stranded eq 'sense' or $stranded eq 'antisense')
+		) {
+			# we will have to check the strand for each object
+			# feature objects we collect don't have the standard strand set
+			# instead, we will have to get the attribute tag named strand
+			
+			# check each feature
+			foreach my $f (@features) {
+				
+				# get the feature strand
+				my $strand = 0; # default
+				if ($f->has_tag('strand') ) {
+					($strand) = $f->get_tag_values('strand');
+					warn " feature has strand $strand\n";
+				}
+				
+				# collect summary if strand is appropriate
+				if (
+					$strand == 0 or
+					(
+						# sense data
+						$region_strand == $strand 
+						and $stranded eq 'sense'
+					) 
+					or (
+						# antisense data
+						$region_strand != $strand  
+						and $stranded eq 'antisense'
+					)
+				) {
+					# we have acceptable data to collect
+					push @summaries, $f->score;
+				}
+			}
+		}
+		
+		# Non-stranded features
+		else {
+			# take all the features found
+			
+			# keep all the summaries
+			foreach my $f (@features) {
+				push @summaries, $f->score;
+			}
+		}
+	}
+	
+	# now process the summary features
+	return _process_summaries($method, @summaries);
+}
+
+
+
+
+sub collect_bigwigset_scores {
+	
+	# pass the required information
+	unless (scalar @_ >= 4) {
+		confess " At least four arguments must be passed to collect BigWigSet data!\n";
+	}
+	my ($region, $region_strand, $stranded, @types) = @_;
+	
+	# initialize collection array
+	my @scores; 
+	
+	# Go through each feature type requested
+	foreach my $type (@types) {
+		
+		# Collect the feature scores
+		$type =~ s/:.+//; # strip the source if present
+			# features method only works with primary_tag, not full 
+			# primary_tag:source type
+		my $iterator = $region->get_seq_stream($type);
+			# since the default feature_type for the bigwigset database is 
+			# region, we will get lots of features returned, one for each 
+			# datapoint
+			# use an iterator to process them
+		
+		# Determine which features to take based on strandedness
+		
+		# Stranded features
+		if (
+			$region_strand != 0 and
+			($stranded eq 'sense' or $stranded eq 'antisense')
+		) {
+			# we will have to check the strand for each object
+			# feature objects we collect don't have the standard strand set
+			# instead, we will have to get the attribute tag named strand
+			
+			# check each feature
+			while (my $f = $iterator->next_seq) {
+				
+				# get the feature strand
+				my $strand = 0; # default
+				if ($f->has_tag('strand') ) {
+					($strand) = $f->get_tag_values('strand');
+				}
+				
+				# collect score if strand is appropriate
+				if (
+					$strand == 0 or
+					(
+						# sense data
+						$strand == $region_strand 
+						and $stranded eq 'sense'
+					) 
+					or (
+						# antisense data
+						$strand != $region_strand  
+						and $stranded eq 'antisense'
+					)
+				) {
+					# we have acceptable data to collect
+					push @scores, $f->score;
+				}
+			}
+		}
+		
+		# Non-stranded features
+		else {
+			# take all the features found
+			while (my $f = $iterator->next_seq) {
+				push @scores, $f->score;
+			}
+		}
+	}
+	
+	# Finished
+	return @scores;
+}
+
+
+
+sub collect_bigwigset_position_scores {
+	
+	# pass the required information
+	unless (scalar @_ >= 4) {
+		confess " At least four arguments must be passed to collect BigWigSet data!\n";
+	}
+	my ($region, $region_strand, $stranded, @types) = @_;
+	
+	# initialize collection hash, position => score
+	my %pos2data; 
+	my %duplicates;
+	
+	# Go through each feature type requested
+	foreach my $type (@types) {
+		
+		# Collect the feature scores
+		$type =~ s/:.+//; # strip the source if present
+			# features method only works with primary_tag, not full 
+			# primary_tag:source type
+		my $iterator = $region->get_seq_stream($type);
+			# since the default feature_type for the bigwigset database is 
+			# region, we will get lots of features returned, one for each 
+			# datapoint
+			# use an iterator to process them
+		
+		# Determine which features to take based on strandedness
+		
+		# Stranded features
+		if (
+			$region_strand != 0 and
+			($stranded eq 'sense' or $stranded eq 'antisense')
+		) {
+			# we will have to check the strand for each object
+			# feature objects we collect don't have the standard strand set
+			# instead, we will have to get the attribute tag named strand
+			
+			# Check each feature
+			
+			# Stranded features
+			while (my $f = $iterator->next_seq) {
+				
+				# get the feature strand
+				my $strand = 0; # default
+				if ($f->has_tag('strand') ) {
+					($strand) = $f->get_tag_values('strand');
+				}
+				
+				# collect score if strand is appropriate
+				if (
+					$strand == 0 or
+					(
+						# sense data
+						$strand == $region_strand 
+						and $stranded eq 'sense'
+					) 
+					or (
+						# antisense data
+						$strand != $region_strand  
+						and $stranded eq 'antisense'
+					)
+				) {
+					# acceptable data point
+					# process
+					_process_position_score_feature(
+						$f, \%pos2data, \%duplicates);
+				}
+			}
+		}
+		
+		# Non-stranded features
+		else {
+			# take all the features found
+			while (my $f = $iterator->next_seq) {
+				# process
+				_process_position_score_feature($f, \%pos2data, \%duplicates);
+			}
+		}
+	}
+	
+	# Remove duplicates
+	if (%duplicates) {
+		_remove_duplicate_positions(\%pos2data, \%duplicates);
+	}
+	
+	
+	# Finished
+	return %pos2data;
 }
 
 
@@ -374,11 +660,196 @@ sub open_bigwigset_db {
 
 
 
+### Internal subroutine for opening a bigwig file 
+# for personal use only
+sub _open_my_bigwig {
+	my $wigfile = shift;
+	my $bw;
+	
+	# check whether the file has been opened or not
+	if (exists $OPENED_BIGFILES{$wigfile} ) {
+		# this file is already opened, use it
+		$bw = $OPENED_BIGFILES{$wigfile};
+	}
+	else {
+		# this file has not been opened yet, open it
+		$bw = open_bigwig_db($wigfile) or 
+			confess " unable to open data BigWig file '$wigfile'";
+		
+		# store the opened object for later use
+		$OPENED_BIGFILES{$wigfile} = $bw;
+		
+		# collect the chromosomes for this bigwig
+		%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
+	}
+	
+	return $bw;
+}
+
+
+
+### Internal subroutine for processing summary features
+# for personal use only
+sub _process_summaries {
+	my ($method, @summaries) = @_;
+	
+	## Process the collected summaries
+	my $value;
+	
+	# No summaries
+	if (scalar @summaries == 0) {
+		# nothing was found!
+		
+		# return empty handed
+		if ($method eq 'sum') {
+			$value = 0;
+		}
+		else {
+			# internal null
+			$value = '.';
+		}
+	}
+	
+	# One summary
+	elsif (scalar @summaries == 1) {
+		# great! only one summary returned
+		
+		# return based on the method
+		if ($method eq 'mean') {
+			$value = binMean( $summaries[0] );
+		}
+		elsif ($method eq 'sum') {
+			$value = $summaries[0]->{sumData};
+		}
+		elsif ($method eq 'min') {
+			$value = $summaries[0]->{minVal};
+		}
+		elsif ($method eq 'max') {
+			$value = $summaries[0]->{maxVal};
+		}
+		elsif ($method eq 'count') {
+			$value = $summaries[0]->{validCount};
+		}
+		elsif ($method eq 'stddev') {
+			$value = binStdev( $summaries[0] );
+		}
+		else {
+			confess " unknown method $method!\n";
+		}
+	}
+	
+	# Multiple summaries
+	else {
+		# more than one summary
+		# this will take a little more work
+		
+		# return based on the method
+		if ($method eq 'mean') {
+			my $sum = 0;
+			my $count = 0;
+			foreach my $s (@summaries) {
+				$sum += $s->{sumData};
+				$count += $s->{validCount};
+			}
+			$value = $count ? $sum/$count : '.';
+		}
+		elsif ($method eq 'sum') {
+			my $sum = 0;
+			foreach my $s (@summaries) {
+				$sum += $s->{sumData};
+			}
+			$value = $sum;
+		}
+		elsif ($method eq 'min') {
+			$value = min( map { $_->{minVal} } @summaries);
+		}
+		elsif ($method eq 'max') {
+			$value = max( map { $_->{maxVal} } @summaries);
+		}
+		elsif ($method eq 'count') {
+			my $count = 0;
+			foreach my $s (@summaries) {
+				$count += $s->{validCount};
+			}
+			$value = $count;
+		}
+		elsif ($method eq 'stddev') {
+			warn " can not determine correct stddev value with " . 
+				scalar(@summaries) . " bigwig summaries!\n";
+			# take the first one only as something to report
+			$value = binStdev( $summaries[0] );
+		}
+		else {
+			confess " unknown method $method!\n";
+		}
+	}
+	
+	# Done
+	return $value;
+}
+
+
+
+### Internal subroutine for processing position and score from features
+# for personal use only
+sub _process_position_score_feature {
+	
+	# collect the feature and hashes
+	my ($f, $pos2data, $duplicates) = @_;
+	
+	# check for duplicate positions
+	if (exists $pos2data->{ $f->start } ) {
+		if (exists $duplicates->{ $f->start } ) {
+			# we have lots of duplicates at this position!
+			
+			# append an incrementing number at the end
+			$duplicates->{ $f->start } += 1; # increment first
+			my $new = $f->start . '.' . $duplicates->{ $f->start };
+			$pos2data->{ $new } = $f->score;
+		}
+		else {
+			# first time duplicate
+			
+			# record this one
+			my $new = $f->start . '.1';
+			$pos2data->{$new} = $f->score;
+			
+			# remember
+			$duplicates->{ $f->start } = 1;
+		}
+	}
+	else {
+		$pos2data->{ $f->start } = $f->score;
+	}
+}
+
+
+### Internal subroutine for removing duplicate positions from pos2data hash
+# for personal use only
+sub _remove_duplicate_positions {
+	
+	# collect the feature and hashes
+	my ($pos2data, $duplicates) = @_;
+	
+	# remove the duplicates
+		# we will combine all of them with a simple mean, what else to do?
+	foreach my $pos (keys %{ $duplicates } ) {
+		my $num = $duplicates->{$pos};
+		
+		# collect all the values
+		my @values;
+		push @values, $pos2data->{$pos}; # initial value
+		for my $i (1..$num) {
+			push @values, $pos2data->{ "$pos\.$i" };
+			delete $pos2data->{ "$pos\.$i" };
+		}
+		$pos2data->{$pos} = mean(@values);
+	}
+}
+
+
 
 __END__
-
-
-
 
 =head1 NAME
 
@@ -412,7 +883,8 @@ a database; directly referenced bigwig files do not have inherent strand
 information - all data will be collected!
 
 For loading bigwig files into a Bio::DB database, see the biotoolbox perl 
-script 'big_file2gff3.pl'.
+script 'big_file2gff3.pl'. This will prepare either a GFF3 file for loading 
+in 
 
 To speed up the program and avoid repetitive opening and 
 closing of the files, the opened bigwig file object is stored in a global 
@@ -437,6 +909,47 @@ It will automatically export the name of the subroutines.
 
 =over
 
+=item collect_bigwig_score
+
+This subroutine will collect a single value from a binary bigWig file. 
+It uses the low-level summary method to collect the statistical 
+information and is therefore significantly faster than the other 
+methods, which rely upon parsing individual data points across the 
+region.
+
+The subroutine is passed five or more arguments in the following order:
+    
+    1) The database object representing the genomic region of interest. 
+       This may be either a Bio::DB::BigWigSet object or another
+       Bio::DB segement object that supports the chromo, start, and 
+       end methods.
+    2) The strand of the original feature (or region), -1, 0, or 1.
+    3) A scalar value representing the desired strandedness of the data 
+       to be collected. Acceptable values include "sense", "antisense", 
+       "none" or "no". Only those scores which match the indicated 
+       strandedness are collected.
+    4) The method of collecting the data. Acceptable values include 
+       mean, min, max, sum, count, and stddev. 
+    4) One or more database feature objects that contain the reference 
+       to the BigWig file. They should contain the attribute 'bigwigfile'
+       which has the path to the BigWig file. Alternatively, pass one 
+       or more filenames of .bw files. Each filename should be 
+       prefixed with 'file:' to indicate that it is a direct file 
+       reference, and not a database object.
+
+The object will return either a valid score. When nothing is found, it 
+will return 0 for methods sum and score, or a null '.' value.
+
+=item collect_bigwigset_score
+
+Similar to collect_bigwig_score() but using a BigWigSet database of 
+BigWig files. Unlike individual BigWig files, BigWigSet features support 
+stranded data collection if a strand attribute is defined in the metadata 
+file. 
+
+Pass the same arguments as collect_bigwig_score(), substituting the list 
+of files with a list of feature types (primary_tag).
+
 =item collect_bigwig_scores
 
 This subroutine will collect only the score values from a binary BigWig file 
@@ -444,7 +957,7 @@ for the specified database region. The positional information of the
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed three or more arguments in the following order:
+The subroutine is passed four or more arguments in the following order:
     
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
@@ -464,12 +977,22 @@ The subroutine is passed three or more arguments in the following order:
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
 
+=item collect_bigwigset_scores
+
+Similar to collect_bigwig_scores() but using a BigWigSet database of 
+BigWig files. Unlike individual BigWig files, BigWigSet features support 
+stranded data collection if a strand attribute is defined in the metadata 
+file. 
+
+Pass the same arguments as collect_bigwig_scores(), substituting the list 
+of files with a list of feature types (primary_tag).
+
 =item collect_bigwig_position_scores
 
 This subroutine will collect the score values from a binary BigWig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed three or more arguments in the following order:
+The subroutine is passed four or more arguments in the following order:
     
     1) The database object representing the genomic region of interest. 
        This should be a Bio::DB::SeqFeature object that supports the 
@@ -491,6 +1014,16 @@ the region of interest keyed by position. Note that only one value is
 returned per position, regardless of the number of dataset features 
 passed. Usually this isn't a problem as only one dataset is examined at a 
 time.
+
+=item collect_bigwigset_position_score
+
+Similar to collect_bigwig_position_scores() but using a BigWigSet database 
+of BigWig files. Unlike individual BigWig files, BigWigSet features support 
+stranded data collection if a strand attribute is defined in the metadata 
+file. 
+
+Pass the same arguments as collect_bigwig_position_scores(), substituting 
+the list of files with a list of feature types (primary_tag).
 
 =item wig_to_bigwig_conversion()
 
