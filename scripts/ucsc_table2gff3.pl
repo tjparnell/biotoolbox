@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.6.4';
+my $VERSION = '1.7.0';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -867,7 +867,7 @@ sub generate_new_gene {
 	# in most cases this will be the name2 item from the gene table
 	# except for some ncRNA and ensGene transcripts
 	my ($id, $name, $alias);
-	if ($linedata->{name} =~ /^ENSDART/i) {
+	if ($linedata->{name} =~ /^ENS/i) {
 		# an ensGene transcript, look up the common name if possible
 		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
 			
@@ -908,10 +908,10 @@ sub generate_new_gene {
 		$name = $name . '.' . $id2counts->{ lc $name };
 		
 		# reset the id
-		if ($linedata->{name} =~ /^ENSDART/i) {
+		if ($linedata->{name} =~ /^ENS/i) {
 			# special case for ensGene transcripts
 			# the id, from the name2 value, should already be unique
-			# this is usually a ENSDARG identifier
+			# this is usually a ENS*T identifier
 			# nothing to do here
 		}
 		else {
@@ -952,7 +952,7 @@ sub generate_new_gene {
 	
 	# add the original ENSDARG identifier as an Alias in addition to ID
 	# for ensGene transcripts
-	if ($linedata->{name} =~ /^ENSDART/i) {
+	if ($linedata->{name} =~ /^ENS/i) {
 		$gene->add_tag_value('Alias', $linedata->{name2});
 	}
 	
@@ -1040,7 +1040,7 @@ sub generate_new_transcript {
 		
 		# check if we have a ensGene transcript, we may have the type
 		if (
-			$linedata->{name} =~ /^ENSDART/i and 
+			$linedata->{name} =~ /^ENS/i and 
 			defined $ensembldata->{ $linedata->{name} }->[1]
 		) {
 			# this is a ensGene transcript
@@ -1087,7 +1087,7 @@ sub generate_new_transcript {
 	
 	
 	# add the Ensembl Gene name if it is an ensGene transcript
-	if ($linedata->{name} =~ /^ENSDART/i) {
+	if ($linedata->{name} =~ /^ENS/i) {
 		# if we have loaded the EnsemblGeneName data hash
 		# we should be able to find the real gene name
 		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
