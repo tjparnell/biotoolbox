@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.6.4';
+our $VERSION = '1.7.0';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -2542,15 +2542,26 @@ sub _get_segment_score {
 	) = @_;
 	
 	# define
-	my %pos2data; # hash of positions to scores
+	my @scores; # array of collected scores
+	my %pos2data; # hash of position to scores
 	my $dataset_type; # remember what type of database the data is from
+	my $iterator; # seqfeature stream object for reiterating db features
+	my $region_type = ref $region; # source of the originating db segment
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
 		# transcriptome data that is on f and r strands. These are given as
 		# ampersand or comma delimited lists
 	
-	# check for data source files
+	
+	### Determine where we are going to get the data
+		# first check whether the provided dataset(s) look like a data file
+		# next check whether the database segment object came from a BigWigSet
+		# finally assume it is a SeqFeature database object
+		# then look for a wigfile, bigwigfile, or bamfile attribute
+		# finally then just take the score directly from the database objects
+	
+	### Data source files provided
 	if ($datasetlist[0] =~ /^file|http|ftp/) {
 		
 		# collect the data according to file type
@@ -2563,13 +2574,56 @@ sub _get_segment_score {
 			# check that we have bigwig support
 			if ($BIGWIG_OK) {
 				# get the dataset scores using tim_db_helper::bigwig
-				%pos2data = collect_bigwig_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					@datasetlist
-				);
-				$dataset_type = 'bw';
+				
+				# the data collection depends on the method
+				if ($value_type eq 'score' and 
+					$method =~ /min|max|mean|sum|count/
+				) {
+					# we can use the low-level, super-speedy, summary method 
+					# warn " using collect_bigwig_score() with file\n";
+					return collect_bigwig_score(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$method,
+						@datasetlist
+					);
+				}
+				
+				elsif ($value_type eq 'count' and $method eq 'sum') {
+					# we can use the low-level, super-speedy, summary method 
+					# warn " using collect_bigwig_score() with file\n";
+					return collect_bigwig_score(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						'count', # special method
+						@datasetlist
+					);
+				}
+				
+				elsif ($method eq 'indexed') {
+					# collect hash of position => scores
+					# warn " using collect_bigwig_position_score() with file\n";
+					return collect_bigwig_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@datasetlist
+					);
+				}
+				
+				else {
+					# use the longer region collection method
+					# warn " using collect_bigwig_scores() with file\n";
+					@scores = collect_bigwig_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@datasetlist
+					);
+					$dataset_type = 'bw';
+				}
 			}
 			else {
 				croak " BigWig support is not enabled! " . 
@@ -2585,14 +2639,29 @@ sub _get_segment_score {
 			# check that we have bigbed support
 			if ($BIGBED_OK) {
 				# get the dataset scores using tim_db_helper::bigbed
-				%pos2data = collect_bigbed_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					$value_type, 
-					@datasetlist
-				);
-				$dataset_type = 'bb';
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bigbed_position_scores() with file\n";
+					return collect_bigbed_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type, 
+						@datasetlist
+					);
+				}
+				
+				else {
+					# warn " using collect_bigbed_scores() with file\n";
+					@scores = collect_bigbed_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type, 
+						@datasetlist
+					);
+					$dataset_type = 'bb';
+				}
 			}
 			else {
 				croak " BigBed support is not enabled! " . 
@@ -2608,14 +2677,28 @@ sub _get_segment_score {
 			# check that we have Bam support
 			if ($BAM_OK) {
 				# get the dataset scores using tim_db_helper::bam
-				%pos2data = collect_bam_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					$value_type, 
-					@datasetlist
-				);
-				$dataset_type = 'bam';
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bam_position_scores() with file\n";
+					return collect_bam_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type, 
+						@datasetlist
+					);
+				}
+				else {
+					# warn " using collect_bam_scores() with file\n";
+					@scores = collect_bam_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type, 
+						@datasetlist
+					);
+					$dataset_type = 'bam';
+				}
 			}
 			else {
 				croak " Bam support is not enabled! " . 
@@ -2630,88 +2713,243 @@ sub _get_segment_score {
 		
 	}
 	
-	# otherwise all other data is from the database
-	else {
 	
-	
-		# retrieve all datapoints in the region
-		# the method depends on the database type
-		my @datapoints;
-		my $region_type = ref $region;
-		if ($region_type =~ m/^Bio::DB::SeqFeature/) {
-			@datapoints = $region->features(-primary_tag => [@datasetlist]);
+	### BigWigSet database
+	elsif ($region_type =~ m/^Bio::DB::BigWigSet/) {
+		# calling features from a BigWigSet::Segment object
+		
+		# we may be able to take advantage of a special low-level 
+		# super-speedy interface based on the BigWigSet summary feature
+		
+		# the data collection depends on the method
+		if ($value_type eq 'score' and 
+			$method =~ /min|max|mean|sum|count/
+		) {
+			# we can use the low-level, super-speedy, summary method 
+			# warn " using collect_bigwigset_score()\n";
+			return collect_bigwigset_score(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				$method,
+				@datasetlist
+			);
 		}
-		elsif ($region_type =~ m/^Bio::DB::BigWigSet/) {
-			# calling features from a BigWigSet::Segment object
-			# doesn't accept named arguments, just the type list
-			@datapoints = $region->features( [@datasetlist] );
+		elsif ($value_type eq 'count' and $method eq 'sum') {
+			# we can use the low-level, super-speedy, summary method 
+			# warn " using collect_bigwigset_score()\n";
+			return collect_bigwigset_score(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				'count', # special method
+				@datasetlist
+			);
 		}
+		
+		elsif ($value_type eq 'score' and $method eq 'indexed') {
+			# want positioned score data
+			# warn " using collect_bigwigset_position_score()\n";
+			return collect_bigwigset_position_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				@datasetlist
+			);
+		}
+		
 		else {
-			confess " unsupported database region object $region_type!\n";
+			# simply collect a list of the scores
+			# warn " using collect_bigwigset_scores()\n";
+			@scores = collect_bigwigset_scores(
+				$region, 
+				$region_strand, 
+				$strandedness, 
+				@datasetlist
+			);
+			$dataset_type = 'bw';
 		}
+	}
 		
-		# Check that we have collected datapoints
-		unless (@datapoints) {
-			# nothing found, return empty handed
-			if ($method eq 'index') {
-				return %pos2data;
-			}
-			elsif ($method eq 'sum') {
-				return 0;
-			}
-			elsif ($method eq 'count') { 
-				return 0;
-			}
-			else {
-				# internal null value
-				return '.';
-			}
-		}
+	
+	### SeqFeature database
+	elsif ($region_type =~ m/^Bio::DB::SeqFeature/) {
+		# a SeqFeature database
+		# normal collection
+		$iterator = $region->get_seq_stream(-primary_tag => [@datasetlist]);
+	}
+	
+	
+	### Some other database?
+	else {
+		# some other Bio::DB database????
+		# until I code in every single possibility
+		# let's just try a basic features method using whatever the 
+		# default type is and hope for the best
+		$iterator = $region->get_seq_stream();
+	}
 		
-		# Check whether we're dealing with wig data or database data
-		# these are attribute tags that might point to a database file
+	
+	
+	### Process database SeqFeature objects
+	if ($iterator) {
+		# We have a seqfeature object stream
+		# First check whether we're dealing with a datafile pointed to by
+		# an attribute tag 
+		# Failing that, assume it's the seqfeature objects themselves we want
 		
-		# Wig Data
-		if ( $datapoints[0]->has_tag('wigfile') ) {
+		# collect the first feature
+		my $feature = $iterator->next_seq;
+		
+		## Wig Data
+		if ( $feature->has_tag('wigfile') ) {
 			# data is in wig format, or at least the first datapoint is
 			
 			# determine the type of wigfile
-			my ($wigfile) = $datapoints[0]->get_tag_values('wigfile');
+			my ($wigfile) = $feature->get_tag_values('wigfile');
 			
+			## Bio::Graphics wib file
 			if ($wigfile =~ /\.wib$/) {
 				# data is in old-style binary wiggle format
 				# based on the Bio::Graphics::Wiggle adaptor
 				
+				# get the full list of features to pass off to the 
+				# helper subroutine
+				my @features;
+				push @features, $feature;
+				while (my $f = $iterator->next_seq) {
+					push @features, $f;
+				}
+				
 				# check that we have wiggle support
 				if ($WIGGLE_OK) {
 					# get the dataset scores using tim_db_helper::wiggle
-					%pos2data = collect_wig_position_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
-						@datapoints
-					);
-					$dataset_type = 'wig';
+					
+					if ($method eq 'indexed') {
+						# warn " using collect_wig_position_scores() from tag\n";
+						return collect_wig_position_scores(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							@features
+						);
+					}
+					else {
+						# warn " using collect_wig_scores() from tag\n";
+						@scores = collect_wig_scores(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							@features
+						);
+						$dataset_type = 'wig';
+					}
 				}
 				else {
 					croak " Wiggle support is not enabled! " . 
 						"Is Bio::Graphics::Wiggle installed?\n";
 				}
 			}
+			
+			## BigWig file
 			elsif ($wigfile =~ /\.bw$/) {
 				# data is in bigwig format
 				# this uses the Bio::DB::BigWig adaptor
 				
+				# collect the wigfile paths
+				# also check strand while we're at it
+				my @wigfiles;
+				while ($feature) {
+					
+					# check if we can take this feature
+					if (
+						$strandedness eq 'all' # stranded data not requested
+						or $feature->strand == 0 # unstranded data
+						or ( 
+							# sense data
+							$region_strand == $feature->strand 
+							and $strandedness eq 'sense'
+						) 
+						or (
+							# antisense data
+							$region_strand != $feature->strand  
+							and $strandedness eq 'antisense'
+						)
+					) {
+						# we can take this file, it passes the strand test
+						my ($file) = $feature->get_tag_values('wigfile');
+						push @wigfiles, "file:$file";
+					}
+					
+					# prepare for next
+					$feature = $iterator->next_seq || undef;
+				}
+				
+				# if no wigfiles are found, return empty handed
+				# should only happen if the strands don't match
+				unless (@wigfiles) {
+					if ($method =~ /sum|count/) {
+						return 0;
+					}
+					elsif ($method eq 'indexed') {
+						return;
+					}
+					else {
+						return '.';
+					}
+				}
+				
 				# check that we have bigwig support
 				if ($BIGWIG_OK) {
-					# get the dataset scores using tim_db_helper::bigwig
-					%pos2data = collect_bigwig_position_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
-						@datapoints
-					);
-					$dataset_type = 'bw';
+					
+					# the data collection depends on the method
+					if ($value_type eq 'score' and 
+						$method =~ /min|max|mean|sum|count/
+					) {
+						# we can use the low-level, super-speedy, summary method 
+						# warn " using collect_bigwig_score() from tag\n";
+						return collect_bigwig_score(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							$method,
+							@wigfiles
+						);
+					}
+					
+					elsif ($value_type eq 'count' and $method eq 'sum') {
+						# we can use the low-level, super-speedy, summary method 
+						# warn " using collect_bigwig_score() from tag\n";
+						return collect_bigwig_score(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							'count', # special method
+							@wigfiles
+						);
+					}
+					
+					elsif ($method eq 'indexed') {
+						# warn " using collect_bigwig_position_scores() from tag\n";
+						return collect_bigwig_position_scores(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							@wigfiles
+						);
+					}
+					
+					else {
+						# use the longer region collection method
+						# warn " using collect_bigwig_scores() from tag\n";
+						@scores = collect_bigwig_scores(
+							$region, 
+							$region_strand, 
+							$strandedness, 
+							@wigfiles
+						);
+						$dataset_type = 'bw';
+					}
 				}
 				else {
 					croak " BigWig support is not enabled! " . 
@@ -2725,21 +2963,106 @@ sub _get_segment_score {
 		}
 		
 		
-		# BigWig Data
-		elsif ( $datapoints[0]->has_tag('bigwigfile') ) {
+		## BigWig Data
+		elsif ( $feature->has_tag('bigwigfile') ) {
 			# data is in bigwig format
 			# this uses the Bio::DB::BigWig adaptor
+			
+			# collect the wigfile paths
+			# also check strand while we're at it
+			my @wigfiles;
+			while ($feature) {
+				
+				# check if we can take this feature
+				if (
+					$strandedness eq 'all' # stranded data not requested
+					or $feature->strand == 0 # unstranded data
+					or ( 
+						# sense data
+						$region_strand == $feature->strand 
+						and $strandedness eq 'sense'
+					) 
+					or (
+						# antisense data
+						$region_strand != $feature->strand  
+						and $strandedness eq 'antisense'
+					)
+				) {
+					# we can take this file, it passes the strand test
+					my ($file) = $feature->get_tag_values('bigwigfile');
+					push @wigfiles, "file:$file";
+				}
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
+			
+			# if no wigfiles are found
+			# should only happen if the strands don't match
+			unless (@wigfiles) {
+				if ($method =~ /sum|count/) {
+					return 0;
+				}
+				elsif ($method eq 'indexed') {
+					return;
+				}
+				else {
+					return '.';
+				}
+			}
 			
 			# check that we have bigwig support
 			if ($BIGWIG_OK) {
 				# get the dataset scores using tim_db_helper::bigwig
-				%pos2data = collect_bigwig_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					@datapoints
-				);
-				$dataset_type = 'bw';
+				
+				# the data collection depends on the method
+				if ($value_type eq 'score' and 
+					$method =~ /min|max|mean|sum|count/
+				) {
+					# we can use the low-level, super-speedy, summary method 
+					# warn " using collect_bigwig_score() from tag\n";
+					return collect_bigwig_score(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$method,
+						@wigfiles
+					);
+				}
+				
+				elsif ($value_type eq 'count' and $method eq 'sum') {
+					# we can use the low-level, super-speedy, summary method 
+					# warn " using collect_bigwig_score() from tag\n";
+					return collect_bigwig_score(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						'count', # special method
+						@wigfiles
+					);
+				}
+				
+				elsif ($method eq 'indexed') {
+					# warn " using collect_bigwig_position_scores() from tag\n";
+					return collect_bigwig_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@wigfiles
+					);
+				}
+				
+				else {
+					# use the longer region collection method
+					# warn " using collect_bigwig_scores() from tag\n";
+					@scores = collect_bigwig_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						@wigfiles
+					);
+					$dataset_type = 'bw';
+				}
 			}
 			else {
 				croak " BigWig support is not enabled! " . 
@@ -2748,22 +3071,46 @@ sub _get_segment_score {
 		}
 		
 		
-		# BigBed Data
-		elsif ( $datapoints[0]->has_tag('bigbedfile') ) {
+		## BigBed Data
+		elsif ( $feature->has_tag('bigbedfile') ) {
 			# data is in bigbed format
 			# this uses the Bio::DB::BigBed adaptor
+			
+			# collect the bedfile paths
+			my @bedfiles;
+			while ($feature) {
+				my ($file) = $feature->get_tag_values('bigbedfile');
+				push @bedfiles, "file:$file";
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
 			
 			# check that we have bigbed support
 			if ($BIGBED_OK) {
 				# get the dataset scores using tim_db_helper::bigbed
-				%pos2data = collect_bigbed_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					$value_type,
-					@datapoints
-				);
-				$dataset_type = 'bb';
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bigbed_position_scores() from tag\n";
+					return collect_bigbed_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type,
+						@bedfiles
+					);
+				}
+				else {
+					# warn " using collect_bigbed_scores() from tag\n";
+					@scores = collect_bigbed_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type,
+						@bedfiles
+					);
+					$dataset_type = 'bb';
+				}
 			}
 			else {
 				croak " BigBed support is not enabled! " . 
@@ -2772,21 +3119,45 @@ sub _get_segment_score {
 		}
 		
 		# Bam Data
-		elsif ( $datapoints[0]->has_tag('bamfile') ) {
+		elsif ( $feature->has_tag('bamfile') ) {
 			# data is in bam format
 			# this uses the Bio::DB::Sam adaptor
+			
+			# collect the bamfile paths
+			my @bamfiles;
+			while ($feature) {
+				my ($file) = $feature->get_tag_values('bamfile');
+				push @bamfiles, "file:$file";
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
 			
 			# check that we have bam support
 			if ($BAM_OK) {
 				# get the dataset scores using tim_db_helper::bigbed
-				%pos2data = collect_bam_position_scores(
-					$region, 
-					$region_strand, 
-					$strandedness, 
-					$value_type,
-					@datapoints
-				);
-				$dataset_type = 'bam';
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bam_position_scores() from tag\n";
+					return collect_bam_position_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type,
+						@bamfiles
+					);
+				}
+				else {
+					# warn " using collect_bam_scores() from tag\n";
+					@scores = collect_bam_scores(
+						$region, 
+						$region_strand, 
+						$strandedness, 
+						$value_type,
+						@bamfiles
+					);
+					$dataset_type = 'bam';
+				}
 			}
 			else {
 				croak " Bam support is not enabled! " . 
@@ -2795,27 +3166,28 @@ sub _get_segment_score {
 		}
 		
 		
-		# Database Data
+		## Database Data
 		else {
 			# Working with data stored directly in the database
 			# this is more straight forward in collection
 			
 			# Walk through the datapoints
-			foreach my $datapoint (@datapoints) {
+			# warn " using database\n";
+			while ($feature) {
 			
 				# Check which data to take based on strand
 				if (
 					$strandedness eq 'all' # all data is requested
 					or $region_strand == 0 # region is unstranded
-					or $datapoint->strand == 0 # unstranded data
+					or $feature->strand == 0 # unstranded data
 					or ( 
 						# sense data
-						$region_strand == $datapoint->strand 
+						$region_strand == $feature->strand 
 						and $strandedness eq 'sense'
 					) 
 					or (
 						# antisense data
-						$region_strand != $datapoint->strand  
+						$region_strand != $feature->strand  
 						and $strandedness eq 'antisense'
 					)
 				) {
@@ -2824,54 +3196,79 @@ sub _get_segment_score {
 					# data is in the database
 					# much easier to collect
 					
-					# determine position to record
-					my $position;
-					if ($datapoint->start == $datapoint->end) {
-						# just one position recorded
-						$position = $datapoint->start;
-					}
-					else {
-						# calculate the midpoint
-						$position = int( 
-							($datapoint->start + $datapoint->end) / 2
-						);
+					# store data in either indexed hash or score array
+					if ($method eq 'indexed') {
+					
+						# determine position to record
+						my $position;
+						if ($feature->start == $feature->end) {
+							# just one position recorded
+							$position = $feature->start;
+						}
+						else {
+							# calculate the midpoint
+							$position = int( 
+								($feature->start + $feature->end) / 2
+							);
+						}
+						
+						# store the appropriate value
+						if ($value_type eq 'score') {
+							push @{ $pos2data{$position} }, $feature->score;
+						}
+						elsif ($value_type eq 'count') {
+							$pos2data{$position} += 1;
+						}
+						elsif ($value_type eq 'length') {
+							push @{ $pos2data{$position} }, $feature->length;
+						}
 					}
 					
-					# store the appropriate value
-					if ($value_type eq 'score') {
-						# perform addition to force the score to be a scalar value
-						push @{ $pos2data{$position} }, $datapoint->score + 0;
-					}
-					elsif ($value_type eq 'count') {
-						$pos2data{$position} += 1;
-					}
-					elsif ($value_type eq 'length') {
-						push @{ $pos2data{$position} }, $datapoint->length;
+					else {
+						# just store the score in the array
+						
+						# store the appropriate value
+						if ($value_type eq 'score') {
+							push @scores, $feature->score;
+						}
+						elsif ($value_type eq 'count') {
+							push @scores, 1;
+						}
+						elsif ($value_type eq 'length') {
+							push @scores, $feature->length;
+						}
 					}
 				}
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
 			}
 			
-			# post-process the collected values 
+			# post-process the collected position->score values 
 			# combine multiple values recorded at the same position
-			if ($value_type eq 'score' or $value_type eq 'length') {
+			if (
+				$method eq 'indexed' and 
+				($value_type eq 'score' or $value_type eq 'length')
+			) {
 				# each 'value' is an array of one or more scores or lengths 
 				# from the datapoints collected above
-				# we will take the simple mean
+				# the mean value is the best we can do right now for 
+				# combining the data
+				# really would prefer something else
+				# we don't have a true method to utilize
 				foreach my $position (keys %pos2data) {
 					$pos2data{$position} = mean( @{$pos2data{$position}} );
 				}
 			}
 			
-			
 			$dataset_type = 'db';
-			
-		} # end database feature score collection
+		} 
 	
 	} # end database collection
 	
 	
 	
-	
+	### Determine region score from collected scores
 	# We have collected the positioned scores
 	# Now return the appropriate values
 	
@@ -2887,15 +3284,11 @@ sub _get_segment_score {
 	else {
 		# requested a single score for this region
 		# we need to combine the data
-		my @scores;
 		my $region_score;
 		
 		# first deal with log2 values if necessary
 		if ($log) {
-			@scores = map {2 ** $_} values(%pos2data);
-		}
-		else {
-			@scores = values(%pos2data);
+			@scores = map {2 ** $_} @scores;
 		}
 		
 		# check that we have scores
