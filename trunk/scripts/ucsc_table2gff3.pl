@@ -866,20 +866,16 @@ sub generate_new_gene {
 	# Set the gene name
 	# in most cases this will be the name2 item from the gene table
 	# except for some ncRNA and ensGene transcripts
-	my ($id, $name, $alias);
+	my $name;
 	if ($linedata->{name} =~ /^ENS/i) {
 		# an ensGene transcript, look up the common name if possible
 		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
 			
-			# use the name2 value as the id, usually ENSDARG identifier
-			$id    = $linedata->{name2};
-			
-			# use the common name as the gene name
+			# use the common name as both the gene name
 			$name  = $ensembldata->{ $linedata->{name} }->[0];
 		}
 		else {
-			# use the name2 value for both
-			$id    = $linedata->{name2};
+			# use the name2 value
 			$name  = $linedata->{name2};
 		}
 	}
@@ -889,15 +885,14 @@ sub generate_new_gene {
 		# change it in linedata hash to propagate it in downstream code
 		$linedata->{name2} = $linedata->{name};
 		$name = $linedata->{name};
-		$id   = $linedata->{name};
 	}
 	else {
 		# default for everything else
 		$name = $linedata->{name2};
-		$id   = $linedata->{name2};
 	}
 	
 	# Uniqueify the gene ID and name
+	my $alias;
 	if (exists $id2counts->{ lc $name }) {
 		# we've encountered this transcript ID before
 		
@@ -906,19 +901,6 @@ sub generate_new_gene {
 		
 		# then make name unique by appending a number
 		$name = $name . '.' . $id2counts->{ lc $name };
-		
-		# reset the id
-		if ($linedata->{name} =~ /^ENS/i) {
-			# special case for ensGene transcripts
-			# the id, from the name2 value, should already be unique
-			# this is usually a ENS*T identifier
-			# nothing to do here
-		}
-		else {
-			# everyone else
-			# set the id to the unique name too
-			$id = $name;
-		}
 		
 		# remember this one
 		# using alias value because that was the original name
@@ -941,7 +923,7 @@ sub generate_new_gene {
 		-strand        => $linedata->{strand} eq '+' ? 1 : -1,
 		-phase         => '.',
 		-display_name  => $name,
-		-primary_id    => $id,
+		-primary_id    => $name,
 	);
 	
 	
