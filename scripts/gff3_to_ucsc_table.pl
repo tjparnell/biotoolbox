@@ -10,18 +10,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::Tools::GFF;
-use Bio::SeqFeature::Generic;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_db_helper::gff3_parser;
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
 
-my $VERSION = '1.6.2';
-
-#use Data::Dumper;
+my $VERSION = '1.7.0';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -171,10 +168,13 @@ sub process_gff_file_to_table {
 	# Without the directives, all feature objects loaded from the GFF3 file 
 	# will be kept open until the end of the file is reached. 
 	
-	my $gff = Bio::Tools::GFF->new(-gff_version => 3) or 
-		die " unable to create GFF object!\n";
+	# open gff3 parser object
+	my $parser = tim_db_helper::gff3_parser->new($infile) or
+		die " unable to open input file '$infile'!\n";
 	
-	while (my @top_features = collect_top_features($gff) ) {
+	
+	# process the features
+	while (my @top_features = $parser->top_features() ) {
 		
 		# processing statement
 		print " Collected ", scalar(@top_features), " features from ",
@@ -256,15 +256,8 @@ sub initialize_transcript {
 	my $feature = shift;
 	
 	# collect the name for the transcript
-	my $name;
-	if ($feature->has_tag('Name')) {
-		# Use the Name tag
-		($name) = $feature->get_tag_values('Name');
-	}
-	else {
+	my $name = $feature->display_name || $feature->primary_id;
 		# Or at the very least the ID, it does have an ID, right?
-		($name) = $feature->get_tag_values('ID');
-	}
 	
 	# Fill the data hash
 	my %transcript = (
@@ -393,19 +386,11 @@ sub collect_second_name {
 		my @aliases = $feature->get_tag_values('Alias');
 		$ucsc->{'name2'} = join(',', @aliases);
 	}
-	elsif ($feature->has_tag('Name')) {
-		# Or use the Name tag
-		my @names = $feature->get_tag_values('Name');
-		$ucsc->{'name2'} = $names[0];
-	}
-	elsif ($feature->has_tag('ID')) {
-		# Or at the very least the ID, it does have an ID, right?
-		my @IDs = $feature->get_tag_values('ID');
-		$ucsc->{'name2'} = $IDs[0];
-	}
 	else {
-		# when all else fails use the main name
-		$ucsc->{'name2'} = $ucsc->{'name'};
+		# Or use the Name or ID or if all else fails the main name
+		my $name2 = $feature->display_name || $feature->primary_id ||
+			$ucsc->{'name'};
+		$ucsc->{'name2'} = $name2;
 	}
 }
 
@@ -545,7 +530,7 @@ sub process_cds_exon {
 	# record the coordinates and information for this exon
 	push @{ $ucsc->{'exonStarts'} }, $utr->start;
 	push @{ $ucsc->{'exonEnds'} }, $utr->end;
-	push @{ $ucsc->{'exonFrames'} }, $utr->frame;
+	push @{ $ucsc->{'exonFrames'} }, $utr->phase;
 	$ucsc->{'exonCount'} += 1;
 }
 
@@ -825,7 +810,6 @@ sub print_table_item {
 	
 	
 	### We finally print
-	#print Dumper($ucsc);
 	my $string;
 	if ($bin) {
 		$string = "0\t";
@@ -853,148 +837,6 @@ sub print_table_item {
 	$outfh->print($string);
 	$count++; # increment global counter
 }
-
-
-
-sub collect_top_features {
-	
-	# the gff feature processor
-	my $gff = shift; 
-	
-	# initialize
-	my @top_features;
-	my @orphan_features;
-	my %loaded; # hash of loaded features
-	
-	# Collect the top features
-	# we will use a global input filehandle, that way we can repeatedly call 
-	# the subroutine and continue to subsequently read the file
-	# we will continue to read the file until we either reach the file end
-	# or we reach a close features directive (###)
-	
-	# Each line will be processed into a SeqFeature object, and then checked 
-	# for parentage. Child objects with a Parent tag will be appropriately 
-	# associated with its parent, or put into an orphanage. Any orphans 
-	# left will be checked a final time for parents; if a parent can't be 
-	# found, it will be lost. Features without a parent are assumed to be 
-	# top-level features.
-	
-	while (my $line = $in_fh->getline) {
-		
-		chomp $line;
-		
-		# process comment and pragma lines
-		if ($line =~ /^##gff-version (\d)$/) {
-			# version pragma, check it
-			unless ($1 == 3) {
-				die " Input GFF file is not version 3!\n" ;
-			}
-			next;
-		}
-		elsif ($line =~ /^###/) {
-			# close features directive line, 
-			# all subfeatures have been loaded for this chromosome/scaffold
-			last;
-		}
-		elsif ($line =~ /^##FASTA$/) {
-			# FASTA pragma
-			# go no further
-			last;
-		}
-		elsif ($line =~ /^#/) {
-			# some other unrecognized pragma or a comment line
-			# skip
-			next;
-		}
-		elsif ($line =~ /^>/) {
-			# fasta header line, skip
-			next;
-		}
-		elsif ($line =~ /^[agctn]+$/i) {
-			# fasta sequence, skip
-			next;
-		}
-		
-		
-		# generate the SeqFeature object for this GFF line
-		my $feature = Bio::SeqFeature::Generic->new();
-			# sorry, we can't use SeqFeature::Lite, no frame method
-			# we will use the Bio::Tools::GFF line processor to 
-			# process the line into the SeqFeature object
-		$gff->from_gff_string($feature, $line);
-		
-		# process the feature
-		my $id; # get the tag
-		if ($feature->has_tag('ID')) {
-			# a proper feature has a ID
-			($id) = $feature->get_tag_values('ID');
-			
-			# this ID should be unique in the GFF file
-			# complain if it isn't
-			if (exists $loaded{$id}) {
-				die " Feature ID '$id' occurs more than once in file!\n";
-			} 
-			else {
-				$loaded{$id} = $feature;
-			}
-		}
-			# if the feature didn't have an ID, we'll just assume it is
-			# a child of another feature, otherwise it may get lost
-		
-		# look for parents and children
-		if ($feature->has_tag('Parent')) {
-			# must be a child
-			my ($parent) = $feature->get_tag_values('Parent');
-			if (exists $loaded{$parent}) {
-				# we've seen this id
-				# associate the child with the parent
-				$loaded{$parent}->add_SeqFeature($feature);
-			}
-			else {
-				# can't find the parent, maybe not loaded yet?
-				# put 'em in the orphanage
-				push @orphan_features, $feature;
-			}
-		}
-		else {
-			# must be a parent
-			push @top_features, $feature;
-		}
-	}
-	# Finished loading the GFF lines (so far....)
-	
-	# check for orphans
-	if (@orphan_features) {
-		
-		my $lost_count = 0;
-		while (my $feature = shift @orphan_features) {
-			
-			# find the parent
-			my ($parent) = $feature->get_tag_values('Parent');
-			if (exists $loaded{$parent}) {
-				# we've seen this id
-				# associate the child with the parent
-				$loaded{$parent}->add_SeqFeature($feature);
-			}
-			else {
-				# can't find the parent
-				# forget about them, just another statistic
-				$lost_count++;
-			}
-		}
-		
-		# report
-		if ($lost_count) {
-			warn " $lost_count features could not be associated with" . 
-				" reported parents!\n";
-		}
-	}
-	
-	# finished (for now)
-	return @top_features;
-}
-
-
 
 
 
