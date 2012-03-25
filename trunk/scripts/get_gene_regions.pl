@@ -171,8 +171,8 @@ sub determine_method {
 		$request = collect_list_item_from_user( {
 			1	=> 'first exon',
 			2	=> 'last exon',
-			3	=> 'transcription start site TSS',
-			4	=> 'transcription stop site TTS',
+			3	=> 'transcription start site',
+			4	=> 'transcription stop site',
 			5	=> 'splice sites',
 			6	=> 'introns',
 		} );
@@ -402,7 +402,7 @@ sub generate_output_structure {
 	
 	# generate
 	my $data = generate_tim_data_structure(
-		$request,
+		"region",
 		qw(
 			Parent
 			Name
@@ -414,6 +414,9 @@ sub generate_output_structure {
 	);
 	
 	# add metadata
+	
+	$data->{1}{'type'} = $request;
+	$data->{1}{'type'} =~ s/\s/_/; # replace spaces
 	if ($start_adj) {
 		$data->{3}{'start_adjusted'} = $start_adj;
 	}
