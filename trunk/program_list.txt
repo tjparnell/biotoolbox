@@ -31,12 +31,14 @@ Lists of programs organized by function.
 	* bam2gff_bed.pl
 	* bar2wig.pl
 	* data2bed.pl
+	* data2fasta.pl
 	* data2gff.pl
 	* data2wig.pl
 	* wig2data.pl
 
 ===Finding features===
 	* find_enriched_regions.pl
+	* get_gene_regions.pl
 	* get_intersecting_features.pl
 	* map_transcripts.pl
 
@@ -106,6 +108,11 @@ data2frequency.pl
 data2bed.pl
 	Convert any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
 
+data2fasta.pl
+	Convert any data text file into a fasta file. Sequences may be provided 
+	as a column of data within the text file, or they may be retrieved from 
+	a genome fasta file given chromosomal coordinates.
+
 data2gff.pl
 	Convert any data text file into a GFF file, so long as there are genomic coordinates within the file.
 	
@@ -126,6 +133,13 @@ get_ensembl_annotation.pl
 
 get_feature_info.pl
 	Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
+
+get_gene_regions.pl
+	Retrieve specific regions associated with gene annotations from a 
+	database that may not be explicitly annotated, including transcription 
+	start and stop sites, first and last exons, splice site junctions, and 
+	introns. Unique regions from genes with alternative transcripts may be 
+	requested.
 
 get_intersecting_features.pl
 	Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
