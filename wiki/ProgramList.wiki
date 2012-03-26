@@ -32,12 +32,14 @@ Lists of programs organized by function.
 	* [ProgramList#bar2wig.pl bar2wig.pl]
 	* [ProgramList#bam2wig.pl bam2wig.pl]
 	* [ProgramList#data2bed.pl data2bed.pl]
+	* [ProgramList#data2fasta.pl data2fasta.pl]
 	* [ProgramList#data2gff.pl data2gff.pl]
 	* [ProgramList#data2wig.pl data2wig.pl]
 	* [ProgramList#wig2data.pl wig2data.pl]
 
 ===Finding features===
 	* [ProgramList#find_enriched_regions.pl find_enriched_regions.pl]
+	* [ProgramList#get_gene_regions.pl get_gene_regions.pl]
 	* [ProgramList#get_intersecting_features.pl get_intersecting_features.pl]
 	* [ProgramList#map_transcripts.pl map_transcripts.pl]
 
@@ -104,6 +106,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====data2bed.pl====
 [Pod_data2bed data2bed.pl] converts any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
 
+====data2fasta.pl====
+[Poddata2fasta data2fasta.pl] converts any data text file into a fasta file. Sequences may be provided as a column of data within the text file, or they may be retrieved from a genome fasta file given chromosomal coordinates.
+
 ====data2gff.pl====
 [Pod_data2gff data2gff.pl] converts any data text file into a GFF file, so long as there are genomic coordinates within the file.
 
@@ -124,6 +129,10 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====get_feature_info.pl====
 [Pod_get_feature_info get_feature_info.pl] collects additional information for a list of genomic annotated features from a Bio::DB::SeqFeature::Store database. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
+
+
+====get_gene_regions.pl====
+[Pod_get_gene_regions get_gene_regions.pl] retrieves specific regions associated with gene annotations from a database and that may not be explicitly annotated, including transcription start and stop sites, first and last exons, splice site junctions, and introns. Unique regions from genes with alternative transcripts may be requested.
 
 ====get_intersecting_features.pl====
 [Pod_get_intersecting_features get_intersecting_features.pl] identifies  intersecting features of the specified type for a given list of features. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
