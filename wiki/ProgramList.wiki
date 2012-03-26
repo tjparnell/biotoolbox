@@ -130,7 +130,6 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====get_feature_info.pl====
 [Pod_get_feature_info get_feature_info.pl] collects additional information for a list of genomic annotated features from a Bio::DB::SeqFeature::Store database. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
 
-
 ====get_gene_regions.pl====
 [Pod_get_gene_regions get_gene_regions.pl] retrieves specific regions associated with gene annotations from a database and that may not be explicitly annotated, including transcription start and stop sites, first and last exons, splice site junctions, and introns. Unique regions from genes with alternative transcripts may be requested.
 

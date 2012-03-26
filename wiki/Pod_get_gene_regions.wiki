@@ -54,9 +54,17 @@ __
 __--region `[`tss|tts|firstExon|lastExon|splice|intron`]`
 
 __
-  Specify the type of region to retrieve. If not specified on the command  line, the list is presented interactively to the user for selection. Six  possibilities are possible.      tss        The first base of transcription      tts        The last base of transcription      firstExon  The first exon of each transcript      lastExon   The last exon of each transcript      splice     The first and last base of each intron      intron     Each intron (usually not defined in the GFF3)
+  Specify the type of region to retrieve. If not specified on the command  line, the list is presented interactively to the user for selection. Six  possibilities are possible.
 __
   __
+{{{
+     tss        The first base of transcription
+     tts        The last base of transcription
+     firstExon  The first exon of each transcript
+     lastExon   The last exon of each transcript
+     splice     The first and last base of each intron
+     intron     Each intron (usually not defined in the GFF3)
+}}}
 __--start=<**integer>
 
 __
