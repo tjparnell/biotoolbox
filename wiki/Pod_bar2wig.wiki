@@ -116,6 +116,8 @@ The bigWig format is an indexed, compressed, binary extension of the wig format.
 
 This program first uses David Nix's !Bar2Gr** application to convert the bar  file to a very simplified text format, a .gr file. This is then further  processed into one or more wig (or bigWig) files. Stranded data (denoted  by `_`+`_` and `_`-`_` in the bar file names) is written to two stranded output  files, appended with either '`_`f' or '`_`r' to the basename. The wig files  are in variableStep format.
 
+You may find the latest version of the USeq package, which contains the  !Bar2Gr** Java application, at http://sourceforge.net/projects/useq/. Specify  the path to the !Bar2Gr** file in the USeq/Apps directory. You may record this information in the !BioToolBox** configuration file biotoolbox.cfg.
+
 Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or  Lincoln Stein's Bio::DB::!BigFile** support.
 
 {{{

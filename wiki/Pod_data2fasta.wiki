@@ -1,0 +1,119 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+data2fasta.pl
+
+==SYNOPSIS==
+data2fasta.pl `[`--options...`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --fasta <filename>
+  --id <index>
+  --seq <index>
+  --desc <index>
+  --chr <index>
+  --start <index>
+  --stop <index>
+  --out <filename> 
+  --(no)gz
+  --version
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the input data file. The file should be a tab-delimited text file  with columns representing the sequence id or name, sequence, description,  chromosome, start, stop, and/or strand information. The file may be  compressed with gzip.
+__
+  __
+  __-item --fasta <**filename|directory>
+__
+  __
+  Optionally specify the genomic fasta file or a directory of fasta files  from which to retrieve the sequence when only chromosome, start, and  stop information is provided.
+__
+  __
+__--id <**index>
+
+__
+  Optionally specify the index for the name or ID column. It may be  automatically determined from the column header.
+__
+  __
+__--seq <**index>
+
+__
+  Optionally specify the index for the sequence column. It may be  automatically determined from the column header.
+__
+  __
+__--desc <**index>
+
+__
+  Optionally specify the index of the description column. It may be  automatically determined from the column header.
+__
+  __
+__--chr <**index>
+
+__
+  Optionally specify the index for the chromosome column. It may be  automatically determined from the column header.
+__
+  __
+__--start <**index>
+
+__
+  Optionally specify the index for the start position column. It may be  automatically determined from the column header.
+__
+  __
+__--stop <**index>
+
+__
+  Optionally specify the index for the stop position column. It may be  automatically determined from the column header.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it uses the input file basename.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will take a tab-delimited text file (tim data formated file,  for example) and generate a multi-sequence fasta file containing the  sequences of each feature defined in the input file. This program has  two modes.
+
+If the name and sequence is already present in the file, it will generate  the fasta file directly from the file content.
+
+If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from one or more genomic fasta files. The fasta file(s) must  be in a writeable directory to create an index for efficient retrieval.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+

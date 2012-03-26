@@ -1,0 +1,108 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+get_gene_regions.pl
+
+==SYNOPSIS==
+get_gene_regions.pl `[`--options...`]` --db <**text> --out <**filename>
+
+{{{
+  Options:
+  --db <text>
+  --out <filename> 
+  --feature <type | type:source>
+  --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
+  --region [tss|tts|firstExon|lastExon|splice|intron]
+  --start=<integer>
+  --stop=<integer>
+  --unique
+  --gz
+  --version
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--db <**text>
+
+__
+  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as an  annotation source. Alternatively, a GFF3 annotation file may be provided.  For best results, the database or file should include hierarchical  annotation in the form of gene -> mRNA -> `[`exon or CDS`]`. The GFF3 file  may be gzipped.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename.
+__
+  __
+__--feature <**type | type:source>
+
+__
+  Specify the feature type (primary_tag) or type:source when using a database.  If not specified, a list of available types will be presented interactively  to the user for selection. This is not relevant for GFF3 source files (all  gene or transcript features are considered). Helpful when gene annotation  from multiple sources are listed in the same database, e.g. refSeq and  ensembl sources.
+__
+  __
+__--transcript `[`all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA`]`
+
+__
+  Specify the transcript feature or gene subfeature type from which to   collect the regions. Multiple types may be specified as a comma-delimited  list, or 'all' may be specified. The default value is mRNA.
+__
+  __
+__--region `[`tss|tts|firstExon|lastExon|splice|intron`]`
+
+__
+  Specify the type of region to retrieve. If not specified on the command  line, the list is presented interactively to the user for selection. Six  possibilities are possible.      tss        The first base of transcription      tts        The last base of transcription      firstExon  The first exon of each transcript      lastExon   The last exon of each transcript      splice     The first and last base of each intron      intron     Each intron (usually not defined in the GFF3)
+__
+  __
+__--start=<**integer>
+
+__
+__--stop=<**integer>
+
+__
+  Optionally specify adjustment values to adjust the reported start and  end coordinates of the collected regions. A negative value is shifted  upstream (5' direction), and a positive value is shifted downstream.
+__
+  __
+__--unique
+
+__
+  For gene features only, take only the unique regions. Useful when  multiple alternative transcripts are defined for a single gene.
+__
+  __
+__--gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will collect specific regions from annotated genes and/or  transcripts. Often these regions are not explicitly defined in the  source GFF3 annotation, necessitating a script to pull them out. These  regions include the start and stop sites of transcription, introns,  the splice sites (both 5' and 3'), and the first and last exons.  Importantly, unique regions may only be reported, especially important  when a single gene may have multiple alternative transcripts.
+
+The program will report the chromosome, start and stop coordinates,  strand, name, and parent name for each region identified. The reported  start and stop sites may be adjusted with modifiers. A standard  biotoolbox data formatted text file is generated. This may be converted  into a standard BED or GFF file using the appropriate biotoolbox  scripts. The file may also be used directly in data collection.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
