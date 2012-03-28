@@ -1535,8 +1535,14 @@ sub get_new_genome_list {
 		}
 		
 		# generate a segment representing the chromosome
-		# this should default to the beginning and end of the chromosome
-		my $segment = $db->segment($chr);
+		# due to fuzzy name matching, we may get more than one back
+		my @segments = $db->segment($chr);
+		# need to find the right one
+		my $segment;
+		while (@segments) {
+			$segment = shift @segments;
+			last if $segment->seq_id eq $chr;
+		}
 		
 		# get the chromosome length
 		my $length = $segment->length;
