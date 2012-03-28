@@ -15,6 +15,7 @@ average_gene.pl
   --in <filename> 
   --out <filename>
   --db <name | filename>
+  --ddb <name | filename>
   --feature <type | type:source | alias>,...
   --data <dataset_name | filename>
   --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
@@ -49,7 +50,19 @@ __
 __--db <**name | filename>
 
 __
-  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as source. Alternatively, an appropriate single file database file may be  provided. Acceptable databases may include a single GFF3 file (.gff or  .gff3) to be loaded into an in-memory database, a pre-loaded !BioPerl**  !SeqFeature**::Store SQLite file (.sqlite or .db), or a !BigWigSet** directory  (see Bio::DB::!BigWigSet**). Specifying the database is required for new  feature data files. For pre-existing input data files, this value may be  obtained from the input file metadata. However, if provided, it overrides  the database specified in the file; this is useful for collecting data  from multiple databases.
+  Specify the name of a !BioPerl** database from which to obtain the  annotation, chromosomal information, and/or data. Typically a  Bio::DB::!SeqFeature**::Store database schema is used, either from a  relational database, SQLite file, or a single GFF3 file to be loaded  into memory. Alternatively, a !BigWigSet** directory, or a single !BigWig**,  !BigBed**, or Bam file may be specified.
+__
+  __
+  A database is required for generating new files. When generating a new  genome interval file, a bigFile or Bam file listed as a data source  will be adopted as the database.
+__
+  __
+  For input files, the database name may be obtained from the file  metadata. A different database may be specified from that listed in  the metadata when a different source is desired.
+__
+  __
+__--ddb <**name | filename>
+
+__
+  Optionally specify the name of an alternate data database from which  the data should be collected, separate from the primary annotation  database. The same options apply as to the --db option.
 __
   __
 __--feature <**type | type:source | alias>,...
