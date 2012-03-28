@@ -179,23 +179,35 @@ sub determine_method {
 	}
 	
 	# determine the method
+	# also change the name of the request from short to long form
 	my $method;
 	if ($request =~ /^first ?exon$/i) {
+		$request = 'first exon';
 		$method = \&collect_first_exon;
 	}
 	elsif ($request =~ /^second ?exon$/i) {
+		$request = 'last exon';
 		$method = \&collect_second_exon;
 	}
 	elsif ($request =~ /tss/i) {
+		$request = 'transcription start site';
+		$method = \&collect_tss;
+	}
+	elsif ($request =~ /start site/i) {
 		$method = \&collect_tss;
 	}
 	elsif ($request =~ /tts/i) {
+		$request = 'transcription stop site';
+		$method = \&collect_tts;
+	}
+	elsif ($request =~ /stop site/i) {
 		$method = \&collect_tts;
 	}
 	elsif ($request =~ /^splices?/i) {
+		$request = 'splice sites';
 		$method = \&collect_splice_sites;
 	}
-	elsif ($request =~ /^introns$/i) {
+	elsif ($request =~ /^introns?$/i) {
 		$method = \&collect_introns;
 	}
 	else {
@@ -874,12 +886,12 @@ sub _adjust_positions {
 		# reverse strand
 		
 		if ($start_adj) {
-			$region->[2] -= $start_adj;
+			$region->[3] -= $start_adj;
 		}
 		
 		# stop
 		if ($stop_adj) {
-			$region->[3] -= $stop_adj;
+			$region->[2] -= $stop_adj;
 		}
 	}
 	
