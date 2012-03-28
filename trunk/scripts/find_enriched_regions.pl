@@ -486,8 +486,15 @@ sub go_find_enriched_regions {
 		# store in a hash the position (key) and values
 		print "  Searching $chr....\n";
 		
-		# chromosome object
-		my $chrobj = $db->segment($chr); 
+		# generate a segment representing the chromosome
+		# due to fuzzy name matching, we may get more than one back
+		my @segments = $db->segment($chr);
+		# need to find the right one
+		my $chrobj;
+		while (@segments) {
+			$chrobj = shift @segments;
+			last if $chrobj->seq_id eq $chr;
+		}
 		
 		# walk windows along the chromosome and find enriched windows
 		my $length = $chrobj->length; # length of the chromosome
