@@ -45,10 +45,10 @@ our %BIGBED_CHROMOS;
 sub collect_bigbed_scores {
 	
 	# pass the required information
-	unless (scalar @_ >= 5) {
-		confess " At least five arguments must be passed to collect BigBed data!\n";
+	unless (scalar @_ >= 7) {
+		confess " At least seven arguments must be passed to collect BigBed scores!\n";
 	}
-	my ($region, $region_strand, $stranded, $method, @bed_features) = @_;
+	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
 		# method can be score, count, or length
 	
 	# initialize the score array
@@ -72,15 +72,15 @@ sub collect_bigbed_scores {
 		my $bb = _open_my_bigbed($bedfile);
 			
 		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$region->seq_id}) {
+		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
 			next;
 		}
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
-			-seq_id   => $region->seq_id, 
-			-start    => $region->start, 
-			-end      => $region->end,
+			-seq_id   => $chromo, 
+			-start    => $start, 
+			-end      => $stop,
 			-iterator => 1,
 		);
 		
@@ -93,12 +93,12 @@ sub collect_bigbed_scores {
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$region_strand == $bed->strand 
+					$strand == $bed->strand 
 					and $stranded eq 'sense'
 				) 
 				or (
 					# antisense data
-					$region_strand != $bed->strand  
+					$strand != $bed->strand  
 					and $stranded eq 'antisense'
 				)
 			) {
@@ -129,10 +129,10 @@ sub collect_bigbed_scores {
 sub collect_bigbed_position_scores {
 	
 	# pass the required information
-	unless (scalar @_ >= 5) {
-		confess " At least five arguments must be passed to collect BigBed data!\n";
+	unless (scalar @_ >= 7) {
+		confess " At least seven arguments must be passed to collect BigBed position scores!\n";
 	}
-	my ($region, $region_strand, $stranded, $method, @bed_features) = @_;
+	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
 		# method can be score, count, or length
 	
 	# set up hash, either position => count or position => [scores]
@@ -155,15 +155,15 @@ sub collect_bigbed_position_scores {
 		my $bb = _open_my_bigbed($bedfile);
 			
 		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$region->seq_id}) {
+		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
 			next;
 		}
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
-			-seq_id   => $region->seq_id, 
-			-start    => $region->start, 
-			-end      => $region->end,
+			-seq_id   => $chromo, 
+			-start    => $start, 
+			-end      => $stop,
 			-iterator => 1,
 		);
 		
@@ -176,12 +176,12 @@ sub collect_bigbed_position_scores {
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$region_strand == $bed->strand 
+					$strand == $bed->strand 
 					and $stranded eq 'sense'
 				) 
 				or (
 					# antisense data
-					$region_strand != $bed->strand  
+					$strand != $bed->strand  
 					and $stranded eq 'antisense'
 				)
 			) {
@@ -204,7 +204,7 @@ sub collect_bigbed_position_scores {
 				next unless (
 					# want to avoid those whose midpoint are not technically 
 					# within the region of interest
-					$position >= $region->start and $position <= $region->end
+					$position >= $start and $position <= $stop
 				);
 				
 				# store the appropriate datapoint
@@ -440,22 +440,14 @@ tim_db_helper::bigbed
 
 =head1 DESCRIPTION
 
-This module supports the use of bigbed file in the biotoolbox scripts, both 
-in the collection of data from a bigbed file, as well as the generation of 
-bigbed files.
+This module supports the use of bigBed file in the biotoolbox scripts, both 
+in the collection of data from a bigBed file, as well as the generation of 
+bigBed files.
 
 =head2 Data collection
 
 This module is used to collect the dataset scores from a binary 
-bigbed file (.bb). The file may be identified in one of two ways. First,
-it may be referenced in the database. Typically, a single 
-feature representing the dataset is present across each chromosome. The 
-feature should contain an attribute ('bigbedfile') that references the 
-location of the binary file representing the dataset scores. Second, 
-the local location of the file may be directly passed to the subroutine. 
-
-In either case, the file is read using the Bio::DB::BigBed module, and 
-the values extracted from the region of interest. 
+bigBed file (.bb). The file may be local or remote.
 
 Scores may be restricted to strand by specifying the desired strandedness. 
 For example, to collect transcription data over a gene, pass the strandedness 
@@ -495,55 +487,31 @@ for the specified database region. The positional information of the
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed five or more arguments in the following order:
+The subroutine is passed seven or more arguments in the following order:
     
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
+    1) The chromosome or seq_id
+    2) The start position of the segment to collect 
+    3) The stop or end position of the segment to collect 
+    4) The strand of the original feature (or region), -1, 0, or 1.
+    5) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
+       or "all". Only those scores which match the indicated 
        strandedness are collected.
-    4) The method or type of data collected. 
+    6) The method or type of data collected. 
        Acceptable values include 'score' (returns the bed feature 
        score), 'count' (returns the number of bed features found), or 
-       'length' (returns the length of the bed features found). 
-    5) One or more database feature objects that contain the reference 
-       to the .bb file. They should contain the attribute 'bigbedfile' 
-       which has the path to the BigBed file. Alternatively, pass one 
-       or more filenames of .bb files. Each filename should be 
-       prefixed with 'file:' to indicate that it is a direct file 
-       reference, and not a database object.
+       'length' (returns the length of the bed features found).  
+    7) The paths, either local or remote, to one or more BigBed files.
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
 
 =item collect_bigbed_position_scores
 
-This subroutine will collect the score values from a binary wig file 
+This subroutine will collect the score values from a binary bigBed file 
 for the specified database region keyed by position. 
 
-The subroutine is passed five or more arguments in the following order:
-    
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
-       strandedness are collected.
-    4) The method or type of data collected. 
-       Acceptable values include 'score' (returns the bed feature 
-       score), 'count' (returns the number of bed features found), or 
-       'length' (returns the length of the bed features found). 
-    5) One or more database feature objects that contain the reference 
-       to the .bb file. They should contain the attribute 'bigbedfile' 
-       which has the path to the BigBed file. Alternatively, pass one 
-       or more filenames of .bb files. Each filename should be 
-       prefixed with 'file:' to indicate that it is a direct file 
-       reference, and not a database object.
+The subroutine is passed the same arguments as collect_bigbed_scores().
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. The feature midpoint is used 

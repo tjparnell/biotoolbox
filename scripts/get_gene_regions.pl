@@ -978,6 +978,7 @@ list, or 'all' may be specified. The default value is mRNA.
 Specify the type of region to retrieve. If not specified on the command 
 line, the list is presented interactively to the user for selection. Six 
 possibilities are possible.
+     
      tss        The first base of transcription
      tts        The last base of transcription
      firstExon  The first exon of each transcript

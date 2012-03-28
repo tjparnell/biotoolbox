@@ -82,13 +82,15 @@ sub collect_bam_position_scores {
 sub _collect_bam_data {
 	
 	# pass the required information
-	unless (scalar @_ >= 5) {
-		confess " At least five arguments must be passed to collect Bam data!\n";
+	unless (scalar @_ >= 8) {
+		confess " At least eight arguments must be passed to collect Bam data!\n";
 	}
 	my (
 		$do_index, 
-		$region, 
-		$region_strand, 
+		$chromo,
+		$start,
+		$stop,
+		$strand, 
 		$stranded, 
 		$value_type, 
 		@bam_features
@@ -123,32 +125,32 @@ sub _collect_bam_data {
 		}
 			
 		# first check that the chromosome is present
-		unless (exists $BAM_CHROMOS{$bamfile}{$region->seq_id}) {
+		unless (exists $BAM_CHROMOS{$bamfile}{$chromo}) {
 			next;
 		}
 		
 		
 		## Set the code to filter alignments based on strand 
 		my $filter;
-		if ($stranded eq 'sense' and $region_strand == 1) {
+		if ($stranded eq 'sense' and $strand == 1) {
 			$filter = sub {
 				my $a = shift;
 				return $a->strand == 1 ? 1 : 0;
 			};
 		}
-		elsif ($stranded eq 'sense' and $region_strand == -1) {
+		elsif ($stranded eq 'sense' and $strand == -1) {
 			$filter = sub {
 				my $a = shift;
 				return $a->strand == -1 ? 1 : 0;
 			};
 		}
-		elsif ($stranded eq 'antisense' and $region_strand == 1) {
+		elsif ($stranded eq 'antisense' and $strand == 1) {
 			$filter = sub {
 				my $a = shift;
 				return $a->strand == -1 ? 1 : 0;
 			};
 		}
-		elsif ($stranded eq 'antisense' and $region_strand == -1) {
+		elsif ($stranded eq 'antisense' and $strand == -1) {
 			$filter = sub {
 				my $a = shift;
 				return $a->strand == 1 ? 1 : 0;
@@ -180,9 +182,9 @@ sub _collect_bam_data {
 				
 				($coverage) = $bam->features(
 					-type     => 'coverage',
-					-seq_id   => $region->seq_id,
-					-start    => $region->start,
-					-end      => $region->end,
+					-seq_id   => $chromo,
+					-start    => $start,
+					-end      => $stop,
 					-filter   => $filter,
 				);
 			}
@@ -190,9 +192,9 @@ sub _collect_bam_data {
 				# no stranded data wanted
 				($coverage) = $bam->features(
 					-type     => 'coverage',
-					-seq_id   => $region->seq_id,
-					-start    => $region->start,
-					-end      => $region->end,
+					-seq_id   => $chromo,
+					-start    => $start,
+					-end      => $stop,
 				);
 			}
 			
@@ -203,7 +205,7 @@ sub _collect_bam_data {
 				
 				# check whether we need to index the scores
 				if ($do_index) {
-					for (my $i = $region->start; $i <= $region->end; $i++) {
+					for (my $i = $start; $i <= $stop; $i++) {
 						# move the scores into the position score hash
 						$pos2data{$i} += shift @scores;
 					}
@@ -223,9 +225,9 @@ sub _collect_bam_data {
 				# include the filter subroutine
 				$iterator = $bam->features(
 					-type     => 'match',
-					-seq_id   => $region->seq_id,
-					-start    => $region->start,
-					-end      => $region->end,
+					-seq_id   => $chromo,
+					-start    => $start,
+					-end      => $stop,
 					-filter   => $filter,
 					-iterator => 1,
 				);
@@ -234,9 +236,9 @@ sub _collect_bam_data {
 				# no stranded data wanted
 				$iterator = $bam->features(
 					-type     => 'match',
-					-seq_id   => $region->seq_id,
-					-start    => $region->start,
-					-end      => $region->end,
+					-seq_id   => $chromo,
+					-start    => $start,
+					-end      => $stop,
 					-iterator => 1,
 				);
 			}
@@ -256,8 +258,8 @@ sub _collect_bam_data {
 						
 						# check midpoint is within the requested region
 						if (
-							$position >= $region->start and 
-							$position <= $region->end
+							$position >= $start and 
+							$position <= $stop
 						) {
 							$pos2data{$position} += 1;
 						}
@@ -272,8 +274,8 @@ sub _collect_bam_data {
 						
 						# check midpoint is within the requested region
 						if (
-							$position >= $region->start and 
-							$position <= $region->end
+							$position >= $start and 
+							$position <= $stop
 						) {
 							push @{ $pos2data{$position} }, $a->length;
 						}
@@ -446,17 +448,8 @@ tim_db_helper::bam
 =head1 DESCRIPTION
 
 This module is used to collect the dataset scores from a binary 
-bam file (.bam) of alignments. The bam file may be identified in one of 
-multiple ways. First, a local file may be specified directly by prefixing 
-the file name with "file:", for example "file:/my/path/to/file.bam". 
-Second, a remote file may be specifie with a URL, for example 
-"http://my.server.com/path/file.bam". Third, the bam file may be referenced 
-in the database. Typically, a single feature representing the dataset is 
-present across each chromosome. The 
-feature should contain an attribute ('bamfile') that references the 
-location of the binary file representing the alignments. 
-In either case, the file is read using the Bio::DB::Sam module, and 
-the values extracted from the region of interest. 
+bam file (.bam) of alignments. Bam files may be local or remote, 
+and are usually prefixed with 'file:', 'http://', of 'ftp://'.
 
 Collected data values may be restricted to strand by specifying the desired 
 strandedness, 
@@ -495,31 +488,24 @@ for the specified database region. The positional information of the
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed five or more arguments in the following order:
+The subroutine is passed seven or more arguments in the following order:
     
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods. Alternatively, a bam file may 
-       also be directly specified, prefixed with "file:", "http://", or 
-       "ftp://".
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
+    1) The chromosome or seq_id
+    2) The start position of the segment to collect 
+    3) The stop or end position of the segment to collect 
+    4) The strand of the original feature (or region), -1, 0, or 1.
+    5) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
+       or "all". Only those scores which match the indicated 
        strandedness are collected.
-    4) The method or type of data collected. 
+    6) The type of data collected. 
        Acceptable values include 'score' (returns the basepair coverage
        of alignments over the region of interest), 'count' (returns the 
        number of alignments found at each base position in the region, 
        recorded at the alignment's midpoint), or 'length' (returns the 
        mean lengths of the alignments found at each base position in 
        the region, recorded at the alignment's midpoint). 
-    5) One or more database feature objects that contain the reference 
-       to the .bam file. They should contain the attribute 'bamfile' 
-       which has the path to the Bam file. Alternatively, pass one 
-       or more filenames of .bam files. Each filename should be 
-       prefixed with 'file:' to indicate that it is a direct file 
-       reference, and not a database object.
+    7) The paths, either local or remote, to one or more Bam files.
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
@@ -529,31 +515,7 @@ the region of interest.
 This subroutine will collect the score values from a binary bam file 
 for the specified database region keyed by position. 
 
-The subroutine is passed five or more arguments in the following order:
-    
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods. Alternatively, a bam file may 
-       also be directly specified, prefixed with "file:", "http://", or 
-       "ftp://".
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
-       strandedness are collected.
-    4) The method or type of data collected. 
-       Acceptable values include 'score' (returns the basepair coverage
-       of alignments over the region of interest), 'count' (returns the 
-       number of alignments found at each base position in the region, 
-       recorded at the alignment's midpoint), or 'length' (returns the 
-       mean lengths of the alignments found at each base position in 
-       the region, recorded at the alignment's midpoint). 
-    5) One or more database feature objects that contain the reference 
-       to the .bam file. They should contain the attribute 'bamfile' 
-       which has the path to the Bam file. Alternatively, pass one 
-       or more filenames of .bam files. Each filename should be 
-       prefixed with 'file:' to indicate that it is a direct file 
-       reference, and not a database object.
+The subroutine is passed the same arguments as collect_bam_scores().
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. The feature midpoint is used 

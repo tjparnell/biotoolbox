@@ -214,9 +214,19 @@ sub open_db_connection {
 		return;
 	}
 	
+	# first check if it is a database reference
+	my $db_ref = ref $database;
+	if ($db_ref =~ /^Bio::DB/) {
+		# a db object returns the name of the package
+		# this appears to be a bioperl db object
+		# nothing to do, return as is
+		return $database;
+	}
+	
 	# determine type of database to connect to
 	my $db;
 	my $error;
+	
 	
 	# check if it is a local file
 	if (-e $database) {
@@ -1683,33 +1693,12 @@ sub get_chromo_region_score {
 	
 	# check the data source
 	unless ($arg_ref->{'dataset'}) {
-		cluck " no dataset requested!";
-		return;
+		confess " no dataset requested!";
 	}
 	
 	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /^Bio::DB/) {
-			# a db object returns the name of the package
-			# this appears to be a bioperl db object
-			$db = $arg_ref->{'db'};
-		}
-		else {
-			# the name of a database
-			$db = open_db_connection( $arg_ref->{'db'} );
-		}
-	}
-	else {
-		cluck 'no database name passed!';
-		return;
-	}
-	unless ($db) {
-		carp 'no database connected!';
-		return;
-	}
+	my $db = open_db_connection( $arg_ref->{'db'} ) or 
+		confess "no database name or connection!!\n";
 	
 	# get coordinates
 	my $chromo = $arg_ref->{'chromo'} || $arg_ref->{'seq'} || 
@@ -1740,42 +1729,13 @@ sub get_chromo_region_score {
 		}
 	}
 	
-	# define the chromosomal region segment
-	my @regions = $db->segment(
-			$chromo,  
-			$start, 
-			$stop, 
-	);
-	
-	# check region
-	my $region;
-	if (scalar @regions == 1) {
-		$region = shift @regions;
-	}
-	elsif (scalar @regions > 1) {
-		# attempt to take the correct one
-		foreach (@regions) {
-			if ($_->seq_id eq $chromo) {
-				$region = $_;
-				last;
-			}
-		}
-		unless ($region) {
-			carp " " . scalar @regions . 
-				" regions found for $chromo:$start..$stop! Skipping!\n";
-			return;
-		}
-	}
-	else {
-		# print warning if nothing found
-		carp " Region $chromo:$start..$stop not found!\n";
-		return;
-	}
-		
 	# get the scores for the region
 	# pass to internal subroutine to combine dataset values
 	return _get_segment_score(
-				$region, 
+				$db,
+				$chromo,
+				$start,
+				$stop,
 				$strand, 
 				$arg_ref->{'dataset'},
 				$value_type,
@@ -1820,8 +1780,8 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  db       => The name of the database or a reference to an 
-              established database object. 
+  db       => The name of the annotation database or a reference to 
+              an established database object. 
   dataset  => The name of the dataset in the database to be 
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
@@ -1835,6 +1795,9 @@ arguments. The keys include
   name     => The name of the genomic feature.
   type     => The type of the genomic feature.
   Optional:
+  ddb      => The name of the data-specific database or a reference 
+              to an established database. Use when the data and 
+              annotation are in separate databases.
   chromo   => The chromosome or sequence name (seq_id). This may be 
               used instead of name and type to specify a genomic 
               segment. This must be used with start and stop options, 
@@ -1903,33 +1866,23 @@ sub get_region_dataset_hash {
 	### Initialize parameters
 	
 	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /^Bio::DB/) {
-			# a db object returns the name of the package
-			# this appears to be a bioperl db object
-			$db = $arg_ref->{'db'};
-		}
-		else {
-			# the name of a database
-			$db = open_db_connection( $arg_ref->{'db'} );
-		}
+	my $db = open_db_connection( $arg_ref->{'db'} ) or 
+		confess "no database name or connection!!\n";
+	
+	# Open the data database if provided
+	my $ddb;
+	if (defined $arg_ref->{'ddb'}) {
+		$ddb = open_db_connection( $arg_ref->{'ddb'} ) or
+			confess "requested data database could not be opened!\n";
 	}
 	else {
-		cluck 'no database name passed!';
-		return;
-	}
-	unless ($db) {
-		carp 'no database connected!';
-		return;
+		# use the same database for both
+		$ddb = $db;
 	}
 	
 	# check the data source
 	unless ($arg_ref->{'dataset'}) {
-		cluck " no dataset requested!";
-		return;
+		confess " no dataset requested!";
 	}
 	
 	# confirm options and check we have what we need 
@@ -1953,14 +1906,19 @@ sub get_region_dataset_hash {
 	my $relative_pos   = $arg_ref->{'position'} || 5;
 	
 	
+	# the final coordinates
+	my $fref_pos; # to remember the feature reference position
+	my $fchromo;
+	my $fstart;
+	my $fstop;
+	my $fstrand;
 	
 	
 	
 	### Define the chromosomal region segment
+	# we will use the primary database to establish the intitial feature
+	# and determine the chromosome, start and stop
 	
-	my $region;
-	my $fref_pos; # to remember the feature reference position
-	my $fstrand; # to remember the feature strand
 	
 	# Extend a named database feature
 	if (
@@ -1983,11 +1941,6 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
-		# change strand if requested
-		if (defined $strand) {
-			$feature->strand($strand);
-		}
-		
 		# record the feature reference position and strand
 		if ($relative_pos == 5 and $feature->strand >= 0) {
 			$fref_pos = $feature->start;
@@ -2005,34 +1958,12 @@ sub get_region_dataset_hash {
 			# strand doesn't matter here
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 		}
-		$fstrand = $feature->strand;
 		
-		# now re-define the region based on the extended coordinates
-		# there is a possibility that poorly constructed databases may 
-		# return multiple segments!? deal with this contingency
-		my @regions = $db->segment( 
-				$feature->seq_id,
-				$feature->start - $arg_ref->{'extend'},
-				$feature->end + $arg_ref->{'extend'},
-		);
-		
-		# check region
-		if (scalar @regions == 1) {
-			$region = shift @regions;
-		}
-		elsif (scalar @regions > 1) {
-			foreach (@regions) {
-				if ($_->seq_id eq $feature->seq_id) {
-					$region = $_;
-					last;
-				}
-			}
-		}
-		unless ($region) {
-			# didn't find the exact match above!?
-			carp " could not define chromosomal segment based on $type $name!\n";
-			return;
-		}
+		# record final coordinates
+		$fchromo = $feature->seq_id;
+		$fstart  = $feature->start - $arg_ref->{'extend'};
+		$fstop   = $feature->end + $arg_ref->{'extend'};
+		$fstrand = defined $strand ? $strand : $feature->strand;
 	} 
 		
 	# Specific start and stop coordinates of a named database feature
@@ -2057,103 +1988,65 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
-		# change strand if requested
-		if (defined $strand) {
-			$feature->strand($strand);
-		}
-		
-		# now define the region based on the relative coordinates
-		# there is a possibility that poorly constructed databases may 
-		# return multiple segments!? deal with this contingency
-		my @regions;
-		
+		# determine the cooridnates based on the identified feature
 		if ($relative_pos == 5 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 5' end
 			
-			# record feature relative position
-			$fref_pos = $feature->start;
-			$fstrand = $feature->strand;
-			
-			@regions = $db->segment( 
-					$feature->seq_id,
-					$feature->start + $start,
-					$feature->start + $stop,
-			);
+			# record final coordinates
+			$fref_pos  = $feature->start;
+			$fchromo   = $feature->seq_id;
+			$fstart    = $feature->start + $start;
+			$fstop     = $feature->start + $stop;
+			$fstrand   = defined $strand ? $strand : $feature->strand;
 		}
+		
 		elsif ($relative_pos == 5 and $feature->strand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 5' end
 			
-			# record feature relative position
+			# record final coordinates
 			$fref_pos = $feature->end;
-			$fstrand = $feature->strand;
-			
-			@regions = $db->segment( 
-					$feature->seq_id,
-					$feature->end - $stop,
-					$feature->end - $start,
-			);
+			$fchromo   = $feature->seq_id;
+			$fstart    = $feature->end - $stop;
+			$fstop     = $feature->end - $start;
+			$fstrand   = defined $strand ? $strand : $feature->strand;
 		}
+		
 		elsif ($relative_pos == 3 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 3' end
 			
-			# record feature start
+			# record final coordinates
 			$fref_pos = $feature->end;
-			$fstrand = $feature->strand;
-			
-			@regions = $db->segment( 
-					$feature->seq_id,
-					$feature->end + $start,
-					$feature->end + $stop,
-			);
+			$fchromo   = $feature->seq_id;
+			$fstart    = $feature->end + $start;
+			$fstop     = $feature->end + $stop;
+			$fstrand   = defined $strand ? $strand : $feature->strand;
 		}
+		
 		elsif ($relative_pos == 3 and $feature->strand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 3' end
 			
-			# record feature start
+			# record final coordinates
 			$fref_pos = $feature->start;
-			$fstrand = $feature->strand;
-			
-			@regions = $db->segment( 
-					$feature->seq_id,
-					$feature->start - $stop,
-					$feature->start - $start,
-			);
+			$fchromo   = $feature->seq_id;
+			$fstart    = $feature->start - $stop;
+			$fstop     = $feature->start - $start;
+			$fstrand   = defined $strand ? $strand : $feature->strand;
 		}
+		
 		elsif ($relative_pos == 4) {
 			# feature can be on any strand
 			# set segment relative to the feature middle
 			
-			# determine the feature midpoint and record it
+			# record final coordinates
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
-			$fstrand = $feature->strand;
-			
-			@regions = $db->segment( 
-					$feature->seq_id,
-					$fref_pos + $start,
-					$fref_pos + $stop,
-			);
-		}
-		
-		# check region
-		if (scalar @regions == 1) {
-			$region = shift @regions;
-		}
-		elsif (scalar @regions > 1) {
-			foreach (@regions) {
-				if ($_->seq_id eq $feature->seq_id) {
-					$region = $_;
-					last;
-				}
-			}
-		}
-		unless ($region) {
-			# didn't find the exact match above!?
-			carp " could not define chromosomal segment based on $type $name!\n";
-			return;
+			$fchromo   = $feature->seq_id;
+			$fstart    = $fref_pos + $start;
+			$fstop     = $fref_pos + $stop;
+			$fstrand   = defined $strand ? $strand : $feature->strand;
 		}
 	}
 	
@@ -2175,56 +2068,31 @@ sub get_region_dataset_hash {
 		}
 		my $feature = shift @features; 
 		
-		# change strand if requested
-		if (defined $strand) {
-			$feature->strand($strand);
-		}
+		# determine the strand
+		$fstrand   = defined $strand ? $strand : $feature->strand;
 		
 		# record the feature reference position and strand
-		if ($relative_pos == 5 and $feature->strand >= 0) {
+		if ($relative_pos == 5 and $fstrand >= 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+		elsif ($relative_pos == 3 and $fstrand >= 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 5 and $feature->strand < 0) {
+		elsif ($relative_pos == 5 and $fstrand < 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 3 and $feature->strand < 0) {
+		elsif ($relative_pos == 3 and $fstrand < 0) {
 			$fref_pos = $feature->start;
 		}
 		elsif ($relative_pos == 4) {
 			# strand doesn't matter here
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 		}
-		$fstrand = $feature->strand;
 		
-		# then establish the segment
-		my @regions = $feature->segment(); 
-			# this should automatically take care of strand
-			# we could probably call the segment directly, but want to 
-			# have mechanism in place in case more than one feature was
-			# present
-			# there is a possibility that poorly constructed databases may 
-			# return multiple segments!? deal with this contingency
-		
-		# check region
-		if (scalar @regions == 1) {
-			$region = shift @regions;
-		}
-		elsif (scalar @regions > 1) {
-			foreach (@regions) {
-				if ($_->seq_id eq $feature->seq_id) {
-					$region = $_;
-					last;
-				}
-			}
-		}
-		unless ($region) {
-			# didn't find the exact match above!?
-			carp " could not define chromosomal segment based on $type $name!\n";
-			return;
-		}
+		# record final coordinates
+		$fchromo   = $feature->seq_id;
+		$fstart    = $feature->start;
+		$fstop     = $feature->end;
 	}
 	
 	# a genomic region
@@ -2233,57 +2101,31 @@ sub get_region_dataset_hash {
 		defined $start and 
 		defined $stop
 	) {
+		# coordinates are easy
+		$fchromo   = $chromo;
+		$fstart    = $start;
+		$fstop     = $fstop;
 		
-		# generate region
-		# there is a possibility that poorly constructed databases may 
-		# return multiple segments!? deal with this contingency
-		my @regions = $db->segment($chromo, $start, $stop);
-		
-		# check region
-		if (scalar @regions == 1) {
-			$region = shift @regions;
-		}
-		elsif (scalar @regions > 1) {
-			foreach (@regions) {
-				if ($_->seq_id eq $chromo) {
-					$region = $_;
-					last;
-				}
-			}
-		}
-		unless ($region) {
-			# didn't find the exact match above!?
-			carp " could not define chromosomal segment based on $chromo\:$start\..$stop!\n";
-			return;
-		}
-		
-		# adjust strand if necessary
-		if (defined $strand) {
-			$region->strand($strand);
-		}
-		else {
-			# default top strand
-			$strand = 1;
-		}
+		# determine the strand
+		$fstrand   = defined $strand ? $strand : 0; # default is no strand
 		
 		# record the feature reference position and strand
-		if ($relative_pos == 5 and $strand >= 0) {
-			$fref_pos = $start;
+		if ($relative_pos == 5 and $fstrand >= 0) {
+			$fref_pos = $fstart;
 		}
-		elsif ($relative_pos == 3 and $strand >= 0) {
-			$fref_pos = $stop;
+		elsif ($relative_pos == 3 and $fstrand >= 0) {
+			$fref_pos = $fstop;
 		}
-		elsif ($relative_pos == 5 and $strand < 0) {
-			$fref_pos = $stop;
+		elsif ($relative_pos == 5 and $fstrand < 0) {
+			$fref_pos = $fstop;
 		}
-		elsif ($relative_pos == 3 and $strand < 0) {
-			$fref_pos = $start;
+		elsif ($relative_pos == 3 and $fstrand < 0) {
+			$fref_pos = $fstart;
 		}
 		elsif ($relative_pos == 4) {
 			# strand doesn't matter here
-			$fref_pos = $start + int( ( ($stop - $start + 1) / 2) + 0.5);
+			$fref_pos = $fstart + int( ( ($fstop - $fstart + 1) / 2) + 0.5);
 		}
-		$fstrand = $strand;
 	}
 	
 	# or else something is wrong
@@ -2292,16 +2134,13 @@ sub get_region_dataset_hash {
 			" identify database feature!\n";
 	}
 	
-	# one last check of region
-	unless (defined $region) {
-		cluck " could not define region! arguments:\n" . 
-			join("\n", map {"$_ => $arg_ref->{$_}\n"} keys %$arg_ref) . "\n";
-	}
-	
 	
 	### Data collection
 	my %datahash = _get_segment_score(
-		$region, 
+		$ddb, # using the data database here
+		$fchromo,
+		$fstart,
+		$fstop,
 		$fstrand, 
 		$arg_ref->{'dataset'}, 
 		$value_type,
@@ -2317,7 +2156,12 @@ sub get_region_dataset_hash {
 		# same type and remove those scores
 		
 		# get the overlapping features of the same type
-		my @overlap_features = $region->features(-type => $type);
+		my @overlap_features = $db->features(
+			-seq_id  => $fchromo,
+			-start   => $fstart,
+			-end     => $fstop,
+			-type    => $type
+		);
 		if (@overlap_features) {
 			# there are one or more feature of the same type in this 
 			# region
@@ -2380,7 +2224,6 @@ sub get_region_dataset_hash {
 		# return the collected dataset hash
 		return %relative_datahash;
 	}
-	
 }
 
 
@@ -2465,29 +2308,35 @@ First, the data may be stored directly in the Bio::DB::SeqFeature::Store
 (using the original GFF score value). Second, the feature may reference 
 a data file as an attribute (e.g., wigfile=/path/to/file.wib). Finally, 
 the name(s) of a data file may be passed from which to collect the data. 
-Supported data files include BigWig (.bw), BigBed (.bb), and Bam (.bam).
+Supported data files include BigWig (.bw), BigBed (.bb), and Bam (.bam). 
+A Bio::DB::BigWigSet database is also supported.
 
-The subroutine is passed an array of five specific values, all of which 
+The subroutine is passed an array of ten specific values, all of which 
 must be defined and presented in this order. These values include
   
-  [0] The genomic segment as a gff database object, the establishment 
-      of which is the responsibility of the calling subroutine.
-  [1] The strand of the region (or original feature), as the strand is 
-      lost when generating the segment. Acceptable values are 
-      -1, 0, or 1.
-  [2] The dataset name for filename. Multiple datasets may be included, 
+  [0] The opened database object that may be used to generate the 
+      the segment and contain the data to collect. If the dataset 
+      request is from a big file (bigWig, bigBed, Bam), then this 
+      database will likely not be used. Otherwise a 
+      Bio::DB::SeqFeature::Store or Bio::DB::BigWigSet database 
+      object should be passed.
+  [1] The chromosome or seq_id of the segment to examine
+  [2] The start position of the segment
+  [3] The stop or end position of the segment
+  [4] The strand of the region (or original feature) -1, 0, or 1.
+  [5] The dataset name for filename. Multiple datasets may be included, 
       delimited with an ampersand (&). Multiple datasets are merged into 
       one, unless excluded by strand. Local data source files should be 
       prepended with 'file:', while remote data source files should be 
       prepended with the transfer protocol (http: or ftp:).
-  [3] The data type to be collecting. In most cases, the score value 
+  [6] The data type to be collecting. In most cases, the score value 
       is used, but others may be collected. Accepted values include
          
          score
          count
          length
          
-  [4] The method of combining all of the dataset values found in the 
+  [7] The method of combining all of the dataset values found in the 
       segment into a single value. Accepted values include
          
          sum
@@ -2501,7 +2350,7 @@ must be defined and presented in this order. These values include
          rpm (returns reads per million mapped, only valid with 
               bam and bigbed databases)
          
-  [5] The strandedness of acceptable data. Genomic segments 
+  [8] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
       (e.g. ORF) have a specific strandedness. If the dataset strand 
       does not match the specified criteria for strandedness, then it 
@@ -2514,7 +2363,7 @@ must be defined and presented in this order. These values include
          antisense   take only values on the opposite strand
          all         take all values
          
-  [6] The log status of the dataset. Many microarray datasets are in 
+  [9] The log status of the dataset. Many microarray datasets are in 
       log2 format, and must be de-logged to perform accurate 
       mathematical calculations, such as mean or median. Supply a 
       boolean (0 or 1) value.
@@ -2532,8 +2381,11 @@ sub _get_segment_score {
 	
 	# get passed arguments
 	my (
-		$region, 
-		$region_strand, 
+		$db,
+		$chromo,
+		$start,
+		$stop,
+		$strand, 
 		$dataset, 
 		$value_type,
 		$method, 
@@ -2546,7 +2398,7 @@ sub _get_segment_score {
 	my %pos2data; # hash of position to scores
 	my $dataset_type; # remember what type of database the data is from
 	my $iterator; # seqfeature stream object for reiterating db features
-	my $region_type = ref $region; # source of the originating db segment
+	my $db_type = ref $db; # source of the originating db 
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
@@ -2582,9 +2434,9 @@ sub _get_segment_score {
 					# we can use the low-level, super-speedy, summary method 
 					# warn " using collect_bigwig_score() with file\n";
 					return collect_bigwig_score(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						$method,
 						@datasetlist
 					);
@@ -2594,9 +2446,9 @@ sub _get_segment_score {
 					# we can use the low-level, super-speedy, summary method 
 					# warn " using collect_bigwig_score() with file\n";
 					return collect_bigwig_score(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						'count', # special method
 						@datasetlist
 					);
@@ -2606,9 +2458,9 @@ sub _get_segment_score {
 					# collect hash of position => scores
 					# warn " using collect_bigwig_position_score() with file\n";
 					return collect_bigwig_position_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						@datasetlist
 					);
 				}
@@ -2617,9 +2469,9 @@ sub _get_segment_score {
 					# use the longer region collection method
 					# warn " using collect_bigwig_scores() with file\n";
 					@scores = collect_bigwig_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						@datasetlist
 					);
 					$dataset_type = 'bw';
@@ -2643,8 +2495,10 @@ sub _get_segment_score {
 				if ($method eq 'indexed') {
 					# warn " using collect_bigbed_position_scores() with file\n";
 					return collect_bigbed_position_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type, 
 						@datasetlist
@@ -2654,8 +2508,10 @@ sub _get_segment_score {
 				else {
 					# warn " using collect_bigbed_scores() with file\n";
 					@scores = collect_bigbed_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type, 
 						@datasetlist
@@ -2681,8 +2537,10 @@ sub _get_segment_score {
 				if ($method eq 'indexed') {
 					# warn " using collect_bam_position_scores() with file\n";
 					return collect_bam_position_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type, 
 						@datasetlist
@@ -2691,8 +2549,10 @@ sub _get_segment_score {
 				else {
 					# warn " using collect_bam_scores() with file\n";
 					@scores = collect_bam_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type, 
 						@datasetlist
@@ -2715,8 +2575,8 @@ sub _get_segment_score {
 	
 	
 	### BigWigSet database
-	elsif ($region_type =~ m/^Bio::DB::BigWigSet/) {
-		# calling features from a BigWigSet::Segment object
+	elsif ($db_type =~ m/^Bio::DB::BigWigSet/) {
+		# calling features from a BigWigSet database object
 		
 		# we may be able to take advantage of a special low-level 
 		# super-speedy interface based on the BigWigSet summary feature
@@ -2728,8 +2588,11 @@ sub _get_segment_score {
 			# we can use the low-level, super-speedy, summary method 
 			# warn " using collect_bigwigset_score()\n";
 			return collect_bigwigset_score(
-				$region, 
-				$region_strand, 
+				$db,
+				$chromo,
+				$start,
+				$stop,
+				$strand, 
 				$strandedness, 
 				$method,
 				@datasetlist
@@ -2739,8 +2602,11 @@ sub _get_segment_score {
 			# we can use the low-level, super-speedy, summary method 
 			# warn " using collect_bigwigset_score()\n";
 			return collect_bigwigset_score(
-				$region, 
-				$region_strand, 
+				$db,
+				$chromo,
+				$start,
+				$stop,
+				$strand, 
 				$strandedness, 
 				'count', # special method
 				@datasetlist
@@ -2751,8 +2617,11 @@ sub _get_segment_score {
 			# want positioned score data
 			# warn " using collect_bigwigset_position_score()\n";
 			return collect_bigwigset_position_scores(
-				$region, 
-				$region_strand, 
+				$db,
+				$chromo,
+				$start,
+				$stop,
+				$strand, 
 				$strandedness, 
 				@datasetlist
 			);
@@ -2762,8 +2631,11 @@ sub _get_segment_score {
 			# simply collect a list of the scores
 			# warn " using collect_bigwigset_scores()\n";
 			@scores = collect_bigwigset_scores(
-				$region, 
-				$region_strand, 
+				$db,
+				$chromo,
+				$start,
+				$stop,
+				$strand, 
 				$strandedness, 
 				@datasetlist
 			);
@@ -2773,10 +2645,15 @@ sub _get_segment_score {
 		
 	
 	### SeqFeature database
-	elsif ($region_type =~ m/^Bio::DB::SeqFeature/) {
+	elsif ($db_type =~ m/^Bio::DB::SeqFeature/) {
 		# a SeqFeature database
 		# normal collection
-		$iterator = $region->get_seq_stream(-primary_tag => [@datasetlist]);
+		$iterator = $db->get_seq_stream(
+			-seq_id      => $chromo,
+			-start       => $start,
+			-end         => $stop,
+			-primary_tag => [@datasetlist],
+		);
 	}
 	
 	
@@ -2786,7 +2663,11 @@ sub _get_segment_score {
 		# until I code in every single possibility
 		# let's just try a basic features method using whatever the 
 		# default type is and hope for the best
-		$iterator = $region->get_seq_stream();
+		$iterator = $db->get_seq_stream(
+			-seq_id      => $chromo,
+			-start       => $start,
+			-end         => $stop,
+		);
 	}
 		
 	
@@ -2800,6 +2681,13 @@ sub _get_segment_score {
 		
 		# collect the first feature
 		my $feature = $iterator->next_seq;
+		
+		# deal with features that might not be from the chromosome we want
+		# sometimes chromosome matching is sloppy and we get something else
+		while ($feature->seq_id ne $chromo) {
+			$feature = $iterator->next_seq;
+		}
+		return unless $feature;
 		
 		## Wig Data
 		if ( $feature->has_tag('wigfile') ) {
@@ -2828,8 +2716,9 @@ sub _get_segment_score {
 					if ($method eq 'indexed') {
 						# warn " using collect_wig_position_scores() from tag\n";
 						return collect_wig_position_scores(
-							$region, 
-							$region_strand, 
+							$start,
+							$stop,
+							$strand, 
 							$strandedness, 
 							@features
 						);
@@ -2837,8 +2726,9 @@ sub _get_segment_score {
 					else {
 						# warn " using collect_wig_scores() from tag\n";
 						@scores = collect_wig_scores(
-							$region, 
-							$region_strand, 
+							$start,
+							$stop,
+							$strand, 
 							$strandedness, 
 							@features
 						);
@@ -2867,12 +2757,12 @@ sub _get_segment_score {
 						or $feature->strand == 0 # unstranded data
 						or ( 
 							# sense data
-							$region_strand == $feature->strand 
+							$strand == $feature->strand 
 							and $strandedness eq 'sense'
 						) 
 						or (
 							# antisense data
-							$region_strand != $feature->strand  
+							$strand != $feature->strand  
 							and $strandedness eq 'antisense'
 						)
 					) {
@@ -2909,9 +2799,9 @@ sub _get_segment_score {
 						# we can use the low-level, super-speedy, summary method 
 						# warn " using collect_bigwig_score() from tag\n";
 						return collect_bigwig_score(
-							$region, 
-							$region_strand, 
-							$strandedness, 
+							$chromo,
+							$start,
+							$stop,
 							$method,
 							@wigfiles
 						);
@@ -2921,9 +2811,9 @@ sub _get_segment_score {
 						# we can use the low-level, super-speedy, summary method 
 						# warn " using collect_bigwig_score() from tag\n";
 						return collect_bigwig_score(
-							$region, 
-							$region_strand, 
-							$strandedness, 
+							$chromo,
+							$start,
+							$stop,
 							'count', # special method
 							@wigfiles
 						);
@@ -2932,9 +2822,9 @@ sub _get_segment_score {
 					elsif ($method eq 'indexed') {
 						# warn " using collect_bigwig_position_scores() from tag\n";
 						return collect_bigwig_position_scores(
-							$region, 
-							$region_strand, 
-							$strandedness, 
+							$chromo,
+							$start,
+							$stop,
 							@wigfiles
 						);
 					}
@@ -2943,9 +2833,9 @@ sub _get_segment_score {
 						# use the longer region collection method
 						# warn " using collect_bigwig_scores() from tag\n";
 						@scores = collect_bigwig_scores(
-							$region, 
-							$region_strand, 
-							$strandedness, 
+							$chromo,
+							$start,
+							$stop,
 							@wigfiles
 						);
 						$dataset_type = 'bw';
@@ -2979,12 +2869,12 @@ sub _get_segment_score {
 					or $feature->strand == 0 # unstranded data
 					or ( 
 						# sense data
-						$region_strand == $feature->strand 
+						$strand == $feature->strand 
 						and $strandedness eq 'sense'
 					) 
 					or (
 						# antisense data
-						$region_strand != $feature->strand  
+						$strand != $feature->strand  
 						and $strandedness eq 'antisense'
 					)
 				) {
@@ -3020,11 +2910,10 @@ sub _get_segment_score {
 					$method =~ /min|max|mean|sum|count/
 				) {
 					# we can use the low-level, super-speedy, summary method 
-					# warn " using collect_bigwig_score() from tag\n";
 					return collect_bigwig_score(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						$method,
 						@wigfiles
 					);
@@ -3032,33 +2921,30 @@ sub _get_segment_score {
 				
 				elsif ($value_type eq 'count' and $method eq 'sum') {
 					# we can use the low-level, super-speedy, summary method 
-					# warn " using collect_bigwig_score() from tag\n";
 					return collect_bigwig_score(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						'count', # special method
 						@wigfiles
 					);
 				}
 				
 				elsif ($method eq 'indexed') {
-					# warn " using collect_bigwig_position_scores() from tag\n";
 					return collect_bigwig_position_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						@wigfiles
 					);
 				}
 				
 				else {
 					# use the longer region collection method
-					# warn " using collect_bigwig_scores() from tag\n";
 					@scores = collect_bigwig_scores(
-						$region, 
-						$region_strand, 
-						$strandedness, 
+						$chromo,
+						$start,
+						$stop,
 						@wigfiles
 					);
 					$dataset_type = 'bw';
@@ -3093,8 +2979,10 @@ sub _get_segment_score {
 				if ($method eq 'indexed') {
 					# warn " using collect_bigbed_position_scores() from tag\n";
 					return collect_bigbed_position_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type,
 						@bedfiles
@@ -3103,8 +2991,10 @@ sub _get_segment_score {
 				else {
 					# warn " using collect_bigbed_scores() from tag\n";
 					@scores = collect_bigbed_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type,
 						@bedfiles
@@ -3140,8 +3030,10 @@ sub _get_segment_score {
 				if ($method eq 'indexed') {
 					# warn " using collect_bam_position_scores() from tag\n";
 					return collect_bam_position_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type,
 						@bamfiles
@@ -3150,8 +3042,10 @@ sub _get_segment_score {
 				else {
 					# warn " using collect_bam_scores() from tag\n";
 					@scores = collect_bam_scores(
-						$region, 
-						$region_strand, 
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
 						$strandedness, 
 						$value_type,
 						@bamfiles
@@ -3178,16 +3072,16 @@ sub _get_segment_score {
 				# Check which data to take based on strand
 				if (
 					$strandedness eq 'all' # all data is requested
-					or $region_strand == 0 # region is unstranded
+					or $strand == 0 # region is unstranded
 					or $feature->strand == 0 # unstranded data
 					or ( 
 						# sense data
-						$region_strand == $feature->strand 
+						$strand == $feature->strand 
 						and $strandedness eq 'sense'
 					) 
 					or (
 						# antisense data
-						$region_strand != $feature->strand  
+						$strand != $feature->strand  
 						and $strandedness eq 'antisense'
 					)
 				) {
