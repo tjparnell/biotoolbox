@@ -35,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.6.3';
+my $VERSION = '1.7.0';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -57,7 +57,8 @@ my (
 	$infile,
 	$new,
 	$outfile,
-	$database,
+	$main_database,
+	$data_database,
 	$feature,
 	$method,
 	$value_type,
@@ -85,7 +86,8 @@ GetOptions(
 	'in=s'       => \$infile, # load a pre-existing file
 	'new'        => \$new, # generate a new file
 	'out=s'      => \$outfile, # name of new output file 
-	'db=s'       => \$database, # database name
+	'db=s'       => \$main_database, # main or annotation database name
+	'ddb=s'      => \$data_database, # data database
 	'feature=s'  => \$feature, # name of genomic feature to analyze
 	'method=s'   => \$method, # method of collecting & reporting data
 	'value=s'    => \$value_type, # type of data to collect
@@ -158,24 +160,30 @@ if (defined $fstart or defined $fstop) {
 set_defaults();
 
 # Assign database if possible
-unless (defined $database) {
-	# we can get the database from two sources
+unless (defined $main_database) {
+	# we can get the database from somewhere else
 	if ($new) {
-		# we could use a dataset file
-		unless (@datasets) {
-			die " You must define a database or an appropriate dataset file! see help\n";
-		}
 		
-		# get the first dataset listed to use as a database
-		# this only works, of course, with certain BigFile files
-		if ($datasets[0] =~ /,/) {
-			# seems to be a comma delimited list
-			# take the first element
-			$database = (split /,/, $datasets[0])[0];
+		if (defined $data_database) {
+			# reuse the data database
+			$main_database = $data_database;
+		}
+		elsif (@datasets) {
+			# we could use a dataset file
+			# get the first dataset listed to use as a database
+			# this only works, of course, with certain BigFile files
+			if ($datasets[0] =~ /,/) {
+				# seems to be a comma delimited list
+				# take the first element
+				$main_database = (split /,/, $datasets[0])[0];
+			}
+			else {
+				# take the first element
+				$main_database = $datasets[0];
+			}
 		}
 		else {
-			# take the first element
-			$database = $datasets[0];
+			die " You must define a database or an appropriate dataset file! see help\n";
 		}
 	}
 	# or else we can get the database from the input file metadata
@@ -193,19 +201,31 @@ my $start_time = time;
 # Generate or open main feature list
 my $main_data_ref = get_main_data_ref();
 
-# Open database connection
-unless ($database) {
+# Open main database connection
+unless ($main_database) {
 	# this could've been obtained either from the input file, 
 	# command line, or a source data file
 	die " no database defined! see help\n";
 }
-my $db = open_db_connection($database) or 
-	die " unable to establish database connection to '$database'!\n";
+my $mdb = open_db_connection($main_database) or 
+	die " unable to establish database connection to '$main_database'!\n";
+
+# Open data database
+my $ddb;
+if (defined $data_database) {
+	# specifically defined a data database
+	$ddb = open_db_connection($data_database) or 
+		die "unable to establish data database connection to $data_database!\n";
+}
+else {
+	# reuse the main database connection
+	$ddb = $mdb;
+}
 
 # Check the datasets
 unless ($datasets[0] eq 'none') {
 	@datasets = process_and_verify_dataset( {
-		'db'      => $db,
+		'db'      => $ddb,
 		'dataset' => [ @datasets ],
 	} );
 }
@@ -371,7 +391,7 @@ sub get_main_data_ref {
 	
 	# Generate new input file from the database
 	if ($new) { 
-		print " Generating a new feature list from database '$database'...\n";
+		print " Generating a new feature list from database '$main_database'...\n";
 		
 		# generate feature list based on type of feature
 		if ($feature eq 'genome') { 
@@ -384,7 +404,7 @@ sub get_main_data_ref {
 			
 			# generate the list
 			$data_ref = get_new_genome_list( {
-				'db'       => $database, 
+				'db'       => $main_database, 
 				'win'      => $win,
 				'step'     => $step,
 			} );
@@ -395,7 +415,7 @@ sub get_main_data_ref {
 			
 			# generate the gene list
 			$data_ref = get_new_feature_list( {
-				'db'        => $database,
+				'db'        => $main_database,
 				'features'  => $feature,
 			} );
 		}
@@ -419,8 +439,8 @@ sub get_main_data_ref {
 		# now set missing arguments with values from loaded file
 		
 		# database
-		unless ($database) {
-			$database = $data_ref->{'db'};
+		unless ($main_database) {
+			$main_database = $data_ref->{'db'};
 		}
 		
 		# feature
@@ -549,8 +569,8 @@ sub collect_dataset {
 		}
 		
 		# check that we have the appropriate database opened
-		my $db_ref = ref $db;
-		unless ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
+		my $mdb_ref = ref $mdb;
+		unless ($mdb_ref =~ /^Bio::DB::SeqFeature::Store/) {
 			die "\n\n Collecting data for named features is currently only " .
 				"supported with\n Bio::DB::SeqFeature::Store databases! " .
 				"Please either open an appropriate\n" . 
@@ -568,7 +588,7 @@ sub collect_dataset {
 			# check if we're doing RPKM
 			if ($method =~ /^rpk?m$/) {
 				# check that we have an appropriate dataset
-				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $db);
+				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $mdb);
 				unless ($rpkm_read_sum) {
 					warn " $method method requested but not supported for " .
 						"dataset '$dataset'\n using summed count instead\n";
@@ -617,7 +637,7 @@ sub get_genome_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $main_data_ref->{'data_table'}->[$row][$start_i],
@@ -654,7 +674,7 @@ sub get_extended_genome_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $start,
@@ -719,7 +739,7 @@ sub get_adjusted_genome_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $start,
@@ -778,7 +798,7 @@ sub get_fractionated_genome_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $start,
@@ -811,7 +831,7 @@ sub get_feature_dataset {
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
-		my @features = $db->features( 
+		my @features = $mdb->features( 
 				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
 				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
@@ -846,7 +866,7 @@ sub get_feature_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
 				'start'     => $feature->start,
@@ -878,7 +898,7 @@ sub get_extended_feature_dataset {
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
-		my @features = $db->features( 
+		my @features = $mdb->features( 
 				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
 				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
@@ -912,7 +932,7 @@ sub get_extended_feature_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
 				'start'     => $feature->start - $extend,
@@ -944,7 +964,7 @@ sub get_adjusted_feature_dataset {
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
-		my @features = $db->features( 
+		my @features = $mdb->features( 
 				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
 				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
@@ -1032,7 +1052,7 @@ sub get_adjusted_feature_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
 				'start'     => $start,
@@ -1066,7 +1086,7 @@ sub get_fractionated_feature_dataset {
 		
 		
 		# get the feature from the database
-		my @features = $db->features( 
+		my @features = $mdb->features( 
 				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
 				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
@@ -1163,7 +1183,7 @@ sub get_fractionated_feature_dataset {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
 				'start'     => $feature->start,
@@ -1195,7 +1215,7 @@ sub get_subfeature_dataset {
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
 		# Get the feature from the database
-		my @features = $db->features( 
+		my @features = $mdb->features( 
 				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
 				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
@@ -1293,7 +1313,7 @@ sub get_subfeature_dataset {
 			# subfeatures are indexed separately from the parent in the 
 			# database
 			my %pos2scores = get_region_dataset_hash( {
-				'db'        => $db,
+				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $subfeat->seq_id,
 				'start'     => $subfeat->start,
@@ -1478,12 +1498,16 @@ sub record_metadata {
 	if ($subfeature) {
 		$metadata{'exons'} = 'yes';
 	}
-	# add database name if different
-	if ($database ne $main_data_ref->{'db'}) {
-		$metadata{'db'} = $database;
-	}
 	if ($set_strand) {
 		$metadata{'strand_implied'} = 'yes';
+	}
+	
+	# add database name if different
+	if (defined $data_database) {
+		$metadata{'db'} = $data_database;
+	}
+	elsif ($main_database ne $main_data_ref->{'db'}) {
+		$metadata{'db'} = $main_database;
 	}
 	
 	# place metadata hash into main data structure
@@ -1518,6 +1542,7 @@ get_datasets.pl [--options...] [<filename>]
   --in <filename>
   --out filename
   --db <name | filename>
+  --ddb <name | filename>
   --feature <type | type:source | alias>, ...
   --data <none | file | type>, ...
   --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
@@ -1568,16 +1593,26 @@ overwritten.
 
 =item --db <name | filename>
 
-Specify the name of a BioPerl SeqFeature::Store database to use as
-source. Alternatively, an appropriate single file database file may be 
-provided. Acceptable databases may include a single GFF3 file (.gff or 
-.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
-SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
-(see Bio::DB::BigWigSet). Specifying the database is required for new 
-feature data files. For pre-existing input data files, this value may be 
-obtained from the input file metadata. However, if provided, it overrides 
-the database specified in the file; this is useful for collecting data 
-from multiple databases.
+Specify the name of a BioPerl database from which to obtain the 
+annotation, chromosomal information, and/or data. Typically a 
+Bio::DB::SeqFeature::Store database schema is used, either from a 
+relational database, SQLite file, or a single GFF3 file to be loaded 
+into memory. Alternatively, a BigWigSet directory, or a single BigWig, 
+BigBed, or Bam file may be specified. 
+
+A database is required for generating new files. When generating a new 
+genome interval file, a bigFile or Bam file listed as a data source 
+will be adopted as the database. 
+
+For input files, the database name may be obtained from the file 
+metadata. A different database may be specified from that listed in 
+the metadata when a different source is desired. 
+
+=item --ddb <name | filename>
+
+Optionally specify the name of an alternate data database from which 
+the data should be collected, separate from the primary annotation 
+database. The same options apply as to the --db option. 
 
 =item --feature <type | type:source | alias>,...
 

@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.6.2';
+my $VERSION = '1.7.0';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -46,7 +46,8 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile, 
 	$outfile, 
-	$database, 
+	$main_database, 
+	$data_database,
 	$dataset, 
 	$feature, 
 	$value_type,
@@ -69,7 +70,8 @@ my (
 GetOptions( 
 	'out=s'      => \$outfile, # output file name
 	'in=s'       => \$infile, # input file name
-	'db=s'       => \$database, # database name
+	'db=s'       => \$main_database, # main or annotation database name
+	'ddb=s'      => \$data_database, # data database
 	'data=s'     => \$dataset, # dataset name
 	'feature=s'  => \$feature, # type of feature
 	'value=s'    => \$value_type, # the type of data to collect
@@ -110,7 +112,7 @@ if ($print_version) {
 
 
 ## Check for required values
-unless ($database or $infile) {
+unless ($main_database or $infile) {
 	die " You must define a database or input file!\n Use --help for more information\n";
 }
 
@@ -262,31 +264,43 @@ my $startcolumn = $main_data_ref->{'number_columns'};
 
 ## Collect the data
 
-# Open database connection
-unless ($database) {
+# Open main database connection
+unless ($main_database) {
 	# define the database 
 	if ( $main_data_ref->{'db'} ) {
 		# from the input file if possible
-		$database = $main_data_ref->{'db'};
+		$main_database = $main_data_ref->{'db'};
 	}
 	elsif ($dataset) {
 		# or use the dataset if possible
-		$database = $dataset;
+		$main_database = $dataset;
 	}
 	else {
 		die " You must define a database or dataset!\n" . 
 			" Use --help for more information\n";
 	}
 }
-my $db = open_db_connection($database);
-unless ($db) {
+my $mdb = open_db_connection($main_database);
+unless ($mdb) {
 	die " You must define a database or dataset!\n" . 
 		" Use --help for more information\n";
 }
 
+# Open data database
+my $ddb;
+if (defined $data_database) {
+	# specifically defined a data database
+	$ddb = open_db_connection($data_database) or 
+		die "unable to establish data database connection to $data_database!\n";
+}
+else {
+	# reuse the main database connection
+	$ddb = $mdb;
+}
+
 # Check the dataset
 $dataset = process_and_verify_dataset( {
-	'db'      => $db,
+	'db'      => $ddb,
 	'dataset' => $dataset,
 	'single'  => 1,
 } );
@@ -295,7 +309,7 @@ $dataset = process_and_verify_dataset( {
 my $rpm_read_sum;
 if ($method eq 'rpm') {
 	print " Checking RPM support for dataset '$dataset'...\n";
-	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $db);
+	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb);
 	if ($rpm_read_sum) {
 		printf " %s total features\n", format_with_commas($rpm_read_sum);
 	}
@@ -377,7 +391,7 @@ sub generate_a_new_feature_dataset {
 	# a subroutine to generate a new feature dataset
 	
 	$main_data_ref = get_new_feature_list( {
-			'db'       => $database,
+			'db'       => $main_database,
 			'features' => $feature,
 	} );
 	
@@ -476,6 +490,9 @@ sub prepare_window_datasets {
 		if ($strand_sense =~ /sense/) {
 			$metadata{'strand'} = $strand_sense;
 		}
+		if ($data_database) {
+			$metadata{'db'} = $data_database;
+		}
 		$main_data_ref->{$new_index} = \%metadata;
 		
 		# set the column header
@@ -559,7 +576,8 @@ sub map_relative_data_for_features {
 		
 		# collect the region scores
 		my %regionscores = get_region_dataset_hash( {
-				'db'          => $db,
+				'db'          => $mdb,
+				'ddb'         => $ddb,
 				'dataset'     => $dataset,
 				'name'        => $data_table_ref->[$row][$name_index],
 				'type'        => $data_table_ref->[$row][$type_index],
@@ -694,7 +712,7 @@ sub map_relative_data_for_regions {
 		
 		# collect the region scores
 		my %regionscores = get_region_dataset_hash( {
-				'db'          => $db,
+				'db'          => $ddb,
 				'dataset'     => $dataset,
 				'chromo'      => $data_table_ref->[$row][$chr_index],
 				'start'       => $start,
@@ -887,6 +905,7 @@ get_relative_data.pl
   
   Options:
   --db <name|file.gff3>
+  --ddb <name|file.gff3>
   --feature [type, type:source]
   --in <filename> 
   --out <filename>
@@ -914,16 +933,26 @@ The command line flags and descriptions:
 
 =item --db <name | filename>
 
-Specify the name of a BioPerl SeqFeature::Store database to use as
-source. Alternatively, an appropriate single file database file may be 
-provided. Acceptable databases may include a single GFF3 file (.gff or 
-.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
-SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
-(see Bio::DB::BigWigSet). Specifying the database is required for new 
-feature data files. For pre-existing input data files, this value may be 
-obtained from the input file metadata. However, if provided, it overrides 
-the database specified in the file; this is useful for collecting data 
-from multiple databases.
+Specify the name of a BioPerl database from which to obtain the 
+annotation, chromosomal information, and/or data. Typically a 
+Bio::DB::SeqFeature::Store database schema is used, either from a 
+relational database, SQLite file, or a single GFF3 file to be loaded 
+into memory. Alternatively, a BigWigSet directory, or a single BigWig, 
+BigBed, or Bam file may be specified. 
+
+A database is required for generating new files. When generating a new 
+genome interval file, a bigFile or Bam file listed as a data source 
+will be adopted as the database. 
+
+For input files, the database name may be obtained from the file 
+metadata. A different database may be specified from that listed in 
+the metadata when a different source is desired. 
+
+=item --ddb <name | filename>
+
+Optionally specify the name of an alternate data database from which 
+the data should be collected, separate from the primary annotation 
+database. The same options apply as to the --db option. 
 
 =item --out <filename>
 
@@ -944,8 +973,7 @@ text files generated with other biotoolbox programs.
 Specify the type of feature to map data around. The feature may be 
 listed either as GFF type or GFF type:source. The list 
 of features will be automatically generated from the database. 
-
-This is optional if the features are defined in the input file.
+This is only required when an input file is not specified. 
 
 =item --data <dataset_name | filename>
 

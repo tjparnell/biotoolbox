@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.5.9';
+my $VERSION = '1.7.0';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -45,7 +45,8 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile,
 	$outfile,
-	$database,
+	$main_database,
+	$data_database,
 	$dataset,
 	$feature,
 	$method,
@@ -68,7 +69,8 @@ my (
 GetOptions( 
 	'in=s'        => \$infile, # input file
 	'out=s'       => \$outfile, # name of outfile
-	'db=s'        => \$database, # database name
+	'db=s'       => \$main_database, # main or annotation database name
+	'ddb=s'      => \$data_database, # data database
 	'data=s'      => \$dataset, # dataset name
 	'feature=s'   => \$feature, # what type of feature to work with
 	'method=s'    => \$method, # method for collecting the data
@@ -107,7 +109,7 @@ if ($print_version) {
 
 ### Check for required values
 
-unless ($database or $infile) {
+unless ($main_database or $infile) {
 	# a database must be defined
 	# a tim data file used as an input file would also define one
 	die " You must define a database or input file!\n";
@@ -217,8 +219,8 @@ if ($infile) {
 	}
 	
 	# define database if necessary
-	unless ($database) {
-		$database = $main_data_ref->{'db'};
+	unless ($main_database) {
+		$main_database = $main_data_ref->{'db'};
 	}
 } 
 else {
@@ -240,24 +242,35 @@ my $data_table_ref = $main_data_ref->{'data_table'};
 
 
 ### Open database connection
-unless ($database) {
+unless ($main_database) {
 	# define the database 
 	if ( $main_data_ref->{'db'} ) {
 		# from the input file if possible
-		$database = $main_data_ref->{'db'};
+		$main_database = $main_data_ref->{'db'};
 	}
 	elsif ($dataset) {
 		# or use the dataset if possible
-		$database = $dataset;
+		$main_database = $dataset;
 	}
 	else {
 		die " You must define a database or dataset!\n" . 
 			" Use --help for more information\n";
 	}
 }
-my $db = open_db_connection($database) or
-	die " unable to open database '$database'!\n";
+my $mdb = open_db_connection($main_database) or
+	die " unable to open database '$main_database'!\n";
 
+# Open data database
+my $ddb;
+if (defined $data_database) {
+	# specifically defined a data database
+	$ddb = open_db_connection($data_database) or 
+		die "unable to establish data database connection to $data_database!\n";
+}
+else {
+	# reuse the main database connection
+	$ddb = $mdb;
+}
 
 
 
@@ -266,7 +279,7 @@ my $db = open_db_connection($database) or
 
 ## Check for the dataset
 $dataset = process_and_verify_dataset( {
-	'db'      => $db,
+	'db'      => $ddb,
 	'dataset' => $dataset,
 	'single'  => 1,
 } );
@@ -275,7 +288,7 @@ $dataset = process_and_verify_dataset( {
 my $rpm_read_sum;
 if ($method eq 'rpm') {
 	print " Checking RPM support for dataset '$dataset'...\n";
-	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $db);
+	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb);
 	if ($rpm_read_sum) {
 		printf " %s total features\n", format_with_commas($rpm_read_sum);
 	}
@@ -358,7 +371,7 @@ sub generate_a_new_feature_dataset {
 	# a subroutine to generate a new feature dataset
 	
 	$main_data_ref = get_new_feature_list( {
-			'db'       => $database,
+			'db'       => $main_database,
 			'features' => $feature,
 	} );
 	
@@ -437,7 +450,7 @@ sub collect_binned_data_for_features {
 		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
 		
 		# pull gene from database
-		my @genes = $db->features( 
+		my @genes = $mdb->features( 
 				-name  => $name,
 				-type => $type,
 		);
@@ -488,7 +501,8 @@ sub collect_binned_data_for_features {
 		
 		# collect the region scores
 		my %regionscores = get_region_dataset_hash( {
-					'db'        => $db,
+					'db'        => $mdb,
+					'ddb'       => $ddb,
 					'dataset'   => $dataset,
 					'value'     => $value_type,
 					'name'      => $name,
@@ -566,7 +580,7 @@ sub collect_binned_data_for_regions {
 		
 		# collect the region scores
 		my %regionscores = get_region_dataset_hash( {
-					'db'       => $db,
+					'db'       => $ddb,
 					'dataset'  => $dataset,
 					'value'    => $value_type,
 					'chromo'   => $chromo,
@@ -994,6 +1008,9 @@ sub _set_metadata {
 	if ($set_strand) {
 		$main_data_ref->{$new_index}{'strand_implied'} = 1;
 	}
+	if ($data_database) {
+		$main_data_ref->{$new_index}{'db'} = $data_database;
+	}
 	
 	# set the column header
 	$data_table_ref->[0][$new_index] = $name;
@@ -1021,6 +1038,7 @@ average_gene.pl
   --in <filename> 
   --out <filename>
   --db <name | filename>
+  --ddb <name | filename>
   --feature <type | type:source | alias>,...
   --data <dataset_name | filename>
   --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
@@ -1058,16 +1076,26 @@ Specify the output file name.
 
 =item --db <name | filename>
 
-Specify the name of a BioPerl SeqFeature::Store database to use as
-source. Alternatively, an appropriate single file database file may be 
-provided. Acceptable databases may include a single GFF3 file (.gff or 
-.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
-SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
-(see Bio::DB::BigWigSet). Specifying the database is required for new 
-feature data files. For pre-existing input data files, this value may be 
-obtained from the input file metadata. However, if provided, it overrides 
-the database specified in the file; this is useful for collecting data 
-from multiple databases.
+Specify the name of a BioPerl database from which to obtain the 
+annotation, chromosomal information, and/or data. Typically a 
+Bio::DB::SeqFeature::Store database schema is used, either from a 
+relational database, SQLite file, or a single GFF3 file to be loaded 
+into memory. Alternatively, a BigWigSet directory, or a single BigWig, 
+BigBed, or Bam file may be specified. 
+
+A database is required for generating new files. When generating a new 
+genome interval file, a bigFile or Bam file listed as a data source 
+will be adopted as the database. 
+
+For input files, the database name may be obtained from the file 
+metadata. A different database may be specified from that listed in 
+the metadata when a different source is desired. 
+
+=item --ddb <name | filename>
+
+Optionally specify the name of an alternate data database from which 
+the data should be collected, separate from the primary annotation 
+database. The same options apply as to the --db option. 
 
 =item --feature <type | type:source | alias>,...
 

@@ -5,7 +5,7 @@ require Exporter;
 use strict;
 use Carp;
 use Bio::Graphics::Wiggle;
-our $VERSION = '1.5.9';
+our $VERSION = '1.7.0';
 
 
 # Exported names
@@ -46,7 +46,7 @@ sub collect_wig_scores {
 sub collect_wig_position_scores {
 	
 	# pass the required information
-	my ($region, $region_strand, $stranded, @wig_features) = @_;
+	my ($start, $stop, $strand, $stranded, @wig_features) = @_;
 	
 	# set up hash, position => score
 	my %wig_data;
@@ -62,20 +62,16 @@ sub collect_wig_position_scores {
 			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$region_strand == $feature->strand 
+				$strand == $feature->strand 
 				and $stranded eq 'sense'
 			) 
 			or (
 				# antisense data
-				$region_strand != $feature->strand  
+				$strand != $feature->strand  
 				and $stranded eq 'antisense'
 			)
 		) {
 			# we have acceptable data to collect
-			
-			# get coordinates of the region
-			my $start = $region->start;
-			my $end   = $region->end;
 			
 			# collect from wigfile if present
 			if ($feature->has_tag('wigfile') ) {
@@ -114,17 +110,17 @@ sub collect_wig_position_scores {
 					# nothing we can do here, no values
 					return;
 				}
-				if ($end > $wig->end) {
+				if ($stop > $wig->end) {
 					# adjust the end position
-					$end = $wig->end;
+					$stop = $wig->end;
 				}
-				elsif ($end < $wig->start) {
+				elsif ($stop < $wig->start) {
 					# nothing we can do here, no values
 					return;
 				}
 				
 				# collect the wig values
-				my $scores_ref = $wig->values($start => $end);
+				my $scores_ref = $wig->values($start => $stop);
 				
 				# re-associate position with the scores
 				my $step = $wig->step;
@@ -208,15 +204,14 @@ some statistical method (mean, median, etc.).
 
 The subroutine is passed three or more arguments in the following order:
     
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
+    1) The start position of the segment to collect from
+    2) The stop or end position of the segment to collect from
+    3) The strand of the original feature (or region), -1, 0, or 1.
+    4) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
-    4) One or more database feature objects that contain the reference 
+    5) One or more database feature objects that contain the reference 
        to the wib file. They should contain the attribute 'wigfile'.
 
 The subroutine returns an array of the defined dataset values found within 
@@ -227,18 +222,7 @@ the region of interest.
 This subroutine will collect the score values from a binary wig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed three or more arguments in the following order:
-    
-    1) The database object representing the genomic region of interest. 
-       This should be a Bio::DB::SeqFeature object that supports the 
-       start, end, and strand methods.
-    2) The strand of the original feature (or region), -1, 0, or 1.
-    3) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
-       strandedness are collected.
-    4) One or more database feature objects that contain the reference 
-       to the wib file. They should contain the attribute 'wigfile'.
+The subroutine is passed the same arguments as collect_wig_scores().
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. Note that only one value is 
