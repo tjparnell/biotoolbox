@@ -245,6 +245,7 @@ sub process_gene_tree {
 					$tree->{$gene}{$transcript},
 					0
 				];
+			$output->{'last_row'} += 1;
 		}
 		
 		# more than 1 transcript
@@ -277,7 +278,6 @@ sub process_gene_tree {
 					$max,
 					range(values %{ $tree->{$gene} }), # the range of the scores
 				 ];
-			
 			$output->{'last_row'} += 1;
 		}
 	}
