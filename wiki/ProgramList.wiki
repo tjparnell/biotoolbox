@@ -13,6 +13,7 @@ Lists of programs organized by function.
 	* [ProgramList#get_relative_data.pl get_relative_data.pl]
 
 ===Data analysis===
+	* [ProgramList#compare_subfeature_scores.pl compare_subfeature_scores.pl]
 	* [ProgramList#data2frequency.pl data2frequency.pl]
 	* [ProgramList#graph_data.pl graph_data.pl]
 	* [ProgramList#graph_histogram.pl graph_histogram.pl]
@@ -99,6 +100,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====change_chr_prefix.pl====
 [Pod_change_chr_prefix change_chr_prefix.pl] changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
+
+====compare_subfeature_scores.pl====
+[Pod_compare_subfeature_scores compare_subfeature_scores.pl] compares the scores of all the subfeatures of a parent feature to find the minimum and maximum subfeature score. For example, identify expressed and not-expressed alternative transcripts of a gene.
 
 ====data2frequency.pl====
 [Pod_data2frequency data2frequency.pl] converts data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.

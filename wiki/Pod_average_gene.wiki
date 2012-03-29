@@ -97,6 +97,7 @@ __
   - min
   - max
   - rpm         Reads Per Million mapped, for Bam and BigBed only
+  - rpkm        Same as rpm but normalized for gene length in kb
 }}}
 __--value `[`score|count|length`]`
 

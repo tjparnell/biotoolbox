@@ -150,7 +150,7 @@ __
 __--exons
 
 __
-  Optionally indicate that data should be collected only over the exon  subfeatures of a gene or transcript, rather than the entire gene.  Subfeatures with a primary_tag of exon are preferentially taken. If exons  are not defined, then CDS and UTR subfeatures are used, or the entire  gene or transcript if no appropriate subfeatures are found. Note that  the options extend, start, stop, fstart, and fstop are ignored.  Default is false. This option is automatically enabled when the method  'rpkm' is specified.
+  Optionally indicate that data should be collected only over the exon  subfeatures of a gene or transcript, rather than the entire gene.  Subfeatures with a primary_tag of exon are preferentially taken. If exons  are not defined, then CDS and UTR subfeatures are used, or the entire  gene or transcript if no appropriate subfeatures are found. Note that  the options extend, start, stop, fstart, and fstop are ignored.  Default is false.
 __
   __
 __--extend <**integer>
