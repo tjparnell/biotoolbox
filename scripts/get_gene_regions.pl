@@ -49,6 +49,7 @@ my (
 	$start_adj,
 	$stop_adj,
 	$unique,
+	$slop,
 	$gz,
 	$help,
 	$print_version,
@@ -65,6 +66,7 @@ GetOptions(
 	'start=i'   => \$start_adj, # start coordinate adjustment
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
+	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -105,6 +107,10 @@ unless ($outfile) {
 
 unless ($transcript_type) {
 	$transcript_type = 'mRNA';
+}
+
+unless (defined $slop) {
+	$slop = 0;
 }
 
 unless (defined $gz) {
@@ -311,9 +317,7 @@ sub collect_from_database {
 			my @regions = process_transcript($seqfeat, $method);
 			
 			# add the parent name
-			for my $i (0 .. $#regions) {
-				unshift @{ $regions[$i] }, $seqfeat->display_name;
-			}
+			map { unshift @$_, $seqfeat->display_name } @regions;
 			
 			push @{ $output->{'data_table'} }, @regions;
 		}
@@ -370,9 +374,7 @@ sub collect_from_file {
 				my @regions = process_transcript($seqfeat, $method);
 				
 				# add the parent name
-				for my $i (0 .. $#regions) {
-					unshift @{ $regions[$i] }, $seqfeat->display_name;
-				}
+				map { unshift @$_, $seqfeat->display_name } @regions;
 				
 				push @{ $output->{'data_table'} }, @regions;
 			}
@@ -417,6 +419,7 @@ sub generate_output_structure {
 		"region",
 		qw(
 			Parent
+			Transcript
 			Name
 			Chromosome
 			Start
@@ -426,17 +429,18 @@ sub generate_output_structure {
 	);
 	
 	# add metadata
-	
 	$data->{1}{'type'} = $request;
 	$data->{1}{'type'} =~ s/\s/_/; # replace spaces
+	$data->{2}{'type'} = $transcript_type;
 	if ($start_adj) {
-		$data->{3}{'start_adjusted'} = $start_adj;
+		$data->{4}{'start_adjusted'} = $start_adj;
 	}
 	if ($stop_adj) {
-		$data->{4}{'stop_adjusted'} = $stop_adj;
+		$data->{5}{'stop_adjusted'} = $stop_adj;
 	}
 	if ($unique) {
-		$data->{1}{'unique'} = 1; # Name
+		$data->{2}{'unique'} = 1; # Name
+		$data->{2}{'slop'} = $slop;
 	}
 	
 	return $data;
@@ -528,7 +532,9 @@ sub collect_tss {
 	# get name
 	my $name = $transcript->display_name . '_TSS';
 	
-	return _adjust_positions( [$name, $chromo, $start, $stop, $strand] );
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $start, $stop, $strand] 
+	);
 }
 
 
@@ -562,7 +568,9 @@ sub collect_tts {
 	# get name
 	my $name = $transcript->display_name . '_TTS';
 	
-	return _adjust_positions( [$name, $chromo, $start, $stop, $strand] );
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $start, $stop, $strand] 
+	);
 }
 
 
@@ -584,6 +592,7 @@ sub collect_first_exon {
 	
 	# finished
 	return _adjust_positions( [ 
+		$transcript->display_name,
 		$name, 
 		$first->seq_id, 
 		$first->start, 
@@ -611,6 +620,7 @@ sub collect_last_exon {
 	
 	# finished
 	return _adjust_positions( [ 
+		$transcript->display_name,
 		$name, 
 		$last->seq_id, 
 		$last->start, 
@@ -651,6 +661,7 @@ sub collect_splice_sites {
 			# first exon
 			if ($i == 0) {
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_3\'', 
 					$exon->seq_id, 
 					$exon->end + 1, 
@@ -662,6 +673,7 @@ sub collect_splice_sites {
 			# last exon
 			elsif ($i == $last) {
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_5\'', 
 					$exon->seq_id, 
 					$exon->start - 1, 
@@ -676,6 +688,7 @@ sub collect_splice_sites {
 				
 				# 5' splice
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_5\'', 
 					$exon->seq_id, 
 					$exon->start - 1, 
@@ -685,6 +698,7 @@ sub collect_splice_sites {
 				
 				# 3' splice
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_3\'', 
 					$exon->seq_id, 
 					$exon->end + 1, 
@@ -709,6 +723,7 @@ sub collect_splice_sites {
 			# first exon
 			if ($i == 0) {
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_3\'', 
 					$exon->seq_id, 
 					$exon->start - 1, 
@@ -720,6 +735,7 @@ sub collect_splice_sites {
 			# last exon
 			elsif ($i == $last) {
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_5\'', 
 					$exon->seq_id, 
 					$exon->end + 1, 
@@ -734,6 +750,7 @@ sub collect_splice_sites {
 				
 				# 5' splice
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_5\'', 
 					$exon->seq_id, 
 					$exon->end + 1, 
@@ -743,6 +760,7 @@ sub collect_splice_sites {
 				
 				# 3' splice
 				push @splices, _adjust_positions( [ 
+					$transcript->display_name,
 					$name . '_3\'', 
 					$exon->seq_id, 
 					$exon->start - 1, 
@@ -781,6 +799,7 @@ sub collect_introns {
 		# walk through each exon
 		for (my $i = 0; $i < $last -1; $i++) {
 			push @introns, _adjust_positions( [ 
+				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
 				$list->[$i]->end + 1, 
@@ -796,6 +815,7 @@ sub collect_introns {
 		# walk through each exon
 		for (my $i = 0; $i < $last -1; $i++) {
 			push @introns, _adjust_positions( [ 
+				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
 				$list->[$i]->start - 1, 
@@ -869,29 +889,29 @@ sub _adjust_positions {
 	
 	my $region = shift;
 	# region is an anonymous array of 5 elements
-	# [$name, $chromo, $start, $stop, $strand]
+	# [$transcript_name, $name, $chromo, $start, $stop, $strand]
 	
 	# adjust the start and end positions according to strand
-	if ($region->[4] == 1) {
+	if ($region->[5] == 1) {
 		# forward strand
 		
 		if ($start_adj) {
-			$region->[2] += $start_adj;
+			$region->[3] += $start_adj;
 		}
 		if ($stop_adj) {
-			$region->[3] += $stop_adj;
+			$region->[4] += $stop_adj;
 		}
 	}
-	elsif ($region->[4] == -1) {
+	elsif ($region->[5] == -1) {
 		# reverse strand
 		
 		if ($start_adj) {
-			$region->[3] -= $start_adj;
+			$region->[4] -= $start_adj;
 		}
 		
 		# stop
 		if ($stop_adj) {
-			$region->[2] -= $stop_adj;
+			$region->[3] -= $stop_adj;
 		}
 	}
 	
@@ -908,14 +928,23 @@ sub remove_duplicates {
 	# look for duplicates using a quick hash of seen positions
 	my %seenit;
 	my @to_remove;
-	for my $i (0 ..  $#{ $regions } ) {
+	for my $i (0 .. $#{ $regions } ) {
 		# we will be using the start position as a unique identifier
+		# to account for the slop factor,
+		# we'll be adding/subtracting the slop value to/from the start position
+		# if this position matches anything else, we'll assume it's a duplicate
 		
-		if (exists $seenit{ $regions->[$i]->[2] }) {
-			push @to_remove, $i;
-		}
-		else {
-			$seenit{ $regions->[$i]->[2] } = $i;
+		foreach my $pos ( 
+			# generate an array of possible start positions
+			# with a default slop of 0, this will only be 1 position
+			($regions->[$i]->[3] - $slop) .. ($regions->[$i]->[3] + $slop)
+		) {
+			if (exists $seenit{ $pos }) {
+				push @to_remove, $i;
+			}
+			else {
+				$seenit{ $pos } = 1;
+			}
 		}
 	}
 	
@@ -947,6 +976,7 @@ get_gene_regions.pl [--options...] --db <text> --out <filename>
   --start=<integer>
   --stop=<integer>
   --unique
+  --slop <integer>
   --gz
   --version
   --help
@@ -1011,6 +1041,16 @@ upstream (5' direction), and a positive value is shifted downstream.
 For gene features only, take only the unique regions. Useful when 
 multiple alternative transcripts are defined for a single gene.
 
+=item --slop <integer>
+
+When identifying unique regions, specify the number of bp to 
+add and subtract to the start position (the slop or fudge factor) 
+of the regions when considering duplicates. Any other region 
+within this window will be considered a duplicate. Useful, for 
+example, when start sites of transcription are not precisely mapped, 
+but not useful with defined introns and exons. The default is 0 
+(no sloppiness).
+
 =item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
@@ -1033,14 +1073,16 @@ source GFF3 annotation, necessitating a script to pull them out. These
 regions include the start and stop sites of transcription, introns, 
 the splice sites (both 5' and 3'), and the first and last exons. 
 Importantly, unique regions may only be reported, especially important 
-when a single gene may have multiple alternative transcripts.
+when a single gene may have multiple alternative transcripts. A 
+slop factor is included for imprecise annotation.
 
 The program will report the chromosome, start and stop coordinates, 
-strand, name, and parent name for each region identified. The reported 
-start and stop sites may be adjusted with modifiers. A standard 
-biotoolbox data formatted text file is generated. This may be converted 
-into a standard BED or GFF file using the appropriate biotoolbox 
-scripts. The file may also be used directly in data collection.
+strand, name, and parent and transcript names for each region 
+identified. The reported start and stop sites may be adjusted with 
+modifiers. A standard biotoolbox data formatted text file is generated. 
+This may be converted into a standard BED or GFF file using the 
+appropriate biotoolbox scripts. The file may also be used directly in 
+data collection. 
 
 =head1 AUTHOR
 
