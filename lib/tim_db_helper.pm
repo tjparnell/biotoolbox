@@ -1649,8 +1649,9 @@ arguments. The keys include
               protocol (ftp: or http:).
   method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
-              sum, mean, median, range, stddev, min, max, and rpm. 
-              See _get_segment_score() documentation for more info.
+              sum, mean, median, range, stddev, min, max, rpm, 
+              and rpkm. See _get_segment_score() documentation 
+              for more info.
   chromo   => The name of the chromosome (reference sequence)
   start    => The start position of the region on the chromosome
   stop     => The stop position of the region on the chromosome
@@ -2355,6 +2356,7 @@ must be defined and presented in this order. These values include
          indexed (returns hash of postion => score)
          rpm (returns reads per million mapped, only valid with 
               bam and bigbed databases)
+         rpkm (same as rpm but normalized for length in kb)
          
   [8] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
@@ -3242,14 +3244,17 @@ sub _get_segment_score {
 			# sum the number of values
 			$region_score = sum(@scores);
 		}
-		elsif ($method eq 'rpm') {
+		elsif ($method =~ /rpk?m/) {
 			# convert to reads per million mapped
 			# this is only supported by bam and bigbed db, checked above
-			if ($dataset_type eq 'bam') {
-				# a bam database
+			
+			# total the number of reads if necessary
+			unless (exists $total_read_number{$dataset} ) {
 				
-				# total the number of reads if necessary
-				unless (exists $total_read_number{$dataset} ) {
+				# check the type of database
+				if ($dataset_type eq 'bam') {
+					# a bam database
+					
 					$total_read_number{$dataset} = 
 						sum_total_bam_alignments($dataset);
 					print "\n [total alignments: ", 
@@ -3257,28 +3262,27 @@ sub _get_segment_score {
 						"]\n";
 				}
 				
-				# calculate the rpm
-				$region_score = 
-					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
-			}
-			
-			elsif ($dataset_type eq 'bb') {
-				# a bigbed database
-				
-				# total the number of reads if necessary
-				unless (exists $total_read_number{$dataset} ) {
+				elsif ($dataset_type eq 'bb') {
+					# bigBed database
+					
 					$total_read_number{$dataset} = 
 						sum_total_bigbed_features($dataset);
 					print "\n [total features: ", 
 						format_with_commas( $total_read_number{$dataset} ), 
 						"]\n";
 				}
-				
-				# calculate the rpm
-				$region_score = 
-					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
-			}
+			}	
 			
+			# calculate the region score according to the method
+			if ($method eq 'rpkm') {
+				$region_score = 
+					( sum(@scores) * 10^9 ) / 
+					( ($stop - $start + 1) * $total_read_number{$dataset} );
+			}
+			elsif ($method eq 'rpm') {
+				$region_score = 
+					( sum(@scores) * 10^6 ) / $total_read_number{$dataset};
+			}
 			else {
 				# this dataset doesn't support rpm methods
 				# use the sum method instead

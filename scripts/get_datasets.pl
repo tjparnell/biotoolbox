@@ -313,8 +313,6 @@ sub set_defaults {
 		}
 		elsif ($method eq 'rpkm') {
 			$value_type = 'count';
-			$subfeature = 1;
-			$stranded = 'sense';
 		}
 		elsif ($method eq 'rpm') {
 			$value_type = 'count';
@@ -588,7 +586,7 @@ sub collect_dataset {
 			# check if we're doing RPKM
 			if ($method =~ /^rpk?m$/) {
 				# check that we have an appropriate dataset
-				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $mdb);
+				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $ddb);
 				unless ($rpkm_read_sum) {
 					warn " $method method requested but not supported for " .
 						"dataset '$dataset'\n using summed count instead\n";
@@ -1705,8 +1703,7 @@ Subfeatures with a primary_tag of exon are preferentially taken. If exons
 are not defined, then CDS and UTR subfeatures are used, or the entire 
 gene or transcript if no appropriate subfeatures are found. Note that 
 the options extend, start, stop, fstart, and fstop are ignored. 
-Default is false. This option is automatically enabled when the method 
-'rpkm' is specified.
+Default is false. 
 
 =item --extend <integer>
 

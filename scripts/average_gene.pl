@@ -162,12 +162,13 @@ if (defined $method) {
 		$method eq 'min' or 
 		$method eq 'max' or 
 		$method eq 'stddev' or
+		$method eq 'rpkm' or
 		$method eq 'rpm'
 	) {
 		die " '$method' is not recognized for method\n Use --help for more information\n";
 	}
 	
-	if ($method eq 'rpm') {
+	if ($method =~ /rpk?m/) {
 		# make sure we collect the right values
 		$value_type = 'count';
 	}
@@ -718,7 +719,11 @@ sub record_the_bin_values {
 					$window_score = stddev(@scores);
 				}
 				elsif ($method eq 'rpm') {
-					$window_score = ( sum(@scores) * 1000000 ) / $rpm_read_sum;
+					$window_score = ( sum(@scores) * 10^6 ) / $rpm_read_sum;
+				}
+				elsif ($method eq 'rpkm') {
+					$window_score = ( sum(@scores) * 10^9 ) / 
+						($length * $rpm_read_sum);
 				}
 				
 				# raw output
@@ -737,7 +742,7 @@ sub record_the_bin_values {
 		} 
 		else {
 			# no values in this window
-			if ($method eq 'sum' or $method eq 'rpm') {
+			if ($method eq 'sum' or $method eq 'rpm' or $method eq 'rpkm') {
 				# score gets 0
 				$window_score = 0;
 			}
@@ -1136,6 +1141,7 @@ genomic region of the feature. Accepted values include:
   - min
   - max
   - rpm         Reads Per Million mapped, for Bam and BigBed only
+  - rpkm        Same as rpm but normalized for gene length in kb
 
 =item --value [score|count|length]
 
