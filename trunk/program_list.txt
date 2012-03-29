@@ -13,6 +13,7 @@ Lists of programs organized by function.
 	* get_relative_data.pl
 
 ===Data analysis===
+	* compare_subfeature_scores.pl
 	* data2frequency.pl
 	* graph_data.pl
 	* graph_histogram.pl
@@ -101,6 +102,9 @@ big_file2gff3.pl
 	
 change_chr_prefix.pl
 	Changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
+
+compare_subfeature_scores.pl
+	Compares the scores of all the subfeatures of a parent feature to find the minimum and maximum subfeature score. For example, identify expressed and not-expressed alternative transcripts of a gene.
 
 data2frequency.pl
 	Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
