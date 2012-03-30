@@ -1,6 +1,6 @@
 ######## biotoolbox revision history #############
 
-v.1.7.0 (svn r339)
+v.1.7.0 (svn r340)
 	- Added new program get_gene_regions.pl which helps in retrieving regions not explicitly annotated in a database, including start and stop sites of transcription and introns.
 	- Added new program data2fasta.pl which generates a multi-Fasta file from a tab-delimited text file of coordinates or a list of sequences, such as microarray probes.
 	- Added new program compare_subfeature_scores.pl which compares a list of feature and subfeatures and find the subfeature with the minimum and maximum score.
