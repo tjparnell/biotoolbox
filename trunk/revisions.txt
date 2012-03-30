@@ -1,5 +1,15 @@
 ######## biotoolbox revision history #############
 
+v.1.7.0 (svn r339)
+	- Added new program get_gene_regions.pl which helps in retrieving regions not explicitly annotated in a database, including start and stop sites of transcription and introns.
+	- Added new program data2fasta.pl which generates a multi-Fasta file from a tab-delimited text file of coordinates or a list of sequences, such as microarray probes.
+	- Added new program compare_subfeature_scores.pl which compares a list of feature and subfeatures and find the subfeature with the minimum and maximum score.
+	- Major update to the data collection scripts to improve memory consumption and efficiency, and a significant boost in speed when working with BigWig data sources (I have seen up to 10 fold increase, depending on collection methods).
+	- Improvements when working with BigWigSet directories, including working with impromptu directories of BigWig files that do not have a defined metadata file.
+	- Added the option of using separate annotation and data databases when using the data collection scripts. This greatly simplifies things when you have, for example, an annotation SeqFeature::Store database and a BigWigSet database of data.
+	- Added the rpkm method to work with any segment, not just genes with exons, in data collection scripts get_datasets.pl and average_gene.pl
+	- Fixed bugs in script ucsc_table2gff3.pl, data2wig.pl, and bar2wig.pl
+
 v.1.6.4 (svn r314)
 	- Major update to script bam2wig.pl to reduce memory consumption by writing incremental portions. The strand option is now a boolean option, and when enabled, automatically writes both strands simultaneously. The binning of read counts into windows of user-selected size is now possible. The optimal shift value for ChIP-Seq data can now be empically determined from the reads using a statistical method.
 	- Added additional support for UCSC ensGene tables by including ensemblToGeneName and ensemblSource supplemental tables in script ucsc_table2gff2.pl. The common gene name is now included in the output GFF3 file.
