@@ -236,7 +236,7 @@ sub collect_bigwigset_score {
 	unless ( exists $BIGWIG_CHROMOS{$first_path}{$chromo} ) {
 		# chromosome is not present, at least in the first bigwig in the set
 		# return null
-		return $method eq 'sum' ? 0 : '.';
+		return $method =~ /sum|count/ ? 0 : '.';
 	}
 	
 	# Reset the feature_type to collect from the database
@@ -254,7 +254,7 @@ sub collect_bigwigset_score {
 	foreach my $type (@types) {
 	
 		# Collect the summary features
-		$type =~ s/:.+//; # strip the source if present
+		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
 		my @features = $db->features(
@@ -263,6 +263,15 @@ sub collect_bigwigset_score {
 			-end      => $stop,
 			-type     => $type,
 		);
+		# if the type doesn't work, then try display_name instead
+		unless (@features) {
+			@features = $db->features(
+				-seq_id   => $chromo,
+				-start    => $start,
+				-end      => $stop,
+				-name     => $type,
+			);
+		}
 			# since we're collecting summary features, we will only get one 
 			# per bigwig file that matches the request
 			# no need for a seqfeature stream
@@ -348,19 +357,34 @@ sub collect_bigwigset_scores {
 	foreach my $type (@types) {
 		
 		# Collect the feature scores
-		$type =~ s/:.+//; # strip the source if present
+		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
+			# since the default feature_type for the bigwigset database is 
+			# region, we will get lots of features returned, one for each 
+			# datapoint
+			# use an iterator to process them
 		my $iterator = $db->get_seq_stream(
 			-seq_id   => $chromo,
 			-start    => $start,
 			-end      => $stop,
 			-type     => $type,
 		);
-			# since the default feature_type for the bigwigset database is 
-			# region, we will get lots of features returned, one for each 
-			# datapoint
-			# use an iterator to process them
+		
+		# check that we have a feature stream
+		my $feature = $iterator->next_seq;
+		unless ($feature) {
+			# uh oh, no feature! perhaps we didn't correctly identify the 
+			# correct bigwig in the set
+			# try again using display_name instead
+			$iterator = $db->get_seq_stream(
+				-seq_id   => $chromo,
+				-start    => $start,
+				-end      => $stop,
+				-name     => $type,
+			);
+			$feature = $iterator->next_seq;
+		}
 		
 		# Determine which features to take based on strandedness
 		
@@ -374,12 +398,12 @@ sub collect_bigwigset_scores {
 			# instead, we will have to get the attribute tag named strand
 			
 			# check each feature
-			while (my $f = $iterator->next_seq) {
+			while ($feature) {
 				
 				# get the feature strand
 				my $fstrand = 0; # default
-				if ($f->has_tag('strand') ) {
-					($fstrand) = $f->get_tag_values('strand');
+				if ($feature->has_tag('strand') ) {
+					($fstrand) = $feature->get_tag_values('strand');
 				}
 				
 				# collect score if strand is appropriate
@@ -397,16 +421,20 @@ sub collect_bigwigset_scores {
 					)
 				) {
 					# we have acceptable data to collect
-					push @scores, $f->score;
+					push @scores, $feature->score;
 				}
+				
+				# prepare for the next feature
+				$feature = $iterator->next_seq;
 			}
 		}
 		
 		# Non-stranded features
 		else {
 			# take all the features found
-			while (my $f = $iterator->next_seq) {
-				push @scores, $f->score;
+			while ($feature) {
+				push @scores, $feature->score;
+				$feature = $iterator->next_seq;
 			}
 		}
 	}
@@ -441,19 +469,34 @@ sub collect_bigwigset_position_scores {
 	foreach my $type (@types) {
 		
 		# Collect the feature scores
-		$type =~ s/:.+//; # strip the source if present
+		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
+			# since the default feature_type for the bigwigset database is 
+			# region, we will get lots of features returned, one for each 
+			# datapoint
+			# use an iterator to process them
 		my $iterator = $db->get_seq_stream(
 			-seq_id   => $chromo,
 			-start    => $start,
 			-end      => $stop,
 			-type     => $type,
 		);
-			# since the default feature_type for the bigwigset database is 
-			# region, we will get lots of features returned, one for each 
-			# datapoint
-			# use an iterator to process them
+		
+		# check that we have a feature stream
+		my $feature = $iterator->next_seq;
+		unless ($feature) {
+			# uh oh, no feature! perhaps we didn't correctly identify the 
+			# correct bigwig in the set
+			# try again using display_name instead
+			$iterator = $db->get_seq_stream(
+				-seq_id   => $chromo,
+				-start    => $start,
+				-end      => $stop,
+				-name     => $type,
+			);
+			$feature = $iterator->next_seq;
+		}
 		
 		# Determine which features to take based on strandedness
 		
@@ -469,12 +512,12 @@ sub collect_bigwigset_position_scores {
 			# Check each feature
 			
 			# Stranded features
-			while (my $f = $iterator->next_seq) {
+			while ($feature) {
 				
 				# get the feature strand
 				my $fstrand = 0; # default
-				if ($f->has_tag('strand') ) {
-					($fstrand) = $f->get_tag_values('strand');
+				if ($feature->has_tag('strand') ) {
+					($fstrand) = $feature->get_tag_values('strand');
 				}
 				
 				# collect score if strand is appropriate
@@ -494,17 +537,22 @@ sub collect_bigwigset_position_scores {
 					# acceptable data point
 					# process
 					_process_position_score_feature(
-						$f, \%pos2data, \%duplicates);
+						$feature, \%pos2data, \%duplicates);
 				}
+				
+				# prepare next
+				$feature = $iterator->next_seq;
 			}
 		}
 		
 		# Non-stranded features
 		else {
 			# take all the features found
-			while (my $f = $iterator->next_seq) {
+			while ($feature) {
 				# process
-				_process_position_score_feature($f, \%pos2data, \%duplicates);
+				_process_position_score_feature(
+					$feature, \%pos2data, \%duplicates);
+				$feature = $iterator->next_seq;
 			}
 		}
 	}
@@ -741,7 +789,7 @@ sub _process_summaries {
 		# nothing was found!
 		
 		# return empty handed
-		if ($method eq 'sum') {
+		if ($method =~ /sum|count/) {
 			$value = 0;
 		}
 		else {

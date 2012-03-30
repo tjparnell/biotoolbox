@@ -554,7 +554,7 @@ sub get_dataset_list {
 		my %types;
 		foreach my $file (keys %{ $metadata }) {
 			# get the type for each file
-			my ($primary, $source, $type);
+			my ($primary, $source, $type, $name);
 			
 			# get the appropriate tags
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
@@ -567,9 +567,15 @@ sub get_dataset_list {
 				elsif ($attribute =~ m/^type/i) {
 					$type = $metadata->{$file}{$attribute};
 				}
+				elsif ($attribute =~ m/^display_name/i) {
+					$name = $metadata->{$file}{$attribute};
+				}
 			}
 				
 			# assemble the type
+				# as per the rest of biotoolbox convention, we prefer to use 
+				# the primary_tag or type first, but then use things like
+				# display_name
 			if ($primary and $source) {
 				$types{ "$primary:$source" } += 1;
 			}
@@ -578,6 +584,9 @@ sub get_dataset_list {
 			}
 			elsif ($primary) {
 				$types{ $primary } += 1;
+			}
+			elsif ($name) {
+				$types{ $name } += 1;
 			}
 		}
 		
