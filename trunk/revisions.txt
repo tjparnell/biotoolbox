@@ -8,7 +8,7 @@ v.1.7.0 (svn r340)
 	- Improvements when working with BigWigSet directories, including working with impromptu directories of BigWig files that do not have a defined metadata file.
 	- Added the option of using separate annotation and data databases when using the data collection scripts. This greatly simplifies things when you have, for example, an annotation SeqFeature::Store database and a BigWigSet database of data.
 	- Added the rpkm method to work with any segment, not just genes with exons, in data collection scripts get_datasets.pl and average_gene.pl
-	- Fixed bugs in script ucsc_table2gff3.pl, data2wig.pl, and bar2wig.pl
+	- Fixed bugs in script ucsc_table2gff3.pl, data2wig.pl, find_enriched_regions.pl, and bar2wig.pl
 
 v.1.6.4 (svn r314)
 	- Major update to script bam2wig.pl to reduce memory consumption by writing incremental portions. The strand option is now a boolean option, and when enabled, automatically writes both strands simultaneously. The binning of read counts into windows of user-selected size is now possible. The optimal shift value for ChIP-Seq data can now be empically determined from the reads using a statistical method.
