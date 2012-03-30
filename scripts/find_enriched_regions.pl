@@ -25,7 +25,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.5.8';
+my $VERSION = '1.7.0';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
