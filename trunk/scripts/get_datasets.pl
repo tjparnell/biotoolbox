@@ -35,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.7.1';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -195,9 +195,6 @@ unless (defined $main_database) {
 
 ### Initialize main data, database, and datasets
 
-# record start time
-my $start_time = time;
-
 # Generate or open main feature list
 my $main_data_ref = get_main_data_ref();
 
@@ -236,45 +233,45 @@ my ($name_i, $type_i, $chromo_i, $start_i, $stop_i, $strand_i) = get_columns();
 # Total reads in Bam file when using rpkm method
 my $rpkm_read_sum = 0;
 
+# record start time
+my $start_time = time;
+
 
 
 
 ### Collect the data from each datasets
 
-unless (@datasets) {
-	print " nothing to do!\n";
-	exit;
-}
+# datasets
 foreach my $dataset (@datasets) {
-	last if $dataset eq 'none';
-	print " Collecting $value_type $method from dataset '$dataset'...";
-	collect_dataset($dataset);
-	printf " in %.1f minutes\n", (time - $start_time)/60;
-}
-
-
-
-
-
-
-### Output the data
-# we will write a tim data file
-# appropriate extensions and compression should be taken care of
-my $success = write_tim_data_file( {
-	'data'     => $main_data_ref,
-	'filename' => $outfile,
-	'gz'       => $gz,
-} );
-if ($success) {
-	print " wrote file '$success'\n";
-}
-else {
-	# failure! the subroutine will have printed error messages
-	print " unable to write file!\n";
-}
-
-printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 	
+	# collect the dataset
+	unless ($dataset eq 'none') {
+		print " Collecting $method $value_type from dataset '$dataset'...";
+		collect_dataset($dataset);
+		printf " in %.1f minutes\n", (time - $start_time)/60;
+	}
+	
+	# write the output file
+	# we will rewrite the file after each collection
+	# appropriate extensions and compression should be taken care of
+	my $success = write_tim_data_file( {
+		'data'     => $main_data_ref,
+		'filename' => $outfile,
+		'gz'       => $gz,
+	} );
+	if ($success) {
+		print " wrote file '$success'\n";
+		# update file name
+		$outfile = $success;
+	}
+	else {
+		# failure! the subroutine will have printed error messages
+		print " unable to write file!\n";
+		exit; # no need to continue
+	}
+	
+	last if $dataset eq 'none';
+}
 
 
 
