@@ -195,19 +195,15 @@ $dataset = process_and_verify_dataset( {
 
 # get a simplified dataset name
 my $dataset_name;
-if ($dataset =~ /^ (?: http | ftp | file ) : \/* (.+) \. (?: bb | bw | bam ) $/xi) {
+if ($dataset =~ /^ (?: http | ftp | file ) \: \/* (.+) \. (?: bb | bw | bam ) $/xi) {
 	# use the file's basename as the dataset name
-	$dataset_name = $1;
+	($dataset_name, undef, undef) = fileparse($1);
 }
 else {
 	# a database feature
 	$dataset_name = $dataset;
 }
 
-# Generate output file name if necessary
-unless ($outfile) {
-	$outfile = "$dataset_name\_w$win\_s$step\_t$threshold";
-}
 
 
 ## Determine the cutoff value
@@ -217,12 +213,19 @@ unless (defined $threshold) {
 	print "  Determining threshold....\n";
 	$threshold = go_determine_cutoff();
 }
-my $cutoff = $threshold; 
-if ($log) {
-	# we assume that the cutoff value is also provided as a log2 number
-	# but the calculations require the value to be de-logged
-	$cutoff = 2 ** $cutoff;
+
+
+
+## Generate output file name if necessary
+# we're doing this here instead of before or later because we need 
+# the threshold value and the debug option needs an outfile name
+unless ($outfile) {
+	$outfile = "$dataset_name\_w$win\_s$step\_t$threshold";
 }
+
+
+
+
 
 ## Find the enriched regions
 go_find_enriched_regions();
@@ -242,7 +245,7 @@ if ($debug) {
 
 ## Merge the windows into larger regions
 # this will merge the overlapping windows in @windows and put them into back
-go_merge_windows(\@windows);
+go_merge_windows();
 print "  Merged windows into " . scalar @windows . " windows\n";
 
 # DEBUGGING: printing out the intermediate @windows array
@@ -484,7 +487,7 @@ sub go_find_enriched_regions {
 		
 		# collect the dataset values for the current chromosome
 		# store in a hash the position (key) and values
-		print "  Searching $chr....\n";
+		print "   Searching $chr....\n";
 		
 		# generate a segment representing the chromosome
 		# due to fuzzy name matching, we may get more than one back
@@ -521,21 +524,18 @@ sub go_find_enriched_regions {
 				#print "no values at $chr:$start..$end!\n"; 
 				next;
 			}
-			if ($log) {
-				$window_score = 2 ** $window_score;
-			}
 			
 			# calculate if window passes threshold
 			if ($deplete) { 
 				# depleted regions
-				if ($window_score <= $cutoff) { 
+				if ($window_score <= $threshold) { 
 					# score passes our threshold
 					push @windows, [$chr, $start, $end, $window_score];
 				}
 			} 
 			else { 
 				# enriched regions
-				if ($window_score >= $cutoff) { 
+				if ($window_score >= $threshold) { 
 					# score passes our threshold
 					push @windows, [$chr, $start, $end, $window_score];
 				}
@@ -549,29 +549,27 @@ sub go_find_enriched_regions {
 
 ### Condense the list of overlapping windows
 sub go_merge_windows {
- 	my $array_ref = shift;
  	
  	# set up new target array and move first item over
  	my @merged; 
- 	push @merged, shift @{$array_ref};
+ 	push @merged, shift @windows;
  	
- 	while ( @$array_ref ) {
- 		my $window = shift @{$array_ref};
+ 	while (@windows) {
+ 		my $window = shift @windows;
  		
  		# first check whether chromosomes are equal
- 		if ( $merged[-1][0] eq $window->[0] ) {
+ 		if ( $merged[-1]->[0] eq $window->[0] ) {
  			# same chromosome
  			
  			# generate Range objects
  			my $range1 = Bio::Range->new(
- 				-start  => $merged[-1][1],
- 				-end    => $merged[-1][2] + $tolerance
+ 				-start  => $merged[-1]->[1],
+ 				-end    => $merged[-1]->[2] + $tolerance
  				# we add tolerance only on side where merging might occur
  			);
  			my $range2 = Bio::Range->new(
  				-start  => $window->[1],
  				-end    => $window->[2]
- 				# we add tolerance only on side where merging might occur
  			);
 			
 			# check for overlap
@@ -581,11 +579,11 @@ sub go_merge_windows {
 				my ($mstart, $mstop, $mstrand) = $range1->union($range2);
 				
 				# update the merged window
-				$merged[-1][1] = $mstart;
-				$merged[-1][2] = $mstop;
+				$merged[-1]->[1] = $mstart;
+				$merged[-1]->[2] = $mstop;
 				
 				# score is no longer relevent
-				$merged[-1][3] = '.';
+				$merged[-1]->[3] = '.';
 			}
 			else {
 				# no overlap
@@ -593,17 +591,15 @@ sub go_merge_windows {
 			}
  		}
  		
- 		
+		# not on same chromosome
  		else {
- 			# not on same chromosome
  			# move onto old array
- 			push @merged, shift @{$array_ref};
+ 			push @merged, $window;
  		}
  	}
  	
  	# Put the merged windows back
- 	@{$array_ref} = @merged;
- 	
+ 	@windows = @merged;
 }
 
 	
@@ -623,7 +619,7 @@ sub go_trim_windows {
 		
 		# calculate extended window size
 		my $start = $window->[1] - $tolerance;
-		my $stop = $window->[2] + $tolerance;
+		my $stop  = $window->[2] + $tolerance;
 		
 		# check sizes so we don't go over limit
 		if ($start < 1) {
@@ -647,22 +643,15 @@ sub go_trim_windows {
 			die " unable to generate value hash for window $window->[0]:$start..$stop!\n";
 		}
 		if ($debug) {
-			print " window $start..$stop scores at ", 
-				join(",", sort {$a <=> $b} keys %pos2score), "\n";
+			# print "found " . scalar(keys %pos2score) . " values\n";
 		}
-		
-		# de-log if necessary
-		if ($log) {
-			foreach (keys %pos2score) {
-				$pos2score{$_} = 2 ** $pos2score{$_};
-			}
-		}
+			
 		
 		# look for first position whose value crosses the threshold
 		foreach my $pos (sort {$a <=> $b} keys %pos2score) {
 			if ($deplete) {
 				# looking for depleted regions
-				if ( $pos2score{$pos} <= $cutoff) {
+				if ( $pos2score{$pos} <= $threshold) {
 					# we found one!
 					# assign it to the window start
 					$window->[1] = $pos;
@@ -673,7 +662,7 @@ sub go_trim_windows {
 			}
 			else {
 				# lookig for enriched regions
-				if ($pos2score{$pos} >= $cutoff) {
+				if ($pos2score{$pos} >= $threshold) {
 					# we found one!
 					# assign it to the window start
 					$window->[1] = $pos;
@@ -918,11 +907,9 @@ sub generate_main_data_hash {
 	$data->{5}{'log2'} = $log;
 	$data->{5}{'method'} = $method;
 	$data->{5}{'dataset'} = $dataset;
-	if ($threshold) {
-		$data->{5}{'threshold'} = $threshold;
-	} else {
+	$data->{5}{'threshold'} = $threshold;
+	if ($sdlimit) {
 		$data->{5}{'standard_deviation_limit'} = $sdlimit;
-		$data->{5}{'threshold'} = $cutoff;
 	}
 	
 	# add feature metadata if it was requested
@@ -988,11 +975,9 @@ sub write_html_file {
 	print HTML "Dataset $dataset<p>\n";
 	print HTML "Window $win<p>\n";
 	print HTML "Step $step<p>\n";
-	if ($threshold) {
-		print HTML "Threshold $threshold<p>\n";
-	} else {
+	print HTML "Threshold $threshold<p>\n";
+	if ($sdlimit) {
 		print HTML "Standard deviation limit $sdlimit<p>\n";
-		print HTML "Threshold $cutoff<p>\n";
 	}
 	if ($deplete) {
 		print HTML "Searching for depleted regions<p>\n";

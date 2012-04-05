@@ -105,29 +105,20 @@ sub collect_bigwig_scores {
 	unless (scalar @_ >= 4) {
 		confess " At least four arguments must be passed to collect BigWig scores!\n";
 	}
-	my ($chromo, $start, $stop, @wig_features) = @_;
+	my ($chromo, $start, $stop, @wig_files) = @_;
 	
 	# initialize 
 	my @scores; 
 	
-	# The region object passed to us should be from any Bio::DB database
-	# we will open a bigwig db connection for each of the features passed to us
-	# and collect the data corresponding to the region coordinates
-	# there is usually only one bigwig feature sent, but there may be 
-	# more to combine data
-	foreach my $wigfile (@wig_features) {
+	# Walk through each requested feature
+	# There is likely only one
+	foreach my $wig (@wig_files) {
 	
-		# Check local files
-		$wigfile =~ s/^file://;
-		unless (-e $wigfile) {
-			croak " BigWig file '$wigfile' does not exist!\n";
-		}
-		
 		# Open the BigWig file
-		my $bw = _open_my_bigwig($wigfile);
+		my $bw = _open_my_bigwig($wig);
 		
 		# first check that the chromosome is present
-		unless (exists $BIGWIG_CHROMOS{$wigfile}{$chromo}) {
+		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
 			next;
 		}
 		
@@ -136,6 +127,7 @@ sub collect_bigwig_scores {
 			-seq_id     => $chromo,
 			-start      => $start,
 			-end        => $stop,
+			-type       => 'region',
 			-iterator   => 1,
 		);
 		
@@ -159,36 +151,21 @@ sub collect_bigwig_position_scores {
 	unless (scalar @_ >= 4) {
 		confess " At least four arguments must be passed to collect BigWig position scores!\n";
 	}
-	my ($chromo, $start, $stop, @wig_features) = @_;
+	my ($chromo, $start, $stop, @wig_files) = @_;
 	
 	# initialize 
 	my %pos2data; # hash of position => score
 	my %duplicates; # hash of duplicate positions, position => number
 	
-	# The region object passed to us should be from any Bio::DB database
-	# we will open a bigwig db connection for each of the features passed to us
-	# and collect the data corresponding to the region coordinates
-	# there is usually only one bigwig feature sent, but there may be 
-	# more to combine data
-	foreach my $wigfile (@wig_features) {
+	# Walk through each requested feature
+	# There is likely only one
+	foreach my $wig (@wig_files) {
 	
-		# Check local files
-		$wigfile =~ s/^file://;
-		unless (-e $wigfile) {
-			croak " BigWig file '$wigfile' does not exist!\n";
-		}
-		
 		# Open the BigWig file
-		my $bw = _open_my_bigwig($wigfile);
-		
-		# Collect from bigwig file
-			# We're not adjusting start and end points as with wig data
-			# because the bigwig file is by default set up to cover the 
-			# entire chromosome (chromosome information is required for 
-			# generating bigwig files)
+		my $bw = _open_my_bigwig($wig);
 		
 		# first check that the chromosome is present
-		unless (exists $BIGWIG_CHROMOS{$wigfile}{$chromo}) {
+		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
 			next;
 		}
 		
@@ -197,6 +174,7 @@ sub collect_bigwig_position_scores {
 			-seq_id     => $chromo,
 			-start      => $start,
 			-end        => $stop,
+			-type       => 'region',
 			-iterator   => 1,
 		);
 		
