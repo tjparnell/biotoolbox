@@ -1,5 +1,12 @@
 ######## biotoolbox revision history #############
 
+v.1.7.1 (svn r345)
+	- Fixed critical bug in data collection library that allowed too many datapoints to be collected by ignoring the stop position. This could affect scripts get_datasets.pl, get_relative_data.pl, average_gene.pl, find_enriched_regions.pl, and others.
+	- Major overhaul of script pull_features.pl to include better automatic identification of identifier columns, the capability to match multiple features, and to simultaneously write all groups from a .kgg list
+	- Updated script get_datasets.pl so that it would rewrite the output file after each round of data collection.
+	- Minor bug fixes in script find_enriched_regions.pl
+	- Retired outdata script convert_yeast_genome_version.pl. Users should use the liftOver program from UCSC and chain files from SGD.
+
 v.1.7.0 (svn r340)
 	- Added new program get_gene_regions.pl which helps in retrieving regions not explicitly annotated in a database, including start and stop sites of transcription and introns.
 	- Added new program data2fasta.pl which generates a multi-Fasta file from a tab-delimited text file of coordinates or a list of sequences, such as microarray probes.
