@@ -1,6 +1,6 @@
 ######## biotoolbox revision history #############
 
-v.1.7.1 (svn r345)
+v.1.7.1 (svn r346)
 	- Fixed critical bug in data collection library that allowed too many datapoints to be collected by ignoring the stop position. This could affect scripts get_datasets.pl, get_relative_data.pl, average_gene.pl, find_enriched_regions.pl, and others.
 	- Major overhaul of script pull_features.pl to include better automatic identification of identifier columns, the capability to match multiple features, and to simultaneously write all groups from a .kgg list
 	- Updated script get_datasets.pl so that it would rewrite the output file after each round of data collection.
