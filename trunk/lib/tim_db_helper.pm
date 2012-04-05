@@ -2120,7 +2120,7 @@ sub get_region_dataset_hash {
 		# coordinates are easy
 		$fchromo   = $chromo;
 		$fstart    = $start;
-		$fstop     = $fstop;
+		$fstop     = $stop;
 		
 		# determine the strand
 		$fstrand   = defined $strand ? $strand : 0; # default is no strand
