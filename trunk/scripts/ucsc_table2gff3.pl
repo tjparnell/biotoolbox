@@ -566,7 +566,8 @@ sub open_output_gff {
 	# prepare output file name
 	my $file = shift;
 	my $outfile = $file;
-	$outfile =~ s/\.txt(?:\.gz)?$/.gff3/i; # exchange the extension
+	$outfile =~ s/\.txt(?:\.gz)?$//i; # remove the extension
+	$outfile .= '.gff3';
 	if ($gz) {
 		$outfile .= '.gz';
 	}
