@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.7.2';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -566,7 +566,10 @@ sub open_output_gff {
 	# prepare output file name
 	my $file = shift;
 	my $outfile = $file;
-	$outfile =~ s/\.txt(?:\.gz)$/.gff3/; # exchange the extension
+	$outfile =~ s/\.txt(?:\.gz)?$/.gff3/i; # exchange the extension
+	if ($gz) {
+		$outfile .= '.gz';
+	}
 	
 	# open file handle
 	my $fh = open_to_write_fh($outfile, $gz) or
