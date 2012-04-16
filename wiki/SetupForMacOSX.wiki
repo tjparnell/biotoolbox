@@ -69,32 +69,41 @@ GBrowse as well as many of the biotoolbox programs require genome annotation to 
 
 SQLite is a lightweight database system that stores all of the database tables in a single file. It's reasonably fast and easy to manage - one file per database. This is already installed in Mac OS X, although you will need to install the appropriate Perl modules to use it.
 
-MySQL is a commonly used open source database that can be used from small databases to large enterprise databases. It uses a daemon to handle multiple simultaneous connections and read/write transactions. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. However, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to link `/var/mysql/mysql.sock` to the typical location of `/tmp/mysql.sock`. 
+MySQL is a commonly used open source database that can be used from small databases to large enterprise databases. It uses a daemon to handle multiple simultaneous connections and read/write transactions. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. 
 
-PostGreSQL is another alternative open source database with capabilities similar to MySQL. I don't personally have any experience with it, but it is supported by BioPerl.
+PostGreSQL is another alternative open source database with capabilities similar to MySQL. I don't personally have any experience with it, but it is supported by BioPerl. If you want to use PostGreSQL, you'll have to look elsewhere for help installing it (I'm sure it's not hard).
 
-===Installing MySQL===
-You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So if you have to install from source and compile the executable for your machine, you might as well save a little effort and go through Fink to handle the compilation for you.
+===Using Mac OS X Server MySQL===
+If you happen to be using the Server version (and not the normal client version installed on everyday consumer Macs), then MySQL should already be installed. There are couple things to note. 
+
+First, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to establish a symbolic link for `/var/mysql/mysql.sock` to the standard location of `/tmp/mysql.sock`. You may want to set up a simple startup bash script to do this for you at each restart.
+
+Second, you'll need to install the MySQL development headers, which are not included by default. For Mac OS X Server 10.6, check out this Apple support [http://support.apple.com/kb/HT4006 document].
+
+===Installing MySQL on a client system===
+You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So you will need to install from source and compile the executable for your machine. You can do this one of two ways; download the source files from the MySQL web site and follow their directions, or you can use Fink.
 
 To install MySQL through Fink, enter the following:
 <pre>
 	sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
 </pre>
 
-To make things easier, I also like to install the MySQL Gui [http://www.mysql.com/downloads/workbench/ Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
+To make things easier, I also like to install the MySQL GUI [http://www.mysql.com/downloads/workbench/ Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
 
-To start up MySQL, run
+Once it's installed, start up MySQL by running the following command
 <pre>
 	sudo mysqld_safe –u root &
 </pre>
-This starts up the MySQL server as a system process in the background. Make sure you have used `sudo` in the past minute or so and authenticate with your password; try running `sudo ls` prior.
+The `&` symbol at the end forces the server process to run in the background, allowing you to exit your Terminal session and still keep it running. Make sure you have used `sudo` in the past minute or so and authenticate with your password; try running `sudo ls` prior to this command. Otherwise, by forcing it to background, you may never see the command prompt for `sudo`.
 
-Set the root password
+Set the MySQL root password
 <pre>
-	mysqladmin –u root password <password>
+	mysqladmin –u root password <your_new_password>
 </pre>
 
-Test by starting the client. Exit the client by typing `exit` at the prompt.
+An important note here. The MySQL server has its own notion of root that is separate from the computer's. So the above commands require two separate passwords (which could be the same word if you want): one for the Mac administrator `sudo` or root access, and the other for MySQL root access.
+
+Test by starting the client. The `-p` option causes it to prompt for the MySQL password for the user "root". Exit the client by typing `exit` at the prompt.
 <pre>
 	mysql –u root –p
 </pre>
@@ -109,7 +118,7 @@ Set up MySQL to start up automatically by running
 	sudo daemonic enable mysql
 </pre>
 
-There should now be a startup plist file in `/Library/StartupItems/`.
+There should now be a startup plist file in `/Library/StartupItems/`. Now the MySQL Server daemon should start everytime when you reboot your Mac, and saves you from running the `mysqld_safe` command everytime. 
 
 ===Installing GD Libraries===
 These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
@@ -208,7 +217,7 @@ If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/
 </pre>
 
 ===Additional modules for biotoolbox===
-There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script [Pod_check_dependencies check_dependencies.pl], located in the biotoolbox root directory. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script [Pod_check_dependencies check_dependencies.pl], located in the biotoolbox root directory. You can download the latest biotoolbox version  [http://code.google.com/p/biotoolbox/downloads/list here]. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
 	* `Config::Simple`
 	* `IO::Zlib`
 	* `Statistics::Lite`
@@ -222,7 +231,8 @@ There are a few additional modules that are required by the biotoolbox scripts. 
 	* `GD::Graph`
 	* `GD::Graph::smoothlines`
 
-Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring errors), and everything seems to still work. 
+====Errors regarding GD====
+Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
 
 ==Installing GBrowse==
 Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
