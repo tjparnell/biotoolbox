@@ -26,7 +26,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.6.4';
+my $VERSION = '1.7.2';
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -343,19 +343,19 @@ sub check_defaults {
 	}
 	elsif ($use_start and $strand and $shift) {
 		$record_count = \&record_stranded_shifted_start;
-		print " recording stranded shifted start position\n";
+		print " recording stranded, shifted-start positions\n";
 	}
 	elsif ($use_start and $strand and !$shift) {
 		$record_count = \&record_stranded_start;
-		print " recording stranded start position\n";
+		print " recording stranded, start positions\n";
 	}
 	elsif ($use_start and !$strand and $shift) {
 		$record_count = \&record_shifted_start;
-		print " recording shifted start position\n";
+		print " recording shifted-start positions\n";
 	}
 	elsif ($use_start and !$strand and !$shift) {
 		$record_count = \&record_start;
-		print " recording start position\n";
+		print " recording start positions\n";
 	}
 	elsif ($use_mid and $strand and $shift and $paired) {
 		# this should not happen, shift is disabled with paired
@@ -363,15 +363,15 @@ sub check_defaults {
 	}
 	elsif ($use_mid and $strand and $shift and !$paired) {
 		$record_count = \&record_stranded_shifted_mid;
-		print " recording stranded shifted mid position\n";
+		print " recording stranded, shifted-mid positions\n";
 	}
 	elsif ($use_mid and $strand and !$shift and $paired) {
 		$record_count = \&record_stranded_paired_mid;
-		print " recording stranded mid position of pairs\n";
+		print " recording stranded, mid positions of pairs\n";
 	}
 	elsif ($use_mid and $strand and !$shift and !$paired) {
 		$record_count = \&record_stranded_mid;
-		print " recording stranded mid position\n";
+		print " recording stranded, mid positions\n";
 	}
 	elsif ($use_mid and !$strand and $shift and $paired) {
 		# this should not happen, shift is disabled with paired
@@ -379,11 +379,11 @@ sub check_defaults {
 	}
 	elsif ($use_mid and !$strand and $shift and !$paired) {
 		$record_count = \&record_shifted_mid;
-		print " recording shifted mid position\n";
+		print " recording shifted-mid positions\n";
 	}
 	elsif ($use_mid and !$strand and !$shift and $paired) {
 		$record_count = \&record_paired_mid;
-		print " recording mid position of pairs\n";
+		print " recording mid positions of pairs\n";
 	}
 	elsif ($use_mid and !$strand and !$shift and !$paired) {
 		$record_count = \&record_mid;
@@ -925,6 +925,13 @@ sub write_wig {
 	my ($seq_id, $seq_length, $start, $data, $fh) = @_;
 	my $count = 0;
 	
+	# check that we have data to write
+	if (!%{ $data } and !$interpolate) {
+		# nothing to write for a varStep file!
+		# doesn't count for fixedStep
+		return $count;
+	}
+	
 	# set the window endpoint
 	# add the window size 2 Mb I'm using, minus 1 kb buffer, minus 1 bp
 	my $end = $start + 1999999; 
@@ -1139,7 +1146,7 @@ sub record_stranded_shifted_start {
 		# forward strand
 		
 		# calculate record position
-		my $position = $a->start + 1 + $shift_value;
+		my $position = $a->start + $shift_value;
 		
 		# determine bin
 		if ($bin) {
@@ -1153,7 +1160,7 @@ sub record_stranded_shifted_start {
 		# reverse strand
 		
 		# calculate record position
-		my $position = $a->end + 1 - $shift_value;
+		my $position = $a->end - $shift_value;
 		
 		# determine bin
 		if ($bin) {
@@ -1174,30 +1181,30 @@ sub record_stranded_start {
 	if ($a->strand == 1) {
 		# forward strand
 		
-		# calculate record position
-		my $position = $a->start + 1;
-		
-		# determine bin
-		if ($bin) {
-			$position = $position - ($position % $bin_size) + 1;
-		}
-		
 		# record position in forward strand data hash
-		$data1{$position} += 1;
+		if ($bin) {
+			# calculate bin
+			my $position = $a->start - ($a->start % $bin_size) + 1;
+			$data1{$position} += 1;
+		}
+		else {
+			# no bin
+			$data1{ $a->start } += 1;
+		}
 	}
 	else {
 		# reverse strand
 		
-		# calculate record position
-		my $position = $a->end + 1;
-		
-		# determine bin
-		if ($bin) {
-			$position = $position - ($position % $bin_size) + 1;
-		}
-		
 		# record position in reverse strand data hash
-		$data2{$position} += 1;
+		if ($bin) {
+			# calculate bin
+			my $position = $a->end - ($a->end % $bin_size) + 1;
+			$data2{$position} += 1;
+		}
+		else {
+			# no bin
+			$data1{ $a->end } += 1;
+		}
 	}
 }
 
@@ -1210,11 +1217,11 @@ sub record_shifted_start {
 	my $position;
 	if ($a->strand == 1) {
 		# forward strand
-		$position = $a->start + 1 + $shift_value;
+		$position = $a->start + $shift_value;
 	}
 	else {
 		# reverse strand
-		$position = $a->end + 1 - $shift_value;
+		$position = $a->end - $shift_value;
 	}
 		
 	# determine bin
@@ -1235,11 +1242,11 @@ sub record_start {
 	my $position;
 	if ($a->strand == 1) {
 		# forward strand
-		$position = $a->start + 1;
+		$position = $a->start;
 	}
 	else {
 		# reverse strand
-		$position = $a->end + 1;
+		$position = $a->end;
 	}
 		
 	# determine bin
@@ -1261,7 +1268,7 @@ sub record_stranded_shifted_mid {
 		# forward strand
 		
 		# calculate record position
-		my $position = int( ($a->start + $a->end) / 2) + 1 + $shift_value;
+		my $position = int( ($a->start + $a->end) / 2) + $shift_value;
 		
 		# determine bin
 		if ($bin) {
@@ -1275,7 +1282,7 @@ sub record_stranded_shifted_mid {
 		# reverse strand
 		
 		# calculate record position
-		my $position = int( ($a->start + $a->end) / 2) + 1 - $shift_value;
+		my $position = int( ($a->start + $a->end) / 2) - $shift_value;
 		
 		# determine bin
 		if ($bin) {
@@ -1293,7 +1300,7 @@ sub record_stranded_paired_mid {
 	my $a = shift;
 	
 	# calculate record position
-	my $position = int( ($a->start + ($a->start + $a->isize -1) ) / 2) + 1;
+	my $position = int( ($a->start + ($a->start + $a->isize -1) ) / 2);
 	
 	# determine bin
 	if ($bin) {
@@ -1328,7 +1335,7 @@ sub record_stranded_mid {
 	my $a = shift;
 	
 	# calculate record position
-	my $position = int( ($a->start + $a->end) / 2) + 1;
+	my $position = int( ($a->start + $a->end) / 2);
 	
 	# determine bin
 	if ($bin) {
@@ -1355,12 +1362,12 @@ sub record_shifted_mid {
 	my $position;
 	if ($a->strand == 1) {
 		# forward strand
-		$position = int( ($a->start + $a->end) / 2) + 1 + $shift_value;
+		$position = int( ($a->start + $a->end) / 2) + $shift_value;
 		
 	}
 	else {
 		# reverse strand
-		$position = int( ($a->start + $a->end) / 2) + 1 - $shift_value;
+		$position = int( ($a->start + $a->end) / 2) - $shift_value;
 	}
 	
 	# determine bin
@@ -1378,7 +1385,7 @@ sub record_paired_mid {
 	my $a = shift;
 	
 	# calculate record position
-	my $position = int( ($a->start + ($a->start + $a->isize -1) ) / 2) + 1;
+	my $position = int( ($a->start + ($a->start + $a->isize -1) ) / 2);
 	
 	# determine bin
 	if ($bin) {
@@ -1395,7 +1402,7 @@ sub record_mid {
 	my $a = shift;
 	
 	# calculate record position
-	my $position = int( ($a->start + $a->end) / 2) + 1;
+	my $position = int( ($a->start + $a->end) / 2);
 	
 	# determine bin
 	if ($bin) {
@@ -1432,11 +1439,8 @@ sub record_stranded_paired_span {
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $end; $i++) {
 				
-				# adjust position
-				my $position = $i + 1;
-				
 				# determin the bin
-				$position = $position - ($position % $bin_size) + 1;
+				my $position = $i - ($i % $bin_size) + 1;
 				
 				# record 
 				$data1{$position} += 1;
@@ -1447,8 +1451,7 @@ sub record_stranded_paired_span {
 			
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $end; $i++) {
-				# record adjust position
-				$data1{$i + 1} += 1;
+				$data1{$i} += 1;
 			}
 		}
 	}
@@ -1461,11 +1464,8 @@ sub record_stranded_paired_span {
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
 				
-				# adjust position
-				my $position = $i + 1;
-				
 				# determin the bin
-				$position = $position - ($position % $bin_size) + 1;
+				my $position = $i - ($i % $bin_size) + 1;
 				
 				# record 
 				$data2{$position} += 1;
@@ -1476,8 +1476,7 @@ sub record_stranded_paired_span {
 			
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
-				# record adjust position
-				$data2{$i + 1} += 1;
+				$data2{$i} += 1;
 			}
 		}
 	}
@@ -1501,11 +1500,8 @@ sub record_stranded_span {
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
 				
-				# adjust position
-				my $position = $i + 1;
-				
 				# determin the bin
-				$position = $position - ($position % $bin_size) + 1;
+				my $position = $i - ($i % $bin_size) + 1;
 				
 				# record 
 				$data1{$position} += 1;
@@ -1516,8 +1512,7 @@ sub record_stranded_span {
 			
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
-				# record adjust position
-				$data1{$i + 1} += 1;
+				$data1{$i} += 1;
 			}
 		}
 	}
@@ -1530,11 +1525,8 @@ sub record_stranded_span {
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
 				
-				# adjust position
-				my $position = $i + 1;
-				
 				# determin the bin
-				$position = $position - ($position % $bin_size) + 1;
+				my $position = $i - ($i % $bin_size) + 1;
 				
 				# record 
 				$data2{$position} += 1;
@@ -1545,8 +1537,7 @@ sub record_stranded_span {
 			
 			# walk along every position of the alignment
 			for (my $i = $a->start; $i <= $a->end; $i++) {
-				# record adjust position
-				$data2{$i + 1} += 1;
+				$data2{$i} += 1;
 			}
 		}
 	}
@@ -1565,11 +1556,8 @@ sub record_paired_span {
 		# walk along every position of the alignment
 		for (my $i = $a->start; $i <= $end; $i++) {
 			
-			# adjust position
-			my $position = $i + 1;
-			
 			# determine the bin
-			$position = $position - ($position % $bin_size) + 1;
+			$position = $i - ($i % $bin_size) + 1;
 			
 			# record 
 			$data1{$position} += 1;
@@ -1580,8 +1568,7 @@ sub record_paired_span {
 		
 		# walk along every position of the alignment
 		for (my $i = $a->start; $i <= $end; $i++) {
-			# record adjust position
-			$data1{$i + 1} += 1;
+			$data1{$i} += 1;
 		}
 	}
 }
@@ -1598,11 +1585,8 @@ sub record_span {
 		# walk along every position of the alignment
 		for (my $i = $a->start; $i <= $a->end; $i++) {
 			
-			# adjust position
-			my $position = $i + 1;
-			
 			# determin the bin
-			$position = $position - ($position % $bin_size) + 1;
+			my $position = $i - ($i % $bin_size) + 1;
 			
 			# record 
 			$data1{$position} += 1;
@@ -1613,8 +1597,7 @@ sub record_span {
 		
 		# walk along every position of the alignment
 		for (my $i = $a->start; $i <= $a->end; $i++) {
-			# record adjust position
-			$data1{$i + 1} += 1;
+			$data1{$i} += 1;
 		}
 	}
 }
@@ -1692,7 +1675,7 @@ Quickly calculate the coverage of the alignments over the genome,
 either at single bp resolution (default) or in bins. This method ignores 
 the position, quality, strand, shift, and log options. It uses a fast 
 low-level interface to the Bam file to eke out performance. It is 
-equivalent to specifying --position=span, --fix, --nosplit, 
+equivalent to specifying --position=span, --fix, --split, 
 --nope, --noshift, --nostrand, --qual=0, --norpm, and no log. 
 
 =item --splice
@@ -1783,7 +1766,7 @@ conversion.
 
 Transform the count to a log scale. Specify the base number, 2 or 
 10. The counts are increased by 1 before taking a log transformation, 
-thus avoiding a log of 0. Only really useful with Bam alignment 
+thus avoiding taking a log of 0. Only really useful with Bam alignment 
 files with high count numbers. Default is to not transform the count.
 
 =item --(no)track
@@ -1842,7 +1825,106 @@ For ChIP-Seq experiments, the alignment position may be shifted
 in the 3' direction. This effectively merges the separate peaks 
 (representing the ends of the enriched fragments) on each strand 
 into a single peak centered over the target locus. The shift value 
-may be empirically determined from the sequencing data. 
+may be empirically determined from the sequencing data (see below). 
+
+The output wig file may be either a variableStep, fixedStep, or 
+bedGraph test format. The wig file may be further converted into a 
+compressed, indexed, binary bigWig format, dependent on the availability 
+of the appropriate conversion utilities. 
+
+More information about wiggle files can be found at 
+http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at 
+http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at 
+http://genome.ucsc.edu/goldenPath/help/bigWig.html.
+
+=head1 RECOMMENDED SETTINGS
+
+The type of wig file to generate for your Bam sequencing file can vary 
+depending on your particular experimental application. Here are a few 
+common sequencing applications and my recommended settings for generating 
+the wig or bigWig file.
+
+=over
+
+=item Straight coverage
+
+To generate a straight-forward coverage map, similar to what most genome 
+browsers display when using a Bam file as source, use the following 
+settings:
+ 
+ bam2wig.pl --coverage --in <bamfile>
+
+=item Single-end ChIP-Seq
+
+When sequencing Chromatin Immuno-Precipitation products, one generally 
+is more interested in the number of tag counts, rather than coverage. 
+Hence, we can simply count the start position of the sequence tags. 
+
+To adjust the positions of tag count peaks to center over the presumed 
+site of interest, let the program empirically determine the shift 
+value from the sequence data (recommended). Otherwise, if you know 
+the mean size of your ChIP eluate fragments, you can use the --shiftval 
+option. 
+
+Finally, to compare ChIP-Seq alignments from multiple experiments, 
+convert your reads to Reads Per Million Mapped, which will help to 
+normalize read counts.
+ 
+ bam2wig.pl --pos start --shift --rpm --in <bamfile>
+
+=item Paired-end ChIP-Seq
+
+If both ends of the ChIP eluate fragments are sequenced, then we do not 
+need to calculate a shift value. Instead, we will simply count at the 
+midpoint of each properly-mapped sequence pair.
+ 
+ bam2wig.pl --pos mid --pe --rpm --in <bamfile>
+
+=item Unstranded RNA-Seq
+
+With RNA-Sequencing, we may be interested in either coverage (generating 
+a transcriptome map) or simple tag counts (differential gene expression), 
+so we can count in one of two ways. 
+
+To compare RNA-Seq data from different experiments, convert the read 
+counts to Reads Per Million Mapped, which will help to normalize read 
+counts.
+ 
+ bam2wig --pos span --rpm --in <bamfile>
+ 
+ bam2wig --pos mid --rpm --in <bamfile>
+
+=item Stranded, single-end RNA-Seq
+
+If the library was generated in such a way as to preserve strand, then 
+we can separate the counts based on the strand of the alignment. Note 
+that the reported strand may be accurate or flipped, depending upon 
+whether first-strand or second-strand synthesized cDNA was sequenced, 
+and whether your aligner took this into account. Please check the 
+output wig files in a genome browser to verify which one is which, and 
+rename appropriately.
+ 
+ bam2wig --pos mid --strand --rpm --in <bamfile>
+ 
+ bam2wig --pos span --strand --rpm --in <bamfile>
+
+=item Stranded, paired-end RNA-Seq
+
+Strand presents a complication when sequencing both ends of the cDNA 
+product from a library that preserves orientation. Currently, 
+the TopHat aligner can handle stranded, paired-end RNA-Seq alignments. 
+Because each pair will align to both strands, the aligner must record 
+separately which strand the original fragment should align. The TopHat 
+program records an 'XS' attribute for each alignment, and, if present, 
+bam2wig.pl will use this to set the strand.
+ 
+ bam2wig --pe --pos mid --strand --rpm --in <bamfile>
+ 
+ bam2wig --pe --pos span --strand --rpm --in <bamfile>
+
+=back
+
+=head1 SHIFT VALUE DETERMINATION
 
 To determine the shift value, the top enriched 500 bp regions (the 
 default number is 100) from the largest chromosome are identified by 
@@ -1857,16 +1939,6 @@ best with clean, distinct peaks. Not all sampled regions may return
 a significant R squared value. The peak shift may be evaluated by 
 viewing separate, stranded wig files together with the shifted wig 
 file in a genome browser.
-
-The output wig file may be either a variableStep, fixedStep, or 
-bedGraph test format. The wig file may be further converted into a 
-compressed, indexed, binary bigWig format, dependent on the availability 
-of the appropriate conversion utilities. 
-
-More information about wiggle files can be found at 
-http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at 
-http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at 
-http://genome.ucsc.edu/goldenPath/help/bigWig.html.
 
 =head1 AUTHOR
 
