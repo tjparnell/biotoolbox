@@ -22,17 +22,19 @@ pull_features.pl --data <**filename> --list <**filename> --out <**filename>
   --version
   --help
 }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
-{{{
-}}}
 __--data
 
 __
-  Specify a tim data formatted input file of genes.
+  Specify a tab-delimited text file as the data source file. One of  the columns in the input file should contain the identifiers to be  used in the lookup. The file may be gzipped.
+__
+  __
+__--list
+
+__
+  Specify the name of a text file containing the list of feature  names or identifiers to pull. The file may be a single column or  tab-delimited multi-column file with column headers. A .kgg file  from a Cluster k-means analysis may be used.
 __
   __
 __--out
@@ -41,22 +43,13 @@ __
   Specify the output file name.
 __
   __
-__--list
-
-__
-  Specify the name of a text file containing the feature names or values to look up. The file must contain a column header  that matches a column header name in the data file. Multiple  columns may be present. A .kgg file (from a Cluster k-means  analysis) may also be provided.
-__
-  __
 __--dindex <**integer>
 
 __
-  Specify the index number of the column in the data file  containing the data to look up and match. Defaults to  interactively asking the user.
-__
-  __
 __--lindex <**integer>
 
 __
-  Specify the index number of the column in the list file  containing the values to look up and match if more than one  column is present. If a k-means Cluster file (.kgg) is  provided, then specify the gene cluster number to use. Defaults to  interactively asking the user.
+  Specify the index numbers of the columns in the data and list  files, respectively, containing the identifiers to match features.  If not specified, then the program will attempt to identify   appropriate matching columns with the same header name. If none  are specified, the user must select interactively from a list of  available column names.
 __
   __
 __--sum
@@ -96,11 +89,11 @@ __
 __
   __
 ==DESCRIPTION==
-Given a list of requested feature IDs, this program will pull out those  features (rows) from a datafile (compare to Microsoft Excel's VLOOKUP  command). The list is provided as a separate text file. The program will  write a new data file containing only those features it found and in the  same order as the request list.
+Given a list of requested feature identifiers, this program will pull  out those features (rows) from a datafile and write a new file. This  program compares in function to a popular spreadsheet VLOOKUP command.  The list is provided as a separate text file, either as a single column  file or a multi-column tab-delimited from which one column is selected.  All rows from the source data file that match an identifier in the list  will be written to the new file.
 
-The list file may be a simple text file containing the feature names of the  features to pull. If more than one column is present in the list of lookup  names, the index will be requested interactively from the user, or be  specified as a command line argument.
+The program will also accept a Cluster gene file (with .kgg extension)  as a list file. In this case, all of the genes for each cluster are  written into separate files, with the output file name appended with the  cluster number.
 
-Alternatively, it will also accept a k-means Cluster gene file (.kgg  extension) and all genes from the specified cluster number will be pulled.
+The program will optionally regenerate a summed data file, in which values  in the specified data columns are averaged and written out as rows in a  separate data file. Compare this function to the summary option in the  biotoolbox scripts [Pod_get_relative_data_pl get_relative_data.pl] or [Pod_average_gene_pl average_gene.pl].
 
 ==AUTHOR==
 {{{

@@ -12,9 +12,10 @@
 
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
-	# First, you'll need to install XCode from Apple's Mac App Store. When you first run XCode, immediately go into preferences (after dismissing the splash welcome screen) and cancel and turn off automatic package and documentation downloads (unless you want them, of course, for you iPhone App development). It will save you a few GB of disk space.... Next, select the Command Line Tools to install them. These are essential to proceed with the installations below. You'll need to authenticate with your (free) Apple Developer Account. 
-	# Second, the default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering `perldoc perllocal` in the terminal.
-	# Third, if you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
+	# You will need to install XCode from Apple's Mac App Store. When you first run XCode, immediately go into preferences (after dismissing the splash welcome screen) and cancel and turn off automatic package and documentation downloads (unless you want them, of course, for you iPhone App development). It will save you a few GB of disk space.... Next, select the Command Line Tools to install them. These are essential to proceed with the installations below. You'll need to authenticate with your (free) Apple Developer Account. 
+	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering `perldoc perllocal` in the terminal.
+	# If you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
+	# The FastCGI module for the Apache web server is no longer included. To install it, download Apache's [http://httpd.apache.org/mod_fcgid/ FastCGI] source code, compile, and install.
 
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
@@ -193,15 +194,10 @@ Some basic modules to upgrade or install right away (but probably not absolutely
 
 ===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
-
 Look back through the output for possible clues to the failure. Often times there is a missing prerequisite module (or version) that wasn't caught. Look for an error that complains about not finding XXX in @INC. Install the missing prereq and try again.
-
 Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed (see above).
-
 Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures (Universal Binary). However, libraries built under Fink as well as other compiled libraries will usually only have only one architecture, and the compiler will warn about this. You can safely ignore those warnings.
-
 Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
-
 Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically test your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
 
 ===Install BioPerl===
@@ -235,15 +231,80 @@ There are a few additional modules that are required by the biotoolbox scripts. 
 Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
 
 ==Installing GBrowse==
-Install [http://gmod.org/wiki/GBrowse GBrowse]. This is now available through CPAN. There are actually two distributions to install. You may need to search CPAN to find the latest GBrowse version; try typing `d /GBrowse/` in the CPAN shell to do a search.
-	* Bio::Graphics
-	* GBrowse
+[http://gmod.org/wiki/GBrowse GBrowse] is a web-based generic genome browser that can display genome annotation and genomic data from microarray or next generation sequencing. Before you begin, you will likely need to install a few more Perl modules. You can install them through CPAN as above.
+	* `CGI::Session`
+	* `Text::ParseWords`
+	* `JSON`
+	* `Bio::Graphics`
+There may or may not be others, but the GBrowse installer will notify you of missing modules.
 
-It should be safe to accept the default locations for the browser installation files. However, feel free to change if you so desire. 
+*Important!* You will need to turn on the Apache web server. You can use the Sharing tab of System Preferences, or from the command line enter `sudo apachectl start`. 
 
-After installation, the installer should set the permissions appropriately for the persistant and tmp directories. Be sure to check those manually in the terminal (`ls -l`); sometimes they need to be fixed.
+GBrowse is now available through CPAN. However, I actually find it easier to install it from the command line, rather than through the CPAN Shell. The reason being is there is a configuration step that I simply find a little easier to use on the command line. Download the package from [http://search.cpan.org/dist/GBrowse/ here] and unpack it in a temporary directory. Move into the directory, and begin the build process
+<pre>
+	perl Build.PL
+</pre>
 
-*Important!* You will need to turn on Apache web server. You can use the Sharing tab of System Preferences, or from the command line enter `sudo apachectl start`. To restart Apache, for example after upgrading GBrowse, enter `sudo apachectl graceful`. The GBrowse installer script tries to restart Apache for you, but the command doesn't work on Mac OS X (it's Linux specific), so you'll have to do it manually.
+Take note of any missing required Perl modules and remedy as necessary. You can also have the Build script install any missing dependencies.
+<pre>
+	./Build installdeps
+</pre>
+
+Next comes the configuration part. Run 
+<pre>
+	./Build config
+</pre>
+The script will ask a series of questions. It should be safe to accept the default locations for everything; however, feel free to change if you desire. One change you may want to note is the Apache user should be `_www` instead of the default `www`.
+
+Next, install the browser. Run
+<pre>
+	./Build
+	./Build test
+	sudo ./Build install
+</pre>
+
+Hopefully, everything should go smoothly. A couple of things to note.
+
+First, the install script will ask to restart Apache. It usually doesn't succeed if you let it, so I always do it myself. Run `sudo apachectl graceful` to restart it from the command line.
+
+Second, the permissions are rarely set correctly on the temp and library folders, so you may need to double check these. If you accepted the defaults, these should be `/var/lib/gbrowse2` and `/var/tmp/gbrowse2`. To set them manually, try this
+<pre>
+	sudo chown -R _www:_www /var/lib/gbrowse2
+	sudo chown -R _www:_www /var/tmp/gbrowse2
+</pre>
+
+Finally, I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
+To enable on Mac OS X 10.6 Snow Leopard, you will have to edit the file `/etc/apache2/httpd.conf` as root. Find the following line in the file and un-comment it. 
+<pre>
+	# LoadModule fastcgi_module     libexec/apache2/mod_fastcgi.so
+</pre>
+
+To enable FastCGI on OS X 10.7 Lion, you will need to install it, as Apple no longer includes it. Download Apache's updated [http://httpd.apache.org/mod_fcgid/ FastCGI] source package from their [http://httpd.apache.org/download.cgi#mod_fcgid mirror]. Unpack, and install using the following commands.
+<pre>
+	./configure.apxs
+	make
+	sudo make install 
+</pre>
+It should install `mod_fcgid.so` into `/usr/libexec/apache2/` for you and automatically update `/etc/apache2/httpd.conf` to enable the FastCGI daemon.
+
+Sometimes I have permissions problems executing the scripts, especially when using FastCGI. You will need to edit the file `/etc/apache2/other/gbrowse2.conf`. Find this entry in the file
+<pre>
+	<Directory "/Library/Webserver/CGI-Executables/gb2">
+	  Options ExecCGI
+	  SetEnv GBROWSE_CONF   "/etc/gbrowse2"
+	</Directory>
+</pre>
+and add the following lines to make this
+<pre>
+	<Directory "/Library/Webserver/CGI-Executables/gb2">
+	  Options ExecCGI
+	  SetEnv GBROWSE_CONF   "/etc/gbrowse2"
+	  # extra permissions
+	  Order allow,deny
+	  Allow from all
+	</Directory>
+</pre>
+Finally, restart the Apache server, and try the new link http://localhost/fgb2/gbrowse.
 
 ==Installing Samtools==
 [http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
@@ -275,12 +336,20 @@ This also copies the executables into the `/usr/local/bin/` directory for easy a
 ==Installing Bio-Samtools==
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
 
+One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, re-edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
+<pre>
+	make clean
+	make
+	make razip
+</pre>
+Repeat the Bio-Samtools installation (you may need to issue the clean command from within CPAN Shell). It should work now.
+
 ==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
 
 While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
 
-Download Jim Kent's source [http://http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
+Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
 
 Set up the environment variables. These are needed during both library compilation and building the Perl modules later. You can temporarily enter these commands in your current terminal session. To make them more permament, add them to your `.profile` or `.bashrc` files in your home directory. The variables below assume a 64-bit Intel machine; change as appropriate.
 <pre>
@@ -322,6 +391,8 @@ A simpler alternative is to compile the module as non-root, then install as root
 	sudo ./Build install
 </pre>
 	
+One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, `make clean`, and `make` again. 
+
 ==Ensembl Perl API==
 To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
 Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.

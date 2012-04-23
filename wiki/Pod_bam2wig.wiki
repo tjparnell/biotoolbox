@@ -59,7 +59,7 @@ __
 __--coverage
 
 __
-  Quickly calculate the coverage of the alignments over the genome,  either at single bp resolution (default) or in bins. This method ignores  the position, quality, strand, shift, and log options. It uses a fast  low-level interface to the Bam file to eke out performance. It is  equivalent to specifying --position=span, --fix, --nosplit,  --nope, --noshift, --nostrand, --qual=0, --norpm, and no log.
+  Quickly calculate the coverage of the alignments over the genome,  either at single bp resolution (default) or in bins. This method ignores  the position, quality, strand, shift, and log options. It uses a fast  low-level interface to the Bam file to eke out performance. It is  equivalent to specifying --position=span, --fix, --split,  --nope, --noshift, --nostrand, --qual=0, --norpm, and no log.
 __
   __
 __--splice
@@ -137,7 +137,7 @@ __
 __--log `[`2|10`]`
 
 __
-  Transform the count to a log scale. Specify the base number, 2 or  10. The counts are increased by 1 before taking a log transformation,  thus avoiding a log of 0. Only really useful with Bam alignment  files with high count numbers. Default is to not transform the count.
+  Transform the count to a log scale. Specify the base number, 2 or  10. The counts are increased by 1 before taking a log transformation,  thus avoiding taking a log of 0. Only really useful with Bam alignment  files with high count numbers. Default is to not transform the count.
 __
   __
 __--(no)track
@@ -181,13 +181,89 @@ This program will enumerate aligned sequence tags and generate a wig,  or option
 
 Both paired-end and single-end alignments may be counted. Alignments  with splices (e.g. RNA-Seq) may be counted singly or separately.  Alignment counts may be separated by strand, facilitating analysis of  RNA-Seq experiments.
 
-For ChIP-Seq experiments, the alignment position may be shifted  in the 3' direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. The shift value  may be empirically determined from the sequencing data.
-
-To determine the shift value, the top enriched 500 bp regions (the  default number is 100) from the largest chromosome are identified by  their read coverage. Stranded read counts are then collected in 10 bp  bins over a 1.5 kb region encompassing the identified region. A  Pearson product-moment correlation coefficient is then reiteratively  determined between the stranded data as the bins are shifted from  30 to 500 bp. The shift corresponding to the highest R squared value  is retained for each sampled region, and the mean best shift for all  sampled regions is used as the final shift value. This approach works  best with clean, distinct peaks. Not all sampled regions may return  a significant R squared value. The peak shift may be evaluated by  viewing separate, stranded wig files together with the shifted wig  file in a genome browser.
+For ChIP-Seq experiments, the alignment position may be shifted  in the 3' direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. The shift value  may be empirically determined from the sequencing data (see below).
 
 The output wig file may be either a variableStep, fixedStep, or  bedGraph test format. The wig file may be further converted into a  compressed, indexed, binary bigWig format, dependent on the availability  of the appropriate conversion utilities.
 
 More information about wiggle files can be found at  http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at  http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at  http://genome.ucsc.edu/goldenPath/help/bigWig.html.
+
+==RECOMMENDED SETTINGS==
+The type of wig file to generate for your Bam sequencing file can vary  depending on your particular experimental application. Here are a few  common sequencing applications and my recommended settings for generating  the wig or bigWig file.
+
+Straight coverage
+
+__
+  To generate a straight-forward coverage map, similar to what most genome  browsers display when using a Bam file as source, use the following  settings:
+__
+  __
+{{{
+ bam2wig.pl --coverage --in <bamfile>
+}}}
+Single-end ChIP-Seq
+
+__
+  When sequencing Chromatin Immuno-Precipitation products, one generally  is more interested in the number of tag counts, rather than coverage.  Hence, we can simply count the start position of the sequence tags.
+__
+  __
+  To adjust the positions of tag count peaks to center over the presumed  site of interest, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
+__
+  __
+  Finally, to compare ChIP-Seq alignments from multiple experiments,  convert your reads to Reads Per Million Mapped, which will help to  normalize read counts.
+__
+  __
+{{{
+ bam2wig.pl --pos start --shift --rpm --in <bamfile>
+}}}
+Paired-end ChIP-Seq
+
+__
+  If both ends of the ChIP eluate fragments are sequenced, then we do not  need to calculate a shift value. Instead, we will simply count at the  midpoint of each properly-mapped sequence pair.
+__
+  __
+{{{
+ bam2wig.pl --pos mid --pe --rpm --in <bamfile>
+}}}
+Unstranded RNA-Seq
+
+__
+  With RNA-Sequencing, we may be interested in either coverage (generating  a transcriptome map) or simple tag counts (differential gene expression),  so we can count in one of two ways.
+__
+  __
+  To compare RNA-Seq data from different experiments, convert the read  counts to Reads Per Million Mapped, which will help to normalize read  counts.
+__
+  __
+{{{
+ bam2wig --pos span --rpm --in <bamfile>
+ }}}
+{{{
+ bam2wig --pos mid --rpm --in <bamfile>
+}}}
+Stranded, single-end RNA-Seq
+
+__
+  If the library was generated in such a way as to preserve strand, then  we can separate the counts based on the strand of the alignment. Note  that the reported strand may be accurate or flipped, depending upon  whether first-strand or second-strand synthesized cDNA was sequenced,  and whether your aligner took this into account. Please check the  output wig files in a genome browser to verify which one is which, and  rename appropriately.
+__
+  __
+{{{
+ bam2wig --pos mid --strand --rpm --in <bamfile>
+ }}}
+{{{
+ bam2wig --pos span --strand --rpm --in <bamfile>
+}}}
+Stranded, paired-end RNA-Seq
+
+__
+  Strand presents a complication when sequencing both ends of the cDNA  product from a library that preserves orientation. Currently,  the !TopHat** aligner can handle stranded, paired-end RNA-Seq alignments.  Because each pair will align to both strands, the aligner must record  separately which strand the original fragment should align. The !TopHat**  program records an 'XS' attribute for each alignment, and, if present,  bam2wig.pl will use this to set the strand.
+__
+  __
+{{{
+ bam2wig --pe --pos mid --strand --rpm --in <bamfile>
+ }}}
+{{{
+ bam2wig --pe --pos span --strand --rpm --in <bamfile>
+}}}
+==SHIFT VALUE DETERMINATION==
+To determine the shift value, the top enriched 500 bp regions (the  default number is 100) from the largest chromosome are identified by  their read coverage. Stranded read counts are then collected in 10 bp  bins over a 1.5 kb region encompassing the identified region. A  Pearson product-moment correlation coefficient is then reiteratively  determined between the stranded data as the bins are shifted from  30 to 500 bp. The shift corresponding to the highest R squared value  is retained for each sampled region, and the mean best shift for all  sampled regions is used as the final shift value. This approach works  best with clean, distinct peaks. Not all sampled regions may return  a significant R squared value. The peak shift may be evaluated by  viewing separate, stranded wig files together with the shifted wig  file in a genome browser.
 
 ==AUTHOR==
 {{{
