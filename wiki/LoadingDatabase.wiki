@@ -7,31 +7,31 @@ The *biotoolbox* scripts utilize a BioPerl [http://bioperl.org/wiki/Module:Bio::
 
 This HowTo focuses on getting the annotation and data into the database. Conveniently, the same database could be used for both data collection and analysis, as well as visualization using the [http://gmod.org/wiki/GBrowse GBrowse] Genome Browser. 
 
-===Database Conventions===
+==Database Conventions==
 The Bio::DB::SeqFeature::Store database uses source data in the [http://www.sequenceontology.org/resources/gff3.html GFF3] format. Each feature in the database has a reference sequence, start and stop coordinates, etc. It also has two tags, _source_ and _type_. The source tag can be anything. The type, on the other hand, should match to a [http://www.sequenceontology.org Sequence Ontology] (SO) term. 
 
 For annotation, it is important to use SO terms in the type. For the data sources, one can be a be a little more flexible. In fact, the *biotoolbox* data collection scripts sort of expects it. There are two reasons: historical, and technical. First, these scripts initially used the simpler Bio::DB::GFF database schema, which used GFF v.2 data formats. This format allowed the type (or method) to be anything. This meant we could play fast and loose with our feature types. Second, it's easiest and faster to find features (including data features) by type, rather than a more cumbersome search by Name. One of these days, I will fix the scripts to allow for finding data features by Name; until then, it's best to use unconventional and unique types for your data features.
 
-===Obtaining Annotation===
+==Obtaining Annotation==
 The most important component of the database is the annotation. The annotation should be obtained from an official organism genome repository online, such as [http://www.yeastgenome.org/ SGD] or [http://flybase.org/ FlyBase], a general genomics repository such as [http://genome.ucsc.edu/ UCSC] or [http://www.ensembl.org Ensembl], or one you've [http://gmod.org/wiki/MAKER annotated] yourself. 
 
 Ideally, the annotation should be provided in GFF3 format, making loading in the database simple. For example, SGD provides the yeast genome in GFF3 files. Unfortunately, this isn't always the case, as annotation can come in many different flavors.
 
 BioPerl includes some converters. For example, there is a converter for the NCBI GenBank format, `genbank2gff3.pl`. For files in GTF format (a variation of GFF v.2), there is a GTF to GFF3 [http://www.sequenceontology.org/cgi-bin/converter.cgi converter] available.
 
-====Annotation from UCSC====
+===Annotation from UCSC===
 Annotation may be downloaded from the UCSC Table Browser in a simple tab-delimited gene table format. It's also possible to download as a GTF, but it is not compatible with the above GTF converter.
 
 The GBrowse distribution provides a script, ucsc_genes2gff.pl, which will convert the gene table. However, it produces fairly simple annotation, and in my experience has some issues. The Chado distribution also includes a different [http://gmod.svn.sourceforge.net/viewvc/gmod/schema/trunk/chado/bin/ucsc_genes2gff.pl?revision=21190&view=markup ucsc_genes2gff.pl] script, which, although I have not used it, appears to produce more complete GFF3 features.
 
 The *biotoolbox* collection also includes a UCSC gene table to GFF3 converter script, [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. It will conveniently download the appropriate gene tables and supporting tables via FTP and generate much more complete GFF3 files than the above programs. It works well with the refGene, ensGene, knownGene, and xenoRefGene tables. 
 
-====Annotation from Ensembl====
+===Annotation from Ensembl===
 Ensembl conveniently provides GTF files for their annotated genomes. However, the information content is limited in the GTF file. Nevertheless, it is compatible with the above GTF to GFF3 converter.
 
 To obtain more complete annotation, there is a *biotoolbox* script, [Pod_get_ensembl_annotation get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
 
-===Data Formats===
+==Data Formats==
 Microarray and next-generation sequencing data are usually comprised of a series of genomic coordinates and values. This data can be provided in a number of different file formats.
 
 ====GFF3 file====
@@ -40,7 +40,7 @@ In addition to defining genomic annotation, the GFF3 format includes a score col
 ====Wig and BigWig files====
 Popularized by the UCSC genome browser and adapted by nearly every other genome browser in existence, the [http://genome.ucsc.edu/goldenPath/help/wiggle.html wig] file is a simple text format that can take a couple of different forms. It is particularly convenient for displaying dense genomic data. 
 
-The wig data itself is not loaded into the database, but rather references converted binary wig data files. A note of caution about the binary wig data file: it is down sampled to 8-bit precision (in the case with BioPerl), or essentially a range of 0-255 values. While this is more than sufficient for visualization in the browser, it may not be sufficient for data analysis. Personal experience, however, suggests it is a pretty good approximation. You can load wig file data into a database using the [http://search.cpan.org/~lds/GBrowse-2.44/bin/wiggle2gff3.pl wiggle2gff3.pl] script.
+The wig data itself is not loaded into the database, but rather references converted binary wig data files. A note of caution about the binary wig data file: it is down sampled to 8-bit precision (in the case with BioPerl), or essentially a range of 0-255 values. While this is more than sufficient for visualization in the browser, it may not be sufficient for data analysis. Personal experience, however, suggests it is a pretty good approximation. You can load wig file data into a database using the [http://search.cpan.org/~lds/GBrowse-2.44/bin/wiggle2gff3.pl wiggle2gff3.pl] script. This script will process the text wig files into 8-bit, binary files (.wib extension) and generate a GFF3 file that references the .wib files for loading into the database.
 
 The updated, and preferred, format is the [http://genome.ucsc.edu/goldenPath/help/bigWig.html BigWig] file. This is a compressed, indexed, binary format which allows for rapid retrieval of statistical data. Importantly, it does not limit precision of the data values like the binary wig file. Furthermore, it can be accessed either locally or remotely. Like the wig file, it is not stored in the database but rather references the location of the data file. Another alternative is to create a BigWigSet, a directory of BigWig files that acts as its own database, described below.
 
@@ -73,20 +73,21 @@ There are numerous *biotoolbox* scripts for converting data file formats from on
 	* [Pod_data2wig data2wig.pl]
 	* [Pod_wig2data wig2data.pl]
 	
-===Loading the database===
-The Bio::DB::SeqFeature::Store database is loaded with either GFF3 or Fasta files. Therefore, genomic data in other data formats, e.g. .wig or .bw, must have GFF3 files prepared that reference the actual data files. In these cases, a genomic feature is described, one for each chromosome strand, that has an attribute tag (in the GFF 9th column) describing the location of the binary file in the local file system. 
+==Loading the Bio::DB::SeqFeature::Store database==
+The Bio::DB::SeqFeature::Store database is loaded using one or more GFF3 files as source. It will also accept fasta sequence files. The actual SQL database may be one of several: MySQL, PostGreSQL, SQLite, or even an in-memory database. Relational databases such as MySQL and PgSQL are much faster and oriented towards multiple simultaneous users, but require a complicated setup. SQLite is much simpler (it uses one, portable file) and is likely already installed on your system; it is moderately fast in reading, but quite slow in loading. The in-memory database is generally not recommended, but can sometimes be useful for very small or limited genome annotation.
 
-Note that this is not necessarily required for data collection; many *biotoolbox* data collection scripts will now take a direct file reference on the command line without having to reference them from within the database.
+Once the GFF3 files are generated, the SQL database may then be loaded using the BioPerl provided script, `seqfeature_load.pl` (or `bp_seqfeature_load.pl`). A typical command for loading a MySQL database with hg18 annotation would look like this 
+<pre>
+	bp_seqfeature_load.pl -c -d hg18 -u loader -p password hg18.gff3
+</pre>
+Note that the MySQL user (`loader`) and password (`password`) are provided on the command line. This user must have at least the following permissions to the database `hg18`: select, insert, update, delete, create, drop, alter.
 
-====wig files====
-The Bio::Graphics modules comes with a Perl script, `wiggle2gff3.pl`, that is used to prepare a wig file. It first converts the text .wig file into a binary .wib (downsampling the data to 8-bit precision in the process), then generates a GFF3 file that references the .wib files.
+A typical command for loading a SQLite database would look like this
+<pre>
+	bp_seqfeature_load.pl -c -a DBI::SQLite -d ./hg18.sqlite hg18.gff3
+</pre>
 
-====Big files====
-BigFiles, including BigBed and BigWig, may be referenced using the *biotoolbox* script, [Pod_big_file2gff3 big_file2gff3.pl]. BAM files may also be referenced using this script. For BigWig files, also see 
-
-Once the GFF3 files are generated, the SQL database may then be loaded using the BioPerl provided script, `seqfeature_load.pl` (or `bp_seqfeature_load.pl`). Alternatively, if there is only one relatively simple GFF3 annotation file, then an in-memory database may be utilized by the *biotoolbox* data collection scripts without having to load a SQL database. The memory database is slow to load, but extremely fast once loaded. Depending on the size of the GFF3 file, it may consume considerable amounts of RAM.
-
-===Using a BigWigSet database===
+==Using a BigWigSet database==
 A directory of BigWig files may be treated specially as its own database, which may be a more convenient alternative to referencing the BigWig files via GFF3 feature in SeqFeature::Store database as described above. The directory is referred to as a BigWigSet. A simple text file, `metadata.index`, allows attributes, including primary_tag, source, strand, or anything else you want, to be associated with each BigWig file in the directory. 
 
 A rudimentary metadata file may be generated using the *biotoolbox* script [Pod_big_file2gff3 big_file2gff3.pl]. A detailed description of the metadata file structure may be found [http://search.cpan.org/perldoc?Bio::DB::BigWigSet here]. Note that current *biotoolbox* data collection scripts should be able to work with a directory of BigWig files without setting a full metedata file.

@@ -121,7 +121,7 @@ Set up MySQL to start up automatically by running
 
 There should now be a startup plist file in `/Library/StartupItems/`. Now the MySQL Server daemon should start everytime when you reboot your Mac, and saves you from running the `mysqld_safe` command everytime. 
 
-===Installing GD Libraries===
+==Installing GD Libraries==
 These are needed primarily by Bio::Graphics and GBrowse, but some of my graphing programs also use it. 
 
 You can install GD from [https://bitbucket.org/pierrejoye/gd-libgd/overview source], but note that you'll also have to install a number of other dependencies first.
@@ -134,11 +134,6 @@ The third approach, and one that I favor, is to install them through Fink. Begin
 </pre>
 
 It should also install libjpeg and libpng, along with the appropriate libraries.
-
-===Installing other programs with Fink===	
-There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
-
-Another generally useful tool is _wget_, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
 
 ==Installing Perl modules through CPAN==
 The [http://search.cpan.org/ Comprehensive Perl Archive Network] is an extensive repository of Perl modules. If you're faced with a difficult job of coding some project, chances are that someone else has either done it for you, or at least written some code that will make the job easier. There are thousands of Perl modules in CPAN, some of which are just right for you.
@@ -273,7 +268,9 @@ Second, the permissions are rarely set correctly on the temp and library folders
 	sudo chown -R _www:_www /var/tmp/gbrowse2
 </pre>
 
-Finally, I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
+
+===Setting up FastCGI with GBrowse===
+I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
 To enable on Mac OS X 10.6 Snow Leopard, you will have to edit the file `/etc/apache2/httpd.conf` as root. Find the following line in the file and un-comment it. 
 <pre>
 	# LoadModule fastcgi_module     libexec/apache2/mod_fastcgi.so
@@ -306,22 +303,53 @@ and add the following lines to make this
 </pre>
 Finally, restart the Apache server, and try the new link http://localhost/fgb2/gbrowse.
 
-==Installing Samtools==
-[http://samtools.sourceforge.net/index.shtml Samtools] is a project for working with large scale next generation sequencing alignments, such as from Illumina. The program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
+===Setting up GBrowse user accounts
+One of the cool things about GBrowse is the ability to offer user accounts. This allows multiple users to store their file uploads and personal settings and, more importantly, have them persistently available across browser and platform sessions.
+
+GBrowse can accept [http://openid.net OpenID] authentications, Pluggable Authentication Modules (PAM), or handle its own user set up and authentications. More information about authenticating users can be found [http://www.gmod.org/wiki/GBrowse_Configuration/Authentication here]. 
+
+====Setting up PAM Authentication with OS X accounts====
+For a small lab setting with a limited number of controlled users, I find it easy to set up the PAM authentication using the Mac OS X user accounts for authentication. For larger setups, you may want to investigate other options. 
+
+You will need to install some additional Perl modules before you begin.
+	* `Authen::Simple`
+	* `Authen::PAM`
+	* `Authen::Simple::PAM`
+These will likely require installing some other dependencies. CPAN should take care of that for you.
+
+Next, create a new service definition file in `/etc/pam.d/`. The easiest way to do this is simply duplicate the `login` file and rename it to `gbrowse`.
+<pre>
+	cd /etc/pam.d/
+	sudo cp login gbrowse
+</pre>
+It's likely not every line is needed from the `login` definition file, but I am not knowledgable enough to know what to keep or toss. I just know it works with everything in there.
+
+Next you'll need to enable user accounts in GBrowse. Edit the main GBrowse configuration file, `/etc/gbrowse2/GBrowse.conf`. Find the line `user_accounts` and change the `0` to `1` to enable. Next, uncomment the following line:
+<pre>
+	authentication plugin = PamAuthenticate
+</pre>
+
+Save the file, restart the Apache web server, reload the GBrowse page, and you should now have login link in the upper right corner. Provide your Mac OS X user account credentials to login. There is a place in `GBrowse.conf` where you can provide a helpful hint to users in the login dialog box.
+
+==Installing Bam file support==
+Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and biotoolbox.
+
+===Installing Samtools===
+The Samtools program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
 
 Download the source code tarball from [http://sourceforge.net/projects/samtools/files/ here]. Unpack into a working directory.
 
-If you'll be working with 64-bit executables, edit the `Makefile` to un-comment out the `-m64` under CLFAGS. This ensures the program will compile as a 64-bit executable.
+If you'll be working with 64-bit executables (likely), edit the `Makefile` to un-comment out the `-m64` on the line containing `CLFAGS`. This ensures the program will compile as a 64-bit executable.
 
 Compile by running `make`. Also compile razip by executing `make razip`. 
 
 To make samtools generally accessible to all the users on the machine, move the samtools folder to `/usr/local/`. Since samtools is under continuous development, I'll append the version number to the folder name. Then, to make navigation easier, I'll create a symbolic link to the latest version directory to a general name. For example,
 <pre>
-	sudo cp samtools /usr/local/samtools-v0.1.18
+	sudo cp ./samtools /usr/local/samtools-v0.1.18
 	cd /usr/local/
 	sudo ln -s samtools-v0.1.18 samtools
 </pre>
-Now I can always reference `/usr/local/samtools/` and it will point to the latest version directory. When a new version comes out, I install it side by side, and then simply update the `/usr/local/samtools` symlink.
+Now I can always reference `/usr/local/samtools/` and it will point to the latest version directory. When a new version comes out, I install it side by side in `/usr/local/`, and then simply update the `/usr/local/samtools` symlink.
 
 To install the Bio-Samtools module (see below), you'll need to put the libraries in an accessible location. Rather than copying the appropriate files, and then doing it again and again with each new version, we can simplify using symlinks.
 <pre>
@@ -333,7 +361,7 @@ To install the Bio-Samtools module (see below), you'll need to put the libraries
 </pre>
 This also copies the executables into the `/usr/local/bin/` directory for easy access through the path.
 
-==Installing Bio-Samtools==
+===Installing Bio-Samtools===
 Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
 
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, re-edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
@@ -347,6 +375,7 @@ Repeat the Bio-Samtools installation (you may need to issue the clean command fr
 ==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
 
+===Building the Kent libraries===
 While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
 
 Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
@@ -381,8 +410,8 @@ Move the files into appropriate common destinations. I suppose the entire kent s
 	sudo cp ~/bin/x86_64/`*` /usr/local/bin
 </pre>
 
+===Installing Bio-BigFile Perl module===
 Finally, you can install the Bio-BigFile Perl module. Note that if you install through the CPAN Shell as root using `sudo`, your environment variables won't carry over to the root session. One solution is to set them again as root.
-
 A simpler alternative is to compile the module as non-root, then install as root. Download the source tarball from CPAN and extract it into a working directory, then `cd` into it. Follow the instructions below for building it. If your MACH_TYPE and KENT_SRC environment variables are properly set, things should go well.
 <pre>
 	perl Build.PL
@@ -397,7 +426,12 @@ One error you may or may not encounter is regarding shared libraries, and errors
 To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
 Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
 
-=Additional Tools=
+==Installing other programs with Fink==
+There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
+
+Another generally useful tool is _wget_, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
+
+==Additional Tools==
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or biotoolbox. These are simply programs that I have found to be helpful in my own work.
 	* [http://www.novocraft.com Novocraft's] novoalign alignment tool. This is quite useful in aligning short sequence tags, generated for example by Illumina next-generation sequencing, to the genome. While it's not a particularly fast aligner, it is quite thorough by tolerating mismatches and gaps, perfect for identifying SNPs and mutations. It handles paired-end, RNA sequencing, and bisulfite sequencing.
 	* An alternative and fast aligner is [http://bowtie-bio.sourceforge.net/ bowtie]. This is ideal for ChIP-Seq, where exact sequence alignments are not of the highest importance but rather identifying location. 
