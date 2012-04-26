@@ -10,9 +10,7 @@ use Pod::Usage;
 use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use Statistics::Descriptive;
-use Data::Dumper;
 use FindBin qw($Bin);
-#use lib "$Bin/../lib";
 use lib '/usr/local/biotoolbox/lib';
 use tim_file_helper qw(
 	open_to_write_fh
@@ -151,7 +149,7 @@ my ($filenames, $fh1, $fh2) = open_wig_files();
 my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
-	print " Calculating total number of aligned fragments....\n";
+	print " Calculating total number of aligned fragments... this may take a while...\n";
 	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired);
 	print "   ", format_with_commas($total_read_number), " total mapped fragments\n";
 	printf " counted in %.1f minutes\n", (time - $start_time)/60;
@@ -1203,7 +1201,7 @@ sub record_stranded_start {
 		}
 		else {
 			# no bin
-			$data1{ $a->end } += 1;
+			$data2{ $a->end } += 1;
 		}
 	}
 }
