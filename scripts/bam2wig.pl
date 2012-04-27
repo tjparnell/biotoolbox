@@ -11,7 +11,7 @@ use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use Statistics::Descriptive;
 use FindBin qw($Bin);
-use lib '/usr/local/biotoolbox/lib';
+use lib "$Bin/../lib";
 use tim_file_helper qw(
 	open_to_write_fh
 );
@@ -24,7 +24,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.7.2';
+my $VERSION = '1.7.3';
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
