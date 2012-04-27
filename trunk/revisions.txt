@@ -1,5 +1,8 @@
 ######## biotoolbox revision history #############
 
+v.1.7.3 (svn r355)
+	- Fixed bugs in script bam2wig.pl that prevents it from finding its libraries and compiling properly; and another bug that prevented stranded start positions from being recorded properly
+
 v.1.7.2 (svn r351)
 	- Fixed bug in script ucsc_table2gff3.pl where the output file name may not be properly generated, leading to an overwrite of the input file.
 	- Fixed bug in script bam2wig.pl where the recorded position is off by 1 bp
