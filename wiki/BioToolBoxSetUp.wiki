@@ -19,26 +19,23 @@ If you are an administrator on the computer, then you can install bioperl and ot
 If you don't have administrator access, or prefer to keep things confined, then you can easily install in just your own little world, AKA your home directory.
 
 ==Installing locally==
-The easiest way to install Perl modules locally in your own directory is to use the [http://search.cpan.org/perldoc?local::lib local::lib] module. By installing this module, it will automatically set up your own Perl libraries in your home directory.
+The easiest way to install Perl modules locally in your own directory is to use the `local::lib` module. By installing this module, it will automatically set up your own Perl libraries in your home directory.
 
-Download the latest version manually from [http://www.cpan.org CPAN], and follow the directions in the readme under bootstrap. Or follow the directions below
+Download the latest [http://search.cpan.org/perldoc?local::lib version] manually from CPAN, and follow the directions in the readme under the bootstrap section. Or follow the directions below within the extracted directory:
 <pre>
-	wget http://search.cpan.org/CPAN/authors/id/A/AP/APEIRON/local-lib-1.008004.tar.gz
-	tar -xf local-lib-1.008004.tar.gz
-	cd local-lib-1.008004
 	perl Makefile.PL --bootstrap
 	make test
 	make install
 </pre>
 
-You should now have a `lib` directory with Perl modules. If you're lucky, it should also have installed an updated version of CPAN.
+You should now have a `lib` or `perl5` directory within your home directory. This will contain your local Perl modules. If you're lucky, it should also have installed an updated version of CPAN.
 
 Now you just need to set up your environment. This is assuming you're using the BASH shell for your login (a pretty safe assumption for most). Run the following command.
 <pre>
 	echo 'eval $(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)' >> ~/.bashrc
 </pre>
 
-If you look at your `.bashrc` file, you should find you've just added the above line to the end of the file. This will take care of setting up environment variables so that everytime you log in, you will use your own Perl libraries and not the system libraries. You should log out and back in for this to take effect. Then run `env` to print out your environment variables and confirm them.
+If you look at your `.bashrc` file, you should find you've just added the above line to the end of the file. This will take care of setting up environment variables so that everytime you log in, you will use your own Perl libraries and not the system libraries. You should log out and back in for this to take effect. Then run `env` to print out your environment variables and confirm them. You should have a number of Perl related environment variables listed, including `PERL5LIB` and `PERL_LOCAL_LIB_ROOT`. If not, try adding the above line to your `~/.profile` file instead (works for Mac OS X).
 
 ==Installing Perl Modules==
 This assumes you now have a Perl environment set up, either locally (see above), system-wide through the operating system's libraries (root access), or a separate Perl installation (either local or root). Remember, if you're working with a system library, you should prepend commands with `sudo` to grant root access. 
@@ -169,11 +166,10 @@ The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWi
 
 You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. First download Jim Kent's [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip source] code.
 <pre>
-	wget http://hgdownload.cse.ucsc.edu/admin/jksrc.zip
 	unzip jksrc.zip
 	cd kent/src/
 	export MACHTYPE=i686     # replace i686 as necessary for i386 or ppc
-	export KENT_SRC=`pwd`
+	export KENT_SRC=```pwd```
 	cd lib/
 	make
 	cd ..

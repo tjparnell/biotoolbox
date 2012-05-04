@@ -303,7 +303,7 @@ and add the following lines to make this
 </pre>
 Finally, restart the Apache server, and try the new link http://localhost/fgb2/gbrowse.
 
-===Setting up GBrowse user accounts
+===Setting up GBrowse user accounts===
 One of the cool things about GBrowse is the ability to offer user accounts. This allows multiple users to store their file uploads and personal settings and, more importantly, have them persistently available across browser and platform sessions.
 
 GBrowse can accept [http://openid.net OpenID] authentications, Pluggable Authentication Modules (PAM), or handle its own user set up and authentications. More information about authenticating users can be found [http://www.gmod.org/wiki/GBrowse_Configuration/Authentication here]. 
@@ -388,7 +388,12 @@ Set up the environment variables. These are needed during both library compilati
 	cd ..
 </pre>
 
-It's also useful to compile utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Enter each directory and compile the utility by entering the command `make`. It will automatically copy the compiled executable file into the directory `~/bin/x86_64/` (assuming a 64-bit machine). This is a short, but not exhaustive, list of programs that I might recommend.
+You will also need to compile the utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Before you begin, you will need to make a destination directory for the executables.
+<pre>
+	mkdir ~/bin/x86_64
+</pre>
+
+Now enter each utility directory and issue the `make` command. It will automatically copy the compiled executable file into the executable directory you just made. This is a short, but not exhaustive, list of programs that I might recommend.
 	* `bedGraphToBigWig`
 	* `bedToBigBed`
 	* `bigBedInfo`
@@ -401,7 +406,7 @@ It's also useful to compile utilities that work with the bigWig and bigBed files
 	* `wigToBedGraph`
 	* `wigToBigWig`
 
-Move the files into appropriate common destinations. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files.
+Move the files into appropriate system directories for availability for other users. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files (at least with regard to the Bio-BigFile Perl modules).
 <pre>
 	sudo mkdir /usr/local/kent_src
 	sudo cp -r ~/Documents/kent/src/inc /usr/local/kent_src/
@@ -423,8 +428,11 @@ A simpler alternative is to compile the module as non-root, then install as root
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, `make clean`, and `make` again. 
 
 ==Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
-Note that because this is essentially a manual installation; any prerequisites or updates must also done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
+To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
+
+It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
+
+Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
 
 ==Installing other programs with Fink==
 There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
@@ -435,10 +443,36 @@ Another generally useful tool is _wget_, which can be used to download file(s) u
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or biotoolbox. These are simply programs that I have found to be helpful in my own work.
 	* [http://www.novocraft.com Novocraft's] novoalign alignment tool. This is quite useful in aligning short sequence tags, generated for example by Illumina next-generation sequencing, to the genome. While it's not a particularly fast aligner, it is quite thorough by tolerating mismatches and gaps, perfect for identifying SNPs and mutations. It handles paired-end, RNA sequencing, and bisulfite sequencing.
 	* An alternative and fast aligner is [http://bowtie-bio.sourceforge.net/ bowtie]. This is ideal for ChIP-Seq, where exact sequence alignments are not of the highest importance but rather identifying location. 
-	* [http://bonsai.hgc.jp/~mdehoon/software/cluster/software.htm Cluster] is an extremely useful program to generate heirarchical and k-means clusters. This is useful in identifying groups of features or genes based on collected data, for example microarray or ChIP-Seq data. 
-	* [http://jtreeview.sourceforge.net/ TreeView] is a Java application perfect for displaying and visualizing the dendograms generated by the Cluster program. I have also used it to visualize the collected data mapped around a class of features generated with the biotoolbox script [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/map_data.pl map_data.pl]. The [http://code.google.com/p/biotoolbox/source/browse/trunk/scripts/manipulate_datasets.pl manipulate_datasets.pl] script has a function to export a tim data file to a simple text file that may be imported into either Treeview or Cluster.
+	* [http://bonsai.hgc.jp/~mdehoon/software/cluster/software.htm Cluster] is an extremely useful program to generate heirarchical and k-means clusters. This is useful in identifying groups of features or genes based on collected data, for example microarray or ChIP-Seq data. This is a Java GUI program capable of many different clustering algorithms. For simply k-means clustering, you can also check out my biotoolbox script [Pod_run_cluster run_cluster.pl].
+	* [http://jtreeview.sourceforge.net/ TreeView] is a Java application perfect for displaying and visualizing the dendograms generated by the Cluster program. I have also used it to visualize the collected data mapped around a class of features generated with the biotoolbox script [Pod_map_data map_data.pl]. The [Pod_manipulate_datasets manipulate_datasets.pl] script has a function to export a data file to a simple text file that may be imported into either Treeview or Cluster.
 	* David Nix's [http://useq.sourceforge.net USeq] and [http://http://timat2.sourceforge.net/ T2] suites of programs is an alternative suite of Java based programs for processing and analyzing next-generation sequencing and microarray data, respectively. 
 	
+===Compiling a 64-bit liftOver tool on OS X===
+The UCSC source tree includes a number of other additional programs. One useful one is the [http://genome.ucsc.edu/cgi-bin/hgLiftOver liftOver] tool for converting coordinates between genome versions. While they provide a 32-bit executable for [http://hgdownload.cse.ucsc.edu/admin/exe/ download] that is probably sufficient, if you want a 64-bit version you will need to compile one yourself. These instructions may also work with other tools (blat?).
 
+This presumes you've followed the instructions above for installing the bigFile support (bigWig and bigBed). It also presumes you have installed MySQL and libpng (a prerequisite for the GD libraries) using Fink.
 
+The liftOver tool is not included under `kent/src/utils/`, but rather a part of the browser. Therefore, we need to compile a few more things. First, we need to set up some more environment variables.
+<pre>
+	export PNGLIB=/sw/lib/libpng.a
+	export MYSQLINC=/sw/include/mysql
+	export MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
+</pre>
+
+Next, we begin compiling some additional libraries, and finally the liftOver tool itself.
+<pre>
+	cd kent/src/jkOwnLib
+	make
+	cd ../hg/lib
+	make
+</pre>
+
+You should now have `jkhgap.a` and `jkOwnLib.a` libraries located under `kent/lib/x86_64`, in addition to `jkweb.a`. 
+
+To compile liftOver, move into its directory and issue `make`.
+<pre>
+	cd kent/src/hg/liftOver
+	make
+</pre>
+You should now have a 64-bit liftOver executable in `~/bin/x86_64/`.
 	
