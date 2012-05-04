@@ -450,16 +450,16 @@ There are additional tools that are useful for bioinformatics analysis but are n
 ===Compiling a 64-bit liftOver tool on OS X===
 The UCSC source tree includes a number of other additional programs. One useful one is the [http://genome.ucsc.edu/cgi-bin/hgLiftOver liftOver] tool for converting coordinates between genome versions. While they provide a 32-bit executable for [http://hgdownload.cse.ucsc.edu/admin/exe/ download] that is probably sufficient, if you want a 64-bit version you will need to compile one yourself. These instructions may also work with other tools (blat?).
 
-This presumes you've followed the instructions above for installing the bigFile support (bigWig and bigBed). It also presumes you have installed MySQL and libpng (a prerequisite for the GD libraries) using Fink.
+This presumes you've followed the instructions above for installing the bigFile support (bigWig and bigBed). It also presumes you have installed MySQL and libpng (a prerequisite for the GD libraries) using Fink. While these are are not required for liftOver per se, they are required for the UCSC libraries that are needed by liftOver.
 
-The liftOver tool is not included under `kent/src/utils/`, but rather a part of the browser. Therefore, we need to compile a few more things. First, we need to set up some more environment variables.
+The liftOver tool is not included under `kent/src/utils/`, but rather a part of the browser. Therefore, we need to compile additional libraries. First, we need to set up some more environment variables. Adjust the paths as necessary if you did not use Fink.
 <pre>
 	export PNGLIB=/sw/lib/libpng.a
 	export MYSQLINC=/sw/include/mysql
 	export MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
 </pre>
 
-Next, we begin compiling some additional libraries, and finally the liftOver tool itself.
+Next, we compile the additional libraries.
 <pre>
 	cd kent/src/jkOwnLib
 	make
@@ -467,7 +467,7 @@ Next, we begin compiling some additional libraries, and finally the liftOver too
 	make
 </pre>
 
-You should now have `jkhgap.a` and `jkOwnLib.a` libraries located under `kent/lib/x86_64`, in addition to `jkweb.a`. 
+You should now have `jkhgap.a` and `jkOwnLib.a` libraries located under `kent/lib/x86_64`, in addition to `jkweb.a` from before. 
 
 To compile liftOver, move into its directory and issue `make`.
 <pre>
