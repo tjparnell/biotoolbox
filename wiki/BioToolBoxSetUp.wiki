@@ -168,8 +168,9 @@ You'll first need to compile the libraries used with big files. You can follow t
 <pre>
 	unzip jksrc.zip
 	cd kent/src/
-	export MACHTYPE=i686     # replace i686 as necessary for i386 or ppc
+	export MACHTYPE=i686     # or replace i686 with i386, x86_64, or ppc
 	export KENT_SRC=```pwd```
+	
 	cd lib/
 	make
 	cd ..
