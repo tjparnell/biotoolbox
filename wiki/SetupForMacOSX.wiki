@@ -2,17 +2,50 @@
 
 =Preparing a Mac OS X computer for bioinformatics analysis using bioperl=
 
+==Contents==
+	# [SetupForMacOSX#Prerequisites Prerequisites]
+	# [SetupForMacOSX#Updated_notes_for_OS_X_10.7_Lion Updated notes for OS X 10.7 Lion]
+	# [SetupForMacOSX#Setting_up_Fink Setting up Fink]
+		# [SetupForMacOSX#Special_notes_for_Mac_OS_X_10.6_only Special notes for Mac OS X 10.6 only]
+		# [SetupForMacOSX#Using_Fink Using Fink]
+		# [SetupForMacOSX#Installing_other_programs_with_Fink Installing other programs with Fink]
+	# [SetupForMacOSX#Installing_a_database Installing a database]
+		# [SetupForMacOSX#Using_Mac_OS_X_Server_MySQL Using Mac OS X Server MySQL]
+		# [SetupForMacOSX#Installing_MySQL_on_a_client_system Installing MySQL on a client system]
+	# [SetupForMacOSX#Installing_GD_Libraries Installing GD Libraries]
+	# [SetupForMacOSX#Installing_Perl_modules_through_CPAN Installing Perl modules through CPAN]
+		# [SetupForMacOSX#Trouble_shooting_Perl_module_installation Trouble shooting Perl module installation]
+		# [SetupForMacOSX#Install_BioPerl Install BioPerl]
+		# [SetupForMacOSX#Additional_modules_for_biotoolbox Additional modules for biotoolbox]
+			# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
+	# [SetupForMacOSX#Installing_GBrowse Installing GBrowse]
+		# [SetupForMacOSX#Setting_up_FastCGI_with_GBrowse Setting up FastCGI with GBrowse]
+		# [SetupForMacOSX#Setting_up_GBrowse_user_accounts Setting up GBrowse user accounts]
+			# [SetupForMacOSX#Setting_up_PAM_Authentication_with_OS_X_accounts Setting up PAM Authentication with OS X accounts]
+	# [SetupForMacOSX#Installing_Bam_file_support Installing Bam file support]
+		# [SetupForMacOSX#Installing_Samtools Installing Samtools]
+		# [SetupForMacOSX#Installing_Bio-Samtools Installing Bio-Samtools]
+	# [SetupForMacOSX#Installing_BigFile_Support Installing BigFile Support]
+		# [SetupForMacOSX#Building_the_Kent_libraries Building the Kent libraries]
+		# [SetupForMacOSX#Build_the_utilities Build the utilities]
+		# [SetupForMacOSX#Install_utilities_and_libraries_into_system_directories Install utilities and libraries into system directories]
+		# [SetupForMacOSX#Installing_Bio-BigFile_Perl_module Installing Bio-BigFile Perl module]
+	# [SetupForMacOSX#Ensembl_Perl_API Ensembl Perl API]
+	# [SetupForMacOSX#Additional_Tools Additional Tools]
+		# [SetupForMacOSX#Compiling_a_64-bit_liftOver_tool_on_OS_X Compiling a 64-bit liftOver tool on OS X]
+		# [SetupForMacOSX#Installing_MACS_and_other_Python_tools Installing MACS and other Python tools]
+
 ==Prerequisites==
 	* A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
 	* Some very basic understanding of perl programs, modules, and how to install upgrade perl modules using CPAN. Knowing and writing the Perl language is not necessary.
 	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system. Fortunately, these installations are pretty safe and shouldn't break the system. Simply installing perl modules rarely (if at all possible) breaks the system, particularly with recent versions (earlier versions were another story). Using the Fink (or MacPorts) package manager keeps everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. Finally, anything installed under `/usr/local/` is off-limits to Apple, so again there should be no conflicts with Apple system directories.
-	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist.
+	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist. For simple editing on the command line, try the `nano` editor.
 	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
-	* This may (or may not) be obvious, but you'll need to install the Developer Tools from Apple. For Snow Leopard 10.6, this can be found under the Optional Installs folder on the OS X Installation Disc. For Lion 10.7 or later, you'll need to download XCode from Apple's Mac App Store. You only really need to install the base and Unix development tools, unless you also intend to write Cocoa or iPhone Apps. 
+	* This may (or may not) be obvious, but you'll need to install the Developer Tools from Apple. For Snow Leopard 10.6, this can be found under the Optional Installs folder on the OS X Installation Disc. 
 
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
-	# You will need to install XCode from Apple's Mac App Store. When you first run XCode, immediately go into preferences (after dismissing the splash welcome screen) and cancel and turn off automatic package and documentation downloads (unless you want them, of course, for you iPhone App development). It will save you a few GB of disk space.... Next, select the Command Line Tools to install them. These are essential to proceed with the installations below. You'll need to authenticate with your (free) Apple Developer Account. 
+	# You will need to install XCode and/or the Command line developer tools. If you only need access to GCC to install open source software, then download "Command Line Tools for Xcode" from Apple's [http://connect.apple.com/ Developer site]. This will require a (free) Apple Developer Account. Alternatively, if you also develop for Mac OS X and/or iOS, download XCode from Apple's Mac App Store or Developer web site. Be sure to select the Command Line Tools from the packages tab in the XCode preferences.  
 	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering `perldoc perllocal` in the terminal.
 	# If you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
 	# The FastCGI module for the Apache web server is no longer included. To install it, download Apache's [http://httpd.apache.org/mod_fcgid/ FastCGI] source code, compile, and install.
@@ -30,24 +63,24 @@ To install, it's best to follow their [http://www.finkproject.org/download/srcdi
 	sudo fink index -f
 </pre>
 
-*Important for Mac OS X 10.6* If you’ll be running 64-bit programs (e.g. default Perl 5.10 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
-
-Fink installs into the `/sw` directory. This makes it convenient by completely isolating Fink software from the system directories, preventing potential conflicts and overwrites. MacPorts accomplishes the same thing by installing in `/opt`. 
+Fink installs into the `/sw` directory by default. This makes it convenient by completely isolating Fink software from the system directories, preventing potential conflicts and overwrites. MacPorts accomplishes the same thing by installing in `/opt`. 
 
 For every user account on the computer, each user must run the following command just once to set up the Fink environment and use the programs installed through Fink. 
 <pre>
 	/sw/bin/pathsetup.sh
 </pre>
 
-====Setting up Fink source trees====
-*Note:* separate source trees are no longer valid for 10.7 installations; Lion users can skip this. The various software packages available to Fink users are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
+===Special notes for Mac OS X 10.6 only===
+If you’ll be running 64-bit programs (e.g. default Perl 5.10 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
+
+The various software packages available to Fink users under 10.6 only are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
 
 To enable the unstable tree, edit the file `/sw/etc/fink.conf`. Find the line that begins with "Trees:" edit the line to look like the following.
 <pre>
 	Trees: local/main stable/main stable/crypto unstable/main unstable/crypto
 </pre>
 
-====Using Fink====
+===Using Fink===
 To find a program to install, run the following command.
 <pre>
 	fink list <program>
@@ -65,6 +98,11 @@ To install the program you want, run the following command. Fink will identify n
 
 You can learn more by running `fink --help`.
 	 
+===Installing other programs with Fink===
+There are a number of cool programs you can obtain through Fink besides the ones listed elsewhere below. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
+
+Another generally useful tool is `wget`, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
+
 ==Installing a database==
 GBrowse as well as many of the biotoolbox programs require genome annotation to be put into a database. There are several choices.
 
@@ -86,7 +124,7 @@ You can download an installation package from the main [http://www.mysql.com MyS
 
 To install MySQL through Fink, enter the following:
 <pre>
-	sudo fink install mysql mysql-client mysql15-dev mysql15-shlibs
+	sudo fink install mysql-unified mysql-unified-client mysql-unified-dev mysql-unified-shlibs 
 </pre>
 
 To make things easier, I also like to install the MySQL GUI [http://www.mysql.com/downloads/workbench/ Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
@@ -95,26 +133,22 @@ Once it's installed, start up MySQL by running the following command
 <pre>
 	sudo mysqld_safe –u root &
 </pre>
-The `&` symbol at the end forces the server process to run in the background, allowing you to exit your Terminal session and still keep it running. Make sure you have used `sudo` in the past minute or so and authenticate with your password; try running `sudo ls` prior to this command. Otherwise, by forcing it to background, you may never see the command prompt for `sudo`.
+The "`&`" symbol at the end forces the server process to run in the background, allowing you to exit your Terminal session and still keep it running. Make sure you have used `sudo` in the past minute or so and authenticate with your password; try running "`sudo ls`" prior to this command. Otherwise, by forcing it to background, you may never see the command prompt for `sudo`.
 
-Set the MySQL root password
+Set the MySQL root password. 
 <pre>
-	mysqladmin –u root password <your_new_password>
+	mysqladmin –u root password <old_password> <your_new_password>
 </pre>
+Since this is a new install, you will not have an old password, so just put two single quotes with nothing in between.
 
-An important note here. The MySQL server has its own notion of root that is separate from the computer's. So the above commands require two separate passwords (which could be the same word if you want): one for the Mac administrator `sudo` or root access, and the other for MySQL root access.
+An important note here. The MySQL server has its own notion of root that is separate from the computer's. So the above commands require two separate passwords (which could be the same word if you want): one for the Mac administrator's `sudo` or root access, and the other for MySQL root access.
 
-Test by starting the client. The `-p` option causes it to prompt for the MySQL password for the user "root". Exit the client by typing `exit` at the prompt.
+Test by starting the client. The "`-p`" option causes it to prompt for the MySQL password for the user "root". Exit the client by typing "`exit`" at the prompt.
 <pre>
 	mysql –u root –p
 </pre>
 
-Install the daemon loader for mysql
-<pre>
-	sudo fink install daemonic
-</pre>
-
-Set up MySQL to start up automatically by running
+To have MySQL to start up automatically after every reboot, we use the daemonic utility, which should have been installed automatically by Fink along with MySQL (if not, you may have to install it by hand). Once the MySQL server is running, run this command:
 <pre>
 	sudo daemonic enable mysql
 </pre>
@@ -130,10 +164,10 @@ Another alternative is to download Mac OS X binaries compiled by a member of the
 
 The third approach, and one that I favor, is to install them through Fink. Begin by running
 <pre>
-	sudo fink install gd2
+	sudo fink install gd2 gd2-shlibs
 </pre>
 
-It should also install libjpeg and libpng, along with the appropriate libraries.
+It should also install `libjpeg` and `libpng`, along with the appropriate libraries.
 
 ==Installing Perl modules through CPAN==
 The [http://search.cpan.org/ Comprehensive Perl Archive Network] is an extensive repository of Perl modules. If you're faced with a difficult job of coding some project, chances are that someone else has either done it for you, or at least written some code that will make the job easier. There are thousands of Perl modules in CPAN, some of which are just right for you.
@@ -177,7 +211,7 @@ If the module was installed properly, you should find something like
 <pre>
 	/usr/bin/make install -- OK
 </pre>
-somewhere near the end of all the text that goes by. If you see `NOT OK`, then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
+somewhere near the end of all the text that goes by. If you see "`NOT OK`", then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
 
 Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
 	* `readline`
@@ -189,10 +223,15 @@ Some basic modules to upgrade or install right away (but probably not absolutely
 
 ===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
-Look back through the output for possible clues to the failure. Often times there is a missing prerequisite module (or version) that wasn't caught. Look for an error that complains about not finding XXX in @INC. Install the missing prereq and try again.
+
+Look back through the output for possible clues to the failure. Often times there is a missing prerequisite module (or version) that wasn't caught. Look for an error that complains about not finding XXX in @INC. Install the missing prerequisite and try again.
+
 Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed (see above).
+
 Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures (Universal Binary). However, libraries built under Fink as well as other compiled libraries will usually only have only one architecture, and the compiler will warn about this. You can safely ignore those warnings.
+
 Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
+
 Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically test your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
 
 ===Install BioPerl===
@@ -233,7 +272,7 @@ Note that on Mac OS X using libGD installed through Fink, I generally see test e
 	* `Bio::Graphics`
 There may or may not be others, but the GBrowse installer will notify you of missing modules.
 
-*Important!* You will need to turn on the Apache web server. You can use the Sharing tab of System Preferences, or from the command line enter `sudo apachectl start`. 
+*Important!* You will need to turn on the Apache web server. You can use the Sharing tab of System Preferences, or from the command line enter "`sudo apachectl start`". 
 
 GBrowse is now available through CPAN. However, I actually find it easier to install it from the command line, rather than through the CPAN Shell. The reason being is there is a configuration step that I simply find a little easier to use on the command line. Download the package from [http://search.cpan.org/dist/GBrowse/ here] and unpack it in a temporary directory. Move into the directory, and begin the build process
 <pre>
@@ -249,7 +288,7 @@ Next comes the configuration part. Run
 <pre>
 	./Build config
 </pre>
-The script will ask a series of questions. It should be safe to accept the default locations for everything; however, feel free to change if you desire. One change you may want to note is the Apache user should be `_www` instead of the default `www`.
+The script will ask a series of questions. It should be safe to accept the default locations for everything; however, feel free to change if you desire. One change you may want to note is the Apache user should be "`_www`" instead of the default "`www`".
 
 Next, install the browser. Run
 <pre>
@@ -260,7 +299,7 @@ Next, install the browser. Run
 
 Hopefully, everything should go smoothly. A couple of things to note.
 
-First, the install script will ask to restart Apache. It usually doesn't succeed if you let it, so I always do it myself. Run `sudo apachectl graceful` to restart it from the command line.
+First, the install script will ask to restart Apache. It usually doesn't succeed if you let it, so I always do it myself. Run "`sudo apachectl graceful`" to restart it from the command line.
 
 Second, the permissions are rarely set correctly on the temp and library folders, so you may need to double check these. If you accepted the defaults, these should be `/var/lib/gbrowse2` and `/var/tmp/gbrowse2`. To set them manually, try this
 <pre>
@@ -268,9 +307,9 @@ Second, the permissions are rarely set correctly on the temp and library folders
 	sudo chown -R _www:_www /var/tmp/gbrowse2
 </pre>
 
-
 ===Setting up FastCGI with GBrowse===
 I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
+
 To enable on Mac OS X 10.6 Snow Leopard, you will have to edit the file `/etc/apache2/httpd.conf` as root. Find the following line in the file and un-comment it. 
 <pre>
 	# LoadModule fastcgi_module     libexec/apache2/mod_fastcgi.so
@@ -324,7 +363,7 @@ Next, create a new service definition file in `/etc/pam.d/`. The easiest way to 
 </pre>
 It's likely not every line is needed from the `login` definition file, but I am not knowledgable enough to know what to keep or toss. I just know it works with everything in there.
 
-Next you'll need to enable user accounts in GBrowse. Edit the main GBrowse configuration file, `/etc/gbrowse2/GBrowse.conf`. Find the line `user_accounts` and change the `0` to `1` to enable. Next, uncomment the following line:
+Next you'll need to enable user accounts in GBrowse. Edit the main GBrowse configuration file, `/etc/gbrowse2/GBrowse.conf`. Find the line "`user_accounts`" and change the `0` to `1` to enable. Next, uncomment the following line:
 <pre>
 	authentication plugin = PamAuthenticate
 </pre>
@@ -362,7 +401,7 @@ To install the Bio-Samtools module (see below), you'll need to put the libraries
 This also copies the executables into the `/usr/local/bin/` directory for easy access through the path.
 
 ===Installing Bio-Samtools===
-Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try `d /bio-samtools/` to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
+Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try "`d /bio-samtools/`" to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
 
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, re-edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
 <pre>
@@ -378,18 +417,26 @@ Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/g
 ===Building the Kent libraries===
 While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
 
-Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations.
+Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations as necessary.
 
-Set up the environment variables. These are needed during both library compilation and building the Perl modules later. You can temporarily enter these commands in your current terminal session. To make them more permament, add them to your `.profile` or `.bashrc` files in your home directory. The variables below assume a 64-bit Intel machine; change as appropriate.
+Set up the environment variables. These are needed during both library compilation and building the Perl modules later. You can temporarily enter these commands in your current terminal session. The variables below assume a 64-bit Intel machine; change as appropriate. Also, it requires `libpng` to be found; this should have been installed along with the GD libraries. If you followed the above instructions, it was installed via Fink; if not, change the paths as appropriate.
 <pre>
 	export MACHTYPE=x86_64
+	export PNGLIB=/sw/lib/libpng.a  
+	export C_INCLUDE_PATH=/sw/include # only necessary for Fink installs
+</pre>
+
+Next, build the main library. 
+<pre>
 	cd kent/src/lib
 	make
 	cd ..
 </pre>
 
+===Build the utilities===
 You will also need to compile the utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Before you begin, you will need to make a destination directory for the executables.
 <pre>
+	mkdir ~/bin
 	mkdir ~/bin/x86_64
 </pre>
 
@@ -406,18 +453,27 @@ Now enter each utility directory and issue the `make` command. It will automatic
 	* `wigToBedGraph`
 	* `wigToBigWig`
 
-Move the files into appropriate system directories for availability for other users. I suppose the entire kent source tree could be moved to a common location, but I chose to only copy the relevant files (at least with regard to the Bio-BigFile Perl modules).
+===Install utilities and libraries into system directories===
+At the very least, move the utility executables into a system directory for other users to use.
 <pre>
-	sudo mkdir /usr/local/kent_src
-	sudo cp -r ~/Documents/kent/src/inc /usr/local/kent_src/
-	sudo cp -r ~/Documents/kent/src/lib /usr/local/kent_src/
-	export KENT_SRC=/usr/local/kent_src
-	sudo cp ~/bin/x86_64/`*` /usr/local/bin
+	sudo cp ~/bin/x86_64/`*` /usr/local/bin/
+</pre>
+
+
+The Kent libraries do not necessarily need to move into a common location; they are only needed during the building of the Bio-BigFile Perl module. However, if you do decide to move them, this is what I have done. I only moved the pertinent `lib` and `inc` folders. 
+<pre>
+	sudo mkdir /usr/local/kent
+	sudo mkdir /usr/local/kent/src
+	sudo mkdir /usr/local/kent/src/lib
+	sudo cp -r kent/src/lib/x86_64 /usr/local/kent/src/lib/
+	sudo cp -r inc /usr/local/kent/src/
+	export KENT_SRC=/usr/local/kent/src
 </pre>
 
 ===Installing Bio-BigFile Perl module===
-Finally, you can install the Bio-BigFile Perl module. Note that if you install through the CPAN Shell as root using `sudo`, your environment variables won't carry over to the root session. One solution is to set them again as root.
-A simpler alternative is to compile the module as non-root, then install as root. Download the source tarball from CPAN and extract it into a working directory, then `cd` into it. Follow the instructions below for building it. If your MACH_TYPE and KENT_SRC environment variables are properly set, things should go well.
+Now you can install the Bio-BigFile Perl module. First, make sure your `MACHTYPE` environment variable is set. You can also set the full path to the `kent/src` directory using the environment variable `KENT_SRC`, which will make building the Perl module faster.
+
+The best way to install this is not through the CPAN Shell, but rather build it from the command line. Download the module from [http://search.cpan.org/dist/Bio-BigFile/ here]. Unpack, and enter the directory. Follow the below commands. If necessary, provide the full path to the `kent/src` directory. It must find the libraries in order to build.
 <pre>
 	perl Build.PL
 	./Build
@@ -425,7 +481,7 @@ A simpler alternative is to compile the module as non-root, then install as root
 	sudo ./Build install
 </pre>
 	
-One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, `make clean`, and `make` again. 
+One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, go back to `kent/src/lib`, issue "`make clean`", and then "`make`" again to rebuild the library, then try the Perl module again. 
 
 ==Ensembl Perl API==
 To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
@@ -433,11 +489,6 @@ To retrieve genome annotation from Ensembl's public MySQL database using the bio
 It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
 
 Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
-
-==Installing other programs with Fink==
-There are a number of cool programs you can obtain through Fink. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
-
-Another generally useful tool is _wget_, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
 
 ==Additional Tools==
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or biotoolbox. These are simply programs that I have found to be helpful in my own work.
@@ -475,4 +526,29 @@ To compile liftOver, move into its directory and issue `make`.
 	make
 </pre>
 You should now have a 64-bit liftOver executable in `~/bin/x86_64/`.
-	
+
+===Installing MACS and other Python tools===
+[http://liulab.dfci.harvard.edu/MACS/ MACS] is a popular tool for analyzing ChIP-Seq data. The author provides a pre-compiled package for Debian and Ubuntu linux, but for Mac OS X users, we will need to install through source. 
+
+MACS was written using the Python language. Mac OS X includes a Python interpretor, but the consensus from several web sources suggest it's better to install your own interpretor. I am not a Python expert, but in my experience trying to install Python libraries in the system directories have been frustrating (at least on 10.6), so I tend to agree with this view. The main problem is that 10.6 includes Python 2.6, but some programs (like MACS and bio-python) prefer the latest Python version 2.7. Note: OS X 10.7 now includes Python 2.7.
+
+Fortunately, I have found many of these libraries can be installed automatically using Fink. These instructions should generally work for any other Python-based programs as well. Use the commands below to install Python 2.7 and some popular Python libraries required for MACS.
+<pre>
+	sudo fink install python
+	sudo fink install setuptools-py27 numpy-py27 biopython-py27 cython-py27
+</pre>
+
+To ensure that the Fink version of Python is used in programs and not the system version, especially for all users, edit the main Bash initialization script `/etc/bashrc` and add the following line. You could alternatively edit your `.bashrc` or `.profile` files in your home directory.
+<pre>
+	export PYTHONPATH=/sw/lib/python2.7/site-packages
+</pre>
+
+To install MACS, download the source code packages from the MACS [https://github.com/taoliu/MACS/downloads GitHub repository]. Currently, there are two versions available, the standard release 1.4, and the new, improved, but experimental, release 2.0. You can install both, or pick one. Unpack the archive and move into the directory. Issue the following command to install.
+<pre>
+	sudo python setup.py install
+</pre>
+
+The setup script will install the libraries under the Fink Python directories, as well as the executable scripts under `/sw`. However, I prefer to keep the scripts in package-specific directories under `/usr/local/`. To do this, I install with this option.
+<pre>
+	sudo python setup.py install --install-scripts=/usr/local/MACS
+</pre>
