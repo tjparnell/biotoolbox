@@ -46,7 +46,7 @@
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
 	# You will need to install XCode and/or the Command line developer tools. If you only need access to GCC to install open source software, then download "Command Line Tools for Xcode" from Apple's [http://connect.apple.com/ Developer site]. This will require a (free) Apple Developer Account. Alternatively, if you also develop for Mac OS X and/or iOS, download XCode from Apple's Mac App Store or Developer web site. Be sure to select the Command Line Tools from the packages tab in the XCode preferences.  
-	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering `perldoc perllocal` in the terminal.
+	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering "`perldoc perllocal`" in the terminal.
 	# If you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
 	# The FastCGI module for the Apache web server is no longer included. To install it, download Apache's [http://httpd.apache.org/mod_fcgid/ FastCGI] source code, compile, and install.
 
@@ -440,7 +440,7 @@ You will also need to compile the utilities that work with the bigWig and bigBed
 	mkdir ~/bin/x86_64
 </pre>
 
-Now enter each utility directory and issue the `make` command. It will automatically copy the compiled executable file into the executable directory you just made. This is a short, but not exhaustive, list of programs that I might recommend.
+Now enter each utility directory and issue the "`make`" command. It will automatically copy the compiled executable file into the executable directory you just made. This is a short, but not exhaustive, list of programs that I might recommend.
 	* `bedGraphToBigWig`
 	* `bedToBigBed`
 	* `bigBedInfo`
@@ -501,7 +501,7 @@ There are additional tools that are useful for bioinformatics analysis but are n
 ===Compiling a 64-bit liftOver tool on OS X===
 The UCSC source tree includes a number of other additional programs. One useful one is the [http://genome.ucsc.edu/cgi-bin/hgLiftOver liftOver] tool for converting coordinates between genome versions. While they provide a 32-bit executable for [http://hgdownload.cse.ucsc.edu/admin/exe/ download] that is probably sufficient, if you want a 64-bit version you will need to compile one yourself. These instructions may also work with other tools (blat?).
 
-This presumes you've followed the instructions above for installing the bigFile support (bigWig and bigBed). It also presumes you have installed MySQL and libpng (a prerequisite for the GD libraries) using Fink. While these are are not required for liftOver per se, they are required for the UCSC libraries that are needed by liftOver.
+This presumes you've followed the [SetupForMacOSX#Installing_BigFile_Support instructions above] for installing the bigFile support (bigWig and bigBed). It also presumes you have installed MySQL and libpng (a prerequisite for the GD libraries) using Fink. While these are are not required for liftOver per se, they are required for the UCSC libraries that are needed by liftOver.
 
 The liftOver tool is not included under `kent/src/utils/`, but rather a part of the browser. Therefore, we need to compile additional libraries. First, we need to set up some more environment variables. Adjust the paths as necessary if you did not use Fink.
 <pre>
@@ -520,7 +520,7 @@ Next, we compile the additional libraries.
 
 You should now have `jkhgap.a` and `jkOwnLib.a` libraries located under `kent/lib/x86_64`, in addition to `jkweb.a` from before. 
 
-To compile liftOver, move into its directory and issue `make`.
+To compile liftOver, move into its directory and issue "`make`".
 <pre>
 	cd kent/src/hg/liftOver
 	make
