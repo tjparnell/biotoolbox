@@ -96,7 +96,7 @@ To install the program you want, run the following command. Fink will identify n
 	fink install <program>
 </pre>
 
-You can learn more by running `fink --help`.
+You can learn more by running "`fink --help`".
 	 
 ===Installing other programs with Fink===
 There are a number of cool programs you can obtain through Fink besides the ones listed elsewhere below. One tool that may be of interest to bioinformaticists is [http://emboss.sourceforge.net/ EMBOSS]. This is an excellent collection of various useful tools for molecular biology. It can take a while to compile, as there are many dependencies and programs.
@@ -409,7 +409,7 @@ One error you may or may not encounter is regarding shared libraries, and errors
 	make
 	make razip
 </pre>
-Repeat the Bio-Samtools installation (you may need to issue the clean command from within CPAN Shell). It should work now.
+Repeat the Bio-Samtools installation (you may need to issue the "`clean`" command from within CPAN Shell). It should work now.
 
 ==Installing BigFile Support==
 Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
