@@ -1553,6 +1553,12 @@ sub get_new_genome_list {
 			last if $segment->seq_id eq $chr;
 		}
 		
+		# check segment
+		unless ($segment) {
+			carp " No genome segment for seq_id $chr!!?? skipping\n";
+			next;
+		}
+		
 		# get the chromosome length
 		my $length = $segment->length;
 		
