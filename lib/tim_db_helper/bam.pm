@@ -321,7 +321,7 @@ sub open_bam_db {
 	my $path = shift;
 	
 	# Check local for local file
-	if ($path =~ m/^file:(.)$/) {
+	if ($path =~ m/^file:(.+)$/) {
 		# clean up the path, take only the file name
 		$path = $1;
 		
