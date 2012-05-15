@@ -15,7 +15,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.6.4';
+our $VERSION = '1.7.4';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -64,9 +64,13 @@ our @SUFFIX_LIST = qw(
 	\.gff3\.gz
 	\.bed
 	\.bed\.gz
+	\.bdg
+	\.bdg\.gz
 	\.sgr
 	\.sgr\.gz
 	\.kgg
+	\.vcf
+	\.vcf\.gz
 ); 
 
 
@@ -690,6 +694,54 @@ sub open_tim_data_file {
 				last PARSE_HEADER_LOOP;
 			}
 			
+			# a BedGraph file
+			elsif ($extension =~ /bdg/i) {
+				# a Bedgraph file is basically like a BED file, just 
+				# slightly different columns 
+				# it contains four columns: chromo, start, stop, score
+				# it is 0-based 
+				
+				# first determine the number of columns we're working
+				my @elements = split /\s+/, $line;
+					# normally tab-delimited, but the specs are not explicit
+				my $column_count = scalar @elements;
+				unless ($column_count == 4) {
+				}
+				$inputdata->{'number_columns'} = 4; 
+				$inputdata->{'bed'} = 4;
+					# this is close enough to the bed format that we flag
+					# it as one
+				
+				# Define the columns and metadata
+				my @bed_names = qw(Chromosome Start End Score);
+				for my $i (0 .. 3) {
+					# the ids of the columns
+					
+					# set the metadata for each column
+					# some of these may already be defined if there was a 
+					# column metadata specific column in the file
+					unless (exists $inputdata->{$i}) {
+						$inputdata->{$i}{'name'}  = $bed_names[$i];
+						$inputdata->{$i}{'index'} = $i;
+						$inputdata->{$i}{'AUTO'}  = 3;
+					}
+					# assign the name to the column header
+					$inputdata->{'column_names'}->[$i] = 
+						$inputdata->{$i}{'name'};
+				}
+				
+				# set headers flag to false
+				$inputdata->{'headers'} = 0;
+				
+				# set the feature type
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'region';
+				}
+				
+				# end this loop
+				last PARSE_HEADER_LOOP;
+			}
+			
 			# a SGR file
 			elsif ($extension =~ /sgr/i) {
 				# a sgr file contains three columns: chromo, position, score
@@ -738,6 +790,7 @@ sub open_tim_data_file {
 			}
 			
 			# Data table files from UCSC Table Browser
+				# also VCF files as well
 				# these will have one comment line marked with #
 				# that really contains the column headers
 			elsif ( _commented_header_line($inputdata, $line) ) {
@@ -912,7 +965,18 @@ sub write_tim_data_file {
 		
 		# a bed file
 		elsif ($datahash_ref->{'bed'}) {
-			$extension = '.bed';
+			# check whether it's a real bed or bedgraph file
+			if (
+				$datahash_ref->{'number_columns'} == 4 and 
+				$datahash_ref->{3}{'name'} =~ /score/i
+			) {
+				# a bedgraph file
+				$extension = '.bdg';
+			}
+			else {
+				# a regular bed file
+				$extension = '.bed';
+			}
 		}
 		
 		# original file had an extension, re-use it
@@ -1033,7 +1097,7 @@ sub write_tim_data_file {
 	
 	
 	# Convert base to interbase coordinates if necessary
-	if ($extension =~ /\.bed/i and $datahash_ref->{'bed'} > 0) {
+	if ($extension =~ /\.bed|bdg/i and $datahash_ref->{'bed'} > 0) {
 		# we are writing a confirmed bed file 
 		if (
 			exists $datahash_ref->{1}{'base'} and 
@@ -1093,7 +1157,7 @@ sub write_tim_data_file {
 			}
 			
 			# Write the primary headers
-			unless ($extension =~ m/gff|bed|sgr|kgg/) {
+			unless ($extension =~ m/gff|bed|bdg|sgr|kgg/) {
 				# we only write these for text files, not gff or bed files
 				
 				if ($datahash_ref->{'program'}) {
@@ -1120,7 +1184,7 @@ sub write_tim_data_file {
 					$_ .= "\n";
 				}
 				# check for comment character at beginning
-				if (/^# /) {
+				if (/^#/) {
 					$fh->print($_);
 				}
 				else {
@@ -1158,7 +1222,7 @@ sub write_tim_data_file {
 					next;
 				}
 				elsif (
-					$datahash_ref->{'extension'} =~ /gff|bed/i and
+					$datahash_ref->{'extension'} =~ /gff|bed|bdg/i and
 					scalar( keys %{ $datahash_ref->{$i} } ) == 2
 				) {
 					# only two metadata keys exist, name and index

@@ -24,7 +24,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.7.3';
+my $VERSION = '1.7.4';
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -463,7 +463,8 @@ sub open_wig_files {
 	my @names;
 	$outfile =~ s/\.wig(?:\.gz)?$//i; # strip extension if present
 	$outfile =~ s/\.bedgraph(?:\.gz)?$//i; # strip extension if present
-	my $ext = $bedgraph ? '.bedgraph' : '.wig';
+	$outfile =~ s/\.bdg(?:\.gz)?$//i; # strip extension if present
+	my $ext = $bedgraph ? '.bdg' : '.wig';
 	if ($strand) {
 		# we need to two names
 		push @names, $outfile . '_f' . $ext;
