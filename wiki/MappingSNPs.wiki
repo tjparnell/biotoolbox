@@ -38,7 +38,7 @@ You will also need to have an indexed fasta file for the reference genome. To in
 
 Now, we run the `mpileup` command. Carefully note the pipe `|` and lone dash `-` characters. This command is all one line, it's broken up here for convenience.
 <pre>
-	samtools mpileup -uf reference.fasta strain1.bam | bcftools view -cgv - | 	vcfutils.pl varFilter > strain1.vcf
+	samtools mpileup -uf reference.fasta strain1.bam | bcftools view -cgv - | vcfutils.pl varFilter > strain1.vcf
 </pre>
 We are running three distinct utilities, `samtools`, `bcftools`, and `vcfutils.pl`, all piped together, with the final output redirected to a new text file, `strain1.vcf`. Each utility has it's own set of options, we're just using the minimal options. 
 
