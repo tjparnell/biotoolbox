@@ -23,19 +23,19 @@ The command line flags and descriptions:
 __--in <**snp_file>
 
 __
-  Specify the name(s) of the input SNP file. Multiple files may be  specified using multiple --in arguments, with a single --in argument and a  comma delimited list, or as a list at the end of all options. The files may  kept gzipped; they will automatically be uncompressed.
+  Specify the name(s) of the input SNP file(s). SNP files should be in the  Variation Call Format (VCF) format. They may be gzipped. Multiple files  may be specified; they will be processed sequentially. Provide multiple  --in arguments, a comma delimited list, or a free list at the end of  the command.
 __
   __
-__--db
+__--db <**database>
 
 __
-  Specify the name of a Bio::DB::!SeqFeature**::Store database that contains the  genome annotation and sequence. Alternatively, a single GFF3 genome  annotation file may be provided, in which case it is loaded in memory. This is required.
+  Specify the name of a Bio::DB::!SeqFeature**::Store database that contains  the genome annotation and sequence. Alternatively, for small genomes,  a single GFF3 genome annotation file may be provided for loading into memory.
 __
   __
 __--features type1,type2,...
 
 __
-  Provide a comma-delimited list (no spaces) of the GFF feature types of the  genes to intersect with the SNPs. Complex gene structures (gene->mRNA->CDS)  should be able to be parsed to look for amino-acid changes. If a list is  not provided, the default list will then include gene, ncRNA, snRNA, snoRNA, and tRNA.
+  Provide a comma-delimited list (no spaces) of the GFF3 feature types  of the features to intersect with the SNPs. Complex gene structures  (gene->mRNA->CDS) can be parsed to look for amino-acid changes. The  default feature is "gene".
 __
   __
 __--version
@@ -51,16 +51,34 @@ __
 __
   __
 ==DESCRIPTION==
-This program will locate SNPs and other sequence variants and identify  which gene the variant is located in, the type of polymorphism (insertion,  deletion, substitution), and, if the variant is located within a CDS, whether  a codon change is generated.
+This program will locate SNPs and other sequence variants and identify  the feature that overlaps the variant. In most cases, the features are  genes, in which case the corresponding coding sequence (CDS), if  present, is evaluated for a change in coding potential due to the  sequence variation. Codon changes, silent changes, and frame shifts  may be reported.
 
-The input files should be files generated using the varFilter function of the samtools.pl script, included with the !SamTools** distribution <[http://samtools.sourceforge.net]>. That script will generate a list of the sequence variations that differ from the reference genome. No verification of the source file format is performed. The files may be gzipped.
+The input SNP files must be in the Variant Call Format (VCF) 4.0 or  4.1 format, a tab-delimited text file with metadata.  See <[http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41]>  for more information about the format. The files may be gzipped.
+
+Numerous SNP callers are capable of generating the VCF format from  sequence (usually Bam) files. The Samtools program is one such program,  using the "mpileup" function in conjunction with it's "bcftools" tool.  See the Samtools site at <[http://samtools.sourceforge.net]> for more  information.
+
+The output file is a simple tab-delimited text file with headers,  suitable for opening in spread-sheet program. Each row represents a SNP.  The following columns are include.
 
 {{{
+  Variation_Type (substitution, insertion, deletion)
+  Overlapping_Feature (feature type, name, alias)
+  Subfeature (exon, CDS, etc)
+  Codon_Change (Reference AA -> mutant AA)
+  Chromosome
+  Position (start position, 1-base, forward strand)
+  Reference_Seq
+  Variant_Seq
+  Number_Supporting_Reads (if reported)
+  Total_Number_Reads (if reported)
+  Percent_Supporting_Reads (if reported)
+  Genotype (if reported)
+  Feature_description (if present in the database)
 }}}
+If more than one variant sequence is reported at a position, then each  is evaluated for effects on the coding potential. If more than one  feature is found overlapping the SNP, then both features are reported.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
- Howard Hughes Medical Institute
  Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah

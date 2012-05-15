@@ -2,8 +2,6 @@
 #labels ManPage
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
-=THIS SCRIPT IS DEPRECATED=
-
 ==NAME==
 novo_wrapper.pl
 
@@ -14,12 +12,15 @@ novo_wrapper.pl
 {{{
   Options:
   --in <seq_file>
-  --index <novo_index>
+  --index </path/to/novoalign_index>
+  --repeat [None | All | Random | Exhaustive]
+  --split
+  --cores <integer>
+  --opt <"text">
   --novo </path/to/novoalign>
   --sam </path/to/samtools>
-  --repeat [None|All|Random|Exhaustive]
-  --(no)il
-  --temp </path/to/temp/directory>
+  --parallel </path/to/parallel>
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -28,43 +29,64 @@ The command line flags and descriptions:
 __--in <**seq_file>
 
 __
-  Specify the name(s) of the input sequence files. Multiple files may be  specified using multiple --in arguments, with a single --in argument and a  comma delimited list, or as a list at the end of all options. The files may  kept gzipped; they will automatically be uncompressed.
+  Specify the name(s) of the input Fastq sequence files. Multiple files may be  specified using multiple --in arguments, with a single --in argument and a  comma delimited list, or as a list at the end of all options. The files may  kept gzipped; they will automatically be uncompressed.
 __
   __
 __--index <**novo_index>
 
 __
-  Specify the indexed genome database file to which the sequences will be  aligned. The file should be built using Novocraft's 'novoindex' program.
+  Specify the path to genome database index file to which the sequences will  be aligned. The file should be built using Novocraft's 'novoindex' program.
+__
+  __
+__--repeat `[`None | All | Random | Exhaustive`]`
+
+__
+  Specify the novoalign option of dealing with sequences which align to  multiple locations in the genome (repeats). See the Novoalign  documentation for more information. Default value is None.
+__
+  __
+__--split
+
+__
+  Indicate that the input file should be split into numerous files (2  million lines each) and multiple instances of Novoalign should be  executed. This requires the GNU 'parallel' utility to be installed.
+__
+  __
+__--cores <**integer>
+
+__
+  When used with the --split option, this will limit the number of  Novoalign instances executed at once. Default is 4.
+__
+  __
+  When using a paid, licensed version of Novoalign, skip the --split  option and specify as many CPU cores you want Novoalign to use in  multi-threaded execution. Default is 1 (assume free academic version  of Novoalign).
+__
+  __
+__--opt <"text">
+
+__
+  Specify any additional options you want to passed to the Novoalign  executable. See the documentation for Novoalign for a full list of  available options. Must enclose in quotes.
 __
   __
 __--novo </path/to/novoalign>
 
 __
-  Specify the full path to Novocraft's 'novoalign' executable file. This  argument is not necessary if it is located in the path.
+  Optionally specify the full path to Novocraft's 'novoalign' executable  file. It may also be specified in the 'biotoolbox.cfg' file, or it may  be automatically identified by searching the environment path.
 __
   __
 __--sam </path/to/samtools>
 
 __
-  Specify the full path to the 'samtools' executable file. This  argument is not necessary if it is located in the path.
+  Optionally specify the full path to the 'samtools' executable  file. It may also be specified in the 'biotoolbox.cfg' file, or it may  be automatically identified by searching the environment path.
 __
   __
-__--repeat `[`None|All|Random|Exhaustive`]`
+__--parallel </path/to/parallel>
 
 __
-  Specify the novoalign option of dealing with sequences which align to  multiple locations in the genome (repeats). See the novoalign documenation  for more information. Default value is None.
+  Optionally specify the full path to the GNU 'parallel' executable  file. It may also be specified in the 'biotoolbox.cfg' file, or it may  be automatically identified by searching the environment path.
 __
   __
-__--(no)il
+__--version
 
 __
-  Indicate whether the input sequence file is (not) an Illumina sequence file  from the Illumina Pipeline v. 1.3. See the novoalign documentation for more  information. Default value is true.
-__
-  __
-__--temp </path/to/temp/directory>
-
-__
-  Specify a temp directory for writing uncompressed sequence files and  intermediate files. By default it uses the temp directory specified in  the user's environment.
+  Print the program version number.
 __
   __
 __--help
@@ -74,12 +96,14 @@ __
 __
   __
 ==DESCRIPTION==
-This program is a simple wrapper for the novoalign and samtools programs, and  performs the same functions as a custom shell script, including aligning the  sequence reads to the genome using Novacraft's novoalign and then converting  the alignments to an indexed, sorted, binary bam file using samtools, but  perhaps in a slightly more friendly, if bloated, script.
+This program is a wrapper for Novocraft's Novoalign alignment tool. It also  performs a number of post-alignment functions, including converting the  alignments into a sorted, indexed, Bam file using samtools.
 
-The temp directory is used for temporary uncompressed sequence files and  intermediate files to avoid unnecessary scheduled backups and indexing.
+When using the unlicensed, free, academic version of Novoalign that is  limited to single-thread execution, novo_wrapper.pl can split the input  file into numerous smaller versions and execute multiple instances of  Novoalign. This requires the GNU parallel utility for managing multiple  executions.
 
-{{{
-}}}
+Licensed versions of Novoalign are multi-threaded and do not need to be  split.
+
+Novoalign is executed with the "-s 2", "-k", and "-r None" as default  options. Additional custom options may be passed on to Novoalign by  using the --opt flag above.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -91,49 +115,3 @@ The temp directory is used for temporary uncompressed sequence files and  interm
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
