@@ -10,15 +10,16 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
+	find_column_index
 );
 use tim_db_helper qw(
 	open_db_connection
 );
 use tim_file_helper qw(
+	open_tim_data_file 
 	write_tim_data_file
-	open_to_read_fh
 );
-my $VERSION = '1.4.4';
+my $VERSION = '1.7.4';
 
 
 
@@ -82,19 +83,18 @@ if ($print_version) {
 if (@infiles) {
 	if (scalar @infiles == 1) {
 		# only one file provided, but may be comma delimited list
-		my $file = shift @infiles;
-		@infiles = split /,/, $file;
+		@infiles = split /,/, shift @infiles;
 	}
 }
 else {
 	# file list was provided on the command line
 	@infiles = @ARGV or
-		die "  OOPS! No source data files specified! \n use $0 --help\n";
+		die " No input files! use --help for more information\n";
 }
 
 # database
 unless ($database) {
-	die " Must define a database name or GFF3 annotation file!\n";
+	die " Must define an annotation database! use --help for more information\n";
 }
 
 # search features
@@ -103,7 +103,8 @@ if ($featurelist) {
 	@search_types = split /,/, $featurelist;
 }
 else {
-	@search_types = qw(gene ncRNA snRNA snoRNA tRNA);
+	@search_types = qw(gene);
+	print " Using default search feature of 'gene'\n";
 }
 
 
@@ -116,198 +117,169 @@ my $db = open_db_connection($database) or
 
 # open codontable connection
 my $codontable = Bio::Tools::CodonTable->new() or 
-	die " unable to load Codon Table! Requires Bio::Tools::CodonTable\n";
+	die " unable to initialize Bio::Tools::CodonTable\n";
 
 
 
 # Process each of the requested SNP files
-foreach my $infile (@ARGV) {
+foreach my $infile (@infiles) {
 	
-	# initialize data structure
+	## Open and process the SNP file
+	print " processing SNP file '$infile'....\n";
+	my ($fh, $metadata) = open_tim_data_file($infile) 
+		or die "unable to open file!\n";
+	
+	# check input file
+	my ($vcf_format, $genotype_exists);
+	foreach ( @{ $metadata->{'other'} } ) {
+		if (/^##fileformat=VCF/) {
+			$vcf_format = 1;
+		}
+		elsif (/^##FORMAT=<ID=GT/) {
+			$genotype_exists = 1;
+		}
+	}
+	unless ($vcf_format) {
+		warn " '$infile' is not a valid VCF format! skipping\n";
+		next;
+	}
+	my $info_index = find_column_index($metadata, 'INFO');
+	my $format_index = find_column_index($metadata, 'FORMAT');
+	
+	
+	## Initialize data structure
 	my $output = generate_tim_data_structure(
 		'SNPs',
 		qw(
 			Variation_Type
 			Overlapping_Feature
+			Subfeature
 			Codon_Change
 			Chromosome
-			Start
-			Reference_Base
-			Variation
+			Position
+			Reference_Seq
+			Variant_Seq
 			Number_Supporting_Reads
 			Total_Number_Reads
-			Percent_Supporting
-			Consensus_Quality
-			SNP_Quality
+			Percent_Supporting_Reads
+			Genotype
+			Feature_description
 		)
 	) or die " unable to generate tim data structure!\n";
 	$output->{'db'} = $database;
-	
 	my $table = $output->{'data_table'};
 	
-	# load and process the SNP file
-	print " processing SNP file '$infile'....\n";
-	my $fh = open_to_read_fh($infile) 
-		or die "unable to open file!\n";
+	
+	## Walk through the file
 	while (my $line = $fh->getline) {
 		
-		# collect data
+		# collect the basic data
 		chomp $line;
 		my @data = split /\t/, $line;
-		my ($chr, $pos, $ref, $snp, $cons_q, $snp_q, $number_reads) = 
-			@data[0,1,2,3,4,5,7];
+		my ($chr, $pos, $ref, $snp) = @data[0,1,3,4];
 		
-		# determine type
+		# collect the read depth
+		my $total_depth = '0'; 
+		my $supporting_depth = '0';
+		foreach my $info ( split /;/, $data[$info_index] ) {
+			# to find read depth and supporting read depth
+			# we need to parse the INFO attributes
+			if ($info =~ /^DP=(\d+)$/) {
+				$total_depth = $1;
+			}
+			elsif ($info =~ /^DP4=(.+)/) {
+				# samtools specific count for reads
+				# comma separated ref-f, ref-r, alt-f, alt-r counts
+				# not sure if this exists for other SNP callers
+				# this may need editing for other formats
+				my (undef, undef, $af, $ar) = split /,/, $1;
+				$supporting_depth = $af + $ar;
+			}
+		}
+		
+		# collect the genotype
+		my $genotype = '.'; # default null value
+		if ($genotype_exists and $format_index) {
+			
+			# determine genotype index
+			my $gt_index;
+			my $i = 0;
+			foreach (split /:/, $data[$format_index]) {
+				if (/GT/) {
+					$gt_index = $i;
+					last;
+				}
+				$i++;
+			}
+			
+			# pull out the genotype
+				# we are using the sample immediately following the FORMAT
+				# column, but there may be others in the file
+			$genotype = ( split /:/, $data[$format_index + 1] )[$gt_index];
+		}
+		else {
+			# no genotype present
+			$genotype = '.'; # internal null
+		}
+		
+		# determine the type of SNP
 		my $snp_type;
-		if ($snp =~ /\-/) {
+		my @snps = split /,/, $snp;
+			# SNP type is based only on the first variant seq, not subsequent
+		if (length $ref == length $snps[0]) {
+			$snp_type = 'substitution';
+		}
+		elsif (length $ref > length $snps[0]) {
 			$snp_type = 'deletion';
 		}
-		elsif ($snp =~ /\+/) {
+		elsif (length $ref < length $snps[0]) {
 			$snp_type = 'insertion';
 		}
 		else {
-			$snp_type = 'substitution';
+			$snp_type = 'unknown';
 		}
 		
 		# determine overlapping features
-		my $snp_feature;
-		my $codon_change;
-		my $segment = $db->segment($chr, $pos, $pos + 1);
-		unless (defined $segment) {
-			warn "  unable to find segment for '$chr:$pos'!\n";
-			next;
-		}
-		my @features = $segment->features(
-				-type => \@search_types,
-		);
-		if (@features) {
-			my @collections;
-			my @codon_changes;
-			foreach my $feature (@features) {
-				# get info
-				my $name = $feature->name;
-				my $type = $feature->primary_tag;
-				my @aliases = $feature->get_tag_values('Alias') if 
-					$feature->has_tag('Alias');
-				my @qual = $feature->get_tag_values('orf_classification') if 
-					$feature->has_tag('orf_classification');
-				
-				# generate name
-				my $id;
-				$id .= "$qual[0] " if (@qual);
-				$id .= "$type $name";
-				$id .= " (" . join(" ", @aliases) . ")" if @aliases;
-				push @collections, $id;
-				
-				# identify subfeatures
-				foreach my $subfeat ($feature->get_SeqFeatures) {
-					# the gene feature object may be comprised of subfeatures
-					# we're looking for the CDS subfeature to look for 
-					# codon changes
-					
-					if (
-						$subfeat->primary_tag eq 'CDS' and
-						$subfeat->overlaps($segment)
-					) {
-						# we have found the specific CDS that overlaps our SNP
-						
-						my $codon_change = determine_codon_change(
-							$snp_type,
-							$snp,
-							$subfeat,
-							$segment,
-						);
-						if ($codon_change) {
-							push @codon_changes, "$name: $codon_change";
-						}
-					}
-					else {
-						# we haven't found it yet
-						
-						# make sure this feature doesn't have more subfeatures
-						foreach my $subfeat2 ($subfeat->get_SeqFeatures) {
-							# we may be looking at a mRNA feature
-							# so go down one more level to look for CDS
-							
-							if (
-								$subfeat2->primary_tag eq 'CDS' and
-								$subfeat2->overlaps($segment)
-							) {
-								# we have found the specific CDS that overlaps our SNP
-								
-								my $codon_change = determine_codon_change(
-									$snp_type,
-									$snp,
-									$subfeat,
-									$segment,
-								);
-								if ($codon_change) {
-									push @codon_changes, "$name: $codon_change";
-								}
-							}
-						}
-					}
-				}
-				
-				
-			}
-			$snp_feature = join ", ", @collections;
-			$codon_change = join ", ", @codon_changes;
-		}
-		else {
-			$snp_feature = 'no features';
-		}
+		my ($snp_feature, $snp_subfeature, $codon_change, $description) = 
+			find_overlapping_features($chr, $pos, $snp, $snp_type);
 		
-		# determine the number of supporting reads
-		my $supporting_count = 0;
-		if ($snp_type eq 'substitution') {
-			if ($snp eq 'A') {
-				$supporting_count = ($data[8] =~ tr/Aa//);
-			}
-			elsif ($snp eq 'T') {
-				$supporting_count = ($data[8] =~ tr/Tt//);
-			}
-			elsif ($snp eq 'C') {
-				$supporting_count = ($data[8] =~ tr/Cc//);
-			}
-			elsif ($snp eq 'G') {
-				$supporting_count = ($data[8] =~ tr/Gg//);
-			}
-		}
-		else { 
-			# insertion/deletion
-			$supporting_count = $data[10];
+		# calculate percent supporting depth
+		my $percent = '0';
+		if ($total_depth != 0 and $supporting_depth != 0) {
+			$percent = sprintf "%.0f", ($supporting_depth / $total_depth) * 100;
 		}
 		
 		# record for output
-		my $percent = sprintf "%.0f", ($supporting_count / $number_reads) * 100;
 		push @{ $table }, [ 
 			(
-					$snp_type, 
-					$snp_feature, 
-					$codon_change, 
-					$chr, 
-					$pos, 
-					$ref,
-			 		$snp, 
-			 		$supporting_count, 
-			 		$number_reads, 
-			 		$percent, 
-			 		$cons_q, 
-			 		$snp_q
+				$snp_type, 
+				$snp_feature,
+				$snp_subfeature,
+				$codon_change, 
+				$chr, 
+				$pos, 
+				$ref,
+				$snp, 
+				$supporting_depth, 
+				$total_depth, 
+				$percent, 
+				$genotype,
+				$description
 			) 
 		];
 
 	}
+	
+	# finished with the file
 	$fh->close;
 	
 	# re-sort the data table in decreasing order of confidence and position
 	my $header = shift @{ $table }; # move the header line
 	my @sorted_table = sort {
-		$b->[7] <=> $a->[7] or # decreasing supporting count
-		$b->[9] <=> $a->[9] or # decreasing percentage
-		$a->[3] cmp $b->[3] or # chromosome
-		$a->[4] <=> $b->[4] # position
+		$b->[10] <=> $a->[10] or # decreasing percentage
+		$b->[8] <=> $a->[8] or # decreasing supporting depth
+		$a->[4] cmp $b->[4] or # chromosome
+		$a->[5] <=> $b->[5] # position
 	} @{$table};
 	unshift @sorted_table, $header;
 	$output->{'data_table'} = \@sorted_table; # replace the table reference
@@ -317,7 +289,7 @@ foreach my $infile (@ARGV) {
 		
 	# write the output
 	my $outfile = $infile;
-	$outfile =~ s/\.txt(?:\.gz)?$//; # strip extension
+	$outfile = $metadata->{'basename'};
 	$outfile .= '_summary.txt';
 	my $written_file = write_tim_data_file( {
 		'data'     => $output,
@@ -339,87 +311,291 @@ foreach my $infile (@ARGV) {
 
 ############# Subroutines #########################
 
-
+# find the feature, if any, that the SNP affects
+sub find_overlapping_features {
+	my ($chr, $pos, $snp, $snp_type) = @_;
+	
+	# establish a database segment based on position and length
+	my $segment = $db->segment($chr, $pos, ($pos + length $snp - 1));
+	unless (defined $segment) {
+		warn "  unable to find segment for '$chr:$pos'!\n";
+		return ('.', '.');
+	}
+	
+	# collected information for the found features
+	my @snp_features;
+	my @snp_subfeatures;
+	my @codon_changes;
+	my $description;
+	
+	# identify overlapping features
+	my @features = $segment->features(
+			-type => \@search_types,
+	);
+	
+	# Process features
+	if (@features) {
+		
+		# we may have more than one overlapping feature
+		# unlikely, but possible
+		
+		# walk through the the features
+		foreach my $feature (@features) {
+			
+			# get info
+			my $name = $feature->display_name;
+			my $type = $feature->primary_tag;
+			my @aliases = $feature->get_tag_values('Alias') if 
+				$feature->has_tag('Alias');
+			my @qual = $feature->get_tag_values('orf_classification') if 
+				$feature->has_tag('orf_classification');
+				# primarily for SGD features
+			
+			# generate name for the overlapping feature
+			my $snp_feature = "$type $name";
+			$snp_feature .= " (" . join(",", @aliases) . ")" if @aliases;
+			if (@qual and $qual[0] =~ /dubious/i) {
+				$snp_feature = "Dubious $snp_feature";
+			}
+			push @snp_features, $snp_feature;
+			
+			# get the description
+			# except for dubious genes, or if we already have a description
+			unless (@qual and $qual[0] =~ /dubious/i) {
+				unless ($description) {
+					$description = $feature->desc || 'None';
+				}
+			}
+			
+			# identify subfeatures
+			my @subfeatures = $feature->get_SeqFeatures;
+			if (@subfeatures) {
+				
+				# walk through 1st level subfeatures
+				foreach my $subfeat (@subfeatures) {
+					# the gene feature object may be comprised of subfeatures
+					# we're looking for the CDS subfeature to look for 
+					# codon changes
+					
+					# CDS Subfeature
+					if (
+						$subfeat->primary_tag eq 'CDS' and
+						$subfeat->overlaps($segment)
+					) {
+						# we have found the specific CDS that overlaps our SNP
+						
+						push @snp_subfeatures, 'CDS';
+						push @codon_changes, determine_codon_change(
+							$snp_type,
+							$snp,
+							$subfeat,
+							$segment,
+						);
+					}
+					
+					# RNA subfeature
+					elsif ($subfeat->primary_tag =~ /rna/i) {
+						# an mRNA, ncRNA, etc subfeature
+						
+						# get 2nd level subfeatures
+						my @subfeatures2 = $subfeat->get_SeqFeatures;
+						if (@subfeatures2) {
+							
+							# walk through each of the 2nd level subfeatures
+							my $cds_found = 0;
+							foreach my $subfeat2 (@subfeatures2) {
+								# we may be looking at a mRNA feature
+								# so go down one more level to look for CDS
+								
+								if (
+									$subfeat2->primary_tag eq 'CDS' and
+									$subfeat2->overlaps($segment)
+								) {
+									# we have found the CDS
+									push @snp_subfeatures, 'CDS';
+									
+									# determine codon changes
+									push @codon_changes, determine_codon_change(
+										$snp_type,
+										$snp,
+										$subfeat,
+										$segment,
+									);
+									
+									# no need to go on
+									$cds_found = 1;
+									last;
+								}
+							}
+							
+							# no CDS found?
+							unless ($cds_found) {
+								if (scalar @subfeatures2 == 1) {
+									# one subfeature2 found
+									# use this one
+									# could be UTR, or something like that
+									push @snp_subfeatures, 
+										$subfeatures2[0]->primary_tag;
+									push @codon_changes, 'NA';
+								}
+								
+								else {
+									# use the first level subfeature instead
+									push @snp_subfeatures, $subfeat->primary_tag;
+									push @codon_changes, 'NA';
+								}
+							}
+						}
+						
+						# no 2nd level subfeatures? maybe Intron?
+						else {
+							push @snp_subfeatures, 'Intron?';
+							push @codon_changes, 'NA';
+						}
+					}
+					
+					# something else: UTR, non-coding exon, etc
+					else {
+						push @snp_subfeatures, $subfeat->primary_tag;
+						push @codon_changes, 'NA';
+					}
+				}
+			}
+			
+			# No subfeatures, but current feature is CDS
+			elsif ($snp_feature =~ /^cds$/i) {
+				# we're already in a CDS feature
+				
+				# no subfeature
+				push @snp_subfeatures, 'None';
+				
+				# determine codon changes
+				push @codon_changes, determine_codon_change(
+					$snp_type,
+					$snp,
+					$feature,
+					$segment,
+				);
+			}
+			
+			# No subfeatures, but current feature is gene/rna
+			elsif ($snp_feature =~ /^gene|rna$/i) {
+				# we're in gene or RNA feature, but can't find subfeatures
+				# perhaps we're in an intron
+				push @snp_subfeatures, 'Intron?';
+				push @codon_changes, 'NA';
+			}
+			
+			# No subfeatures at all, intergenic maybe?
+			else {
+				push @snp_subfeatures, 'None';
+				push @codon_changes, 'NA';
+			}
+		}
+	}
+	
+	# No features found!
+	else {
+		push @snp_features, 'None';
+		push @snp_subfeatures, 'None';
+		push @codon_changes, 'NA';
+		$description = 'None';
+	}
+	
+	# finished
+	$description ||= 'None';
+	return (
+		join(',', @snp_features), 
+		join(',', @snp_subfeatures), 
+		join(',', @codon_changes),
+		$description,
+	);
+}
 
 
 sub determine_codon_change {
 	# determine codon changes in the CDS
 	
 	# get passed arguments
-	my ($snp_type, $snp, $feature, $segment) = @_; 
+	my ($snp_type, $given_snp, $feature, $segment) = @_; 
 	
-	# the return value
-	my $codon_change;
+	# the return values
+	my @codon_changes;
 	
-	# determine the type of change
-	if ($snp_type eq 'substitution') {
-		# this may be a real codon change
-		
-		# get more feature info
-		my $strand = $feature->strand;
-		my $phase = $feature->phase;
-		my $start = $feature->start;
-		my $stop = $feature->stop;
-		
-		# determine the SNP position
-		my $pos = $segment->start;
-		my $chr = $segment->seq_id;
-		
-		# collect the original codon
-		my $codon_segment;
-		my $pos_phase;
-		if ($strand > 0) {
-			# watson or forward strand
-			$pos_phase = ($pos - $start - $phase) % 3;
-			if ($pos_phase == 0) {
-				$codon_segment = $db->segment($chr, $pos, $pos + 2);
-			} 
-			elsif ($pos_phase == 1) {
-				$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
-			} 
-			elsif ($pos_phase == 2) {
-				$codon_segment = $db->segment($chr, $pos - 2, $pos);
+	# check each given SNP, there may be more than one
+	# we're assuming that all the SNPs are the same type
+		# may be bad assumption, but generally true
+	foreach my $snp (split /,/, $given_snp) {
+		# determine the type of change
+		if ($snp_type eq 'substitution') {
+			# this may be a real codon change
+			
+			# get more feature info
+			my $strand = $feature->strand;
+			my $phase = $feature->phase;
+			my $start = $feature->start;
+			my $stop = $feature->stop;
+			
+			# determine the SNP position
+			my $pos = $segment->start;
+			my $chr = $segment->seq_id;
+			
+			# collect the original codon
+			my $codon_segment;
+			my $pos_phase;
+			if ($strand > 0) {
+				# watson or forward strand
+				$pos_phase = ($pos - $start - $phase) % 3;
+				if ($pos_phase == 0) {
+					$codon_segment = $db->segment($chr, $pos, $pos + 2);
+				} 
+				elsif ($pos_phase == 1) {
+					$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
+				} 
+				elsif ($pos_phase == 2) {
+					$codon_segment = $db->segment($chr, $pos - 2, $pos);
+				}
+			}
+			else {
+				# crick or reverse strand
+				$pos_phase = ($stop - $pos - $phase) % 3;
+				if ($pos_phase == 0) {
+					$codon_segment = $db->segment($chr, $pos + 2, $pos);
+				} 
+				elsif ($pos_phase == 1) {
+					$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
+				} 
+				elsif ($pos_phase == 2) {
+					$codon_segment = $db->segment($chr, $pos, $pos - 2);
+				}
+			}
+			my $codon = $codon_segment->seq->seq;
+			my $aa = $codontable->translate($codon);
+			
+			# make the substitution into the mutant
+			my @triplet = split //, $codon;
+			$triplet[$pos_phase] = $snp; # change the appropriate codon
+			my $mutant_codon = join q(), @triplet;
+			my $mutant_aa = $codontable->translate($mutant_codon);
+			
+			# report the change
+			if ($aa eq $mutant_aa) {
+				# no change
+				push @codon_changes, 'silent';
+			}
+			else {
+				# real change!
+				push @codon_changes, "$aa->$mutant_aa";
 			}
 		}
-		else {
-			# crick or reverse strand
-			$pos_phase = ($stop - $pos - $phase) % 3;
-			if ($pos_phase == 0) {
-				$codon_segment = $db->segment($chr, $pos + 2, $pos);
-			} 
-			elsif ($pos_phase == 1) {
-				$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
-			} 
-			elsif ($pos_phase == 2) {
-				$codon_segment = $db->segment($chr, $pos, $pos - 2);
-			}
-		}
-		my $codon = $codon_segment->seq->seq;
-		my $aa = $codontable->translate($codon);
 		
-		# make the substitution into the mutant
-		my @triplet = split //, $codon;
-		$triplet[$pos_phase] = $snp; # change the appropriate codon
-		my $mutant_codon = join q(), @triplet;
-		my $mutant_aa = $codontable->translate($mutant_codon);
-		
-		# report the change
-		if ($aa eq $mutant_aa) {
-			# no change
-			$codon_change = 'silent';
-		}
 		else {
-			# real change!
-			$codon_change = "$aa->$mutant_aa";
+			# insertion/deletion
+			push @codon_changes, 'frameshift';
 		}
 	}
 	
-	else {
-		# insertion/deletion
-		$codon_change = 'frameshift';
-	}
-	
-	return $codon_change;
+	return join(',', @codon_changes);
 }
 
 
@@ -451,25 +627,24 @@ The command line flags and descriptions:
 
 =item --in <snp_file>
 
-Specify the name(s) of the input SNP file. Multiple files may be 
-specified using multiple --in arguments, with a single --in argument and a 
-comma delimited list, or as a list at the end of all options. The files may 
-kept gzipped; they will automatically be uncompressed.
+Specify the name(s) of the input SNP file(s). SNP files should be in the 
+Variation Call Format (VCF) format. They may be gzipped. Multiple files 
+may be specified; they will be processed sequentially. Provide multiple 
+--in arguments, a comma delimited list, or a free list at the end of 
+the command. 
 
-=item --db
+=item --db <database>
 
-Specify the name of a Bio::DB::SeqFeature::Store database that contains the 
-genome annotation and sequence. Alternatively, a single GFF3 genome 
-annotation file may be provided, in which case it is loaded in memory.
-This is required.
+Specify the name of a Bio::DB::SeqFeature::Store database that contains 
+the genome annotation and sequence. Alternatively, for small genomes, 
+a single GFF3 genome annotation file may be provided for loading into memory.
 
 =item --features type1,type2,...
 
-Provide a comma-delimited list (no spaces) of the GFF feature types of the 
-genes to intersect with the SNPs. Complex gene structures (gene->mRNA->CDS) 
-should be able to be parsed to look for amino-acid changes. If a list is 
-not provided, the default list will then include gene, ncRNA, snRNA, snoRNA,
-and tRNA.
+Provide a comma-delimited list (no spaces) of the GFF3 feature types 
+of the features to intersect with the SNPs. Complex gene structures 
+(gene->mRNA->CDS) can be parsed to look for amino-acid changes. The 
+default feature is "gene". 
 
 =item --version
 
@@ -484,21 +659,48 @@ This help text.
 =head1 DESCRIPTION
 
 This program will locate SNPs and other sequence variants and identify 
-which gene the variant is located in, the type of polymorphism (insertion, 
-deletion, substitution), and, if the variant is located within a CDS, whether 
-a codon change is generated.
+the feature that overlaps the variant. In most cases, the features are 
+genes, in which case the corresponding coding sequence (CDS), if 
+present, is evaluated for a change in coding potential due to the 
+sequence variation. Codon changes, silent changes, and frame shifts 
+may be reported.
 
-The input files should be files generated using the varFilter function of
-the samtools.pl script, included with the SamTools distribution
-L<http://samtools.sourceforge.net>. That script will generate a list of the
-sequence variations that differ from the reference genome. No verification
-of the source file format is performed. The files may be gzipped.
+The input SNP files must be in the Variant Call Format (VCF) 4.0 or 
+4.1 format, a tab-delimited text file with metadata. 
+See L<http://www.1000genomes.org/wiki/Analysis/Variant%20Call%20Format/vcf-variant-call-format-version-41> 
+for more information about the format. The files may be gzipped.
 
+Numerous SNP callers are capable of generating the VCF format from 
+sequence (usually Bam) files. The Samtools program is one such program, 
+using the "mpileup" function in conjunction with it's "bcftools" tool. 
+See the Samtools site at L<http://samtools.sourceforge.net> for more 
+information.
+
+The output file is a simple tab-delimited text file with headers, 
+suitable for opening in spread-sheet program. Each row represents a SNP. 
+The following columns are include.
+  
+  Variation_Type (substitution, insertion, deletion)
+  Overlapping_Feature (feature type, name, alias)
+  Subfeature (exon, CDS, etc)
+  Codon_Change (Reference AA -> mutant AA)
+  Chromosome
+  Position (start position, 1-base, forward strand)
+  Reference_Seq
+  Variant_Seq
+  Number_Supporting_Reads (if reported)
+  Total_Number_Reads (if reported)
+  Percent_Supporting_Reads (if reported)
+  Genotype (if reported)
+  Feature_description (if present in the database)
+
+If more than one variant sequence is reported at a position, then each 
+is evaluated for effects on the coding potential. If more than one 
+feature is found overlapping the SNP, then both features are reported.
 
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
- Howard Hughes Medical Institute
  Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah
