@@ -26,7 +26,7 @@ Again, there are many different SNP callers for identifying the sequence variant
 
 For these purposes, I assume that one Bam sequencing file `=` one strain. It is possible to combine multiple samples into one Bam file, but that quickly gets quite complicated. If you have multiple Bam files for one strain (perhaps you have more than one lane of sequencing), they should be combined into one Bam file for simplicity.
 
-====Running samtools mpileup====
+===Running samtools mpileup===
 The Samtools site [http://samtools.sourceforge.net/mpileup.shtml describes] using the `mpileup` function to generate the sequence variants. The tool writes files in the [http://vcftools.sourceforge.net/specs.html VCF] format. Here, I'm combining multiple steps into one. Again, we're using one strain per sequence file at a time. 
 
 I am assuming the tools are in your environment path; if not, you will need to provide the full paths to the executables.
@@ -38,8 +38,7 @@ You will also need to have an indexed fasta file for the reference genome. To in
 
 Now, we run the `mpileup` command. Carefully note the pipe `|` and lone dash `-` characters. This command is all one line, it's broken up here for convenience.
 <pre>
-	samtools mpileup -uf reference.fasta strain1.bam | bcftools view -cgv - | \
-	vcfutils.pl varFilter > strain1.vcf
+	samtools mpileup -uf reference.fasta strain1.bam | bcftools view -cgv - | 	vcfutils.pl varFilter > strain1.vcf
 </pre>
 We are running three distinct utilities, `samtools`, `bcftools`, and `vcfutils.pl`, all piped together, with the final output redirected to a new text file, `strain1.vcf`. Each utility has it's own set of options, we're just using the minimal options. 
 
