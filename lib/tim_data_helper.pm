@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.6.3';
+our $VERSION = '1.7.4';
 
 
 
@@ -251,7 +251,9 @@ sub verify_data_structure {
 		}
 		if (
 			exists $datahash_ref->{3} and
-			$datahash_ref->{3}{'name'} !~ m/^name|id/i
+			$datahash_ref->{3}{'name'} !~ m/^name|id|score/i
+			# for bed this should be name or ID
+			# for bedgraph this should be score
 		) {
 			$bed_check = 0;
 		}

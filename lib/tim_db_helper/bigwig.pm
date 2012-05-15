@@ -8,7 +8,7 @@ use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.7.0';
+our $VERSION = '1.7.4';
 
 
 # Exported names
@@ -604,7 +604,7 @@ sub wig_to_bigwig_conversion {
 	# generate the bw file name
 	# we can substitute one of three possible names for bw
 	my $bw_file = $wigfile;
-	$bw_file =~ s/\.(?:bed|bedgraph|wig)$/.bw/;
+	$bw_file =~ s/\.(?:bed|bdg|bedgraph|wig)$/.bw/;
 	
 	# generate the bigwig file 
 	if ($bw_app_path) {
