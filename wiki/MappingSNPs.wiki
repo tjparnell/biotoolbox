@@ -1,58 +1,76 @@
-#summary Mapping all sequence variants between two or more strains through next generation sequencing technologies. 
+#summary Mapping sequence variants and mutations using next generation sequencing technologies. 
 #labels Featured 
 
 =HOWTO: Mapping unidentified mutations by whole genome sequencing=
 
-Working with yeast strains, it used to be a relatively straight forward approach to map a new mutation. Simply back cross to appropriate strains and genetically map the mutation. Complement the mutation with a genomic library on plasmids. Sequence the complementing plasmids, identify candidate genes, and test again. It would take a good graduate student a couple months; an unlucky (or bad) student upwards of a year.
+Whole genome sequencing has now enabled a (relatively) easy and straight forward approach to mapping sequence variants and unknown mutations. This is particularly useful, for example, in sequencing lab strains (yeast, fly, etc.) with novel, unknown mutations. What used to take months to more than a year can now be done in a couple weeks!
 
-Enter next generation sequencing technologies. After a clean genomic DNA preparation of your mutant(s), send it off to the local genomics core facility to sequence, and then scan the genome for mutations. Within weeks you have your answer, and most of that time is waiting for your data. 
+This HOWTO should help in this process. Don't forget, you may still need to verify your mutant by complementation and linkage as appropriate.
 
-This HOWTO should help you in this process. Don't forget, you still need to verify your mutant by complementation and linkage.
+==Starting==
+Sequence your strain's genome. This usually involves submitting high-quality genomic DNA, which is sheared, prepped into a library, and sequenced with next generation sequence technologies. You should aim for 10-50X average coverage to reliably call sequence variants; more is generally better, but at a cost. Talk to you local sequencing facility for more specifics.
 
+You may want to consider sequencing the parent strain to determine the background level of sequence variants that exist between your laboratory strain and the published reference genome. Alternatively, sequence multiple unknown strains, and assume that all the common sequence variants are background.
 
-==Set up==
-With yeast, the genome is so small that an Illumina lane worth of sequencing would cover it with ridiculous numbers of reads. It's prudent, therefore, to barcode the multiple libraries from different yeast strains with specific primers that incorporate two or three bases in the 5' end of the read, allowing you to mix multiple libraries in a sequencing lane. The reads from each strain are then pulled out afterwards using the two base barcode tag. While this may not be feasible with larger genomes currently, it is only a matter of time with improvements in sequencing.
+==Sequence alignments==
+There are numerous sequence aligners that may be used to align the raw sequence reads to the reference genome. Two popular aligners that I am familar with is [http://bowtie-bio.sourceforge.net/index.shtml Bowtie] and [http://novocraft.com/main/index.php Novoalign], but many more exist; some are faster but at a cost of accuracy, some align gaps and others do not, and so on. 
 
-We'll assume you now have your sequencing data in hand.
+The specifics of aligning the data is beyond the scope of this tutorial, but in general for SNP discovery you want slower, more accurate aligners that allow for gaps (InDels, or Insertion/Deletions).
 
-==Steps==
-	# If the sequence file contains multiple barcoded genomes, you'll want to first split the file based on the 5' tags, as well as remove the tags. The [http://biotoolbox.googlecode.com/svn/wiki/pod/split_by_tags.pod.html split_by_tags.pl] script in the *biotoolbox* package should accomplish this. This will result in separate files for each strain, with the tag stripped from the sequence.
-	{{{
-		split_by_tags.pl <sequence_file.txt.gz> <tag1> <tag2> ...
-	}}} 
-	# Perform the alignment. While any aligner should work, some are more capable of others. For purposes of identifying sequence variants, I recommend [http://www.novascript.com Novascript]'s novoalign simply because it handles both mismatches and gaps well and is pretty thorough. Although, alignment algorithms continue to improve, so this advice may be out of date. You'll first need to build the index file for the reference genome before using. This is essentially a fast, indexed database of all short reads in the genome. Read the documentation, but it should go like this.
-	{{{
-		novoindex <index_name> <reference.fa>
-	}}}
-	# Convert the aligned reads to the [http://samtools.sourceforge.net/index.shtml Samtools] binary BAM file format. The BAM format is a convenient, compressed, file format that can be indexed for rapid access and search. The BAM file should be sorted and indexed.
-	# Both steps of aligning and converting to BAM format can be accomplished by running the [Pod_novo_wrapper novo_wrapper.pl] script in my *biotoolbox* package. Note that this is a simple wrapper with generic options for the programs. Advanced users should do run the individual programs manually. You should get indexed BAM alignment files of your sequence reads. You may give the wrapper multiple input files at a time.
-	{{{
-		novo_wrapper.pl --index /path/to/index sequence.txt.gz
-	}}}
-	# Pileup the reads and find the sequence variants. This generates the consensus sequence from all of the sequence reads, using the reference genome where there are gaps in read coverage. Read the SamTools documentation for more options. Notice the redirect out to a pileup file.
-	{{{
-		samtools pileup -c -f reference.fa sequence.bam >sequence.pileup
-	}}}
-	# Find the sequence variants. This will identify all of the differences between the sequenced and reference genomes. This uses the `samtools.pl` perl script included with the SamTools distribution. This command also includes a filter to weed out weak calls. The output is a tab-delimited text file that may be viewed if desired.
-	{{{
-		samtools.pl varFilter sequence.pileup | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.filtered.pileup
-	}}}
-	# To make things a little easier and avoid intermediate files, you may combine the two above steps into one by taking advantage of pipes. This is a long command that should be entered as one.
-	{{{
-		samtools pileup -c -f reference.fa sequence.bam | samtools.pl varFilter | awk '($3=="*"&&$6>=50)||($3!="*"&&$6>=20)' >sequence.filtered.pileup
-	}}}
-	# If you have multiple strains that were sequenced together, you can now merge the sequence variations together to identify unique and common variations. This is useful, for example, to identify those SNPs that are in the background but different from the reference genome (every lab strain will be different). Further, it will reduce the number of SNPs that are unique in each strain to help narrow down informative sequence variations (the mutation you're hunting down). You can use the [Pod_merge_SNPs merge_SNPs.pl] script in the *biotoolbox* package to perform this task. This program will take multiple pileup files (one for each strain), and write out multiple pileup files in accordance to their commonality. For example, two sequenced strains (strA and strB) may yield three files (strA, strB, strA_strB). 
-	{{{
-		merge_SNPs.pl sequence1.filtered.pileup sequence2.filtered.pileup ...
-	}}}
-	# Locate the sequence variants. This is the fun part where we get to identify where the mutations are located. The [Pod_locate_SNPs locate_SNPs.pl] script in the *biotoolbox* package will help identify which genomic features (genes) overlap the sequence variations, and if they overlap a coding sequence (CDS), what type of codon change would be produced. The output will be a tab-delimited text file that may be opened in a spreadsheet program (such as Microsoft Excel). The mutations may be then be sorted and/or filtered to identify the ones of interest.
-	{{{
-		locate_SNPs.pl --db genome_annotation.gff sequence1.pileup
-	}}}
-	# Viewing the alignments. The GBrowse viewer will accept BAM files to view the alignments. Other genome browsers may also accept BAM files. Simply navigate to your favorite candidate gene identified with [Pod_locate_SNPs locate_SNPs.pl] and check out the sequence variant.
-	
-	
-	
-	
-	
+The aligned sequences are usually converted into a near de-facto standard format, the [http://samtools.sourceforge.net/SAM1.pdf BAM] format, which allows for rapid, random access through a compressed, indexed, binary file format. See either [http://samtools.sourceforge.net Samtools] or [http://picard.sourceforge.net/index.shtml Picard] for converting, sorting, and indexing the Bam file.
 
+For those using Novoalign (I'm not necessarily advocating, but it works quite well), I have written a [Pod_novo_wrapper wrapper tool] for simplifying alignment and subsequent conversion to Bam file. A custom Bash script could accomplish the same thing.
+
+==Finding the sequence variants==
+Again, there are many different SNP callers for identifying the sequence variants. For simplicity, I am illustrating with the Samtools SNP caller. Some more advanced SNP callers include [http://www.broadinstitute.org/gsa/wiki/index.php/Home_Page GATK] and [http://www.yandell-lab.org/software/vaast.html VAAST] and many, many more. Determining which SNP caller is the best is left as an exercise to the reader.
+
+For these purposes, I assume that one Bam sequencing file `=` one strain. It is possible to combine multiple samples into one Bam file, but that quickly gets quite complicated. If you have multiple Bam files for one strain (perhaps you have more than one lane of sequencing), they should be combined into one Bam file for simplicity.
+
+====Running samtools mpileup====
+The Samtools site [http://samtools.sourceforge.net/mpileup.shtml describes] using the `mpileup` function to generate the sequence variants. The tool writes files in the [http://vcftools.sourceforge.net/specs.html VCF] format. Here, I'm combining multiple steps into one. Again, we're using one strain per sequence file at a time. 
+
+I am assuming the tools are in your environment path; if not, you will need to provide the full paths to the executables.
+
+You will also need to have an indexed fasta file for the reference genome. To index the fasta file, use `samtools`.
+<pre>
+	samtools faidx reference.fasta 
+</pre>
+
+Now, we run the `mpileup` command. Carefully note the pipe `|` and lone dash `-` characters. This command is all one line, it's broken up here for convenience.
+<pre>
+	samtools mpileup -uf reference.fasta strain1.bam | bcftools view -cgv - | \
+	vcfutils.pl varFilter > strain1.vcf
+</pre>
+We are running three distinct utilities, `samtools`, `bcftools`, and `vcfutils.pl`, all piped together, with the final output redirected to a new text file, `strain1.vcf`. Each utility has it's own set of options, we're just using the minimal options. 
+
+The first utility, `samtools`, generates a stream of all of the sequenced bases from the alignments at each position in the genome.
+
+The second utility, `bcftools`, determines whether all sequences are the same or a variation occurs, and performs some fancy statistical calculations as to the liklihood of the variation.
+
+The third utility, `vcfutils.pl`, further filters the sequence variants.
+
+Repeat the above command for each strain that you have sequenced.
+
+==Finding unique and common sequence variants==
+Assuming you have sequenced two or more strains, you can now intersect those two lists to find the sequence variants that are unique (representing potential novel mutations) and common (representing strain background polymorphisms). The *biotoolbox* script [Pod_intersect_SNPs intersect_SNPs.pl] can generate these lists of common and unique sequence variants.
+<pre>
+	intersect_SNPs.pl strain1.vcf strain2.vcf ...
+</pre>
+
+For two input files, you should get three output files: `strain1_unique.vcf`, `strain2_unique.vcf`, and `strain1_strain2_common.vcf`. The unique files should be considerably shorter, hopefully.
+
+==Identifying novel mutations==
+Now comes the fun part of identifying which sequence variants overlap which genomic annotations (genes) and, if so, alter coding potential. The *biotoolbox* script [Pod_locate_SNPs locate_SNPs.pl] will do this.
+
+You will need a Bio::DB::SeqFeature::Store formatted database containing the reference genome annotation. See [LoadingDatabase Loading a Database] for more information. For small genomes, it is possible to load the annotation GFF3 file into an in-memory database.
+
+Run the [Pod_locate_SNPs locate_SNPs.pl] script on each of your strain's unique VCF files. Multiple input files may be specified at once.
+<pre>
+	locate_SNPs.pl --db annotation strain1_unique.vcf strain2_unique.vcf
+</pre>
+
+You should obtain a simple, tab-delimited text file for each input file. Each row represents one sequence variant, and columns describe the overlapping feature(s), any potential codon change(s), and the number of supporting reads. 
+
+One key column to note, if present, is the number of supporting reads. For a haploid organism, such as _S. cerevisiae_, you might expect all of the reads to have the same alternate sequence variant. For diploid organisms, you may or may not expect 100% supporting reads, depending on the zygosity of the mutant allele. 
+
+Once you have a list of candidates, you should inspect the Bam sequence alignments in a genome viewer. False positives might be expected for sequence variants near a sequence gap or in poor quality base calls at the end of the sequence reads.
