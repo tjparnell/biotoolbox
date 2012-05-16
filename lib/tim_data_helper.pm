@@ -597,7 +597,7 @@ file name.
 =item extension
 
 The known extension(s) of the original file name. Known extensions 
-currently include '.txt, .store, .gff, .gff3, .bed, .sgr' as well as 
+currently include '.txt, .gff, .gff3, .bed, .sgr' as well as 
 their gzip equivalents.
 
 =item path
@@ -651,15 +651,14 @@ position within the data_table, but you will still need to step
 through the features (rows) starting at the indexed position 
 until you find the row you want. That should save you a little bit 
 of time, at least. The index is not stored upon writing to a 
-standard tim data text file, but is stored in a binary .store file.
+standard tim data text file.
 
 =item index_increment
 
 This is a single number representing the increment value to calculate 
 the index value for the index. It is generated along with the index 
 by the index_data_table() function. The index_increment value is not 
-stored upon writing to a standard tim data text file, but is stored in 
-a binary .store file.
+stored upon writing to a standard tim data text file.
 
 =back
 
