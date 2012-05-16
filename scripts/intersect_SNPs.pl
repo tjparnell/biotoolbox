@@ -17,7 +17,7 @@ use tim_data_helper qw(
 	generate_tim_data_structure
 );
 use Data::Dumper;
-my $VERSION = 'beta';
+my $VERSION = '1.8.0';
 
 print "\n A script to intersect and pull unique SNPs from multiple lists\n\n";
 
