@@ -1,5 +1,16 @@
 ######## biotoolbox revision history #############
 
+v.1.8.0 (svn r375)
+	- Moved script novo_wrapper.pl out of retirement (due to popular demand) and significantly updated it to handle parallel execution
+	- Retired old script merge_SNPs and replaced it with new intersect_SNPs.pl script, which is an improved version that uses the VCF format. 
+	- Updated script locate_SNPs.pl to work with multiple alternate sequences, multiple features, and importantly with the VCF format
+	- Added .vcf and .bdg extensions as properly recognized file format extensions. Changed default bedgraph extension to use .bdg in script bam2wig.pl
+	- Stripped all code and mention of binary tim_data_formatted files based on Storable. Not really a prominent feature and never lived up to its hype anyway, so removing it
+
+v.1.7.4 (svn r363) (not released)
+	- Fixed critical bug that prevents local Bam files from opening for data collection
+	- Added warnings if a chromosome segment failed to be found in a database
+
 v.1.7.3 (svn r355)
 	- Fixed bugs in script bam2wig.pl that prevents it from finding its libraries and compiling properly; and another bug that prevented stranded start positions from being recorded properly
 
