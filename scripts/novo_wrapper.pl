@@ -7,7 +7,6 @@ use Pod::Usage;
 use Getopt::Long;
 use IO::Dir;
 use File::Basename qw(fileparse);
-use lib '/usr/local/biotoolbox/lib';
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper::config;
