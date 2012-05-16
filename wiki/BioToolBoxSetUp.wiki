@@ -194,3 +194,11 @@ Now that you have Bio-BigFile installed, you should go ahead and compile some of
 There are a number of reasons to go with binary bigWig files over the original wiggle implementation, but if you have legacy data, *biotoolbox* will work with it. The legacy adaptor is [http://search.cpan.org/perldoc?Bio::Graphics::Wiggle Bio::Graphics::Wiggle], and was developed as part of the [http://gmod.org/wiki/GBrowse GBrowse] browser. The associated Perl script, [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl], is part of GBrowse and will take as input a text wiggle file (.wig) and generate binary files (.wib) referenced by a GFF3 file. This GFF3 file, in turn, will need to be loaded in a Bio::DB::SeqFeature::Store database.
 
 To install support, you'll need to install from CPAN at least  [http://search.cpan.org/dist/Bio-Graphics/ Bio-Graphics] and the [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl] script (or the complete [http://search.cpan.org/dist/GBrowse/ GBrowse]). These will require a number of other prerequisites, which the CPAN Shell should be able to handle.
+
+==Installing the Ensembl Perl API==
+To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
+
+It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed.
+
+Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
+
