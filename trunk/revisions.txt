@@ -1,6 +1,6 @@
 ######## biotoolbox revision history #############
 
-v.1.8.0 (svn r375)
+v.1.8.0 (svn r378)
 	- Moved script novo_wrapper.pl out of retirement (due to popular demand) and significantly updated it to handle parallel execution
 	- Retired old script merge_SNPs and replaced it with new intersect_SNPs.pl script, which is an improved version that uses the VCF format. 
 	- Updated script locate_SNPs.pl to work with multiple alternate sequences, multiple features, and importantly with the VCF format

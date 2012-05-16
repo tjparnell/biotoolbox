@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.7.4';
+our $VERSION = '1.8.0';
 
 # check for IO gzip support
 our $GZIP_OK = 0;

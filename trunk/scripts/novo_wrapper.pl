@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.7.4';
+my $VERSION = '1.8.0';
 
 
 print "\n This script is a wrapper for the Novoaligner program\n\n";
