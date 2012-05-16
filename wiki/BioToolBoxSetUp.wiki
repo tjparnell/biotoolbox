@@ -1,15 +1,15 @@
-#summary A new users guide for installing biotoolbox and its prerequisites.
+#summary A new users guide for installing BioToolBox and its prerequisites.
 #labels Featured 
 
-=Installing bioperl and other prerequisites for biotoolbox=
+=Installing bioperl and other prerequisites for BioToolBox=
 
-This guide is for new users looking to set up bioperl and biotoolbox. Advanced users can probably just run the [Pod_check_dependencies check_dependencies.pl] script included with the biotoolbox package (although scanning below won't hurt).
+This guide is for new users looking to set up bioperl and BioToolBox. Advanced users can probably just run the [Pod_check_dependencies check_dependencies.pl] script included with the BioToolBox package (although scanning below won't hurt).
  
 ==Before you begin==
 This guide assumes a few things.
 	* First, you have access to a unix-based computer, including Linux and Mac OS X. Windows users may need to explore other options (a new [http://store.apple.com computer], a new dual-boot [http://www.ubuntu.com/ operating system], etc.)
 	* Second, you have relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
-	* Third, Perl is installed on your machine. Almost every unix-based computer should have it installed, at least in some basic form. The biotoolbox programs have been tested with Perl versions 5.8.8 and 5.10.0. I assume anything > 5.8 should work. It's also useful to know whether it is 32-bit or 64-bit executable. 64-bit is preferred, if only because you avoid out-of-memory errors when working with large datasets. Run `perl -v` to find out the version and bit-ness. Familiarity with Perl is helpful, insofar as installing modules through CPAN, but Perl programming skills are not a requirement.
+	* Third, Perl is installed on your machine. Almost every unix-based computer should have it installed, at least in some basic form. The BioToolBox programs have been tested with Perl versions 5.8.8 and 5.10.0. I assume anything > 5.8 should work. It's also useful to know whether it is 32-bit or 64-bit executable. 64-bit is preferred, if only because you avoid out-of-memory errors when working with large datasets. Run `perl -v` to find out the version and bit-ness. Familiarity with Perl is helpful, insofar as installing modules through CPAN, but Perl programming skills are not a requirement.
 	* Finally, you'll need to have GNU C compiler (GCC) installed for compiling software from source code. Most Linux distributions should already have this installed; if not, it's easily obtainable using your favorite package manager. On Mac OS X, you'll need to install the Developer Tools from your installation disc or XCode from the Mac App Store. Be sure to include the command line tools from within XCode.
 	* Mac users may wish to look more closely at my other guide, [SetupForMacOSX Set up for Mac OS X], although this guide will mostly work as well.
 
@@ -87,10 +87,10 @@ Try installing a few modules. Here are some basic ones to try first
 	* `Module::Build`
 	* `ExtUtils::MakeMaker`
 
-==biotoolbox prerequisite modules==
-Now that you have some basic Perl modules installed, let's go for some others that are required for some or all of the *biotoolbox* programs. There are two ways to install these.
+==BioToolBox prerequisite modules==
+Now that you have some basic Perl modules installed, let's go for some others that are required for some or all of the *BioToolBox* programs. There are two ways to install these.
 
-First, you can run the [Pod_check_dependencies check_dependencies.pl] script in the root directory of the *biotoolbox* package. This will use CPAN to check for known dependencies, compare them with what is available from CPAN, and offer to install them for you. Note that dependencies may need to be taken care of manually.
+First, you can run the [Pod_check_dependencies check_dependencies.pl] script in the root directory of the *BioToolBox* package. This will use CPAN to check for known dependencies, compare them with what is available from CPAN, and offer to install them for you. Note that dependencies may need to be taken care of manually.
 
 Second, you can install them manually through the CPAN shell. Here is a list of basic requirements.
 	* `Config::Simple`
@@ -103,20 +103,20 @@ Second, you can install them manually through the CPAN shell. Here is a list of 
 Not all of the modules are required. Only the first one is absolutely required, the next three are important for most modules, and the last two are required for specific modules. 
 
 ==Installing database modules==
-If you intend to use a database for storing genome annotation, then a relational database is in order. The *biotoolbox* programs relies on the [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema. This can be utilized on a SQLite, MySQL, or PostgreSQL database. A memory database is also available, although it's usefulness is quite limited. The SQLite database is a safe, simple alternative without the overhead and complexity. The others will provide much better performance, especially in multi-user environments.
+If you intend to use a database for storing genome annotation, then a relational database is in order. The *BioToolBox* programs relies on the [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema. This can be utilized on a SQLite, MySQL, or PostgreSQL database. A memory database is also available, although it's usefulness is quite limited. The SQLite database is a safe, simple alternative without the overhead and complexity. The others will provide much better performance, especially in multi-user environments.
 
 If it's not installed already, most Linux distributions and Mac OS X versions have packages or installers available to install one or more of these database systems on your computer, usually as a system-wide service. You'll have to look elsewhere for help on installing one. Be sure to also install the associated developer files or package, which include the libraries and header files necessary for installing the Perl modules. 
 
-Once a database is installed, you can then install the appropriate Perl module drivers. The DBI module is required, and the subsequent ones are specific for your chosen database. 
+Once a database is installed, you can then install the appropriate Perl module drivers. The `DBI` module is required, and the subsequent ones are specific for your chosen database. 
 	* `DBI`
 	* `DBD::SQLite`
 	* `DBD::mysql`
 	* `DBD::Pg`
 
-If you do not need or want to install a database, that's OK too. Most *biotoolbox* programs happily take BED style input files with genomic coordinates, rather than retrieving coordinates from genomic annotation stored in the database.
+If you do not need or want to install a database, that's OK too. Most *BioToolBox* programs happily take BED style input files with genomic coordinates, rather than retrieving coordinates from genomic annotation stored in the database.
 
 ==Installing Bioperl==
-Bioperl is the primary distribution from which most of the *biotoolbox* programs are based on. All of the data collection scripts rely on it. Hence, this is a major (but not absolute) requirement. 
+Bioperl is the primary distribution from which most of the *BioToolBox* programs are based on. All of the data collection scripts rely on it. Hence, this is a major (but not absolute) requirement. 
 
 Your Linux operating system's package manager (if it has one) may already have a package for bioperl which you could install. This will install it in the system libraries. Mac OS X does not have a package manager (the App Store doesn't count here), but you could use [http://www.finkproject.org/ Fink] ([http://www.macports.org/ MacPorts] currently does not have bioperl).
 
@@ -125,7 +125,7 @@ With that said, I generally prefer to install through the CPAN Shell. If you're 
 Bioperl is a complex distribution, containing hundreds of modules, some external dependencies, and numerous Perl scripts. The installation routine will ask you several questions. In general, the external dependencies are not necessary (you'll find out later if you need one when something doesn't work), internet-based tests are not necessary, and it doesn't hurt to install all of the scripts (some are useful).
 
 ==Installing Graphing Modules==
-There are a few *biotoolbox* scripts that allow you to generate simple plots or graphs as PNG files. These rely on the [http://search.cpan.org/dist/GD/ GD] Perl module, which, in turn, rely on [http://www.boutell.com/gd/ GD] libraries. These are also required for [http://gmod.org/wiki/GBrowse GBrowse], if you intend to install that as well. 
+There are a few *BioToolBox* scripts that allow you to generate simple plots or graphs as PNG files. These rely on the [http://search.cpan.org/dist/GD/ GD] Perl module, which, in turn, rely on [http://www.boutell.com/gd/ GD] libraries. These are also required for [http://gmod.org/wiki/GBrowse GBrowse], if you intend to install that as well. 
 
 If the GD libraries are not installed already (most Linux distributions should have them), you can readily obtain them through your package manager. For Mac OS X, you'll have to install from source (good luck), use [http://www.finkproject.org/ Fink], or obtain pre-compiled packages from [http://sourceforge.net/projects/gmod/files/Generic%20Genome%20Browser/libgd-MacOSX/ here]. 
 
@@ -162,7 +162,7 @@ One error you may or may not encounter is regarding shared libraries, and errors
 Repeat the Bio-Samtools installation (you may need to issue the clean command from within CPAN Shell). It should work now.
 
 ==Installing bigWig and bigBed support==
-The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats for easy sharing and viewing of dense genomic data, such as from next generation sequencing technologies. These are self-contained, compressed, indexed, binary file formats, similar to a Bam file, that can be accessed locally or remotely. While they are tremendously helpful in viewing data, I have found they are also quite useful in genome analysis with the *biotoolbox* scripts. Their use, while not required, are highly recommended if you're using large datasets. 
+The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats for easy sharing and viewing of dense genomic data, such as from next generation sequencing technologies. These are self-contained, compressed, indexed, binary file formats, similar to a Bam file, that can be accessed locally or remotely. While they are tremendously helpful in viewing data, I have found they are also quite useful in genome analysis with the *BioToolBox* scripts. Their use, while not required, are highly recommended if you're using large datasets. 
 
 You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. First download Jim Kent's [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip source] code.
 <pre>
@@ -191,14 +191,14 @@ Now that you have Bio-BigFile installed, you should go ahead and compile some of
 	* `bigBedToBed`
 
 ==Installing support for legacy wig files==
-There are a number of reasons to go with binary bigWig files over the original wiggle implementation, but if you have legacy data, *biotoolbox* will work with it. The legacy adaptor is [http://search.cpan.org/perldoc?Bio::Graphics::Wiggle Bio::Graphics::Wiggle], and was developed as part of the [http://gmod.org/wiki/GBrowse GBrowse] browser. The associated Perl script, [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl], is part of GBrowse and will take as input a text wiggle file (.wig) and generate binary files (.wib) referenced by a GFF3 file. This GFF3 file, in turn, will need to be loaded in a Bio::DB::SeqFeature::Store database.
+There are a number of reasons to go with binary bigWig files over the original wiggle implementation, but if you have legacy data, *BioToolBox* will work with it. The legacy adaptor is [http://search.cpan.org/perldoc?Bio::Graphics::Wiggle Bio::Graphics::Wiggle], and was developed as part of the [http://gmod.org/wiki/GBrowse GBrowse] browser. The associated Perl script, [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl], is part of GBrowse and will take as input a text wiggle file (.wig) and generate binary files (.wib) referenced by a GFF3 file. This GFF3 file, in turn, will need to be loaded in a Bio::DB::SeqFeature::Store database.
 
 To install support, you'll need to install from CPAN at least  [http://search.cpan.org/dist/Bio-Graphics/ Bio-Graphics] and the [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl] script (or the complete [http://search.cpan.org/dist/GBrowse/ GBrowse]). These will require a number of other prerequisites, which the CPAN Shell should be able to handle.
 
 ==Installing the Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
+To retrieve genome annotation from Ensembl's public MySQL database using the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
 
 It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed.
 
-Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
+Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the BioToolBox script `get_ensembl_annotation.pl`. Be forewarned.
 
