@@ -6,7 +6,6 @@ use strict;
 use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use IO::File;
-use Storable qw(store_fd fd_retrieve store retrieve);
 use Statistics::Lite qw(mean min);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -52,8 +51,6 @@ our $GFF3_ID_COUNT = 0;
 	# need to escape the periods so that they match periods and not 
 	# any character - apparently fileparse() uses a regex
 our @SUFFIX_LIST = qw(
-	\.store
-	\.store\.gz
 	\.txt
 	\.txt\.gz
 	\.gff
@@ -98,110 +95,72 @@ sub load_tim_data_file {
 	# The resulting data structure
 	my $inputdata_ref;
 	
-	# Open the file based on the file type and load datastructure
-	if ($extension =~ /store/i) {
-		# the file is a binary Storable.pm file
-		
-		if ($extension eq '.store.gz') {
-			# the stored file is compressed
-			# need to filter through gunzip first
-			# we're opening a standard globtype filehandle for compatibility
-			# with Storable.pm
-			
-			open *FILE, "gunzip -c $filename |" or confess "unable to open gunzip -c $filename";
-			$inputdata_ref = fd_retrieve(\*FILE);
-			close FILE;
-		}
-		else {
-			# an uncompressed stored file
-			
-			$inputdata_ref = retrieve($filename);
-		}
-		
-		# check file
-		unless (verify_data_structure($inputdata_ref) ) {
-			cluck "badly formatted data file!";
-			return;
-		}
-		
-		# record current filename data
-		$inputdata_ref->{'filename'} = $filename; # the original filename
-		$inputdata_ref->{'basename'} = $basename; # filename basename
-		$inputdata_ref->{'extension'} = $extension; # the filename extension
+	# open the file and parse the metadata
+	# this will return the metadata hash and an open filehandle
+	my $fh; # open filehandle for processing the data table
+	($fh, $inputdata_ref) = open_tim_data_file($filename);
+	unless ($fh) {
+		return;
 	}
 	
-	#
-	else {
-		# a text file that must be parsed into a data structure
+	# prepare the data table
+	my @datatable;
+	
+	# put the column names into the data table
+	push @datatable, $inputdata_ref->{'column_names'};
+	delete $inputdata_ref->{'column_names'}; # we no longer need this
+	
+	# load the data table
+	while (my $line = $fh->getline) {		
+		chomp $line;
 		
-		# open the file and parse the metadata
-		# this will return the metadata hash and an open filehandle
-		my $fh; # open filehandle for processing the data table
-		($fh, $inputdata_ref) = open_tim_data_file($filename);
-		unless ($fh) {
-			return;
+		# the current file position should be at the beginning of the
+		# data table information
+		
+		# simply read each line in the file, explode the line into an 
+		# anonymous array and push it to the data_table array
+		my @linedata = split /\t/, $line;
+		
+		# convert null values to internal '.'
+		for (my $i = 0; $i < $inputdata_ref->{'number_columns'}; $i++ ) {
+			if (!defined $linedata[$i]) {
+				# a null value to convert
+				$linedata[$i] = '.';
+			}
+			if ($linedata[$i] =~ /^n\/?a$/i) {
+				# value matches na or n/a, a null value
+				$linedata[$i] = '.';
+			}
 		}
 		
-		# prepare the data table
-		my @datatable;
-		
-		# put the column names into the data table
-		push @datatable, $inputdata_ref->{'column_names'};
-		delete $inputdata_ref->{'column_names'}; # we no longer need this
-		
-		# load the data table
-		while (my $line = $fh->getline) {		
-			chomp $line;
-			
-			# the current file position should be at the beginning of the
-			# data table information
-			
-			# simply read each line in the file, explode the line into an 
-			# anonymous array and push it to the data_table array
-			my @linedata = split /\t/, $line;
-			
-			# convert null values to internal '.'
-			for (my $i = 0; $i < $inputdata_ref->{'number_columns'}; $i++ ) {
-				if (!defined $linedata[$i]) {
-					# a null value to convert
-					$linedata[$i] = '.';
-				}
-				if ($linedata[$i] =~ /^n\/?a$/i) {
-					# value matches na or n/a, a null value
-					$linedata[$i] = '.';
-				}
-			}
-			
-			# check the number of elements
-			if (scalar @linedata != $inputdata_ref->{'number_columns'} ) {
-				carp "line $. has wrong number of columns! " .
-					scalar(@linedata) . " instead of " . 
-					$inputdata_ref->{'number_columns'};
-			}
-			
-			# store the array
-			push @datatable, [ @linedata ];
+		# check the number of elements
+		if (scalar @linedata != $inputdata_ref->{'number_columns'} ) {
+			carp "line $. has wrong number of columns! " .
+				scalar(@linedata) . " instead of " . 
+				$inputdata_ref->{'number_columns'};
 		}
 		
-		# convert 0-based starts to 1-base for BED source files
-		if ($inputdata_ref->{'bed'}) {
-			for (my $row = 1; $row < scalar @datatable; $row++) {
-				# add 1 to each start position
-				$datatable[$row][1] += 1;
-			}
-			$inputdata_ref->{1}{'base'} = 1;
-		}
-		
-		# associate the data table with the data hash
-		$inputdata_ref->{'data_table'} = \@datatable;
-		
-		# record the index number of the last data row
-		$inputdata_ref->{'last_row'} = scalar @datatable - 1;
-		
-		# completed loading the file
-		$fh->close;
-		
+		# store the array
+		push @datatable, [ @linedata ];
 	}
+	
+	# convert 0-based starts to 1-base for BED source files
+	if ($inputdata_ref->{'bed'}) {
+		for (my $row = 1; $row < scalar @datatable; $row++) {
+			# add 1 to each start position
+			$datatable[$row][1] += 1;
+		}
+		$inputdata_ref->{1}{'base'} = 1;
+	}
+	
+	# associate the data table with the data hash
+	$inputdata_ref->{'data_table'} = \@datatable;
+	
+	# record the index number of the last data row
+	$inputdata_ref->{'last_row'} = scalar @datatable - 1;
+	
+	# completed loading the file
+	$fh->close;
 	
 	# finished
 	return $inputdata_ref;
@@ -234,12 +193,6 @@ sub open_tim_data_file {
 	
 	# split filename into its base components
 	my ($basename, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
-	
-	# check for Storable files
-	if ($extension =~ /store/i) {
-		cluck " stored files should be opened with tim_file_helper::load_tim_data_file";
-		return;
-	}
 	
 	# open the file
 	my $fh = open_to_read_fh($filename);
@@ -948,13 +901,8 @@ sub write_tim_data_file {
 	# Adjust filename extension if necessary
 	unless ($extension) {
 			
-		# a binary store file
-		if (defined $format and $format eq 'store') {
-			$extension = '.store';
-		}
-		
 		# a gff file
-		elsif ($datahash_ref->{'gff'}) {
+		if ($datahash_ref->{'gff'}) {
 			$extension = '.gff';
 			
 			# for GFF3 files only
@@ -1027,11 +975,7 @@ sub write_tim_data_file {
 		}
 		elsif ($extension) {
 			# check extension from the parsed filename, if present
-			if ($extension =~ /store/i) {
-				# filename suggests the Storable format
-				$format = 'store';
-			}
-			elsif ($extension =~ /sgr/) {
+			if ($extension =~ /sgr/) {
 				# sgr is simple format, no headers 
 				$format = 'simple';
 			}
@@ -1072,19 +1016,14 @@ sub write_tim_data_file {
 		}
 		else {
 			# support is not there
-			unless ($format eq 'store') {
-				# we are excepting the binary store format
-				# because that uses an external gzip
-				
-				# complain to user
-				carp " IO::ZLIB is not installed for gz support! writing non-compressed file\n";
-				
-				# reset gzip
-				$gz = 0;
-				
-				# strip gz extension if present
-				$extension =~ s/\.gz$//i; 
-			}
+			# complain to user
+			carp " IO::ZLIB is not installed for gz support! writing non-compressed file\n";
+			
+			# reset gzip
+			$gz = 0;
+			
+			# strip gz extension if present
+			$extension =~ s/\.gz$//i; 
 		}
 	}
 	else {
@@ -1114,194 +1053,163 @@ sub write_tim_data_file {
 	}
 	
 	
-	# Write file based on the format
-	if ($format eq 'store') {
-		# Storable binary data format using architecture independent format
-		
-		if ($gz) {
-			# compress the stored file
-			# we're opening the file using a standard globtype file handle
-			# to make it compatible with Storable.pm
-			
-			open *FILE, "| gzip >$newname " or confess "unable to open gzip $newname";
-			store_fd($datahash_ref, \*FILE);
-			close FILE;
-		}
-		else {
-			# write an uncompressed store file
-			
-			store($datahash_ref, $newname);
-		}
-		
-		
+	# Open file for writing
+	my $fh = open_to_write_fh($newname, $gz);
+	unless (defined $fh) { 
+		return;
 	}
-	elsif ($format eq 'text' or $format eq 'simple') {
-		# A text format
 	
-		# Open file for writing
-		my $fh = open_to_write_fh($newname, $gz);
-		unless (defined $fh) { 
-			return;
+	
+	# Write the headers
+	if ($format eq 'text') {
+		# default text format has metadata headers
+		# 'simple format
+		
+		# write gff statement if gff format
+		if ($datahash_ref->{'gff'}) {
+			# write gff statement
+			$fh->print("##gff-version $datahash_ref->{gff}\n");
 		}
 		
-		
-		# Write the headers
-		if ($format eq 'text') {
-			# default text format has metadata headers
-			# 'simple format
+		# Write the primary headers
+		unless ($extension =~ m/gff|bed|bdg|sgr|kgg/) {
+			# we only write these for text files, not gff or bed files
 			
-			# write gff statement if gff format
-			if ($datahash_ref->{'gff'}) {
-				# write gff statement
-				$fh->print("##gff-version $datahash_ref->{gff}\n");
+			if ($datahash_ref->{'program'}) {
+				# write program header if present
+				$fh->print('# Program ' . $datahash_ref->{'program'} . "\n");
 			}
-			
-			# Write the primary headers
-			unless ($extension =~ m/gff|bed|bdg|sgr|kgg/) {
-				# we only write these for text files, not gff or bed files
-				
-				if ($datahash_ref->{'program'}) {
-					# write program header if present
-					$fh->print('# Program ' . $datahash_ref->{'program'} . "\n");
-				}
-				if ($datahash_ref->{'db'}) {
-					# write database header if present
-					$fh->print('# Database ' . $datahash_ref->{'db'} . "\n");
-				}
-				if ($datahash_ref->{'feature'}) {
-					# write feature header if present
-					$fh->print('# Feature ' . $datahash_ref->{'feature'} . "\n");
-				}
+			if ($datahash_ref->{'db'}) {
+				# write database header if present
+				$fh->print('# Database ' . $datahash_ref->{'db'} . "\n");
 			}
-			
-			# Write the miscellaneous headers
-			foreach ( @{ $datahash_ref->{'other'} } ) {
-				# write remaining miscellaneous header lines if present
-				# we do this for all files
-				
-				unless (/\n$/s) {
-					# append newline if not present
-					$_ .= "\n";
-				}
-				# check for comment character at beginning
-				if (/^#/) {
-					$fh->print($_);
-				}
-				else {
-					$fh->print("# " . $_);
-				}
-			}
-		
-			# Write the column metadata headers
-			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-				# each column metadata in the hash is referenced by the column's
-				# index number as the key
-				# we will take each index one at a time in increasing order
-				
-				# some files do not need or tolerate metadata lines, for those 
-				# known files the metadata lines will be skipped
-				
-				# these column metadata lines do not need to be written if they
-				# only have two values, presumably name and index, for files 
-				# that don't normally have column headers, e.g. gff
-				if (
-					exists $datahash_ref->{'extension'} and
-					$datahash_ref->{'extension'} =~ /sgr|kgg/i
-				) {
-					# these do not need metadata
-					next;
-				}
-				elsif (
-					exists $datahash_ref->{$i}{'AUTO'} and
-					scalar( keys %{ $datahash_ref->{$i} } ) == 
-						$datahash_ref->{$i}{'AUTO'}
-				) {
-					# some of the metadata values were autogenerated and 
-					# we have the same number of keys as were autogenerated
-					# no need to write these
-					next;
-				}
-				elsif (
-					$datahash_ref->{'extension'} =~ /gff|bed|bdg/i and
-					scalar( keys %{ $datahash_ref->{$i} } ) == 2
-				) {
-					# only two metadata keys exist, name and index
-					# GFF and BED files do not these to be written
-					# so skip
-					next;
-				}
-				
-				# we will put each key=value pair into @pairs, listed asciibetically
-				my @pairs; # an array of the key value pairs from the metadata hash
-				# put name first
-				# we are no longer writing the index number
-				push @pairs, 'name=' . $datahash_ref->{$i}{'name'};
-				# put remainder in alphabetical order
-				foreach (sort {$a cmp $b} keys %{ $datahash_ref->{$i} } ) {
-					next if $_ eq 'name'; # already written
-					next if $_ eq 'index'; # internal use only
-					next if $_ eq 'AUTO'; # internal use only
-					push @pairs,  $_ . '=' . $datahash_ref->{$i}{$_};
-				}
-				
-				# Finally write the header line, joining the pairs with a 
-				# semi-colon into a single string.
-				# The column identifier is comprised of the word 'Column' 
-				# and the index number joined by '_'.
-				$fh->print("# Column_$i ", join(";", @pairs), "\n");
+			if ($datahash_ref->{'feature'}) {
+				# write feature header if present
+				$fh->print('# Feature ' . $datahash_ref->{'feature'} . "\n");
 			}
 		}
 		
-		
-		# Write the table column headers
-		if ($datahash_ref->{'headers'}) {
-			# table headers existed in original source file, 
-			# and they should be written again
-			$fh->print( 
-				join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
+		# Write the miscellaneous headers
+		foreach ( @{ $datahash_ref->{'other'} } ) {
+			# write remaining miscellaneous header lines if present
+			# we do this for all files
+			
+			unless (/\n$/s) {
+				# append newline if not present
+				$_ .= "\n";
+			}
+			# check for comment character at beginning
+			if (/^#/) {
+				$fh->print($_);
+			}
+			else {
+				$fh->print("# " . $_);
+			}
 		}
+	
+		# Write the column metadata headers
+		for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+			# each column metadata in the hash is referenced by the column's
+			# index number as the key
+			# we will take each index one at a time in increasing order
 			
+			# some files do not need or tolerate metadata lines, for those 
+			# known files the metadata lines will be skipped
+			
+			# these column metadata lines do not need to be written if they
+			# only have two values, presumably name and index, for files 
+			# that don't normally have column headers, e.g. gff
+			if (
+				exists $datahash_ref->{'extension'} and
+				$datahash_ref->{'extension'} =~ /sgr|kgg/i
+			) {
+				# these do not need metadata
+				next;
+			}
+			elsif (
+				exists $datahash_ref->{$i}{'AUTO'} and
+				scalar( keys %{ $datahash_ref->{$i} } ) == 
+					$datahash_ref->{$i}{'AUTO'}
+			) {
+				# some of the metadata values were autogenerated and 
+				# we have the same number of keys as were autogenerated
+				# no need to write these
+				next;
+			}
+			elsif (
+				$datahash_ref->{'extension'} =~ /gff|bed|bdg/i and
+				scalar( keys %{ $datahash_ref->{$i} } ) == 2
+			) {
+				# only two metadata keys exist, name and index
+				# GFF and BED files do not these to be written
+				# so skip
+				next;
+			}
+			
+			# we will put each key=value pair into @pairs, listed asciibetically
+			my @pairs; # an array of the key value pairs from the metadata hash
+			# put name first
+			# we are no longer writing the index number
+			push @pairs, 'name=' . $datahash_ref->{$i}{'name'};
+			# put remainder in alphabetical order
+			foreach (sort {$a cmp $b} keys %{ $datahash_ref->{$i} } ) {
+				next if $_ eq 'name'; # already written
+				next if $_ eq 'index'; # internal use only
+				next if $_ eq 'AUTO'; # internal use only
+				push @pairs,  $_ . '=' . $datahash_ref->{$i}{$_};
+			}
+			
+			# Finally write the header line, joining the pairs with a 
+			# semi-colon into a single string.
+			# The column identifier is comprised of the word 'Column' 
+			# and the index number joined by '_'.
+			$fh->print("# Column_$i ", join(";", @pairs), "\n");
+		}
+	}
+	
+	
+	# Write the table column headers
+	if ($datahash_ref->{'headers'}) {
+		# table headers existed in original source file, 
+		# and they should be written again
+		$fh->print( 
+			join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
+	}
 		
-		# Write the data table
-		if ($format eq 'simple') {
-			
-			# the simple format will strip the non-value '.' from the table
-			for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
-				# we will step though the data_table array one row at a time
-				# convert the non-value '.' to undefined
-				# and print using a tab-delimited format
-				my @linedata;
-				foreach ( @{ $datahash_ref->{'data_table'}[$i] }) {
-					if ($_ eq '.') {
-						push @linedata, q{}; # an undefined value
-					} else {
-						push @linedata, $_;
-					}
+	
+	# Write the data table
+	if ($format eq 'simple') {
+		
+		# the simple format will strip the non-value '.' from the table
+		for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
+			# we will step though the data_table array one row at a time
+			# convert the non-value '.' to undefined
+			# and print using a tab-delimited format
+			my @linedata;
+			foreach ( @{ $datahash_ref->{'data_table'}[$i] }) {
+				if ($_ eq '.') {
+					push @linedata, q{}; # an undefined value
+				} else {
+					push @linedata, $_;
 				}
-				$fh->print(join("\t", @linedata) . "\n");
 			}
+			$fh->print(join("\t", @linedata) . "\n");
 		}
-		
-		else {
-			# normal data files
-			for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
-				# we will step though the data_table array one row at a time
-				# we will join each row's array of elements into a string to print
-				# using a tab-delimited format
-				$fh->print( 
-					join("\t", @{ $datahash_ref->{'data_table'}[$i] }), "\n");
-			}
-		}
-		
-		# done writing
-		$fh->close;
 	}
 	
 	else {
-		# some unrecognized file format was passed on
-		carp "unrecognized file format!\n";
-		return;
+		# normal data files
+		for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
+			# we will step though the data_table array one row at a time
+			# we will join each row's array of elements into a string to print
+			# using a tab-delimited format
+			$fh->print( 
+				join("\t", @{ $datahash_ref->{'data_table'}[$i] }), "\n");
+		}
 	}
+	
+	# done writing
+	$fh->close;
 	
 	# if we made it this far, it should've been a success!
 	# return the new file name as indication of success
@@ -1327,13 +1235,6 @@ sub open_to_read_fh {
 	}
 	
 	
-	# check for binary store file
-	if ($filename =~ /\.store(?:\.gz)?$/) {
-		carp " binary store files should not be opened with this subroutine!\n";
-		return;
-	}
-	
-
 	# Open filehandle object as appropriate
 	my $fh; # filehandle
 	if ($filename =~ /\.gz$/i and $GZIP_OK) {
@@ -2050,7 +1951,7 @@ sub convert_and_write_to_gff_file {
 		$filename = $arg_ref->{'filename'};
 		# remove unnecessary extensions
 		$filename =~ s/\.gz$//;
-		$filename =~ s/\.(txt|store)$//;
+		$filename =~ s/\.txt$//;
 		unless ($filename =~ /\.gff$/) {
 			# add extension if necessary
 			$filename .= '.gff';
@@ -2768,28 +2669,6 @@ The column name should be the same as defined in the column's metadata.
 When loading GFF files, the header names and metadata are automatically
 generated for conveniance. 
 
-
-=head1 BINARY REPRESENTATION OF TIM DATA FILE
-
-Alternatively, the internal memory data structure may be written and 
-read directly as a binary file using the Storable.pm module, negating 
-the need for both metadata and data parsing. This may significantly 
-decrease both load and write times owing to the faster compiled C code. 
-This is evident particularly with very large datasets, at the cost of 
-slightly larger files. 
-
-Binary stored files are recognized by the file extension '.store'. They 
-are stored in an architecture dependent manner. Be careful when migrating 
-between different machine architectures, and when in doubt, use the text 
-format. As with text files, the files may be compressed using gzip, 
-and recognized as such with the '.gz' extension. 
-
-Many of the programs which utilize this module may not directly offer the 
-choice of writing a binary file. By explicitly including the '.store' 
-extension in the output filename, the write modules within should 
-then write a binary file.
-
-
 =head1 USAGE
 
 Call the module at the beginning of your perl script and it will import 
@@ -2871,8 +2750,7 @@ Example:
 =item write_tim_data_file()
 
 This subroutine will write out a data file formatted for tim's data files. 
-Either text or binary files may be written. Please refer to L<FORMAT OF 
-TIM DATA TEXT FILE> and L<BINARY REPRESENTATION OF TIM DATA FILE> for more 
+Please refer to L<FORMAT OF TIM DATA TEXT FILE> for more 
 information regarding the file format. If the 'gff' key is true in the data 
 hash, then a gff file will be written.
 
@@ -2887,13 +2765,11 @@ arguments. The keys include
               write. This value is required for new data files and 
               optional for overwriting existing files (the filename 
               stored in the metadata is used). Appropriate extensions 
-              are added (e.g, .store, .txt, .gz, etc) as neccessary. 
+              are added (e.g, .txt, .gz, etc) as neccessary. 
   format   => A string to indicate the file format to be written.
-              Acceptable values include 'text', 'store', and 'simple'.
+              Acceptable values include 'text', and 'simple'.
               Text files are text in nature, include all metadata, and
-              usually have '.txt' extensions. Store files are binary
-              Storable.pm files representing all data and metadata,
-              and have '.store' extensions. Simple files are
+              usually have '.txt' extensions. Simple files are
               tab-delimited text files without metadata, useful for
               exporting data. If the format is not specified, the
               extension of the passed filename will be used as a
@@ -2914,9 +2790,7 @@ changes to the extension if necessary.
 
 Note that by explicitly providing the filename extension, some of these 
 options may be set without providing the arguments to the subroutine. 
-Specifically, using '.store' vs '.txt' will set the file format, and 
-adding '.gz' will compress the file. The arguments always take 
-precendence over the filename extensions, however.
+The arguments always take precendence over the filename extensions, however.
 
 Example
 
