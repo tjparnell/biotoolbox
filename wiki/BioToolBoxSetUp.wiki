@@ -5,6 +5,19 @@
 
 This guide is for new users looking to set up bioperl and BioToolBox. Advanced users can probably just run the [Pod_check_dependencies check_dependencies.pl] script included with the BioToolBox package (although scanning below won't hurt).
  
+==Contents==
+	# [BioToolBoxSetUp#Before_you_begin Before you begin]
+	# [BioToolBoxSetUp#Local_or_Root Local or Root]
+	# [BioToolBoxSetUp#Installing_locally Installing locally]
+	# [BioToolBoxSetUp#Installing_Perl_Modules Installing Perl Modules]
+	# [BioToolBoxSetUp#BioToolBox_prerequisite_modules BioToolBox prerequisite modules]
+	# [BioToolBoxSetUp#Installing_database_modules Installing database modules]
+	# [BioToolBoxSetUp#Installing_Bioperl Installing Bioperl]
+	# [BioToolBoxSetUp#Installing_Graphing_Modules Installing Graphing Modules]
+	# [BioToolBoxSetUp#Installing_bigWig_and_bigBed_support Installing bigWig and bigBed support]
+	# [BioToolBoxSetUp#Installing_support_for_legacy_wig_files Installing support for legacy wig files]
+	# [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Installing the Ensembl Perl API]
+
 ==Before you begin==
 This guide assumes a few things.
 	* First, you have access to a unix-based computer, including Linux and Mac OS X. Windows users may need to explore other options (a new [http://store.apple.com computer], a new dual-boot [http://www.ubuntu.com/ operating system], etc.)

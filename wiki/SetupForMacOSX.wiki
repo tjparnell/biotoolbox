@@ -16,7 +16,7 @@
 	# [SetupForMacOSX#Installing_Perl_modules_through_CPAN Installing Perl modules through CPAN]
 		# [SetupForMacOSX#Trouble_shooting_Perl_module_installation Trouble shooting Perl module installation]
 		# [SetupForMacOSX#Install_BioPerl Install BioPerl]
-		# [SetupForMacOSX#Additional_modules_for_biotoolbox Additional modules for biotoolbox]
+		# [SetupForMacOSX#Additional_modules_for_BioToolBox Additional modules for BioToolBox]
 			# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
 	# [SetupForMacOSX#Installing_GBrowse Installing GBrowse]
 		# [SetupForMacOSX#Setting_up_FastCGI_with_GBrowse Setting up FastCGI with GBrowse]
@@ -104,7 +104,7 @@ There are a number of cool programs you can obtain through Fink besides the ones
 Another generally useful tool is `wget`, which can be used to download file(s) using http and ftp protocols from the commandline, without going through a browser.
 
 ==Installing a database==
-GBrowse as well as many of the biotoolbox programs require genome annotation to be put into a database. There are several choices.
+GBrowse as well as many of the BioToolBox programs require genome annotation to be put into a database. There are several choices.
 
 SQLite is a lightweight database system that stores all of the database tables in a single file. It's reasonably fast and easy to manage - one file per database. This is already installed in Mac OS X, although you will need to install the appropriate Perl modules to use it.
 
@@ -246,8 +246,8 @@ If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/
 	sudo ./Build install
 </pre>
 
-===Additional modules for biotoolbox===
-There are a few additional modules that are required by the biotoolbox scripts. The easiest way to check for these is to run the biotoolbox script [Pod_check_dependencies check_dependencies.pl], located in the biotoolbox root directory. You can download the latest biotoolbox version  [http://code.google.com/p/biotoolbox/downloads/list here]. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for biotoolbox; the dependencies depend on which biotoolbox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
+===Additional modules for BioToolBox===
+There are a few additional modules that are required by the BioToolBox scripts. The easiest way to check for these is to run the BioToolBox script [Pod_check_dependencies check_dependencies.pl], located in the BioToolBox root directory. You can download the latest BioToolBox version  [http://code.google.com/p/BioToolBox/downloads/list here]. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for BioToolBox; the dependencies depend on which BioToolBox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
 	* `Config::Simple`
 	* `IO::Zlib`
 	* `Statistics::Lite`
@@ -372,7 +372,7 @@ Next you'll need to enable user accounts in GBrowse. Edit the main GBrowse confi
 Save the file, restart the Apache web server, reload the GBrowse page, and you should now have login link in the upper right corner. Provide your Mac OS X user account credentials to login. There is a place in `GBrowse.conf` where you can provide a helpful hint to users in the login dialog box.
 
 ==Installing Bam file support==
-Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and biotoolbox.
+Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and BioToolBox.
 
 ===Installing Samtools===
 The Samtools program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
@@ -413,10 +413,10 @@ One error you may or may not encounter is regarding shared libraries, and errors
 Repeat the Bio-Samtools installation (you may need to issue the "`clean`" command from within CPAN Shell). It should work now.
 
 ==Installing BigFile Support==
-Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for biotoolbox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
+Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for BioToolBox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
 
 ===Building the Kent libraries===
-While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and biotoolbox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
+While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and BioToolBox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
 
 Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations as necessary.
 
@@ -485,18 +485,18 @@ The best way to install this is not through the CPAN Shell, but rather build it 
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, go back to `kent/src/lib`, issue "`make clean`", and then "`make`" again to rebuild the library, then try the Perl module again. 
 
 ==Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the biotoolbox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
+To retrieve genome annotation from Ensembl's public MySQL database using the BioToolBox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
 
 It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
 
-Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the biotoolbox script `get_ensembl_annotation.pl`. Be forewarned.
+Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the BioToolBox script `get_ensembl_annotation.pl`. Be forewarned.
 
 ==Additional Tools==
-There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or biotoolbox. These are simply programs that I have found to be helpful in my own work.
+There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or BioToolBox. These are simply programs that I have found to be helpful in my own work.
 	* [http://www.novocraft.com Novocraft's] novoalign alignment tool. This is quite useful in aligning short sequence tags, generated for example by Illumina next-generation sequencing, to the genome. While it's not a particularly fast aligner, it is quite thorough by tolerating mismatches and gaps, perfect for identifying SNPs and mutations. It handles paired-end, RNA sequencing, and bisulfite sequencing.
 	* An alternative and fast aligner is [http://bowtie-bio.sourceforge.net/ bowtie]. This is ideal for ChIP-Seq, where exact sequence alignments are not of the highest importance but rather identifying location. 
-	* [http://bonsai.hgc.jp/~mdehoon/software/cluster/software.htm Cluster] is an extremely useful program to generate heirarchical and k-means clusters. This is useful in identifying groups of features or genes based on collected data, for example microarray or ChIP-Seq data. This is a Java GUI program capable of many different clustering algorithms. For simply k-means clustering, you can also check out my biotoolbox script [Pod_run_cluster run_cluster.pl].
-	* [http://jtreeview.sourceforge.net/ TreeView] is a Java application perfect for displaying and visualizing the dendograms generated by the Cluster program. I have also used it to visualize the collected data mapped around a class of features generated with the biotoolbox script [Pod_map_data map_data.pl]. The [Pod_manipulate_datasets manipulate_datasets.pl] script has a function to export a data file to a simple text file that may be imported into either Treeview or Cluster.
+	* [http://bonsai.hgc.jp/~mdehoon/software/cluster/software.htm Cluster] is an extremely useful program to generate heirarchical and k-means clusters. This is useful in identifying groups of features or genes based on collected data, for example microarray or ChIP-Seq data. This is a Java GUI program capable of many different clustering algorithms. For simply k-means clustering, you can also check out my BioToolBox script [Pod_run_cluster run_cluster.pl].
+	* [http://jtreeview.sourceforge.net/ TreeView] is a Java application perfect for displaying and visualizing the dendograms generated by the Cluster program. I have also used it to visualize the collected data mapped around a class of features generated with the BioToolBox script [Pod_map_data map_data.pl]. The [Pod_manipulate_datasets manipulate_datasets.pl] script has a function to export a data file to a simple text file that may be imported into either Treeview or Cluster.
 	* David Nix's [http://useq.sourceforge.net USeq] and [http://http://timat2.sourceforge.net/ T2] suites of programs is an alternative suite of Java based programs for processing and analyzing next-generation sequencing and microarray data, respectively. 
 	
 ===Compiling a 64-bit liftOver tool on OS X===
