@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.8.0';
+my $VERSION = '1.8.1';
 
 
 print "\n This script is a wrapper for the Novoaligner program\n\n";
@@ -313,7 +313,7 @@ sub run_single_split_alignments {
 		}
 		else {
 			# run split 
-			my $split_command = "split -l 2000000 -a 2 - $newfile";
+			my $split_command = "split -l 2000000 -a 2 $file $newfile";
 				# split into 2 million lines per file
 				# use two letters for unique file suffix
 			warn "#### Splitting file\n";
