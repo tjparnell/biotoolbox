@@ -399,7 +399,8 @@ sub post_process {
 		}
 	}
 	else {
-		$unsorted_file = shift @_;
+		# no need to merge
+		$unsorted_file = shift @files;
 	}
 
 	# sort bam file
