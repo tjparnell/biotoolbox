@@ -328,6 +328,7 @@ sub run_single_split_alignments {
 		while (my $f = $dir->read) {
 			if ($f =~ m/$basename\_\w{2} \Z/x) {
 				push @split_files, $f;
+				push @to_delete, $f;
 			}
 		}
 		unless (@split_files) {
