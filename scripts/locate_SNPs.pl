@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file
 );
-my $VERSION = '1.8.0';
+my $VERSION = '1.8.1';
 
 
 
