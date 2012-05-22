@@ -80,16 +80,14 @@ if ($print_version) {
 ### Check for general required values
 
 # files
-if (@infiles) {
-	if (scalar @infiles == 1) {
-		# only one file provided, but may be comma delimited list
-		@infiles = split /,/, shift @infiles;
-	}
-}
-else {
+unless (@infiles) {
 	# file list was provided on the command line
 	@infiles = @ARGV or
 		die " No input files! use --help for more information\n";
+}
+if (scalar @infiles == 1) {
+	# only one file provided, but may be comma delimited list
+	@infiles = split /,/, shift @infiles;
 }
 
 # database
