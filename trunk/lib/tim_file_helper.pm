@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.8.0';
+our $VERSION = '1.8.1';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -124,10 +124,14 @@ sub load_tim_data_file {
 		# convert null values to internal '.'
 		for (my $i = 0; $i < $inputdata_ref->{'number_columns'}; $i++ ) {
 			if (!defined $linedata[$i]) {
-				# a null value to convert
+				# not defined position in the array?
 				$linedata[$i] = '.';
 			}
-			if ($linedata[$i] =~ /^n\/?a$/i) {
+			if ($linedata[$i] eq '') {
+				# a null value
+				$linedata[$i] = '.';
+			}
+			elsif ($linedata[$i] =~ /^n\/?a$/i) {
 				# value matches na or n/a, a null value
 				$linedata[$i] = '.';
 			}
