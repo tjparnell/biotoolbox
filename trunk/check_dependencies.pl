@@ -2,8 +2,41 @@
 
 use strict;
 use Cwd;
+use Getopt::Long;
+use Pod::Usage;
 require CPAN;
-my $VERSION = '1.6.4';
+
+my $VERSION = '1.8.1';
+
+# Initialize values
+my (
+	$help,
+	$print_version,
+); # command line variables
+my @infiles; 
+
+
+# Command line options
+GetOptions( 
+	'help'        => \$help, # print the help
+	'version'     => \$print_version, # print the version
+);
+
+# Print help
+if ($help) {
+	# print entire POD
+	pod2usage( {
+		'-verbose' => 2,
+		'-exitval' => 1,
+	} );
+}
+
+# Print version
+if ($print_version) {
+	print " Biotoolbox script check_dependencies.pl, version $VERSION\n\n";
+	exit;
+}
+
 
 # get current working directory
 my $current = Cwd::cwd();
@@ -57,17 +90,17 @@ foreach ( get_list_of_modules() ) {
 print " checking for Bio::EnsEMBL modules          ";
 my $bio_ensembl = 0;
 eval {
-	require Bio::EnsEMBL::Registry;
-	Bio::EnsEMBL::Registry->import;
-	$bio_ensembl = 1;
+	require Bio::EnsEMBL::ApiVersion;
+	Bio::EnsEMBL::ApiVersion->import;
+	$bio_ensembl = software_version();
 };
 if ($bio_ensembl) {
-	print " installed\n";
+	print " core API version $bio_ensembl\n";
 }
 else {
 	print " not installed\n";
 	print "  Optional, only required for the script 'get_ensembl_annotation.pl'\n";
-	print "  It is not available through CPAN, but you can obtain if from\n" .
+	print "  It is not available through CPAN, but you can obtain it from\n" .
 		"  http://www.ensembl.org/info/docs/api/api_installation.html\n";
 }
 
@@ -88,7 +121,7 @@ if (@install_list) {
 	}
 }
 else {
-	print "Everything is up to date. You are good to go!\n";
+	print "Everything appears up to date.\n";
 	exit;
 }
 
@@ -118,7 +151,12 @@ if ($not_installed) {
 	print " Some biotoolbox programs may not work properly\n";
 }
 else {
-	print " You should be good to go!\n";
+	print " Some dependencies were installed. You may be ready.\n";
+	print " Would you like to recheck?  y/n    \n";
+	my $answer = <STDIN>;
+	if ($answer =~ /^y/i) {
+		exec $0;
+	}
 }
 
 
@@ -136,23 +174,24 @@ qq(  Required for reading and writing gzipped files
 )
 		],
 		['Statistics::Lite', 
-qq(  Required for numerous analysis programs
+qq(  Required for all data collection and analysis programs
 )
 		],
 		['Statistics::Descriptive', 
-qq(  Required for some analysis and graphing scripts
+qq(  Required for analysis and graphing scripts
 )
 		],
 		['Statistics::LineFit', 
-qq(  Required for bam2wig.pl script
+qq(  Required for some conversion scripts
 )
 		],
 		['Bio::Root::Version', 
-qq(  Required for BioPerl database functions, data analysis, and GFF3 conversions
+qq(  Required for all BioPerl database interactions and most GFF3 processing
 )
 		],
 		['GD', 
-qq(  Optional, required for graphing scripts. Requires GD2 libraries to be installed
+qq(  Optional, required for graphing scripts. 
+  Requires that GD2 C libraries be installed.
 )
 		],
 		['GD::Graph', 
@@ -164,11 +203,11 @@ qq(  Optional, required for graphing smooth bezier curve graphs
 )
 		],
 		['Archive::Zip', 
-qq(  Optional, required only for script bar2wig.pl
+qq(  Optional, required only for converting Bar files
 )
 		],
 		['Algorithm::Cluster', 
-qq(  Optional, required only for the script run_cluster.pl
+qq(  Optional, required only for cluster analysis
 )
 		],
 		['DBI', 
@@ -179,13 +218,17 @@ qq(  Required for BioPerl SQL database functions
 qq(  Optional, but required for interacting with MySQL databases
 )
 		],
+		['DBD::Pg', 
+qq(  Optional, but required for interacting with PostgreSQL databases
+)
+		],
 		['DBD::SQLite', 
 qq(  Optional, but required for interacting with SQLite databases
 )
 		],
 		['Bio::DB::Sam', 
 qq(  Optional, but required for working with Next Generation Sequencing BAM 
-  data files. Requires building the SamTools C libraries.
+  data files. Requires building the SamTools C libraries from source.
 )
 		],
 		['Bio::DB::BigFile', 
@@ -209,11 +252,27 @@ check_dependencies.pl
 
 =head1 SYNOPSIS
 
-check_dependencies.pl
+[sudo] ./check_dependencies.pl
+  
+  Options:
+  --version
+  --help
   
 =head1 OPTIONS
 
-None
+The command line flags and descriptions:
+
+=over 4
+
+=item --version
+
+Print the program version number.
+
+=item --help
+
+This help text.
+
+=back
 
 =head1 DESCRIPTION
 
@@ -228,6 +287,9 @@ execute this script with root privilages. Or, if you prefer, check what is
 missing with this program and then install manually with root privilages.
 
 This will require that CPAN is properly configured (proxies, mirrors, etc.).
+
+More information about setting up your computer may be found on the web at
+http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp.
 
 =head1 AUTHOR
 
