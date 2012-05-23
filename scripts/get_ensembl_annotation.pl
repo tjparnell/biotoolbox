@@ -13,11 +13,16 @@ use Bio::SeqFeature::Lite;
 # Check for Bio::EnsEMBL
 my $bio_ensembl = 0;
 eval {
+	# API version
+	require Bio::EnsEMBL::ApiVersion;
+	Bio::EnsEMBL::ApiVersion->import;
+	$bio_ensembl = software_version();
+	
+	# main registry
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
-	$bio_ensembl = 1;
 };
-my $VERSION = '1.4.1';
+my $VERSION = '1.8.1';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -98,7 +103,10 @@ if ($print_version) {
 
 
 # Check EnsEMBL
-unless ($bio_ensembl) {
+if ($bio_ensembl) {
+	print " Using Bio::EnsEMBL API version $bio_ensembl\n";
+}
+else {
 	die "\n Bio::EnsEMBL modules are not installed. Please see help\n";
 }
 
@@ -214,6 +222,9 @@ $gff_fh->print("# Collected from database $db_name\n");
 my $slices_ref = $slice_adaptor->fetch_all('toplevel');
 print " Identified " . scalar(@{ $slices_ref }) . " toplevel chromosomes/contigs\n";
 
+# reorder chromosomes
+$slices_ref = reorder_slices($slices_ref);
+
 # Process chromosomes
 my $phase; # global variable for keeping track of CDS phases
 foreach my $slice (@{ $slices_ref }) {
@@ -318,6 +329,63 @@ print " Finished! Wrote output file '$outfile'.\n";
 
 
 ########################   Subroutines   ###################################
+
+
+sub reorder_slices {
+	my $slices = shift;
+	
+	# hashes by type of name => slice
+	my %chr_numeric2slice;
+	my %contig_numeric2slice;
+	my %chr_string2slice;
+	my %contig_string2slice;
+	
+	# go through the list
+	foreach my $slice (@{ $slices }) {
+		my $name = $slice->seq_region_name;
+		if ($slice->coord_system_name eq 'chromosome') {
+			# chromosomes
+			if ($name =~ /(\d+)$/) {
+				# numeric
+				$chr_numeric2slice{$1} = $slice;
+			}
+			else {
+				# string
+				$chr_string2slice{$name} = $slice;
+			}
+		}
+		else {
+			# contigs etc
+			if ($name =~ /(\d+)$/) {
+				# numeric
+				$contig_numeric2slice{$1} = $slice;
+			}
+			else {
+				# string
+				$contig_string2slice{$name} = $slice;
+			}
+		}
+	}
+	
+	# sort the slices, chromosome first, then contigs
+	# taking numeric ones first, then strings
+	my @sorted;
+	foreach (sort {$a <=> $b} keys %chr_numeric2slice) {
+		push @sorted, $chr_numeric2slice{$_};
+	}
+	foreach (sort {$a cmp $b} keys %chr_string2slice) {
+		push @sorted, $chr_string2slice{$_};
+	}
+	foreach (sort {$a <=> $b} keys %contig_numeric2slice) {
+		push @sorted, $contig_numeric2slice{$_};
+	}
+	foreach (sort {$a cmp $b} keys %contig_string2slice) {
+		push @sorted, $contig_string2slice{$_};
+	}
+	
+	# finished
+	return \@sorted;
+}
 
 
 sub process_genes {
@@ -1239,7 +1307,12 @@ scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
 This program requires EnsEMBL's Perl API modules to connect to their public 
 MySQL servers. It is not available through CPAN, unfortunately, but you can 
-find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
+find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html. 
+
+Note that EnsEMBL releases new Perl API modules with each database 
+release. If you do not see the latest genome version (compared to what 
+is available on the web), you should update your EnsEMBL Perl modules. 
+The API version should be printed at the beginning of execution.
 
 =head1 AUTHOR
 
