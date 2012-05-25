@@ -3,11 +3,11 @@
 # a script to selectively write out paired-end alignments of a given size
 
 use strict;
-use warnings;
+use File::Copy;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::DB::Sam;
-my $VERSION = '1.0.2';
+my $VERSION = '1.8.1';
 
 
 print "\n A script to split a paired-end bam file by insert sizes\n\n";
@@ -143,6 +143,14 @@ unless ($header) {
 	die "no header in input bam file!!!\n";
 }
 
+# fix the header with the sort flag, in anticipation of the output
+# files being properly sorted
+{
+	my $text = $header->text;
+	$text =~ s/SO:unsorted/SO:Coordinate/;
+	$header->text($text);
+}
+
 # output files
 foreach (@sizes) {
 	# we will open a separate file for each size range
@@ -171,6 +179,7 @@ foreach (@sizes) {
 ### Start conversion
 
 # loop through the chromosomes
+print " Splitting reads... this may take a while...\n";
 for my $tid (0 .. $in_sam->n_targets - 1) {
 	# each chromosome is internally represented in the bam file as a numeric
 	# target identifier
@@ -180,7 +189,7 @@ for my $tid (0 .. $in_sam->n_targets - 1) {
 	# sequence name
 	my $seq_id = $in_sam->target_name($tid);
 	
-	print " Converting reads on $seq_id...\n";
+	print "  walking through $seq_id...\n";
 	my $iterator = $in_sam->features(
 			'-type'     => 'read_pair',
 			'-iterator' => 1,
@@ -284,17 +293,20 @@ foreach my $size (@sizes) {
 	# sort
 	my $new_file = $size->[3];
 	$new_file =~ s/\.bam/.sorted/;
-	print " re-sorting $size->[3]... ";
+	print " re-sorting $size->[3]...\n";
 	Bio::DB::Bam->sort_core(0, $size->[3], $new_file);
 	
 	# make new indices
 	$new_file .= '.bam'; # sorting would've automatically added the extension
-	if (-e $new_file) {
+	if (-s $new_file) {
 		unlink $size->[3]; # remove the old unsorted output file
+		move($new_file, $size->[3]);
 		print " re-indexing...\n";
-		Bio::DB::Bam->index_build($new_file);
+		Bio::DB::Bam->index_build($size->[3]);
 	}
-	$size->[3] = $new_file;
+	else {
+		warn "  re-sorting and indexing failed! leaving as is\n";
+	}
 }
 
 
@@ -414,7 +426,7 @@ base input name. The output file names are appended with '.$min_$max'.
 =item --at
 
 Boolean option to indicate that only fragments whose paired sequence reads 
-end in a [AT] nucleotide should be included in the output GFF file. 
+end in a [AT] nucleotide should be included in the output Bam file(s). 
 Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides; 
 this option ensures that the fragment is more likely derived from a MNase 
 cut.
@@ -441,13 +453,16 @@ written to separate files.
 
 Additionally, fragments may be checked for the presence of an A/T nucleotide 
 at the 5' end of the sequence, as is usually produced by digestion with 
-Micrococcal Nuclease.
+Micrococcal Nuclease. This does NOT ensure that the original cut site was 
+AA, TT, or AT, as we only have one half of the site in the read sequence, 
+only that it increases the liklihood of being an A/T dinucleotide 
+(absolute checking would require looking up the original sequence).
 
 The input and output files are BAM files as described by the Samtools 
 project (http://samtools.sourceforge.net). 
 
-The input file should be sorted and indexed prior to sizing. The output file 
-will also be automatically re-sorted and re-indexed for you.
+The input file should be sorted and indexed prior to sizing. The output 
+file(s) will be automatically re-sorted and re-indexed for you.
 
 =head1 AUTHOR
 
