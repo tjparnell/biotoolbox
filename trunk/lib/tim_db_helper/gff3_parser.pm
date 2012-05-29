@@ -9,7 +9,7 @@ use lib "$Bin/../lib";
 use tim_file_helper qw(
 	open_to_read_fh
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.8.1';
 
 sub new {
 	my $class = shift;
@@ -73,10 +73,10 @@ sub top_features {
 		chomp $line;
 		
 		# process comment and pragma lines
-		if ($line =~ /^##gff-version (\d)$/) {
+		if ($line =~ /^##gff-version ([\d\.]+)$/) {
 			# version pragma, check it
-			unless ($1 == 3) {
-				croak " Input GFF file is not version 3!\n" ;
+			if ($1 != 3) {
+				croak " Input GFF version is $1 not 3!\n" ;
 			}
 			next;
 		}
@@ -112,17 +112,19 @@ sub top_features {
 		
 		# check the ID
 		my $id = $feature->primary_id;
+		if ($id) {
 			# this ID should be unique in the GFF file
 			# complain if it isn't
-		if (exists $loaded{$id}) {
-			carp " Feature ID '$id' occurs more than once in file! skipping\n";
-			next;
-		} 
-		else {
-			$loaded{$id} = $feature;
+			if (exists $loaded{$id}) {
+				carp " Feature ID '$id' occurs more than once in file! skipping\n";
+				next;
+			} 
+			else {
+				$loaded{$id} = $feature;
+			}
 		}
-			# if the feature didn't have an ID, we'll just assume it is
-			# a child of another feature, otherwise it may get lost
+		# if the feature didn't have an ID, we'll just assume it is
+		# a child of another feature, otherwise it may get lost
 		
 		# look for parents and children
 		if ($feature->has_tag('Parent')) {
