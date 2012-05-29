@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.7.0';
+my $VERSION = '1.8.1';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -177,8 +177,14 @@ sub process_gff_file_to_table {
 	while (my @top_features = $parser->top_features() ) {
 		
 		# processing statement
-		print " Collected ", scalar(@top_features), " features from ",
-			" region '", $top_features[0]->seq_id, "'\n";
+		print " Collected ", scalar(@top_features), " features from ";
+		if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
+			# check whether all the features came from the same top sequence
+			print "sequence ID '", $top_features[0]->seq_id, "'\n";
+		}
+		else {
+			print "multiple sequences\n";
+		}
 		
 		# Process the top features
 		while (@top_features) {
@@ -525,12 +531,12 @@ sub process_utr {
 
 ### process coding Exon
 sub process_cds_exon {
-	my ($ucsc, $utr) = @_;
+	my ($ucsc, $exon) = @_;
 	
 	# record the coordinates and information for this exon
-	push @{ $ucsc->{'exonStarts'} }, $utr->start;
-	push @{ $ucsc->{'exonEnds'} }, $utr->end;
-	push @{ $ucsc->{'exonFrames'} }, $utr->phase;
+	push @{ $ucsc->{'exonStarts'} }, $exon->start;
+	push @{ $ucsc->{'exonEnds'} }, $exon->end;
+	push @{ $ucsc->{'exonFrames'} }, $exon->phase;
 	$ucsc->{'exonCount'} += 1;
 }
 
