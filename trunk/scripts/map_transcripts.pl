@@ -13,6 +13,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
+	find_column_index
 );
 use tim_db_helper qw(
 	open_db_connection 
@@ -23,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.5.4';
+my $VERSION = '1.8.1';
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -119,6 +120,8 @@ unless ($ffile and $rfile) {
 	}
 }
 
+
+
 ### Set up data variables
 
 # assign default values
@@ -145,7 +148,9 @@ unless (defined $log) {
 }
 
 
-# global values
+
+
+### global values
 my %transcripts; # a hash of all the transcription fragments (enriched windows)
 my %sensetranscripts; # a hash of gene names with associated sense transfrags
 my %antisensetranscripts; # a hash of gene names with associated antisense transfrags
@@ -160,85 +165,12 @@ if ($raw) {
 
 
 ### Generate (or load) the transcript data
+my ($fcount, $rcount) = prepare_regions();
 
-# Forward strand
-if ($ffile) {
-	# previously run enriched regions file
-	print " Using forward strand enriched regions data file '$ffile'\n";
-} 
-else {
-	# generate enriched regions
-	print " No forward strand data file specified. Generating new data by\n" .
-		"  running 'find_enriched_regions.pl' script...\n";
-	
-	# need to generate the file name
-	unless ($fdata_name) {
-		($fdata, $fdata_name) = check_dataset($fdata);
-	}
-	$ffile = "$fdata_name\_w$win\_s$step\_t$threshold\_f.txt";
-	
-	# find_enriched_regions.pl should be found at the same location
-	my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
-	$find_enriched_program .= " --db $database --out $ffile --win $win" . 
-		" --step $step --nofeat --thresh $threshold --method median --trim";
-	if ($fdata =~ /^file:(.+)$/) {
-		$find_enriched_program .= " --data $1";
-	}
-	else {
-		$find_enriched_program .= " --data $fdata";
-	}
-	$find_enriched_program .= ' --log' if $log;
-		
-	# execute
-	!system "$find_enriched_program" or
-			die "can't launch '$find_enriched_program'\n"; 
-			# successful run of program will return 0, not 1, 
-			# so negate system with !
-}
-# Reverse strand
-if ($rfile) {
-	# previously run enriched regions file
-	print "   using reverse strand enriched regions data file '$rfile'\n";
-} 
-else {
-	# generate enriched regions
-	print " No reverse strand data file specified. Generating new data by\n" .
-		"  running find_enriched_regions.pl script...";
-	
-	# need to generate the file name
-	unless ($rdata_name) {
-		($rdata, $rdata_name) = check_dataset($rdata);
-	}
-	$rfile = "$rdata_name\_w$win\_s$step\_t$threshold\_r.txt";
-	
-	# find_enriched_regions.pl should be found at the same location
-	my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
-	$find_enriched_program .= " --db $database --out $rfile --win $win" . 
-		" --step $step --nofeat --thresh $threshold --method median --trim";
-	if ($rdata =~ /^file:(.+)$/) {
-		$find_enriched_program .= " --data $1";
-	}
-	else {
-		$find_enriched_program .= " --data $rdata";
-	}
-	$find_enriched_program .= ' --log' if $log;
-	
-	# execute
-	!system "$find_enriched_program " or
-			die "can't launch '$find_enriched_program'\n";
-			# successful run of program will return 0, not 1, 
-			# so negate system with !
-}
 
-# Loading the enriched regions transcript data
-my $fcount = load_regions($ffile, 1); # load the f regions and return the count
-print " Loading enriched regions transcript data...\n";
-print "  loaded $fcount forward transcripts\n";
 
-my $rcount = load_regions($rfile, -1); # load the r regions and return the count
-print "  loaded $rcount forward transcripts\n";
 
-# open database connection
+### Open database connection
 	# we do this here because the database could be specified in the 
 	# provided $ffile metadata
 my $db = open_db_connection($database) or 
@@ -339,7 +271,100 @@ print "All done!\n";
 
 
 
-##### Subroutines #######
+######### Subroutines ########################################################
+
+
+sub prepare_regions {
+	# We will check the regions file
+	# if none was provided, then execute find_enriched_regions.pl
+	
+	# Forward strand
+	if ($ffile) {
+		# previously run enriched regions file
+		print " Using forward strand enriched regions data file '$ffile'\n";
+	} 
+	else {
+		# generate enriched regions
+		print " No forward strand data file specified. Generating new data by\n" .
+			"  running 'find_enriched_regions.pl' script...\n";
+		
+		# need to generate the file name
+		unless ($fdata_name) {
+			($fdata, $fdata_name) = check_dataset($fdata);
+		}
+		$ffile = "$fdata_name\_w$win\_s$step\_t$threshold\_f.txt";
+		
+		# find_enriched_regions.pl should be found at the same location
+		my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
+		$find_enriched_program .= " --db $database --out $ffile --win $win" . 
+			" --step $step --nofeat --thresh $threshold --method median" . 
+			" --trim --strand f";
+		if ($fdata =~ /^file:(.+)$/) {
+			$find_enriched_program .= " --data $1";
+		}
+		else {
+			$find_enriched_program .= " --data $fdata";
+		}
+		$find_enriched_program .= ' --log' if $log;
+			
+		# execute
+		!system "$find_enriched_program" or
+				die "can't launch '$find_enriched_program'\n"; 
+				# successful run of program will return 0, not 1, 
+				# so negate system with !
+	}
+	# Reverse strand
+	if ($rfile) {
+		# previously run enriched regions file
+		print "   using reverse strand enriched regions data file '$rfile'\n";
+	} 
+	else {
+		# generate enriched regions
+		print " No reverse strand data file specified. Generating new data by\n" .
+			"  running find_enriched_regions.pl script...";
+		
+		# need to generate the file name
+		unless ($rdata_name) {
+			($rdata, $rdata_name) = check_dataset($rdata);
+		}
+		$rfile = "$rdata_name\_w$win\_s$step\_t$threshold\_r.txt";
+		
+		# find_enriched_regions.pl should be found at the same location
+		my $find_enriched_program = $Bin . '/find_enriched_regions.pl';
+		$find_enriched_program .= " --db $database --out $rfile --win $win" . 
+			" --step $step --nofeat --thresh $threshold --method median" . 
+			" --trim --strand r";
+		if ($rdata =~ /^file:(.+)$/) {
+			$find_enriched_program .= " --data $1";
+		}
+		else {
+			$find_enriched_program .= " --data $rdata";
+		}
+		$find_enriched_program .= ' --log' if $log;
+		
+		# execute
+		!system "$find_enriched_program " or
+				die "can't launch '$find_enriched_program'\n";
+				# successful run of program will return 0, not 1, 
+				# so negate system with !
+	}
+	
+	# Loading the enriched regions transcript data
+	print " Loading enriched regions transcript data...\n";
+	my %chromosomes; # for remembering chromosome names
+	$chromosomes{'dummy_no_name_chromosome'} = 0;
+	
+	# load the f regions and return the count
+	my $fcount = load_regions($ffile, 1, \%chromosomes); 
+	print "  loaded $fcount forward transcripts\n";
+	
+	# load the r regions and return the count
+	my $rcount = load_regions($rfile, -1, \%chromosomes); 
+	print "  loaded $rcount forward transcripts\n";
+	
+	# finished loading
+	return ($fcount, $rcount);
+}
 
 sub check_dataset {
 	my $data = shift;
@@ -386,10 +411,10 @@ sub check_dataset {
 
 
 sub load_regions {
-	my ($filename, $strand) = @_;
+	my ($filename, $strand, $chromosomes) = @_;
 	print " Loading regions from file '$filename'....\n";
 	
-	# First load the enriched windows file
+	# First open the enriched windows file
 	my $count = 0;
 	my ($fh, $metadata_ref) = open_tim_data_file($filename) or 
 		die " unable to open regions file '$filename!'\n";
@@ -399,20 +424,33 @@ sub load_regions {
 		die " file does not have features of 'enriched_regions'!\n";
 	}
 	
-	# update missing information from the metadata
+	
+	# Determine indices
+	my $id_idx = find_column_index($metadata_ref, '^window|id') || 0;
+	my $chr_idx = find_column_index($metadata_ref, '^chr|seq') || 1;
+	my $start_idx = find_column_index($metadata_ref, '^start') || 2;
+	my $stop_idx = find_column_index($metadata_ref, '^stop|end') || 3;
+	my $size_idx = find_column_index($metadata_ref, '^size|length') || 4;
+	my $score_idx = find_column_index($metadata_ref, '^score') or 
+		die " unable to identify score column in '$filename'!\n";
+	unless (defined $chr_idx and defined $start_idx and defined $stop_idx) {
+		die " unable to identify coordinate columns in '$filename'!\n";
+	}
+	
+	# Update missing information from the metadata
 		# these references are hard coded because they should be coming from 
 		# 'find_enriched_regions.pl'. Woe is me if I ever change that 
 		# program!
 	if (!$fdata and $strand == 1) {
 		# forward dataset
-		$fdata = $metadata_ref->{5}{dataset};
+		$fdata = $metadata_ref->{$score_idx}{dataset};
 		unless ($fdata_name) {
 			($fdata, $fdata_name) = check_dataset($fdata);
 		}
 	}
 	if (!$rdata and $strand == -1) {
 		# reverse dataset
-		$rdata = $metadata_ref->{5}{dataset};
+		$rdata = $metadata_ref->{$score_idx}{dataset};
 		unless ($rdata_name) {
 			($rdata, $rdata_name) = check_dataset($rdata);
 		}
@@ -423,21 +461,33 @@ sub load_regions {
 	}
 	if (defined $threshold) {
 		# check that thresholds match
-		unless ($metadata_ref->{5}{threshold} == $threshold) {
+		unless ($metadata_ref->{$score_idx}{threshold} == $threshold) {
 			warn " whoa! the threshold values don't match between this program and file!\n";
 		}
 	}
 	else {
 		# define theshold
-		$threshold = $metadata_ref->{5}{threshold};
+		$threshold = $metadata_ref->{$score_idx}{threshold};
 	}
 	
-	# load the regions data into the transcripts hash
+	
+	
+	# Load the regions data into the transcripts hash
 	while (my $line = $fh->getline) {
 		chomp $line;
 		my @line_data = split /\t/, $line;
-		my $cv = ($line_data[1] =~ /(\d+)$/)[0]; # extract the digits for chromosome value
-		my $sv = $line_data[2]; # start value
+		
+		# identify the chromosome and value
+		# to simplify sorting later on, we will assign the chromosome 
+		# name a simple number
+		unless (exists $chromosomes->{ $line_data[$chr_idx] } ) {
+			# generate a new number for this chromosome
+			$chromosomes->{ $line_data[$chr_idx] } = 
+				max( values %{$chromosomes} ) + 1;
+		}
+		my $cv = $chromosomes->{ $line_data[$chr_idx] };
+		
+		my $sv = $line_data[$start_idx]; # start value
 		while (exists $transcripts{$cv}{$sv}) {
 			# check that the start position is unique
 			$sv += 0.01; # if not, make it unique by adding a small value
@@ -445,12 +495,12 @@ sub load_regions {
 		$transcripts{$cv}{$sv} = {
 				# these are hardcoded because they're defined in the program
 				# 'find_enriched_regions.pl'
-				'transfrag' => $line_data[0],
-				'chromo'    => $line_data[1],
-				'start'     => $line_data[2],
-				'end'       => $line_data[3],
-				'size'      => $line_data[4],
-				'score'     => $line_data[5],
+				'transfrag' => $line_data[$id_idx],
+				'chromo'    => $line_data[$chr_idx],
+				'start'     => $line_data[$start_idx],
+				'end'       => $line_data[$stop_idx],
+				'size'      => $line_data[$size_idx],
+				'score'     => $line_data[$score_idx],
 				'strand'    => $strand,
 		};
 		$count++;
@@ -1308,15 +1358,10 @@ from the metadata in the provided enriched regions files.
 =item --rdata <dataset>
 
 Specify the name of the datasets in the database representing the 
-individual forward and reverse transcription data. Alternatively, 
+forward and reverse transcription data. Alternatively, 
 the paths of data files may be provided. Supported formats include 
 Bam (.bam), BigBed (.bb), or BigWig (.bw). Files may be local or 
-remote (http:// or ftp://). Usually this data is provided separately 
-for each strand; a single dataset with both strands of data is not 
-accepted. For Bam or BigBed files that support strand, they should be 
-separated into two separate files based on strand. If not provided, 
-the values may be obtained from the metadata of the provided 
-enriched regions files. 
+remote (http:// or ftp://).  
 
 =item --tol <integer>
 
@@ -1357,7 +1402,15 @@ Display the POD documentation.
 =head1 DESCRIPTION
 
 This program will identify transcription fragments that correspond to 
-gene transcripts using available transcriptome microarray data. 
+gene transcripts using available transcriptome microarray data. Specifically, 
+it will identify the start and stop coordinates of transcribed regions 
+that correspond or overlap an annotated gene or ORF. It does not identify 
+exons or introns. 
+
+The program was initially written to address the lack of officially mapped 
+transcripts in the S. cerevisiae genome, which has few and small introns. 
+It may work well other similar genomes, but probably not complex 
+metazoan genomes with very large introns.
 
 Transcription fragments are identified as windows of enrichment using the 
 script 'find_enriched_regions.pl'. This script can either be automatically
@@ -1367,27 +1420,20 @@ the output files should be indicated (--ffile and --rfile).
 Each enriched window, or transcription fragment, is checked for corresponding 
 or overlapping genomic features. The name(s) of the overlapping gene(s) are 
 reported, as well as a classification for the transcript. Transcripts that 
-completely contain (within a 20 bp tolerance) a single known gene (ORF or 
-ncRNA) are labeled as 'complete'. Transcription fragments that simply overlap a
-known gene are labeled as 'overlap'. Transcription fragments that overlap more 
-than one annotated gene are labeled as 'multi-orf'.
+completely contain (within a default 20 bp tolerance) a single known gene 
+(ORF or ncRNA) are labeled as 'complete'. Transcription fragments that 
+simply overlap a known gene are labeled as 'overlap'. Transcription fragments 
+that overlap more than one annotated gene are labeled as 'multi-orf'.
 
 Transcription fragments that only overlap annotated genes on the opposite 
 strand are labeled as 'anti-sense'. Transcription fragments overlapping 
 repetitive elements or no known feature are also reported.
-
-The program does not attempt to identify individual exons and introns. 
-Rather, it is primarily focused on only identifying transcription start 
-and stop sites. All transcription fragments which overlap a known 
-known gene are considered to be part of the same of transcript and are 
-therefore merged together into one transcript.
 
 Some rudimentary calculations are performed to identify the length of 
 the 5' and 3' UTRs. 
 
 The program writes out a tab delimited text file. It will also write out
 a gff file for the genome browser. It also writes out a summary report file.
-
 
 =head1 AUTHOR
 
@@ -1401,8 +1447,3 @@ a gff file for the genome browser. It also writes out a summary report file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
