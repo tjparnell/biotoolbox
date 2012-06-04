@@ -8,7 +8,7 @@ use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.7.4';
+our $VERSION = '1.8.1';
 
 
 # Exported names
@@ -217,8 +217,9 @@ sub collect_bigwigset_score {
 		return $method =~ /sum|count/ ? 0 : '.';
 	}
 	
-	# Reset the feature_type to collect from the database
+	# Reset which feature_type to collect from the database
 	# this is normally set to region when we opened the bigwigset db
+	# but it may be changed by a previous method
 	# we now want summary feature_type
 	$db->feature_type('summary');
 	
@@ -327,6 +328,12 @@ sub collect_bigwigset_scores {
 		# return nothing
 		return;
 	}
+	
+	# Reset which feature_type to collect from the database
+	# this is normally set to region when we opened the bigwigset db
+	# but it may be changed by a previous method
+	# we now want region feature_type
+	$db->feature_type('region');
 	
 	# initialize collection array
 	my @scores; 
@@ -438,6 +445,12 @@ sub collect_bigwigset_position_scores {
 		# return nothing
 		return;
 	}
+	
+	# Reset which feature_type to collect from the database
+	# this is normally set to region when we opened the bigwigset db
+	# but it may be changed by a previous method
+	# we now want region feature_type
+	$db->feature_type('region');
 	
 	# initialize collection hash, position => score
 	my %pos2data; 
@@ -695,6 +708,11 @@ sub open_bigwigset_db {
 	
 	my $directory = shift;
 	
+	# check for trailing slash
+	# this seems to interfere with generating the list of files, leading 
+	# to duplicates: both raw files as well as contents from metadata
+	$directory =~ s/\/$//; # strip trailing slash
+	
 	# open the database connection 
 	# we're using the region feature type because that's what the rest of 
 	# tim_db_helper modules expect and work with
@@ -711,7 +729,7 @@ sub open_bigwigset_db {
 		
 		# collect the chromosomes from the first bigwig
 		# we will assume all of the bigwigs have the same chromosomes!
-		my $bw = open_bigwig_db($paths[0]);
+		my $bw = $bws->get_bigwig($paths[0]);
 		
 		# collect the chromosomes for this bigwig
 		%{ $BIGWIG_CHROMOS{$paths[0]} } = map { $_ => 1 } $bw->seq_ids;
