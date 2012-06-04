@@ -6,7 +6,6 @@ use strict;
 use Getopt::Long;
 use Statistics::Lite qw(mean median stddevp);
 use Pod::Usage;
-use Data::Dumper;
 use File::Basename qw(fileparse);
 use Bio::Range;
 use FindBin qw($Bin);
@@ -25,7 +24,8 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.7.1';
+# use Data::Dumper;
+my $VERSION = '1.8.1';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -45,10 +45,12 @@ unless (@ARGV) { # when no command line options are present
 # Initialize values
 my (
 	$dataset,
-	$database,
+	$main_database,
+	$data_database,
 	$outfile,
 	$win,
 	$step,
+	$strand,
 	$sdlimit,
 	$threshold,
 	$method,
@@ -69,10 +71,12 @@ my (
 # Command line options
 GetOptions( 
 	'data=s'    => \$dataset, # the dataset to look for enriched regions
-	'db=s'      => \$database, # database name
+	'db=s'      => \$main_database, # main or feature database name
+	'ddb=s'     => \$data_database, # data database name
 	'out=s'     => \$outfile, # output file name
 	'win=i'     => \$win, # size of the window to scan the genome
 	'step=i'    => \$step, # step size to move the window along the genome
+	'strand=s'  => \$strand, # specific strand to search
 	'sd=f'      => \$sdlimit, # the number of standard deviations above mean to set as the threshold
 	'thresh=s'  => \$threshold, # the explicitly given threshold value
 	'method=s'  => \$method, # method of combining values
@@ -84,7 +88,6 @@ GetOptions(
 	'sort!'     => \$sort, # sort the windows by score
 	'log!'      => \$log, # dataset is in log2 space
 	'gff'       => \$gff, # write out a gff file
-#	'html'      => \$html, # write out a html file with hyperlinks to gbrowse
 	'debug'     => \$debug, # limit to chromosome 1 for debugging purposes
 	'help'      => \$help, # print help
 	'version'   => \$print_version, # print the version
@@ -108,7 +111,7 @@ if ($print_version) {
 
 
 # Check for required flags and assign undefined variables default values
-unless ($database) {
+unless ($main_database or $data_database) {
 	die " You must define a database!\n Use --help for more information\n";
 }
 
@@ -116,7 +119,10 @@ $outfile =~ s/\.txt$//; # strip extension, it'll be added later
 
 # window defaults
 unless ($win) {
-	$win = 250;
+	# collect the window size from biotoolbox.cfg
+	$win = $TIM_CONFIG->param("$main_database\.window") || 
+			$TIM_CONFIG->param("$data_database\.window") || 
+			$TIM_CONFIG->param("default_db.window") || 500;
 }
 unless ($step) {
 	# default is to use the window size
@@ -157,6 +163,24 @@ unless (defined $trim) {
 	$trim = 0;
 }
 
+# set strand
+if ($strand) {
+	if ($strand =~ /^[f\+]/) {
+		# forward strand
+		$strand = 1;
+	}
+	elsif ($strand =~ /^[r\-]/i) {
+		# reverse strand
+		$strand = -1;
+	}
+	else {
+		die " unrecognized strand character!\n";
+	}
+}
+else {
+	# default is no strand
+	$strand = 0;
+}
 
 
 
@@ -176,7 +200,35 @@ my @windows; # a temporary of the found enriched windows
 	# $chr, $start, $end, $window_score
 my @genelist; # an array of gene names overlapping the regions
 my %chrom2length; # a hash to store the chromosome lengths
-my $db = open_db_connection($database);
+
+
+## Open databases
+my ($fdb, $ddb); # feature and 
+if ($main_database and $data_database) {
+	# two separate databases defined
+	$fdb = open_db_connection($main_database) or 
+		die " unable to establish connection to database '$main_database'!\n";
+	$ddb = open_db_connection($data_database) or 
+		die " unable to establish connection to database '$data_database'!\n";
+} 
+elsif ($main_database and !$data_database) {
+	# only main database defined
+	$fdb = open_db_connection($main_database) or 
+		die " unable to establish connection to database '$main_database'!\n";
+	$ddb = $fdb; # reuse
+} 
+elsif (!$main_database and $data_database) {
+	# only data database defined
+	$ddb = open_db_connection($data_database) or 
+		die " unable to establish connection to database '$data_database'!\n";
+	if ($feat) {
+		warn " no main or feature database defined! disabling search for features\n\n";
+		$feat = 0;
+	}
+} 
+else {
+	die " no databases defined!\n";
+}
 
 
 ## Begin the search for the enriched windows
@@ -188,7 +240,7 @@ my $db = open_db_connection($database);
 
 # Check or request the dataset
 $dataset = process_and_verify_dataset( {
-	'db'      => $db,
+	'db'      => $ddb,
 	'dataset' => $dataset,
 	'single'  => 1,
 } );
@@ -210,7 +262,7 @@ else {
 # the actual value used to determine if a region is enriched or not
 unless (defined $threshold) { 
 	# otherwise determine cutoff value from the dataset distribution
-	print "  Determining threshold....\n";
+	print " Determining threshold....\n";
 	$threshold = go_determine_cutoff();
 }
 
@@ -235,39 +287,39 @@ unless (@windows) { # exit the program if nothing found
 }
 
 # DEBUGGING: printing out the intermediate @windows array
-if ($debug) {
-	open FILE, ">$outfile.debug.post_windows.txt";
-	print FILE Dumper(\@windows);
-	close FILE;
-}
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_windows.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
 
 
 
 ## Merge the windows into larger regions
 # this will merge the overlapping windows in @windows and put them into back
 go_merge_windows();
-print "  Merged windows into " . scalar @windows . " windows\n";
+print " Merged windows into " . scalar @windows . " windows\n";
 
 # DEBUGGING: printing out the intermediate @windows array
-if ($debug) {
-	open FILE, ">$outfile.debug.post_merge1.txt";
-	print FILE Dumper(\@windows);
-	close FILE;
-}
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_merge1.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
 
 
 
 ## Trim the merged windows of datapoints that are below the threshold
 if ($trim) {
-	print "  Trimming windows....\n";
+	print " Trimming windows....\n";
 	go_trim_windows();
 	
 	# DEBUGGING: printing out the intermediate @windows array
-	if ($debug) {
-		open FILE, ">$outfile.debug.post_trim.txt";
-		print FILE Dumper(\@windows);
-		close FILE;
-	}
+# 	if ($debug) {
+# 		open FILE, ">$outfile.debug.post_trim.txt";
+# 		print FILE Dumper(\@windows);
+# 		close FILE;
+# 	}
 }
 
 
@@ -275,24 +327,24 @@ if ($trim) {
 # Go back quickly through double-checking that we don't have two neighboring windows
 # I still seem to have some slip through....
 go_merge_windows(\@windows);
-print "  Merged trimmed windows into " . scalar @windows . " windows\n";
+print " Merged trimmed windows into " . scalar @windows . " windows\n";
 
 # DEBUGGING: printing out the intermediate @windows array
-if ($debug) {
-	open FILE, ">$outfile.debug.post_merge2.txt";
-	print FILE Dumper(\@windows);
-	close FILE;
-}
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_merge2.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
 
 
 ## Get score for final window
-print "  Calculating final score of merged, trimmed windows....\n";
+print " Calculating final score of merged, trimmed windows....\n";
 get_final_window_score();
 
 
 ## Sort the array by the final score of the windows
 if ($sort) {
-	print "  Sorting windows by score....\n";
+	print " Sorting windows by score....\n";
 	sort_data_by_final_score();
 }
 
@@ -302,7 +354,7 @@ name_the_windows();
 
 ## Identify features for merged windows
 if ($feat) {
-	print "  Identifying associated genomic features....\n";
+	print " Identifying associated genomic features....\n";
 	get_overlapping_features();
 }
 
@@ -333,11 +385,6 @@ else {
 	print " unable to write data file!\n";
 }
 
-# write html output file
-if ($html) { 
-	write_html_file();
-}
-
 # write gff file
 if ($gff) { 
 	my $method;
@@ -349,7 +396,7 @@ if ($gff) {
 	}
 	my $gff_file = convert_and_write_to_gff_file( {
 		'data'     => $main_data_ref,
-		'score'    => 5,
+		'score'    => 6,
 		'name'     => 0,
 		'source'   => 'find_enriched_regions.pl',
 		'method'   => $method,
@@ -364,7 +411,7 @@ if ($gff) {
 	}
 }
 
-print "All done!\n\n";
+print " All done!\n\n";
 
 
 
@@ -376,44 +423,48 @@ print "All done!\n\n";
 ### Determine the cutoff values for the dataset
 sub go_determine_cutoff {
 	
-	# collect sample of values from the dataset
-	my @chromosomes = $db->seq_ids; 
-	unless (@chromosomes) {
-		die " unable to identify chromosome sequences in the database!\n";
-	}
-	
-	# select chromosome randomly
-	my $n = rand (scalar @chromosomes);
-	while ($chromosomes[$n] =~ /chrm|chrmt|chrmt|NA/i) {
-		# avoid that mitochrondrial chromosome like the plague!
-		$n = rand (scalar @chromosomes);
+	# select the largest chromosome
+	my $length = 1;
+	my $chromosome;
+	foreach ( get_chromosome_list() ) {
+		
+		# this is an array of chromosome name and length
+		my ($name, $size) = @$_;
+		
+		# check its size
+		if ($size > $length) {
+			$chromosome = $name;
+			$length = $size;
+		}
 	}
 	
 	# collect statistics on the chromosome
-	print " Sampling '$dataset_name' values across chromosome '" . 
-		$chromosomes[$n] . "'...\n";
-	my $chromosome = $db->segment($chromosomes[$n]);
-	
+	print " Sampling '$dataset_name' values across largest chromosome " . 
+		"$chromosome...\n";
 	my $mean = get_chromo_region_score( {
-		'db'           => $db,
+		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'mean',
-		'chromo'       => $chromosomes[$n],
+		'chromo'       => $chromosome,
 		'start'        => 1,
-		'stop'         => $chromosome->length,
+		'stop'         => $length,
 		'log'          => $log,
+		'strand'       => $strand,
+		'stranded'     => 'sense',
 	} );
 	unless ($mean) { 
 		die " unable to determine mean value for '$dataset'!\n";
 	}
 	my $stdev = get_chromo_region_score( {
-		'db'           => $db,
+		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'stddev',
-		'chromo'       => $chromosomes[$n],
+		'chromo'       => $chromosome,
 		'start'        => 1,
-		'stop'         => $chromosome->length,
+		'stop'         => $length,
 		'log'          => $log,
+		'strand'       => $strand,
+		'stranded'     => 'sense',
 	} );
 	unless ($stdev) { 
 		die " unable to determine stdev value for '$dataset'!\n";
@@ -434,7 +485,7 @@ sub go_determine_cutoff {
 	}
 	
 	# conclusion
-	print "  Using a threshold of $value ($sdlimit std devs)\n";
+	print " Using a threshold of $value ($sdlimit std devs)\n";
 	return $value;
 }
 
@@ -445,62 +496,35 @@ sub go_find_enriched_regions {
 	
 	# print messages
 	if ($deplete) {
-		print "  Looking for depleted regions ";
+		print " Looking for depleted regions ";
 	} 
 	else {
-		print "  Looking for enriched regions ";
+		print " Looking for enriched regions ";
 	}
 	print "using window $method values\n";
 	
 	
 	## collect chromosomes and data
-	# get list of chromosomes
-	my @chromosomes = $db->seq_ids; 
-	unless (@chromosomes) {
-		die " unable to retrieve chromosomes from the database!\n";
-	}
-	# Get the names of chromosomes to avoid
-	my @excluded_chromosomes = 
-			$TIM_CONFIG->param("$database\.chromosome_exclude") ||
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
-	
 	
 	# walk through each chromosome
-	foreach my $chr (@chromosomes) {
+	my $chr_count = 1;
+	foreach ( get_chromosome_list() ) {
 		
-		# check for excluded chromosomes
-		my $skip_chr = 0;
-		foreach (@excluded_chromosomes) {
-			if ($chr eq $_) {
-				$skip_chr = 1;
-				last;
-			}
-		}
-		next if $skip_chr;
+		# this is an array of chromosome name and length
+		my ($chr, $length) = @$_;
 		
 		# START DEBUGGING # 
 		if ($debug) {
 			# LIMIT TO ONE CHROMOSOME
-			if ($chr eq 'chr2') {last} 
+			last if ($chr_count == 2); 
 		}
 		# END DEBUGGING #
 		
 		# collect the dataset values for the current chromosome
 		# store in a hash the position (key) and values
-		print "   Searching $chr....\n";
-		
-		# generate a segment representing the chromosome
-		# due to fuzzy name matching, we may get more than one back
-		my @segments = $db->segment($chr);
-		# need to find the right one
-		my $chrobj;
-		while (@segments) {
-			$chrobj = shift @segments;
-			last if $chrobj->seq_id eq $chr;
-		}
+		print "  Searching $chr....\n";
 		
 		# walk windows along the chromosome and find enriched windows
-		my $length = $chrobj->length; # length of the chromosome
 		$chrom2length{$chr} = $length; # remember this length for later
 		for (my $start = 1; $start < $length; $start += $step) {
 			# define the window to look in
@@ -512,13 +536,15 @@ sub go_find_enriched_regions {
 						
 			# determine window value
 			my $window_score = get_chromo_region_score( {
-				'db'         => $db,
+				'db'         => $ddb,
 				'dataset'    => $dataset,
 				'method'     => $method,
 				'chromo'     => $chr,
 				'start'      => $start,
 				'stop'       => $end,
 				'log'        => $log,
+				'strand'     => $strand,
+				'stranded'   => 'sense',
 			} );
 			unless ($window_score) {
 				#print "no values at $chr:$start..$end!\n"; 
@@ -542,8 +568,9 @@ sub go_find_enriched_regions {
 			}
 		}
 		
+		$chr_count++;
 	}
-	print "  Found " . scalar @windows . " windows for $dataset.\n";
+	print " Found " . scalar @windows . " windows for $dataset.\n";
 }
 
 
@@ -631,19 +658,18 @@ sub go_trim_windows {
 		
 		# get values across the extended window
 		my %pos2score = get_region_dataset_hash( {
-			'db'       => $db,
+			'db'       => $ddb,
 			'dataset'  => $dataset,
 			'chromo'   => $window->[0],
 			'start'    => $start,
 			'stop'     => $stop,
 			'absolute' => 1,
+			'strand'   => $strand,
+			'stranded' => 'sense',
 		} );
 		unless (%pos2score) {
 			# we should be able to! this region has to have scores!
 			die " unable to generate value hash for window $window->[0]:$start..$stop!\n";
-		}
-		if ($debug) {
-			# print "found " . scalar(keys %pos2score) . " values\n";
 		}
 			
 		
@@ -730,25 +756,27 @@ sub get_final_window_score {
 		# arrays currently have $chr, $start, $end, $region_score
 		# we will calculate a new region score, as well as the window size
 		
-		# determine window size
-		my $size = $windows[$i][2] - $windows[$i][1] + 1;
-		
 		# replace the current score with the window size
-		$windows[$i][3] = $size;
+		$windows[$i][3] = $windows[$i][2] - $windows[$i][1] + 1;
 		# arrays now have $chr, $start, $end, $size
 		
+		# add the strand column
+		$windows[$i][4] = $strand;
+		
 		# re-calculate window score
-		$windows[$i][4] = get_chromo_region_score( {
-				'db'       => $db,
+		$windows[$i][5] = get_chromo_region_score( {
+				'db'       => $ddb,
 				'dataset'  => $dataset, 
 				'chromo'   => $windows[$i][0],
 				'start'    => $windows[$i][1],
 				'stop'     => $windows[$i][2],
 				'method'   => $method,
 				'log'      => $log,
+				'strand'   => $strand,
+				'stranded' => 'sense',
 		} );
 		
-		# arrays now have $chr, $start, $end, $size, $finalscore
+		# arrays now have $chr, $start, $end, $size, $strand, $finalscore
 	}
 }
 
@@ -756,11 +784,19 @@ sub get_final_window_score {
 ### Collect the overlapping features of the enriched windows
 sub get_overlapping_features {
 	
+	# first check the database
+	my $fdb_ref = ref $fdb;
+	unless ($fdb_ref =~ m/^Bio::DB::SeqFeature::Store/i) {
+		warn " feature database is not Bio::DB::SeqFeature::Store!\n" .
+			" unable to search for features\n";
+		return;
+	}
+	
 	# walk through the list of windows
 	for my $i (0..$#windows) {
 		
 		# collect the genomic features in the region
-		my @features = $db->get_features_by_location(
+		my @features = $fdb->get_features_by_location(
 			-seq_id    => $windows[$i][1],
 			-start     => $windows[$i][2],
 			-end       => $windows[$i][3],
@@ -807,7 +843,7 @@ sub get_overlapping_features {
 		else {
 			push @{ $windows[$i] }, '.';
 		}
-		# arrays now have $chr, $start, $end, $size, $finalscore,
+		# arrays now have $chr, $start, $end, $size, $strand, $finalscore,
 		# plus, if requested, $orf_list, $rna_list, $non_gene_list
 		
 		# Record the gene names if requested
@@ -834,11 +870,11 @@ sub sort_data_by_final_score {
 	my @temp;
 	if ($deplete) {
 		# increasing order
-		@temp = sort { $a->[4] <=> $b->[4] } @windows;
+		@temp = sort { $a->[5] <=> $b->[5] } @windows;
 	}
 	else {
 		# decreasing order
-		@temp = sort { $b->[4] <=> $a->[4] } @windows;
+		@temp = sort { $b->[5] <=> $a->[5] } @windows;
 	}
 	
 	# put back
@@ -850,13 +886,11 @@ sub sort_data_by_final_score {
 sub name_the_windows {
 	my $count = 1;
 	foreach (@windows) {
-		my $name = $dataset_name . '_win' . $count;
-		unshift @{ $_ }, $name;
+		unshift @{ $_ }, $dataset_name . '_win' . $count;
 		$count++;
 	}
-	# arrays now have $name, $chr, $start, $end, $size, $region_score
+	# arrays now have $name, $chr, $start, $end, $size, $strand, $region_score
 	# plus, if requested, $orf_list, $rna_list, $non_gene_list
-	
 }
 
 
@@ -885,11 +919,12 @@ sub generate_main_data_hash {
 		'Start',
 		'Stop',
 		'Size',
+		'Strand',
 		'Score',
 	) or die " unable to generate tim data structure!\n";
 	
 	# Add metadata
-	$data->{'db'} = $database;
+	$data->{'db'} = $main_database || $data_database;
 	
 	# window metadata
 		# traditionally with the genome feature datasets, extra pertinant
@@ -904,12 +939,15 @@ sub generate_main_data_hash {
 	}
 	
 	# score metadata
-	$data->{5}{'log2'} = $log;
-	$data->{5}{'method'} = $method;
-	$data->{5}{'dataset'} = $dataset;
-	$data->{5}{'threshold'} = $threshold;
+	$data->{6}{'log2'} = $log;
+	$data->{6}{'method'} = $method;
+	$data->{6}{'dataset'} = $dataset;
+	$data->{6}{'threshold'} = $threshold;
 	if ($sdlimit) {
-		$data->{5}{'standard_deviation_limit'} = $sdlimit;
+		$data->{6}{'standard_deviation_limit'} = $sdlimit;
+	}
+	if ($main_database and $data_database) {
+		$data->{6}{'data_database'} = $data_database;
 	}
 	
 	# add feature metadata if it was requested
@@ -920,19 +958,19 @@ sub generate_main_data_hash {
 			'name'  => 'ORF_Features',
 			'index' => 6,
 		};
-		$data->{7} = {
+		$data->{8} = {
 			# the orf list
 			'name'  => 'RNA_Features',
 			'index' => 7,
 		};
-		$data->{8} = {
+		$data->{9} = {
 			# the orf list
 			'name'  => 'Non-gene_Features',
 			'index' => 8,
 		};
 		
 		# update the number of columns
-		$data->{'number_columns'} = 9;
+		$data->{'number_columns'} = 10;
 		
 	}
 	
@@ -956,111 +994,61 @@ sub generate_main_data_hash {
 
 
 
-
-### Write the html output file
-# this is old code for writing an html table file of the hits
-# it worked with GBrowse 1.x, but has not been vetted with GBrowse 2.x and 
-# is unlikely to work with the new browser
-# I'm keeping the code here in case I ever want to revisit it in the future
-# in the meantime, I've deleted references to it in the POD
-sub write_html_file {
-	open HTML, ">$outfile.html";
-	# print the head
-	print HTML "<HTML>\n\n<HEAD>\n\t<TITLE>\n\t$outfile\n\t</TITLE>\n</HEAD>\n";
-	print HTML "<BODY BGCOLOR=\"#FFFFFF\" text=\"#000000\">\n\n\n";
-	print HTML "<H2>\n$outfile\n</H2>\n";
-	# print the parameters
-	print HTML "Program $0<p>\n"; # header information marked with #
-	print HTML "Database $database<p>\n";
-	print HTML "Dataset $dataset<p>\n";
-	print HTML "Window $win<p>\n";
-	print HTML "Step $step<p>\n";
-	print HTML "Threshold $threshold<p>\n";
-	if ($sdlimit) {
-		print HTML "Standard deviation limit $sdlimit<p>\n";
-	}
-	if ($deplete) {
-		print HTML "Searching for depleted regions<p>\n";
-	} else {
-		print HTML "Searching for enriched regions<p>\n";
-	}
-	print HTML "Method $method<p>\n";
-	if ($trim) {
-		print HTML "Windows trimmed<p>\n";
-	} else {
-		print HTML "Windows not trimmed<p>\n";
-	}
-	if ($feat) {
-		print HTML "Features collected<p>\n";
-	}
-	# print the table headers
-	print HTML "\n\n<table border cellspacing=0 cellpadding=3>\n";
-	print HTML "<tr bgcolor=\"#ccccff\">\n";
-	print HTML "<th align=\"left\">WindowID</th>\n";
-	print HTML "<th align=\"left\">Position</th>\n";
-	print HTML "<th align=\"left\">Size</th>\n";
-	print HTML "<th align=\"left\">$method score</th>\n";
-	print HTML "<th align=\"left\">ORF features</th>\n";
-	print HTML "<th align=\"left\">RNA features</th>\n";
-	print HTML "<th align=\"left\">Non-gene features</th>\n";
-	print HTML "</tr>\n\n";
+sub get_chromosome_list {
 	
-	# print the data
-	my $gbrowse = "http://localhost/cgi-bin/gbrowse/$database/?"; # hyperlink to machine & gbrowse
-	for my $i (0..$#windows) {
-		# http://localhost/cgi-bin/gbrowse/cerevisiae/?name=chr1:137066..145763;enable=RSC_ChIP_ypd_244k;h_region=chr1:142066..143368@lightcyan
-		my $position = "$windows[$i][1]:$windows[$i][2]..$windows[$i][3]"; # chromosome:start-stop
-		
-		# set size of selected region for gbrowse
-		# data should now have $window_name, $chr, $start, $end, $size, $region_score
-		my ($start, $stop);
-		if ($windows[$i][4] < 500) { 
-			# size is under 500 bp, set 2 kb region
-			$start = $windows[$i][2] - 1000;
-			$stop = $windows[$i][2] + 999;
-		} 
-		elsif ($windows[$i][4]  < 1000) { 
-			# size is under 1 kb, set 5 kb region
-			$start = $windows[$i][2] - 2500;
-			$stop = $windows[$i][2] + 2499;
-		} 
-		elsif ($windows[$i][4]  < 5000) { 
-			# size is under 5 kb, set 10 kb region
-			$start = $windows[$i][2] - 5000;
-			$stop = $windows[$i][2] + 4999;
-		} 
-		else { 
-			# size is really big, set 20 kb region
-			$start = $windows[$i][2] - 10000;
-			$stop = $windows[$i][2] + 9999;
-		}
-		if ($start < 0) {$start = 1} # in case we're at left end of chromosome
-		
-		# generate hypertext reference
-		my $region = "name=$windows[$i][1]:$start\..$stop";
-		my $track = "enable=$dataset";
-		my $highlight = "h_region=$position\@bisque";
-		my $link = $gbrowse . "$region;$track;$highlight";
-		
-		# generate table data
-		print HTML "<tr>\n";
-		print HTML "<td><a href=\"$link\">$windows[$i][0]</a></td>\n"; 
-			# windowID with hyperlink text
-		print HTML "<td>$position</td>\n"; # position
-		print HTML "<td>$windows[$i][4]</td>\n"; # size
-		print HTML "<td>$windows[$i][5]</td>\n"; # score
-		print HTML "<td>$windows[$i][6]</td>\n"; # ORF features
-		print HTML "<td>$windows[$i][7]</td>\n"; # RNA features
-		print HTML "<td>$windows[$i][8]</td>\n"; # non-gene features
-		print HTML "</tr>\n\n";
+	# Get the names of chromosomes to avoid
+	my @excluded_chromosomes = 
+		$TIM_CONFIG->param("$data_database\.chromosome_exclude");
+	unless (@excluded_chromosomes) {
+		@excluded_chromosomes = 
+			$TIM_CONFIG->param('$main_database.chromosome_exclude');
 	}
-	# close up
-	print HTML "</table>\n";
-	print HTML "</BODY>\n</HTML>\n";
-	close HTML;
-	print " Wrote html file $outfile.html\n";
+	unless (@excluded_chromosomes) {
+		@excluded_chromosomes = 
+			$TIM_CONFIG->param('default_db.chromosome_exclude');
+	}
+	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
+	
+	# reset the database if necessary
+	my $db;
+	if (ref $ddb eq 'Bio::DB::BigWigSet') {
+		# BigWigSet databases do not support seq_id method
+		# so we have to fake it by looking at one of the bigwigs
+		my $bw_file = ($ddb->bigwigs)[0];
+		$db = $ddb->get_bigwig($bw_file);
+	}
+	else {
+		$db = $ddb;
+	}
+	
+	# generate the chromosome list
+	my @list;
+	foreach my $seq ($db->seq_ids) {
+		
+		# skip ones we don't want
+		next if exists $excluded_chr_lookup{$seq};
+			
+		# generate a segment representing the chromosome
+		# due to fuzzy name matching, we may get more than one back
+		my @segments = $db->segment($seq);
+		
+		# need to find the right one
+		my $chrobj;
+		while (@segments) {
+			$chrobj = shift @segments;
+			last if $chrobj->seq_id eq $seq;
+		}
+		
+		# record the chromosome and it's size
+		push @list, [ $seq, $chrobj->length ];
+	}
+	
+	unless (@list) {
+		die " no chromosomes collected from database\n";
+	}
+	
+	return @list;
 }
-
 
 
 
@@ -1076,7 +1064,8 @@ find_enriched_regions.pl
  find_enriched_regions.pl --db <db_name> [--options]
  
   Options:
-  --db <name|file.gff3>
+  --db <name | filename>
+  --ddb <name | filename>
   --data <dataset | filename>
   --out <filename>
   --win <integer>
@@ -1085,6 +1074,7 @@ find_enriched_regions.pl
   --thresh <number>
   --sd <number>
   --method [mean|median]
+  --strand [f|r]
   --deplete
   --(no)trim
   --(no)sort
@@ -1103,22 +1093,28 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --db <database_name>
+=item --db <name | filename>
 
-=item --db <name|file.gff3>
+Specify the name of the database or a file that may be opened as 
+a database, including GFF3, Bam, bigWig, bigBed, or BigWigSet 
+directory. This database may be used for collecting chromosomes, 
+data scores, and/or overlapping feature annotations. 
 
-Specify the name of the BioPerl SeqFeature::Store database to use as
-source. Alternatively, a single GFF3 file may be loaded into a in-memory
-database. 
+=item --ddb <name | filename>
+
+When data scores are present in a separate database from annotation,
+then specify the second data-specific database. The same options 
+apply as --db.
 
 =item --data <dataset | filename>
 
-Specify the name of the dataset from which to collect the scores. 
-If not specified, then the data set may be chosen interactively 
-from a presented list.
-Alternatively, the name of a data file may be provided. Supported 
-file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
-(.bam). The file may be local or remote.
+Specify the feature type or primary_tag of the dataset within the 
+database from which to collect the scores. If not specified, then 
+the data set may be chosen interactively from a presented list.
+
+Alternatively, the name of a single data file may be provided. 
+Supported file types include BigWig (.bw), BigBed (.bb), or 
+single-end Bam (.bam). The file may be local or remote.
 
 =item --out <filename>
 
@@ -1162,6 +1158,13 @@ data with single bp resolution.
 Specify the method for combining score values within each window 
 when determining whether the window exceeds the threshold.
 Default method is mean.
+
+--strand [f|r]
+
+Optionally specify a specific strand from which to restrict the 
+data collection. This requires that the dataset supports 
+stranded data collection (GFF3, Bam, bigBed, BigWigSet). 
+Default is to collect from both strands.
 
 =item --deplete
 
@@ -1216,7 +1219,7 @@ Display the POD documentation.
 
 This program will search for regions in the genome that are enriched for a 
 particular data set. It walks through each chromosome using a 
-window of specified size (default 500 bp) and specified step size (default 100
+window of specified size (default 250 bp) and specified step size (default 500
 bp). Data scores within a window that exceed a determined threshold
 will be noted. Adjacent windows are merged and then trimmed on the ends to the
 minimum thresholded window.
