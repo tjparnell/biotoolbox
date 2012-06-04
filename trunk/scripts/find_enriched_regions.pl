@@ -1095,10 +1095,10 @@ The command line flags and descriptions:
 
 =item --db <name | filename>
 
-Specify the name of the database or a file that may be opened as 
-a database, including GFF3, Bam, bigWig, bigBed, or BigWigSet 
-directory. This database may be used for collecting chromosomes, 
-data scores, and/or overlapping feature annotations. 
+Specify the name or file of a Bio::DB::SeqFeature::store database 
+or BigWigSet database from which to collect chromosomes, data scores, 
+and/or overlapping feature annotations. Features may only be 
+collected from a SeqFeature::store database.
 
 =item --ddb <name | filename>
 
@@ -1124,7 +1124,9 @@ values.
 
 =item --win <integer>
 
-Specify the genomic bin window size in bp. Default value is 250 bp.
+Specify the genomic bin window size in bp. If not specified, 
+then the default window size is retrieved from the biotoolbox.cfg 
+configuration file. Default is 500 bp.
 
 =item --step <integer>
 
@@ -1172,9 +1174,9 @@ Specify whether depleted regions should be reported instead.
 For example, windows whose scores are 1.5 standard deviations 
 below the mean, rather than above.
 
-=item --(no)trim
+=item --trim
 
-Indicate that the merged windows should (not) be trimmed of below 
+Indicate that the merged windows should be trimmed of below 
 threshold scores on the ends of the window. Normally when windows 
 are merged, there may be some data points on the ends of the 
 windows whose scores don't actually pass the threshold, but were 
@@ -1182,7 +1184,7 @@ included because the entire window mean (or median) exceeded
 the threshold. This step removes those data points. The default 
 behavior is false (notrim).
 
-=item --(no)feat
+=item --feat
 
 Indicate that features overlapping the windows should be 
 identified. The default behavior is false.
@@ -1219,24 +1221,30 @@ Display the POD documentation.
 
 This program will search for regions in the genome that are enriched for a 
 particular data set. It walks through each chromosome using a 
-window of specified size (default 250 bp) and specified step size (default 500
-bp). Data scores within a window that exceed a determined threshold
-will be noted. Adjacent windows are merged and then trimmed on the ends to the
-minimum thresholded window.
+window of specified size (default 500 bp) and specified step size (default 
+same as window). Data scores within a window that exceed a determined threshold
+will be noted. Adjoining windows (within a specific tolerance, default is 
+1/2 of window size) are merged. The windows may be optionally trimmed 
+of flanking below-threshold positions.
 
-The threshold scores for identifying an enriched region may either be 
-explicitly set or automatically determined from the mean and standard 
-deviation (SD) of the entire collection of datapoints across the genome. 
-This, of course, assumes a normal distribution of datapoint scores, which may 
-or may not be suitable for the particular dataset. Note that the 
-automatic method may not appropriate for very extremely large datasets 
-(e.g. next generation sequencing) as it attempts to calculate the mean and SD 
-on all of the datapoints in the database. 
+The method for identifying enrichment is based on a very simple criteria: 
+a window is kept if the mean (or median) value for the window is greater 
+than (or less than for depletion) the threshold. No statistics or False 
+Discovery Rate is calculated.
 
-The program writes out a tim data formatted text file consisting of chromosome, 
-start, stop, score, and overlapping gene or non-gene genomic features. It 
-will optionally write a GFF file.
+The threshold may be automatically determined based on a calculated 
+mean and standard deviation from a sampling of the dataset. For sampling 
+purposes, the largest chromosome, scaffold, or sequence defined in the 
+database is used. A multiple (default 1.5X) of the standard deviation 
+is used to set the threshold.
 
+If an annotation database is provided, gene, ORF, non-coding RNA, or 
+other features may optionally be identified overlapping the enriched 
+regions.
+
+The program writes out a tab-delimited text file consisting of chromosome, 
+start, stop, strand, score, and overlapping gene or non-gene genomic 
+features. It will optionally write a GFF3 file.
 
 =head1 AUTHOR
 
@@ -1250,8 +1258,3 @@ will optionally write a GFF file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
