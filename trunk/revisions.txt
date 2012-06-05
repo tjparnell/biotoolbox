@@ -1,5 +1,17 @@
 ######## biotoolbox revision history #############
 
+v.1.8.1 (svn r392)
+	- Updated script find_enriched_regions.pl to handle separate feature and data databases if desired, and add capability to restrict searches to specific strands.
+	- Updated script map_transcripts to handle chromosomes names without integers in their names
+	- Brought script convert_yeast_genome.pl back out of retirement and updated with R63 to R64 convertor
+	- Added chromosome and sequence sorting to GFF3 output from script get_ensembl_annotation.pl. Also include Ensembl API version reporting.
+	- Updated script check_dependencies.pl to report the installed Ensembl API version number
+	- Improved GFF3 parsing and minor improvements to script gff3_to_ucsc_table.pl
+	- Fixed bugs when working with BigWigSet databases, where a trailing slash in the directory name may lead to different behaviors, and unexpected results when collecting data from BigWigSet databases using two different methods in the same program
+	- Fixed bug where null values in tab-delimited text files are now internally converted to null character .
+	- Fixed sorting issues in script split_bam_by_isize.pl
+	- Fixed bugs in script novo_wrapper.pl that prevented an uncompressed Fastq input file from being split properly, split input files from being removed after aligning, and a single unsorted Bam file is not further processed
+	
 v.1.8.0 (svn r378)
 	- Moved script novo_wrapper.pl out of retirement (due to popular demand) and significantly updated it to handle parallel execution
 	- Retired old script merge_SNPs and replaced it with new intersect_SNPs.pl script, which is an improved version that uses the VCF format. 
@@ -24,7 +36,7 @@ v.1.7.1 (svn r346)
 	- Major overhaul of script pull_features.pl to include better automatic identification of identifier columns, the capability to match multiple features, and to simultaneously write all groups from a .kgg list
 	- Updated script get_datasets.pl so that it would rewrite the output file after each round of data collection.
 	- Minor bug fixes in script find_enriched_regions.pl
-	- Retired outdata script convert_yeast_genome_version.pl. Users should use the liftOver program from UCSC and chain files from SGD.
+	- Retired outdated script convert_yeast_genome_version.pl. Users should use the liftOver program from UCSC and chain files from SGD.
 
 v.1.7.0 (svn r340)
 	- Added new program get_gene_regions.pl which helps in retrieving regions not explicitly annotated in a database, including start and stop sites of transcription and introns.
