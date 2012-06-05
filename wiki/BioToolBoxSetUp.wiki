@@ -20,7 +20,7 @@ This guide is for new users looking to set up bioperl and BioToolBox. Advanced u
 
 ==Before you begin==
 This guide assumes a few things.
-	* First, you have access to a unix-based computer, including Linux and Mac OS X. Windows users may need to explore other options (a new [http://store.apple.com computer], a new dual-boot [http://www.ubuntu.com/ operating system], etc.)
+	* First, you have access to a unix-based computer, including Linux and Mac OS X. Windows users may need to explore other options (a new [http://store.apple.com computer] or a new [http://www.ubuntu.com/ operating system])
 	* Second, you have relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc.
 	* Third, Perl is installed on your machine. Almost every unix-based computer should have it installed, at least in some basic form. The BioToolBox programs have been tested with Perl versions 5.8.8 and 5.10.0. I assume anything > 5.8 should work. It's also useful to know whether it is 32-bit or 64-bit executable. 64-bit is preferred, if only because you avoid out-of-memory errors when working with large datasets. Run `perl -v` to find out the version and bit-ness. Familiarity with Perl is helpful, insofar as installing modules through CPAN, but Perl programming skills are not a requirement.
 	* Finally, you'll need to have GNU C compiler (GCC) installed for compiling software from source code. Most Linux distributions should already have this installed; if not, it's easily obtainable using your favorite package manager. On Mac OS X, you'll need to install the Developer Tools from your installation disc or XCode from the Mac App Store. Be sure to include the command line tools from within XCode.
@@ -211,7 +211,10 @@ To install support, you'll need to install from CPAN at least  [http://search.cp
 ==Installing the Ensembl Perl API==
 To retrieve genome annotation from Ensembl's public MySQL database using the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
 
-It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed.
+Ensembl is not very explicit about prerequisites, but you will need Perl modules `DBI` and `DBD::mysql` installed, as well as BioPerl. Their recommendation for BioPerl is an old version; the current CPAN or live version should work just as well, and it should be installed from the above instructions.
+
+Rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed. The `EnsEMBL` directory will go into your `Bio/` directory, along with the rest of BioPerl.
 
 Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the BioToolBox script `get_ensembl_annotation.pl`. Be forewarned.
 
+Ensembl publishes a new Core API with each database release. If you are not seeing the latest genome version in the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you should update your Ensembl Perl API modules.

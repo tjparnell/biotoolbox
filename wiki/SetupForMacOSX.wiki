@@ -298,7 +298,7 @@ Next, install the browser. Run
 	sudo ./Build install
 </pre>
 
-Hopefully, everything should go smoothly. A couple of things to note.
+Hopefully, everything should go smoothly. A few things to note.
 
 First, the install script will ask to restart Apache. It usually doesn't succeed if you let it, so I always do it myself. Run "`sudo apachectl graceful`" to restart it from the command line.
 
@@ -307,6 +307,12 @@ Second, the permissions are rarely set correctly on the temp and library folders
 	sudo chown -R _www:_www /var/lib/gbrowse2
 	sudo chown -R _www:_www /var/tmp/gbrowse2
 </pre>
+
+Third, verify that the Build install added a new Apache configuration file in `/etc/apache2/other/`, probably named `gbrowse2.conf` (not to be confused with a similarly named file in `/etc/gbrowse2/`). On Mac OS X Server, the file should be in `/etc/apache2/sites/`. This file adds additional definitions, aliases, and permissions for the GBrowse CGI scripts. It will be loaded by an `Include` statement in the main Apache configuration file `/etc/apache2/httpd.conf`. If, for some reason, this file is missing, you can generate the file by running 
+<pre>
+	./Build apache_conf > gbrowse2.apache.conf
+</pre>
+Copy the resulting file into the appropriate directory as described above.
 
 ===Setting up FastCGI with GBrowse===
 I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
@@ -324,7 +330,7 @@ To enable FastCGI on OS X 10.7 Lion, you will need to install it, as Apple no lo
 </pre>
 It should install `mod_fcgid.so` into `/usr/libexec/apache2/` for you and automatically update `/etc/apache2/httpd.conf` to enable the FastCGI daemon.
 
-Sometimes I have permissions problems executing the scripts, especially when using FastCGI. You will need to edit the file `/etc/apache2/other/gbrowse2.conf`. Find this entry in the file
+Sometimes I have permissions problems executing the scripts, especially when using FastCGI. You will need to edit the file `/etc/apache2/other/gbrowse2.conf` (see above if it's not present). Find this entry in the file
 <pre>
 	<Directory "/Library/Webserver/CGI-Executables/gb2">
 	  Options ExecCGI
@@ -341,7 +347,7 @@ and add the following lines to make this
 	  Allow from all
 	</Directory>
 </pre>
-Finally, restart the Apache server, and try the new link http://localhost/fgb2/gbrowse.
+Finally, restart the Apache server (you should "fcgi" mentioned in the Apache log when restarting), and try the new link http://localhost/fgb2/gbrowse.
 
 ===Setting up GBrowse user accounts===
 One of the cool things about GBrowse is the ability to offer user accounts. This allows multiple users to store their file uploads and personal settings and, more importantly, have them persistently available across browser and platform sessions.
@@ -485,11 +491,15 @@ The best way to install this is not through the CPAN Shell, but rather build it 
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, go back to `kent/src/lib`, issue "`make clean`", and then "`make`" again to rebuild the library, then try the Perl module again. 
 
 ==Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the BioToolBox script `get_ensembl_annotation.pl`, you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
+To retrieve genome annotation from Ensembl's public MySQL database using the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
 
-It is safe to ignore their BioPerl instructions, as you should already have it installed. Also, rather than following their instructions for setting up your environment, I simply manually copied their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into `/Library/Perl/5.10.0/Bio/` on Mac OS X 10.6 (or `/Library/Perl/5.12.3/Bio/` under OS X 10.7). This allows their modules to be found automatically in the normal manner. 
+Ensembl is not very explicit about prerequisites, but you will need Perl modules `DBI` and `DBD::mysql` installed, as well as BioPerl. Their recommendation for BioPerl is an old version; the current CPAN or live version should work just as well, and it should be installed from the above instructions.
+
+Rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed. The `EnsEMBL` directory will go into your `Bio/` directory, along with the rest of BioPerl.
 
 Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the BioToolBox script `get_ensembl_annotation.pl`. Be forewarned.
+
+Ensembl publishes a new Core API with each database release. If you are not seeing the latest genome version in the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you should update your Ensembl Perl API modules.
 
 ==Additional Tools==
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or BioToolBox. These are simply programs that I have found to be helpful in my own work.

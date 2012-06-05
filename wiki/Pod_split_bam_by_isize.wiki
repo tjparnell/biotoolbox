@@ -57,7 +57,7 @@ __
 __--at
 
 __
-  Boolean option to indicate that only fragments whose paired sequence reads  end in a `[`AT`]` nucleotide should be included in the output GFF file.  Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides;  this option ensures that the fragment is more likely derived from a MNase  cut.
+  Boolean option to indicate that only fragments whose paired sequence reads  end in a `[`AT`]` nucleotide should be included in the output Bam file(s).  Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides;  this option ensures that the fragment is more likely derived from a MNase  cut.
 __
   __
 __--version
@@ -77,11 +77,11 @@ This program will read a BAM file containing paired-read alignments and write a 
 
 Multiple size ranges may be specified, and pairs within each range are  written to separate files.
 
-Additionally, fragments may be checked for the presence of an A/T nucleotide  at the 5' end of the sequence, as is usually produced by digestion with  Micrococcal Nuclease.
+Additionally, fragments may be checked for the presence of an A/T nucleotide  at the 5' end of the sequence, as is usually produced by digestion with  Micrococcal Nuclease. This does NOT ensure that the original cut site was  AA, TT, or AT, as we only have one half of the site in the read sequence,  only that it increases the liklihood of being an A/T dinucleotide  (absolute checking would require looking up the original sequence).
 
 The input and output files are BAM files as described by the Samtools  project (http://samtools.sourceforge.net).
 
-The input file should be sorted and indexed prior to sizing. The output file  will also be automatically re-sorted and re-indexed for you.
+The input file should be sorted and indexed prior to sizing. The output  file(s) will be automatically re-sorted and re-indexed for you.
 
 ==AUTHOR==
 {{{

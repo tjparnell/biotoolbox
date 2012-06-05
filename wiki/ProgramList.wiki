@@ -45,6 +45,7 @@ Lists of programs organized by function.
 	* [ProgramList#map_transcripts.pl map_transcripts.pl]
 
 ===Genome annotation===
+	* [ProgramList#convert_yeast_genome_version.pl convert_yeast_genome_version.pl]
 	* [ProgramList#get_ensembl_annotation.pl get_ensembl_annotation.pl]
 	* [ProgramList#gff3_to_ucsc_table.pl gff3_to_ucsc_table.pl]
 	* [ProgramList#ucsc_cytoband2gff3.pl ucsc_cytoband2gff3.pl]
@@ -104,6 +105,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====compare_subfeature_scores.pl====
 [Pod_compare_subfeature_scores compare_subfeature_scores.pl] compares the scores of all the subfeatures of a parent feature to find the minimum and maximum subfeature score. For example, identify expressed and not-expressed alternative transcripts of a gene.
+
+====convert_yeast_genome_version.pl====
+[Pod_convert_yeast_genome_version convert_yeast_genome_version.pl] converts genomic coordinates of popular file formats between a limited set of S. cerevisiae SGD genome releases.
 
 ====data2frequency.pl====
 [Pod_data2frequency data2frequency.pl] converts data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.

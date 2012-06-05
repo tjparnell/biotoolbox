@@ -80,7 +80,7 @@ __
 __--rdata <**dataset>
 
 __
-  Specify the name of the datasets in the database representing the  individual forward and reverse transcription data. Alternatively,  the paths of data files may be provided. Supported formats include  Bam (.bam), !BigBed** (.bb), or !BigWig** (.bw). Files may be local or  remote (http:// or ftp://). Usually this data is provided separately  for each strand; a single dataset with both strands of data is not  accepted. For Bam or !BigBed** files that support strand, they should be  separated into two separate files based on strand. If not provided,  the values may be obtained from the metadata of the provided  enriched regions files.
+  Specify the name of the datasets in the database representing the  forward and reverse transcription data. Alternatively,  the paths of data files may be provided. Supported formats include  Bam (.bam), !BigBed** (.bb), or !BigWig** (.bw). Files may be local or  remote (http:// or ftp://).
 __
   __
 __--tol <**integer>
@@ -120,22 +120,20 @@ __
 __
   __
 ==DESCRIPTION==
-This program will identify transcription fragments that correspond to  gene transcripts using available transcriptome microarray data.
+This program will identify transcription fragments that correspond to  gene transcripts using available transcriptome microarray data. Specifically,  it will identify the start and stop coordinates of transcribed regions  that correspond or overlap an annotated gene or ORF. It does not identify  exons or introns.
+
+The program was initially written to address the lack of officially mapped  transcripts in the S. cerevisiae genome, which has few and small introns.  It may work well other similar genomes, but probably not complex  metazoan genomes with very large introns.
 
 Transcription fragments are identified as windows of enrichment using the  script 'find_enriched_regions.pl'. This script can either be automatically executed using the specified parameters, or run separately. If run separately,  the output files should be indicated (--ffile and --rfile).
 
-Each enriched window, or transcription fragment, is checked for corresponding  or overlapping genomic features. The name(s) of the overlapping gene(s) are  reported, as well as a classification for the transcript. Transcripts that  completely contain (within a 20 bp tolerance) a single known gene (ORF or  ncRNA) are labeled as 'complete'. Transcription fragments that simply overlap a known gene are labeled as 'overlap'. Transcription fragments that overlap more  than one annotated gene are labeled as 'multi-orf'.
+Each enriched window, or transcription fragment, is checked for corresponding  or overlapping genomic features. The name(s) of the overlapping gene(s) are  reported, as well as a classification for the transcript. Transcripts that  completely contain (within a default 20 bp tolerance) a single known gene  (ORF or ncRNA) are labeled as 'complete'. Transcription fragments that  simply overlap a known gene are labeled as 'overlap'. Transcription fragments  that overlap more than one annotated gene are labeled as 'multi-orf'.
 
 Transcription fragments that only overlap annotated genes on the opposite  strand are labeled as 'anti-sense'. Transcription fragments overlapping  repetitive elements or no known feature are also reported.
-
-The program does not attempt to identify individual exons and introns.  Rather, it is primarily focused on only identifying transcription start  and stop sites. All transcription fragments which overlap a known  known gene are considered to be part of the same of transcript and are  therefore merged together into one transcript.
 
 Some rudimentary calculations are performed to identify the length of  the 5' and 3' UTRs.
 
 The program writes out a tab delimited text file. It will also write out a gff file for the genome browser. It also writes out a summary report file.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -147,11 +145,3 @@ The program writes out a tab delimited text file. It will also write out a gff f
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

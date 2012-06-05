@@ -154,6 +154,8 @@ This program will connect to the public EnsEMBL MySQL database and  retrieve the
 
 This program requires EnsEMBL's Perl API modules to connect to their public  MySQL servers. It is not available through CPAN, unfortunately, but you can  find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
 
+Note that EnsEMBL releases new Perl API modules with each database  release. If you do not see the latest genome version (compared to what  is available on the web), you should update your EnsEMBL Perl modules.  The API version should be printed at the beginning of execution.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
