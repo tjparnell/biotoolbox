@@ -10,6 +10,7 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_data_helper qw(find_column_index);
 use tim_file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
@@ -329,19 +330,9 @@ sub process_file {
 	else { 
 		# a non-standard file
 		# identify the indices to the genomic coordinates
-		for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-			# check the names of each column
-			# looking for chromo, start, stop
-			if ($metadata_ref->{$i}{'name'} =~ /^chr|refseq/i) {
-				$chromo_index = $i;
-			}
-			elsif ($metadata_ref->{$i}{'name'} =~ /start/i) {
-				$pos_index = $i;
-			}
-			elsif ($metadata_ref->{$i}{'name'} =~ /stop|end/i) {
-				$pos2_index = $i;
-			}
-		}
+		$chromo_index = find_column_index($metadata_ref, '^chr|seq|ref');
+		$pos_index    = find_column_index($metadata_ref, '^start$');
+		$pos2_index   = find_column_index($metadata_ref, '^stop|end$');
 		unless ( 
 			# check that we have these basic genomic coordinates
 			defined $chromo_index and
