@@ -340,26 +340,29 @@ sub process_regions {
 		# nucleotides quite efficiently, but it will NOT count dinucleotides
 		# therefore, we will use the slightly more intensive approach of using 
 		# substr to march through the sequence and count
-		my $numC = 0;
-		my $numG = 0;
+		my $numC  = 0;
+		my $numG  = 0;
 		my $numCG = 0;
-		for (my $i = 0; $i < length $seq - 1; $i++) {
+		for (my $i = 0; $i < length($seq) - 1; $i++) {
 			my $dinuc = substr($seq, $i, 2);
-			$numC += 1 if $dinuc =~ m/^c/i;
-			$numG += 1 if $dinuc =~ m/^g/i;
+			$numC  += 1 if $dinuc =~ m/^c/i;
+			$numG  += 1 if $dinuc =~ m/^g/i;
 			$numCG += 1 if $dinuc =~ m/^cg/i;
 		}
 		
-		# calculate the statistics
-		my $fraction = sprintf "%.3f", ($numC + $numG) / length($seq);
-		my $expected = sprintf "%.0f", ($numC * $numG) / length($seq);
+		# record the statistics
+		$data->{'data_table'}->[$row][$fgc_i] = 
+			sprintf "%.3f", ($numC + $numG) / length($seq); # fraction GC
 		
-		# record
-		$data->{'data_table'}->[$row][$fgc_i] = $fraction;
-		$data->{'data_table'}->[$row][$cg_i]  = $numCG;
-		$data->{'data_table'}->[$row][$exp_i] = $expected;
-		$data->{'data_table'}->[$row][$oe_i]  = $expected ?
-			sprintf("%.3f", $numCG / $expected) : 0;
+		$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
+		
+		$data->{'data_table'}->[$row][$exp_i] = 
+			sprintf "%.0f", ($numC * $numG) / length($seq); # expected CpG
+		
+		$data->{'data_table'}->[$row][$oe_i]  = 
+			$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
+			sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
+			0; # obs/exp ratio
 	}
 	
 }
