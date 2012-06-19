@@ -1,4 +1,4 @@
-#summary A summary of the scripts available in *biotoolbox*
+#summary A summary of the scripts available in BioToolBox
 #labels Featured
 
 =Program Groups=

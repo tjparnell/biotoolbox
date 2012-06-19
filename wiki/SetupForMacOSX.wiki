@@ -45,7 +45,7 @@
 
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
-	# You will need to install XCode and/or the Command line developer tools. If you only need access to GCC to install open source software, then download "Command Line Tools for Xcode" from Apple's [http://connect.apple.com/ Developer site]. This will require a (free) Apple Developer Account. Alternatively, if you also develop for Mac OS X and/or iOS, download XCode from Apple's Mac App Store or Developer web site. Be sure to select the Command Line Tools from the packages tab in the XCode preferences.  
+	# You will need to install or reinstall XCode and/or the Command line developer tools, even if you had it installed under 10.6 (previous versions do not work). If you only need access to GCC to install open source software, then download "Command Line Tools for Xcode" from Apple's [http://connect.apple.com/ Developer site]. This will require a (free) Apple Developer Account. Alternatively, if you also develop for Mac OS X and/or iOS, download XCode from Apple's Mac App Store or Developer web site. Be sure to select the Command Line Tools from the packages tab in the XCode preferences. *Note:* Fink may require the full XCode install, not just the Command Line Tools.
 	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering "`perldoc perllocal`" in the terminal.
 	# If you're updating from a 10.6 system, heed the warnings about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
 	# The FastCGI module for the Apache web server is no longer included. To install it, download Apache's [http://httpd.apache.org/mod_fcgid/ FastCGI] source code, compile, and install.
@@ -55,7 +55,7 @@ These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most o
 
 An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. One other thing to keep in mind is that Fink tries to use many of the default Mac OS X libraries and executables whenever possible, whereas MacPorts sometimes wants to install everything on its own. This creates duplicates in your system, for example duplicate Perl installations. This can be good in that you get a newer version, but more complicated because you have to keep track of which version is executed.
 
-To install, it's best to follow their [http://www.finkproject.org/download/srcdist.php instructions]. In general, run the following commands after downloading, extracting, and moving into the fink directory.
+To install Fink, [http://www.finkproject.org/download/srcdist.php download] the source file and follow their instructions. In general, run the following commands after downloading, extracting, and moving into the fink directory.
 <pre>
 	sudo ./bootstrap
 	/sw/bin/pathsetup.sh
@@ -232,7 +232,7 @@ Note that there may be warnings about missing or wrong file or machine architect
 
 Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
 
-Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a `force install`, and then empirically test your program(s). I generally try to avoid this (being cautious), but have resorted to it successfully. 
+Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a "`force install`", and then empirically test your program(s). I generally try to avoid this (being cautious), but have [SetupForMacOSX#Errors_regarding_GD resorted] to it successfully. 
 
 ===Install BioPerl===
 Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`C/CJ/CJFIELDS/BioPerl-1.6.901.tar.gz`), which should be adequate for most purposes, or obtain the latest development version from GitHub. 
@@ -262,7 +262,7 @@ There are a few additional modules that are required by the BioToolBox scripts. 
 	* `GD::Graph::smoothlines`
 
 ====Errors regarding GD====
-Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
+Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
 
 ==Installing GBrowse==
 [http://gmod.org/wiki/GBrowse GBrowse] is a web-based generic genome browser that can display genome annotation and genomic data from microarray or next generation sequencing. Before you begin, you will likely need to install a few more Perl modules. You can install them through CPAN as above.
