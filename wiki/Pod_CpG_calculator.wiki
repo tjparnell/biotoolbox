@@ -1,0 +1,90 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+!CpG_calculator**.pl
+
+==SYNOPSIS==
+!CpG_calculator**.pl --fasta <**directory|filename> `[`--options...`]` !CpG_calculator**.pl --db <**text> `[`--options...`]`
+
+{{{
+  Options:
+  --fasta <directory|filename>
+  --db <text>
+  --in <filename>
+  --win <integer>
+  --out <filename> 
+  --(no)gz
+  --version
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--fasta <**directory|filename>
+
+__
+  Provide the name of an uncompressed Fasta file (multi-fasta is ok) or  directory containing multiple fasta files representing the genomic  sequence. The directory must be writeable for a small index file to be  written. Required unless a database is provided.
+__
+  __
+__--db <**text>
+
+__
+  Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. A relational database name, SQLite file, or  GFF3 file with sequence may be provided. Required unless a Fasta file is  provided.
+__
+  __
+__--in <**filename>
+
+__
+  Optionally specify an input file representing a list of regions to  analyze. If not provided, then the entire genome will be scanned using  the specified window size. Supported formats include BED, GFF, and tab  delimited text files with column headers (chromosome, start, and stop columns must be present and labeled as such or similarly). The file may  be compressed with gzip.
+__
+  __
+__--win <**integer>
+
+__
+  Optionally provide the window size in bp with which to scan the genome.  Option is ignored if an input file is provided. Default is 1000 bp.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it uses the input file base  name if provided. Required if no input file is provided.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will calculate percent GC composition, number of CpG  dinucleotide pairs, number of expected CpG dinucleotide pairs based  on GC content, and the ratio of observed / expected CpG pairs.  Calculations are performed on either windows across the entire genome  (default behavior using 1000 bp windows) or user-provided regions in an  input file (BED, GFF, or custom text file are supported).
+
+Genomic sequence may be provided in two ways. First, a Fasta file or  directory of Fasta files may be provided. A small index file will be  written to assist in random access using the Bio::DB::Fasta module.  Alternatively, a Bio::DB::!SeqFeature**::Store database with sequence may  be provided. Depending on the database driver and implementation, the  fasta option is usually faster.
+
+The four additional columns of information are appended to the input  or generated file.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
