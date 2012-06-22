@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.0.2';
+my $VERSION = '1.8.2';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -78,20 +78,32 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($binsize) {
-	die " Missing bin size!\n Please use --help for more information\n";
-}
-unless ($binnumber or $max) {
-	die " Either bin number or maximum value must be entered!\n" . 
-		" Please use --help for more information\n";
-}
 unless (defined $start) {
-	# default value 
-	$start = 0;
+	$start = 0; # default start of 0
+}
+unless (defined $binsize) {
+	if (defined $binnumber and defined $max) {
+		$binsize = ($max - $start) / $binnumber;
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
+}
+unless (defined $binnumber) {
+	if (defined $binsize and defined $max) {
+		$binnumber = int( ($max - $start) / $binsize);
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
 }
 unless (defined $max) {
-	# default value is calculated
-	$max = $start + ($binnumber * $binsize);
+	if (defined $binsize and defined $binnumber) {
+		$max = $start + ($binnumber * $binsize);
+	}
+	else {
+		die " need to specify at least two of bins, binsize, or max! see help\n";
+	}
 }
 
 
@@ -115,12 +127,11 @@ for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
 	my $name = $in_data_ref->{$i}{'name'};
 	if (
 		# check column header names for gene or window attribute information
-		$name =~ /name/i or 
-		$name =~ /class/i or
-		$name =~ /alias/i or
-		$name =~ /^chr/i or
-		$name =~ /start/i or
-		$name =~ /stop/i
+		$name =~ /^name|ID|alias/i or 
+		$name =~ /^class|type/i or
+		$name =~ /^chr|ref/i or
+		$name =~ /^start/i or
+		$name =~ /^stop|end/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -136,9 +147,12 @@ for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
 
 ### Calculate the Bins
 my @bins; # an array for the bins
-for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
+# for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
+# 	push @bins, $i;
+# 	#print "$i ";
+# }
+for (my $i = $start; $i <= $max; $i += $binsize) {
 	push @bins, $i;
-	#print "$i ";
 }
 
 
@@ -165,9 +179,10 @@ my $out_table_ref = $out_data_ref->{'data_table'}; # quick ref
 #print " this is the new output data structure:\n", Dumper($out_data_ref);
 
 # Process each requested index
-print " Converting datasets to a distributin frequency....\n";
+print " Converting datasets to a distribution frequency....\n";
 foreach (@indices) {
 	# convert this dataset to the distribution frequency
+	print "   " . $in_data_ref->{$_}{'name'} . "...\n";
 	my $success = convert_dataset($_);
 	unless ($success) {
 		die " unable to convert dataset index $_!\n";
@@ -178,8 +193,7 @@ foreach (@indices) {
 ### Write the new file
 unless ($outfile) {
 	$outfile = $infile; # use input name
-	$outfile =~ s/\.txt(\.gz)?$//; # strip extension
-	$outfile .= '_frequency'; # append
+	$outfile = $in_data_ref->{'basename'} . '_frequency';
 }
 my $write_results = write_tim_data_file( {
 	'data'      => $out_data_ref,
@@ -256,6 +270,7 @@ sub prepare_output_data_structure {
 	# Record the bins
 	for my $row (1..$binnumber) {
 		$data->{'data_table'}->[$row][0] = $bins[$row - 1];
+		$data->{'last_row'} += 1;
 	}
 	
 	# Generate the percentages
@@ -278,23 +293,21 @@ sub convert_dataset {
 	for my $i (1..$in_data_ref->{'last_row'}) {
 		# walk through the data file
 		
-		my $value = $in_table_ref->[$i][$data_index];
-		
-		# only take numerical data
-		unless ($value eq '.') {
-			push @values, $value; 
+		# collect numerical data
+		unless ($in_table_ref->[$i][$data_index] eq '.') {
+			push @values, $in_table_ref->[$i][$data_index]; 
 		}
 	}
 	
 	# calculate the distribution frequency
 	my $stat = Statistics::Descriptive::Full->new() or
-		die " can initialize Statistics object!\n";
+		die " can not initialize Statistics object!\n";
 	$stat->add_data(@values);
-	my $freq_ref = $stat->frequency_distribution_ref(\@bins);
+	my $freq_ref = $stat->frequency_distribution_ref(\@bins) or 
+		die " frequency distribution could not be generated!\n";
 		# this should return a reference to a hash where the keys
 		# are the values in @bins and the value is the number of 
 		# datapoints 
-	unless ($freq_ref) {die " frequency distribution not generated from Statistics subroutine!\n"}
 	
 	#print " this is the frequency structure:\n", Dumper($freq_ref);
 	
@@ -306,16 +319,18 @@ sub convert_dataset {
 	
 	# record the distribution in the output data structure
 	for my $row (1..$out_data_ref->{'last_row'}) {
-		# identify the bin value from the output data
-		my $bin = $out_table_ref->[$row][0]; 
 		# use this bin value in the lookup of the calculated distribution
 		# frequency hash
-		$out_table_ref->[$row][$new_index] = $freq_ref->{$bin}; 
+		$out_table_ref->[$row][$new_index] = 
+			$freq_ref->{ $out_table_ref->[$row][0] }; 
 	}
 	
 	# update metada, copy from old data structure
 	$out_data_ref->{$new_index} = { %{ $in_data_ref->{$data_index} } };
-	$out_data_ref->{$new_index}{'log2'} = 0; # no longer log2
+	if (exists $out_data_ref->{$new_index}{'log2'}) {
+		# no longer log2
+		delete $out_data_ref->{$new_index}{'log2'};
+	}
 	$out_data_ref->{$new_index}{'index'} = $new_index; # update index
 	$out_data_ref->{'number_columns'} += 1;
 	
@@ -333,6 +348,8 @@ A script to convert data into a frequency distribution, useful for graphing.
 =head1 SYNOPSIS
 
 data2frequency.pl --bins <integer> --size <number> <filename> 
+data2frequency.pl --bins <integer> --max <number> <filename> 
+data2frequency.pl --size <number> --max <number> <filename> 
   
   --in <filename>
   --bins <integer>
@@ -359,11 +376,24 @@ although any format should work. The file may be compressed with gzip.
 
 =item --bins <integer>
 
-Specify the number of bins that the data should be placed into.
+Specify the number of bins or partitions into which the data will be 
+grouped. This argument is optional if --max and --size are provided.
 
-=item --size <integer>
+=item --size <number>
 
-Specify the size of each bin.
+Specify the size of each bin or partition. A decimal number may be 
+provided. This argument is optional if --bins and --max are provided.
+
+=item --min <number>
+
+Optionally indicate the minimum value of the bins. When generating 
+the list of bins, this is used as the starting value. Default is 0. 
+A negative number may be provided using the format --min=-1. 
+
+=item --max <number>
+
+Specify the maximum bin value. This argument is optional if --bins 
+and --size are provided.
 
 =item --index <list|range>
 
@@ -373,20 +403,6 @@ datasets may be provided as a comma-delimited list, as a consecutive list
 (start-stop), or a combination of both. Do not include spaces! If no 
 datasets are provided, the program will interactively present to the user 
 a list of possible datasets to convert.
-
-=item --min <number>
-
-Optionally indicate the minimum value of the bins. When generating 
-the list of bins, this is used as the starting value. Default is 0. 
-Useful for log2 distributions where the minimum value is negative. 
-A negative number may be provided using the format --min=-1. 
-
-=item --max <number>
-
-Optionally provide the maximum bin value. This argument is optional 
-and is automatically calculated as (bins * size). This argument 
-may also be provided as an alternative to specifying the binsize 
-value, in which case the number of bins is empirically determined.
 
 =item --out <filename>
 
@@ -400,7 +416,6 @@ Print the version number.
 =item --help
 
 Display this help
-
 
 =back
 
@@ -418,10 +433,9 @@ One or more datasets within the data file may be converted. These may be
 specified on the command line or chosen interactively from a list presented 
 to the user.
 
-A tim data text file will be written as output. The bin values are listed 
+A data text file will be written as output. The bin values are listed 
 as the first column, and the number of datapoints within each bin are 
 listed in subsequent columns for each dataset requested.
-
 
 =head1 AUTHOR
 
