@@ -425,7 +425,7 @@ while (@infiles) {
 		push @metadata, "[$target_basename$infile_ext]\n";
 		
 		# add metadata
-		push @metadata, "primary_tag  = $gfftype\n";
+		push @metadata, "type         = $gfftype\n";
 		push @metadata, "source       = $source\n";
 		push @metadata, "display_name = $display_name\n";
 		if ($strand =~ /^f|w|\+|1/) {
@@ -578,19 +578,29 @@ if ($write_conf) {
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
+		# generate stanza name
+		my $stanza_name;
+		if ($set_name eq $source) {
+			# avoid duplication 
+			$stanza_name = $source;
+		}
+		else {
+			$stanza_name = "$source\_$set_name";
+		}
+		
 		# add the database stanza, in reverse order
-		push @confdata, "[$source\_$set_name\_db:database]\n";
+		push @confdata, "[$stanza_name\_db:database]\n";
 		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
 		push @confdata, "db_args      = -dir $path\n";
 		push @confdata, "               -feature_type summary\n\n";
 		
 		# generate the conf stanzas 
-		push @confdata, "[$source\_$set_name]\n";
-		push @confdata, "database     = $source\_$set_name\_db\n";
+		push @confdata, "[$stanza_name]\n";
+		push @confdata, "database     = $stanza_name\_db\n";
 		push @confdata, "feature      = " . 
 			# using the gfftype
 			join(" ", map {$_->[0]} @subtracks) . "\n";
-		push @confdata, "subtrack select = Feature primary_tag\n";
+		push @confdata, "subtrack select = Feature type\n";
 		for my $i (0 .. $#subtracks) {
 			# create subtrack table 
 			# each item has gfftype and name in anon array
