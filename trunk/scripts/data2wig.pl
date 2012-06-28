@@ -23,7 +23,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
-my $VERSION = '1.6.5';
+my $VERSION = '1.8.2';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -238,9 +238,9 @@ sub identify_indices {
 	# non-standard text file or tim data format text file
 	else {
 		# we will automatically look for the coordinate columns
-		$chr_index    = find_column_index($metadata_ref, '^chr|seq|refseq');
-		$start_index  = find_column_index($metadata_ref, 'start');
-		$stop_index   = find_column_index($metadata_ref, 'stop|end');
+		$chr_index    = find_column_index($metadata_ref, '^chr|seq|ref');
+		$start_index  = find_column_index($metadata_ref, '^start|pos');
+		$stop_index   = find_column_index($metadata_ref, '^stop|end');
 		
 		# check that we have the required coordinates
 		unless (defined $start_index) {
@@ -362,6 +362,9 @@ sub set_bigwig_options {
 	if ($bigwig) {
 		# if we're generating bigwig file, no track is needed
 		$use_track = 0;
+		
+		# force no compression
+		$gz = 0;
 		
 		# check that we have a source for chromosome info
 		unless ($database or $chromo_file) {
