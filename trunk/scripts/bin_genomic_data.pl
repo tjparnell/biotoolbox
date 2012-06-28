@@ -27,7 +27,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.6.2';
+my $VERSION = '1.8.2';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -680,13 +680,11 @@ sub get_wig_data {
 	# initialize variables
 	my $bin_count = 0;
 	my $feature_count = 0;
-	my (
-		# reusuable variables
-		$chromo,
-		$fixstart,
-		$step,
-		$span,
-	); 
+	# reusuable variables
+	my $chromo;
+	my $fixstart;
+	my $step;
+	my $span = 1; # default of 1 bp
 	
 	# collect the data
 	while (my $line = $fh->getline) {
@@ -743,12 +741,7 @@ sub get_wig_data {
 				die "Bad formatting! variable step data but chromosome not defined!\n";
 			}
 			$start = $data[0];
-			if ($span) {
-				$stop = $start + $span;
-			} 
-			else {
-				$stop = $start;
-			}
+			$stop = $start + $span - 1;
 			$score = $data[1];
 		} 
 		
@@ -765,12 +758,7 @@ sub get_wig_data {
 			}
 			$start = $fixstart;
 			$fixstart += $step; # prepare for next round
-			if ($span) {
-				$stop = $start + $span;
-			} 
-			else {
-				$stop = $start;
-			}
+			$stop = $start + $span - 1;
 			$score = $data[0];
 		}
 		
