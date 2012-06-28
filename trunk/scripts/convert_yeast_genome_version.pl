@@ -23,7 +23,7 @@ eval {
 	tim_db_helper::bigwig->import;
 };
 
-my $VERSION = '1.8.1';
+my $VERSION = '1.8.2';
 
 print "\n This script will convert yeast genomic coordinates\n";
 
@@ -96,14 +96,23 @@ if (scalar @infiles == 1) {
 # Prepare for converting to roman numerals
 my %old2new = (
 	'chr1'	=>	'chrI',
+	'chr01'	=>	'chrI',
 	'chr2'	=>	'chrII',
+	'chr02'	=>	'chrII',
 	'chr3'	=>	'chrIII',
+	'chr03'	=>	'chrIII',
 	'chr4'	=>	'chrIV',
+	'chr04'	=>	'chrIV',
 	'chr5'	=>	'chrV',
+	'chr05'	=>	'chrV',
 	'chr6'	=>	'chrVI',
+	'chr06'	=>	'chrVI',
 	'chr7'	=>	'chrVII',
+	'chr07'	=>	'chrVII',
 	'chr8'	=>	'chrVIII',
+	'chr08'	=>	'chrVIII',
 	'chr9'	=>	'chrIX',
+	'chr09'	=>	'chrIX',
 	'chr10'	=>	'chrX',
 	'chr11'	=>	'chrXI',
 	'chr12'	=>	'chrXII',
@@ -111,7 +120,7 @@ my %old2new = (
 	'chr14'	=>	'chrXIV',
 	'chr15'	=>	'chrXV',
 	'chr16'	=>	'chrXVI',
-	'chrMito'	=>	'chrMito',
+	'chrMito'	=>	'chrMito', # no change for these
 	'2-micron' =>	'2-micron',
 );
 
@@ -251,6 +260,13 @@ sub determine_method {
 		print " converting from version $old_version_number to " . 
 			"$new_version_number...\n";
 	} 
+	elsif ($version == 11) {
+		$goconvert = \&version_20080606_20110203;
+		$old_version_number = '20080606';
+		$new_version_number = '20110203';
+		print " converting from version $old_version_number to " . 
+			"$new_version_number...\n";
+	} 
 	else {
 		die " unknown version conversion!\n";
 	}
@@ -269,6 +285,7 @@ print " Available conversions:
    8) 20050806 (perocchi..steinmetz 2007, SGD R43?) to 20100109 (SGD R63)
    9) 20070901 (xu..steinmetz 2009, SGD R56) to 20100109 (SGD R63)
    10) 20100109 (SGD R63) to 20110203 (SGD R64, UCSC SacCer3)
+   11) 20080606 (SGD R61, UCSC SacCer2) to 20110203 (SGD R64, UCSC SacCer3)
 ";
 }
 
@@ -393,7 +410,7 @@ sub process_file {
 		my $position = $data[$pos_index];
 		
 		# convert the first position
-		my $newposition = &{$goconvert}($chromo, $position); # do the conversion
+		my $newposition = &{$goconvert}(convert_chr($chromo), $position);
 		if ($newposition != $position) {
 			$data[$pos_index] = $newposition;
 			$changed = 1;
@@ -411,7 +428,8 @@ sub process_file {
 			} 
 			else {
 				# using different start and end positions
-				my $newposition2 = &{$goconvert}($chromo, $position2); 
+				my $newposition2 = 
+					&{$goconvert}(convert_chr($chromo), $position2); 
 				if ($newposition2 != $position2) {
 					$data[$pos2_index] = $newposition2;
 					$changed = 1;
@@ -421,7 +439,7 @@ sub process_file {
 		
 		# convert chromosome name
 		if ($convert_to_roman) {
-			$data[$chromo_index] = convert_chr_to_roman($chromo);
+			$data[$chromo_index] = convert_chr($chromo);
 		}
 		
 		# put back
@@ -471,10 +489,21 @@ sub process_file {
 
 
 
-sub convert_chr_to_roman {
+sub convert_chr {
 	my $chromo = shift;
 	
-	# take care of pesky leading 0
+	# return if looks ok
+	return $chromo if $chromo =~ /^chr[IVX]+$/;
+	
+	# add chr prefix if missing (numerals only)
+	if ($chromo =~ m/^[\dIXV]+$/) {
+		$chromo = 'chr' . $chromo;
+	}
+	
+	# normalize prefix case
+	$chromo =~ s/^chr/chr/i;
+		
+	# remove preceding 0 if present
 	$chromo =~ s/0(\d)$/$1/;
 	
 	if (exists $old2new{$chromo}) {
@@ -491,7 +520,7 @@ sub convert_chr_to_roman {
 
 # the conversion subroutines
 	# the adjustment numbers below were obtained by running the EMBOSS program 
-	# 'diffseq' on the two sequences. I used -wordsize of 10 and -globaldifferences Y
+	# 'diffseq' on the two sequences. I used -wordsize of 8 or 10 and -globaldifferences Y
 	# I wrote a shell script find_diffs.sh to expediate the search
 	# The diffseq program will report the location and sequence changes between the two 
 	# sequence versions. I am using the highest position of the 2003 sequence as 
@@ -501,51 +530,66 @@ sub convert_chr_to_roman {
 	# new version subroutines may be added by duplicating the subroutine,
 	# renaming it, and making the necessary changes. Don't forget to add it to the
 	# choice menu below
+	
+	# here is the list of methods I've been using lately after running diffseq
+	# grep ^(chr\w+) ([\d\-]+) Length: (\d+) ?\(?(\w*)\)?\rSequence: \w*\rSequence: \w*\rchr\w+ ([\d\-]+) Length: (\d+)[ \w\(\)]*$
+	# replace with \1\t\2\t\3\t\5\t\6\t\4
+	# toss empty and comment lines
+	# extract indels with perl -w -n -e 'chomp; next if /^#|C/; my @a = split /\t/; next if $a[2] == $a[4]; $pos = $1 if $a[1] =~ /^(\d+)/; if ($a[5]) {print join("\t", $a[0], $pos, $a[4]) . "\n";}  elsif ($a[2] == 2 and $a[4] == 1) { print join("\t", $a[0], $pos, 1) . "\n";} else {print join("\t", $a[0], $pos, $a[4] - $a[2]) . "\n";}' 20080606_vs_20110203.table.txt | pbcopy
+	# new document from clipboard
+	# manually add new chromosome name by itself at beginning of each chromo block
+	# grep "^chr(\w+)\t(\d+)\t(\d+)$"
+	# replace with "		$new += \3 if ($position >= \2);"
+	# grep "^chr(\w+)\t(\d+)\t\-(\d+)$"
+	# replace with "		$new -= \3 if ($position >= \2);"
+	# grep "^chr(\w+)$"
+	# replace with "\t}\r\t\r	elsif ($chromo eq '\1') {"
+	
 
 sub version_20050806_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		if ($position >= 76147) {$new += 1}
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 478026) {$new += 1}
 		if ($position >= 613205) {$new += 1}
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		if ($position >= 946899) {$new += 1}
 		if ($position >= 962548) {$new -= 1}
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		if ($position >= 54132) {$new += 1}
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 101726) {$new += 1}
 		if ($position >= 120804) {$new += 6}
 		if ($position >= 120890) {$new += 72}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		if ($position >= 185987) {$new -= 2}
 		if ($position >= 255409) {$new += 1}
 		if ($position >= 363801) {$new += 1}
 		if ($position >= 552426) {$new += 1}
 		if ($position >= 552516) {$new -= 1}
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		if ($position >= 922648) {$new += 1}
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		if ($position >= 60402) {$new += 1}
 		if ($position >= 68346) {$new += 1} # this one is not present in 20051106
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		if ($position >= 42534) {$new += 1}
 		if ($position >= 803745) {$new += 1}
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -557,46 +601,46 @@ sub version_20050806_20070113 {
 sub version_20051106_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		if ($position >= 76147) {$new += 1}
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 478026) {$new += 1}
 		if ($position >= 613205) {$new += 1}
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		if ($position >= 946899) {$new += 1}
 		if ($position >= 962548) {$new -= 1}
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		if ($position >= 54132) {$new += 1}
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 101726) {$new += 1}
 		if ($position >= 120804) {$new += 6}
 		if ($position >= 120890) {$new += 72}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		if ($position >= 185987) {$new -= 2}
 		if ($position >= 255409) {$new += 1}
 		if ($position >= 363801) {$new += 1}
 		if ($position >= 552426) {$new += 1}
 		if ($position >= 552516) {$new -= 1}
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		if ($position >= 922648) {$new += 1}
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		if ($position >= 60402) {$new += 1}
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		if ($position >= 42534) {$new += 1}
 		if ($position >= 803745) {$new += 1}
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -608,39 +652,39 @@ sub version_20051106_20070113 {
 sub version_20060204_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		# no changes
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		#if ($position >= 478023) {$new += 1}
 		# comment this out for Segal's 2006 version only
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		# no changes
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		# no changes
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 120805) {$new += 6}
 		if ($position >= 120891) {$new += 72}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		# no changes
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		# no changes
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		# no changes
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		# no changes
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -651,38 +695,38 @@ sub version_20060204_20070113 {
 sub version_200601xx_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		# no changes
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 478023) {$new += 1}
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		# no changes
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		# no changes
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 120805) {$new += 6}
 		if ($position >= 120891) {$new += 72}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		# no changes
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		# no changes
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		# no changes
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		# no changes
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -692,38 +736,38 @@ sub version_200601xx_20070113 {
 sub version_20060916_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		# no changes
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		# no changes
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		# no changes
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		# no changes
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 120805) {$new += 6}
 		if ($position >= 120891) {$new += 72}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		# no changes
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		# no changes
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		# no changes
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		# no changes
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -734,13 +778,13 @@ sub version_20060916_20070113 {
 sub version_20031001_20070113 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		if ($position >= 41778) {$new += 1}
 		if ($position >= 51691) {$new -= 2}
 		if ($position >= 130247) {$new += 1}
 		if ($position >= 143846) {$new += 1}
 		if ($position >= 166768) {$new -= 1}
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		if ($position >= 18364) {$new += 1}
 		if ($position >= 21346) {$new += 4}
 		if ($position >= 40893) {$new -= 2}
@@ -753,11 +797,11 @@ sub version_20031001_20070113 {
 		if ($position >= 457296) {$new += 1}
 		if ($position >= 553996) {$new += 1}
 		if ($position >= 742173) {$new += 2}
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		if ($position >= 76147) {$new += 1}
 		if ($position >= 101692) {$new += 4}
 		if ($position >= 105969) {$new -= 1}
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 235713) {$new += 1}
 		if ($position >= 478022) {$new += 1}
 		if ($position >= 503839) {$new += 1}
@@ -765,10 +809,10 @@ sub version_20031001_20070113 {
 		if ($position >= 819477) {$new += 1}
 		if ($position >= 1192051) {$new -= 1}
 	# no changes for Chromosome 5
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		if ($position >= 231670) {$new -= 1}
 		if ($position >= 242179) {$new += 1}
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		if ($position >= 53811) {$new += 1}
 		if ($position >= 93036) {$new += 1}
 		if ($position >= 93253) {$new += 1}
@@ -783,7 +827,7 @@ sub version_20031001_20070113 {
 		if ($position >= 946896) {$new += 1}
 		if ($position >= 952554) {$new -= 1}
 		if ($position >= 962546) {$new -= 1}
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		if ($position >= 54135) {$new += 1}
 		if ($position >= 98460) {$new += 1}
 		if ($position >= 217748) {$new -= 1}
@@ -791,7 +835,7 @@ sub version_20031001_20070113 {
 		if ($position >= 455307) {$new += 1}
 		if ($position >= 455502) {$new += 1}
 	# no changes for Chromosome 9
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 89893) {$new += 1}
 		if ($position >= 101724) {$new += 1}
 		if ($position >= 118302) {$new -= 1}
@@ -800,7 +844,7 @@ sub version_20031001_20070113 {
 		if ($position >= 121257) {$new += 220}
 		if ($position >= 411267) {$new += 1}
 		if ($position >= 460191) {$new -= 1}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		if ($position >= 48828) {$new += 1}
 		if ($position >= 58939) {$new += 3}
 		if ($position >= 185983) {$new -= 2}
@@ -813,15 +857,15 @@ sub version_20031001_20070113 {
 		if ($position >= 603770) {$new += 1}
 		if ($position >= 611272) {$new += 1}
 		if ($position >= 638899) {$new += 1}
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		if ($position >= 553548) {$new += 1}
 		if ($position >= 553629) {$new += 1}
 		if ($position >= 760764) {$new -= 2}
 		if ($position >= 899751) {$new += 1}
 		if ($position >= 922644) {$new += 1}
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		if ($position >= 804684) {$new -= 1}
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		if ($position >= 60402) {$new += 1}
 		if ($position >= 68346) {$new += 1}
 		if ($position >= 254767) {$new += 1}
@@ -829,11 +873,11 @@ sub version_20031001_20070113 {
 		if ($position >= 271648) {$new += 1}
 		if ($position >= 472581) {$new -= 1}
 		if ($position >= 505511) {$new += 1}
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		if ($position >= 42534) {$new += 1}
 		if ($position >= 803745) {$new += 1}
 		if ($position >= 877622) {$new += 2}
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		if ($position >= 347285) {$new += 1}
 		if ($position >= 347373) {$new += 1}
 	}
@@ -846,40 +890,40 @@ sub version_20031001_20070113 {
 sub version_20070113_20100109 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		# no changes
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 382379) {$new += 1}
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		if ($position >= 1038054) {$new += 1}
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		# no changes
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 126896) {$new -= 1}
 		if ($position >= 599597) {$new -= 1}
 		if ($position >= 599640) {$new -= 1}
 		if ($position >= 599715) {$new -= 1}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		# no changes
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		# no changes
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		if ($position >= 472585) {$new += 1}
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		# no changes
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -891,29 +935,29 @@ sub version_20070113_20100109 {
 sub version_20050806_20100109 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo =~ /^chr0?1$/i) { # Chromosome 1
+	if ($chromo eq 'chrI') { # Chromosome 1
 		# no changes
-	} elsif ($chromo =~ /^chr0?2$/i) { # Chromosome 2
+	} elsif ($chromo eq 'chrII') { # Chromosome 2
 		# no changes
-	} elsif ($chromo =~ /^chr0?3$/i) { # Chromosome 3
+	} elsif ($chromo eq 'chrIII') { # Chromosome 3
 		if ($position >= 76147) {$new += 1}
-	} elsif ($chromo =~ /^chr0?4$/i) { # Chromosome 4
+	} elsif ($chromo eq 'chrIV') { # Chromosome 4
 		if ($position >= 382381) {$new += 1}
 		if ($position >= 478023) {$new += 1}
 		if ($position >= 613205) {$new += 1}
-	} elsif ($chromo =~ /^chr0?5$/i) { # Chromosome 5
+	} elsif ($chromo eq 'chrV') { # Chromosome 5
 		# no changes
-	} elsif ($chromo =~ /^chr0?6$/i) { # Chromosome 6
+	} elsif ($chromo eq 'chrVI') { # Chromosome 6
 		# no changes
-	} elsif ($chromo =~ /^chr0?7$/i) { # Chromosome 7
+	} elsif ($chromo eq 'chrVII') { # Chromosome 7
 		if ($position >= 946899) {$new += 1}
 		if ($position >= 962548) {$new -= 1}
 		if ($position >= 1038054) {$new += 1}
-	} elsif ($chromo =~ /^chr0?8$/i) { # Chromosome 8
+	} elsif ($chromo eq 'chrVIII') { # Chromosome 8
 		if ($position >= 54132) {$new += 1}
-	} elsif ($chromo =~ /^chr0?9$/i) { # Chromosome 9
+	} elsif ($chromo eq 'chrIX') { # Chromosome 9
 		# no changes
-	} elsif ($chromo =~ /^chr10$/i) { # Chromosome 10
+	} elsif ($chromo eq 'chrX') { # Chromosome 10
 		if ($position >= 101726) {$new += 1}
 		if ($position >= 120804) {$new += 6}
 		if ($position >= 120890) {$new += 72}
@@ -921,25 +965,25 @@ sub version_20050806_20100109 {
 		if ($position >= 599518) {$new -= 1}
 		if ($position >= 599561) {$new -= 1}
 		if ($position >= 599636) {$new -= 1}
-	} elsif ($chromo =~ /^chr11$/i) { # Chromosome 11
+	} elsif ($chromo eq 'chrXI') { # Chromosome 11
 		if ($position >= 185979) {$new -= 1}
 		if ($position >= 185987) {$new -= 1}
 		if ($position >= 255409) {$new += 1}
 		if ($position >= 363801) {$new += 1}
 		if ($position >= 552426) {$new += 1}
 		if ($position >= 552516) {$new -= 1}
-	} elsif ($chromo =~ /^chr12$/i) { # Chromosome 12
+	} elsif ($chromo eq 'chrXII') { # Chromosome 12
 		if ($position >= 922648) {$new += 1}
-	} elsif ($chromo =~ /^chr13$/i) { # Chromosome 13
+	} elsif ($chromo eq 'chrXIII') { # Chromosome 13
 		# no changes
-	} elsif ($chromo =~ /^chr14$/i) { # Chromosome 14
+	} elsif ($chromo eq 'chrXIV') { # Chromosome 14
 		if ($position >= 60402) {$new += 1}
 		if ($position >= 68346) {$new += 1}
 		if ($position >= 472579) {$new += 1}
-	} elsif ($chromo =~ /^chr15$/i) { # Chromosome 15
+	} elsif ($chromo eq 'chrXV') { # Chromosome 15
 		if ($position >= 42534) {$new += 1}
 		if ($position >= 803745) {$new += 1}
-	} elsif ($chromo =~ /^chr16$/i) { # Chromosome 16
+	} elsif ($chromo eq 'chrXVI') { # Chromosome 16
 		# no changes
 	}
 	# no changes for Chromosome MT
@@ -950,7 +994,7 @@ sub version_20050806_20100109 {
 sub version_20100109_20110203 {
 	my ($chromo, $position) = @_;
 	my $new = $position;
-	if ($chromo eq 'chr1') {
+	if ($chromo eq 'chrI') {
 		$new += -1 if ($position >= 3836);
 		$new += 1 if ($position >= 5926); 
 		$new += -1 if ($position >= 6454);
@@ -983,7 +1027,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 203326);
 		$new += 1 if ($position >= 229570);
 	}
-	elsif ($chromo eq 'chr2') {
+	elsif ($chromo eq 'chrII') {
 		$new += 1 if ($position >= 21375);
 		$new += -2 if ($position >= 23855);
 		$new += 1 if ($position >= 23945);
@@ -1021,13 +1065,13 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 786760);
 		$new += 1 if ($position >= 792275);
 	}
-	elsif ($chromo eq 'chr3') {
+	elsif ($chromo eq 'chrIII') {
 		$new += 1 if ($position >= 110880);
 		$new += 1 if ($position >= 111717);
 		$new += 2 if ($position >= 155960); # manual insertion
 		$new += -1 if ($position >= 242460);
 	}
-	elsif ($chromo eq 'chr4') {
+	elsif ($chromo eq 'chrIV') {
 		$new += -1 if ($position >= 34006);
 		$new += 1 if ($position >= 215995);
 		$new += -1 if ($position >= 330573);
@@ -1055,14 +1099,14 @@ sub version_20100109_20110203 {
 		$new += 2 if ($position >= 1516838);
 		$new += -1 if ($position >= 1522501);
 	}
-	elsif ($chromo eq 'chr5') {
+	elsif ($chromo eq 'chrV') {
 		$new += 1 if ($position >= 141111);
 		$new += 1 if ($position >= 268856);
 		$new += 1 if ($position >= 303531);
 		$new += 1 if ($position >= 305709);
 		$new += 1 if ($position >= 449958);
 	}
-	elsif ($chromo eq 'chr6') {
+	elsif ($chromo eq 'chrVI') {
 		$new += 1 if ($position >= 54506);
 		$new += 1 if ($position >= 65120);
 		$new += 1 if ($position >= 97513);
@@ -1076,7 +1120,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 194784);
 		$new += 1 if ($position >= 226683);
 	}
-	elsif ($chromo eq 'chr7') {
+	elsif ($chromo eq 'chrVII') {
 		$new += 1 if ($position >= 72711);
 		$new += -4 if ($position >= 89587);
 		$new += 1 if ($position >= 89600);
@@ -1128,7 +1172,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 1004545);
 		$new += -1 if ($position >= 1039741);
 	}
-	elsif ($chromo eq 'chr8') {
+	elsif ($chromo eq 'chrVIII') {
 		$new += 1 if ($position >= 2249);
 		$new += 1 if ($position >= 8357);
 		$new += 1 if ($position >= 18566);
@@ -1150,7 +1194,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 441868);
 		$new += 1 if ($position >= 445613);
 	}
-	elsif ($chromo eq 'chr9') {
+	elsif ($chromo eq 'chrIX') {
 		$new += 3 if ($position >= 128404);
 		$new += -1 if ($position >= 249637);
 		$new += -1 if ($position >= 257479);
@@ -1159,7 +1203,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 427191);
 		$new += -1 if ($position >= 435031);
 	}
-	elsif ($chromo eq 'chr10') {
+	elsif ($chromo eq 'chrX') {
 		$new += 1 if ($position >= 59470);
 		$new += 1 if ($position >= 79349);
 		$new += 2 if ($position >= 97251);
@@ -1190,7 +1234,7 @@ sub version_20100109_20110203 {
 		$new += -1 if ($position >= 627319);
 		$new += -1 if ($position >= 628638);
 	}
-	elsif ($chromo eq 'chr11') {
+	elsif ($chromo eq 'chrXI') {
 		$new += -1 if ($position >= 394);
 		$new += -1 if ($position >= 12941);
 		$new += 2 if ($position >= 14461); # manual insertion
@@ -1212,7 +1256,7 @@ sub version_20100109_20110203 {
 		$new += 2 if ($position >= 630164);
 		$new += 2 if ($position >= 630275);
 	}
-	elsif ($chromo eq 'chr12') {
+	elsif ($chromo eq 'chrXII') {
 		$new += 1 if ($position >= 32901);
 		$new += -1 if ($position >= 187394);
 		$new += -1 if ($position >= 187419);
@@ -1227,13 +1271,13 @@ sub version_20100109_20110203 {
 		$new += -1 if ($position >= 1032533);
 		$new += -1 if ($position >= 1038769);
 	}
-	elsif ($chromo eq 'chr13') {
+	elsif ($chromo eq 'chrXIII') {
 		$new += -1 if ($position >= 9529);
 		$new += 1 if ($position >= 26591);
 		$new += 1 if ($position >= 283465);
 		$new += 1 if ($position >= 904640);
 	}
-	elsif ($chromo eq 'chr14') {
+	elsif ($chromo eq 'chrXIV') {
 		$new += 1 if ($position >= 23470);
 		$new += -1 if ($position >= 56218);
 		$new += -1 if ($position >= 129279);
@@ -1242,7 +1286,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 721803);
 		$new += 1 if ($position >= 731362);
 	}
-	elsif ($chromo eq 'chr15') {
+	elsif ($chromo eq 'chrXV') {
 		$new += 1 if ($position >= 8474);
 		$new += -1 if ($position >= 58558);
 		$new += 1 if ($position >= 218999);
@@ -1263,7 +1307,7 @@ sub version_20100109_20110203 {
 		$new += 1 if ($position >= 892172);
 		$new += -1 if ($position >= 1004738);
 	}
-	elsif ($chromo eq 'chr16') {
+	elsif ($chromo eq 'chrXVI') {
 		$new += 1 if ($position >= 126767);
 		$new += 1 if ($position >= 347527);
 		$new += 1 if ($position >= 347758);
@@ -1280,6 +1324,349 @@ sub version_20100109_20110203 {
 }
 
 
+
+
+sub version_20080606_20110203 {
+	my ($chromo, $position) = @_;
+	my $new = $position;
+	
+	if ($chromo eq 'chrI') {
+		$new -= 1 if ($position >= 3836);
+		$new += 1 if ($position >= 5926);
+		$new -= 1 if ($position >= 6454);
+		$new -= 1 if ($position >= 16468);
+		$new -= 1 if ($position >= 16498);
+		$new += 1 if ($position >= 21530);
+		$new += 1 if ($position >= 23240);
+		$new -= 1 if ($position >= 28069);
+		$new += 1 if ($position >= 28948);
+		$new -= 2 if ($position >= 130488);
+		$new += 1 if ($position >= 134124);
+		$new += 1 if ($position >= 158933);
+		$new += 1 if ($position >= 167086);
+		$new += 1 if ($position >= 167113);
+		$new += 4 if ($position >= 167135);
+		$new += 1 if ($position >= 171882);
+		$new -= 5 if ($position >= 171969);
+		$new -= 2 if ($position >= 172018);
+		$new += 2 if ($position >= 172042);
+		$new += 1 if ($position >= 172169);
+		$new += 1 if ($position >= 175305);
+		$new -= 1 if ($position >= 175372);
+		$new += 1 if ($position >= 177136);
+		$new -= 1 if ($position >= 178602);
+		$new += 1 if ($position >= 178617);
+		$new -= 1 if ($position >= 178639);
+		$new += 4 if ($position >= 180960);
+		$new += 1 if ($position >= 198909);
+		$new += 1 if ($position >= 202933);
+		$new += 1 if ($position >= 203326);
+		$new += 1 if ($position >= 229570);
+	}
+	
+	elsif ($chromo eq 'chrII') {
+		$new += 1 if ($position >= 21375);
+		$new -= 2 if ($position >= 23855);
+		$new += 1 if ($position >= 23945);
+		$new += 2 if ($position >= 28886); # manual insertion 
+		$new += 1 if ($position >= 28906);
+		$new += 1 if ($position >= 59405);
+		$new -= 1 if ($position >= 61051);
+		$new -= 1 if ($position >= 80743);
+		$new -= 3 if ($position >= 92916);
+		$new -= 1 if ($position >= 93620);
+		$new -= 1 if ($position >= 113437);
+		$new += 1 if ($position >= 237020);
+		$new += 1 if ($position >= 248622);
+		$new += 1 if ($position >= 254543);
+		$new += 2 if ($position >= 254720);
+		$new -= 1 if ($position >= 265902);
+		$new -= 1 if ($position >= 265920);
+		$new += 1 if ($position >= 310456);
+		$new -= 1 if ($position >= 315071);
+		$new += 1 if ($position >= 324361);
+		$new += 1 if ($position >= 328378);
+		$new += 1 if ($position >= 371419);
+		$new += 1 if ($position >= 382728);
+		$new += 1 if ($position >= 382740);
+		$new += 1 if ($position >= 390032);
+		$new -= 1 if ($position >= 390442);
+		$new += 1 if ($position >= 391272);
+		$new -= 2 if ($position >= 392341);
+		$new += 1 if ($position >= 392818);
+		$new += 1 if ($position >= 394725);
+		$new -= 1 if ($position >= 561435);
+		$new -= 1 if ($position >= 623445);
+		$new += 1 if ($position >= 625434);
+		$new -= 1 if ($position >= 757291);
+		$new += 1 if ($position >= 786760);
+		$new += 1 if ($position >= 792275);
+	}
+	
+	elsif ($chromo eq 'chrIII') {
+		$new += 1 if ($position >= 110880);
+		$new += 2 if ($position >= 155960); # manual insertion
+		$new += 1 if ($position >= 111717);
+		$new -= 1 if ($position >= 242460);
+	}
+	
+	elsif ($chromo eq 'chrIV') {
+		$new -= 1 if ($position >= 34006);
+		$new += 1 if ($position >= 215995);
+		$new -= 1 if ($position >= 330573);
+		$new += 1 if ($position >= 332985);
+		$new += 2 if ($position >= 369164);
+		$new += 1 if ($position >= 371107);
+		$new -= 1 if ($position >= 381865);
+		$new += 1 if ($position >= 396409);
+		$new -= 1 if ($position >= 396437);
+		$new -= 1 if ($position >= 542033);
+		$new += 1 if ($position >= 569993);
+		$new -= 1 if ($position >= 578227);
+		$new += 1 if ($position >= 592031);
+		$new += 1 if ($position >= 894307);
+		$new -= 1 if ($position >= 1084519);
+		$new += 2 if ($position >= 1117109); # manual insertion
+		$new += 1 if ($position >= 1140693);
+		$new += 1 if ($position >= 1176394);
+		$new += 1 if ($position >= 1194953);
+		$new += 1 if ($position >= 1502733);
+		$new += 1 if ($position >= 1509885);
+		$new += 4 if ($position >= 1516809);
+		$new += 2 if ($position >= 1516838);
+		$new -= 1 if ($position >= 1522501);
+	}
+	
+	elsif ($chromo eq 'chrV') {
+		$new += 1 if ($position >= 141111);
+		$new += 1 if ($position >= 268856);
+		$new += 1 if ($position >= 303531);
+		$new += 1 if ($position >= 305709);
+		$new += 1 if ($position >= 449958);
+	}
+	
+	elsif ($chromo eq 'chrVI') {
+		$new += 1 if ($position >= 54506);
+		$new += 1 if ($position >= 65120);
+		$new += 1 if ($position >= 97513);
+		$new += 3 if ($position >= 98795);
+		$new -= 1 if ($position >= 118606);
+		$new += 1 if ($position >= 155994);
+		$new += 1 if ($position >= 164823);
+		$new += 1 if ($position >= 168868);
+		$new += 4 if ($position >= 181038);
+		$new -= 1 if ($position >= 192393);
+		$new += 1 if ($position >= 194784);
+		$new += 1 if ($position >= 226683);
+	}
+	
+	elsif ($chromo eq 'chrVII') {
+		$new += 1 if ($position >= 72711);
+		$new -= 4 if ($position >= 89587);
+		$new -= 2 if ($position >= 89749);
+		$new += 1 if ($position >= 90017);
+		$new -= 1 if ($position >= 93660);
+		$new += 1 if ($position >= 94594);
+		$new -= 2 if ($position >= 95082);
+		$new -= 1 if ($position >= 95444);
+		$new += 3 if ($position >= 95472);
+		$new -= 1 if ($position >= 122568);
+		$new -= 1 if ($position >= 131261);
+		$new -= 1 if ($position >= 152961);
+		$new += 1 if ($position >= 153008);
+		$new += 1 if ($position >= 206465);
+		$new -= 1 if ($position >= 269097);
+		$new += 1 if ($position >= 286354);
+		$new -= 1 if ($position >= 286727);
+		$new += 2 if ($position >= 289526);
+		$new += 1 if ($position >= 289566);
+		$new -= 1 if ($position >= 389965);
+		$new -= 1 if ($position >= 390007);
+		$new -= 1 if ($position >= 393811);
+		$new -= 1 if ($position >= 397868);
+		$new += 1 if ($position >= 398013);
+		$new += 2 if ($position >= 398027);
+		$new += 1 if ($position >= 398065);
+		$new += 1 if ($position >= 412392);
+		$new -= 1 if ($position >= 413089);
+		$new += 1 if ($position >= 413409);
+		$new -= 1 if ($position >= 413784);
+		$new -= 1 if ($position >= 413969);
+		$new -= 1 if ($position >= 418633);
+		$new -= 1 if ($position >= 419054);
+		$new += 1 if ($position >= 428248);
+		$new += 1 if ($position >= 485888);
+		$new -= 1 if ($position >= 727145);
+		$new += 2 if ($position >= 924486);
+		$new -= 1 if ($position >= 938725);
+		$new += 1 if ($position >= 938791);
+		$new -= 1 if ($position >= 958924);
+		$new -= 1 if ($position >= 962981);
+		$new += 1 if ($position >= 999335);
+		$new -= 1 if ($position >= 999676);
+		$new -= 1 if ($position >= 1004036);
+		$new -= 1 if ($position >= 1004345);
+		$new += 1 if ($position >= 1004545);
+		$new -= 1 if ($position >= 1039741);
+	}
+	
+	elsif ($chromo eq 'chrVIII') {
+		$new += 1 if ($position >= 2249);
+		$new += 1 if ($position >= 8357);
+		$new += 1 if ($position >= 18566);
+		$new -= 1 if ($position >= 25811);
+		$new += 1 if ($position >= 64382);
+		$new += 1 if ($position >= 78732);
+		$new += 1 if ($position >= 102563);
+		$new += 1 if ($position >= 126325);
+		$new += 1 if ($position >= 131450);
+		$new -= 1 if ($position >= 207353);
+		$new -= 8 if ($position >= 212258);
+		$new -= 2 if ($position >= 287116);
+		$new += 1 if ($position >= 287175);
+		$new += 1 if ($position >= 293373);
+		$new -= 1 if ($position >= 294429);
+		$new += 1 if ($position >= 369888);
+		$new -= 1 if ($position >= 369985);
+		$new += 1 if ($position >= 423722);
+		$new += 1 if ($position >= 441868);
+		$new += 1 if ($position >= 445613);
+	}
+	
+	elsif ($chromo eq 'chrIX') {
+		$new += 3 if ($position >= 128404);
+		$new -= 1 if ($position >= 249637);
+		$new -= 1 if ($position >= 257479);
+		$new += 1 if ($position >= 300238);
+		$new += 1 if ($position >= 333320);
+		$new += 1 if ($position >= 427191);
+		$new -= 1 if ($position >= 435031);
+	}
+	
+	elsif ($chromo eq 'chrX') {
+		$new += 1 if ($position >= 59470);
+		$new += 1 if ($position >= 79349);
+		$new += 2 if ($position >= 97251);
+		$new += 1 if ($position >= 97582);
+		$new += 1 if ($position >= 97647);
+		$new += 4 if ($position >= 99526);
+		$new -= 2 if ($position >= 99569);
+		$new -= 2 if ($position >= 99634);
+		$new -= 1 if ($position >= 110898);
+		$new += 1 if ($position >= 110918);
+		$new -= 1 if ($position >= 111288);
+		$new -= 1 if ($position >= 111645);
+		$new -= 1 if ($position >= 126896);
+		$new -= 1 if ($position >= 180996);
+		$new -= 1 if ($position >= 187025);
+		$new += 1 if ($position >= 195502);
+		$new -= 1 if ($position >= 198589);
+		$new -= 1 if ($position >= 198630);
+		$new += 1 if ($position >= 204519);
+		$new += 3 if ($position >= 204534);
+		$new += 1 if ($position >= 247044);
+		$new += 1 if ($position >= 407437);
+		$new -= 1 if ($position >= 422267);
+		$new += 1 if ($position >= 422449);
+		$new += 1 if ($position >= 438630);
+		$new += 2 if ($position >= 613906);
+		$new += 1 if ($position >= 613918);
+		$new += 1 if ($position >= 622415);
+		$new -= 1 if ($position >= 627320);
+		$new -= 1 if ($position >= 628639);
+	}
+	
+	elsif ($chromo eq 'chrXI') {
+		$new -= 1 if ($position >= 394);
+		$new -= 1 if ($position >= 12941);
+		$new += 2 if ($position >= 14461); # manual insertion
+		$new -= 1 if ($position >= 24799);
+		$new -= 1 if ($position >= 67956);
+		$new -= 1 if ($position >= 68314);
+		$new -= 1 if ($position >= 70487);
+		$new -= 1 if ($position >= 70683);
+		$new -= 1 if ($position >= 158182);
+		$new += 1 if ($position >= 158689);
+		$new -= 1 if ($position >= 189342);
+		$new += 1 if ($position >= 189366);
+		$new += 6 if ($position >= 190399);
+		$new += 3 if ($position >= 199357);
+		$new += 352 if ($position >= 200376);
+		$new += 1 if ($position >= 359603);
+		$new += 1 if ($position >= 496922);
+		$new += 2 if ($position >= 630164);
+		$new += 2 if ($position >= 630275);
+	}
+	
+	elsif ($chromo eq 'chrXII') {
+		$new += 1 if ($position >= 32901);
+		$new -= 1 if ($position >= 187394);
+		$new -= 1 if ($position >= 187419);
+		$new -= 1 if ($position >= 491156);
+		$new += 2 if ($position >= 760763); # manual insertion
+		$new += 1 if ($position >= 822958);
+		$new -= 1 if ($position >= 878172);
+		$new += 1 if ($position >= 924691);
+		$new += 1 if ($position >= 933638);
+		$new += 1 if ($position >= 949229);
+		$new += 1 if ($position >= 1028607);
+		$new -= 1 if ($position >= 1032533);
+		$new -= 1 if ($position >= 1038769);
+	}
+	
+	elsif ($chromo eq 'chrXIII') {
+		$new -= 1 if ($position >= 9529);
+		$new += 1 if ($position >= 26591);
+		$new += 1 if ($position >= 283465);
+		$new += 1 if ($position >= 904640);
+	}
+	
+	elsif ($chromo eq 'chrXIV') {
+		$new += 1 if ($position >= 23470);
+		$new -= 1 if ($position >= 56218);
+		$new -= 1 if ($position >= 129279);
+		$new -= 1 if ($position >= 287983);
+		$new += 1 if ($position >= 472581);
+		$new -= 1 if ($position >= 618197);
+		$new += 1 if ($position >= 721802);
+		$new += 1 if ($position >= 731361);
+	}
+	
+	elsif ($chromo eq 'chrXV') {
+		$new += 1 if ($position >= 8474);
+		$new -= 1 if ($position >= 58558);
+		$new += 1 if ($position >= 218999);
+		$new -= 2 if ($position >= 259230);
+		$new += 1 if ($position >= 343135);
+		$new -= 1 if ($position >= 414326);
+		$new -= 1 if ($position >= 423750);
+		$new += 1 if ($position >= 492978);
+		$new += 1 if ($position >= 521070);
+		$new -= 1 if ($position >= 521098);
+		$new += 1 if ($position >= 588317);
+		$new -= 1 if ($position >= 588344);
+		$new += 1 if ($position >= 808201);
+		$new += 1 if ($position >= 816958);
+		$new += 1 if ($position >= 877794);
+		$new += 1 if ($position >= 892172);
+		$new -= 1 if ($position >= 1004738);
+	}
+	
+	elsif ($chromo eq 'chrXVI') {
+		$new += 1 if ($position >= 126767);
+		$new += 1 if ($position >= 347527);
+		$new += 1 if ($position >= 347758);
+		$new -= 1 if ($position >= 482784);
+		$new += 1 if ($position >= 520377);
+		$new += 1 if ($position >= 520646);
+		$new -= 1 if ($position >= 520818);
+		$new -= 1 if ($position >= 698541);
+		$new += 1 if ($position >= 778302);
+		$new += 1 if ($position >= 778375);
+	}
+	
+	return $new;
+}
 
 
 
@@ -1381,6 +1768,8 @@ yeast genome version releases.
 9) 20070901 (xu..steinmetz 2009, SGD R56) to 20100109 (SGD R63)
 
 10) 20100109 (SGD R63) to 20110203 (SGD R64, UCSC SacCer3)
+
+11) 20080606 (SGD R61, UCSC SacCer2) to 20110203 (SGD R64, UCSC SacCer3)
 
 =head1 AUTHOR
 
