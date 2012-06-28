@@ -219,6 +219,8 @@ my ($name, $path, $ext) = fileparse($datafile,
 		\.sgr\.gz
 		\.wig
 		\.wig\.gz
+		\.bdg
+		\.bdg\.gz
 		\.bam
 	) 
 );
@@ -265,7 +267,7 @@ elsif ($ext =~ /sgr/) {
 elsif ($ext =~ /bam/) {
 	get_bam_data();
 } 
-elsif ($ext =~ /wig/) {
+elsif ($ext =~ /wig|bdg/) {
 	get_wig_data();
 } 
 else {
@@ -669,7 +671,7 @@ sub get_bam_data {
 
 
 sub get_wig_data {
-	print " Collecting features from sgr file '$datafile'....\n";
+	print " Collecting features from wig file '$datafile'....\n";
 	
 	# open file io object
 	my $fh = open_to_read_fh($datafile);
