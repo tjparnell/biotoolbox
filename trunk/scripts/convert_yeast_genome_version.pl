@@ -339,7 +339,7 @@ sub process_file {
 		# a non-standard file
 		# identify the indices to the genomic coordinates
 		$chromo_index = find_column_index($metadata_ref, '^chr|seq|ref');
-		$pos_index    = find_column_index($metadata_ref, '^start|pos$');
+		$pos_index    = find_column_index($metadata_ref, '^start|pos');
 		$pos2_index   = find_column_index($metadata_ref, '^stop|end$');
 		unless ( 
 			# check that we have these basic genomic coordinates
