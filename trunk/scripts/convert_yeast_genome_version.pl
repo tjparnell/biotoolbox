@@ -96,23 +96,14 @@ if (scalar @infiles == 1) {
 # Prepare for converting to roman numerals
 my %old2new = (
 	'chr1'	=>	'chrI',
-	'chr01'	=>	'chrI',
 	'chr2'	=>	'chrII',
-	'chr02'	=>	'chrII',
 	'chr3'	=>	'chrIII',
-	'chr03'	=>	'chrIII',
 	'chr4'	=>	'chrIV',
-	'chr04'	=>	'chrIV',
 	'chr5'	=>	'chrV',
-	'chr05'	=>	'chrV',
 	'chr6'	=>	'chrVI',
-	'chr06'	=>	'chrVI',
 	'chr7'	=>	'chrVII',
-	'chr07'	=>	'chrVII',
 	'chr8'	=>	'chrVIII',
-	'chr08'	=>	'chrVIII',
 	'chr9'	=>	'chrIX',
-	'chr09'	=>	'chrIX',
 	'chr10'	=>	'chrX',
 	'chr11'	=>	'chrXI',
 	'chr12'	=>	'chrXII',
@@ -348,7 +339,7 @@ sub process_file {
 		# a non-standard file
 		# identify the indices to the genomic coordinates
 		$chromo_index = find_column_index($metadata_ref, '^chr|seq|ref');
-		$pos_index    = find_column_index($metadata_ref, '^start$');
+		$pos_index    = find_column_index($metadata_ref, '^start|pos$');
 		$pos2_index   = find_column_index($metadata_ref, '^stop|end$');
 		unless ( 
 			# check that we have these basic genomic coordinates
