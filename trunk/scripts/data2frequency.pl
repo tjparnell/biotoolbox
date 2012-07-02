@@ -121,43 +121,11 @@ unless ($in_data_ref) {
 }
 my $in_table_ref = $in_data_ref->{'data_table'};
 
-# load the dataset names into hashes
-my (%dataset_by_name, %dataset_by_id); # hashes for name and id
-for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
-	my $name = $in_data_ref->{$i}{'name'};
-	if (
-		# check column header names for gene or window attribute information
-		$name =~ /^name|ID|alias/i or 
-		$name =~ /^class|type/i or
-		$name =~ /^chr|ref/i or
-		$name =~ /^start/i or
-		$name =~ /^stop|end/i
-	) { 
-		# skip on to the next header
-		next; 
-	} 
-	else { 
-		# record the data set name
-		$dataset_by_id{$i} = $name;
-		$dataset_by_name{$name} = $i;
-	}
-}	
 
 
 
-### Calculate the Bins
-my @bins; # an array for the bins
-# for (my $i = ($binsize + $start); $i < $max; $i += $binsize) {
-# 	push @bins, $i;
-# 	#print "$i ";
-# }
-for (my $i = $start; $i <= $max; $i += $binsize) {
-	push @bins, $i;
-}
 
-
-
-### Determine the order
+### Determine the request order
 my @indices; # an array of the indices to convert
 if (defined $index) {
 	# indices defined as command line argument
@@ -172,11 +140,12 @@ unless (@indices) {
 }
 
 
+
 ### Convert to distribution frequency
 # Generate a new output data structure
+my @bins; 
 my $out_data_ref = prepare_output_data_structure();
 my $out_table_ref = $out_data_ref->{'data_table'}; # quick ref
-#print " this is the new output data structure:\n", Dumper($out_data_ref);
 
 # Process each requested index
 print " Converting datasets to a distribution frequency....\n";
@@ -188,6 +157,7 @@ foreach (@indices) {
 		die " unable to convert dataset index $_!\n";
 	}
 }
+
 
 
 ### Write the new file
@@ -216,6 +186,28 @@ else {
 
 ### Ask user for the index
 sub ask_for_index {
+	
+	# load the dataset names into hashes
+	my (%dataset_by_name, %dataset_by_id); # hashes for name and id
+	for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
+		my $name = $in_data_ref->{$i}{'name'};
+		if (
+			# check column header names for gene or window attribute information
+			$name =~ /^name|ID|alias/i or 
+			$name =~ /^class|type/i or
+			$name =~ /^chr|ref/i or
+			$name =~ /^start/i or
+			$name =~ /^stop|end/i
+		) { 
+			# skip on to the next header
+			next; 
+		} 
+		else { 
+			# record the data set name
+			$dataset_by_id{$i} = $name;
+			$dataset_by_name{$name} = $i;
+		}
+	}	
 	
 	# present the dataset name list
 	print " These are the data sets in the file '$infile'\n";
@@ -258,25 +250,25 @@ sub prepare_output_data_structure {
 	my $data = generate_tim_data_structure(
 		'distribution_frequency',
 		'Bin',
-		'Percentage',
+		'Range',
 	) or die " unable to generate tim data structure!\n";
 	
 	# add metadata
-	$data->{0}{'start'}      = $start;
+	$data->{0}{'mininum'}    = $start;
+	$data->{0}{'maximum'}    = $max;
 	$data->{0}{'bin_number'} = $binnumber;
 	$data->{0}{'bin_size'}   = $binsize;
 	
 	
-	# Record the bins
-	for my $row (1..$binnumber) {
-		$data->{'data_table'}->[$row][0] = $bins[$row - 1];
+	# Calculate and record the bins
+	for (my $i = $start; $i <= $max; $i += $binsize) {
+		push @bins, $i + $binsize;
+		push @{ $data->{'data_table'} }, [
+			($i + $binsize),
+			$i . '-' . ($i + $binsize), 
+		];
+		# $data->{'data_table'}->[$row][0] = $bins[$row - 1];
 		$data->{'last_row'} += 1;
-	}
-	
-	# Generate the percentages
-	for (my $i = 1; $i <= $binnumber; $i++) {
-		$data->{'data_table'}->[$i][1] = 
-			sprintf "%.0f%%", (100 / $binnumber) * $i;
 	}
 	
 	# Return
@@ -293,8 +285,12 @@ sub convert_dataset {
 	for my $i (1..$in_data_ref->{'last_row'}) {
 		# walk through the data file
 		
-		# collect numerical data
-		unless ($in_table_ref->[$i][$data_index] eq '.') {
+		# collect numerical data within range
+		unless (
+			$in_table_ref->[$i][$data_index] eq '.' or
+			$in_table_ref->[$i][$data_index] < $start or
+			$in_table_ref->[$i][$data_index] > $max
+		) {
 			push @values, $in_table_ref->[$i][$data_index]; 
 		}
 	}
@@ -308,14 +304,12 @@ sub convert_dataset {
 		# this should return a reference to a hash where the keys
 		# are the values in @bins and the value is the number of 
 		# datapoints 
-	
-	#print " this is the frequency structure:\n", Dumper($freq_ref);
-	
+		
 	# determine the new index
 	my $new_index = $out_data_ref->{'number_columns'};
 	
 	# record the header name
-	$out_table_ref->[0][$new_index] = $in_table_ref->[0][$data_index];
+	$out_table_ref->[0][$new_index] = $in_data_ref->{$data_index}{'name'};
 	
 	# record the distribution in the output data structure
 	for my $row (1..$out_data_ref->{'last_row'}) {
@@ -387,13 +381,15 @@ provided. This argument is optional if --bins and --max are provided.
 =item --min <number>
 
 Optionally indicate the minimum value of the bins. When generating 
-the list of bins, this is used as the starting value. Default is 0. 
-A negative number may be provided using the format --min=-1. 
+the list of bins, this is used as the starting value. All values less 
+than this value will be ignored.  The default is 0. A negative number 
+may be provided using the format --min=-1. 
 
 =item --max <number>
 
-Specify the maximum bin value. This argument is optional if --bins 
-and --size are provided.
+Specify the maximum bin value. All values greater than this value 
+will be ignored. This argument is optional if --bins and --size are 
+provided.
 
 =item --index <list|range>
 
@@ -449,15 +445,4 @@ listed in subsequent columns for each dataset requested.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
 
