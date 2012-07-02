@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.5.8';
+my $VERSION = '1.8.2';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -170,7 +170,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 # determine the bins for the frequency distribution
 my @bins; # an array for the bins
 for (my $i = $start; $i <= $max; $i += $binsize) {
-	push @bins, $i;
+	push @bins, $i + $binsize;
 }
 
 # Prepare output directory
@@ -312,7 +312,11 @@ sub graph_one {
 		my $y = $data_table_ref->[$i][$index];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
-		if ($y ne '.') {
+		unless (
+			$y eq '.' or 
+			$y < $start or
+			$y > $max
+		) {
 			push @values, $y; # put into the values array
 		}
 	}
@@ -359,10 +363,18 @@ sub graph_two {
 		my $value2 = $data_table_ref->[$i][$index2];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
-		if ($value1 ne '.') {
+		unless (
+			$value1 eq '.' or
+			$value1 < $start or
+			$value1 > $max
+		) {
 			push @values1, $value1; # put into the values array
 		}
-		if ($value2 ne '.') {
+		unless (
+			$value2 eq '.' or
+			$value2 < $start or
+			$value2 > $max
+		) {
 			push @values2, $value2; # put into the values array
 		}
 	}
