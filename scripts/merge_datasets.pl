@@ -13,7 +13,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.6.4';
+my $VERSION = '1.8.2';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -31,6 +31,7 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my (
 	$lookup,
+	$automatic,
 	$outfile,
 	$gz,
 	$help,
@@ -40,6 +41,7 @@ my (
 # Command line options
 GetOptions( 
 	'lookup!'   => \$lookup, # force merging by value lookup
+	'auto!'     => \$automatic, # select columns automatically
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -64,31 +66,44 @@ if ($print_version) {
 
 
 
-# Set up output
-my $output_data_ref; # the reference scalar for the output data structure
+### Check for requirements and set defaults
 
+# input files
+unless (scalar @ARGV >= 2) {
+	die " At least two input files are required!\n";
+}
+
+# automatic mode
+if ($automatic) {
+	if ($lookup) {
+		die " Unable to look up values in automatic mode! Must run interactively\n";
+	}
+	unless ($outfile) {
+		die " Must provide an output file name in automatic mode!\n";
+	}
+}
 
 # Get the alphabet-number conversion hashes
 my %letter_of = get_letters(); # convert numbers into letters
 my %number_of = get_numbers(); # to convert letters into numbers
 
+# Set up output
+my $output_data_ref; # the reference scalar for the output data structure
+
+
+
 
 ### Process and merge the files
-if (scalar @ARGV < 2) {
-	# nothing to merge!
-	warn " At least two input files are required!\n";
-	print_help();
-	exit;
-}
-elsif (scalar @ARGV == 2) {
-	# exactly two filenames are provided
+
+# exactly two filenames are provided
+if (scalar @ARGV == 2) {
 	my $input_data1_ref = read_file(shift @ARGV);
 	my $input_data2_ref = read_file(shift @ARGV);
 	merge_two_datasets($input_data1_ref, $input_data2_ref);
 }
+
+# more than two filenames
 else {
-	# more than two filenames
-	
 	# merge the first two
 	my $input_data1_ref = read_file(shift @ARGV);
 	my $input_data2_ref = read_file(shift @ARGV);
@@ -104,16 +119,19 @@ else {
 }
 
 
-### Offer to re-name the datasets
-print " Do you wish to rename the headers? y or n   ";
-my $response = <STDIN>;
-chomp $response;
-if ($response eq 'y' or $response eq 'Y') { 
-	# we will be re-naming headers
-	
-	rename_dataset_names();
-}
 
+
+### Offer to re-name the datasets
+unless ($automatic) {
+	print " Do you wish to rename the headers? y or n   ";
+	my $response = <STDIN>;
+	chomp $response;
+	
+	if ($response eq 'y' or $response eq 'Y') { 
+		# we will be re-naming headers
+		rename_dataset_names();
+	}
+}
 
 
 
@@ -150,10 +168,6 @@ else {
 
 ########################   Subroutines   ###################################
 
-
-
-
-
 ### Read the input data file
 sub read_file {
 	# subroutine to load the time data file and print basic stats about it
@@ -180,6 +194,9 @@ sub merge_two_datasets {
 	
 	# Check the input data
 	my $check = check_data_tables($input_data1_ref, $input_data2_ref);
+	if ($automatic and $check) {
+		die " files do not have equal numbers of rows! Cannot merge automatically!\n";
+	}
 	
 	
 	# Merge by lookup values
@@ -192,7 +209,17 @@ sub merge_two_datasets {
 	else {
 		
 		# determine the new order
-		my @order = request_new_order($input_data1_ref, $input_data2_ref);
+		my @order;
+		if ($automatic) {
+			# automatic selection
+			@order = automatically_determine_order(
+				$input_data1_ref, $input_data2_ref);
+			
+		}
+		else {
+			# manual selection from user
+			@order = request_new_order($input_data1_ref, $input_data2_ref);
+		}
 		
 		# Initialize the output data structure if necessary
 		$output_data_ref = initialize_output_data_structure($input_data1_ref); 
@@ -206,6 +233,12 @@ sub merge_two_datasets {
 			# add the dataset from the appropriate input file
 			if ($request =~ /^\d+$/) {
 				# a digit indicates a dataset from file1
+				
+				# print dataset name in automatic mode
+				if ($automatic) {
+					print "  Merging column " . 
+						$input_data1_ref->{$request}{'name'} . "\n";
+				}
 				
 				# copy the dataset
 				for my $row (0 .. $input_data1_ref->{'last_row'}) {
@@ -221,6 +254,12 @@ sub merge_two_datasets {
 				
 				# first convert back to number
 				my $number = $number_of{$request};
+				
+				# print dataset name in automatic mode
+				if ($automatic) {
+					print "  Merging column " . 
+						$input_data2_ref->{$number}{'name'} . "\n";
+				}
 				
 				# copy the dataset
 				for my $row (0 .. $input_data2_ref->{'last_row'}) {
@@ -367,6 +406,9 @@ sub add_datasets {
 	
 	# Check the input data
 	my $check = check_data_tables($output_data_ref, $data_ref);
+	if ($automatic and $check) {
+		die " files do not have equal numbers of rows! Cannot merge automatically!\n";
+	}
 	
 	
 	# Merge by lookup values
@@ -383,7 +425,16 @@ sub add_datasets {
 	else {
 	
 		# determine the new order
-		my @order = request_new_order($data_ref);
+		my @order;
+		if ($automatic) {
+			# automatic selection
+			@order = automatically_determine_order($data_ref);
+			
+		}
+		else {
+			# manual selection from user
+			@order = request_new_order($data_ref);
+		}
 		
 		# assign the datasets to the output data in requested order
 		foreach my $request (@order) {
@@ -394,6 +445,12 @@ sub add_datasets {
 			# add the dataset from the appropriate input file
 			if ($request =~ /^\d+$/) {
 				# a digit indicates a dataset from file1
+				
+				# print dataset name in automatic mode
+				if ($automatic) {
+					print "  Merging column " . 
+						$data_ref->{$request}{'name'} . "\n";
+				}
 				
 				# copy the dataset
 				for my $row (0 .. $data_ref->{'last_row'}) {
@@ -505,6 +562,80 @@ sub request_indices_and_order {
 }
 
 
+### Automatically determine the order
+sub automatically_determine_order {
+	
+	# get the two data structures
+	# we could have two, or only one
+	my ($data1, $data2, $number);
+	if (scalar @_ == 1) {
+		# comparing new data with the output data we are building
+		$data1 = $output_data_ref;
+		$data2 = shift @_;
+		$number = 1;
+	}
+	else {
+		# two new datasets 
+		$data1 = shift @_;
+		$data2 = shift @_;
+		$number = 2;
+	}
+	
+	# generate quick hash of names to exclude from data1
+	my %exclude;
+	for (my $i = 0; $i < $data1->{'number_columns'}; $i++) {
+		$exclude{ $data1->{$i}{'name'} } = 1;
+	}
+	
+	# generate the order
+	my @order;
+	
+	# add the first dataset if provided
+	if ($number == 2) {
+		# we will automatically take all of the columns from the first data
+		for (my $i = 0; $i < $data1->{'number_columns'}; $i++) {
+			push @order, $i;
+		}
+	}
+	
+	# automatically identify those columns in second data not present in
+	# the first one to take
+	for (my $i = 0; $i < $data2->{'number_columns'}; $i++) {
+		if ($data2->{$i}{'name'} eq 'Score') {
+			# name is score, take it
+			if ($number == 1) {
+				# one data file only, push number
+				push @order, $i;
+			}
+			else {
+				# two data files, push letter
+				push @order, $letter_of{$i};
+			}
+		}
+		
+		elsif (exists $exclude{ $data2->{$i}{'name'} } ) {
+			# non-unique column, skip
+			next;
+		}
+		
+		else {
+			# must be a unique column, take it
+			if ($number == 1) {
+				# one dataset only, push number
+				push @order, $i;
+			}
+			else {
+				# two datasets, push letter
+				push @order, $letter_of{$i};
+			}
+		}
+	}
+	
+	# done
+	return @order;
+}
+
+
 ### Parse a string into a list
 sub parse_list {
 	my $string = shift;
@@ -608,14 +739,22 @@ sub check_data_tables {
 	) {
 		# Each file has feature type defined, but they're not the same
 		# probably really don't want to combine these
-		print " !!! The metadata feature types for both files don't match!!!\n". 
-			"  Do you still want to proceed (y/n)  ";
-		my $prompt = <STDIN>;
-		if ($prompt =~ /^y/i) {
-			print " OK. Continuing anyway\n\n\n";
+		print " The metadata feature types for both files don't match!!!\n";
+		if ($automatic) {
+			# attempt to continue automatically 
+			print " Continuing anyway...\n";
 		}
+		
 		else {
-			exit " OK. Nothing done\n\n";
+			# confirm from the user
+			print "  Do you still want to proceed (y/n)  ";
+			my $prompt = <STDIN>;
+			if ($prompt =~ /^y/i) {
+				print " OK. Continuing anyway\n\n\n";
+			}
+			else {
+				exit " OK. Nothing done\n\n";
+			}
 		}
 	}
 	
@@ -662,6 +801,17 @@ sub copy_metadata {
 	
 	# copy the metadata
 	$output_data_ref->{$current_index} = { %{ $data_ref->{$dataset_index} } };
+	
+	# check if should rename the dataset
+	if ($automatic and $data_ref->{$dataset_index}{'name'} eq 'Score') {
+		# only in automatic mode and the dataset is a generic Score
+		# no opportunity to rename interactively
+		# use file basename appended with Score
+		$output_data_ref->{$current_index}{'name'} = 
+			$data_ref->{'basename'} . '_Score';
+		$output_data_ref->{'data_table'}->[0][$current_index] = 
+			$output_data_ref->{$current_index}{'name'};
+	}
 	
 	# set the original file name
 	$output_data_ref->{$current_index}{'original_file'} = $data_ref->{'filename'};
@@ -875,15 +1025,6 @@ sub get_numbers {
 	return %hash;
 }
 
-
-
-
-
-
-
-
-
-
 __END__
 
 =head1 NAME
@@ -896,6 +1037,7 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   
   Options:
   --lookup
+  --auto
   --out <filename> 
   --(no)gz
   --version
@@ -910,11 +1052,21 @@ The command line flags and descriptions:
 
 =item --lookup
 
-Force the program to merge data by using lookup values in each file.
+Force the program to merge data by using lookup values in each file. 
+This should be done if the data rows are not in the same order or 
+have different number of rows.
+
+=item --auto
+
+Execute in automatic mode, where all columns from the first data file 
+are retained, and only uniquely named or Score columns from subsequent 
+data files are merged. Files must have identical numbers of rows and 
+row identifiers. 
 
 =item --out <filename>
 
 Specify the output filename. By default it uses the first file name.
+Required in automatic mode.
 
 =item --(no)gz
 
@@ -933,25 +1085,28 @@ Display this POD documentation.
 =head1 DESCRIPTION
 
 This program will merge two or more tab-delimited data files into one file. 
-Datasets (columns) from each file are interactively chosen and then merged 
-into an output file. Datasets from the third and subsequent files are 
-added to the end (rightmost column) of the first two merged files.
+Datasets or columns from each file are merged together into an output file. 
+Columns are appended to the end (after the rightmost column). 
+
+By default, the program is run in an interactive mode allowing the columns 
+to be chosen from a presented list. Alternatively, it may be run in 
+automatic mode, where uniquely named datasets from subsequent files are 
+appended to the first file. Score columns from specific formatted files 
+(BED, BedGraph, GFF) are also automatically taken. 
 
 The program blindly assumes that rows (features) are equivalent in all of the 
 datasets if there are an equal number of data rows. However, if there are an 
 unequal number of data rows, or the user forces by using the --lookup option, 
 then dataset values are looked up first using specified lookup values before 
 merging (compare with Excel VLOOKUP function). In this case, the dataset 
-lookup indices from each file are requested, followed by the order of datasets 
-to merge. The first index in the order determines which file is dominant, 
-meaning that all rows from that file are included, and only the rows that 
-match by lookup value are included from the second file. Null values are 
-recorded when no match is found in the second file.
+lookup indices from each file are requested, followed by the order of 
+datasets to merge. The first index in the order determines which file is 
+dominant, meaning that all rows from that file are included, and only the 
+rows that match by lookup value are included from the second file. Null 
+values are recorded when no match is found in the second file.
 
-After merging, an opportunity for renaming the dataset names is 
-presented.
-
-
+After merging in interactive mode, an opportunity for interactively 
+renaming the dataset names is presented.
 
 =head1 AUTHOR
 
@@ -965,7 +1120,3 @@ presented.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
