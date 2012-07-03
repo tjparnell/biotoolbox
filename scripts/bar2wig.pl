@@ -117,7 +117,7 @@ else {
 unless ($bar_app_path) {
 	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
 }
-unless ($bar_app_path =~ /bar2gr$/) {
+unless ($bar_app_path =~ /Bar2Gr$/) {
 	die "  Must define the path to the USeq or T2 java application Bar2Gr! see help\n";
 }
 
