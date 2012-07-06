@@ -8,7 +8,7 @@ data2gff.pl
 A script to convert data into a frequency distribution, useful for graphing.
 
 ==SYNOPSIS==
-data2frequency.pl --bins <**integer> --size <**number> <**filename>
+data2frequency.pl --bins <**integer> --size <**number> <**filename>  data2frequency.pl --bins <**integer> --max <**number> <**filename>  data2frequency.pl --size <**number> --max <**number> <**filename>
 
 {{{
   --in <filename>
@@ -35,31 +35,31 @@ __
 __--bins <**integer>
 
 __
-  Specify the number of bins that the data should be placed into.
+  Specify the number of bins or partitions into which the data will be  grouped. This argument is optional if --max and --size are provided.
 __
   __
-__--size <**integer>
+__--size <**number>
 
 __
-  Specify the size of each bin.
+  Specify the size of each bin or partition. A decimal number may be  provided. This argument is optional if --bins and --max are provided.
+__
+  __
+__--min <**number>
+
+__
+  Optionally indicate the minimum value of the bins. When generating  the list of bins, this is used as the starting value. All values less  than this value will be ignored.  The default is 0. A negative number  may be provided using the format --min=-1.
+__
+  __
+__--max <**number>
+
+__
+  Specify the maximum bin value. All values greater than this value  will be ignored. This argument is optional if --bins and --size are  provided.
 __
   __
 __--index <**list|range>
 
 __
   Specify the datasets in the input data file to be converted to a distribution. The 0-based column number of the datasets should be provided. Multiple  datasets may be provided as a comma-delimited list, as a consecutive list  (start-stop), or a combination of both. Do not include spaces! If no  datasets are provided, the program will interactively present to the user  a list of possible datasets to convert.
-__
-  __
-__--min <**number>
-
-__
-  Optionally indicate the minimum value of the bins. When generating  the list of bins, this is used as the starting value. Default is 0.  Useful for log2 distributions where the minimum value is negative.  A negative number may be provided using the format --min=-1.
-__
-  __
-__--max <**number>
-
-__
-  Optionally provide the maximum bin value. This argument is optional  and is automatically calculated as (bins `*` size). This argument  may also be provided as an alternative to specifying the binsize  value, in which case the number of bins is empirically determined.
 __
   __
 __--out <**filename>
@@ -80,8 +80,6 @@ __
   Display this help
 __
   __
-{{{
-}}}
 ==DESCRIPTION==
 This program will convert a datasets in a data file into a distribution. This may then be used to conveniantly plot a histogram using a program such as  'graph_profile.pl'.
 
@@ -89,10 +87,8 @@ Set the distribution parameters using the --bins and --binsize arguments,  which
 
 One or more datasets within the data file may be converted. These may be  specified on the command line or chosen interactively from a list presented  to the user.
 
-A tim data text file will be written as output. The bin values are listed  as the first column, and the number of datapoints within each bin are  listed in subsequent columns for each dataset requested.
+A data text file will be written as output. The bin values are listed  as the first column, and the number of datapoints within each bin are  listed in subsequent columns for each dataset requested.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -104,25 +100,3 @@ A tim data text file will be written as output. The bin values are listed  as th
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

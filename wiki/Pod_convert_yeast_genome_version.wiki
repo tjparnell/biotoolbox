@@ -86,6 +86,8 @@ Check SGD (http://www.yeastgenome.org) to identify and obtain the available  yea
 
 10) 20100109 (SGD R63) to 20110203 (SGD R64, UCSC !SacCer3**)
 
+11) 20080606 (SGD R61, UCSC !SacCer2**) to 20110203 (SGD R64, UCSC !SacCer3**)
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD

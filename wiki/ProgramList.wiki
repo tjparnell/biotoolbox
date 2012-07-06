@@ -76,6 +76,7 @@ Lists of programs organized by function.
 ===Miscellaneous===
 	* [ProgramList#big_file2gff3.pl big_file2gff3.pl]
 	* [ProgramList#change_chr_prefix.pl change_chr_prefix.pl]
+	* [ProgramList#CpG_calculator.pl CpG_calculator.pl]
 	* [ProgramList#print_feature_types.pl print_feature_types.pl]
 
 =Program List=
@@ -108,6 +109,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====convert_yeast_genome_version.pl====
 [Pod_convert_yeast_genome_version convert_yeast_genome_version.pl] converts genomic coordinates of popular file formats between a limited set of S. cerevisiae SGD genome releases.
+
+====CpG_calculator.pl====
+[Pod_CpG_calculator CpG_calculator.pl] counts observed and expected CpG dinucleotides in genomic sequences for defined regions or windows across a genome.
 
 ====data2frequency.pl====
 [Pod_data2frequency data2frequency.pl] converts data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.

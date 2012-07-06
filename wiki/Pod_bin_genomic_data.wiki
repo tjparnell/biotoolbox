@@ -10,8 +10,6 @@ A script to bin genomic data into windows
 ==SYNOPSIS==
 {{{
  bin_genomic_data.pl --data <filename> --in <filename> --method [method]
- }}}
-{{{
  bin_genomic_data.pl --data <filename> --new --win <integer> --db <db_name>
      --out <filename> --method [method]
  }}}
@@ -20,7 +18,7 @@ A script to bin genomic data into windows
   --data <filename>
   --in <filename>
   --new
-  --method [enumerate | mean | median]
+  --method [count | mean | median |sum]
   --out <filename>
   --db <database_name>
   --win <integer>
@@ -59,16 +57,17 @@ __
   Indicate that a new data file should be generated. Required unless --in  is used.
 __
   __
-__--method `[`enumerate | mean | median`]`
+__--method `[`count | mean | median |sum`]`
 
 __
   Indicate which method should be used to collect the binned data.  Acceptable values include:
 __
   __
 {{{
- - enumerate     Sum the number of unique features in the bin.
+ - count         Count the number of unique features in the bin.
  - mean          Take the mean score of features in the bin.
  - median        Take the median score of features in the bin.
+ - sum           Sum the scores of features in the bin
 }}}
 __--out <**filename>
 
@@ -121,7 +120,7 @@ __
 __--interpolate
 
 __
-  Flag to indicate that those bins lacking data should be interpolated  from neighboring bins. Only 'mean' or 'median' collected values are  interpolated. (we assume you don't want to interpolate enumerated  counts, right????).
+  Optionally interpolate missing bin values from flanking bins.
 __
   __
 __--(no)log
@@ -154,21 +153,17 @@ __
   Display the POD documentation.
 __
   __
-{{{
-}}}
 ==DESCRIPTION==
 This program will convert genomic data into genomic binned data. The genomic  bins are generated from the indicated database as segments of the genome of  the specified window size. The step size may be optionally specified, or  defaults to the window size. The source data may be collected from multiple  sources, including GFF, BED, BAM, WIG, or SGR files. The data may be  collected in one of two ways.
 
 First, the program can enumerate (or count) features which overlap with a  genomic bin. Sequence tag (BAM file) alignments (both single- and  paired-end), BED, and GFF features may be counted. The feature start point,  or optionally the midpoint, is used to record the feature. Alternatively, the  counts may be enumerated across the entire span of the feature when using  small (single bp) bins.
 
-Second, the program can statistically combine the scores (values) of features that overlap each genomic bin. Feature scores may be collected from GFF, BED,  WIG, or SGR files. Either the mean or the median value can be recorded for the  genomic bin.
+Second, the program can statistically combine the scores (values) of features that overlap each genomic bin. Feature scores may be collected from GFF, BED,  WIG, or SGR files. Either the mean, median, or sum value can be recorded  for the genomic bin.
 
 Genomic bins lacking a score may be interpolated from neighboring bins. Up to four consecutive non-value bins may interpolated from neighboring bins that contain values.
 
 The program reads/writes a data file compatable with the 'get_datasets.pl'  program. It can optionally write a new GFF file based on the genomic binned data.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -180,7 +175,3 @@ The program reads/writes a data file compatable with the 'get_datasets.pl'  prog
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
