@@ -30,6 +30,7 @@ Lists of programs organized by function.
 
 === File format conversion ===
 	* bam2gff_bed.pl
+	* bam2wig.pl
 	* bar2wig.pl
 	* data2bed.pl
 	* data2fasta.pl
@@ -75,6 +76,7 @@ Lists of programs organized by function.
 === Miscellaneous ===
 	* big_file2gff3.pl
 	* change_chr_prefix.pl
+	* CpG_calculator.pl
 	* print_feature_types.pl
 
 
@@ -110,6 +112,9 @@ compare_subfeature_scores.pl
 
 convert_yeast_genome_version.pl
 	Convert genomic coordinates of popular file formats between a limited set of S. cerevisiae SGD genome releases.
+
+CpG_calculator.pl
+	Counts observed and expected CpG dinucleotides in genomic sequences for defined regions or windows across a genome.
 
 data2frequency.pl
 	Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.

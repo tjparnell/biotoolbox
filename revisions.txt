@@ -1,4 +1,14 @@
-######## biotoolbox revision history #############
+######## BioToolBox revision history #############
+
+v.1.8.2 (svn r411)
+	- Added new script CpG_calculator.pl to count observed and expected CpG dinucleotides across a genome sequence or defined regions.
+	- Added R61 SacCer2 to R64 SacCer3 conversion to script convert_yeast_genome_version.pl. Also improved chromosome name recognition and identification of columns in custom file structures.
+	- Fixed and improved bin generation and output in scripts data2frequency.pl and graph_histogram.pl. Values outside of the requested range are now ignored. Script data2frequency.pl also has considerable code cleanup and reorganization.
+	- Added a sum method and made minor enhancements to wig data collection to script bin_genomic_data.pl, along with considerable code cleanup.
+	- Added automatic capability to script merge_datasets.pl. All unique columns are automatically merged without manual interaction. This is now useful for automated shell scripts.
+	- Enforced no compression when generating bigWig files, and improved column recognition in script data2wig.pl
+	- Changed 'primary_tag' to 'type' in the generated metadata and subtrack selection for BigWigSet database output in script big_file2gff3.pl. Also improved conf stanza renaming scheme for BigWigSets.
+	- Fixed bug in script bar2wig.pl that prevented the USeq App Bar2Gr from being used.
 
 v.1.8.1 (svn r392)
 	- Updated script find_enriched_regions.pl to handle separate feature and data databases if desired, and add capability to restrict searches to specific strands.
