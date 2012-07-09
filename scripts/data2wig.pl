@@ -23,7 +23,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
-my $VERSION = '1.8.2';
+my $VERSION = '1.8.3';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -412,6 +412,9 @@ sub convert_to_fixedStep {
 			$data[$start_index] += 1;
 		}
 		
+		# skip negative or zero coordinates
+		next if $data[$start_index] >= 0;
+		
 		# write definition line if necessary
 		if ($data[$chr_index] ne $current_chr) {
 			# new chromosome, new definition line
@@ -530,6 +533,9 @@ sub convert_to_variableStep {
 			$data[$start_index] += 1;
 		}
 		
+		# skip negative or zero coordinates
+		next if $data[$start_index] <= 0;
+		
 		# collect the score
 		my $score;
 		if ($data[$score_index] eq '.') {
@@ -549,6 +555,9 @@ sub convert_to_variableStep {
 		# calculate the position that we will use
 		my $position = calculate_position(@data);
 			
+		# skip negative or zero coordinates
+		next if $position <= 0;
+		
 		# check for duplicate positions and write appropriately
 		if (!defined $previous_pos) {
 			# new chromosome
@@ -564,7 +573,8 @@ sub convert_to_variableStep {
 		elsif ($position < $previous_pos) {
 			# error!!! unsorted file!!!!
 			die " file is not sorted by increasing position!\n   " . 
-				"chromosome $current_chr, compare $position versus $previous_pos\n";
+				"chromosome $current_chr, compare current position " . 
+				"$position\n    versus previous position $previous_pos\n";
 		}
 		
 		else {
