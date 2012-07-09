@@ -112,7 +112,7 @@ sub load_tim_data_file {
 	
 	# load the data table
 	while (my $line = $fh->getline) {		
-		chomp $line;
+		$line =~ s/\r|\n$//g;
 		
 		# the current file position should be at the beginning of the
 		# data table information
@@ -235,21 +235,21 @@ sub open_tim_data_file {
 		# the generating program
 		if ($line =~ m/^# Program (.+)$/) {
 			$inputdata->{'program'} = $1;
-			chomp $inputdata->{'program'}; # in case it comes through the grep
+			$inputdata->{'program'} =~ s/\r|\n$//g; 
 			$header_line_count++;
 		}
 		
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
 			$inputdata->{'db'} = $1;
-			chomp $inputdata->{'db'};
+			$inputdata->{'db'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
 			$inputdata->{'feature'} = $1;
-			chomp $inputdata->{'feature'};
+			$inputdata->{'feature'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
@@ -265,7 +265,7 @@ sub open_tim_data_file {
 			
 			# strip the Column metadata identifier
 			my $metadataline = $line; # to avoid manipulating $line
-			chomp $metadataline;
+			$metadataline =~ s/\r|\n$//g;
 			$metadataline =~ s/^# Column_\d+ //; 
 			
 			# break up the column metadata
@@ -347,7 +347,7 @@ sub open_tim_data_file {
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			$inputdata->{'gff'} = $1;
-			chomp $inputdata->{'gff'};
+			$inputdata->{'gff'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
@@ -759,7 +759,7 @@ sub open_tim_data_file {
 				
 				# process the real header line
 				my $header_line = pop @{ $inputdata->{'other'} };
-				chomp $header_line;
+				$header_line =~ s/\r|\n$//g;
 				
 				# generate the metadata
 				my $i = 0;
@@ -788,7 +788,7 @@ sub open_tim_data_file {
 				# we will do so now
 				
 				my @namelist = split /\t/, $line;
-				chomp $namelist[-1];
+				$namelist[-1] =~ s/\r|\n$//g;
 				
 				# we will define the columns based on
 				for my $i (0..$#namelist) {
