@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.6.4';
+my $VERSION = '1.8.3';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1094,10 +1094,10 @@ sub genomic_sort_function {
 	
 	# attempt to automatically identify the chromo and start indices
 	my $chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq');
-	my $start_i = find_column_index($main_data_ref, 'start');
+	my $start_i = find_column_index($main_data_ref, '^start|position');
 	
 	# if unable to auto-identify columns, request from user
-	unless (defined $chromo_i or defined $start_i) {
+	unless (defined $chromo_i and defined $start_i) {
 		my $line = " Please enter the index numbers for chromosome and start," .
 			"\n separated by a comma   ";
 		($chromo_i, $start_i) = _request_indices($line);
