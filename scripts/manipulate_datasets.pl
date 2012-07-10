@@ -189,7 +189,7 @@ else {
 
 sub print_menu {
 	print " These are the functions available:\n" .
-		"  a  Print St(a)tistics on a dataset\n" .
+		"  t  Print S(t)atistics on a dataset\n" .
 		"  R  (R)eorder columns in a different order\n" .
 		"  D  (D)elete a dataset\n" .
 		"  n  Re(n)ame a dataset\n" .
@@ -202,6 +202,10 @@ sub print_menu {
 		"  B  Toss data lines with values (B)elow threshold\n" .
 		"  I  Set a m(I)nimum value\n" .
 		"  X  Set a ma(X)imum value\n" .
+		"  a  (a)dd a specific value to a dataset\n" .
+		"  u  S(u)btract a specific value from a dataset\n" .
+		"  y  Multipl(y) a specific value with a dataset\n" .
+		"  v  Di(v)ide a dataset by a specific value\n" . 
 		"  s  Median (s)cale a dataset\n" .
 		"  p  (p)ercentile rank convert a dataset\n" .
 		"  Z  Generate (Z)-score values of a dataset\n" .
@@ -209,17 +213,15 @@ sub print_menu {
 		"  2  De-log(2) convert the dataset\n" .
 		"  f  (f)ormat decimal numbers in a dataset\n" .
 		"  c  (c)ombine datasets together\n" .
-		"  U  S(U)bsample a dataset\n" .
 		"  r  Generate a (r)atio between two datasets\n" .
 		"  d  Generate a (d)ifference between two datasets\n" .
 		"  z  Generate a normali(z)ed difference between two datasets\n" .
-		"  v  Di(v)ide \n" .
-		"  u  S(u)btract\n" . 
-		"  i  Convert data to s(i)gned data according to strand\n" .
-		"  t  Merge s(t)randed datasets into one\n" .
+		"  U  S(U)bsample a dataset\n" .
+		"  si Convert data to (si)gned data according to strand\n" .
+		"  st Merge (st)randed datasets into one\n" .
 		"  e  C(e)nter normalize feature datapoints \n" .
 		"  w  Generate a ne(w) column with a single identical value\n" .
-		"  y  Write out a summar(y) file of the data\n" .
+		"  Y  Write out a summar(Y) file of the data\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
 		"  W  Re(W)rite the file\n" .
 		"  T  Export for (T)reeview or Cluster analysis\n" .
@@ -228,7 +230,7 @@ sub print_menu {
 		"  Q  (Q)uit without saving changes\n"
 		#  m  print this (m)enu
 	;
-	# unused letters: C E F G H jJ kK L M O S V yY 
+	# unused letters: C E F G H jJ kK L O S V Y 
 	return; # return 0, nothing done
 }
 
@@ -2444,65 +2446,6 @@ sub difference_function {
 # 		return;
 # 	}
 
-# we're eliminating the automatic assumption of working with enumerated 
-# data sets that must be subsampled prior to generating a difference
-# opens this function to working with more kinds of data
-	
-# 	## Perform sub sampling as necessary
-# 		# Since we are generating a difference between two datasets of counts
-# 		# we want to have equal numbers of counts, i.e. equal sums
-# 		# The easiest and fairest way to do this is to subsample the larger
-# 		# dataset so they are equal
-# 	# Get statistics
-# 	print " checking statistics....\n";
-# 	my %experiment_stats = _get_statistics_hash($experiment_index, 'y');
-# 	my %control_stats = _get_statistics_hash($control_index, 'y');
-# 	unless (%experiment_stats and %control_stats) {
-# 		warn " unable to get statistics on datasets; nothing done\n";
-# 		return;
-# 	}
-# 	# Check sums
-# 	my $subsampled; # remember which dataset was subsampled
-# 	my $subsampled_index; # index of the subsampled dataset
-# 	if ($experiment_stats{'sum'} == $control_stats{'sum'}) {
-# 		# the sums are equal, we can continue
-# 		$subsampled = -1;
-# 	}
-# 	elsif ($experiment_stats{'sum'} > $control_stats{'sum'}) {
-# 		# numerator dataset has higher sum, subsample it
-# 		my $new_numerator = _subsample_dataset(
-# 			$experiment_index, 
-# 			$experiment_stats{'sum'},
-# 			$control_stats{'sum'}
-# 		);
-# 		if (defined $new_numerator) {
-# 			$subsampled = $experiment_index; # remember which one was subsampled
-# 			$experiment_index = $new_numerator; # assign new position
-# 			$subsampled_index = $new_numerator;
-# 		}
-# 		else {
-# 			warn " unable to sub sample dataset '$experiment_index'; nothing done\n";
-# 			return;
-# 		}
-# 	}
-# 	elsif ($experiment_stats{'sum'} < $control_stats{'sum'}) {
-# 		# denominator dataset has higher sum, subsample it
-# 		my $new_denominator = _subsample_dataset(
-# 			$control_index, 
-# 			$control_stats{'sum'},
-# 			$experiment_stats{'sum'}
-# 		);
-# 		if (defined $new_denominator) {
-# 			$subsampled = $control_index; # remember which one was subsampled
-# 			$control_index = $new_denominator; # assign new position
-# 			$subsampled_index = $new_denominator;
-# 		}
-# 		else {
-# 			warn " unable to sub sample dataset '$control_index'; nothing done\n";
-# 			return;
-# 		}
-# 	}
-# 	
 	
 	# the new index position is equivalent to the number of columns
 	my $new_position = $main_data_ref->{'number_columns'};
@@ -2554,12 +2497,10 @@ sub difference_function {
 	elsif ($normalization) {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_normdiff';
-#		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	else {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_diff';
-#		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	
 	# Determine the new method for the dataset's metadata
@@ -2591,18 +2532,6 @@ sub difference_function {
 		print " $failure_count datapoints could not generate ratios\n";
 	}
 	
-	# Delete the duplicate sub-sampled dataset
-# 	if ($subsampled != -1) {
-# 		# sub sampling was performed
-# 		
-# 		# record metadata
-# 		$main_data_ref->{$new_position}{'subsampled'} = 
-# 			$main_data_ref->{$subsampled}{'name'};
-# 		
-# 		# delete the temporary subsampled dataset
-# 		delete_function($subsampled_index);
-# 	}	
-	
 	return 1;
 }
 
@@ -2623,209 +2552,131 @@ sub normalized_difference_function {
 
 
 
-sub subtract_function {
-	# Subtract a specific value from each datapoint value in a dataset
-	
-	# request datasets
-	my $line = " Enter the index number(s) of the dataset(s) to subtract  ";
-	my @indices = _request_indices($line);
-	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
-	}
-	
-	# request value
-	my $value;
-	if (defined $opt_target) {
-		# command line option
-		$value = $opt_target;
-	}
-	else {
-		# interactively ask the user
-		print " Enter the numeric value, 'mean', or 'median' to subtract  ";
-		$value = <STDIN>;
-		chomp $value;
-	}
-	
-	# request placement
-	my $placement = _request_placement();
-	
-	
-	## Process the datasets and subtract their values
-	my $dataset_modification_count = 0; # a count of how many processed
-	foreach my $index (@indices) {
-		
-		# determine the actual value to subtract
-		my $subtractor; # the actual number to subtract
-		if ($value =~ /median/i) { 
-			# use dataset median
-			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) { 
-				warn " unable to get statistics! nothing done\n";
-				return;
-			}
-			$subtractor = $stathash{'median'};
-			print " subtracting median value $subtractor\n";
-		} 
-		elsif ($value =~ /mean/i) { 
-			# use dataset mean
-			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) { 
-				warn " unable to get statistics! nothing done\n";
-				return;
-			}
-			$subtractor = $stathash{'mean'};
-			print " subtracting mean value $subtractor\n";
-		} 
-		elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
-			# a numeric value, allowing for negatives, decimals, exponents
-			$subtractor = $value;
-		} 
-		else {
-			warn " unrecognized value; nothing done\n";
-			return;
-		}
-		
-		# generate subtraction product
-		my $count = 0; # failed count  
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					$count++;
-					next;
-				} else {
-					$data_table_ref->[$i][$index] = 
-						($data_table_ref->[$i][$index] - $subtractor);
-				}
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'subtract'} = $value;
-			
-			# print conclusion
-			print " $value was subtracted from dataset $main_data_ref->{$index}{'name'}\n";
-			$dataset_modification_count++;
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					$data_table_ref->[$i][$new_position] = '.';
-					$count++;
-				} else {
-					$data_table_ref->[$i][$new_position] = 
-						($data_table_ref->[$i][$index] - $subtractor);
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "-$value";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'subtract',
-				$value,
-				$new_name,
-			);
-			
-			# print conclusion
-			print " value '$value' was subtracted from dataset $main_data_ref->{$index}{'name'}" 
-				. " and generated as a new dataset\n";
-			$dataset_modification_count++;
-		} 
-		
-		else {
-			warn " subtraction NOT done; unknown placement request\n";
-		}
-		
-		if ($count > 0) {
-			print " $count datapoints could not be subtracted\n";
-		}
-	}
-	
-	# done 
-	return $dataset_modification_count;
+sub add_function {
+	# add a specific value to dataset values
+	return math_function('add');
 }
 
 
+sub subtract_function {
+	# subtract a specific value from dataset values
+	return math_function('subtract');
+}
 
-sub division_function {
-	# Divide each datapoint value in a dataset by a specific value
+
+sub multiply_function {
+	# multiply dataset values by a specific value
+	return math_function('multiply');
+}
+
+
+sub divide_function {
+	# divide dataset values by a specific value
+	return math_function('divide');
+}
+
+
+sub math_function {
+	# General function to perform simple math on each datapoint value 
+	# in a dataset by a specific value
+	
+	# determine the mathematical function
+		# function is one of add, subtract, multiply, divide
+	my $math = shift;
+	my $calculate; # a reference to the appropriate function
+	if ($math eq 'add') {
+		$calculate = sub {
+			return $_[0] + $_[1];
+		};
+	}
+	elsif ($math eq 'subtract') {
+		$calculate = sub {
+			return $_[0] - $_[1];
+		};
+	}
+	elsif ($math eq 'multiply') {
+		$calculate = sub {
+			return $_[0] * $_[1];
+		};
+	}
+	elsif ($math eq 'divide') {
+		$calculate = sub {
+			return $_[0] / $_[1];
+		};
+	}
+
 	
 	# request dataset
-	my $line = " Enter the index number(s) of the dataset(s) to divide  ";
+	my $line = " Enter the index number(s) of the dataset(s) to $math  ";
 	my @indices = _request_indices($line);
 	unless (@indices) {
 		warn " no valid indices. nothing done\n";
 		return;
 	}
 	
-	# request value
-	my $value;
+	# request the value to perform the mathematical function 
+	my $request_value;
 	if (defined $opt_target) {
 		# command line option
-		$value = $opt_target;
+		$request_value = $opt_target;
 	}
 	else {
 		# interactively ask the user
-		print " Enter the numeric value, 'mean', or 'median' to divide by  ";
-		$value = <STDIN>;
-		chomp $value;
+		print " Enter the numeric value, 'mean', 'median', or 'sum' to $math  ";
+		$request_value = <STDIN>;
+		chomp $request_value;
 	}
+	
 	
 	# request placement
 	my $placement = _request_placement();
 	
+	
+	# generate past tense verb
+	my $mathed = $math;
+	$mathed =~ s/^(multipl)y$/$1ied/;
+	$mathed =~ s/^(add)$/$1ed/;
+	$mathed =~ s/^(divide)$/$1d/;
+	$mathed =~ s/^(subtract)$/$1ed/;
 	
 	## Process the datasets and subtract their values
 	my $dataset_modification_count = 0; # a count of how many processed
 	foreach my $index (@indices) {
 		
 		# determine the actual value to divide by
-		my $divisor; # the actual number to divide by
-		if ($value =~ /median/i) { 
-			# use dataset median
+		my $value; # the actual number to divide by
+		if ($request_value =~ /median|mean|sum/i) { 
+			
+			# collect dataset statistics
 			my %stathash = _get_statistics_hash($index);
 			unless (%stathash) { 
 				warn " unable to get statistics! nothing done\n";
 				return;
 			}
-			$divisor = $stathash{'median'};
-			print " dividing by median value $divisor\n";
-		} 
-		elsif ($value =~ /mean/i) { 
-			# use dataset mean
-			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) { 
-				warn " unable to get statistics! nothing done\n";
-				return;
+			
+			# assign the appropriate value
+			if ($request_value eq 'median') {
+				$value = $stathash{'median'};
+				print "  median value for " . 
+					$main_data_ref->{$index}{'name'} . " is $value\n";
 			}
-			$divisor = $stathash{'mean'};
-			print " dividing by mean value $divisor\n";
+			elsif ($request_value eq 'mean') {
+				$value = $stathash{'mean'};
+				print "  mean value for " . 
+					$main_data_ref->{$index}{'name'} . " is $value\n";
+			}
+			elsif ($request_value eq 'sum') {
+				$value = $stathash{'sum'};
+				print "  sum value for " . 
+					$main_data_ref->{$index}{'name'} . " is $value\n";
+			}
 		} 
-		elsif ($value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
+		elsif ($request_value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
 			# a numeric value, allowing for negatives, decimals, exponents
-			$divisor = $value;
+			$value = $request_value;
 		} 
 		else {
-			warn " unrecognized value; nothing done\n";
+			warn " unrecognized value '$request_value'; nothing done\n";
 			return;
 		}
 		
@@ -2842,16 +2693,16 @@ sub division_function {
 					next;
 				} else {
 					$data_table_ref->[$i][$index] = 
-						($data_table_ref->[$i][$index] / $divisor);
+						&$calculate($data_table_ref->[$i][$index], $value);
 				}
 			}
 			
 			# update metadata
-			$main_data_ref->{$index}{'divide'} = $value;
+			$main_data_ref->{$index}{$math} = $value;
 			
 			# print conclusion
-			print " dataset $main_data_ref->{$index}{'name'} was divided by value "
-				. "'$value'\n";
+			print " dataset $main_data_ref->{$index}{'name'} was $mathed "
+				. "by value '$value'\n";
 			$dataset_modification_count++;
 		} 
 		
@@ -2869,7 +2720,7 @@ sub division_function {
 					$count++;
 				} else {
 					$data_table_ref->[$i][$new_position] = 
-						($data_table_ref->[$i][$index] / $divisor);
+						&$calculate($data_table_ref->[$i][$index], $value);
 				}
 			}
 			
@@ -2880,35 +2731,36 @@ sub division_function {
 				$new_name = $opt_name;
 			}
 			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "/$value";
+				$new_name = $main_data_ref->{$index}{'name'} . "_$mathed\_$value";
 			}
 			_generate_new_metadata(
 				$index,
 				$new_position,
-				'divide',
+				$math,
 				$value,
 				$new_name,
 			);
 			
 			# print conclusion
-			print " dataset $main_data_ref->{$index}{'name'} was divided by value " 
+			print " dataset '$main_data_ref->{$index}{'name'}' was $mathed by value " 
 				. "'$value' and generated as a new dataset\n";
 			$dataset_modification_count++;
 		} 
 		
 		else {
-			warn " division NOT done; unknown placement request\n";
+			warn " $math NOT done; unknown placement request\n";
 			return;
 		}
 		
 		if ($count > 0) {
-			print " $count datapoints could not be divided\n";
+			print " $count datapoints could not be $mathed\n";
 		}
 	}
 	
 	# done
 	return $dataset_modification_count;
 }
+
 
 
 
@@ -3084,7 +2936,6 @@ sub merge_stranded_data {
 			# both datasets either have zero or no data
 			# use forward dataset as the default
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
-			warn "  $row both are zero or null, using forward\n";
 		}
 		
 		elsif (
@@ -3095,7 +2946,6 @@ sub merge_stranded_data {
 			# use reverse dataset, reversing sign
 			$data_table_ref->[$row][$new] = 
 				-($data_table_ref->[$row][$r_index]);
-			warn "  $row forward only, using reverse\n";
 		}
 		
 		elsif (
@@ -3105,7 +2955,6 @@ sub merge_stranded_data {
 			# reverse dataset only has zero or no data
 			# use forward dataset 
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
-			warn "  $row reverse only, using forward\n";
 		}
 		
 		else {
@@ -3113,7 +2962,6 @@ sub merge_stranded_data {
 			# perform simple subtraction
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index] - 
 				$data_table_ref->[$row][$r_index];
-			warn "  $row both, calculating diff\n";
 		}
 	}
 	
@@ -3659,7 +3507,7 @@ sub _get_letter_to_function_hash {
 	# the key is the menu letter
 	# the value is the function name
 	my %hash = (
-		'a' => "stat",
+		't' => "stat",
 		'R' => "reorder",
 		'D' => "delete",
 		'n' => "rename",
@@ -3672,6 +3520,10 @@ sub _get_letter_to_function_hash {
 		'B' => "below",
 		'I' => "minimum",
 		'X' => "maximum",
+		'a' => "add",
+		'u' => "subtract",
+		'y' => "multiply",
+		'v' => "divide",
 		's' => "scale",
 		'p' => "pr",
 		'Z' => "zscore",
@@ -3683,13 +3535,11 @@ sub _get_letter_to_function_hash {
 		'r' => "ratio",
 		'd' => "diff",
 		'z' => "normdiff",
-		'v' => "divide",
-		'u' => "subtract",
-		'i' => "strandsign",
-		't' => "mergestrand",
+		'si' => "strandsign",
+		'st' => "mergestrand",
 		'e' => "center",
 		'w' => "new",
-		'y' => "summary",
+		'Y' => "summary",
 		'x' => "export",
 		'W' => "rewrite",
 		'T' => "treeview",
@@ -3719,6 +3569,10 @@ sub _get_function_to_subroutine_hash {
 		'below'       => \&toss_below_threshold_function,
 		'minimum'     => \&minimum_function,
 		'maximum'     => \&maximum_function,
+		'add'         => \&add_function,
+		'subtract'    => \&subtract_function,
+		'multiply'    => \&multiply_function,
+		'divide'      => \&divide_function,
 		'scale'       => \&median_scale_function,
 		'pr'          => \&percentile_rank_function,
 		'zscore'      => \&zscore_function,
@@ -3730,8 +3584,6 @@ sub _get_function_to_subroutine_hash {
 		'ratio'       => \&ratio_function,
 		'diff'        => \&difference_function,
 		'normdiff'    => \&normalized_difference_function,
-		'divide'      => \&division_function,
-		'subtract'    => \&subtract_function,
 		'strandsign'  => \&convert_strand_to_sign,
 		'mergestrand' => \&merge_stranded_data,
 		'center'      => \&center_function,
@@ -4061,12 +3913,12 @@ manipulate_datasets.pl [--options ...] <input_filename>
 
   Options:
   --in <input_filename>
-  --func [stat | reorder | delete | rename | number | sort | gsort | 
+  --func [ stat | reorder | delete | rename | number | sort | gsort | 
           null | duplicate | above | below | minimum | maximum | 
-          scale | pr | zscore | log2 | delog2 | format | combine | 
-          subsample | ratio | diff | normdiff | divide | subtract | 
-          strandsign | mergestrand | center | new | summary | 
-          export | rewrite | treeview]
+          add | subtract | multiply | divide | scale | pr | zscore | 
+          log2 | delog2 | format | combine | subsample | ratio | diff | 
+          normdiff | strandsign | mergestrand | center | new | summary | 
+          export | rewrite | treeview ]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -4125,6 +3977,10 @@ other required options. These functions include the following.
   below
   minimum
   maximum
+  add
+  subtract
+  multiply
+  divide
   scale
   pr
   zscore
@@ -4136,8 +3992,6 @@ other required options. These functions include the following.
   ratio
   diff
   normdiff
-  divide
-  subtract
   strandsign
   mergestrand
   center
@@ -4203,7 +4057,6 @@ Specify the direction of a sort:
   - (i)ncreasing
   - (d)ecreasing
   
-
 =item --name <string>
 
 Specify a new dataset name when re-naming a dataset using the rename function 
@@ -4261,7 +4114,6 @@ any are performed, will write out to file the changed data. Unless an
 output file name is provided, it will overwrite the input file (NO BACKUP is
 made!).
 
-
 =head1 FUNCTIONS
 
 This is a list of the functions available for manipulating datasets. These may 
@@ -4270,7 +4122,7 @@ or specified on the command line using the --func option.
 
 =over 4
 
-=item B<stat> (menu option 'a')
+=item B<stat> (menu option 't')
 
 Print some basic statistics for a dataset, including mean, 
 median, standard deviation, min, and max. If 0 values are present,
@@ -4356,6 +4208,38 @@ Reset datapoints whose values are greater than a specified maximum
 value to the maximum value. One or more datasets may be selected 
 to reset values to the maximum. The maximum value may be requested 
 interactively or specified with the --target option. 
+
+=item B<add> (menu option 'a')
+
+Add a value to a dataset. A real number may be supplied, or the words
+'mean', 'median', or 'sum' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
+=item B<subtract> (menu option 'u')
+
+Subtract a value from a dataset. A real number may be supplied, or the words
+'mean', 'median', or 'sum' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
+=item B<multiply> (menu option 'y')
+
+Multiply a dataset by a value. A real number may be supplied, or the words
+'mean', 'median', or 'sum' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
+=item B<divide> (menu option 'v')
+
+Divide a dataset by a value. A real number may be supplied, or the words
+'mean', 'median', or 'sum' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
 
 =item B<scale> (menu option 's')
 
@@ -4455,25 +4339,7 @@ of the two datasets. The indices for the experimental and control datasets
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
-
-=item B<divide> (menu option 'v')
-
-Divide a value from a dataset. A real number may be supplied, or the words
-'mean' or 'median' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
-=item B<subtract> (menu option 'u')
-
-Subtract a value from a dataset. A real number may be supplied, or the words
-'mean' or 'median' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
-
-=item B<strandsign> (menu option 'i')
+=item B<strandsign> (menu option 'si')
 
 Convert a dataset's values to signed data according to strand. Forward 
 strand data is positive, and reverse strand is negative. This function 
@@ -4484,7 +4350,7 @@ with a name that includes either 'strand' or 'direction'. Strand
 information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded 
 data may overwrite the data or written to a new dataset.
 
-=item B<mergestrand> (menu option 't')
+=item B<mergestrand> (menu option 'st')
 
 Merge two stranded datasets into a single new dataset, with the forward 
 dataset represented as a positive value, and the reverse dataset as a 
@@ -4557,8 +4423,6 @@ text file formats via a commmand line tool (in which case, give the
 
 =back
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -4571,6 +4435,3 @@ text file formats via a commmand line tool (in which case, give the
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-=head1 TODO
