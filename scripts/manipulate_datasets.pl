@@ -3678,7 +3678,7 @@ sub _request_indices {
 	
 	# check the list of indices
 	unless ( _validate_index_list(@indices) ) {
-		@indices = q(); # clear the array
+		return;
 	}
 	
 	return @indices;
@@ -3712,8 +3712,7 @@ sub _validate_index_list {
 	# actual columns, i.e., is each number < than the number of datasets in 
 	# the data table
 	
-	my @list = @_;
-	foreach my $number (@list) {
+	foreach my $number (@_) {
 		# check that each number represents a metadata hash 
 		# and presumably dataset
 		if (defined $number and $number == 0) {
