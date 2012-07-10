@@ -413,7 +413,7 @@ sub convert_to_fixedStep {
 		}
 		
 		# skip negative or zero coordinates
-		next if $data[$start_index] >= 0;
+		next if $data[$start_index] <= 0;
 		
 		# write definition line if necessary
 		if ($data[$chr_index] ne $current_chr) {
@@ -532,9 +532,6 @@ sub convert_to_variableStep {
 		if ($interbase) {
 			$data[$start_index] += 1;
 		}
-		
-		# skip negative or zero coordinates
-		next if $data[$start_index] <= 0;
 		
 		# collect the score
 		my $score;
