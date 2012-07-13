@@ -22,7 +22,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.8.3';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -181,6 +181,8 @@ sub determine_method {
 			4	=> 'transcription stop site',
 			5	=> 'splice sites',
 			6	=> 'introns',
+			7   => 'first intron',
+			8   => 'last intron',
 		} );
 	}
 	
@@ -215,6 +217,14 @@ sub determine_method {
 	}
 	elsif ($request =~ /^introns?$/i) {
 		$method = \&collect_introns;
+	}
+	elsif ($request =~ /^first ?intron/i) {
+		$request = 'first intron';
+		$method = \&collect_first_intron;
+	}
+	elsif ($request =~ /^last ?intron/i) {
+		$request = 'last intron';
+		$method = \&collect_last_intron;
 	}
 	else {
 		die " unknown region request!\n";
@@ -783,12 +793,12 @@ sub collect_introns {
 	my $transcript = shift;
 	
 	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
-	return unless $list;
-	return if (scalar(@$list) == 1);
+	my $exons = _collect_exons($transcript);
+	return unless $exons;
+	return if (scalar(@$exons) == 1);
 	
 	# identify the last exon index position
-	my $last = scalar(@$list) - 1;
+	my $last = scalar(@$exons) - 1;
 	
 	# collect the introns
 	my @introns;
@@ -797,13 +807,13 @@ sub collect_introns {
 	if ($transcript->strand == 1) {
 		
 		# walk through each exon
-		for (my $i = 0; $i < $last -1; $i++) {
+		for (my $i = 0; $i < $last; $i++) {
 			push @introns, _adjust_positions( [ 
 				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
-				$list->[$i]->end + 1, 
-				$list->[$i + 1]->start - 1,
+				$exons->[$i]->end + 1, 
+				$exons->[$i + 1]->start - 1,
 				$transcript->strand,
 			] );
 		}
@@ -813,13 +823,13 @@ sub collect_introns {
 	else {
 	
 		# walk through each exon
-		for (my $i = 0; $i < $last -1; $i++) {
+		for (my $i = 0; $i < $last; $i++) {
 			push @introns, _adjust_positions( [ 
 				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
-				$list->[$i]->start - 1, 
-				$list->[$i + 1]->end + 1,
+				$exons->[$i + 1]->end + 1,
+				$exons->[$i]->start - 1, 
 				$transcript->strand,
 			] );
 		}
@@ -827,6 +837,32 @@ sub collect_introns {
 	
 	# finished
 	return @introns;
+}
+
+
+sub collect_first_intron {
+	
+	# seqfeature object
+	my $transcript = shift;
+	
+	# collect all of the introns
+	my @introns = collect_introns($transcript);
+	
+	# return the first one
+	return shift @introns;
+}
+
+
+sub collect_last_intron {
+	
+	# seqfeature object
+	my $transcript = shift;
+	
+	# collect all of the introns
+	my @introns = collect_introns($transcript);
+	
+	# return the first one
+	return pop @introns;
 }
 
 
@@ -972,7 +1008,7 @@ get_gene_regions.pl [--options...] --db <text> --out <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
-  --region [tss|tts|firstExon|lastExon|splice|intron]
+  --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
   --start=<integer>
   --stop=<integer>
   --unique
@@ -1002,12 +1038,12 @@ Specify the output filename.
 
 =item --feature <type | type:source>
 
-Specify the feature type (primary_tag) or type:source when using a database. 
-If not specified, a list of available types will be presented interactively 
-to the user for selection. This is not relevant for GFF3 source files (all 
-gene or transcript features are considered). Helpful when gene annotation 
-from multiple sources are listed in the same database, e.g. refSeq and 
-ensembl sources.
+Specify the parental gene feature type (primary_tag) or type:source when
+using a database. If not specified, a list of available types will be
+presented interactively to the user for selection. This is not relevant for
+GFF3 source files (all gene or transcript features are considered). Helpful
+when gene annotation from multiple sources are listed in the same database,
+e.g. refSeq and ensembl sources.
 
 =item --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
 
@@ -1015,18 +1051,20 @@ Specify the transcript feature or gene subfeature type from which to
 collect the regions. Multiple types may be specified as a comma-delimited 
 list, or 'all' may be specified. The default value is mRNA.
 
-=item --region [tss|tts|firstExon|lastExon|splice|intron]
+=item --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
 
 Specify the type of region to retrieve. If not specified on the command 
 line, the list is presented interactively to the user for selection. Six 
 possibilities are possible.
      
-     tss        The first base of transcription
-     tts        The last base of transcription
-     firstExon  The first exon of each transcript
-     lastExon   The last exon of each transcript
-     splice     The first and last base of each intron
-     intron     Each intron (usually not defined in the GFF3)
+     tss         The first base of transcription
+     tts         The last base of transcription
+     firstExon   The first exon of each transcript
+     lastExon    The last exon of each transcript
+     splice      The first and last base of each intron
+     intron      Each intron (usually not defined in the GFF3)
+     firstIntron The first intron of each transcript
+     lastIntron  The last intron of each transcript
 
 =item --start=<integer>
 
@@ -1048,8 +1086,9 @@ add and subtract to the start position (the slop or fudge factor)
 of the regions when considering duplicates. Any other region 
 within this window will be considered a duplicate. Useful, for 
 example, when start sites of transcription are not precisely mapped, 
-but not useful with defined introns and exons. The default is 0 
-(no sloppiness).
+but not useful with defined introns and exons. This does not take 
+into consideration transcripts from other genes, only the current 
+gene. The default is 0 (no sloppiness).
 
 =item --gz
 
