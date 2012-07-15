@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.5.4';
+my $VERSION = '1.8.3';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
@@ -83,10 +83,47 @@ print " Loaded file '$infile' with " . $data_ref->{last_row} . " nucleosomes\n";
 my $table = $data_ref->{data_table};
 
 
+
 ### Open db connection
-my $db = open_db_connection($data_ref->{db}) or 
-	die " can't connect to database ". $data_ref->{db} . "\n";
-my $dataset = $data_ref->{5}{dataset}; # Occupancy column
+my $db;
+if ($data_ref->{'db'}) {
+	# a database was defined, so we'll use that
+	$db = open_db_connection($data_ref->{db}) or 
+		die " can't connect to database ". $data_ref->{db} . "\n";
+}
+else {
+	# no database was defined
+	# use one of the datasets
+	if (exists $data_ref->{5}{'dataset'}) {
+		# dataset in the Occupancy column
+		my $database = $data_ref->{5}{'dataset'};
+		$database =~ s/^\w+://;
+		$db = open_db_connection($database) or 
+			die " can't connect to database $database!\n";
+	}
+	elsif (exists $data_ref->{4}{'scan_dataset'} or exists $data_ref->{4}{'dataset'}) {
+		# dataset in the NucleosomeID column
+		my $database = $data_ref->{4}{'scan_dataset'} || $data_ref->{4}{'dataset'};
+		$database =~ s/^\w+://;
+		$db = open_db_connection($database) or 
+			die " can't connect to database $database!\n";
+	}
+	else {
+		die " no database defined in input file metadata!\n";
+	}
+}
+
+
+
+### Define the dataset
+# defined in the Occupancy 
+my $dataset = $data_ref->{5}{'dataset'} ||      # Occupancy column
+			  $data_ref->{4}{'scan_dataset'} || # NucleosomeID column
+			  $data_ref->{4}{'dataset'} ||      # NucleosomeID column
+			  undef; 
+unless ($dataset) {
+	die " unable to identify the dataset in the input file metadata!\n";
+}
 
 
 
@@ -120,6 +157,7 @@ my @peak_distances;
 my $on_target_count = 0;
 
 # identify indices
+# these are presumed from the map_nucleosomes.pl script
 my $chrom_i = 0;
 my $start_i = 1;
 my $stop_i = 2;
@@ -162,6 +200,8 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 		'chromo'     => $table->[$row][$chrom_i],
 		'start'      => $table->[$row][$mid_i] - 50,
 		'stop'       => $table->[$row][$mid_i] + 50,
+		'value'      => 'score',
+		'absolute'   => 1,
 	});
 	
 	# find the max peak
@@ -249,11 +289,11 @@ __END__
 
 =head1 NAME
 
-<name>.pl
+verify_nucleosome_mapping.pl
 
 =head1 SYNOPSIS
 
-<name>.pl [--options...] <filename>
+verify_nucleosome_mapping.pl [--options...] <filename>
   
   Options:
   --in <filename>
@@ -312,8 +352,6 @@ not; one of two values is recorded: centered or offset.
 Center_peak_offset records the distance in bp between the nucleosome peak 
 and the recorded midpoint.
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -322,10 +360,6 @@ and the recorded midpoint.
  Huntsman Cancer Institute
  University of Utah
  Salt Lake City, UT, 84112
-
-This package is free software; you can redistribute it and/or modify
-it under the terms of the GPL (either version 1, or at your option,
-any later version) or the Artistic License 2.0.  
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
