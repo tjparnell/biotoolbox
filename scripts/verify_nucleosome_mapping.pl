@@ -182,6 +182,7 @@ my $mapping_i = $overlap_i + 1;
 $data_ref->{$mapping_i} = {
 	'name'       => 'center_peak_mapping',
 	'index'      => '$mapping_i',
+	'dataset'    => $dataset,
 };
 my $offset_i = $overlap_i + 2;
 $data_ref->{$offset_i} = {
