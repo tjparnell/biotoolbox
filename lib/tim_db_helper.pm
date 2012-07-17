@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.7.4';
+our $VERSION = '1.8.3';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -2704,11 +2704,12 @@ sub _get_segment_score {
 		
 		# collect the first feature
 		my $feature = $iterator->next_seq;
+		return unless $feature;
 		
 		# deal with features that might not be from the chromosome we want
 		# sometimes chromosome matching is sloppy and we get something else
 		while ($feature->seq_id ne $chromo) {
-			$feature = $iterator->next_seq;
+			$feature = $iterator->next_seq || undef;
 		}
 		return unless $feature;
 		
