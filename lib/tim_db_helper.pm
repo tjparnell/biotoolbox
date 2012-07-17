@@ -2704,14 +2704,14 @@ sub _get_segment_score {
 		
 		# collect the first feature
 		my $feature = $iterator->next_seq;
-		return unless $feature;
+		return _return_null($method) unless $feature;
 		
 		# deal with features that might not be from the chromosome we want
 		# sometimes chromosome matching is sloppy and we get something else
 		while ($feature->seq_id ne $chromo) {
 			$feature = $iterator->next_seq || undef;
 		}
-		return unless $feature;
+		return _return_null($method) unless $feature;
 		
 		## Wig Data
 		if ( $feature->has_tag('wigfile') ) {
@@ -2801,17 +2801,7 @@ sub _get_segment_score {
 				
 				# if no wigfiles are found, return empty handed
 				# should only happen if the strands don't match
-				unless (@wigfiles) {
-					if ($method =~ /sum|count/) {
-						return 0;
-					}
-					elsif ($method eq 'indexed') {
-						return;
-					}
-					else {
-						return '.';
-					}
-				}
+				return _return_null($method) unless (@wigfiles);
 				
 				# check that we have bigwig support
 				if ($BIGWIG_OK) {
@@ -2913,17 +2903,7 @@ sub _get_segment_score {
 			
 			# if no wigfiles are found
 			# should only happen if the strands don't match
-			unless (@wigfiles) {
-				if ($method =~ /sum|count/) {
-					return 0;
-				}
-				elsif ($method eq 'indexed') {
-					return;
-				}
-				else {
-					return '.';
-				}
-			}
+			return _return_null($method) unless (@wigfiles);
 			
 			# check that we have bigwig support
 			if ($BIGWIG_OK) {
@@ -3210,18 +3190,7 @@ sub _get_segment_score {
 		}
 		
 		# check that we have scores
-		unless (@scores) {
-			if ($method eq 'sum') { 
-				return 0;
-			}
-			elsif ($method eq 'count') { 
-				return 0;
-			}
-			else {
-				# internal null value
-				return '.';
-			}
-		}
+		return _return_null($method) unless (@scores);
 		
 		# determine the region score according to method
 		# we are using subroutines from Statistics::Lite
@@ -3321,6 +3290,28 @@ sub _get_segment_score {
 }
 
 
+=item _return_null
+
+Internal method for returning a 0 or internal null '.' character based 
+on the method being used.
+
+=cut
+
+sub _return_null {
+	my $method = shift;
+	
+	# return based on the method
+	if ($method eq 'sum') { 
+		return 0;
+	}
+	elsif ($method eq 'count') { 
+		return 0;
+	}
+	else {
+		# internal null value
+		return '.';
+	}
+}
 
 
 
