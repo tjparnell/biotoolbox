@@ -196,7 +196,7 @@ $table->[0][$offset_i]  = 'center_peak_offset';
 
 
 ### Process the nucleosomes
-# initialize variables
+# initialize variables for statistical analysis at the end
 my $overlap_count = 0;
 my @overlaps;
 my @peak_distances;
@@ -242,7 +242,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	## Check midpoint
 	# determine midpoint
 	my $midpoint = defined $mid_i ? $table->[$row][$mid_i] : 
-		int( ( ($table->[$row][$stop_i] + $table->[$row][$stop_i]) / 2) + 0.5 );
+		int( ( ($table->[$row][$start_i] + $table->[$row][$stop_i]) / 2) + 0.5 );
 	
 	# collect the raw data for 101 bp around the mapped midpoint
 	# this distance is arbitrary
