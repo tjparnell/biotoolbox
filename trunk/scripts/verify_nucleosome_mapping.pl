@@ -129,6 +129,7 @@ else {
 		$dataset = $data_ref->{$index}{'dataset'} || 
 				   $data_ref->{$index}{'scan_dataset'} || 
 				   undef; 
+		$dataset =~ s/^\w+\/*://; # strip any prefix
 		$db = open_db_connection($dataset) or 
 			die " can't connect to a database!\n";
 	}
