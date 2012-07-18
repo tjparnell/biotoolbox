@@ -346,7 +346,7 @@ sub map_nucleosomes {
 		
 		# Limit to one chromosome if debug
 		if ($debug) {
-			if ($chromo eq $chromosomes[1]) {
+			if ($chromo eq $chromosomes[2]) {
 				# limit to only the first chromosome
 				# this should force only chr1 to be done
 				last;
@@ -510,7 +510,7 @@ sub identify_peak_position {
 	# get all of the positions that correspond to that peak value
 	my $tag_peak_value = max(values %window_pos2tags);
 	my @peak_positions;
-	foreach (sort {$a <=> $b} keys %window_pos2tags) {
+	foreach (keys %window_pos2tags) {
 		if ($window_pos2tags{$_} == $tag_peak_value) {
 			push @peak_positions, $_;
 		}
@@ -520,17 +520,17 @@ sub identify_peak_position {
 	my $peak_position;
 	if (scalar @peak_positions == 1) {
 		# one peak makes this easy
-		$peak_position = $peak_positions[0];
+		$peak_position = shift @peak_positions;
 	}
 	
 	else {
 		# more than one equal peaks
 		# if the positions are really close together, take the 
-		# mean position
+		# closest position
 		if (range(@peak_positions) <= 10) {
 			# the range between the peaks is 10 bp or less
 			# 10 bp is totally arbitrary but reasonable
-			$peak_position = int( mean(@peak_positions) + 0.5);
+			$peak_position = min(@peak_positions);
 		}
 		
 		else {
@@ -539,16 +539,16 @@ sub identify_peak_position {
 			my %best;
 			my $window_midpoint =  
 						int( ( ($position + $win_stop) / 2) + 0.5);
-			foreach (reverse @peak_positions) {
-				# we're reversing the order to take the rightmost
-				# position first
+			foreach (sort {$b <=> $a} @peak_positions) {
+				# we're reversing the order to take the rightmost or 
+				# highest position first
 				# that way if the positions are equidistant and the 
 				# key gets overwritten, we'll take the leftmost 
-				# position
+				# lowest position
 				$best{ abs( $_ -  $window_midpoint ) } = $_;
 			}
 			
-			# take the closest to the middle position
+			# take the position closest to the middle
 			$peak_position = $best{ min( keys %best ) }
 		}
 	}
@@ -557,11 +557,90 @@ sub identify_peak_position {
 		print DEBUG_FH " Peak found at position $peak_position\n";
 	}
 	
+	# run a sanity check to verify the peak position
+	$peak_position = verify_peak_position($chromo, $position, $peak_position);
+	
 	# done
 	return $peak_position;
 }
 
 
+
+## Verify the peak position is accurate
+sub verify_peak_position {
+	
+	# This sub verifies that the peak position identified in the window scan
+	# is accurate.
+	# We will re-scan within the vicinity of the supposed peak position.
+	# If it is real, then no other peaks should be in the vicinity.
+	# Otherwise, we may have prematurely called a nucleosome that is not 
+	# accurate, and this sub should fix that.
+	# This should greatly reduce the incidence of offset or improperly 
+	# mapped nucleosomes found with the script verify_nucleosome_mapping.pl.
+	
+	# coordinates
+	my ($chromo, $scan_start, $peak_position) = @_;
+	
+	# collect the raw data for +/- 35 bp around the supposed peak position
+	# this distance is arbitrarily about 1/2 nucleosome size
+	# limit this by not going further backwards than the original window scan 
+	# start - do not want to overlap previous nucleosome
+	my %pos_data = get_region_dataset_hash( {
+		'db'         => $db,
+		'dataset'    => $tag_dataset,
+		'chromo'     => $chromo,
+		'start'      => $peak_position - 35 < $scan_start ? $scan_start : 
+						$peak_position - 35,
+		'stop'       => $peak_position + 35,
+		'value'      => 'score',
+		'absolute'   => 1,
+	});
+	
+	# find the max peak
+	my @peaks;
+	my $max = max(values %pos_data);
+	foreach my $pos (keys %pos_data) {
+		if ($pos_data{$pos} == $max) {
+			# one of the peaks, 
+			# very likely there will only be one, but there may be more
+			# record all the positions with this peak value
+			push @peaks, $pos;
+		}
+	}
+	
+	# as in the identify_peak_position, for multiple identical observed peaks
+	# we will take the one closest to the original peak, assuming that is best
+	if (scalar @peaks == 1) {
+		# only one, that's great
+		if ($debug and $peaks[0] != $peak_position) {
+			print DEBUG_FH "  Reset the peak position from $peak_position" .
+				" to $peaks[0] via sanity check\n";
+		}
+		return shift @peaks;
+	}
+	else {
+		# more than one
+		# identify one closest to the original peak
+		my %best;
+		foreach (sort {$b <=> $a} @peaks) {
+			# we're reversing the order to take the rightmost or 
+			# highest position first
+			# that way if the positions are equidistant and the 
+			# key gets overwritten, we'll take the leftmost 
+			# position
+			$best{ abs( $_ -  $peak_position ) } = $_;
+		}
+		
+		# take the position closest to the original
+		my $new_peak = $best{ min( keys %best ) };
+		
+		if ($debug and $new_peak != $peak_position) {
+			print DEBUG_FH "  Reset the peak position from $peak_position" .
+				" to $new_peak via sanity check\n";
+		}
+		return $new_peak;
+	}
+}
 
 
 ## Process the nucleosome and record it
