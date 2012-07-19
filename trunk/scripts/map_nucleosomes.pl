@@ -101,12 +101,13 @@ unless ($thresh) {
 }
 
 unless ($window) {
-	# set default value of 150 bp
-	print " Using default window size of 175 bp\n";
-	$window = 175;
+	# set default value of 145 bp
+	print " Using default window size of 145 bp\n";
+	$window = 145;
 } 
 unless ($buffer) {
-	$buffer = 20;
+	print " Using default buffer size of 5 bp\n";
+	$buffer = 5;
 }
 unless (defined $bin) {
 	$bin = 0;
@@ -827,7 +828,7 @@ the type or primary_tag should be provided.
 The scan dataset (--sdata) is required, while the tag dataset
 (--tdata) is only used to collect nucleosome statistics. The same
 dataset could be used for both, in which case both may be set simultaneously 
-using the --data option. See the L<DESCRIPTION> for details regarding
+using the --data option. See L<DATASETS> section for details regarding
 the datasets. If the datasets are not specified on the commandline,
 then they may be interactively chosen from a list from the database.
 
@@ -840,14 +841,14 @@ This is only used when scanning the scan dataset.
 
 Provide the window size for which to scan the chromosome. Setting this  
 value too large and overlapping nucleosomes may result, while setting 
-this value too low may miss some nucleosomes. The default value is 175 bp. 
+this value too low may miss some nucleosomes. The default value is 145 bp. 
 
 =item --buf <integer>
 
 Provide the buffer size in bp which will be added between the end of the 
 previous found nucleosome and the beginning of the window to scan for the 
 next nucleosome. Setting this value may limit the number of overlapping 
-nucleosomes. Default is 20 bp.
+nucleosomes. Default is 5 bp.
 
 =item --bin
 
@@ -897,13 +898,13 @@ enumerated counts of sequenced nucleosomal fragment midpoints, although
 very high resolution microarray data could also be used in principle. 
 
 Nucleosome calls are made by scanning the chromosomes in windows of
-specified size (default 175 bp, set with --win option) looking for the
+specified size (default 145 bp, set with --win option) looking for the
 maximum peak that exceeds the minimum threshold value. The position of
 the maximum peak is called as the new nucleosome midpoint. The window
 is then advanced starting at the previous just-identified nucleosome
 endpoint, or at the end of the previous window if no nucleosome was
 identified. This position may be further advanced by setting the
-buffer value (default 20 bp), which inserts space between the previous
+buffer value (default 5 bp), which inserts space between the previous
 nucleosome end and the next window. By advancing the window relative
 to the previously identified nucleosome, the program can adapt to
 variable nucleosome spacing and (hopefully) avoid overlapping
@@ -914,10 +915,7 @@ periodic pattern of peaks. Noisy datasets derived from partially
 fragmented nucleosomes or low sequencing depth may require some 
 statistical smoothing.
 
-The default values (window and buffer) were determined empirically
-using yeast nucleosomes and paired-end next generation sequencing.
-Values should be optimized and adjusted empirically for new datasets
-and confirmed in a genome browser.
+=head1 DATASETS
 
 Two datasets must be provided for the mapping, although the same could
 be used for both functions. The datasets should represent sequenced
@@ -933,7 +931,7 @@ proper interpretation.
 
 The optional tag dataset (--tdata) is used for calculating nucleosome
 statistics, including the precise nucleosome midpoint peak, occupancy,
-and fuzziness. The tag dataset must be enumerated counts of nucleosome
+and fuzziness. The tag dataset should be enumerated counts of nucleosome
 midpoints. Normalized counts (for example, Reads Per Million mapped or
 RPM) or difference counts (experiment minus control) may be used, but
 P-value scores should not.
@@ -944,6 +942,8 @@ may be enumerated using the BioToolBox script L<bam2wig.pl>.
 For genomic regions with few nucleosome reads and no positions that
 pass the threshold value, the window positions may optionally be
 binned together to increase sensitivity (see the --bin option).
+
+=head1 REPORTING
 
 Two attributes of each identified nucleosome are calculated, Occupancy
 and Fuzziness. Occupancy represents the sum of the tag counts that
@@ -960,7 +960,25 @@ of this window is arbitrary but reasonable.
 The identified nucleosomes are artificially set to 147 bp in length,
 centered at the maximum peak. A second script,
 C<get_actual_nuc_sizes.pl>, can determine the actual nucleosome sizes
-based on paired-end reads in a BAM file.
+based on paired-end reads in a BAM file. Because of stochastic 
+positioning of nucleosomes in vivo, it is common to see 10-20% of 
+the mapped nucleosomes exhibit predicted overlap with its neighbors. 
+
+=head1 PARAMETERS
+
+The default values (window and buffer) were determined empirically
+using yeast nucleosomes and paired-end next generation sequencing.  
+Parameters tested included windows of 140 to 180 bp in 5 bp increments, 
+and buffers of 0 to 20 bp in 5 bp increments. In general, in order of 
+importance, lower threshold, lower buffer sizes (with the exception of 
+a buffer of 0 bp), and lower window sizes, lead to higher numbers of 
+nucleosomes identified. The percentages of predicted nucleosome overlap 
+and offcenter nucleosomes (where the observed tag dataset peak does not 
+correspond to the reported nucleosome midpoint) generally increase as 
+the number of nucleosomes are identified.
+
+Values should be optimized and adjusted empirically for new datasets
+and confirmed in a genome browser. 
 
 =head1 AUTHOR
 
