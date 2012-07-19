@@ -13,12 +13,12 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
 {{{
   Options:
   --in <input_filename>
-  --func [stat | reorder | delete | rename | number | sort | gsort | 
+  --func [ stat | reorder | delete | rename | number | sort | gsort | 
           null | duplicate | above | below | minimum | maximum | 
-          scale | pr | zscore | log2 | delog2 | format | combine | 
-          subsample | ratio | diff | normdiff | divide | subtract | 
-          strandsign | mergestrand | center | new | summary | 
-          export | rewrite | treeview]
+          add | subtract | multiply | divide | scale | pr | zscore | 
+          log2 | delog2 | format | combine | subsample | ratio | diff | 
+          normdiff | strandsign | mergestrand | center | new | summary | 
+          export | rewrite | treeview ]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -72,6 +72,10 @@ __
   below
   minimum
   maximum
+  add
+  subtract
+  multiply
+  divide
   scale
   pr
   zscore
@@ -83,8 +87,6 @@ __
   ratio
   diff
   normdiff
-  divide
-  subtract
   strandsign
   mergestrand
   center
@@ -157,8 +159,6 @@ __
   - (i)ncreasing
   - (d)ecreasing
   }}}
-{{{
-}}}
 __--name <**string>
 
 __
@@ -202,12 +202,10 @@ Note that the datafile is loaded entirely in memory. For extremely large  datafi
 
 The program keeps track of the number of manipulations performed, and if  any are performed, will write out to file the changed data. Unless an  output file name is provided, it will overwrite the input file (NO BACKUP is made!).
 
-{{{
-}}}
 ==FUNCTIONS==
 This is a list of the functions available for manipulating datasets. These may  be selected interactively from the main menu (note the case sensitivity!),  or specified on the command line using the --func option.
 
-_*_stat_*_ (menu option 'a')
+_*_stat_*_ (menu option 't')
 
 __
   Print some basic statistics for a dataset, including mean,  median, standard deviation, min, and max. If 0 values are present, indicate whether to include them (y or n)
@@ -285,6 +283,30 @@ __
   Reset datapoints whose values are greater than a specified maximum  value to the maximum value. One or more datasets may be selected  to reset values to the maximum. The maximum value may be requested  interactively or specified with the --target option.
 __
   __
+_*_add_*_ (menu option 'a')
+
+__
+  Add a value to a dataset. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
+__
+  __
+_*_subtract_*_ (menu option 'u')
+
+__
+  Subtract a value from a dataset. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
+__
+  __
+_*_multiply_*_ (menu option 'y')
+
+__
+  Multiply a dataset by a value. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
+__
+  __
+_*_divide_*_ (menu option 'v')
+
+__
+  Divide a dataset by a value. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
+__
+  __
 _*_scale_*_ (menu option 's')
 
 __
@@ -351,29 +373,13 @@ __
   A normalized difference is generated between two existing datasets.  The difference between 'control' and 'experimental' dataset values  is divided by the square root of the sum (an approximation of the  standard deviation). This is supposed to yield fewer false positives than a simple difference (see Nix et al, BMC Bioinformatics, 2008). For enumerated datasets (e.g. tag counts from Next Generation  Sequencing), the datasets should be subsampled to equalize the sums  of the two datasets. The indices for the experimental and control datasets  may either requested from the user or supplied by the --exp and  --con command line options.
 __
   __
-{{{
-}}}
-_*_divide_*_ (menu option 'v')
-
-__
-  Divide a value from a dataset. A real number may be supplied, or the words 'mean' or 'median' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
-__
-  __
-_*_subtract_*_ (menu option 'u')
-
-__
-  Subtract a value from a dataset. A real number may be supplied, or the words 'mean' or 'median' may be entered as a proxy for those statistical values of the dataset. The dataset may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
-__
-  __
-{{{
-}}}
-_*_strandsign_*_ (menu option 'i')
+_*_strandsign_*_ (menu option 'si')
 
 __
   Convert a dataset's values to signed data according to strand. Forward  strand data is positive, and reverse strand is negative. This function  may not be appropriate with logarithmic or other datasets that include  negative values. Provide the index of a single dataset to convert. A  second dataset should provide the strand information and be labeled  with a name that includes either 'strand' or 'direction'. Strand  information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded  data may overwrite the data or written to a new dataset.
 __
   __
-_*_mergestrand_*_ (menu option 't')
+_*_mergestrand_*_ (menu option 'st')
 
 __
   Merge two stranded datasets into a single new dataset, with the forward  dataset represented as a positive value, and the reverse dataset as a  negative value. Datapoints which contain values on both strands are  recorded as a simple difference (forward - reverse). This function may  not be appropriate with logarithmic or other datasets that include  negative values. Provide the indices of the two datasets as forward,  reverse. Metadata is not checked for validity.
@@ -415,10 +421,6 @@ __
   Force the data file contents to be re-written. Useful if you want to  write an intermediate file during numerous interactive manipulations,  or if you want to quickly convert between binary data store file and  text file formats via a commmand line tool (in which case, give the  --out file name with the appropriate extension).
 __
   __
-{{{
-}}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -430,6 +432,3 @@ __
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-==TODO==

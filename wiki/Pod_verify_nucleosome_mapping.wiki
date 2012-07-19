@@ -3,14 +3,16 @@
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
 ==NAME==
-<**name>.pl
+verify_nucleosome_mapping.pl
 
 ==SYNOPSIS==
-<**name>.pl `[`--options...`]` <**filename>
+verify_nucleosome_mapping.pl `[`--options...`]` <**filename>
 
 {{{
   Options:
   --in <filename>
+  --db <text>
+  --data <text | filename>
   --out <filename> 
   --(no)gz
   --version
@@ -24,7 +26,31 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the input file. The program expects the output data file from  the biotoolbox script 'map_nucleosomes.pl'. The file may be compressed  with gzip.
+  Specify the input file. The program expects a text data file with  at least chromosome, start, and stop coordinates representing  nucleosome annotation. The output file from the biotoolbox script  'map_nucleosomes.pl' is ideal, although a Bed, GFF, or other file  is allowed. The file may be compressed with gzip.
+__
+  __
+__--db <**text>
+
+__
+  Specify the name of a !BioPerl** database to pull the source data. A  !SeqFeature**::Store database or !BigWigSet** directory may be supplied.  The default is to use the database defined in the input file metadata  or the dataset file.
+__
+  __
+__--data <**text | filename>
+
+__
+  Provide the name of the dataset or data file (bigWig format) containing the nucleosome midpoint occupancy data with which to verify nucleosomal positions. If data is obtained from a database, the type or primary_tag should be provided. Default is to use the  dataset defined in the input file metadata.
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify the output file name. By default it will overwrite  the input file.
+__
+  __
+__--gz
+
+__
+  Optionally indicate the file should be compressed when written.
 __
   __
 __--version
@@ -40,20 +66,18 @@ __
 __
   __
 ==DESCRIPTION==
-This program will verify the mapping of nucleosomes. It expects as input  the output data file from 'map_nucleosomes.pl'. Nucleosomes are verified  by comparing the peak of nucleosome reads collected from the original  dataset with the recorded midpoint of the mapped nucleosome. If the peak  is <= 10 bp from the recorded midpoint, then the nucleosome is considered  centered on the peak and it is properly mapped. If the peak is > 10 bp  from the recorded midpoint, then it is considered offset, or improperly  mapped. This is most often due to nucleosomes being called prematurely  when the dataset is being scanned in windows from left to right.  Adjusting the parameters for window and buffer in map_nucleosomes.pl can  limit the number of overlapping nucleosomes.
+This program will verify the mapping of nucleosomes. It expects as input a text file containing the genomic coordinates of annotated nucleosomes. The output data file from the !BioToolBox** script 'map_nucleosomes.pl' is ideal, although other text files, including Bed and GFF, are supported. Nucleosomes are verified by comparing the peak of nucleosome reads collected from the original dataset with the recorded midpoint of the mapped nucleosome. If the peak is <= 10 bp from the recorded midpoint, then the nucleosome is considered centered on the peak and it is properly mapped. If the peak is > 10 bp from the recorded midpoint, then it is considered offset, or improperly mapped. This is most often due to nucleosomes being called prematurely when the dataset is being scanned in windows from left to right. Adjusting the parameters for window and buffer in map_nucleosomes.pl can limit the number of overlapping nucleosomes.
 
-The same data file is re-written with three additional columns appended,  overlap_length, center_peak_mapping, and center_peak_offset.
+The same data file is re-written or a new file written with three  additional columns appended, overlap_length, center_peak_mapping, and  center_peak_offset.
 
-Overlap_length records the amount of overlap between mapped nucleosomes.  Ideally this should be 0 as nucleosomes should not overlap; overlapping  nucleosomes indicate an error in mapping or multiple phasing of nucleosomes.
+Overlap_length records the amount of overlap between mapped nucleosomes.  Ideally this should be 0 as nucleosomes should not overlap; overlapping  nucleosomes indicates either an error in mapping or multiple phasing of  nucleosomes.
 
-Center_peak_mapping records whether the nucleosome was properly mapped or  not; one of two values is recorded: centered or offset.
+Center_peak_mapping records whether the nucleosome was properly mapped or  not. One of two values is recorded: centered or offset.
 
 Center_peak_offset records the distance in bp between the nucleosome peak  and the recorded midpoint.
 
-{{{
-}}}
-{{{
-}}}
+Basic statistics are reported to Standard Output for the overlap and  offset lengths.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -63,7 +87,5 @@ Center_peak_offset records the distance in bp between the nucleosome peak  and t
  University of Utah
  Salt Lake City, UT, 84112
 }}}
-This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
-
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
