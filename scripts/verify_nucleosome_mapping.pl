@@ -245,14 +245,14 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	my $midpoint = defined $mid_i ? $table->[$row][$mid_i] : 
 		int( ( ($table->[$row][$start_i] + $table->[$row][$stop_i]) / 2) + 0.5 );
 	
-	# collect the raw data for 101 bp around the mapped midpoint
-	# this distance is arbitrary
+	# collect the raw data for 71 bp around the mapped midpoint
+	# this distance is arbitrary but about 1/2 a nucleosome
 	my %nuc_data = get_region_dataset_hash( {
 		'db'         => $db,
 		'dataset'    => $dataset,
 		'chromo'     => $table->[$row][$chrom_i],
-		'start'      => $midpoint - 50,
-		'stop'       => $midpoint + 50,
+		'start'      => $midpoint - 35,
+		'stop'       => $midpoint + 35,
 		'value'      => 'score',
 		'absolute'   => 1,
 	});
@@ -440,10 +440,13 @@ nucleosomes indicates either an error in mapping or multiple phasing of
 nucleosomes. 
 
 Center_peak_mapping records whether the nucleosome was properly mapped or 
-not; one of two values is recorded: centered or offset.
+not. One of two values is recorded: centered or offset.
 
 Center_peak_offset records the distance in bp between the nucleosome peak 
 and the recorded midpoint.
+
+Basic statistics are reported to Standard Output for the overlap and 
+offset lengths.
 
 =head1 AUTHOR
 
