@@ -1,5 +1,17 @@
 ######## BioToolBox revision history #############
 
+v.1.8.3 (svn 431)
+	- Improved mapping efficiency, made tag dataset optional, added direct support of BigWig and BigWigSet datasources, and updated documentation to script map_nucleosomes.pl.
+	- Updated script verify_nucleosome_mapping.pl to accomodate changes in map_nucleosomes.pl output, added support for generic input files, added option for other datasources, and added direct support for BigWig and BigWigSet datasources.
+	- Added multiply and add methods to script manipulate_datasets.pl.
+	- Added firstIntron and lastIntron to list of regions to collect in script get_gene_regions.pl
+	- Fixed critical bug when collecting data about GFF features from a database that caused a crash when no features were found.
+	- Fixed bug in get_gene_regions.pl when collecting introns where the last intron was skipped and reverse strand coordinates were flipped
+	- Fixed bugs in manipulate_datasets.pl where a list of invalid index numbers could still evaluate to index 0, and the start column may not be recognized when performing a genomic sort.
+	- Fixed bug where text files with DOS/Windows line endings (CRLF) were not loaded properly
+	- Fixed bug in data2wig.pl to skip positions less than or equal to 0
+	- Improved null value reporting when collecting data
+
 v.1.8.2 (svn r411)
 	- Added new script CpG_calculator.pl to count observed and expected CpG dinucleotides across a genome sequence or defined regions.
 	- Added R61 SacCer2 to R64 SacCer3 conversion to script convert_yeast_genome_version.pl. Also improved chromosome name recognition and identification of columns in custom file structures.
