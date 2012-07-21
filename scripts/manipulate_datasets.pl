@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.8.3';
+my $VERSION = '1.8.4';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -113,7 +113,11 @@ print "    Loaded '$infile' with ", $main_data_ref->{'last_row'},
 
 ### Initialize more variables
 # parse the requested index string in to an array of indices
-my @opt_indices = parse_list($opt_index);
+my @opt_indices;
+if (defined $opt_index) {
+	@opt_indices = parse_list($opt_index) or 
+		die " requested index '$opt_index' cannot be parsed!\n";
+}
 
 # initialize modification count
 my $modification = 0; 
@@ -3626,6 +3630,10 @@ sub _request_index {
 		# index array is specified on the command line
 		# use the first element in the global index array
 		$index = $opt_indices[0];
+		unless ( _validate_index_list($index) )  {
+			# return an error value
+			$index = -1;
+		}
 	}
 	
 	else {
@@ -3635,19 +3643,10 @@ sub _request_index {
 		print $line; # print the user prompt
 		$index = <STDIN>;
 		chomp $index;
-	}
-	
-	# check the index
-	if (defined $index) {
-		unless ( _validate_index_list($index) ) {
+		unless ( _validate_index_list($index) )  {
 			# return an error value
 			$index = -1;
 		}
-	}
-	else {
-		# no input
-		warn " nothing entered!\n";
-		$index = -1;
 	}
 	
 	return $index;
@@ -3715,11 +3714,12 @@ sub _validate_index_list {
 	foreach my $number (@_) {
 		# check that each number represents a metadata hash 
 		# and presumably dataset
-		if (defined $number and $number == 0) {
-			# a number of 0 is good
-		}
-		elsif (exists $main_data_ref->{$number} )  {
-			# some other number represented by a metadata hash is good
+		if (
+			$number =~ /^\d+$/ and 
+			exists $main_data_ref->{$number}
+		) {
+			# some integer number represented by a metadata hash is good
+			# nothing to do, it is ok
 		}
 		else {
 			# any other number is not good
