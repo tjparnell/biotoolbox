@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.6.4';
+my $VERSION = '1.8.4';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -86,16 +86,10 @@ unless (defined $gz) {
 
 
 ### Load file
-if ($infile =~ /\.store(?:\.gz)$/) {
-	die "Unable to split a binary store file! convert to text first\n";
-}
 my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
-
-# generate data table
-$metadata_ref->{'data_table'} = [];
 
 # add column headers
 push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
@@ -115,14 +109,13 @@ unless (defined $index) {
 	
 	# get user response
 	print "  Enter the column index number containing the values to split by   ";
-	my $answer = <STDIN>;
-	chomp $answer;
-	if ($answer =~ /^\d+$/ and exists $metadata_ref->{$answer}) {
-		$index = $answer;
-	}
-	else {
-		die " unknown column index!\n";
-	}
+	$index = <STDIN>;
+	chomp $index;
+}
+
+# check index
+unless ($index =~ /^\d+$/ and exists $metadata_ref->{$index}) {
+	die " unknown column index!\n";
 }
 
 
@@ -203,7 +196,7 @@ sub write_current_data_to_file_part {
 
 	# get the current value we're working with
 	my $value = shift;
-	my $lines = $metadata_ref->{'last_row'};
+	my $last_row = $metadata_ref->{'last_row'};
 	
 	# open the file and write
 		# check for a pre-existing file to be added, or start a new one
@@ -218,7 +211,7 @@ sub write_current_data_to_file_part {
 		# maximum is defined but we'll have to do two writes
 		if (
 			defined $max and
-			($max - $written_files{$value}{'number'}) < $lines
+			($max - $written_files{$value}{'number'}) < $last_row
 		) {
 			# we'll have to do two writes
 			# finish up current, then write the remainder
@@ -230,7 +223,6 @@ sub write_current_data_to_file_part {
 					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
 				"\n");
 			}
-			$out_fh->close;
 			$written_files{$value}{'total'} += $limit;
 			
 			# clear the table contents of the written lines
@@ -252,7 +244,7 @@ sub write_current_data_to_file_part {
 			# we can write with impunity
 			
 			# write the lines
-			for (my $row = 1; $row <= $lines; $row++) {
+			for (my $row = 1; $row <= $last_row; $row++) {
 				$out_fh->print(
 					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
 				"\n");
@@ -262,11 +254,8 @@ sub write_current_data_to_file_part {
 				$written_files{$value}{'total'} += 1;
 			}
 			
-			# finished
-			$out_fh->close;
-			
 			# clear the table contents
-			splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
+			splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
 			$metadata_ref->{'last_row'} = 0;
 		}
 	}
@@ -284,22 +273,22 @@ sub write_current_data_to_file_part {
 		} );
 		if ($success) {
 			# record the number of lines written
-			$written_files{$value}{'number'} += $lines;
-			$written_files{$value}{'total'} += $lines;
+			$written_files{$value}{'number'} += $last_row;
+			$written_files{$value}{'total'} += $last_row;
 			
 			# update the file name in case it was changed by the write method
 			$written_files{$value}{'file'} = $success;
 		}
 		else {
-			warn "   unable to write $lines lines! data lost!\n";
+			warn "   unable to write $last_row lines! data lost!\n";
 		}
 		
 		# clear the table contents
-		splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
+		splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
 		$metadata_ref->{'last_row'} = 0;
 		
 		# check whether we've filled up the file
-		if (defined $max and $lines == $max) {
+		if (defined $max and $last_row == $max) {
 			$written_files{$value}{'file'} = undef;
 			$written_files{$value}{'number'} = 0;
 		}
@@ -319,8 +308,9 @@ sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
 	my $value = shift;
 	my $filename_value = $value;
-	$filename_value =~ s/[\:\|\\\/]+/_/g; # replace unsafe characters
-	my $file = $metadata_ref->{'basename'} . '#' . $filename_value;
+	$filename_value =~ s/[\:\|\\\/\+\*\?\# ]+/_/g; # replace unsafe characters
+	my $file = $metadata_ref->{'path'} . $metadata_ref->{'basename'} . 
+		'#' . $filename_value;
 	
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
