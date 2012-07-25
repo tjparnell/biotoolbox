@@ -7,7 +7,6 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
-use Bio::SeqFeature::Lite;
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure

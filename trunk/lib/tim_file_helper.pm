@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.8.3';
+our $VERSION = '1.8.4';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -1123,10 +1123,7 @@ sub write_tim_data_file {
 			# these column metadata lines do not need to be written if they
 			# only have two values, presumably name and index, for files 
 			# that don't normally have column headers, e.g. gff
-			if (
-				exists $datahash_ref->{'extension'} and
-				$datahash_ref->{'extension'} =~ /sgr|kgg/i
-			) {
+			if ($extension =~ /sgr|kgg/i) {
 				# these do not need metadata
 				next;
 			}
@@ -1141,7 +1138,7 @@ sub write_tim_data_file {
 				next;
 			}
 			elsif (
-				$datahash_ref->{'extension'} =~ /gff|bed|bdg/i and
+				$extension =~ m/gff|bed|bdg/i and
 				scalar( keys %{ $datahash_ref->{$i} } ) == 2
 			) {
 				# only two metadata keys exist, name and index
@@ -1173,9 +1170,14 @@ sub write_tim_data_file {
 	
 	
 	# Write the table column headers
-	if ($datahash_ref->{'headers'}) {
+	if (
+		$datahash_ref->{'headers'} and
+		$datahash_ref->{'gff'} == 0 and
+		$datahash_ref->{'bed'} == 0
+	) {
 		# table headers existed in original source file, 
-		# and they should be written again
+		# and this is not a GFF or BED file,
+		# therefore headers should be written
 		$fh->print( 
 			join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
 	}
