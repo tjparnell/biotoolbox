@@ -25,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.9';
+my $VERSION = '1.9.0';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -96,9 +96,6 @@ if ($print_version) {
 unless ($database) {
 	die " must provide a database name! use --help for more information\n";
 }
-unless ($outfile) {
-	die " must provide an output file name! use --help for more information\n";
-}
 unless (defined $gz) {
 	$gz = 0;
 }
@@ -162,15 +159,19 @@ else {
 		$count = collect_features(\&record_standard_feature);
 	}
 }
-print "  Collected $count features\n";
+print "  Collected " . format_with_commas($count) . " features\n";
 
 
 
 ### Print output
 if ($convert_to_gff) {
 	$out_fh->close;
+	print " Wrote file '$outfile'\n";
 }
 else {
+	unless ($outfile) {
+		$outfile = generate_file_name();
+	}
 	my $success = write_tim_data_file( {
 		'data'     => $data,
 		'filename' => $outfile,
@@ -251,6 +252,9 @@ sub prepare_data_structure_or_output {
 		# we will be printing directly to outfile
 		
 		# check filename
+		unless ($outfile) {
+			$outfile = generate_file_name();
+		}
 		unless ($outfile =~ /\.gff3?(?:\.gz)?$/i) {
 			$outfile .= '.gff3';
 		}
@@ -494,6 +498,22 @@ sub adjust_coordinates {
 }
 
 
+sub generate_file_name {
+	my $filename = join(',', @features);
+	$filename =~ s/:/_/g; # 
+	if ($convert_to_gff) {
+		$filename .= '.gff';
+	}
+	elsif ($convert_to_bed) {
+		$filename .= '.bed';
+	}
+	else {
+		$filename .= '.txt';
+	}
+	return $filename;
+}
+
+
 
 __END__
 
@@ -503,7 +523,7 @@ get_features.pl
 
 =head1 SYNOPSIS
 
-get_features.pl --db <text> --out <filename> [--options...]
+get_features.pl --db <text> [--options...]
   
   Options:
   --db <text>
@@ -570,7 +590,7 @@ are ignored if a GFF file is written.
 
 =item --out <filename>
 
-Specify the output base file name. Required.
+Specify the output file name. Default is the joined list of features. 
 
 =item --bed
 
