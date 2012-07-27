@@ -278,6 +278,8 @@ sub prepare_data_structure_or_output {
 			$data->{'bed'} = 6; # set the bed parameter
 			
 			# add extra comments
+			# normally added to main data hash, but we want these 
+			# written to the bed file where they normally are not
 			push @{ $data->{'other'} }, 
 				"# Collected from database $database\n",
 				"# Features " . join(',', @features) . "\n";
@@ -327,6 +329,9 @@ sub prepare_data_structure_or_output {
 				$data = generate_tim_data_structure(
 					$feature_string, qw(Name Type) );
 			}
+			
+			# add database
+			$data->{'db'} = $database;
 		}
 	}
 }
