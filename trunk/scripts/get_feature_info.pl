@@ -402,7 +402,7 @@ sub get_midpoint {
 
 sub get_strand {
 	my $feature = shift;
-	return $feature->strand || '.';
+	return $feature->strand;
 }
 
 
