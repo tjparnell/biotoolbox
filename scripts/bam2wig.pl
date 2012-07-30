@@ -24,7 +24,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.7.4';
+my $VERSION = '1.8.4';
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -52,6 +52,7 @@ my (
 	$shift,
 	$shift_value,
 	$sample_number,
+	$correlation_min,
 	$strand,
 	$bin_size,
 	$min_mapq,
@@ -78,6 +79,7 @@ GetOptions(
 	'shift!'    => \$shift, # shift coordinates 3'
 	'shiftval=i' => \$shift_value, # value to shift coordinates
 	'sample=i'  => \$sample_number, # number of samples to test for shift
+	'minr=f'    => \$correlation_min, # R^2 minimum value for shift
 	'strand!'   => \$strand, # separate strands
 	'bin=i'     => \$bin_size, # size of bin to make
 	'qual=i'    => \$min_mapq, # minimum mapping quality
@@ -294,6 +296,15 @@ sub check_defaults {
 	}
 	unless ($sample_number) {
 		$sample_number = 100;
+	}
+	if (defined $correlation_min) {
+		if ($correlation_min <= 0 or $correlation_min >= 1) {
+			die " cannot use minimum correlation value of $correlation_min!\n" .
+				" use --help for more information\n";
+		}
+	}
+	else {
+		$correlation_min = 0.25;
 	}
 	
 	# check bin size
@@ -642,7 +653,7 @@ sub determine_shift_value {
 			my $r2 = $stat->rSquared();
 			
 			# store rsquared
-			if ($r2 > 0.2) {
+			if ($r2 >= $correlation_min) {
 				$r2shift{$r2} = $i * 10;
 			}
 		}
@@ -659,6 +670,15 @@ sub determine_shift_value {
 	}
 	
 	# determine the optimal shift value
+	# we will be using a trimmed mean value to avoid outliers
+	@shift_values = sort {$a <=> $b} @shift_values;
+	my $cut = int( ( scalar(@shift_values) / 10 ) + 0.5); # take 10%
+	$cut++ if ($cut % 2); # make an even number
+	for (1 .. $cut) {
+		# trim 10% of the values from both ends, leaving middle 80%
+		shift @shift_values;
+		pop @shift_values;
+	}
 	my $best_value = mean(@shift_values);
 	printf "  The mean shift value is %.0f +/- %.0f bp\n", 
 		$best_value, stddev(@shift_values);
@@ -1626,6 +1646,7 @@ bam2wig.pl [--options...] <filename>
   --shift
   --shiftval <integer>
   --sample <integer>
+  --minr <float>
   --strand
   --qual <integer>
   --inter|fix
@@ -1719,6 +1740,13 @@ determine the appropriate shift value. See below for the approach.
 
 Indicate the number of top regions to sample when empirically 
 determining the shift value. The default is 100.
+
+=item --minr <float>
+
+Provide the minimum R^2 value to accept a shift value when 
+empirically determining the shift value. Enter a decimal value 
+between 0 and 1. Higher values are more stringent. The default 
+is 0.25.
 
 =item --strand
 
@@ -1903,10 +1931,10 @@ and whether your aligner took this into account. Please check the
 output wig files in a genome browser to verify which one is which, and 
 rename appropriately.
  
- bam2wig --pos mid --strand --rpm --in <bamfile>
- 
  bam2wig --pos span --strand --rpm --in <bamfile>
 
+ bam2wig --pos mid --strand --rpm --in <bamfile>
+ 
 =item Stranded, paired-end RNA-Seq
 
 Strand presents a complication when sequencing both ends of the cDNA 
@@ -1917,27 +1945,30 @@ separately which strand the original fragment should align. The TopHat
 program records an 'XS' attribute for each alignment, and, if present, 
 bam2wig.pl will use this to set the strand.
  
- bam2wig --pe --pos mid --strand --rpm --in <bamfile>
- 
  bam2wig --pe --pos span --strand --rpm --in <bamfile>
 
+ bam2wig --pe --pos mid --strand --rpm --in <bamfile>
+ 
 =back
 
 =head1 SHIFT VALUE DETERMINATION
 
-To determine the shift value, the top enriched 500 bp regions (the 
-default number is 100) from the largest chromosome are identified by 
-their read coverage. Stranded read counts are then collected in 10 bp 
-bins over a 1.5 kb region encompassing the identified region. A 
-Pearson product-moment correlation coefficient is then reiteratively 
-determined between the stranded data as the bins are shifted from 
-30 to 500 bp. The shift corresponding to the highest R squared value 
-is retained for each sampled region, and the mean best shift for all 
-sampled regions is used as the final shift value. This approach works 
-best with clean, distinct peaks. Not all sampled regions may return 
-a significant R squared value. The peak shift may be evaluated by 
-viewing separate, stranded wig files together with the shifted wig 
-file in a genome browser.
+To determine the shift value, the top 500 bp regions (the default
+number is 100 regions) with the highest coverage are collected from
+the largest chromosome or sequence represented in the Bam file. The
+largest chromosome is used merely as a representative fraction of the
+genome for performance reasons rather than random sampling. Stranded
+read counts are collected in 10 bp bins over the region and flanking
+500 bp regions (1.5 kb total). A Pearson product-moment correlation
+coefficient is then reiteratively determined between the stranded data
+as the bins are shifted from 30 to 500 bp. The shift corresponding to
+the highest R squared value is retained for each sampled region. The
+default minimum R^2 value to keep is 0.25, and not all sampled regions
+may return a significant R^2 value. A trimmed mean is then calculated
+from all of the calculated shift values to be used used as the final
+shift value. This approach works best with clean, distinct peaks. The
+peak shift may be evaluated by viewing separate, stranded wig files
+together with the shifted wig file in a genome browser.
 
 =head1 AUTHOR
 
