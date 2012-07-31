@@ -20,7 +20,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.5.0';
+my $VERSION = '1.8.4';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -199,14 +199,9 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	if (
 		# check column header names for gene or window attribute information
 		# these won't be used for graph generation, so we'll skip them
-		$name =~ /name/i or 
-		$name =~ /class/i or
-		$name =~ /alias/i or
-		$name =~ /^chr/i or
-		$name =~ /start/i or
-		$name =~ /stop/i or
-		$name =~ /end/i or
-		$name =~ /^probe/i
+		$name =~ /^name|id|class|type|alias|probe$/i or
+		$name =~ /^chr|chromo|chromosome|seq|sequence|refseq|contig|scaffold$/i or
+		$name =~ /^start|stop|end|strand$/i
 	) { 
 		# skip on to the next header
 		next; 
