@@ -35,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.7.1';
+my $VERSION = '1.8.4';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -101,7 +101,7 @@ GetOptions(
 	'fstart=f'   => \$fstart, # fractional start position
 	'fstop=f'    => \$fstop, # fractional stop position
 	'limit=i'    => \$limit, # size limit to fractionate a feature
-	'pos=i'      => \$position, # set the relative feature position
+	'pos=s'      => \$position, # set the relative feature position
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
 	'set_strand' => \$set_strand, # enforce a specific strand
@@ -361,10 +361,10 @@ sub set_defaults {
 	# check the relative position
 	if (defined $position) {
 		# check the position value
-		unless ($position =~ m/^5|4|3|m$/) {
+		unless ($position =~ m/^5|4|3|m$/i) {
 			die " Unknown relative position '$position'!\n";
 		}
-		if ($position eq 'm') {$position = 4} # change to match internal usage
+		$position =~ s/m/4/i # change to match internal usage
 	}
 	else {
 		# default position to use the 5' end
@@ -1661,7 +1661,7 @@ genomic region of the feature. Accepted values include:
   - stddev      Standard deviation of the population (within the region)
   - min
   - max
-  - range       Returns 'max-min'
+  - range       Returns difference of max and min
   - rpm         Reads Per Million mapped, for Bam and BigBed only
   - rpkm        Reads Per Kilobase per Million Mapped, for Bam and BigBed only
   
