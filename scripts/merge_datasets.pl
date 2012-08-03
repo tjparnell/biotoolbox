@@ -8,12 +8,15 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_data_helper qw(generate_tim_data_structure);
+use tim_data_helper qw(
+	generate_tim_data_structure
+	find_column_index
+);
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.2';
+my $VERSION = '1.8.4';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -75,9 +78,6 @@ unless (scalar @ARGV >= 2) {
 
 # automatic mode
 if ($automatic) {
-	if ($lookup) {
-		die " Unable to look up values in automatic mode! Must run interactively\n";
-	}
 	unless ($outfile) {
 		die " Must provide an output file name in automatic mode!\n";
 	}
@@ -90,7 +90,8 @@ my %number_of = get_numbers(); # to convert letters into numbers
 # Set up output
 my $output_data_ref; # the reference scalar for the output data structure
 
-
+# name of lookup column to be used for all files
+my $lookup_name;
 
 
 ### Process and merge the files
@@ -180,8 +181,8 @@ sub read_file {
 	}
 	
 	# print the results
-	print "    Loaded '$filename' with ", $file_data_ref->{'last_row'}, 
-		" data rows and ", $file_data_ref->{'number_columns'}, " columns\n\n";
+	print "\n Loaded '$filename' with ", $file_data_ref->{'last_row'}, 
+		" data rows and ", $file_data_ref->{'number_columns'}, " columns\n";
 	
 	# return
 	return $file_data_ref;
@@ -194,8 +195,8 @@ sub merge_two_datasets {
 	
 	# Check the input data
 	my $check = check_data_tables($input_data1_ref, $input_data2_ref);
-	if ($automatic and $check) {
-		die " files do not have equal numbers of rows! Cannot merge automatically!\n";
+	if ($check) {
+		print " Files have non-equal numbers of data rows! Enabling lookup\n";
 	}
 	
 	
@@ -284,9 +285,22 @@ sub merge_two_datasets {
 sub merge_two_datasets_by_lookup {
 	my ($input_data1_ref, $input_data2_ref) = @_;
 	
-	# determine lookup indices and order
-	my ($lookup1, $lookup2, @order) = 
-		request_indices_and_order($input_data1_ref, $input_data2_ref);
+	# determine lookup indices
+	my ($lookup_i1, $lookup_i2) = 
+		request_lookup_indices($input_data1_ref, $input_data2_ref);
+		
+	# determine order
+	my @order;
+	if ($automatic) {
+		# automatic selection
+		@order = automatically_determine_order(
+			$input_data1_ref, $input_data2_ref);
+		
+	}
+	else {
+		# manual selection from user
+		@order = request_new_order($input_data1_ref, $input_data2_ref);
+	}
 	
 	# rearrange as necessary to make the first data structure dominant
 	if ($order[0] =~ /[a-z]+/i) {
@@ -298,18 +312,17 @@ sub merge_two_datasets_by_lookup {
 			($input_data2_ref, $input_data1_ref);
 		
 		# switch the lookup indices
-		($lookup1, $lookup2) = ($lookup2, $lookup1);
+		($lookup_i1, $lookup_i2) = ($lookup_i2, $lookup_i1);
 		
 		# switch the numbers and letters
-		for my $i (0 .. $#order) {
-			# essenially a conditional map function
+		map {
 			if (/\d+/) {
-				$order[$i] = $letter_of{$order[$i]};
+				$_ = $letter_of{$_};
 			}
 			else {
-				$order[$i] = $number_of{$order[$i]};
+				$_ = $number_of{$_};
 			}
-		}
+		} @order;
 	}
 	
 	# Index the second dataset
@@ -317,7 +330,7 @@ sub merge_two_datasets_by_lookup {
 		# where the lookup value is the key and the row number is the value
 	$input_data2_ref->{'index'} = {};
 	for (my $row = 1; $row <= $input_data2_ref->{'last_row'}; $row++) {
-		my $key = $input_data2_ref->{'data_table'}->[$row][$lookup2];
+		my $key = $input_data2_ref->{'data_table'}->[$row][$lookup_i2];
 		if (exists $input_data2_ref->{'index'}{$key}) {
 			# value is not unique
 			warn " lookup value '$key' in file " . 
@@ -346,12 +359,14 @@ sub merge_two_datasets_by_lookup {
 			# we're assuming that file1 is dominant, we copy all the 
 			# rows from file1 into output, no lookup required
 			
-			# copy the header
-			$output_data_ref->{'data_table'}->[0][$column] = 
-				$input_data1_ref->{'data_table'}->[0][$request];
+			# print dataset name in automatic mode
+			if ($automatic) {
+				print "  Merging column " . 
+					$input_data1_ref->{$request}{'name'} . "\n";
+			}
 			
-			# copy the dataset
-			for my $row (1 .. $input_data1_ref->{'last_row'}) {
+			# copy the dataset including header
+			for my $row (0 .. $input_data1_ref->{'last_row'}) {
 				$output_data_ref->{'data_table'}->[$row][$column] = 
 					$input_data1_ref->{'data_table'}->[$row][$request];
 				
@@ -366,22 +381,28 @@ sub merge_two_datasets_by_lookup {
 			# we will have to perform the lookup here
 			
 			# first convert back to number
-			my $number = $number_of{$request};
+			my $request_number = $number_of{$request};
+			
+			# print dataset name in automatic mode
+			if ($automatic) {
+				print "  Merging column " . 
+					$input_data2_ref->{$request_number}{'name'} . "\n";
+			}
 			
 			# copy the header
 			$output_data_ref->{'data_table'}->[0][$column] = 
-				$input_data1_ref->{'data_table'}->[0][$number];
+				$input_data2_ref->{'data_table'}->[0][$request_number];
 			
 			# copy the dataset
 			for my $row (1 .. $input_data1_ref->{'last_row'}) {
 				# identify the appropriate row in file2 by lookup value
-				my $lookup = $input_data1_ref->{'data_table'}->[$row][$lookup1];
+				my $lookup = $input_data1_ref->{'data_table'}->[$row][$lookup_i1];
 				my $row2 = $input_data2_ref->{'index'}{$lookup} || undef;
 				
 				# copy the appropriate value
-				if ($row2) {
+				if (defined $row2) {
 					$output_data_ref->{'data_table'}->[$row][$column] = 
-						$input_data2_ref->{'data_table'}->[$row2][$number];
+						$input_data2_ref->{'data_table'}->[$row2][$request_number];
 				}
 				else {
 					$output_data_ref->{'data_table'}->[$row][$column] = '.';
@@ -389,8 +410,9 @@ sub merge_two_datasets_by_lookup {
 			}
 			
 			# copy the metadata
-			copy_metadata($input_data2_ref, $number);
+			copy_metadata($input_data2_ref, $request_number);
 		} 
+		
 		else {
 			die " unrecognized  symbol '$request' in request! nothing done!\n";
 		}
@@ -406,64 +428,112 @@ sub add_datasets {
 	
 	# Check the input data
 	my $check = check_data_tables($output_data_ref, $data_ref);
-	if ($automatic and $check) {
-		die " files do not have equal numbers of rows! Cannot merge automatically!\n";
-	}
 	
 	
-	# Merge by lookup values
+	# Determine if we need to do lookup
+	my $lookup_i;
 	if ($check or $lookup) {
 		# we need to merge by lookup values
-		# even though we are just trying to add data from one file to the 
-		# current output data structure, we're still going to force the 
-		# user to go through the two dataset subroutine
-		# this will force re-selecting lookup indices
-		merge_two_datasets_by_lookup($output_data_ref, $data_ref);
-	}
-	
-	# Merge the two datasets blindly
-	else {
-	
-		# determine the new order
-		my @order;
-		if ($automatic) {
-			# automatic selection
-			@order = automatically_determine_order($data_ref);
-			
-		}
-		else {
-			# manual selection from user
-			@order = request_new_order($data_ref);
+		
+		# check whether we have a lookup column defined
+		unless ($lookup_name) {
+			# we have to do this by treating as two new datasets
+			merge_two_datasets_by_lookup($output_data_ref, $data_ref);
+			return;
 		}
 		
-		# assign the datasets to the output data in requested order
-		foreach my $request (@order) {
+		# proceed with single lookup
+		$lookup_i = request_lookup_indices($data_ref);
+		
+		# index the new data reference
+			# we'll be putting the lookup values into an index hash
+			# where the lookup value is the key and the row number is the value
+		$data_ref->{'index'} = {};
+		for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
+			my $key = $data_ref->{'data_table'}->[$row][$lookup_i];
+			if (exists $data_ref->{'index'}{$key}) {
+				# value is not unique
+				warn " lookup value '$key' in file " . 
+					$data_ref->{'filename'} . 
+					", row $row is a duplicate!\n" . 
+					" Using the first occurence value\n";
+			}
+			else {
+				# value is ok
+				$data_ref->{'index'}{$key} = $row;
+			}
+		}
+		
+	}
+	
+	
+	# Merge the new datasets with current output
+	# determine the new order
+	my @order;
+	if ($automatic) {
+		# automatic selection
+		@order = automatically_determine_order($data_ref);
+		
+	}
+	else {
+		# manual selection from user
+		@order = request_new_order($data_ref);
+	}
+	
+	# assign the datasets to the output data in requested order
+	foreach my $request (@order) {
+		
+		# determine the current column index we're working with
+		my $column = $output_data_ref->{'number_columns'};
+		
+		# add the dataset from the appropriate input file
+		if ($request =~ /^\d+$/) {
 			
-			# determine the current column index we're working with
-			my $column = $output_data_ref->{'number_columns'};
+			# print dataset name in automatic mode
+			if ($automatic) {
+				print "  Merging column " . 
+					$data_ref->{$request}{'name'} . "\n";
+			}
 			
-			# add the dataset from the appropriate input file
-			if ($request =~ /^\d+$/) {
-				# a digit indicates a dataset from file1
+			# copy the dataset by lookup or blindly
+			if (defined $lookup_i) {
+				# merging by lookup
 				
-				# print dataset name in automatic mode
-				if ($automatic) {
-					print "  Merging column " . 
-						$data_ref->{$request}{'name'} . "\n";
-				}
+				# copy the header
+				$output_data_ref->{'data_table'}->[0][$column] = 
+					$data_ref->{'data_table'}->[0][$request];
 				
 				# copy the dataset
+				for my $row (1 .. $output_data_ref->{'last_row'}) {
+					# identify the appropriate row in file2 by lookup value
+					my $lookup = 
+						$output_data_ref->{'data_table'}->[$row][$lookup_i];
+					my $row2 = $data_ref->{'index'}{$lookup} || undef;
+					
+					# copy the appropriate value
+					if (defined $row2) {
+						$output_data_ref->{'data_table'}->[$row][$column] = 
+							$data_ref->{'data_table'}->[$row2][$request];
+					}
+					else {
+						$output_data_ref->{'data_table'}->[$row][$column] = '.';
+					}
+				}
+			}
+			else {
+				# merging blindly
+				
 				for my $row (0 .. $data_ref->{'last_row'}) {
 					$output_data_ref->{'data_table'}->[$row][$column] = 
 						$data_ref->{'data_table'}->[$row][$request];
 				}
-				
-				# copy the metadata
-				copy_metadata($data_ref, $request);
-			} 
-			else {
-				die " unrecognized  symbol '$request' in request! nothing done!\n";
 			}
+			
+			# copy the metadata
+			copy_metadata($data_ref, $request);
+		} 
+		else {
+			die " unrecognized  symbol '$request' in request! nothing done!\n";
 		}
 	}
 }
@@ -507,59 +577,109 @@ sub request_new_order {
 }
 
 
-### Request indices and then order
-sub request_indices_and_order {
-	my @data_refs = @_;
-	# Two data references will always be passed
+### Request lookup indices for two datasets
+sub request_lookup_indices {
+	my ($data1, $data2) = @_;
+	# One or two data references may be passed
 	# We'll ask for the lookup value indices for each
 	
-	# index value
+	
+	# Determine the lookup index values
 	my $index1;
 	my $index2;
 	
-	# Print the index headers
-	# use numbers for the first one
-	print_datasets($data_refs[0], 'number');
-	# use letters for the second one
-	print_datasets($data_refs[1], 'letter');
-	
-	# Request first index responses from user
-	print " Enter the lookup value column index for first file   ";
-	$index1 = <STDIN>;
-	chomp $index1;
-	unless ($index1 =~ /^\d+$/ and exists $data_refs[0]->{$index1}) {
-		# check that it's valid
-		die " unknown index value!\n";
+	# Determine if we need one or two
+	if (!defined $data2 and $lookup_name) {
+		# we already have a lookup name
+		# just need to find same column for one dataset
+		
+		my $index1 = find_column_index($data1, "^$lookup_name\$");
+		unless (defined $index1) {
+			die " Cannot find lookup column with name '$lookup_name'" . 
+				" in file " . $data1->{'filename'} . "\n";
+		}
+		
+		# print the found column name
+		print "  using column $index1 (", 
+			$data1->{$index1}{'name'}, 
+			") as lookup index for file ", 
+			$data1->{'filename'}, "\n";
+		return $index1;
 	}
 	
-	# Request second index responses from user
-	print " Enter the lookup value column index for second file   ";
-	$index2 = <STDIN>;
-	chomp $index2;
-	unless ($index2 =~ /^[a-z]+$/i) { 
-		# check that it's valid
-		die " unknown index value!\n";
-	}
-	$index2 = $number_of{$index2}; # convert to a number
-	unless (exists $data_refs[0]->{$index2}) {
-		# check that it's valid
-		die " unknown index value!\n";
+	# First try some known column identifiers we could use automatically
+	foreach my $name (qw(name id transcript gene)) {
+		
+		# identify possibilities
+		my $possible_index1 = find_column_index($data1, "^$name\$");
+		my $possible_index2 = find_column_index($data2, "^$name\$");
+		
+		# check if something was found
+		if (defined $possible_index1 and defined $possible_index2) {
+			
+			# assign
+			$index1 = $possible_index1;
+			$index2 = $possible_index2;
+			$lookup_name = $name; # for future lookups
+			
+			# report
+			print "  using column $index1 (", 
+				$data1->{$index1}{'name'}, 
+				") as lookup index for file ", 
+				$data1->{'filename'}, "\n";
+			print "  using column $index2 (", 
+				$data2->{$index2}{'name'}, 
+				") as lookup index for file ", 
+				$data2->{'filename'}, "\n";
+		}
 	}
 	
-	# Request order
-	print " Enter the columns' indices in the desired final order.\n" .
-		" Separate indices with commas or specify a range (start - stop).\n   ";
-	my $response = <STDIN>;
-	chomp $response;
-	$response =~ s/\s+//g;
+	unless (defined $index1 and defined $index2) {
+		# Automatic identification didn't work
+		# must bother the user for help
+		if ($automatic) {
+			die " Unable to identify appropriate lookup columns automatically!\n" .
+				" Please execute interactively to identify lookup columns\n";
+		}
+		
+		print " Unable to identify appropriate lookup columns automatically!\n";
+		
+		# Print the index headers
+		# use numbers for the first one
+		print_datasets($data1, 'number');
+		# use letters for the second one
+		print_datasets($data2, 'letter');
 	
-	# Parse response
-	my @order = parse_list($response); 
+		# Request first index responses from user
+		print " Enter the lookup value column index for first file   ";
+		$index1 = <STDIN>;
+		chomp $index1;
+		unless ($index1 =~ /^\d+$/ and exists $data1->{$index1}) {
+			# check that it's valid
+			die " unknown index value!\n";
+		}
+		
+		# Request second index responses from user
+		print " Enter the lookup value column index for second file   ";
+		$index2 = <STDIN>;
+		chomp $index2;
+		unless ($index2 =~ /^[a-z]+$/i) { 
+			# check that it's valid
+			die " unknown index value!\n";
+		}
+		$index2 = $number_of{$index2}; # convert to a number
+		unless (exists $data1->{$index2}) {
+			# check that it's valid
+			die " unknown index value!\n";
+		}
+		
+	}
 	
 	# done
-	print " using order: ", join(", ", @order), "\n";
-	return $index1, $index2, @order;
+	return $index1, $index2;
 }
+
+
 
 
 ### Automatically determine the order
@@ -699,11 +819,8 @@ sub print_datasets {
 	# array to be used in the default order
 	my @order;
 	
-	# Collect the original file name
-	my $file = $data_ref->{'filename'};
-	
 	# print the dataset names for this datafile
-	print " These are the headers in file '$file'\n";
+	print " These are the headers in file '" . $data_ref->{'filename'} . "'\n";
 	foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
 		# walk through each dataset (column) in file
 		
@@ -1053,15 +1170,16 @@ The command line flags and descriptions:
 =item --lookup
 
 Force the program to merge data by using lookup values in each file. 
-This should be done if the data rows are not in the same order or 
-have different number of rows.
+Enable this option if the data rows are not sorted identically.
+This will be done automatically if the number of data rows are not 
+equal between the files.
 
 =item --auto
 
 Execute in automatic mode, where all columns from the first data file 
 are retained, and only uniquely named or Score columns from subsequent 
-data files are merged. Files must have identical numbers of rows and 
-row identifiers. 
+data files are merged. If lookup is enabled, then an appropriate 
+lookup column will be chosen.
 
 =item --out <filename>
 
@@ -1099,10 +1217,13 @@ datasets if there are an equal number of data rows. However, if there are an
 unequal number of data rows, or the user forces by using the --lookup option, 
 then dataset values are looked up first using specified lookup values before 
 merging (compare with Excel VLOOKUP function). In this case, the dataset 
-lookup indices from each file are requested, followed by the order of 
-datasets to merge. The first index in the order determines which file is 
-dominant, meaning that all rows from that file are included, and only the 
-rows that match by lookup value are included from the second file. Null 
+lookup indices from each file are identified automatically. Potential 
+lookup columns include 'Name', 'ID', 'Transcript', or 'Gene'. Failing that, 
+they are chosen interactively.
+
+When a lookup is performed, the first index in the order determines which 
+file is dominant, meaning that all rows from that file are included, and only 
+the rows that match by the lookup value are included from the second file. Null 
 values are recorded when no match is found in the second file.
 
 After merging in interactive mode, an opportunity for interactively 
