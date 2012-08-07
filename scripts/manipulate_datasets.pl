@@ -840,9 +840,8 @@ sub zscore_function {
 		my $new_position = $main_data_ref->{'number_columns'};
 		for my $row (1 .. $main_data_ref->{'last_row'}) {
 			$data_table_ref->[$row][$new_position] = 
-				( 
-					abs( $statdata{'mean'} - $data_table_ref->[$row][$index] )
-				) / $statdata{'stddevp'};
+				( $statdata{'mean'} - $data_table_ref->[$row][$index] ) / 
+				$statdata{'stddevp'};
 		}
 	
 		# copy the medadata hash and annotate
@@ -4259,10 +4258,11 @@ dataset. The original order of the dataset is maintained.
 
 =item B<zscore> (menu option 'Z')
 
-Generate a Z-score for each value in a dataset. The Z-score is 
-the number of standard deviations the value is away from the 
-dataset's mean. Provides a simple measure of identifying significant 
-outliers.
+Generate a Z-score or standard score for each value in a dataset. The
+Z-score is the number of standard deviations the value is away from
+the dataset's mean, such that the new mean is 0 and the standard 
+deviation is 1. Provides a simple method of normalizing datasets
+with disparate dynamic ranges.
 
 =item B<log2> (menu option 'l')
 
