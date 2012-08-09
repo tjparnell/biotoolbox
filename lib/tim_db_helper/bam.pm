@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
-our $VERSION = '1.7.4';
+our $VERSION = '1.8.4';
 
 
 # Exported names
@@ -107,22 +107,7 @@ sub _collect_bam_data {
 	foreach my $bamfile (@bam_features) {
 	
 		## Open the Bam File
-		my $bam;
-		if (exists $OPENED_BAMFILES{$bamfile} ) {
-			# this file is already opened, use it
-			$bam = $OPENED_BAMFILES{$bamfile};
-		}
-		else {
-			# this file has not been opened yet, open it
-			$bam = open_bam_db($bamfile) or
-				confess " unable to open Bam file '$bamfile'";
-			
-			# store the opened object for later use
-			$OPENED_BAMFILES{$bamfile} = $bam;
-				
-			# collect the chromosomes for this bam
-			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
-		}
+		my $bam = open_bam_db($bamfile);
 			
 		# first check that the chromosome is present
 		unless (exists $BAM_CHROMOS{$bamfile}{$chromo}) {
@@ -318,35 +303,39 @@ sub _collect_bam_data {
 ### Open a bigWig database connection
 sub open_bam_db {
 	
-	my $path = shift;
+	my $bamfile = shift;
 	
-	# Check local for local file
-	if ($path =~ m/^file:(.+)$/) {
-		# clean up the path, take only the file name
-		$path = $1;
-		
-		unless (-e $path) {
-			carp " Bam file '$path' does not exist!\n";
-			return;
-		}
+	# check if we have seen this bam file before
+	if (exists $OPENED_BAMFILES{$bamfile} ) {
+		# this file is already opened, use it
+		return $OPENED_BAMFILES{$bamfile};
 	}
-		
-	# open the database connection 
-	my $sam;
-	eval {
-		$sam = Bio::DB::Sam->new(
-				-bam         => $path,
-				-autoindex   => 1,
-		);
-	};
 	
-	# done
-	if ($sam) {
-		return $sam;
-	}
 	else {
-		carp " ERROR: can't open BAM file '$path'!\n";
-		return;
+		# this file has not been opened yet, open it
+		
+		# check the path
+		my $path = $bamfile;
+		$path =~ s/^file://; # strip the file prefix if present
+		
+		# open the bam database object
+		my $bam;
+		eval {
+			$bam = Bio::DB::Sam->new(
+					-bam         => $path,
+					-autoindex   => 1,
+			);
+		};
+		return unless $bam;
+		
+		# store the opened object for later use
+		$OPENED_BAMFILES{$bamfile} = $bam;
+			
+		# collect the chromosomes for this bam
+		%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
+		
+		# done
+		return $bam;
 	}
 }
 

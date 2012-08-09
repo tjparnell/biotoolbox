@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.8.3';
+our $VERSION = '1.8.4';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -255,10 +255,15 @@ sub open_db_connection {
 		# a SQLite database
 		elsif ($database =~ /\.(?:sqlite|db)$/i) {
 			# open using SQLite adaptor
-			$db = Bio::DB::SeqFeature::Store->new(
-				-adaptor  => 'DBI::SQLite',
-				-dsn      => $database,
-			);
+			eval {
+				$db = Bio::DB::SeqFeature::Store->new(
+					-adaptor  => 'DBI::SQLite',
+					-dsn      => $database,
+				);
+			};
+			unless ($db) {
+				$error = " ERROR: could not open SQLite file '$database'! $!\n";
+			}
 		}
 		
 		# a Bam database
@@ -266,6 +271,10 @@ sub open_db_connection {
 			# open using BigWig adaptor
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open local Bam file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " Bam database cannot be loaded because\n" . 
@@ -278,6 +287,10 @@ sub open_db_connection {
 			# open using BigBed adaptor
 			if ($BIGBED_OK) {
 				$db = open_bigbed_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open local BigBed file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " BigBed database cannot be loaded because\n" . 
@@ -290,6 +303,10 @@ sub open_db_connection {
 			# open using BigWig adaptor
 			if ($BIGWIG_OK) {
 				$db = open_bigwig_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open local BigWig file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " BigWig database cannot be loaded because\n" . 
@@ -302,6 +319,10 @@ sub open_db_connection {
 			# open using BigWigSet adaptor
 			if ($BIGWIG_OK) {
 				$db = open_bigwigset_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open local BigWigSet " . 
+						"directory '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " Presumed BigWigSet database cannot be loaded because\n" . 
@@ -318,6 +339,10 @@ sub open_db_connection {
 			# open using BigWig adaptor
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open remote Bam file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " Bam database cannot be loaded because\n" . 
@@ -330,6 +355,10 @@ sub open_db_connection {
 			# open using BigBed adaptor
 			if ($BIGBED_OK) {
 				$db = open_bigbed_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open remote BigBed file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " BigBed database cannot be loaded because\n" . 
@@ -342,6 +371,10 @@ sub open_db_connection {
 			# open using BigWig adaptor
 			if ($BIGWIG_OK) {
 				$db = open_bigwig_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open remote BigWig file" .
+						" '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " BigWig database cannot be loaded because\n" . 
@@ -349,11 +382,15 @@ sub open_db_connection {
 			}
 		}
 		
-		# a remote directory, presumably of bigwig files
-		elsif (-d $database) {
+		# a presumed remote directory, presumably of bigwig files
+		else {
 			# open using BigWigSet adaptor
 			if ($BIGWIG_OK) {
 				$db = open_bigwigset_db($database);
+				unless ($db) {
+					$error = " ERROR: could not open presumed remote " .
+						"BigWigSet directory '$database'! $!\n";
+				}
 			}
 			else {
 				$error = " Presumed BigWigSet database cannot be loaded because\n" . 
