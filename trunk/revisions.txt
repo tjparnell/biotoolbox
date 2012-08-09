@@ -1,5 +1,18 @@
 ######## BioToolBox revision history #############
 
+v.1.8.4 (svn 448)
+	- Changed shift value determination to use trimmed mean to avoid outliers, and added new option to control the minimum acceptable R^2 value in script bam2wig.pl
+	- Improved script merge_datasets.pl to identify appropriate lookup columns automatically and successfully merge more than two files using lookup
+	- Changed my implementation of Z-score generation so that signed values are properly reported instead of absolute values in script manipulate_datasets.pl
+	- Fixed critical bug where output files were prematurely closed when splitting a data file in script split_data_file.pl
+	- Reduced some unnecessary error reporting when opening databases that do not exist
+	- Updated list of column names to avoid in script graph_data.pl
+	- Updated interactive prompts in script manipulate_datasets.pl
+	- Fixed bug where the --pos option in script_datasets.pl did not accept the 'm' argument
+	- Fixed bug where strand was reported as '.' instead of '0' in script get_feature_info.pl
+	- Fixed bug regarding writing headers, especially with new BED files
+	- Fixed bug when providing an index of 0 on the command line with script manipulate_datasets.pl
+
 v.1.8.3 (svn 431)
 	- Improved mapping efficiency, made tag dataset optional, added direct support of BigWig and BigWigSet datasources, and updated documentation to script map_nucleosomes.pl.
 	- Updated script verify_nucleosome_mapping.pl to accomodate changes in map_nucleosomes.pl output, added support for generic input files, added option for other datasources, and added direct support for BigWig and BigWigSet datasources.
