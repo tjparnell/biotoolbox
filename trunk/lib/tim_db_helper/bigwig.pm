@@ -8,7 +8,7 @@ use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.8.1';
+our $VERSION = '1.8.4';
 
 
 # Exported names
@@ -69,7 +69,8 @@ sub collect_bigwig_score {
 	foreach my $wig (@wig_files) {
 		
 		# open a new db object
-		my $bw = _open_my_bigwig($wig);
+		my $bw = open_bigwig_db($wig) or 
+			croak " Unable to open bigWig file '$wig'! $!\n";
 		
 		# first check that the chromosome is present
 		if (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -115,7 +116,8 @@ sub collect_bigwig_scores {
 	foreach my $wig (@wig_files) {
 	
 		# Open the BigWig file
-		my $bw = _open_my_bigwig($wig);
+		my $bw = open_bigwig_db($wig) or 
+			croak " Unable to open bigWig file '$wig'! $!\n";;
 		
 		# first check that the chromosome is present
 		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -162,7 +164,8 @@ sub collect_bigwig_position_scores {
 	foreach my $wig (@wig_files) {
 	
 		# Open the BigWig file
-		my $bw = _open_my_bigwig($wig);
+		my $bw = open_bigwig_db($wig) or 
+			croak " Unable to open bigWig file '$wig'! $!\n";;
 		
 		# first check that the chromosome is present
 		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -682,22 +685,32 @@ sub wig_to_bigwig_conversion {
 ### Open a bigWig database connection
 sub open_bigwig_db {
 	
-	my $path = shift;
-	$path =~ s/^file://; # clean up file prefix if present
+	my $wigfile = shift;
+	my $bw;
 	
-	# open the database connection 
-	my $db;
-	eval {
-		$db = Bio::DB::BigWig->new( -bigwig => $path);
-	};
-	
-	if ($db) {
-		return $db;
+	# check whether the file has been opened or not
+	if (exists $OPENED_BIGFILES{$wigfile} ) {
+		# this file is already opened, use it
+		$bw = $OPENED_BIGFILES{$wigfile};
 	}
+	
 	else {
-		carp " ERROR: can't open BigWig file '$path'!\n";
-		return;
+		# this file has not been opened yet, open it
+		my $path = $wigfile;
+		$path =~ s/^file://; # clean up file prefix if present
+		eval {
+			$bw = Bio::DB::BigWig->new( -bigwig => $path);
+		};
+		return unless $bw;
+		
+		# store the opened object for later use
+		$OPENED_BIGFILES{$wigfile} = $bw;
+		
+		# collect the chromosomes for this bigwig
+		%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
 	}
+	
+	return $bw;
 }
 
 
@@ -716,10 +729,14 @@ sub open_bigwigset_db {
 	# open the database connection 
 	# we're using the region feature type because that's what the rest of 
 	# tim_db_helper modules expect and work with
-	my $bws = Bio::DB::BigWigSet->new(
-				-dir            => $directory,
-				-feature_type   => 'region',
-	);
+	my $bws;
+	eval {
+		$bws = Bio::DB::BigWigSet->new(
+					-dir            => $directory,
+					-feature_type   => 'region',
+		);
+	};
+	return unless $bws;
 	
 	# check that we haven't just opened a new empty bigwigset object
 	my @paths = $bws->bigwigs;
@@ -737,38 +754,11 @@ sub open_bigwigset_db {
 		return $bws;
 	}
 	else {
-		carp " ERROR: can't open BigWigSet directory '$directory'!\n";
+		# no valid bigWig files, not valid
 		return;
 	}
 }
 
-
-
-### Internal subroutine for opening a bigwig file 
-# for personal use only
-sub _open_my_bigwig {
-	my $wigfile = shift;
-	my $bw;
-	
-	# check whether the file has been opened or not
-	if (exists $OPENED_BIGFILES{$wigfile} ) {
-		# this file is already opened, use it
-		$bw = $OPENED_BIGFILES{$wigfile};
-	}
-	else {
-		# this file has not been opened yet, open it
-		$bw = open_bigwig_db($wigfile) or 
-			croak " unable to open data BigWig file '$wigfile'";
-		
-		# store the opened object for later use
-		$OPENED_BIGFILES{$wigfile} = $bw;
-		
-		# collect the chromosomes for this bigwig
-		%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
-	}
-	
-	return $bw;
-}
 
 
 

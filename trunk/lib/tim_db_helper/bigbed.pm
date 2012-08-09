@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.7.0';
+our $VERSION = '1.8.4';
 
 
 # Exported names
@@ -60,16 +60,9 @@ sub collect_bigbed_scores {
 	# two bedfiles (+ and -), so we'll check each wig file for strand info
 	foreach my $bedfile (@bed_features) {
 	
-		# check for local file
-		$bedfile =~ s/^file://;
-		# check the file
-		unless (-e $bedfile) {
-			confess " BigBed file '$bedfile' does not exist!\n";
-			return;
-		}
-		
-		# check for opened bedfile
-		my $bb = _open_my_bigbed($bedfile);
+		# open the bedfile
+		my $bb = open_bigbed_db($bedfile) or 
+			croak "Unable to open bigBed file '$bedfile'! $!\n";
 			
 		# first check that the chromosome is present
 		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
@@ -143,16 +136,9 @@ sub collect_bigbed_position_scores {
 	# two bedfiles (+ and -), so we'll check each wig file for strand info
 	foreach my $bedfile (@bed_features) {
 	
-		# check for local file
-		$bedfile =~ s/^file://;
-		# check the file
-		unless (-e $bedfile) {
-			confess " BigBed file '$bedfile' does not exist!\n";
-			return;
-		}
-		
 		# check for opened bedfile
-		my $bb = _open_my_bigbed($bedfile);
+		my $bb = open_bigbed_db($bedfile) or 
+			croak "Unable to open bigBed file '$bedfile'! $!\n";
 			
 		# first check that the chromosome is present
 		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
@@ -333,19 +319,31 @@ sub bed_to_bigbed_conversion {
 ### Open a bigBed database connection
 sub open_bigbed_db {
 	
-	my $path = shift;
-	$path =~ s/^file://; # clean up file prefix if present
+	my $bedfile = shift;
 	
-	# open the database connection 
-	my $db;
-	eval { $db = Bio::DB::BigBed->new($path); };
-	
-	if ($db) {
-		return $db;
+	# check whether the file has been opened or not
+	if (exists $OPENED_BEDFILES{$bedfile} ) {
+		# this file is already opened, use it
+		return $OPENED_BEDFILES{$bedfile};
 	}
+	
 	else {
-		carp " ERROR: can't open BigBed file '$path'!\n";
-		return;
+		# this file has not been opened yet, open it
+		my $path = $bedfile;
+		$path =~ s/^file://; # clean up file prefix if present
+		my $bb;
+		eval {
+			$bb = Bio::DB::BigBed->new($path);
+		};
+		return unless $bb;
+		
+		# store the opened object for later use
+		$OPENED_BEDFILES{$bedfile} = $bb;
+		
+		# collect the chromosomes for this bigBed file
+		%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
+		
+		return $bb;
 	}
 }
 
@@ -400,39 +398,7 @@ sub sum_total_bigbed_features {
 
 
 
-### Internal subroutine for opening a bigbed file 
-# for personal use only
-sub _open_my_bigbed {
-	my $bedfile = shift;
-	my $bb;
-	
-	# check whether the file has been opened or not
-	if (exists $OPENED_BEDFILES{$bedfile} ) {
-		# this file is already opened, use it
-		$bb = $OPENED_BEDFILES{$bedfile};
-	}
-	else {
-		# this file has not been opened yet, open it
-		$bb = open_bigbed_db($bedfile) or 
-			confess " unable to open data BigBed file '$bedfile'";
-		
-		# store the opened object for later use
-		$OPENED_BEDFILES{$bedfile} = $bb;
-		
-		# collect the chromosomes for this bigbed
-		%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-	}
-	
-	return $bb;
-}
-
-
-
-
 __END__
-
-
-
 
 =head1 NAME
 
