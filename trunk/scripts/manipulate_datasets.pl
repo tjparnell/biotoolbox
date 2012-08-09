@@ -296,7 +296,7 @@ sub interactive_execution {
 	# interact with the user to perform an unlimited number of executions
 	
 	# Ask for the function
-	print " Functions are chosen by character. Use m for menu or h for help\n";
+	print " Functions are chosen by symbol. Use [m] for menu or [h] for help\n";
 	print " Enter the symbol for the function you would like to perform   ";
 	my $response = <STDIN>;
 	chomp $response;
@@ -308,13 +308,11 @@ sub interactive_execution {
 			if ($response eq 'Q') {
 				# quit without saving changes
 				$modification = 0; # pretend we never made changes
-				$response = undef;
-				next;
+				return;
 			}
 			elsif ($response eq 'q') {
 				# quit, saving changes if necessary
-				$response = undef;
-				next;
+				return;
 			}
 			
 			# perform the function
@@ -325,7 +323,7 @@ sub interactive_execution {
 			};
 			
 			# prepare for the next function
-			print " Which function is next? [or (m)enu, (h)elp, (q)uit]  ";
+			print " Which function is next? [m]enu, [h]elp, save & [q]uit, just [Q]uit  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
