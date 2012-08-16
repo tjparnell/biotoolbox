@@ -6,7 +6,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Statistics::Lite qw(sum min max mean stddev);
+use Statistics::Lite qw(sum min max mean stddevp);
 use Statistics::LineFit;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
@@ -23,7 +23,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.90';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -159,6 +159,7 @@ validate_or_request_dataset();
 
 
 ### Collect correlations
+my $start_time = time;
 print " Collecting correlations....\n";
 collect_correlations();
 
@@ -179,8 +180,9 @@ if ($success) {
 else {
 	print " unable to write output file!\n";
 }
-# The End
 
+# The End
+printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 
 
 
@@ -232,48 +234,9 @@ sub collect_correlations {
 		$set_strand = 0;
 	}
 	
+	
 	# Prepare new columns
-	# the rSquared Pearson column
-	my $r2_i = $mainData->{'number_columns'};
-	$mainData->{$r2_i} = {
-		'index'     => $r2_i,
-		'name'      => 'Pearson_correlation',
-		'reference' => $refDataSet,
-		'test'      => $testDataSet,
-	};
-	$mainData->{'data_table'}->[0][$r2_i] = 'Pearson_correlation';
-	$mainData->{'number_columns'} += 1;
-	
-	# optimal test-reference shift value
-	my $shift_i = $mainData->{'number_columns'};
-	$mainData->{$shift_i} = {
-		'index'     => $shift_i,
-		'name'      => 'optimal_shift',
-		'reference' => $refDataSet,
-		'test'      => $testDataSet,
-		'radius'    => $radius,
-	};
-	$mainData->{'data_table'}->[0][$shift_i] = 'optimal_shift';
-	$mainData->{'number_columns'} += 1;
-	
-	# optimal test-reference shift value
-	my $shiftr2_i = $mainData->{'number_columns'};
-	$mainData->{$shiftr2_i} = {
-		'index'     => $shiftr2_i,
-		'name'      => 'shift_correlation',
-	};
-	$mainData->{'data_table'}->[0][$shiftr2_i] = 'shift_correlation';
-	$mainData->{'number_columns'} += 1;
-	
-	# data database metadata
-	if ($data_database) {
-		$mainData->{$r2_i}{'data_database'} = $data_database;
-		$mainData->{$shift_i}{'data_database'} = $data_database;
-	}
-	
-	# add reference position
-	$mainData->{$shift_i}{'reference_point'} = $position == 5 ? 
-		'5_prime' : $position == 4 ? 'midpoint' : '3_prime';
+	my ($r2_i, $shift_i, $shiftr2_i) = add_new_columns();
 	
 	
 	# Set variables for summary analysis
@@ -282,6 +245,7 @@ sub collect_correlations {
 	my @optimal_correlations;
 	my $count = 0;
 	my $not_enough_data = 0;
+	my $no_variance = 0;
 	
 	
 	# Walk through features
@@ -371,13 +335,10 @@ sub collect_correlations {
 		
 		# verify
 		if (
-			scalar(keys %ref_pos2data) < 5 or 
-			scalar(keys %test_pos2data) < 5 or
 			sum( map {abs $_} values %ref_pos2data ) == 0 or 
 			sum( map {abs $_} values %test_pos2data ) == 0
 		) {
 			# not enough data points to work with
-			# warn "  feature at data row $row returned < 10 data points, skipping\n";
 			$mainData->{'data_table'}->[$row][$r2_i]      = '.';
 			$mainData->{'data_table'}->[$row][$shift_i]   = '.';
 			$mainData->{'data_table'}->[$row][$shiftr2_i] = '.';
@@ -385,6 +346,16 @@ sub collect_correlations {
 			next;
 		}
 			
+		
+		
+		# Interpolate data points
+		# this will improve calculating Pearson values 
+		# especially when data is sparse
+		if ($interpolate) {
+			interpolate_values(\%ref_pos2data);
+			interpolate_values(\%test_pos2data);
+		}
+		
 		
 		# Scale the data sums to 100
 		# use absolute value just in case there are negatives....
@@ -403,12 +374,6 @@ sub collect_correlations {
 		} keys %test_pos2data;
 		
 		
-		# Interpolate data points
-		if ($interpolate) {
-			interpolate_values(\%ref_pos2data, 2 * $radius);
-			interpolate_values(\%test_pos2data, 2 * $radius);
-		}
-		
 		
 		# Calculate the Pearson correlation between test and reference
 		# collect data +/- 1 radius from midpoint
@@ -419,38 +384,81 @@ sub collect_correlations {
 			push @ref_data, $ref_pos2data{$i} || 0;
 			push @test_data, $test_pos2data{$i} || 0;
 		}
-		my $r2 = calculate_pearson(\@ref_data, \@test_data);
+		# verify the reference data
+		if ( min(@ref_data) == max(@ref_data) ) {
+			# no variance in the data! cannot calculate Pearson
+			$mainData->{'data_table'}->[$row][$r2_i]      = '.';
+			$mainData->{'data_table'}->[$row][$shift_i]   = '.';
+			$mainData->{'data_table'}->[$row][$shiftr2_i] = '.';
+			
+			# if the reference is no good, cannot continue, must bail
+			$no_variance++;
+			next;
+		}
+		my $r2;
+		if ( min(@test_data) == max(@test_data) ) {
+			# test has no variance
+			# report a Pearson of 0
+			$r2 = 0;
+			# this may not be a total loss, as there may be data points 
+			# outside of the window that would generate an optimal Pearson
+			# so we will continue rather than bailing
+		}
+		else {
+			# test has variance, calculate Pearson
+			$r2 = calculate_pearson(\@ref_data, \@test_data) || 0;
+		}
+		
 		
 		
 		# Determine optimal shift
 		# calculate a Pearson r^2 correlation for each shift
 		# calculating window of 2*radius, shifting 2*radius across region
 		my %shift2pearson;
-		for my $adjustment ( (-1 * $radius) .. $radius ) {
-			# adjustment is from -1radius to +1radius
+		for (
+			my $shift = 0 - $radius; 
+			$shift <= $radius;
+			$shift++
+		) {
+			# shift is from -1radius to +1radius
 			# starting point is at -1radius to +1radius
 			# so adding together we get first window from -2radius to 0
 			# and last window is from 0 to +2radius
 			# this will be compared to the reference window, which does not move
 			
 			# generate the array of test values
-			my @test_data;
-			for my $i ((0 - $radius + $adjustment) .. ($radius + $adjustment)) {
+			undef @test_data; # reuse the array
+			for my $i ((0 - $radius + $shift) .. ($radius + $shift)) {
 				push @test_data, $test_pos2data{$i} || 0;
+			}
+			
+			# check the test array
+			if ( min(@test_data) == max(@test_data) ) {
+				# no variance!
+				next;
 			}
 			
 			# calculate Pearson correlation
 			my $pearson = calculate_pearson( \@ref_data, \@test_data); 
 			if (defined $pearson) {
-				$shift2pearson{$adjustment} = $pearson;
+				$shift2pearson{$shift} = $pearson;
 			}
 		}
 		
 		# identify the best shift
-		my $best_r2 = 0; 
-		my $best_shift = 1000;
+		my $best_r2 = $r2; 
+		my $best_shift = 1000000; # an impossibly high number
 		foreach my $shift (keys %shift2pearson) {
-			if ($shift2pearson{$shift} >= $best_r2) {
+			if ($shift2pearson{$shift} == $best_r2) {
+				# same as before
+				if ($best_shift != 1000 and $shift < $best_shift) {
+					# if it's a lower shift, then keep it, 
+					# but not if it's original
+					$best_r2 = $shift2pearson{$shift};
+					$best_shift = $shift;
+				}
+			}
+			elsif ($shift2pearson{$shift} > $best_r2) {
 				# a good looking R^2 value
 				# but we only want those with the smallest shift
 				if (abs($shift) < abs($best_shift)) {
@@ -459,10 +467,12 @@ sub collect_correlations {
 				}
 			}
 		}
-		if ($best_shift == 1000) {
+		if ($best_shift == 1000000) {
 			# no good shift found!? then that means no shift
 			$best_shift = 0;
 		}
+		
+		
 		
 		# Record final data
 		# change strand
@@ -475,37 +485,95 @@ sub collect_correlations {
 		}
 		
 		# record in data table
-		$mainData->{'data_table'}->[$row][$r2_i] = defined $r2 ? $r2 : '.';
+		$mainData->{'data_table'}->[$row][$r2_i] = $r2;
 		$mainData->{'data_table'}->[$row][$shift_i] = $best_shift;
-		$mainData->{'data_table'}->[$row][$shiftr2_i] = $best_r2;
+		$mainData->{'data_table'}->[$row][$shiftr2_i] = 
+			$best_r2 > $r2 ? $best_r2 : '.';
 		
 		# record for summary analyses
-		push @correlations, $r2 if defined $r2;
-		push @optimal_shifts, $best_shift;
-		push @optimal_correlations, $best_r2;
+		push @correlations, $r2 if $r2;
+		push @optimal_shifts, $best_shift if ($best_r2 > $r2);
+		push @optimal_correlations, $best_r2 if ($best_r2 > $r2);
 		$count++;
 	}
+	
 	
 	
 	# Summary analyses
 	printf " Correlated %s features\n", format_with_commas($count);
 	printf " Mean Pearson correlation was %.3f  +/- %.3f\n", 
-		mean(@correlations), stddev(@correlations);
+		mean(@correlations), stddevp(@correlations);
 	printf " Mean absolute optimal shift was %.0f +/- %.0f bp\n", 
 		mean( map {abs $_} @optimal_shifts), 
-		stddev( map {abs $_} @optimal_shifts);
+		stddevp( map {abs $_} @optimal_shifts);
 	printf " Mean optimal Pearson correlation was %.3f  +/- %.3f\n", 
-		mean(@optimal_correlations), stddev(@optimal_correlations);
+		mean(@optimal_correlations), stddevp(@optimal_correlations);
 	if ($not_enough_data) {
 		printf " %s features did not have enough data points\n", 
 			format_with_commas($not_enough_data);
 	}
+	if ($no_variance) {
+		printf " %s features had no variance in the reference data points\n", 
+			format_with_commas($no_variance);
+	}
 }
+
+
+sub add_new_columns {
+	
+	# the rSquared Pearson column
+	my $r2_i = $mainData->{'number_columns'};
+	$mainData->{$r2_i} = {
+		'index'     => $r2_i,
+		'name'      => 'Pearson_correlation',
+		'reference' => $refDataSet,
+		'test'      => $testDataSet,
+	};
+	$mainData->{'data_table'}->[0][$r2_i] = 'Pearson_correlation';
+	$mainData->{'number_columns'} += 1;
+	
+	# optimal test-reference shift value
+	my $shift_i = $mainData->{'number_columns'};
+	$mainData->{$shift_i} = {
+		'index'     => $shift_i,
+		'name'      => 'optimal_shift',
+		'reference' => $refDataSet,
+		'test'      => $testDataSet,
+		'radius'    => $radius,
+	};
+	$mainData->{'data_table'}->[0][$shift_i] = 'optimal_shift';
+	$mainData->{'number_columns'} += 1;
+	
+	# optimal test-reference shift value
+	my $shiftr2_i = $mainData->{'number_columns'};
+	$mainData->{$shiftr2_i} = {
+		'index'     => $shiftr2_i,
+		'name'      => 'shift_correlation',
+	};
+	$mainData->{'data_table'}->[0][$shiftr2_i] = 'shift_correlation';
+	$mainData->{'number_columns'} += 1;
+	
+	# data database metadata
+	if ($data_database) {
+		$mainData->{$r2_i}{'data_database'} = $data_database;
+		$mainData->{$shift_i}{'data_database'} = $data_database;
+	}
+	
+	# add reference position
+	$mainData->{$shift_i}{'reference_point'} = $position == 5 ? 
+		'5_prime' : $position == 4 ? 'midpoint' : '3_prime';
+	
+	# finished
+	return ($r2_i, $shift_i, $shiftr2_i);
+}
+
 
 
 sub interpolate_values {
 	
-	my ($data, $limit) = @_;
+	# initiate
+	my $data = shift;
+	my $limit = 2 * $radius; # hard encoded, that's what we're working with
 	
 	# Fill out the data so that we have all elements filled
 	for (my $i = 0 - $limit; $i <= $limit; $i++) {
@@ -571,12 +639,6 @@ sub calculate_pearson {
 	
 	# positioned data hashes, start, and stop coordinates for evaluating
 	my ($ref, $test) = @_;
-	
-	# check that we have non-zero values in both arrays
-	return unless (
-		sum(map {abs $_} @$ref) > 0 and 
-		sum(map {abs $_} @$test) > 0
-	);
 	
 	# calculate correlation
 	my $stat = Statistics::LineFit->new();
@@ -702,10 +764,10 @@ Display this POD documentation.
 =head1 DESCRIPTION
 
 This program will calculate a Pearson correlation coefficient (R^2 value) 
-between the positioned scores (occupancy) of two datasets over a window of 
-an annotated feature or chromosomal segment. This will determine whether 
-the positions or distribution of scores across the window vary between 
-two different data sets: a test dataset and a reference dataset. 
+between the positioned scores (occupancy) of two datasets over a window 
+from an annotated feature or chromosomal segment. This will determine 
+whether the positions or distribution of scores across the window vary 
+between two different data sets: a test dataset and a reference dataset. 
 The original implementation of this program is to compare nucleosome 
 occupancy differences between two datasets and identify shifts in position. 
 
