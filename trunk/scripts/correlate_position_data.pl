@@ -23,7 +23,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.90';
+my $VERSION = '1.9.0';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -333,10 +333,19 @@ sub collect_correlations {
 		} );
 		
 		
-		# verify
+		# Verify minimum data count 
 		if (
-			sum( map {abs $_} values %ref_pos2data ) == 0 or 
-			sum( map {abs $_} values %test_pos2data ) == 0
+			(
+				not $interpolate and (
+					scalar(keys %ref_pos2data) < 5 or 
+					scalar(keys %test_pos2data) < 5
+					# 5 is an arbitrary minimum number
+				)
+			) or
+			(
+				sum( map {abs $_} values %ref_pos2data ) == 0 or 
+				sum( map {abs $_} values %test_pos2data ) == 0
+			)
 		) {
 			# not enough data points to work with
 			$mainData->{'data_table'}->[$row][$r2_i]      = '.';
