@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.0.2';
+my $VERSION = '1.8.5';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -85,7 +85,6 @@ unless (defined $gz) {
 
 ### Load first file
 my $first_file = shift @ARGV;
-print " Joining file '$first_file'...  ";
 my ($in_fh, $metadata_ref) = open_tim_data_file($first_file);
 unless ($in_fh) {
 	die "Unable to open first file '$first_file'!\n";
@@ -132,13 +131,14 @@ unless ($new_outfile) {
 my $out_fh = open_to_write_fh($new_outfile, $gz, 1);
 
 # Continue writing the first file
+print " Joining file '$first_file'...";
 my $line_count = 0;
 while (my $line = $in_fh->getline) {
 	print {$out_fh} $line;
 	$line_count++;
 }
 $in_fh->close;
-print " " . format_with_commas($line_count) . " data lines merged\n";
+print "   " . format_with_commas($line_count) . " data lines merged\n";
 
 
 
@@ -146,12 +146,12 @@ print " " . format_with_commas($line_count) . " data lines merged\n";
 ### Now write the remaining files
 foreach my $file (@ARGV) {
 	
-	print " Joining file '$file'...  ";
+	print " Joining file '$file'...";
 	
 	# open the file
 	my ($file_fh, $file_data_ref) = open_tim_data_file($file);
 	unless ($file_fh) {
-		die " Unable to open file '$file'! Unable to proceed!\n";
+		die "\n Unable to open file '$file'! Unable to proceed!\n";
 	}
 	
 	# check that metadata matches
@@ -159,7 +159,7 @@ foreach my $file (@ARGV) {
 		$file_data_ref->{number_columns} == 
 			$metadata_ref->{number_columns} 
 	) {
-		die " Number of file columns don't match! Unable to proceed!\n";
+		die "\n Number of file columns don't match! Unable to proceed!\n";
 	}
 	unless (
 		$file_data_ref->{column_names}->[0] eq 
@@ -168,7 +168,17 @@ foreach my $file (@ARGV) {
 		$file_data_ref->{column_names}->[-1] eq 
 			$metadata_ref->{column_names}->[-1]
 	) {
-		die " Column headers don't match! Unable to proceed!\n";
+		print "\n   WARNING! Column header names don't match!! ";
+		for my $i (0 .. $metadata_ref->{number_columns}-1) {
+			if (
+				$file_data_ref->{column_names}->[$i] ne 
+				$metadata_ref->{column_names}->[$i]
+			) {
+				print "compare index $i, '" . 
+					$file_data_ref->{column_names}->[$i] . "' with '" . 
+					$metadata_ref->{column_names}->[$i] . "'\n";
+			}
+		}
 	}
 	
 	# continue writing the file
@@ -178,7 +188,7 @@ foreach my $file (@ARGV) {
 	}
 	$file_fh->close;
 	$file_fh = undef;
-	print " " . format_with_commas($line_count) . " data lines merged\n";
+	print "   " . format_with_commas($line_count) . " data lines merged\n";
 }
 
 
