@@ -204,7 +204,8 @@ sub print_menu {
 		"  P  Toss data lines with du(P)licate values\n" .
 		"  A  Toss data lines with values (A)bove threshold\n" .
 		"  B  Toss data lines with values (B)elow threshold\n" .
-		"  U  Convert n(U)ll values to a value\n" .
+		"  U  Convert n(U)ll values to a specific value\n" .
+		"  L  Convert signed values to an abso(L)ute value\n" .
 		"  I  Set a m(I)nimum value\n" .
 		"  X  Set a ma(X)imum value\n" .
 		"  a  (a)dd a specific value to a dataset\n" .
@@ -816,18 +817,18 @@ sub zscore_function {
 	# this subroutine will generate a z-score for each value in a dataset
 
 	# identify the datasets to convert
-	my @datasets;
+	my @indices;
 	if (@_) {
 		# provided from an internal subroutine
-		@datasets = @_;
+		@indices = @_;
 	}
 	else {
 		# otherwise request from user
-		@datasets = _request_indices(
+		@indices = _request_indices(
 			" Enter the index number(s) of the dataset(s) to generate z-scores  "
 		);
 	}
-	unless (@datasets) {
+	unless (@indices) {
 		warn " Unknown datasets. Nothing done.\n";
 		return;
 	}
@@ -1518,18 +1519,18 @@ sub convert_nulls_function {
 	# Convert null values to something else
 	
 	# identify the datasets to check
-	my @datasets;
+	my @indices;
 	if (@_) {
 		# provided from an internal subroutine
-		@datasets = @_;
+		@indices = @_;
 	}
 	else {
 		# otherwise request from user
-		@datasets = _request_indices(
+		@indices = _request_indices(
 			" Enter the index number(s) of the dataset(s) to convert null values  "
 		);
 	}
-	unless (@datasets) {
+	unless (@indices) {
 		warn " no valid indices. Nothing done.\n";
 		return;
 	}
@@ -1609,7 +1610,7 @@ sub convert_nulls_function {
 				$new_name = $opt_name;
 			}
 			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_minimum_reset";
+				$new_name = $main_data_ref->{$index}{'name'} . "_convert_nulls";
 			}
 			_generate_new_metadata(
 				$index,
@@ -1635,6 +1636,135 @@ sub convert_nulls_function {
 }
 
 
+
+sub convert_absolute_function {
+	# Convert signed values to their absolute value
+	
+	# identify the datasets to check
+	my @indices;
+	if (@_) {
+		# provided from an internal subroutine
+		@indices = @_;
+	}
+	else {
+		# otherwise request from user
+		@indices = _request_indices(
+			" Enter the index number(s) of the dataset(s) to make absolute  "
+		);
+	}
+	unless (@indices) {
+		warn " no valid indices. Nothing done.\n";
+		return;
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
+		
+		# number of resets we do
+		my $count  = 0; 
+		my $failed = 0;
+		
+		# reset minimum values
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, cannot change
+					next;
+				}
+				else {
+					# change it in situ
+					my $new_value;
+					eval { $new_value = abs( $data_table_ref->[$i][$index] ) };
+					if (defined $new_value) {
+						$data_table_ref->[$i][$index] = $new_value;
+						$count++;
+					}
+					else {
+						$failed++;
+					}
+				} 
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'convert'} = 'absolute';
+			
+			# print conclusion
+			print " $count values were converted to absolute values for" .
+				" dataset $main_data_ref->{$index}{'name'}\n";
+			print " $failed values could not be converted\n" if $failed;
+			$dataset_modification_count++ if $count;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for null values
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, cannot change
+					$data_table_ref->[$i][$new_position] = '.';
+				} 
+				else {
+					# acceptable
+					my $new_value;
+					eval { $new_value = abs( $data_table_ref->[$i][$index] ) };
+					if (defined $new_value) {
+						$data_table_ref->[$i][$new_position] = $new_value;
+						$count++;
+					}
+					else {
+						$data_table_ref->[$i][$new_position] = 
+							$data_table_ref->[$i][$index];
+						$failed++;
+					}
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "_absolute";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'convert',
+				'absolute',
+				$new_name,
+			);
+			
+			# print conclusion
+			print " $count values were converted to absolute values for " . 
+				"dataset $main_data_ref->{$index}{'name'}" .
+				" and generated as a new dataset\n";
+			print " $failed values could not be converted\n" if $failed;
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " values NOT changed; unknown placement request\n";
+		}
+	}
+	
+	# done 
+	return $dataset_modification_count;
+}
 
 
 
@@ -3657,6 +3787,7 @@ sub _get_letter_to_function_hash {
 		'A' => "above",
 		'B' => "below",
 		'U' => "cnull",
+		'L' => "absolute",
 		'I' => "minimum",
 		'X' => "maximum",
 		'a' => "add",
@@ -3706,6 +3837,7 @@ sub _get_function_to_subroutine_hash {
 		'above'       => \&toss_above_threshold_function,
 		'below'       => \&toss_below_threshold_function,
 		'cnull'       => \&convert_nulls_function,
+		'absolute'    => \&convert_absolute_function,
 		'minimum'     => \&minimum_function,
 		'maximum'     => \&maximum_function,
 		'add'         => \&add_function,
@@ -4047,11 +4179,11 @@ manipulate_datasets.pl [--options ...] <input_filename>
   Options:
   --in <input_filename>
   --func [ stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | cnull | minimum | maximum | 
-          add | subtract | multiply | divide | scale | pr | zscore | 
-          log2 | delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | strandsign | mergestrand | center | new | summary | 
-          export | rewrite | treeview ]
+          null | duplicate | above | below | cnull | absolute | minimum | 
+          maximum | add | subtract | multiply | divide | scale | pr | 
+          zscore | log2 | delog2 | format | combine | subsample | ratio | 
+          diff | normdiff | strandsign | mergestrand | center | new | 
+          summary | export | rewrite | treeview ]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -4109,6 +4241,7 @@ other required options. These functions include the following.
   above
   below
   cnull
+  absolute
   minimum
   maximum
   add
@@ -4334,6 +4467,11 @@ specified with the --target option.
 Convert null values to a specific value. One or more datasets may 
 be selected to convert null values. The new value may be requested 
 interactively or defined with the --target option.  
+
+=item B<absolute> (menu option 'L')
+
+Convert signed values to their absolute value equivalents. One or 
+more datasets may be selected to convert.
 
 =item B<minimum> (menu option 'I')
 
