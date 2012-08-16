@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.8.4';
+my $VERSION = '1.8.5';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -204,6 +204,7 @@ sub print_menu {
 		"  P  Toss data lines with du(P)licate values\n" .
 		"  A  Toss data lines with values (A)bove threshold\n" .
 		"  B  Toss data lines with values (B)elow threshold\n" .
+		"  U  Convert n(U)ll values to a value\n" .
 		"  I  Set a m(I)nimum value\n" .
 		"  X  Set a ma(X)imum value\n" .
 		"  a  (a)dd a specific value to a dataset\n" .
@@ -220,7 +221,7 @@ sub print_menu {
 		"  r  Generate a (r)atio between two datasets\n" .
 		"  d  Generate a (d)ifference between two datasets\n" .
 		"  z  Generate a normali(z)ed difference between two datasets\n" .
-		"  U  S(U)bsample a dataset\n" .
+		"  su (su)bsample a dataset\n" .
 		"  si Convert data to (si)gned data according to strand\n" .
 		"  st Merge (st)randed datasets into one\n" .
 		"  e  C(e)nter normalize feature datapoints \n" .
@@ -814,12 +815,20 @@ sub percentile_rank_function {
 sub zscore_function {
 	# this subroutine will generate a z-score for each value in a dataset
 
-	# request datasets
-	my @indices = &_request_indices(
-		" Enter the index number(s) of the dataset(s) to generate z-scores  "
-	);
-	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
+	# identify the datasets to convert
+	my @datasets;
+	if (@_) {
+		# provided from an internal subroutine
+		@datasets = @_;
+	}
+	else {
+		# otherwise request from user
+		@datasets = _request_indices(
+			" Enter the index number(s) of the dataset(s) to generate z-scores  "
+		);
+	}
+	unless (@datasets) {
+		warn " Unknown datasets. Nothing done.\n";
 		return;
 	}
 	
@@ -1502,6 +1511,131 @@ sub toss_threshold_function {
 	print " ", $main_data_ref->{'last_row'}, " data lines are remaining\n";
 	return 1;
 }
+
+
+
+sub convert_nulls_function {
+	# Convert null values to something else
+	
+	# identify the datasets to check
+	my @datasets;
+	if (@_) {
+		# provided from an internal subroutine
+		@datasets = @_;
+	}
+	else {
+		# otherwise request from user
+		@datasets = _request_indices(
+			" Enter the index number(s) of the dataset(s) to convert null values  "
+		);
+	}
+	unless (@datasets) {
+		warn " no valid indices. Nothing done.\n";
+		return;
+	}
+	
+	# request value
+	my $value;
+	if (defined $opt_target) {
+		# command line option
+		$value = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the new value to convert nulls to  ";
+		$value = <STDIN>;
+		chomp $value;
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	
+	## Process the datasets and subtract their values
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
+		
+		# number of resets we do
+		my $count  = 0; 
+		my $failed = 0;
+		
+		# reset minimum values
+		if ($placement eq 'r' or $placement eq 'R') {
+			# Replace the contents of the original dataset
+			
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for valid numbers
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, need to change
+					# change it in situ
+					$data_table_ref->[$i][$index] = $value;
+					$count++;
+				} 
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'null_value'} = $value;
+			
+			# print conclusion
+			print " $count null values were changed for dataset $main_data_ref->{$index}{'name'}\n";
+			$dataset_modification_count++ if $count;
+		} 
+		
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			# Generate a new dataset
+			
+			# the new index position is equivalent to the number of columns
+			my $new_position = $main_data_ref->{'number_columns'};
+			
+			# calculate new values
+			for my $i (1..$main_data_ref->{'last_row'}) {
+				# check for null values
+				if ($data_table_ref->[$i][$index] eq '.') {
+					# null value, need to change
+					$data_table_ref->[$i][$new_position] = $value;
+					$count++;
+				} 
+				else {
+					# acceptable
+					$data_table_ref->[$i][$new_position] = 
+						$data_table_ref->[$i][$index];
+				}
+			}
+			
+			# copy the medadata hash and annotate
+			my $new_name;
+			if ($function and $opt_name) {
+				# automatic execution and new name was specifically given 
+				$new_name = $opt_name;
+			}
+			else {
+				$new_name = $main_data_ref->{$index}{'name'} . "_minimum_reset";
+			}
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'null_value',
+				$value,
+				$new_name,
+			);
+			
+			# print conclusion
+			print " $count null values were changed for dataset $main_data_ref->{$index}{'name'}" 
+				. " and generated as a new dataset\n";
+			$dataset_modification_count++;
+		} 
+		
+		else {
+			warn " null values NOT changed; unknown placement request\n";
+		}
+	}
+	
+	# done 
+	return $dataset_modification_count;
+}
+
+
+
 
 
 
@@ -3207,7 +3341,7 @@ sub export_treeview_function {
 	unshift @datasets, $name_index;
 	
 	
-	### Second, delete extraneous datasets or columns
+	### First, delete extraneous datasets or columns
 	# identify the columns to delete
 	my @to_delete;
 	for my $i (0 .. ($main_data_ref->{'number_columns'} - 1) ) {
@@ -3215,7 +3349,10 @@ sub export_treeview_function {
 		# walk though the keeper list in @datasets
 		foreach (@datasets) {
 			# set check to false if we want to keep
-			$check = 0 if $i == $_;
+			if ($i == $_) {
+				$check = 0;
+				last;
+			}
 		}
 		if ($check) {
 			# not in keeper list, so targeted for deletion
@@ -3507,7 +3644,7 @@ sub _get_letter_to_function_hash {
 	# this hash converts the one-letter menu key to the function name
 	# the key is the menu letter
 	# the value is the function name
-	my %hash = (
+	return (
 		't' => "stat",
 		'R' => "reorder",
 		'D' => "delete",
@@ -3519,6 +3656,7 @@ sub _get_letter_to_function_hash {
 		'P' => "duplicate",
 		'A' => "above",
 		'B' => "below",
+		'U' => "cnull",
 		'I' => "minimum",
 		'X' => "maximum",
 		'a' => "add",
@@ -3532,7 +3670,7 @@ sub _get_letter_to_function_hash {
 		'2' => "delog2",
 		'f' => "format",
 		'c' => "combine",
-		'U' => "subsample",
+		'su' => "subsample",
 		'r' => "ratio",
 		'd' => "diff",
 		'z' => "normdiff",
@@ -3549,14 +3687,13 @@ sub _get_letter_to_function_hash {
 		'Q' => "quit",
 		'm' => "menu",
 	);
-	return %hash;
 }
 
 sub _get_function_to_subroutine_hash {
 	# this hash converts the function name to the actual subroutine for the function
 	# the key is the function name
 	# the value is a scalar reference to the subroutine
-	my %hash = (
+	return (
 		'stat'        => \&print_statistics_function,
 		'reorder'     => \&reorder_function,
 		'delete'      => \&delete_function,
@@ -3568,6 +3705,7 @@ sub _get_function_to_subroutine_hash {
 		'duplicate'   => \&toss_duplicates_function,
 		'above'       => \&toss_above_threshold_function,
 		'below'       => \&toss_below_threshold_function,
+		'cnull'       => \&convert_nulls_function,
 		'minimum'     => \&minimum_function,
 		'maximum'     => \&maximum_function,
 		'add'         => \&add_function,
@@ -3596,7 +3734,6 @@ sub _get_function_to_subroutine_hash {
 		'help'        => \&print_online_help,
 		'menu'        => \&print_menu,
 	);
-	return %hash;
 }
 
 
@@ -3910,7 +4047,7 @@ manipulate_datasets.pl [--options ...] <input_filename>
   Options:
   --in <input_filename>
   --func [ stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | minimum | maximum | 
+          null | duplicate | above | below | cnull | minimum | maximum | 
           add | subtract | multiply | divide | scale | pr | zscore | 
           log2 | delog2 | format | combine | subsample | ratio | diff | 
           normdiff | strandsign | mergestrand | center | new | summary | 
@@ -3971,6 +4108,7 @@ other required options. These functions include the following.
   duplicate
   above
   below
+  cnull
   minimum
   maximum
   add
@@ -4191,6 +4329,12 @@ One or more datasets may be selected to test values for the
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
 
+=item B<cnull> (menu option 'U')
+
+Convert null values to a specific value. One or more datasets may 
+be selected to convert null values. The new value may be requested 
+interactively or defined with the --target option.  
+
 =item B<minimum> (menu option 'I')
 
 Reset datapoints whose values are less than a specified minimum 
@@ -4290,10 +4434,10 @@ stdev, or sum. The method may be specified on the command line
 using the --target option. The combined data values are added as a 
 new dataset.
 
-=item B<subsample> (menu option 'U')
+=item B<subsample> (menu option 'su')
 
 Subsample an enumerated dataset. Datapoints within a dataset are chosen 
-randomlyand the values reduced by one until the target sum is reached. 
+randomly and the values reduced by one until the target sum is reached. 
 This assumes an enumerated dataset, e.g. tag counts from
 Next-gen sequencing, where the sum of tags from two or more datasets
 must be normalized to each other. This function assumes that the data
