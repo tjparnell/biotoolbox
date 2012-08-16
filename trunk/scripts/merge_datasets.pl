@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.4';
+my $VERSION = '1.8.5';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -195,7 +195,7 @@ sub merge_two_datasets {
 	
 	# Check the input data
 	my $check = check_data_tables($input_data1_ref, $input_data2_ref);
-	if ($check) {
+	if ($check and !$lookup) {
 		print " Files have non-equal numbers of data rows! Enabling lookup\n";
 	}
 	
@@ -204,78 +204,76 @@ sub merge_two_datasets {
 	if ($lookup or $check) {
 		# we need to merge by lookup values
 		merge_two_datasets_by_lookup($input_data1_ref, $input_data2_ref);
+		return;
 	}
 	
-	# Merge the two datasets blindly
+	
+	# Otherwise Merge the two datasets blindly
+	# determine the new order
+	my @order;
+	if ($automatic) {
+		# automatic selection
+		@order = automatically_determine_order(
+			$input_data1_ref, $input_data2_ref);
+		
+	}
 	else {
-		
-		# determine the new order
-		my @order;
-		if ($automatic) {
-			# automatic selection
-			@order = automatically_determine_order(
-				$input_data1_ref, $input_data2_ref);
-			
-		}
-		else {
-			# manual selection from user
-			@order = request_new_order($input_data1_ref, $input_data2_ref);
-		}
-		
-		# Initialize the output data structure if necessary
-		$output_data_ref = initialize_output_data_structure($input_data1_ref); 
+		# manual selection from user
+		@order = request_new_order($input_data1_ref, $input_data2_ref);
+	}
 	
-		# assign the datasets to the output data in requested order
-		foreach my $request (@order) {
+	# Initialize the output data structure if necessary
+	$output_data_ref = initialize_output_data_structure($input_data1_ref); 
+
+	# assign the datasets to the output data in requested order
+	foreach my $request (@order) {
+		
+		# determine the current column index we're working with
+		my $column = $output_data_ref->{'number_columns'};
+		
+		# add the dataset from the appropriate input file
+		if ($request =~ /^\d+$/) {
+			# a digit indicates a dataset from file1
 			
-			# determine the current column index we're working with
-			my $column = $output_data_ref->{'number_columns'};
-			
-			# add the dataset from the appropriate input file
-			if ($request =~ /^\d+$/) {
-				# a digit indicates a dataset from file1
-				
-				# print dataset name in automatic mode
-				if ($automatic) {
-					print "  Merging column " . 
-						$input_data1_ref->{$request}{'name'} . "\n";
-				}
-				
-				# copy the dataset
-				for my $row (0 .. $input_data1_ref->{'last_row'}) {
-					$output_data_ref->{'data_table'}->[$row][$column] = 
-						$input_data1_ref->{'data_table'}->[$row][$request];
-				}
-				
-				# copy the metadata
-				copy_metadata($input_data1_ref, $request);
-			} 
-			elsif ($request =~ /^[a-z]+$/i) {
-				# a letter indicates a dataset from file2
-				
-				# first convert back to number
-				my $number = $number_of{$request};
-				
-				# print dataset name in automatic mode
-				if ($automatic) {
-					print "  Merging column " . 
-						$input_data2_ref->{$number}{'name'} . "\n";
-				}
-				
-				# copy the dataset
-				for my $row (0 .. $input_data2_ref->{'last_row'}) {
-					$output_data_ref->{'data_table'}->[$row][$column] = 
-						$input_data2_ref->{'data_table'}->[$row][$number];
-				}
-				
-				# copy the metadata
-				copy_metadata($input_data2_ref, $number);
-			} 
-			else {
-				die " unrecognized symbol '$request' in request! nothing done!\n";
+			# print dataset name in automatic mode
+			if ($automatic) {
+				print "  Merging column " . 
+					$input_data1_ref->{$request}{'name'} . "\n";
 			}
+			
+			# copy the dataset
+			for my $row (0 .. $input_data1_ref->{'last_row'}) {
+				$output_data_ref->{'data_table'}->[$row][$column] = 
+					$input_data1_ref->{'data_table'}->[$row][$request];
+			}
+			
+			# copy the metadata
+			copy_metadata($input_data1_ref, $request);
+		} 
+		elsif ($request =~ /^[a-z]+$/i) {
+			# a letter indicates a dataset from file2
+			
+			# first convert back to number
+			my $number = $number_of{$request};
+			
+			# print dataset name in automatic mode
+			if ($automatic) {
+				print "  Merging column " . 
+					$input_data2_ref->{$number}{'name'} . "\n";
+			}
+			
+			# copy the dataset
+			for my $row (0 .. $input_data2_ref->{'last_row'}) {
+				$output_data_ref->{'data_table'}->[$row][$column] = 
+					$input_data2_ref->{'data_table'}->[$row][$number];
+			}
+			
+			# copy the metadata
+			copy_metadata($input_data2_ref, $number);
+		} 
+		else {
+			die " unrecognized symbol '$request' in request! nothing done!\n";
 		}
-	
 	}
 }
 
@@ -651,7 +649,7 @@ sub request_lookup_indices {
 		print_datasets($data2, 'letter');
 	
 		# Request first index responses from user
-		print " Enter the lookup value column index for first file   ";
+		print " Enter the unique identifier index for lookup in the first file   ";
 		$index1 = <STDIN>;
 		chomp $index1;
 		unless ($index1 =~ /^\d+$/ and exists $data1->{$index1}) {
@@ -660,7 +658,7 @@ sub request_lookup_indices {
 		}
 		
 		# Request second index responses from user
-		print " Enter the lookup value column index for second file   ";
+		print " Enter the unique identifier index for lookup in the second file   ";
 		$index2 = <STDIN>;
 		chomp $index2;
 		unless ($index2 =~ /^[a-z]+$/i) { 
@@ -856,23 +854,8 @@ sub check_data_tables {
 	) {
 		# Each file has feature type defined, but they're not the same
 		# probably really don't want to combine these
-		print " The metadata feature types for both files don't match!!!\n";
-		if ($automatic) {
-			# attempt to continue automatically 
-			print " Continuing anyway...\n";
-		}
-		
-		else {
-			# confirm from the user
-			print "  Do you still want to proceed (y/n)  ";
-			my $prompt = <STDIN>;
-			if ($prompt =~ /^y/i) {
-				print " OK. Continuing anyway\n\n\n";
-			}
-			else {
-				exit " OK. Nothing done\n\n";
-			}
-		}
+		print " WARNING! The metadata feature types for both files don't match!!!\n";
+		print "   Continuing anyway...\n";
 	}
 	
 	# check line numbers
@@ -931,7 +914,8 @@ sub copy_metadata {
 	}
 	
 	# set the original file name
-	$output_data_ref->{$current_index}{'original_file'} = $data_ref->{'filename'};
+	$output_data_ref->{$current_index}{'original_file'} = 
+		$data_ref->{'filename'};
 	
 	# reset the index
 	$output_data_ref->{$current_index}{'index'} = $current_index;
