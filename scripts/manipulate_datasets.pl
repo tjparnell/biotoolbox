@@ -848,7 +848,7 @@ sub zscore_function {
 		my $new_position = $main_data_ref->{'number_columns'};
 		for my $row (1 .. $main_data_ref->{'last_row'}) {
 			$data_table_ref->[$row][$new_position] = 
-				( $statdata{'mean'} - $data_table_ref->[$row][$index] ) / 
+				( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
 				$statdata{'stddevp'};
 		}
 	
