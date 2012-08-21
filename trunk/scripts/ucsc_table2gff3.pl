@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.7.2';
+my $VERSION = '1.8.5';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -658,7 +658,7 @@ sub process_line_data {
 		$data{chrom}      = $linedata[1];
 		$data{strand}     = $linedata[2];
 		$data{txStart}    = $linedata[3] + 1;
-		$data{txEnd}      = $linedata[3];
+		$data{txEnd}      = $linedata[4];
 		$data{cdsStart}   = $linedata[5] + 1;
 		$data{cdsEnd}     = $linedata[6];
 		$data{exonCount}  = $linedata[7];
@@ -719,11 +719,9 @@ sub process_gene_table {
 		next if $line =~ /^#/;
 		my $linedata = process_line_data($line);
 		
-		
 		## generate the transcript
 		my $transcript = generate_new_transcript($linedata, \%id2count);
-		
-		
+				
 		## count the transcript type
 		my $type = $transcript->primary_tag;
 		if ($type eq 'mRNA') {
