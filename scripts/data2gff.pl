@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.5.1';
+my $VERSION = '1.8.5';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -132,23 +132,34 @@ if ($metadata_ref->{'extension'} =~ /sgr/) {
 	$start_index = 1 unless defined $start_index;
 	$stop_index = 1 unless defined $stop_index; # same as start
 	$score_index = 2 unless defined $score_index;
+	$type ||= 'region'; # default
 }
 
 # automatically identify bed format
-elsif ($metadata_ref->{'extension'} =~ /bed/) {
-	$chr_index = 0 unless defined $chr_index;
-	$start_index = 1 unless defined $start_index;
-	$stop_index = 2 unless defined $stop_index; # same as start
+elsif ($metadata_ref->{'bed'}) {
 	
-	if (!defined $name_index and $metadata_ref->{'number_columns'} >= 4) {
+	# standard columns
+	$chr_index = 0;
+	$start_index = 1;
+	$stop_index = 2; # same as start
+	
+	# optional columns
+	# we are assuming standard BED columns
+	if ($metadata_ref->{'bed'} >= 4) {
 		$name_index = 3;
 	}
-	if (!defined $score_index and $metadata_ref->{'number_columns'} >= 5) {
+	if ($metadata_ref->{'bed'} >= 5) {
 		$score_index = 4;
 	}
-	if (!defined $strand_index and $metadata_ref->{'number_columns'} >= 6) {
+	if ($metadata_ref->{'bed'} >= 6) {
 		$strand_index = 5;
 	}
+	
+	# assign type
+	$type ||= 'region';
+	
+	# bedfiles are 0-based
+	$zero_based = 1;
 }
 
 # Ask user interactively
@@ -278,13 +289,18 @@ if ($tag) {
 }
 
 # Determine the name index or text
-if (defined $name and $name =~/^\d+$/) {
+if (
+	defined $name and 
+	$name =~/^\d+$/ and 
+	$name <= $metadata_ref->{'number_columns'}
+) {
+	# looks like a number, so assume it is the index
 	$name_index = $name;
 }
-if ($unique and !defined $name) {
+if ($unique and (not defined $name and not defined $name_index)) {
 	die " unable to assign unique feature names without a name index or text!\n";
 }
-if ($unique and !defined $name_index) {
+if ($unique and not defined $name_index) {
 	# a uniqe name is requested but we don't have an index, yet
 	# so make one
 	$name_index = $metadata_ref->{'number_columns'};
@@ -296,10 +312,31 @@ if ($unique and !defined $name_index) {
 	$metadata_ref->{'number_columns'} += 1;
 }
 
+# Generate the output file name
+unless ($outfile) {
+	# generate an output file name based on provided data
+	if (defined $type and $type =~ /[a-z]+/i and $type ne 'region') {
+		# user has provide a GFF type, use that preferentially as the 
+		# the filename
+		# this is ignored if a column index or default region is used
+		if ($source) {
+			# user has provided source, combine that
+			$outfile = $source . '_' . $type;
+		}
+		else {
+			# just use the type
+			$outfile = $type;
+		}
+	}
+	else {
+		# re-use the input file name
+		$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
+	}
+}
 
-### Convert to GFF progressively
-# To avoid exorbitant memory requirements for ginormous files, 
-# we will only convert 20000 lines at time. 
+
+
+### Print the user or auto-generated options
 print " converting to GFF using\n";
 print "  - '", $metadata_ref->{$chr_index}{name}, "' for chromosome\n" 
 	if defined $chr_index;
@@ -332,7 +369,13 @@ print "  - '", join(", ", map { $metadata_ref->{$_}{name} } @tag_indices ),
 	"' for group tags\n" if $tag;
 
 
-# first, generate a temporary gff data structure based on the input metadata
+
+
+### Generate a temporary gff data structure based on the input metadata
+# doing this manually rather than calling tim_data_helper to make a new 
+# structure, because we're basing this off the input file metadata, 
+# and we populate, empty, and regenerate numerous times as we walk 
+# through the file. Ugh, it's complicated, and very old un-optimized, crazy code
 my %output_data;
 if (exists $metadata_ref->{'program'}) {
 	# use originating data file program
@@ -352,6 +395,9 @@ $output_data{'other'} = [ @{ $metadata_ref->{'other'} } ];
 $output_data{'data_table'} = [];
 regenerate_output_data_hash();
 
+
+
+### Global variables
 # set output control variables
 my $out_fh; # the output file handle
 my $count = 0; # the number of lines processed before writing output
@@ -360,7 +406,12 @@ my $total_count = 0;
 # set unique name counter
 my %unique_name_counter;
 
-# parse through the data lines in the input data file
+
+
+
+### Parse input file into GFF
+# To avoid exorbitant memory requirements for ginormous files, 
+# we will only convert 20000 lines at time. 
 while (my $line = $in_fh->getline) {
 	
 	# add line to the data table
@@ -525,17 +576,6 @@ sub write_gff_data {
 	else {
 		# we will need to open the output file to write if it's not 
 		# opened yet
-		
-		# check for filename
-		unless ($outfile) {
-			# by default, we typically use the method or type name
-			# we'll grab it from the first feature, type column
-			# we're grabbing it from the data table because the user
-			# may not have specified it via $type, whereupon the the
-			# gff conversion subroutine will automatically derive one
-			$outfile = $output_data{'data_table'}->[1][2];
-			# the extension will be changed automatically
-		}
 		
 		# rather than generating new code for writing the gff file,
 		# we will simply use the write_tim_data_file sub
