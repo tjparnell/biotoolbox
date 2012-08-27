@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.8.4';
+our $VERSION = '1.8.5';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -903,8 +903,85 @@ sub write_tim_data_file {
 	my ($name, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
 	
 	# Adjust filename extension if necessary
-	unless ($extension) {
-			
+	if ($extension) {
+		# we have an extension
+		# make sure it makes sense
+		
+		# GFF file
+		if ($extension =~ /gff/i) {
+			unless ($datahash_ref->{'gff'}) {
+				# it's not set as a gff data
+				# let's set it to true and see if it passes verification
+				$datahash_ref->{'gff'} = 3; # default
+				if ( 
+					verify_data_structure($datahash_ref) and
+					$datahash_ref->{'gff'}
+				) {
+					# keep the gff extension, it seems  good
+				}
+				else {
+					# it's not good, set it back to text
+					warn " re-setting extension from $extension to .txt\n";
+					$extension =~ s/gff3?/txt/i;
+				}
+			}
+		}
+		
+		# BED file
+		elsif ($extension =~ /bed|bdg/i) {
+			unless ($datahash_ref->{'bed'}) {
+				# it's not set as a bed data
+				# let's set it to true and see if it passes verification
+				$datahash_ref->{'bed'} = 1; # a fake true
+				if ( 
+					verify_data_structure($datahash_ref) and
+					$datahash_ref->{'bed'}
+				) {
+					# keep the bed extension, it seems  good
+				}
+				else {
+					# if it's not BED data, we don't use the extension
+					# change it to text
+					warn " re-setting extension from $extension to .txt\n";
+					$extension =~ s/bed|bdg/txt/i;
+				}
+			}
+		}
+		
+		# SGR file
+		elsif ($extension =~ /sgr/i) {
+			if (
+				exists $datahash_ref->{'extension'} and
+				$datahash_ref->{'extension'} =~ /sgr/i
+			) {
+				# if the original file extension was sgr
+				# then it likely passed verification above
+				# so we will keep it
+			}
+			else {
+				# original file was not SGR
+				# let's pretend it was and see if still passes 
+				# verification
+				# the sgr verification relies on the recorded extension
+				$datahash_ref->{'extension'} = '.sgr';
+				
+				# re-verify the structure
+				verify_data_structure($datahash_ref);
+				
+				# we'll take the extension the verification sets
+				if ($datahash_ref->{'extension'} =~ /txt/) {
+					warn " re-setting extension from $extension to .txt\n";
+				}
+				$extension = $datahash_ref->{'extension'};
+			}
+		}
+		
+	}
+	
+	else {
+		# no extension was available
+		# try and determine one
+				
 		# a gff file
 		if ($datahash_ref->{'gff'}) {
 			$extension = '.gff';
@@ -935,7 +1012,7 @@ sub write_tim_data_file {
 		elsif (exists $datahash_ref->{'extension'}) {
 			
 			# structure is gff
-			if ($datahash_ref->{'extension'} =~ /gff/) {
+			if ($datahash_ref->{'extension'} =~ /gff/i) {
 				
 				# check to see that we still have a valid gff structure
 				if ($datahash_ref->{'gff'}) {
@@ -948,7 +1025,7 @@ sub write_tim_data_file {
 			}
 			
 			# structure is bed
-			elsif ($datahash_ref->{'extension'} =~ /bed/) {
+			elsif ($datahash_ref->{'extension'} =~ /bed/i) {
 				# check to see that we still have a valid bed structure
 				if ($datahash_ref->{'bed'}) {
 					$extension = $datahash_ref->{'extension'};
@@ -979,7 +1056,7 @@ sub write_tim_data_file {
 		}
 		elsif ($extension) {
 			# check extension from the parsed filename, if present
-			if ($extension =~ /sgr/) {
+			if ($extension =~ /sgr/i) {
 				# sgr is simple format, no headers 
 				$format = 'simple';
 			}
@@ -1076,7 +1153,7 @@ sub write_tim_data_file {
 		}
 		
 		# Write the primary headers
-		unless ($extension =~ m/gff|bed|bdg|sgr|kgg/) {
+		unless ($extension =~ m/gff|bed|bdg|sgr|kgg/i) {
 			# we only write these for text files, not gff or bed files
 			
 			if ($datahash_ref->{'program'}) {
@@ -1173,10 +1250,11 @@ sub write_tim_data_file {
 	if (
 		$datahash_ref->{'headers'} and
 		$datahash_ref->{'gff'} == 0 and
-		$datahash_ref->{'bed'} == 0
+		$datahash_ref->{'bed'} == 0 and
+		$extension !~ /sgr/i
 	) {
 		# table headers existed in original source file, 
-		# and this is not a GFF or BED file,
+		# and this is not a GFF, BED, or SGR file,
 		# therefore headers should be written
 		$fh->print( 
 			join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
