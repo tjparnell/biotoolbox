@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.8.4';
+our $VERSION = '1.8.5';
 
 
 
@@ -208,8 +208,16 @@ sub verify_data_structure {
 		
 		# update gff value as necessary
 		if ($gff_check == 0) {
+			# reset metadata
 			$datahash_ref->{'gff'} = 0;
 			$datahash_ref->{'headers'} = 1;
+			
+			# remove the AUTO key from the metadata
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
+				}
+			}
 		}
 	}
 	
@@ -249,61 +257,70 @@ sub verify_data_structure {
 		) {
 			$bed_check = 0;
 		}
+		
+		# the remaining columns are tricky, as they may or may not be 
+		# named as I expect, especially if it was generated de novo
+		# so only check these if the original file extension was bed
 		if (
-			exists $datahash_ref->{3} and
-			$datahash_ref->{3}{'name'} !~ m/^name|id|score/i
-			# for bed this should be name or ID
-			# for bedgraph this should be score
+			exists $datahash_ref->{'extension'} and 
+			$datahash_ref->{'extension'} =~ /bed|bdg/i
 		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{4} and
-			$datahash_ref->{4}{'name'} !~ m/^score|value/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{5} and
-			$datahash_ref->{5}{'name'} !~ m/^strand/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{6} and
-			$datahash_ref->{6}{'name'} !~ m/^thickstart/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{7} and
-			$datahash_ref->{7}{'name'} !~ m/^thickend/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{8} and
-			$datahash_ref->{8}{'name'} !~ m/^itemrgb/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{9} and
-			$datahash_ref->{9}{'name'} !~ m/^blockcount/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{10} and
-			$datahash_ref->{10}{'name'} !~ m/^blocksizes/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{11} and
-			$datahash_ref->{11}{'name'} !~ m/^blockstarts/i
-		) {
-			$bed_check = 0;
+			if (
+				exists $datahash_ref->{3} and
+				$datahash_ref->{3}{'name'} !~ m/^name|id|score/i
+				# for bed this should be name or ID
+				# for bedgraph this should be score
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{4} and
+				$datahash_ref->{4}{'name'} !~ m/^score|value/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{5} and
+				$datahash_ref->{5}{'name'} !~ m/^strand/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{6} and
+				$datahash_ref->{6}{'name'} !~ m/^thickstart/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{7} and
+				$datahash_ref->{7}{'name'} !~ m/^thickend/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{8} and
+				$datahash_ref->{8}{'name'} !~ m/^itemrgb/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{9} and
+				$datahash_ref->{9}{'name'} !~ m/^blockcount/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{10} and
+				$datahash_ref->{10}{'name'} !~ m/^blocksizes/i
+			) {
+				$bed_check = 0;
+			}
+			if (
+				exists $datahash_ref->{11} and
+				$datahash_ref->{11}{'name'} !~ m/^blockstarts/i
+			) {
+				$bed_check = 0;
+			}
 		}
 		
 		# reset the BED tag value as appropriate
@@ -311,8 +328,45 @@ sub verify_data_structure {
 			$datahash_ref->{'bed'} = $datahash_ref->{'number_columns'};
 		}
 		else {
+			# reset metadata
 			$datahash_ref->{'bed'} = 0;
 			$datahash_ref->{'headers'} = 1;
+			
+			# remove the AUTO key from the metadata
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
+				}
+			}
+		}
+	}
+	
+	# check proper SGR file structure
+	if (
+		$datahash_ref->{'extension'} =~ /sgr/i or
+		$datahash_ref->{'filename'} =~ /sgr/i
+	) {
+		# there is no sgr field in the data structure
+		# so we're just checking for the extension
+		# we will change the extension as necessary if it doesn't conform
+		if (
+			$datahash_ref->{'number_columns'} != 3 or
+			$datahash_ref->{0}{'name'} !~ /^chr|seq|ref/i or
+			$datahash_ref->{1}{'name'} !~ /^start|position/i
+		) {
+			# doesn't smell like a SGR file
+			# change the extension so the write subroutine won't think it is
+			# make it a text file
+			$datahash_ref->{'extension'} =~ s/sgr/txt/i;
+			$datahash_ref->{'filename'}  =~ s/sgr/txt/i;
+			$datahash_ref->{'headers'} = 1;
+			
+			# remove the AUTO key from the metadata
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
+				}
+			}
 		}
 	}
 	
@@ -403,6 +457,11 @@ sub index_data_table {
 ### Subroutine to find a column
 sub find_column_index {
 	my ($data_ref, $name) = @_;
+	
+	# the $name variable will be used as a regex in identifying the name
+	# fix it so that it will possible accept a # character at the beginning
+	# without a following space, in case the first column has a # prefix
+	$name =~ s/ \A (\^?) (.+) \Z /$1#?$2/x;
 	
 	# walk through each column index
 	my $index;
