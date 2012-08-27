@@ -8,7 +8,7 @@ use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.8.4';
+our $VERSION = '1.8.5';
 
 
 # Exported names
@@ -859,6 +859,10 @@ sub _process_summaries {
 	}
 	
 	# Done
+	unless (defined $value) {
+		# one last check to avoid undefined values
+		$value = $method =~ /sum|count/ ? 0 : '.';
+	}
 	return $value;
 }
 
