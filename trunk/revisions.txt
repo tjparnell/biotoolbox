@@ -1,5 +1,16 @@
 ######## BioToolBox revision history #############
 
+v.1.8.5 (svn 461)
+	- Fixed critical bug where all knownGene feature strands are reversed in script ucsc_table2gff3.pl
+	- Fixed critical bug where the sign is flipped when generating Z-scores with script manipulate_datasets.pl
+	- Added new functions "convert null values" and "absolute value" to script manipulate_datasets.pl
+	- Added additional file format checks when writing formatted files including GFF, BED, and SGR. File extensions may automatically change to default txt if the format does not match.
+	- Better handling of input Bed files and generating appropriate default file names in script data2gff.pl
+	- Improved merging of datasets by lookup, and loosened restrictions on metadata checking, issuing warnings instead, in script merge_datasets.pl
+	- Loosened restrictions on metadata differences and failures in script join_data_file.pl
+	- Included fix for finding column indices when name is prefixed with #
+	- Added another check to avoid returning undefined values from BigWig data collection
+
 v.1.8.4 (svn 448)
 	- Changed shift value determination to use trimmed mean to avoid outliers, and added new option to control the minimum acceptable R^2 value in script bam2wig.pl
 	- Improved script merge_datasets.pl to identify appropriate lookup columns automatically and successfully merge more than two files using lookup
