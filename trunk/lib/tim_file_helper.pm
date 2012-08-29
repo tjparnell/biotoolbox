@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.8.5';
+our $VERSION = '1.8.6';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -63,6 +63,8 @@ our @SUFFIX_LIST = qw(
 	\.bed\.gz
 	\.bdg
 	\.bdg\.gz
+	\.bedgraph
+	\.bedgraph.gz
 	\.sgr
 	\.sgr\.gz
 	\.kgg
@@ -232,8 +234,14 @@ sub open_tim_data_file {
 		
 		# Parse the datafile metadata headers
 		
+		# no real line, just empty space
+		if ($line !~ m/\w+/) {
+			$header_line_count++;
+			next;
+		}
+		
 		# the generating program
-		if ($line =~ m/^# Program (.+)$/) {
+		elsif ($line =~ m/^# Program (.+)$/) {
 			$inputdata->{'program'} = $1;
 			$inputdata->{'program'} =~ s/\r|\n$//g; 
 			$header_line_count++;
@@ -358,6 +366,16 @@ sub open_tim_data_file {
 			$header_line_count++;
 		}
 		
+		# a track line 
+		elsif ($line =~ /^track\s+/) {
+			# common with wig, bed, or bedgraph files for use with
+			# the UCSC genome browser
+			# treat as a comment line, there's not that much useful info
+			# in here, possibly the name, that's it
+			push @{ $inputdata->{'other'} }, $line;
+			$header_line_count++;
+		}
+		
 		# the remainder is the data table itself
 		else {
 			# the first row in the data table are (usually) the column names 
@@ -367,7 +385,7 @@ sub open_tim_data_file {
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
 			
-			# working with a gff file
+			# a GFF file
 			if ($extension =~ /g[tf]f/i) {
 				# gff files have nine defined columns
 				# there are different specifications and variants:
@@ -433,14 +451,19 @@ sub open_tim_data_file {
 				last PARSE_HEADER_LOOP;
 			}
 			
-			# working with a bed file
-			elsif ($extension =~ /bed/i) {
+			# a Bed or BedGraph file
+			elsif ($extension =~ /bdg|bed/i) {
 				# bed files have a loose format
 				# they require a minimum of 3 columns, and have a max of 12
 				# 3, 6, and 12 column files are the most common
 				# there are also something called paired bed files floating around
 				# The official details and specifications may be found at 
 				# http://genome.ucsc.edu/FAQ/FAQformat#format1
+				
+				# a special type of bed file is the bedgraph, using 
+				# either a bdg, bedgraph, or simply bed extension
+				# these only have four columns, no more, no less
+				# the fourth column is score, not name
 				
 				# first determine the number of columns we're working
 				my @elements = split /\s+/, $line;
@@ -478,18 +501,42 @@ sub open_tim_data_file {
 					
 					# add additional columns if necessary
 					if ($column_count >= 4) {
-						# name of the bed line feature
+						# this is a special column
+						# it may be either a name or a score
+						# determine this by the file extension, not an 
+						# exact science
 						
-						# column metadata
-						unless (exists $inputdata->{3}) {
-							$inputdata->{3}{'name'}  = 'Name';
-							$inputdata->{3}{'index'} = 3;
-							$inputdata->{3}{'AUTO'}  = 3;
+						if ($extension =~ /bdg|graph/i) {
+							# a bedgraph file
+							# this is the score column
+							
+							# column metadata
+							unless (exists $inputdata->{3}) {
+								$inputdata->{3}{'name'}  = 'Score';
+								$inputdata->{3}{'index'} = 3;
+								$inputdata->{3}{'AUTO'}  = 3;
+							}
+							
+							# column header name
+							$inputdata->{'column_names'}->[3] = 
+								$inputdata->{3}{'name'};
 						}
 						
-						# column header name
-						$inputdata->{'column_names'}->[3] = 
-							$inputdata->{3}{'name'};
+						else {
+							# a plain old bed file
+							# this is the name column
+							
+							# column metadata
+							unless (exists $inputdata->{3}) {
+								$inputdata->{3}{'name'}  = 'Name';
+								$inputdata->{3}{'index'} = 3;
+								$inputdata->{3}{'AUTO'}  = 3;
+							}
+							
+							# column header name
+							$inputdata->{'column_names'}->[3] = 
+								$inputdata->{3}{'name'};
+						}
 					}	
 					
 					if ($column_count >= 5) {
@@ -646,54 +693,6 @@ sub open_tim_data_file {
 				
 				# set headers flag to false
 				$inputdata->{'headers'} = 0;
-				
-				# end this loop
-				last PARSE_HEADER_LOOP;
-			}
-			
-			# a BedGraph file
-			elsif ($extension =~ /bdg/i) {
-				# a Bedgraph file is basically like a BED file, just 
-				# slightly different columns 
-				# it contains four columns: chromo, start, stop, score
-				# it is 0-based 
-				
-				# first determine the number of columns we're working
-				my @elements = split /\s+/, $line;
-					# normally tab-delimited, but the specs are not explicit
-				my $column_count = scalar @elements;
-				unless ($column_count == 4) {
-				}
-				$inputdata->{'number_columns'} = 4; 
-				$inputdata->{'bed'} = 4;
-					# this is close enough to the bed format that we flag
-					# it as one
-				
-				# Define the columns and metadata
-				my @bed_names = qw(Chromosome Start End Score);
-				for my $i (0 .. 3) {
-					# the ids of the columns
-					
-					# set the metadata for each column
-					# some of these may already be defined if there was a 
-					# column metadata specific column in the file
-					unless (exists $inputdata->{$i}) {
-						$inputdata->{$i}{'name'}  = $bed_names[$i];
-						$inputdata->{$i}{'index'} = $i;
-						$inputdata->{$i}{'AUTO'}  = 3;
-					}
-					# assign the name to the column header
-					$inputdata->{'column_names'}->[$i] = 
-						$inputdata->{$i}{'name'};
-				}
-				
-				# set headers flag to false
-				$inputdata->{'headers'} = 0;
-				
-				# set the feature type
-				unless (defined $inputdata->{'feature'}) {
-					$inputdata->{'feature'} = 'region';
-				}
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
