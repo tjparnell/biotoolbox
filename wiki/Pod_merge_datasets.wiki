@@ -25,13 +25,13 @@ The command line flags and descriptions:
 __--lookup
 
 __
-  Force the program to merge data by using lookup values in each file.  This should be done if the data rows are not in the same order or  have different number of rows.
+  Force the program to merge data by using lookup values in each file.  Enable this option if the data rows are not sorted identically. This will be done automatically if the number of data rows are not  equal between the files.
 __
   __
 __--auto
 
 __
-  Execute in automatic mode, where all columns from the first data file  are retained, and only uniquely named or Score columns from subsequent  data files are merged. Files must have identical numbers of rows and  row identifiers.
+  Execute in automatic mode, where all columns from the first data file  are retained, and only uniquely named or Score columns from subsequent  data files are merged. If lookup is enabled, then an appropriate  lookup column will be chosen.
 __
   __
 __--out <**filename>
@@ -63,7 +63,9 @@ This program will merge two or more tab-delimited data files into one file.  Dat
 
 By default, the program is run in an interactive mode allowing the columns  to be chosen from a presented list. Alternatively, it may be run in  automatic mode, where uniquely named datasets from subsequent files are  appended to the first file. Score columns from specific formatted files  (BED, !BedGraph**, GFF) are also automatically taken.
 
-The program blindly assumes that rows (features) are equivalent in all of the  datasets if there are an equal number of data rows. However, if there are an  unequal number of data rows, or the user forces by using the --lookup option,  then dataset values are looked up first using specified lookup values before  merging (compare with Excel VLOOKUP function). In this case, the dataset  lookup indices from each file are requested, followed by the order of  datasets to merge. The first index in the order determines which file is  dominant, meaning that all rows from that file are included, and only the  rows that match by lookup value are included from the second file. Null  values are recorded when no match is found in the second file.
+The program blindly assumes that rows (features) are equivalent in all of the  datasets if there are an equal number of data rows. However, if there are an  unequal number of data rows, or the user forces by using the --lookup option,  then dataset values are looked up first using specified lookup values before  merging (compare with Excel VLOOKUP function). In this case, the dataset  lookup indices from each file are identified automatically. Potential  lookup columns include 'Name', 'ID', 'Transcript', or 'Gene'. Failing that,  they are chosen interactively.
+
+When a lookup is performed, the first index in the order determines which  file is dominant, meaning that all rows from that file are included, and only  the rows that match by the lookup value are included from the second file. Null  values are recorded when no match is found in the second file.
 
 After merging in interactive mode, an opportunity for interactively  renaming the dataset names is presented.
 

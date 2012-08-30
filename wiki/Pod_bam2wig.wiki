@@ -20,6 +20,7 @@ bam2wig.pl `[`--options...`]` <**filename>
   --shift
   --shiftval <integer>
   --sample <integer>
+  --minr <float>
   --strand
   --qual <integer>
   --inter|fix
@@ -99,6 +100,12 @@ __--sample <**integer>
 
 __
   Indicate the number of top regions to sample when empirically  determining the shift value. The default is 100.
+__
+  __
+__--minr <**float>
+
+__
+  Provide the minimum R^2 value to accept a shift value when  empirically determining the shift value. Enter a decimal value  between 0 and 1. Higher values are more stringent. The default  is 0.25.
 __
   __
 __--strand
@@ -245,11 +252,11 @@ __
 __
   __
 {{{
- bam2wig --pos mid --strand --rpm --in <bamfile>
- }}}
-{{{
  bam2wig --pos span --strand --rpm --in <bamfile>
 }}}
+{{{
+ bam2wig --pos mid --strand --rpm --in <bamfile>
+ }}}
 Stranded, paired-end RNA-Seq
 
 __
@@ -257,13 +264,13 @@ __
 __
   __
 {{{
- bam2wig --pe --pos mid --strand --rpm --in <bamfile>
- }}}
-{{{
  bam2wig --pe --pos span --strand --rpm --in <bamfile>
 }}}
+{{{
+ bam2wig --pe --pos mid --strand --rpm --in <bamfile>
+ }}}
 ==SHIFT VALUE DETERMINATION==
-To determine the shift value, the top enriched 500 bp regions (the  default number is 100) from the largest chromosome are identified by  their read coverage. Stranded read counts are then collected in 10 bp  bins over a 1.5 kb region encompassing the identified region. A  Pearson product-moment correlation coefficient is then reiteratively  determined between the stranded data as the bins are shifted from  30 to 500 bp. The shift corresponding to the highest R squared value  is retained for each sampled region, and the mean best shift for all  sampled regions is used as the final shift value. This approach works  best with clean, distinct peaks. Not all sampled regions may return  a significant R squared value. The peak shift may be evaluated by  viewing separate, stranded wig files together with the shifted wig  file in a genome browser.
+To determine the shift value, the top 500 bp regions (the default number is 100 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 500 bp regions (1.5 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 500 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R^2 value to keep is 0.25, and not all sampled regions may return a significant R^2 value. A trimmed mean is then calculated from all of the calculated shift values to be used used as the final shift value. This approach works best with clean, distinct peaks. The peak shift may be evaluated by viewing separate, stranded wig files together with the shifted wig file in a genome browser.
 
 ==AUTHOR==
 {{{

@@ -1,0 +1,125 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+correlate_position_data.pl
+
+==SYNOPSIS==
+correlate_position_data.pl `[`--options`]` <**filename>
+
+{{{
+  Options:
+  --in <filename>
+  --out <filename> 
+  --db <name | filename>
+  --ddb <name | filename>
+  --ref <type | filename>
+  --test <type | filename>
+  --radius <integer>
+  --pos [5 | m | 3]
+  --set_strand
+  --(no)interpolate
+  --(no)gz
+  --version
+  --help
+}}}
+{{{
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**filename>
+
+__
+  Specify the input file of features. The features may be comprised of  name and type, or chromosome, start, and stop. Strand information is  optional, but is respected if included. A feature list may be  generated with the program _*_get_features.pl_*_. The file may be  compressed with gzip.
+__
+  __
+__--out <**filename>
+
+__
+  Specify the output filename. By default it rewrites the input file.
+__
+  __
+__--db <**name | filename>
+
+__
+  Specify the !BioPerl** database that contains the features listed in the  input file and potentially the reference and test datasets. A  Bio::DB::!SeqFeature**::Store database is typically used for  storing annotation. If genomic coordinates are provided instead, then  any database or bigFile may be provided. The default database is  obtained from the metadata of the input file.
+__
+  __
+__--ddb <**name | filename>
+
+__
+  Optionally specify an alternative !BioPerl** database or !BigWigSet** directory  from which the reference and test datasets may be obtained.
+__
+  __
+__--ref <**type | filename>
+
+__
+__--test <**type | filename>
+
+__
+  Define both the reference and test datasets with which to compare and  correlate. These may be GFF type or name in a database or !BigWigSet**, or  they may be a !BigWig** or even Bam file. Both options are required. If  not provided, they may be interactively chosen from the database.
+__
+  __
+__--radius <**integer>
+
+__
+  Define the radius in basepairs to determine the window size for the  correlation analysis and the limit for sliding the window to determine  the optimal shift. Default is 30 bp.
+__
+  __
+__--pos `[`5 | m | 3`]`
+
+__
+  Indicate the relative position of the feature to be used as the  reference point around which the window for collecting data will  be centered. Three values are accepted: "5" indicates the  5' prime end is used, "3" indicates the 3' end is used, and "m"  indicates the middle of the feature is used. The default is to  use the midpoint.
+__
+  __
+__--set_strand
+
+__
+  If enabled, a strand orientation will be enforced when determining the  optimal shift. This does not affect the correlation calculation, only  the direction of the reported shift. This requires the presence of a  data column in the input file with strand information. The default is  no enforcement of strand.
+__
+  __
+__--(no)interpolate
+
+__
+  Interpolate missing or zero positioned values in each window for both  reference and test data. This will improve the Pearson correlation  values, especially for sparse data. Enabled by default.
+__
+  __
+__--(no)gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--version
+
+__
+  Print the version number.
+__
+  __
+__--help
+
+__
+  Display this POD documentation.
+__
+  __
+==DESCRIPTION==
+This program will calculate a Pearson correlation coefficient (R^2 value)  between the positioned scores (occupancy) of two datasets over a window  from an annotated feature or chromosomal segment. This will determine  whether the positions or distribution of scores across the window vary  between two different data sets: a test dataset and a reference dataset.  The original implementation of this program is to compare nucleosome  occupancy differences between two datasets and identify shifts in position.
+
+The window is determined by the radius parameter. The window is set as  +1 to -1 radius from the feature's reference point. The default reference  point is the feature midpoint.
+
+To ensure a more reliable Pearson value, the absolute sum of the data  points in the window are scaled to the same value, and missing values or  values of zero are interpolated from neighboring values, when possible.
+
+To determine whether a significant shift has occurred, the window for the  test dataset is shifted, 1 bp at a time, from -2 radius to +2 radius from  the reference point, and new Pearson correlations are determined. The  highest correlation found is reported along with the shift value that  generated it.
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+

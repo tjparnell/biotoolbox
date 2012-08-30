@@ -125,7 +125,7 @@ __
   - stddev      Standard deviation of the population (within the region)
   - min
   - max
-  - range       Returns 'max-min'
+  - range       Returns difference of max and min
   - rpm         Reads Per Million mapped, for Bam and BigBed only
   - rpkm        Reads Per Kilobase per Million Mapped, for Bam and BigBed only
   }}}

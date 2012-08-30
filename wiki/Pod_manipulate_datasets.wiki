@@ -14,11 +14,11 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
   Options:
   --in <input_filename>
   --func [ stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | minimum | maximum | 
-          add | subtract | multiply | divide | scale | pr | zscore | 
-          log2 | delog2 | format | combine | subsample | ratio | diff | 
-          normdiff | strandsign | mergestrand | center | new | summary | 
-          export | rewrite | treeview ]
+          null | duplicate | above | below | cnull | absolute | minimum | 
+          maximum | add | subtract | multiply | divide | scale | pr | 
+          zscore | log2 | delog2 | format | combine | subsample | ratio | 
+          diff | normdiff | strandsign | mergestrand | center | new | 
+          summary | export | rewrite | treeview ]
   --index <integers>
   --exp <integer>
   --con <integer>
@@ -70,6 +70,8 @@ __
   duplicate
   above
   below
+  cnull
+  absolute
   minimum
   maximum
   add
@@ -271,6 +273,18 @@ __
   Toss datapoints with values that are below a certain threshold value.  One or more datasets may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
 __
   __
+_*_cnull_*_ (menu option 'U')
+
+__
+  Convert null values to a specific value. One or more datasets may  be selected to convert null values. The new value may be requested  interactively or defined with the --target option.
+__
+  __
+_*_absolute_*_ (menu option 'L')
+
+__
+  Convert signed values to their absolute value equivalents. One or  more datasets may be selected to convert.
+__
+  __
 _*_minimum_*_ (menu option 'I')
 
 __
@@ -322,7 +336,7 @@ __
 _*_zscore_*_ (menu option 'Z')
 
 __
-  Generate a Z-score for each value in a dataset. The Z-score is  the number of standard deviations the value is away from the  dataset's mean. Provides a simple measure of identifying significant  outliers.
+  Generate a Z-score or standard score for each value in a dataset. The Z-score is the number of standard deviations the value is away from the dataset's mean, such that the new mean is 0 and the standard  deviation is 1. Provides a simple method of normalizing datasets with disparate dynamic ranges.
 __
   __
 _*_log2_*_ (menu option 'l')
@@ -349,10 +363,10 @@ __
   Mathematically combine the data values in two or more datasets. The  methods for combining the values include mean, median, min, max,  stdev, or sum. The method may be specified on the command line  using the --target option. The combined data values are added as a  new dataset.
 __
   __
-_*_subsample_*_ (menu option 'U')
+_*_subsample_*_ (menu option 'su')
 
 __
-  Subsample an enumerated dataset. Datapoints within a dataset are chosen  randomlyand the values reduced by one until the target sum is reached.  This assumes an enumerated dataset, e.g. tag counts from Next-gen sequencing, where the sum of tags from two or more datasets must be normalized to each other. This function assumes that the data are positive integers; log2 datasets will not be used. Provide a target sum to reach using the --target option. If this number is less than or equal to the number of datasets in the file, then it is assumed to be an index number and the sum of that dataset will be used as the target. The subsampled dataset is always added as new dataset.
+  Subsample an enumerated dataset. Datapoints within a dataset are chosen  randomly and the values reduced by one until the target sum is reached.  This assumes an enumerated dataset, e.g. tag counts from Next-gen sequencing, where the sum of tags from two or more datasets must be normalized to each other. This function assumes that the data are positive integers; log2 datasets will not be used. Provide a target sum to reach using the --target option. If this number is less than or equal to the number of datasets in the file, then it is assumed to be an index number and the sum of that dataset will be used as the target. The subsampled dataset is always added as new dataset.
 __
   __
 _*_ratio_*_ (menu option 'r')

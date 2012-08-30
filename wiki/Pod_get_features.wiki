@@ -6,7 +6,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 get_features.pl
 
 ==SYNOPSIS==
-get_features.pl --db <**text> --out <**filename> `[`--options...`]`
+get_features.pl --db <**text> `[`--options...`]`
 
 {{{
   Options:
@@ -69,7 +69,7 @@ __
 __--out <**filename>
 
 __
-  Specify the output base file name. Required.
+  Specify the output file name. Default is the joined list of features.
 __
   __
 __--bed
