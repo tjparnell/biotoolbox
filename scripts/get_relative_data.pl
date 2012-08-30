@@ -900,8 +900,8 @@ get_relative_data.pl
 
 =head1 SYNOPSIS
  
- map_data.pl --db <database> --feature <name> --out <file> [--options]
- map_data.pl --in <in_filename> --out <out_filename> [--options]
+ get_relative_data.pl --db <database> --feature <name> --out <file> [--options]
+ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options:
   --db <name|file.gff3>
