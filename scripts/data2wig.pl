@@ -23,7 +23,7 @@ eval {
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
 };
-my $VERSION = '1.8.3';
+my $VERSION = '1.8.6';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -76,13 +76,13 @@ GetOptions(
 	'size=i'    => \$step_size, # wig step size
 	'span=i'    => \$span, # the wig span size
 	'chr=i'     => \$chr_index, # index for the chromosome column
-	'start=i'   => \$start_index, # index for the start column
+	'start|pos=i' => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
 	'index|score=i' => \$score_index, # index for the score column
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
 	'mid!'      => \$midpoint, # boolean to use the midpoint
-	'inter!'    => \$interbase, # shift from interbase
+	'zero|inter!' => \$interbase, # shift from interbase
 	'format=i'  => \$format, # format output to indicated number of places
 	'method=s'  => \$method, # method for combining duplicate values
 	'log!'      => \$log2, # data is in log2 format
@@ -208,54 +208,98 @@ sub identify_indices {
 	
 	# gff
 	if ( $metadata_ref->{'gff'} ) {
-		# if it is a gff file, it will be the score index
-		$chr_index   = 0;
-		$start_index = 3;
-		$stop_index  = 4;
-		$score_index = 5;
+		# these indices are assumptions based on proper GFF format
+		$chr_index   = 0 unless defined $chr_index;
+		$start_index = 3 unless defined $start_index;
+		$stop_index  = 4 unless defined $stop_index;
+		$score_index = 5 unless defined $score_index;
 	}
 	
-	# bed
+	# bedgraph
 	elsif ( 
-		$metadata_ref->{'extension'} =~ /bed/ and
-		$metadata_ref->{'number_columns'} >=5
+		$metadata_ref->{'bed'} == 4 and
+		$metadata_ref->{'extension'} =~ /graph|bdg/
 	) {
-		# this is the default bed format, not a bedgraph
-		$chr_index   = 0;
-		$start_index = 1;
-		$stop_index  = 2;
-		$score_index = 4;
+		# a bedgraph format
+		$chr_index   = 0 unless defined $chr_index;
+		$start_index = 1 unless defined $start_index;
+		$stop_index  = 2 unless defined $stop_index;
+		$score_index = 3 unless defined $score_index;
+		
+		# automatically set interbase
+		$interbase = 1;
+	}
+	
+	# traditional bed
+	elsif ( 
+		$metadata_ref->{'bed'} >=5
+	) {
+		# a bed format, using the score column
+		$chr_index   = 0 unless defined $chr_index;
+		$start_index = 1 unless defined $start_index;
+		$stop_index  = 2 unless defined $stop_index;
+		$score_index = 4 unless defined $score_index;
+		
+		# automatically set interbase
+		$interbase = 1;
 	}
 	
 	# sgr
 	elsif ( $metadata_ref->{'extension'} =~ /sgr/ ) {
-		# if it is a sgr file, it will be the score index
-		$chr_index   = 0;
-		$start_index = 1;
-		$score_index = 2;
+		# SGR format only has start and score
+		$chr_index   = 0 unless defined $chr_index;
+		$start_index = 1 unless defined $start_index;
+		$score_index = 2 unless defined $score_index;
 	}
 	
 	# non-standard text file or tim data format text file
 	else {
 		# we will automatically look for the coordinate columns
-		$chr_index    = find_column_index($metadata_ref, '^chr|seq|ref');
-		$start_index  = find_column_index($metadata_ref, '^start|pos');
-		$stop_index   = find_column_index($metadata_ref, '^stop|end');
 		
-		# check that we have the required coordinates
-		unless (defined $start_index) {
-			# no start? how about a midpoint? position?
-			$start_index = find_column_index($metadata_ref, 'midpoint|mid|position');
-			unless (defined $start_index) {
-				# still nothing found, fail
-				die " No start, midpoint, or position coordinate column found in the file!\n";
+		# chromosome
+		unless (defined $chr_index) {
+			$chr_index = find_column_index($metadata_ref, '^chr|seq|ref');
+			
+			# this is a required index
+			unless (defined $chr_index) {
+				die " No chromosome or sequence ID column" . 
+						" found in the file!!!\n  Please specify with" . 
+						" the --chr option\n";
 			}
 		}
-		unless (defined $chr_index) {
-			die " No chromosome or sequence ID column found in the file!\n";
+		
+		# start
+		unless (defined $start_index) {
+			$start_index = find_column_index($metadata_ref, '^start|pos');
+			
+			# this is a required index
+			unless (defined $start_index) {
+				# still no start? how about a midpoint? position?
+				# keep trying
+				$start_index = find_column_index($metadata_ref, 
+					'midpoint|mid|position|index');
+				
+				# fail
+				unless (defined $start_index) {
+					# still nothing found, fail
+					die " No start, midpoint, or position coordinate column" . 
+						" found in the file!!!\n  Please specify with" . 
+						" the --start option\n";
+				}
+			}
 		}
 		
-		# identify the score index
+		# stop
+		unless (defined $stop_index) {
+			# this is not absolutely required
+			$stop_index = find_column_index($metadata_ref, '^stop|end');
+			
+			if ($midpoint and not defined $stop_index) {
+				die " Stop index is required to calculate midpoint!\n";
+			}
+		}
+		
+		# score
 		unless (defined $score_index) {
 			# ask the user for help if it wasn't provided
 			# print the column names
@@ -281,8 +325,8 @@ sub check_track_name {
 	unless (defined $track_name) {
 		if ( 
 			$metadata_ref->{'gff'} or
-			$metadata_ref->{'extension'} =~ /sgr/ or
-			$metadata_ref->{'extension'} =~ /bed/
+			$metadata_ref->{'bed'} or
+			$metadata_ref->{'extension'} =~ /sgr/
 		) {
 			# if it is a gff/sgr/bed file, use the base file name
 			# I have a practice of using the GFF type as the file name
@@ -298,6 +342,13 @@ sub check_track_name {
 
 
 sub check_step {
+	# In my biotoolbox scripts that generate genomic bins or windows
+	# the win(dow) and step values are recorded as metadata under 
+	# the start column
+	# Therefore, we will check for this metadata to confirm and/or 
+	# determine the step and span parameters
+	
+	
 	# check step 
 	if ($step eq 'variable') {
 		# this is ok, we can work with it
@@ -306,19 +357,22 @@ sub check_step {
 		# double check that the data file supports this
 		# assign the step size as necessary
 		if (exists $metadata_ref->{$start_index}{'step'} ) {
+			
 			if (defined $step_size) {
 				if ($step_size != $metadata_ref->{$start_index}{'step'}) {
 					warn " Requested step size $step_size does not match" .
 						" metadata step size " . 
 						$metadata_ref->{$start_index}{'step'} . "!\n" .
-						" Accurate wig file is not guaranteed!\n";
+						"  Accurate wig file is not guaranteed!!!\n";
 				}
 			}
+			
 			else {
 				# define it from the metadata
 				$step_size = $metadata_ref->{$start_index}{'step'};
 			}
 		}
+		
 		elsif (!defined $step_size) {
 			warn " Fixed step size not defined by user or metadata! Using 'variableStep'\n";
 			$step = 'variable';
@@ -327,19 +381,59 @@ sub check_step {
 	else {
 		# attempt to determine automatically
 		if ( exists $metadata_ref->{$start_index}{'step'} ) {
-			print " Automatically generating 'fixedStep' wig....\n";
+			
+			# set step size
 			$step = 'fixed';
 			$step_size = $metadata_ref->{$start_index}{'step'};
+			print " Automatically generating 'fixedStep' wig with " . 
+				"step of $step_size bp\n";
 		}
 		else {
-			print " Automatically generating 'variableStep' wig....\n";
+			print " Automatically generating 'variableStep' wig\n";
 			$step = 'variable';
 		}
 	}
 	
-	# check the span
-	unless ($span) {
+	# check span
+	if ($span) {
+		# user set it, confirm with metadata if possible
+		if (
+			exists $metadata_ref->{$start_index}{'win'} and
+			$metadata_ref->{$start_index}{'win'} != $span
+		) {
+			# the requested span and metadata window size do not match
+			warn " Requested span size $span does not match" .
+						" metadata window size " . 
+						$metadata_ref->{$start_index}{'win'} . "!\n" .
+						"  Accurate wig file is not guaranteed!!!\n";
+		}
+	}
+	else {
+		# attempt to determine automatically 
+		if (exists $metadata_ref->{$start_index}{'win'} ) {
+			# set the span equal to the window size
+			$span = $metadata_ref->{$start_index}{'win'};
+			print " Automatically setting span to $span bp\n";
+		}
+		else {
+			# default span is 1 bp
+			$span = 1;
+		}
+	}
+	
+	# confirm span
+	if ($midpoint) {
+		# cannot use span parameter if the midpoint is requested
 		$span = 1;
+	}
+	if ($step eq 'fixed' and $span and $span > $step_size) {
+		# span greater than the step will confuse wig parsers, 
+		# including conversion to bigWig files
+		# the wig format definition cannot have > 1 value per position
+		warn " Span of $span bp is greater than step of $step_size bp!\n" . 
+			"   Wig cannot have overlapping positions. Switching to midpoint\n";
+		$span = 1;
+		$midpoint = 1;
 	}
 }
 
@@ -424,10 +518,7 @@ sub convert_to_fixedStep {
 			
 			# print definition line
 			my $definition = 'fixedStep chrom=' . $data[$chr_index] .
-				 ' start=' . $start . ' step=' . $step_size;
-			if ($span > 1) {
-				$definition .= " span=$span";
-			}
+				 " start=$start step=$step_size span=$span";
 			$out_fh->print("$definition\n");
 				
 			
@@ -515,10 +606,8 @@ sub convert_to_variableStep {
 			}
 			
 			# new chromosome, new definition line
-			my $definition = 'variableStep chrom=' . $data[$chr_index];
-			if ($span > 1) {
-				$definition .= " span=$span";
-			}
+			my $definition = 'variableStep chrom=' . $data[$chr_index] . 
+				" span=$span";
 			$out_fh->print("$definition\n");
 			
 			# reset the current chromosome
@@ -743,15 +832,18 @@ data2wig.pl [--options...] <filename>
   --step [fixed | variable]
   --size <integer>
   --span <integer>
-  --index <column_index>
+  --index | --score <column_index>
+  --chr <column_index>
+  --start | --pos <column_index>
+  --stop | --end <column_index>
   --name <text>
   --(no)track
-  --(no)mid
-  --inter
+  --mid
+  --inter | --zero
   --format [0 | 1 | 2 | 3]
   --method [mean | median | sum | max]
   --(no)log
-  --bigwig|--bw
+  --bigwig | --bw
   --chromof <filename>
   --db <database>
   --(no)gz
@@ -767,12 +859,11 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the file name of a data file, with or without the --in flag. 
-The file may be any tab-delimited text file (preferably in the tim data 
-format as described in C<tim_file_helper.pm>), GFF, SGR, or BED file. 
-Recognizeable genome coordinate columns should be present, including 
-chromosome, start, and stop. Data files collected using the 'genome' 
-windows feature are ideal. The file may be compressed with gzip.
+Specify the file name of a data file, with or without the --in flag.
+The file may be any tab-delimited text file, including GFF, BED,
+BedGraph, or SGR file formats. Genome coordinate columns should be
+recognizable or manually specified, including chromosome, start, and
+optionally stop. The file may be compressed with gzip.
 
 =item --out <filename>
 
@@ -816,6 +907,27 @@ automatically selected. If not defined as an option, then the program will
 interactively ask the user for the column index from a list of available
 columns.
 
+=item --chr <column_index>
+
+Optionally specify the column index (0-based) of the chromosome or 
+sequence identifier. This is required to generate the wig file. It may be 
+identified automatically from the column header names.
+
+=item --start <column_index>
+
+=item --pos <column_index>
+
+Optionally specify the column index (0-based) of the start or chromosome 
+position. This is required to generate the wig file. It may be 
+identified automatically from the column header names.
+
+=item --start <column_index>
+
+=item --end <column_index>
+
+Optionally specify the column index (0-based) of the stop or end 
+position. It may be identified automatically from the column header names.
+
 =item --name <text>
 
 The name of the track defined in the wig file. The default is to use 
@@ -830,11 +942,13 @@ the binary bigwig format, the converter requires no track line. Why it
 can't simply ignore the line is beyond me. This option is automatically 
 set to false when the --bigwig option is enabled.
 
-=item --(no)mid
+=item --mid
 
 A boolean value to indicate whether the 
 midpoint between the actual 'start' and 'stop' values
 should be used. The default is to use only the 'start' position. 
+
+=item --zero
 
 =item --inter
 
@@ -907,7 +1021,12 @@ exists to use the midpoint of a region, e.g. microarray probe.
 The wig file format is specified by documentation supporting the UCSC 
 Genome Browser and detailed at this location:
 http://genome.ucsc.edu/goldenPath/help/wiggle.html
-Two formats are supported, 'fixedStep' and 'variableStep'. 
+Two formats are supported, 'fixedStep' and 'variableStep'. The format 
+may be requested or determined empirically from the input file 
+metadata. Genomic bin files generated with BioToolBox scripts record 
+the window and step values in the metadata, which are used to determine 
+the span and step wig values, respectively. The variableStep format 
+is otherwise generated by default. The span is, by default, 1 bp.
 
 Wiggle files cannot tolerate multiple datapoints at the same identical 
 position, e.g. multiple microarray probes matching a repetitive sequence. 
@@ -921,7 +1040,6 @@ http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires
 BigWig file support, supplied by the biotoolbox module 
 C<tim_db_helper::bigwig>. 
 
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -934,14 +1052,4 @@ C<tim_db_helper::bigwig>.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
 
