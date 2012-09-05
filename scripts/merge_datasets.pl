@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.6';
+my $VERSION = '1.8.6.1';
 
 print "\n A progam to merge datasets from two files\n";
 
