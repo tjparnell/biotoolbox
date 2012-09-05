@@ -196,7 +196,17 @@ else {
 	# default is no strand
 	$strand = 0;
 }
-
+# set strandedness of data collection
+my $strandedness;
+if ($strand == 0) {
+	# collect data from both strands since strand is not requested
+	$strandedness = 'all';
+}
+else {
+	# stranded data, we assume the user wants sense orientation
+	# this could become a user defined option in the future....
+	$strandedness = 'sense';
+}
 
 
 
@@ -466,7 +476,7 @@ sub go_determine_cutoff {
 		'stop'         => $length,
 		'log'          => $log,
 		'strand'       => $strand,
-		'stranded'     => 'sense',
+		'stranded'     => $strandedness,
 	} );
 	unless ($mean) { 
 		die " unable to determine mean value for '$dataset'!\n";
@@ -481,7 +491,7 @@ sub go_determine_cutoff {
 		'stop'         => $length,
 		'log'          => $log,
 		'strand'       => $strand,
-		'stranded'     => 'sense',
+		'stranded'     => $strandedness,
 	} );
 	unless ($stdev) { 
 		die " unable to determine stdev value for '$dataset'!\n";
@@ -562,7 +572,7 @@ sub go_find_enriched_regions {
 				'stop'       => $end,
 				'log'        => $log,
 				'strand'     => $strand,
-				'stranded'   => 'all',
+				'stranded'   => $strandedness,
 			} );
 			unless (defined $window_score) {
 				# print "no values at $chr:$start..$end!\n"; 
@@ -685,7 +695,7 @@ sub go_trim_windows {
 			'stop'     => $stop,
 			'absolute' => 1,
 			'strand'   => $strand,
-			'stranded' => 'all',
+			'stranded' => $strandedness,
 		} );
 		unless (%pos2score) {
 			# we should be able to! this region has to have scores!
@@ -795,7 +805,7 @@ sub get_final_window_score {
 				'value'    => $value,
 				'log'      => $log,
 				'strand'   => $strand,
-				'stranded' => 'all',
+				'stranded' => $strandedness,
 		} );
 		
 		# arrays now have $chr, $start, $end, $size, $strand, $finalscore
