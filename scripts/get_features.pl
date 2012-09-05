@@ -281,8 +281,8 @@ sub prepare_data_structure_or_output {
 			# normally added to main data hash, but we want these 
 			# written to the bed file where they normally are not
 			push @{ $data->{'other'} }, 
-				"# Collected from database $database\n",
-				"# Features " . join(',', @features) . "\n";
+				"# Collected " . join(',', @features) . 
+				" features from database $database\n";
 			
 			# position adjustments
 			if ($start_adj) {
