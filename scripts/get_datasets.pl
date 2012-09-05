@@ -35,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.4';
+my $VERSION = '1.8.6';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -202,7 +202,16 @@ my $main_data_ref = get_main_data_ref();
 unless ($main_database) {
 	# this could've been obtained either from the input file, 
 	# command line, or a source data file
-	die " no database defined! see help\n";
+	# lacking that, we'll attempt to use the first dataset provided
+	# and hope for the best 
+	if (@datasets) {
+		# we hope this some sort of indexed data file like bigWig or Bam
+		$main_database = $datasets[0];
+		print " no database defined, using $main_database\n";
+	}
+	else {
+		die " no database defined! see help\n";
+	}
 }
 my $mdb = open_db_connection($main_database) or 
 	die " unable to establish database connection to '$main_database'!\n";
