@@ -1,4 +1,5 @@
 #!/usr/bin/perl
+$! = 1;
 
 # A script to look for enriched regions for a specific microarray data set
 
@@ -25,7 +26,7 @@ use tim_file_helper qw(
 );
 use tim_db_helper::config;
 # use Data::Dumper;
-my $VERSION = '1.8.1';
+my $VERSION = '1.8.6';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -54,6 +55,7 @@ my (
 	$sdlimit,
 	$threshold,
 	$method,
+	$value,
 	$deplete,
 	$tolerance,
 	$feat,
@@ -80,6 +82,7 @@ GetOptions(
 	'sd=f'      => \$sdlimit, # the number of standard deviations above mean to set as the threshold
 	'thresh=s'  => \$threshold, # the explicitly given threshold value
 	'method=s'  => \$method, # method of combining values
+	'value=s'   => \$value, # type of value to collect
 	'deplete'   => \$deplete, # look for depleted regions instead of enriched
 	'tol=i'     => \$tolerance, # tolerance for merging windows
 	'feat!'     => \$feat, # collect feature information
@@ -143,7 +146,7 @@ unless ($threshold) {
 
 # set the method of combining scores
 if (defined $method) {
-	unless ($method eq 'mean' or $method eq 'median') {
+	unless ($method =~ /^mean|median|sum$/) {
 		die " unknown method '$method'!\n";
 	}
 } 
@@ -151,6 +154,18 @@ else {
 	#  default is average
 	$method = 'mean';
 }
+
+# set the type of score value to collect
+if (defined $value) {
+	unless ($value =~ /^score|count|length$/) {
+		die " unknown method '$value'!\n";
+	}
+} 
+else {
+	#  default is score
+	$value = 'score';
+}
+
 
 # set log2 default
 unless (defined $log) {
@@ -445,6 +460,7 @@ sub go_determine_cutoff {
 		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'mean',
+		'value'        => $value,
 		'chromo'       => $chromosome,
 		'start'        => 1,
 		'stop'         => $length,
@@ -459,6 +475,7 @@ sub go_determine_cutoff {
 		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'stddev',
+		'value'        => $value,
 		'chromo'       => $chromosome,
 		'start'        => 1,
 		'stop'         => $length,
@@ -472,21 +489,21 @@ sub go_determine_cutoff {
 	print "   the mean value is $mean and standard deviation $stdev\n";
 	
 	# calculate the actual cuttoff value, depending on enriched or depleted
-	my $value; 
+	my $cutoff; 
 	if ($deplete) { 
 		# look for depleted regions
 		# cutoff is the defined multiples of std dev above the mean
-		$value = $mean - ($stdev * $sdlimit); 
+		$cutoff = $mean - ($stdev * $sdlimit); 
 	} 
 	else { 
 		# default to look for enriched regions
 		# cutoff is the defined multiples of std dev above the mean
-		$value = $mean + ($stdev * $sdlimit); 
+		$cutoff = $mean + ($stdev * $sdlimit); 
 	}
 	
 	# conclusion
-	print " Using a threshold of $value ($sdlimit std devs)\n";
-	return $value;
+	print " Using a threshold of $cutoff ($sdlimit std devs)\n";
+	return $cutoff;
 }
 
 
@@ -539,17 +556,19 @@ sub go_find_enriched_regions {
 				'db'         => $ddb,
 				'dataset'    => $dataset,
 				'method'     => $method,
+				'value'      => $value,
 				'chromo'     => $chr,
 				'start'      => $start,
 				'stop'       => $end,
 				'log'        => $log,
 				'strand'     => $strand,
-				'stranded'   => 'sense',
+				'stranded'   => 'all',
 			} );
-			unless ($window_score) {
-				#print "no values at $chr:$start..$end!\n"; 
+			unless (defined $window_score) {
+				# print "no values at $chr:$start..$end!\n"; 
 				next;
 			}
+			# print "  collected score $window_score at $chr:$start..$end!\n"; 
 			
 			# calculate if window passes threshold
 			if ($deplete) { 
@@ -661,15 +680,17 @@ sub go_trim_windows {
 			'db'       => $ddb,
 			'dataset'  => $dataset,
 			'chromo'   => $window->[0],
+			'value'    => $value,
 			'start'    => $start,
 			'stop'     => $stop,
 			'absolute' => 1,
 			'strand'   => $strand,
-			'stranded' => 'sense',
+			'stranded' => 'all',
 		} );
 		unless (%pos2score) {
 			# we should be able to! this region has to have scores!
-			die " unable to generate value hash for window $window->[0]:$start..$stop!\n";
+			warn " unable to generate value hash for window $window->[0]:$start..$stop!\n";
+			next;
 		}
 			
 		
@@ -771,9 +792,10 @@ sub get_final_window_score {
 				'start'    => $windows[$i][1],
 				'stop'     => $windows[$i][2],
 				'method'   => $method,
+				'value'    => $value,
 				'log'      => $log,
 				'strand'   => $strand,
-				'stranded' => 'sense',
+				'stranded' => 'all',
 		} );
 		
 		# arrays now have $chr, $start, $end, $size, $strand, $finalscore
@@ -941,6 +963,7 @@ sub generate_main_data_hash {
 	# score metadata
 	$data->{6}{'log2'} = $log;
 	$data->{6}{'method'} = $method;
+	$data->{6}{'value'} = $value;
 	$data->{6}{'dataset'} = $dataset;
 	$data->{6}{'threshold'} = $threshold;
 	if ($sdlimit) {
@@ -1073,7 +1096,8 @@ find_enriched_regions.pl
   --tol <integer>
   --thresh <number>
   --sd <number>
-  --method [mean|median]
+  --method [mean|median|sum]
+  --value [score|count|length]
   --strand [f|r]
   --deplete
   --(no)trim
@@ -1155,11 +1179,16 @@ standard deviation - which may be acceptable for limited tiling
 microarrays but not acceptable for next generation sequencing 
 data with single bp resolution.
 
-=item --method [mean|median]
+=item --method [mean|median|sum]
 
 Specify the method for combining score values within each window 
 when determining whether the window exceeds the threshold.
 Default method is mean.
+
+=item --value [score|count|length]
+
+Specify the type of value to collect from the dataset. The 
+default value type is score.
 
 --strand [f|r]
 

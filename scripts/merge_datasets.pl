@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.5';
+my $VERSION = '1.8.6';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -92,6 +92,7 @@ my $output_data_ref; # the reference scalar for the output data structure
 
 # name of lookup column to be used for all files
 my $lookup_name;
+my $output_lookup_i;
 
 
 ### Process and merge the files
@@ -414,6 +415,20 @@ sub merge_two_datasets_by_lookup {
 		else {
 			die " unrecognized  symbol '$request' in request! nothing done!\n";
 		}
+		
+		# make sure we remember the lookup_column_index in the new output
+		# if it is necessary
+		if ($lookup_name and not defined $output_lookup_i) {
+			# we have a lookup name, but the index for this lookup in
+			# the output data structure is not yet defined
+			
+			# check if the current output index is it
+			if ($output_data_ref->{$column}{'name'} =~ /\A $lookup_name \Z/xi) {
+				# this current column matches the lookup name
+				# so we will use it
+				$output_lookup_i = $column;
+			}
+		}
 	}
 	
 }
@@ -497,6 +512,14 @@ sub add_datasets {
 			if (defined $lookup_i) {
 				# merging by lookup
 				
+				# check that we have the output lookup index
+				unless (defined $output_lookup_i) {
+					die " The lookup index for column '$lookup_name' is " .
+						"not defined in the output!\n" . 
+						" Please ensure you include column '$lookup_name' in" .
+						" the output file.\n";
+				}
+				
 				# copy the header
 				$output_data_ref->{'data_table'}->[0][$column] = 
 					$data_ref->{'data_table'}->[0][$request];
@@ -505,7 +528,7 @@ sub add_datasets {
 				for my $row (1 .. $output_data_ref->{'last_row'}) {
 					# identify the appropriate row in file2 by lookup value
 					my $lookup = 
-						$output_data_ref->{'data_table'}->[$row][$lookup_i];
+						$output_data_ref->{'data_table'}->[$row][$output_lookup_i];
 					my $row2 = $data_ref->{'index'}{$lookup} || undef;
 					
 					# copy the appropriate value

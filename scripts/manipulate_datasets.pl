@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.8.5';
+my $VERSION = '1.8.6';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -833,6 +833,9 @@ sub zscore_function {
 		return;
 	}
 	
+	# Where to put new values?
+	my $placement = _request_placement();	
+	
 	# Process each index request
 	my $dataset_modification_count = 0; # a count of how many processed
 	foreach my $index (@indices) {
@@ -844,27 +847,59 @@ sub zscore_function {
 			return;
 		}
 		
-		# generate the z scores into a new dataset
-		my $new_position = $main_data_ref->{'number_columns'};
-		for my $row (1 .. $main_data_ref->{'last_row'}) {
-			$data_table_ref->[$row][$new_position] = 
-				( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
-				$statdata{'stddevp'};
+		# Put new values back in
+		if ($placement eq 'r' or $placement eq 'R') {
+			
+			# Replace the current values
+			for my $row (1 .. $main_data_ref->{'last_row'}) {
+				next if $data_table_ref->[$row][$index] eq '.';
+				$data_table_ref->[$row][$index] = 
+					( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
+					$statdata{'stddevp'};
+			}
+			
+			# update metadata
+			$main_data_ref->{$index}{'converted'} = 'Z-score';
+			
+			# print conclusion
+			$dataset_modification_count++;
+			print " dataset $main_data_ref->{$index}{'name'} converted to Z-scores\n";
 		}
-	
-		# copy the medadata hash and annotate
-		my $new_name = $main_data_ref->{$index}{'name'} . '_zscore';
-		_generate_new_metadata(
-			$index,
-			$new_position,
-			'generated',
-			'z-score',
-			$new_name,
-		);
 		
-		# print conclusion
-		$dataset_modification_count++;
-		print " z-scores of $main_data_ref->{$index}{'name'} added as new dataset\n";
+		# Generate a new dataset
+		elsif ($placement eq 'n' or $placement eq 'N') {
+			
+			# generate the z scores into a new dataset
+			my $new_position = $main_data_ref->{'number_columns'};
+			for my $row (1 .. $main_data_ref->{'last_row'}) {
+				if ($data_table_ref->[$row][$index] eq '.') {
+					$data_table_ref->[$row][$new_position] = '.';
+					next;
+				}
+				$data_table_ref->[$row][$new_position] = 
+					( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
+					$statdata{'stddevp'};
+			}
+		
+			# copy the medadata hash and annotate
+			my $new_name = $main_data_ref->{$index}{'name'} . '_Zscore';
+			_generate_new_metadata(
+				$index,
+				$new_position,
+				'converted',
+				'Z-score',
+				$new_name,
+			);
+			
+			# print conclusion
+			$dataset_modification_count++;
+			print " Z-scores of $main_data_ref->{$index}{'name'} added as new dataset\n";
+		}
+		
+		else {
+			warn " Z-score conversion NOT done; unknown placement request\n";
+			return;
+		}
 	}
 	
 	return $dataset_modification_count;
@@ -2819,25 +2854,25 @@ sub normalized_difference_function {
 
 sub add_function {
 	# add a specific value to dataset values
-	return math_function('add');
+	return math_function('add', @_);
 }
 
 
 sub subtract_function {
 	# subtract a specific value from dataset values
-	return math_function('subtract');
+	return math_function('subtract', @_);
 }
 
 
 sub multiply_function {
 	# multiply dataset values by a specific value
-	return math_function('multiply');
+	return math_function('multiply', @_);
 }
 
 
 sub divide_function {
 	# divide dataset values by a specific value
-	return math_function('divide');
+	return math_function('divide', @_);
 }
 
 
@@ -2871,9 +2906,17 @@ sub math_function {
 	}
 
 	
-	# request dataset
+	# request dataset indices
 	my $line = " Enter the index number(s) of the dataset(s) to $math  ";
-	my @indices = _request_indices($line);
+	my @indices;
+	if (@_) {
+		# provided from an internal subroutine
+		@indices = @_;
+	}
+	else {
+		# otherwise request from user
+		@indices = _request_indices($line);
+	}
 	unless (@indices) {
 		warn " no valid indices. nothing done\n";
 		return;
@@ -3448,10 +3491,14 @@ sub export_treeview_function {
 		}
 	}
 	
+	# Set options for placement for subsequent manipulations
+	$opt_placement = 'r';
+	
+	
+	### Get user information for processing
+	# Identify the dataset columns
 	# we need one unique name column, and a range of data columns
 	# the rest will be deleted
-	
-	# collect those indices that we want to keep
 	my @datasets = _request_indices(
 		" Enter one unique name column, followed by a range of data columns  "
 	);
@@ -3460,43 +3507,76 @@ sub export_treeview_function {
 		return;
 	}
 	
-	### First, center the data columns
-	# the first index in the datasets array should be the name column
-	# the remaining are datasets to be centered
-	my $name_index = shift @datasets;
-	print " median centering datasets....\n";
-	center_function(@datasets);
-	
-	# put the name index back
-	unshift @datasets, $name_index;
+	# Identify the manipulations requested
+	# choices include 
+		# cg - median center genes
+		# cd - median center datasets
+		# zd - calculate Z-score for the dataset
+		# n0 - convert nulls to 0.0
+	my @manipulations;
+	if ($function) {
+		# automatic function, use the command line target option
+		@manipulations = split /,/, $opt_target;
+	}
+	else {
+		# ask the user
+		print " Available dataset manipulations\n";
+		print "   cg - median center features (genes)\n";
+		print "   cd - median center datasets\n";
+		print "   zd - convert dataset to Z-scores\n";
+		print "   n0 - convert null values to 0\n";
+		print " Enter the manipulation(s) in order of desired execution   ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		@manipulations = split /[,\s]+/, $answer;
+	}
 	
 	
 	### First, delete extraneous datasets or columns
-	# identify the columns to delete
-	my @to_delete;
-	for my $i (0 .. ($main_data_ref->{'number_columns'} - 1) ) {
-		my $check = 1;
-		# walk though the keeper list in @datasets
-		foreach (@datasets) {
-			# set check to false if we want to keep
-			if ($i == $_) {
-				$check = 0;
-				last;
-			}
+	# we will perform a reordering of the columns
+	reorder_function(@datasets);
+	
+	# we now have just the columns we want
+	# reset the dataset indices to what we currently have
+	# name should be index 0
+	@datasets = (1 .. $main_data_ref->{'number_columns'} - 2);
+	
+	
+	### Second, perform dataset manipulations
+	foreach (@manipulations) {
+		if (/^cg$/i) {
+			# Median center features
+			print " median centering features....\n";
+			center_function(@datasets);
 		}
-		if ($check) {
-			# not in keeper list, so targeted for deletion
-			push @to_delete, $i;
+		elsif (/^cd$/i) {
+			# Median center datasets
+			print " median centering datasets....\n";
+			$opt_target = 'median';
+			$opt_exception = 'y';
+			subtract_function(@datasets);
+		}
+		elsif (/^zd$/i) {
+			# Z-score convert dataset
+			print " converting datasets to Z-scores....\n";
+			zscore_function(@datasets);
+		}
+		elsif (/^n0$/i) {
+			# convert nulls to 0
+			print " converting null values to 0.0....\n";
+			$opt_target = '0.0';
+			convert_nulls_function(@datasets);
+		}
+		else {
+			warn " unkown manipulation '$_'!\n";
 		}
 	}
-	
-	# delete the unneccessary columns
-	delete_function(@to_delete);
 	
 	
 	### Third, export a simple file
 	unless ($outfile) {
-		$outfile = $main_data_ref->{'basename'} . '_tview.txt';
+		$gz = 0;
+		$outfile = $main_data_ref->{'basename'} . '_tview';
 	}
 	export_function();
 	
@@ -4292,9 +4372,9 @@ for the same thing.
 
 =item --target <string> or <number>
 
-Specify the target value when using various functions, including the 
-'scale', 'subtract', 'divide', and 'format' functions. Please refer to the 
-function description for more information.
+Specify the target value when using various functions. This is a catch-all 
+option for a number of functions. Please refer to the function description 
+for more information.
 
 =item --place [r | n]
 
@@ -4687,18 +4767,24 @@ Export the data into a format compatible with the Treeview program for
 visualizing the data either as a heatmap or a dendrogram (when combined 
 with the Cluster program to generate the clusters or tree). Specify the 
 columns containing a unique name and the datasets to be analyzed (use 
---index <name>,<start-stop>). Prior to exporting, additional columns are 
-deleted and the dataset columns are center normalized. A simple text 
-file is written (default file name "<basename>_tview.txt"). No changes 
-are made to the original file.
+--index <name>,<start-stop>). Extraneous datasets are removed. 
+Additional manipulations on the datasets may be performed prior to 
+exporting. These may be chosen interactively or using the codes 
+listed below and specified using the --target option.
+  
+  cg - median center features (genes)
+  cd - median center datasets
+  zd - convert dataset to Z-scores
+  n0 - convert nulls to 0.0
+
+A simple text file is written (default file name "<basename>_tview.txt"). 
+The original file will not be rewritten.
 
 =item B<rewrite> (menu option 'W')
 
 Force the data file contents to be re-written. Useful if you want to 
-write an intermediate file during numerous interactive manipulations, 
-or if you want to quickly convert between binary data store file and 
-text file formats via a commmand line tool (in which case, give the 
---out file name with the appropriate extension).
+write an intermediate file during numerous interactive manipulations. 
+Consider this as a 'Save as...'.
 
 =back
 
