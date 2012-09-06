@@ -68,6 +68,7 @@ our @SUFFIX_LIST = qw(
 	\.sgr
 	\.sgr\.gz
 	\.kgg
+	\.cdt
 	\.vcf
 	\.vcf\.gz
 ); 
@@ -1055,7 +1056,7 @@ sub write_tim_data_file {
 		}
 		elsif ($extension) {
 			# check extension from the parsed filename, if present
-			if ($extension =~ /sgr/i) {
+			if ($extension =~ /sgr|cdt/i) {
 				# sgr is simple format, no headers 
 				$format = 'simple';
 			}
@@ -1152,7 +1153,7 @@ sub write_tim_data_file {
 		}
 		
 		# Write the primary headers
-		unless ($extension =~ m/gff|bed|bdg|sgr|kgg/i) {
+		unless ($extension =~ m/gff|bed|bdg|sgr|kgg|cdt/i) {
 			# we only write these for text files, not gff or bed files
 			
 			if ($datahash_ref->{'program'}) {
@@ -1199,7 +1200,7 @@ sub write_tim_data_file {
 			# these column metadata lines do not need to be written if they
 			# only have two values, presumably name and index, for files 
 			# that don't normally have column headers, e.g. gff
-			if ($extension =~ /sgr|kgg/i) {
+			if ($extension =~ /sgr|kgg|cdt/i) {
 				# these do not need metadata
 				next;
 			}
