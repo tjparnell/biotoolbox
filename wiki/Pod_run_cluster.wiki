@@ -39,13 +39,13 @@ __
 __--num <**integer>
 
 __
-  Specify the number of clusters to identify. Default value is 6 – enough to be  informative but not overwhelming.
+  Specify the number of clusters to identify. Default value is 6.
 __
   __
 __--run <**integer>
 
 __
-  Enter the number of times to run the cluster algorithm to find a solution.  The default value is 200.
+  Enter the number of times to run the cluster algorithm to find a solution.  The default value is 500.
 __
   __
 __--method `[`a|m`]`
@@ -88,10 +88,8 @@ __
 ==DESCRIPTION==
 This program is a wrapper around the Cluster 3.0 C library, which identifies  clusters between genes. Currently the program performs the k-means or  k-medians functions, although other functions could be implemented if  requested.
 
-{{{
-}}}
-{{{
-}}}
+Please refer to the Cluster 3 documentation for more detailed information  regarding the implementation and detailed methods. Documentation may be  found at http://bonsai.hgc.jp/~mdehoon/software/cluster/.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -103,5 +101,3 @@ This program is a wrapper around the Cluster 3.0 C library, which identifies  cl
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

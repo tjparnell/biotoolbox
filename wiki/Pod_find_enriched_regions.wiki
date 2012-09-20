@@ -20,7 +20,8 @@ find_enriched_regions.pl
   --tol <integer>
   --thresh <number>
   --sd <number>
-  --method [mean|median]
+  --method [mean|median|sum]
+  --value [score|count|length]
   --strand [f|r]
   --deplete
   --(no)trim
@@ -95,10 +96,16 @@ __
   Specify the multiple of standard deviations above the mean as a window score threshold. Default is 1.5 standard deviations. Be  quite careful with this method as it attempts to pull all of the  datapoints out of the database to calculate the mean and  standard deviation - which may be acceptable for limited tiling  microarrays but not acceptable for next generation sequencing  data with single bp resolution.
 __
   __
-__--method `[`mean|median`]`
+__--method `[`mean|median|sum`]`
 
 __
   Specify the method for combining score values within each window  when determining whether the window exceeds the threshold. Default method is mean.
+__
+  __
+__--value `[`score|count|length`]`
+
+__
+  Specify the type of value to collect from the dataset. The  default value type is score.
 __
   __
   __--strand `[`f|r`]`

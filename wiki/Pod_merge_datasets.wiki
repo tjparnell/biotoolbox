@@ -12,6 +12,7 @@ merge_datasets.pl `[`--options...`]` <**file1> <**file2> ...
   Options:
   --lookup
   --auto
+  --index <number,letter,range>
   --out <filename> 
   --(no)gz
   --version
@@ -32,6 +33,12 @@ __--auto
 
 __
   Execute in automatic mode, where all columns from the first data file  are retained, and only uniquely named or Score columns from subsequent  data files are merged. If lookup is enabled, then an appropriate  lookup column will be chosen.
+__
+  __
+__--index <**number,letter,range>
+
+__
+  For advanced users, provide the list of indices to merge from both  datasets. The format is the same as in the interactive mode. Column  indices from the first file are represented by numbers, the second  file by letters. Values are comma-delimited, and ranges may be  provided as "start-stop". To indicate indices from subsequent files,  provide separate --index options for each subsequent file. The default  is to run the program interactively.
 __
   __
 __--out <**filename>
@@ -61,13 +68,13 @@ __
 ==DESCRIPTION==
 This program will merge two or more tab-delimited data files into one file.  Datasets or columns from each file are merged together into an output file.  Columns are appended to the end (after the rightmost column).
 
-By default, the program is run in an interactive mode allowing the columns  to be chosen from a presented list. Alternatively, it may be run in  automatic mode, where uniquely named datasets from subsequent files are  appended to the first file. Score columns from specific formatted files  (BED, !BedGraph**, GFF) are also automatically taken.
+The columns may be specified using one of three methods. By default,  the program is run in an interactive mode allowing the columns to be  chosen from a presented list for each input file provided. Second, the  columns may be specified manually on the command line using one or  more --index options. Third, the program may be executed in full  automatic mode, where uniquely named datasets from subsequent files  are automatically appended to the first file. Score columns from  specific formatted files (BED, !BedGraph**, GFF) are also automatically  taken.
 
-The program blindly assumes that rows (features) are equivalent in all of the  datasets if there are an equal number of data rows. However, if there are an  unequal number of data rows, or the user forces by using the --lookup option,  then dataset values are looked up first using specified lookup values before  merging (compare with Excel VLOOKUP function). In this case, the dataset  lookup indices from each file are identified automatically. Potential  lookup columns include 'Name', 'ID', 'Transcript', or 'Gene'. Failing that,  they are chosen interactively.
+The program blindly assumes that rows (features) are equivalent and in the  same order for all of the datasets. However, if there are an  unequal number of data rows, or the user forces by using the --lookup option,  then dataset values are looked up first using specified lookup values before  merging (compare with Excel VLOOKUP function). In this case, the dataset  lookup indices from each file are identified automatically. Potential  lookup columns include 'Name', 'ID', 'Transcript', or 'Gene'. Failing that,  they are chosen interactively.
 
 When a lookup is performed, the first index in the order determines which  file is dominant, meaning that all rows from that file are included, and only  the rows that match by the lookup value are included from the second file. Null  values are recorded when no match is found in the second file.
 
-After merging in interactive mode, an opportunity for interactively  renaming the dataset names is presented.
+After merging in interactive mode only, an opportunity for interactively  renaming the dataset names is presented.
 
 ==AUTHOR==
 {{{
