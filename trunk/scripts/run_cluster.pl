@@ -5,11 +5,20 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use File::Basename qw(fileparse);
 use Algorithm::Cluster::Record;
-my $VERSION = '1.0.2';
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_data_helper qw(
+	find_column_index
+);
+use tim_file_helper qw(
+	open_tim_data_file
+);
+my $VERSION = '1.8.6';
 
 print "\n A script to run the k-means cluster analysis\n\n";
+
+
 
 ### Quick help
 unless (@ARGV) { 
@@ -71,27 +80,15 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use --help\n";
 }
-my ($basename, $path, $extension) = fileparse($infile, qw(.txt .cdt));
 
-unless ( 
-	($basename =~ /_tview$/ and $extension eq '.txt') or $extension eq '.cdt'
-) {
-	die " The input file does not look like the appropriate file type\n" . 
-		" Consider using 'manipulate_datasets.pl' with the treeview export function\n" . 
-		" Use --help for more information\n";
-}
 
 # set defaults
-unless ($outfile) {
-	$outfile = $basename;
-}
 unless ($number) {
 	# I like six clusters - an informative but not overwhelming number
 	$number = 6;
 }
 unless ($runs) {
-	# I like 200 runs for some reason - a lot but not too much
-	$runs = 200;
+	$runs = 500;
 }
 unless ($method) {
 	# default is k-means
@@ -104,7 +101,67 @@ unless ($distribution) {
 }
 
 
+
+### Check the input file format
+# open to read metadata
+# we're not actually loading the file
+# we just want to verify it looks ok
+my ($in_fh, $metadata) = open_tim_data_file($infile);
+my $check = 1; # assume ok to begin with
+my $error;
+
+# check comment lines
+if (scalar @{ $metadata->{'other'}} != 0) {
+	$check = 0;
+	$error .= "  file has extraneous comment lines\n";
+}
+
+# check first column
+if ($metadata->{0}{'name'} !~ /name|id|gene|transcript/i) {
+	# may not be lethal
+	$error .= "  first column name is unusual\n";
+}
+
+# check for column data
+for (my $i = 0; $i < $metadata->{'number_columns'}; $i++) {
+	if (not exists $metadata->{$i}{'AUTO'}) {
+		# no automatically generated column metadata 
+		# suggests there was column metadata in the file
+		$check = 0;
+		$error .= "  file column $i has extra metadata\n";
+	}
+}
+
+# check for extraneous data columns
+foreach (qw(chr seq start stop end strand type class source phase)) {
+	my $i = find_column_index($metadata, "^$_");
+	if (defined $i) {
+		$check = 0;
+		$error .= "  file has extraneous column '$_' at position $i\n";
+	}
+}
+
+# print errors
+if ($check == 0 and $error) {
+	print " input file did not pass validation for the following reasons\n";
+	print $error;
+	print " consider using the treeview export function in manipulate_datasets.pl\n";
+	exit;
+}
+elsif ($check == 1 and $error) {
+	print " input file may not be valid for the following reasons\n";
+	print $error;
+}
+else {
+	print " input file appears to be valid\n";
+}
+$in_fh->close;
+
+
+
+
 ### Load the file
+my $start_time = time;
 my $record = Algorithm::Cluster::Record->new() or 
 	die " unable to intialize Cluster::Record object!\n";
 
@@ -122,11 +179,15 @@ my ($clusterid, $error, $nfound) = $record->kcluster(
 	'method'        => $method,
 	'dist'          => $distribution,
 );
-print " An optimal solution was identified $nfound times\n";
+printf " An optimal solution was identified %s times in %.1f minutes\n",
+	$nfound, (time - $start_time)/60;
 
 
 
 ### Output results
+unless ($outfile) {
+	$outfile = $metadata->{'path'} . $metadata->{'basename'};
+}
 $record->save(
 	'jobname'       => $outfile,
 	'geneclusters'  => $clusterid,
@@ -180,13 +241,12 @@ By default it uses the input base filename.
 
 =item --num <integer>
 
-Specify the number of clusters to identify. Default value is 6 – enough to be 
-informative but not overwhelming.
+Specify the number of clusters to identify. Default value is 6.
 
 =item --run <integer>
 
 Enter the number of times to run the cluster algorithm to find a solution. 
-The default value is 200.
+The default value is 500.
 
 =item --method [a|m]
 
@@ -225,7 +285,9 @@ clusters between genes. Currently the program performs the k-means or
 k-medians functions, although other functions could be implemented if 
 requested.
 
-
+Please refer to the Cluster 3 documentation for more detailed information 
+regarding the implementation and detailed methods. Documentation may be 
+found at http://bonsai.hgc.jp/~mdehoon/software/cluster/.
 
 =head1 AUTHOR
 
@@ -239,5 +301,3 @@ requested.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
