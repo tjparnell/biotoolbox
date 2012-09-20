@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.6.1';
+my $VERSION = '1.8.6';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -40,11 +40,13 @@ my (
 	$help,
 	$print_version,
 );
+my @order_requests;
 
 # Command line options
 GetOptions( 
 	'lookup!'   => \$lookup, # force merging by value lookup
 	'auto!'     => \$automatic, # select columns automatically
+	'index=s'   => \@order_requests, # determine order in advance
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -76,16 +78,18 @@ unless (scalar @ARGV >= 2) {
 	die " At least two input files are required!\n";
 }
 
+# user provided index list
+my $user_list = @order_requests ? 1 : 0;
+
 # automatic mode
-if ($automatic) {
+if ($automatic or $user_list) {
 	unless ($outfile) {
 		die " Must provide an output file name in automatic mode!\n";
 	}
 }
 
 # Get the alphabet-number conversion hashes
-my %letter_of = get_letters(); # convert numbers into letters
-my %number_of = get_numbers(); # to convert letters into numbers
+my ($letter_of, $number_of) = get_number_letters(); # convert numbers into letters
 
 # Set up output
 my $output_data_ref; # the reference scalar for the output data structure
@@ -124,7 +128,7 @@ else {
 
 
 ### Offer to re-name the datasets
-unless ($automatic) {
+unless ($automatic or $user_list) {
 	print " Do you wish to rename the headers? y or n   ";
 	my $response = <STDIN>;
 	chomp $response;
@@ -255,7 +259,7 @@ sub merge_two_datasets {
 			# a letter indicates a dataset from file2
 			
 			# first convert back to number
-			my $number = $number_of{$request};
+			my $number = $number_of->{$request};
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
@@ -316,10 +320,10 @@ sub merge_two_datasets_by_lookup {
 		# switch the numbers and letters
 		map {
 			if (/\d+/) {
-				$_ = $letter_of{$_};
+				$_ = $letter_of->{$_};
 			}
 			else {
-				$_ = $number_of{$_};
+				$_ = $number_of->{$_};
 			}
 		} @order;
 	}
@@ -380,7 +384,7 @@ sub merge_two_datasets_by_lookup {
 			# we will have to perform the lookup here
 			
 			# first convert back to number
-			my $request_number = $number_of{$request};
+			my $request_number = $number_of->{$request};
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
@@ -566,31 +570,40 @@ sub request_new_order {
 	# Either one or two data file references may be passed
 	# The dataset names will be printed listed by their index. Numbers will be
 	# used for the first data file, letters for the second, if present.
+	my $list;
 	
-	# Print the column headers
-	if (scalar @data_refs == 1) {
-		# Only one data file
-		# we'll be using only numbers to list the datasets
-		print_datasets($data_refs[0], 'number');
+	# Check if user supplied the order by command line
+	if (@order_requests) {
+		$list = shift @order_requests;
 	}
-	elsif (scalar @data_refs == 2) {
-		# Two data files
-		# use numbers for the first one
-		print_datasets($data_refs[0], 'number');
-		# use letters for the second one
-		print_datasets($data_refs[1], 'letter');
-		
+	
+	# else request interactively
+	else {
+		# Print the column headers
+		if (scalar @data_refs == 1) {
+			# Only one data file
+			# we'll be using only numbers to list the datasets
+			print_datasets($data_refs[0], 'number');
+		}
+		elsif (scalar @data_refs == 2) {
+			# Two data files
+			# use numbers for the first one
+			print_datasets($data_refs[0], 'number');
+			# use letters for the second one
+			print_datasets($data_refs[1], 'letter');
+			
+		}
+			
+		# Request response from user
+		print " Enter the columns' indices in the desired final order.\n" .
+			" Separate indices with commas or specify a range (start - stop).\n   ";
+		$list = <STDIN>;
+		chomp $list;
+		$list =~ s/\s+//g;
 	}
-		
-	# Request response from user
-	print " Enter the columns' indices in the desired final order.\n" .
-		" Separate indices with commas or specify a range (start - stop).\n   ";
-	my $response = <STDIN>;
-	chomp $response;
-	$response =~ s/\s+//g;
 	
 	# Parse response
-	my @order = parse_list($response); 
+	my @order = parse_list($list); 
 	
 	# done
 	print " using order: ", join(", ", @order), "\n";
@@ -688,7 +701,7 @@ sub request_lookup_indices {
 			# check that it's valid
 			die " unknown index value!\n";
 		}
-		$index2 = $number_of{$index2}; # convert to a number
+		$index2 = $number_of->{$index2}; # convert to a number
 		unless (exists $data1->{$index2}) {
 			# check that it's valid
 			die " unknown index value!\n";
@@ -750,7 +763,7 @@ sub automatically_determine_order {
 			}
 			else {
 				# two data files, push letter
-				push @order, $letter_of{$i};
+				push @order, $letter_of->{$i};
 			}
 		}
 		
@@ -767,7 +780,7 @@ sub automatically_determine_order {
 			}
 			else {
 				# two datasets, push letter
-				push @order, $letter_of{$i};
+				push @order, $letter_of->{$i};
 			}
 		}
 	}
@@ -802,13 +815,13 @@ sub parse_list {
 			
 			elsif ($item =~ /^([a-z]+)\-([a-z]+)$/) {
 				# range does not contain numbers, so must be from file2
-				for (my $i = $number_of{$1}; $i <= $number_of{$2}; $i++) {
+				for (my $i = $number_of->{$1}; $i <= $number_of->{$2}; $i++) {
 					# we will loop through from specified start to stop
 					# converting each letter to the corresponding number for 
 					# use in the for loop
 					# then convert the number in $i back to a letter to add
 					# to the order 
-					push @list, $letter_of{$i};
+					push @list, $letter_of->{$i};
 				}
 			} 
 			
@@ -853,7 +866,7 @@ sub print_datasets {
 		}
 		else {
 			# use letters instead of numbers as the index key
-			my $letter = $letter_of{$i};
+			my $letter = $letter_of->{$i};
 			print '  ', $letter, "\t", $data_ref->{$i}{'name'}, "\n";
 			push @order, $letter;
 		}
@@ -976,11 +989,13 @@ sub rename_dataset_names {
 
 
 
-
-
-### Generate the lookup hash for numbers to letters
-sub get_letters {
-	my %hash = (
+### Generate lookup hashes for converting numbers to letters and back
+sub get_number_letters {
+	
+	# hashes
+	my %n2l; # numbers to letters
+	my %l2n; # letters to numbers
+	my %lookup = (
 		0 => 'a',
 		1 => 'b',
 		2 => 'c', 
@@ -1007,147 +1022,30 @@ sub get_letters {
 		23 => 'x',
 		24 => 'y',
 		25 => 'z',
-		26 => 'aa',
-		27 => 'bb',
-		28 => 'cc',
-		29 => 'dd',
-		30 => 'ee',
-		31 => 'ff',
-		32 => 'gg',
-		33 => 'hh',
-		34 => 'ii',
-		35 => 'jj',
-		36 => 'kk',
-		37 => 'll',
-		38 => 'mm',
-		39 => 'nn',
-		40 => 'oo',
-		41 => 'pp',
-		42 => 'qq',
-		43 => 'rr',
-		44 => 'ss',
-		45 => 'tt',
-		46 => 'uu',
-		47 => 'vv',
-		48 => 'ww',
-		49 => 'xx',
-		50 => 'yy',
-		51 => 'zz',
-		52 => 'aaa',
-		53 => 'bbb',
-		54 => 'ccc',
-		55 => 'ddd',
-		56 => 'eee',
-		57 => 'fff',
-		58 => 'ggg',
-		59 => 'hhh',
-		60 => 'iii',
-		61 => 'jjj',
-		62 => 'kkk',
-		63 => 'lll',
-		64 => 'mmm',
-		65 => 'nnn',
-		66 => 'ooo',
-		67 => 'ppp',
-		68 => 'qqq',
-		69 => 'rrr',
-		70 => 'sss',
-		71 => 'ttt',
-		72 => 'uuu',
-		73 => 'vvv',
-		74 => 'www',
-		75 => 'xxx',
-		76 => 'yyy',
-		77 => 'zzz',
 	);
-	return %hash;
+	
+	# fill up the lookup hashes
+	my $first;
+	for (my $i = 0; $i < 702; $i++) {
+		# this gives range from a to zz
+		
+		# check the first letter
+		if ( $i % 26 == 0) {
+			$first = $lookup{ ($i / 26) - 1 };
+		}
+		
+		# generate the letter
+		# two letters [null..z][a..z]
+		my $letter = $first . $lookup{ $i % 26 };
+		
+		# store in hashes
+		$n2l{ $i } = $letter;
+		$l2n{ $letter } = $i;
+	}
+	
+	return (\%n2l, \%l2n);
 }
 
-
-### Generate the lookup hash for letters to numbers
-sub get_numbers {
-	my %hash = (
-		'a' => 0,
-		'b' => 1,
-		'c' => 2, 
-		'd' => 3,
-		'e' => 4,
-		'f' => 5,
-		'g' => 6,
-		'h' => 7,
-		'i' => 8,
-		'j' => 9,
-		'k' => 10,
-		'l' => 11,
-		'm' => 12,
-		'n' => 13,
-		'o' => 14,
-		'p' => 15,
-		'q' => 16,
-		'r' => 17,
-		's' => 18,
-		't' => 19,
-		'u' => 20,
-		'v' => 21,
-		'w' => 22,
-		'x' => 23,
-		'y' => 24,
-		'z' => 25,
-		'aa' => 26,
-		'bb' => 27,
-		'cc' => 28,
-		'dd' => 29,
-		'ee' => 30,
-		'ff' => 31,
-		'gg' => 32,
-		'hh' => 33,
-		'ii' => 34,
-		'jj' => 35,
-		'kk' => 36,
-		'll' => 37,
-		'mm' => 38,
-		'nn' => 39,
-		'oo' => 40,
-		'pp' => 41,
-		'qq' => 42,
-		'rr' => 43,
-		'ss' => 44,
-		'tt' => 45,
-		'uu' => 46,
-		'vv' => 47,
-		'ww' => 48,
-		'xx' => 49,
-		'yy' => 50,
-		'zz' => 51,
-		'aaa' => 52,
-		'bbb' => 53,
-		'ccc' => 54,
-		'ddd' => 55,
-		'eee' => 56,
-		'fff' => 57,
-		'ggg' => 58,
-		'hhh' => 59,
-		'iii' => 60,
-		'jjj' => 61,
-		'kkk' => 62,
-		'lll' => 63,
-		'mmm' => 64,
-		'nnn' => 65,
-		'ooo' => 66,
-		'ppp' => 67,
-		'qqq' => 68,
-		'rrr' => 69,
-		'sss' => 70,
-		'ttt' => 71,
-		'uuu' => 72,
-		'vvv' => 73,
-		'www' => 74,
-		'xxx' => 75,
-		'yyy' => 76,
-		'zzz' => 77,
-	);
-	return %hash;
-}
 
 __END__
 
@@ -1162,6 +1060,7 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   Options:
   --lookup
   --auto
+  --index <number,letter,range>
   --out <filename> 
   --(no)gz
   --version
@@ -1188,6 +1087,16 @@ are retained, and only uniquely named or Score columns from subsequent
 data files are merged. If lookup is enabled, then an appropriate 
 lookup column will be chosen.
 
+=item --index <number,letter,range>
+
+For advanced users, provide the list of indices to merge from both 
+datasets. The format is the same as in the interactive mode. Column 
+indices from the first file are represented by numbers, the second 
+file by letters. Values are comma-delimited, and ranges may be 
+provided as "start-stop". To indicate indices from subsequent files, 
+provide separate --index options for each subsequent file. The default 
+is to run the program interactively.
+
 =item --out <filename>
 
 Specify the output filename. By default it uses the first file name.
@@ -1213,14 +1122,18 @@ This program will merge two or more tab-delimited data files into one file.
 Datasets or columns from each file are merged together into an output file. 
 Columns are appended to the end (after the rightmost column). 
 
-By default, the program is run in an interactive mode allowing the columns 
-to be chosen from a presented list. Alternatively, it may be run in 
-automatic mode, where uniquely named datasets from subsequent files are 
-appended to the first file. Score columns from specific formatted files 
-(BED, BedGraph, GFF) are also automatically taken. 
+The columns may be specified using one of three methods. By default, 
+the program is run in an interactive mode allowing the columns to be 
+chosen from a presented list for each input file provided. Second, the 
+columns may be specified manually on the command line using one or 
+more --index options. Third, the program may be executed in full 
+automatic mode, where uniquely named datasets from subsequent files 
+are automatically appended to the first file. Score columns from 
+specific formatted files (BED, BedGraph, GFF) are also automatically 
+taken. 
 
-The program blindly assumes that rows (features) are equivalent in all of the 
-datasets if there are an equal number of data rows. However, if there are an 
+The program blindly assumes that rows (features) are equivalent and in the 
+same order for all of the datasets. However, if there are an 
 unequal number of data rows, or the user forces by using the --lookup option, 
 then dataset values are looked up first using specified lookup values before 
 merging (compare with Excel VLOOKUP function). In this case, the dataset 
@@ -1233,7 +1146,7 @@ file is dominant, meaning that all rows from that file are included, and only
 the rows that match by the lookup value are included from the second file. Null 
 values are recorded when no match is found in the second file.
 
-After merging in interactive mode, an opportunity for interactively 
+After merging in interactive mode only, an opportunity for interactively 
 renaming the dataset names is presented.
 
 =head1 AUTHOR
