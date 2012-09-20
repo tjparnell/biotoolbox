@@ -3576,7 +3576,8 @@ sub export_treeview_function {
 	### Third, export a simple file
 	unless ($outfile) {
 		$gz = 0;
-		$outfile = $main_data_ref->{'basename'} . '_tview';
+		$outfile = $main_data_ref->{'basename'} . 
+			$main_data_ref->{'path'} . '.cdt';
 	}
 	export_function();
 	
@@ -4777,8 +4778,9 @@ listed below and specified using the --target option.
   zd - convert dataset to Z-scores
   n0 - convert nulls to 0.0
 
-A simple text file is written (default file name "<basename>_tview.txt"). 
-The original file will not be rewritten.
+A simple Cluster data text file is written (default file name 
+"<basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The 
+original file will not be rewritten.
 
 =item B<rewrite> (menu option 'W')
 
