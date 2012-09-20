@@ -1,5 +1,17 @@
 ######## BioToolBox revision history #############
 
+v.1.8.6 (svn 477)
+	- Added numerous enhancements and bug fixes to script data2wig.pl, including automatically assigning the span parameter in the wig file, identifying coordinate columns, adding command line options for coordinate columns, and updating the POD documentation
+	- Improved the treeview export function in script manipulate_datasets.pl to include different manipulations, including median center of genes or datasets, converting to Z-scores, and converting null values. Also changed the default output name to <basename>.cdt.
+	- Added advanced option to script merge_datasets.pl to specify the column order on the command line instead of interactively. Also increased the number of columns that can be specified as letters.
+	- Added the "value" command line option to specify the type of data to collect to the script find_enriched_regions.pl. Also added the sum method plus some improvements for identifying depleted regions.
+	- Updated the script run_cluster.pl to accept any file name as input, and added basic file format validation checks prior to running the cluster algorithm, among a few other minor improvements
+	- Improved handling of error messages when attempting to open databases that do not exist or can not otherwise be opened.
+	- Added more support for reading bedgraph files, dealing with track lines and possibly empty lines
+	- Collecting data from bigWig files that use spanned features (span > 1 bp) are now collected at every base rather than just the start position
+	- Fixed bug where more than two files were not properly merged using lookup in script merge_datasets.pl
+	- Fixed bug to allow data to be collected for Bed files from indexed data files without specifying a database in script get_datasets.pl
+
 v.1.8.5 (svn 461)
 	- Fixed critical bug where all knownGene feature strands are reversed in script ucsc_table2gff3.pl
 	- Fixed critical bug where the sign is flipped when generating Z-scores with script manipulate_datasets.pl
