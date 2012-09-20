@@ -8,7 +8,7 @@ use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.8.5';
+our $VERSION = '1.8.6';
 
 
 # Exported names
@@ -875,29 +875,39 @@ sub _process_position_score_feature {
 	# collect the feature and hashes
 	my ($f, $pos2data, $duplicates) = @_;
 	
-	# check for duplicate positions
-	if (exists $pos2data->{ $f->start } ) {
-		if (exists $duplicates->{ $f->start } ) {
-			# we have lots of duplicates at this position!
+	# process across the length of this feature
+		# for most wig features this is almost certainly a single point
+		# but just in case this is spanned data, we will record the 
+		# value at every position
+	for (my $pos = $f->start; $pos <= $f->end; $pos++) {
+		
+		# check for duplicate positions
+		# duplicates should not normally exist for a single wig file
+		# but we may be working with multiple wigs that are being combined
+		if (exists $pos2data->{$pos} ) {
 			
-			# append an incrementing number at the end
-			$duplicates->{ $f->start } += 1; # increment first
-			my $new = $f->start . '.' . $duplicates->{ $f->start };
-			$pos2data->{ $new } = $f->score;
+			if (exists $duplicates->{$pos} ) {
+				# we have lots of duplicates at this position!
+				
+				# append an incrementing number at the end
+				$duplicates->{$pos} += 1; # increment first
+				my $new = $pos . '.' . $duplicates->{$pos};
+				$pos2data->{$new} = $f->score;
+			}
+			else {
+				# first time duplicate
+				
+				# record this one
+				my $new = $pos . '.1';
+				$pos2data->{$new} = $f->score;
+				
+				# remember
+				$duplicates->{$pos} = 1;
+			}
 		}
 		else {
-			# first time duplicate
-			
-			# record this one
-			my $new = $f->start . '.1';
-			$pos2data->{$new} = $f->score;
-			
-			# remember
-			$duplicates->{ $f->start } = 1;
+			$pos2data->{$pos} = $f->score;
 		}
-	}
-	else {
-		$pos2data->{ $f->start } = $f->score;
 	}
 }
 
