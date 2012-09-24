@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.6';
+my $VERSION = '1.8.7';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -35,6 +35,8 @@ unless (@ARGV) {
 my (
 	$lookup,
 	$automatic,
+	$manual,
+	$user_lookup_name,
 	$outfile,
 	$gz,
 	$help,
@@ -46,6 +48,8 @@ my @order_requests;
 GetOptions( 
 	'lookup!'   => \$lookup, # force merging by value lookup
 	'auto!'     => \$automatic, # select columns automatically
+	'manual!'   => \$manual, # always run interactively
+	'lookupname|lun=s' => \$user_lookup_name, # alternate lookup column name
 	'index=s'   => \@order_requests, # determine order in advance
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
@@ -82,6 +86,9 @@ unless (scalar @ARGV >= 2) {
 my $user_list = @order_requests ? 1 : 0;
 
 # automatic mode
+if ($automatic and $manual) {
+	die " AAGH! I can't do both manual and automatic at the same time!\n";
+}
 if ($automatic or $user_list) {
 	unless ($outfile) {
 		die " Must provide an output file name in automatic mode!\n";
@@ -188,6 +195,14 @@ sub read_file {
 	# print the results
 	print "\n Loaded '$filename' with ", $file_data_ref->{'last_row'}, 
 		" data rows and ", $file_data_ref->{'number_columns'}, " columns\n";
+	
+	# delete any pre-existing original_file metadata
+	# we'll be writing new
+	for (my $i = 0; $i < $file_data_ref->{'number_columns'}; $i++) {
+		if (exists $file_data_ref->{$i}{'original_file'}) {
+			delete $file_data_ref->{$i}{'original_file'};
+		}
+	}
 	
 	# return
 	return $file_data_ref;
@@ -453,7 +468,7 @@ sub add_datasets {
 		# we need to merge by lookup values
 		
 		# check whether we have a lookup column defined
-		unless ($lookup_name) {
+		if ($manual or not $lookup_name) {
 			# we have to do this by treating as two new datasets
 			merge_two_datasets_by_lookup($output_data_ref, $data_ref);
 			return;
@@ -622,49 +637,62 @@ sub request_lookup_indices {
 	my $index1;
 	my $index2;
 	
-	# Determine if we need one or two
-	if (!defined $data2 and $lookup_name) {
-		# we already have a lookup name
-		# just need to find same column for one dataset
-		
-		my $index1 = find_column_index($data1, "^$lookup_name\$");
-		unless (defined $index1) {
-			die " Cannot find lookup column with name '$lookup_name'" . 
-				" in file " . $data1->{'filename'} . "\n";
-		}
-		
-		# print the found column name
-		print "  using column $index1 (", 
-			$data1->{$index1}{'name'}, 
-			") as lookup index for file ", 
-			$data1->{'filename'}, "\n";
-		return $index1;
-	}
 	
-	# First try some known column identifiers we could use automatically
-	foreach my $name (qw(name id transcript gene)) {
-		
-		# identify possibilities
-		my $possible_index1 = find_column_index($data1, "^$name\$");
-		my $possible_index2 = find_column_index($data2, "^$name\$");
-		
-		# check if something was found
-		if (defined $possible_index1 and defined $possible_index2) {
+	# Automatic methods of determining the lookup index
+	unless ($manual) {
+		# Determine if we need one or two
+		if (!defined $data2 and $lookup_name) {
+			# we already have a lookup name
+			# just need to find same column for one dataset
 			
-			# assign
-			$index1 = $possible_index1;
-			$index2 = $possible_index2;
-			$lookup_name = $name; # for future lookups
+			my $index1 = find_column_index($data1, "^$lookup_name\$");
+			unless (defined $index1) {
+				die " Cannot find lookup column with name '$lookup_name'" . 
+					" in file " . $data1->{'filename'} . "\n";
+			}
 			
-			# report
+			# print the found column name
 			print "  using column $index1 (", 
 				$data1->{$index1}{'name'}, 
 				") as lookup index for file ", 
 				$data1->{'filename'}, "\n";
-			print "  using column $index2 (", 
-				$data2->{$index2}{'name'}, 
-				") as lookup index for file ", 
-				$data2->{'filename'}, "\n";
+			return $index1;
+		}
+		
+		# First try some known column identifiers we could use automatically
+		# don't forget to add the user-requested lookup name
+		my @name_list = qw(name id transcript gene);
+		if ($user_lookup_name) {
+			unshift @name_list, $user_lookup_name;
+		}
+		foreach my $name (@name_list) {
+			print " checking for lookup column name $name...\n";
+			
+			# identify possibilities
+			my $possible_index1 = find_column_index($data1, "^$name\$");
+			my $possible_index2 = find_column_index($data2, "^$name\$");
+			
+			# check if something was found
+			if (defined $possible_index1 and defined $possible_index2) {
+				
+				# assign
+				$index1 = $possible_index1;
+				$index2 = $possible_index2;
+				$lookup_name = $name; # for future lookups
+				
+				# report
+				print "  using column $index1 (", 
+					$data1->{$index1}{'name'}, 
+					") as lookup index for file ", 
+					$data1->{'filename'}, "\n";
+				print "  using column $index2 (", 
+					$data2->{$index2}{'name'}, 
+					") as lookup index for file ", 
+					$data2->{'filename'}, "\n";
+				
+				# don't go through remaining list
+				last;
+			}
 		}
 	}
 	
@@ -676,7 +704,8 @@ sub request_lookup_indices {
 				" Please execute interactively to identify lookup columns\n";
 		}
 		
-		print " Unable to identify appropriate lookup columns automatically!\n";
+		print " Unable to identify appropriate lookup columns automatically!\n"
+			unless $manual;
 		
 		# Print the index headers
 		# use numbers for the first one
@@ -918,9 +947,18 @@ sub initialize_output_data_structure {
 	# we'll re-use the values from file1 
 	$output_data->{'program'}   = $data_ref->{'program'};
 	$output_data->{'db'}        = $data_ref->{'db'};
-	$output_data->{'filename'}  = $data_ref->{'filename'}; # borrow file name
 	$output_data->{'last_row'}  = $data_ref->{'last_row'}; # should be identical
 
+	# assign the filename
+	if ($outfile) {
+		# use the new output file name
+		$output_data->{'filename'}  = $outfile;
+	}
+	else {
+		# borrow the first file name
+		$output_data->{'filename'}  = $data_ref->{'filename'}; # borrow file name
+	}
+	
 	return $output_data;
 }
 
@@ -950,8 +988,10 @@ sub copy_metadata {
 	}
 	
 	# set the original file name
-	$output_data_ref->{$current_index}{'original_file'} = 
-		$data_ref->{'filename'};
+	unless (exists $output_data_ref->{$current_index}{'original_file'}) {
+		$output_data_ref->{$current_index}{'original_file'} = 
+			$data_ref->{'filename'};
+	}
 	
 	# reset the index
 	$output_data_ref->{$current_index}{'index'} = $current_index;
@@ -1060,7 +1100,9 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   Options:
   --lookup
   --auto
+  --manual
   --index <number,letter,range>
+  --lookupname | --lun <text>
   --out <filename> 
   --(no)gz
   --version
@@ -1087,6 +1129,11 @@ are retained, and only uniquely named or Score columns from subsequent
 data files are merged. If lookup is enabled, then an appropriate 
 lookup column will be chosen.
 
+=item --manual
+
+Execute in full manual mode, where columns for lookup and merge are 
+chosen interactively from lists.
+
 =item --index <number,letter,range>
 
 For advanced users, provide the list of indices to merge from both 
@@ -1096,6 +1143,15 @@ file by letters. Values are comma-delimited, and ranges may be
 provided as "start-stop". To indicate indices from subsequent files, 
 provide separate --index options for each subsequent file. The default 
 is to run the program interactively.
+
+=item --lookupname <text>
+
+=item --lun <text>
+
+Provide an alternate column name to identify the columns automatically 
+in the input files containing the lookup values when performing the 
+lookup. Each file should have the same lookup column name. Default 
+values include 'Name', 'ID', 'Transcript', or 'Gene'.
 
 =item --out <filename>
 
@@ -1138,8 +1194,9 @@ unequal number of data rows, or the user forces by using the --lookup option,
 then dataset values are looked up first using specified lookup values before 
 merging (compare with Excel VLOOKUP function). In this case, the dataset 
 lookup indices from each file are identified automatically. Potential 
-lookup columns include 'Name', 'ID', 'Transcript', or 'Gene'. Failing that, 
-they are chosen interactively.
+lookup columns include 'Name', 'ID', 'Transcript', 'Gene', or any user 
+provided name (using the --lookupname option). Failing that, they are 
+chosen interactively.
 
 When a lookup is performed, the first index in the order determines which 
 file is dominant, meaning that all rows from that file are included, and only 
