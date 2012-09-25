@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.8.4';
+my $VERSION = '1.8.7';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -176,17 +176,25 @@ while (my $line = $in_fh->getline) {
 	}
 }
 
+
+
 ### Finish
-$in_fh->close;
 
 # Final write 
 write_current_data_to_file_part($previous_value);
+
+# Properly close out all file handles
+$in_fh->close;
+foreach my $value (keys %written_files) {
+	$written_files{$value}{'fh'}->close;
+}
+
 
 # report
 print " Split '$infile' into $split_count files\n";
 foreach my $value (sort {$a cmp $b} keys %written_files) {
 	print "  wrote $written_files{$value}{total} lines in " . 
-		"$written_files{$value}{parts} file(s) for '$value'\n";
+		"$written_files{$value}{parts} files for '$value'\n";
 }
 
 
