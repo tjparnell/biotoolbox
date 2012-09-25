@@ -17,6 +17,7 @@ use tim_db_helper qw(
 	process_and_verify_dataset
 	get_new_feature_list
 	get_region_dataset_hash
+	get_chromo_region_score
 	check_dataset_for_rpm_support
 );
 use tim_file_helper qw(
@@ -24,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.8.7';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -58,6 +59,7 @@ my (
 	$strand_sense,
 	$set_strand,
 	$avoid,
+	$long_data,
 	$smooth,
 	$sum,
 	$log,
@@ -82,6 +84,7 @@ GetOptions(
 	'strand=s'   => \$strand_sense, # collected stranded data
 	'set_strand' => \$set_strand, # enforce an artificial strand
 	'avoid!'     => \$avoid, # avoid conflicting features
+	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
 	'log!'       => \$log, # data is in log2 space
@@ -534,21 +537,42 @@ sub map_relative_data {
 	# Select the appropriate method for data collection
 	if (
 		defined $name and
-		defined $type
+		defined $type and 
+		not $long_data
 	) {
-		# using named features
+		# mapping point data features using named features
 		map_relative_data_for_features(
 			$starting_point, $ending_point, $name, $type, $strand);
 	}
 	
 	elsif (
+		defined $name and
+		defined $type and 
+		$long_data
+	) {
+		# mapping long data features using named features
+		map_relative_long_data_for_features($name, $type, $strand);
+	}
+	
+	elsif (
 		defined $start and
 		defined $stop  and
-		defined $chromo
+		defined $chromo and
+		not $long_data
 	) {
-		# using genome segments
+		# mapping point data features using genome segments
 		map_relative_data_for_regions(
 			$starting_point, $ending_point, $chromo, $start, $stop, $strand);
+	}
+	
+	elsif (
+		defined $start and
+		defined $stop  and
+		defined $chromo and
+		$long_data
+	) {
+		# mapping long data features using genome segments
+		map_relative_long_data_for_regions($chromo, $start, $stop, $strand);
 	}
 	
 	else {
@@ -599,6 +623,65 @@ sub map_relative_data_for_features {
 
 
 
+sub map_relative_long_data_for_features {
+	
+	# Get the feature indices
+	my (
+		$name_index, 
+		$type_index, 
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		# Get the feature from the database
+		my @features = $mdb->features( 
+				-name => $data_table_ref->[$row][$name_index],
+				-type => $data_table_ref->[$row][$type_index],
+		);
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$data_table_ref->[$row][$type_index] . " features" .  
+				" named " . $data_table_ref->[$row][$name_index] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$data_table_ref->[$row][$type_index] . " features" .
+				" named " . $data_table_ref->[$row][$name_index] . 
+				" in the database!\n";
+			
+			# record a null values
+			for (
+				my $column = $startcolumn; 
+				$column < $main_data_ref->{'number_columns'}; 
+				$column++
+			) {
+				$data_table_ref->[$row][$column] = '.';
+			}
+			
+			# move on
+			next;
+		}
+		my $feature = shift @features; 
+		
+		
+		# Collect the scores for each window
+		collect_long_data_window_scores(
+			$row,
+			$feature->seq_id,
+			$feature->start,
+			$feature->end,
+			$set_strand ? 
+				$data_table_ref->[$row][$strand_index] : $feature->strand
+		);
+	}
+}
 
 sub map_relative_data_for_regions {
 	
@@ -737,6 +820,80 @@ sub map_relative_data_for_regions {
 
 
 
+sub map_relative_long_data_for_regions {
+	
+	# Get the feature indices
+	my (
+		$chr_index, 
+		$start_index, 
+		$stop_index, 
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		# collect the given coordinates from the data table
+		my ($fstart, $fstop, $fstrand);
+		if (
+			$data_table_ref->[$row][$start_index] <= 
+			$data_table_ref->[$row][$stop_index]
+		) {
+			# proper orientation
+			$fstart = $data_table_ref->[$row][$start_index];
+			$fstop  = $data_table_ref->[$row][$stop_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$fstrand = 1;
+			}
+		}
+		else {
+			# not a proper orientation of values
+			# assume the user really meant this
+			$fstart = $data_table_ref->[$row][$stop_index];
+			$fstop  = $data_table_ref->[$row][$start_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$fstrand = -1;
+			}
+		}
+			
+		# determine strand
+		if (defined $strand_index) {
+			# the strand in the data table could be any one of several 
+			# characters denoting strand
+			if ($data_table_ref->[$row][$strand_index] =~ m/^[1|f|w|\+]/i) {
+				$fstrand = 1;
+			}
+			elsif ($data_table_ref->[$row][$strand_index] =~ m/^[r|c|\-]/i) {
+				$fstrand = -1;
+			}
+			else {
+				$fstrand = 0;
+			}
+		}
+		else {
+			$fstrand = 0 unless defined $fstrand;
+		}
+		
+		
+		# Collect the scores for each window
+		collect_long_data_window_scores(
+			$row,
+			$data_table_ref->[$row][$chr_index],
+			$fstart,
+			$fstop,
+			$fstrand,
+		);
+	}
+	
+}
+
+
+
 sub record_scores {
 	
 	# get the collected raw scores
@@ -815,6 +972,82 @@ sub record_scores {
 	}
 
 }
+
+
+
+## Collecting long data in windows
+sub collect_long_data_window_scores {
+	
+	# passed row index and coordinates
+	my (
+		$row,
+		$fchromo,
+		$fstart,
+		$fstop,
+		$fstrand
+	) = @_;
+
+	# Translate the actual reference start position based on requested 
+	# reference position and region strand
+	my $reference;
+	if ($fstrand >= 0 and $position == 5) {
+		# 5' end of forward strand
+		$reference = $fstart;
+	}
+	
+	elsif ($fstrand == -1 and $position == 5) {
+		# 5' end of reverse strand
+		$reference = $fstop;
+	}
+	
+	elsif ($fstrand >= 0 and $position == 3) {
+		# 3' end of forward strand
+		$reference = $fstop;
+	}
+	
+	elsif ($fstrand == -1 and $position == 3) {
+		# 3' end of reverse strand
+		$reference = $fstart;
+	}
+	
+	elsif ($position == 4) {
+		# midpoint regardless of strand
+		$reference = int( ( ($fstop - $fstart) / 2) + 0.5);
+	}
+	
+	else {
+		# something happened
+		die " programming error!? feature " . 
+			" at data row $row\n";
+	}
+	
+	
+	# collect the data
+	# we will be using the get_chromo_region_score() to collect data
+	# for every window 
+	for (
+		my $column = $startcolumn; 
+		$column < $main_data_ref->{'number_columns'}; 
+		$column++
+	) {
+		$data_table_ref->[$row][$column] = get_chromo_region_score( {
+			'db'          => $ddb,
+			'dataset'     => $dataset,
+			'chromo'      => $fchromo,
+			'start'       => $reference + $main_data_ref->{$column}{'start'},
+			'stop'        => $reference + $main_data_ref->{$column}{'stop'},
+			'strand'      => $fstrand,
+			'method'      => $method,
+			'value'       => $value_type,
+			'stranded'    => $strand_sense,
+			'log'         => $log,
+		} ) || '.';
+	}
+}
+
+
+
+
 
 
 ## Interpolate the '.' values with the mean of the neighbors
@@ -917,7 +1150,8 @@ get_relative_data.pl
   --pos [5|3|m]
   --strand [sense|antisense|all]
   --set_strand
-  --(no)avoid
+  --avoid
+  --long
   --(no)sum
   --(no)smooth
   --(no)log
@@ -998,7 +1232,7 @@ count values.
 Optionally specify the type of data value to collect from the dataset or 
 data file. Three values are accepted: score, count, or length. Note that 
 some data sources only support certain types of data values. Wig and 
-BigWig files only support score and count; BigBed and database features 
+BigWig files only support score and count; BigBed database features 
 support count and length and optionally score; Bam files support basepair 
 coverage (score), count (number of alignments), and length. The default 
 value type is score. 
@@ -1038,7 +1272,7 @@ column in the input data file with a name of "strand". Hence, it
 will not work with newly generated datasets, but only with input 
 data files. Default is false.
 
-=item --(no)avoid
+=item --avoid
 
 Indicate whether features of the same type should be avoided when 
 calculating values in a window. Each window is checked for 
@@ -1046,6 +1280,17 @@ overlapping features of the same type; if the window does overlap
 another feature of the same type, no value is reported for the 
 window. The default is false (return all values regardless of 
 overlap).
+
+=item --long
+
+Indicate that the dataset from which scores are collected are 
+long features (counting genomic annotation for example) and not point 
+data (microarray data or sequence coverage). Normally long features are 
+only recorded at their midpoint, leading to inaccurate representation at 
+some windows. This option forces the program to collect data separately 
+at each window, rather than once for each file feature or region and 
+subsequently assigning scores to windows. Execution times may be 
+longer than otherwise. Default is false.
 
 =item --(no)sum
 
