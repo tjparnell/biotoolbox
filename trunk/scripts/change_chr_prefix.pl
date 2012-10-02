@@ -196,13 +196,7 @@ sub process_bam_file {
 		$outfile = $infile;
 		
 		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.bam$/_chr.bam/i;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.bam$/_nochr.bam/i;
-		}
+		$outfile =~ s/\.bam$/_new.bam/i;
 	}
 	unless ($outfile =~ /\.bam$/) {
 		# add extension as necessary
@@ -367,15 +361,7 @@ sub process_sam_file {
 	unless ($outfile) {
 		# generate output file name
 		$outfile = $infile;
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.sam (?:\.gz)? \Z/_$prefix.sam/xi;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.sam (?:\.gz)? \Z/_no$prefix.sam/xi;
-		}
+		$outfile =~ s/\.sam (?:\.gz)? \Z/_new.sam/xi;
 	}
 	unless ($outfile =~ /\.sam (?:\.gz)? \Z/xi) {
 		# add extension as necessary
@@ -430,15 +416,7 @@ sub process_bed_file {
 	unless ($outfile) {
 		# generate output file name
 		$outfile = $infile;
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.bed (?:\.gz)? \Z/_$prefix.bed/xi;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.bed (?:\.gz)? \Z/_no$prefix.bed/xi;
-		}
+		$outfile =~ s/\.bed (?:\.gz)? \Z/_new.bed/xi;
 	}
 	unless ($outfile =~ /\.bed (?:\.gz)? \Z/xi) {
 		# add extension as necessary
@@ -485,15 +463,7 @@ sub process_gff_file {
 	unless ($outfile) {
 		# generate output file name
 		$outfile = $infile;
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.g[t|f]f3? (?:\.gz)? \Z/_$prefix/xi;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.g[t|f]f3? (?:\.gz)? \Z/_no$prefix/xi;
-		}
+		$outfile =~ s/\.g[t|f]f3? (?:\.gz)? \Z/_new/xi;
 	}
 	unless ($outfile =~ /\.g[t|f]f3? (?:\.gz)? \Z/xi) {
 		# add extension as necessary
@@ -593,16 +563,7 @@ sub process_text_file {
 	# check output file
 	unless ($outfile) {
 		# generate output file name
-		$outfile = $in_data->{'basename'};
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile .= "_$prefix";
-		}
-		else {
-			# strip prefix
-			$outfile .= "_no$prefix";
-		}
+		$outfile = $in_data->{'basename'} . '_new';
 	}
 	
 	# write out the file
@@ -627,15 +588,7 @@ sub process_fasta_file {
 	unless ($outfile) {
 		# generate output file name
 		$outfile = $infile;
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.fa (?:sta)? (?:\.gz)? \Z/_$prefix.fa/xi;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.fa (?:sta)? (?:\.gz)? \Z/_no$prefix.fa/xi;
-		}
+		$outfile =~ s/\.fa (?:sta)? (?:\.gz)? \Z/_new.fa/xi;
 	}
 	unless ($outfile =~ /\.fa (?:sta)? (?:\.gz)? \Z/xi) {
 		# add extension as necessary
@@ -677,15 +630,7 @@ sub process_wig_file {
 	unless ($outfile) {
 		# generate output file name
 		$outfile = $infile;
-		
-		# modify the name as appropriate
-		if ($add_chr) {
-			$outfile =~ s/\.(wig | bdg) (?:\.gz)? \Z/_$prefix.$1/xi;
-		}
-		else {
-			# strip prefix
-			$outfile =~ s/\.(wig | bdg) (?:\.gz)? \Z/_no$prefix.$1/xi;
-		}
+		$outfile =~ s/\.(wig | bdg) (?:\.gz)? \Z/_new.$1/xi;
 	}
 	unless ($outfile =~ /\. (?:wig|bdg) (?:\.gz)? \Z/xi) {
 		# add extension as necessary
@@ -892,6 +837,8 @@ change_chr_prefix.pl [--add | --strip] [--options...] <filename>
   --out <filename> 
   --add
   --strip
+  --roman
+  --arabic
   --prefix <text>
   --(no)contig
   --(no)gz
@@ -924,6 +871,16 @@ Specify the renaming action. One or the other must be specified. The add
 action will prefix simple chromosome names (one to four characters) with 
 the prefix, while the strip action will remove the offending prefix.
 
+=item --roman
+
+Convert arabic numerals (1, 2 ... 30) to Roman numerals (I, II ... XXX). 
+Up to 30 is renamed, all others are ignored.
+
+=item --arabic
+
+Convert Roman numerals (I, II, ... XXX) to Arabic numerals (1, 2 ... 30).
+Only upper case are recognized. Higher numbers are ignored.
+
 =item --prefix <text>
 
 Specify the chromosome prefix. The default value is 'chr'.
@@ -952,14 +909,18 @@ Display this POD documentation.
 
 This program will re-name chromosome names in a data file. Supported data 
 formats include Bam and Sam alignment files, GFF and BED feature files, 
-Fasta sequence files, and any other tab-delimited text files. 
+Fasta sequence files, wig and bedgraph files, and any other tab-delimited 
+text files. 
 
 Re-naming consists of either adding or stripping a prefix from the chromosome 
 name. Some genome repositories prefix their chromosome names with text, 
 most commonly 'chr', while other repositories prefer bare numbers, or 
-<gasp!> Roman Numerals. UCSC and Ensembl are two good examples. Mixing 
+Roman numerals. UCSC and Ensembl are two good examples. Mixing 
 and matching annotation from different authorities requires matching 
 chromosome names.
+
+Be careful with the conversions, and check carefully. Mitochondrial 
+chromosomes or other funny named chromosomes may need to be changed manually.
 
 =head1 AUTHOR
 
