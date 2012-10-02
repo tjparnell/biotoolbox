@@ -959,7 +959,8 @@ should be used. The default is to use only the 'start' position.
 
 Source data is in interbase coordinate (0-base) system. Shift the 
 start position to base coordinate (1-base) system. Wig files are by 
-definition 1-based. Default is false.
+definition 1-based. This is automatically enabled when converting 
+from Bed or BedGraph files. Default is false.
 
 =item --format [0 | 1 | 2 | 3]
 
