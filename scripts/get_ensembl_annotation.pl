@@ -22,7 +22,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.8.1';
+my $VERSION = '1.8.7';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -53,6 +53,7 @@ my (
 	$get_trna_genes,
 	$group,
 	$host,
+	$port,
 	$user,
 	$pass,
 	$prefix,
@@ -76,6 +77,7 @@ GetOptions(
 	'trna!'     => \$get_trna_genes,
 	'group=s'   => \$group, # the database group
 	'host=s'    => \$host, # host address
+	'port=i'    => \$port, # IP port number
 	'user=s'    => \$user, # user name to log in
 	'pass=s'    => \$pass, # password to log in with
 	'prefix!'   => \$prefix, # prefix chromosome names with chr
@@ -124,6 +126,9 @@ unless ($outfile) {
 unless ($host) {
 	$host = 'ensembldb.ensembl.org';
 }
+unless ($port) {
+	$port = 3306;
+}
 unless ($user) {
 	$user = 'anonymous';
 }
@@ -157,6 +162,7 @@ $registry->load_registry_from_db(
 		-host    => $host,
 		-user    => $user,
 		-pass    => $pass,
+		-port    => $port,
 ) or die " Can't connect to registry!\n";
 
 
@@ -1180,6 +1186,7 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --prefix
   --group <text>
   --host <host.address>
+  --port <integer>
   --user <text>
   --pass <text>
   --printdb
@@ -1270,6 +1277,10 @@ value is 'core'. See EnsEMBL documentation for more information.
 Specify the Internet address of the EnsEMBL public MySQL database host. 
 The default value is 'ensembldb.ensembl.org'.
 
+=item --port <integer>
+
+Specify the IP port address for the MySQL server. Default is 3306.
+
 =item --user <text>
 
 Specify the user name to connect as to the EnsEMBL public database. 
@@ -1314,6 +1325,9 @@ release. If you do not see the latest genome version (compared to what
 is available on the web), you should update your EnsEMBL Perl modules. 
 The API version should be printed at the beginning of execution.
 
+To connect to the Ensembl Genomes public mysql server rather than the 
+default, please specify the host as "mysql.ebi.ac.uk" and port 4157.
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1326,5 +1340,4 @@ The API version should be printed at the beginning of execution.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
 
