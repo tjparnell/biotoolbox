@@ -27,7 +27,7 @@ eval {
 	$bam_support = 1;
 };
 
-my $VERSION = '1.6.2';
+my $VERSION = '1.8.7';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -50,6 +50,8 @@ my (
 	$outfile,
 	$add_chr,
 	$strip_chr,
+	$to_roman,
+	$to_arabic,
 	$do_contigs,
 	$prefix,
 	$gz,
@@ -63,6 +65,8 @@ GetOptions(
 	'out=s'     => \$outfile, # name of output file 
 	'add'       => \$add_chr, # add the prefix
 	'strip'     => \$strip_chr, # remove the prefix
+	'roman'     => \$to_roman, # change numbers from arabic to roman
+	'arabic'    => \$to_arabic, # change numbers from roman to arabic
 	'contig!'   => \$do_contigs, # prefix on contigs too
 	'prefix=s'  => \$prefix, # the actual prefix
 	'gz!'       => \$gz, # compress output
@@ -103,8 +107,14 @@ unless (defined $gz) {
 	}
 }
 
-unless ($add_chr or $strip_chr) {
-	die " must define an action! add or strip a prefix\n";
+unless ($add_chr or $strip_chr or $to_roman or $to_arabic) {
+	die " must define an action! see help\n";
+}
+if ($add_chr and $strip_chr) {
+	die " cannot add and strip at the same time!\n";
+}
+if ($to_roman and $to_arabic) {
+	die " cannot convert to and from roman and arabic at the same time!\n";
 }
 
 unless ($prefix) {
@@ -119,6 +129,8 @@ unless ($prefix) {
 # required global arguments
 my $out_fh; # to be used for output filehandles
 my $final_file;
+my $numbers = get_number_hash();
+
 my $time = time;
 
 # convert according to type
@@ -145,6 +157,10 @@ elsif ($infile =~ /\.txt(?:\.gz)?$/i) {
 elsif ($infile =~ /\.fa (?:sta)? (?:\.gz)? \Z/xi) {
 	# a fasta file
 	$final_file = process_fasta_file($infile, $outfile);
+}
+elsif ($infile =~ /\. (?:wig|bdg) (?:\.gz)? \Z/xi) {
+	# a wig file
+	$final_file = process_wig_file($infile, $outfile);
 }
 else {
 	die " unrecognized file format! see documentation for supported files\n";
@@ -650,6 +666,74 @@ sub process_fasta_file {
 }
 
 
+sub process_wig_file {
+	print "\n Processing a wig file....\n";
+	
+	my ($infile, $outfile) = @_;
+	
+	# open files
+	my $in_fh = open_to_read_fh($infile) or 
+		die " can't open input file!\n";
+	unless ($outfile) {
+		# generate output file name
+		$outfile = $infile;
+		
+		# modify the name as appropriate
+		if ($add_chr) {
+			$outfile =~ s/\.(wig | bdg) (?:\.gz)? \Z/_$prefix.$1/xi;
+		}
+		else {
+			# strip prefix
+			$outfile =~ s/\.(wig | bdg) (?:\.gz)? \Z/_no$prefix.$1/xi;
+		}
+	}
+	unless ($outfile =~ /\. (?:wig|bdg) (?:\.gz)? \Z/xi) {
+		# add extension as necessary
+		$outfile .= '.wig';
+	}
+	$out_fh = open_to_write_fh($outfile, $gz) or 
+		die " can't open output file '$outfile'!\n";
+	
+	
+	# convert the chromosome definition lines
+	while (my $line = $in_fh->getline) {
+		my @data = split /\s+/, $line;
+		if ($data[0] =~ /^fixedstep|variablestep/i) { 
+			# wig definition line
+			if ($line =~ /chrom=([\w\.\_\-]+)/i) {
+				my $chr = $1;
+				my $new_chr = change_name($chr);
+				$line =~ s/$chr/$new_chr/;
+				$out_fh->print($line);
+			}
+			else {
+				die "wig definition line does not include a chromosome key!\n";
+			}
+		}
+		elsif (scalar(@data) == 4) {
+			# a bedgraph line
+			$data[0] = change_name($data[0]);
+			$out_fh->print(join("\t", @data) . "\n");
+		}
+		else {
+			# everything else we skip
+			$out_fh->print($line);
+		}
+	}
+	
+	# finished
+	$in_fh->close;
+	$out_fh->close;
+	return $outfile;
+	
+}
+
+
+sub process_bigwig_file {
+	die " not supported!\n";
+}
+
+
 sub process_sam_seq_header {
 	# subroutine to process a sequence header line from a sam/bam file
 	my $line = shift;
@@ -695,19 +779,102 @@ sub change_name {
 	
 	# adjust the chromosome name as requested
 	if ($add_chr) {
-		# we're enforcing a chromosome name of only 1-4 characters
-		# anything longer is likely to be not a simple chromosome name
-		$name =~ s/\A (\w{1,4}) \Z /$prefix$1/x;
+		$name = $prefix . $name;
 	}
-	else {
+	elsif ($strip_chr) {
 		# strip
-		$name =~ s/\A ${prefix} (.+) \Z /$1/x;
+		$name =~ s/\A ${prefix}//x;
+	}
+	
+	# change number format if requested
+	if ($to_roman) {
+		if ( 
+			$name =~ /(\d+)\Z/ and
+			exists $numbers->{$1}
+		) {
+			my $new = $numbers->{$1};
+			$name =~ s/$1/$new/;
+		}
+	}
+	elsif ($to_arabic) {
+		if ( 
+			$name =~ /([IVX]+)\Z/ and
+			exists $numbers->{$1}
+		) {
+			my $new = $numbers->{$1};
+			$name =~ s/$1/$new/;
+		}
 	}
 	
 	return $name;
 }
 
 
+sub get_number_hash {
+	my %hash = (
+		'1'		=>	'I',
+		'2'		=>	'II',
+		'3'		=>	'III',
+		'4'		=>	'IV',
+		'5'		=>	'V',
+		'6'		=>	'VI',
+		'7'		=>	'VII',
+		'8'		=>	'VIII',
+		'9'		=>	'IX',
+		'10'	=>	'X',
+		'11'	=>	'XI',
+		'12'	=>	'XII',
+		'13'	=>	'XIII',
+		'14'	=>	'XIV',
+		'15'	=>	'XV',
+		'16'	=>	'XVI',
+		'17'	=>	'XVII',
+		'18'	=>	'XVIII',
+		'19'	=>	'XIX',
+		'20'	=>	'XX',
+		'21'	=>	'XXI',
+		'22'	=>	'XXII',
+		'23'	=>	'XXIII',
+		'24'	=>	'XXIV',
+		'25'	=>	'XXV',
+		'26'	=>	'XXVI',
+		'27'	=>	'XXVII',
+		'28'	=>	'XXVIII',
+		'29'	=>	'XXIX',
+		'30'	=>	'XXX',
+		'I'		=>	'1',
+		'II'	=>	'2',
+		'III'	=>	'3',
+		'IV'	=>	'4',
+		'V'		=>	'5',
+		'VI'	=>	'6',
+		'VII'	=>	'7',
+		'VIII'	=>	'8',
+		'IX'	=>	'9',
+		'X'		=>	'10',
+		'XI'	=>	'11',
+		'XII'	=>	'12',
+		'XIII'	=>	'13',
+		'XIV'	=>	'14',
+		'XV'	=>	'15',
+		'XVI'	=>	'16',
+		'XVII'	=>	'17',
+		'XVIII'	=>	'18',
+		'XIX'	=>	'19',
+		'XX'	=>	'20',
+		'XXI'	=>	'21',
+		'XXII'	=>	'22',
+		'XXIII'	=>	'23',
+		'XXIV'	=>	'24',
+		'XXV'	=>	'25',
+		'XXVI'	=>	'26',
+		'XXVII'	=>	'27',
+		'XXVIII'	=>	'28',
+		'XXIX'	=>	'29',
+		'XXX'	=>	'30',
+	);
+	return \%hash;
+}
 
 
 __END__
