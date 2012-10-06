@@ -1,5 +1,13 @@
 ######## BioToolBox revision history #############
 
+v.1.8.7 (svn 487)
+	- Added new command line options to script merge_datasets.pl to control the program's behavior. The "--lookupname" option allows you to specify the name of the lookup column, while "--manual" turns off all automatic guessing of columns. Also improved handling of original_file metadata.
+	- Added a new option to collect data from long features (such as genomic annotations) instead of point data (microarray or sequence data) in script get_relative_data.pl.
+	- Added option to convert to and from Roman numerals in chromosome names and support for wig files in script change_chr_prefix.pl
+	- Added option to change the IP port number when connecting to a remote MySQL database host in script get_ensembl_annotation.pl
+	- Fixed bug to properly close opened files in script split_data_file.pl and avoid unnecessary error messages.
+	- Modified statements and warnings regarding step and span values in script data2wig.pl
+
 v.1.8.6 (svn 477)
 	- Added numerous enhancements and bug fixes to script data2wig.pl, including automatically assigning the span parameter in the wig file, identifying coordinate columns, adding command line options for coordinate columns, and updating the POD documentation
 	- Improved the treeview export function in script manipulate_datasets.pl to include different manipulations, including median center of genes or datasets, converting to Z-scores, and converting null values. Also changed the default output name to <basename>.cdt.
