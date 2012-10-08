@@ -12,18 +12,12 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 );
-# use tim_db_helper has moved down below and is loaded on demand
+use tim_big_helper qw(wig_to_bigwig_conversion);
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-use tim_db_helper::config;
-eval {
-	# check for bigwig file conversion support
-	require tim_db_helper::bigwig;
-	tim_db_helper::bigwig->import;
-};
-my $VERSION = '1.8.7';
+my $VERSION = '1.9.0';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -762,43 +756,10 @@ sub format_score {
 
 sub convert_to_bigwig {
 	
-	# check that bigwig conversion is supported
-	unless (exists &wig_to_bigwig_conversion) {
-		warn "\n  Support for converting to bigwig format is not available\n" . 
-			"  Please convert manually. See documentation for more info\n";
-		print " finished\n";
-		exit;
-	}
-	
-	# open database connection if necessary
-	my $db;
-	if ($database) {
-		eval {
-			use tim_db_helper qw(open_db_connection);
-		};
-		if ($@) {
-			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
-		}
-		else {
-			$db = open_db_connection($database);
-		}
-	}
-	
-	# find wigToBigWig utility
-	unless ($bw_app_path) {
-		# check for an entry in the configuration file
-		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
-			undef;
-	}
-	unless ($bw_app_path) {
-		# next check the system path
-		$bw_app_path = `which wigToBigWig` || undef;
-	}
-			
 	# perform the conversion
 	my $bw_file = wig_to_bigwig_conversion( {
 			'wig'       => $outfile,
-			'db'        => $db,
+			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bwapppath' => $bw_app_path,
 	} );
@@ -850,6 +811,7 @@ data2wig.pl [--options...] <filename>
   --bigwig | --bw
   --chromof <filename>
   --db <database>
+  --bwapp </path/to/wigToBigWig>
   --(no)gz
   --version
   --help
@@ -1000,6 +962,14 @@ generating a bigwig file. This option is only required when generating
 bigwig files. It may also be supplied from the metadata in the source 
 data file.
 
+=item --bwapp </path/to/wigToBigWig>
+
+Specify the path to the Jim Kent's wigToBigWig conversion utility. The 
+default is to first check the BioToolBox  configuration 
+file C<biotoolbox.cfg> for the application path. Failing that, it will 
+search the default environment path for the utility. If found, it will 
+automatically execute the utility to convert the wig file.
+
 =item --(no)gz
 
 A boolean value to indicate whether the output wiggle 
@@ -1047,8 +1017,8 @@ text wiggle file. The binary format is preferential to the text version
 for a variety of reasons, including fast, random access and no loss in 
 data value precision. More information can be found at this location:
 http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires 
-BigWig file support, supplied by the biotoolbox module 
-C<tim_db_helper::bigwig>. 
+BigWig file support, supplied by the external C<wigToBigWig> utility 
+available from UCSC.
 
 =head1 AUTHOR
 

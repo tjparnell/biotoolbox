@@ -15,14 +15,9 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-# use tim_db_helper has moved down below and is loaded on demand
 use tim_db_helper::config;
-eval {
-	# check for bigwig file conversion support
-	require tim_db_helper::bigwig;
-	tim_db_helper::bigwig->import;
-};
-my $VERSION = '1.6.5';
+use tim_big_helper qw(wig_to_bigwig_conversion);
+my $VERSION = '1.9.0';
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -358,41 +353,16 @@ else {
 
 
 ### Convert to bigWig as requested
-if ($bigwig and exists &wig_to_bigwig_conversion) {
+if ($bigwig) {
 	
 	
-	# open database connection if necessary
-	my $db;
-	if ($database) {
-		eval {
-			use tim_db_helper qw(open_db_connection);
-		};
-		if ($@) {
-			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
-		}
-		else {
-			$db = open_db_connection($database);
-		}
-	}
-	
-	# find wigToBigWig utility
-	unless ($bw_app_path) {
-		# check for an entry in the configuration file
-		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
-			undef;
-	}
-	unless ($bw_app_path) {
-		# next check the system path
-		$bw_app_path = `which wigToBigWig` || undef;
-	}
-			
 	# perform the conversion
 	foreach my $wigfile (@wigfiles) {
 		
 		# conversion
 		my $bw_file = wig_to_bigwig_conversion( {
 				'wig'       => $wigfile,
-				'db'        => $db,
+				'db'        => $database,
 				'chromo'    => $chromo_file,
 				'bwapppath' => $bw_app_path,
 		} );
@@ -410,11 +380,6 @@ if ($bigwig and exists &wig_to_bigwig_conversion) {
 			# we won't delete the wigfile
 		}
 	}
-}
-elsif ($bigwig and !exists &wig_to_bigwig_conversion) {
-	# conversion to bigwig is requested but not supported
-	warn " Support for converting to bigwig format is not available\n" . 
-		" Please convert manually. See documentation for more info\n";
 }
 
 
@@ -770,9 +735,7 @@ delimited by whitespace, consisting of the chromosome name and size.
 Specify the full path to Jim Kent's wigToBigWig conversion utility. By 
 default it uses the path defined in the biotoolbox configuration file, 
 biotoolbox.cfg. If it is not defined here or in the config file, then 
-the system path is searched for the executable. Finally, failing that, 
-it will attempt to use Lincoln Stein's Bio::DB::BigFile module for 
-conversion, if available.
+the system path is searched for the executable. 
 
 =item --(no)gz
 
@@ -828,7 +791,6 @@ information in the BioToolBox configuration file biotoolbox.cfg.
 Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or 
 Lincoln Stein's Bio::DB::BigFile support.
 
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -841,5 +803,3 @@ Lincoln Stein's Bio::DB::BigFile support.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-

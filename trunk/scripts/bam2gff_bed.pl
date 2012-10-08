@@ -7,24 +7,19 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_big_helper qw(bed_to_bigbed_conversion);
 use tim_data_helper qw(
 	format_with_commas
 );
 use tim_file_helper qw(
 	open_to_write_fh
 );
-use tim_db_helper::config;
 eval {
 	# check for bam support
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-eval {
-	# check for bigbed file conversion support
-	require tim_db_helper::bigbed;
-	tim_db_helper::bigbed->import;
-};
-my $VERSION = '1.5.8';
+my $VERSION = '1.9.0';
 
 
 print "\n A script to convert Bam alignments to GFF or BED files\n\n";
@@ -274,44 +269,11 @@ if ($bed and $bigbed) {
 	# requested to continue and generate a binary bigbed file
 	print " converting to bigbed file....\n";
 	
-	# check that bigbed conversion is supported
-	unless (exists &bed_to_bigbed_conversion) {
-		warn "\n  Support for converting to bigbed format is not available\n" . 
-			"  Please convert manually. See documentation for more info\n";
-		print " finished\n";
-		exit;
-	}
-	
-	
-	# find bedToBigBed utility
-	unless ($bb_app_path) {
-		# check the config or system path
-		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
-			`which bedToBigBed` || undef;
-		chomp $bb_app_path if $bb_app_path;
-	}
-	unless ($bb_app_path) {
-		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
-			"  See documentation for more info\n";
-		print " Finished\n";
-		exit;
-	}
-		
 			
-	# generate chromosome sizes file from BAM data
-	my $chromo_fh = open_to_write_fh('chromosome_sizes.txt');
-	for my $tid (0 .. $sam->n_targets - 1) {
-		my $seq_id = $sam->target_name($tid);
-		my $length = $sam->target_len($tid);
-		$chromo_fh->print("$seq_id\t$length\n");
-	}
-	$chromo_fh->close;
-	
-	
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
-			'chromo'    => 'chromosome_sizes.txt',
+			'db'        => $sam,
 			'bbapppath' => $bb_app_path,
 	} );
 
@@ -324,7 +286,6 @@ if ($bed and $bigbed) {
 	else {
 		warn " BigBed file not generated! see standard error\n";
 	}
-	unlink 'chromosome_sizes.txt';
 	
 }
 
@@ -657,16 +618,3 @@ format. Jim Kent's bedToBigBed conversion utility must be available.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-
-
