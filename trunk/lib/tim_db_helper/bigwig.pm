@@ -6,9 +6,8 @@ use strict;
 use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
-use Bio::DB::BigFile;
 use Bio::DB::BigWigSet;
-our $VERSION = '1.8.6';
+our $VERSION = '1.9.0';
 
 
 # Exported names
@@ -20,7 +19,6 @@ our @EXPORT = qw(
 	collect_bigwigset_score
 	collect_bigwigset_scores
 	collect_bigwigset_position_scores
-	wig_to_bigwig_conversion
 	open_bigwig_db
 	open_bigwigset_db
 );
@@ -564,124 +562,6 @@ sub collect_bigwigset_position_scores {
 
 
 
-### Wig to BigWig file conversion
-sub wig_to_bigwig_conversion {
-	
-	# Collect passed arguments
-	my $argument_ref = shift;
-	unless ($argument_ref) {
-		carp "no arguments passed!";
-		return;
-	}
-	
-	# wigfile
-	my $wigfile = $argument_ref->{'wig'} || undef;
-	unless ($wigfile) {
-		carp "no wig file passed!";
-		return;
-	}
-	
-	# identify bigwig conversion utility
-	my $bw_app_path = $argument_ref->{'bwapppath'} || undef;
-	unless ($bw_app_path) {
-		print " wigToBigWig utility not specified; using Bio::DB::BigFile\n";
-	}
-	
-	# Generate list of chromosome sizes if necessary
-	my $chromo_file = $argument_ref->{'chromo'} || undef;
-	unless ($chromo_file) {
-		# a pre-generated list of chromosome sizes was not provided
-		# need to generate one from the database
-		print " generating chromosome file....\n";
-		
-		# check that we a specified database
-		my $db = $argument_ref->{'db'} || undef;
-		unless ($db) {
-			carp " database or chromosome file not specified! " . 
-				"Unable to convert!\n";
-			return;
-		};
-		
-		# generate chromosome lengths file
-		my @chromos = $db->seq_ids;
-		unless (@chromos) {
-			carp " no chromosome sequences identified in database!\n";
-			return;
-		}
-		open CHR_FILE, ">tim_helper_chr_lengths.txt";
-		foreach my $chr (@chromos) {
-			my $segment = $db->segment($chr);
-			print CHR_FILE "$chr\t", $segment->length, "\n";
-		}
-		close CHR_FILE;
-		$chromo_file = "tim_helper_chr_lengths.txt";
-	}
-	
-	# generate the bw file name
-	# we can substitute one of three possible names for bw
-	my $bw_file = $wigfile;
-	$bw_file =~ s/\.(?:bed|bdg|bedgraph|wig)$/.bw/;
-	
-	# generate the bigwig file 
-	if ($bw_app_path) {
-		# we found Kent's utility
-		# this is arguably the best method for converting
-		# execute
-		print " converting $wigfile to bigWig....\n";
-		if ($bw_app_path =~ /wigToBigWig$/) {
-			# include the -clip option in case there are any positions 
-			# out of bounds of the chromosome
-			# it will just warn instead of fail
-			system $bw_app_path, '-clip', $wigfile, $chromo_file, $bw_file;
-		}
-		elsif ($bw_app_path =~ /bedGraphToBigWig$/) {
-			# this doesn't have the -clip option, too bad
-			system $bw_app_path, $wigfile, $chromo_file, $bw_file;
-		}
-	}
-	else {
-		# we are using the Bio::DB::BigFile module to generate the 
-		# bigwig file
-		# however, Lincoln notes that this method may be deprecated
-		# in future versions
-		# for the time being we will use this method as it avoids
-		# having to hunt down Jim Kent's utility in the path
-		
-		# we'll use Lincoln's default values, which are slightly
-		# different from Kent's default values in his utility
-		# but I'm not sure the reasoning behind the differences
-		Bio::DB::BigFile->createBigWig(
-			$wigfile, 
-			$chromo_file,
-			$bw_file
-		);
-	}
-	
-	# check the result
-	if (-e $bw_file and -s $bw_file) {
-		# conversion successful
-		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
-			# we no longer need our temp chromosome file
-			unlink $chromo_file;
-		}
-		return $bw_file;
-	}
-	else {
-		carp " Conversion failed. You should try manually and watch for errors\n";
-		if (-e $bw_file) {
-			# 0-byte file was created
-			unlink $bw_file;
-		}
-		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
-			# leave the temp chromosome file as a courtesy
-			carp " Leaving temporary chromosome file '$chromo_file'\n";
-		}
-		return;
-	}
-}
-
-
-
 ### Open a bigWig database connection
 sub open_bigwig_db {
 	
@@ -945,13 +825,8 @@ tim_db_helper::bigwig
 
 =head1 DESCRIPTION
 
-This module supports the use of bigwig file in the biotoolbox scripts, both 
-in the collection of data from a bigwig file, as well as the generation of 
-bigwig files.
-
-=head2 Data collection
-
-This module is used to collect the dataset scores from a binary 
+This module supports the use of bigwig file in the biotoolbox scripts.
+It is used to collect the dataset scores from a binary 
 bigWig file (.bw), or from a directory of bigWig files, known as a 
 BigWigSet. BigWig files may be local or remote.
 
@@ -977,13 +852,6 @@ statistical method is employed to significantly reduce data collection
 times. Up to a ten fold improvement or better has been observed over the 
 simple point-by-point collection, depending on the size of the region 
 requested.
-
-=head2 File generation
-
-This module also supports the generation of bigwig files. This is dependent 
-on either Jim Kent's UCSC commandline utility, or Lincoln Stein's 
-Bio::DB::BigFile support. It automates the collection of chromosome 
-information in prepration of conversion, if necessary.
 
 =head1 USAGE
 
@@ -1113,55 +981,6 @@ The subroutine is passed seven or more arguments
        or "all". Only those scores which match the indicated 
        strandedness are collected.
     7) One or more database feature types for the data 
-
-=item wig_to_bigwig_conversion()
-
-This subroutine will convert a wig file to a bigWig file. See the UCSC 
-documentation regarding wig (http://genome.ucsc.edu/goldenPath/help/wiggle.html)
-and bigWig (http://genome.ucsc.edu/goldenPath/help/bigWig.html) file formats. 
-It preferentially uses Jim Kent's wigToBigWig utility to perform the 
-conversion, although Lincoln Stein's Bio::DB::BigFile module may alternatively 
-be used. One of these must be present on the system for the conversion to 
-succeed. 
-
-The conversion requires a list of chromosome name and sizes in a simple text 
-file, where each line is comprised of two columns, "<chromosome name> 
-<size in bases>". This file may be specified, or automatically generated if 
-given a Bio::DB database name (preferred to ensure genome version 
-compatibility).
-
-The function returns the name of the bigWig file, which will be the 
-input wig file basename with the BigWig ".bw". Note that the it does 
-not check for success of writing the bigwig file. Check STDERR for errors 
-in bigwig file generation.
-
-Pass the function an anonymous hash of arguments, including the following:
-
-  Required:
-  wig         => The name of the wig source file. 
-  db          => Provide an opened database object from which to generate 
-                 the chromosome sizes information.
-  Optional: 
-  chromo      => The name of the chromosome sizes text file, described 
-                 above, as an alternative to providing the database name.
-  bwapppath   => Provide the full path to Jim Kent's wigToBigWig 
-                 utility. This parameter may instead be defined in the 
-                 configuration file "biotoolbox.cfg". 
-
-Example
-
-	my $wig_file = 'example_wig';
-	my $bw_file = wig_to_bigwig_conversion( {
-			'wig'   => $wig_file,
-			'db'    => $database,
-	} );
-	if (-e $bw_file) {
-		print " success! wrote bigwig file $bw_file\n";
-		unlink $wig_file; # no longer necessary
-	}
-	else {
-		print " failure! see STDERR for errors\n";
-	};
 
 =item open_bigwig_db()
 
