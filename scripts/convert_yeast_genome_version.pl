@@ -16,14 +16,10 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
+use tim_big_helper qw(wig_to_bigwig_conversion);
 use tim_db_helper::config;
-eval {
-	# check for bigwig file conversion support
-	require tim_db_helper::bigwig;
-	tim_db_helper::bigwig->import;
-};
 
-my $VERSION = '1.8.2';
+my $VERSION = '1.9.0';
 
 print "\n This script will convert yeast genomic coordinates\n";
 
@@ -132,20 +128,6 @@ unless ($bw_app_path) {
 	$bw_app_path = `which bedGraphToBigWig` || undef;
 }
 		
-# open database connection if necessary
-my $db;
-if ($database) {
-	eval {
-		use tim_db_helper qw(open_db_connection);
-	};
-	if ($@) {
-		warn " unable to load tim_db_helper! Is BioPerl installed?\n";
-	}
-	else {
-		$db = open_db_connection($database);
-	}
-}
-	
 
 
 
@@ -450,15 +432,10 @@ sub process_file {
 	if ($bigwig) {
 		print "  post-converting bedGraph back to bigWig....\n";
 		
-		# check that bigwig conversion is supported
-		unless (exists &wig_to_bigwig_conversion) {
-			die "\n  Support for converting to bigwig format is not available\n";
-		}
-		
 		# perform the conversion
 		my $bw_file = wig_to_bigwig_conversion( {
 				'wig'       => $new_filename,
-				'db'        => $db,
+				'db'        => $database,
 				'bwapppath' => $bw_app_path,
 		} );
 	

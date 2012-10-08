@@ -10,18 +10,12 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 );
-# use tim_db_helper has moved down below and is loaded on demand
+use tim_big_helper qw(bed_to_bigbed_conversion);
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-use tim_db_helper::config;
-eval {
-	# check for bigbed file conversion support
-	require tim_db_helper::bigbed;
-	tim_db_helper::bigbed->import;
-};
-my $VERSION = '1.6.2';
+my $VERSION = '1.9.0';
 
 print "\n This program will write a BED file\n";
 
@@ -460,52 +454,11 @@ if ($bigbed) {
 	print " wrote $count lines to temporary bed file '$outfile'\n";
 	print " converting to bigbed file....\n";
 	
-	# find bedToBigBed utility
-	unless ($bb_app_path) {
-		# check for an entry in the configuration file
-		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
-			undef;
-	}
-	unless ($bb_app_path) {
-		# next check the system path
-		$bb_app_path = `which bedToBigBed` || undef;
-		chomp $bb_app_path if $bb_app_path;
-	}
-	unless ($bb_app_path) {
-		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
-			"  See documentation for more info\n";
-		print " finished\n";
-		exit;
-	}
-		
-	# check that bigbed conversion is supported
-	unless (exists &bed_to_bigbed_conversion) {
-		warn "\n  Support for converting to bigbed format is not available\n" . 
-			"  Please convert manually. See documentation for more info\n";
-		print " finished\n";
-		exit;
-	}
-	
-	
-	# open database connection if necessary
-	my $db;
-	if ($database) {
-		eval {
-			use tim_db_helper qw(open_db_connection);
-		};
-		if ($@) {
-			warn " unable to load tim_db_helper! Is BioPerl installed?\n";
-		}
-		else {
-			$db = open_db_connection($database);
-		}
-	}
-	
 			
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
-			'db'        => $db,
+			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
 	} );
@@ -649,10 +602,10 @@ data file.
 =item --bbapp </path/to/bedToBigBed>
 
 Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
-default is to first check the biotoolbox.cfg configuration file for 
-the application path. Failing that, it will search the default 
-environment path for the utility. If found, it will automatically 
-execute the utility to convert the bed file.
+default is to first check the BioToolBox  configuration 
+file C<biotoolbox.cfg> for the application path. Failing that, it will 
+search the default environment path for the utility. If found, it will 
+automatically execute the utility to convert the bed file.
 
 =item --(no)gz
 
