@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.8.4';
+our $VERSION = '1.9.0';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -87,6 +87,7 @@ our @EXPORT_OK = qw(
 	validate_included_feature 
 	get_chromo_region_score 
 	get_region_dataset_hash 
+	get_chromosome_list 
 );
 
 
@@ -192,7 +193,7 @@ a SQLite database file (file.sqlite or file.db), or a single GFF3 file
 (file.gff) that can be loaded into an in-memory database. In-memory databases 
 should only be used with small files as they demand a lot of memory.
 
-Parameters for connecting to a relational database are stored in a 
+Parameters for connecting to a relational database are stored in the BioToolBox 
 configuration file, C<biotoolbox.cfg>. These include database adaptors, 
 user name, password, etc. Information regarding the configuration file may 
 be found within the file itself. 
@@ -208,6 +209,14 @@ may be either local or remote (prefixed with http:// or ftp://).
 A self-contained database of scores represented by a BigWig (file.bw). See
 http://genome.ucsc.edu/goldenPath/help/bigWig.html for more information.
 Files may be either local or remote (prefixed with http:// or ftp://).
+
+=item Bio::DB::BigWigSet database
+
+A local or remote directory of one or more BigWig files that can treated 
+collectively as a database. A special text file may be included in the 
+directory to assign metadata to each BigWig file, including attributes such 
+as type, source, display name, strand, etc. See L<Bio::DB::BigWigSet> for 
+more information on the formatting of the metadata file.
 
 =item Bio::DB::BigBed database
 
@@ -242,10 +251,32 @@ sub open_db_connection {
 	# first check if it is a database reference
 	my $db_ref = ref $database;
 	if ($db_ref =~ /^Bio::DB/) {
-		# a db object returns the name of the package
-		# this appears to be a bioperl db object
-		# nothing to do, return as is
-		return $database;
+		# the provided database is already an open database object
+		# nothing to open, return as is
+		
+		# determine the name if possible
+		my $db_name;
+		if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
+			# a SeqFeature database, using any DBI adapter
+			$db_name = $database->{'dbh'}->{'name'}; 
+				# dig through the object internals to identify the original 
+				# name of the database
+				# this should be relatively well documented through DBI
+				# but could break in the future since it's not official API
+		}
+		elsif ($db_ref eq 'Bio::DB::Sam') {
+			# a Bam database
+			$db_name = $database->{'bam_path'};
+		}
+		else {
+			# determining the database name from other sources is
+			# either not possible or not easy, so won't bother unless
+			# there is a really really good need
+			$db_name = q(); # undefined
+		}
+		
+		# return as appropriate either both object and name or just object
+		return wantarray ? ($database, $db_name) : $database;
 	}
 	
 	# determine type of database to connect to
@@ -494,7 +525,8 @@ sub open_db_connection {
 	
 	# conditional return
 	if ($db) {
-		return $db;
+		# return as appropriate either both object and name or just object
+		return wantarray ? ($db, $database) : $db;
 	} 
 	else {
 		$error .= " no database could be found or connected!\n";
@@ -552,35 +584,7 @@ sub get_dataset_list {
 	my $use_all_features = shift;
 	
 	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	my $db_name; # the name of the database, for use with config param
-	if ($database) {
-		my $db_ref = ref $database;
-		if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
-			# a SeqFeature database, using any DBI adapter
-			$db = $database;
-			$db_name = $db->{'dbh'}->{'name'}; 
-				# dig through the object internals to identify the original 
-				# name of the database
-				# this should be relatively well documented through DBI
-				# but could break in the future since it's not official API
-		}
-		elsif ($db_ref =~ /^Bio::DB/) {
-			# some other unsupported database
-			$db = $database;
-		}
-		else {
-			# assume the name of a database was passed, 
-			# create a database connection
-			$db_name = $database;
-			$db = open_db_connection($db_name);
-		}
-	}
-	else {
-		cluck 'no database name passed!';
-		return;
-	}
+	my ($db, $db_name) = open_db_connection($database);
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -859,18 +863,10 @@ sub process_and_verify_dataset {
 	}
 	
 	
-	# Check database
-	my $db; # the database object to be used
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /^Bio::DB/) {
-			$db = $arg_ref->{'db'};
-		}
-		else {
-			# the name of a database was passed, create a database connection
-			$db = open_db_connection( $arg_ref->{'db'} );
-		}
-	}
+	# Open database object
+	my $db = open_db_connection( $arg_ref->{'db'} ) or 
+		confess "no database name or connection!!\n";
+	
 	
 	# Initialize main output arrays
 	my @good_datasets;
@@ -1286,40 +1282,13 @@ sub get_new_feature_list {
 	my $arg_ref = shift; # the passed argument values as a hash reference
 	
 	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	my $db_name; # the name of the database, for use with config param
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
-			# a db object returns the name of the package
-			# this appears to be a bioperl db object
-			$db = $arg_ref->{'db'};
-			$db_name = $db->{'dbh'}->{'name'}; 
-				# dig through the object internals to identify the original 
-				# name of the database
-				# this should be relatively well documented through DBI
-				# but could break in the future since it's not official API
-		}
-		elsif ($db_ref =~ /^Bio::DB/) {
-			$db = $arg_ref->{'db'};
-		}
-		else {
-			# the name of a database was passed, create a database connection
-			$db_name = $arg_ref->{'db'};
-			$db = open_db_connection($db_name);
-		}
-	}
-	else {
-		cluck 'no database name passed!';
-		return;
-	}
-	
-	# Verify the database 
+	my ($db, $db_name) = open_db_connection($arg_ref->{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
 	}
+
+	# Verify a SeqFeature::Store database
 	my $db_ref = ref $db;
 	unless ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
 		carp "Database type $db_ref doesn't support generating feature lists!\n";
@@ -1507,55 +1476,14 @@ sub get_new_genome_list {
 	# Collect the passed arguments
 	my $arg_ref = shift; 
 	
+	
 	# Open a db connection 
-	# determine whether we have just a database name or an opened object
-	my $db; # the database object to be used
-	my $db_name; # the name of the database, for use with config param
-	if (defined $arg_ref->{'db'}) {
-		my $db_ref = ref $arg_ref->{'db'};
-		if ($db_ref =~ m/^Bio::DB::SeqFeature::Store/) {
-			# a Seqfeature store database object
-			$db = $arg_ref->{'db'};
-			$db_name = $db->{'dbh'}->{'name'}; 
-				# dig through the object internals to identify the original 
-				# name of the database
-				# this should be relatively well documented through DBI
-				# but could break in the future since it's not official API
-		}
-		elsif ($db_ref eq 'Bio::DB::BigWig') {
-			# a BigWig database
-			$db = $arg_ref->{'db'};
-			# we can't get the original file name
-		}
-		elsif ($db_ref eq 'Bio::DB::BigWigSet') {
-			# a BigWigSet database
-			$db = $arg_ref->{'db'};
-			# we can't get the original file name
-		}
-		elsif ($db_ref eq 'Bio::DB::BigBed') {
-			# a BigBed database
-			$db = $arg_ref->{'db'};
-			# we can't get the original file name
-		}
-		elsif ($db_ref eq 'Bio::DB::Sam') {
-			# a Bam database
-			$db = $arg_ref->{'db'};
-			$db_name = $db->{'bam_path'};
-		}
-		else {
-			# the name of a database was passed, create a database connection
-			$db_name = $arg_ref->{'db'};
-			$db = open_db_connection($db_name);
-		}
-	}
-	else {
-		cluck 'no database name passed!';
-		return;
-	}
+	my ($db, $db_name) = open_db_connection($arg_ref->{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
 	}
+	
 	
 	# Determine win and step sizes
 	my ($win, $step);
@@ -1597,58 +1525,21 @@ sub get_new_genome_list {
 	
 	
 	# Collect the chromosomes
-	if (ref $db eq 'Bio::DB::BigWigSet') {
-		# BigWigSet databases are the only databases that don't 
-		# support the seq_ids method
-		# instead we have to look at one of the bigwigs in the set
-		my $bw_file = ($db->bigwigs)[0];
-		$db = open_db_connection($bw_file);
-	}
-	my @chromosomes = $db->seq_ids;
+	# include option to exclude those listed in biotoolbox.cfg that
+	# we don't want
+	my @chromosomes = get_chromosome_list($db, 1);
 	unless (@chromosomes) {
 		carp " no sequence IDs were found in the database!\n";
 		return;
 	}
 	
 	
-	# Get the names of chromosomes to avoid
-	my @excluded_chromosomes = 
-		$TIM_CONFIG->param("$db_name\.chromosome_exclude");
-	unless (@excluded_chromosomes) {
-		@excluded_chromosomes = 
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
-	}
-	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
-
-	
-	
 	# Collect the genomic windows
 	print "   Generating $win bp windows in $step bp increments\n";
-	foreach my $chr (@chromosomes) {
+	foreach (@chromosomes) {
 		
-		# check for excluded chromosomes
-		if (exists $excluded_chr_lookup{ $chr } ) {
-			next;
-		}
-		
-		# generate a segment representing the chromosome
-		# due to fuzzy name matching, we may get more than one back
-		my @segments = $db->segment($chr);
-		# need to find the right one
-		my $segment;
-		while (@segments) {
-			$segment = shift @segments;
-			last if $segment->seq_id eq $chr;
-		}
-		
-		# check segment
-		unless ($segment) {
-			carp " No genome segment for seq_id $chr!!?? skipping\n";
-			next;
-		}
-		
-		# get the chromosome length
-		my $length = $segment->length;
+		# name and length as sub-array in each element
+		my ($chr, $length) = @{$_};
 		
 		for (my $start = 1; $start <= $length; $start += $step) {
 			# set the end point
@@ -1671,6 +1562,19 @@ sub get_new_genome_list {
 }
 
 
+=item validate_included_feature
+
+This subroutine will validate a database feature to make sure it is 
+useable. It will check feature attributes and compare them against 
+a list of attributes and values to be avoided. The list of unwanted 
+attributes and values is stored in the BioToolBox configuration file 
+biotoolbox.cfg. 
+
+Pass the subroutine a Bio::DB::SeqFeature::Store database feature. 
+It will return true (1) if the feature passes validation and false 
+(undefined) if it contains an excluded attribute and value.
+
+=cut
 
 sub validate_included_feature {
 	
@@ -2337,6 +2241,174 @@ sub get_region_dataset_hash {
 }
 
 
+
+
+=item get_chromosome_list
+
+This subroutine will collect a list of chromosomes or reference sequences 
+in a Bio::DB database and return the list along with their sizes in bp. 
+Many BioPerl-based databases are supported, including 
+Bio::DB::SeqFeature::Store, Bio::DB::Sam, Bio::DB::BigWig, 
+Bio::DB::BigWigSet, and Bio::DB::BigBed, or any others that support the 
+"seq_ids" method. See the L<open_db_connection> subroutine for more 
+information.
+
+Pass the subroutine either the name of the database, the path to the 
+database file, or an opened database object.
+
+Optionally pass a second value, a boolean argument to limit and exclude 
+unwanted chromosomes as defined by the "chromosome_exclude" option in 
+the BioToolBox configuration file, C<biotoolbox.cfg>. A true value limits 
+chromosomes, and false includes all chromosomes. The default is to return 
+all chromosomes. Sometimes some sequences are simply not wanted in 
+analysis, like the mitochondrial chromosome or unmapped contigs.
+
+The subroutine will return an array, with each element representing each 
+chromosome or reference sequence in the database. Each element is an anonymous 
+array of two elements, the chromosome name and length in bp.
+
+Example
+	
+	my $db = open_db_connection('cerevisiae');
+	# get all chromosomes in the database
+	my @chromosomes = get_chromosome_list($db);
+	foreach (@chromosomes) {
+		my $name = $_->[0];
+		my $length = $_->[1];
+		print "chromosome $name is $length bp\n";
+	}
+
+=cut
+
+sub get_chromosome_list {
+	
+	# options
+	my $database = shift;
+	my $limit = shift || 0;
+	
+	# Open a db connection 
+	my ($db, $db_name) = open_db_connection($database);
+	unless ($db) {
+		carp 'no database connected!';
+		return;
+	}
+	
+	# Check for BigWigSet database
+	# these need to be handled a little differently
+	if (ref $db eq 'Bio::DB::BigWigSet') {
+		# BigWigSet databases are the only databases that don't 
+		# support the seq_ids method
+		# instead we have to look at one of the bigwigs in the set
+		my $bw_file = ($db->bigwigs)[0];
+		$db = open_db_connection($bw_file);
+	}
+	
+	# Get chromosome exclusion list
+	# these are chromosomes that we do not want to include in the final 
+	# list
+	# they must be explicitly requested to ignore
+	my %excluded_chr_lookup;
+	if ($limit) {
+		my @excluded_chromosomes = 
+			$TIM_CONFIG->param("$db_name\.chromosome_exclude");
+		unless (@excluded_chromosomes) {
+			@excluded_chromosomes = 
+				$TIM_CONFIG->param('default_db.chromosome_exclude');
+		}
+		%excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
+	}
+		
+	
+	# Collect chromosome lengths
+	# we want to maintain the original order of the chromosomes so we 
+	# won't be putting it into a hash
+	# instead an array of arrays
+	my @chrom_lengths;
+	
+	# Database specific approaches to collecting chromosomes
+	# I used to have one generic approach, but idiosyncrasies and potential 
+	# bugs make me use different approaches for better consistency
+	
+	# Bigfile
+	if (ref $db eq 'Bio::DB::BigWig' or ref $db eq 'Bio::DB::BigBed') {
+		foreach my $chr ($db->seq_ids) {
+			
+			# check for excluded chromosomes
+			if (exists $excluded_chr_lookup{$chr} ) {
+				next;
+			}
+			
+			# get chromosome size
+			my $length = $db->length($chr);
+			
+			# store
+			push @chrom_lengths, [ $chr, $length ];
+		}
+	}
+	
+	# Bam
+	elsif (ref $db eq 'Bio::DB::Sam') {
+		for my $tid (0 .. $db->n_targets - 1) {
+			# each chromosome is internally represented in the bam file as 
+			# a numeric target identifier
+			# we can easily convert this to an actual sequence name
+			# we will force the conversion to go one chromosome at a time
+			
+			# sequence info
+			my $chr    = $db->target_name($tid);
+			my $length = $db->target_len($tid);
+			
+			# check for excluded chromosomes
+			if (exists $excluded_chr_lookup{$chr} ) {
+				next;
+			}
+			
+			# store
+			push @chrom_lengths, [ $chr, $length ];
+		}
+	}
+	
+	# SeqFeature::Store or other Bioperl
+	else {
+		foreach my $chr ($db->seq_ids) {
+			
+			# check for excluded chromosomes
+			if (exists $excluded_chr_lookup{$chr} ) {
+				next;
+			}
+			
+			# generate a segment representing the chromosome
+			# due to fuzzy name matching, we may get more than one back
+			my @segments = $db->segment($chr);
+			# need to find the right one
+			my $segment;
+			while (@segments) {
+				$segment = shift @segments;
+				last if $segment->seq_id eq $chr;
+			}
+			
+			# check segment
+			unless ($segment) {
+				carp " No genome segment for seq_id $chr!!?? skipping\n";
+				next;
+			}
+			
+			# get the chromosome length
+			my $length = $segment->length;
+			
+			# store
+			push @chrom_lengths, [ $chr, $length ];
+		}	
+	}
+	
+	
+	# Return
+	unless (@chrom_lengths) {
+		carp " no chromosome sequences identified in database!\n";
+		return;
+	}
+	return @chrom_lengths;
+}
 
 
 
