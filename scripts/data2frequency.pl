@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.2';
+my $VERSION = '1.9.0';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -245,6 +245,7 @@ sub ask_for_index {
 
 ### Prepare the output tim data structure
 sub prepare_output_data_structure {
+	print " Defining $binnumber bins of size $binsize from $start to $max\n";
 	
 	# generate a new data structure
 	my $data = generate_tim_data_structure(
@@ -259,15 +260,22 @@ sub prepare_output_data_structure {
 	$data->{0}{'bin_number'} = $binnumber;
 	$data->{0}{'bin_size'}   = $binsize;
 	
+	# determine formatting 
+	my $format = 0;
+	if ($binsize =~ /\.(\d+)$/) {
+		$format = length $1;
+	}
 	
 	# Calculate and record the bins
-	for (my $i = $start; $i <= $max; $i += $binsize) {
-		push @bins, $i + $binsize;
+	for my $i (1 .. $binnumber) {
+		my $bin_start = sprintf "%.$format" . "f", 
+			$start + ( ($i - 1) * $binsize);
+		my $bin_end   = sprintf "%.$format" . "f", $start + ($i * $binsize);
+		push @bins, $bin_end;
 		push @{ $data->{'data_table'} }, [
-			($i + $binsize),
-			$i . '-' . ($i + $binsize), 
+			$bin_end,
+			$bin_start . '..' . $bin_end, 
 		];
-		# $data->{'data_table'}->[$row][0] = $bins[$row - 1];
 		$data->{'last_row'} += 1;
 	}
 	
