@@ -14,6 +14,7 @@ Lists of programs organized by function.
 
 ===Data analysis===
 	* [ProgramList#compare_subfeature_scores.pl compare_subfeature_scores.pl]
+	* [ProgramList#correlate_position_data.pl correlate_position_data.pl]
 	* [ProgramList#data2frequency.pl data2frequency.pl]
 	* [ProgramList#graph_data.pl graph_data.pl]
 	* [ProgramList#graph_histogram.pl graph_histogram.pl]
@@ -40,6 +41,7 @@ Lists of programs organized by function.
 
 ===Finding features===
 	* [ProgramList#find_enriched_regions.pl find_enriched_regions.pl]
+	* [ProgramList#get_features.pl get_features.pl]
 	* [ProgramList#get_gene_regions.pl get_gene_regions.pl]
 	* [ProgramList#get_intersecting_features.pl get_intersecting_features.pl]
 	* [ProgramList#map_transcripts.pl map_transcripts.pl]
@@ -110,6 +112,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====convert_yeast_genome_version.pl====
 [Pod_convert_yeast_genome_version convert_yeast_genome_version.pl] converts genomic coordinates of popular file formats between a limited set of S. cerevisiae SGD genome releases.
 
+====correlate_position_data.pl====
+[Pod_correlate_position_data correlate_position_data.pl] calculates a Pearson correlation between the score values at identical positions along a feature between two datasets. This helps in identifying changes in spatial distribution of values. An option for calculating shifts is also available.
+
 ====CpG_calculator.pl====
 [Pod_CpG_calculator CpG_calculator.pl] counts observed and expected CpG dinucleotides in genomic sequences for defined regions or windows across a genome.
 
@@ -142,6 +147,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====get_feature_info.pl====
 [Pod_get_feature_info get_feature_info.pl] collects additional information for a list of genomic annotated features from a Bio::DB::SeqFeature::Store database. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
+
+====get_features.pl====
+[Pod_get_features get_features.pl] generates a list of features for one or more feature types from a database. Information about the features may be returned, including name, type, and coordinates. Sub features may be included. The data may be written as a BioToolBox formatted text file, GFF or BED. 
 
 ====get_gene_regions.pl====
 [Pod_get_gene_regions get_gene_regions.pl] retrieves specific regions associated with gene annotations from a database and that may not be explicitly annotated, including transcription start and stop sites, first and last exons, splice site junctions, and introns. Unique regions from genes with alternative transcripts may be requested.
@@ -222,4 +230,4 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [Pod_verify_nucleosome_mapping verify_nucleosome_mapping.pl] verifies the accuracy of mapped nucleosomes generated with the script [ProgramList#map_nucleosomes.pl map_nucleosomes.pl]. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 
 ====wig2data.pl====
-[Pod_wig2data wig2data.pl] converts a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.
+[Pod_wig2data wig2data.pl] converts a text wiggle file into a tab-delimited tim data format text file. FixedStep, variableStep, and BedGraph style wig files are allowed.
