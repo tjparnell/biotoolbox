@@ -1,5 +1,11 @@
 ######## BioToolBox revision history #############
 
+v.1.9.0 (svn 493)
+	- Added new script get_features.pl which generates a list of features for one or more feature types from a database. Information about the features may be returned, including name, type, and coordinates. Sub features may be included. The data may be written as a BioToolBox formatted text file, GFF or BED.
+	- Added new script correlate_position_data.pl that calculates a Pearson correlation between the score values at identical positions along a feature between two datasets. This helps in identifying changes in spatial distribution of values. An option for calculating shifts is also available.
+	- Improved Big File generation such that Bio::DB::BigWig or Bio::DB::BigBed is no longer required just to generate the big file, as conversion uses external utilities anyway.
+	- Fixed generation of bin values when calculating distribution frequencies in scripts data2frequency.pl and graph_histogram.pl
+
 v.1.8.7 (svn 487)
 	- Added new command line options to script merge_datasets.pl to control the program's behavior. The "--lookupname" option allows you to specify the name of the lookup column, while "--manual" turns off all automatic guessing of columns. Also improved handling of original_file metadata.
 	- Added a new option to collect data from long features (such as genomic annotations) instead of point data (microarray or sequence data) in script get_relative_data.pl.
