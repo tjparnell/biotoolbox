@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.8.2';
+my $VERSION = '1.9.0';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -124,6 +124,10 @@ unless (defined $x_skip) {
 }
 unless (defined $x_format) {
 	$x_format = 0;
+	# set it to equal the number of decimals in binsize
+	if ($binsize =~ /\.(\d+)$/) {
+		$x_format = length $1;
+	}
 }
 unless (defined $x_offset) {
 	$x_offset = 0;
@@ -169,8 +173,9 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 
 # determine the bins for the frequency distribution
 my @bins; # an array for the bins
-for (my $i = $start; $i <= $max; $i += $binsize) {
-	push @bins, $i + $binsize;
+my $format = $binsize =~ /\.(\d+)$/ ? length $1 : $x_format;
+for my $i (1 .. $binnumber) {
+	push @bins, sprintf "%.$format" . "f", $start + ($i * $binsize);
 }
 
 # Prepare output directory
@@ -661,7 +666,7 @@ default is 0.
 =item --format <integer>
 
 Specify the number of decimal places the X axis labels should be formatted. 
-The default is 0.
+The default is the number of decimal places in the bin size parameter.
 
 =item --lines
 
