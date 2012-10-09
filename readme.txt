@@ -7,7 +7,7 @@ converting, analyzing, and manipulating genomic data and/or features.
 These programs include the following capabilities
 	
 	* Tools for converting data formats between popular formats, including
-	  GFF3, wig, bed, BAM, bigWig, bigBed, Bar, and USeq
+	  GFF3, wig, bed, BAM, bigWig, bigBed, and Bar
 	* Collecting data relative to any annotated genomic feature
 	* Manipulation and analysis of collected data
 	* Generating simple graphs of collected data
