@@ -25,7 +25,8 @@ get_relative_data.pl
   --pos [5|3|m]
   --strand [sense|antisense|all]
   --set_strand
-  --(no)avoid
+  --avoid
+  --long
   --(no)sum
   --(no)smooth
   --(no)log
@@ -87,7 +88,7 @@ __
 __--value `[`score|count|length`]`
 
 __
-  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. Note that  some data sources only support certain types of data values. Wig and  !BigWig** files only support score and count; !BigBed** and database features  support count and length and optionally score; Bam files support basepair  coverage (score), count (number of alignments), and length. The default  value type is score.
+  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. Note that  some data sources only support certain types of data values. Wig and  !BigWig** files only support score and count; !BigBed** database features  support count and length and optionally score; Bam files support basepair  coverage (score), count (number of alignments), and length. The default  value type is score.
 __
   __
 __--win <**integer>
@@ -120,10 +121,16 @@ __
   For features that are not inherently stranded (strand value of 0),  impose an artificial strand for each feature (1 or -1). This will  have the effect of enforcing a relative orientation for each feature,  or to collected stranded data. This requires the presence a  column in the input data file with a name of "strand". Hence, it  will not work with newly generated datasets, but only with input  data files. Default is false.
 __
   __
-__--(no)avoid
+__--avoid
 
 __
   Indicate whether features of the same type should be avoided when  calculating values in a window. Each window is checked for  overlapping features of the same type; if the window does overlap  another feature of the same type, no value is reported for the  window. The default is false (return all values regardless of  overlap).
+__
+  __
+__--long
+
+__
+  Indicate that the dataset from which scores are collected are  long features (counting genomic annotation for example) and not point  data (microarray data or sequence coverage). Normally long features are  only recorded at their midpoint, leading to inaccurate representation at  some windows. This option forces the program to collect data separately  at each window, rather than once for each file feature or region and  subsequently assigning scores to windows. Execution times may be  longer than otherwise. Default is false.
 __
   __
 __--(no)sum

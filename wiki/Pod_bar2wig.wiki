@@ -84,7 +84,7 @@ __
 __--bwapp </path/to/wigToBigWig>
 
 __
-  Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  biotoolbox.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable. Finally, failing that,  it will attempt to use Lincoln Stein's Bio::DB::!BigFile** module for  conversion, if available.
+  Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  biotoolbox.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable.
 __
   __
 __--(no)gz
@@ -120,8 +120,6 @@ You may find the latest version of the USeq package, which contains the  !Bar2Gr
 
 Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or  Lincoln Stein's Bio::DB::!BigFile** support.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -133,5 +131,3 @@ Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or  Lincol
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

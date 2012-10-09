@@ -14,6 +14,8 @@ change_chr_prefix.pl `[`--add | --strip`]` `[`--options...`]` <**filename>
   --out <filename> 
   --add
   --strip
+  --roman
+  --arabic
   --prefix <text>
   --(no)contig
   --(no)gz
@@ -44,6 +46,18 @@ __--strip
 
 __
   Specify the renaming action. One or the other must be specified. The add  action will prefix simple chromosome names (one to four characters) with  the prefix, while the strip action will remove the offending prefix.
+__
+  __
+__--roman
+
+__
+  Convert arabic numerals (1, 2 ... 30) to Roman numerals (I, II ... XXX).  Up to 30 is renamed, all others are ignored.
+__
+  __
+__--arabic
+
+__
+  Convert Roman numerals (I, II, ... XXX) to Arabic numerals (1, 2 ... 30). Only upper case are recognized. Higher numbers are ignored.
 __
   __
 __--prefix <**text>
@@ -77,9 +91,11 @@ __
 __
   __
 ==DESCRIPTION==
-This program will re-name chromosome names in a data file. Supported data  formats include Bam and Sam alignment files, GFF and BED feature files,  Fasta sequence files, and any other tab-delimited text files.
+This program will re-name chromosome names in a data file. Supported data  formats include Bam and Sam alignment files, GFF and BED feature files,  Fasta sequence files, wig and bedgraph files, and any other tab-delimited  text files.
 
-Re-naming consists of either adding or stripping a prefix from the chromosome  name. Some genome repositories prefix their chromosome names with text,  most commonly 'chr', while other repositories prefer bare numbers, or  <**gasp!> Roman Numerals. UCSC and Ensembl are two good examples. Mixing  and matching annotation from different authorities requires matching  chromosome names.
+Re-naming consists of either adding or stripping a prefix from the chromosome  name. Some genome repositories prefix their chromosome names with text,  most commonly 'chr', while other repositories prefer bare numbers, or  Roman numerals. UCSC and Ensembl are two good examples. Mixing  and matching annotation from different authorities requires matching  chromosome names.
+
+Be careful with the conversions, and check carefully. Mitochondrial  chromosomes or other funny named chromosomes may need to be changed manually.
 
 ==AUTHOR==
 {{{

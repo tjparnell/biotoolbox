@@ -97,7 +97,7 @@ __
 __--format <**integer>
 
 __
-  Specify the number of decimal places the X axis labels should be formatted.  The default is 0.
+  Specify the number of decimal places the X axis labels should be formatted.  The default is the number of decimal places in the bin size parameter.
 __
   __
 __--lines

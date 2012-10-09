@@ -24,6 +24,7 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --prefix
   --group <text>
   --host <host.address>
+  --port <integer>
   --user <text>
   --pass <text>
   --printdb
@@ -119,6 +120,12 @@ __
   Specify the Internet address of the EnsEMBL public MySQL database host.  The default value is 'ensembldb.ensembl.org'.
 __
   __
+__--port <**integer>
+
+__
+  Specify the IP port address for the MySQL server. Default is 3306.
+__
+  __
 __--user <**text>
 
 __
@@ -156,6 +163,8 @@ This program requires EnsEMBL's Perl API modules to connect to their public  MyS
 
 Note that EnsEMBL releases new Perl API modules with each database  release. If you do not see the latest genome version (compared to what  is available on the web), you should update your EnsEMBL Perl modules.  The API version should be printed at the beginning of execution.
 
+To connect to the Ensembl Genomes public mysql server rather than the  default, please specify the host as "mysql.ebi.ac.uk" and port 4157.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -167,5 +176,3 @@ Note that EnsEMBL releases new Perl API modules with each database  release. If 
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

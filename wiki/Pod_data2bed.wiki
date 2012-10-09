@@ -118,7 +118,7 @@ __
 __--bbapp </path/to/bedToBigBed>
 
 __
-  Specify the path to the Jim Kent's bedToBigBed conversion utility. The  default is to first check the biotoolbox.cfg configuration file for  the application path. Failing that, it will search the default  environment path for the utility. If found, it will automatically  execute the utility to convert the bed file.
+  Specify the path to the Jim Kent's bedToBigBed conversion utility. The  default is to first check the !BioToolBox**  configuration  file `biotoolbox.cfg` for the application path. Failing that, it will  search the default environment path for the utility. If found, it will  automatically execute the utility to convert the bed file.
 __
   __
 __--(no)gz
