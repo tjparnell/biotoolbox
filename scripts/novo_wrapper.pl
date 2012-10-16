@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.8.1';
+my $VERSION = '1.9.1';
 
 
 print "\n This script is a wrapper for the Novoaligner program\n\n";
@@ -240,6 +240,10 @@ sub run_single_alignments {
 		warn "#### Processing '$file'... ####\n";
 		my ($basename, $path, $extension) = fileparse($file, 
 			qw(.txt .txt.gz .fq .fq.gz .fastq .fastq.gz) );
+		unless ($extension) {
+			warn "#### WARNING: input file has no known extension!!!???? may not work\n";
+		}
+		
 		
 		# check if we need to decompress first
 		if ($cores == 1 and $extension =~ m/^(.+)\.gz$/) {
@@ -335,19 +339,29 @@ sub run_single_split_alignments {
 			die " unable to find split files for $basename!\n";
 		}
 		
+		# write out master file list of the split files
+		my $master_file = $basename . '_master_list.txt';
+		push @to_delete, $master_file;
+		my $master_fh = open_to_write_fh($master_file) or die
+			" unable to write $master_file to directory!\n";
+		foreach (@split_files) {
+			$master_fh->write("$_\n");
+		}
+		$master_fh->close;
+		
 		# prepare novoalign execution using GNU parallel
-		my $novo_command = "$parallel_path -j $cores $novo_path -d $index" .
-			" -o SAM -r $repeat -s 2 -k $options -f {}";
+		my $novo_command = "$parallel_path -j $cores --progress" . 
+			" -a $master_file $novo_path" .
+			" -d $index -o SAM -r $repeat -s 2 $options -f {}";
 			# set the number of parallel jobs
+			# set progress indicator
+			# set master_file as input to parallel
+			# execute novoalign with index
 			# output to SAM
 			# read trimming of 2 nt for unaligned reads
-			# use base quality calibration
 		
 		# piping to samtools
 		$novo_command .= " '|' $sam_path view -bS - '>' {}.unsorted.bam";
-		
-		# add the list of split file names
-		$novo_command .= ' ::: ' . join(" ", @split_files);
 		
 		# executing alignment
 		warn "#### Executing alignment: \"$novo_command\"\n";
