@@ -339,29 +339,22 @@ sub run_single_split_alignments {
 			die " unable to find split files for $basename!\n";
 		}
 		
-		# write out master file list of the split files
-		my $master_file = $basename . '_master_list.txt';
-		push @to_delete, $master_file;
-		my $master_fh = open_to_write_fh($master_file) or die
-			" unable to write $master_file to directory!\n";
-		foreach (@split_files) {
-			$master_fh->write("$_\n");
-		}
-		$master_fh->close;
-		
 		# prepare novoalign execution using GNU parallel
-		my $novo_command = "$parallel_path -j $cores --progress" . 
-			" -a $master_file $novo_path" .
+		my $novo_command = "$parallel_path -j $cores --progress $novo_path" . 
 			" -d $index -o SAM -r $repeat -s 2 $options -f {}";
 			# set the number of parallel jobs
 			# set progress indicator
-			# set master_file as input to parallel
 			# execute novoalign with index
 			# output to SAM
 			# read trimming of 2 nt for unaligned reads
 		
 		# piping to samtools
 		$novo_command .= " '|' $sam_path view -bS - '>' {}.unsorted.bam";
+		
+		# add split files, and hope this doesn't exceed the command line length
+		# parallel does accept an input list as a file (the -a argument), 
+		# but it breaks with too many pipes or something?!
+		$novo_command .= " ::: " . join(" ", @split_files);
 		
 		# executing alignment
 		warn "#### Executing alignment: \"$novo_command\"\n";
