@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.8.6';
+our $VERSION = '1.9.1';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -219,7 +219,8 @@ sub open_tim_data_file {
 	$inputdata->{'extension'} = $extension; # the filename extension
 	$inputdata->{'path'} = $path; # the original path
 	$inputdata->{'column_names'} = []; # array for the column names
-	$inputdata->{'headers'} = undef; # boolean to indicate column headers present
+	$inputdata->{'headers'} = q(); # boolean to indicate column headers present
+	$inputdata->{'program'} = q(); # clear program, this will be read from file
 	
 	# read and parse the file
 	# we will ONLY parse the header lines prefixed with a #, as well as the 
