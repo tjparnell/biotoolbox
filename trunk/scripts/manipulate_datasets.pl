@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.8.6';
+my $VERSION = '1.9.1';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -325,7 +325,7 @@ sub interactive_execution {
 			};
 			
 			# prepare for the next function
-			print " Which function is next? [m]enu, [h]elp, save & [q]uit, just [Q]uit  ";
+			print " Which function is next? [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
@@ -3576,8 +3576,8 @@ sub export_treeview_function {
 	### Third, export a simple file
 	unless ($outfile) {
 		$gz = 0;
-		$outfile = $main_data_ref->{'basename'} . 
-			$main_data_ref->{'path'} . '.cdt';
+		$outfile = $main_data_ref->{'path'} . 
+			$main_data_ref->{'basename'} . '.cdt';
 	}
 	export_function();
 	
