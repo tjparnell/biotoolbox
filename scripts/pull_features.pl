@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.7.1';
+my $VERSION = '1.9.1';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -153,13 +153,14 @@ sub identify_indices {
 		# the answer is obvious
 		print "  list file only has 1 column, using it\n";
 		$list_index = 0;
+		return;
 	}
 	elsif ($listfile =~ /\.kgg$/i) {
 		# a cluster gene file
 		# the answer is obvious
-		print "  using. kgg file as list, using column '", 
-			$list_md->{0}{'name'}, "', index 0\n";
+		print "  using .kgg file as list\n";
 		$list_index = 0;
+		return;
 	}
 		
 	
