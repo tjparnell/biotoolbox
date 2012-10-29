@@ -14,14 +14,14 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list
+	verify_or_request_feature_types
 );
 use tim_db_helper::gff3_parser;
 use tim_file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.8.3';
+my $VERSION = '1.9.1';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -173,16 +173,7 @@ sub determine_method {
 	
 	# determine the region request from user if necessary
 	unless ($request) {
-		$request = collect_list_item_from_user( {
-			1	=> 'first exon',
-			2	=> 'last exon',
-			3	=> 'transcription start site',
-			4	=> 'transcription stop site',
-			5	=> 'splice sites',
-			6	=> 'introns',
-			7   => 'first intron',
-			8   => 'last intron',
-		} );
+		$request = collect_method_from_user();
 	}
 	
 	# determine the method
@@ -230,6 +221,39 @@ sub determine_method {
 	}
 	
 	return $method;
+}
+
+
+
+sub collect_method_from_user {
+	
+	my %list = (
+		1	=> 'first exon',
+		2	=> 'last exon',
+		3	=> 'transcription start site',
+		4	=> 'transcription stop site',
+		5	=> 'splice sites',
+		6	=> 'introns',
+		7   => 'first intron',
+		8   => 'last intron',
+	);
+	
+	# request feature from the user
+	print " These are the available feature types in the database:\n";
+	foreach my $i (sort {$a <=> $b} keys %list ) {
+		print "   $i\t$list{$i}\n";
+	}
+	print " Enter the type of region to collect   ";
+	my $answer = <STDIN>;
+	chomp $answer;
+	
+	# verify and return answer
+	if (exists $list{$answer}) {
+		return $list{$answer};
+	}
+	else {
+		die " unknown request!\n";
+	}
 }
 
 
@@ -293,14 +317,12 @@ sub collect_from_database {
 		die " unable to open database connection!\n";
 	
 	# get feature type if necessary
-	unless ($feature) {
-		
-		# get the types present in the database
-		my %types = get_dataset_list($db, 1); # collect all features
-		
-		# get feature from user
-		$feature = collect_list_item_from_user(\%types);
-	}
+	$feature = verify_or_request_feature_types( {
+		'db'      => $db,
+		'feature' => $feature,
+		'prompt'  => 'Enter the gene feature from which to collect regions   ',
+		'single'  => 1,
+	} ) or die "No valid gene feature type was provided! see help\n";
 	
 	# generate output data
 	my $output = generate_output_structure();
@@ -393,30 +415,6 @@ sub collect_from_file {
 	
 	# finished
 	return $output;
-}
-
-
-
-sub collect_list_item_from_user {
-	
-	my $list = shift;
-	
-	# request feature from the user
-	print " These are the available feature types in the database:\n";
-	foreach my $i (sort {$a <=> $b} keys %{$list} ) {
-		print "   $i\t$list->{$i}\n";
-	}
-	print " Enter the feature type to use\n";
-	my $answer = <STDIN>;
-	chomp $answer;
-	
-	# verify and return answer
-	if (exists $list->{$answer}) {
-		return $list->{$answer};
-	}
-	else {
-		die " unknown request!\n";
-	}
 }
 
 

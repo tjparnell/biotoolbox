@@ -17,14 +17,14 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.9.1';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -211,9 +211,9 @@ printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 sub validate_or_request_dataset {
 	
 	# Process the reference dataset
-	$refDataSet = process_and_verify_dataset( {
+	$refDataSet = verify_or_request_feature_types( {
 		'db'      => $ddb,
-		'dataset' => $refDataSet,
+		'feature' => $refDataSet,
 		'prompt'  => "Enter the reference data set  ",
 		'single'  => 1,
 	} );
@@ -223,9 +223,9 @@ sub validate_or_request_dataset {
 	
 	
 	# Process the test dataset
-	$testDataSet = process_and_verify_dataset( {
+	$testDataSet = verify_or_request_feature_types( {
 		'db'      => $ddb,
-		'dataset' => $testDataSet,
+		'feature' => $testDataSet,
 		'prompt'  => "Enter the test data set  ",
 		'single'  => 1,
 	} );

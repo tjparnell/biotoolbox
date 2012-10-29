@@ -14,7 +14,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	get_new_feature_list
 	get_region_dataset_hash
 	get_chromo_region_score
@@ -25,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.8.7';
+my $VERSION = '1.9.1';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -302,10 +302,12 @@ else {
 }
 
 # Check the dataset
-$dataset = process_and_verify_dataset( {
+$dataset = verify_or_request_feature_types( {
 	'db'      => $ddb,
-	'dataset' => $dataset,
+	'feature' => $dataset,
 	'single'  => 1,
+	'prompt'  => " Enter the number of the feature or dataset from which to" . 
+					" collect data   ",
 } );
 
 # Check the RPM method if necessary

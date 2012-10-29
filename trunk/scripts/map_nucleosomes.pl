@@ -14,8 +14,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	get_region_dataset_hash
 	get_chromo_region_score
 );
@@ -24,7 +23,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.8.3';
+my $VERSION = '1.9.1';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -281,9 +280,9 @@ sub validate_or_request_dataset {
 		# only one dataset provided, then assign it to scan
 		$scan_dataset = $dataset;
 	}
-	$scan_dataset = process_and_verify_dataset( {
+	$scan_dataset = verify_or_request_feature_types( {
 		'db'      => $database,
-		'dataset' => $scan_dataset,
+		'feature' => $scan_dataset,
 		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks",
 		'single'  => 1,
 	} );
@@ -296,11 +295,12 @@ sub validate_or_request_dataset {
 	if ($dataset and !$tag_dataset) {
 		# only one dataset provided, then assign it to scan
 		$tag_dataset = $dataset;
+		return; # should already be verified
 	}
 	if ($tag_dataset or $database) {
-		$tag_dataset = process_and_verify_dataset( {
+		$tag_dataset = verify_or_request_feature_types( {
 			'db'      => $database,
-			'dataset' => $tag_dataset,
+			'feature' => $tag_dataset,
 			'prompt'  => "Enter the dataset of tag count data for calculating nucleosome stats",
 			'single'  => 1,
 		} );

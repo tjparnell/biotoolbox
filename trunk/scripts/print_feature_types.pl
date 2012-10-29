@@ -11,7 +11,7 @@ use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-my $VERSION = '1.5.8';
+my $VERSION = '1.9.1';
 
 print "\n A script to print all available feature types in a database\n\n";
 
@@ -74,11 +74,10 @@ my $count = 0;
 my %source2type;
 
 # Get the features
-my %types = get_dataset_list($dbname, 'all');
-	# this returns a hash where key is a unique number and the value
-	# is the actual gff type
+my @types = get_dataset_list($dbname);
+	# this returns an array of database types
 	
-foreach my $type (values %types) {
+foreach my $type (@types) {
 	
 	# each type is usually comprised of primary_tag:source_tag
 	# although sometimes it is just the primary_tag

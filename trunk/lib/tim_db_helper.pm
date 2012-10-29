@@ -21,7 +21,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.9.0';
+our $VERSION = '1.9.1';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -79,8 +79,7 @@ our @EXPORT = qw();
 our @EXPORT_OK = qw(
 	open_db_connection
 	get_dataset_list 
-	validate_dataset_list 
-	process_and_verify_dataset 
+	verify_or_request_feature_types 
 	check_dataset_for_rpm_support 
 	get_new_feature_list 
 	get_new_genome_list 
@@ -542,39 +541,25 @@ sub open_db_connection {
 =item get_dataset_list
 
 This subroutine will retrieve a list of the available features stored in the 
-database and returns a hash of the feature's GFF types, represented as 
-"type:source", corresponding to the third and second GFF columns, respectively.
-The hash is keyed with an incrementing number, and the value is the GFF type 
-of the dataset. A hash is returned rather than a list to help facilitate 
-presenting and having the user select an item from the list. The list of
-available features are sorted asciibetically before numbered.
+database and returns an array of the features' types.
+
+For Bio::DB::SeqFeature::Store databases, the type is represented as 
+"type:source", corresponding to the third and second GFF columns, 
+respectively. The types are sorted alphabetically first by source, 
+then by method.
+
+For Bio::DB::BigWigSet databases, the type, primary_tag, method, or 
+display_name attribute may be used, in that respective order of 
+availability. The list is sorted alphabetically.
 
 Pass either the name of the database or an established database object. 
 Supported databases include both Bio::DB::SeqFeature::Store and 
 Bio::DB::BigWigSet databases. 
 
-By default, the list of feature types are filtered by the source. Features 
-whose source are listed in the C<source_exclude> array of the 
-C<biotoolbox.cfg> file are excluded from the final hash. These usually 
-include sources from official genomic authorities, such as 'SGD', 'GeneDB', 
-'UCSC', 'Ensembl', etc. In this way, only special features (e.g. microarray 
-datasets) are included in the list. Filtering is not performed with 
-Bio::DB::BigWigSet databases (it is generally not needed).
-
-To include all features without filtering, pass a second true argument 
-(1, 'all', etc.).
-
 Example:
 
 	my $db_name = 'cerevisiae';
-	my %microarray_dataset = get_dataset_list($db_name);
-	foreach (sort {$a <=> $b} keys %microarray_dataset) {
-		# print number in ascending order, dataset name
-		print $_, $microarray_dataset{$_};
-	}
-	
-	my %all_features = get_dataset_list($db_name, 'all');
-
+	my @types = get_dataset_list($db_name);
 
 =cut
 
@@ -589,48 +574,22 @@ sub get_dataset_list {
 		carp 'no database connected!';
 		return;
 	}
+	my $db_ref = ref $db;
 	
-	# get sources to skip
-		# usually these are features from an official genome authority
-	my %source2skip;
-	unless ($use_all_features) {
-		foreach ($TIM_CONFIG->param($db_name . '.source_exclude') ) {
-			# database specific source exclusions
-			$source2skip{$_} = 1;
-		}
-		unless (keys %source2skip) {
-			# no database specific exclusions, we'll read default then
-			foreach ($TIM_CONFIG->param('default_db.source_exclude') ) {
-				$source2skip{$_} = 1;
-			}
-		}
-	}
-		
 	# process the database types, according to the type of database
-	my %dataset;
+	my @types;
 	
 	# a SeqFeature database
-	my $db_ref = ref $db;
 	if ($db_ref =~ m/Bio::DB::SeqFeature::Store/) {
-		my $i = 1;
-		foreach my $type (
-			map $_->[1],
-			sort {$a->[0] cmp $b->[0]} 
-			map [$_->method, $_],
+		
+		# collect the database types, 
+		# sort first by source, then by method
+		@types = (
+			map $_->[2],
+			sort { ($a->[0] cmp $b->[0]) or ($a->[1] cmp $b->[1]) } 
+			map [$_->source, $_->method, $_],
 			$db->types
-		) {
-			# sort the types asciibetically by method
-			
-			my $source = $type->source;
-			
-			# add the type to the list
-			# check and skip unwanted sources
-			unless (exists $source2skip{$source}) {
-				# keep if it's not on the unwanted list
-				$dataset{$i} = $type;
-				$i++;
-			}
-		}
+		);
 	}
 	
 	# a BigWigSet database
@@ -639,22 +598,15 @@ sub get_dataset_list {
 		# get the metadata
 		my $metadata = $db->metadata;
 		
-		# since a BigWigSet database has very few types, and they are all
-		# data sources and not features, there is no need to filter the list
-				
 		# collect
-		my %types;
 		foreach my $file (keys %{ $metadata }) {
 			# get the type for each file
-			my ($primary, $source, $type, $name);
+			my ($primary, $type, $name);
 			
 			# get the appropriate tags
 			foreach my $attribute (keys %{ $metadata->{$file} } ) {
 				if ($attribute =~ m/^primary_tag|method$/i) {
 					$primary = $metadata->{$file}{$attribute};
-				}
-				elsif ($attribute =~ m/^source/i) {
-					$source = $metadata->{$file}{$attribute};
 				}
 				elsif ($attribute =~ m/^type/i) {
 					$type = $metadata->{$file}{$attribute};
@@ -664,164 +616,68 @@ sub get_dataset_list {
 				}
 			}
 				
-			# assemble the type
-				# as per the rest of biotoolbox convention, we prefer to use 
-				# the primary_tag or type first, but then use things like
-				# display_name
-			if ($primary and $source) {
-				$types{ "$primary:$source" } += 1;
-			}
-			elsif ($type) {
-				$types{ $type } += 1;
-			}
-			elsif ($primary) {
-				$types{ $primary } += 1;
-			}
-			elsif ($name) {
-				$types{ $name } += 1;
-			}
+			# store the type
+			push @types, $type || $primary || $name;
 		}
 		
-		# put the types into the final dataset hash
-		my $i = 1;
-		foreach my $type (sort {$a cmp $b} keys %types) {
-			$dataset{$i} = $type;
-			$i++;
-		}
+		# sort the types in alphabetical order
+		@types = sort {$a cmp $b} @types;
 	}
 	
 	# some other database
 	else {
 		carp " no dataset lists for database type $db_ref!\n";
 	}
-	return %dataset;
-}
-
-
-### Validate a list of microarray data sets against those in a db
-
-=item validate_dataset_list
-
-This subroutine will validate that a list of microarray data set names exist 
-within the given database. This is to help with, for example, checking that 
-a dataset name written on a commandline is spelled correctly and actually 
-exists within the given database. This is why the above subroutine, 
-get_dataset_list(), is so helpful as it avoids having to validate existance and
-spelling. 
-
-The subroutine is passed an array. The first element of the array must be 
-either the name of the database or an established database object reference. 
-The subsequent elements are the names of the datasets to be verified.
-
-The subroutine returns a scalar string consisting of the names of the bad
-dataset names (to be passed on to the user). The list is separated by a 
-comma and space ", ". 
-
-This subroutine could do with a much better interface and needs a re-write and
-re-work of the API.
-
-Example:
 	
-	my @dataset_names = qw(
-		H3_ChIP_44k
-		H3k4me3_ChIP_44k
-		H3k7ac_ChIP_44k   
-	); 
-	# 3rd dataset should be H3k9ac_ChIP_44k
-	my $db_name = 'cerevisiae';
-	my $bad_dataset = validate_dataset_list(
-		$db_name,
-		@dataset_names
-	);
-	print $bad_dataset; # prints 'H3k7ac_ChIP_44k'
-
-=cut
-
-
-sub validate_dataset_list {
-	my $database = shift;
-	
-	# verify passed data
-	unless ($database) {
-		cluck "no database passed!\n";
-		return;
-	}
-	unless (scalar @_ > 0) { 
-		carp "no datasets to validate!\n";
-		return;
-	}
-	
-	# collect a list of available datasets
-	my %dataset_list = get_dataset_list($database, 1);
-		# the 1 forces get_dataset_list to collect all feature types
-		# without filtering
-	return unless %dataset_list; # no need to continue if we don't have a list
-	
-	# transform dataset list hash into something more useable
-	my %dataset_checklist;
-	foreach my $item (values %dataset_list) {
-		# store the gff type into our dataset checklist
-		$dataset_checklist{$item} = 1; # the value is unimportant
-		
-		# break the gff type into type:source
-		if ($item =~ /^([\w\-]+):.+/) {
-			# store the actual type or method, ignore source
-			$dataset_checklist{$1} = 1;
-		}
-	}
-	unless (%dataset_checklist) {
-		carp "database has no features to validate against!\n";
-		return;
-	}
-	
-	
-	# now go through the list of datasets to check the name
-	my @baddatasets; # an array of the names that fail validation
-	foreach my $dataset (@_) {
-		# we may have combined datasets indicated by a &
-		if ($dataset =~ /&/) {
-			foreach (split /&/, $dataset) {
-				unless (exists $dataset_checklist{$_}) {
-					push @baddatasets, $_;
-				}
-			}
-		} else { # only one dataset
-			unless (exists $dataset_checklist{$dataset}) {
-				push @baddatasets, $dataset;
-			}
-		}
-	}
-	
-	# return the name of bad datasets
-	return join(", ", @baddatasets);
+	# finish
+	return @types;
 }
 
 
 
 ### Process and verify a dataset
 
-=item process_and_verify_dataset()
+=item verify_or_request_feature_types()
 
-This subroutine will process a dataset list. It will verify that the 
-dataset exists, either in the presented database, or if a local file that 
-the file exists and is readable. For file-based datasets, it will prepend 
-the 'file:' prefix that is necessary for the get dataset or score 
-methods in tim_db_helper.
+This subroutine will process a list of feature types or data sources to be 
+used for data or feature collection. There are two modes of action. If a 
+list was provided, it will process and verify the list. If no list was 
+provided, then the user will be prompted to select from a list of available 
+feature types in the provided database.
 
-If no dataset names are passed, then an interactive list will be 
-presented to the user for selection. The list will include features 
-present in the database for the user to select. One or more features 
-may be selected. If the single dataset option is set to true, then only 
-one feature is accepted. The user response is validated before 
-returning the list. 
+The provided list may be a list of feature types or a list of single 
+file data sources, including Bam, bigWig, or bigBed files. If the list 
+includes feature types, they are verified as existing in the provided 
+database. If the list includes file names, the local files are checked 
+and the names prefixed with "file:" for use downstream.
+
+If no list was provided, then a list of available feature types in the 
+provided database will be presented to the user, and the user prompted 
+to make a selection. One or more types may be selected, and a single 
+item may be enforced if requested. The response is filtered through 
+the parse_list() method from B<tim_db_helper>, so a mix of single 
+numbers or a range of numbers may be accepted. The responses are then 
+validated.
+
+Two types of databases are supported: L<Bio::DB::SeqFeature::Store> and 
+L<Bio::DB::BigWigSet> databases. For SeqFeature Store databases, the 
+type is comprised of "method:source", corresponding to the third and 
+second GFF columns. For BigWigSet databases, types correspond to either 
+the type, method, primary_tag, or display_name attributes, in that 
+order of availability. 
+
+For feature types or files that pass validation, they are returned as a 
+list. Types of files that do not pass validation are printed to STDOUT. 
 
 To use this subroutine, pass an anonymous array with the following keys 
 and values. Not every key is required.
 
   db       => The name of the database or a reference to an 
-              established BioPerl database object. Typically, a 
-              Bio::DB::SeqFeature::Store database is used.
-  dataset  => Pass either a single dataset name as a scalar or an 
+              established BioPerl database object. A 
+              Bio::DB::SeqFeature::Store or Bio::DB::BigWigSet 
+              database are typically used. Only required when 
+              no features are provided.
+  feature  => Pass either a single dataset name as a scalar or an 
               anonymous array reference of a list of dataset names. 
               These may have been provided as a command line option and 
               need to be verified. If nothing is passed, then a list of 
@@ -837,11 +693,40 @@ and values. Not every key is required.
               allowed.
 
 The subroutine will return a list of the accepted datasets. It will print 
-bad dataset names to standard error.
+bad dataset names to standard out.
+
+Example:
+
+	# verify a dataset, either file or database type
+	my $db_name = 'cerevisiae';
+	my $dataset = 'microaray_data';
+	my @features = verify_or_request_feature_types( {
+		db      => $db_name,
+		feature => $dataset,
+	} );
+	unless (@features) {
+		die " no valid feature provided!\n";
+	}
+	
+	# select a list of features
+	my $db_name = 'cerevisiae';
+	my @types = (); # user not provided
+	@types = verify_or_request_feature_types( {
+		db      => $db_name,
+		feature => $types,
+	} );
+	# user will be promoted to select from database list
+	if (@types) {
+		print "using types " . join(", ", @types);
+	}
+	else {
+		die " no valid features selected!\n";
+	}
+	
 
 =cut
 
-sub process_and_verify_dataset {
+sub verify_or_request_feature_types {
 	
 	# Retrieve passed values
 	my $arg_ref = shift; # the passed argument values as a hash reference
@@ -851,26 +736,26 @@ sub process_and_verify_dataset {
 	
 	# Collect the datasets
 	my @datasets;
-	if (exists $arg_ref->{'dataset'} and defined $arg_ref->{'dataset'}) {
+	if (exists $arg_ref->{'feature'} and defined $arg_ref->{'feature'}) {
 		
 		# check if it's an anonymous array of datasets
-		if (ref $arg_ref->{'dataset'} eq 'ARRAY') {
-			@datasets = @{ $arg_ref->{'dataset'} };
+		if (ref $arg_ref->{'feature'} eq 'ARRAY') {
+			@datasets = @{ $arg_ref->{'feature'} };
 		}
 		else {
-			push @datasets, $arg_ref->{'dataset'};
+			push @datasets, $arg_ref->{'feature'};
 		}
 	}
 	
 	
-	# Open database object
-	my $db = open_db_connection( $arg_ref->{'db'} ) or 
-		confess "no database name or connection!!\n";
-	
+	# Open database object and collect features
+	my $database = $arg_ref->{'db'} || undef;
+	my $db = $database ? open_db_connection($database) : undef;
 	
 	# Initialize main output arrays
 	my @good_datasets;
 	my @bad_datasets;
+	my %db_features; # hash for features found in the database, use when needed
 	
 	# Check provided datasets
 	if (@datasets) {
@@ -929,21 +814,43 @@ sub process_and_verify_dataset {
 			# a feature type in a database
 			else {
 				# must be a database feature type
-			
-				# check for a database
-				unless ($db) {
-					cluck " dataset '$dataset' is a presumed database feature ",
-						"but no database was passed!\n";
-					return;
+				
+				# check for database features hash
+				unless (%db_features) {
+					if ($db) {
+						# collect the database features as needed
+						# I want both method:source and method in the hash
+						foreach my $type ( get_dataset_list($db) ) {
+							my ($method, $source) = split /:/, $type;
+							if ($source) {
+								$db_features{$type} = 1;
+								$db_features{$method} = 1;
+							}
+							else {
+								$db_features{$type} = 1;
+							}
+						}
+						
+						# verify
+						unless (%db_features) {
+							cluck " provided database has no feature types " . 
+								"to verify dataset(s) against!\n";
+							return;
+						}
+					}
+					else {
+						# we need a database
+						cluck " no database provided to verify dataset(s) against!\n";
+						return;
+					}
 				}
 				
 				# validate the given dataset
-				my $bad = validate_dataset_list($db, $dataset);
-				if ($bad) {
-					push @bad_datasets, $dataset;
+				if (exists $db_features{$dataset}) {
+					push @good_datasets, $dataset;
 				}
 				else {
-					push @good_datasets, $dataset;
+					push @bad_datasets, $dataset;
 				}
 			}
 		}
@@ -954,20 +861,33 @@ sub process_and_verify_dataset {
 		# dataset not specified
 		# present the dataset list to the user and get an answer
 		
-		# check for a database
-		unless ($db) {
-			cluck " no database provided to select datasets!\n";
+		# get the dataset list
+		if ($db) {
+			# collect the database features as needed
+			my $i = 1;
+			foreach my $type ( get_dataset_list($db) ) {
+				$db_features{$i} = $type;
+				$i++;
+			}
+			
+			# verify
+			unless (%db_features) {
+				cluck " provided database has no feature types " . 
+					"to collect!\n";
+				return;
+			}
+		}
+		else {
+			# we need a database
+			cluck " no database provided to collect features from!\n";
 			return;
 		}
-				
-		# get the dataset list
-		my %datasethash = get_dataset_list($db);
 		
 		# present the list
 		print "\n These are the available data sets in the database:\n";
-		foreach (sort {$a <=> $b} keys %datasethash) {
+		foreach (sort {$a <=> $b} keys %db_features) {
 			# print out the list of microarray data sets
-			print "  $_\t$datasethash{$_}\n"; 
+			print "  $_\t$db_features{$_}\n"; 
 		}
 		
 		# prompt the user
@@ -977,7 +897,13 @@ sub process_and_verify_dataset {
 		}
 		else {
 			# generic prompt
-			print " Enter the number of the data set you would like to analyze  ";
+			if ($single) {
+				print " Enter one number for the data set or feature   ";
+			}
+			else {
+				print " Enter the number(s) or range of the data set(s) or" . 
+					" feature(s)   ";
+			}
 		}
 		
 		# get answer from the user
@@ -1003,7 +929,7 @@ sub process_and_verify_dataset {
 				
 				# check all are good
 				foreach (@list) {
-					unless (exists $datasethash{$_}) {
+					unless (exists $db_features{$_}) {
 						$check = 0;
 					}
 				}
@@ -1011,7 +937,7 @@ sub process_and_verify_dataset {
 				# if all are good
 				if ($check) {
 					push @good_datasets, 
-						join( "&", map { $datasethash{$_} } @list);
+						join( "&", map { $db_features{$_} } @list);
 				}
 				else {
 					push @bad_datasets, $answer;
@@ -1022,11 +948,11 @@ sub process_and_verify_dataset {
 				# a single dataset
 				# check if it is good
 				
-				if (exists $datasethash{$answer}) {
-					push @good_datasets, $datasethash{$answer};
+				if (exists $db_features{$answer}) {
+					push @good_datasets, $db_features{$answer};
 				} 
 				else {
-					push @bad_datasets, $datasethash{$answer};
+					push @bad_datasets, $db_features{$answer};
 				}
 			}
 		}
@@ -1067,7 +993,7 @@ not support RPM (because it is not a Bam or BigBed file, for example),
 then it will return undefined.
 
 Pass this subroutine one or two values. The first is the name of the 
-dataset. Ideally it should be validated using process_and_verify_dataset() 
+dataset. Ideally it should be validated using verify_or_request_feature_types() 
 and have an appropriate prefix (file, http, or ftp). If it does not 
 have a prefix, then it is assumed to be a database feature. The second 
 passed feature is the name of a BioPerl database or an opened database 
@@ -1648,7 +1574,7 @@ arguments. The keys include
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
               The name should be verified using the 
-              subroutine validate_dataset_list() prior to passing.
+              subroutine verify_or_request_feature_types() prior to passing.
               Multiple datasets may be given, joined by '&', with no
               spaces. Alternatively, specify a data file name. 
               A local file should be prefixed with 'file:', while 
@@ -1800,7 +1726,7 @@ arguments. The keys include
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
               The name should be verified using the 
-              subroutine validate_dataset_list() prior to passing.
+              subroutine verify_or_request_feature_types() prior to passing.
               Multiple datasets may be given, joined by '&', with no
               spaces. Alternatively, specify a data file name. 
               A local file should be prefixed with 'file:', while 
