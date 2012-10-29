@@ -12,12 +12,10 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	format_with_commas
 	generate_tim_data_structure
-	parse_list
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list
-	validate_dataset_list
+	verify_or_request_feature_types
 	validate_included_feature
 );
 use tim_file_helper qw(
@@ -25,7 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.9.0';
+my $VERSION = '1.9.1';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -130,7 +128,18 @@ my $db = open_db_connection($database) or
 
 
 ### Get features
-collect_and_check_features();
+# check if it is a comma delimited list
+if (scalar @features == 1 and $features[0] =~ /,/) {
+	@features = split /,/, shift @features;
+}
+
+# validate and/or request features
+@features = verify_or_request_feature_types( {
+	'db'      => $db,
+	'feature' => [ @features ],
+	'prompt'  => " Enter the feature(s) to collect." . 
+			" A comma de-limited list or range may be given\n",
+} ) or die " no valid features were provided! see help\n";
 
 
 
@@ -189,60 +198,6 @@ else {
 
 
 ########################   Subroutines   ###################################
-
-sub collect_and_check_features {
-	
-	if (@features) {
-		# User provided list
-		
-		# check if it is a comma delimited list
-		if ($features[0] =~ /,/) {
-			@features = split /,/, shift @features;
-		}
-		
-		# validate the list
-		my $bad = validate_dataset_list($db, @features);
-		if ($bad) {
-			die " The following features could not be validated in " . 
-				"database '$database':\n  $bad\n";
-		}
-		
-	}
-	else {
-		# no features were provided
-		# collect from the database
-		
-		# collect all features from the database
-		my %types = get_dataset_list($db, 1); 
-		
-		# request feature from the user
-		print " These are the available feature types in the database:\n";
-		foreach my $i (sort {$a <=> $b} keys %types ) {
-			print "   $i\t$types{$i}\n";
-		}
-		print " Enter the feature(s) to collect." . 
-			" A comma de-limited list or range may be given\n";
-		my $answer = <STDIN>;
-		chomp $answer;
-		unless (defined $answer) {
-			die " No valid response!\n";
-		}
-		my @list = parse_list($answer);
-		
-		# convert to feature names
-		@features = map { $types{$_} } @list;
-		
-		# validate
-		my $bad = validate_dataset_list($db, @features);
-		if ($bad) {
-			die " The following features could not be validated in " . 
-				"database '$database':\n  $bad\n";
-		}
-	}
-}	
-
-
-
 
 sub prepare_data_structure_or_output {
 	# how we prepare the structure is dependent on the output format

@@ -14,7 +14,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	get_new_feature_list
 	get_region_dataset_hash
 	check_dataset_for_rpm_support
@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.9.1';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -279,9 +279,11 @@ else {
 
 
 ## Check for the dataset
-$dataset = process_and_verify_dataset( {
+$dataset = verify_or_request_feature_types( {
 	'db'      => $ddb,
-	'dataset' => $dataset,
+	'feature' => $dataset,
+	'prompt'  => " Enter the number of the feature or dataset from which to" . 
+					" collect data   ",
 	'single'  => 1,
 } );
 

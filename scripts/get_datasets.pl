@@ -19,12 +19,11 @@ use Statistics::Lite qw(
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
-	parse_list
 	find_column_index
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	check_dataset_for_rpm_support
 	get_new_feature_list 
 	get_new_genome_list 
@@ -230,9 +229,11 @@ else {
 
 # Check the datasets
 unless ($datasets[0] eq 'none') {
-	@datasets = process_and_verify_dataset( {
+	@datasets = verify_or_request_feature_types( {
 		'db'      => $ddb,
-		'dataset' => [ @datasets ],
+		'feature' => [ @datasets ],
+		'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
+					" to collect data. Comma delimited or range is acceptable\n",
 	} );
 }
 
@@ -284,6 +285,9 @@ foreach my $dataset (@datasets) {
 
 
 
+### Finished
+# writing output file has been moved to after each dataset collection
+print " Finished data collection\n";
 
 
 
@@ -1535,8 +1539,6 @@ __END__
 
 get_datasets.pl
 
-A script to collect genomic datasets from a Bioperl SeqFeature::Store db.
-
 =head1 SYNOPSIS
 
 get_datasets.pl [--options...] [<filename>]
@@ -1839,5 +1841,4 @@ of the file. The file may be gzipped.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
 

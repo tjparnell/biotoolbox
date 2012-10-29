@@ -16,9 +16,11 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
+	get_chromosome_list
 	get_region_dataset_hash
 	get_chromo_region_score
+	get_chromosome_list
 );
 use tim_file_helper qw(
 	write_tim_data_file
@@ -26,7 +28,7 @@ use tim_file_helper qw(
 );
 use tim_db_helper::config;
 # use Data::Dumper;
-my $VERSION = '1.8.6';
+my $VERSION = '1.9.1';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -264,10 +266,12 @@ else {
 # stored in the @windows array
 
 # Check or request the dataset
-$dataset = process_and_verify_dataset( {
+$dataset = verify_or_request_feature_types( {
 	'db'      => $ddb,
-	'dataset' => $dataset,
+	'feature' => $dataset,
 	'single'  => 1,
+	'prompt'  => " Enter the number of the feature or dataset to scan for" . 
+					" enrichment   ",
 } );
 
 # get a simplified dataset name
@@ -451,7 +455,7 @@ sub go_determine_cutoff {
 	# select the largest chromosome
 	my $length = 1;
 	my $chromosome;
-	foreach ( get_chromosome_list() ) {
+	foreach ( get_chromosome_list($ddb, 1) ) {
 		
 		# this is an array of chromosome name and length
 		my ($name, $size) = @$_;
@@ -535,7 +539,7 @@ sub go_find_enriched_regions {
 	
 	# walk through each chromosome
 	my $chr_count = 1;
-	foreach ( get_chromosome_list() ) {
+	foreach ( get_chromosome_list($ddb, 1) ) {
 		
 		# this is an array of chromosome name and length
 		my ($chr, $length) = @$_;
@@ -1023,64 +1027,6 @@ sub generate_main_data_hash {
 	
 	# return the reference to the generated data hash
 	return $data;
-}
-
-
-
-sub get_chromosome_list {
-	
-	# Get the names of chromosomes to avoid
-	my @excluded_chromosomes = 
-		$TIM_CONFIG->param("$data_database\.chromosome_exclude");
-	unless (@excluded_chromosomes) {
-		@excluded_chromosomes = 
-			$TIM_CONFIG->param('$main_database.chromosome_exclude');
-	}
-	unless (@excluded_chromosomes) {
-		@excluded_chromosomes = 
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
-	}
-	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
-	
-	# reset the database if necessary
-	my $db;
-	if (ref $ddb eq 'Bio::DB::BigWigSet') {
-		# BigWigSet databases do not support seq_id method
-		# so we have to fake it by looking at one of the bigwigs
-		my $bw_file = ($ddb->bigwigs)[0];
-		$db = $ddb->get_bigwig($bw_file);
-	}
-	else {
-		$db = $ddb;
-	}
-	
-	# generate the chromosome list
-	my @list;
-	foreach my $seq ($db->seq_ids) {
-		
-		# skip ones we don't want
-		next if exists $excluded_chr_lookup{$seq};
-			
-		# generate a segment representing the chromosome
-		# due to fuzzy name matching, we may get more than one back
-		my @segments = $db->segment($seq);
-		
-		# need to find the right one
-		my $chrobj;
-		while (@segments) {
-			$chrobj = shift @segments;
-			last if $chrobj->seq_id eq $seq;
-		}
-		
-		# record the chromosome and it's size
-		push @list, [ $seq, $chrobj->length ];
-	}
-	
-	unless (@list) {
-		die " no chromosomes collected from database\n";
-	}
-	
-	return @list;
 }
 
 

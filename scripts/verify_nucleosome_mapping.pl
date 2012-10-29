@@ -14,14 +14,14 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	process_and_verify_dataset
+	verify_or_request_feature_types
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.3';
+my $VERSION = '1.9.1';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
@@ -141,9 +141,9 @@ else {
 # defined in the Occupancy 
 if ($dataset) {
 	# dataset defined on the command line
-	$dataset = process_and_verify_dataset( {
+	$dataset = verify_or_request_feature_types( {
 		'db'        => $db,
-		'dataset'   => $dataset,
+		'feature'   => $dataset,
 		'prompt'    => "Enter the dataset to use for verifying nucleosome maps",
 		'single'    => 1,
 	} );

@@ -17,6 +17,7 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection 
+	verify_or_request_feature_types
 	get_chromo_region_score
 );
 use tim_file_helper qw(
@@ -24,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.8.1';
+my $VERSION = '1.9.1';
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -399,8 +400,13 @@ sub check_dataset {
 		}
 		else {
 			# maybe it's a funny named dataset?
-			if (validate_dataset_list($db, $data) ) {
-				# returned true, the name of the bad dataset
+			# verify with the database
+			$data = verify_or_request_feature_types( {
+				'db'      => $db,
+				'feature' => $data,
+			} );
+			unless ($data) {
+				# if it wasn't returned, it is not valid
 				die " The requested file or dataset '$data' " . 
 					"neither exists or is valid!\n";
 			}
