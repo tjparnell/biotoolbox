@@ -34,7 +34,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.6';
+my $VERSION = '1.9.1';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -207,6 +207,10 @@ unless ($main_database) {
 		# we hope this some sort of indexed data file like bigWig or Bam
 		$main_database = $datasets[0];
 		print " no database defined, using $main_database\n";
+	}
+	elsif ($data_database) {
+		# use data database if defined instead of main database
+		$main_database = $data_database;
 	}
 	else {
 		die " no database defined! see help\n";
