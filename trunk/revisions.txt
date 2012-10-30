@@ -1,5 +1,15 @@
 ######## BioToolBox revision history #############
 
+v.1.9.1 (svn 506)
+	- Added critical code to interpret strand information from input files such as Bed and GFF into BioPerl standards. Essential for collecting stranded data. Also properly writes back strand information for valid Bed and GFF files
+	- Upgraded script get_intersecting_features.pl to automatically recognize input file columns and search for more than 1 feature type
+	- Fixed bug in script get_datasets.pl where the program will not continue when only a data database was provided
+	- Fixed bug of requesting index when using a .kgg file as a gene list in script pull_features.pl
+	- Fixed bug in generating file name for Treeview export function in script manipulate_datasets.pl
+	- Fixed behavior when reading files to prevent adding the current program name to the metadata when the input file does not have this metadata
+	- Minor updates to script novo_wrapper.pl
+	- Updated and unified internal library methods for validating and requesting database feature types. 
+	
 v.1.9.0 (svn 493)
 	- Added new script get_features.pl which generates a list of features for one or more feature types from a database. Information about the features may be returned, including name, type, and coordinates. Sub features may be included. The data may be written as a BioToolBox formatted text file, GFF or BED.
 	- Added new script correlate_position_data.pl that calculates a Pearson correlation between the score values at identical positions along a feature between two datasets. This helps in identifying changes in spatial distribution of values. An option for calculating shifts is also available.
