@@ -160,6 +160,32 @@ sub load_tim_data_file {
 		$inputdata_ref->{1}{'base'} = 1;
 	}
 	
+	
+	# convert strand information to integers
+	# NOTE: this may change original data if file is written again
+		# with the exception of GFF and BED, which should be automatically
+		# converted back if the format is maintained
+	my $strand_i = find_column_index($inputdata_ref, '^strand$');
+	if (defined $strand_i) {
+		# should be true for BED and GFF files or any other file with strand
+		for (my $row = 1; $row < scalar @datatable; $row++) {
+			# convert any interpretable value to signed value
+			if ($datatable[$row][$strand_i] =~ /^[\+1fw]/i) {
+				# plus, one, forward, watson
+				$datatable[$row][$strand_i] = 1;
+			}
+			elsif ($datatable[$row][$strand_i] =~ /^[\-rc]/i) {
+				# minus, reverse, crick
+				$datatable[$row][$strand_i] = -1;
+			}
+			else {
+				# uninterpretable value, including zero and dot, no strand
+				$datatable[$row][$strand_i] = 0;
+			}
+		}
+	}
+	
+		
 	# associate the data table with the data hash
 	$inputdata_ref->{'data_table'} = \@datatable;
 	
@@ -1133,6 +1159,40 @@ sub write_tim_data_file {
 			delete $datahash_ref->{1}{'base'};
 		}
 	}
+	
+	
+	# Convert strand information
+	if ($extension =~ /.bed/i and $datahash_ref->{'bed'} >= 6) {
+		for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
+			# convert from signed integer back to sign
+			# can't guarantee value is integer, so put it under eval
+			eval {
+				if ($datahash_ref->{'data_table'}->[$row][5] >= 0 ) {
+					$datahash_ref->{'data_table'}->[$row][5] = '+';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][5] == -1 ) {
+					$datahash_ref->{'data_table'}->[$row][5] = '-';
+				}
+			};
+		}
+	}	
+	if ($extension =~ /.g[tf]f/i and $datahash_ref->{'gff'}) {
+		for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
+			# convert from signed integer back to sign
+			# can't guarantee value is integer, so put it under eval
+			eval {
+				if ($datahash_ref->{'data_table'}->[$row][6] == 1 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '+';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][6] == -1 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '-';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][6] == 0 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '.';
+				}
+			};
+		}
+	}	
 	
 	
 	# Open file for writing
@@ -2743,7 +2803,6 @@ boolean indicating the values are in log2 space or not
 
 =back
 
-
 Finally, the data table follows the metadata. The table consists of 
 tab-delimited data. The same number of fields should be present in each 
 row. Each row represents a genomic feature or landmark, and each column 
@@ -2756,17 +2815,14 @@ generated for conveniance.
 
 =head1 USAGE
 
-Call the module at the beginning of your perl script and it will import 
-both read and write modules.
+Call the module at the beginning of your perl script and pass a list of the 
+desired modules to import. None are imported by default.
   
-  use tim_db_helper;
+  use tim_db_helper qw(load_tim_data_file write_tim_data_file);
   
-
 The specific usage for each subroutine is detailed below.
 
-
 =over
-
 
 =item load_tim_data_file()
 
@@ -2782,12 +2838,22 @@ automatically named.
 This subroutine uses the open_tim_data_file() subroutine and completes the 
 loading of the file into memory.
 
+BED and BedGraph style files, recognized by .bed or .bdg file extensions, 
+have their start coordinate adjusted by +1 to convert from 0-based interbase 
+numbering system to 1-based numbering format, the convention used by BioPerl. 
+A metadata attribute is applied informing the user of the change. When writing 
+a valid Bed or BedGraph file, converted start positions are changed back to 
+interbase format.
+
+Strand information is parsed from recognizable symbols, including "+, -, 1, 
+-1, f, r, w, c, 0, .",  to the BioPerl convention of 1, 0, and -1. Valid 
+BED and GFF files are changed back when writing these files. 
+
 Pass the module the filename. The file may be compressed with gzip, recognized
 by the .gz extension.
 
 The subroutine will return a scalar reference to the hash, described above. 
 Failure to read or parse the file will return an empty value.
-
 
 Example:
 	
@@ -3211,8 +3277,6 @@ in shell scripts.
 
 =back
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -3225,4 +3289,3 @@ in shell scripts.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
