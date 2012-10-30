@@ -3575,9 +3575,14 @@ sub export_treeview_function {
 	
 	### Third, export a simple file
 	unless ($outfile) {
+		# generate file name
 		$gz = 0;
 		$outfile = $main_data_ref->{'path'} . 
 			$main_data_ref->{'basename'} . '.cdt';
+	}
+	unless ($outfile =~ /\.\w{2,3}$/) {
+		# make sure it has an extension, prefer .cdt
+		$outfile .= '.cdt';
 	}
 	export_function();
 	
