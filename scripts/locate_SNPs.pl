@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file
 );
-my $VERSION = '1.8.1';
+my $VERSION = '1.9.2';
 
 
 
@@ -529,7 +529,6 @@ sub determine_codon_change {
 			# this may be a real codon change
 			
 			# get more feature info
-			my $strand = $feature->strand;
 			my $phase = $feature->phase;
 			my $start = $feature->start;
 			my $stop = $feature->stop;
@@ -541,7 +540,8 @@ sub determine_codon_change {
 			# collect the original codon
 			my $codon_segment;
 			my $pos_phase;
-			if ($strand > 0) {
+			my $codon;
+			if ($feature->strand >= 0) {
 				# watson or forward strand
 				$pos_phase = ($pos - $start - $phase) % 3;
 				if ($pos_phase == 0) {
@@ -553,27 +553,39 @@ sub determine_codon_change {
 				elsif ($pos_phase == 2) {
 					$codon_segment = $db->segment($chr, $pos - 2, $pos);
 				}
+				
+				# obtain the codon sequence
+				$codon = $codon_segment->seq->seq;
 			}
 			else {
 				# crick or reverse strand
 				$pos_phase = ($stop - $pos - $phase) % 3;
 				if ($pos_phase == 0) {
-					$codon_segment = $db->segment($chr, $pos + 2, $pos);
+					$codon_segment = $db->segment($chr, $pos - 2, $pos);
 				} 
 				elsif ($pos_phase == 1) {
-					$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
+					$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
 				} 
 				elsif ($pos_phase == 2) {
-					$codon_segment = $db->segment($chr, $pos, $pos - 2);
+					$codon_segment = $db->segment($chr, $pos, $pos + 2);
 				}
+				
+				# obtain the reverse complement codon sequence
+				$codon = $codon_segment->seq->revcom->seq;
 			}
-			my $codon = $codon_segment->seq->seq;
+			
+			# generate the corresponding translated product
 			my $aa = $codontable->translate($codon);
 			
 			# make the substitution into the mutant
-			my @triplet = split //, $codon;
-			$triplet[$pos_phase] = $snp; # change the appropriate codon
-			my $mutant_codon = join q(), @triplet;
+			if ($feature->strand < 0) {
+				# don't forget to take the complement of the SNP
+				# the SNP will always be the top strand base
+				$snp =~ tr/agctAGCT/tcgaTCGA/;
+				
+			}
+			my $mutant_codon = $codon;
+			substr($mutant_codon, $pos_phase, 1, $snp);
 			my $mutant_aa = $codontable->translate($mutant_codon);
 			
 			# report the change
