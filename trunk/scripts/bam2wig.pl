@@ -24,7 +24,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.8.4';
+my $VERSION = '1.9.3';
 	
 
 print "\n This program will convert bam alignments to enumerated wig data\n";
@@ -944,6 +944,22 @@ sub write_wig {
 	my ($seq_id, $seq_length, $start, $data, $fh) = @_;
 	my $count = 0;
 	
+	# write the wig definition line
+	if ($start == 1 and not $bedgraph) {
+		
+		# fixedStep wig file
+		if ($interpolate) {
+			$fh->print(
+				"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+			);
+		}
+		
+		# variableStep wig file
+		else {
+			$fh->print("variableStep chrom=$seq_id span=1\n");
+		}
+	}
+	
 	# check that we have data to write
 	if (!%{ $data } and !$interpolate) {
 		# nothing to write for a varStep file!
@@ -989,13 +1005,6 @@ sub write_wig {
 		}
 		else {
 			# we're writing a fixed step file
-			
-			# write a header line if we're at the beginning of a chromosome
-			if ($start == 1) {
-				$fh->print(
-					"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-				);
-			}
 			for (my $i = $start; $i <= $end; $i += $bin_size) {
 				my $value = $data->{$i} ||= 0;			
 				$fh->print("$value\n");
@@ -1032,20 +1041,12 @@ sub write_wig {
 		}
 		else {
 			# we're writing a variable step file
-			
-			# write a header line if we're at the beginning of a chromosome
-			if ($start == 1) {
-				$fh->print("variableStep chrom=$seq_id span=1\n");
-			}
-			
-			# walk through data
 			foreach my $i (sort {$a <=> $b} keys %{ $data }) {
 				# only process properly positioned data
 				if ($i >= $start and $i <= $end) {
 					$fh->print("$i\t$data->{$i}\n");
 					$count++;
 				}
-				# delete $data->{$i};
 			}
 		}
 	}
