@@ -18,10 +18,11 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure 
+	format_with_commas
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.9.1';
+our $VERSION = '1.9.3';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
