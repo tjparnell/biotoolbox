@@ -36,8 +36,6 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --version
   --help
 }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -124,9 +122,12 @@ __
   - min
   - max
   - range       Returns difference of max and min
-  - rpm         Reads Per Million mapped, for Bam and BigBed only
-  - rpkm        Reads Per Kilobase per Million Mapped, for Bam and BigBed only
-  }}}
+  - rpm         Reads Per Million mapped, Bam/BigBed only
+  - rpkm        Reads Per Kilobase per Million Mapped, Bam/BigBed only
+}}}
+  When collecting data using rpkm, the normalized sum of the reads is  divided by the length of the feature requested (the Kilobase part in rpkm).  Note that for mRNA or gene features, this will be the sum of the exon  lengths, not the gene or mRNA.
+__
+  __
 __--value `[`score | count | length`]`
 
 __
@@ -238,7 +239,7 @@ At each feature or interval, multiple data points within the genomic segment  ar
 
 The coordinates of the features may be adjusted in numerous ways, including  specifying a specific relative start and stop, a fractional start and stop,  an extension to both start and stop, and specifying the relative position  (5' or 3' or midpoint).
 
-Stranded data may be collected, if the dataset supports stranded information.  Also, two or more datasets may be combined and treated as one.
+Stranded data may be collected, if the dataset supports stranded information.  Also, two or more datasets may be combined and treated as one. Note that  collecting stranded data may significantly slow down data collection.
 
 The output file is a standard tim data formatted file, a tab delimited  file format with each row a genomic feature and each column a dataset.  Metadata regarding the datasets are stored in comment lines at the beginning  of the file. The file may be gzipped.
 
