@@ -1,5 +1,10 @@
 ######## BioToolBox revision history #############
 
+v.1.9.3 (svn 516)
+	- Fixed bug where wig definition lines may not be written when no alignments exist in the first 2 Mb of a chromosome when converting a bam file to a wig file in script bam2wig.pl. Definition lines are now always written. Thanks to Matt J. for reporting.
+	- Fixed bug where the format_with_commas sub was not properly imported into the tim_db_helper library
+	- Fixed bug where the bed output from script get_features.pl did not properly report strand information. 
+
 v.1.9.2 (svn 510)
 	- Fixed critical bug where codon changes were not reported correctly for minus strand genes in script locate_SNPs.pl. Thanks to Craig K. for reporting.
 
