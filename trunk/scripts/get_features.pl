@@ -23,7 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.3';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -361,7 +361,7 @@ sub record_bed_feature {
 		$seqfeature->end,
 		$seqfeature->display_name || $seqfeature->primary_id || 'region',
 		$seqfeature->score || 0,
-		$seqfeature->strand >= 0 ? '+' : '-',
+		$seqfeature->strand, # this will be converted to + or - upon writing
 	];
 	$data->{'last_row'} += 1;
 	
