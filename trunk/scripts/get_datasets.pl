@@ -20,6 +20,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
+	format_with_commas
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -34,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.4';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -103,7 +104,8 @@ GetOptions(
 	'pos=s'      => \$position, # set the relative feature position
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
-	'set_strand' => \$set_strand, # enforce a specific strand
+	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
+				# force_strand is preferred option, but respect the old option
 	'gz!'        => \$gz, # compress output file
 	'help'       => \$help, # request help
 	'version'    => \$print_version, # print the version
@@ -194,8 +196,17 @@ unless (defined $main_database) {
 
 ### Initialize main data, database, and datasets
 
-# Generate or open main feature list
-my $main_data_ref = get_main_data_ref();
+# Generate or open main feature list and identify columns
+my (
+	$main_data_ref, 
+	$name_i, 
+	$type_i, 
+	$chromo_i, 
+	$start_i, 
+	$stop_i, 
+	$strand_i
+) = get_main_data_ref();
+
 
 # Open main database connection
 unless ($main_database) {
@@ -240,9 +251,6 @@ unless ($datasets[0] eq 'none') {
 					" to collect data. Comma delimited or range is acceptable\n",
 	} );
 }
-
-# Identify the feature data indices
-my ($name_i, $type_i, $chromo_i, $start_i, $stop_i, $strand_i) = get_columns();
 
 # Total reads in Bam file when using rpkm method
 my $rpkm_read_sum = 0;
@@ -399,7 +407,7 @@ sub set_defaults {
 ### Collect the feature list and populate the 
 sub get_main_data_ref {
 	
-	my $data_ref;
+	my ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
 	
 	# Generate new input file from the database
 	if ($new) { 
@@ -420,6 +428,11 @@ sub get_main_data_ref {
 				'win'      => $win,
 				'step'     => $step,
 			} );
+			
+			# assign the column indices
+			$chromo = 0;
+			$start  = 1;
+			$stop   = 2;
 		} 
 		
 		else { 
@@ -430,15 +443,19 @@ sub get_main_data_ref {
 				'db'        => $main_database,
 				'features'  => $feature,
 			} );
+			
+			# assign the column indices
+			$name   = 0;
+			$type   = 1;
 		}
 		
+		# check
 		unless ($data_ref) {
 			die "no new feature list generated!";
 		}
 		
-		# set the current program
+		# assign the current program
 		$data_ref->{'program'} = $0;
-		
 	} 
 	
 	
@@ -448,67 +465,112 @@ sub get_main_data_ref {
 		$data_ref = load_tim_data_file($infile) or
 			die "no file data loaded!";
 		
-		# now set missing arguments with values from loaded file
+		# identify relevant feature data columns 
+		$name   = find_column_index($data_ref, '^name|id');
+		$type   = find_column_index($data_ref, '^type|class');
+		$chromo = find_column_index($data_ref, '^chr|seq|ref|ref.?seq');
+		$start  = find_column_index($data_ref, '^start|position');
+		$stop   = find_column_index($data_ref, '^stop|end');
+		$strand = find_column_index($data_ref, '^strand');
 		
+		# now set missing arguments with values from loaded file
 		# database
 		unless ($main_database) {
 			$main_database = $data_ref->{'db'};
 		}
-		
 		# feature
 		unless ($feature) {
 			if ( exists $data_ref->{'feature'} ) {
 				# load the feature defined in the file's metadata
 				$feature = $data_ref->{'feature'};
 			}
-			unless ($feature) {
-				# the file's metadata doesn't have the feature defined
-				# most likely because the file doesn't have metadata
-				# let's try looking for known column names
-				my $name_i  = find_column_index($data_ref, "^name");
-				my $type_i  = find_column_index($data_ref, "^type");
-				my $chr_i   = find_column_index($data_ref, "^chr|seq");
-				my $start_i = find_column_index($data_ref, "^start");
+		}
+		
+		# validate the feature
+		if ($feature =~ /genome|region|segment|interval/i) {
+			# genomic regions?
+			
+			# must have coordinates
+			unless (defined $chromo and defined $start) {
+				# no basic coordinates!!!!
 				
-				# guess 
-				if (defined $name_i and defined $type_i) {
-					$feature = 'Named feature';
+				# does it at least have name and type?
+				if (defined $name and defined $type) {
+					# whew! reassign feature to named_feature
+					$feature = "Named feature";
 				}
-				elsif (defined $chr_i and defined $start_i) {
+				else {
+					# nothing recognized!
+					die " File suggests genomic regions but coordinate" . 
+						" column headers can not be found!\n";
+				}
+			}
+			
+			# make sure we have stop index defined
+			unless (defined $stop) {
+				# we'll use the start index for the stop index in case 
+				# it isn't defined
+				# this will define a region of 1 bp
+				$stop = $start;
+			}
+		}
+		
+		elsif ($feature =~ /\w+/) {
+			# some named feature
+			
+			# must have name and type columns
+			unless (defined $name and defined $type) {
+				# no name or type defined!?
+				
+				# do we at least have coordinates?
+				if (defined $chromo and defined $start and defined $stop) {
+					# whew! reassign to genome feature
 					$feature = 'region';
 				}
 				else {
-					$feature = 'unknown feature';
+					# nothing recognized
+					die " File suggests '$feature' features but name and" . 
+						" type column headers can not be found!\n";
 				}
 			}
 		}
+		
+		else {
+			# feature was not explicitly defined
+			
+			# determine empirically from column names
+			if (defined $name and defined $type) {
+				# named features!
+				$feature = "Named feature";
+			}
+			elsif (defined $chromo and defined $start) {
+				# genomic coordinates
+				$feature = 'region';
+				
+				# make sure we have stop index defined
+				unless (defined $stop) {
+					# we'll use the start index for the stop index in case 
+					# it isn't defined
+					# this will define a region of 1 bp
+					$stop = $start;
+				}
+			}
+			else {
+				# no useable columns defined
+				die " File does not have recognizable name, type, and/or" .
+					" coordinate column headers!\n Unable to proceed\n";
+			}
+		}
+		
+		# print statement on feature
+		printf "  Loaded %s '%s' features.\n", 
+			format_with_commas( $data_ref->{'last_row'} ),
+			$feature;
 	}
 	
 	# done
-	return $data_ref;
+	return ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
 }
-
-
-
-# Identify the feature data columns
-sub get_columns {
-	
-	# look for the feature data columns
-	my $name = find_column_index($main_data_ref, '^name|id');
-	
-	my $type = find_column_index($main_data_ref, '^type|class');
-	
-	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
-	
-	my $start = find_column_index($main_data_ref, '^start|position');
-	
-	my $stop = find_column_index($main_data_ref, '^stop|end');
-	
-	my $strand = find_column_index($main_data_ref, '^strand');
-	
-	return ($name, $type, $chromo, $start, $stop, $strand);
-}
-
 
 
 
@@ -533,19 +595,7 @@ sub collect_dataset {
 	# are we modifying or extending the coordinates of the region or feature?
 	
 	# Genomic regions
-	if ($feature =~ /genome|region|segment/i) {
-		
-		# check that we have the proper indices identified
-		unless (defined $chromo_i and defined $start_i) {
-			die " genomic region features must have chromosome and start" .
-				"column indices defined!\n";
-		}
-		unless (defined $stop_i) {
-			# we'll use the start index for the stop index in case 
-			# it isn't defined
-			# this will define a region of 1 bp
-			$stop_i = $start_i;
-		}
+	if ($feature =~ /genome|region|segment|interval/i) {
 		
 		# collect the genome dataset based on whether we need to modify 
 		# the genomic coordinates or not
@@ -574,20 +624,13 @@ sub collect_dataset {
 	# Named features
 	else {
 		
-		# check that we have the proper indices identified
-		unless (defined $name_i and defined $type_i) {
-			die " named features must have name and type" .
-				"column indices defined!\n";
-		}
-		
 		# check that we have the appropriate database opened
 		my $mdb_ref = ref $mdb;
 		unless ($mdb_ref =~ /^Bio::DB::SeqFeature::Store/) {
 			die "\n\n Collecting data for named features is currently only " .
 				"supported with\n Bio::DB::SeqFeature::Store databases! " .
 				"Please either open an appropriate\n" . 
-				" database or include coordinate information in your file" .
-				" and\n specify --feature region\n";
+				" database or include coordinate information in your file\n";
 		}
 		
 		
@@ -717,36 +760,73 @@ sub get_adjusted_genome_dataset {
 	# Loop through the genomic regions
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
-		# get adjusted coordinates
+		# get strand of the region if defined
+		my $strand = defined $strand_i ? 
+			$main_data_ref->{'data_table'}->[$row][$strand_i] : 0;
+		
+		# calculate new relative start and stop positions
+		# this depends on both feature orientation and the 
+		# relative position requested
 		my ($start, $stop);
 		
-		
-		# adjust relative to the start position
+		# adjust relative to the 5' position 
 		if ($position == 5) {
-			$start = $main_data_ref->{'data_table'}->[$row][$start_i] +
-				$start_adj;
-			$stop  = $main_data_ref->{'data_table'}->[$row][$start_i]  + 
-				$stop_adj;
+		
+			if ($strand >= 0) {
+				# feature is on the forward, watson strand
+				$start = $main_data_ref->{'data_table'}->[$row][$start_i] +
+					$start_adj;
+				$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] + 
+					$stop_adj;
+			}
+			elsif ($strand < 0) {
+				# feature is on the reverse, crick strand
+				$start = $main_data_ref->{'data_table'}->[$row][$stop_i] -
+					$stop_adj;
+				$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
+					$start_adj;
+			}
 		}
 		
-		# adjust relative to the end position
+		# adjust relative to the 3' position
 		elsif ($position == 3) {
-			$start = $main_data_ref->{'data_table'}->[$row][$stop_i] +
-				$start_adj;
-			$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i]  + 
-				$stop_adj;
+			
+			if ($strand >= 0) {
+				# feature is on the forward, watson strand
+				$start = $main_data_ref->{'data_table'}->[$row][$stop_i] +
+					$start_adj;
+				$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
+					$stop_adj;
+			}
+			elsif ($strand < 0) {
+				# feature is on the reverse, crick strand
+				$start = $main_data_ref->{'data_table'}->[$row][$start_i] -
+					$stop_adj;
+				$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] - 
+					$start_adj;
+			}
 		}
 		
-		# adjust relative to the middle position
+		# adjust relative to the midpoint position
 		elsif ($position == 4) {
-			my $mid = int(
+			# determine the midpoint position
+			my $middle = int(
+				# calculate same way regardless of strand
 				(
 					$main_data_ref->{'data_table'}->[$row][$stop_i] +
 					$main_data_ref->{'data_table'}->[$row][$start_i] 
 				) / 2
 			);
-			$start = $mid + $start_adj;	
-			$stop  = $mid + $stop_adj;
+			if ($strand >= 0) {
+				# feature is on the forward, watson strand
+				$start = $middle + $start_adj;
+				$stop  = $middle + $stop_adj;
+			}
+			elsif ($strand < 0) {
+				# feature is on the reverse, crick strand
+				$start = $middle - $stop_adj;
+				$stop  = $middle - $start_adj;
+			}
 		}
 		
 		# get region score
@@ -756,8 +836,7 @@ sub get_adjusted_genome_dataset {
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $start,
 				'stop'      => $stop,
-				'strand'    => defined $strand_i ?
-						$main_data_ref->{'data_table'}->[$row][$strand_i] : 0,
+				'strand'    => $strand,
 				'value'     => $value_type,
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
@@ -783,26 +862,92 @@ sub get_fractionated_genome_dataset {
 	# Loop through the genomic regions
 	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
 		
+		# get strand of the region if defined
+		my $strand = defined $strand_i ? 
+			$main_data_ref->{'data_table'}->[$row][$strand_i] : 0;
+		
 		# get region length
 		my $length = 
 			$main_data_ref->{'data_table'}->[$row][$stop_i] -
 			$main_data_ref->{'data_table'}->[$row][$start_i] + 1;
 			
 		
-		# get adjusted coordinates
+		# calculate new fractional start and stop positions
+		# the fraction depends on the length
+		# this depends on both feature orientation and the 
+		# relative position requested
+		my $relative_start = int( ($length * $fstart) + 0.5);
+		my $relative_stop  = int( ($length * $fstop) + 0.5);
 		my ($start, $stop);
 		
 		# check whether length exceeds the limit
 		if ($length >= $limit) {
 			# length exceeds our minimum limit
 			# we can take a fractional length
-			$start = $main_data_ref->{'data_table'}->[$row][$start_i] + 
-				int( ($fstart * $length) + 0.5 );
-			$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] + 
-				int( ($fstop * $length) + 0.5 );
+			
+			# adjust relative to the 5' position 
+			if ($position == 5) {
+			
+				if ($strand >= 0) {
+					# feature is on the forward, watson strand
+					$start = $main_data_ref->{'data_table'}->[$row][$start_i] + 
+						$relative_start;
+					$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] + 
+						$relative_stop;
+				}
+				elsif ($strand < 0) {
+					# feature is on the reverse, crick strand
+					$start = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
+						$relative_stop;
+					$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
+						$relative_start;
+				}
+			}
+			
+			# adjust relative to the 3' position
+			elsif ($position == 3) {
+				
+				if ($strand >= 0) {
+					# feature is on the forward, watson strand
+					$start = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
+						$relative_start;
+					$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
+						$relative_stop;
+				}
+				elsif ($strand < 0) {
+					# feature is on the reverse, crick strand
+					$start = $main_data_ref->{'data_table'}->[$row][$start_i] - 
+						$relative_stop;
+					$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] - 
+						$relative_start;
+				}
+			}
+			
+			# adjust relative to the midpoint position
+			elsif ($position == 4) {
+				# determine the midpoint position
+				my $middle = int(
+					# calculate same way regardless of strand
+					(
+						$main_data_ref->{'data_table'}->[$row][$stop_i] +
+						$main_data_ref->{'data_table'}->[$row][$start_i] 
+					) / 2
+				);
+				if ($strand >= 0) {
+					# feature is on the forward, watson strand
+					$start = $middle + $relative_start;
+					$stop  = $middle + $relative_stop;
+				}
+				elsif ($strand < 0) {
+					# feature is on the reverse, crick strand
+					$start = $middle - $relative_stop;
+					$stop  = $middle - $relative_start;
+				}
+			}
 		}
+		
+		# length doesn't exceed minimum limit
 		else {
-			# length doesn't exceed minimum limit
 			# simply take the whole fragment
 			$start = $main_data_ref->{'data_table'}->[$row][$start_i];
 			$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i];
@@ -815,8 +960,7 @@ sub get_fractionated_genome_dataset {
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
 				'start'     => $start,
 				'stop'      => $stop,
-				'strand'    => defined $strand_i ?
-						$main_data_ref->{'data_table'}->[$row][$strand_i] : 0,
+				'strand'    => $strand,
 				'value'     => $value_type,
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
@@ -1198,8 +1342,8 @@ sub get_fractionated_feature_dataset {
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
-				'start'     => $feature->start,
-				'stop'      => $feature->end,
+				'start'     => $start,
+				'stop'      => $stop,
 				'strand'    => $feature->strand,
 				'value'     => $value_type,
 				'method'    => $method,
@@ -1511,7 +1655,7 @@ sub record_metadata {
 		$metadata{'exons'} = 'yes';
 	}
 	if ($set_strand) {
-		$metadata{'strand_implied'} = 'yes';
+		$metadata{'forced_strand'} = 'yes';
 	}
 	
 	# add database name if different
@@ -1569,7 +1713,7 @@ get_datasets.pl [--options...] [<filename>]
   --pos [5 | m | 3]
   --win <integer>
   --step <integer>
-  --set_strand
+  --force_strand
   --(no)gz
   --version
   --help
@@ -1780,15 +1924,15 @@ configuration file, biotoolbox.cfg.
 Optionally indicate the step size when generating a new list of intervals 
 across the genome. The default is equal to the window size.
 
-=item --set_strand
+=item --force_strand
 
-For features that are not inherently stranded (strand value of 0), 
-impose an artificial strand for each feature (1 or -1). This will 
-have the effect of enforcing a relative orientation for each feature, 
-or to collected stranded data. This requires the presence of a 
-column in the input data file with a name of "strand". Hence, it 
-will not work with newly generated datasets, but only with input 
-data files. Default is false.
+For features that are not inherently stranded (strand value of 0)
+or that you want to impose a different strand, set this option when
+collecting stranded data. This will reassign the specified strand for
+each feature regardless of its original orientation. This requires the
+presence of a "strand" column in the input data file. This option only
+works with input file lists of database features, not defined genomic
+regions (e.g. BED files). Default is false.
 
 =item --(no)gz
 
