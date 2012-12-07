@@ -31,7 +31,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --pos [5 | m | 3]
   --win <integer>
   --step <integer>
-  --set_strand
+  --force_strand
   --(no)gz
   --version
   --help
@@ -206,10 +206,10 @@ __
   Optionally indicate the step size when generating a new list of intervals  across the genome. The default is equal to the window size.
 __
   __
-__--set_strand
+__--force_strand
 
 __
-  For features that are not inherently stranded (strand value of 0),  impose an artificial strand for each feature (1 or -1). This will  have the effect of enforcing a relative orientation for each feature,  or to collected stranded data. This requires the presence of a  column in the input data file with a name of "strand". Hence, it  will not work with newly generated datasets, but only with input  data files. Default is false.
+  For features that are not inherently stranded (strand value of 0) or that you want to impose a different strand, set this option when collecting stranded data. This will reassign the specified strand for each feature regardless of its original orientation. This requires the presence of a "strand" column in the input data file. This option only works with input file lists of database features, not defined genomic regions (e.g. BED files). Default is false.
 __
   __
 __--(no)gz

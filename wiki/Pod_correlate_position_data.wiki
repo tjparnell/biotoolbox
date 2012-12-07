@@ -20,7 +20,7 @@ correlate_position_data.pl `[`--options`]` <**filename>
   --radius <integer>
   --pos [5 | m | 3]
   --norm [rank | sum ]
-  --set_strand
+  --force_strand
   --(no)interpolate
   --(no)gz
   --version
@@ -85,10 +85,10 @@ __
 __--norm `[`rank | sum`]`
 
 __
-  Optionally define a method of normalizing the scores between the  reference and test data sets prior to calculating the correlation.  Three methods are currently supported: "rank" converts all values  to rank values (the mean rank is reported for identical values)  and essentially calculating a Spearman's rank correlation, while  "sum" scales all values so that the absolute sums are identical.  Normalization occurs after missing or zero values are interpolated.  The default is no normalization.
+  Optionally define a method of normalizing the scores between the  reference and test data sets prior to calculating the correlation.  Two methods are currently supported: "rank" converts all values  to rank values (the mean rank is reported for identical values)  and essentially calculating a Spearman's rank correlation, while  "sum" scales all values so that the absolute sums are identical.  Normalization occurs after missing or zero values are interpolated.  The default is no normalization.
 __
   __
-__--set_strand
+__--force_strand
 
 __
   If enabled, a strand orientation will be enforced when determining the  optimal shift. This does not affect the correlation calculation, only  the direction of the reported shift. This requires the presence of a  data column in the input file with strand information. The default is  no enforcement of strand.
