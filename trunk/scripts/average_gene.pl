@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.4';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -83,7 +83,8 @@ GetOptions(
 	'smooth!'     => \$smooth, # do not interpolate over missing values
 	'sum'         => \$sum, # determine a final average for all the features
 	'log!'        => \$log, # dataset is in log2 space
-	'set_strand'  => \$set_strand, # enforce an artificial strand
+	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
+				# force_strand is preferred option, but respect the old option
 	'raw'         => \$raw, # output raw data
 	'help'        => \$help, # print the help
 	'version'     => \$print_version, # print the version
@@ -1057,7 +1058,7 @@ average_gene.pl
   --strand [all|sense|antisense]
   --sum
   --smooth
-  --set_strand
+  --force_strand
   --(no)log
   --version
   --help
@@ -1198,15 +1199,15 @@ is false.
 Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false.
 
-=item --set_strand
+=item --force_strand
 
-For features that are not inherently stranded (strand value of 0), 
-impose an artificial strand for each feature (1 or -1). This will 
-have the effect of enforcing a relative orientation for each feature, 
-or to collected stranded data. This requires the presence a 
-column in the input data file with a name of "strand". Hence, it 
-will not work with newly generated datasets, but only with input 
-data files. Default is false.
+For features that are not inherently stranded (strand value of 0)
+or that you want to impose a different strand, set this option when
+collecting stranded data. This will reassign the specified strand for
+each feature regardless of its original orientation. This requires the
+presence of a "strand" column in the input data file. This option only
+works with input file lists of database features, not defined genomic
+regions (e.g. BED files). Default is false.
 
 =item --(no)log
 
@@ -1247,6 +1248,3 @@ optionally generate a "summed" or average profile for all of the features.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-

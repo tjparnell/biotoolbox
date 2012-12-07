@@ -19,8 +19,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.4.3';
-#use Data::Dumper;
+my $VERSION = '1.9.4';
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 
@@ -58,7 +57,8 @@ GetOptions(
 	'in1=s'      => \$infile1, # input file one
 	'in2=s'      => \$infile2, # input file two
 	'out=s'      => \$outfile, # output filename
-	'set_strand' => \$set_strand, # artificially enforce a strand for target
+	'force_strand|set_strand' => \$set_strand, # artificially enforce a strand for target
+				# force_strand is preferred option, but respect the old option
 	'gff!'       => \$gff, # output gff file
 	'type=s'     => \$type, # the gff type
 	'source=s'   => \$source, # the gff source
@@ -650,16 +650,14 @@ __END__
 
 intersect_nucs.pl
 
-A script to intersect two lists of nucleosomes.
-
 =head1 SYNOPSIS
 
 intersect_nucs.pl [--options...] <filename_1> <filename_2>
   
   --in1 <filename1>
   --in2 <filename2>
-  --set_strand
   --out <filename>
+  --force_strand
   --gff
   --type <gff_type>
   --source <gff_source>
@@ -668,14 +666,15 @@ intersect_nucs.pl [--options...] <filename_1> <filename_2>
   --help
 
 
-
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
 =over 4
 
-=item --in1 <filename>, --in2 <filename>
+=item --in1 <filename>
+
+=item --in2 <filename>
 
 Specify two files of nucleosome lists. The files must contain sorted
 genomic position coordinates for each nucleosome. Supported file formats
@@ -685,17 +684,17 @@ the target, while the file with the most is designated as the reference
 list. When files with equivalent numbers are provided, the first file 
 is target.
 
-=item --set_strand
+=item --out <filename>
+
+Specify the output file name. The default is "intersection_" appended 
+with both input names.
+
+=item --force_strand
 
 Force the target nucleosomes to be considered as stranded. This enforces 
 an orientation and affects the direction of any reported nucleosome shift. 
 A column with a label including 'strand' is required in the target file. 
 The default is false.
-
-=item --out <filename>
-
-Specify the output file name. The default is "intersection_" appended 
-with both input names.
 
 =item --gff
 
@@ -744,8 +743,6 @@ features, for example, nucleosomes flanking a transcription start site.
 A summary and statistics of the intersection are printed to standard output 
 upon completion.
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -758,12 +755,3 @@ upon completion.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
