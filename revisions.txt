@@ -1,5 +1,11 @@
 ######## BioToolBox revision history #############
 
+v.1.9.4 (svn 519)
+	- Fixed first critical bug in script get_datasets.pl where strand information in input files with genomic coordinates (e.g. BED files) was not considered when adjusting coordinates (start, stop, or fractional). 
+	- Fixed second critical bug in script get_datasets.pl where collecting fractional data for named database features resulted in data collection over the entire feature.
+	- Improved interpretation of input file features as genomic regions or named features in script get_datasets.pl.
+	- Changed the --set_strand option to --force_strand in multiple data collection scripts. This should make the function a little more obvious as to its purpose. Documentation changed as appropriate.
+
 v.1.9.3 (svn 516)
 	- Fixed bug where wig definition lines may not be written when no alignments exist in the first 2 Mb of a chromosome when converting a bam file to a wig file in script bam2wig.pl. Definition lines are now always written. Thanks to Matt J. for reporting.
 	- Fixed bug where the format_with_commas sub was not properly imported into the tim_db_helper library
