@@ -25,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.4';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -82,7 +82,8 @@ GetOptions(
 	'number=i'   => \$number, # number of windows
 	'position=s' => \$position, # indicate relative location of the feature
 	'strand=s'   => \$strand_sense, # collected stranded data
-	'set_strand' => \$set_strand, # enforce an artificial strand
+	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
+				# force_strand is preferred option, but respect the old option
 	'avoid!'     => \$avoid, # avoid conflicting features
 	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
@@ -1151,7 +1152,7 @@ get_relative_data.pl
   --num <integer>
   --pos [5|3|m]
   --strand [sense|antisense|all]
-  --set_strand
+  --force_strand
   --avoid
   --long
   --(no)sum
@@ -1264,15 +1265,15 @@ datasets. Either sense or antisense (relative to the feature) data
 may be collected. The default value is 'all', indicating all 
 data will be collected.
 
-=item --set_strand
+=item --force_strand
 
-For features that are not inherently stranded (strand value of 0), 
-impose an artificial strand for each feature (1 or -1). This will 
-have the effect of enforcing a relative orientation for each feature, 
-or to collected stranded data. This requires the presence a 
-column in the input data file with a name of "strand". Hence, it 
-will not work with newly generated datasets, but only with input 
-data files. Default is false.
+For features that are not inherently stranded (strand value of 0)
+or that you want to impose a different strand, set this option when
+collecting stranded data. This will reassign the specified strand for
+each feature regardless of its original orientation. This requires the
+presence of a "strand" column in the input data file. This option only
+works with input file lists of database features, not defined genomic
+regions (e.g. BED files). Default is false.
 
 =item --avoid
 

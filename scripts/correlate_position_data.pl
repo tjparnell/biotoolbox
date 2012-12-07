@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.4';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -70,7 +70,8 @@ GetOptions(
 	'shift!'      => \$find_shift, # calculate optimum shift
 	'radius=i'    => \$radius, # for collecting data when shifting
 	'pos=s'       => \$position, # set the relative feature position
-	'set_strand'  => \$set_strand, # enforce a specific orientation
+	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
+				# force_strand is preferred option, but respect the old option
 	'norm=s'      => \$norm_method, # method of normalization
 	'interpolate!' => \$interpolate, # interpolate the position data
 	'gz!'         => \$gz, # compress output
@@ -913,7 +914,7 @@ correlate_position_data.pl [--options] <filename>
   --radius <integer>
   --pos [5 | m | 3]
   --norm [rank | sum ]
-  --set_strand
+  --force_strand
   --(no)interpolate
   --(no)gz
   --version
@@ -988,14 +989,14 @@ The default is to use the midpoint.
 
 Optionally define a method of normalizing the scores between the 
 reference and test data sets prior to calculating the correlation. 
-Three methods are currently supported: "rank" converts all values 
+Two methods are currently supported: "rank" converts all values 
 to rank values (the mean rank is reported for identical values) 
 and essentially calculating a Spearman's rank correlation, while 
 "sum" scales all values so that the absolute sums are identical. 
 Normalization occurs after missing or zero values are interpolated. 
 The default is no normalization.
 
-=item --set_strand
+=item --force_strand
 
 If enabled, a strand orientation will be enforced when determining the 
 optimal shift. This does not affect the correlation calculation, only 
