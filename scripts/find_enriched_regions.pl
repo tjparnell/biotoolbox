@@ -28,7 +28,7 @@ use tim_file_helper qw(
 );
 use tim_db_helper::config;
 # use Data::Dumper;
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.5';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -116,9 +116,6 @@ if ($print_version) {
 
 
 # Check for required flags and assign undefined variables default values
-unless ($main_database or $data_database) {
-	die " You must define a database!\n Use --help for more information\n";
-}
 
 $outfile =~ s/\.txt$//; # strip extension, it'll be added later
 
@@ -230,7 +227,7 @@ my %chrom2length; # a hash to store the chromosome lengths
 
 
 ## Open databases
-my ($fdb, $ddb); # feature and 
+my ($fdb, $ddb); # feature and data databases
 if ($main_database and $data_database) {
 	# two separate databases defined
 	$fdb = open_db_connection($main_database) or 
@@ -253,8 +250,18 @@ elsif (!$main_database and $data_database) {
 		$feat = 0;
 	}
 } 
+elsif (!$main_database and !$data_database and $dataset =~ /\.(?:bw|bb|bam)$/) {
+	# dataset is a bigwig, bigbed, or bam file
+	# use this as the data database
+	$ddb = open_db_connection($dataset) or 
+		die " unable to establish connection to database '$dataset'!\n";
+	if ($feat) {
+		warn " no main or feature database defined! disabling search for features\n\n";
+		$feat = 0;
+	}
+}
 else {
-	die " no databases defined!\n";
+	die " no databases defined! see help for more information\n";
 }
 
 
@@ -349,14 +356,13 @@ if ($trim) {
 # 		print FILE Dumper(\@windows);
 # 		close FILE;
 # 	}
+	
+	# Double check the merging
+	# Go back quickly through double-checking that we don't have two neighboring windows
+	# I still seem to have some slip through....
+	go_merge_windows(\@windows);
+	print " Merged trimmed windows into " . scalar @windows . " windows\n";
 }
-
-
-## Double check the merging
-# Go back quickly through double-checking that we don't have two neighboring windows
-# I still seem to have some slip through....
-go_merge_windows(\@windows);
-print " Merged trimmed windows into " . scalar @windows . " windows\n";
 
 # DEBUGGING: printing out the intermediate @windows array
 # if ($debug) {
@@ -1041,6 +1047,7 @@ find_enriched_regions.pl
 =head1 SYNOPSIS
  
  find_enriched_regions.pl --db <db_name> [--options]
+ find_enriched_regions.pl --data <file> [--options]
  
   Options:
   --db <name | filename>
@@ -1073,14 +1080,15 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --db <name | filename>
+=item --db <name>
 
-Specify the name or file of a Bio::DB::SeqFeature::store database 
+Specify the name or file of a Bio::DB::SeqFeature::Store database 
 or BigWigSet database from which to collect chromosomes, data scores, 
 and/or overlapping feature annotations. Features may only be 
-collected from a SeqFeature::store database.
+collected from a SeqFeature::Store databases. This may be skipped 
+if a big file (bigWig, bigBed, or Bam) file is provided as the dataset.
 
-=item --ddb <name | filename>
+=item --ddb <name>
 
 When data scores are present in a separate database from annotation,
 then specify the second data-specific database. The same options 
