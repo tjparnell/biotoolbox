@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.9.1';
+our $VERSION = '1.9.5';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -42,9 +42,6 @@ our @EXPORT_OK = qw(
 	convert_and_write_to_gff_file
 	write_summary_data
 );
-
-# Count for unique GFF3 ID creation
-our $GFF3_ID_COUNT = 0; 
 
 # List of acceptable filename extensions
 	# include gzipped versions, but list uncompressed versions first
@@ -1529,7 +1526,11 @@ sub convert_genome_data_2_gff_data {
 	
 	# chromosome
 	my $chr_index;
-	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'chromo'} and 
+		$arg_ref->{'chromo'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'chromo'} }
+	) {
 		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
@@ -1538,7 +1539,11 @@ sub convert_genome_data_2_gff_data {
 		
 	# start position
 	my $start_index;
-	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'start'} and 
+		$arg_ref->{'start'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'start'} }
+	) {
 		$start_index = $arg_ref->{'start'};
 	}
 	else {
@@ -1547,7 +1552,11 @@ sub convert_genome_data_2_gff_data {
 		
 	# stop position
 	my $stop_index;
-	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'stop'} and 
+		$arg_ref->{'stop'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'stop'} }
+	) {
 		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
@@ -1566,7 +1575,11 @@ sub convert_genome_data_2_gff_data {
 	
 	# score
 	my $score_index;
-	if (exists $arg_ref->{'score'} and $arg_ref->{'score'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'score'} and 
+		$arg_ref->{'score'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'score'} }
+	) {
 		$score_index = $arg_ref->{'score'};
 	}
 	
@@ -1574,7 +1587,10 @@ sub convert_genome_data_2_gff_data {
 	my $name;
 	my $name_index;
 	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
-		if ($arg_ref->{'name'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'name'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'name'} }
+		) {
 			# name is a single digit, most likely a index
 			$name_index = $arg_ref->{'name'};
 		}
@@ -1586,7 +1602,11 @@ sub convert_genome_data_2_gff_data {
 	
 	# strand
 	my $strand_index;
-	if ( exists $arg_ref->{'strand'} and $arg_ref->{'strand'} =~ /^\d+$/ ) {
+	if (
+		exists $arg_ref->{'strand'} and 
+		$arg_ref->{'strand'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'strand'} }
+	) {
 		$strand_index = $arg_ref->{'strand'};
 	}
 	
@@ -1602,7 +1622,11 @@ sub convert_genome_data_2_gff_data {
 	
 	# identify the unique ID index
 	my $id_index;
-	if (exists $arg_ref->{'id'} and $arg_ref->{'id'} =~ /^\d+$/ ) {
+	if (
+		exists $arg_ref->{'id'} and 
+		$arg_ref->{'id'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'id'} }
+	) {
 		$id_index = $arg_ref->{'id'} ;
 	}
 	
@@ -1612,20 +1636,35 @@ sub convert_genome_data_2_gff_data {
 	
 	### Identify default values
 	
-	# set default gff data variables
-	my $source;
+	# gff source tag
+	my ($source, $source_index);
 	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
-		$source = $arg_ref->{'source'};
+		if (
+			$arg_ref->{'source'} =~ /^\d+$/ and 
+			exists $input_data_ref->{ $arg_ref->{'source'} }
+		) {
+			# looks like an index
+			$source_index = $arg_ref->{'source'};
+		}
+		else {
+			# a text string
+			$source = $arg_ref->{'source'};
+		}
 	}
 	else {
 		# the default is data
 		$source = 'data';
 	}
+	
+	# gff method or type column
 	my ($method, $method_index);
 	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
-		if ($arg_ref->{'method'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'method'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'method'} }
+		) {
 			# the method looks like a single digit, most likely an index value
 			$method_index = $arg_ref->{'method'};
 		}
@@ -1636,7 +1675,10 @@ sub convert_genome_data_2_gff_data {
 	}
 	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
-		if ($arg_ref->{'type'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'type'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'type'} }
+		) {
 			# the method looks like a single digit, most likely an index value
 			$method_index = $arg_ref->{'type'};
 		}
@@ -1644,6 +1686,10 @@ sub convert_genome_data_2_gff_data {
 			# explicit method string
 			$method = $arg_ref->{'type'};
 		}
+	}
+	elsif (defined $name) {
+		# the name provided
+		$method = $name;
 	}
 	elsif (defined $name_index) {
 		# the name of the dataset for the features' name
@@ -1659,7 +1705,7 @@ sub convert_genome_data_2_gff_data {
 	
 	# fix method and source if necessary
 	# replace any whitespace or dashes with underscores
-	$source =~ s/[\s\-]/_/g;
+	$source =~ s/[\s\-]/_/g if defined $source;
 	$method =~ s/[\s\-]/_/g if defined $method;
 	
 	
@@ -1741,6 +1787,17 @@ sub convert_genome_data_2_gff_data {
 			$gff_method = $method;
 		}
 		
+		# collect source tag
+		my $gff_source;
+		if (defined $source_index) {
+			# variable source tag
+			$gff_source = $data_table_ref->[$row][$source_index];
+		}
+		else {
+			# static source tag
+			$gff_source = $source;
+		}
+		
 		# collect score information
 		my $score;
 		if (defined $score_index) {
@@ -1759,24 +1816,6 @@ sub convert_genome_data_2_gff_data {
 				# this assumes that the $id_index values are all unique
 				# user's responsibility to fix it otherwise
 				$group = 'ID=' . $data_table_ref->[$row][$id_index] . ';';
-			}
-			else {
-				# ID is not really needed unless we have subfeatures
-				# therefore we no longer automatically include ID
-# 				if (defined $name) {
-# 					# a name string was explicitly defined
-# 					# increment the GFF ID count to make unique
-# 					$GFF3_ID_COUNT++;
-# 					# Record ID
-# 					$group = 'ID=' . $name . '.' . $GFF3_ID_COUNT . ';';
-# 				}
-# 				else {
-# 					# use the method as the name
-# 					# increment the GFF ID count to make unique
-# 					$GFF3_ID_COUNT++;
-# 					# Record ID 
-# 					$group = 'ID=' . $gff_method . '.' . $GFF3_ID_COUNT . ';';
-# 				}
 			}
 			
 			# define and record the GFF Name
@@ -1816,7 +1855,7 @@ sub convert_genome_data_2_gff_data {
 		# rewrite in gff format
 		$data_table_ref->[$row] = [ (
 			$refseq,
-			$source, 
+			$gff_source, 
 			$gff_method,
 			$start,
 			$stop,
@@ -1931,9 +1970,6 @@ sub convert_and_write_to_gff_file {
 	
 	## Establish general variables
 	
-	# reset GFF3 counter
-	$GFF3_ID_COUNT = 0;
-	
 	# get passed arguments
 	my $arg_ref = shift;
 	unless ($arg_ref) {
@@ -1956,7 +1992,11 @@ sub convert_and_write_to_gff_file {
 	
 	# chromosome
 	my $chr_index;
-	if (exists $arg_ref->{'chromo'} and $arg_ref->{'chromo'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'chromo'} and 
+		$arg_ref->{'chromo'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'chromo'} }
+	) {
 		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
@@ -1965,7 +2005,11 @@ sub convert_and_write_to_gff_file {
 		
 	# start position
 	my $start_index;
-	if (exists $arg_ref->{'start'} and $arg_ref->{'start'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'start'} and 
+		$arg_ref->{'start'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'start'} }
+	) {
 		$start_index = $arg_ref->{'start'};
 	}
 	else {
@@ -1974,7 +2018,11 @@ sub convert_and_write_to_gff_file {
 		
 	# stop position
 	my $stop_index;
-	if (exists $arg_ref->{'stop'} and $arg_ref->{'stop'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'stop'} and 
+		$arg_ref->{'stop'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'stop'} }
+	) {
 		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
@@ -1993,7 +2041,11 @@ sub convert_and_write_to_gff_file {
 	
 	# score
 	my $score_index;
-	if (exists $arg_ref->{'score'} and $arg_ref->{'score'} =~ /^\d+$/) {
+	if (
+		exists $arg_ref->{'score'} and 
+		$arg_ref->{'score'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'score'} }
+	) {
 		$score_index = $arg_ref->{'score'};
 	}
 	
@@ -2001,7 +2053,10 @@ sub convert_and_write_to_gff_file {
 	my $name;
 	my $name_index;
 	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
-		if ($arg_ref->{'name'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'name'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'name'} }
+		) {
 			# name is a single digit, most likely a index
 			$name_index = $arg_ref->{'name'};
 		}
@@ -2013,7 +2068,11 @@ sub convert_and_write_to_gff_file {
 	
 	# strand
 	my $strand_index;
-	if ( exists $arg_ref->{'strand'} and $arg_ref->{'strand'} =~ /^\d+$/ ) {
+	if (
+		exists $arg_ref->{'strand'} and 
+		$arg_ref->{'strand'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'strand'} }
+	) {
 		$strand_index = $arg_ref->{'strand'};
 	}
 	
@@ -2028,27 +2087,47 @@ sub convert_and_write_to_gff_file {
 	
 	# identify the unique ID index
 	my $id_index;
-	if (exists $arg_ref->{'id'} and $arg_ref->{'id'} =~ /^\d+$/ ) {
+	if (
+		exists $arg_ref->{'id'} and 
+		$arg_ref->{'id'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'id'} }
+	) {
 		$id_index = $arg_ref->{'id'} ;
 	}
 	
 	
 	
 	## Set default gff data variables
-	my $source;
+	
+	# gff source tag
+	my ($source, $source_index);
 	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
-		$source = $arg_ref->{'source'};
+		if (
+			$arg_ref->{'source'} =~ /^\d+$/ and 
+			exists $input_data_ref->{ $arg_ref->{'source'} }
+		) {
+			# looks like an index
+			$source_index = $arg_ref->{'source'};
+		}
+		else {
+			# a text string
+			$source = $arg_ref->{'source'};
+		}
 	}
 	else {
 		# the default is data
 		$source = 'data';
 	}
 	
+	# gff method or type column
 	my ($method, $method_index);
 	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
-		if ($arg_ref->{'method'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'method'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'method'} }
+		) {
 			# the method looks like a single digit, most likely an index value
 			$method_index = $arg_ref->{'method'};
 		}
@@ -2059,7 +2138,10 @@ sub convert_and_write_to_gff_file {
 	}
 	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
-		if ($arg_ref->{'type'} =~ /^\d+$/) {
+		if (
+			$arg_ref->{'type'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'type'} }
+		) {
 			# the method looks like a single digit, most likely an index value
 			$method_index = $arg_ref->{'type'};
 		}
@@ -2085,7 +2167,7 @@ sub convert_and_write_to_gff_file {
 	}
 	# fix method and source if necessary
 	# replace any whitespace or dashes with underscores
-	$source =~ s/[\s\-]/_/g;
+	$source =~ s/[\s\-]/_/g if defined $source;
 	$method =~ s/[\s\-]/_/g if defined $method;
 	
 	
@@ -2134,99 +2216,100 @@ sub convert_and_write_to_gff_file {
 			$input_data_ref->{'filename'}, "'\n";
 	}
 	
-	# Write the column metadata headers
-		# write the metadata lines only if there is useful information
-		# and only for the pertinent columns (chr, start, score)
-		# we will check the relavent columns for extra information beyond
-		# that of name and index
-		# we will write the metadata then for that dataset that is being used
-		# substituting the column name and index appropriate for a gff file
-		
-		# check the chromosome metadata
-		if (scalar( keys %{ $input_data_ref->{$chr_index} } ) > 2) {
-			# chromosome has extra keys of info
-			print {$output_gff} "# Column_0 ";
-			my @pairs;
-			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$chr_index} } ) {
-				if ($_ eq 'index') {
-					next;
-				}
-				elsif ($_ eq 'name') {
-					push @pairs, "name=Chromosome";
-				}
-				else {
-					push @pairs,  $_ . '=' . $input_data_ref->{$chr_index}{$_};
-				}
+	
+	### Write the column metadata headers
+	# write the metadata lines only if there is useful information
+	# and only for the pertinent columns (chr, start, score)
+	# we will check the relavent columns for extra information beyond
+	# that of name and index
+	# we will write the metadata then for that dataset that is being used
+	# substituting the column name and index appropriate for a gff file
+	
+	# check the chromosome metadata
+	if (scalar( keys %{ $input_data_ref->{$chr_index} } ) > 2) {
+		# chromosome has extra keys of info
+		print {$output_gff} "# Column_0 ";
+		my @pairs;
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$chr_index} } ) {
+			if ($_ eq 'index') {
+				next;
 			}
-			print {$output_gff} join(";", @pairs), "\n";
-		}
-		
-		# check the start metadata
-		if (scalar( keys %{ $input_data_ref->{$start_index} } ) > 2) {
-			# start has extra keys of info
-			print {$output_gff} "# Column_3 ";
-			my @pairs;
-			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$start_index} } ) {
-				if ($_ eq 'index') {
-					next;
-				}
-				elsif ($_ eq 'name') {
-					push @pairs, "name=Start";
-				}
-				else {
-					push @pairs,  $_ . '=' . $input_data_ref->{$start_index}{$_};
-				}
+			elsif ($_ eq 'name') {
+				push @pairs, "name=Chromosome";
 			}
-			print {$output_gff} join(";", @pairs), "\n";
-		}
-		
-		# check the score metadata
-		if (
-			defined $score_index and
-			scalar( keys %{ $input_data_ref->{$score_index} } ) > 2
-		) {
-			# score has extra keys of info
-			print {$output_gff} "# Column_5 ";
-			my @pairs;
-			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$score_index} } ) {
-				if ($_ eq 'index') {
-					next;
-				}
-				elsif ($_ eq 'name') {
-					push @pairs, "name=Score";
-				}
-				else {
-					push @pairs,  $_ . '=' . $input_data_ref->{$score_index}{$_};
-				}
+			else {
+				push @pairs,  $_ . '=' . $input_data_ref->{$chr_index}{$_};
 			}
-			print {$output_gff} join(";", @pairs), "\n";
 		}
-		
-		# check the name metadata
-		if (
-			defined $name_index and
-			scalar( keys %{ $input_data_ref->{$name_index} } ) > 2
-		) {
-			# score has extra keys of info
-			print {$output_gff} "# Column_8 ";
-			my @pairs;
-			foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$name_index} } ) {
-				if ($_ eq 'index') {
-					next;
-				}
-				elsif ($_ eq 'name') {
-					push @pairs, "name=Group";
-				}
-				else {
-					push @pairs,  $_ . '=' . $input_data_ref->{$name_index}{$_};
-				}
+		print {$output_gff} join(";", @pairs), "\n";
+	}
+	
+	# check the start metadata
+	if (scalar( keys %{ $input_data_ref->{$start_index} } ) > 2) {
+		# start has extra keys of info
+		print {$output_gff} "# Column_3 ";
+		my @pairs;
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$start_index} } ) {
+			if ($_ eq 'index') {
+				next;
 			}
-			print {$output_gff} join(";", @pairs), "\n";
+			elsif ($_ eq 'name') {
+				push @pairs, "name=Start";
+			}
+			else {
+				push @pairs,  $_ . '=' . $input_data_ref->{$start_index}{$_};
+			}
 		}
-		
+		print {$output_gff} join(";", @pairs), "\n";
+	}
+	
+	# check the score metadata
+	if (
+		defined $score_index and
+		scalar( keys %{ $input_data_ref->{$score_index} } ) > 2
+	) {
+		# score has extra keys of info
+		print {$output_gff} "# Column_5 ";
+		my @pairs;
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$score_index} } ) {
+			if ($_ eq 'index') {
+				next;
+			}
+			elsif ($_ eq 'name') {
+				push @pairs, "name=Score";
+			}
+			else {
+				push @pairs,  $_ . '=' . $input_data_ref->{$score_index}{$_};
+			}
+		}
+		print {$output_gff} join(";", @pairs), "\n";
+	}
+	
+	# check the name metadata
+	if (
+		defined $name_index and
+		scalar( keys %{ $input_data_ref->{$name_index} } ) > 2
+	) {
+		# score has extra keys of info
+		print {$output_gff} "# Column_8 ";
+		my @pairs;
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$name_index} } ) {
+			if ($_ eq 'index') {
+				next;
+			}
+			elsif ($_ eq 'name') {
+				push @pairs, "name=Group";
+			}
+			else {
+				push @pairs,  $_ . '=' . $input_data_ref->{$name_index}{$_};
+			}
+		}
+		print {$output_gff} join(";", @pairs), "\n";
+	}
 	
 			
-	# Write the gff features
+	
+	### Write the gff features
 	for my $row (1..$input_data_ref->{'last_row'}) {
 		
 		# collect coordinate information
@@ -2293,6 +2376,16 @@ sub convert_and_write_to_gff_file {
 			$gff_method = $method;
 		}
 		
+		# collect source tag
+		my $gff_source;
+		if (defined $source_index) {
+			# variable source tag
+			$gff_source = $data_table_ref->[$row][$source_index];
+		}
+		else {
+			# static source tag
+			$gff_source = $source;
+		}
 		
 		# collect group information based on version
 		my $group;
@@ -2303,24 +2396,6 @@ sub convert_and_write_to_gff_file {
 				# this assumes that the $id_index values are all unique
 				# user's responsibility to fix it otherwise
 				$group = 'ID=' . $data_table_ref->[$row][$id_index] . ';';
-			}
-			else {
-				# ID is not really needed unless we have subfeatures
-				# therefore we no longer automatically include ID
-# 				if (defined $name) {
-# 					# a name string was explicitly defined
-# 					# increment the GFF ID count to make unique
-# 					$GFF3_ID_COUNT++;
-# 					# Record ID
-# 					$group = 'ID=' . $name . '.' . $GFF3_ID_COUNT . ';';
-# 				}
-# 				else {
-# 					# use the method as the name
-# 					# increment the GFF ID count to make unique
-# 					$GFF3_ID_COUNT++;
-# 					# Record ID 
-# 					$group = 'ID=' . $gff_method . '.' . $GFF3_ID_COUNT . ';';
-# 				}
 			}
 			
 			# define and record the GFF Name
@@ -2364,7 +2439,7 @@ sub convert_and_write_to_gff_file {
 		# Write gff feature
 		print {$output_gff} join("\t", (
 			$refseq,
-			$source, 
+			$gff_source, 
 			$gff_method,
 			$start,
 			$stop,
@@ -3059,16 +3134,16 @@ arguments. The keys include
               for strand information. Accepted values might include
               any of the following 'f(orward), r(everse), w(atson),
               c(rick), +, -, 1, -1, 0, .).
-  source   => A scalar value to be used as the text in the 'source' 
-              column. Default is 'data'.
-  type     => A scalar value to be used as the text in the 'method'
-              or 'type' column. If not defined, it will use the 
-              name of the dataset used for either the 'score' or 
-              'name' column, if defined. As a last resort, it 
-              will use the most creative method of 'Experiment'.
-              Alternatively, if a single integer is passed, then 
-              it is assumed to be the column index for a unique 
-              method value for each feature.
+  source   => A scalar value representing either the index of the 
+              column containing values, or a text string to 
+              be used as the GFF source value. Default is 'data'.
+  type     => A scalar value representing either the index of the 
+              column containing values, or a text string to 
+              be used as the GFF type or method value. If not 
+              defined, it will use the column name of the dataset 
+              used for either the 'score' or 'name' column, if 
+              defined. As a last resort, it will use the most 
+              creative method of 'Experiment'.
   method   => Alias for "type".
   midpoint => A boolean (1 or 0) value to indicate whether the 
               midpoint between the actual 'start' and 'stop' values
@@ -3169,17 +3244,17 @@ arguments. The keys include
               for strand information. Accepted values might include
               any of the following 'f(orward), r(everse), w(atson),
               c(rick), +, -, 1, -1, 0, .).
-  source   => A scalar value to be used as the text in the 'source' 
-              column. Default is 'data'.
-  method   => A scalar value to be used as the text in the "method"
-              or "type" column. If not defined, it will use the 
-              name of the dataset used for either the 'score' or 
-              'name' column, if defined. As a last resort, it 
-              will use the most creative method of 'Experiment'.
-              Alternatively, if a single integer is passed, then 
-              it is assumed to be the column index for a unique 
-              method value for each feature.
-  type     => Alias for "method".
+  source   => A scalar value representing either the index of the 
+              column containing values, or a text string to 
+              be used as the GFF source value. Default is 'data'.
+  type     => A scalar value representing either the index of the 
+              column containing values, or a text string to 
+              be used as the GFF type or method value. If not 
+              defined, it will use the column name of the dataset 
+              used for either the 'score' or 'name' column, if 
+              defined. As a last resort, it will use the most 
+              creative method of 'Experiment'.
+  method   => Alias for "type".
   midpoint => A boolean (1 or 0) value to indicate whether the 
               midpoint between the actual 'start' and 'stop' values
               should be used instead of the actual values. Default 
