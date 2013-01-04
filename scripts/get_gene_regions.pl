@@ -21,7 +21,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.5';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -49,6 +49,7 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
+	$bed,
 	$gz,
 	$help,
 	$print_version,
@@ -66,6 +67,7 @@ GetOptions(
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
+	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -161,9 +163,28 @@ else {
 }
 
 
-
-
-
+### Convert to bed format if requested
+# rather than taking the time to modify the data structures and all the 
+# the data collection subroutines to a BED format, we'll just simply 
+# take advantage of the data2bed.pl program as a convenient cop-out
+if ($bed and $success) {
+	system(
+		"$Bin/data2bed.pl",
+		"--chr",
+		3,
+		"--start",
+		4,
+		"--stop",
+		5,
+		"--strand",
+		6,
+		"--name",
+		2,
+		"--in",
+		$success,
+		$gz ? "--gz" : "",
+	) == 0 or warn " unable to execute data2bed.pl for converting to bed!\n";
+}
 
 
 
@@ -999,9 +1020,11 @@ get_gene_regions.pl
 =head1 SYNOPSIS
 
 get_gene_regions.pl [--options...] --db <text> --out <filename>
+get_gene_regions.pl [--options...] --in <filename> --out <filename>
   
   Options:
   --db <text>
+  --in <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
@@ -1010,6 +1033,7 @@ get_gene_regions.pl [--options...] --db <text> --out <filename>
   --stop=<integer>
   --unique
   --slop <integer>
+  --bed
   --gz
   --version
   --help
@@ -1024,10 +1048,14 @@ The command line flags and descriptions:
 =item --db <text>
 
 Specify the name of a BioPerl SeqFeature::Store database to use as an 
-annotation source. Alternatively, a GFF3 annotation file may be provided. 
+annotation source. 
+
+=item --in <filename>
+
+Alternative to a database, a GFF3 annotation file may be provided. 
 For best results, the database or file should include hierarchical 
-annotation in the form of gene -> mRNA -> [exon or CDS]. The GFF3 file 
-may be gzipped.
+parent-child annotation in the form of gene -> mRNA -> [exon or CDS]. 
+The GFF3 file may be gzipped.
 
 =item --out <filename>
 
@@ -1086,6 +1114,10 @@ example, when start sites of transcription are not precisely mapped,
 but not useful with defined introns and exons. This does not take 
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
+
+=item --bed
+
+Automatically convert the output file to a BED file.
 
 =item --gz
 
