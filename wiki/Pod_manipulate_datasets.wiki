@@ -24,7 +24,7 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
   --con <integer>
   --target <text> or <number>
   --place [r | n]
-  --except [y | n]
+  --zero
   --dir [i | d]
   --name <text>
   --out <filename>
@@ -138,17 +138,10 @@ __
   Defaults to new placement when executed automatically using the --func  option, or prompts the user when executed interactively.
 __
   __
-__--except `[`y | n`]`
+__--(no)zero
 
 __
-  Specify what to do when a calculation encounters a 0 value. Two exception  values are accepted:
-__
-  __
-{{{
-  - (y)es, include 0 values in the calculation
-  - (n)o, do not include 0 values in the calculation
-  }}}
-  If this is not specified, the program will ask interactively if this occurs.
+  Specify that zero values should or should not be included when  calculating statistics on a dataset. The default is undefined, meaning  the program may ask the user interactively whether to include zero values  or not.
 __
   __
 __--dir `[`i | d`]`

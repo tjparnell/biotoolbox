@@ -8,6 +8,7 @@ find_enriched_regions.pl
 ==SYNOPSIS==
 {{{
  find_enriched_regions.pl --db <db_name> [--options]
+ find_enriched_regions.pl --data <file> [--options]
  }}}
 {{{
   Options:
@@ -39,13 +40,13 @@ find_enriched_regions.pl
 ==OPTIONS==
 The command line flags and descriptions:
 
-__--db <**name | filename>
+__--db <**name>
 
 __
-  Specify the name or file of a Bio::DB::!SeqFeature**::store database  or !BigWigSet** database from which to collect chromosomes, data scores,  and/or overlapping feature annotations. Features may only be  collected from a !SeqFeature**::store database.
+  Specify the name or file of a Bio::DB::!SeqFeature**::Store database  or !BigWigSet** database from which to collect chromosomes, data scores,  and/or overlapping feature annotations. Features may only be  collected from a !SeqFeature**::Store databases. This may be skipped  if a big file (bigWig, bigBed, or Bam) file is provided as the dataset.
 __
   __
-__--ddb <**name | filename>
+__--ddb <**name>
 
 __
   When data scores are present in a separate database from annotation, then specify the second data-specific database. The same options  apply as --db.

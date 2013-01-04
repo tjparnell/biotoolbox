@@ -46,7 +46,7 @@ __
 __--ask
 
 __
-  Indicate that the program should interactively ask for the indices for  feature score, name, and strand. It will present a list of the column  names to choose from. It will also ask for the source, and type or method text strings. Enter nothing for non-relevant columns or to  accept default values.
+  Indicate that the program should interactively ask for column indices or text strings for the GFF attributes, including coordinates, source, type,  etc. It will present a list of the column names to choose from. Enter  nothing for non-relevant columns or to accept default values.
 __
   __
 __--chr <**column_index>
@@ -97,16 +97,16 @@ __
   Provide a comma delimited list of column indices that contain  values to be included as group tags in the GFF features. The  key will be the column name.
 __
   __
-__--source <**text>
+__--source <**text | column_index>
 
 __
-  A scalar value to be used as the text in the 'source'  column. Default is 'data'.
+  Enter either a text string or a column index representing the  GFF source that should be used for the features. The default is  'data'.
 __
   __
 __--type <**text | column_index>
 
 __
-  Enter either a text string to be used as the GFF 'method' or 'type' column, or a column index representing the  feature type when one simply won't due. If not defined,  it will use the name of the dataset used for either the 'score'  or 'name' column, if defined. As a last resort, it  will use the most creative method of 'Experiment'.
+  Enter either a text string or a column index representing the  GFF 'type' or 'method' that should be used for the features. If  not defined, it will use the column name for either  the 'score' or 'name' column, if defined. As a last resort, it  will use the most creative method of 'Experiment'.
 __
   __
 __--(no)zero
@@ -164,14 +164,10 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a data file into a GFF formatted text file.  Only simple conversions are performed, where each data line is converted  to a single feature. Complex features with parent-child relationships (such  as genes) should be converted with something else.
+This program will convert a data file into a GFF formatted text file.  Only simple conversions are performed, where each data line is converted  to a single feature. Complex features with parent-child relationships (such  as genes) should be converted with something more advanced.
 
-The source file should have chromosomal coordinates, i.e. chromosome,  start, and (optionally) stop or end coordinates. They may be specified  upon execution or identified automatically. If they are not found, the  GFF conversion will fail.
+The input file should have chromosomal coordinates, i.e. chromosome,  start, and (optionally) stop or end coordinates. They may be specified  upon execution or identified automatically. If they are not found, the  GFF conversion will fail.
 
-Additional feature information may be specified using appropriate command-line  arguments, including score values, strand, name, ID, source, type, etc. See  the [Pod_OPTIONS OPTIONS] for more details.
-
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -183,11 +179,3 @@ Additional feature information may be specified using appropriate command-line  
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

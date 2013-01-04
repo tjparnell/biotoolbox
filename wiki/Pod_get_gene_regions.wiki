@@ -6,11 +6,12 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 get_gene_regions.pl
 
 ==SYNOPSIS==
-get_gene_regions.pl `[`--options...`]` --db <**text> --out <**filename>
+get_gene_regions.pl `[`--options...`]` --db <**text> --out <**filename> get_gene_regions.pl `[`--options...`]` --in <**filename> --out <**filename>
 
 {{{
   Options:
   --db <text>
+  --in <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
@@ -19,6 +20,7 @@ get_gene_regions.pl `[`--options...`]` --db <**text> --out <**filename>
   --stop=<integer>
   --unique
   --slop <integer>
+  --bed
   --gz
   --version
   --help
@@ -31,7 +33,13 @@ The command line flags and descriptions:
 __--db <**text>
 
 __
-  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as an  annotation source. Alternatively, a GFF3 annotation file may be provided.  For best results, the database or file should include hierarchical  annotation in the form of gene -> mRNA -> `[`exon or CDS`]`. The GFF3 file  may be gzipped.
+  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as an  annotation source.
+__
+  __
+__--in <**filename>
+
+__
+  Alternative to a database, a GFF3 annotation file may be provided.  For best results, the database or file should include hierarchical  parent-child annotation in the form of gene -> mRNA -> `[`exon or CDS`]`.  The GFF3 file may be gzipped.
 __
   __
 __--out <**filename>
@@ -87,6 +95,12 @@ __--slop <**integer>
 
 __
   When identifying unique regions, specify the number of bp to  add and subtract to the start position (the slop or fudge factor)  of the regions when considering duplicates. Any other region  within this window will be considered a duplicate. Useful, for  example, when start sites of transcription are not precisely mapped,  but not useful with defined introns and exons. This does not take  into consideration transcripts from other genes, only the current  gene. The default is 0 (no sloppiness).
+__
+  __
+__--bed
+
+__
+  Automatically convert the output file to a BED file.
 __
   __
 __--gz
