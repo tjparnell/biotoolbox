@@ -1,5 +1,11 @@
 ######## BioToolBox revision history #############
 
+v.1.9.5 (svn 525)
+	- Changed the non-intuitive --except option to a more intuitive --zero option in script manipulate_datasets.pl; this is now a boolean option to include or exclude zero values when calculating statistics. The printed statistics output has also been cleaned up and no longer includes decimal formatting. The export function will automatically generate a name when executed automatically.
+	- Added capability to use a column of source values rather than a static text string for the GFF source tag in script data2gff.pl. Also made improvements to the interactive ask session.
+	- Added the capability to use a big file dataset as the database for chromosome information in script find_enriched_regions.pl.
+	- Added an option to automatically convert the output file to a BED file in script get_gene_regions.pl, and included a description of the --in option in the POD documentation.
+
 v.1.9.4 (svn 519)
 	- Fixed first critical bug in script get_datasets.pl where strand information in input files with genomic coordinates (e.g. BED files) was not considered when adjusting coordinates (start, stop, or fractional). 
 	- Fixed second critical bug in script get_datasets.pl where collecting fractional data for named database features resulted in data collection over the entire feature.
