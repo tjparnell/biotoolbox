@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.9.5';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -43,8 +43,9 @@ my ( # command line option variables
 	$opt_numerator, 
 	$opt_denominator, 
 	$opt_target, 
-	$opt_placement, 
+	$opt_placement,
 	$opt_exception, 
+	$opt_zero, 
 	$opt_direction, 
 	$opt_name, 
 	$opt_log, 
@@ -63,7 +64,8 @@ GetOptions(
 	'con|den=i' => \$opt_denominator, # index number of denominator dataset
 	'target=s'  => \$opt_target, # target
 	'place=s'   => \$opt_placement, # placement of transformed dataset
-	'except=s'  => \$opt_exception, # exception to deal with 0 values
+	'except=s'  => \$opt_exception, # old argument exception to deal with 0 values
+	'zero!'     => \$opt_zero, # include 0 values
 	'dir=s'     => \$opt_direction, # sort order
 	'name=s'    => \$opt_name, # new dataset name
 	'log!'      => \$opt_log, # data values are in log2 space
@@ -117,6 +119,11 @@ my @opt_indices;
 if (defined $opt_index) {
 	@opt_indices = parse_list($opt_index) or 
 		die " requested index '$opt_index' cannot be parsed!\n";
+}
+
+# set zero usage
+if ($opt_exception =~ /^y/i) {
+	$opt_zero = 1;
 }
 
 # initialize modification count
@@ -266,7 +273,7 @@ sub automatic_execution {
 		'control'    => $opt_denominator, 
 		'target'     => $opt_target, 
 		'place'      => $opt_placement, 
-		'exception'  => $opt_exception, 
+		'include zero' => $opt_zero, 
 		'direction'  => $opt_direction, 
 		'name'       => $opt_name, 
 		'log'        => $opt_log, 
@@ -359,57 +366,43 @@ sub print_statistics_function {
 		return;
 	}
 	
-	my $exception = $opt_exception; # take global value if present
+	# determine what to do with zero values
+	my $zero = $opt_zero; 
 	
 	# get statistics and print
 	foreach my $index (@indices) {
-		my %statdata = _get_statistics_hash($index, $exception);
+		my %statdata = _get_statistics_hash($index, $zero);
 		unless (%statdata) { 
 			warn " unable to get statistics for dataset index $index!\n"; 
 			return;
 		}
-# 		
-# 		# check log2 status
-# 		if ($main_data_ref->{$index}{'log2'} == 1) {
-# 			# values are in log2 space
-# 			# they would've been de-logged when the stats were calculated
-# 			# need to put back in log2 state
-# 			$statdata{mean}      = log( $statdata{'mean'} ) / log(2);
-# 			$statdata{'median'}  = log( $statdata{'median'} ) / log(2);
-# 			$statdata{'stddevp'} = log( $statdata{'stddevp'} ) / log(2);
-# 			$statdata{'min'}     = log( $statdata{'min'} ) / log(2);
-# 			$statdata{'max'}     = log( $statdata{'max'} ) / log(2);
-# 			$statdata{'mode'}    = log( $statdata{'mode'} ) / log(2);
-# 			$statdata{'sum'}     = log( $statdata{'sum'} ) / log(2);
-# 		}
 
 		# print the metadata and the calculated statistics
-		print "  Statistics for dataset index '$index'\n";
-		print "    Dataset name is '", $main_data_ref->{$index}{'name'}, "'\n";
+		printf "  Statistics for dataset '%s'\n", $main_data_ref->{$index}{'name'};
+		print "   index => $index\n";
 		foreach my $key (keys %{ $main_data_ref->{$index} } ) {
 			# print the metadata
-			if ($key eq 'index') {
-				next; # skip the index
-			}
-			elsif ($key eq 'name') {
+			if ($key eq 'name') {
 				next; # skip the name, it's been done
+			}
+			elsif ($key eq 'index') {
+				next; # skip the index, it's been done
 			}
 			elsif ($key eq 'AUTO') {
 				next; # skip the name, it's been done
 			}
 			else {
-				print "    '$key' is '", $main_data_ref->{$index}{$key}, "'\n";
+				printf "   $key => '%s'\n", $main_data_ref->{$index}{$key};
 			}
 		}
-		print "     Count is $statdata{'count'}\n";
-		print "     Mean is " . sprintf("%.3f", $statdata{'mean'}) . "\n";
-		print "     Median is " . sprintf("%.3f", $statdata{'median'}) . "\n";
-		print "     Standard deviation is " . 
-			sprintf("%.3f", $statdata{'stddevp'}) . "\n";
-		print "     Min is " . sprintf("%.3f", $statdata{'min'}) . "\n";
-		print "     Max is " . sprintf("%.3f", $statdata{'max'}) . "\n";
-		print "     Mode is " . sprintf("%.3f", $statdata{'mode'}) . "\n";
-		print "     Sum is " . sprintf("%.3f", $statdata{'sum'}) . "\n";
+		print "   count    = $statdata{count}\n" ;
+		print "   mean     = $statdata{mean}\n", ;
+		print "   median   = $statdata{median}\n", ;
+		print "   std dev  = $statdata{stddevp}\n", ;
+		print "   min      = $statdata{min}\n", ;
+		print "   max      = $statdata{max}\n";
+		print "   mode     = $statdata{mode}\n";
+		print "   sum      = $statdata{sum}\n";
 	}
 	
 	# we're returning 0 because the data file has not been modified
@@ -1259,7 +1252,7 @@ sub toss_nulls_function {
 	}
 	
 	# Collection exception rule from commandline
-	my $exception = $opt_exception;
+	my $zero = $opt_zero;
 	
 	# Begin checking and tossing
 	# We will walk through each row in the data table checking for non-values.
@@ -1288,17 +1281,18 @@ sub toss_nulls_function {
 			} 
 			elsif ($data_table_ref->[$row][$index] == 0) {
 				# we have a 0 value, what to do?
-				unless (defined $exception) {
+				unless (defined $zero) {
 					# ask the user if we haven't already
 					print " Also toss values of 0? y or n  ";
-					$exception = <STDIN>;
-					chomp $exception;
-					unless ($exception =~ /^[yn]$/i) {
-						warn " unknown exception response\n";
-						return;
+					my $answer = <STDIN>;
+					if ($answer =~ /^y/i) {
+						$zero = 1;
+					}
+					else {
+						$zero = 0;
 					}
 				}
-				if ($exception eq 'y' or $exception eq 'Y') { 
+				if ($zero) { 
 					# Yes, toss the 0 values
 					$check++;
 				}
@@ -2608,15 +2602,6 @@ sub ratio_function {
 		}
 	}
 	
-	# define exception to handle denominator of 0 cases
-	my $exception;
-	if (defined $opt_exception) {
-		# use command line specified option
-		$exception = $opt_exception;
-	}
-		# otherwise wait and define it when/if it happens
-	
-	
 	# the new index position is equivalent to the number of columns
 	my $new_position = $main_data_ref->{'number_columns'};
 		
@@ -3422,6 +3407,9 @@ sub write_summary_function {
 sub export_function {
 	# this will export the file into an even simpler text format
 	
+	# generate a possible new name based on the input name
+	my $possible_name = $main_data_ref->{'basename'} . '_out.txt';
+	
 	# determine the export file name
 	my $outfilename;
 	if (defined $outfile) {
@@ -3432,10 +3420,11 @@ sub export_function {
 		print " using export file name '$outfile'\n";
 		$outfilename = $outfile;
 	}
+	elsif ($function) {
+		# automatic execution, don't ask the user
+		$outfilename = $possible_name;
+	}
 	else {
-		# generate a possible new name based on the input name
-		my $possible_name = $main_data_ref->{'basename'} . '_out.txt';
-		
 		# ask for new filename
 		print " Exported file name? [$possible_name]  ";
 		my $answer = <STDIN>;
@@ -3553,7 +3542,7 @@ sub export_treeview_function {
 			# Median center datasets
 			print " median centering datasets....\n";
 			$opt_target = 'median';
-			$opt_exception = 'y';
+			$opt_zero = 1;
 			subtract_function(@datasets);
 		}
 		elsif (/^zd$/i) {
@@ -4087,12 +4076,12 @@ sub _validate_index_list {
 sub _get_statistics_hash {
 	# internal subroutine to get statistics
 	
-	my ($index, $exception) = @_;
+	my ($index, $zero) = @_;
 	# the index number (column) of the dataset
 	# the exception rule to work with 0 numbers
-	unless (defined $exception) {
+	unless (defined $zero) {
 		# use global command-line specified value if present
-		$exception = $opt_exception;
+		$zero = $opt_zero;
 	}
 	
 	# collect the values in the dataset
@@ -4105,23 +4094,22 @@ sub _get_statistics_hash {
 		} 
 		elsif ($value == 0) {
 			# we need to determine whether we can accept 0 values
-			unless (defined $exception) {
+			unless (defined $zero) {
 				# wasn't defined on the command line, so stop the program and ask the user
 				print " Include 0 values in the statistics? y or n  ";
-				$exception = <STDIN>;
-				chomp $exception;
-				unless ($exception =~ /^[yn]$/i) {
-					# enforce recognizable answer
-					warn " unknown exception response; nothing done\n";
-					return;
+				my $answer = <STDIN>;
+				if ($answer =~ /^y/i) {
+					$zero = 1;
+				}
+				else {
+					$zero = 0;
 				}
 				
 				# remember for next time, chances are user may still want this
 				# value again in the future
-				$opt_exception = $exception;
+				$opt_zero = $zero;
 			}
-			if ($exception eq 'y') {
-				# a yes value indicates 0 values should be included
+			if ($zero) {
 				push @values, $value;
 			}
 			# otherwise, we skip the 0 value and move on
@@ -4136,13 +4124,6 @@ sub _get_statistics_hash {
 		warn " no valid values collected from dataset index '$index'!";
 		return;
 	}
-# 	
-# 	# check log2 status
-# 	if ($main_data_ref->{$index}{'log2'} == 1) {
-# 		# values are in log2 space
-# 		# de-log them
-# 		@values = map { 2 ** $_ } @values;
-# 	}
 	
 	my %statdata = statshash(@values);
 	return %statdata;
@@ -4275,7 +4256,7 @@ manipulate_datasets.pl [--options ...] <input_filename>
   --con <integer>
   --target <text> or <number>
   --place [r | n]
-  --except [y | n]
+  --zero
   --dir [i | d]
   --name <text>
   --out <filename>
@@ -4393,15 +4374,12 @@ or 'n'):
 Defaults to new placement when executed automatically using the --func 
 option, or prompts the user when executed interactively.
 
-=item --except [y | n]
+=item --(no)zero
 
-Specify what to do when a calculation encounters a 0 value. Two exception 
-values are accepted: 
-  
-  - (y)es, include 0 values in the calculation
-  - (n)o, do not include 0 values in the calculation
-  
-If this is not specified, the program will ask interactively if this occurs.
+Specify that zero values should or should not be included when 
+calculating statistics on a dataset. The default is undefined, meaning 
+the program may ask the user interactively whether to include zero values 
+or not.
 
 =item --dir [i | d]
 
