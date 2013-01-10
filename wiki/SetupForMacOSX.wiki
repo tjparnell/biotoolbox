@@ -5,6 +5,8 @@
 ==Contents==
 	# [SetupForMacOSX#Prerequisites Prerequisites]
 	# [SetupForMacOSX#Updated_notes_for_OS_X_10.7_Lion Updated notes for OS X 10.7 Lion]
+	# [SetupForMacOSX#Updated_notes_for_OS_X_10.8_Mountain_Lion Updated notes for OS X 10.8 Mountain Lion]
+	# [SetupForMacOSX#Installing_XCode Installing XCode]
 	# [SetupForMacOSX#Setting_up_Fink Setting up Fink]
 		# [SetupForMacOSX#Special_notes_for_Mac_OS_X_10.6_only Special notes for Mac OS X 10.6 only]
 		# [SetupForMacOSX#Using_Fink Using Fink]
@@ -20,6 +22,9 @@
 			# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
 	# [SetupForMacOSX#Installing_GBrowse Installing GBrowse]
 		# [SetupForMacOSX#Setting_up_FastCGI_with_GBrowse Setting up FastCGI with GBrowse]
+			# [SetupForMacOSX#FastCGI_on_10.6_Snow_Leopard FastCGI on 10.6 Snow Leopard]
+			# [SetupForMacOSX#FastCGI_on_10.7_or_later FastCGI on 10.7 or later]
+			# [SetupForMacOSX#FastCGI_Permissions FastCGI Permissions]
 		# [SetupForMacOSX#Setting_up_GBrowse_user_accounts Setting up GBrowse user accounts]
 			# [SetupForMacOSX#Setting_up_PAM_Authentication_with_OS_X_accounts Setting up PAM Authentication with OS X accounts]
 	# [SetupForMacOSX#Installing_Bam_file_support Installing Bam file support]
@@ -41,14 +46,36 @@
 	* Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system. Fortunately, these installations are pretty safe and shouldn't break the system. Simply installing perl modules rarely (if at all possible) breaks the system, particularly with recent versions (earlier versions were another story). Using the Fink (or MacPorts) package manager keeps everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. Finally, anything installed under `/usr/local/` is off-limits to Apple, so again there should be no conflicts with Apple system directories.
 	* A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist. For simple editing on the command line, try the `nano` editor.
 	* If you are using Mac OS X 10.6 Snow Leopard, then Perl can run as a 64 bit executable. This speeds some things up, but more importantly allows for more memory usage (some of these data files can consume GB of RAM!). By default, on a 64-bit computer with 10.6, perl should automatically execute Perl 5.10.0 as a 64-bit executable and you shouldn't have to do anything. But you'll need to know this when installing Fink below.
-	* This may (or may not) be obvious, but you'll need to install the Developer Tools from Apple. For Snow Leopard 10.6, this can be found under the Optional Installs folder on the OS X Installation Disc. 
+	* This may (or may not) be obvious, but you'll need to install the Developer Tools or XCode from Apple. See [SetupForMacOSX#Installing_XCode Installing XCode] below for more information. 
 
 ==Updated notes for OS X 10.7 Lion==
 These instructions were written initially for Mac OS X 10.6 Snow Leopard. Most of these instructions are still valid for OS X 10.7 Lion, but with a couple of notable differences. 
-	# You will need to install or reinstall XCode and/or the Command line developer tools, even if you had it installed under 10.6 (previous versions do not work). If you only need access to GCC to install open source software, then download "Command Line Tools for Xcode" from Apple's [http://connect.apple.com/ Developer site]. This will require a (free) Apple Developer Account. Alternatively, if you also develop for Mac OS X and/or iOS, download XCode from Apple's Mac App Store or Developer web site. Be sure to select the Command Line Tools from the packages tab in the XCode preferences. *Note:* Fink may require the full XCode install, not just the Command Line Tools.
 	# The default Perl is now 5.12.3. The 5.10 version used in OS X 10.6 Snow Leopard is still there, but unfortunately the upgrade process removes all of your previously installed modules in the main root Library (Bad Apple!). You might as well use the default Perl 5.12, as you will have to reinstall all your Modules. There's another argument for using [BioToolBoxSetUp#Installing_locally local libraries]. You can view a list of your installed modules by entering "`perldoc perllocal`" in the terminal.
-	# If you're updating from a 10.6 system, heed the [http://www.finkproject.org/news/ warnings] about upgrading Fink. Specifically, you'll probably need to destroy your `/sw` directory and build again from scratch. Make a list of what you have installed. There are more details on the [http://www.finkproject.org/ Fink] site. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
+	# If you're updating from a 10.6 system, note that there is no official upgrade path and that you will have to destroy your Fink installation and re-install everything again. Read their [http://www.finkproject.org/download/10.7-upgrade.php upgrade page] for more information on how to make this slightly less painful. Also note, Fink no longer maintains separate source trees (stable and unstable) under the 10.7 vesion as it did under previous OS X versions.
 	# The FastCGI module for the Apache web server is no longer included. To install it, download Apache's [http://httpd.apache.org/mod_fcgid/ FastCGI] source code, compile, and install.
+
+==Updated notes for OS X 10.8 Mountain Lion==
+Most of these instructions are still valid and applicable to 10.8. There are just a couple of things to note.
+	# The default Perl is now 5.12.4. Yes, the 10.8 Installer will still wipe out your main /Library/Perl directories and all your installed modules from your previous version, so be prepared to spend some time in CPAN re-installing modules.
+	# If you are upgrading to 10.8, it is possible to maintain your Fink installation. The Fink project web site has some notes on keeping your Fink installation during updating. Go to their [http://www.finkproject.org/download/10.8-upgrade.php 10.8 upgrade page] for more information.
+	# Since Fink uses Perl 5.12.3 and OS X 10.8 now has 5.12.4 installed, it looks like Fink will install its own Perl for its own use. They do not have a plain `perl` binary, so it shouldn't execute preferentially over the system perl.
+	# If you want to install FastCGI using mod_fcgid, there is a bug with XCode when compiling code using apxs configuration detailed [http://apple.stackexchange.com/questions/58186/how-to-compile-mod-wsgi-mod-fastcgi-etc-on-mountain-lion-by-fixing-apxserror here]. Make the appropriate symbolic link described therein, and the build should work.
+
+==Installing XCode==
+Since we will be compiling and installing a lot of software, it is *absolutely essential* to install the developer tools for Mac. On 10.6 and earlier versions, the Developer Tools came as an optional install on the system DVD that came with your computer, or as a download from their developer site. With 10.7 and later, XCode is Apple's development tool, and is available from their Mac App Store. It is currently free, although they have charged a fee for it in the past.
+
+You must install the Command Line Tools, which are a separate option under XCode. You can select to install it from the packages tab in the XCode preferences. You do not need the SDKs for Mac OS X or iOS, unless, of course, you intend to do something with them. You can also avoid downloading the documentation, which will save you a considerable amount of disk space. 
+
+You will need to run a few commands to work with the command line tools, particularly Fink (below). Enter this command, assuming XCode is in the default Applications folder.
+<pre>
+	xcode-select -switch /Applications/Xcode.app/Contents/Developer
+</pre>
+
+Next you must accept their license on the command line (yes, you already did this with the App version, but Apple feels compelled to put as many licenses in front of you as possible). 
+<pre>
+	sudo xcodebuild -license
+</pre>
+Scroll to the bottom and accept it.
 
 ==Setting up Fink==
 [http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
@@ -70,7 +97,7 @@ For every user account on the computer, each user must run the following command
 	/sw/bin/pathsetup.sh
 </pre>
 
-===Special notes for Mac OS X 10.6 only===
+====Special notes for Mac OS X 10.6 only====
 If you’ll be running 64-bit programs (e.g. default Perl 5.10 under Mac OS X 10.6), you must set up Fink to be 64-bit as well! In the source install, it will ask you this question at the beginning.
 
 The various software packages available to Fink users under 10.6 only are primarily found in two different source trees, _stable_ and _unstable_. The versions in the stable tree are usually older, but in theory more reliable. Unfortunately, not everything I want is included in the stable tree, necessitating looking in the unstable tree. I find that many programs are only found under the unstable tree, which, despite the name, are often quite usable. These are always the latest versions.
@@ -127,7 +154,7 @@ To install MySQL through Fink, enter the following:
 	sudo fink install mysql-unified mysql-unified-client mysql-unified-dev mysql-unified-shlibs 
 </pre>
 
-To make things easier, I also like to install the MySQL GUI [http://www.mysql.com/downloads/workbench/ Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
+To make things easier, I also like to install the [http://www.mysql.com/downloads/workbench/ MySQL GUI Workbench]. This is especially helpful when you're not familiar with MySQL language and commands but need to set up databases, add users, and set permissions.
 
 Once it's installed, start up MySQL by running the following command
 <pre>
@@ -317,12 +344,14 @@ Copy the resulting file into the appropriate directory as described above.
 ===Setting up FastCGI with GBrowse===
 I recommend enabling FastCGI to speed up web rendering. This enables running the GBrowse Perl script to run as long-lived process, rather than executing the Perl script each and every time you do something in the browser. This should be a noticeable improvement in browsing. 
 
+====FastCGI on 10.6 Snow Leopard====
 To enable on Mac OS X 10.6 Snow Leopard, you will have to edit the file `/etc/apache2/httpd.conf` as root. Find the following line in the file and un-comment it. 
 <pre>
 	# LoadModule fastcgi_module     libexec/apache2/mod_fastcgi.so
 </pre>
 
-To enable FastCGI on OS X 10.7 Lion, you will need to install it, as Apple no longer includes it. Download Apache's updated [http://httpd.apache.org/mod_fcgid/ FastCGI] source package from their [http://httpd.apache.org/download.cgi#mod_fcgid mirror]. Unpack, and install using the following commands.
+====FastCGI on 10.7 or later====
+To enable FastCGI on OS X 10.7 Lion or later, you will need to install it, as Apple no longer includes it. Download Apache's updated [http://httpd.apache.org/mod_fcgid/ FastCGI] source package from their [http://httpd.apache.org/download.cgi#mod_fcgid mirror]. Unpack, and install using the following commands.
 <pre>
 	./configure.apxs
 	make
@@ -330,6 +359,13 @@ To enable FastCGI on OS X 10.7 Lion, you will need to install it, as Apple no lo
 </pre>
 It should install `mod_fcgid.so` into `/usr/libexec/apache2/` for you and automatically update `/etc/apache2/httpd.conf` to enable the FastCGI daemon.
 
+Note that with XCode 4.x on 10.8, there is a bug with XCode when running the `./configure.apxs` step. You get an error from `libtool` saying that `cc` could not be found. The issue and solution is described  [http://apple.stackexchange.com/questions/58186/how-to-compile-mod-wsgi-mod-fastcgi-etc-on-mountain-lion-by-fixing-apxserror here]. You will need to make a symbolic link using the following command.
+<pre>
+	sudo ln -s /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/ /Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.8.xctoolchain
+</pre>
+The `configure` and `make` command should then complete correctly.
+
+====FastCGI Permissions====
 Sometimes I have permissions problems executing the scripts, especially when using FastCGI. You will need to edit the file `/etc/apache2/other/gbrowse2.conf` (see above if it's not present). Find this entry in the file
 <pre>
 	<Directory "/Library/Webserver/CGI-Executables/gb2">
@@ -347,7 +383,7 @@ and add the following lines to make this
 	  Allow from all
 	</Directory>
 </pre>
-Finally, restart the Apache server (you should "fcgi" mentioned in the Apache log when restarting), and try the new link http://localhost/fgb2/gbrowse.
+Finally, restart the Apache server (you should see "fcgi" mentioned in the Apache log when restarting), and try the new link http://localhost/fgb2/gbrowse.
 
 ===Setting up GBrowse user accounts===
 One of the cool things about GBrowse is the ability to offer user accounts. This allows multiple users to store their file uploads and personal settings and, more importantly, have them persistently available across browser and platform sessions.
