@@ -399,19 +399,21 @@ You will need to install some additional Perl modules before you begin.
 	* `Authen::Simple::PAM`
 These will likely require installing some other dependencies. CPAN should take care of that for you.
 
-Next, create a new service definition file in `/etc/pam.d/`. The easiest way to do this is simply duplicate the `login` file and rename it to `gbrowse`.
+Next, create a new service definition file in `/etc/pam.d/` named `gbrowse` with the following content.
 <pre>
-	cd /etc/pam.d/
-	sudo cp login gbrowse
+	# login: auth account password session
+	auth       optional       pam_krb5.so use_kcminit
+	account    required       pam_nologin.so
 </pre>
-It's likely not every line is needed from the `login` definition file, but I am not knowledgable enough to know what to keep or toss. I just know it works with everything in there.
+These should be the only services you need, empirically selected from those present in the `login` file.
 
 Next you'll need to enable user accounts in GBrowse. Edit the main GBrowse configuration file, `/etc/gbrowse2/GBrowse.conf`. Find the line "`user_accounts`" and change the `0` to `1` to enable. Next, uncomment the following line:
 <pre>
 	authentication plugin = PamAuthenticate
 </pre>
+To add login hints and help text, find the `PamAuthenticate:plugin` stanza and edit the appropriate lines as necessary. 
 
-Save the file, restart the Apache web server, reload the GBrowse page, and you should now have login link in the upper right corner. Provide your Mac OS X user account credentials to login. There is a place in `GBrowse.conf` where you can provide a helpful hint to users in the login dialog box.
+Save the file, restart the Apache web server, reload the GBrowse page, and you should now have login link in the upper right corner. Provide your Mac OS X user account credentials to login. 
 
 ==Installing Bam file support==
 Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and BioToolBox.
