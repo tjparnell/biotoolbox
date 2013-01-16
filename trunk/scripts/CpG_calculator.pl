@@ -20,7 +20,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.8.2';
+my $VERSION = '1.9.6';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -334,6 +334,22 @@ sub process_regions {
 			$data->{'data_table'}->[$row][$stop_i] + 1,
 			# we add 1 bp so that we can count CpG that cross a window border
 		);
+		unless ($seq) {
+			# this may happen if 0 or >1 chromosomes match the name
+			# or possibly coordinates are off the end, although I thought this was 
+			# checked by the db adaptor
+			warn "No sequence for segment " . 
+				$data->{'data_table'}->[$row][$chr_i] . ":" .
+				$data->{'data_table'}->[$row][$start_i] . ".." .
+				$data->{'data_table'}->[$row][$stop_i] . " at row $row, skipping.\n";
+			
+			# fill out null data
+			$data->{'data_table'}->[$row][$fgc_i] = '.';
+			$data->{'data_table'}->[$row][$cg_i]  = '.';
+			$data->{'data_table'}->[$row][$exp_i] = '.';
+			$data->{'data_table'}->[$row][$oe_i]  = '.';
+			next;
+		}
 		
 		# count frequencies
 		# we could use the transliterate tr function to count single 
@@ -351,13 +367,14 @@ sub process_regions {
 		}
 		
 		# record the statistics
+		# we subtract 1 from the length because we added 1 when we generated the seq
 		$data->{'data_table'}->[$row][$fgc_i] = 
-			sprintf "%.3f", ($numC + $numG) / length($seq); # fraction GC
+			sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
 		
 		$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
 		
 		$data->{'data_table'}->[$row][$exp_i] = 
-			sprintf "%.0f", ($numC * $numG) / length($seq); # expected CpG
+			sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
 		
 		$data->{'data_table'}->[$row][$oe_i]  = 
 			$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
