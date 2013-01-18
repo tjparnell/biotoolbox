@@ -1,5 +1,9 @@
 ######## BioToolBox revision history #############
 
+v.1.9.6 (svn 533)
+	- Fixed critical bug in script ucsc_table2gff3.pl where single exons containing all three 5'UTR, CDS, and 3'UTR subfeatures were not properly parsed into GFF3. This had resulted in an extended CDS longer than expected. Thanks to H. Stovall for reporting.
+	- Added warnings when a sequence could not be generated to avoid division by 0 errors, and a slight correction to fraction calculations, in script CpG_calculator.pl.
+
 v.1.9.5 (svn 525)
 	- Changed the non-intuitive --except option to a more intuitive --zero option in script manipulate_datasets.pl; this is now a boolean option to include or exclude zero values when calculating statistics. The printed statistics output has also been cleaned up and no longer includes decimal formatting. The export function will automatically generate a name when executed automatically.
 	- Added capability to use a column of source values rather than a static text string for the GFF source tag in script data2gff.pl. Also made improvements to the interactive ask session.
