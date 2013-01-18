@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.8.5';
+my $VERSION = '1.9.6';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -1213,9 +1213,32 @@ sub add_utrs {
 		# to the exon coordinates
 		# the primary tag is determined by the exon strand orientation
 		my ($start, $stop, $tag);
+		# in case we need to build two UTRs
+		my ($start2, $stop2, $tag2);
+		
+		# Split 5'UTR, CDS, and 3'UTR all on the same exon
+		if (
+			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
+			and
+			$linedata->{exonEnds}->[$i] > $linedata->{cdsEnd}
+		) {
+			# the CDS is entirely within the exon, resulting in two UTRs 
+			# on either side of the exon
+			# we must build two UTRs
+			
+			# the left UTR
+			$start = $linedata->{exonStarts}->[$i];
+			$stop  = $linedata->{cdsStart} - 1;
+			$tag   = $transcript->strand == 1 ? 'five_prime_UTR' : 'three_prime_UTR';
+			
+			# the right UTR
+			$start2 = $linedata->{cdsEnd} + 1;
+			$stop2  = $linedata->{exonEnds}->[$i];
+			$tag2   = $transcript->strand == 1 ? 'three_prime_UTR' : 'five_prime_UTR';
+		}
 		
 		# 5'UTR forward, 3'UTR reverse
-		if (
+		elsif (
 			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
 			and
 			$linedata->{exonEnds}->[$i] < $linedata->{cdsStart}
@@ -1226,7 +1249,7 @@ sub add_utrs {
 			$tag   = $transcript->strand == 1 ? 'five_prime_UTR' : 'three_prime_UTR';
 		}
 		
-		# Split 5'UTR forward, 3'UTR reverse
+		# Split 5'UTR & CDS on forward, 3'UTR & CDS
 		elsif (
 			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
 			and
@@ -1243,13 +1266,13 @@ sub add_utrs {
 		elsif (
 			$linedata->{exonStarts}->[$i] >= $linedata->{cdsStart}
 			and
-			$linedata->{exonEnds}->[$i] < $linedata->{cdsEnd}
+			$linedata->{exonEnds}->[$i] <= $linedata->{cdsEnd}
 		) {
 			# CDS only exon
 			next;
 		}
 		
-		# Split 3'UTR forward, 5'UTR reverse
+		# Split 3'UTR & CDS on forward, 5'UTR & CDS
 		elsif (
 			$linedata->{exonStarts}->[$i] <= $linedata->{cdsEnd}
 			and
@@ -1275,12 +1298,22 @@ sub add_utrs {
 			$tag   = $transcript->strand == 1 ? 'three_prime_UTR' : 'five_prime_UTR';
 		}
 		
+		# Something else?
 		else {
-			# something else?
+			my $warning = "Here is an exon that doesn't match UTR criteria\n";
+			foreach (sort {$a cmp $b} keys %$linedata) {
+				if (ref $linedata->{$_} eq 'ARRAY') {
+					$warning .= "  $_ => " . join(',', @{$linedata->{$_}}) . "\n";
+				}
+				else {
+					$warning .= "  $_ => $linedata->{$_}\n";
+				}
+			}
+			warn $warning;
 			next;
 		}
 			
-		# build the utr object
+		# build the UTR object
 		my $utr = Bio::SeqFeature::Lite->new(
 			-seq_id        => $transcript->seq_id,
 			-source        => $transcript->source,
@@ -1295,6 +1328,24 @@ sub add_utrs {
 		
 		# store this utr seqfeature in a temporary array
 		push @utrs, $utr;
+		
+		# build a second UTR object as necessary
+		if ($start2) {
+			my $utr2 = Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-start         => $start2,
+				-end           => $stop2,
+				-strand        => $transcript->strand,
+				-phase         => '.',
+				-primary_tag   => $tag2,
+				-primary_id    => $transcript->primary_id . ".utr$number" . "a",
+				-display_name  => $transcript->display_name . ".utr$number" . "a",
+			);
+		
+			# store this utr seqfeature in a temporary array
+			push @utrs, $utr2;
+		}
 	}
 	
 	# associate found UTRs with the transcript
@@ -1332,8 +1383,29 @@ sub add_cds {
 		# to the exon coordinates
 		my ($start, $stop);
 		
-		# Split 5'UTR & CDS on forward, 3'UTR & CDS on reverse
+		# Split 5'UTR, CDS, and 3'UTR all on the same exon
 		if (
+			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
+			and
+			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
+		) {
+			# exon contains the entire CDS
+			$start = $linedata->{cdsStart};
+			$stop  = $linedata->{cdsEnd};
+		}
+		
+		# 5'UTR forward, 3'UTR reverse
+		elsif (
+			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
+			and
+			$linedata->{exonEnds}->[$j] < $linedata->{cdsStart}
+		) {
+			# no CDS in this exon
+			next;
+		}
+		
+		# Split 5'UTR & CDS on forward, 3'UTR & CDS
+		elsif (
 			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
 			and
 			$linedata->{exonEnds}->[$j] >= $linedata->{cdsStart}
@@ -1355,20 +1427,41 @@ sub add_cds {
 			$stop  = $linedata->{exonEnds}->[$j];
 		}
 	
-		# Split 3'UTR & CDS on forward, 5'UTR & CDS on reverse
+		# Split 3'UTR & CDS on forward, 5'UTR & CDS
 		elsif (
 			$linedata->{exonStarts}->[$j] <= $linedata->{cdsEnd}
 			and
 			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
 		) {
 			# the stop/start codon is in this exon
-			# we need to make the UTR out of a portion of this exon 
+			# we need to make the CDS out of a portion of this exon 
 			$start = $linedata->{exonStarts}->[$j];
 			$stop  = $linedata->{cdsEnd};
 		}
 	
+		# 3'UTR forward, 5'UTR reverse
+		elsif (
+			$linedata->{exonStarts}->[$j] > $linedata->{cdsEnd}
+			and
+			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
+		) {
+			# the exon start/end is entirely after the cdsStop
+			# we have entirely 5' or 3'UTR, no CDS
+			next;
+		}
+		
+		# Something else?
 		else {
-			# UTR exon
+			my $warning = "Here is an exon that doesn't match CDS criteria\n";
+			foreach (sort {$a cmp $b} keys %$linedata) {
+				if (ref $linedata->{$_} eq 'ARRAY') {
+					$warning .= "  $_ => " . join(',', @{$linedata->{$_}}) . "\n";
+				}
+				else {
+					$warning .= "  $_ => $linedata->{$_}\n";
+				}
+			}
+			warn $warning;
 			next;
 		}
 			
@@ -1697,7 +1790,7 @@ Otherwise, mRNA transcripts are kept independent. The gene name, when
 available, are always associated with transcripts through the Alias tag. 
 The default is true.
 
-=item --no(cds)
+=item --(no)cds
 
 Specify whether (or not) to include CDS features in the output GFF file. 
 The default is true.
