@@ -1668,8 +1668,6 @@ __END__
 
 =head1 NAME ucsc_table2gff3.pl
 
-
-
 =head1 SYNOPSIS
 
    ucsc_table2gff3.pl --ftp <text> --db <text>
@@ -1848,7 +1846,6 @@ written.
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
- Howard Hughes Medical Institute
  Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah
