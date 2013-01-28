@@ -22,7 +22,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.8.7';
+my $VERSION = '1.9.7';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -51,12 +51,15 @@ my (
 	$get_mirna_genes,
 	$get_rrna_genes,
 	$get_trna_genes,
+	$do_cds,
+	$do_utr,
+	$do_codon,
 	$group,
 	$host,
 	$port,
 	$user,
 	$pass,
-	$prefix,
+	$ucsc,
 	$outfile,
 	$printdb,
 	$help,
@@ -75,12 +78,15 @@ GetOptions(
 	'mirna!'    => \$get_mirna_genes,
 	'rrna!'     => \$get_rrna_genes,
 	'trna!'     => \$get_trna_genes,
+	'cds!'      => \$do_cds, # include CDS in output
+	'utr!'      => \$do_utr, # include UTRs in output
+	'codon!'    => \$do_codon, # include start & stop codons in output
 	'group=s'   => \$group, # the database group
 	'host=s'    => \$host, # host address
 	'port=i'    => \$port, # IP port number
 	'user=s'    => \$user, # user name to log in
 	'pass=s'    => \$pass, # password to log in with
-	'prefix!'   => \$prefix, # prefix chromosome names with chr
+	'ucsc|prefix!' => \$ucsc, # use UCSC style chromosome naming conventions
 	'out=s'     => \$outfile, # name of output file 
 	'printdb'   => \$printdb, # print all of the available databases
 	'help'      => \$help, # request help
@@ -126,11 +132,11 @@ unless ($outfile) {
 unless ($host) {
 	$host = 'ensembldb.ensembl.org';
 }
-unless ($port) {
-	$port = 3306;
-}
 unless ($user) {
 	$user = 'anonymous';
+}
+unless ($port) {
+	$port = 5306;
 }
 unless ($group) {
 	$group = 'core';
@@ -143,6 +149,9 @@ unless (defined $get_chromo) {
 unless (defined $get_protein_genes) {
 	$get_protein_genes = 1;
 }
+unless (defined $get_rna_genes) {
+	$get_rna_genes = 1;
+}
 if ($get_rna_genes) {
 	# we will set all the individual rna genes to true unless already defined
 	$get_misc_rna_genes = 1 unless defined $get_misc_rna_genes;
@@ -152,7 +161,16 @@ if ($get_rna_genes) {
 	$get_rrna_genes     = 1 unless defined $get_rrna_genes;
 	$get_trna_genes     = 1 unless defined $get_trna_genes;
 }
-
+unless (defined $do_cds) {
+	$do_cds = 1;
+	unless (defined $do_codon) {
+		$do_codon = 1;
+	}
+}
+unless (defined $do_utr) {
+	$do_utr = 1;
+}
+my $start_time = time;
 
 
 
@@ -246,7 +264,8 @@ foreach my $slice (@{ $slices_ref }) {
 		
 		# set chromosome name
 		my $name = $slice->seq_region_name;
-		if ($slice->coord_system_name eq 'chromosome' and $prefix) {
+		if ($slice->coord_system_name eq 'chromosome' and $ucsc) {
+			$name =~ s/^MT$/M/; # rename mitochondrial chromosome
 			$name = 'chr' . $name;
 		}
 		
@@ -325,7 +344,8 @@ foreach my $slice (@{ $slices_ref }) {
 
 ### Finish
 $gff_fh->close;
-print " Finished! Wrote output file '$outfile'.\n";
+printf " Finished in %.1f minutes. Wrote file '$outfile' \n", 
+	(time - $start_time)/60;
 
 
 
@@ -399,7 +419,7 @@ sub process_genes {
 	
 	# get chromosome name
 	my $chr = $slice->seq_region_name;
-	if ($slice->coord_system_name eq 'chromosome' and $prefix) {
+	if ($slice->coord_system_name eq 'chromosome' and $ucsc) {
 		$chr = 'chr' . $chr;
 	}
 	
@@ -484,20 +504,16 @@ sub process_coding_gene {
 		
 		# add the exons
 		my $exons_ref = $transcript->get_all_Exons;
-		add_exon_codon_subfeatures(
-			$trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+		add_exons($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
 		
 		# process CDS and UTRs
-		if ($transcript->strand > 0) {
-			# forward strand
-			process_forward_exons(
-				$trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+		if ($do_cds or $do_utr) {
+			add_cds_and_utrs($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
 		}
-		else {
-			# reverse strand
-			process_reverse_exons(
-				$trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
 		
+		# add codons
+		if ($do_codon) {
+			add_codons($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
 		}
 		
 		# add the transcript
@@ -514,101 +530,23 @@ sub process_coding_gene {
 }
 
 
-sub add_exon_codon_subfeatures {
-	my ($trnscpt_sf, $exons_ref, $coding_start, $coding_stop) = @_;
+sub add_exons {
+	my ($transcript, $exons_ref, $coding_start, $coding_stop) = @_;
 	
-	# generate the start and stop codons
-	if ($trnscpt_sf->strand == 1) {
-		# forward strand
-		
-		# in some situations, there may be protein_coding gene transcript
-		# without a coding start or stop !?
-		if (defined $coding_start and defined $coding_stop) {
-			# start codon
-			$trnscpt_sf->add_SeqFeature( 
-				Bio::SeqFeature::Lite->new(
-					-seq_id        => $trnscpt_sf->seq_id,
-					-source        => $trnscpt_sf->source,
-					-primary_tag   => 'start_codon',
-					-start         => $coding_start,
-					-end           => $coding_start + 2,
-					-strand        => 1,
-					-phase         => 0,
-					-display_name  => $trnscpt_sf->display_name . '.start_codon',
-					-primary_id    => $trnscpt_sf->display_name . '.start_codon',
-				)
-			);
-			
-			# stop codon
-			$trnscpt_sf->add_SeqFeature( 
-				Bio::SeqFeature::Lite->new(
-					-seq_id        => $trnscpt_sf->seq_id,
-					-source        => $trnscpt_sf->source,
-					-primary_tag   => 'stop_codon',
-					-start         => $coding_stop - 2,
-					-end           => $coding_stop,
-					-strand        => 1,
-					-phase         => 0,
-					-display_name  => $trnscpt_sf->display_name . '.stop_codon',
-					-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
-				)
-			);
-		}
-	}
-	
-	else {
-		# reverse strand
-		
-		# in some situations, there may be protein_coding gene transcript
-		# without a coding start or stop !?
-		if (defined $coding_start and defined $coding_stop) {
-		# stop codon
-			$trnscpt_sf->add_SeqFeature( 
-				Bio::SeqFeature::Lite->new(
-					-seq_id        => $trnscpt_sf->seq_id,
-					-source        => $trnscpt_sf->source,
-					-primary_tag   => 'stop_codon',
-					-start         => $coding_start,
-					-end           => $coding_start + 2,
-					-strand        => -1,
-					-phase         => 0,
-					-display_name  => $trnscpt_sf->display_name . '.stop_codon',
-					-primary_id    => $trnscpt_sf->display_name . '.stop_codon',
-				)
-			);
-			
-			# start codon
-			$trnscpt_sf->add_SeqFeature( 
-				Bio::SeqFeature::Lite->new(
-					-seq_id        => $trnscpt_sf->seq_id,
-					-source        => $trnscpt_sf->source,
-					-primary_tag   => 'start_codon',
-					-start         => $coding_stop - 2,
-					-end           => $coding_stop,
-					-strand        => -1,
-					-phase         => 0,
-					-display_name  => $trnscpt_sf->display_name . '.start_codon',
-					-primary_id    => $trnscpt_sf->display_name . '.start_codon',
-				)
-			);
-		}
-	}
-	
-	# add exons
 	my $exon_count = 1;
 	foreach my $exon ( @{ $exons_ref } ) {
 		
 		# add the exon as a subfeature
-		$trnscpt_sf->add_SeqFeature( 
+		$transcript->add_SeqFeature( 
 			Bio::SeqFeature::Lite->new(
-				-seq_id        => $trnscpt_sf->seq_id,
-				-source        => $trnscpt_sf->source,
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
 				-primary_tag   => 'exon',
 				-start         => $exon->start,
 				-end           => $exon->end,
 				-strand        => $exon->strand,
 				-display_name  => $exon->stable_id,
-				-primary_id    => $trnscpt_sf->display_name . ".exon.$exon_count",
+				-primary_id    => $transcript->display_name . ".exon.$exon_count",
 			)
 		);
 		
@@ -619,234 +557,66 @@ sub add_exon_codon_subfeatures {
 }
 
 
+sub add_codons {
 
-sub process_forward_exons {
-	my ($transcript, $exons_ref, $cdsStart, $cdsStop) = @_;
+	my ($transcript, $exons_ref, $coding_start, $coding_stop) = @_;
 	
-	# exon counter
-	# we need to make the primary ids unique, and since exons may be 
-	# shared between multiple transcripts, we can't use the exon's id
-	# we'll use the transcript id plus an incrementing number to make unique
-	my $ex_count = 1; 
-	
-	
-	foreach my $exon ( @{ $exons_ref } ) {
+	# in some situations, there may be protein_coding gene transcript
+	# without a coding start or stop !?
+	if (defined $coding_start and defined $coding_stop) {
 		
-		# we need to determine whether the exon is UTR, CDS, or split both
-		
-		#### No CDS whatsoever ####
-		if (!defined $cdsStart and !defined $cdsStop) {
-			# nothing to write
-			# there should already be an exon written
+		# generate the start and stop codons
+		my ($start_codon_start, $start_codon_stop, $stop_codon_start, $stop_codon_stop);
+		if ($transcript->strand == 1) {
+			# forward strand
+			$start_codon_start = $coding_start;
+			$start_codon_stop  = $coding_start + 2;
+			$stop_codon_start  = $coding_stop -2;
+			$stop_codon_stop   = $coding_stop;
 		}
-		
-		#### 5'UTR only ####
-		elsif (
-			$exon->start < $cdsStart # cdsStart
-			and
-			$exon->end < $cdsStart
-		) {
-			# the exon start/end is entirely before the cdsStart
-			# we have a 5'UTR
-			
-			# build the utr SeqFeature object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $exon->start,
-				-end           => $exon->end,
-				-strand        => 1, # we know this already
-				-phase         => '.',
-				-primary_tag   => 'five_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-		}
-		
-		
-		#### Split 5'UTR and CDS ####
-		elsif (
-			$exon->start < $cdsStart 
-			and
-			$exon->end >= $cdsStart
-		) {
-			# the start codon is in this exon
-			# we need to make two features, 
-			# one for the utr half, other for the cds
-			
-			# build the utr half of the object
-			my $utr_exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $exon->start,
-				-end           => $cdsStart - 1,
-				-strand        => 1,
-				-phase         => '.',
-				-primary_tag   => 'five_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id . '.utr',
-			);
-			# since we're actually building two objects here, we have to 
-			# complete the process of building the utr object and associate 
-			# it with the transcript object
-			# the cds half of the exon will be finished below
-			
-			# associate add the utr half to the parent transcript
-			$transcript->add_SeqFeature($utr_exon_sf);
-			
-			# now build the cds half of the object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $cdsStart,
-				-end           => $exon->end,
-				-strand        => 1,
-				-phase         => $phase,
-				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
-				-display_name  => $exon->stable_id . '.cds',
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-			
-			# reset phase for next CDS
-			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
-			# adapted from Barry Moore's gtf2gff3.pl script
-			$phase = $phase + (3 - ( ($exon->end - $cdsStart + 1) % 3) );
-			$phase -=3 if $phase > 2;
-		}
-		
-		#### CDS only ####
-		elsif (
-			$exon->start >= $cdsStart 
-			and
-			$exon->end <= $cdsStop
-		) {
-			# we are in the CDS
-			# this will also work with genes that have no UTRs, where the 
-			# the cdsStart == txStart, and same with End
-			
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $exon->start,
-				-end           => $exon->end,
-				-strand        => 1,
-				-phase         => $phase,
-				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
-				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-			
-			# reset phase for next CDS
-			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
-			# adapted from Barry Moore's gtf2gff3.pl script
-			$phase = $phase + (3 - ( ($exon->end - $exon->start + 1) % 3) );
-			$phase -=3 if $phase > 2;
-		}
-		
-		
-		#### Split CDS and 3'UTR ####
-		elsif (
-			$exon->start <= $cdsStop 
-			and
-			$exon->end > $cdsStop
-		) {
-			# the stop codon is in this exon
-			# we need to make two features, 
-			# one for the cds half, other for the utr
-			
-			# build the cds half of the object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $exon->start,
-				-end           => $cdsStop,
-				-strand        => 1,
-				-phase         => $phase,
-				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
-				-display_name  => $exon->stable_id . '.cds',
-			);
-			
-			# now build the utr half of the object
-			my $utr_exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $cdsStop + 1,
-				-end           => $exon->end,
-				-strand        => 1,
-				-phase         => '.',
-				-primary_tag   => 'three_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id . '.utr',
-			);
-			
-			# associate exons with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-			$transcript->add_SeqFeature($utr_exon_sf);
-			
-			# reset phase for next CDS - huh?
-			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
-			# adapted from Barry Moore's gtf2gff3.pl script
-			$phase = $phase + (3 - ( ($cdsStop - $exon->start + 1) % 3) );
-			$phase -=3 if $phase > 2;
-		}
-		
-		#### 3'UTR only ####
-		elsif (
-			$exon->start > $cdsStop 
-			and
-			$exon->end > $cdsStop
-		) {
-			# the exon start/end is entirely after the cdsStop
-			# we have a 3'UTR
-			
-			# build the utr object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $exon->start,
-				-end           => $exon->end,
-				-strand        => 1,
-				-phase         => '.',
-				-primary_tag   => 'three_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-		}
-		
-		#### Something's wrong ####
 		else {
-			# just in case I goofed something up
-			warn " programming error! the exon coordinates don't match up " .
-				"with CDS coordinates for transcript '" . 
-				$transcript->display_name . "'\n " . 
-				" Forward strand exon coordinates " . $exon->start . ".." .
-				$exon->end . "\n" .
-				" CDS coordinates $cdsStart .. $cdsStop\n";
-		}
+			# reverse strand
+			$start_codon_start = $coding_stop -2;
+			$start_codon_stop  = $coding_stop;
+			$stop_codon_start  = $coding_start;
+			$stop_codon_stop   = $coding_start + 2;
+		} 
 		
-		# increment exon counter
-		$ex_count++;
+		# start codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'start_codon',
+				-start         => $start_codon_start,
+				-end           => $start_codon_stop,
+				-strand        => $transcript->strand,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.start_codon',
+				-primary_id    => $transcript->display_name . '.start_codon',
+			)
+		);
+		
+		# stop codon
+		$transcript->add_SeqFeature( 
+			Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'stop_codon',
+				-start         => $stop_codon_start,
+				-end           => $stop_codon_stop,
+				-strand        => $transcript->strand,
+				-phase         => 0,
+				-display_name  => $transcript->display_name . '.stop_codon',
+				-primary_id    => $transcript->display_name . '.stop_codon',
+			)
+		);
 	}
 }
 
 
+sub add_cds_and_utrs {
 
-
-
-sub process_reverse_exons {
 	my ($transcript, $exons_ref, $cdsStart, $cdsStop) = @_;
 	
 	# exon counter
@@ -864,81 +634,149 @@ sub process_reverse_exons {
 		if (!defined $cdsStart and !defined $cdsStop) {
 			# nothing to write
 			# there should already be an exon written
+			return;
 		}
 		
-		#### 3'UTR only ####
+		#### 5'UTR, CDS, and 3'UTR all in one exon
+		elsif (
+			$exon->start < $cdsStart 
+			and
+			$exon->end > $cdsStop
+		) {
+			# all three subfeatures are in this exon
+			# we need to make two UTRs and one CDS
+			
+			# build the left UTR object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new( 
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source_tag,
+				-start         => $exon->start,
+				-end           => $cdsStart - 1,
+				-strand        => $transcript->strand,
+				-phase         => '.',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'five_prime_UTR' :
+									'three_prime_UTR',
+				-primary_id    => $transcript->strand == 1 ? 
+									$transcript->primary_id . ".5utr.$ex_count" :
+									$transcript->primary_id . ".3utr.$ex_count",
+				-display_name  => $transcript->strand == 1 ? 
+									$transcript->primary_id . ".5utr" :
+									$transcript->primary_id . ".3utr",
+				)
+			) if $do_utr;
+			
+			# build the right UTR object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source_tag,
+				-start         => $cdsStop + 1,
+				-end           => $exon->end,
+				-strand        => $transcript->strand,
+				-phase         => '.',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'three_prime_UTR':
+									'five_prime_UTR' ,
+				-primary_id    => $transcript->strand == 1 ? 
+									$transcript->primary_id . ".3utr.$ex_count" :
+									$transcript->primary_id . ".5utr.$ex_count",
+				-display_name  => $transcript->strand == 1 ? 
+									$transcript->primary_id . ".3utr" :
+									$transcript->primary_id . ".5utr",
+				)
+			) if $do_utr;
+			
+			# now build the cds object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source_tag,
+				-start         => $cdsStart,
+				-end           => $cdsStop,
+				-strand        => $transcript->strand,
+				-phase         => $phase,
+				-primary_tag   => 'CDS',
+				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
+				-display_name  => $exon->stable_id . ".cds",
+				)
+			) if $do_cds;
+			
+			# do not need to reset the phase
+		}
+		
+		#### UTR only ####
 		elsif (
 			$exon->start < $cdsStart # cdsStart
 			and
 			$exon->end < $cdsStart
 		) {
 			# the exon start/end is entirely before the cdsStart
-			# we have a 3'UTR
+			# we have either a 5'UTR for forward strand or 3'UTR for reverse strand
 			
-			# build the utr object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
+			# build the utr SeqFeature object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source_tag,
 				-start         => $exon->start,
 				-end           => $exon->end,
-				-strand        => -1,
+				-strand        => $transcript->strand, 
 				-phase         => '.',
-				-primary_tag   => 'three_prime_UTR',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'five_prime_UTR' :
+									'three_prime_UTR',
 				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-			
+				-display_name  => $exon->stable_id . ".utr",
+				)
+			) if $do_utr;
 		}
 		
 		
-		#### Split 3'UTR and CDS ####
+		#### Split UTR and CDS ####
 		elsif (
 			$exon->start < $cdsStart 
 			and
 			$exon->end >= $cdsStart
 		) {
-			# the (stop) codon is in this exon
+			# the start or stop codon is in this exon
 			# we need to make two features, 
-			# one for the utr half, other for the cds
+			# 5'UTR for forward strand, or 3'UTR for reverse strand, plus CDS
 			
-			# build the cds half of the object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $cdsStart,
-				-end           => $exon->end,
-				-strand        => -1,
-				-phase         => $phase,
-				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
-				-display_name  => $exon->stable_id . '.cds',
-			);
-			
-			# now build the utr half of the object
-			my $utr_exon_sf = Bio::SeqFeature::Lite->new(
+			# build the utr half of the object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source_tag,
 				-start         => $exon->start,
 				-end           => $cdsStart - 1,
-				-strand        => -1,
+				-strand        => $transcript->strand,
 				-phase         => '.',
-				-primary_tag   => 'three_prime_UTR',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'five_prime_UTR' :
+									'three_prime_UTR',
 				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
 				-display_name  => $exon->stable_id . '.utr',
-			);
-			# since we're actually building two objects here, we have to 
-			# complete the process of building the utr object and associate 
-			# it with the transcript object
-			# the cds half of the exon will be finished below
+				)
+			) if $do_utr;
 			
-			# associate exons with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
-			$transcript->add_SeqFeature($utr_exon_sf);
+			# build the cds half of the object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source_tag,
+				-start         => $cdsStart,
+				-end           => $exon->end,
+				-strand        => $transcript->strand,
+				-phase         => $phase,
+				-primary_tag   => 'CDS',
+				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
+				-display_name  => $exon->stable_id . ".cds",
+				)
+			) if $do_cds;
 			
-			# reset phase for next CDS - huh?
+			# reset phase for next CDS
 			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
 			# adapted from Barry Moore's gtf2gff3.pl script
 			$phase = $phase + (3 - ( ($exon->end - $cdsStart + 1) % 3) );
@@ -955,20 +793,19 @@ sub process_reverse_exons {
 			# this will also work with genes that have no UTRs, where the 
 			# the cdsStart == txStart, and same with End
 			
-			my $exon_sf = Bio::SeqFeature::Lite->new(
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source_tag,
 				-start         => $exon->start,
 				-end           => $exon->end,
-				-strand        => -1,
+				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
 				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
 				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
+				)
+			) if $do_cds;
 			
 			# reset phase for next CDS
 			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
@@ -978,88 +815,91 @@ sub process_reverse_exons {
 		}
 		
 		
-		#### Split CDS and 5'UTR ####
+		#### Split CDS and UTR ####
 		elsif (
 			$exon->start <= $cdsStop 
 			and
 			$exon->end > $cdsStop
 		) {
-			# the (start) codon is in this exon
+			# the start or stop codon is in this exon
 			# we need to make two features, 
-			# one for the cds half, other for the utr
+			# 3'UTR for forward strand or 5'UTR for reverse strand, plus CDS
 			
-			# build the utr half of the object
-			my $utr_exon_sf = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source_tag,
-				-start         => $cdsStop + 1,
-				-end           => $exon->end,
-				-strand        => -1,
-				-phase         => '.',
-				-primary_tag   => 'five_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id . '.utr',
-			);
-						
-			# now build the cds half of the object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
+			# build the cds half of the object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source_tag,
 				-start         => $exon->start,
 				-end           => $cdsStop,
-				-strand        => -1,
+				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
 				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
 				-display_name  => $exon->stable_id . '.cds',
-			);
+				)
+			) if $do_cds;
 			
-			# associate exons with the parent transcript
-			$transcript->add_SeqFeature($utr_exon_sf);
-			$transcript->add_SeqFeature($exon_sf);
+			# now build the utr half of the object
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source_tag,
+				-start         => $cdsStop + 1,
+				-end           => $exon->end,
+				-strand        => $transcript->strand,
+				-phase         => '.',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'three_prime_UTR':
+									'five_prime_UTR' ,
+				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
+				-display_name  => $exon->stable_id . '.utr',
+				)
+			) if $do_utr;
 			
-			# reset phase for next CDS
+			# reset phase for next CDS - huh?
 			# phase + (3 - (length % 3)), readjust to 0..2 if necessary
 			# adapted from Barry Moore's gtf2gff3.pl script
 			$phase = $phase + (3 - ( ($cdsStop - $exon->start + 1) % 3) );
 			$phase -=3 if $phase > 2;
 		}
 		
-		#### 5'UTR only ####
+		#### UTR only ####
 		elsif (
 			$exon->start > $cdsStop 
 			and
 			$exon->end > $cdsStop
 		) {
 			# the exon start/end is entirely after the cdsStop
-			# we have a 5'UTR
+			# we have either a 3'UTR for forward strand or 5'UTR for reverse strand
 			
 			# build the utr object
-			my $exon_sf = Bio::SeqFeature::Lite->new(
+			$transcript->add_SeqFeature( 
+				Bio::SeqFeature::Lite->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source_tag,
 				-start         => $exon->start,
 				-end           => $exon->end,
-				-strand        => -1,
+				-strand        => $transcript->strand,
 				-phase         => '.',
-				-primary_tag   => 'five_prime_UTR',
+				-primary_tag   => $transcript->strand == 1 ? 
+									'three_prime_UTR':
+									'five_prime_UTR' ,
 				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
-				-display_name  => $exon->stable_id,
-			);
-			
-			# associate exon with the parent transcript
-			$transcript->add_SeqFeature($exon_sf);
+				-display_name  => $exon->stable_id . '.utr',
+				)
+			) if $do_utr;
 		}
-			
+		
 		#### Something's wrong ####
 		else {
 			# just in case I goofed something up
 			warn " programming error! the exon coordinates don't match up " .
 				"with CDS coordinates for transcript '" . 
 				$transcript->display_name . "'\n " . 
-				" Reverse strand exon coordinates " . $exon->start . ".." .
+				" Exon coordinates " . $exon->start . ".." .
 				$exon->end . "\n" .
-				" CDS coordinates $cdsStart .. $cdsStop\n";
+				" CDS coordinates $cdsStart .. $cdsStop, strand " . $exon->strand . "\n";
 		}
 		
 		# increment exon counter
@@ -1203,8 +1043,10 @@ The command line flags and descriptions:
 =item --species <text>
 
 Enter the species name for the database to connect to. Common aliases, 
-e.g. human, may be acceptable. Check the EnsEMBL website for the species 
-databases available or print the list using the --printdb option below.
+e.g. human, may be acceptable. This is typically provided in the format 
+as "genus_species", e.g. "homo_sapiens". Check the EnsEMBL website for 
+the species databases available, or print the list using the --printdb 
+option below.
 
 =item --out <filename>
 
@@ -1228,7 +1070,7 @@ Boolean flag to indicate whether or not to collect all non-coding RNA
 genes, including misc_RNA, snRNA, snoRNA, rRNA, tRNA, miRNA, and piRNA, 
 from the database. This option may be superseded by setting the 
 individual RNA options. For example, setting both --rna and --notrna 
-will collect all RNA types except tRNAs. The default is false. 
+will collect all RNA types except tRNAs. The default is true. 
 
 =item --(no)miscrna
 
@@ -1279,11 +1121,11 @@ The default value is 'ensembldb.ensembl.org'.
 
 =item --port <integer>
 
-Specify the IP port address for the MySQL server. Default is 3306.
+Specify the IP port address for the MySQL server. Default is 5306.
 
 =item --user <text>
 
-Specify the user name to connect as to the EnsEMBL public database. 
+Specify the user name with which to connect to the EnsEMBL public database. 
 The default value is 'anonymous'.
 
 =item --pass <text>
@@ -1316,17 +1158,27 @@ multi-level nested gene->mRNA->CDS features. It will optionally
 generate features for the top-level sequences (chromosomes, contigs, 
 scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
-This program requires EnsEMBL's Perl API modules to connect to their public 
-MySQL servers. It is not available through CPAN, unfortunately, but you can 
-find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html. 
-
 Note that EnsEMBL releases new Perl API modules with each database 
 release. If you do not see the latest genome version (compared to what 
 is available on the web), you should update your EnsEMBL Perl modules. 
 The API version should be printed at the beginning of execution.
 
+=head1 REQUIREMENTS
+
+This program requires EnsEMBL's Perl API modules to connect to their public 
+MySQL servers. It is not available through CPAN, unfortunately, but you can 
+find installation instructions at 
+L<http://www.ensembl.org/info/docs/api/api_installation.html>. 
+
+=head1 DATABASE ACCESS
+
+If you having difficulties connecting, check the server and port numbers 
+at L<http://uswest.ensembl.org/info/data/mysql.html>.
+
 To connect to the Ensembl Genomes public mysql server rather than the 
-default, please specify the host as "mysql.ebi.ac.uk" and port 4157.
+default, please specify the host as "mysql.ebi.ac.uk" and port 4157. 
+See L<http://www.ensemblgenomes.org/info/data_access> for up to date 
+information.
 
 =head1 AUTHOR
 

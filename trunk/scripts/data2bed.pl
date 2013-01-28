@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.9.7';
 
 print "\n This program will write a BED file\n";
 
@@ -247,23 +247,12 @@ if ($ask) {
 	}
 }
 
-# automatically identify gff format
+# otherwise attempt to identify indices automatically
 elsif (
-	$metadata_ref->{'extension'} =~ /gff/ and
 	!defined $chr_index and
 	!defined $start_index and 
 	!defined $stop_index
 ) {
-	$chr_index    = 0 unless defined $chr_index;
-	$start_index  = 3 unless defined $start_index;
-	$stop_index   = 4 unless defined $stop_index;
-	$score_index  = 5 unless defined $score_index;
-	$strand_index = 6 unless defined $strand_index;
-	$name_index   = 8 unless defined $name_index;
-}
-
-# otherwise attempt to identify indices automatically
-else {
 	unless (defined $chr_index) {
 		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
 	}
