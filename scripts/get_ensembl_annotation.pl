@@ -22,7 +22,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.9.7';
+my $VERSION = '1.9.7.1';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
