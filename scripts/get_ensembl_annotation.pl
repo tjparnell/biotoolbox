@@ -22,7 +22,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.9.7.1';
+my $VERSION = '1.9.7';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -1023,7 +1023,10 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --(no)mirna
   --(no)rrna
   --(no)trna
-  --prefix
+  --(no)ucsc
+  --(no)cds
+  --(no)utr
+  --(no)codon
   --group <text>
   --host <host.address>
   --port <integer>
@@ -1032,7 +1035,6 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --printdb
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -1102,12 +1104,26 @@ Boolean flag to indicate whether or not to collect ribosomal RNA
 Boolean flag to indicate whether or not to collect transfer RNA   
 (tRNA) genes.
 
-=item --prefix
+=item --(no)ucsc
 
-Boolean flag to prefix chromosome names with 'chr'. Some people and/or 
-downstream applications prefer chromosomes to be named as 'chr1' 
-instead of '1'. Only coordinate systems of type 'chromosome' are 
-changed, not scaffolds, contigs, etc. Default is false.
+Boolean flag to prefix chromosome names with 'chr' in the style of 
+UCSC genome annotation. Only coordinate systems of type 'chromosome' 
+are changed, not scaffolds, contigs, etc. Default is false.
+
+=item --(no)cds
+
+Boolean flag to indicate whether or not to include CDS information for 
+mRNA transcripts and genes. Default is true.
+
+=item --(no)utr
+
+Boolean flag to indicate whether or not to include UTR features for 
+mRNA transcripts and genes. Default is true.
+
+=item --(no)codon
+
+Boolean flag to indicate whether or not to include start and stop codons 
+for mRNA transcripts and genes. Default is true if CDSs are included.
 
 =item --group <text>
 
@@ -1173,7 +1189,7 @@ L<http://www.ensembl.org/info/docs/api/api_installation.html>.
 =head1 DATABASE ACCESS
 
 If you having difficulties connecting, check the server and port numbers 
-at L<http://uswest.ensembl.org/info/data/mysql.html>.
+at L<http://www.ensembl.org/info/data/mysql.html>.
 
 To connect to the Ensembl Genomes public mysql server rather than the 
 default, please specify the host as "mysql.ebi.ac.uk" and port 4157. 
