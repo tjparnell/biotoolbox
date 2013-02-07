@@ -12,7 +12,7 @@ use IO::File;
 use IO::Zlib;
 
 
-my $VERSION = '1.9.6';
+my $VERSION = '1.9.7';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -120,6 +120,9 @@ unless (defined $do_utr) {
 }
 unless (defined $do_cds) {
 	$do_cds = 1;
+	unless (defined $do_codon) {
+		$do_codon = 1;
+	}
 }
 my $start_time = time;
 
@@ -1639,7 +1642,7 @@ sub print_chromosomes {
 		my $chrom = Bio::SeqFeature::Lite->new(
 			-seq_id        => $chr,
 			-source        => 'UCSC', # using a generic source here
-			-primary_tag   => $chr =~ m/scaffold/i ? 'scaffold' : 'chromosome',
+			-primary_tag   => $chr =~ m/^chr/i ? 'chromosome' : 'scaffold',
 			-start         => 1,
 			-end           => $end,
 			-primary_id    => $chr,
@@ -1964,7 +1967,7 @@ must infer the UTRs from the CDS and exon features. The default is true.
 =item --(no)codon
 
 Specify whether (or not) to include start_codon and stop_codon features 
-in the transcript heirarchy. The default is false.
+in the transcript heirarchy. The default is true.
 
 =item --(no)gz
 
