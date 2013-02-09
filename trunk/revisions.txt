@@ -1,5 +1,10 @@
 ######## BioToolBox revision history #############
 
+v.1.9.7 (svn 539)
+	- Fixed critical bug where an exon containing all three 5'UTR, CDS, and 3'UTR was not properly parsed in the script get_ensembl_annotation.pl. New command line options for to include or not CDS, UTR, and start/stop codons were added. Significant changes to improve and organize the code was also made.
+	- Changed the method of assigning the GFF type for chromosomes and scaffolds based on their name in the script ucsc_table2gff3.pl.  Also made the inclusion of start and stop  codons enabled by default.
+	- Removed annoying automatic column assignment for input GFF files in script data2bed.pl. GFF files are still handled properly if no columns are specified on the command line.
+
 v.1.9.6 (svn 533)
 	- Fixed critical bug in script ucsc_table2gff3.pl where single exons containing all three 5'UTR, CDS, and 3'UTR subfeatures were not properly parsed into GFF3. This had resulted in an extended CDS longer than expected. Thanks to H. Stovall for reporting.
 	- Added warnings when a sequence could not be generated to avoid division by 0 errors, and a slight correction to fraction calculations, in script CpG_calculator.pl.
