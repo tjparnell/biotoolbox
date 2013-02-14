@@ -1,7 +1,43 @@
-#!/usr/bin/perl
-$| = 1;
+#!/usr/bin/env perl
 
-# A script to collect data from a bioperl db for genomic features
+=head1 NAME
+
+get_datasets.pl
+
+A program to collect data for a list of features
+
+=head1 SYNOPSIS
+
+get_datasets.pl [--options...] [<filename>]
+  
+  Options:
+  --new
+  --in <filename>
+  --out filename
+  --db <name | filename>
+  --ddb <name | filename>
+  --feature <type | type:source | alias>, ...
+  --data <none | file | type>, ...
+  --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
+  --value [score | count | length]
+  --(no)log
+  --strand [all | sense | antisense]
+  --exons
+  --extend <integer>
+  --start <integer>
+  --stop <integer>
+  --fstart <decimal>
+  --fstop <decimal>
+  --limit <integer>
+  --pos [5 | m | 3]
+  --win <integer>
+  --step <integer>
+  --force_strand
+  --(no)gz
+  --version
+  --help
+
+=cut 
 
 use strict;
 use Getopt::Long;
@@ -35,7 +71,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.9.4';
+my $VERSION = '1.10';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -268,9 +304,8 @@ foreach my $dataset (@datasets) {
 	
 	# collect the dataset
 	unless ($dataset eq 'none') {
-		print " Collecting $method $value_type from dataset '$dataset'...";
+		print " Collecting $method $value_type from dataset '$dataset'...\n";
 		collect_dataset($dataset);
-		printf " in %.1f minutes\n", (time - $start_time)/60;
 	}
 	
 	# write the output file
@@ -282,7 +317,7 @@ foreach my $dataset (@datasets) {
 		'gz'       => $gz,
 	} );
 	if ($success) {
-		print " wrote file '$success'\n";
+		printf " wrote file '%s' in %.1f minutes\n", $success, (time - $start_time)/60;
 		# update file name
 		$outfile = $success;
 	}
@@ -688,7 +723,7 @@ sub get_genome_dataset {
 	
 	
 	# Loop through the genomic regions
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get region score
 		my $score = get_chromo_region_score( {
@@ -721,7 +756,7 @@ sub get_extended_genome_dataset {
 	
 	
 	# Loop through the genomic regions
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get extended coordinates
 		my $start = $main_data_ref->{'data_table'}->[$row][$start_i] - $extend;
@@ -758,7 +793,7 @@ sub get_adjusted_genome_dataset {
 	
 	
 	# Loop through the genomic regions
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get strand of the region if defined
 		my $strand = defined $strand_i ? 
@@ -860,7 +895,7 @@ sub get_fractionated_genome_dataset {
 	
 	
 	# Loop through the genomic regions
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get strand of the region if defined
 		my $strand = defined $strand_i ? 
@@ -984,7 +1019,7 @@ sub get_feature_dataset {
 	
 	
 	# Loop through the list of features
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
 		my @features = $mdb->features( 
@@ -1051,7 +1086,7 @@ sub get_extended_feature_dataset {
 	
 	
 	# Loop through the list of features
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
 		my @features = $mdb->features( 
@@ -1117,7 +1152,7 @@ sub get_adjusted_feature_dataset {
 	
 	
 	# Loop through the list of features
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get the feature from the database
 		my @features = $mdb->features( 
@@ -1238,7 +1273,7 @@ sub get_fractionated_feature_dataset {
 	
 	
 	# Loop through the list of features
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		
 		# get the feature from the database
@@ -1368,7 +1403,7 @@ sub get_subfeature_dataset {
 	
 	
 	# Loop through the list of features
-	for (my $row = 1; $row < $main_data_ref->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# Get the feature from the database
 		my @features = $mdb->features( 
@@ -1682,41 +1717,6 @@ sub record_metadata {
 
 
 __END__
-
-=head1 NAME
-
-get_datasets.pl
-
-=head1 SYNOPSIS
-
-get_datasets.pl [--options...] [<filename>]
-  
-  Options:
-  --new
-  --in <filename>
-  --out filename
-  --db <name | filename>
-  --ddb <name | filename>
-  --feature <type | type:source | alias>, ...
-  --data <none | file | type>, ...
-  --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
-  --value [score | count | length]
-  --(no)log
-  --strand [all | sense | antisense]
-  --exons
-  --extend <integer>
-  --start <integer>
-  --stop <integer>
-  --fstart <decimal>
-  --fstop <decimal>
-  --limit <integer>
-  --pos [5 | m | 3]
-  --win <integer>
-  --step <integer>
-  --force_strand
-  --(no)gz
-  --version
-  --help
 
 =head1 OPTIONS
 
