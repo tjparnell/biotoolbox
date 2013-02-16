@@ -43,13 +43,9 @@ use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper qw(
-	open_to_write_fh
-);
-use tim_data_helper qw(
-	format_with_commas
-);
-use tim_db_helper::config;
+use tim_file_helper qw(open_to_write_fh);
+use tim_data_helper qw(format_with_commas);
+use tim_big_helper qw(wig_to_bigwig_conversion);
 eval {
 	# check for bam support
 	require tim_db_helper::bam;
@@ -383,13 +379,6 @@ sub check_defaults {
 	# determine output format
 	$bedgraph = $use_span ? 1 : 0; 
 	
-	# look for bigwig app
-	if ($bigwig) {
-		# we need to set some options prior to writing the wig file if 
-		# we're going to be writing a bigWig later
-		find_bigwig_app();
-	}
-	
 	# check output file
 	unless ($outfile) {
 		$outfile = $infile;
@@ -543,56 +532,6 @@ sub check_defaults {
 		$convertor = sub {
 			return $_[0];
 		};
-	}
-}
-
-
-### Find the appropriate executable for generating a bigWig
-sub find_bigwig_app {
-	# check for the app
-	unless ($bwapp) {
-		# first check the biotoolbox configuration file for the UCSC 
-		# conversion utilities
-		# if it's not listed, then check the environment path 
-		if ($bedgraph) {
-			$bwapp = 
-				$TIM_CONFIG->param('applications.bedGraphToBigWig') || undef;
-			
-			# try looking in the environment path using external which 
-			unless ($bwapp) {
-				$bwapp = `which bedGraphToBigWig`;
-				chomp $bwapp;
-			}
-		}
-		else {
-			$bwapp = 
-				$TIM_CONFIG->param('applications.wigToBigWig') || undef;
-			
-			# try looking in the environment path using external which 
-			unless ($bwapp) {
-				$bwapp = `which wigToBigWig`;
-				chomp $bwapp;
-			}
-		}	
-	}	
-	
-	# check the executable
-	unless ($bwapp =~ /ToBigWig$/) {
-		warn " Unable to find bigWig conversion utility!\n" .
-			" Generating text file only\n";
-		$bigwig = 0;
-	}
-	if ($bedgraph) {
-		if ($bwapp =~ /wigToBigWig$/) {
-			warn " Wrong utility! Need bedGraphToBigWig.\n";
-			$bigwig = 0;
-		}
-	}
-	else {
-		if ($bwapp =~ /bedGraphToBigWig$/) {
-			warn " Wrong utility! Need wigToBigWig.\n";
-			$bigwig = 0;
-		}
 	}
 }
 
@@ -1563,59 +1502,24 @@ sub write_bedgraph {
 }
 
 
-### Run the BigWig conversion utility
+### Convert to BigWig format
 sub convert_to_bigwig {
-	my @filenames = @_;
+	my @files = @_;
 	
-	print " Converting to bigWig...\n";
-	
-	# generate chromosome information file
-	# we'll use the bam sequence header info for this
-	my $chr_file = "$outfile\.chromo.info";
-	my $chr_fh = open_to_write_fh($chr_file);
-	for my $tid (0 .. $sam->n_targets - 1) {
-		$chr_fh->print( 
-			join("\t", 
-				$sam->target_name($tid),
-				$sam->target_len($tid)
-			) . "\n"
-		);
-	}
-	$chr_fh->close;
-	
-	# process each wig file
-	my $error = 0;
-	foreach my $name (@filenames) {
-		next unless defined $name;
-		
-		# make new bw file name
-		my $bw_file = $name;
-		$bw_file =~ s/(?:wig|bdg)$/bw/;
-		
-		# run the utility, trapping errors in a file
-		print " Running $bwapp...\n";
-		system($bwapp, $name, $chr_file, $bw_file);
-		
-		# confirm
-		if (-s $bw_file) {
-			print " bigwig file '$bw_file' generated\n";
-			unlink $name; # remove the wig file
+	foreach my $file (@files) {
+		my $bw_file = wig_to_bigwig_conversion( {
+			'wig'   => $file,
+			'db'    => $sam,
+		});
+		if ($bw_file) {
+			print " Converted to $bw_file\n";
+			unlink $file;
 		}
 		else {
-			warn " bigwig file not generated! see standard error\n";
-			$error = 1;
+			print " BigWig conversion failed! see standard error for details\n";
 		}
 	}
-	
-	# remove chromosome file
-	if ($error) {
-		warn " leaving chromosome file $chr_file\n";
-	}
-	else {
-		unlink $chr_file;
-	}
 }
-
 
 
 __END__
