@@ -23,7 +23,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.10';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -453,7 +453,7 @@ sub intersect_genome_features {
 			# succesfully established a region, find features
 			process_region(
 				$region,
-				defined $search_chrom_i ? $table->[$row][$search_strand_i] : 0, 
+				defined $search_strand_i ? $table->[$row][$search_strand_i] : 0, 
 					# use strand if available in source data file, otherwise
 					# it is non-stranded region
 				$row, 
