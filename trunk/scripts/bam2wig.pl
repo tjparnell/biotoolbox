@@ -1414,13 +1414,15 @@ sub write_bedgraph {
 		my $offset = "offset$s";
 		my $fh     = "fh$s";
 		
+		# reset final to true as necessary
+		$final = 1 if ( max(keys %{$data->{$s}}) >= $data->{'seq_length'} );
+		
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - BUFFER_MIN; 
 		
 		# convert read lengths to coverage in the buffer array
-		my $pos_start_count = scalar(keys %{$data->{$s}});
 		foreach my $pos (sort {$a <=> $b} keys %{ $data->{$s} }) {
 			
 			# first check the position and bail when we've gone far enough
@@ -1436,7 +1438,9 @@ sub write_bedgraph {
 				# we're relying on autovivification of the buffer array here
 				# this is what makes Perl both great and terrible at the same time
 				# this could also balloon memory usage - oh dear
-				for (0 .. $len -1) { $data->{$buffer}->[$pos - $data->{$offset} + $_] += 1 }
+				for (0 .. $len -1) { 
+					$data->{$buffer}->[$pos - $data->{$offset} + $_] += 1;
+				}
 			}
 			delete $data->{$s}{$pos};
 		}
@@ -1460,6 +1464,7 @@ sub write_bedgraph {
 				# write out bedgraph line for the current interval of identical values
 				
 				# generate the end point
+				# remember we're working with 0-base positions here
 				my $end = $current_pos + $current_offset + 1;
 				if ($final and $end >= $maximum) {
 					# we've reached the end of the chromosome
@@ -1488,12 +1493,31 @@ sub write_bedgraph {
 		
 		# make sure we don't leave a value hanging
 		if ($current_offset) {
-			$data->{$fh}->print( join("\t", 
-					$data->{'seq_id'}, 
-					$current_pos,
-					$current_pos + $current_offset + 1,
-					&$convertor($current_value) # convert RPM or log before writing
-			) . "\n");
+			my $end = $current_pos + $current_offset + 1;
+			if ($final) {
+				# interval must not go off the chromosome end
+				if ($current_pos < $data->{'seq_length'}) {
+					
+					# reset end if necessary
+					$end = $end > $data->{'seq_length'} ? $data->{'seq_length'} : $end;
+					
+					# print the hanging value
+					$data->{$fh}->print( join("\t", 
+							$data->{'seq_id'}, 
+							$current_pos,
+							$end,
+							&$convertor($current_value) # convert RPM or log before writing
+					) . "\n");
+				}
+			}
+			else {
+				$data->{$fh}->print( join("\t", 
+						$data->{'seq_id'}, 
+						$current_pos,
+						$end,
+						&$convertor($current_value) # convert RPM or log before writing
+				) . "\n");
+			}
 		}
 		
 		# remember the current position for next writing
@@ -1507,6 +1531,7 @@ sub convert_to_bigwig {
 	my @files = @_;
 	
 	foreach my $file (@files) {
+		next unless defined $file;
 		my $bw_file = wig_to_bigwig_conversion( {
 			'wig'   => $file,
 			'db'    => $sam,
