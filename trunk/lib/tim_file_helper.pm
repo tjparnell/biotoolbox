@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.9.5';
+our $VERSION = '1.10';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -89,16 +89,9 @@ sub load_tim_data_file {
 		return;
 	}
 	
-	# split filename into its base components
-	my ($basename, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
-	
-	# The resulting data structure
-	my $inputdata_ref;
-	
 	# open the file and parse the metadata
 	# this will return the metadata hash and an open filehandle
-	my $fh; # open filehandle for processing the data table
-	($fh, $inputdata_ref) = open_tim_data_file($filename);
+	my ($fh, $inputdata) = open_tim_data_file($filename);
 	unless ($fh) {
 		return;
 	}
@@ -107,12 +100,12 @@ sub load_tim_data_file {
 	my @datatable;
 	
 	# put the column names into the data table
-	push @datatable, $inputdata_ref->{'column_names'};
-	delete $inputdata_ref->{'column_names'}; # we no longer need this
+	push @datatable, $inputdata->{'column_names'};
+	delete $inputdata->{'column_names'}; # we no longer need this
 	
 	# load the data table
 	while (my $line = $fh->getline) {		
-		$line =~ s/\r|\n$//g;
+		$line =~ s/[\r\n]+$//;
 		
 		# the current file position should be at the beginning of the
 		# data table information
@@ -121,8 +114,15 @@ sub load_tim_data_file {
 		# anonymous array and push it to the data_table array
 		my @linedata = split /\t/, $line;
 		
+		# check the number of elements
+		if (scalar @linedata != $inputdata->{'number_columns'} ) {
+			carp "File '$filename' is inconsistent! line $. has ", scalar(@linedata),
+				" columns instead of expected ", $inputdata->{'number_columns'}, "\n";
+			return;
+		}
+		
 		# convert null values to internal '.'
-		for (my $i = 0; $i < $inputdata_ref->{'number_columns'}; $i++ ) {
+		for (my $i = 0; $i < $inputdata->{'number_columns'}; $i++ ) {
 			if (!defined $linedata[$i]) {
 				# not defined position in the array?
 				$linedata[$i] = '.';
@@ -137,24 +137,17 @@ sub load_tim_data_file {
 			}
 		}
 		
-		# check the number of elements
-		if (scalar @linedata != $inputdata_ref->{'number_columns'} ) {
-			carp "line $. has wrong number of columns! " .
-				scalar(@linedata) . " instead of " . 
-				$inputdata_ref->{'number_columns'};
-		}
-		
 		# store the array
 		push @datatable, [ @linedata ];
 	}
 	
 	# convert 0-based starts to 1-base for BED source files
-	if ($inputdata_ref->{'bed'}) {
+	if ($inputdata->{'bed'}) {
 		for (my $row = 1; $row < scalar @datatable; $row++) {
 			# add 1 to each start position
 			$datatable[$row][1] += 1;
 		}
-		$inputdata_ref->{1}{'base'} = 1;
+		$inputdata->{1}{'base'} = 1;
 	}
 	
 	
@@ -162,7 +155,7 @@ sub load_tim_data_file {
 	# NOTE: this may change original data if file is written again
 		# with the exception of GFF and BED, which should be automatically
 		# converted back if the format is maintained
-	my $strand_i = find_column_index($inputdata_ref, '^strand$');
+	my $strand_i = find_column_index($inputdata, '^strand$');
 	if (defined $strand_i) {
 		# should be true for BED and GFF files or any other file with strand
 		for (my $row = 1; $row < scalar @datatable; $row++) {
@@ -184,16 +177,19 @@ sub load_tim_data_file {
 	
 		
 	# associate the data table with the data hash
-	$inputdata_ref->{'data_table'} = \@datatable;
+	$inputdata->{'data_table'} = \@datatable;
 	
 	# record the index number of the last data row
-	$inputdata_ref->{'last_row'} = scalar @datatable - 1;
+	$inputdata->{'last_row'} = scalar @datatable - 1;
 	
 	# completed loading the file
 	$fh->close;
 	
+	# verify the structure
+	verify_data_structure($inputdata);
+	
 	# finished
-	return $inputdata_ref;
+	return $inputdata;
 }
 
 
@@ -268,21 +264,21 @@ sub open_tim_data_file {
 		# the generating program
 		elsif ($line =~ m/^# Program (.+)$/) {
 			$inputdata->{'program'} = $1;
-			$inputdata->{'program'} =~ s/\r|\n$//g; 
+			$inputdata->{'program'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
 			$inputdata->{'db'} = $1;
-			$inputdata->{'db'} =~ s/\r|\n$//g;
+			$inputdata->{'db'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
 			$inputdata->{'feature'} = $1;
-			$inputdata->{'feature'} =~ s/\r|\n$//g;
+			$inputdata->{'feature'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
@@ -298,7 +294,7 @@ sub open_tim_data_file {
 			
 			# strip the Column metadata identifier
 			my $metadataline = $line; # to avoid manipulating $line
-			$metadataline =~ s/\r|\n$//g;
+			$metadataline =~ s/[\r\n]+$//;
 			$metadataline =~ s/^# Column_\d+ //; 
 			
 			# break up the column metadata
@@ -380,7 +376,7 @@ sub open_tim_data_file {
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			$inputdata->{'gff'} = $1;
-			$inputdata->{'gff'} =~ s/\r|\n$//g;
+			$inputdata->{'gff'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
@@ -392,7 +388,7 @@ sub open_tim_data_file {
 		}
 		
 		# a track line 
-		elsif ($line =~ /^track\s+/) {
+		elsif ($line =~ /^track\s+/i) {
 			# common with wig, bed, or bedgraph files for use with
 			# the UCSC genome browser
 			# treat as a comment line, there's not that much useful info
@@ -410,8 +406,74 @@ sub open_tim_data_file {
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
 			
+			# Data tables with a commented header line
+				# including data table files from UCSC Table Browser
+				# also VCF files as well
+				# these will have one comment line marked with #
+				# that really contains the column headers
+			if ( _commented_header_line($inputdata, $line) ) {
+				# lots of requirements, but this checks that (column 
+				# metadata has not already been loaded), there is at least one 
+				# unknown comment line, and that the last comment line is 
+				# splitable and has the same number of elements as the first 
+				# data line
+				
+				# process the real header line
+				my $header_line = pop @{ $inputdata->{'other'} };
+				$header_line =~ s/[\r\n]+$//;
+				
+				# generate the metadata
+				my $i = 0;
+				foreach (split /\t/, $header_line) {
+					$inputdata->{$i} = { 
+						'name'   => $_,
+						'index'  => $i,
+						'AUTO'   => 3,
+					} unless exists $inputdata->{$i};
+					
+					push @{ $inputdata->{'column_names'} }, $_;
+					$i++;
+				}
+				$inputdata->{'number_columns'} = $i;
+				
+				# we do not count the current line as a header
+				
+				# set headers flag to true
+				$inputdata->{'headers'} = 1;
+				
+				# check for special formatted files
+					# these include GFF and BED, which don't normally have 
+					# header lines, even commented ones, but you never know 
+					# what crazy users like Sue will feed these programs
+					# we set the gff or bed flag
+				if ($extension =~ /gtf|gff3?/) {
+					# set the gff version based on the extension
+					unless ($inputdata->{'gff'}) {
+						$inputdata->{'gff'} = 
+							$extension =~ /gtf/  ? 2.5 :
+							$extension =~ /gff3/ ? 3   :
+							2;
+					}
+					
+					# set the feature type
+					unless (defined $inputdata->{'feature'}) {
+						$inputdata->{'feature'} = 'region';
+					}
+				}
+				elsif ($extension =~ /bed|bdg|bedgraph/) {
+					$inputdata->{'bed'} = $inputdata->{'number_columns'};
+					
+					# set the feature type
+					unless (defined $inputdata->{'feature'}) {
+						$inputdata->{'feature'} = 'region';
+					}
+				}
+				
+				last PARSE_HEADER_LOOP;
+			}
+			
 			# a GFF file
-			if ($extension =~ /g[tf]f/i) {
+			elsif ($extension =~ /g[tf]f/i) {
 				# gff files have nine defined columns
 				# there are different specifications and variants:
 				# gff (v.1), gff v.2, gff v.2.5 (aka gtf), gff v.3 (gff3)
@@ -419,20 +481,15 @@ sub open_tim_data_file {
 				# more info on gff can be found here
 				# http://gmod.org/wiki/GFF3
 				
-				# set values
+				# set column number
 				$inputdata->{'number_columns'} = 9; # supposed to be 9 columns
-				if ($inputdata->{'gff'} == 0) { 
-					# try and determine type based on extension (yeah, right)
-					if ($extension =~ /gtf/) {
-						$inputdata->{'gff'} = 2.5;
-					}
-					elsif ($extension =~ /gff3/) {
-						$inputdata->{'gff'} = 3;
-					}
-					else {
-						# likely version 2, never really encounter v. 1
-						$inputdata->{'gff'} = 2;
-					}
+				
+				# set the gff version based on the extension
+				unless ($inputdata->{'gff'}) {
+					$inputdata->{'gff'} = 
+						$extension =~ /gtf/  ? 2.5 :
+						$extension =~ /gff3/ ? 3   :
+						2;
 				}
 				
 				# a list of gff column names
@@ -490,12 +547,17 @@ sub open_tim_data_file {
 				# these only have four columns, no more, no less
 				# the fourth column is score, not name
 				
+				# first check for a commented header line, in case someone like 
+				# Sue puts one in (geez)
+				
 				# first determine the number of columns we're working
 				my @elements = split /\s+/, $line;
 					# normally tab-delimited, but the specs are not explicit
 				my $column_count = scalar @elements;
 				$inputdata->{'number_columns'} = $column_count; 
 				$inputdata->{'bed'} = $column_count;
+				
+				
 				
 				# Define the columns and metadata
 				if ($column_count >= 3) {
@@ -770,49 +832,13 @@ sub open_tim_data_file {
 				last PARSE_HEADER_LOOP;
 			}
 			
-			# Data table files from UCSC Table Browser
-				# also VCF files as well
-				# these will have one comment line marked with #
-				# that really contains the column headers
-			elsif ( _commented_header_line($inputdata, $line) ) {
-				# lots of requirements, but this checks that (column 
-				# metadata has not already been loaded), there is at least one 
-				# unknown comment line, and that the last comment line is 
-				# splitable and has the same number of elements as the first 
-				# data line
-				
-				# process the real header line
-				my $header_line = pop @{ $inputdata->{'other'} };
-				$header_line =~ s/\r|\n$//g;
-				
-				# generate the metadata
-				my $i = 0;
-				foreach (split /\t/, $header_line) {
-					$inputdata->{$i} = { 
-						'name'   => $_,
-						'index'  => $i,
-						'AUTO'   => 3,
-					};
-					push @{ $inputdata->{'column_names'} }, $_;
-					$i++;
-				}
-				$inputdata->{'number_columns'} = $i;
-				
-				# we do not count the current line as a header
-				
-				# set headers flag to true
-				$inputdata->{'headers'} = 1;
-				
-				last PARSE_HEADER_LOOP;
-			}
-			
 			# all other file formats, including tim data files
 			else {
 				# we have not yet parsed the row of data column names
 				# we will do so now
 				
 				my @namelist = split /\t/, $line;
-				$namelist[-1] =~ s/\r|\n$//g;
+				$namelist[-1] =~ s/[\r\n]+$//;
 				
 				# we will define the columns based on
 				for my $i (0..$#namelist) {
