@@ -24,7 +24,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.10.0';
+my $VERSION = '1.10';
 
 print "\n This script will map nucleosomes\n\n";
 
