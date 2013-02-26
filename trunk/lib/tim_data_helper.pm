@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.8.5';
+our $VERSION = '1.10';
 
 
 
@@ -48,7 +48,7 @@ sub generate_tim_data_structure {
 		'bed'            => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
-		'headers'        => 1,
+		'headers'        => @datasets ? 1 : 0,
 		'other'          => [],
 		'data_table'     => [],
 	);
@@ -153,7 +153,7 @@ sub verify_data_structure {
 		if (
 			exists $datahash_ref->{0} and
 			$datahash_ref->{0}{'name'} !~ 
-			m/^chr|chromo|seq|refseq|ref_seq|seq|seq_id/i
+			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$gff_check = 0;
 		}
@@ -241,7 +241,7 @@ sub verify_data_structure {
 		if (
 			exists $datahash_ref->{0} and
 			$datahash_ref->{0}{'name'} !~ 
-			m/^chr|chromo|seq|refseq|ref_seq|seq|seq_id/i
+			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$bed_check = 0;
 		}
