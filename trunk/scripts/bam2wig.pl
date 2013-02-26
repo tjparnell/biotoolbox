@@ -31,6 +31,7 @@ bam2wig.pl [--options...] <filename.bam>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --(no)gz
+  --verbose
   --version
   --help
 
@@ -105,6 +106,7 @@ my (
 	$bigwig,
 	$bwapp,
 	$gz,
+	$verbose,
 	$help,
 	$print_version,
 );
@@ -131,6 +133,7 @@ GetOptions(
 	'bw!'       => \$bigwig, # generate bigwig file
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
 	'gz!'       => \$gz, # compress text output
+	'verbose!'  => \$verbose, # print sample correlations
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -698,10 +701,12 @@ sub determine_shift_value {
 		if (%r2shift) {
 			my $max_r = max(keys %r2shift);
 			push @shift_values, $r2shift{$max_r};
-			printf "$string shift %s bp (r^2 %.3f)\n", $r2shift{$max_r}, $max_r;
+			if ($verbose) {
+				printf "$string shift %s bp (r^2 %.3f)\n", $r2shift{$max_r}, $max_r;
+			}
 		}
 		else {
-			print "$string\n";
+			print "$string\n" if $verbose;
 		}
 	}
 	
@@ -1439,7 +1444,9 @@ sub write_bedgraph {
 				# this is what makes Perl both great and terrible at the same time
 				# this could also balloon memory usage - oh dear
 				for (0 .. $len -1) { 
-					$data->{$buffer}->[$pos - $data->{$offset} + $_] += 1;
+					my $p = $pos - $data->{$offset} + $_;
+					$data->{$buffer}->[$p] += 1 if $p >= 0;
+					# avoid modifying array subscript -1 in rare situations
 				}
 			}
 			delete $data->{$s}{$pos};
@@ -1709,6 +1716,11 @@ paths may be set in the biotoolbox.cfg file.
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
 requested.
+
+=item --verbose
+
+Print the sample correlations when determining the shift value. 
+The default is false.
 
 =item --version
 
