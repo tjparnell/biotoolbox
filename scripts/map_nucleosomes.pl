@@ -15,6 +15,7 @@ use tim_data_helper qw(
 use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
+	get_chromosome_list
 	get_region_dataset_hash
 	get_chromo_region_score
 );
@@ -23,7 +24,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.9.1';
+my $VERSION = '1.10.0';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -95,7 +96,7 @@ if ($print_version) {
 
 
 # Check for Requirements and assign default variables
-unless ($thresh) {
+unless (defined $thresh) {
 	die " You must define the threshold!\n Use --help for more information\n";
 }
 
@@ -104,7 +105,7 @@ unless ($window) {
 	print " Using default window size of 145 bp\n";
 	$window = 145;
 } 
-unless ($buffer) {
+unless (defined $buffer) {
 	print " Using default buffer size of 5 bp\n";
 	$buffer = 5;
 }
@@ -279,11 +280,12 @@ sub validate_or_request_dataset {
 	if ($dataset and !$scan_dataset) {
 		# only one dataset provided, then assign it to scan
 		$scan_dataset = $dataset;
+		print " Using '$scan_dataset' to scan for nucleosome peaks\n";
 	}
 	$scan_dataset = verify_or_request_feature_types( {
 		'db'      => $database,
 		'feature' => $scan_dataset,
-		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks",
+		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks ",
 		'single'  => 1,
 	} );
 	unless ($scan_dataset) {
@@ -295,13 +297,13 @@ sub validate_or_request_dataset {
 	if ($dataset and !$tag_dataset) {
 		# only one dataset provided, then assign it to scan
 		$tag_dataset = $dataset;
-		return; # should already be verified
+		print " Using '$tag_dataset' for analyzing nucleosome peaks\n";
 	}
 	if ($tag_dataset or $database) {
 		$tag_dataset = verify_or_request_feature_types( {
 			'db'      => $database,
 			'feature' => $tag_dataset,
-			'prompt'  => "Enter the dataset of tag count data for calculating nucleosome stats",
+			'prompt'  => "Enter the dataset of tag count data for calculating nucleosome stats ",
 			'single'  => 1,
 		} );
 	}
@@ -334,16 +336,17 @@ sub map_nucleosomes {
 	my $found_nucleosomes = 0;
 	
 	# Walk through each chromosome
-	my @chromosomes = $db->seq_ids or 
+	my @chromosomes = get_chromosome_list($db, 1) or 
 		die " unable to find sequences in database!\n";
-	foreach my $chromo (@chromosomes) {
+		# force the database to discard unwanted chromosomes
+	foreach (@chromosomes) {
+		
+		# we have chromosome name and length
+		my ($chromo, $chr_length) = @{$_};
 		
 		# skip mitochrondrial chromosome
+			# just in case it wasn't excluded by default above
 		if ($chromo =~ /^chrm|chrmt|mt|mito/i) {next}
-		
-		# get chromosome length
-		my $chr_segment = $db->segment($chromo);
-		my $chr_length = $chr_segment->length;
 		
 		# Limit to one chromosome if debug
 		if ($debug) {
@@ -353,7 +356,7 @@ sub map_nucleosomes {
 				last;
 			}
 			
-			# artificially set chr_length to small number
+			# artificially set chr_length to small number for debug purposes
 			# $chr_length = 5000;
 		}
 		
@@ -366,15 +369,12 @@ sub map_nucleosomes {
 			
 			# determine the window stop position
 			my $win_stop = $position + $window - 1;
-			
+			$win_stop = $chr_length if $win_stop > $chr_length;
 			
 			# scan the window for a potential nucleosome peak
-			my $found_peak = scan_window($chromo, $position, $win_stop);
-
-			
-			# identify the peak position
-			if ($found_peak) {
+			if ( scan_window($chromo, $position, $win_stop) ) {
 				# we found a peak, acurately map it with tag data
+				# identify the peak position
 				my $peak_position = identify_peak_position(
 					$chromo, $position, $win_stop);
 				
@@ -417,6 +417,10 @@ sub scan_window {
 			'value'    => 'score',
 			'absolute' => 1,
 	} );
+	unless (%window_pos2score) {
+		# no scores, no nucleosome, return null
+		return;
+	}
 	if ($debug) {
 		print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
 		print DEBUG_FH "  Window scores:\n  ";
@@ -489,8 +493,8 @@ sub identify_peak_position {
 	
 	# only process if we have a tag dataset
 	if (!$tag_dataset) {
-		# just use the position that was found from the scan dataset
-		return $position;
+		# just use the mid position of the window
+		return int( (($position + $win_stop) / 2) + 0.5);
 	}
 	
 	# collect the tag scores for the window
@@ -507,6 +511,17 @@ sub identify_peak_position {
 			'value'    => 'score',
 			'absolute' => 1,
 	} );
+	unless (%window_pos2tags) {
+		warn " unable to get tag dataset scores for $chromo:$position..$win_stop, using midpoint\n";
+		return int( (($position + $win_stop) / 2) + 0.5);
+	}
+	if ($debug) {
+		print DEBUG_FH "  Window tag scores for $chromo:$position..$win_stop\n  ";
+		foreach (sort {$a <=> $b} keys %window_pos2tags) {
+			print DEBUG_FH "$_:$window_pos2tags{$_}, ";
+		}
+		print DEBUG_FH "\n";
+	}
 	
 	# get all of the positions that correspond to that peak value
 	my $tag_peak_value = max(values %window_pos2tags);
@@ -516,7 +531,9 @@ sub identify_peak_position {
 			push @peak_positions, $_;
 		}
 	}
-	
+	if ($debug) {
+		print DEBUG_FH "  Max peak of $tag_peak_value at @peak_positions\n";
+	}
 	# now identify the best peak position, ideally this is just one
 	my $peak_position;
 	if (scalar @peak_positions == 1) {
