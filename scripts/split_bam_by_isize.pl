@@ -148,8 +148,6 @@ my $in_sam = Bio::DB::Sam->new(
 ) or die " unable to open input bam file '$infile'!\n";
 	# we are opening the input bam file using the high level sam API
 print "   input file '$infile'\n";
-my $in_bam = $in_sam->bam;
-my $index = $in_sam->bam_index;
 
 # input header
 my $header = $in_sam->header();
@@ -198,16 +196,25 @@ for my $tid (0 .. $in_sam->n_targets - 1) {
 	# we can easily convert this to an actual sequence name
 	# we will force the conversion to go one chromosome at a time
 	
-	# sequence attributes
-	my $seq_id = $in_sam->target_name($tid);
-	my $seq_length = $in_sam->target_len($tid);
+	print "  splitting alignments on ", $in_sam->target_name($tid), "...\n";
 	
-	print "  splitting alignments on $seq_id...\n";
 	if ($quick) {
-		$index->fetch($in_bam, $tid, 0, $seq_length, \&quick_callback);
+		$in_sam->bam_index->fetch(
+			$in_sam->bam, 
+			$tid, 
+			0, 
+			$in_sam->target_len($tid), 
+			\&quick_callback
+		);
 	}
 	else {
-		$index->fetch($in_bam, $tid, 0, $seq_length, \&paired_callback);
+		$in_sam->bam_index->fetch(
+			$in_sam->bam, 
+			$tid, 
+			0, 
+			$in_sam->target_len($tid), 
+			\&paired_callback
+		);
 	}
 	
 	# check for orphans
@@ -516,10 +523,11 @@ The command line flags and descriptions:
 
 =item --in <file.bam>
 
-Specify the file name of a binary BAM file as described for Samtools. 
-Use samtools to convert text sam files to binary bam files. The file 
-should be indexed; this program should be able to do it for you 
-automatically if it is not (assuming the bam directory is writeable).
+Specify the file name of a binary Bam file of paired-end alignments 
+as described for Samtools. Use samtools to convert text Sam files 
+to binary Bam files. The file should be sorted and indexed; this 
+program should be able to do it for you automatically if it is not 
+(assuming the bam directory is writeable).
 
 =item --min <integer>
 
@@ -538,7 +546,8 @@ is 200 bp.
 When multiple size ranges are desired, they may be specified using the 
 size option. Define the minimum and maximum size as a range separated by 
 a dash (no spaces). Use this option repeatedly for multiple size ranges. 
-The size option takes precedence over the min and max options.
+Size ranges may overlap. The size option takes precedence over the --min 
+and --max options.
 
 =item --out <filename>
 
@@ -600,7 +609,17 @@ The input file should be sorted and indexed prior to sizing. The output
 file(s) will be automatically re-sorted and re-indexed for you.
 
 A number of statistics about the read pairs are also written to standard 
-output for your information. 
+output for your information, including the number of proper alignments 
+in each requested size range, the number of alignments that fail the AT 
+check (if requested), and the number of improper paired alignments, 
+including those whose mates align to the same strand or different 
+chromosomes, or pairs with a non-aligned mate. Given the vagaries of 
+different alignment possibilities and enumerations, not all possible 
+combinations may be accounted. 
+
+If no pairs are written to the output file(s), try enabling the --quick 
+option. It may be that only one of the two mates are actually present 
+in the Bam file, or that they do not have matching ID numbers.
 
 =head1 AUTHOR
 
