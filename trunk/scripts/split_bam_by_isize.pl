@@ -5,13 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use File::Copy;
 use Bio::DB::Sam;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(format_with_commas);
 my $VERSION = '1.10';
 
+# constant for memory usage while sorting
+# this increases default from 500Mb to 1Gb
+use constant SORT_MEM => 1_000_000_000;
 
 print "\n A script to split a paired-end bam file by insert sizes\n\n";
 
@@ -229,27 +231,27 @@ for my $tid (0 .. $in_sam->n_targets - 1) {
 
 
 ### Finish up 
-# close files
-undef $in_sam;
-foreach (@sizes) {
-	pop @{$_}; # undefine the bam object
-}
 
 # resort and index the bam files
 foreach my $size (@sizes) {
+	
+	# undefine the bam object to close
+	pop @{$size}; 
 	
 	# sort
 	my $new_file = $size->[3];
 	$new_file =~ s/\.bam/.sorted/;
 	print " re-sorting $size->[3]...\n";
-	Bio::DB::Bam->sort_core(0, $size->[3], $new_file);
+	Bio::DB::Bam->sort_core(0, $size->[3], $new_file, SORT_MEM);
 	
 	# make new indices
 	$new_file .= '.bam'; # sorting would've automatically added the extension
 	if (-s $new_file) {
-		unlink $size->[3]; # remove the old unsorted output file
-		move($new_file, $size->[3]);
-		print " re-indexing...\n";
+		# remove old and rename new output file
+		unlink $size->[3]; 
+		rename($new_file, $size->[3]);
+		
+		# be nice and re-index it for them
 		Bio::DB::Bam->index_build($size->[3]);
 	}
 	else {
@@ -259,21 +261,19 @@ foreach my $size (@sizes) {
 
 
 # Print summaries
-print "\n There were ", format_with_commas($read_count),
-	" total mapped reads\n";
+print "\n There were ", format_with_commas($read_count)," total mapped reads\n";
 print " There were ", format_with_commas($non_paired_count), " non-paired reads\n" if 
 	$non_paired_count;
-print " There were ", format_with_commas($pair_count),
-	" total alignment pairs\n";
+print " There were ", format_with_commas($pair_count), " total alignment pairs\n";
 
 print "   " . format_with_commas($improper_count) . " (". percent_pc($improper_count) . 
-	") pairs were improper\n" if $improper_count > 0;
+	") pairs were improper\n" if $improper_count;
 print "     " . format_with_commas($mate_unmapped_count) . " (". percent_pc($mate_unmapped_count) . 
-	") pairs had an unmapped mate\n" if $mate_unmapped_count > 0;
+	") pairs had an unmapped mate\n" if $mate_unmapped_count;
 print "     " . format_with_commas($same_strand_count) . " (". percent_pc($same_strand_count) . 
-	") pairs had mates on the same strand\n" if $same_strand_count > 0;
+	") pairs had mates on the same strand\n" if $same_strand_count;
 print "     " . format_with_commas($diffchromo_count) . " (". percent_pc($diffchromo_count) . 
-	") pairs had mates on different chromosomes\n" if $diffchromo_count > 0;
+	") pairs had mates on different chromosomes\n" if $diffchromo_count;
 
 print "   " . format_with_commas($toosmall_count + $toobig_count + $just_right_count) . 
 	" (" . percent_pc($toosmall_count + $toobig_count + $just_right_count) . 
@@ -285,15 +285,15 @@ print "     " . format_with_commas($toobig_count) . " (". percent_pc($toobig_cou
 print "     " . format_with_commas($just_right_count) . " (". percent_pc($just_right_count) . 
 	") pairs had insertions of acceptable size\n";
 
-print "   " . format_with_commas($non_AT_end_count + $missing_paired_count + $no_left_mate_count) . 
-	" (" . percent_pc($non_AT_end_count + $missing_paired_count + $no_left_mate_count) . 
-	") pairs failed to write\n";
+my $failed_sum = $non_AT_end_count + $missing_paired_count + $no_left_mate_count;
+print "   " . format_with_commas($failed_sum) . " (" . percent_pc($failed_sum) . 
+	") pairs failed to write\n" if $failed_sum;
 print "     " . format_with_commas($non_AT_end_count) . " (". percent_pc($non_AT_end_count) . 
-	") pairs had one or more non-AT ends\n" if $non_AT_end_count > 0;
+	") pairs had one or more non-AT ends\n" if $non_AT_end_count;
 print "     " . format_with_commas($missing_paired_count) . " (". percent_pc($missing_paired_count) . 
-	") pairs had a missing right mate\n" if $missing_paired_count > 0;
+	") pairs had a missing right mate\n" if $missing_paired_count;
 print "     " . format_with_commas($no_left_mate_count) . " (". percent_pc($no_left_mate_count) . 
-	") pairs had a missing left mate\n" if $no_left_mate_count > 0;
+	") pairs had a missing left mate\n" if $no_left_mate_count;
 
 
 foreach (@sizes) {
