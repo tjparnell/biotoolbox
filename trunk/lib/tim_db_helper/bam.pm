@@ -11,9 +11,9 @@ our $VERSION = '1.10';
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
+	open_bam_db
 	collect_bam_scores
 	collect_bam_position_scores
-	open_bam_db
 	sum_total_bam_alignments
 );
 
@@ -37,6 +37,47 @@ our %BAM_CHROMOS;
 
 
 ### Modules ###
+
+
+
+### Open a bigWig database connection
+sub open_bam_db {
+	
+	my $bamfile = shift;
+	
+	# check if we have seen this bam file before
+	if (exists $OPENED_BAMFILES{$bamfile} ) {
+		# this file is already opened, use it
+		return $OPENED_BAMFILES{$bamfile};
+	}
+	
+	else {
+		# this file has not been opened yet, open it
+		
+		# check the path
+		my $path = $bamfile;
+		$path =~ s/^file://; # strip the file prefix if present
+		
+		# open the bam database object
+		my $sam;
+		eval {
+			$sam = Bio::DB::Sam->new(
+					-bam         => $path,
+					-autoindex   => 1,
+			);
+		};
+		return unless $sam;
+		
+		# store the opened object for later use
+		$OPENED_BAMFILES{$bamfile} = $sam;
+			
+		# collect the chromosomes for this bam
+		%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
+		
+		# done
+		return $sam;
+	}
+}
 
 
 
@@ -187,47 +228,6 @@ sub _collect_bam_data {
 }
 
 
-### Open a bigWig database connection
-sub open_bam_db {
-	
-	my $bamfile = shift;
-	
-	# check if we have seen this bam file before
-	if (exists $OPENED_BAMFILES{$bamfile} ) {
-		# this file is already opened, use it
-		return $OPENED_BAMFILES{$bamfile};
-	}
-	
-	else {
-		# this file has not been opened yet, open it
-		
-		# check the path
-		my $path = $bamfile;
-		$path =~ s/^file://; # strip the file prefix if present
-		
-		# open the bam database object
-		my $bam;
-		eval {
-			$bam = Bio::DB::Sam->new(
-					-bam         => $path,
-					-autoindex   => 1,
-			);
-		};
-		return unless $bam;
-		
-		# store the opened object for later use
-		$OPENED_BAMFILES{$bamfile} = $bam;
-			
-		# collect the chromosomes for this bam
-		%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
-		
-		# done
-		return $bam;
-	}
-}
-
-
-
 ### Determine total number of alignments in a bam file
 sub sum_total_bam_alignments {
 	
@@ -275,10 +275,8 @@ sub sum_total_bam_alignments {
 					my ($a, $number) = @_;
 					
 					# check paired alignment
-					return if $a->unmapped;
-					return if $a->reversed; # only count left alignments
 					return unless $a->proper_pair;
-					return unless $a->tid == $a->mtid;
+					return if $a->reversed; # only count left alignments
 					return if $a->qual < $min_mapq;
 					
 					# count this fragment
@@ -726,6 +724,16 @@ It will automatically export the name of the subroutines.
 
 =over
 
+=item open_bam_db()
+
+This subroutine will open a Bam database connection. Pass either the 
+local path to a Bam file (.bam extension) or the URL of a remote Bam 
+file. A remote bam file must be indexed. A local bam file may be 
+automatically indexed upon opening if the user has write permissions 
+in the parent directory. 
+
+It will return the opened database object.
+
 =item collect_bam_scores
 
 This subroutine will collect only the data values from a binary bam file 
@@ -768,12 +776,6 @@ as the key position. When multiple features are found at the same
 position, a simple mean (for length data methods) or sum 
 (for count methods) is returned.
 
-=item open_bam_db()
-
-This subroutine will open a Bam database connection. Pass either the 
-local path to a Bam file (.bam extension) or the URL of a remote Bam 
-file. It will return the opened database object.
-
 =item sum_total_bam_alignments()
 
 This subroutine will sum the total number of properly mapped alignments 
@@ -782,7 +784,7 @@ in a bam file. Pass the subroutine one to three arguments.
     1) The name of the Bam file which should be counted. Alternatively,  
        an opened Bio::DB::Sam object may also be given. Required.
     2) Optionally pass the minimum mapping quality of the reads to be 
-       counted. The default is 0, or all alignments are counted.
+       counted. The default is 0, where all alignments are counted.
     3) Optionally pass a boolean value (1 or 0) indicating whether 
        the Bam file represents paired-end alignments. Only proper 
        alignment pairs are counted. The default is to treat all 
