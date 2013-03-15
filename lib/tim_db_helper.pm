@@ -520,6 +520,9 @@ sub open_db_connection {
 		
 		unless ($db) {
 			$error .= " ERROR: unknown $adaptor database '$database'\n";
+			if ($dsn =~ /my|pg/) {
+				$error .= "   using user '$user' and password '$pass'\n";
+			}
 		}
 	}
 	
