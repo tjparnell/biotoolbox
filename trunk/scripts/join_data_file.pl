@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to join two or more tim data files
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.8.5';
+my $VERSION = '1.10';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -118,11 +118,11 @@ unless ($outfile) {
 }
 
 # First write the metadata file
-my $new_outfile = write_tim_data_file( {
+my $new_outfile = write_tim_data_file(
 	'data'     => $metadata_ref,
 	'filename' => $outfile,
 	'gz'       => $gz,
-} );
+);
 unless ($new_outfile) {
 	die " unable to write output file!\n";
 }
@@ -207,15 +207,17 @@ __END__
 
 join_data_file.pl
 
+A script to join two or more data files and concatenate rows.
+
 =head1 SYNOPSIS
 
 join_data_file.pl [--options] <file1> <file2> ...
   
+  Options:
   --out <filename>
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -230,7 +232,7 @@ split using 'split_data_file.pl', then the original base name
 may be reconstituted. Otherwise, the user will be asked for 
 an output file name.
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output files should be compressed 
 with gzip. Default behavior is to preserve the compression 
@@ -270,15 +272,3 @@ This program is intended as the complement to 'split_data_files.pl'.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-

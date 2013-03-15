@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to map data around a feature start position
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -25,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.4';
+my $VERSION = '1.10';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -303,13 +303,13 @@ else {
 }
 
 # Check the dataset
-$dataset = verify_or_request_feature_types( {
+$dataset = verify_or_request_feature_types(
 	'db'      => $ddb,
 	'feature' => $dataset,
 	'single'  => 1,
 	'prompt'  => " Enter the number of the feature or dataset from which to" . 
 					" collect data   ",
-} );
+);
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
@@ -345,13 +345,13 @@ if ($method eq 'sum' or $method eq 'rpm') {
 # an average across all features at each position suitable for plotting
 if ($sum) {
 	print " Generating final summed data....\n";
-	my $sumfile = write_summary_data( {
+	my $sumfile = write_summary_data(
 		'data'        => $main_data_ref,
 		'filename'    => $outfile,
 		'startcolumn' => $startcolumn,
 		'dataset'     => $dataset,
 		'log'         => $log,
-	} );
+	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
 	}
@@ -368,11 +368,11 @@ $main_data_ref->{'program'} = $0;
 
 # we will write a standard tim data file
 # appropriate extensions and compression should be taken care of
-my $written_file = write_tim_data_file( {
+my $written_file = write_tim_data_file(
 	'data'     => $main_data_ref,
 	'filename' => $outfile,
 	'gz'       => $gz,
-} );
+);
 if ($written_file) {
 	# success!
 	print " wrote file $written_file\n";
@@ -396,10 +396,10 @@ printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 sub generate_a_new_feature_dataset {
 	# a subroutine to generate a new feature dataset
 	
-	$main_data_ref = get_new_feature_list( {
+	$main_data_ref = get_new_feature_list(
 			'db'       => $main_database,
 			'features' => $feature,
-	} );
+	);
 	
 	# set the current program
 	$main_data_ref->{'program'} = $0;
@@ -602,7 +602,7 @@ sub map_relative_data_for_features {
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash( {
+		my %regionscores = get_region_dataset_hash(
 				'db'          => $mdb,
 				'ddb'         => $ddb,
 				'dataset'     => $dataset,
@@ -616,7 +616,7 @@ sub map_relative_data_for_features {
 				'set_strand'  => $set_strand ? 
 								$data_table_ref->[$row][$strand_index] : undef, 
 				'avoid'       => $avoid,
-		} );
+		);
 		
 		# record the scores
 		record_scores($row, \%regionscores);
@@ -797,7 +797,7 @@ sub map_relative_data_for_regions {
 		}
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash( {
+		my %regionscores = get_region_dataset_hash(
 				'db'          => $ddb,
 				'dataset'     => $dataset,
 				'chromo'      => $data_table_ref->[$row][$chr_index],
@@ -806,7 +806,7 @@ sub map_relative_data_for_regions {
 				'strand'      => $strand,
 				'value'       => $value_type,
 				'stranded'    => $strand_sense,
-		} );
+		);
 		
 		# convert the regions scores back into relative scores
 		my %relative_scores;
@@ -1033,7 +1033,7 @@ sub collect_long_data_window_scores {
 		$column < $main_data_ref->{'number_columns'}; 
 		$column++
 	) {
-		$data_table_ref->[$row][$column] = get_chromo_region_score( {
+		$data_table_ref->[$row][$column] = get_chromo_region_score(
 			'db'          => $ddb,
 			'dataset'     => $dataset,
 			'chromo'      => $fchromo,
@@ -1044,7 +1044,7 @@ sub collect_long_data_window_scores {
 			'value'       => $value_type,
 			'stranded'    => $strand_sense,
 			'log'         => $log,
-		} ) || '.';
+		);
 	}
 }
 
@@ -1134,10 +1134,13 @@ __END__
 
 get_relative_data.pl
 
+A script to collect data in bins around a relative position.
+
 =head1 SYNOPSIS
  
- get_relative_data.pl --db <database> --feature <name> --out <file> [--options]
- get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
+get_relative_data.pl --db <database> --feature <name> --out <file> [--options]
+
+get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options:
   --db <name|file.gff3>
@@ -1156,8 +1159,8 @@ get_relative_data.pl
   --avoid
   --long
   --(no)sum
-  --(no)smooth
-  --(no)log
+  --smooth
+  --log
   --gz
   --version
   --help
@@ -1302,18 +1305,18 @@ each position, suitable for graphing. A separate text file will
 be written with the suffix '_summed' with the averaged data. 
 Default is true (sum).
 
-=item --(no)smooth
+=item --smooth
 
 Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false (nosmooth).
 
-=item --(no)log
+=item --log
 
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space. The default is 
 false (nolog).
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -1367,4 +1370,3 @@ or merged with other summed data sets for comparison.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

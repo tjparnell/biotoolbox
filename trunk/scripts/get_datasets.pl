@@ -1,43 +1,6 @@
 #!/usr/bin/env perl
 
-=head1 NAME
-
-get_datasets.pl
-
-A program to collect data for a list of features
-
-=head1 SYNOPSIS
-
-get_datasets.pl [--options...] [<filename>]
-  
-  Options:
-  --new
-  --in <filename>
-  --out filename
-  --db <name | filename>
-  --ddb <name | filename>
-  --feature <type | type:source | alias>, ...
-  --data <none | file | type>, ...
-  --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
-  --value [score | count | length]
-  --(no)log
-  --strand [all | sense | antisense]
-  --exons
-  --extend <integer>
-  --start <integer>
-  --stop <integer>
-  --fstart <decimal>
-  --fstop <decimal>
-  --limit <integer>
-  --pos [5 | m | 3]
-  --win <integer>
-  --step <integer>
-  --force_strand
-  --(no)gz
-  --version
-  --help
-
-=cut 
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -280,12 +243,12 @@ else {
 
 # Check the datasets
 unless ($datasets[0] eq 'none') {
-	@datasets = verify_or_request_feature_types( {
+	@datasets = verify_or_request_feature_types(
 		'db'      => $ddb,
 		'feature' => [ @datasets ],
 		'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
 					" to collect data. Comma delimited or range is acceptable\n",
-	} );
+	);
 }
 
 # Total reads in Bam file when using rpkm method
@@ -311,11 +274,11 @@ foreach my $dataset (@datasets) {
 	# write the output file
 	# we will rewrite the file after each collection
 	# appropriate extensions and compression should be taken care of
-	my $success = write_tim_data_file( {
+	my $success = write_tim_data_file(
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
 		'gz'       => $gz,
-	} );
+	);
 	if ($success) {
 		printf " wrote file '%s' in %.1f minutes\n", $success, (time - $start_time)/60;
 		# update file name
@@ -458,11 +421,11 @@ sub get_main_data_ref {
 			# and step size = window size
 			
 			# generate the list
-			$data_ref = get_new_genome_list( {
+			$data_ref = get_new_genome_list(
 				'db'       => $main_database, 
 				'win'      => $win,
 				'step'     => $step,
-			} );
+			);
 			
 			# assign the column indices
 			$chromo = 0;
@@ -474,10 +437,10 @@ sub get_main_data_ref {
 			# everything else works off a feature list
 			
 			# generate the gene list
-			$data_ref = get_new_feature_list( {
+			$data_ref = get_new_feature_list(
 				'db'        => $main_database,
 				'features'  => $feature,
-			} );
+			);
 			
 			# assign the column indices
 			$name   = 0;
@@ -726,7 +689,7 @@ sub get_genome_dataset {
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -738,7 +701,6 @@ sub get_genome_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -763,7 +725,7 @@ sub get_extended_genome_dataset {
 		my $stop  = $main_data_ref->{'data_table'}->[$row][$stop_i]  + $extend;
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -775,7 +737,6 @@ sub get_extended_genome_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -865,7 +826,7 @@ sub get_adjusted_genome_dataset {
 		}
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -876,7 +837,6 @@ sub get_adjusted_genome_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -989,7 +949,7 @@ sub get_fractionated_genome_dataset {
 		}
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
@@ -1000,7 +960,6 @@ sub get_fractionated_genome_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -1056,7 +1015,7 @@ sub get_feature_dataset {
 		
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1067,7 +1026,6 @@ sub get_feature_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -1122,7 +1080,7 @@ sub get_extended_feature_dataset {
 		}
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1133,7 +1091,6 @@ sub get_extended_feature_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -1242,7 +1199,7 @@ sub get_adjusted_feature_dataset {
 		
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1253,7 +1210,6 @@ sub get_adjusted_feature_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -1373,7 +1329,7 @@ sub get_fractionated_feature_dataset {
 		
 		
 		# get region score
-		my $score = get_chromo_region_score( {
+		my $score = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $feature->seq_id,
@@ -1384,7 +1340,6 @@ sub get_fractionated_feature_dataset {
 				'method'    => $method,
 				'log'       => $main_data_ref->{$index}{'log2'},
 				'stranded'  => $stranded,
-			} 
 		);
 		unless (defined $score) {
 			# this should return a value, otherwise we record an internal null
@@ -1503,7 +1458,7 @@ sub get_subfeature_dataset {
 			# name and feature type, since we can't guarantee that the 
 			# subfeatures are indexed separately from the parent in the 
 			# database
-			my %pos2scores = get_region_dataset_hash( {
+			my %pos2scores = get_region_dataset_hash(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $subfeat->seq_id,
@@ -1512,7 +1467,7 @@ sub get_subfeature_dataset {
 				'strand'    => $subfeat->strand,
 				'value'     => $value_type,
 				'stranded'  => $stranded,
-			} );
+			);
 			
 			# record the values
 			push @subf_values, values %pos2scores;
@@ -1718,6 +1673,43 @@ sub record_metadata {
 
 __END__
 
+=head1 NAME
+
+get_datasets.pl
+
+A program to collect data for a list of features
+
+=head1 SYNOPSIS
+
+get_datasets.pl [--options...] [<filename>]
+  
+  Options:
+  --new
+  --in <filename>
+  --out filename
+  --db <name | filename>
+  --ddb <name | filename>
+  --feature <type | type:source | alias>, ...
+  --data <none | file | type>, ...
+  --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
+  --value [score | count | length]
+  --log
+  --strand [all | sense | antisense]
+  --exons
+  --extend <integer>
+  --start <integer>
+  --stop <integer>
+  --fstart <decimal>
+  --fstop <decimal>
+  --limit <integer>
+  --pos [5 | m | 3]
+  --win <integer>
+  --step <integer>
+  --force_strand
+  --gz
+  --version
+  --help
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1838,7 +1830,7 @@ BigBed and database features support count and length and optionally
 score; Bam files support basepair coverage (score), count (number of 
 alignments), and length.
 
-=item --(no)log
+=item --log
 
 Indicate the dataset is (not) in log2 space. The log2 status of the dataset is 
 critical for accurately mathematically combining the dataset values in the 
@@ -1934,7 +1926,7 @@ presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output file should (not) be compressed by gzip. 
 If compressed, the extension '.gz' is appended to the filename. If a compressed 

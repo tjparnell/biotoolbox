@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to convert a tim data file to a fasta file
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.7.0';
+my $VERSION = '1.10';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -262,6 +262,8 @@ __END__
 
 data2fasta.pl
 
+A script to retrieve sequences from a list of features
+
 =head1 SYNOPSIS
 
 data2fasta.pl [--options...] <filename>
@@ -276,10 +278,9 @@ data2fasta.pl [--options...] <filename>
   --start <index>
   --stop <index>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -334,7 +335,7 @@ automatically determined from the column header.
 
 Specify the output filename. By default it uses the input file basename.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -374,4 +375,3 @@ be in a writeable directory to create an index for efficient retrieval.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

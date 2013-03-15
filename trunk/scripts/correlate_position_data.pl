@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will correlate the positions of occupancy from two datasets
-# for a region (nucleosome)
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -24,7 +23,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.9.4';
+my $VERSION = '1.10';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -189,11 +188,11 @@ collect_correlations();
 unless ($outfile) {
 	$outfile = $infile;
 }
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'     => $mainData,
 	'filename' => $outfile,
 	'gz'       => $gz,
-} );
+);
 if ($success) {
 	print " wrote output file $success\n";
 }
@@ -212,24 +211,24 @@ printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 sub validate_or_request_dataset {
 	
 	# Process the reference dataset
-	$refDataSet = verify_or_request_feature_types( {
+	$refDataSet = verify_or_request_feature_types(
 		'db'      => $ddb,
 		'feature' => $refDataSet,
 		'prompt'  => "Enter the reference data set  ",
 		'single'  => 1,
-	} );
+	);
 	unless ($refDataSet) {
 		die " A valid reference data set must be provided!\n";
 	}
 	
 	
 	# Process the test dataset
-	$testDataSet = verify_or_request_feature_types( {
+	$testDataSet = verify_or_request_feature_types(
 		'db'      => $ddb,
 		'feature' => $testDataSet,
 		'prompt'  => "Enter the test data set  ",
 		'single'  => 1,
-	} );
+	);
 	unless ($testDataSet) {
 		die " A valid test data set must be provided!\n";
 	}
@@ -320,7 +319,7 @@ sub collect_correlations {
 			# collecting data in a radius around a reference point
 			
 			# collect data
-			%ref_pos2data = get_region_dataset_hash( {
+			%ref_pos2data = get_region_dataset_hash(
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
@@ -328,8 +327,8 @@ sub collect_correlations {
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
 				'value'     => 'score',
-			} );
-			%test_pos2data = get_region_dataset_hash( {
+			);
+			%test_pos2data = get_region_dataset_hash(
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
@@ -337,12 +336,12 @@ sub collect_correlations {
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
 				'value'     => 'score',
-			} );
+			);
 		}
 		else {
 			# just collect data over the region
 			# collect data
-			%ref_pos2data = get_region_dataset_hash( {
+			%ref_pos2data = get_region_dataset_hash(
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
@@ -352,8 +351,8 @@ sub collect_correlations {
 				'strand'    => $strand,
 				'position'  => 5, 
 				'value'     => 'score',
-			} );
-			%test_pos2data = get_region_dataset_hash( {
+			);
+			%test_pos2data = get_region_dataset_hash(
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
@@ -363,7 +362,7 @@ sub collect_correlations {
 				'strand'    => $strand,
 				'position'  => 5, 
 				'value'     => 'score',
-			} );
+			);
 		}
 		
 		# Verify minimum data count 
@@ -899,6 +898,8 @@ __END__
 
 correlate_position_data.pl
 
+A script to calculate correlations between two datasets along the length of a feature.
+
 =head1 SYNOPSIS
 
 correlate_position_data.pl [--options] <filename>
@@ -916,10 +917,9 @@ correlate_position_data.pl [--options] <filename>
   --norm [rank | sum ]
   --force_strand
   --(no)interpolate
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -1010,7 +1010,7 @@ Interpolate missing or zero positioned values in each window for both
 reference and test data. This will improve the Pearson correlation 
 values, especially for sparse data. Enabled by default.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -1063,4 +1063,3 @@ shift value that generated it.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

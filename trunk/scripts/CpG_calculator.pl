@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will calculate observed expected CpG dinucleotides
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -20,7 +20,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.9.6';
+my $VERSION = '1.10';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -131,10 +131,10 @@ else {
 	# make a new genome list based on the type of database we're using
 	if ($database) {
 		# get the list from the database
-		$data = get_new_genome_list( {
+		$data = get_new_genome_list(
 			'db'   => $db,
 			'win'  => $window,
-		} ) or die " unable to generate genome window list!\n";
+		) or die " unable to generate genome window list!\n";
 	}
 	else {
 		# working with a fasta db
@@ -160,12 +160,12 @@ unless ($outfile) {
 	$outfile = $data->{'basename'};
 }
 
-my $written_file = write_tim_data_file( {
+my $written_file = write_tim_data_file(
 	# we will write a tim data file
 	# appropriate extensions and compression should be taken care of
 	'data'     => $data,
 	'filename' => $outfile,
-} );
+);
 if ($written_file) {
 	print " Wrote data file '$written_file' ";
 }
@@ -406,9 +406,12 @@ __END__
 
 CpG_calculator.pl
 
+A script to calculate observed vs expected CpG dinucleotides
+
 =head1 SYNOPSIS
 
 CpG_calculator.pl --fasta <directory|filename> [--options...]
+
 CpG_calculator.pl --db <text> [--options...]
   
   Options:
@@ -417,7 +420,7 @@ CpG_calculator.pl --db <text> [--options...]
   --in <filename>
   --win <integer>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -460,7 +463,7 @@ Option is ignored if an input file is provided. Default is 1000 bp.
 Specify the output filename. By default it uses the input file base 
 name if provided. Required if no input file is provided.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -505,4 +508,3 @@ or generated file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

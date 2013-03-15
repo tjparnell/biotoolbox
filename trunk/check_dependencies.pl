@@ -1,4 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+# documentation at end of file
 
 use strict;
 use Cwd;
@@ -250,6 +252,8 @@ __END__
 
 check_dependencies.pl
 
+A script to check for BioToolBox prerequisites.
+
 =head1 SYNOPSIS
 
 [sudo] ./check_dependencies.pl
@@ -303,6 +307,4 @@ http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
 

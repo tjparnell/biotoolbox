@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to convert a generic data file into a wig file
-# this presumes it has chromosomal coordinates to convert
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -17,7 +16,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.10';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -757,12 +756,12 @@ sub format_score {
 sub convert_to_bigwig {
 	
 	# perform the conversion
-	my $bw_file = wig_to_bigwig_conversion( {
+	my $bw_file = wig_to_bigwig_conversion(
 			'wig'       => $outfile,
 			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bwapppath' => $bw_app_path,
-	} );
+	);
 
 	
 	# confirm
@@ -807,15 +806,14 @@ data2wig.pl [--options...] <filename>
   --inter | --zero
   --format [0 | 1 | 2 | 3]
   --method [mean | median | sum | max]
-  --(no)log
+  --log
   --bigwig | --bw
   --chromof <filename>
   --db <database>
   --bwapp </path/to/wigToBigWig>
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -935,7 +933,7 @@ The default is to not format the score value.
 Define the method used to combine multiple data values at a single 
 position. Wig files do not tolerate multiple identical positions.
 
-=item --(no)log
+=item --log
 
 If multiple data values need to be combined at a single identical 
 position, indicate whether the data is in log2 space or not. This 
@@ -970,7 +968,7 @@ file C<biotoolbox.cfg> for the application path. Failing that, it will
 search the default environment path for the utility. If found, it will 
 automatically execute the utility to convert the wig file.
 
-=item --(no)gz
+=item --gz
 
 A boolean value to indicate whether the output wiggle 
 file should be compressed with gzip.
@@ -1032,4 +1030,3 @@ available from UCSC.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

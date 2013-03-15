@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will convert a data file to a bed file
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.9.7';
+my $VERSION = '1.10';
 
 print "\n This program will write a BED file\n";
 
@@ -445,12 +445,12 @@ if ($bigbed) {
 	
 			
 	# perform the conversion
-	my $bb_file = bed_to_bigbed_conversion( {
+	my $bb_file = bed_to_bigbed_conversion(
 			'bed'       => $outfile,
 			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
-	} );
+	);
 
 	
 	# confirm
@@ -474,6 +474,8 @@ __END__
 
 data2bed.pl
 
+A script to convert a data file to a bed file.
+
 =head1 SYNOPSIS
 
 data2bed.pl [--options...] <filename>
@@ -493,7 +495,7 @@ data2bed.pl [--options...] <filename>
   --chromof <filename>
   --db <database>
   --bbapp </path/to/bedToBigBed>
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -596,7 +598,7 @@ file C<biotoolbox.cfg> for the application path. Failing that, it will
 search the default environment path for the utility. If found, it will 
 automatically execute the utility to convert the bed file.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -640,9 +642,6 @@ An option exists to further convert the BED file to an indexed, binary BigBed
 format. Jim Kent's bedToBigBed conversion utility must be available, and 
 either a chromosome definition file or access to a Bio::DB database is required.
 
-
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -655,5 +654,3 @@ either a chromosome definition file or access to a Bio::DB database is required.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-

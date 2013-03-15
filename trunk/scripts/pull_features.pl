@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to pull out a specific subset or list of features or lines of data 
-# from a data file. Compare to Excel's VLOOKUP command, only faster.
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -16,7 +15,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.10';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -419,10 +418,10 @@ sub write_files {
 		next unless $out->{'last_row'} > 0; # nothing but the header
 		
 		# write the file
-		my $write_results = write_tim_data_file( {
+		my $write_results = write_tim_data_file(
 			'data'      => $out,
 			# no file name, using the filename recorded in the out data
-		} );
+		);
 		if ($write_results) {
 			print "  Wrote new datafile '$write_results'\n";
 		}
@@ -433,13 +432,13 @@ sub write_files {
 		# Summarize the pulled data
 		if ($sum) {
 			print " Generating final summed data...\n";
-			my $sumfile = write_summary_data( {
+			my $sumfile = write_summary_data(
 				'data'         => $out,
 				'filename'     => $out->{'filename'}, # must provide
 				'startcolumn'  => $startcolumn,
 				'endcolumn'    => $stopcolumn,
 				'log'          => $log,
-			} );
+			);
 			if ($sumfile) {
 				print "  Wrote summary file '$sumfile'\n";
 			}
@@ -457,6 +456,8 @@ __END__
 =head1 NAME
 
 pull_features.pl
+
+A script to pull out a specific list of data rows from a data file.
 
 =head1 SYNOPSIS
 
@@ -575,11 +576,3 @@ biotoolbox scripts L<get_relative_data.pl> or L<average_gene.pl>.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-

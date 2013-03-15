@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will collect specific regions from features
-
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -21,7 +20,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.9.5';
+my $VERSION = '1.10';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -149,11 +148,11 @@ print "  collected ", format_with_commas($outdata->{'last_row'}), " regions\n";
 
 
 ### Finished
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'     => $outdata,
 	'filename' => $outfile,
 	'gz'       => $gz,
-} );
+);
 if ($success) {
 	print " wrote file '$success'\n";
 }
@@ -338,12 +337,12 @@ sub collect_from_database {
 		die " unable to open database connection!\n";
 	
 	# get feature type if necessary
-	$feature = verify_or_request_feature_types( {
+	$feature = verify_or_request_feature_types(
 		'db'      => $db,
 		'feature' => $feature,
 		'prompt'  => 'Enter the gene feature from which to collect regions   ',
 		'single'  => 1,
-	} ) or die "No valid gene feature type was provided! see help\n";
+	) or die "No valid gene feature type was provided! see help\n";
 	
 	# generate output data
 	my $output = generate_output_structure();
@@ -1017,9 +1016,12 @@ __END__
 
 get_gene_regions.pl
 
+A script to collect specific, often un-annotated regions from genes.
+
 =head1 SYNOPSIS
 
 get_gene_regions.pl [--options...] --db <text> --out <filename>
+
 get_gene_regions.pl [--options...] --in <filename> --out <filename>
   
   Options:
@@ -1037,7 +1039,6 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -1164,4 +1165,3 @@ data collection.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

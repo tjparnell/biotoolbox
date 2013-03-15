@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to convert microarray oligo data to GFF
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.6.2';
+my $VERSION = '1.10';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -271,11 +271,11 @@ $oligo_feature_ref->{'basename'} = undef;
 $oligo_feature_ref->{'filename'} = undef;
 $oligo_feature_ref->{'extension'} = undef;
 
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'       => $oligo_feature_ref,
 	'filename'   => $outfile,
 	'gz'         => $gz
-} );
+);
 if ($success) {
 	print " Wrote file '$success'\n";
 }
@@ -355,6 +355,8 @@ __END__
 
 map_oligo_data2gff.pl
 
+A script to assign processed microarray data to genomic coordinates.
+
 =head1 SYNOPSIS
 
 map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
@@ -366,7 +368,7 @@ map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--option
   --name <text>
   --type <text>
   --source <text>
-  --(no)strand
+  --strand
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
@@ -374,7 +376,6 @@ map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--option
   --version
   --help
   
-
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -418,9 +419,9 @@ Specify the output GFF type or method field value. By default, it uses the name.
 
 Specify the output GFF source field value. By default it is 'lab'.
 
-=item --(no)strand
+=item --strand
 
-Indicate whether the original strand information should (not) be kept from the 
+Indicate whether the original strand information should be kept from the 
 original oligo GFF file. The default is false, as most ChIP data is inherently 
 not stranded.
 
@@ -439,7 +440,7 @@ default is no formatting.
 
 Specify the output filename. The default is to use the name value.
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output file should (not) be compressed with gzip.
 
@@ -464,7 +465,6 @@ The score value may be formatted, and the GFF type, source, name, and strand
 may be set to new values. It will write a GFF v.3 file, regardless of the 
 source oligo GFF file version.
 
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -477,5 +477,3 @@ source oligo GFF file version.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-

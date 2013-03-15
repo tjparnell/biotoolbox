@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to pull out feature attributes from a database
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.6.4';
+my $VERSION = '1.10';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -140,10 +140,10 @@ unless ($outfile) {
 }
 
 # write the file
-my $file_success = write_tim_data_file( {
+my $file_success = write_tim_data_file(
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-} );
+);
 if ($file_success) {
 	# success
 	print " Wrote file '$file_success'\n";
@@ -540,17 +540,18 @@ __END__
 
 get_feature_info.pl
 
-A script to feature information from a Bioperl SeqFeature::Store db.
+A script to collect feature information from a BioPerl SeqFeature::Store db.
 
 =head1 SYNOPSIS
 
 get_feature_info.pl <filename> 
 
+  Options:
   --in <filename> 
   --db <name>
   --attrib <attribute1,attribute2,...>
   --out filename
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -568,7 +569,6 @@ Attributes include:
    transcript_length (sum of exon lengths)
    parent (name)
    <tag>
-
 
 =head1 OPTIONS
 
@@ -619,7 +619,7 @@ can't remember the feature's tag keys in the database.
 Optionally specify an alternate output file name. The default is to 
 overwrite the input file.
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output file should (not) be compressed by gzip. 
 If compressed, the extension '.gz' is appended to the filename. If a compressed 
@@ -654,4 +654,3 @@ field of the original source GFF file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will run the k-means cluster analysis
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -203,6 +203,8 @@ __END__
 
 run_cluster.pl
 
+A script to run the k-means cluster analysis.
+
 =head1 SYNOPSIS
 
 run_cluster.pl [--options...] <filename>
@@ -216,7 +218,6 @@ run_cluster.pl [--options...] <filename>
   --dist [c|a|u|x|s|k|e|b]
   --version
   --help
-
 
 =head1 OPTIONS
 

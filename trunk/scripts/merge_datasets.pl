@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A program to merge two or more dataset files
-
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -16,7 +15,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.8.7';
+my $VERSION = '1.10';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -163,11 +162,11 @@ unless ($outfile) {
 }
 
 # write the file
-my $file_written = write_tim_data_file( {
+my $file_written = write_tim_data_file(
 	'data'      => $output_data_ref,
 	'filename'  => $outfile,
 	'gz'        => $gz,
-} );
+);
 if ($file_written) {
 	print " Wrote file '$file_written'\n";
 }
@@ -1093,6 +1092,8 @@ __END__
 
 merge_datasets.pl
 
+A program to merge two or more data files by appending columns.
+
 =head1 SYNOPSIS
 
 merge_datasets.pl [--options...] <file1> <file2> ...
@@ -1104,10 +1105,9 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   --index <number,letter,range>
   --lookupname | --lun <text>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -1158,7 +1158,7 @@ values include 'Name', 'ID', 'Transcript', or 'Gene'.
 Specify the output filename. By default it uses the first file name.
 Required in automatic mode.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 

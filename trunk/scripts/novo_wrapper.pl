@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a wrapper program for Novocraft's novoaligner
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -498,6 +498,8 @@ __END__
 =head1 NAME
 
 novo_wrapper.pl
+
+A parallelized wrapper program for Novocraft's novoaligner.
 
 =head1 SYNOPSIS
  

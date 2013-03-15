@@ -1,41 +1,6 @@
 #!/usr/bin/env perl
 
-=head1 NAME
-
-bam2wig.pl
-
-A script to enumerate Bam alignments or coverage into a wig file
-
-=head1 SYNOPSIS
-
-bam2wig.pl [--options...] <filename.bam>
-  
-  Options:
-  --in <filename.bam>
-  --out <filename> 
-  --position [start|mid|span|extend]
-  --coverage
-  --splice|split
-  --pe
-  --bin <integer>
-  --shift
-  --shiftval <integer>
-  --sample <integer>
-  --chrom <integer>
-  --minr <float>
-  --strand
-  --qual <integer>
-  --max <integer>
-  --rpm
-  --log [2|10]
-  --bw
-  --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
-  --(no)gz
-  --verbose
-  --version
-  --help
-
-=cut
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -1539,10 +1504,10 @@ sub convert_to_bigwig {
 	
 	foreach my $file (@files) {
 		next unless defined $file;
-		my $bw_file = wig_to_bigwig_conversion( {
+		my $bw_file = wig_to_bigwig_conversion(
 			'wig'   => $file,
 			'db'    => $sam,
-		});
+		);
 		if ($bw_file) {
 			print " Converted to $bw_file\n";
 			unlink $file;
@@ -1555,6 +1520,41 @@ sub convert_to_bigwig {
 
 
 __END__
+
+=head1 NAME
+
+bam2wig.pl
+
+A script to enumerate Bam alignments or coverage into a wig file.
+
+=head1 SYNOPSIS
+
+bam2wig.pl [--options...] <filename.bam>
+  
+  Options:
+  --in <filename.bam>
+  --out <filename> 
+  --position [start|mid|span|extend]
+  --coverage
+  --splice|split
+  --pe
+  --bin <integer>
+  --shift
+  --shiftval <integer>
+  --sample <integer>
+  --chrom <integer>
+  --minr <float>
+  --strand
+  --qual <integer>
+  --max <integer>
+  --rpm
+  --log [2|10]
+  --bw
+  --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
+  --gz
+  --verbose
+  --version
+  --help
 
 =head1 OPTIONS
 
@@ -1711,7 +1711,7 @@ different utilities may be used, bedGraphToBigWig or wigToBigWig,
 depending on the format of the wig file generated. The application 
 paths may be set in the biotoolbox.cfg file.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
@@ -1896,4 +1896,3 @@ together with the shifted wig file in a genome browser.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

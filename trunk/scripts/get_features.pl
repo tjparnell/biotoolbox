@@ -1,8 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will collect features from a database
-
-# Inspired by Magda and all those confused by GFF3 annotation databases
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -23,7 +21,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.9.3';
+my $VERSION = '1.10';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -134,12 +132,12 @@ if (scalar @features == 1 and $features[0] =~ /,/) {
 }
 
 # validate and/or request features
-@features = verify_or_request_feature_types( {
+@features = verify_or_request_feature_types(
 	'db'      => $db,
 	'feature' => [ @features ],
 	'prompt'  => " Enter the feature(s) to collect." . 
 			" A comma de-limited list or range may be given\n",
-} ) or die " no valid features were provided! see help\n";
+) or die " no valid features were provided! see help\n";
 
 
 
@@ -181,11 +179,11 @@ else {
 	unless ($outfile) {
 		$outfile = generate_file_name();
 	}
-	my $success = write_tim_data_file( {
+	my $success = write_tim_data_file(
 		'data'     => $data,
 		'filename' => $outfile,
 		'gz'       => $gz,
-	} );
+	);
 	if ($success) {
 		print " Wrote file '$success'\n";
 	}
@@ -481,6 +479,8 @@ __END__
 
 get_features.pl
 
+A script to collect features from a BioPerl SeqFeature::Store database.
+
 =head1 SYNOPSIS
 
 get_features.pl --db <text> [--options...]
@@ -496,7 +496,7 @@ get_features.pl --db <text> [--options...]
   --out <filename>
   --bed
   --gff 
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -564,7 +564,7 @@ Optionally indicate that a GFF3 format file should be written. This
 option enables the database features to be written completely with 
 all attributes. Coordinate adjustments are ignored.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 

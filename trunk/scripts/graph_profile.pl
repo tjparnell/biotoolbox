@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to graph bezier-curve smoothed profile plots for summed genomic 
-# data, e.g. average gene, TSS data, etc.
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -514,28 +513,29 @@ __END__
 
 graph_profile.pl
 
-A script to graph values along a specific X-axis
+A script to graph Y values along a genomic coordinate X-axis.
 
 =head1 SYNOPSIS
 
 graph_profile.pl <filename> 
    
-   --in <filename>
-   --index <index1,index2,...>
-   --all
-   --(no)cen
-   --(no)log
-   --xindex <index>
-   --skip <integer>
-   --offset <integer>
-   --xformat <integer>
-   --min <number>
-   --max <number>
-   --yformat <integer>
-   --ytick <integer>
-   --color <name,name,...>
-   --dir <foldername>
-   --version
+  Options:
+  --in <filename>
+  --index <index1,index2,...>
+  --all
+  --cen
+  --log
+  --xindex <index>
+  --skip <integer>
+  --offset <integer>
+  --xformat <integer>
+  --min <number>
+  --max <number>
+  --yformat <integer>
+  --ytick <integer>
+  --color <name,name,...>
+  --dir <foldername>
+  --version
   --help
 
 =head1 OPTIONS
@@ -567,14 +567,15 @@ interactively from a list.
 
 Automatically graph all available datasets present in the file. 
 
-=item --(no)cen
+=item --cen
 
 Datasets should (not) be median centered prior to graphing. Useful when 
-graphing multiple datasets together when they have different medians.
+graphing multiple datasets together when they have different medians. 
+Default is false.
 
-=item --(no)log
+=item --log
 
-Dataset values are (not) in log2 space, or status should be respected 
+Dataset values are in log2 space, or status should be respected 
 if indicated in the file metadata.
 
 =item --xindex <index>
@@ -664,8 +665,3 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-

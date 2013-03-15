@@ -1,7 +1,6 @@
-#!/usr/bin/perl
-$! = 1;
+#!/usr/bin/env perl
 
-# A script to look for enriched regions for a specific microarray data set
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -28,7 +27,7 @@ use tim_file_helper qw(
 );
 use tim_db_helper::config;
 # use Data::Dumper;
-my $VERSION = '1.9.5';
+my $VERSION = '1.10';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -273,13 +272,13 @@ else {
 # stored in the @windows array
 
 # Check or request the dataset
-$dataset = verify_or_request_feature_types( {
+$dataset = verify_or_request_feature_types(
 	'db'      => $ddb,
 	'feature' => $dataset,
 	'single'  => 1,
 	'prompt'  => " Enter the number of the feature or dataset to scan for" . 
 					" enrichment   ",
-} );
+);
 
 # get a simplified dataset name
 my $dataset_name;
@@ -409,10 +408,10 @@ unless ($main_data_ref) {
 
 ## Print the output
 # write standard output data file
-my $write_success = write_tim_data_file( {
+my $write_success = write_tim_data_file(
 	'data'     => $main_data_ref,
 	'filename' => $outfile,
-} );
+);
 if ($write_success) {
 	print " Wrote data file '$write_success'\n";
 }
@@ -429,7 +428,7 @@ if ($gff) {
 	else {
 		$method = 'enriched_region';
 	}
-	my $gff_file = convert_and_write_to_gff_file( {
+	my $gff_file = convert_and_write_to_gff_file(
 		'data'     => $main_data_ref,
 		'score'    => 6,
 		'name'     => 0,
@@ -437,7 +436,7 @@ if ($gff) {
 		'method'   => $method,
 		'version'  => 3,
 		'filename' => $outfile,
-	} );
+	);
 	if ($gff_file) {
 		print " Wrote GFF file '$gff_file'\n";
 	}
@@ -476,7 +475,7 @@ sub go_determine_cutoff {
 	# collect statistics on the chromosome
 	print " Sampling '$dataset_name' values across largest chromosome " . 
 		"$chromosome...\n";
-	my $mean = get_chromo_region_score( {
+	my $mean = get_chromo_region_score(
 		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'mean',
@@ -487,11 +486,11 @@ sub go_determine_cutoff {
 		'log'          => $log,
 		'strand'       => $strand,
 		'stranded'     => $strandedness,
-	} );
+	);
 	unless ($mean) { 
 		die " unable to determine mean value for '$dataset'!\n";
 	}
-	my $stdev = get_chromo_region_score( {
+	my $stdev = get_chromo_region_score(
 		'db'           => $ddb,
 		'dataset'      => $dataset,
 		'method'       => 'stddev',
@@ -502,7 +501,7 @@ sub go_determine_cutoff {
 		'log'          => $log,
 		'strand'       => $strand,
 		'stranded'     => $strandedness,
-	} );
+	);
 	unless ($stdev) { 
 		die " unable to determine stdev value for '$dataset'!\n";
 	}
@@ -572,7 +571,7 @@ sub go_find_enriched_regions {
 			} 
 						
 			# determine window value
-			my $window_score = get_chromo_region_score( {
+			my $window_score = get_chromo_region_score(
 				'db'         => $ddb,
 				'dataset'    => $dataset,
 				'method'     => $method,
@@ -583,7 +582,7 @@ sub go_find_enriched_regions {
 				'log'        => $log,
 				'strand'     => $strand,
 				'stranded'   => $strandedness,
-			} );
+			);
 			unless (defined $window_score) {
 				# print "no values at $chr:$start..$end!\n"; 
 				next;
@@ -696,7 +695,7 @@ sub go_trim_windows {
 		}
 		
 		# get values across the extended window
-		my %pos2score = get_region_dataset_hash( {
+		my %pos2score = get_region_dataset_hash(
 			'db'       => $ddb,
 			'dataset'  => $dataset,
 			'chromo'   => $window->[0],
@@ -706,7 +705,7 @@ sub go_trim_windows {
 			'absolute' => 1,
 			'strand'   => $strand,
 			'stranded' => $strandedness,
-		} );
+		);
 		unless (%pos2score) {
 			# we should be able to! this region has to have scores!
 			warn " unable to generate value hash for window $window->[0]:$start..$stop!\n";
@@ -805,7 +804,7 @@ sub get_final_window_score {
 		$windows[$i][4] = $strand;
 		
 		# re-calculate window score
-		$windows[$i][5] = get_chromo_region_score( {
+		$windows[$i][5] = get_chromo_region_score(
 				'db'       => $ddb,
 				'dataset'  => $dataset, 
 				'chromo'   => $windows[$i][0],
@@ -816,7 +815,7 @@ sub get_final_window_score {
 				'log'      => $log,
 				'strand'   => $strand,
 				'stranded' => $strandedness,
-		} );
+		);
 		
 		# arrays now have $chr, $start, $end, $size, $strand, $finalscore
 	}
@@ -1044,9 +1043,12 @@ __END__
 
 find_enriched_regions.pl
 
+A script to find enriched regions in a dataset using a simple threshold.
+
 =head1 SYNOPSIS
  
  find_enriched_regions.pl --db <db_name> [--options]
+ 
  find_enriched_regions.pl --data <file> [--options]
  
   Options:
@@ -1063,17 +1065,16 @@ find_enriched_regions.pl
   --value [score|count|length]
   --strand [f|r]
   --deplete
-  --(no)trim
-  --(no)sort
-  --(no)feat
-  --(no)log
+  --trim
+  --sort
+  --feat
+  --log
   --genes
   --gff
   --gz
   --version
   --help
 
- 
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1175,7 +1176,14 @@ are merged, there may be some data points on the ends of the
 windows whose scores don't actually pass the threshold, but were 
 included because the entire window mean (or median) exceeded 
 the threshold. This step removes those data points. The default 
-behavior is false (notrim).
+behavior is false.
+
+=item --sort
+
+Indicate that the regions should be sorted by their score. 
+Sort order is decreasing for enriched regions and increasing 
+for depleted regions. Default is false (they should be 
+ordered mostly by coordinate).
 
 =item --feat
 
@@ -1191,9 +1199,9 @@ Write out a text file containing a list of the found overlapping genes.
 Indicate that a GFF version 3 file should be written out in
 addition to the data text file.
 
-=item --(no)log
+=item --log
 
-Flag to indicate that source data is (not) log2, and to calculate 
+Flag to indicate that source data is log2, and to calculate 
 accordingly and report as log2 data.
 
 =item --gz

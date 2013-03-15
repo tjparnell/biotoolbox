@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to generate GFF3 files for bigwig, bigbed, and bam files
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -33,7 +33,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.6.2';
+my $VERSION = '1.10';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -363,7 +363,7 @@ while (@infiles) {
 	}
 	
 	# convert the data structure to GFF for writing
-	convert_genome_data_2_gff_data( {
+	convert_genome_data_2_gff_data(
 		'data'       => $main_data_ref,
 		'version'    => 3,
 		'source'     => $source,
@@ -371,7 +371,7 @@ while (@infiles) {
 		'name'       => $name,
 		'strand'     => 3,
 		'tags'       => [4],
-	} ) or die " unable to convert data to GFF format!\n";
+	) or die " unable to convert data to GFF format!\n";
 	
 	# write new or append existing GFF file
 	if (-e $gff_file) {
@@ -403,10 +403,10 @@ while (@infiles) {
 			$main_data_ref->{'last_row'} += scalar(@chromodata);
 		}
 		
-		my $success = write_tim_data_file( {
+		my $success = write_tim_data_file(
 			'data'       => $main_data_ref,
 			'filename'   => $gff_file,
-		} );
+		);
 		if ($success) {
 			print "  wrote GFF3 file '$success'\n";
 		}
@@ -861,10 +861,13 @@ __END__
 
 big_file2gff3.pl
 
+A script to generate GFF3 files for bigwig, bigbed, and bam files.
+
 =head1 SYNOPSIS
 
 big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   
+  Options:
   --in <file> or <file1,file2,...>
   --path </destination/path/for/bigfiles/>
   --source <text>
@@ -879,7 +882,6 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --version
   --help
   
-
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1011,8 +1013,6 @@ written to the current directory to facilitate setting up GBrowse. If a
 BigWigSet database is requested, then the track stanza will be set up with 
 subtrack tables representing each BigWig file. 
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1025,6 +1025,3 @@ subtrack tables representing each BigWig file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
