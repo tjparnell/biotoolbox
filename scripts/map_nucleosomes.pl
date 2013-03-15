@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to map nucleosomes
-
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -132,12 +131,12 @@ else {
 
 
 # Identify the dataset to use
-$dataset = verify_or_request_feature_types( {
+$dataset = verify_or_request_feature_types(
 		'db'      => $database,
 		'feature' => $dataset,
 		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks ",
 		'single'  => 1,
-} );
+);
 unless ($dataset) {
 	die " A valid scan dataset must be provided!\n";
 }
@@ -169,10 +168,10 @@ exit unless $found_nucs;
 unless ($outfile) {
 	$outfile = $dataset . '_nucleosome';
 }
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'     => $nucleosomes_ref,
 	'filename' => $outfile,
-} );
+);
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -196,7 +195,7 @@ if ($gff) {
 		# set default source, the name of this program
 		$source = 'map_nucleosomes.pl';
 	}
-	$success = convert_and_write_to_gff_file( {
+	$success = convert_and_write_to_gff_file(
 		'data'     => $nucleosomes_ref,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -205,7 +204,7 @@ if ($gff) {
 		'type'     => $type,
 		'source'   => $source,
 		'tag'      => [6],
-	} );
+	);
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -312,7 +311,7 @@ sub map_nucleosomes {
 			$win_stop = $chr_length if $win_stop > $chr_length;
 			
 			# collect the scores
-			my %pos2score = get_region_dataset_hash( {
+			my %pos2score = get_region_dataset_hash(
 					'db'       => $db,
 					'dataset'  => $dataset,
 					'chromo'   => $chromo,
@@ -320,7 +319,7 @@ sub map_nucleosomes {
 					'stop'     => $win_stop,
 					'value'    => 'score',
 					'absolute' => 1,
-			} );
+			);
 			
 			if ($debug) {
 				print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
@@ -450,7 +449,7 @@ sub verify_peak_position {
 	# this distance is arbitrarily about 1/2 nucleosome size
 	# limit this by not going further backwards than the original window scan 
 	# start - do not want to overlap previous nucleosome
-	my %pos2score = get_region_dataset_hash( {
+	my %pos2score = get_region_dataset_hash(
 			'db'       => $db,
 			'dataset'  => $dataset,
 			'chromo'   => $chromo,
@@ -459,7 +458,7 @@ sub verify_peak_position {
 			'stop'     => $peak_position + 35,
 			'value'    => 'score',
 			'absolute' => 1,
-	} );
+	);
 
 	
 	# find the max peak
@@ -532,7 +531,7 @@ sub process_nucleosome {
 		
 		# we will skip moving average here if it was enabled
 		# we want real data, not averaged
-	my %pos2score = get_region_dataset_hash( {
+	my %pos2score = get_region_dataset_hash(
 		'db'       => $db,
 		'dataset'  => $dataset,
 		'chromo'   => $chromo,
@@ -540,7 +539,7 @@ sub process_nucleosome {
 		'stop'     => $peak_position + 40,
 		'value'    => 'score',
 		'absolute' => 1,
-	} );
+	);
 	
 	my @nucleosome_positions;
 	for (my $i = -37; $i <= 37; $i++) {
@@ -580,7 +579,7 @@ sub process_nucleosome {
 	
 	# Calculate the number of nucleosome midpoints used in calling 
 	# this nucleosome, this will be the score
-	$score = get_chromo_region_score( {
+	$score = get_chromo_region_score(
 		'db'       => $db,
 		'dataset'  => $dataset,
 		'chromo'   => $chromo,
@@ -588,7 +587,7 @@ sub process_nucleosome {
 		'stop'     => $peak_position + 37,
 		'value'    => 'score',
 		'method'   => 'sum',
-	} );
+	);
 	
 	# Determine the nucleosome coordinates
 		# we are assuming a standard 147 bp sized nucleosome
@@ -641,8 +640,10 @@ A script to map nucleosomes.
 =head1 SYNOPSIS
 
 map_nucleosomes.pl --db <text> --thresh <number> [--options...]
+
 map_nucleosomes.pl --data <text|file> --thresh <number> [--options...]
   
+  Options:
   --db <text>
   --data <text|file>
   --thesh <number>

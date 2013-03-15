@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to pull out overlapping features from the database
+# documentation at end of file
 
 use strict;
 use warnings;
@@ -136,12 +136,12 @@ my $db = open_db_connection($database) ||
 
 
 ### Identify the Features to Search
-@search_features = verify_or_request_feature_types( {
+@search_features = verify_or_request_feature_types(
 	'db'      => $db,
 	'feature' => [ @search_features ],
 	'prompt'  => "Enter the number(s) to the intersecting feature(s) to" . 
 				" search.\n Enter as comma delimited list and/or range   ",
-} );
+);
 
 
 
@@ -163,10 +163,10 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-} );
+);
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -812,13 +812,15 @@ sub summarize_found_features {
 
 __END__
 
-=head1 NAME get_intersecting_features.pl
+=head1 NAME 
 
+get_intersecting_features.pl
 
+A script to pull out overlapping features from the database.
 
 =head1 SYNOPSIS
 
-   get_intersecting_features.pl [--options] <filename>
+get_intersecting_features.pl [--options] <filename>
   
   Options:
   --in <filename>
@@ -829,7 +831,7 @@ __END__
   --extend <integer>
   --ref [start | mid]
   --out <filename>
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -886,7 +888,7 @@ features. Valid options include "start" (or 5' end for stranded features) and
 Optionally specify a new filename. A standard tim data text file is written. 
 The default is to rewrite the input file.
 
-=item --(no)gz
+=item --gz
 
 Specify whether the output file should (not) be compressed with gzip.
 
@@ -923,7 +925,6 @@ measurement is relative to the coordinates after adjustment with the --start,
 
 A standard tim data text file is written.
 
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -936,14 +937,3 @@ A standard tim data text file is written.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-

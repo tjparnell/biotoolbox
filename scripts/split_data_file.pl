@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to split a tim data file based on common unique data values
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.8.7';
+my $VERSION = '1.10';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -274,11 +274,11 @@ sub write_current_data_to_file_part {
 		
 		# write the file
 		# this should be within the maximum line limit, so we should be safe
-		my $success = write_tim_data_file( {
+		my $success = write_tim_data_file(
 			'data'     => $metadata_ref,
 			'filename' => $written_files{$value}{'file'},
 			'gz'       => $gz,
-		} );
+		);
 		if ($success) {
 			# record the number of lines written
 			$written_files{$value}{'number'} += $last_row;
@@ -359,17 +359,19 @@ __END__
 
 split_data_file.pl
 
+A script to split a data file by rows based on common data values.
+
 =head1 SYNOPSIS
 
 split_data_file.pl [--options] <filename>
   
+  Options:
   --in <filename>
   --index <column_index>
   --max <integer>
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -398,7 +400,7 @@ file. Each group of specific value data is written to one or more files.
 Enter as an integer; underscores may be used as thousands separator, e.g. 
 100_000. 
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output files should be compressed 
 with gzip. Default behavior is to preserve the compression 
@@ -417,7 +419,7 @@ Display the POD documentation
 =head1 DESCRIPTION
 
 This program will split a data file into multiple files based on common 
-unique values in the data table. All rows with the same value will be 
+values in the data table. All rows with the same value will be 
 written into the same file. A good example is chromosome, where all 
 data points for a given chromosome will be written to a separate file, 
 resulting in multiple files representing each chromosome found in the 
@@ -440,8 +442,6 @@ metadata. The original file is preserved.
 
 This program is intended as the complement to 'join_data_files.pl'.
 
-
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -454,15 +454,3 @@ This program is intended as the complement to 'join_data_files.pl'.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-

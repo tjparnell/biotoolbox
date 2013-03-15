@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will compare multiple subfeature scores
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.7.0';
+my $VERSION = '1.10';
 
 print "\n This program will compare scores from multiple subfeatures\n\n";
 
@@ -106,11 +106,11 @@ my $outdata = process_gene_tree($tree);
 
 
 ### Finished
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'     => $outdata,
 	'filename' => $outfile,
 	'gz'       => $gz,
-} );
+);
 if ($success) {
 	print " wrote file '$success'\n";
 }
@@ -296,6 +296,8 @@ __END__
 
 compare_subfeature_scores.pl
 
+A script to compare the scores between one or more subfeatures.
+
 =head1 SYNOPSIS
 
 compare_subfeature_scores.pl --in <filename> --out <filename>
@@ -306,7 +308,7 @@ compare_subfeature_scores.pl --in <filename> --out <filename>
   --parent <index>
   --subfeature <index>
   --score <index>
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -345,7 +347,7 @@ Optionally specify the index column for the score to compare. If
 not specified, the program will interactively present a list of columns 
 to choose from.
 
-=item --(no)gz
+=item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -387,4 +389,3 @@ the range of scores.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

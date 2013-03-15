@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to graph correlation plots for two microarray data sets
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -974,9 +974,11 @@ __END__
 
 graph_data.pl
 
+A script to graph XY line or dot plots between data sets.
+
 =head1 SYNOPSIS
- 
-  graph_data.pl [--options] <filename>
+
+graph_data.pl [--options] <filename>
   
   Options:
   --in <filename>
@@ -985,8 +987,8 @@ graph_data.pl
   --index <X_index&Y_index,...>
   --all
   --ma <window>,<step>
-  --(no)norm
-  --(no)log
+  --norm
+  --log
   --min=<value>
   --xmin=<value>
   --ymin=<value>
@@ -1009,7 +1011,6 @@ graph_data.pl
 The command line flags and descriptions:
 
 =over 4
-
 
 =item --in <filename>
 
@@ -1050,14 +1051,14 @@ set, then the lists may be selected interactively from a list.
 Indicate that all available datasets in the input file should be
 plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.
 
-=item --(no)log
+=item --log
 
 Indicate whether dataset values are in log2 space or not. If set 
 to true and the log2 status is indicated in the metadata, then 
 the metadata status is preserved. Default is false (and metadata 
 ignored).
 
-=item --(no)norm
+=item --norm
 
 Datasets should (not) be normalized by converting to percentile 
 rank values (0..1). This is helpful when the two datasets are 
@@ -1167,7 +1168,6 @@ converting to a percent rank (--norm), try explicitly setting the --min and
 automatically, but sometimes does funny things, particularly with log2 data 
 that spans 0.
 
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1180,9 +1180,3 @@ that spans 0.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-

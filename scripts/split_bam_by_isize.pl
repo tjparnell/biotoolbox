@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to selectively write out paired-end alignments of a given size
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -499,6 +499,8 @@ __END__
 
 split_bam_by_isize.pl
 
+A script to selectively write out paired-end alignments of a given insertion size.
+
 =head1 SYNOPSIS
 
 split_bam_by_isize.pl [--options] <file.bam>
@@ -513,7 +515,6 @@ split_bam_by_isize.pl [--options] <file.bam>
   --quick
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -633,4 +634,3 @@ in the Bam file, or that they do not have matching ID numbers.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

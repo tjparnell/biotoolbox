@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# convert ucsc refseq table file to gff3
-
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -1669,7 +1668,11 @@ sub print_chromosomes {
 
 __END__
 
-=head1 NAME ucsc_table2gff3.pl
+=head1 NAME 
+
+ucsc_table2gff3.pl
+
+A script to convert UCSC gene tables to GFF3 annotation.
 
 =head1 SYNOPSIS
 
@@ -1694,7 +1697,7 @@ __END__
   --(no)cds
   --(no)utr
   --(no)codon
-  --(no)gz
+  --gz
   --version
   --help
 
@@ -1807,7 +1810,7 @@ must infer the UTRs from the CDS and exon features. The default is true.
 Specify whether (or not) to include start_codon and stop_codon features 
 in the transcript heirarchy. The default is true.
 
-=item --(no)gz
+=item --gz
 
 Specify whether the output file should be compressed with gzip.
 

@@ -22,7 +22,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.9.3';
+our $VERSION = '1.10';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -33,7 +33,7 @@ eval {
 unless ($@) {
 	$WIGGLE_OK = 1;
 }; 
-$@ = undef;
+undef $@;
 
 # check for BigWig support
 our $BIGWIG_OK = 0;
@@ -44,7 +44,7 @@ eval {
 unless ($@) {
 	$BIGWIG_OK = 1;
 }; 
-$@ = undef;
+undef $@;
 
 # check for BigBed support
 our $BIGBED_OK = 0;
@@ -55,7 +55,7 @@ eval {
 unless ($@) {
 	$BIGBED_OK = 1;
 }; 
-$@ = undef;
+undef $@;
 
 # check for Bam support
 our $BAM_OK = 0;
@@ -66,7 +66,7 @@ eval {
 unless ($@) {
 	$BAM_OK = 1;
 }; 
-$@ = undef;
+undef $@;
 
 
 
@@ -670,7 +670,7 @@ order of availability.
 For feature types or files that pass validation, they are returned as a 
 list. Types of files that do not pass validation are printed to STDOUT. 
 
-To use this subroutine, pass an anonymous array with the following keys 
+To use this subroutine, pass an array with the following keys 
 and values. Not every key is required.
 
   db       => The name of the database or a reference to an 
@@ -691,7 +691,7 @@ and values. Not every key is required.
               dataset is allowed when selecting datasets from a 
               presented list. If true, only one dataset choice is 
               accepted. If false, one or more dataset choices are 
-              allowed.
+              allowed. Default is false.
 
 The subroutine will return a list of the accepted datasets. It will print 
 bad dataset names to standard out.
@@ -701,10 +701,10 @@ Example:
 	# verify a dataset, either file or database type
 	my $db_name = 'cerevisiae';
 	my $dataset = 'microaray_data';
-	my @features = verify_or_request_feature_types( {
+	my @features = verify_or_request_feature_types(
 		db      => $db_name,
 		feature => $dataset,
-	} );
+	);
 	unless (@features) {
 		die " no valid feature provided!\n";
 	}
@@ -712,10 +712,10 @@ Example:
 	# select a list of features
 	my $db_name = 'cerevisiae';
 	my @types = (); # user not provided
-	@types = verify_or_request_feature_types( {
+	@types = verify_or_request_feature_types(
 		db      => $db_name,
 		feature => $types,
-	} );
+	);
 	# user will be promoted to select from database list
 	if (@types) {
 		print "using types " . join(", ", @types);
@@ -730,28 +730,26 @@ Example:
 sub verify_or_request_feature_types {
 	
 	# Retrieve passed values
-	my $arg_ref = shift; # the passed argument values as a hash reference
+	my %args = @_; # the passed argument values as a hash reference
 	
 	# Check for single option
-	my $single = $arg_ref->{'single'} || 0;
+	$args{'single'} ||= 0;
 	
 	# Collect the datasets
 	my @datasets;
-	if (exists $arg_ref->{'feature'} and defined $arg_ref->{'feature'}) {
-		
-		# check if it's an anonymous array of datasets
-		if (ref $arg_ref->{'feature'} eq 'ARRAY') {
-			@datasets = @{ $arg_ref->{'feature'} };
-		}
-		else {
-			push @datasets, $arg_ref->{'feature'};
-		}
+	$args{'feature'} ||= undef;
+	if (ref $args{'feature'} eq 'ARRAY') {
+		# an anonymous array of datasets
+		@datasets = @{ $args{'feature'} };
+	}
+	else {
+		push @datasets, $args{'feature'};
 	}
 	
 	
 	# Open database object and collect features
-	my $database = $arg_ref->{'db'} || undef;
-	my $db = $database ? open_db_connection($database) : undef;
+	$args{'db'} ||= undef;
+	my $db = $args{'db'} ? open_db_connection( $args{'db'} ) : undef;
 	
 	# Initialize main output arrays
 	my @good_datasets;
@@ -892,13 +890,14 @@ sub verify_or_request_feature_types {
 		}
 		
 		# prompt the user
-		if ($arg_ref->{'prompt'}) {
+		$args{'prompt'} ||= undef;
+		if ($args{'prompt'}) {
 			# provided custom prompt
-			print $arg_ref->{'prompt'};
+			print $args{'prompt'};
 		}
 		else {
 			# generic prompt
-			if ($single) {
+			if ($args{'single'}) {
 				print " Enter one number for the data set or feature   ";
 			}
 			else {
@@ -913,7 +912,7 @@ sub verify_or_request_feature_types {
 		my @answer_list = parse_list($answer);
 		
 		# take the first one if requested
-		if ($single) {
+		if ($args{'single'}) {
 			unless (scalar @answer_list == 1) {
 				splice(@answer_list, 1);
 			}
@@ -968,7 +967,7 @@ sub verify_or_request_feature_types {
 	}
 	
 	# Return good results
-	if ($single) {
+	if ($args{'single'}) {
 		return $good_datasets[0];
 	}
 	else {
@@ -1171,8 +1170,8 @@ feature name and type:source are listed in columns one and two, respectively.
 If the features have an Alias tag, then a third column is included with 
 a comma delimited list of the feature aliases.
 
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
+The subroutine is passed an array containing the arguments. 
+The keys include
 
   Required:
   db       => The name of the database or a reference to an 
@@ -1182,10 +1181,6 @@ arguments. The keys include
               parsed into an actual list with the internal subroutine 
               _features_to_classes(). Refer to that documentation for 
               a list of appropriate features.
-  Optional: 
-  dubious  => A boolean value (1 or 0) indicating whether genes 
-              flagged in the database as 'dubious' should be 
-              included. The default is false (not kept).
 
 The subroutine will return a reference to the data hash. It will print 
 status messages to STDOUT. 
@@ -1193,11 +1188,10 @@ status messages to STDOUT.
 Example
 
 	my $db_name = 'cerevisiae';
-	my %data = get_new_feature_list( {
+	my %data = get_new_feature_list(
 		'db'        => $db_name,
 		'features'  => 'genes',
-		'dubious'   => 0,
-	} );
+	);
 
 
 =cut
@@ -1206,10 +1200,11 @@ Example
 sub get_new_feature_list {
 
 	# Retrieve passed values
-	my $arg_ref = shift; # the passed argument values as a hash reference
+	my %args = @_; # the passed argument values
 	
 	# Open a db connection 
-	my ($db, $db_name) = open_db_connection($arg_ref->{'db'});
+	$args{'db'} ||= undef;
+	my ($db, $db_name) = open_db_connection($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -1224,7 +1219,7 @@ sub get_new_feature_list {
 	
 	
 	# Translate the features into a list of classes
-	my @classes = _features_to_classes($arg_ref->{'features'});
+	my @classes = _features_to_classes($args{'features'});
 	unless (@classes) {
 		carp "no or unknown features passed!";
 		return;
@@ -1232,7 +1227,7 @@ sub get_new_feature_list {
 	
 	# Generate data structures
 	my $new_data = generate_tim_data_structure(
-		$arg_ref->{'features'},
+		$args{'features'},
 		'Name',
 		'Type'
 	);
@@ -1367,8 +1362,8 @@ The subroutine will generate and return a data hash as described in
 tim_file_helper.pm. The data table will have 3 columns, including 
 Chromosome, Start, and Stop.
 
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
+The subroutine is passed an array containing the arguments. 
+The keys include
 
   Required:
   db       => The name of the database or a reference to an 
@@ -1389,11 +1384,11 @@ Example
 	my $db_name = 'cerevisiae';
 	my $window_size = 500;
 	my $step_size = 250;
-	my %data = get_new_genome_list( {
+	my %data = get_new_genome_list(
 		'db'        => $db_name,
 		'win'       => $window_size,
 		'step'      => $step_size,
-	} );
+	);
 
 
 =cut
@@ -1401,11 +1396,12 @@ Example
 sub get_new_genome_list {
 
 	# Collect the passed arguments
-	my $arg_ref = shift; 
+	my %args = @_; 
 	
 	
 	# Open a db connection 
-	my ($db, $db_name) = open_db_connection($arg_ref->{'db'});
+	$args{'db'} ||= undef;
+	my ($db, $db_name) = open_db_connection($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -1413,23 +1409,15 @@ sub get_new_genome_list {
 	
 	
 	# Determine win and step sizes
-	my ($win, $step);
-	if ($arg_ref->{'win'}) {
-		$win = $arg_ref->{'win'};
-	}
-	else {
-		$win = 
+	$args{'win'} ||= undef;
+	unless ($args{'win'}) {
+		$args{'win'} = 
 			$TIM_CONFIG->param("$db_name\.window") ||
 			$TIM_CONFIG->param('default_db.window');
-		print "  Using default window size $win bp\n";
+		print "  Using default window size $args{win} bp\n";
 	}
-	if ($arg_ref->{'step'}) {
-		$step = $arg_ref->{'step'};
-	}
-	else {
-		$step = $win;
-	}
-	
+	$args{'step'} ||= $args{'win'};
+		
 	
 	# Generate data structures
 	my $new_data = generate_tim_data_structure(
@@ -1446,8 +1434,8 @@ sub get_new_genome_list {
 	
 	# Begin loading basic metadata information
 	$new_data->{'db'}      = $db_name; # the db name
-	$new_data->{1}{'win'}  = $win; # under the Start metadata
-	$new_data->{1}{'step'} = $step;
+	$new_data->{1}{'win'}  = $args{'win'}; # under the Start metadata
+	$new_data->{1}{'step'} = $args{'step'};
 	
 	
 	
@@ -1462,15 +1450,15 @@ sub get_new_genome_list {
 	
 	
 	# Collect the genomic windows
-	print "   Generating $win bp windows in $step bp increments\n";
+	print "   Generating $args{win} bp windows in $args{step} bp increments\n";
 	foreach (@chromosomes) {
 		
 		# name and length as sub-array in each element
 		my ($chr, $length) = @{$_};
 		
-		for (my $start = 1; $start <= $length; $start += $step) {
+		for (my $start = 1; $start <= $length; $start += $args{step}) {
 			# set the end point
-			my $end = $start + $win - 1; 
+			my $end = $start + $args{win} - 1; 
 			
 			if ($end > $length) {
 				# fix end to the length of the chromosome
@@ -1565,8 +1553,8 @@ region in the genome. The region is specified with chromosomal coordinates:
 chromosome name, start, and stop. It will collect all dataset values within the
 window, combine them with the specified method, and return the single value.
 
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
+The subroutine is passed an array containing the arguments. 
+The keys include
 
   Required:
   db       => The name of the database or a reference to an 
@@ -1613,7 +1601,7 @@ The subroutine will return the region score if successful.
 Examples
 
 	my $db = open_db_connection('cerevisiae');
-	my $score = get_chromo_region_score( {
+	my $score = get_chromo_region_score(
 		'db'      => $db,
 		'method'  => 'mean',
 		'dataset' => $dataset,
@@ -1621,7 +1609,7 @@ Examples
 		'start'   => $startposition,
 		'stop'    => $stopposition,
 		'log'     => 1,
-	} );
+	);
 	
 
 
@@ -1630,43 +1618,43 @@ Examples
 sub get_chromo_region_score {
 	
 	# retrieve passed values
-	my $arg_ref = shift; 
+	my %args = @_; 
 	
 	# check the data source
-	unless ($arg_ref->{'dataset'}) {
+	unless ($args{'dataset'}) {
 		confess " no dataset requested!";
 	}
 	
 	# Open a db connection 
-	my $db = open_db_connection( $arg_ref->{'db'} ) or 
+	$args{'db'} ||= undef;
+	my $db = open_db_connection( $args{'db'} ) or 
 		confess "no database name or connection!!\n";
 	
-	# get coordinates
-	my $chromo = $arg_ref->{'chromo'} || $arg_ref->{'seq'} || 
-		$arg_ref->{'seq_id'} || undef;
-	my $start = $arg_ref->{'start'} || undef;
-	my $stop = $arg_ref->{'stop'} || $arg_ref->{'end'} || undef;
-	my $strand = $arg_ref->{'strand'} || 0;
-	unless ($chromo and $start and $stop) {
+	# establish coordinates
+	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
+	$args{'start'}  ||= undef;
+	$args{'stop'}   ||= $args{'end'} || undef;
+	$args{'strand'} ||= 0;
+	unless ($args{chromo} and $args{start} and $args{stop}) {
 		cluck "one or more genomic region coordinates are missing!";
 		return;
 	};
 	
 	# define default values as necessary
-	my $value_type = $arg_ref->{'value'} || 'score';
-	my $stranded = $arg_ref->{'stranded'} || 'all';
-	my $log = $arg_ref->{'log'} || undef;
-	unless (defined $log) {
+	$args{'value'}    ||= 'score';
+	$args{'stranded'} ||= 'all';
+	$args{'log'}      ||= undef;
+	unless (defined $args{'log'}) {
 		# we need to know whether we are working with a log2 dataset or not
 		# as it will adversely affect the math!
-		if ($arg_ref->{'dataset'} =~ /log2/i) {
+		if ($args{'dataset'} =~ /log2/i) {
 			# if we're smart we'll encode the log2 status in the dataset name
 			# but chances are, we're not that smart
-			$log = 1;
+			$args{'log'} = 1;
 		} else {
 			# otherwise assume it is non-log
 			# unsafe, but what else to do? we'll put the onus on the user
-			$log = 0;
+			$args{'log'} = 0;
 		}
 	}
 	
@@ -1674,15 +1662,15 @@ sub get_chromo_region_score {
 	# pass to internal subroutine to combine dataset values
 	return _get_segment_score(
 				$db,
-				$chromo,
-				$start,
-				$stop,
-				$strand, 
-				$arg_ref->{'dataset'},
-				$value_type,
-				$arg_ref->{'method'}, 
-				$stranded,  
-				$log,
+				$args{'chromo'},
+				$args{'start'},
+				$args{'stop'},
+				$args{'strand'}, 
+				$args{'dataset'},
+				$args{'value'},
+				$args{'method'}, 
+				$args{'stranded'},  
+				$args{'log'},
 	);
 }
 
@@ -1717,8 +1705,8 @@ to the feature start position, i.e. the keys will >= -200 and <= 200.
 Absolute coordinates relative to the reference sequence or chromosome 
 may be optionally returned instead.
 
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
+The subroutine is passed an array containing the arguments. 
+The keys include
 
   Required:
   db       => The name of the annotation database or a reference to 
@@ -1788,12 +1776,12 @@ The subroutine will return the hash if successful.
 Example
 
 	my $db = open_db_connection('cerevisiae');
-	my %region_scores = get_region_dataset_hash( {
+	my %region_scores = get_region_dataset_hash(
 		'db'      => $db,
 		'dataset' => $dataset,
 		'name'    => $name,
 		'type'    => $type,
-	} );
+	);
 	
 
 
@@ -1802,18 +1790,20 @@ Example
 sub get_region_dataset_hash {
 	
 	# retrieve passed values
-	my $arg_ref = shift; 
+	my %args = @_; 
 	
 	### Initialize parameters
 	
 	# Open a db connection 
-	my $db = open_db_connection( $arg_ref->{'db'} ) or 
+	$args{'db'} ||= undef;
+	my $db = open_db_connection( $args{'db'} ) or 
 		confess "no database name or connection!!\n";
 	
 	# Open the data database if provided
+	$args{'ddb'} ||= undef;
 	my $ddb;
-	if (defined $arg_ref->{'ddb'}) {
-		$ddb = open_db_connection( $arg_ref->{'ddb'} ) or
+	if ($args{'ddb'}) {
+		$ddb = open_db_connection( $args{'ddb'} ) or
 			confess "requested data database could not be opened!\n";
 	}
 	else {
@@ -1822,29 +1812,33 @@ sub get_region_dataset_hash {
 	}
 	
 	# check the data source
-	unless ($arg_ref->{'dataset'}) {
+	$args{'dataset'} ||= undef;
+	unless ($args{'dataset'}) {
 		confess " no dataset requested!";
 	}
 	
 	# confirm options and check we have what we need 
-	my $name   = $arg_ref->{'name'}   || undef;
-	my $type   = $arg_ref->{'type'}   || undef;
-	my $chromo = $arg_ref->{'chromo'} || undef;
-	my $start  = $arg_ref->{'start'}  || undef;
-	my $stop   = $arg_ref->{'stop'}   || $arg_ref->{'end'} || undef;
-	my $strand = $arg_ref->{'strand'} || undef;
+	$args{'name'}   ||= undef;
+	$args{'type'}   ||= undef;
+	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
+	$args{'start'}  ||= undef;
+	$args{'stop'}   ||= $args{'end'} || undef;
+	$args{'strand'} ||= 0;
 	unless (
-		(defined $name and defined $type) or 
-		(defined $chromo and defined $start and defined $stop)
+		(defined $args{'name'} and defined $args{'type'}) or 
+		(defined $args{'chromo'} and defined $args{'start'} and defined $args{'stop'})
 	) {
 		cluck "the feature name and type or genomic coordinates are missing!";
 		return;
 	};
 	
-	# assign defaults
-	my $stranded       = $arg_ref->{'stranded'} || 'all';
-	my $value_type     = $arg_ref->{'value'}    || 'score';
-	my $relative_pos   = $arg_ref->{'position'} || 5;
+	# assign other defaults
+	$args{'stranded'} ||= 'all';
+	$args{'value'}    ||= 'score';
+	$args{'position'} ||= 5;
+	$args{'extend'}   ||= 0;
+	$args{'avoid'}    ||= 0;
+	$args{'absolute'} ||= 0;
 	
 	
 	# the final coordinates
@@ -1863,169 +1857,169 @@ sub get_region_dataset_hash {
 	
 	# Extend a named database feature
 	if (
-		defined $name and 
-		defined $type and 
-		$arg_ref->{'extend'}
+		defined $args{'name'} and 
+		defined $args{'type'} and 
+		$args{'extend'}
 	) {
 		# if an extension is specified to the feature region
 		# first define the feature
 		my @features = $db->features( 
-				-name  => $name,
-				-type  => $type,
+				-name  => $args{'name'},
+				-type  => $args{'type'},
 		);
 		if (scalar @features > 1) {
 			# there should only be one feature found
 			# if more, there's redundant or duplicated data in the db
 			# warn the user, this should be fixed
-			warn " Found more than one feature of '$type => $name' in " .
+			warn " Found more than one feature of '$args{'type'} => $args{'name'}' in " .
 				"the database!\n Using the first feature only!\n";
 		}
 		my $feature = shift @features; 
 		
 		# record the feature reference position and strand
-		if ($relative_pos == 5 and $feature->strand >= 0) {
+		if ($args{'position'} == 5 and $feature->strand >= 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+		elsif ($args{'position'} == 3 and $feature->strand >= 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 5 and $feature->strand < 0) {
+		elsif ($args{'position'} == 5 and $feature->strand < 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 3 and $feature->strand < 0) {
+		elsif ($args{'position'} == 3 and $feature->strand < 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($relative_pos == 4) {
+		elsif ($args{'position'} == 4) {
 			# strand doesn't matter here
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 		}
 		
 		# record final coordinates
 		$fchromo = $feature->seq_id;
-		$fstart  = $feature->start - $arg_ref->{'extend'};
-		$fstop   = $feature->end + $arg_ref->{'extend'};
-		$fstrand = defined $strand ? $strand : $feature->strand;
+		$fstart  = $feature->start - $args{'extend'};
+		$fstop   = $feature->end + $args{'extend'};
+		$fstrand = $args{'strand'} ? $args{'strand'} : $feature->strand;
 	} 
 		
 	# Specific start and stop coordinates of a named database feature
 	elsif (
-			defined $name and
-			defined $type and 
-			defined $start and
-			defined $stop
+			defined $args{'name'} and
+			defined $args{'type'} and 
+			defined $args{'start'} and
+			defined $args{'stop'}
 	) {
 		
 		# first define the feature to get endpoints
 		my @features = $db->features( 
-				-name  => $name,
-				-type => $type,
+				-name  => $args{'name'},
+				-type => $args{'type'},
 		);
 		if (scalar @features > 1) {
 			# there should only be one feature found
 			# if more, there's redundant or duplicated data in the db
 			# warn the user, this should be fixed
-			warn " Found more than one feature of '$type => $name' in " .
+			warn " Found more than one feature of '$args{'type'} => $args{'name'}' in " .
 				"the database!\n Using the first feature only!\n";
 		}
 		my $feature = shift @features; 
 		
 		# determine the cooridnates based on the identified feature
-		if ($relative_pos == 5 and $feature->strand >= 0) {
+		if ($args{'position'} == 5 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 5' end
 			
 			# record final coordinates
 			$fref_pos  = $feature->start;
 			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->start + $start;
-			$fstop     = $feature->start + $stop;
-			$fstrand   = defined $strand ? $strand : $feature->strand;
+			$fstart    = $feature->start + $args{'start'};
+			$fstop     = $feature->start + $args{'stop'};
+			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($relative_pos == 5 and $feature->strand < 0) {
+		elsif ($args{'position'} == 5 and $feature->strand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 5' end
 			
 			# record final coordinates
-			$fref_pos = $feature->end;
+			$fref_pos  = $feature->end;
 			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->end - $stop;
-			$fstop     = $feature->end - $start;
-			$fstrand   = defined $strand ? $strand : $feature->strand;
+			$fstart    = $feature->end - $args{'stop'};
+			$fstop     = $feature->end - $args{'start'};
+			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($relative_pos == 3 and $feature->strand >= 0) {
+		elsif ($args{'position'} == 3 and $feature->strand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 3' end
 			
 			# record final coordinates
 			$fref_pos = $feature->end;
 			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->end + $start;
-			$fstop     = $feature->end + $stop;
-			$fstrand   = defined $strand ? $strand : $feature->strand;
+			$fstart    = $feature->end + $args{'start'};
+			$fstop     = $feature->end + $args{'stop'};
+			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($relative_pos == 3 and $feature->strand < 0) {
+		elsif ($args{'position'} == 3 and $feature->strand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 3' end
 			
 			# record final coordinates
 			$fref_pos = $feature->start;
 			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->start - $stop;
-			$fstop     = $feature->start - $start;
-			$fstrand   = defined $strand ? $strand : $feature->strand;
+			$fstart    = $feature->start - $args{'stop'};
+			$fstop     = $feature->start - $args{'start'};
+			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($relative_pos == 4) {
+		elsif ($args{'position'} == 4) {
 			# feature can be on any strand
 			# set segment relative to the feature middle
 			
 			# record final coordinates
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 			$fchromo   = $feature->seq_id;
-			$fstart    = $fref_pos + $start;
-			$fstop     = $fref_pos + $stop;
-			$fstrand   = defined $strand ? $strand : $feature->strand;
+			$fstart    = $fref_pos + $args{'start'};
+			$fstop     = $fref_pos + $args{'stop'};
+			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 	}
 	
 	# an entire named database feature
 	elsif (
-		defined $name and 
-		defined $type
+		defined $args{'name'} and 
+		defined $args{'type'}
 	) {
 		my @features = $db->features( 
-				-name  => $name,
-				-type => $type,
+				-name  => $args{'name'},
+				-type => $args{'type'},
 		);
 		if (scalar @features > 1) {
 			# there should only be one feature found
 			# if more, there's redundant or duplicated data in the db
 			# warn the user, this should be fixed
-			warn " Found more than one feature of '$type => $name' in " .
+			warn " Found more than one feature of '$args{'type'} => $args{'name'}' in " .
 				"the database!\n Using the first feature only!\n";
 		}
 		my $feature = shift @features; 
 		
 		# determine the strand
-		$fstrand   = defined $strand ? $strand : $feature->strand;
+		$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		
 		# record the feature reference position and strand
-		if ($relative_pos == 5 and $fstrand >= 0) {
+		if ($args{'position'} == 5 and $fstrand >= 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($relative_pos == 3 and $fstrand >= 0) {
+		elsif ($args{'position'} == 3 and $fstrand >= 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 5 and $fstrand < 0) {
+		elsif ($args{'position'} == 5 and $fstrand < 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($relative_pos == 3 and $fstrand < 0) {
+		elsif ($args{'position'} == 3 and $fstrand < 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($relative_pos == 4) {
+		elsif ($args{'position'} == 4) {
 			# strand doesn't matter here
 			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
 		}
@@ -2038,32 +2032,32 @@ sub get_region_dataset_hash {
 	
 	# a genomic region
 	elsif (
-		defined $chromo and
-		defined $start and 
-		defined $stop
+		defined $args{'chromo'} and
+		defined $args{'start'} and 
+		defined $args{'stop'}
 	) {
 		# coordinates are easy
-		$fchromo   = $chromo;
-		$fstart    = $start;
-		$fstop     = $stop;
+		$fchromo   = $args{'chromo'};
+		$fstart    = $args{'start'};
+		$fstop     = $args{'stop'};
 		
 		# determine the strand
-		$fstrand   = defined $strand ? $strand : 0; # default is no strand
+		$fstrand   = $args{'strand'} ? $args{'strand'} : 0; # default is no strand
 		
 		# record the feature reference position and strand
-		if ($relative_pos == 5 and $fstrand >= 0) {
+		if ($args{'position'} == 5 and $fstrand >= 0) {
 			$fref_pos = $fstart;
 		}
-		elsif ($relative_pos == 3 and $fstrand >= 0) {
+		elsif ($args{'position'} == 3 and $fstrand >= 0) {
 			$fref_pos = $fstop;
 		}
-		elsif ($relative_pos == 5 and $fstrand < 0) {
+		elsif ($args{'position'} == 5 and $fstrand < 0) {
 			$fref_pos = $fstop;
 		}
-		elsif ($relative_pos == 3 and $fstrand < 0) {
+		elsif ($args{'position'} == 3 and $fstrand < 0) {
 			$fref_pos = $fstart;
 		}
-		elsif ($relative_pos == 4) {
+		elsif ($args{'position'} == 4) {
 			# strand doesn't matter here
 			$fref_pos = $fstart + int( ( ($fstop - $fstart + 1) / 2) + 0.5);
 		}
@@ -2083,16 +2077,16 @@ sub get_region_dataset_hash {
 		$fstart,
 		$fstop,
 		$fstrand, 
-		$arg_ref->{'dataset'}, 
-		$value_type,
+		$args{'dataset'}, 
+		$args{'value'},
 		'indexed', # method
-		$stranded, 
+		$args{'stranded'}, 
 		0, # log value
 	);
 	
 	
 	### Check for conflicting features
-	if (exists $arg_ref->{'avoid'} and $arg_ref->{'avoid'} and $type) {
+	if ($args{'avoid'} and $args{'type'}) {
 		# we need to look for any potential overlapping features of the 
 		# same type and remove those scores
 		
@@ -2101,7 +2095,7 @@ sub get_region_dataset_hash {
 			-seq_id  => $fchromo,
 			-start   => $fstart,
 			-end     => $fstop,
-			-type    => $type
+			-type    => $args{'type'}
 		);
 		if (@overlap_features) {
 			# there are one or more feature of the same type in this 
@@ -2113,7 +2107,7 @@ sub get_region_dataset_hash {
 			foreach my $feat (@overlap_features) {
 				
 				# skip the one we want
-				next if ($feat->display_name eq $name);
+				next if ($feat->display_name eq $args{'name'});
 				
 				# now eliminate those scores which overlap this feature
 				foreach my $position (keys %datahash) {
@@ -2141,7 +2135,7 @@ sub get_region_dataset_hash {
 		# relative positions
 		# most downstream applications of this function expect this, and it's
 		# a little easier to work with. Just a little bit, though....
-	if (exists $arg_ref->{'absolute'} and $arg_ref->{'absolute'}) {
+	if ($args{'absolute'}) {
 		# do not convert to relative positions
 		return %datahash;
 	}

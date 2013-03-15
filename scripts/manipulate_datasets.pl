@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A program to manipulate a (very large) data set file and avoid ExcHell
-
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -18,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.5';
+my $VERSION = '1.10';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -168,11 +167,11 @@ if ($modification > 0) {
 	}
 	
 	# write the file
-	my $write_results = write_tim_data_file( {
+	my $write_results = write_tim_data_file(
 		'data'      => $main_data_ref,
 		'filename'  => $outfile,
 		'gz'        => $gz,
-	} );
+	);
 	
 	# report write results
 	print " $modification manipulations performed\n";
@@ -3383,13 +3382,13 @@ sub write_summary_function {
 	}
 	
 	# write the summary
-	my $sumfile = write_summary_data( {
+	my $sumfile = write_summary_data(
 		'data'         => $main_data_ref,
 		'filename'     => $outfile,
 		'startcolumn'  => $startcolumn,
 		'endcolumn'    => $stopcolumn,
 		'log'          => $opt_log,
-	} );
+	);
 	
 	# report outcome
 	if ($sumfile) {
@@ -3441,12 +3440,12 @@ sub export_function {
 		
 	
 	# write the file
-	my $write_results = write_tim_data_file( {
+	my $write_results = write_tim_data_file(
 		'data'      => $main_data_ref,
 		'filename'  => $outfilename,
 		'gz'        => $gz,
 		'simple'    => 1,
-	} );
+	);
 	
 	# report write results
 	if ($write_results) {
@@ -3819,11 +3818,11 @@ sub rewrite_function {
 	}
 	
 	# write the file
-	my $write_results = write_tim_data_file( {
+	my $write_results = write_tim_data_file(
 		'data'      => $main_data_ref,
 		'filename'  => $rewrite_filename,
 		'gz'        => $gz,
-	} );
+	);
 	
 	# report write results
 	if ($write_results) {
@@ -4237,7 +4236,7 @@ __END__
 
 manipulate_datasets.pl
 
-A progam to manipulate tab-delimited dataset files and avoid ExcHell.
+A progam to manipulate tab-delimited data files.
 
 =head1 SYNOPSIS
 
@@ -4252,16 +4251,16 @@ manipulate_datasets.pl [--options ...] <input_filename>
           diff | normdiff | strandsign | mergestrand | center | new | 
           summary | export | rewrite | treeview ]
   --index <integers>
-  --exp <integer>
-  --con <integer>
+  --exp | --num <integer>
+  --con | --den <integer>
   --target <text> or <number>
   --place [r | n]
-  --zero
+  --(no)zero
   --dir [i | d]
   --name <text>
   --out <filename>
-  --(no)log
-  --(no)gz
+  --log
+  --gz
   --version
   --help
   --doc
@@ -4274,21 +4273,19 @@ The command line flags and descriptions:
 
 =item --in <input_filename>
 
-Provide the name of an input file. The file must be a tab-delimited text file, with each row 
-specifiying a genomic feature (gene) or region, and each column representing identifying 
-information or a dataset value. The first row should include the name for each column, e.g. the
-name of the database dataset from which the values were collected.
+Provide the name of an input file. The file must be a tab-delimited text file,
+with each row specifiying a genomic feature (gene) or region, and each column
+representing identifying information or a dataset value. The first row should
+include the name for each column, e.g. the name of the database dataset from
+which the values were collected.
 
-If the file was generated using 'get_datasets.pl' and/or uses Tim's data file format, then each 
-column will have metadata stored in a header comment line at the beginning of the file. This line
-is prefixed with a # and is comprised of key=value pairs demarcated by semi-colons. Manipulations 
-on the data in a column dataset will be added to this metadata and recorded upon file write.
+If the file was generated using a BioToolBox script, then each column may have
+metadata stored in a header comment line at the beginning of the file.
+Manipulations on the data in a column dataset will be added to this metadata and
+recorded upon file write.
 
-If no metadata is present in the file, then it will be automatically generated with minimal 
-information upon opening the file.
-
-The input file may be compressed using the gzip program and recognized with the extension '.gz'. It 
-will be automatically decompressed upon reading. 
+The input file may be compressed using the gzip program and recognized with 
+the extension '.gz'.  
 
 =item --func <function>
 
@@ -4345,16 +4342,20 @@ list without spaces. Ranges of contiguous indices may be specified using a
 dash between the start and stop. For example, '1,2,5-7,9' would indicate 
 datasets '1, 2, 5, 6, 7, and 9'. 
 
-=item --exp | --num <integer>
+=item --exp <integer>
+
+=item --num <integer>
 
 Specify the 0-based index number to be used for the experiment or numerator 
-dataset with the 'ratio' or 'difference' functions. Both flags are aliases
+column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
-=item --con | --den <integer>
+=item --con <integer>
+
+=item --den <integer>
 
 Specify the 0-based index number to be used for the control or denominator 
-dataset with the 'ratio' or 'difference' functions. Both flags are aliases
+column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
 =item --target <string> or <number>
@@ -4365,11 +4366,11 @@ for more information.
 
 =item --place [r | n]
 
-Specify the placement of a transformed dataset. Two values are accepted ('r' 
+Specify the placement of a transformed column. Two values are accepted ('r' 
 or 'n'):
   
-  - (r)eplace the original dataset with the new one
-  - add as a (n)ew dataset
+  - (r)eplace the original column with new values
+  - add as a (n)ew column
 
 Defaults to new placement when executed automatically using the --func 
 option, or prompts the user when executed interactively.
@@ -4377,7 +4378,7 @@ option, or prompts the user when executed interactively.
 =item --(no)zero
 
 Specify that zero values should or should not be included when 
-calculating statistics on a dataset. The default is undefined, meaning 
+calculating statistics on a column. The default is undefined, meaning 
 the program may ask the user interactively whether to include zero values 
 or not.
 
@@ -4390,23 +4391,24 @@ Specify the direction of a sort:
   
 =item --name <string>
 
-Specify a new dataset name when re-naming a dataset using the rename function 
-from the command line. Also, when generating a new dataset using a defined 
-function (--func <function>) from the command line, the new dataset will use 
+Specify a new column name when re-naming a column using the rename function 
+from the command line. Also, when generating a new column using a defined 
+function (--func <function>) from the command line, the new column will use 
 this name.
 
 =item --out <filename>
 
-Optionally provide an alternative output file name. If no name is provided, then the input file 
-will be overwritten with a new file. Appropriate extensions will be appended as necessary.
+Optionally provide an alternative output file name. If no name is provided, 
+then the input file will be overwritten with a new file. Appropriate 
+extensions will be appended as necessary.
 
-=item --(no)log 
+=item --log 
 
-Indicate whether the data is (not) in log2 space. This is required to ensure accurate mathematical 
-calculations in some manipulations. This is not necessary when the log status is appropriately 
-recorded in the dataset metadata.
+Indicate whether the data is (not) in log2 space. This is required to ensure 
+accurate mathematical calculations in some manipulations. This is not necessary 
+when the log status is appropriately recorded in the dataset metadata.
 
-=item --(no)gz 
+=item --gz 
 
 Indicate whether the output file should (not) be compressed. The appropriate extension will be 
 added. If this option is not specified, then the compression status of the input file will be 
@@ -4425,7 +4427,7 @@ Display the POD documentation using perldoc.
 =head1 DESCRIPTION
 
 This program allows some common mathematical and other manipulations on one
-or more datasets in a datafile. The program is designed as a simple
+or more columns in a datafile. The program is designed as a simple
 replacement for common manipulations performed in a full featured
 spreadsheet program, e.g. Excel, particularly with datasets too large to be
 loaded, all in a conveniant command line program. The program is designed
@@ -4442,12 +4444,12 @@ through a simple shell script.
 
 The program keeps track of the number of manipulations performed, and if 
 any are performed, will write out to file the changed data. Unless an 
-output file name is provided, it will overwrite the input file (NO BACKUP is
+output file name is provided, it will overwrite the input file (NO backup is
 made!).
 
 =head1 FUNCTIONS
 
-This is a list of the functions available for manipulating datasets. These may 
+This is a list of the functions available for manipulating columns. These may 
 be selected interactively from the main menu (note the case sensitivity!), 
 or specified on the command line using the --func option.
 
@@ -4455,37 +4457,37 @@ or specified on the command line using the --func option.
 
 =item B<stat> (menu option 't')
 
-Print some basic statistics for a dataset, including mean, 
+Print some basic statistics for a column, including mean, 
 median, standard deviation, min, and max. If 0 values are present,
 indicate whether to include them (y or n)
 
 =item B<reorder> (menu option 'R')
 
-The datasets may be rewritten in a different order. The new order 
+The column may be rewritten in a different order. The new order 
 is requested as a string of index numbers in the desired order. 
-Also, a dataset may be deleted by skipping its number or duplicated
+Also, a column may be deleted by skipping its number or duplicated
 by including it twice.
 
 =item B<delete> (menu option 'D')
 
-One or more datasets may be selected for deletion.
+One or more column may be selected for deletion.
 
 =item B<rename> (menu option 'n')
 
-Assign a new name to a dataset. For automatic execution, use the --name 
+Assign a new name to a column. For automatic execution, use the --name 
 option to specify the new name. Also, for any automatically executed 
-function (using the --func option) that generates a new dataset, the 
-dataset's new name may be explicitly defined with this option.
+function (using the --func option) that generates a new column, the 
+column's new name may be explicitly defined with this option.
 
 =item B<number> (menu option 'b')
 
 Assign a number to each datapoint (or line), incrementing from 1 
-to the end. The numbered dataset will be inserted after the requested 
-dataset index.
+to the end. The numbered column will be inserted after the requested 
+column index.
 
 =item B<sort> (menu option 'o')
 
-The entire data table is sorted by a specific dataset. The first
+The entire data table is sorted by a specific column. The first
 datapoint is checked for the presence of letters, and the data 
 table is then sorted either asciibetically or numerically. If the 
 sort method cannot be automatically determined, it will ask. The 
@@ -4500,219 +4502,219 @@ and have recognizable names (e.g. 'chromo', 'chromosome', 'start').
 =item B<null> (menu option 'N')
 
 Toss datapoints (rows) that contain a null value in one or more 
-datasets (columns). Some of the other functions may not work properly if
+columns. Some of the other functions may not work properly if
 a non-value is present. If 0 values are present, indicate whether
 to toss them (y or n). This may also be specified as a command line 
 option using the --except flag.
 
 =item B<duplicate> (menu option 'P')
 
-Toss datapoints with duplicate values. One or more datasets may be 
+Toss datapoints with duplicate values. One or more columns may be 
 selected to search for duplicate values. Values are simply concatenated 
-when multiple datasets are selected. Rows with duplicated values are 
+when multiple columns are selected. Rows with duplicated values are 
 deleted, always leaving the first row.
 
 =item B<above> (menu option 'A')
 
 Toss datapoints with values that are above a certain threshold value. 
-One or more datasets may be selected to test values for the 
+One or more columns may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
 
 =item B<below> (menu option 'B')
 
 Toss datapoints with values that are below a certain threshold value. 
-One or more datasets may be selected to test values for the 
+One or more columns may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
 
 =item B<cnull> (menu option 'U')
 
-Convert null values to a specific value. One or more datasets may 
+Convert null values to a specific value. One or more columns may 
 be selected to convert null values. The new value may be requested 
 interactively or defined with the --target option.  
 
 =item B<absolute> (menu option 'L')
 
 Convert signed values to their absolute value equivalents. One or 
-more datasets may be selected to convert.
+more columns may be selected to convert.
 
 =item B<minimum> (menu option 'I')
 
 Reset datapoints whose values are less than a specified minimum 
-value to the minimum value. One or more datasets may be selected 
+value to the minimum value. One or more columns may be selected 
 to reset values to the minimum. The minimum value may be requested 
 interactively or specified with the --target option. 
 
 =item B<maximum> (menu option 'X')
 
 Reset datapoints whose values are greater than a specified maximum 
-value to the maximum value. One or more datasets may be selected 
+value to the maximum value. One or more columns may be selected 
 to reset values to the maximum. The maximum value may be requested 
 interactively or specified with the --target option. 
 
 =item B<add> (menu option 'a')
 
-Add a value to a dataset. A real number may be supplied, or the words
+Add a value to a column. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
+values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
 
 =item B<subtract> (menu option 'u')
 
-Subtract a value from a dataset. A real number may be supplied, or the words
+Subtract a value from a column. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
+values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
 
 =item B<multiply> (menu option 'y')
 
-Multiply a dataset by a value. A real number may be supplied, or the words
+Multiply a column by a value. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
+values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
 
 =item B<divide> (menu option 'v')
 
-Divide a dataset by a value. A real number may be supplied, or the words
+Divide a column by a value. A real number may be supplied, or the words
 'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the dataset. The dataset may either be replaced or added
+values of the column. The column may either be replaced or added
 as a new one. For automatic execution, specify the number using the
 --target option.
 
 =item B<scale> (menu option 's')
 
-A dataset may be a median scaled as a means of normalization 
-with other datasets. The current median of the dataset requested is
-presented, and a new median target is requested. The dataset may 
+A column may be a median scaled as a means of normalization 
+with other columns. The current median of the column requested is
+presented, and a new median target is requested. The column may 
 either be replaced with the median scaled values or added as a new 
-dataset. For automatic execution, specify the new median target 
+column. For automatic execution, specify the new median target 
 with the --target option.
 
 =item B<pr> (menu option 'p')
 
-A dataset may be converted to a percentile rank, whereby the
+A column may be converted to a percentile rank, whereby the
 data values are sorted in ascending order and assigned a new value 
-from 0..1 based on its rank in the sorted order. The dataset may 
+from 0..1 based on its rank in the sorted order. The column may 
 either be replaced with the percentile rank or added as a new
-dataset. The original order of the dataset is maintained.
+column. The original order of the column is maintained.
 
 =item B<zscore> (menu option 'Z')
 
-Generate a Z-score or standard score for each value in a dataset. The
+Generate a Z-score or standard score for each value in a column. The
 Z-score is the number of standard deviations the value is away from
-the dataset's mean, such that the new mean is 0 and the standard 
-deviation is 1. Provides a simple method of normalizing datasets
+the column's mean, such that the new mean is 0 and the standard 
+deviation is 1. Provides a simple method of normalizing columns
 with disparate dynamic ranges.
 
 =item B<log2> (menu option 'l')
 
-A dataset may be converted to log base 2 values. The dataset
+A column may be converted to log base 2 values. The column
 may either be replaced with the log2 values ar added as a new 
-dataset.
+column.
 
 =item B<delog2> (menu option '2')
 
-A dataset that is currently in log2 space may be converted back to
-normal base10 numbers. The dataset may either be replaced with the 
-new values or added as a new dataset.
+A column that is currently in log2 space may be converted back to
+normal base10 numbers. The column may either be replaced with the 
+new values or added as a new column.
 
 =item B<format> (menu option 'f')
 
-Format the numbers of a dataset to a given number of decimal places. 
+Format the numbers of a column to a given number of decimal places. 
 Acceptable numbers of decimal places include 0, 1, 2, or 3.
-The dataset may either be replaced or added as a new dataset. For 
+The column may either be replaced or added as a new column. For 
 automatic execution, use the --target option to specify the number 
 decimal places.
 
 =item B<combine> (menu option 'c')
 
-Mathematically combine the data values in two or more datasets. The 
+Mathematically combine the data values in two or more columns. The 
 methods for combining the values include mean, median, min, max, 
 stdev, or sum. The method may be specified on the command line 
 using the --target option. The combined data values are added as a 
-new dataset.
+new column.
 
 =item B<subsample> (menu option 'su')
 
-Subsample an enumerated dataset. Datapoints within a dataset are chosen 
+Subsample an enumerated dataset. Datapoints within a column are chosen 
 randomly and the values reduced by one until the target sum is reached. 
 This assumes an enumerated dataset, e.g. tag counts from
-Next-gen sequencing, where the sum of tags from two or more datasets
+Next-gen sequencing, where the sum of tags from two or more columns
 must be normalized to each other. This function assumes that the data
-are positive integers; log2 datasets will not be used. Provide a
+are positive integers; log2 columns will not be used. Provide a
 target sum to reach using the --target option. If this number is less
-than or equal to the number of datasets in the file, then it is
-assumed to be an index number and the sum of that dataset will be used
-as the target. The subsampled dataset is always added as new dataset.
+than or equal to the number of columns in the file, then it is
+assumed to be an index number and the sum of that column will be used
+as the target. The subsampled dataset is always added as new column.
 
 =item B<ratio> (menu option 'r')
 
-A ratio may be generated between two datasets. The experiment and 
-control datasets are requested and the ratio is added as a new
-dataset. For log2 numbers, the control is subtracted from the
+A ratio may be generated between two columns. The experiment and 
+control columns are requested and the ratio is added as a new
+column. For log2 numbers, the control is subtracted from the
 experiment. The log2 status is checked in the metadata for the 
-specified datasets, or may be specified as a command line option, or
+specified columns, or may be specified as a command line option, or
 asked of the user.
 
 =item B<diff> (menu option 'd')
 
-A simple difference is generated between two existing datasets. The 
-values in the 'control' dataset are simply subtracted from the 
-values in the 'experimental' dataset and recorded as a new dataset.
-For enumerated datasets (e.g. tag counts from Next Generation 
-Sequencing), the datasets should be subsampled to equalize the sums 
-of the two datasets. The indices for the experimental and control datasets 
+A simple difference is generated between two existing columns. The 
+values in the 'control' column are simply subtracted from the 
+values in the 'experimental' column and recorded as a new column.
+For enumerated columns (e.g. tag counts from Next Generation 
+Sequencing), the columns should be subsampled to equalize the sums 
+of the two columns. The indices for the experimental and control columns 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
 =item B<normdiff> (menu option 'z')
 
-A normalized difference is generated between two existing datasets. 
-The difference between 'control' and 'experimental' dataset values 
+A normalized difference is generated between two existing columns. 
+The difference between 'control' and 'experimental' column values 
 is divided by the square root of the sum (an approximation of the 
 standard deviation). This is supposed to yield fewer false positives
 than a simple difference (see Nix et al, BMC Bioinformatics, 2008).
 For enumerated datasets (e.g. tag counts from Next Generation 
 Sequencing), the datasets should be subsampled to equalize the sums 
-of the two datasets. The indices for the experimental and control datasets 
+of the two datasets. The indices for the experimental and control columns 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
 =item B<strandsign> (menu option 'si')
 
-Convert a dataset's values to signed data according to strand. Forward 
+Convert a column's values to signed data according to strand. Forward 
 strand data is positive, and reverse strand is negative. This function 
 may not be appropriate with logarithmic or other datasets that include 
-negative values. Provide the index of a single dataset to convert. A 
-second dataset should provide the strand information and be labeled 
+negative values. Provide the index of a single column to convert. A 
+second column should provide the strand information and be labeled 
 with a name that includes either 'strand' or 'direction'. Strand 
 information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded 
-data may overwrite the data or written to a new dataset.
+data may overwrite the data or written to a new column.
 
 =item B<mergestrand> (menu option 'st')
 
-Merge two stranded datasets into a single new dataset, with the forward 
+Merge two stranded columns into a single new column, with the forward 
 dataset represented as a positive value, and the reverse dataset as a 
 negative value. Datapoints which contain values on both strands are 
 recorded as a simple difference (forward - reverse). This function may 
 not be appropriate with logarithmic or other datasets that include 
-negative values. Provide the indices of the two datasets as forward, 
+negative values. Provide the indices of the two columns as forward, 
 reverse. Metadata is not checked for validity. 
 
 =item B<center> (menu option 'e')
 
 Center normalize the datapoints in a row by subtracting the mean or
-median of the datapoints. The range of datasets is requested or 
+median of the datapoints. The range of columns is requested or 
 provided by the --index option. Old values are replaced by new 
 values. This is useful for visualizing data as a heat map, for example.
 
 =item B<new> (menu option 'w')
 
-Generate a new dataset (column) which contains an identical value for 
+Generate a new column which contains an identical value for 
 each datapoint (row). The value may be either requested interactively or 
 supplied using the --target option. This function may be useful for 
 assigning a common value to all of the data points before joining the 
@@ -4725,10 +4727,10 @@ for each of the data columns is calculated, transposed (columns become
 rows), and written to a new data file. This is essentially identical to 
 the summary function from the biotoolbox analysis scripts 
 L<map_relative_data.pl> and L<pull_features.pl>. It assumes that each 
-dataset has start and stop metadata. The program will automatically 
-identify available datasets to summarize based on their name. In 
+column has start and stop metadata. The program will automatically 
+identify available columns to summarize based on their name. In 
 interactive mode, it will request the contiguous range of start and 
-ending datasets to summarize. The contiguous datasets may also be 
+ending columns to summarize. The contiguous columns may also be 
 indicated using the --index option. By default, a new file using the 
 input file base name appended with '_summary' is written, or a 
 filename may be specified using the --out option.
@@ -4750,15 +4752,15 @@ use the same name!
 Export the data into a format compatible with the Treeview program for 
 visualizing the data either as a heatmap or a dendrogram (when combined 
 with the Cluster program to generate the clusters or tree). Specify the 
-columns containing a unique name and the datasets to be analyzed (use 
---index <name>,<start-stop>). Extraneous datasets are removed. 
-Additional manipulations on the datasets may be performed prior to 
+columns containing a unique name and the columns to be analyzed (use 
+--index <name>,<start-stop>). Extraneous columns are removed. 
+Additional manipulations on the columns may be performed prior to 
 exporting. These may be chosen interactively or using the codes 
 listed below and specified using the --target option.
   
-  cg - median center features (genes)
-  cd - median center datasets
-  zd - convert dataset to Z-scores
+  cg - median center features (rows)
+  cd - median center datasets (columns)
+  zd - convert column to Z-scores
   n0 - convert nulls to 0.0
 
 A simple Cluster data text file is written (default file name 

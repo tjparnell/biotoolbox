@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# This script will verify nucleosome mapping
-# It will identify overlaps and accuracy
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -149,12 +148,12 @@ else {
 # defined in the Occupancy 
 if ($dataset) {
 	# dataset defined on the command line
-	$dataset = verify_or_request_feature_types( {
+	$dataset = verify_or_request_feature_types(
 		'db'        => $db,
 		'feature'   => $dataset,
 		'prompt'    => "Enter the dataset to use for verifying nucleosome maps",
 		'single'    => 1,
-	} );
+	);
 }	
 else {	
 	# use a dataset defined in the input metadata
@@ -172,12 +171,12 @@ else {
 	$dataset = $data_ref->{$index}{'dataset'} || 
 			   $data_ref->{$index}{'scan_dataset'} || 
 			   undef; 
-	$dataset = verify_or_request_feature_types( {
+	$dataset = verify_or_request_feature_types(
 		'db'        => $db,
 		'feature'   => $dataset,
 		'prompt'    => "Enter the dataset to use for verifying nucleosome maps",
 		'single'    => 1,
-	} );
+	);
 }
 unless ($dataset) {
 	die " unable to identify the dataset in the input file metadata!\n";
@@ -264,7 +263,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	
 	# collect the raw data for 71 bp around the mapped midpoint
 	# this distance is arbitrary but about 1/2 a nucleosome
-	my %nuc_data = get_region_dataset_hash( {
+	my %nuc_data = get_region_dataset_hash(
 		'db'         => $db,
 		'dataset'    => $dataset,
 		'chromo'     => $table->[$row][$chrom_i],
@@ -272,7 +271,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 		'stop'       => $midpoint + 35,
 		'value'      => 'score',
 		'absolute'   => 1,
-	});
+	);
 	
 	# find the max peak
 	my @distances;
@@ -434,11 +433,11 @@ unless ($outfile) {
 }
 my $success;
 if (
-	$success = write_tim_data_file( {
+	$success = write_tim_data_file(
 		'data'     => $data_ref,
 		'filename' => $outfile,
 		'gz'       => $gz,
-	}) 
+	) 
 ) {
 	print " wrote data file $success\n";
 }
@@ -455,6 +454,8 @@ __END__
 
 verify_nucleosome_mapping.pl
 
+A script to verify nucleosome mapping and identify overlaps.
+
 =head1 SYNOPSIS
 
 verify_nucleosome_mapping.pl [--options...] <filename>
@@ -466,10 +467,9 @@ verify_nucleosome_mapping.pl [--options...] <filename>
   --filter
   --max <integer>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 

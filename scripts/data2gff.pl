@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to convert a generic data file into a gff file
-# this presumes it has chromosomal coordinates to convert
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -18,7 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.9.5';
+my $VERSION = '1.10';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -615,11 +614,11 @@ sub write_gff_data {
 		
 		# rather than generating new code for writing the gff file,
 		# we will simply use the write_tim_data_file sub
-		$outfile = write_tim_data_file( {
+		$outfile = write_tim_data_file(
 			'data'      => \%output_data,
 			'filename'  => $outfile,
 			'gz'        => $gz,
-		} );
+		);
 		
 		# but now we will have to reopen the file for appended writing
 		$out_fh = open_to_write_fh($outfile, $gz, 1);
@@ -671,6 +670,8 @@ __END__
 
 data2gff.pl
 
+A script to convert a generic data file to GFF format.
+
 =head1 SYNOPSIS
 
 data2gff.pl [--options...] <filename>
@@ -688,16 +689,15 @@ data2gff.pl [--options...] <filename>
   --tags <column_index,column_index,...>
   --source <text>
   --type <text | column_index>
-  --(no)zero
+  --zero
   --format [0,1,2,3]
-  --(no)midpoint
-  --(no)unique
+  --midpoint
+  --unique
   --out <filename> 
   --version [2,3]
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -781,7 +781,7 @@ not defined, it will use the column name for either
 the 'score' or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
 
-=item --(no)zero
+=item --zero
 
 Indicate whether the source data is in interbase or 0-based 
 coordinates, as is used with UCSC source data or USeq data 
@@ -795,14 +795,14 @@ Indicate the number of decimal places the score value should
 be formatted. Acceptable values include 0, 1, 2, or 3 places.
 Anything else is ignored.
 
-=item --(no)midpoint
+=item --midpoint
 
 A boolean (1 or 0) value to indicate whether the 
 midpoint between the actual 'start' and 'stop' values
 should be used instead of the actual values. Default 
 is false.
 
-=item --(no)unique
+=item --unique
 
 Indicate whether the feature names should be made unique. A count 
 number is appended to the name of subsequent features to make them 
@@ -820,7 +820,7 @@ added if required.
 
 Specify the GFF version. The default is version 3.
 
-=item --(no)gz
+=item --gz
 
 Indicate whether the output file should (not) be compressed with gzip.
 

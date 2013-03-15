@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to graph histogram plots for one or two microarray data sets
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -572,29 +572,32 @@ __END__
 
 graph_histogram.pl
 
-A script to graph a histogram of a dataset of values
+A script to graph a histogram (bar or line) of one or more datasets.
 
 =head1 SYNOPSIS
 
 graph_histogram.pl --bins <integer> --size <number> <filename> 
+
 graph_histogram.pl --bins <integer> --max <number> <filename> 
+
 graph_histogram.pl --size <number> --max <number> <filename> 
    
-   --in <filename>
-   --index <column_index>
-   --bins <integer>
-   --size <number>
-   --min <number>
-   --max <number>
-   --ymax <integer>
-   --yticks <integer>
-   --skip <integer>
-   --offset <integer>
-   --format <integer>
-   --lines
-   --out <base_filename>
-   --dir <output_directory>
-   --version
+  Options:
+  --in <filename>
+  --index <column_index>
+  --bins <integer>
+  --size <number>
+  --min <number>
+  --max <number>
+  --ymax <integer>
+  --yticks <integer>
+  --skip <integer>
+  --offset <integer>
+  --format <integer>
+  --lines
+  --out <base_filename>
+  --dir <output_directory>
+  --version
   --help
 
 =head1 OPTIONS
@@ -715,18 +718,3 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

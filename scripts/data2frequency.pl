@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to convert a datafile into a frequency distribution
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.10';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -165,10 +165,10 @@ unless ($outfile) {
 	$outfile = $infile; # use input name
 	$outfile = $in_data_ref->{'basename'} . '_frequency';
 }
-my $write_results = write_tim_data_file( {
+my $write_results = write_tim_data_file(
 	'data'      => $out_data_ref,
 	'filename'  => $outfile,
-} );
+);
 # report write results
 if ($write_results) {
 	print "  Wrote new datafile '$write_results'\n";
@@ -350,9 +350,12 @@ A script to convert data into a frequency distribution, useful for graphing.
 =head1 SYNOPSIS
 
 data2frequency.pl --bins <integer> --size <number> <filename> 
+
 data2frequency.pl --bins <integer> --max <number> <filename> 
+
 data2frequency.pl --size <number> --max <number> <filename> 
   
+  Options:
   --in <filename>
   --bins <integer>
   --size <number>
@@ -362,7 +365,6 @@ data2frequency.pl --size <number> --max <number> <filename>
   --out <filename>
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -453,4 +455,3 @@ listed in subsequent columns for each dataset requested.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

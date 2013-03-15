@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to collect values across the body of gene and assign them to an 'average'
-# gene body. It collects values into percentage-based bins across the body.
+# documentation at end of file
 
 use strict;
 use Pod::Usage;
@@ -24,7 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.9.4';
+my $VERSION = '1.10';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -280,13 +279,13 @@ else {
 
 
 ## Check for the dataset
-$dataset = verify_or_request_feature_types( {
+$dataset = verify_or_request_feature_types(
 	'db'      => $ddb,
 	'feature' => $dataset,
 	'prompt'  => " Enter the number of the feature or dataset from which to" . 
 					" collect data   ",
 	'single'  => 1,
-} );
+);
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
@@ -330,13 +329,13 @@ if ($smooth) {
 # an average across all features at each position suitable for plotting
 if ($sum) {
 	print " Generating final summed data....\n";
-	my $sumfile = write_summary_data( {
+	my $sumfile = write_summary_data(
 		'data'        => $main_data_ref,
 		'filename'    => $outfile,
 		'startcolumn' => $startcolumn,
 		'dataset'     => $dataset,
 		'log'         => $log,
-	} );
+	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
 	}
@@ -350,12 +349,12 @@ if ($sum) {
 ## Output the data
 
 # write main output
-my $written_file = write_tim_data_file( {
+my $written_file = write_tim_data_file(
 	# we will write a tim data file
 	# appropriate extensions and compression should be taken care of
 	'data'     => $main_data_ref,
 	'filename' => $outfile,
-} );
+);
 if ($written_file) {
 	print " Wrote data file '$written_file'\n";
 }
@@ -374,10 +373,10 @@ printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 sub generate_a_new_feature_dataset {
 	# a subroutine to generate a new feature dataset
 	
-	$main_data_ref = get_new_feature_list( {
+	$main_data_ref = get_new_feature_list(
 			'db'       => $main_database,
 			'features' => $feature,
-	} );
+	);
 	
 	# set the current program
 	$main_data_ref->{'program'} = $0;
@@ -504,7 +503,7 @@ sub collect_binned_data_for_features {
 		
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash( {
+		my %regionscores = get_region_dataset_hash(
 					'db'        => $mdb,
 					'ddb'       => $ddb,
 					'dataset'   => $dataset,
@@ -515,7 +514,7 @@ sub collect_binned_data_for_features {
 					'stranded'  => $stranded,
 					'strand'    => $set_strand ? 
 						$data_table_ref->[$row][$strand_index] : undef,
-		} );
+		);
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
 				print RAWFILE "\tdb: $regionscores{$_} \@ $_";
@@ -583,7 +582,7 @@ sub collect_binned_data_for_regions {
 		}
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash( {
+		my %regionscores = get_region_dataset_hash(
 					'db'       => $ddb,
 					'dataset'  => $dataset,
 					'value'    => $value_type,
@@ -593,7 +592,7 @@ sub collect_binned_data_for_regions {
 					'absolute' => 1,
 					'stranded' => $stranded,
 					'strand'   => $strand,
-		} );
+		);
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
 				print RAWFILE "\tdb: $regionscores{$_} \@ $_";
@@ -1037,9 +1036,12 @@ __END__
 
 average_gene.pl
 
+A program to generate class average summaries for a list of genes or features.
+
 =head1 SYNOPSIS
  
  average_gene.pl --db <database> --feature <text> --out <file> [--options]
+ 
  average_gene.pl --in <file> --out <file> [--options]
   
   Options:

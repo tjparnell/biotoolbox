@@ -1,7 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# a script to get ensEMBL annotation and write it out as GFF3
-
+# documentation at end of file
 
 use strict;
 use IO::File;
@@ -1007,6 +1006,8 @@ __END__
 
 get_ensembl_annotation.pl
 
+A script to retrieve Ensembl annotation and write it out as GFF3.
+
 =head1 SYNOPSIS
 
 get_ensembl_annotation.pl [--options...] --species <text>
@@ -1023,10 +1024,10 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --(no)mirna
   --(no)rrna
   --(no)trna
-  --(no)ucsc
   --(no)cds
   --(no)utr
   --(no)codon
+  --ucsc
   --group <text>
   --host <host.address>
   --port <integer>
@@ -1077,38 +1078,32 @@ will collect all RNA types except tRNAs. The default is true.
 =item --(no)miscrna
 
 Boolean flag to indicate whether or not to collect miscellenaeous 
-noncoding RNA genes.
+noncoding RNA genes. The default is true. 
 
 =item --(no)snrna
 
 Boolean flag to indicate whether or not to collect small nuclear 
-RNA (snRNA) genes.
+RNA (snRNA) genes. The default is true. 
 
 =item --(no)snorna
 
 Boolean flag to indicate whether or not to collect small nucleolar 
-RNA (snoRNA) genes.
+RNA (snoRNA) genes. The default is true. 
 
 =item --(no)mirna
 
 Boolean flag to indicate whether or not to collect micro 
-RNA (miRNA) genes.
+RNA (miRNA) genes. The default is true. 
 
 =item --(no)rrna
 
 Boolean flag to indicate whether or not to collect ribosomal RNA 
-(rRNA) genes.
+(rRNA) genes. The default is true. 
 
 =item --(no)trna
 
 Boolean flag to indicate whether or not to collect transfer RNA   
-(tRNA) genes.
-
-=item --(no)ucsc
-
-Boolean flag to prefix chromosome names with 'chr' in the style of 
-UCSC genome annotation. Only coordinate systems of type 'chromosome' 
-are changed, not scaffolds, contigs, etc. Default is false.
+(tRNA) genes. The default is true. 
 
 =item --(no)cds
 
@@ -1124,6 +1119,12 @@ mRNA transcripts and genes. Default is true.
 
 Boolean flag to indicate whether or not to include start and stop codons 
 for mRNA transcripts and genes. Default is true if CDSs are included.
+
+=item --ucsc
+
+Boolean flag to prefix chromosome names with 'chr' in the style of 
+UCSC genome annotation. Only coordinate systems of type 'chromosome' 
+are changed, not scaffolds, contigs, etc. Default is false.
 
 =item --group <text>
 
@@ -1208,4 +1209,3 @@ information.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-

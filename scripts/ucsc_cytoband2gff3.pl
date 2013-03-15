@@ -1,4 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
+
+# documentation at end of file
 
 # this script was copied directly from Bio::Graphics::Glyph::ideogram 
 

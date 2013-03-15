@@ -1,6 +1,6 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
-# A script to intersect two lists of nucleosomes
+# documentation at end of file
 
 use strict;
 use Getopt::Long;
@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.9.4';
+my $VERSION = '1.10';
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 
@@ -148,10 +148,10 @@ unless ($outfile) {
 	$outfile = 'intersection_' . $data1->{'basename'} . '_' . 
 		$data2->{'basename'};
 }
-my $success = write_tim_data_file( {
+my $success = write_tim_data_file(
 	'data'     => $output,
 	'filename' => $outfile,
-} );
+);
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -169,7 +169,7 @@ if ($gff) {
 		# set default source, the name of this program
 		$source = 'intersect_nucs.pl';
 	}
-	$success = convert_and_write_to_gff_file( {
+	$success = convert_and_write_to_gff_file(
 		'data'     => $output,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -177,7 +177,7 @@ if ($gff) {
 		'strand'   => 3,
 		'type'     => $type,
 		'source'   => $source,
-	} );
+	);
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -650,10 +650,13 @@ __END__
 
 intersect_nucs.pl
 
+A script to intersect two lists of nucleosomes.
+
 =head1 SYNOPSIS
 
 intersect_nucs.pl [--options...] <filename_1> <filename_2>
   
+  Options:
   --in1 <filename1>
   --in2 <filename2>
   --out <filename>
@@ -661,10 +664,9 @@ intersect_nucs.pl [--options...] <filename_1> <filename_2>
   --gff
   --type <gff_type>
   --source <gff_source>
-  --(no)gz
+  --gz
   --version
   --help
-
 
 =head1 OPTIONS
 
@@ -710,6 +712,11 @@ writing the GFF file. The default value is "nucleosome_intersection".
 
 Provide the text to be used as the GFF source used in writing the 
 GFF file. The default value is the name of this program.
+
+=item --gz
+
+Specify whether (or not) the output files should be compressed 
+with gzip. 
 
 =item --version
 
