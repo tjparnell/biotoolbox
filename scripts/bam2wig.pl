@@ -603,12 +603,12 @@ sub determine_shift_value {
 	foreach my $i (sort {$a <=> $b} keys %coverage2region) {
 		
 		# get the start and end positions
-		# we're adjusting them by 500 bp in both directions to actually 
-		# sample a 1.5 kb region centered over the original region
+		# we're adjusting them by 400 bp in both directions to actually 
+		# sample a 1.3 kb region centered over the original region
 		my $tid   = $coverage2region{$i}->[0];
 		my $chrom = $sam->target_name($tid);
-		my $start = $coverage2region{$i}->[1] - 500;
-		my $end   = $coverage2region{$i}->[2] + 500;
+		my $start = $coverage2region{$i}->[1] - 400;
+		my $end   = $coverage2region{$i}->[2] + 400;
 		# just in case we go over
 		$start = 0 if $start < 1;
 		$end = $sam->target_len($tid) if $end > $sam->target_len($tid);
@@ -638,8 +638,8 @@ sub determine_shift_value {
 		
 		# calculate correlations
 		my %r2shift;
-		for (my $i = 1; $i <= 50; $i++) {
-			# check shift from 10 to 500 bp
+		for (my $i = 1; $i <= 40; $i++) {
+			# check shift from 10 to 400 bp
 			
 			# adjust the arrays, mimicking shifting arrays towards the 3'
 			unshift @f, 0;
@@ -647,8 +647,8 @@ sub determine_shift_value {
 			shift @r;
 			push @r, 0;
 			
-			# skip the first 30 bp
-			next if $i < 4;
+			# skip the first 20 bp
+			next if $i < 3;
 			
 			# calculate correlation
 			my $stat = Statistics::LineFit->new();
@@ -682,12 +682,12 @@ sub determine_shift_value {
 	$cut++ if ($cut % 2); # make an even number
 	splice(@shift_values, 0, $cut);
 	splice(@shift_values, scalar(@shift_values) - $cut);
-	my $best_value = mean(@shift_values);
-	printf "  The mean shift value is %.0f +/- %.0f bp\n", 
+	my $best_value = sprintf("%.0f", mean(@shift_values) );
+	printf "  The mean shift value is %s +/- %.0f bp\n", 
 		$best_value, stddev(@shift_values);
 	
 	# done
-	return sprintf("%.0f", $best_value);
+	return $best_value;
 }
 
 ### Collect alignment coverage
@@ -1638,8 +1638,8 @@ value.
 
 Provide the value in bp that the record position should be shifted. 
 The value should be 1/2 the average length of the insert library 
-that was sequenced. The default is to automatically and empirically 
-determine the appropriate shift value. See below for the approach.
+that was sequenced. The default is to empirically determine the 
+appropriate shift value. See below for the approach.
 
 =item --sample <integer>
 
@@ -1649,10 +1649,10 @@ determining the shift value. The default is 200.
 =item --chrom <integer>
 
 Indicate the number of sequences or chromosomes to sample when 
-empirically determining the shift value. The sequences listed 
-in the Bam file are taken in order of decreasing length, and 
-one or more are taken as a representative sample of the genome. 
-The default value is 2. 
+empirically determining the shift value. The reference sequences 
+listed in the Bam file header are taken in order of decreasing 
+length, and one or more are taken as a representative sample of 
+the genome. The default value is 2. 
 
 =item --minr <float>
 
@@ -1752,8 +1752,9 @@ in the 3' direction. This effectively merges the separate peaks
 (representing the ends of the enriched fragments) on each strand 
 into a single peak centered over the target locus. Alternatively, 
 the entire predicted fragment may be recorded across its span. 
-The shift value may be empirically determined from the sequencing 
-data (see below). 
+This extended method of recording is analogous to the approach 
+used by the MACS2 program. The shift value may be empirically 
+determined from the sequencing data (see below). 
 
 The output wig file may be either a variableStep, fixedStep, or 
 bedGraph format. The file format is dictated by where the alignment 
@@ -1873,9 +1874,9 @@ the largest chromosome or sequence represented in the Bam file. The
 largest chromosome is used merely as a representative fraction of the
 genome for performance reasons rather than random sampling. Stranded
 read counts are collected in 10 bp bins over the region and flanking
-500 bp regions (1.5 kb total). A Pearson product-moment correlation
+400 bp regions (1.3 kb total). A Pearson product-moment correlation
 coefficient is then reiteratively determined between the stranded data
-as the bins are shifted from 30 to 500 bp. The shift corresponding to
+as the bins are shifted from 30 to 400 bp. The shift corresponding to
 the highest R squared value is retained for each sampled region. The
 default minimum R^2 value to keep is 0.25, and not all sampled regions
 may return a significant R^2 value. A trimmed mean is then calculated
