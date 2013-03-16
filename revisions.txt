@@ -1,5 +1,19 @@
 ######## BioToolBox revision history #############
 
+v.1.10 (svn 559)
+	- Significantly improved performance when collecting data from Bam files by using a low level API. Improvements of at least 2X may be realized.
+	- Significantly improved the performance of the bam2wig.pl script by at least 2X. Added a new option of recording extended regions across the predicted fragment based on empirically determined shift values. Sampling to determine shift values has been increased. BedGraph files are now written more efficiently. Maximum number of identical reads are now enforced.
+	- Significantly improved the performance of the split_bam_by_isize.pl script to increase speed by at least 2X. Added an option to skip checking of mates. Improved reporting of results.
+	- Added a filter option to remove overlapping nucleosomes in script verify_nucleosome_mapping.pl; also fixed bugs in reporting offset distances and improved output reporting.
+	- Removed confusing separate scan and tag datasets required for script map_nucleosomes.pl. Cleaned up and organized code. Fixed bugs that prevented datasets from being validated.
+	- Fixed critical bug where data was not collected for the final row in script get_datasets.pl.
+	- Fixed bugs with parsing unusual input files, for example commented header lines in bed files or inconsistent column numbers.
+	- Fixed bug in script get_intersecting_features.pl where a strand column was expected even if it was not present.
+	- Changed all tim library calls to use arrays instead of anonymous hashes for a cleaner API. 
+	- Changed shebang lines to use /usr/bin/env to improve portability on systems with different Perl versions installed. 
+	- Cleaned up and made POD documentation more consistent.
+	- Add warnings about database users and passwords in configuration file. 
+
 v.1.9.7 (svn 539)
 	- Fixed critical bug where an exon containing all three 5'UTR, CDS, and 3'UTR was not properly parsed in the script get_ensembl_annotation.pl. New command line options for to include or not CDS, UTR, and start/stop codons were added. Significant changes to improve and organize the code was also made.
 	- Changed the method of assigning the GFF type for chromosomes and scaffolds based on their name in the script ucsc_table2gff3.pl.  Also made the inclusion of start and stop  codons enabled by default.
