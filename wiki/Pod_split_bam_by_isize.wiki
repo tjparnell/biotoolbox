@@ -3,10 +3,12 @@
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
 ==NAME==
-split_bam_paired_by_size.pl
+split_bam_by_isize.pl
+
+A script to selectively write out paired-end alignments of a given insertion size.
 
 ==SYNOPSIS==
-split_bam_paired_by_size.pl `[`--options`]` <**file.bam>
+split_bam_by_isize.pl `[`--options`]` <**file.bam>
 
 {{{
   Options:
@@ -16,10 +18,9 @@ split_bam_paired_by_size.pl `[`--options`]` <**file.bam>
   --size <min-max>
   --out <filename>
   --at
+  --quick
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -27,25 +28,25 @@ The command line flags and descriptions:
 __--in <**file.bam>
 
 __
-  Specify the file name of a binary BAM file as described for Samtools.  Use samtools to convert text sam files to binary bam files. The file  should be indexed; this program should be able to do it for you  automatically if it is not (assuming the bam directory is writeable).
+  Specify the file name of a binary Bam file of paired-end alignments  as described for Samtools. Use samtools to convert text Sam files  to binary Bam files. The file should be sorted and indexed; this  program should be able to do it for you automatically if it is not  (assuming the bam directory is writeable).
 __
   __
 __--min <**integer>
 
 __
-  Optionally specify the minimum size of fragment to include in the output GFF file. The default value is 100 bp.
+  Optionally specify the minimum size of fragment to include in the output Bam file. Not required if the --size option is used. The default value  is 100 bp.
 __
   __
 __--max <**integer>
 
 __
-  Optionally specify the maximum size of fragment to include in the output GFF file. The default value is 200 bp.
+  Optionally specify the maximum size of fragment to include in the output Bam file. Not required if the --size option is used. The default value  is 200 bp.
 __
   __
 __--size <**min-max>
 
 __
-  When multiple size ranges are desired, they may be specified using the  size option. Define the minimum and maximum size as a range separated by  a dash (no spaces). Use this option repeatedly for multiple size ranges.  The size option takes precedence over the min and max options.
+  When multiple size ranges are desired, they may be specified using the  size option. Define the minimum and maximum size as a range separated by  a dash (no spaces). Use this option repeatedly for multiple size ranges.  Size ranges may overlap. The size option takes precedence over the --min  and --max options.
 __
   __
 __--out <**filename>
@@ -57,7 +58,19 @@ __
 __--at
 
 __
-  Boolean option to indicate that only fragments whose paired sequence reads  end in a `[`AT`]` nucleotide should be included in the output Bam file(s).  Micrococcal nuclease (MNase) cuts (almost?) exclusively at AT dinucleotides;  this option ensures that the fragment is more likely derived from a MNase  cut.
+  Boolean option to indicate that only alignments whose query sequence  begins with an `[`AT`]` nucleotide should be included in the output Bam file(s).  Micrococcal nuclease (MNase) cuts (almost?) exclusively at `[`AT`]``[`AT`]`  dinucleotides; this option ensures that the fragment is more likely derived  from a MNase cut.
+__
+  __
+  By default, both mates must pass the AT test prior to writing.
+__
+  __
+__--quick
+
+__
+  Boolean option to quickly split the Bam file without checking both mates.  By default, both mates in a pair must exist and be checked prior to writing,  which increases processing time and memory requirements. Each mate in the  pair must have the same ID tag to be considered paired.
+__
+  __
+  When both the --quick and --at option (above) are enabled, each read mate is  checked independently, potentially leading to the possibility of only one  mate in a pair being written to the output file.
 __
   __
 __--version
@@ -83,6 +96,10 @@ The input and output files are BAM files as described by the Samtools  project (
 
 The input file should be sorted and indexed prior to sizing. The output  file(s) will be automatically re-sorted and re-indexed for you.
 
+A number of statistics about the read pairs are also written to standard  output for your information, including the number of proper alignments  in each requested size range, the number of alignments that fail the AT  check (if requested), and the number of improper paired alignments,  including those whose mates align to the same strand or different  chromosomes, or pairs with a non-aligned mate. Given the vagaries of  different alignment possibilities and enumerations, not all possible  combinations may be accounted.
+
+If no pairs are written to the output file(s), try enabling the --quick  option. It may be that only one of the two mates are actually present  in the Bam file, or that they do not have matching ID numbers.
+
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -94,15 +111,3 @@ The input file should be sorted and indexed prior to sizing. The output  file(s)
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

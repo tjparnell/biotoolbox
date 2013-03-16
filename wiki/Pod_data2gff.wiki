@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 data2gff.pl
 
+A script to convert a generic data file to GFF format.
+
 ==SYNOPSIS==
 data2gff.pl `[`--options...`]` <**filename>
 
@@ -22,17 +24,15 @@ data2gff.pl `[`--options...`]` <**filename>
   --tags <column_index,column_index,...>
   --source <text>
   --type <text | column_index>
-  --(no)zero
+  --zero
   --format [0,1,2,3]
-  --(no)midpoint
-  --(no)unique
+  --midpoint
+  --unique
   --out <filename> 
   --version [2,3]
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -109,7 +109,7 @@ __
   Enter either a text string or a column index representing the  GFF 'type' or 'method' that should be used for the features. If  not defined, it will use the column name for either  the 'score' or 'name' column, if defined. As a last resort, it  will use the most creative method of 'Experiment'.
 __
   __
-__--(no)zero
+__--zero
 
 __
   Indicate whether the source data is in interbase or 0-based  coordinates, as is used with UCSC source data or USeq data  packages. The coordinates will then be converted to 1-based  coordinates, consistent with the rest of bioperl conventions. The default is false (will not convert).
@@ -121,13 +121,13 @@ __
   Indicate the number of decimal places the score value should be formatted. Acceptable values include 0, 1, 2, or 3 places. Anything else is ignored.
 __
   __
-__--(no)midpoint
+__--midpoint
 
 __
   A boolean (1 or 0) value to indicate whether the  midpoint between the actual 'start' and 'stop' values should be used instead of the actual values. Default  is false.
 __
   __
-__--(no)unique
+__--unique
 
 __
   Indicate whether the feature names should be made unique. A count  number is appended to the name of subsequent features to make them  unique. This should only be applied to genomic features, and not to  genomic data values (microarray data, sequencing data, etc). The  default behavior is false (not unique).
@@ -145,7 +145,7 @@ __
   Specify the GFF version. The default is version 3.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Indicate whether the output file should (not) be compressed with gzip.

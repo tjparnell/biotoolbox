@@ -27,16 +27,14 @@ data2wig.pl `[`--options...`]` <**filename>
   --inter | --zero
   --format [0 | 1 | 2 | 3]
   --method [mean | median | sum | max]
-  --(no)log
+  --log
   --bigwig | --bw
   --chromof <filename>
   --db <database>
   --bwapp </path/to/wigToBigWig>
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -143,7 +141,7 @@ __
   Define the method used to combine multiple data values at a single  position. Wig files do not tolerate multiple identical positions.
 __
   __
-__--(no)log
+__--log
 
 __
   If multiple data values need to be combined at a single identical  position, indicate whether the data is in log2 space or not. This  affects the mathematics behind the combination method.
@@ -176,7 +174,7 @@ __
   Specify the path to the Jim Kent's wigToBigWig conversion utility. The  default is to first check the !BioToolBox**  configuration  file `biotoolbox.cfg` for the application path. Failing that, it will  search the default environment path for the utility. If found, it will  automatically execute the utility to convert the wig file.
 __
   __
-__--(no)gz
+__--gz
 
 __
   A boolean value to indicate whether the output wiggle  file should be compressed with gzip.

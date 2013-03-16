@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_datasets.pl
 
+A program to collect data for a list of features
+
 ==SYNOPSIS==
 get_datasets.pl `[`--options...`]` `[`<**filename>`]`
 
@@ -19,7 +21,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --data <none | file | type>, ...
   --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
   --value [score | count | length]
-  --(no)log
+  --log
   --strand [all | sense | antisense]
   --exons
   --extend <integer>
@@ -32,7 +34,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --win <integer>
   --step <integer>
   --force_strand
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -134,7 +136,7 @@ __
   Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
 __
   __
-__--(no)log
+__--log
 
 __
   Indicate the dataset is (not) in log2 space. The log2 status of the dataset is  critical for accurately mathematically combining the dataset values in the  feature's genomic region. It may be determined automatically if the dataset  name includes the phrase "log2".
@@ -212,7 +214,7 @@ __
   For features that are not inherently stranded (strand value of 0) or that you want to impose a different strand, set this option when collecting stranded data. This will reassign the specified strand for each feature regardless of its original orientation. This requires the presence of a "strand" column in the input data file. This option only works with input file lists of database features, not defined genomic regions (e.g. BED files). Default is false.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Indicate whether the output file should (not) be compressed by gzip.  If compressed, the extension '.gz' is appended to the filename. If a compressed  file is opened, the compression status is preserved unless specified otherwise.

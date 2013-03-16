@@ -5,14 +5,16 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 bam2wig.pl
 
+A script to enumerate Bam alignments or coverage into a wig file.
+
 ==SYNOPSIS==
-bam2wig.pl `[`--options...`]` <**filename>
+bam2wig.pl `[`--options...`]` <**filename.bam>
 
 {{{
   Options:
-  --in <filename>
+  --in <filename.bam>
   --out <filename> 
-  --position [start|mid|span]
+  --position [start|mid|span|extend]
   --coverage
   --splice|split
   --pe
@@ -20,21 +22,19 @@ bam2wig.pl `[`--options...`]` <**filename>
   --shift
   --shiftval <integer>
   --sample <integer>
+  --chrom <integer>
   --minr <float>
   --strand
   --qual <integer>
-  --inter|fix
-  --bed
+  --max <integer>
   --rpm
   --log [2|10]
-  --(no)track
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
-  --(no)gz
+  --gz
+  --verbose
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -42,25 +42,36 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the input Bam alignment file. The file should be sorted and  indexed, although it may be indexed automatically
+  Specify the input Bam alignment file. The file should be sorted by  genomic position and indexed, although it may be indexed automatically.
 __
   __
 __--out <**filename>
 
 __
-  Specify the output filename. By default it uses the base name of the  input file.
+  Specify the output base filename. By default it uses the base name of  the input file.
 __
   __
-__--position `[`start|mid|span`]`
+__--position `[`start|mid|span|extend`]`
 
 __
-  Specify the position of the alignment coordinate which should be  recorded. Several positions are accepted: the start (5') position of  the alignment, the midpoint of the alignment, or at all positions  along the length of the alignment (span). Note that the   span option gives coverage but not a true count of the number of  alignments, unlike start or mid. With paired-end alignments, the  positions are relative to the entire insert fragment defined by two  alignments. The default value is the start position for single-end and  midpoint position for paired-end alignments.
+  Specify the position of the alignment coordinate which should be  recorded. Several positions are accepted:
+__
+  __
+{{{
+    start     the 5' position of the alignment
+    mid       the midpoint of the alignment
+    span      along the length of the alignment (coverage)
+    extend    along the length of the predicted fragment
+              equal to 2 x the shift value (enables --shift) 
+    coverage  another way to specify --coverage
+     }}}
+  With paired-end alignments, the positions are relative to the entire  insert fragment defined by two proper alignments. For single-end  alignments, the default value is coverage if no other options are  specified, otherwise start. For paired-end alignments, the midpoint  position is the default.
 __
   __
 __--coverage
 
 __
-  Quickly calculate the coverage of the alignments over the genome,  either at single bp resolution (default) or in bins. This method ignores  the position, quality, strand, shift, and log options. It uses a fast  low-level interface to the Bam file to eke out performance. It is  equivalent to specifying --position=span, --fix, --split,  --nope, --noshift, --nostrand, --qual=0, --norpm, and no log.
+  Quickly calculates the coverage of the alignments over the genome,  either at single bp resolution (default) or in bins. This method ignores  the position, quality, strand, shift, and log options. It is  equivalent to specifying --position=span, --fix, --split,  --nope, --noshift, --nostrand, --qual=0, --max=8000, --norpm, and no log.
 __
   __
 __--splice
@@ -69,7 +80,7 @@ __
 __--split
 
 __
-  The Bam file alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag. This only works with single-end alignments.  Splices are disabled for paired-end reads.
+  The Bam file alignments may contain splices, where the  read is split between two separate alignments. This is most common  with splice junctions from RNA-Seq data. In this case, treat each  alignment as a separate tag. This only works with single-end alignments.  Splices are disabled for paired-end reads. Note that this will  increase processing time.
 __
   __
 __--pe
@@ -81,25 +92,34 @@ __
 __--bin <**integer>
 
 __
-  Specify the window or bin size in which alignments are counted. This  may make visualization in browsers easier when zoomed out to large  views. This option is compatible with all modes of counting, including  coverage. The default is to count at single basepair resolution.
+  Specify the window or bin size in which alignment counts are summed.  This option is compatible with start, mid, and coverage recording  options, but is automatically disabled with span and extend recording  options. The default is to count at single basepair resolution.
 __
   __
 __--shift
 
 __
-  Specify that the positions of the alignment should be shifted towards  the 3' end. Useful for ChIP-Seq applications, where only the ends of  the fragments are counted and often seen as discrete peaks on separate  strands flanking the true target site. This option is disabled with  paired-end and spliced reads, and when --position=span is enabled.
+  Specify that the positions of the alignment should be shifted towards  the 3' end. Useful for ChIP-Seq applications, where only the ends of  the fragments are counted and often seen as separated discrete peaks  on opposite strands flanking the true target site. This option is  disabled with paired-end and spliced reads (where it is not needed).
+__
+  __
+  The extend position option is a special mode where the entire predicted  ChIP fragment is recorded across the span. The length is 2 x the shift  value.
 __
   __
 __--shiftval <**integer>
 
 __
-  Provide the value in bp that the record position should be shifted.  The value should be 1/2 the average length of the insert library  that was sequenced. The default is to automatically and empirically  determine the appropriate shift value. See below for the approach.
+  Provide the value in bp that the record position should be shifted.  The value should be 1/2 the average length of the insert library  that was sequenced. The default is to empirically determine the  appropriate shift value. See below for the approach.
 __
   __
 __--sample <**integer>
 
 __
-  Indicate the number of top regions to sample when empirically  determining the shift value. The default is 100.
+  Indicate the number of top regions to sample when empirically  determining the shift value. The default is 200.
+__
+  __
+__--chrom <**integer>
+
+__
+  Indicate the number of sequences or chromosomes to sample when  empirically determining the shift value. The reference sequences  listed in the Bam file header are taken in order of decreasing  length, and one or more are taken as a representative sample of  the genome. The default value is 2.
 __
   __
 __--minr <**float>
@@ -120,37 +140,22 @@ __
   Set a minimum mapping quality score of alignments to count. The mapping quality score is a posterior probability that the alignment was mapped incorrectly, and reported as a -10Log10(P) value, rounded to the nearest integer (range 0..255). Higher numbers are more stringent. For performance reasons, when counting paired-end reads, only the left alignment is checked. The default value is 0 (accept everything).
 __
   __
-__--fix
+__--max <**integer>
 
 __
-__--inter
-
-__
-  Specify whether or not to record interpolating positions with a count  of 0. If true, a fixedStep wig file is written, otherwise a  variableStep wig file is written that only records the positions  where a tag is found. This will also work with bedGraph output.  This option is automatically enabled when the --bin option is enabled.  The default behavior is to not record empty positions.
-__
-  __
-__--bed
-
-__
-  Specify whether or not to write a bedGraph (chromosome start stop value)  file or a traditional fixedStep or variableStep wiggle file. The  default is false.
+  Set a maximum number of duplicate alignments tolerated at a single position.  The default is 1000.
 __
   __
 __--rpm
 
 __
-  Convert the data to Reads (or Fragments) Per Million mapped. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. The default is no  conversion.
+  Convert the data to Reads (or Fragments) Per Million mapped. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. This will increase  processing time, as the alignments must first be counted. Only mapped reads  with a minimum mapping quality are counted. All duplicates are counted.  The default is no RPM conversion.
 __
   __
 __--log `[`2|10`]`
 
 __
   Transform the count to a log scale. Specify the base number, 2 or  10. The counts are increased by 1 before taking a log transformation,  thus avoiding taking a log of 0. Only really useful with Bam alignment  files with high count numbers. Default is to not transform the count.
-__
-  __
-__--(no)track
-
-__
-  Specify whether or not to include a track line in the wig file. This  option is automatically disabled when further converting to a bigWig  file.
 __
   __
 __--bw
@@ -162,13 +167,19 @@ __
 __--bwapp < /path/to/wigToBigWig or /path/to/bedGraphToBigWig >
 
 __
-  Specify the full path to Jim Kent's bigWig conversion utility. Two  different utilities may be used, bedGraphToBigWig or wigToBigWig,  depending on the format of the wig file generated. The wigToBigWig  is preferred only because smaller file sizes are produced, but with  slightly higher memory requirements. The application paths may be  set in the biotoolbox.cfg file.
+  Specify the full path to Jim Kent's bigWig conversion utility. Two  different utilities may be used, bedGraphToBigWig or wigToBigWig,  depending on the format of the wig file generated. The application  paths may be set in the biotoolbox.cfg file.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested.
+__
+  __
+__--verbose
+
+__
+  Print the sample correlations when determining the shift value.  The default is false.
 __
   __
 __--version
@@ -184,13 +195,15 @@ __
 __
   __
 ==DESCRIPTION==
-This program will enumerate aligned sequence tags and generate a wig,  or optionally !BigWig**, file. Each position in the wig file records the  number of alignments which map to that position. Alignments may be  counted at the start (5') or midpoint positions, or optionally  enumerated at every position across the alignment (resulting in a  coverage map rather than an alignment enumeration). Additionally,  alignments may be summed in bins (10, 100, 237, etc bp), which may  facilitate viewing in genome browsers zoomed out.
+This program will enumerate aligned sequence tags and generate a wig,  or optionally !BigWig**, file. Alignments may be counted and recorded  in several different ways. Strict enumeration may be performed and  recorded at either the alignment's start or midpoint position.  Alternatively, either the alignment or fragment may be recorded  across its span. Finally, a basic unstranded, unshifted, and  non-transformed alignment coverage may be generated.
 
 Both paired-end and single-end alignments may be counted. Alignments  with splices (e.g. RNA-Seq) may be counted singly or separately.  Alignment counts may be separated by strand, facilitating analysis of  RNA-Seq experiments.
 
-For ChIP-Seq experiments, the alignment position may be shifted  in the 3' direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. The shift value  may be empirically determined from the sequencing data (see below).
+For ChIP-Seq experiments, the alignment position may be shifted  in the 3' direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS2 program. The shift value may be empirically  determined from the sequencing data (see below).
 
-The output wig file may be either a variableStep, fixedStep, or  bedGraph test format. The wig file may be further converted into a  compressed, indexed, binary bigWig format, dependent on the availability  of the appropriate conversion utilities.
+The output wig file may be either a variableStep, fixedStep, or  bedGraph format. The file format is dictated by where the alignment  position is recorded. Recording start and midpoint at  single base-pair resolution writes a variableStep wig file. Binned start  or midpoint counts and coverage are written as a fixedStep wig file.  Span and extended positions are written as a bedGraph file.
+
+The wig file may be further converted into a compressed, indexed, binary  bigWig format, dependent on the availability of the appropriate  conversion utilities.
 
 More information about wiggle files can be found at  http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at  http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at  http://genome.ucsc.edu/goldenPath/help/bigWig.html.
 
@@ -209,10 +222,10 @@ __
 Single-end ChIP-Seq
 
 __
-  When sequencing Chromatin Immuno-Precipitation products, one generally  is more interested in the number of tag counts, rather than coverage.  Hence, we can simply count the start position of the sequence tags.
+  When sequencing Chromatin Immuno-Precipitation products, one generally  performs a 3' shift adjustment to center the fragment's end reads  over the predicted center and putative target. To adjust the positions  of tag count peaks, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
 __
   __
-  To adjust the positions of tag count peaks to center over the presumed  site of interest, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
+  Depending on your downstream applications and/or preferences, you  can record strict enumeration (start positions) or coverage (extend  position).
 __
   __
   Finally, to compare ChIP-Seq alignments from multiple experiments,  convert your reads to Reads Per Million Mapped, which will help to  normalize read counts.
@@ -220,15 +233,21 @@ __
   __
 {{{
  bam2wig.pl --pos start --shift --rpm --in <bamfile>
+ }}}
+{{{
+ bam2wig.pl --pos extend --rpm --in <bamfile>
 }}}
 Paired-end ChIP-Seq
 
 __
-  If both ends of the ChIP eluate fragments are sequenced, then we do not  need to calculate a shift value. Instead, we will simply count at the  midpoint of each properly-mapped sequence pair.
+  If both ends of the ChIP eluate fragments are sequenced, then we do not  need to calculate a shift value. Instead, we will simply count at the  midpoint of each properly-mapped sequence pair, or record the defined  fragment span.
 __
   __
 {{{
  bam2wig.pl --pos mid --pe --rpm --in <bamfile>
+ }}}
+{{{
+ bam2wig.pl --pos span --pe --rpm --in <bamfile>
 }}}
 Unstranded RNA-Seq
 
@@ -270,7 +289,7 @@ __
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  }}}
 ==SHIFT VALUE DETERMINATION==
-To determine the shift value, the top 500 bp regions (the default number is 100 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 500 bp regions (1.5 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 500 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R^2 value to keep is 0.25, and not all sampled regions may return a significant R^2 value. A trimmed mean is then calculated from all of the calculated shift values to be used used as the final shift value. This approach works best with clean, distinct peaks. The peak shift may be evaluated by viewing separate, stranded wig files together with the shifted wig file in a genome browser.
+To determine the shift value, the top 500 bp regions (the default number is 200 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 400 bp regions (1.3 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 400 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R^2 value to keep is 0.25, and not all sampled regions may return a significant R^2 value. A trimmed mean is then calculated from all of the calculated shift values to be used used as the final shift value. This approach works best with clean, distinct peaks. The peak shift may be evaluated by viewing separate, stranded wig files together with the shifted wig file in a genome browser.
 
 ==AUTHOR==
 {{{

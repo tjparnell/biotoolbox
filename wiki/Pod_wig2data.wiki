@@ -2,6 +2,11 @@
 #labels ManPage
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
+==NAME==
+wig2data.pl
+
+A script to convert a text wiggle file to a tab-delimited text file.
+
 ==SYNOPSIS==
 wig2data.pl `[`--options...`]` <**filename>
 
@@ -9,17 +14,15 @@ wig2data.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
-  --(no)gff
+  --gff
   --type <text>
   --source <text>
   --format [0,1,2,3]
-  --(no)midpoint
+  --midpoint
   --version [2,3]
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -36,7 +39,7 @@ __
   Specify the output filename. By default it uses the GFF type as the  basename.
 __
   __
-__--(no)gff
+__--gff
 
 __
   Indicate whether the output file should be in GFF format. If false, a  standard tim data tab delimited text file will be written with four  columns: chromosome, start, stop, and score. The default value is false.
@@ -60,7 +63,7 @@ __
   Specify the number of decimal places to which the wig file will be  formatted. Default is no formatting.
 __
   __
-__--(no)midpoint
+__--midpoint
 
 __
   Specify whether (or not) a midpoint position should be calculated  between the start and stop positions and be used in the output GFF  file. This only pertains to BED style wig files where both the  start and stop positions are reported and stepped wig files where  a span value is specified. The default value is false.
@@ -72,7 +75,7 @@ __
   Specify the GFF version. The default is version 3.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

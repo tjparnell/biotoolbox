@@ -5,28 +5,29 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 graph_profile.pl
 
-A script to graph values along a specific X-axis
+A script to graph Y values along a genomic coordinate X-axis.
 
 ==SYNOPSIS==
 graph_profile.pl <**filename>
 
 {{{
-   --in <filename>
-   --index <index1,index2,...>
-   --all
-   --(no)cen
-   --(no)log
-   --xindex <index>
-   --skip <integer>
-   --offset <integer>
-   --xformat <integer>
-   --min <number>
-   --max <number>
-   --yformat <integer>
-   --ytick <integer>
-   --color <name,name,...>
-   --dir <foldername>
-   --version
+  Options:
+  --in <filename>
+  --index <index1,index2,...>
+  --all
+  --cen
+  --log
+  --xindex <index>
+  --skip <integer>
+  --offset <integer>
+  --xformat <integer>
+  --min <number>
+  --max <number>
+  --yformat <integer>
+  --ytick <integer>
+  --color <name,name,...>
+  --dir <foldername>
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -53,16 +54,16 @@ __
   Automatically graph all available datasets present in the file.
 __
   __
-__--(no)cen
+__--cen
 
 __
-  Datasets should (not) be median centered prior to graphing. Useful when  graphing multiple datasets together when they have different medians.
+  Datasets should (not) be median centered prior to graphing. Useful when  graphing multiple datasets together when they have different medians.  Default is false.
 __
   __
-__--(no)log
+__--log
 
 __
-  Dataset values are (not) in log2 space, or status should be respected  if indicated in the file metadata.
+  Dataset values are in log2 space, or status should be respected  if indicated in the file metadata.
 __
   __
 __--xindex <**index>
@@ -150,11 +151,3 @@ The resulting files are written to a subdirectory named after  the input file. T
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

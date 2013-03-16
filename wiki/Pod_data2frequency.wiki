@@ -8,9 +8,14 @@ data2gff.pl
 A script to convert data into a frequency distribution, useful for graphing.
 
 ==SYNOPSIS==
-data2frequency.pl --bins <**integer> --size <**number> <**filename>  data2frequency.pl --bins <**integer> --max <**number> <**filename>  data2frequency.pl --size <**number> --max <**number> <**filename>
+data2frequency.pl --bins <**integer> --size <**number> <**filename>
+
+data2frequency.pl --bins <**integer> --max <**number> <**filename>
+
+data2frequency.pl --size <**number> --max <**number> <**filename>
 
 {{{
+  Options:
   --in <filename>
   --bins <integer>
   --size <number>
@@ -20,8 +25,6 @@ data2frequency.pl --bins <**integer> --size <**number> <**filename>  data2freque
   --out <filename>
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:

@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_features.pl
 
+A script to collect features from a !BioPerl** !SeqFeature**::Store database.
+
 ==SYNOPSIS==
 get_features.pl --db <**text> `[`--options...`]`
 
@@ -20,7 +22,7 @@ get_features.pl --db <**text> `[`--options...`]`
   --out <filename>
   --bed
   --gff 
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -84,7 +86,7 @@ __
   Optionally indicate that a GFF3 format file should be written. This  option enables the database features to be written completely with  all attributes. Coordinate adjustments are ignored.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

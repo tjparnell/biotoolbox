@@ -5,10 +5,13 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 big_file2gff3.pl
 
+A script to generate GFF3 files for bigwig, bigbed, and bam files.
+
 ==SYNOPSIS==
 big_file2gff3.pl `[`--options...`]` <**filename1.bw> <**filename2.bb> ...
 
 {{{
+  Options:
   --in <file> or <file1,file2,...>
   --path </destination/path/for/bigfiles/>
   --source <text>
@@ -23,8 +26,6 @@ big_file2gff3.pl `[`--options...`]` <**filename1.bw> <**filename2.bb> ...
   --version
   --help
   }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -121,10 +122,6 @@ The generated GFF3 file is written to the current directory. One GFF file is  wr
 
 Optionally, sample database and track GBrowse configuration stanzas may also be  written to the current directory to facilitate setting up GBrowse. If a  !BigWigSet** database is requested, then the track stanza will be set up with  subtrack tables representing each !BigWig** file.
 
-{{{
-}}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -136,7 +133,3 @@ Optionally, sample database and track GBrowse configuration stanzas may also be 
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}

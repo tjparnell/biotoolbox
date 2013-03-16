@@ -5,8 +5,12 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 !CpG_calculator**.pl
 
+A script to calculate observed vs expected CpG dinucleotides
+
 ==SYNOPSIS==
-!CpG_calculator**.pl --fasta <**directory|filename> `[`--options...`]` !CpG_calculator**.pl --db <**text> `[`--options...`]`
+!CpG_calculator**.pl --fasta <**directory|filename> `[`--options...`]`
+
+!CpG_calculator**.pl --db <**text> `[`--options...`]`
 
 {{{
   Options:
@@ -15,7 +19,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --in <filename>
   --win <integer>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -52,7 +56,7 @@ __
   Specify the output filename. By default it uses the input file base  name if provided. Required if no input file is provided.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

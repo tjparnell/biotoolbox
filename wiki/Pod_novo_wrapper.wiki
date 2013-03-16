@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 novo_wrapper.pl
 
+A parallelized wrapper program for Novocraft's novoaligner.
+
 ==SYNOPSIS==
 {{{
  novo_wrapper.pl --index <file> [--options] <seq_file1> ...

@@ -3,24 +3,24 @@
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
 ==NAME==
-bar2wig.pl
+bam2gff_bed.pl
+
+A script to convert bam paired_reads to a gff or bed file.
 
 ==SYNOPSIS==
-bar2wig.pl `[`--options...`]` <**filename>
+bam2gff_bed.pl `[`--options...`]` <**filename>
 
 {{{
   Options:
-  --in <filename> or <directory>
+  --in <filename>
+  --bed | --gff | --bigbed | --bb
+  --pe
+  --type <text>
+  --source <text>
+  --randstr
   --out <filename> 
-  --barapp </path/to/Bar2Gr>
-  --method [mean | median | sum | max]
-  --(no)log
-  --(no)track
-  --bw
-  --db <database>
-  --chromof <filename>
-  --bwapp </path/to/wigToBigWig>
-  --(no)gz
+  --bbapp </path/to/bedToBigBed>
+  --gz
   --version
   --help
 }}}
@@ -51,13 +51,13 @@ __
   Define the method used to combine multiple data values at a single  position. Bar files can frequently have one or more values at a single  position, usually due to either multiple identical oligo probes (microarray  data) or multiple sequence tags aligning to the same position (next  generation sequencing data). Typically, with FDR or microarray data,  the mean or max value should be taken, while bar files representing  sequence tag !PointData** should be summed.
 __
   __
-__--(no)log
+__--log
 
 __
   If multiple data values need to be combined at a single identical  position, indicate whether the data is in log2 space or not. This  affects the mathematics behind the combination method.
 __
   __
-__--(no)track
+__--track
 
 __
   Wig files typically include a track line at the beginning of the file which  defines the appearance. However, conversion of a wig file to bigWig  requires that the track line is absent. Do not include the track line when  generating bigWig files manually. The default is to include for wig files  (true), and exclude for bigWig files (false).
@@ -87,7 +87,7 @@ __
   Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  biotoolbox.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output wig file should be compressed with gzip. This option does not affect bigWig files, but will affect intermediate  wig files.

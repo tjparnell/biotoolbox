@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 convert_yeast_genome_version.pl
 
+A script to convert genomic data between different S cerevisiae versions
+
 ==SYNOPSIS==
 convert_yeast_genome_version.pl `[`options`]` <**file1> <**file2> ...
 
@@ -12,12 +14,10 @@ convert_yeast_genome_version.pl `[`options`]` <**file1> <**file2> ...
   Options:
   --in <file>
   --convert <integer>
-  --(no)roman
+  --roman
   --db <text>
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -37,7 +37,7 @@ __
   If you happen to know the custom index number for the conversion method,  then Great! you can put it here to save time. Otherwise, the program  will interactively present a list of available conversions from which  to select.
 __
   __
-__--(no)roman
+__--roman
 
 __
   Boolean flag to indicate whether or not the chromosome name should be  converted from Arabic (normal) numerals to Roman numerals (used by SGD).  The default is false.

@@ -2,15 +2,14 @@
 #labels ManPage
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
-==NAME get_intersecting_features.pl==
-{{{
-}}}
-{{{
-}}}
+==NAME==
+get_intersecting_features.pl
+
+A script to pull out overlapping features from the database.
+
 ==SYNOPSIS==
-{{{
-   get_intersecting_features.pl [--options] <filename>
-  }}}
+get_intersecting_features.pl `[`--options`]` <**filename>
+
 {{{
   Options:
   --in <filename>
@@ -21,7 +20,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --extend <integer>
   --ref [start | mid]
   --out <filename>
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -70,7 +69,7 @@ __
   Optionally specify a new filename. A standard tim data text file is written.  The default is to rewrite the input file.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether the output file should (not) be compressed with gzip.
@@ -95,8 +94,6 @@ Several attributes of the found features are appended to the original input  fil
 
 A standard tim data text file is written.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -108,23 +105,3 @@ A standard tim data text file is written.
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

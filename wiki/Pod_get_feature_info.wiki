@@ -5,24 +5,23 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_feature_info.pl
 
-A script to feature information from a Bioperl !SeqFeature**::Store db.
+A script to collect feature information from a !BioPerl** !SeqFeature**::Store db.
 
 ==SYNOPSIS==
 get_feature_info.pl <**filename>
 
 {{{
+  Options:
   --in <filename> 
   --db <name>
   --attrib <attribute1,attribute2,...>
   --out filename
-  --(no)gz
+  --gz
   --version
   --help
 }}}
 Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    rna_count    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
 
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -67,7 +66,7 @@ __
   Optionally specify an alternate output file name. The default is to  overwrite the input file.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Indicate whether the output file should (not) be compressed by gzip.  If compressed, the extension '.gz' is appended to the filename. If a compressed  file is opened, the compression status is preserved unless specified otherwise.

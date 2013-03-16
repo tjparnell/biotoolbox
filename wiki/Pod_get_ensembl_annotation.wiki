@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_ensembl_annotation.pl
 
+A script to retrieve Ensembl annotation and write it out as GFF3.
+
 ==SYNOPSIS==
 get_ensembl_annotation.pl `[`--options...`]` --species <**text>
 
@@ -21,7 +23,10 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --(no)mirna
   --(no)rrna
   --(no)trna
-  --prefix
+  --(no)cds
+  --(no)utr
+  --(no)codon
+  --ucsc
   --group <text>
   --host <host.address>
   --port <integer>
@@ -31,15 +36,13 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --version
   --help
 }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
 __--species <**text>
 
 __
-  Enter the species name for the database to connect to. Common aliases,  e.g. human, may be acceptable. Check the EnsEMBL website for the species  databases available or print the list using the --printdb option below.
+  Enter the species name for the database to connect to. Common aliases,  e.g. human, may be acceptable. This is typically provided in the format  as "genus_species", e.g. "homo_sapiens". Check the EnsEMBL website for  the species databases available, or print the list using the --printdb  option below.
 __
   __
 __--out <**filename>
@@ -63,49 +66,67 @@ __
 __--(no)rna
 
 __
-  Boolean flag to indicate whether or not to collect all non-coding RNA  genes, including misc_RNA, snRNA, snoRNA, rRNA, tRNA, miRNA, and piRNA,  from the database. This option may be superseded by setting the  individual RNA options. For example, setting both --rna and --notrna  will collect all RNA types except tRNAs. The default is false.
+  Boolean flag to indicate whether or not to collect all non-coding RNA  genes, including misc_RNA, snRNA, snoRNA, rRNA, tRNA, miRNA, and piRNA,  from the database. This option may be superseded by setting the  individual RNA options. For example, setting both --rna and --notrna  will collect all RNA types except tRNAs. The default is true.
 __
   __
 __--(no)miscrna
 
 __
-  Boolean flag to indicate whether or not to collect miscellenaeous  noncoding RNA genes.
+  Boolean flag to indicate whether or not to collect miscellenaeous  noncoding RNA genes. The default is true.
 __
   __
 __--(no)snrna
 
 __
-  Boolean flag to indicate whether or not to collect small nuclear  RNA (snRNA) genes.
+  Boolean flag to indicate whether or not to collect small nuclear  RNA (snRNA) genes. The default is true.
 __
   __
 __--(no)snorna
 
 __
-  Boolean flag to indicate whether or not to collect small nucleolar  RNA (snoRNA) genes.
+  Boolean flag to indicate whether or not to collect small nucleolar  RNA (snoRNA) genes. The default is true.
 __
   __
 __--(no)mirna
 
 __
-  Boolean flag to indicate whether or not to collect micro  RNA (miRNA) genes.
+  Boolean flag to indicate whether or not to collect micro  RNA (miRNA) genes. The default is true.
 __
   __
 __--(no)rrna
 
 __
-  Boolean flag to indicate whether or not to collect ribosomal RNA  (rRNA) genes.
+  Boolean flag to indicate whether or not to collect ribosomal RNA  (rRNA) genes. The default is true.
 __
   __
 __--(no)trna
 
 __
-  Boolean flag to indicate whether or not to collect transfer RNA    (tRNA) genes.
+  Boolean flag to indicate whether or not to collect transfer RNA    (tRNA) genes. The default is true.
 __
   __
-__--prefix
+__--(no)cds
 
 __
-  Boolean flag to prefix chromosome names with 'chr'. Some people and/or  downstream applications prefer chromosomes to be named as 'chr1'  instead of '1'. Only coordinate systems of type 'chromosome' are  changed, not scaffolds, contigs, etc. Default is false.
+  Boolean flag to indicate whether or not to include CDS information for  mRNA transcripts and genes. Default is true.
+__
+  __
+__--(no)utr
+
+__
+  Boolean flag to indicate whether or not to include UTR features for  mRNA transcripts and genes. Default is true.
+__
+  __
+__--(no)codon
+
+__
+  Boolean flag to indicate whether or not to include start and stop codons  for mRNA transcripts and genes. Default is true if CDSs are included.
+__
+  __
+__--ucsc
+
+__
+  Boolean flag to prefix chromosome names with 'chr' in the style of  UCSC genome annotation. Only coordinate systems of type 'chromosome'  are changed, not scaffolds, contigs, etc. Default is false.
 __
   __
 __--group <**text>
@@ -123,13 +144,13 @@ __
 __--port <**integer>
 
 __
-  Specify the IP port address for the MySQL server. Default is 3306.
+  Specify the IP port address for the MySQL server. Default is 5306.
 __
   __
 __--user <**text>
 
 __
-  Specify the user name to connect as to the EnsEMBL public database.  The default value is 'anonymous'.
+  Specify the user name with which to connect to the EnsEMBL public database.  The default value is 'anonymous'.
 __
   __
 __--pass <**text>
@@ -159,11 +180,15 @@ __
 ==DESCRIPTION==
 This program will connect to the public EnsEMBL MySQL database and  retrieve the latest genome annotation for a given species. It will  generate a GFF3 annotation file suitable for loading into a Bio::DB  database or genome browser. The GFF3 features generated are  multi-level nested gene->mRNA->CDS features. It will optionally  generate features for the top-level sequences (chromosomes, contigs,  scaffolds, etc.) and non-coding RNA genes (snRNA, tRNA, rRNA, etc.).
 
-This program requires EnsEMBL's Perl API modules to connect to their public  MySQL servers. It is not available through CPAN, unfortunately, but you can  find installation instructions at http://www.ensembl.org/info/docs/api/api_installation.html.
-
 Note that EnsEMBL releases new Perl API modules with each database  release. If you do not see the latest genome version (compared to what  is available on the web), you should update your EnsEMBL Perl modules.  The API version should be printed at the beginning of execution.
 
-To connect to the Ensembl Genomes public mysql server rather than the  default, please specify the host as "mysql.ebi.ac.uk" and port 4157.
+==REQUIREMENTS==
+This program requires EnsEMBL's Perl API modules to connect to their public  MySQL servers. It is not available through CPAN, unfortunately, but you can  find installation instructions at  <[http://www.ensembl.org/info/docs/api/api_installation.html]>.
+
+==DATABASE ACCESS==
+If you having difficulties connecting, check the server and port numbers  at <[http://www.ensembl.org/info/data/mysql.html]>.
+
+To connect to the Ensembl Genomes public mysql server rather than the  default, please specify the host as "mysql.ebi.ac.uk" and port 4157.  See <[http://www.ensemblgenomes.org/info/data_access]> for up to date  information.
 
 ==AUTHOR==
 {{{

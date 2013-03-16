@@ -5,16 +5,17 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 join_data_file.pl
 
+A script to join two or more data files and concatenate rows.
+
 ==SYNOPSIS==
 join_data_file.pl `[`--options`]` <**file1> <**file2> ...
 
 {{{
+  Options:
   --out <filename>
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -25,7 +26,7 @@ __
   Provide the name of the output file. If the input files were  split using 'split_data_file.pl', then the original base name  may be reconstituted. Otherwise, the user will be asked for  an output file name.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Indicate whether the output files should be compressed  with gzip. Default behavior is to preserve the compression  status of the first input file.
@@ -61,25 +62,3 @@ This program is intended as the complement to 'split_data_files.pl'.
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

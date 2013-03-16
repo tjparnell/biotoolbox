@@ -5,11 +5,13 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 bin_genomic_data.pl
 
-A script to bin genomic data into windows
+A script to bin genomic data into windows.
 
 ==SYNOPSIS==
 {{{
  bin_genomic_data.pl --data <filename> --in <filename> --method [method]
+ }}}
+{{{
  bin_genomic_data.pl --data <filename> --new --win <integer> --db <db_name>
      --out <filename> --method [method]
  }}}
@@ -28,14 +30,12 @@ A script to bin genomic data into windows
   --midpoint
   --shift <integer>
   --interpolate
-  --(no)log
+  --log
   --gff
-  --(no)gz
+  --gz
   --version
   --help
 }}}
-{{{
- }}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -123,10 +123,10 @@ __
   Optionally interpolate missing bin values from flanking bins.
 __
   __
-__--(no)log
+__--log
 
 __
-  Flag to indicate that source data is (not) log2, and to calculate  accordingly and report as log2 data.
+  Flag to indicate that source data is log2, and to calculate  accordingly and report as log2 data.
 __
   __
 __--gff

@@ -8,17 +8,17 @@ map_nucleosomes.pl
 A script to map nucleosomes.
 
 ==SYNOPSIS==
-map_nucleosomes.pl --db <**text> --thresh <**number> `[`--options...`]` map_nucleosomes.pl --sdata <**text|file> --thresh <**number> `[`--options...`]`
+map_nucleosomes.pl --db <**text> --thresh <**number> `[`--options...`]`
+
+map_nucleosomes.pl --data <**text|file> --thresh <**number> `[`--options...`]`
 
 {{{
+  Options:
   --db <text>
-  --sdata <text|file>
-  --tdata <text|file>
   --data <text|file>
   --thesh <number>
   --win <integer>
   --buf <integer>
-  --(no)bin
   --gff
   --type <gff_type>
   --source <gff_source>
@@ -35,19 +35,10 @@ __
   Specify the name of the !BioPerl** database to pull the source data  and/or chromsomes. A !SeqFeature**::Store database may be supplied,  or a !BigWigSet** directory. Required unless data is pulled from  a bigWig file (.bw).
 __
   __
-__--sdata <**text|file>
-
-__
-__--tdata <**text|file>
-
-__
 __--data <**text|file>
 
 __
-  Provide the name of the dataset(s) and/or data files (bigWig format) containing the nucleosome midpoint occupancy data from which to identify nucleosomal positions. If data is obtained from a database, the type or primary_tag should be provided.
-__
-  __
-  The scan dataset (--sdata) is required, while the tag dataset (--tdata) is only used to collect nucleosome statistics. The same dataset could be used for both, in which case both may be set simultaneously  using the --data option. See [Pod_DATASETS DATASETS] section for details regarding the datasets. If the datasets are not specified on the commandline, then they may be interactively chosen from a list from the database.
+  Provide the name of the dataset and/or data files (bigWig format) containing the nucleosome midpoint occupancy data from which to identify nucleosomal positions. If data is obtained from a database, the name or type should be provided.
 __
   __
 __--thresh <**number>
@@ -66,12 +57,6 @@ __--buf <**integer>
 
 __
   Provide the buffer size in bp which will be added between the end of the  previous found nucleosome and the beginning of the window to scan for the  next nucleosome. Setting this value may limit the number of overlapping  nucleosomes. Default is 5 bp.
-__
-  __
-__--bin
-
-__
-  Indicate whether the scan data should be binned in an attempt to find  and map a nucleosome midpoint peak. Binning only occurs when a single  position fails to pass the threshold value. Bins are generated from  three adjacent positions and their values summed. This may help   those genomic regions with very few nucleosome reads. The default is  to not bin the scan data.
 __
   __
 __--gff
@@ -118,15 +103,7 @@ Nucleosome calls are made by scanning the chromosomes in windows of specified si
 This approach works reasonably well if the data shows an inherent,  periodic pattern of peaks. Noisy datasets derived from partially  fragmented nucleosomes or low sequencing depth may require some  statistical smoothing.
 
 ==DATASETS==
-Two datasets must be provided for the mapping, although the same could be used for both functions. The datasets should represent sequenced nucleosome fragment midpoints. For the most accurate mapping, the midpoints should be mapped at 1 bp resolution, but lower resolutions (5 or 10 bp) could also work.
-
-The scan dataset (--sdata) is used to scan for a potential nucleosome. The dataset may be a simple difference, normalized difference, ratio,  P-value, Q-Value, False Discovery Rate, or raw or normalized tag  counts. Probability scores should be converted using -10Log10(P) for proper interpretation.
-
-The optional tag dataset (--tdata) is used for calculating nucleosome statistics, including the precise nucleosome midpoint peak, occupancy, and fuzziness. The tag dataset should be enumerated counts of nucleosome midpoints. Normalized counts (for example, Reads Per Million mapped or RPM) or difference counts (experiment minus control) may be used, but P-value scores should not.
-
-When working with next generation sequencing tags from nucleosomes, tags  may be enumerated using the !BioToolBox** script [Pod_bam2wig_pl bam2wig.pl].
-
-For genomic regions with few nucleosome reads and no positions that pass the threshold value, the window positions may optionally be binned together to increase sensitivity (see the --bin option).
+This programs expects to work with enumerated midpoint counts of  nucleosomal sequence fragments at a single bp resolution. Typically,  nucleosome fragments are sequenced using massively parallel sequencing  technologies, and the mapped alignments are converted to predicted  midpoint occupancy counts. The midpoints may be precisely mapped with  paired-end sequencing, or estimated by 3' end shifting of single-end  sequence alignments. See the !BioToolBox** script bam2wig.pl for one  approach.
 
 ==REPORTING==
 Two attributes of each identified nucleosome are calculated, Occupancy and Fuzziness. Occupancy represents the sum of the tag counts that support the nucleosome position; higher scores indicate a more highly occupied nucleosome. Fuzziness indicates how well all of the scores are aligned in register. The Fuzziness value is the standard deviation of the population of scores from the peak; a high value indicates the nucleosome has a fuzzy or variable position, whereas a low value indicates the nucleosome is highly positioned. For both attributes, the scores are counted in a window representing 1/2 of a nucleosome length (74 bp) centered on the defined nucleosome midpoint. The size of this window is arbitrary but reasonable.

@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_actual_nuc_sizes.pl
 
+A script to pull out actual nucleosome fragments and enumerate their sizes.
+
 ==SYNOPSIS==
 {{{
   get_actual_nuc_sizes.pl --in <file1.txt> --bam <file2.bam> [--options]
@@ -23,8 +25,6 @@ get_actual_nuc_sizes.pl
   --out <filename>
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -106,8 +106,6 @@ This program will determine actual nucleosome fragment sizes based on the  origi
 
 In addition to updating the start and stop coordinates, three additional  columns of data are appended to the data table. These include the count of  sequence read-pair fragments, and the standard deviation of the fragment  lengths. In addition to writing a new data file, it can optionally write  a GFF3 file.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -119,13 +117,3 @@ In addition to updating the start and stop coordinates, three additional  column
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

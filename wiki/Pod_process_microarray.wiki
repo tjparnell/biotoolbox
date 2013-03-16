@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 process_microarray.pl
 
+A script to quantile normalize two or more raw microarray data sets.
+
 ==SYNOPSIS==
 process_microarray.pl --in <**filename1>,<**filename2> --channel <**redgreen>  --out <**filename>
 
@@ -25,8 +27,6 @@ process_microarray.pl --recipe <**file>
   --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -91,7 +91,7 @@ __
   Optionally indicate that the Processed values in an Agilent text file  should be used. The default is to use the Raw values.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
@@ -139,8 +139,6 @@ An example is below
  # two-channel file, red is experiment, green is not used
  path/to/file.txt	en
  }}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -152,5 +150,3 @@ An example is below
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

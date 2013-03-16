@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 verify_nucleosome_mapping.pl
 
+A script to verify nucleosome mapping and identify overlaps.
+
 ==SYNOPSIS==
 verify_nucleosome_mapping.pl `[`--options...`]` <**filename>
 
@@ -13,12 +15,12 @@ verify_nucleosome_mapping.pl `[`--options...`]` <**filename>
   --in <filename>
   --db <text>
   --data <text | filename>
+  --filter
+  --max <integer>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -39,6 +41,18 @@ __--data <**text | filename>
 
 __
   Provide the name of the dataset or data file (bigWig format) containing the nucleosome midpoint occupancy data with which to verify nucleosomal positions. If data is obtained from a database, the type or primary_tag should be provided. Default is to use the  dataset defined in the input file metadata.
+__
+  __
+__--filter
+
+__
+  Optionally filter out nucleosomes that exceed a maximum allowed  overlap. Filtered nucleosomes are deleted from the file. Default is  no filtering.
+__
+  __
+__--max <**integer>
+
+__
+  Specify the maximum allowed overlap in bp when filtering out  overlapping nucleosomes. The default is 30 bp.
 __
   __
 __--out <**filename>
@@ -77,6 +91,8 @@ Center_peak_mapping records whether the nucleosome was properly mapped or  not. 
 Center_peak_offset records the distance in bp between the nucleosome peak  and the recorded midpoint.
 
 Basic statistics are reported to Standard Output for the overlap and  offset lengths.
+
+The program can also optionally filter out nucleosomes which exceed a  set limit of overlap. The overlapping nucleosome to be deleted is  chosen based on a set of rules: offset nucleosomes are deleted, or if  both nucleosomes are offset, then the one with the greatest offset is  deleted. If neither nucleosome is offset, then the nucleosome with the  lowest occupancy is deleted, or if both occupancies are equal, then  the rightmost is deleted.
 
 ==AUTHOR==
 {{{

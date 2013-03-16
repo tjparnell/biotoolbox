@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 data2bed.pl
 
+A script to convert a data file to a bed file.
+
 ==SYNOPSIS==
 data2bed.pl `[`--options...`]` <**filename>
 
@@ -24,7 +26,7 @@ data2bed.pl `[`--options...`]` <**filename>
   --chromof <filename>
   --db <database>
   --bbapp </path/to/bedToBigBed>
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -121,7 +123,7 @@ __
   Specify the path to the Jim Kent's bedToBigBed conversion utility. The  default is to first check the !BioToolBox**  configuration  file `biotoolbox.cfg` for the application path. Failing that, it will  search the default environment path for the utility. If found, it will  automatically execute the utility to convert the bed file.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
@@ -154,12 +156,6 @@ Score values should be integers within the range 1..1000. Score values  are not 
 
 An option exists to further convert the BED file to an indexed, binary !BigBed**  format. Jim Kent's bedToBigBed conversion utility must be available, and  either a chromosome definition file or access to a Bio::DB database is required.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -171,5 +167,3 @@ An option exists to further convert the BED file to an indexed, binary !BigBed**
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

@@ -5,27 +5,32 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 graph_histogram.pl
 
-A script to graph a histogram of a dataset of values
+A script to graph a histogram (bar or line) of one or more datasets.
 
 ==SYNOPSIS==
-graph_histogram.pl --bins <**integer> --size <**number> <**filename>  graph_histogram.pl --bins <**integer> --max <**number> <**filename>  graph_histogram.pl --size <**number> --max <**number> <**filename>
+graph_histogram.pl --bins <**integer> --size <**number> <**filename>
+
+graph_histogram.pl --bins <**integer> --max <**number> <**filename>
+
+graph_histogram.pl --size <**number> --max <**number> <**filename>
 
 {{{
-   --in <filename>
-   --index <column_index>
-   --bins <integer>
-   --size <number>
-   --min <number>
-   --max <number>
-   --ymax <integer>
-   --yticks <integer>
-   --skip <integer>
-   --offset <integer>
-   --format <integer>
-   --lines
-   --out <base_filename>
-   --dir <output_directory>
-   --version
+  Options:
+  --in <filename>
+  --index <column_index>
+  --bins <integer>
+  --size <number>
+  --min <number>
+  --max <number>
+  --ymax <integer>
+  --yticks <integer>
+  --skip <integer>
+  --offset <integer>
+  --format <integer>
+  --lines
+  --out <base_filename>
+  --dir <output_directory>
+  --version
   --help
 }}}
 ==OPTIONS==
@@ -144,31 +149,3 @@ This program will generate PNG graphic files representing the histogram  of the 
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}

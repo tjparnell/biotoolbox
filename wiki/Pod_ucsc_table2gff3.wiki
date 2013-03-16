@@ -2,11 +2,11 @@
 #labels ManPage
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
-==NAME ucsc_table2gff3.pl==
-{{{
-}}}
-{{{
-}}}
+==NAME==
+ucsc_table2gff3.pl
+
+A script to convert UCSC gene tables to GFF3 annotation.
+
 ==SYNOPSIS==
 {{{
    ucsc_table2gff3.pl --ftp <text> --db <text>
@@ -32,7 +32,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
   --(no)cds
   --(no)utr
   --(no)codon
-  --(no)gz
+  --gz
   --version
   --help
 }}}
@@ -117,7 +117,7 @@ __
   Specify whether (or not) to assemble mRNA transcripts into genes. This  will create the canonical gene->mRNA->(exon,CDS) heirarchical structure.  Otherwise, mRNA transcripts are kept independent. The gene name, when  available, are always associated with transcripts through the Alias tag.  The default is true.
 __
   __
-__--no(cds)
+__--(no)cds
 
 __
   Specify whether (or not) to include CDS features in the output GFF file.  The default is true.
@@ -132,10 +132,10 @@ __
 __--(no)codon
 
 __
-  Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is false.
+  Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is true.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether the output file should be compressed with gzip.
@@ -165,7 +165,6 @@ If provided, chromosome and/or scaffold features may also be written to a  GFF f
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
- Howard Hughes Medical Institute
  Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah

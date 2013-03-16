@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 correlate_position_data.pl
 
+A script to calculate correlations between two datasets along the length of a feature.
+
 ==SYNOPSIS==
 correlate_position_data.pl `[`--options`]` <**filename>
 
@@ -22,11 +24,9 @@ correlate_position_data.pl `[`--options`]` <**filename>
   --norm [rank | sum ]
   --force_strand
   --(no)interpolate
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -100,7 +100,7 @@ __
   Interpolate missing or zero positioned values in each window for both  reference and test data. This will improve the Pearson correlation  values, especially for sparse data. Enabled by default.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

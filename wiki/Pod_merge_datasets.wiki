@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 merge_datasets.pl
 
+A program to merge two or more data files by appending columns.
+
 ==SYNOPSIS==
 merge_datasets.pl `[`--options...`]` <**file1> <**file2> ...
 
@@ -16,11 +18,9 @@ merge_datasets.pl `[`--options...`]` <**file1> <**file2> ...
   --index <number,letter,range>
   --lookupname | --lun <text>
   --out <filename> 
-  --(no)gz
+  --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -64,7 +64,7 @@ __
   Specify the output filename. By default it uses the first file name. Required in automatic mode.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

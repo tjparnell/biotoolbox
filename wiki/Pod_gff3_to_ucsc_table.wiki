@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 gff3_to_ucsc_table.pl
 
+A script to convert a GFF3 file to a UCSC style gene table
+
 ==SYNOPSIS==
 gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
 
@@ -16,8 +18,6 @@ gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
   --gz
   --version
   --help
-}}}
-{{{
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -34,13 +34,13 @@ __
   Specify the output filename. By default it uses input file base name  appened with '`_`ucsc_genetable.txt'.
 __
   __
-__--(no)bin
+__--bin
 
 __
   Specify whether the UCSC table-specific column bin should be included as  the first column in the table. This column is reserved for internal  UCSC database use, and, if included here, will simply be populated with  0s. The default behavior is to not include it.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.  The default is to mimic the status of the input file

@@ -5,6 +5,8 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 map_oligo_data2gff.pl
 
+A script to assign processed microarray data to genomic coordinates.
+
 ==SYNOPSIS==
 map_oligo_data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--options`]`
 
@@ -16,7 +18,7 @@ map_oligo_data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--
   --name <text>
   --type <text>
   --source <text>
-  --(no)strand
+  --strand
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
@@ -24,8 +26,6 @@ map_oligo_data2gff.pl --oligo <**oligo_file.gff> --data <**oligo_data.txt> `[`--
   --version
   --help
   }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -71,10 +71,10 @@ __
   Specify the output GFF source field value. By default it is 'lab'.
 __
   __
-__--(no)strand
+__--strand
 
 __
-  Indicate whether the original strand information should (not) be kept from the  original oligo GFF file. The default is false, as most ChIP data is inherently  not stranded.
+  Indicate whether the original strand information should be kept from the  original oligo GFF file. The default is false, as most ChIP data is inherently  not stranded.
 __
   __
 __--(no)mid
@@ -95,7 +95,7 @@ __
   Specify the output filename. The default is to use the name value.
 __
   __
-__--(no)gz
+__--gz
 
 __
   Indicate whether the output file should (not) be compressed with gzip.
@@ -118,8 +118,6 @@ This script assigns data values for microarray oligo probes to positions in the 
 
 The score value may be formatted, and the GFF type, source, name, and strand  may be set to new values. It will write a GFF v.3 file, regardless of the  source oligo GFF file version.
 
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD
@@ -131,5 +129,3 @@ The score value may be formatted, and the GFF type, source, name, and strand  ma
 }}}
 This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
 
-{{{
-}}}

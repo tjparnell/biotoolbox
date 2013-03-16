@@ -5,16 +5,17 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 print_feature_types.pl
 
+A script to print out the available feature types in a database.
+
 ==SYNOPSIS==
 print_feature_types.pl <**database>
 
 {{{
+  Options:
   --db <database>
   --version
   --help
   }}}
-{{{
-}}}
 ==OPTIONS==
 The command line flags and descriptions:
 

@@ -5,11 +5,13 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 get_relative_data.pl
 
+A script to collect data in bins around a relative position.
+
 ==SYNOPSIS==
-{{{
- get_relative_data.pl --db <database> --feature <name> --out <file> [--options]
- get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
-  }}}
+get_relative_data.pl --db <**database> --feature <**name> --out <**file> `[`--options`]`
+
+get_relative_data.pl --in <**in_filename> --out <**out_filename> `[`--options`]`
+
 {{{
   Options:
   --db <name|file.gff3>
@@ -28,8 +30,8 @@ get_relative_data.pl
   --avoid
   --long
   --(no)sum
-  --(no)smooth
-  --(no)log
+  --smooth
+  --log
   --gz
   --version
   --help
@@ -139,19 +141,19 @@ __
   Indicate that the data should be averaged across all features at each position, suitable for graphing. A separate text file will  be written with the suffix '`_`summed' with the averaged data.  Default is true (sum).
 __
   __
-__--(no)smooth
+__--smooth
 
 __
   Indicate that windows without values should (not) be interpolated from neighboring values. The default is false (nosmooth).
 __
   __
-__--(no)log
+__--log
 
 __
   Dataset values are (not) in log2 space and should be treated  accordingly. Output values will be in the same space. The default is  false (nolog).
 __
   __
-__--(no)gz
+__--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.

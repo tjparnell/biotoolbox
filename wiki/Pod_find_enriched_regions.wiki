@@ -5,9 +5,13 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 find_enriched_regions.pl
 
+A script to find enriched regions in a dataset using a simple threshold.
+
 ==SYNOPSIS==
 {{{
  find_enriched_regions.pl --db <db_name> [--options]
+ }}}
+{{{
  find_enriched_regions.pl --data <file> [--options]
  }}}
 {{{
@@ -25,18 +29,16 @@ find_enriched_regions.pl
   --value [score|count|length]
   --strand [f|r]
   --deplete
-  --(no)trim
-  --(no)sort
-  --(no)feat
-  --(no)log
+  --trim
+  --sort
+  --feat
+  --log
   --genes
   --gff
   --gz
   --version
   --help
 }}}
-{{{
- }}}
 ==OPTIONS==
 The command line flags and descriptions:
 
@@ -124,7 +126,13 @@ __
 __--trim
 
 __
-  Indicate that the merged windows should be trimmed of below  threshold scores on the ends of the window. Normally when windows  are merged, there may be some data points on the ends of the  windows whose scores don't actually pass the threshold, but were  included because the entire window mean (or median) exceeded  the threshold. This step removes those data points. The default  behavior is false (notrim).
+  Indicate that the merged windows should be trimmed of below  threshold scores on the ends of the window. Normally when windows  are merged, there may be some data points on the ends of the  windows whose scores don't actually pass the threshold, but were  included because the entire window mean (or median) exceeded  the threshold. This step removes those data points. The default  behavior is false.
+__
+  __
+__--sort
+
+__
+  Indicate that the regions should be sorted by their score.  Sort order is decreasing for enriched regions and increasing  for depleted regions. Default is false (they should be  ordered mostly by coordinate).
 __
   __
 __--feat
@@ -145,10 +153,10 @@ __
   Indicate that a GFF version 3 file should be written out in addition to the data text file.
 __
   __
-__--(no)log
+__--log
 
 __
-  Flag to indicate that source data is (not) log2, and to calculate  accordingly and report as log2 data.
+  Flag to indicate that source data is log2, and to calculate  accordingly and report as log2 data.
 __
   __
 __--gz
