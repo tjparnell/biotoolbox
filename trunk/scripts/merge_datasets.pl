@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.1';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -120,8 +120,8 @@ else {
 	my $input_data1_ref = read_file(shift @ARGV);
 	my $input_data2_ref = read_file(shift @ARGV);
 	merge_two_datasets($input_data1_ref, $input_data2_ref);
-	$input_data1_ref = undef;
-	$input_data2_ref = undef;
+	undef $input_data1_ref;
+	undef $input_data2_ref;
 	
 	# merge the subsequent files
 	foreach (@ARGV) {
@@ -947,7 +947,8 @@ sub initialize_output_data_structure {
 	$output_data->{'program'}   = $data_ref->{'program'};
 	$output_data->{'db'}        = $data_ref->{'db'};
 	$output_data->{'last_row'}  = $data_ref->{'last_row'}; # should be identical
-
+	$output_data->{'headers'}   = $data_ref->{'headers'};
+	
 	# assign the filename
 	if ($outfile) {
 		# use the new output file name
