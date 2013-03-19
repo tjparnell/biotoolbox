@@ -545,8 +545,10 @@ when writing a BED or GFF format.
 Optionally specify adjustment values to adjust the reported start and 
 end coordinates of the collected regions. A negative value is shifted 
 upstream (5' direction), and a positive value is shifted downstream.
-Adjustments are made relative to the feature's strand. Adjustments 
-are ignored if a GFF file is written.
+Adjustments are made relative to the feature's strand, such that 
+a start adjustment will always modify the feature's 5'end, either 
+the feature startpoint or endpoint, depending on its orientation. 
+Adjustments are ignored if a GFF file is written.
 
 =item --out <filename>
 
