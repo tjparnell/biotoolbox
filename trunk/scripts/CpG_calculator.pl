@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Fasta;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -20,7 +19,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.1';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -40,7 +39,6 @@ unless (@ARGV) {
 my (
 	$infile,
 	$database,
-	$fasta,
 	$window,
 	$outfile,
 	$gz,
@@ -51,8 +49,7 @@ my (
 # Command line options
 GetOptions( 
 	'in=s'      => \$infile, # the input data file
-	'db=s'      => \$database, # a SeqFeature::Store database
-	'fasta=s'   => \$fasta, # path to a fasta or directory of fasta files
+	'db|fasta=s'=> \$database, # a SeqFeature::Store database or fasta file
 	'win=i'     => \$window, # window size to take
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
@@ -78,7 +75,7 @@ if ($print_version) {
 
 
 ### Check for requirements
-unless ($database or $fasta) {
+unless ($database) {
 	die " no database or fasta file given! use --help for more information\n";
 }
 unless ($window) {
@@ -101,20 +98,11 @@ unless (defined $gz) {
 
 
 ### Open the database
-my $db;
-if ($fasta) {
-	# a Fasta file, or directory of Fastas
-	$db = Bio::DB::Fasta->new($fasta) or 
-		die " unable to open fasta database! $!\n";
-}
-else {
-	# presumably a SeqFeature::Store database with sequence
-	$db = open_db_connection($database) or 
+my $db = open_db_connection($database) or 
 		die " unable to open database connection!\n";
-	my $db_ref = ref $db;
-	unless ($db_ref =~ /Bio::DB::SeqFeature::Store/) {
-		die " unsupported database type $db_ref!\n";
-	}
+my $db_ref = ref $db;
+unless ($db_ref =~ /SeqFeature|Fasta/) {
+	die " unsupported database type $db_ref!\n";
 }
 
 
@@ -178,59 +166,6 @@ printf "in %.2f minutes\n", (time - $start_time) / 60;
 
 
 ########################   Subroutines   ###################################
-
-sub get_genome_list_from_fasta_db {
-	
-	print "   Generating $window bp windows across genome\n"; 
-	
-	# generate new structure
-	my $data = generate_tim_data_structure(
-		'genome',
-		'Chromosome',
-		'Start',
-		'Stop'
-	);
-	
-	# Load basic metadata information
-	$data->{'db'}      = $fasta; # the fasta name
-	$data->{1}{'win'}  = $window; # under the Start metadata
-	$data->{1}{'step'} = $window; # for this purpose it is the same as win
-	
-	
-	# get chromosome list
-	my @chromosomes = $db->get_all_ids;
-	unless (@chromosomes) {
-		die " no sequence IDs in $fasta!\n";
-	}
-	
-	# process the chromosomes
-	foreach my $chrom (@chromosomes) {
-		
-		# get sequence object
-		my $seq = $db->get_Seq_by_id($chrom) or 
-			die " unable to get sequence object for $chrom from $fasta!\n";
-		my $length = $seq->length;
-		
-		# generate the windows
-		for (my $start = 1; $start < $length; $start += $window) {
-			
-			# calculate stop position
-			my $stop = $start + $window - 1;
-			$stop = $length if $stop > $length;
-			
-			# record
-			push @{ $data->{'data_table'} }, [
-				$chrom,
-				$start,
-				$stop,
-			];
-			$data->{'last_row'}++;
-		}
-	}
-	
-	print "   Kept " . $data->{'last_row'} . " windows\n"; 
-	return $data;
-}
 
 
 sub identify_indices {
@@ -315,20 +250,11 @@ sub process_regions {
 	}
 	
 	
-	# Identify the appropriate sequence method
-	my $get_seq;
-	if ($fasta) {
-		$get_seq = \&get_seq_from_fasta;
-	}
-	else {
-		$get_seq = \&get_seq_from_db;
-	}
-	
 	# Process the regions
 	for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 		
 		# get the region subsequence
-		my $seq = &{$get_seq}(
+		my $seq = $db->seq(
 			$data->{'data_table'}->[$row][$chr_i],
 			$data->{'data_table'}->[$row][$start_i],
 			$data->{'data_table'}->[$row][$stop_i] + 1,
@@ -385,21 +311,6 @@ sub process_regions {
 }
 
 
-sub get_seq_from_fasta {
-	# fasta database
-	# pass on chr, start, stop
-	return $db->seq(@_);
-}
-
-
-sub get_seq_from_db {
-	# assume Bio::DB::SeqFeature::Store
-	# pass on chr, start, stop
-	my $seg = $db->fetch_sequence(@_);
-}
-
-
-
 __END__
 
 =head1 NAME
@@ -415,8 +326,7 @@ CpG_calculator.pl --fasta <directory|filename> [--options...]
 CpG_calculator.pl --db <text> [--options...]
   
   Options:
-  --fasta <directory|filename>
-  --db <text>
+  --db <name|file|directory>
   --in <filename>
   --win <integer>
   --out <filename> 
@@ -430,19 +340,14 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --fasta <directory|filename>
-
-Provide the name of an uncompressed Fasta file (multi-fasta is ok) or 
-directory containing multiple fasta files representing the genomic 
-sequence. The directory must be writeable for a small index file to be 
-written. Required unless a database is provided.
-
-=item --db <text>
+=item --db <name|file|directory>
 
 Provide the name of a Bio::DB::SeqFeature::Store database from which to 
 collect the genomic sequence. A relational database name, SQLite file, or 
-GFF3 file with sequence may be provided. Required unless a Fasta file is 
-provided.
+GFF3 file with sequence may be provided. Alternatively, provide the name 
+of an uncompressed Fasta file (multi-fasta is ok) or directory containing 
+multiple fasta files representing the genomic sequence. The directory 
+must be writeable for a small index file to be written. Required.
 
 =item --in <filename>
 
