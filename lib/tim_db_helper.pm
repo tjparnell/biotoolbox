@@ -4,6 +4,7 @@ use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
 use File::Spec;
+use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
 	sum
@@ -22,7 +23,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.10';
+our $VERSION = '1.10.1';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -224,6 +225,12 @@ A self-contained database of regions represented by a BigBed (file.bb). See
 http://genome.ucsc.edu/goldenPath/help/bigBed.html for more information.
 Files may be either local or remote (prefixed with http:// or ftp://).
 
+=item Bio::DB::Fasta Database
+
+A database of fasta sequences. A single multi-fasta or a directory of 
+fasta files may be specified. The directory or parent directory must be 
+writeable by the user to write a small index file. 
+
 =back
 
 Pass the name of a relational database or the path of the database file to 
@@ -360,7 +367,7 @@ sub open_db_connection {
 	
 	# a directory, presumably of bigwig files
 	elsif (-d $database) {
-		# open using BigWigSet adaptor
+		# try opening using the BigWigSet adaptor
 		if ($BIGWIG_OK) {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
@@ -372,10 +379,20 @@ sub open_db_connection {
 			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
 				" Bio::DB::BigWigSet is not installed\n";
 		}
+		
+		# try opening with the Fasta adaptor
+		unless ($db) {
+			eval {
+				$db = Bio::DB::Fasta->new($database);
+			};
+			unless ($db) {
+				$error = " ERROR: could not open fasta directory '$database'! $!\n";
+			}
+		}
 	}
 	
 	# check for a known file type
-	elsif ($database =~ /gff3|bw|bb|bam|db|sqlite/i) {
+	elsif ($database =~ /gff3|bw|bb|bam|db|sqlite|fa|fasta/i) {
 		
 		# first check that it exists
 		if (-e $database and -r _) {
@@ -454,6 +471,16 @@ sub open_db_connection {
 				else {
 					$error = " BigWig database cannot be loaded because\n" . 
 						" Bio::DB::BigWig is not installed\n";
+				}
+			}
+			
+			# a Fasta File
+			elsif ($database =~ /\.fa(?:sta)?$/i) {
+				eval {
+					$db = Bio::DB::Fasta->new($database);
+				};
+				unless ($db) {
+					$error = " ERROR: could not open fasta file '$database'! $!\n";
 				}
 			}
 		}
@@ -2172,7 +2199,7 @@ sub get_region_dataset_hash {
 This subroutine will collect a list of chromosomes or reference sequences 
 in a Bio::DB database and return the list along with their sizes in bp. 
 Many BioPerl-based databases are supported, including 
-Bio::DB::SeqFeature::Store, Bio::DB::Sam, Bio::DB::BigWig, 
+Bio::DB::SeqFeature::Store, Bio::DB::Fasta, Bio::DB::Sam, Bio::DB::BigWig, 
 Bio::DB::BigWigSet, and Bio::DB::BigBed, or any others that support the 
 "seq_ids" method. See the L<open_db_connection> subroutine for more 
 information.
@@ -2286,6 +2313,24 @@ sub get_chromosome_list {
 			if (exists $excluded_chr_lookup{$chr} ) {
 				next;
 			}
+			
+			# store
+			push @chrom_lengths, [ $chr, $length ];
+		}
+	}
+	
+	# Fasta
+	elsif (ref $db eq 'Bio::DB::Fasta') {
+		for my $chr ($db->get_all_ids) {
+			
+			# check for excluded chromosomes
+			if (exists $excluded_chr_lookup{$chr} ) {
+				next;
+			}
+			
+			# get chromosome size
+			my $seq = $db->get_Seq_by_id($chr);
+			my $length = $seq ? $seq->length : 0;
 			
 			# store
 			push @chrom_lengths, [ $chr, $length ];
