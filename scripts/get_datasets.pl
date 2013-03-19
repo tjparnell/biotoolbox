@@ -1697,12 +1697,12 @@ get_datasets.pl [--options...] [<filename>]
   --strand [all | sense | antisense]
   --exons
   --extend <integer>
-  --start <integer>
-  --stop <integer>
-  --fstart <decimal>
-  --fstop <decimal>
-  --limit <integer>
+  --start=<integer>
+  --stop=<integer>
+  --fstart=<decimal>
+  --fstop=<decimal>
   --pos [5 | m | 3]
+  --limit <integer>
   --win <integer>
   --step <integer>
   --force_strand
@@ -1862,39 +1862,27 @@ Default is false.
 Optionally specify the bp extension that will be added to both sides of the 
 feature's region.
 
-=item --start <integer>
+=item --start=<integer>
 
-Optionally specify the start position of the region to collect values relative 
-to the feature start. Prefix a negative sign to specify 
-an upstream position. Specify a negative value on the command line with an 
-equals sign, e.g. "--start=-300'. Must be combined with "--stop".
+=item --stop=<integer>
 
-=item --stop <integer>
+Optionally specify adjustment values to adjust the region to collect values 
+relative to the feature position defined by the --pos option (default is 
+the 5' position). A negative value is shifted upstream (5' direction), 
+and a positive value is shifted downstream. Adjustments are always made 
+relative to the feature's strand. Both options must be applied; one is 
+not allowed.
 
-Optionally specify the stop position of the region to collect values relative 
-to the feature start. Must be combined with "--start".
+=item --fstart=<number>
 
-=item --fstart <number>
+=item --fstop=<number>
 
-Optionally specify the fractional start position of the region to collect 
-values relative to the feature start (or end if specified). The fraction is 
-based on the feature's region length. The fraction should be presented as a 
-decimal number, e.g. 0.25. Prefix a negative sign to specify an upstream 
-position. Must be combined with "--fstop".
-
-=item --fstop <number>
-
-Optionally specify the fractional stop position of the region to collect 
-values relative to the feature start (or end if specified). The fraction is 
-based on the feature's region length. The fraction should be presented as a 
-decimal number, e.g. 0.25. A value > 1 would include the region downstream 
-of the feature. Must be combined with "--fstart".
-
-=item --limit <integer>
-
-Optionally specify the minimum size limit for subfractionating a feature's 
-region. Used in combination with fstart and fstop to prevent taking a 
-subregion from a region too small to support it. The default is 1000 bp.
+Optionally specify the fractional start and stop position of the region to 
+collect values as a function of the feature's length and relative to the 
+specified feature position defined by the --pos option (default is 5'). The 
+fraction should be presented as a decimal number, e.g. 0.25. Prefix a 
+negative sign to specify an upstream position. Both options must be 
+applied; one is not allowed. 
 
 =item --pos [5 | m | 3]
 
@@ -1904,6 +1892,12 @@ and "fstop" options. Three values are accepted: "5" indicates the
 5' prime end is used, "3" indicates the 3' end is used, and "m" 
 indicates the middle of the feature is used. The default is to 
 use the 5' end, or the start position of unstranded features. 
+
+=item --limit <integer>
+
+Optionally specify the minimum size limit for subfractionating a feature's 
+region. Used in combination with fstart and fstop to prevent taking a 
+subregion from a region too small to support it. The default is 1000 bp.
 
 =item --win <integer>
 
