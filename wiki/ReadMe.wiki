@@ -72,7 +72,7 @@ Please contact the author for bugs. Feature requests are also accepted, within t
 	
 	* Up to date list of BioToolBox [ProgramList programs]
 	
-	* Setting up a Bio::DB::SeqFeature::Store [LoadingDatabase database]
+	* Setting up a Bio::DB::SeqFeature::Store [WorkingWithDatabases database]
 	
 	* Description of supported data [DataFileFormats file formats]
 	

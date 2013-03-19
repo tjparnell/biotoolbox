@@ -13,7 +13,7 @@ data2fasta.pl `[`--options...`]` <**filename>
 {{{
   Options:
   --in <filename>
-  --fasta <filename>
+  --db <name|file|directory>
   --id <index>
   --seq <index>
   --desc <index>
@@ -34,10 +34,10 @@ __
   Specify the input data file. The file should be a tab-delimited text file  with columns representing the sequence id or name, sequence, description,  chromosome, start, stop, and/or strand information. The file may be  compressed with gzip.
 __
   __
-  __-item --fasta <**filename|directory>
+__--db <**name|file|directory>
+
 __
-  __
-  Optionally specify the genomic fasta file or a directory of fasta files  from which to retrieve the sequence when only chromosome, start, and  stop information is provided.
+  Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. A relational database name, SQLite file, or  GFF3 file with sequence may be provided. Alternatively, provide the name  of an uncompressed Fasta file (multi-fasta is ok) or directory containing  multiple fasta files representing the genomic sequence. The directory  must be writeable for a small index file to be written. The database  name may be obtained from the input file metadata. Required.
 __
   __
 __--id <**index>
@@ -105,7 +105,7 @@ This program will take a tab-delimited text file (tim data formated file,  for e
 
 If the name and sequence is already present in the file, it will generate  the fasta file directly from the file content.
 
-If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from one or more genomic fasta files. The fasta file(s) must  be in a writeable directory to create an index for efficient retrieval.
+If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from a database, either a Bio::DB::!SeqFeature**::Store database,  a genomic sequence multi-fasta, or a directory of multiple fasta files.
 
 ==AUTHOR==
 {{{

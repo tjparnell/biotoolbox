@@ -61,7 +61,7 @@ For two input files, you should get three output files: `strain1_unique.vcf`, `s
 ==Identifying novel mutations==
 Now comes the fun part of identifying which sequence variants overlap which genomic annotations (genes) and, if so, alter coding potential. The *BioToolBox* script [Pod_locate_SNPs locate_SNPs.pl] will do this.
 
-You will need a Bio::DB::SeqFeature::Store formatted database containing the reference genome annotation. See [LoadingDatabase Loading a Database] for more information. For small genomes, it is possible to load the annotation GFF3 file into an in-memory database.
+You will need a Bio::DB::SeqFeature::Store formatted database containing the reference genome annotation. See [WorkingWithDatabases Working with Databases] for more information. For small genomes, it is possible to load the annotation GFF3 file into an in-memory database.
 
 Run the [Pod_locate_SNPs locate_SNPs.pl] script on each of your strain's unique VCF files. Multiple input files may be specified at once.
 <pre>

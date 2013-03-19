@@ -3,7 +3,7 @@
 
 =HOWTO: Generating a feature list and collecting data=
 
-This is an example guide for collecting features and dataset from a Bio::DB::SeqFeature::Store database housing genomic features and a microarray data set using *biotoolbox* scripts. This presumes that the database is already set up and loaded. You can read more about [LoadingDatabase loading a database].
+This is an example guide for collecting features and dataset from a Bio::DB::SeqFeature::Store database housing genomic features and a microarray data set using *biotoolbox* scripts. This presumes that the database is already set up and loaded. You can read more about [WorkingWithDatabases loading a database].
 
 ===Notes on running the *biotoolbox* scripts===
 	* All of the scripts are designed to be run from the scripts directory. Most require helper modules found in the lib directory, which the script should be able to find on its own if the directory structure is not changed.
