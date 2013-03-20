@@ -281,6 +281,7 @@ data2fasta.pl [--options...] <filename>
   --chr <index>
   --start <index>
   --stop <index>
+  --strand <index>
   --out <filename> 
   --gz
   --version
@@ -339,6 +340,11 @@ automatically determined from the column header.
 Optionally specify the index for the stop position column. It may be 
 automatically determined from the column header.
 
+=item --strand <index>
+
+Optionally specify the index for the strand column. It may be 
+automatically determined from the column header.
+
 =item --out <filename>
 
 Specify the output filename. By default it uses the input file basename.
@@ -371,6 +377,8 @@ If only genomic position information (chromosome, start, stop, and
 optionally strand) is present in the file, then the sequence will be 
 retrieved from a database, either a Bio::DB::SeqFeature::Store database, 
 a genomic sequence multi-fasta, or a directory of multiple fasta files. 
+If strand information is provided, then the sequence reverse complement 
+is returned for reverse strand coordinates.
 
 =head1 AUTHOR
 
