@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.1';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -535,7 +535,7 @@ sub write_gff_data {
 	# a subroutine to progressively write out the converted gff data
 	
 	# convert to gff
-	my %arguments = (
+	my @arguments = (
 		'data'     => \%output_data,
 		'chromo'   => $chr_index,
 		'start'    => $start_index,
@@ -552,17 +552,17 @@ sub write_gff_data {
 	);
 	if ($unique) {
 		# we've generated a new name index
-		$arguments{'name'} = $name_index;
+		push @arguments, 'name' => $name_index;
 	}
 	elsif (defined $name_index) {
 		# supplied name index
-		$arguments{'name'} = $name_index;
+		push @arguments, 'name' => $name_index;
 	}
 	else {
 		# text name
-		$arguments{'name'} = $name;
+		push @arguments, 'name' => $name;
 	}
-	convert_genome_data_2_gff_data( \%arguments ) or 
+	convert_genome_data_2_gff_data( @arguments ) or 
 		die " Unable to convert to GFF format!\n";
 	
 	# format the numbers
