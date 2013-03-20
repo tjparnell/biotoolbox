@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.9.7';
+my $VERSION = '1.10.1';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -386,7 +386,13 @@ sub fetch_files_by_ftp {
 			push @fetched_files, $new_file;
 		}
 		else {	
-			warn "Cannot get file $file: " . $ftp->message;
+			my $message = $ftp->message;
+			if ($message =~ /no such file/i) {
+				print "   file unavailable\n";
+			}
+			else {
+				warn $message;
+			}
 		}
 	}
 	$ftp->quit;
