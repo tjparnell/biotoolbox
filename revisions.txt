@@ -1,5 +1,12 @@
 ######## BioToolBox revision history #############
 
+v.1.10.1 (svn 568)
+	- Added support for Bio::DB::Fasta in the main BioToolBox library, and added the support to scripts data2fasta.pl and CpG_calculator.pl. Any BioToolBox program that requires chromosome information or sequence can now use a genomic multi-fasta or directory of fasta files in the --db option.
+	- Fixed critical error in data2gff.pl that prevented files from being converted to GFF format.
+	- Fixed critical error merge_datasets.pl that prevented column headers from being written to the output file.
+	- Made the warning about unavailable files on the UCSC FTP server less scary in the script ucsc_table2gff3.pl.
+	- Updated and clarified some script documentation.
+
 v.1.10 (svn 559)
 	- Significantly improved performance when collecting data from Bam files by using a low level API. Improvements of at least 2X may be realized.
 	- Significantly improved the performance of the bam2wig.pl script by at least 2X. Added a new option of recording extended regions across the predicted fragment based on empirically determined shift values. Sampling to determine shift values has been increased. BedGraph files are now written more efficiently. Maximum number of identical reads are now enforced.
