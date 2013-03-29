@@ -253,6 +253,9 @@ Some basic modules to upgrade or install right away (but probably not absolutely
 	* `CPAN`
 	* `Module::Build`
 	* `ExtUtils::MakeMaker`
+	* `Test::More`
+	* `Data::Stag`
+The last two are prerequisites for BioPerl, see below.
 
 ===Trouble shooting	Perl module installation===
 Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
@@ -270,11 +273,12 @@ Finally, it's possible that there is an error in the test that's preventing the 
 ===Install BioPerl===
 Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`C/CJ/CJFIELDS/BioPerl-1.6.901.tar.gz`), which should be adequate for most purposes, or obtain the latest development version from GitHub. 
 
-There are dozens of prerequisite modules for bioperl, but many are not absolutely necessary. If you install through CPAN, which is the easiest method, it should be able to automatically install the prerequisites for you. You can select which ones you want to install. 
+Bioperl is a complex distribution, containing hundreds of modules, some with external dependencies, and numerous Perl scripts. It will warn you about missing prerequisites; Pay attention to the required ones, while the recommended ones can usually be safely ignored. The installation routine will ask you several questions. In general, the external dependencies are not necessary (you'll find out later if you need one when something doesn't work), internet-based tests are not necessary, and it doesn't hurt to install all of the scripts (some are useful). 
 
 If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/master bioperl version], follow the instructions for installing, but it should go something like the following. Note that you will have to install the prerequisites manually before building bioperl.
 <pre>
 	perl Build.PL
+	./Build
 	./Build test
 	sudo ./Build install
 </pre>
@@ -295,7 +299,7 @@ There are a few additional modules that are required by the BioToolBox scripts. 
 	* `GD::Graph::smoothlines`
 
 ====Errors regarding GD====
-Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
+Note that on Mac OS X using GD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
 
 ==Installing GBrowse==
 [http://gmod.org/wiki/GBrowse GBrowse] is a web-based generic genome browser that can display genome annotation and genomic data from microarray or next generation sequencing. Before you begin, you will likely need to install a few more Perl modules. You can install them through CPAN as above.

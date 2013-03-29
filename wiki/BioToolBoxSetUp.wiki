@@ -99,21 +99,30 @@ Try installing a few modules. Here are some basic ones to try first
 	* `CPAN`
 	* `Module::Build`
 	* `ExtUtils::MakeMaker`
+	* `Test::More`
+	* `Data::Stag`
+The last two are prerequisites for BioPerl, see below.
 
 ==BioToolBox prerequisite modules==
 Now that you have some basic Perl modules installed, let's go for some others that are required for some or all of the *BioToolBox* programs. There are two ways to install these.
 
-First, you can run the [Pod_check_dependencies check_dependencies.pl] script in the root directory of the *BioToolBox* package. This will use CPAN to check for known dependencies, compare them with what is available from CPAN, and offer to install them for you. Note that dependencies may need to be taken care of manually.
+First, you can run the [Pod_check_dependencies check_dependencies.pl] script in the root directory of the *BioToolBox* package. This will use CPAN to check for known dependencies, compare them with what is available from CPAN, and offer to install them for you. Note that some external dependencies may need to be taken care of manually.
 
 Second, you can install them manually through the CPAN shell. Here is a list of basic requirements.
 	* `Config::Simple`
 	* `IO::Zlib`
 	* `Statistics::Lite`
 	* `Statistics::Descriptive`
-	* `Archive::Zip`
-	* `Algorithm::Cluster`
+	* BioPerl (see below)
 
-Not all of the modules are required. Only the first one is absolutely required, the next three are important for most modules, and the last two are required for specific modules. 
+There are other modules recommended by *BioToolBox*, but they are only required for specific scripts or functions.
+
+==Installing Bioperl==
+Bioperl is the primary distribution from which most of the *BioToolBox* programs are based on. All of the data collection scripts rely on it. Hence, this is a major (but not absolute) requirement. 
+
+Your Linux operating system's package manager (if it has one) may already have a package for bioperl which you could install. This will install it in the system libraries. With that said, I generally prefer to install through the CPAN Shell. If you're installing locally, this may be your only option. You could also install the latest bioperl-live modules available from the [http://www.bioperl.org/wiki/Main_Page bioperl] developer's site. 
+
+Bioperl is a complex distribution, containing hundreds of modules, some with external dependencies, and numerous Perl scripts. It will warn you about missing prerequisites; Pay attention to the required ones, while the recommended ones can usually be safely ignored. The installation routine will ask you several questions. In general, the external dependencies are not necessary (you'll find out later if you need one when something doesn't work), internet-based tests are not necessary, and it doesn't hurt to install all of the scripts (some are useful). 
 
 ==Installing database modules==
 If you intend to use a database for storing genome annotation, then a relational database is in order. The *BioToolBox* programs relies on the [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema. This can be utilized on a SQLite, MySQL, or PostgreSQL database. A memory database is also available, although it's usefulness is quite limited. The SQLite database is a safe, simple alternative without the overhead and complexity. The others will provide much better performance, especially in multi-user environments.
@@ -128,19 +137,10 @@ Once a database is installed, you can then install the appropriate Perl module d
 
 If you do not need or want to install a database, that's OK too. Most *BioToolBox* programs happily take BED style input files with genomic coordinates, rather than retrieving coordinates from genomic annotation stored in the database.
 
-==Installing Bioperl==
-Bioperl is the primary distribution from which most of the *BioToolBox* programs are based on. All of the data collection scripts rely on it. Hence, this is a major (but not absolute) requirement. 
-
-Your Linux operating system's package manager (if it has one) may already have a package for bioperl which you could install. This will install it in the system libraries. Mac OS X does not have a package manager (the App Store doesn't count here), but you could use [http://www.finkproject.org/ Fink] ([http://www.macports.org/ MacPorts] currently does not have bioperl).
-
-With that said, I generally prefer to install through the CPAN Shell. If you're installing locally, this may be your only option. You could also install the latest bioperl-live modules available from the [http://www.bioperl.org/wiki/Main_Page bioperl] developer's site. 
-
-Bioperl is a complex distribution, containing hundreds of modules, some external dependencies, and numerous Perl scripts. The installation routine will ask you several questions. In general, the external dependencies are not necessary (you'll find out later if you need one when something doesn't work), internet-based tests are not necessary, and it doesn't hurt to install all of the scripts (some are useful).
-
 ==Installing Graphing Modules==
 There are a few *BioToolBox* scripts that allow you to generate simple plots or graphs as PNG files. These rely on the [http://search.cpan.org/dist/GD/ GD] Perl module, which, in turn, rely on [http://www.boutell.com/gd/ GD] libraries. These are also required for [http://gmod.org/wiki/GBrowse GBrowse], if you intend to install that as well. 
 
-If the GD libraries are not installed already (most Linux distributions should have them), you can readily obtain them through your package manager. For Mac OS X, you'll have to install from source (good luck), use [http://www.finkproject.org/ Fink], or obtain pre-compiled packages from [http://sourceforge.net/projects/gmod/files/Generic%20Genome%20Browser/libgd-MacOSX/ here]. 
+If the GD libraries are not installed already (most Linux distributions should have them), you can readily obtain them through your package manager. For Mac OS X, you'll have to install from source (good luck), use [http://www.finkproject.org/ Fink], or obtain pre-compiled packages from [http://sourceforge.net/projects/gmod/files/Generic%20Genome%20Browser/libgd-MacOSX/ here]. For more information about Mac OS X, see [SetupForMacOSX#Installing_GD_Libraries Installing GD Libraries].
 
 Once the GD libraries are installed, you can then install the GD Perl modules using the CPAN Shell. 
 	* `GD`
