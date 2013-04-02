@@ -433,7 +433,7 @@ GBrowse creates a lot of small temporary image files. The built-in OS X scripts 
 </pre>
 
 An even better option is to have `launchd`, the OS X equivalent of `init.d` and `cron` in Linux, run it periodically for you. Create a new text file, `org.gmod.gbrowse_clean.plist`, and paste the following contents into it. 
-<pre>
+<code language="xml">
 	<?xml version="1.0" encoding="UTF-8"?>
 	<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 	<plist version="1.0">
@@ -455,7 +455,7 @@ An even better option is to have `launchd`, the OS X equivalent of `init.d` and 
 		</dict>
 	</dict>
 	</plist>
-</pre>
+</code>
 Save the file in `/Library/LaunchDaemons/`, make it owned by root, and load it by running the following commands.
 <pre>
 	sudo chown root:wheel /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
