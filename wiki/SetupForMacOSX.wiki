@@ -29,6 +29,7 @@
 			# [SetupForMacOSX#FastCGI_Permissions FastCGI Permissions]
 		# [SetupForMacOSX#Setting_up_GBrowse_user_accounts Setting up GBrowse user accounts]
 			# [SetupForMacOSX#Setting_up_PAM_Authentication_with_OS_X_accounts Setting up PAM Authentication with OS X accounts]
+		# [SetupForMacOSX#Cleaning_up_after_GBrowse Cleaning up after GBrowse]
 	# [SetupForMacOSX#Installing_Bam_file_support Installing Bam file support]
 		# [SetupForMacOSX#Installing_Samtools Installing Samtools]
 		# [SetupForMacOSX#Installing_Bio-Samtools Installing Bio-Samtools]
@@ -425,6 +426,43 @@ To add login hints and help text, find the `PamAuthenticate:plugin` stanza and e
 
 Save the file, restart the Apache web server, reload the GBrowse page, and you should now have login link in the upper right corner. Provide your Mac OS X user account credentials to login. 
 
+===Cleaning up after GBrowse===
+GBrowse creates a lot of small temporary image files. The built-in OS X scripts for cleaning your Mac won't touch these, and over time they will really pile up and eventually create havoc on your system. GBrowse comes with a script, `gbrowse_clean.pl` which will read the settings in the main `GBrowse.conf` configuration file and clean up old temporary files, expired sessions, and old untouched uploads. The trick is running it as the Apache user so that it will have ownership over the files and perform its duties. You can run it manually like so:
+<pre>
+	sudo -u _www /usr/local/bin/gbrowse_clean.pl
+</pre>
+
+An even better option is to have `launchd`, the OS X equivalent of `init.d` and `cron` in Linux, run it periodically for you. Create a new text file, `org.gmod.gbrowse_clean.plist`, and paste the following contents into it. 
+<pre>
+	<?xml version="1.0" encoding="UTF-8"?>
+	<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+	<plist version="1.0">
+	<dict>
+		<key>Label</key>
+		<string>org.gmod.gbrowse_clean</string>
+		<key>UserName</key>
+		<string>_www</string>
+		<key>Program</key>
+		<string>/usr/local/bin/gbrowse_clean.pl</string>
+		<key>StartCalendarInterval</key>
+		<dict>
+			<key>Hour</key>
+			<integer>22</integer>
+			<key>Minute</key>
+			<integer>0</integer>
+			<key>Weekday</key>
+			<integer>0</integer>
+		</dict>
+	</dict>
+	</plist>
+</pre>
+Save the file in `/Library/LaunchDaemons/`, make it owned by root, and load it by running the following commands.
+<pre>
+	sudo chown root:wheel /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
+	sudo /bin/launchctl load /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
+</pre>
+You can also simply reboot the computer to load the job. It should now automatically clean up your GBrowse files at 10:00 PM every Sunday. Messages concerning its execution will be reported in the system log. 
+
 ==Installing Bam file support==
 Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and BioToolBox.
 
@@ -551,6 +589,7 @@ Ensembl publishes a new Core API with each database release. If you are not seei
 
 ==Additional Tools==
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or BioToolBox. These are simply programs that I have found to be helpful in my own work.
+	* [http://www.gnu.org/software/parallel/ GNU parallel] is an incredible tool for running command-line programs in a parallel fashion. This is especially useful for running many single-threaded programs (most Perl scripts, *BioToolBox* included) in a timely fashion on a multi-core machine, particularly when running the same program over a series of parameters or files. Writing multi-level `for` loops in Bash are no longer necessary. It can be installed through Fink. 
 	* [http://www.novocraft.com Novocraft's] novoalign alignment tool. This is quite useful in aligning short sequence tags, generated for example by Illumina next-generation sequencing, to the genome. While it's not a particularly fast aligner, it is quite thorough by tolerating mismatches and gaps, perfect for identifying SNPs and mutations. It handles paired-end, RNA sequencing, and bisulfite sequencing.
 	* An alternative and fast aligner is [http://bowtie-bio.sourceforge.net/ bowtie]. This is ideal for ChIP-Seq, where exact sequence alignments are not of the highest importance but rather identifying location. 
 	* [http://bonsai.hgc.jp/~mdehoon/software/cluster/software.htm Cluster] is an extremely useful program to generate heirarchical and k-means clusters. This is useful in identifying groups of features or genes based on collected data, for example microarray or ChIP-Seq data. This is a Java GUI program capable of many different clustering algorithms. For simply k-means clustering, you can also check out my BioToolBox script [Pod_run_cluster run_cluster.pl].
