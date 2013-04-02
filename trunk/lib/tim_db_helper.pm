@@ -23,7 +23,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.10.1';
+our $VERSION = '1.10.2';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -875,7 +875,24 @@ sub verify_or_request_feature_types {
 				}
 				
 				# validate the given dataset
-				if (exists $db_features{$dataset}) {
+				# user may have requested two or more features to be merged
+				# these should be combined with an ampersand
+				# check each one 
+				my $check = 0;
+				foreach my $d (split /&/, $dataset) {
+					# validate this dataset
+					if (exists $db_features{$d}) {
+						$check++;
+					}
+					else {
+						# at least one of these is not good, fail check
+						$check = 0;
+						last;
+					}
+				}
+				
+				# report the verification
+				if ($check) {
 					push @good_datasets, $dataset;
 				}
 				else {
