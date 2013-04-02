@@ -434,27 +434,27 @@ GBrowse creates a lot of small temporary image files. The built-in OS X scripts 
 
 An even better option is to have `launchd`, the OS X equivalent of `init.d` and `cron` in Linux, run it periodically for you. Create a new text file, `org.gmod.gbrowse_clean.plist`, and paste the following contents into it. 
 {{{
-	<?xml version="1.0" encoding="UTF-8"?>
-	<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-	<plist version="1.0">
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>Label</key>
+	<string>org.gmod.gbrowse_clean</string>
+	<key>UserName</key>
+	<string>_www</string>
+	<key>Program</key>
+	<string>/usr/local/bin/gbrowse_clean.pl</string>
+	<key>StartCalendarInterval</key>
 	<dict>
-		<key>Label</key>
-		<string>org.gmod.gbrowse_clean</string>
-		<key>UserName</key>
-		<string>_www</string>
-		<key>Program</key>
-		<string>/usr/local/bin/gbrowse_clean.pl</string>
-		<key>StartCalendarInterval</key>
-		<dict>
-			<key>Hour</key>
-			<integer>22</integer>
-			<key>Minute</key>
-			<integer>0</integer>
-			<key>Weekday</key>
-			<integer>0</integer>
-		</dict>
+		<key>Hour</key>
+		<integer>22</integer>
+		<key>Minute</key>
+		<integer>0</integer>
+		<key>Weekday</key>
+		<integer>0</integer>
 	</dict>
-	</plist>
+</dict>
+</plist>
 }}}
 Save the file in `/Library/LaunchDaemons/`, make it owned by root, and load it by running the following commands.
 <pre>
