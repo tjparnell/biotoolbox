@@ -19,7 +19,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.10';
+our $VERSION = '1.10.2';
 
 
 
@@ -461,7 +461,9 @@ sub find_column_index {
 	# the $name variable will be used as a regex in identifying the name
 	# fix it so that it will possible accept a # character at the beginning
 	# without a following space, in case the first column has a # prefix
-	$name =~ s/ \A (\^?) (.+) \Z /$1#?$2/x;
+	# also place the remainder of the text in a non-capturing parentheses for 
+	# grouping purposes while maintaining the anchors
+	$name =~ s/ \A (\^?) (.+) (\$?)\Z /$1#?(?:$2)$3/x;
 	
 	# walk through each column index
 	my $index;
