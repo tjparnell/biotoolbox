@@ -23,7 +23,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -445,17 +445,18 @@ sub verify_peak_position {
 	# coordinates
 	my ($chromo, $scan_start, $peak_position) = @_;
 	
-	# collect the raw data for +/- 35 bp around the supposed peak position
-	# this distance is arbitrarily about 1/2 nucleosome size
+	# collect the raw data for +/- 50 bp around the supposed peak position
+	# this distance is arbitrarily about 2/3rd nucleosome size
+	# tried 1/2 and still getting offset nucleosomes
 	# limit this by not going further backwards than the original window scan 
 	# start - do not want to overlap previous nucleosome
 	my %pos2score = get_region_dataset_hash(
 			'db'       => $db,
 			'dataset'  => $dataset,
 			'chromo'   => $chromo,
-			'start'    => $peak_position - 35 < $scan_start ? $scan_start : 
-							$peak_position - 35,
-			'stop'     => $peak_position + 35,
+			'start'    => $peak_position - 50 < $scan_start ? $scan_start : 
+							$peak_position - 50,
+			'stop'     => $peak_position + 50,
 			'value'    => 'score',
 			'absolute' => 1,
 	);
