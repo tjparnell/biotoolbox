@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -551,27 +551,37 @@ sub delete_function {
 sub rename_function {
 	# this subroutine will re-name a dataset name
 	
-	# determine or request dataset index
-	my $index = _request_index(
-		" Enter the index number of the dataset to rename  "
-	);
-	if ($index == -1) {
-		warn " unknown index number. nothing done\n";
-		return;
-	}
-		
-	# ask for new name
-	my $newname;
-	if ($function and $opt_name) {
-		# new name is specified from the command line during automatic execution
-		# use this global value
-		$newname = $opt_name;
+	# determine or request dataset index and newname
+	my ($index, $newname);
+	if (scalar @_ == 2) {
+		# passed from internal subroutine
+		$index   = $_[0];
+		$newname = $_[1];
 	}
 	else {
-		# request a new name from the user
-		print " Enter a new name...  ";
-		$newname = <STDIN>;
-		chomp $newname;
+		# request from user
+		
+		# index
+		$index = _request_index(
+			" Enter the index number of the dataset to rename  "
+		);
+		if ($index == -1) {
+			warn " unknown index number. nothing done\n";
+			return;
+		}
+		
+		# name
+		if ($function and $opt_name) {
+			# new name is specified from the command line during automatic execution
+			# use this global value
+			$newname = $opt_name;
+		}
+		else {
+			# request a new name from the user
+			print " Enter a new name...  ";
+			$newname = <STDIN>;
+			chomp $newname;
+		}
 	}
 	
 	# assign new name
@@ -706,9 +716,17 @@ sub percentile_rank_function {
 	# this subroutine will convert a dataset into a percentile rank
 
 	# request datasets
-	my @indices = &_request_indices(
-		" Enter the index number(s) of the dataset(s) to convert to percentile rank  "
-	);
+	my @indices;
+	if (@_) {
+		# provided from an internal subroutine
+		@indices = @_;
+	}
+	else {
+		# otherwise request from user
+		@indices = _request_indices(
+			" Enter the index number(s) of the dataset(s) to convert to percentile rank  "
+		);
+	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -2044,9 +2062,17 @@ sub log2_function {
 	# this subroutine will convert dataset values to log2 space
 	
 	# request datasets
-	my @indices = _request_indices(
-		" Enter the index number(s) of the dataset(s) to convert to log2  "
-	);
+	my @indices;
+	if (@_) {
+		# provided from an internal subroutine
+		@indices = @_;
+	}
+	else {
+		# otherwise request from user
+		@indices = _request_indices(
+			" Enter the index number(s) of the dataset(s) to convert to log2  "
+		);
+	}
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -3496,11 +3522,6 @@ sub export_treeview_function {
 	}
 	
 	# Identify the manipulations requested
-	# choices include 
-		# cg - median center genes
-		# cd - median center datasets
-		# zd - calculate Z-score for the dataset
-		# n0 - convert nulls to 0.0
 	my @manipulations;
 	if ($function) {
 		# automatic function, use the command line target option
@@ -3512,6 +3533,8 @@ sub export_treeview_function {
 		print "   cg - median center features (genes)\n";
 		print "   cd - median center datasets\n";
 		print "   zd - convert dataset to Z-scores\n";
+		print "   pd - convert dataset to percentile rank\n";
+		print "   L2 - convert dataset to log2\n";
 		print "   n0 - convert null values to 0\n";
 		print " Enter the manipulation(s) in order of desired execution   ";
 		my $answer = <STDIN>;
@@ -3521,13 +3544,21 @@ sub export_treeview_function {
 	
 	
 	### First, delete extraneous datasets or columns
-	# we will perform a reordering of the columns
+	# the CDT format for Treeview expects a unique ID and NAME column
+	# we will duplicate the first column
+	unshift @datasets, $datasets[0];
+	
+	# perform a reordering of the columns
 	reorder_function(@datasets);
+	
+	# rename the first two columns
+	rename_function(0, 'ID');
+	rename_function(1, 'NAME');
 	
 	# we now have just the columns we want
 	# reset the dataset indices to what we currently have
-	# name should be index 0
-	@datasets = (1 .. $main_data_ref->{'number_columns'} - 2);
+	# name and ID should be index 0 and 1
+	@datasets = (2 .. $main_data_ref->{'number_columns'} - 3);
 	
 	
 	### Second, perform dataset manipulations
@@ -3549,6 +3580,16 @@ sub export_treeview_function {
 			print " converting datasets to Z-scores....\n";
 			zscore_function(@datasets);
 		}
+		elsif (/^pd$/i) {
+			# convert dataset to percentile rank
+			print " converting datasets to percentile ranks....\n";
+			percentile_rank_function(@datasets);
+		}
+		elsif (/^l2$/i) {
+			# convert dataset to log2 values
+			print " converting datasets to log2 values....\n";
+			log2_function(@datasets);
+		}
 		elsif (/^n0$/i) {
 			# convert nulls to 0
 			print " converting null values to 0.0....\n";
@@ -3562,16 +3603,18 @@ sub export_treeview_function {
 	
 	
 	### Third, export a simple file
-	unless ($outfile) {
+	if ($outfile) {
+		unless ($outfile =~ /\.cdt$/i) {
+			# make sure it has .cdt extension
+			$outfile .= '.cdt';
+		}
+	}
+	else {
 		# generate file name
-		$gz = 0;
 		$outfile = $main_data_ref->{'path'} . 
 			$main_data_ref->{'basename'} . '.cdt';
 	}
-	unless ($outfile =~ /\.\w{2,3}$/) {
-		# make sure it has an extension, prefer .cdt
-		$outfile .= '.cdt';
-	}
+	$gz = 0;
 	export_function();
 	
 	
@@ -4752,7 +4795,7 @@ use the same name!
 Export the data into a format compatible with the Treeview program for 
 visualizing the data either as a heatmap or a dendrogram (when combined 
 with the Cluster program to generate the clusters or tree). Specify the 
-columns containing a unique name and the columns to be analyzed (use 
+columns containing a unique name and the columns to be analyzed (e.g. 
 --index <name>,<start-stop>). Extraneous columns are removed. 
 Additional manipulations on the columns may be performed prior to 
 exporting. These may be chosen interactively or using the codes 
@@ -4760,7 +4803,9 @@ listed below and specified using the --target option.
   
   cg - median center features (rows)
   cd - median center datasets (columns)
-  zd - convert column to Z-scores
+  zd - convert columns to Z-scores
+  pd - convert columns to percentile ranks
+  L2 - convert values to log2
   n0 - convert nulls to 0.0
 
 A simple Cluster data text file is written (default file name 
