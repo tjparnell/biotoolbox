@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.10';
+our $VERSION = '1.10.2';
 
 # check for IO gzip support
 our $GZIP_OK = 0;
@@ -2660,11 +2660,11 @@ sub write_summary_data {
 	
 	# Write summed data
 	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
-	my $written_file = write_tim_data_file( {
+	my $written_file = write_tim_data_file(
 		'data'      => $summed_data,
 		'filename'  => $outfile . '_summed',
 		'gz'        => 0,
-	} );
+	);
 	
 	# Return
 	if ($written_file) {
