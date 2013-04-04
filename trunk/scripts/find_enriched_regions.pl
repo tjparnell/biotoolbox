@@ -27,7 +27,7 @@ use tim_file_helper qw(
 );
 use tim_db_helper::config;
 # use Data::Dumper;
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -62,10 +62,12 @@ my (
 	$feat,
 	$genes,
 	$trim,
+	$min_size,
 	$sort,
 	$log,
 	$html,
 	$gff,
+	$gz,
 	$help,
 	$print_version,
 	$debug,
@@ -89,9 +91,11 @@ GetOptions(
 	'feat!'     => \$feat, # collect feature information
 	'genes'     => \$genes, # indicate a text file of overlapping genes shoudl be written
 	'trim!'     => \$trim, # do trim the windows
+	'min=i'     => \$min_size, # do not trim below this size
 	'sort!'     => \$sort, # sort the windows by score
 	'log!'      => \$log, # dataset is in log2 space
 	'gff'       => \$gff, # write out a gff file
+	'gz!'       => \$gz, # write compressed file
 	'debug'     => \$debug, # limit to chromosome 1 for debugging purposes
 	'help'      => \$help, # print help
 	'version'   => \$print_version, # print the version
@@ -132,6 +136,10 @@ unless ($step) {
 unless (defined $tolerance) {
 	# default is 1/2 of the window size
 	$tolerance = int($win / 2);
+}
+unless ($min_size) {
+	# don't go below the window size
+	$min_size = $win;
 }
 
 # threshold default
@@ -410,6 +418,7 @@ unless ($main_data_ref) {
 # write standard output data file
 my $write_success = write_tim_data_file(
 	'data'     => $main_data_ref,
+	'gz'       => $gz,
 	'filename' => $outfile,
 );
 if ($write_success) {
@@ -436,6 +445,7 @@ if ($gff) {
 		'method'   => $method,
 		'version'  => 3,
 		'filename' => $outfile,
+		'gz'       => $gz,
 	);
 	if ($gff_file) {
 		print " Wrote GFF file '$gff_file'\n";
@@ -766,14 +776,15 @@ sub go_trim_windows {
 			}
 		}
 		
-		# what to do with single points?
-		if ($window->[1] == $window->[2]) { 
-			# a single datapoint
-			# make it at least a small window half the size of $win
-			# this is just to make the data look pretty and avoid a region
-			# of 1 bp, which could interfere with the final score later on
-			$window->[1] -= int($step/4);
-			$window->[2] += int($step/4);
+		# check the minimum size of the window
+		my $length = $window->[2] - $window->[1] + 1;
+		if ($length < $min_size) {
+			# find how much to add to either side to make it a minimum size
+			my $add = int( ( ($min_size - $length) / 2) + 0.5);
+			
+			# adjust the window
+			$window->[1] -= $add;
+			$window->[2] += $add;
 			
 			# check sizes so we don't go over limit
 			if ($window->[1] < 1) {
@@ -783,7 +794,6 @@ sub go_trim_windows {
 				$window->[2] = $chrom2length{ $window->[0] };
 			}
 		}
-		
 	}
 
 }
@@ -1066,6 +1076,7 @@ A script to find enriched regions in a dataset using a simple threshold.
   --strand [f|r]
   --deplete
   --trim
+  --min <integer>
   --sort
   --feat
   --log
@@ -1177,6 +1188,11 @@ windows whose scores don't actually pass the threshold, but were
 included because the entire window mean (or median) exceeded 
 the threshold. This step removes those data points. The default 
 behavior is false.
+
+=item --min <integer>
+
+Set the minimum window size in bp when trimming the merged windows. 
+The default value is equal to the search window size.
 
 =item --sort
 
