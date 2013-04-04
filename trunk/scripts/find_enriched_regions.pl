@@ -984,10 +984,11 @@ sub generate_main_data_hash {
 	$data->{2}{'win'} = $win;
 	$data->{2}{'step'} = $step;
 	if ($trim) {
-		$data->{2}{'trimmed'} = 1;
+		$data->{4}{'trimmed'} = 1;
 	} else {
-		$data->{2}{'trimmed'} = 0;
+		$data->{4}{'trimmed'} = 0;
 	}
+	$data->{4}{'min_size'} = $min_size;
 	
 	# score metadata
 	$data->{6}{'log2'} = $log;
