@@ -105,7 +105,6 @@ sub load_tim_data_file {
 	
 	# load the data table
 	while (my $line = $fh->getline) {		
-		$line =~ s/[\r\n]+$//;
 		
 		# the current file position should be at the beginning of the
 		# data table information
@@ -121,13 +120,19 @@ sub load_tim_data_file {
 			return;
 		}
 		
+		# chomp the last element
+		# we do this here to ensure the tab split above gets all of the values
+		# otherwise trailing null values aren't included in @linedata
+		# be sure to handle both newlines and carriage returns
+		$linedata[-1] =~ s/[\r\n]+$//;
+		
 		# convert null values to internal '.'
 		for (my $i = 0; $i < $inputdata->{'number_columns'}; $i++ ) {
 			if (!defined $linedata[$i]) {
 				# not defined position in the array?
 				$linedata[$i] = '.';
 			}
-			if ($linedata[$i] eq '') {
+			elsif ($linedata[$i] eq '') {
 				# a null value
 				$linedata[$i] = '.';
 			}
