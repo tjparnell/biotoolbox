@@ -1594,6 +1594,14 @@ sub convert_nulls_function {
 		chomp $value;
 	}
 	
+	# check zero status
+	my $zero;
+	if (defined $opt_zero) {
+		# command line option
+		$zero = $opt_zero;
+	}
+	
+	
 	# request placement
 	my $placement = _request_placement();
 	
@@ -1617,7 +1625,31 @@ sub convert_nulls_function {
 					# change it in situ
 					$data_table_ref->[$i][$index] = $value;
 					$count++;
-				} 
+				}
+				elsif ($data_table_ref->[$i][$index] == 0) {
+					# zero value, what to do?
+					unless (defined $zero) {
+						# wasn't defined on the command line, so stop the program and ask the user
+						print " Include 0 values to convert? y or n  ";
+						my $answer = <STDIN>;
+						if ($answer =~ /^y/i) {
+							$zero = 1;
+						}
+						else {
+							$zero = 0;
+						}
+				
+						# remember for next time, chances are user may still want this
+						# value again in the future
+						$opt_zero = $zero;
+					}
+					
+					if ($zero) {
+						# change it in situ
+						$data_table_ref->[$i][$index] = $value;
+						$count++;
+					}
+				}
 			}
 			
 			# update metadata
@@ -1642,6 +1674,30 @@ sub convert_nulls_function {
 					$data_table_ref->[$i][$new_position] = $value;
 					$count++;
 				} 
+				elsif ($data_table_ref->[$i][$index] == 0) {
+					# zero value, what to do?
+					unless (defined $zero) {
+						# wasn't defined on the command line, so stop the program and ask the user
+						print " Include 0 values to convert? y or n  ";
+						my $answer = <STDIN>;
+						if ($answer =~ /^y/i) {
+							$zero = 1;
+						}
+						else {
+							$zero = 0;
+						}
+				
+						# remember for next time, chances are user may still want this
+						# value again in the future
+						$opt_zero = $zero;
+					}
+					
+					if ($zero) {
+						# change it in situ
+						$data_table_ref->[$i][$new_position] = $value;
+						$count++;
+					}
+				}
 				else {
 					# acceptable
 					$data_table_ref->[$i][$new_position] = 
@@ -3496,7 +3552,7 @@ sub export_treeview_function {
 	# First check for previous modifications
 	if ($modification) {
 		print " There are existing unsaved changes to the data. Do you want to\n";
-		print " save these first before making changes required for exporting?".
+		print " save these first before making required, irreversible changes?".
 			"y or n   ";
 		my $answer = <STDIN>;
 		chomp $answer;
@@ -3558,7 +3614,7 @@ sub export_treeview_function {
 	# we now have just the columns we want
 	# reset the dataset indices to what we currently have
 	# name and ID should be index 0 and 1
-	@datasets = (2 .. $main_data_ref->{'number_columns'} - 3);
+	@datasets = (2 .. $main_data_ref->{'number_columns'} -1);
 	
 	
 	### Second, perform dataset manipulations
@@ -3594,6 +3650,7 @@ sub export_treeview_function {
 			# convert nulls to 0
 			print " converting null values to 0.0....\n";
 			$opt_target = '0.0';
+			$opt_zero   = 1 unless defined $opt_zero; # convert 0s too
 			convert_nulls_function(@datasets);
 		}
 		else {
@@ -4421,9 +4478,9 @@ option, or prompts the user when executed interactively.
 =item --(no)zero
 
 Specify that zero values should or should not be included when 
-calculating statistics on a column. The default is undefined, meaning 
-the program may ask the user interactively whether to include zero values 
-or not.
+calculating statistics or converting null values on a column. The default is 
+undefined, meaning the program may ask the user interactively whether to 
+include zero values or not.
 
 =item --dir [i | d]
 
@@ -4792,9 +4849,8 @@ use the same name!
 
 =item B<treeview> (menu option 'T')
 
-Export the data into a format compatible with the Treeview program for 
-visualizing the data either as a heatmap or a dendrogram (when combined 
-with the Cluster program to generate the clusters or tree). Specify the 
+Export the data to the CDT format compatible with both Treeview and 
+Cluster programs for visualizing and/or generating clusters. Specify the 
 columns containing a unique name and the columns to be analyzed (e.g. 
 --index <name>,<start-stop>). Extraneous columns are removed. 
 Additional manipulations on the columns may be performed prior to 
