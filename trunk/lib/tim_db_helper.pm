@@ -772,9 +772,10 @@ sub verify_or_request_feature_types {
 		# an anonymous array of datasets
 		@datasets = @{ $args{'feature'} };
 	}
-	else {
+	elsif (defined $args{'feature'}) {
 		push @datasets, $args{'feature'};
 	}
+	# else it is null and @datasets remains empty, prompting user input
 	
 	
 	# Open database object and collect features
