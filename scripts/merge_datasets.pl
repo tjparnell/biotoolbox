@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10.1';
+my $VERSION = '1.10.2';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -730,7 +730,7 @@ sub request_lookup_indices {
 			die " unknown index value!\n";
 		}
 		$index2 = $number_of->{$index2}; # convert to a number
-		unless (exists $data1->{$index2}) {
+		unless (exists $data2->{$index2}) {
 			# check that it's valid
 			die " unknown index value!\n";
 		}
