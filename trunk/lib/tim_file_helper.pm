@@ -1165,6 +1165,15 @@ sub write_tim_data_file {
 		$extension =~ s/\.gz$//i; 
 	}
 	
+	# check filename length
+	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
+	if (length($name . $extension) > 255) {
+		my $limit = 253 - length($extension);
+		$name = substr($name, 0, $limit) . '..';
+		warn " filename too long! Truncating to $limit characters\n";
+	}
+	
+	
 	# generate the new filename
 	my $newname = $path . $name . $extension;
 	
@@ -1450,6 +1459,14 @@ sub open_to_write_fh {
 		return;
 	}
 	
+	# check filename length
+	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
+	my $name = fileparse($filename);
+	if (length $name > 255) {
+		carp " filename is too long! please shorten\n";
+		return;
+	}
+	
 	# check zip status if necessary
 	unless (defined $gz) {
 		# look at filename extension as a clue
@@ -1524,7 +1541,7 @@ sub open_to_write_fh {
 		return $fh;
 	}
 	else {
-		carp " unable to open file '$filename': " . $fh->error . "\n";
+		carp " unable to open file '$filename': error " . $fh->error . "\n";
 		return;
 	}
 }
