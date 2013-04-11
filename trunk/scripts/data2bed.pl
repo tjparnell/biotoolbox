@@ -275,6 +275,9 @@ elsif (
 	unless (defined $name_index) {
 		$name_index = find_column_index($metadata_ref, 'name|ID$');
 	}
+	if (not defined $name_index and $metadata_ref->{'gff'}) {
+		$name_index = 8;
+	}
 	unless (defined $score_index) {
 		$score_index = find_column_index($metadata_ref, '^score$');
 	}
