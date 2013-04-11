@@ -17,6 +17,7 @@ verify_nucleosome_mapping.pl `[`--options...`]` <**filename>
   --data <text | filename>
   --filter
   --max <integer>
+  --recenter
   --out <filename> 
   --gz
   --version
@@ -55,6 +56,12 @@ __
   Specify the maximum allowed overlap in bp when filtering out  overlapping nucleosomes. The default is 30 bp.
 __
   __
+__--recenter
+
+__
+  Optionally re-center those nucleosomes determined to be offset  from the actual peak in the data.
+__
+  __
 __--out <**filename>
 
 __
@@ -82,17 +89,19 @@ __
 ==DESCRIPTION==
 This program will verify the mapping of nucleosomes. It expects as input a text file containing the genomic coordinates of annotated nucleosomes. The output data file from the !BioToolBox** script 'map_nucleosomes.pl' is ideal, although other text files, including Bed and GFF, are supported. Nucleosomes are verified by comparing the peak of nucleosome reads collected from the original dataset with the recorded midpoint of the mapped nucleosome. If the peak is <= 10 bp from the recorded midpoint, then the nucleosome is considered centered on the peak and it is properly mapped. If the peak is > 10 bp from the recorded midpoint, then it is considered offset, or improperly mapped. This is most often due to nucleosomes being called prematurely when the dataset is being scanned in windows from left to right. Adjusting the parameters for window and buffer in map_nucleosomes.pl can limit the number of overlapping nucleosomes.
 
+The program can optionally re-center those nucleosomes considered to  be offset from their actual data peak. The start, end, midpoint, and  name is changed to reflect the new position.
+
+The program can also optionally filter out nucleosomes which exceed a  set limit of overlap. The overlapping nucleosome to be deleted is  chosen based on a set of rules: offset nucleosomes are deleted, or if  both nucleosomes are offset, then the one with the greatest offset is  deleted. If neither nucleosome is offset, then the nucleosome with the  lowest occupancy is deleted, or if both occupancies are equal, then  the rightmost is deleted. Overlap statistics are then recalculated after  filtering.
+
 The same data file is re-written or a new file written with three  additional columns appended, overlap_length, center_peak_mapping, and  center_peak_offset.
 
 Overlap_length records the amount of overlap between mapped nucleosomes.  Ideally this should be 0 as nucleosomes should not overlap; overlapping  nucleosomes indicates either an error in mapping or multiple phasing of  nucleosomes.
 
-Center_peak_mapping records whether the nucleosome was properly mapped or  not. One of two values is recorded: centered or offset.
+Center_peak_mapping records whether the nucleosome was properly mapped or  not. One of three values is recorded: centered, recentered, or offset.
 
-Center_peak_offset records the distance in bp between the nucleosome peak  and the recorded midpoint.
+Center_peak_offset records the distance in bp between the observed data  peak and the recorded midpoint.
 
 Basic statistics are reported to Standard Output for the overlap and  offset lengths.
-
-The program can also optionally filter out nucleosomes which exceed a  set limit of overlap. The overlapping nucleosome to be deleted is  chosen based on a set of rules: offset nucleosomes are deleted, or if  both nucleosomes are offset, then the one with the greatest offset is  deleted. If neither nucleosome is offset, then the nucleosome with the  lowest occupancy is deleted, or if both occupancies are equal, then  the rightmost is deleted.
 
 ==AUTHOR==
 {{{

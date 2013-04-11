@@ -20,6 +20,7 @@ data2fasta.pl `[`--options...`]` <**filename>
   --chr <index>
   --start <index>
   --stop <index>
+  --strand <index>
   --out <filename> 
   --gz
   --version
@@ -76,6 +77,12 @@ __
   Optionally specify the index for the stop position column. It may be  automatically determined from the column header.
 __
   __
+__--strand <**index>
+
+__
+  Optionally specify the index for the strand column. It may be  automatically determined from the column header.
+__
+  __
 __--out <**filename>
 
 __
@@ -105,7 +112,7 @@ This program will take a tab-delimited text file (tim data formated file,  for e
 
 If the name and sequence is already present in the file, it will generate  the fasta file directly from the file content.
 
-If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from a database, either a Bio::DB::!SeqFeature**::Store database,  a genomic sequence multi-fasta, or a directory of multiple fasta files.
+If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from a database, either a Bio::DB::!SeqFeature**::Store database,  a genomic sequence multi-fasta, or a directory of multiple fasta files.  If strand information is provided, then the sequence reverse complement  is returned for reverse strand coordinates.
 
 ==AUTHOR==
 {{{

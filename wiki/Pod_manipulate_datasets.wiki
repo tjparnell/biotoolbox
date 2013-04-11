@@ -144,7 +144,7 @@ __
 __--(no)zero
 
 __
-  Specify that zero values should or should not be included when  calculating statistics on a column. The default is undefined, meaning  the program may ask the user interactively whether to include zero values  or not.
+  Specify that zero values should or should not be included when  calculating statistics or converting null values on a column. The default is  undefined, meaning the program may ask the user interactively whether to  include zero values or not.
 __
   __
 __--dir `[`i | d`]`
@@ -422,13 +422,15 @@ __
 _*_treeview_*_ (menu option 'T')
 
 __
-  Export the data into a format compatible with the Treeview program for  visualizing the data either as a heatmap or a dendrogram (when combined  with the Cluster program to generate the clusters or tree). Specify the  columns containing a unique name and the columns to be analyzed (use  --index <**name>,<**start-stop>). Extraneous columns are removed.  Additional manipulations on the columns may be performed prior to  exporting. These may be chosen interactively or using the codes  listed below and specified using the --target option.
+  Export the data to the CDT format compatible with both Treeview and  Cluster programs for visualizing and/or generating clusters. Specify the  columns containing a unique name and the columns to be analyzed (e.g.  --index <**name>,<**start-stop>). Extraneous columns are removed.  Additional manipulations on the columns may be performed prior to  exporting. These may be chosen interactively or using the codes  listed below and specified using the --target option.
 __
   __
 {{{
   cg - median center features (rows)
   cd - median center datasets (columns)
-  zd - convert column to Z-scores
+  zd - convert columns to Z-scores
+  pd - convert columns to percentile ranks
+  L2 - convert values to log2
   n0 - convert nulls to 0.0
 }}}
   A simple Cluster data text file is written (default file name  "<**basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The  original file will not be rewritten.
