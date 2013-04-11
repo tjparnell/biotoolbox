@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -294,17 +294,22 @@ sub identify_indices {
 		
 		# score
 		unless (defined $score_index) {
-			# ask the user for help if it wasn't provided
-			# print the column names
-			print " These are the column names in the datafile\n";
-			for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-				print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
-			}
+			# first look for a generic score index
+			$score_index = find_column_index($metadata_ref, '^score$');
 			
-			# ask for the score index
-			print " Enter the index for the feature score column  ";
-			$score_index = <STDIN>;
-			chomp $score_index;
+			unless (defined $score_index) {
+				# ask the user for help if we can't find it
+				# print the column names
+				print " These are the column names in the datafile\n";
+				for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
+					print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
+				}
+			
+				# ask for the score index
+				print " Enter the index for the feature score column  ";
+				$score_index = <STDIN>;
+				chomp $score_index;
+			}
 		}
 	}
 	

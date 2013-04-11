@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n This program will write a BED file\n";
 
@@ -226,10 +226,14 @@ if ($ask) {
 	
 	# request score index
 	unless (defined $score_index) {
-		print " Enter the index for the feature score column  ";
+		my $suggestion = find_column_index($metadata_ref, '^score$');
+		print " Enter the index for the feature score column [$suggestion]  ";
 		my $in = <STDIN>;
 		if ($in =~ /(\d+)/) {
 			$score_index = $1;
+		}
+		elsif (defined $suggestion) {
+			$score_index = $suggestion;
 		}
 	}
 	
@@ -262,14 +266,17 @@ elsif (
 	unless (defined $stop_index) {
 		$stop_index = find_column_index($metadata_ref, 'stop|end');
 	}
-	unless (defined $stop_index) {
-		$stop_index = find_column_index($metadata_ref, 'stop|end');
-	}
 	unless (defined $strand_index) {
 		$strand_index = find_column_index($metadata_ref, 'strand');
 	}
 	unless (defined $name_index) {
-		$name_index = find_column_index($metadata_ref, 'name|ID');
+		$name_index = find_column_index($metadata_ref, '^name|ID');
+	}
+	unless (defined $name_index) {
+		$name_index = find_column_index($metadata_ref, 'name|ID$');
+	}
+	unless (defined $score_index) {
+		$score_index = find_column_index($metadata_ref, '^score$');
 	}
 }
 

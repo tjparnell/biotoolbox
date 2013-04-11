@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10.1';
+my $VERSION = '1.10.2';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -126,42 +126,6 @@ unless ($in_fh) {
 
 ### Determine indices
 
-# automatically identify sgr format
-if ($metadata_ref->{'extension'} =~ /sgr/) {
-	$chr_index = 0 unless defined $chr_index;
-	$start_index = 1 unless defined $start_index;
-	$stop_index = 1 unless defined $stop_index; # same as start
-	$score_index = 2 unless defined $score_index;
-	$type ||= 'region'; # default
-}
-
-# automatically identify bed format
-elsif ($metadata_ref->{'bed'}) {
-	
-	# standard columns
-	$chr_index = 0;
-	$start_index = 1;
-	$stop_index = 2; # same as start
-	
-	# optional columns
-	# we are assuming standard BED columns
-	if ($metadata_ref->{'bed'} >= 4) {
-		$name_index = 3;
-	}
-	if ($metadata_ref->{'bed'} >= 5) {
-		$score_index = 4;
-	}
-	if ($metadata_ref->{'bed'} >= 6) {
-		$strand_index = 5;
-	}
-	
-	# assign type
-	$type ||= 'region';
-	
-	# bedfiles are 0-based
-	$zero_based = 1;
-}
-
 # Ask user interactively
 if ($ask) {
 	# the user has specified that we should ask for specific indices
@@ -240,7 +204,7 @@ if ($ask) {
 	
 	# request score index
 	unless (defined $score_index) {
-		my $suggestion = find_column_index($metadata_ref, 'score');
+		my $suggestion = find_column_index($metadata_ref, '^score$');
 		print " Enter the index for the feature score column [$suggestion]  ";
 		my $in = <STDIN>;
 		chomp $in;
@@ -305,6 +269,43 @@ if ($ask) {
 	}
 }
 
+# otherwise attempt to identify indices automatically
+else {
+	unless (defined $chr_index) {
+		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
+	}
+	unless (defined $start_index) {
+		$start_index = find_column_index($metadata_ref, '^start');
+	}
+	unless (defined $stop_index) {
+		$stop_index = find_column_index($metadata_ref, '^stop|end');
+	}
+	unless (defined $strand_index) {
+		$strand_index = find_column_index($metadata_ref, '^strand');
+	}
+	unless (defined $name or defined $name_index) {
+		$name_index = find_column_index($metadata_ref, '^name|ID');
+		unless (defined $name_index) {
+			$name_index = find_column_index($metadata_ref, 'name|ID$');
+		}
+	}
+	unless (defined $score_index) {
+		$score_index = find_column_index($metadata_ref, '^score$');
+	}
+	unless (defined $type) {
+		$type = $metadata_ref->{'feature'} || 'region';
+	}
+	unless (defined $source) {
+		$source = $metadata_ref->{'basename'};
+	}
+}
+
+if ($metadata_ref->{'bed'}) {
+	# bedfiles are 0-based
+	$zero_based = 1;
+}
+
+
 # Convert tag text to list of indices
 my @tag_indices;
 if ($tag) {
@@ -341,24 +342,8 @@ if ($unique and not defined $name_index) {
 
 # Generate the output file name
 unless ($outfile) {
-	# generate an output file name based on provided data
-	if (defined $type and $type =~ /[a-z]+/i and $type ne 'region') {
-		# user has provide a GFF type, use that preferentially as the 
-		# the filename
-		# this is ignored if a column index or default region is used
-		if ($source and $source =~ /[a-z]+/i) {
-			# user has provided source string, combine that
-			$outfile = $source . '_' . $type;
-		}
-		else {
-			# just use the type
-			$outfile = $type;
-		}
-	}
-	else {
-		# re-use the input file name
-		$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
-	}
+	# re-use the input file name
+	$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
 }
 
 
