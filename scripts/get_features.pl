@@ -21,7 +21,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.10';
+my $VERSION = '1.10.2';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -45,6 +45,7 @@ my (
 	$include_coordinates,
 	$start_adj,
 	$stop_adj,
+	$position,
 	$convert_to_bed,
 	$convert_to_gff,
 	$outfile,
@@ -63,6 +64,7 @@ GetOptions(
 	'coord!'    => \$include_coordinates, # collect coordinates
 	'start=i'   => \$start_adj, # start coordinate adjustment
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
+	'pos=s'     => \$position, # relative position to adjust coordinates
 	'bed!'      => \$convert_to_bed, # convert to bed format
 	'gff!'      => \$convert_to_gff, # convert to GFF3 format
 	'out=s'     => \$outfile, # name of output file 
@@ -110,6 +112,15 @@ if ($convert_to_bed and $convert_to_gff) {
 if ($start_adj or $stop_adj) {
 	# automatically include coordinates if we're adjusting them
 	$include_coordinates = 1;
+}
+if ($position) {
+	unless ($position =~ /[543m]{1,2}/) {
+		die " unrecognized position value '$position'! see help\n";
+	}
+}
+else {
+	# default is from both ends
+	$position = '53';
 }
 
 
@@ -240,9 +251,11 @@ sub prepare_data_structure_or_output {
 			# position adjustments
 			if ($start_adj) {
 				$data->{1}{'start_adjustment'} = $start_adj;
+				$data->{1}{'position'} = $position;
 			}
 			if ($stop_adj) {
 				$data->{2}{'stop_adjustment'} = $stop_adj;
+				$data->{2}{'position'} = $position;
 			}
 		}
 		else {
@@ -271,9 +284,11 @@ sub prepare_data_structure_or_output {
 				# position adjustments
 				if ($start_adj) {
 					$data->{3}{'start_adjustment'} = $start_adj;
+					$data->{3}{'position'} = $position;
 				}
 				if ($stop_adj) {
 					$data->{4}{'stop_adjustment'} = $stop_adj;
+					$data->{4}{'position'} = $position;
 				}
 			}
 			
@@ -427,31 +442,118 @@ sub adjust_coordinates {
 	
 	# we will always adjust relative coordinates based on strand
 	# and not absolute coordinates
-	if ($seqfeature->strand >= 0) {
-		# forward strand
-		if ($start_adj) {
-			my $start = $seqfeature->start;
-			$start += $start_adj;
-			$seqfeature->start($start);
+	
+	# get the original coordinates
+	my $start = $seqfeature->start;
+	my $end   = $seqfeature->end;
+	
+	# adjust from 5' end
+	if ($position eq '5') {
+	
+		if ($seqfeature->strand >= 0) {
+			# forward strand
+			if ($start_adj) {
+				$seqfeature->start($start + $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->end($start + $stop_adj);
+			}
 		}
-		if ($stop_adj) {
-			my $stop = $seqfeature->end;
-			$stop += $stop_adj;
-			$seqfeature->end($stop);
+		else {
+			# reverse strand
+			if ($start_adj) {
+				$seqfeature->end($end - $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->start($end - $stop_adj);
+			}
 		}
 	}
+	
+	# adjust from 3' end
+	elsif ($position eq '3') {
+	
+		if ($seqfeature->strand >= 0) {
+			# forward strand
+			if ($start_adj) {
+				$seqfeature->end($end + $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->start($end + $stop_adj);
+			}
+		}
+		else {
+			# reverse strand
+			if ($start_adj) {
+				$seqfeature->start($start - $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->end($start - $stop_adj);
+			}
+		}
+	}
+	
+	# adjust from middle position
+	elsif ($position eq 'm' or $position eq '4') {
+		
+		my $midpoint = int( ( ($start + $end) / 2) + 0.5);
+		if ($seqfeature->strand >= 0) {
+			# forward strand
+			if ($start_adj) {
+				$seqfeature->start($midpoint + $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->end($midpoint + $stop_adj);
+			}
+		}
+		else {
+			# reverse strand
+			if ($start_adj) {
+				$seqfeature->end($midpoint - $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->start($midpoint - $stop_adj);
+			}
+		}
+	}
+	
+	# adjust from both ends
+	elsif ($position eq '53') {
+	
+		if ($seqfeature->strand >= 0) {
+			# forward strand
+			if ($start_adj) {
+				$seqfeature->start($start + $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->end($end + $stop_adj);
+			}
+		}
+		else {
+			# reverse strand
+			if ($start_adj) {
+				$seqfeature->end($end - $start_adj);
+			}
+			if ($stop_adj) {
+				$seqfeature->start($start - $stop_adj)
+			}
+		}
+	}
+	
+	# something else?
 	else {
-		# reverse strand
-		if ($start_adj) {
-			my $start = $seqfeature->end;
-			$start -= $start_adj;
-			$seqfeature->start($start);
-		}
-		if ($stop_adj) {
-			my $stop = $seqfeature->start;
-			$stop -= $stop_adj;
-			$seqfeature->start($stop);
-		}
+		die "unrecognized position value '$position'! see help\n";
+	}
+	
+	# flip coordinates to make start and stop consistent with strand
+	# sometimes when only one coordinate is changed, it flips the orientation
+	# start must always be less than the stop coordinate
+	# but always respect the given strand
+	if ($seqfeature->start > $seqfeature->end) {
+		my $start = $seqfeature->end;
+		my $end   = $seqfeature->start;
+		$seqfeature->start($start);
+		$seqfeature->end($end);
 	}
 }
 
@@ -493,6 +595,7 @@ get_features.pl --db <text> [--options...]
   --coord
   --start=<integer>
   --stop=<integer>
+  --pos [ 5 | m | 3 | 53 ]
   --out <filename>
   --bed
   --gff 
@@ -544,11 +647,19 @@ when writing a BED or GFF format.
 
 Optionally specify adjustment values to adjust the reported start and 
 end coordinates of the collected regions. A negative value is shifted 
-upstream (5' direction), and a positive value is shifted downstream.
-Adjustments are made relative to the feature's strand, such that 
-a start adjustment will always modify the feature's 5'end, either 
-the feature startpoint or endpoint, depending on its orientation. 
-Adjustments are ignored if a GFF file is written.
+upstream (towards the 5 prime end), and a positive value is shifted 
+downstream (towards the 3 prime end). Adjustments are made relative 
+to the indicated position (--pos option, below) based on the feature 
+strand. Adjustments are ignored if a GFF file is written.
+
+=item --pos [ 5 | m | 3 | 53 ]
+
+Indicate the relative position from which both coordinate adjustments 
+are made. Both start and stop adjustments may be made from the respective 
+5 prime, 3 prime, or middle position as dictated by the feature's strand 
+value. Alternatively, specify '53' to indicate that the start adjustment 
+adjusts the 5 prime end and the stop adjustment adjusts the 3 prime end. 
+The default is '53'.
 
 =item --out <filename>
 
@@ -599,6 +710,40 @@ include a database-specific or default database option,
 chromosomes (such as the mitochondrial chromosome), and the
 "exclude_tags", which are attribute keys and values to be avoided.
 More information may be found in the configuration file itself.
+
+=head1 COORDINATE ADJUSTMENTS
+
+Coordinates of the features may be adjusted as desired. Adjustments 
+may be made relative to either the 5 prime, 3 prime, both ends, or the 
+feature midpoint. Positions are based on the feature strand. Use the 
+following examples as a guide. 
+
+=over 4
+
+=item upstream 500 bp only
+
+  get_features.pl --start=-500 --stop=-1 --pos 5
+
+=item 1 kb total around 5 prime end
+
+  get_features.pl --start=-500 --stop=500 --pos 5
+
+=item last 500 bp of feature
+
+  get_features.pl --start=-500 --pos 3
+
+=item middle 500 bp of feature
+
+  get_features.pl --start=-250 --stop=250 --pos m
+
+=item entire feature plus 1 kb of flanking
+
+  get_features.pl --start=-1000 --stop=1000 --pos 53
+
+=back
+
+Note that positions are always in base coordinates, and the resulting regions 
+may be 1 bp longer depending on whether the reference base was included or not.
 
 =head1 AUTHOR
 
