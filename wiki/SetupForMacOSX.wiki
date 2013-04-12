@@ -42,6 +42,7 @@
 	# [SetupForMacOSX#Additional_Tools Additional Tools]
 		# [SetupForMacOSX#Compiling_a_64-bit_liftOver_tool_on_OS_X Compiling a 64-bit liftOver tool on OS X]
 		# [SetupForMacOSX#Installing_MACS_and_other_Python_tools Installing MACS and other Python tools]
+		# [SetupForMacOSX#Installing_mfold Installing mfold]
 
 ==Prerequisites==
 	# A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc. There are both online and dead-tree resources available to learn this.
@@ -650,3 +651,32 @@ The setup script will install the libraries under the Fink Python directories, a
 <pre>
 	sudo python setup.py install --install-scripts=/usr/local/MACS
 </pre>
+
+===Installing mfold===
+[http://mfold.rna.albany.edu/?q=mfold/download-mfold mfold] is a venerable software for predicting secondary structures of nucleic acid, typically RNA but also DNA. It has been superseded by another package which requires a license, but mfold is still freely available. This is my guide for getting it installed.
+
+There are no listed prerequisites that I could find, but this is a best effort short list that I could elucidate.
+	* XCode to obtain the GCC and Fortran compilers
+	* GD libraries, which you can install through Fink. See [SetupForMacOSX#Installing_GD_Libraries Installing GD Libraries].
+	* Ghostscript, a command line postscript renderer, which you can also install using Fink. Try the command `fink install ghostscript-nox ghostscript-fonts`.
+
+Download the source code from the link above. I used [http://mfold.rna.albany.edu/download/mfold-3.5.tar.gz version 3.5]. Expand the archive and move into the directory. 
+
+The trick to compiling is specifying the alternate locations of libraries, specifying 64 bit (assuming we're working with 64 bit), and the CPU architecture. These flags were determined empirically, and not all may be necessary. 
+<pre>
+	./configure CXXFLAGS=-m64 LDFLAGS=-L/sw/lib LIBS=-L/sw/lib CPPFLAGS=-I/sw/include CFLAGS=-m64 FFLAGS=-m64 CXXFLAGS="-arch x86_64"
+	make
+	sudo make install
+</pre>
+This will install the executables into `/usr/local/bin/` and the data files into `/usr/local/share/mfold`. To install somewhere else, you can use the `--prefix=`, `--bindir=`, and `--datarootdir=` options to specify alternate locations. Running `./configure --help` will list more options.
+
+On my installation, I still had some problems getting it to run correctly. Upon investigation, it turns out the data directory was not replaced properly in the main `mfold` script. Edit the file `/usr/local/bin/mfold` as root. Replace the following line at or around line 6
+<pre>
+	export DATDIR=@PKGDATADIR@
+</pre>
+to the following
+<pre>
+	export DATDIR=/usr/local/share/mfold
+</pre>
+ 
+It should now run properly.

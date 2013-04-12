@@ -2,14 +2,29 @@
 #labels Featured 
 
 =HOWTO: Working with an annotation database=
-The *biotoolbox* scripts are designed to work with annotation from a relational database. This is designed to simplify data collection by not having to maintain separate annotation files, e.g. Bed files, for every gene, transcript, promoter, and everything else you're possibly interested in. Keeping those files properly annotated, labeled, and up-to-date with the latest genome version can be difficult. 
+The *BioToolBox* scripts are designed to work with annotation from a relational database. This is designed to simplify data collection by not having to maintain separate annotation files, e.g. Bed files, for every gene, transcript, promoter, and everything else you're possibly interested in. Keeping those files properly annotated, labeled, and up-to-date with the latest genome version can be difficult. 
 
-Instead, the *biotoolbox* scripts allow you to collect a list of gene names and identifiers from the database, and use those in data collection, without regard to maintaining chromosome, start, stop, strand coordinates, especially between genome builds. The scripts automatically look up the gene names in the database and grab the coordinates for you behind the scenes prior to data collection.
+Instead, the *BioToolBox* scripts allow you to collect a list of gene names and identifiers from the database, and use those in data collection, without regard to maintaining chromosome, start, stop, strand coordinates, especially between genome builds. The scripts automatically look up the gene names in the database and grab the coordinates for you behind the scenes prior to data collection.
 
 This HowTo describes some possible scenarios with working with databases. 
 
+==Contents==
+	# [WorkingWithDatabases#Annotation Annotation]
+		# [WorkingWithDatabases#Obtaining_Annotation Obtaining Annotation]
+			# [WorkingWithDatabases#Annotation_from_UCSC Annotation from UCSC]
+			# [WorkingWithDatabases#Annotation_from_Ensembl Annotation from Ensembl]
+		# [WorkingWithDatabases#Sequence_information Sequence information]
+		# [WorkingWithDatabases#Database_setup Database setup]
+		# [WorkingWithDatabases#Loading_the_database Loading the database]
+	# [WorkingWithDatabases#Getting_a_gene_list Getting a gene list]
+	# [WorkingWithDatabases#Getting_more_from_the_database Getting more from the database]
+		# [WorkingWithDatabases#Additional_information Additional information]
+		# [WorkingWithDatabases#Getting_nonannotated_regions Getting nonannotated regions]
+		# [WorkingWithDatabases#Collecting_sequences Collecting sequences]
+		# [WorkingWithDatabases#Calculating_CpG_frequency Calculating CpG frequency]
+
 ==Annotation==
-The *biotoolbox* scripts work primarily with the BioPerl [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema, which was designed to use primarily annotation in the GFF3 format. 
+The *BioToolBox* scripts work primarily with the BioPerl [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema, which was designed to use primarily annotation in the GFF3 format. 
 
 ===Obtaining Annotation===
 The most important component of the database is the annotation. The annotation should be obtained from an official organism genome repository online, such as [http://www.yeastgenome.org/ SGD] or [http://flybase.org/ FlyBase], a general genomics repository such as [http://genome.ucsc.edu/ UCSC] or [http://www.ensembl.org Ensembl], or one you've [http://gmod.org/wiki/MAKER annotated] yourself. 
@@ -23,7 +38,7 @@ Annotation may be downloaded from the UCSC Table Browser in a simple tab-delimit
 
 The GBrowse distribution provides a script, ucsc_genes2gff.pl, which will convert the gene table. However, it produces fairly simple annotation, and in my experience has some issues. The Chado distribution also includes a different [http://gmod.svn.sourceforge.net/viewvc/gmod/schema/trunk/chado/bin/ucsc_genes2gff.pl?revision=21190&view=markup ucsc_genes2gff.pl] script, which, although I have not used it, appears to produce more complete GFF3 features.
 
-The *biotoolbox* collection also includes a UCSC gene table to GFF3 converter script, [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. It will conveniently download the appropriate gene tables and supporting tables via FTP and generate much more complete GFF3 files than the above programs. It works well with the refGene, ensGene, knownGene, and xenoRefGene tables. 
+The *BioToolBox* collection also includes a UCSC gene table to GFF3 converter script, [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. It will conveniently download the appropriate gene tables and supporting tables via FTP and generate much more complete GFF3 files than the above programs. It works well with the refGene, ensGene, knownGene, and xenoRefGene tables. 
 
 To download the refGene and ensGene annotation files from UCSC for the zebrafish genome, execute this command. You will need to first identify the genome version name from their list of official [http://genome.ucsc.edu/FAQ/FAQreleases.html releases].
 <pre>
@@ -40,7 +55,7 @@ This will fetch the relevant annotation tables from their FTP server and process
 ====Annotation from Ensembl====
 Ensembl conveniently provides GTF files for their annotated genomes. However, the information content is limited in the GTF file. Nevertheless, it is compatible with the above GTF to GFF3 converter.
 
-To obtain more complete annotation, however, use the *biotoolbox* script, [Pod_get_ensembl_annotation get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
+To obtain more complete annotation, however, use the *BioToolBox* script, [Pod_get_ensembl_annotation get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
 
 You must have the latest  [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Ensembl Perl modules installed] to use this script. To run this script for zebrafish, execute the following command. 
 <pre>
@@ -49,7 +64,7 @@ You must have the latest  [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Ensem
 You should get out one file: `danio_rerio.gff3`.
 
 ===Sequence information===
-You need to generate a GFF3 file representing the chromosomes, contigs, and/or scaffolds for your genome. Each of the above *biotoolbox* scripts above will default to downloading sequence information, either as a separate file or embedded in the GFF3 file. Each sequence must have a line similar to this.
+You need to generate a GFF3 file representing the chromosomes, contigs, and/or scaffolds for your genome. Each of the above *BioToolBox* scripts above will default to downloading sequence information, either as a separate file or embedded in the GFF3 file. Each sequence must have a line similar to this.
 <pre>
 chr1	UCSC	chromosome	1	60348388	.	.	.	Name=chr1;ID=chr1
 </pre>
@@ -66,7 +81,7 @@ The database may be loaded into one of three relational database systems: MySQL,
 
 You may have to install the database server and necessary Perl modules for your system. When in doubt, the SQLite system is the simplest choice.
 
-Relational database servers such as MySQL use users and passwords to control access to their contents. The `root` or other priveleged user is required to load the database. At minimal the following permissions are required: `select, insert, update, delete, create, drop, alter`. For querying content, as with all of the *biotoolbox* scripts, we only need a read-only account (`select` permission).
+Relational database servers such as MySQL use users and passwords to control access to their contents. The `root` or other priveleged user is required to load the database. At minimal the following permissions are required: `select, insert, update, delete, create, drop, alter`. For querying content, as with all of the *BioToolBox* scripts, we only need a read-only account (`select` permission).
 
 For a MySQL database, the following example session shows creating a new database `zv9`, adjusting permissions, and creating a read-only account (user nobody, password hello).
 <pre>
@@ -103,7 +118,7 @@ For a MySQL database, the following example session shows creating a new databas
 </pre>
 See the documentation for your database server for more details.
 
-*IMPORTANT* For *biotoolbox* scripts, you must enter the read-only user name and password in the `biotoolbox.cfg` configuration file. 
+*IMPORTANT* For *BioToolBox* scripts, you must enter the read-only user name and password in the `biotoolbox.cfg` configuration file. 
 
 ===Loading the database===
 The SQL database may then be loaded using the BioPerl provided script, [http://search.cpan.org/perldoc?bp_seqfeature_load.pl bp_seqfeature_load.pl]. A typical command for loading a MySQL database with zv9 annotation would look like this 
@@ -118,7 +133,7 @@ A typical command for loading a SQLite database would look like this
 </pre>
 Note that the dsn option is the name of the SQLite file, and that a user and password are not necessary. Loading a SQLite database may take considerably longer than using a relational database server. 
 
-After loading the database, you may check the contents with the *biotoolbox* script [Pod_print_features print_features.pl].
+After loading the database, you may check the contents with the *BioToolBox* script [Pod_print_features print_features.pl].
 <pre>
 	biotoolbox/scripts/print_features.pl zv9
 </pre>
@@ -127,7 +142,7 @@ This should generate a list of feature types sorted by their source tags printed
 ==Getting a gene list==
 Getting a gene list out of the database is easy. It may be done separately or in conjunction with collecting data. To illustrate, we'll just collect a gene list. 
 
-We use the *biotoolbox* script [Pod_get_features get_features.pl]. We must provide the name of the database, or the path to a local SQLite file. An interactive list of available feature types will be presented, and we can select the one (or more) we want by number. Alternatively, if we know the feature type beforehand (using [Pod_print_features print_features.pl] for example), we can provide it on the command line. Here is an example interactively collecting genes from a MySQL database and previewing the file.
+We use the *BioToolBox* script [Pod_get_features get_features.pl]. We must provide the name of the database, or the path to a local SQLite file. An interactive list of available feature types will be presented, and we can select the one (or more) we want by number. Alternatively, if we know the feature type beforehand (using [Pod_print_features print_features.pl] for example), we can provide it on the command line. Here is an example interactively collecting genes from a MySQL database and previewing the file.
 <pre>
 	localhost:~ tim$ get_features.pl --db zv9
 
@@ -168,7 +183,7 @@ The output file is a simple tab-delimited text file of the feature Name or Ident
 
 We can also modify the output depending on what we want. If we want genomic coordinates, or output as BED or GFF format, we can specify that through additional command line options. If we want to include, for example, 1 kb of flanking region for each gene, we can provide start and stop adjustment coordinates, like so.
 <pre>
-	localhost:~ tim$ get_features.pl --db zv9 --feature gene:refGene --start=-1000 --stop=1000
+	localhost:~ tim$ get_features.pl --db zv9 --feature gene:refGene --start=-1000 --stop=1000 --pos 53
 
 	 This program will collect features from a database
 
@@ -194,12 +209,14 @@ We can also modify the output depending on what we want. If we want genomic coor
 	plgrkt	gene:refGene	Zv9_NA15	17565	22757	1
 	localhost:~ tim$
 </pre>
-Note that the start and stop coordinates of each gene have now been adjusted by 1000 bp, the 5'end (start) being subtracted and the 3'end (stop) being added. Strand is automatically considered such that `--start` always adjusts the 5' end when making adjustments. For `+` strand features this will be the start coordinate, for `-` strand features, this would be the end coordinate.
+Note that the output now includes start and stop coordinates for each gene, and that each have been adjusted by 1000 bp. The `--pos` option indicates the reference point from which the coordinates will be adjusted; in this case, we have indicated `53`, which means use the `5'` end for the start adjustment and the `3'` end for the stop adjustment. See the documentation for more examples. Note that the reported start and end coordinates are absolute (start `<` stop), but that the adjustment factors are based on the strand of the feature. 
 
-==Getting more information from the database==
+Also note that the coordinates are in base (not interbase, or 0-based) format. This is standard for all *BioToolBox* programs and BioPerl in general, and different from the UCSC-style BED format. A standard BED file may be written using `--bed` option.
 
-===Additional information for a gene list===
-Sometimes we want more information about a gene than what [Pod_get_features get_features.pl] tells us. For example, there may be attributes encoded in the source GFF file that we want, such as Alias, Parent, or even exon count. We can use the *biotoolbox* script [Pod_get_feature_info get_feature_info.pl] to collect additional information. 
+==Getting more from the database==
+
+===Additional information===
+Sometimes we want more information about a gene than what [Pod_get_features get_features.pl] tells us. For example, there may be attributes encoded in the source GFF file that we want, such as Alias, Parent, or even exon count. We can use the *BioToolBox* script [Pod_get_feature_info get_feature_info.pl] to collect additional information. 
 
 To continue our example, we want the number of exons and the gene status. We're using the interactive method to choose the attributes, but these can also be specified on the command line.
 <pre>
@@ -243,8 +260,8 @@ To continue our example, we want the number of exons and the gene status. We're 
 	localhost:~ tim$ 
 </pre>
 
-===Getting non-annotated regions from the database===
-Sometimes the information we want is not specifically defined in the database or source GFF files. Rather, they must be inferred or calculated. For example, we may want just the promoter region, or the first or last exon, or the first or last intron. In this case, we can use the *biotoolbox* script [Pod_get_gene_regions get_gene_regions.pl]. Note that this script works with canonical gene structures, such as gene `->` mRNA `->` CDS, as typically found in GFF3 files.
+===Getting nonannotated regions===
+Sometimes the information we want is not specifically defined in the database or source GFF files. Rather, they must be inferred or calculated. For example, we may want just the promoter region, or the first or last exon, or the first or last intron. In this case, we can use the *BioToolBox* script [Pod_get_gene_regions get_gene_regions.pl]. Note that this script works with canonical gene structures, such as gene `->` mRNA `->` CDS, as typically found in GFF3 files.
 
 Here, we need to specify two things. First, the feature type in the database that we want to collect, same as above, for example gene:refGene. Second, the region to collect, for example firstIntron. Here is a sample session.
 <pre>
@@ -290,7 +307,7 @@ The program collected the first exon from mRNA subfeature of the requested gene 
 This program can also be used to conveniently obtain the promoter regions by specifying the Transcription Start Site (tss) region and adjusting the coordinates with `--start` and `--stop` parameters (otherwise it will return a 1 bp region). But what if there are multiple alternative transcripts and/or promoters for a gene? You could specify mRNA as the feature type, but there may be lots of identical regions. Specify the `--unique` and `--slop` parameters to collect just the unique alternative promoter regions of genes. See the [Pod_get_gene_regions documentation] for more details.
 
 ===Collecting sequences===
-Perhaps you want to look for your favorite transcription factor binding site in the first exon or promoter. You can use the *biotoolbox* script [Pod_data2fasta data2fasta.pl] script with the file of regions you just collected as input, collect the sequences from the database or a fasta file, and write out a multi-fasta file.
+Perhaps you want to look for your favorite transcription factor binding site in the first exon or promoter. You can use the *BioToolBox* script [Pod_data2fasta data2fasta.pl] script with the file of regions you just collected as input, collect the sequences from the database or a fasta file, and write out a multi-fasta file.
 
 ===Calculating CpG frequency===
-Perhaps you have just identified differentially methylated regions in your latest genome-wide bisulfite sequencing data, and you want to now calculate whether the CpG frequency in these regions are below or above expected. You can use the *biotoolbox* script [Pod_CpG_calculator CpG_calculator.pl] to calculate the observed and expected (based on GC content) CpG dinucleotides and their ratio. 
+Perhaps you have just identified differentially methylated regions in your latest genome-wide bisulfite sequencing data, and you want to now calculate whether the CpG frequency in these regions are below or above expected. You can use the *BioToolBox* script [Pod_CpG_calculator CpG_calculator.pl] to calculate the observed and expected (based on GC content) CpG dinucleotides and their ratio. 
