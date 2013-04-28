@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.9.0';
+my $VERSION = '1.10.3';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -159,7 +159,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'};
 	if (
 		# check column header names for gene or window attribute information
-		$name =~ /^name|id|alias|chr|ref|start|stop|end|strand|type|class/i
+		$name =~ /^(?:name|id|alias|chromosome|start|stop|end|strand|type|class)$/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -180,7 +180,7 @@ for my $i (1 .. $binnumber) {
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
