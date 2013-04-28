@@ -1,5 +1,12 @@
 ######## BioToolBox revision history #############
 
+v.1.10.3 (svn 597)
+	- Unified column names and improved their recognition in scripts 
+	get_feature_info.pl and the graphing scripts graph_data.pl, 
+	graph_histogram.pl, and graph_profile.pl.
+	- Graphing scripts now write the output graph directory in the input 
+	file parent directory instead of the current directory.
+
 v.1.10.2 (svn 591)
 	- Added a new option of position when adjusting coordinates of retrieved
 	features using the script get_features.pl. Coordinates may be adjusted
