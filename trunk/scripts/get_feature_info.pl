@@ -18,7 +18,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.10.3';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -204,8 +204,8 @@ sub get_attribute_list_from_user {
 		my %index2att;
 		# standard attributes for any user
 		foreach ( 
-			qw(chromo start stop midpoint length strand phase score 
-				rna_count exon_count transcript_length parent
+			qw(Chromosome Start Stop Strand Score Length Midpoint Phase 
+				RNA_count Exon_count Transcript_length Parent
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -248,40 +248,40 @@ sub get_attribute_method {
 	
 	# set the appropriate attribute collection subroutine
 	my $method;
-	if ($attrib eq 'chromo') {
+	if ($attrib =~ /^chromo/i) {
 		$method = \&get_chromo;
 	} 
-	elsif ($attrib eq 'start') {
+	elsif ($attrib =~ /^start$/i) {
 		$method = \&get_start;
 	} 
-	elsif ($attrib eq 'stop') {
+	elsif ($attrib =~ /^stop$/i) {
 		$method = \&get_stop;
 	} 
-	elsif ($attrib eq 'midpoint') {
+	elsif ($attrib =~ /^midpoint$/i) {
 		$method = \&get_midpoint;
 	} 
-	elsif ($attrib eq 'length') {
+	elsif ($attrib =~ /^length$/i) {
 		$method = \&get_length;
 	} 
-	elsif ($attrib eq 'transcript_length') {
+	elsif ($attrib =~ /^transcript_length$/i) {
 		$method = \&get_transcript_length;
 	} 
-	elsif ($attrib eq 'strand') {
+	elsif ($attrib =~ /^strand$/i) {
 		$method = \&get_strand;
 	} 
-	elsif ($attrib eq 'phase') {
+	elsif ($attrib =~ /^phase$/i) {
 		$method = \&get_phase;
 	} 
-	elsif ($attrib eq 'score') {
+	elsif ($attrib =~ /^score$/i) {
 		$method = \&get_score;
 	} 
-	elsif ($attrib eq 'rna_count') {
+	elsif ($attrib =~ /^rna_count$/i) {
 		$method = \&get_rna_number;
 	} 
-	elsif ($attrib eq 'exon_count') {
+	elsif ($attrib =~ /^exon_count$/i) {
 		$method = \&get_exon_number;
 	} 
-	elsif ($attrib eq 'parent') {
+	elsif ($attrib =~ /^parent$/i) {
 		$method = \&get_parent;
 	} 
 	else {
@@ -556,18 +556,18 @@ get_feature_info.pl <filename>
   --help
 
 Attributes include:
-   chromo
-   start
-   stop
-   midpoint
-   length
-   strand
-   phase
-   score
-   rna_count
-   exon_count
-   transcript_length (sum of exon lengths)
-   parent (name)
+   Chromosome
+   Start
+   Stop
+   Strand
+   Score
+   Length
+   Midpoint
+   Phase
+   RNA_count
+   Exon_count
+   Transcript_length (sum of exon lengths)
+   Parent (name)
    <tag>
 
 =head1 OPTIONS
@@ -597,18 +597,19 @@ may be collected, as well as values from specific group tags. These tags
 are found in the group (ninth) column of the source GFF file. Standard 
 attributes include the following
    
-   -chromo
-   -start
-   -stop
-   -midpoint
-   -length
-   -strand
-   -phase
-   -score
-   -rna_count (number of RNA subfeatures)
-   -exon_count (number of exons, or CDS, subfeatures)
-   -transcript_length
-   -parent (name)
+   -Chromosome
+   -Start
+   -Stop
+   -Strand
+   -Score
+   -Length
+   -Midpoint
+   -Phase
+   -RNA_count (number of RNA subfeatures)
+   -Exon_count (number of exons, or CDS, subfeatures)
+   -Transcript_length
+   -Parent (name)
+   -<tag>
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
