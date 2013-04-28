@@ -20,7 +20,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.8.4';
+my $VERSION = '1.10.3';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -199,9 +199,8 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	if (
 		# check column header names for gene or window attribute information
 		# these won't be used for graph generation, so we'll skip them
-		$name =~ /^name|id|class|type|alias|probe$/i or
-		$name =~ /^chr|chromo|chromosome|seq|sequence|refseq|contig|scaffold$/i or
-		$name =~ /^start|stop|end|strand$/i
+		$name =~ /^(?:name|id|class|type|alias|probe|chr|chromo|chromosome|seq|
+			sequence|refseq|contig|scaffold|start|stop|end|mid|midpoint|strand)$/xi
 	) { 
 		# skip on to the next header
 		next; 
@@ -217,7 +216,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 unless ($directory) {
 	# directory may be specified from a command line argument, otherwise
 	# generate default directory from input file name
-	$directory = $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory '$directory'\n";

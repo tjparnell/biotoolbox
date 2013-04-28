@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.5.9';
+my $VERSION = '1.10.3';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -139,7 +139,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'}; # name of the dataset
 	
 	# skip some common index names
-	next if $name =~ /window|midpoint|name|type/i;
+	next if $name =~ /^(?:window|midpoint|name|type|start|stop|end|chromosome)$/i;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
@@ -152,7 +152,7 @@ unless (defined $x_index) {
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
@@ -233,9 +233,10 @@ sub find_x_index {
 	
 	# automatically identify the X index if these columns are available
 	$x_index = 
-		find_column_index($main_data_ref, 'midpoint') || 
-		find_column_index($main_data_ref, 'window')   ||
-		find_column_index($main_data_ref, 'name');
+		find_column_index($main_data_ref, '^midpoint$') || 
+		find_column_index($main_data_ref, '^start$')   ||
+		find_column_index($main_data_ref, '^window$')   ||
+		find_column_index($main_data_ref, '^name');
 	
 	# request from the user
 	unless (defined $x_index) {
