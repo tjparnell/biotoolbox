@@ -20,7 +20,7 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.10',
+	VERSION         => '1.11',
 	LOG2            => log(2),
 	LOG10           => log(10),
 	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
@@ -123,7 +123,7 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # global variables
 my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, 
-	$write_wig, $convertor, $data_ref);
+	$split_callback, $write_wig, $convertor, $data_ref);
 check_defaults();
 
 # record start time
@@ -377,6 +377,7 @@ sub check_defaults {
 	}
 	elsif ($use_start and $strand and !$shift) {
 		$callback  = \&record_stranded_start;
+		$split_callback = \&record_split_stranded_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording stranded, start positions\n";
 	}
@@ -387,6 +388,7 @@ sub check_defaults {
 	}
 	elsif ($use_start and !$strand and !$shift) {
 		$callback  = \&record_start;
+		$split_callback = \&record_split_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording start positions\n";
 	}
@@ -406,6 +408,7 @@ sub check_defaults {
 	}
 	elsif ($use_mid and $strand and !$shift and !$paired) {
 		$callback = \&record_stranded_mid;
+		$split_callback = \&record_split_stranded_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording stranded, mid positions\n";
 	}
@@ -425,6 +428,7 @@ sub check_defaults {
 	}
 	elsif ($use_mid and !$strand and !$shift and !$paired) {
 		$callback  = \&record_mid;
+		$split_callback = \&record_split_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording mid position\n";
 	}
@@ -435,6 +439,7 @@ sub check_defaults {
 	}
 	elsif ($use_span and $strand and !$shift and !$paired) {
 		$callback  = \&record_stranded_span;
+		$split_callback = \&record_split_stranded_span;
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning alignments\n";
 	}
@@ -444,7 +449,7 @@ sub check_defaults {
 		print " recording positions spanning paired alignments\n";
 	}
 	elsif ($use_span and !$strand and !$shift and !$paired) {
-		if (!$rpm and !$log) {
+		if (!$rpm and !$log and !$splice) {
 			# this is actually coverage
 			undef $use_span;
 			undef $bedgraph; # no bedgraph file, coverage uses fixedStep
@@ -453,6 +458,7 @@ sub check_defaults {
 		}
 		else {
 			$callback  = \&record_span;
+			$split_callback = \&record_split_span;
 			$write_wig = \&write_bedgraph;
 			print " recording positions spanning alignments\n";
 		}
@@ -889,6 +895,10 @@ sub process_split_alignments {
 		# this will increase processing time as each alignment must be incorporated 
 		# into AlignWrapper objects
 		
+		# to make things even more complicated, the split alignment subfeatures
+		# are no longer bam alignments, but essentially SeqFeature objects
+		# which means we must use special callbacks to record them (sigh....)
+		
 		# since the high level API does not allow for a data structure to be passed 
 		# to the callback, we'll have to link it to a global variable
 		my %data = (
@@ -935,13 +945,17 @@ sub single_end_spliced_callback {
 	
 	# check alignment
 	return if $a->unmapped;
+	return if $a->qual < $min_mapq;
+		# we need to check the quality here instead of later
+		# because the subfeatures lose this quality score
 	
 	# check for subfeatures
 	my @subfeatures = $a->get_SeqFeatures;
 	if (@subfeatures) {
 		# process each subfeature
 		foreach my $subf (@subfeatures) {
-			&$callback($subf, $data_ref);
+			# use special split callbacks since these are no longer bam alignments
+			&$split_callback($subf, $data_ref);
 		}
 	}
 	else {
@@ -993,6 +1007,23 @@ sub record_stranded_start {
 }
 
 
+### Record split stranded at start position
+sub record_split_stranded_start {
+	my ($part, $data) = @_;
+	
+	# record based on the strand
+	if ($part->strand == 1) {
+		# forward strand
+		$data->{f}{ $part->start }++;
+	}
+	else {
+		# reverse strand
+		$data->{r}{ $part->end }++;
+	}
+	check_data($data);
+}
+
+
 ### Record at shifted start position
 sub record_shifted_start {
 	my ($a, $data) = @_;
@@ -1029,6 +1060,23 @@ sub record_start {
 	else {
 		# forward strand
 		$data->{f}{ $a->pos + 1 }++;
+	}
+	check_data($data);
+}
+
+
+### Record split at start position
+sub record_split_start {
+	my ($part, $data) = @_;
+	
+	# start based on strand, record on forward
+	if ($part->strand == 1) {
+		# forward strand
+		$data->{f}{ $part->start }++;
+	}
+	else {
+		# reverse strand
+		$data->{f}{ $part->end }++;
 	}
 	check_data($data);
 }
@@ -1076,6 +1124,26 @@ sub record_stranded_mid {
 	else {
 		# forward strand
 		$data->{f}{ $pos }++;
+	}
+	check_data($data);
+}
+
+
+### Record split stranded at mid position
+sub record_split_stranded_mid {
+	my ($part, $data) = @_;
+	
+	# calculate mid position
+	my $pos = int( ($part->start + $part->end) / 2);
+	
+	# record based on the strand
+	if ($part->strand == 1) {
+		# forward strand
+		$data->{f}{ $pos }++;
+	}
+	else {
+		# reverse strand
+		$data->{r}{ $pos }++;
 	}
 	check_data($data);
 }
@@ -1178,6 +1246,17 @@ sub record_mid {
 }
 
 
+### Record at mid position
+sub record_split_mid {
+	my ($part, $data) = @_;
+	
+	# record mid position
+	$data->{f}{ int( ($part->start + $part->end) / 2) }++;
+	
+	check_data($data);
+}
+
+
 ### Record stranded across alignment for paired end
 sub record_stranded_paired_span {
 	my ($a, $data) = @_;
@@ -1234,6 +1313,23 @@ sub record_stranded_span {
 }
 
 
+### Record stranded across alignment
+sub record_split_stranded_span {
+	my ($part, $data) = @_;
+	
+	# record length at the start position based on strand
+	if ($part->strand == 1) {
+		# forward strand
+		$data->{f}{ $part->start } .= $part->length . ',';
+	}
+	else {
+		# reverse strand
+		$data->{r}{ $part->start } .= $part->length . ',';
+	}
+	check_data($data);
+}
+
+
 ### Record across alignment for paired end
 sub record_paired_span {
 	my ($a, $data) = @_;
@@ -1263,6 +1359,15 @@ sub record_span {
 	check_data($data);
 }
 
+
+### Record across alignment
+sub record_split_span {
+	my ($part, $data) = @_;
+	
+	# record the length
+	$data->{f}{ $part->start } .= $part->length . ',';
+	check_data($data);
+}
 
 
 ### Record extended alignment
