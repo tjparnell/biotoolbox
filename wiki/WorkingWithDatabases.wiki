@@ -123,15 +123,17 @@ See the documentation for your database server for more details.
 ===Loading the database===
 The SQL database may then be loaded using the BioPerl provided script, [http://search.cpan.org/perldoc?bp_seqfeature_load.pl bp_seqfeature_load.pl]. A typical command for loading a MySQL database with zv9 annotation would look like this 
 <pre>
-	bp_seqfeature_load.pl -c -d zv9 -u admin -p password danRer7_refGene.gff3 ...
+	bp_seqfeature_load.pl -c -f -d zv9 -u admin -p password danRer7_refGene.gff3 ...
 </pre>
 Provide as many input annotation and sequence files as you would like. The only requirement is that the GFF3 file with the reference sequences should be loaded first. Note that you must enter the password on the command line; you may wish to use a priveleged user rather than `root` if you're concerned with security.
 
 A typical command for loading a SQLite database would look like this
 <pre>
-	bp_seqfeature_load.pl -c -a DBI::SQLite -d ./zv9.sqlite danRer7_refGene.gff3 ...
+	bp_seqfeature_load.pl -c -f -a DBI::SQLite -d ./zv9.sqlite danRer7_refGene.gff3 ...
 </pre>
-Note that the dsn option is the name of the SQLite file, and that a user and password are not necessary. Loading a SQLite database may take considerably longer than using a relational database server. 
+Note that the dsn option is the name of the SQLite file, and that a user and password are not necessary. 
+
+Both commands above use the `-f` or fast loading option to increase loading time. This will dramatically decrease loading time, sometimes by orders of magnitude for extremely large datasets. For hierarchical gene annotation, this presumes parent and child features are clustered within the file; otherwise, this trick won't work.
 
 After loading the database, you may check the contents with the *BioToolBox* script [Pod_print_features print_features.pl].
 <pre>
