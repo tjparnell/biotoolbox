@@ -21,7 +21,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.9.7';
+my $VERSION = '1.11';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -163,7 +163,7 @@ if ($get_rna_genes) {
 unless (defined $do_cds) {
 	$do_cds = 1;
 	unless (defined $do_codon) {
-		$do_codon = 1;
+		$do_codon = 0;
 	}
 }
 unless (defined $do_utr) {
@@ -211,6 +211,7 @@ my $slice_adaptor = $registry->get_adaptor($species, $group, 'slice') or
 	die " Can't get slice adaptor!\n";
 my $db_connection = $slice_adaptor->dbc;
 my $db_name = $db_connection->dbname;
+my $csa = Bio::EnsEMBL::Registry->get_adaptor($species, $group, "coordsystem" );
 print " Success in connecting to database $db_name\n";
 
 
@@ -232,7 +233,9 @@ $gff_fh->print("##gff-version 3\n");
 $gff_fh->print("# EnsEMBL data for species $species\n");
 $gff_fh->print("# Collected from database $db_name\n");
 
-
+my $top_level_coordsys = $csa->fetch_all('toplevel') if $csa;
+my $assembly = $top_level_coordsys->[0]->version || undef;
+$gff_fh->print("##genome_build $assembly\n") if $assembly; 
 
 
 
@@ -250,6 +253,7 @@ $slices_ref = reorder_slices($slices_ref);
 
 # Process chromosomes
 my $phase; # global variable for keeping track of CDS phases
+my %id2counts; # global hash for keeping track of unique gene names
 foreach my $slice (@{ $slices_ref }) {
 	
 	print "  Collecting features for chromosome " . 
@@ -271,7 +275,7 @@ foreach my $slice (@{ $slices_ref }) {
 		# generate the chromosome SeqFeature object
 		my $chromo_sf = Bio::SeqFeature::Lite->new(
 				-seq_id        => $name,
-				-source        => $db_name,
+				-source        => $assembly || $db_name,
 				-primary_tag   => $slice->coord_system_name, 
 				-start         => 1,
 				-end           => $slice->seq_region_length,
@@ -286,12 +290,6 @@ foreach my $slice (@{ $slices_ref }) {
 		$gff_fh->print( $chromo_sf->gff_string . "\n");
 		$chr_feature_count++;
 	}
-	
-# 	#### DEBUGGING LIMITER ####
-# 	unless ($slice->seq_region_name eq '11') {
-# 		next;
-# 	}
-# 	###########################
 	
 	# collect the protein_coding genes
 	if ($get_protein_genes) {
@@ -330,11 +328,12 @@ foreach my $slice (@{ $slices_ref }) {
 	
 	# finished with this chromosome
 	if ($chr_feature_count) {
-		# print directive to close out all previous genes
-		$gff_fh->print("###\n"); 
 		print " Wrote $chr_feature_count features for chromosome " . 
 			$slice->seq_region_name . "\n";
 	}
+	
+	# debugging limiter
+# 	last;
 }
 
 
@@ -458,22 +457,31 @@ sub process_coding_gene {
 				-end           => $gene->end,
 				-strand        => $gene->strand,
 				-phase         => '.',
-				-display_name  => $gene->stable_id,
+				-display_name  => $gene->external_name || $gene->stable_id,
 				-primary_id    => $gene->stable_id,
 	);
-	$gene_sf->add_tag_value('status', $gene->status);
+	
+	# add stable ID as an alias
+	if ($gene->external_name) {
+		$gene_sf->add_tag_value('Alias', $gene->stable_id);
+	}
 	
 	# get additional information
-	my $alias = $gene->external_name;
-	if (defined $alias) {
-		$alias =~ s/ {3,}//g; # strip excessive spaces
-		$gene_sf->add_tag_value('Alias', $alias);
-	}
+	$gene_sf->add_tag_value('status', $gene->status);
 	my $note_text = $gene->description;
 	if (defined $note_text) {
-		$note_text =~ s/ {3,}//g; # strip excessive spaces
+		$note_text =~ s/ {2,}/ /g; # strip excessive spaces
 		$gene_sf->add_tag_value('Note', $note_text);
 	}
+	
+	# get external db cross reference
+	my $xref = $gene->display_xref;
+	if ($xref) {
+		my $db = $xref->dbname;
+		my $id = $xref->primary_id;
+		$gene_sf->add_tag_value('Dbxref', "$db:$id");
+	}
+	
 	
 	# work through the transcripts
 	foreach my $transcript (@{ $gene->get_all_Transcripts }) {
@@ -487,32 +495,51 @@ sub process_coding_gene {
 				-end           => $transcript->end,
 				-strand        => $transcript->strand,
 				-phase         => '.',
-				-display_name  => $transcript->stable_id,
+				-display_name  => $transcript->external_name || $transcript->stable_id,
 				-primary_id    => $transcript->stable_id,
 		);
 		
-		# add alias
-		if (defined $alias) {
-			$trnscpt_sf->add_tag_value('Alias', $alias);
+		# add stable ID as an alias
+		if ($transcript->external_name) {
+			$trnscpt_sf->add_tag_value('Alias', $transcript->stable_id);
 		}
+		
+		# use the parent gene common name as an alias
+		$trnscpt_sf->add_tag_value('Alias', $gene_sf->display_name);
+		
+		# get external db cross reference
+		my $xref = $transcript->display_xref;
+		if ($xref) {
+			my $db = $xref->dbname;
+			my $id = $xref->primary_id;
+			$trnscpt_sf->add_tag_value('Dbxref', "$db:$id");
+		}
+	
+		# add the exons
+		my $exons_ref = $transcript->get_all_Exons;
+		add_exons($trnscpt_sf, $exons_ref);
 		
 		# get transcription start/stop
 		my $coding_start = $transcript->coding_region_start || undef;
 		my $coding_stop  = $transcript->coding_region_end || undef;
 		$phase = 0; # reset phase to zero for all new transcripts
 		
-		# add the exons
-		my $exons_ref = $transcript->get_all_Exons;
-		add_exons($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
-		
-		# process CDS and UTRs
-		if ($do_cds or $do_utr) {
-			add_cds_and_utrs($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+		# check whether we have coding potential or not
+		if (!defined $coding_start and !defined $coding_stop) {
+			# do not need to write CDS, UTRs, or codons
+			# change the transcript primary_tag to ncRNA
+			$trnscpt_sf->primary_tag('ncRNA');
 		}
+		else {
+			# process CDS and UTRs
+			if ($do_cds or $do_utr) {
+				add_cds_and_utrs($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+			}
 		
-		# add codons
-		if ($do_codon) {
-			add_codons($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+			# add codons
+			if ($do_codon) {
+				add_codons($trnscpt_sf, $exons_ref, $coding_start, $coding_stop);
+			}
 		}
 		
 		# add the transcript
@@ -522,16 +549,23 @@ sub process_coding_gene {
 	
 	# print the gene feature and its subfeatures
 	$gene_sf->version(3);
-	$gff_fh->print( $gene_sf->gff_string(1) . "\n");
+	$gff_fh->print( $gene_sf->gff_string(1), "\n###\n");
 		# the gff_string method is undocumented in the POD, but is a 
 		# valid method. Passing 1 should force a recursive action to 
 		# print parent and children.
+		# also print the close directive
 }
 
 
 sub add_exons {
-	my ($transcript, $exons_ref, $coding_start, $coding_stop) = @_;
+	my ($transcript, $exons_ref) = @_;
 	
+	# exon counter
+	# we need to make the primary ids unique, and since exons may be 
+	# shared between multiple transcripts, we can't use the exon's id
+	# we'll use the transcript id plus an incrementing number to make unique
+	# it will take considerable effort to write unified exons with multiple parentage
+	# perhaps if I was writing GFF3 directly without going through SeqFeature objects....
 	my $exon_count = 1;
 	foreach my $exon ( @{ $exons_ref } ) {
 		
@@ -545,7 +579,7 @@ sub add_exons {
 				-end           => $exon->end,
 				-strand        => $exon->strand,
 				-display_name  => $exon->stable_id,
-				-primary_id    => $transcript->display_name . ".exon.$exon_count",
+				-primary_id    => $transcript->primary_id . ".exon$exon_count",
 			)
 		);
 		
@@ -591,8 +625,8 @@ sub add_codons {
 				-end           => $start_codon_stop,
 				-strand        => $transcript->strand,
 				-phase         => 0,
-				-display_name  => $transcript->display_name . '.start_codon',
-				-primary_id    => $transcript->display_name . '.start_codon',
+				-display_name  => $transcript->primary_id . '.start_codon',
+				-primary_id    => $transcript->primary_id . '.start_codon',
 			)
 		);
 		
@@ -606,8 +640,8 @@ sub add_codons {
 				-end           => $stop_codon_stop,
 				-strand        => $transcript->strand,
 				-phase         => 0,
-				-display_name  => $transcript->display_name . '.stop_codon',
-				-primary_id    => $transcript->display_name . '.stop_codon',
+				-display_name  => $transcript->primary_id . '.stop_codon',
+				-primary_id    => $transcript->primary_id . '.stop_codon',
 			)
 		);
 	}
@@ -623,21 +657,12 @@ sub add_cds_and_utrs {
 	# shared between multiple transcripts, we can't use the exon's id
 	# we'll use the transcript id plus an incrementing number to make unique
 	my $ex_count = 1; 
-	
-	
 	foreach my $exon ( @{ $exons_ref } ) {
 		
 		# we need to determine whether the exon is UTR, CDS, or split both
 		
-		#### No CDS whatsoever ####
-		if (!defined $cdsStart and !defined $cdsStop) {
-			# nothing to write
-			# there should already be an exon written
-			return;
-		}
-		
 		#### 5'UTR, CDS, and 3'UTR all in one exon
-		elsif (
+		if (
 			$exon->start < $cdsStart 
 			and
 			$exon->end > $cdsStop
@@ -658,11 +683,11 @@ sub add_cds_and_utrs {
 									'five_prime_UTR' :
 									'three_prime_UTR',
 				-primary_id    => $transcript->strand == 1 ? 
-									$transcript->primary_id . ".5utr.$ex_count" :
-									$transcript->primary_id . ".3utr.$ex_count",
+									$transcript->primary_id . ".5utr$ex_count" :
+									$transcript->primary_id . ".3utr$ex_count",
 				-display_name  => $transcript->strand == 1 ? 
-									$transcript->primary_id . ".5utr" :
-									$transcript->primary_id . ".3utr",
+									$exon->stable_id . ".5utr" :
+									$exon->stable_id . ".3utr",
 				)
 			) if $do_utr;
 			
@@ -679,11 +704,11 @@ sub add_cds_and_utrs {
 									'three_prime_UTR':
 									'five_prime_UTR' ,
 				-primary_id    => $transcript->strand == 1 ? 
-									$transcript->primary_id . ".3utr.$ex_count" :
-									$transcript->primary_id . ".5utr.$ex_count",
+									$transcript->primary_id . ".3utr$ex_count" :
+									$transcript->primary_id . ".5utr$ex_count",
 				-display_name  => $transcript->strand == 1 ? 
-									$transcript->primary_id . ".3utr" :
-									$transcript->primary_id . ".5utr",
+									$exon->stable_id . ".3utr" :
+									$exon->stable_id . ".5utr",
 				)
 			) if $do_utr;
 			
@@ -697,7 +722,7 @@ sub add_cds_and_utrs {
 				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
+				-primary_id    => $transcript->primary_id . ".cds$ex_count",
 				-display_name  => $exon->stable_id . ".cds",
 				)
 			) if $do_cds;
@@ -726,7 +751,7 @@ sub add_cds_and_utrs {
 				-primary_tag   => $transcript->strand == 1 ? 
 									'five_prime_UTR' :
 									'three_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
+				-primary_id    => $transcript->primary_id . ".utr$ex_count",
 				-display_name  => $exon->stable_id . ".utr",
 				)
 			) if $do_utr;
@@ -755,7 +780,7 @@ sub add_cds_and_utrs {
 				-primary_tag   => $transcript->strand == 1 ? 
 									'five_prime_UTR' :
 									'three_prime_UTR',
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
+				-primary_id    => $transcript->primary_id . ".utr$ex_count",
 				-display_name  => $exon->stable_id . '.utr',
 				)
 			) if $do_utr;
@@ -770,7 +795,7 @@ sub add_cds_and_utrs {
 				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
+				-primary_id    => $transcript->primary_id . ".cds$ex_count",
 				-display_name  => $exon->stable_id . ".cds",
 				)
 			) if $do_cds;
@@ -801,8 +826,8 @@ sub add_cds_and_utrs {
 				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
-				-display_name  => $exon->stable_id,
+				-primary_id    => $transcript->primary_id . ".cds$ex_count",
+				-display_name  => $exon->stable_id . '.cds',
 				)
 			) if $do_cds;
 			
@@ -834,7 +859,7 @@ sub add_cds_and_utrs {
 				-strand        => $transcript->strand,
 				-phase         => $phase,
 				-primary_tag   => 'CDS',
-				-primary_id    => $transcript->primary_id . ".cds.$ex_count",
+				-primary_id    => $transcript->primary_id . ".cds$ex_count",
 				-display_name  => $exon->stable_id . '.cds',
 				)
 			) if $do_cds;
@@ -851,7 +876,7 @@ sub add_cds_and_utrs {
 				-primary_tag   => $transcript->strand == 1 ? 
 									'three_prime_UTR':
 									'five_prime_UTR' ,
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
+				-primary_id    => $transcript->primary_id . ".utr$ex_count",
 				-display_name  => $exon->stable_id . '.utr',
 				)
 			) if $do_utr;
@@ -884,7 +909,7 @@ sub add_cds_and_utrs {
 				-primary_tag   => $transcript->strand == 1 ? 
 									'three_prime_UTR':
 									'five_prime_UTR' ,
-				-primary_id    => $transcript->primary_id . ".utr.$ex_count",
+				-primary_id    => $transcript->primary_id . ".utr$ex_count",
 				-display_name  => $exon->stable_id . '.utr',
 				)
 			) if $do_utr;
@@ -921,21 +946,29 @@ sub process_rna_gene {
 				-end           => $gene->end,
 				-strand        => $gene->strand,
 				-phase         => '.',
-				-display_name  => $gene->stable_id,
+				-display_name  => $gene->external_name || $gene->stable_id,
 				-primary_id    => $gene->stable_id,
 	);
-	$gene_sf->add_tag_value('status', $gene->status);
 	
-	# add additional information
-	my $alias = $gene->external_name;
-	if (defined $alias) {
-		$alias =~ s/ {3,}//g; # strip excessive spaces
-		$gene_sf->add_tag_value('Alias', $alias);
+	# add stable ID as an alias
+	if ($gene->external_name) {
+		$gene_sf->add_tag_value('Alias', $gene->stable_id);
 	}
+	
+	# get additional information
+	$gene_sf->add_tag_value('status', $gene->status);
 	my $note_text = $gene->description;
 	if (defined $note_text) {
-		$note_text =~ s/ {3,}//g; # strip excessive spaces
+		$note_text =~ s/ {2,}/ /g; # strip excessive spaces
 		$gene_sf->add_tag_value('Note', $note_text);
+	}
+	
+	# get external db cross reference
+	my $xref = $gene->display_xref;
+	if ($xref) {
+		my $db = $xref->dbname;
+		my $id = $xref->primary_id;
+		$gene_sf->add_tag_value('Dbxref', "$db:$id");
 	}
 	
 	# work through the transcript(s)
@@ -955,11 +988,17 @@ sub process_rna_gene {
 				-primary_id    => $transcript->stable_id,
 		);
 		
-		# add alias
-		if ($alias) {
-			$trnscpt_sf->add_tag_value('Alias', $alias);
-		}
+		# add parent display_name as alias
+		$trnscpt_sf->add_tag_value('Alias', $gene_sf->display_name);
 		
+		# get external db cross reference
+		my $xref = $transcript->display_xref;
+		if ($xref) {
+			my $db = $xref->dbname;
+			my $id = $xref->primary_id;
+			$trnscpt_sf->add_tag_value('Dbxref', "$db:$id");
+		}
+	
 		# add the exon(s), again, typically expect only one
 		my $exons_ref = $transcript->get_all_Exons;
 		my $exon_count = 1;
@@ -990,10 +1029,11 @@ sub process_rna_gene {
 	
 	# print the gene feature and its subfeatures
 	$gene_sf->version(3);
-	$gff_fh->print( $gene_sf->gff_string(1) . "\n" );
+	$gff_fh->print( $gene_sf->gff_string(1), "\n###\n");
 		# the gff_string method is undocumented in the POD, but is a 
 		# valid method. Passing 1 should force a recursive action to 
 		# print parent and children.
+		# also print the close directive
 }
 
 
@@ -1026,7 +1066,7 @@ get_ensembl_annotation.pl [--options...] --species <text>
   --(no)trna
   --(no)cds
   --(no)utr
-  --(no)codon
+  --codon
   --ucsc
   --group <text>
   --host <host.address>
@@ -1058,9 +1098,9 @@ extension will be added if necessary.
 
 =item --(no)chromo
 
-Boolean flag to indicate whether or not to write (or not) features for 
+Boolean flag to indicate whether to write (or not) features for 
 the toplevel chromosomes/scaffolds/contigs/sequences in the database. 
-The GFF type is the generic term 'chromosome'. The default is true.
+The default is true.
 
 =item --no(protein)
 
@@ -1115,10 +1155,10 @@ mRNA transcripts and genes. Default is true.
 Boolean flag to indicate whether or not to include UTR features for 
 mRNA transcripts and genes. Default is true.
 
-=item --(no)codon
+=item --codon
 
 Boolean flag to indicate whether or not to include start and stop codons 
-for mRNA transcripts and genes. Default is true if CDSs are included.
+for mRNA transcripts and genes. Default is false.
 
 =item --ucsc
 
