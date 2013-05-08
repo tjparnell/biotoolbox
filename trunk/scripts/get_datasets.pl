@@ -27,6 +27,7 @@ use tim_db_helper qw(
 	check_dataset_for_rpm_support
 	get_new_feature_list 
 	get_new_genome_list 
+	get_feature
 	get_chromo_region_score
 	get_region_dataset_hash
 );
@@ -34,7 +35,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.11';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -200,6 +201,7 @@ my (
 	$main_data_ref, 
 	$name_i, 
 	$type_i, 
+	$id_i,
 	$chromo_i, 
 	$start_i, 
 	$stop_i, 
@@ -405,7 +407,7 @@ sub set_defaults {
 ### Collect the feature list and populate the 
 sub get_main_data_ref {
 	
-	my ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
+	my ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
 	
 	# Generate new input file from the database
 	if ($new) { 
@@ -443,8 +445,9 @@ sub get_main_data_ref {
 			);
 			
 			# assign the column indices
-			$name   = 0;
-			$type   = 1;
+			$id     = 0;
+			$name   = 1;
+			$type   = 2;
 		}
 		
 		# check
@@ -464,8 +467,9 @@ sub get_main_data_ref {
 			die "no file data loaded!";
 		
 		# identify relevant feature data columns 
-		$name   = find_column_index($data_ref, '^name|id');
+		$name   = find_column_index($data_ref, '^name');
 		$type   = find_column_index($data_ref, '^type|class');
+		$id     = find_column_index($data_ref, '^primary_id');
 		$chromo = find_column_index($data_ref, '^chr|seq|ref|ref.?seq');
 		$start  = find_column_index($data_ref, '^start|position');
 		$stop   = find_column_index($data_ref, '^stop|end');
@@ -517,7 +521,7 @@ sub get_main_data_ref {
 			# some named feature
 			
 			# must have name and type columns
-			unless (defined $name and defined $type) {
+			unless (defined $id or (defined $name and defined $type)) {
 				# no name or type defined!?
 				
 				# do we at least have coordinates?
@@ -528,7 +532,7 @@ sub get_main_data_ref {
 				else {
 					# nothing recognized
 					die " File suggests '$feature' features but name and" . 
-						" type column headers can not be found!\n";
+						" type column headers cannot be found!\n";
 				}
 			}
 		}
@@ -537,7 +541,7 @@ sub get_main_data_ref {
 			# feature was not explicitly defined
 			
 			# determine empirically from column names
-			if (defined $name and defined $type) {
+			if (defined $id or (defined $name and defined $type)) {
 				# named features!
 				$feature = "Named feature";
 			}
@@ -567,7 +571,7 @@ sub get_main_data_ref {
 	}
 	
 	# done
-	return ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
+	return ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
 }
 
 
@@ -980,33 +984,21 @@ sub get_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get the feature from the database
-		my @features = $mdb->features( 
-				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
-				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_i ? 
+				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
+			'name'  => defined $name_i ? 
+				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
+			'type'  => defined $type_i ? 
+				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n";
-			
-			# record a null value
+		unless ($feature) {
+			# record a null value and move on
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			
-			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1046,33 +1038,21 @@ sub get_extended_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get the feature from the database
-		my @features = $mdb->features( 
-				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
-				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_i ? 
+				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
+			'name'  => defined $name_i ? 
+				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
+			'type'  => defined $type_i ? 
+				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n";
-			
-			# record a null value
+		unless ($feature) {
+			# record a null value and move on
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			
-			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1111,33 +1091,21 @@ sub get_adjusted_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get the feature from the database
-		my @features = $mdb->features( 
-				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
-				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_i ? 
+				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
+			'name'  => defined $name_i ? 
+				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
+			'type'  => defined $type_i ? 
+				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n";
-			
-			# record a null value
+		unless ($feature) {
+			# record a null value and move on
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			
-			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1232,33 +1200,21 @@ sub get_fractionated_feature_dataset {
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		
-		# get the feature from the database
-		my @features = $mdb->features( 
-				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
-				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_i ? 
+				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
+			'name'  => defined $name_i ? 
+				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
+			'type'  => defined $type_i ? 
+				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n";
-			
-			# record a null value
+		unless ($feature) {
+			# record a null value and move on
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			
-			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1360,33 +1316,21 @@ sub get_subfeature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# Get the feature from the database
-		my @features = $mdb->features( 
-				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
-				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_i ? 
+				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
+			'name'  => defined $name_i ? 
+				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
+			'type'  => defined $type_i ? 
+				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
-				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
-				" in the database!\n";
-			
-			# record a null value
+		unless ($feature) {
+			# record a null value and move on
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			
-			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1552,8 +1496,6 @@ sub get_subfeature_dataset {
 		$main_data_ref->{'data_table'}->[$row][$index] = $parent_score;
 	}
 }
-
-
 
 
 # subroutine to record the metadata for a dataset
@@ -1728,7 +1670,7 @@ genomic coordinates for which to collect data. The file should be a
 tab-delimited text file, one row per feature, with columns representing 
 feature identifiers, attributes, coordinates, and/or data values. The 
 first row should be column headers. Bed files are acceptable, as are 
-text files generated with this program.
+text files generated with this program or get_features.pl.
 
 =item --out <filename>
 

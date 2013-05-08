@@ -16,6 +16,7 @@ use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_new_feature_list
+	get_feature
 	get_region_dataset_hash
 	get_chromo_region_score
 	check_dataset_for_rpm_support
@@ -25,7 +26,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.10';
+my $VERSION = '1.11';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -523,15 +524,17 @@ sub map_relative_data {
 	
 	
 	# Identify columns for feature identification
-	my $name = find_column_index($main_data_ref, '^name|id');
+	my $name   = find_column_index($main_data_ref, '^name');
 	
-	my $type = find_column_index($main_data_ref, '^type|class');
+	my $type   = find_column_index($main_data_ref, '^type|class');
+	
+	my $id     = find_column_index($main_data_ref, '^primary_id');
 	
 	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
 	
-	my $start = find_column_index($main_data_ref, '^start|position');
+	my $start  = find_column_index($main_data_ref, '^start|position');
 	
-	my $stop = find_column_index($main_data_ref, '^stop|end');
+	my $stop   = find_column_index($main_data_ref, '^stop|end');
 	
 	my $strand = find_column_index($main_data_ref, '^strand');
 	
@@ -539,25 +542,6 @@ sub map_relative_data {
 	
 	# Select the appropriate method for data collection
 	if (
-		defined $name and
-		defined $type and 
-		not $long_data
-	) {
-		# mapping point data features using named features
-		map_relative_data_for_features(
-			$starting_point, $ending_point, $name, $type, $strand);
-	}
-	
-	elsif (
-		defined $name and
-		defined $type and 
-		$long_data
-	) {
-		# mapping long data features using named features
-		map_relative_long_data_for_features($name, $type, $strand);
-	}
-	
-	elsif (
 		defined $start and
 		defined $stop  and
 		defined $chromo and
@@ -578,9 +562,30 @@ sub map_relative_data {
 		map_relative_long_data_for_regions($chromo, $start, $stop, $strand);
 	}
 	
+	elsif (
+		(defined $id or 
+			( defined $name and defined $type ) 
+		) and 
+		not $long_data
+	) {
+		# mapping point data features using named features
+		map_relative_data_for_features(
+			$starting_point, $ending_point, $name, $type, $id, $strand);
+	}
+	
+	elsif (
+		(defined $id or 
+			( defined $name and defined $type ) 
+		) and 
+		$long_data
+	) {
+		# mapping long data features using named features
+		map_relative_long_data_for_features($name, $type, $id, $strand);
+	}
+	
 	else {
 		die " Unable to identify columns with feature identifiers!\n" .
-			" File must have Name and Type, or Chromo, Start, Stop columns\n";
+			" File must have Primary_ID or Name and Type, or Chromo, Start, Stop columns\n";
 	}
 	
 }
@@ -594,6 +599,7 @@ sub map_relative_data_for_features {
 		$ending_point, 
 		$name_index, 
 		$type_index, 
+		$id_index,
 		$strand_index
 	) = @_;
 	
@@ -606,8 +612,12 @@ sub map_relative_data_for_features {
 				'db'          => $mdb,
 				'ddb'         => $ddb,
 				'dataset'     => $dataset,
-				'name'        => $data_table_ref->[$row][$name_index],
-				'type'        => $data_table_ref->[$row][$type_index],
+				'name'        => defined $name_index ? 
+									$data_table_ref->[$row][$name_index] : undef,
+				'type'        => defined $type_index ? 
+									$data_table_ref->[$row][$type_index] : undef,
+				'id'          => defined $id_index ?
+									$data_table_ref->[$row][$id_index] : undef,
 				'start'       => $starting_point,
 				'stop'        => $ending_point,
 				'position'    => $position,
@@ -632,6 +642,7 @@ sub map_relative_long_data_for_features {
 	my (
 		$name_index, 
 		$type_index, 
+		$id_index,
 		$strand_index
 	) = @_;
 	
@@ -639,25 +650,19 @@ sub map_relative_long_data_for_features {
 	### Collect the data
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		
-		# Get the feature from the database
-		my @features = $mdb->features( 
-				-name => $data_table_ref->[$row][$name_index],
-				-type => $data_table_ref->[$row][$type_index],
+		# get feature from the database
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_index ? 
+				$data_table_ref->[$row][$id_index] : undef,
+			'name'  => defined $name_index ? 
+				$data_table_ref->[$row][$name_index] : undef,
+			'type'  => defined $type_index ? 
+				$data_table_ref->[$row][$type_index] : undef,
 		);
-		if (scalar @features > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one " . 
-				$data_table_ref->[$row][$type_index] . " features" .  
-				" named " . $data_table_ref->[$row][$name_index] . 
-				" in the database!\n Using the first feature only!\n";
-		}
-		elsif (!@features) {
-			warn " Found no " . 
-				$data_table_ref->[$row][$type_index] . " features" .
-				" named " . $data_table_ref->[$row][$name_index] . 
-				" in the database!\n";
+		
+		# check that we have a feature
+		unless ($feature) {
 			
 			# record a null values
 			for (
@@ -671,7 +676,6 @@ sub map_relative_long_data_for_features {
 			# move on
 			next;
 		}
-		my $feature = shift @features; 
 		
 		
 		# Collect the scores for each window
