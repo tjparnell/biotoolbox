@@ -13,12 +13,13 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
+	get_feature
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10.3';
+my $VERSION = '1.11';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -96,15 +97,9 @@ unless ($main_data_ref) {
 }
 
 # identify indices
-my $name_index = find_column_index($main_data_ref, 'name');
-my $type_index = find_column_index($main_data_ref, 'type');
-unless (
-	defined $name_index and
-	defined $type_index 
-) {
-	die 'unable to identify Name and/or Type columns in data table';
-}
-
+my $name_index = find_column_index($main_data_ref, '^name');
+my $type_index = find_column_index($main_data_ref, '^type');
+my $id_index   = find_column_index($main_data_ref, '^primary_id');
 
 
 
@@ -192,9 +187,11 @@ sub get_attribute_list_from_user {
 			unless (@examples) {
 				next;
 			}
-			my %taghash = $examples[0]->attributes();
-			foreach (keys %taghash) {
-				$tagexamples{$_} += 1;
+			foreach my $example (@examples) {
+				my %taghash = $example->attributes();
+				foreach (keys %taghash) {
+					$tagexamples{$_} += 1;
+				}
 			}
 		}
 		
@@ -205,7 +202,7 @@ sub get_attribute_list_from_user {
 		# standard attributes for any user
 		foreach ( 
 			qw(Chromosome Start Stop Strand Score Length Midpoint Phase 
-				RNA_count Exon_count Transcript_length Parent
+				RNA_count Exon_count Transcript_length Parent Primary_ID
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -214,6 +211,7 @@ sub get_attribute_list_from_user {
 		}
 		# specific attributes for these features
 		foreach (sort {$a cmp $b} keys %tagexamples) {
+			# all other attributes
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
@@ -284,6 +282,9 @@ sub get_attribute_method {
 	elsif ($attrib =~ /^parent$/i) {
 		$method = \&get_parent;
 	} 
+	elsif ($attrib =~ /^primary_id$/i) {
+		$method = \&get_primary_id;
+	} 
 	else {
 		# unrecognized, must be tag key
 		$method = \&get_tag_value;
@@ -306,24 +307,21 @@ sub collect_attributes_for_list {
 	print " Retrieving ", join(", ", @list), "\n";
 	my $table = $main_data_ref->{'data_table'}; # shortcut reference
 	for my $row (1..$main_data_ref->{'last_row'}) {
-		my @features = $db->features( 
-			# define the region
-			-name   => $table->[$row][$name_index],
-			-type  => $table->[$row][$type_index],
+		
+		# get the name of the feature
+		my $name = $table->[$row][$name_index];
+		$name = (split(';', $name))[0] if $name =~ /;/; # take the first name only
+		
+		# pull the feature(s) from the database
+		my $feature = get_feature(
+			'db'    => $db,
+			'name'  => defined $name_index ? 
+				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
+			'type'  => defined $type_index ? 
+				$main_data_ref->{'data_table'}->[$row][$type_index] : undef,
+			'id'    => defined $id_index ? 
+				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
 		);
-		if (scalar @features == 0) {
-			warn " no features found for '$table->[$row][$name_index]'\n";
-			
-			# record null value(s)
-			foreach (@list) {
-				push @{ $table->[$row] }, '.'; 
-			}
-			next;
-		}
-		elsif (scalar @features > 1) {
-			warn " multiple features found for '$table->[$row][$name_index]'" .
-				". Using first one\n";
-		}
 		
 		# get the attribute(s)
 		for (my $i = 0; $i < scalar @list; $i++) {
@@ -332,7 +330,7 @@ sub collect_attributes_for_list {
  			# pass both the feature and the name of the attribute
  			# only the tag value actually needs the name of the attribute
  			push @{ $table->[$row] }, 
- 				&{ $methods[$i] }($features[0], $list[$i]);
+ 				&{ $methods[$i] }($feature, $list[$i]);
  		}
 	}
 	
@@ -347,12 +345,14 @@ sub collect_attributes_for_list {
 
 sub get_chromo {
 	my $feature = shift;
+	return '.' unless $feature;
 	return $feature->seq_id || '.';
 }
 
 
 sub get_start {
 	my $feature = shift;
+	return '.' unless $feature;
 	return $feature->start || '.';
 }
 
@@ -360,18 +360,21 @@ sub get_start {
 
 sub get_stop {
 	my $feature = shift;
+	return '.' unless $feature;
 	return $feature->end || '.';
 }
 
 
 sub get_length {
 	my $feature = shift;
-	return $feature->length || '.';
+	return 0 unless $feature;
+	return $feature->length || 0;
 }
 
 
 sub get_transcript_length {
 	my $feature = shift;
+	return 0 unless $feature;
 	my $exon_total = 0;
 	my $cds_total  = 0;
 	foreach my $subf ( $feature->get_SeqFeatures() ) {
@@ -396,30 +399,35 @@ sub get_transcript_length {
 
 sub get_midpoint {
 	my $feature = shift;
+	return '.' unless $feature;
 	return ($feature->start + int( $feature->length / 2) ) || '.';
 }
 
 
 sub get_strand {
 	my $feature = shift;
-	return $feature->strand;
+	return '.' unless $feature;
+	return $feature->strand || 0;
 }
 
 
 sub get_phase {
 	my $feature = shift;
+	return '.' unless $feature;
 	return $feature->phase || '.';
 }
 
 
 sub get_score {
 	my $feature = shift;
+	return '.' unless $feature;
 	return $feature->score || '.';
 }
 
 
 sub get_rna_number {
 	my $feature = shift;
+	return 0 unless $feature;
 	my $rna_count = 0;
 	foreach my $f ($feature->get_SeqFeatures) {
 		if ($f->primary_tag =~ /rna/i) {
@@ -433,6 +441,7 @@ sub get_rna_number {
 
 sub get_exon_number {
 	my $feature = shift;
+	return 0 unless $feature;
 	my $exon_count = 0;
 	my $cds_count = 0;
 	foreach my $f ($feature->get_SeqFeatures) {
@@ -462,6 +471,7 @@ sub get_exon_number {
 
 sub get_parent {
 	my $feature = shift;
+	return '.' unless $feature;
 	if ($feature->has_tag('parent_id')) {
 		# feature has a parent
 		my ($parent_id) = $feature->get_tag_values('parent_id');
@@ -488,12 +498,18 @@ sub get_parent {
 }
 
 
+sub get_primary_id {
+	my $feature = shift;
+	return $feature->primary_id || '.';
+}
+
+
 sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
+	return '.' unless $feature;
 	if ($feature->has_tag($attrib)) {
-		my @values = $feature->get_tag_values($attrib);
-		return join(';', @values) || '.';
+		return join(';', ($feature->get_tag_values($attrib)) );
 	}
 	else {
 		return '.';
@@ -568,6 +584,7 @@ Attributes include:
    Exon_count
    Transcript_length (sum of exon lengths)
    Parent (name)
+   Primary_ID
    <tag>
 
 =head1 OPTIONS
@@ -609,6 +626,7 @@ attributes include the following
    -Exon_count (number of exons, or CDS, subfeatures)
    -Transcript_length
    -Parent (name)
+   -Primary_ID
    -<tag>
 
 If attrib is not specified on the command line, then an interactive list 

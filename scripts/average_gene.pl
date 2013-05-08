@@ -15,6 +15,7 @@ use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_new_feature_list
+	get_feature
 	get_region_dataset_hash
 	check_dataset_for_rpm_support
 );
@@ -23,7 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.10';
+my $VERSION = '1.11';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -393,15 +394,17 @@ sub collect_binned_data {
 	
 	
 	## Identify columns for feature identification
-	my $name = find_column_index($main_data_ref, '^name|id');
+	my $name   = find_column_index($main_data_ref, '^name');
 	
-	my $type = find_column_index($main_data_ref, '^type|class');
+	my $type   = find_column_index($main_data_ref, '^type|class');
+	
+	my $id     = find_column_index($main_data_ref, '^primary_id');
 	
 	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
 	
-	my $start = find_column_index($main_data_ref, '^start|position');
+	my $start  = find_column_index($main_data_ref, '^start|position');
 	
-	my $stop = find_column_index($main_data_ref, '^stop|end');
+	my $stop   = find_column_index($main_data_ref, '^stop|end');
 	
 	my $strand = find_column_index($main_data_ref, '^strand');
 	
@@ -409,15 +412,6 @@ sub collect_binned_data {
 	
 	## Select the appropriate method for data collection
 	if (
-		defined $name and
-		defined $type
-	) {
-		# using named features
-		collect_binned_data_for_features(
-			$binsize, $name, $type, $strand);
-	}
-	
-	elsif (
 		defined $start and
 		defined $stop  and
 		defined $chromo
@@ -425,6 +419,17 @@ sub collect_binned_data {
 		# using genome segments
 		collect_binned_data_for_regions(
 			$binsize, $chromo, $start, $stop, $strand);
+	}
+	
+	elsif (
+		defined $id or (
+			defined $name and 
+			defined $type
+		)
+	) {
+		# using named features
+		collect_binned_data_for_features(
+			$binsize, $id, $name, $type, $strand);
 	}
 	
 	else {
@@ -438,7 +443,7 @@ sub collect_binned_data {
 sub collect_binned_data_for_features {	
 	
 	## Passed data
-	my ($binsize, $name_index, $type_index, $strand_index) = @_;
+	my ($binsize, $id_index, $name_index, $type_index, $strand_index) = @_;
 	
 	
 	## Collect the data
@@ -446,31 +451,25 @@ sub collect_binned_data_for_features {
 		# walk through each feature
 		
 		# identify the feature first
-		my $name = $data_table_ref->[$row][$name_index]; # name
-		my $type = $data_table_ref->[$row][$type_index]; # class
-		
-		# start printing raw data
-		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
-		
-		# pull gene from database
-		my @genes = $mdb->features( 
-				-name  => $name,
-				-type => $type,
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_index ? 
+				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
+			'name'  => defined $name_index ? 
+				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
+			'type'  => defined $type_index ? 
+				$main_data_ref->{'data_table'}->[$row][$type_index] : undef,
 		);
-		if (scalar @genes > 1) {
-			# there should only be one feature found
-			# if more, there's redundant or duplicated data in the db
-			# warn the user, this should be fixed
-			warn " Found more than one feature of '$type => $name' in " .
-				"the database!\n Using the first feature only!\n";
-		}
-		my $gene = shift @genes; 
-		unless ($gene) {
-			die " unable to establish db region for $type feature $name!\n";
+		unless ($feature) {
+			# record null values
+			for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
+				$data_table_ref->[$row][$column] = '.';
+			}
+			next;
 		}
 		
 		# define the starting and ending points based on gene length
-		my $length = $gene->length;
+		my $length = $feature->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -481,8 +480,6 @@ sub collect_binned_data_for_features {
 			for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
 				$data_table_ref->[$row][$column] = '.';
 			}
-			
-			# move on to next feature
 			next;
 		}
 		
@@ -508,12 +505,13 @@ sub collect_binned_data_for_features {
 					'ddb'       => $ddb,
 					'dataset'   => $dataset,
 					'value'     => $value_type,
-					'name'      => $name,
-					'type'      => $type,
+					'chromo'    => $feature->seq_id,
+					'start'     => $feature->start,
+					'stop'      => $feature->end,
 					'extend'    => $extra,
 					'stranded'  => $stranded,
 					'strand'    => $set_strand ? 
-						$data_table_ref->[$row][$strand_index] : undef,
+						$data_table_ref->[$row][$strand_index] : $feature->strand,
 		);
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
@@ -538,17 +536,12 @@ sub collect_binned_data_for_regions {
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		# walk through each feature
 		
-		# identify the coordinates
-		my $chromo = $data_table_ref->[$row][$chromo_index]; 
-		my $start  = $data_table_ref->[$row][$start_index]; 
-		my $stop   = $data_table_ref->[$row][$stop_index]; 
-		my $strand = $data_table_ref->[$row][$strand_index] || 1; # default +1
-		
 		# start printing raw data
 		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
 		
 		# determine the segment length
-		my $length = $stop - $start + 1;
+		my $length = $data_table_ref->[$row][$stop_index] - 
+			$data_table_ref->[$row][$start_index] + 1;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -567,18 +560,14 @@ sub collect_binned_data_for_regions {
 		# the starting and ending points will be calculated from the number of
 		# extensions, the binsize (multiply by 0.01 to get fraction), and the gene
 		# length. No extensions should give just the length of the gene.
-		my ($startingpoint, $endingpoint);
+		my $extra;
 		if ($extension_size) {
 			# extension is specific bp in size
-			my $extra = $extension_size * $binsize;
-			$startingpoint = int( $start - $extra + 0.5 );
-			$endingpoint   = int( $stop + $extra + 0.5 );
+			$extra = int( ($extension_size * $binsize) + 0.5);
 		}
 		else {
 			# extension is dependent on feature length
-			my $extra = $extension * $binsize * 0.01 * $length;
-			$startingpoint = int( $start - $extra + 0.5);
-			$endingpoint   = int( $stop + $extra + 0.5);
+			my $extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
 		}
 		
 		# collect the region scores
@@ -586,12 +575,12 @@ sub collect_binned_data_for_regions {
 					'db'       => $ddb,
 					'dataset'  => $dataset,
 					'value'    => $value_type,
-					'chromo'   => $chromo,
-					'start'    => $startingpoint,
-					'stop'     => $endingpoint,
-					'absolute' => 1,
+					'chromo'   => $data_table_ref->[$row][$chromo_index],
+					'start'    => $data_table_ref->[$row][$start_index],
+					'stop'     => $data_table_ref->[$row][$stop_index],
+					'extend'   => $extra,
 					'stranded' => $stranded,
-					'strand'   => $strand,
+					'strand'   => $data_table_ref->[$row][$chromo_index],
 		);
 		if ($raw) {
 			foreach (sort {$a <=> $b} keys %regionscores) {
@@ -599,24 +588,8 @@ sub collect_binned_data_for_regions {
 			}
 		}
 		
-		# convert absolute scores to relative scores
-		# must be done here because we have the original coordinates
-		my %relative_scores;
-		if ($strand >= 0) {
-			# forward strand
-			foreach my $pos (keys %regionscores) {
-				$relative_scores{ $pos - $start } = $regionscores{$pos};
-			}
-		}
-		else {
-			# reverse strand
-			foreach my $pos (keys %regionscores) {
-				$relative_scores{ $stop - $pos } = $regionscores{$pos};
-			}
-		}
-		
 		# record the scores for each bin
-		record_the_bin_values($row, $length, \%relative_scores);
+		record_the_bin_values($row, $length, \%regionscores);
 		
 	}
 }

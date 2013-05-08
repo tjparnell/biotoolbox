@@ -18,12 +18,13 @@ use tim_db_helper qw(
 	verify_or_request_feature_types 
 	get_chromosome_list
 	validate_included_feature
+	get_feature
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.11';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -192,8 +193,9 @@ sub find_overlapping_features {
 	my $start_i  = find_column_index($main_data_ref, '^start');
 	my $stop_i   = find_column_index($main_data_ref, '^stop|end');
 	my $strand_i = find_column_index($main_data_ref, '^strand');
-	my $name_i   = find_column_index($main_data_ref, 'name');
-	my $type_i   = find_column_index($main_data_ref, 'type');
+	my $name_i   = find_column_index($main_data_ref, '^name');
+	my $type_i   = find_column_index($main_data_ref, '^type');
+	my $id_i     = find_column_index($main_data_ref, '^primary_id');
 	
 	# genomic coordinates
 	if (
@@ -208,17 +210,17 @@ sub find_overlapping_features {
 	
 	# named database features
 	elsif (
-		defined $name_i and 
-		defined $type_i
+		defined $id_i or 
+		(defined $name_i and defined $type_i)
 	) {
 		# we're working with named features
 		print " Input file '$infile' has named features\n";
-		intersect_named_features($name_i, $type_i);
+		intersect_named_features($id_i, $name_i, $type_i);
 	}
 	else {
 		# unable to identify
 		die " unable to identify feature information columns in source file " .
-			"'$infile'\n No chromosome, start, stop, name and/or type columns\n";
+			"'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
 	}
 }
 	
@@ -229,7 +231,7 @@ sub intersect_named_features {
 	# Named features 
 	
 	# search feature indices
-	my ($search_name_i, $search_type_i) = @_;
+	my ($search_id_i, $search_name_i, $search_type_i) = @_;
 	
 	# shortcut reference
 	my $table = $main_data_ref->{'data_table'};
@@ -243,14 +245,13 @@ sub intersect_named_features {
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# identify feature first
-		my @features = $db->features(
-			-name   => $table->[$row][$search_name_i],
-			-type   => $table->[$row][$search_type_i],
+		my $feature = get_feature(
+			'db'    => $db,
+			'id'    => defined $search_id_i   ? $table->[$row][$search_id_i]   : undef,
+			'name'  => defined $search_name_i ? $table->[$row][$search_name_i] : undef,
+			'type'  => defined $search_type_i ? $table->[$row][$search_type_i] : undef,
 		);
-		my $feature;
-		if (scalar @features == 0) {
-			warn " no features found for $table->[$row][$search_type_i] " . 
-				"$table->[$row][$search_name_i]\n";
+		unless ($feature) {
 			process_no_feature(
 				$row, 
 				$number_i, 
@@ -261,15 +262,6 @@ sub intersect_named_features {
 				$overlap_i,
 			);
 			next;
-		}
-		elsif (scalar @features > 1) {
-			warn " more than one feature found for $table->[$row][$search_type_i] " .
-				"$table->[$row][$search_name_i]; using first one\n";
-			$feature = shift @features;
-		}
-		else {
-			# only one feature - as it should be
-			$feature = shift @features;
 		}
 		
 		# Establish the region based on the found feature
