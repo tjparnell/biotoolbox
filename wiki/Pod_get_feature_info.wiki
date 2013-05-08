@@ -20,7 +20,7 @@ get_feature_info.pl <**filename>
   --version
   --help
 }}}
-Attributes include:    chromo    start    stop    midpoint    length    strand    phase    score    rna_count    exon_count    transcript_length (sum of exon lengths)    parent (name)    <**tag>
+Attributes include:    Chromosome    Start    Stop    Strand    Score    Length    Midpoint    Phase    RNA_count    Exon_count    Transcript_length (sum of exon lengths)    Parent (name)    Primary_ID    <**tag>
 
 ==OPTIONS==
 The command line flags and descriptions:
@@ -44,18 +44,20 @@ __
 __
   __
 {{{
-   -chromo
-   -start
-   -stop
-   -midpoint
-   -length
-   -strand
-   -phase
-   -score
-   -rna_count (number of RNA subfeatures)
-   -exon_count (number of exons, or CDS, subfeatures)
-   -transcript_length
-   -parent (name)
+   -Chromosome
+   -Start
+   -Stop
+   -Strand
+   -Score
+   -Length
+   -Midpoint
+   -Phase
+   -RNA_count (number of RNA subfeatures)
+   -Exon_count (number of exons, or CDS, subfeatures)
+   -Transcript_length
+   -Parent (name)
+   -Primary_ID
+   -<tag>
 }}}
   If attrib is not specified on the command line, then an interactive list  will be presented to the user for selection. Especially useful when you  can't remember the feature's tag keys in the database.
 __

@@ -50,7 +50,7 @@ __
 __--in <**filename>
 
 __
-  Specify an input file containing either a list of database features or  genomic coordinates for which to collect data. The file should be a  tab-delimited text file, one row per feature, with columns representing  feature identifiers, attributes, coordinates, and/or data values. The  first row should be column headers. Bed files are acceptable, as are  text files generated with this program.
+  Specify an input file containing either a list of database features or  genomic coordinates for which to collect data. The file should be a  tab-delimited text file, one row per feature, with columns representing  feature identifiers, attributes, coordinates, and/or data values. The  first row should be column headers. Bed files are acceptable, as are  text files generated with this program or get_features.pl.
 __
   __
 __--out <**filename>

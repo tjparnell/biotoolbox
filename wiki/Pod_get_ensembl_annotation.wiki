@@ -25,7 +25,7 @@ get_ensembl_annotation.pl `[`--options...`]` --species <**text>
   --(no)trna
   --(no)cds
   --(no)utr
-  --(no)codon
+  --codon
   --ucsc
   --group <text>
   --host <host.address>
@@ -54,7 +54,7 @@ __
 __--(no)chromo
 
 __
-  Boolean flag to indicate whether or not to write (or not) features for  the toplevel chromosomes/scaffolds/contigs/sequences in the database.  The GFF type is the generic term 'chromosome'. The default is true.
+  Boolean flag to indicate whether to write (or not) features for  the toplevel chromosomes/scaffolds/contigs/sequences in the database.  The default is true.
 __
   __
 __--no(protein)
@@ -117,10 +117,10 @@ __
   Boolean flag to indicate whether or not to include UTR features for  mRNA transcripts and genes. Default is true.
 __
   __
-__--(no)codon
+__--codon
 
 __
-  Boolean flag to indicate whether or not to include start and stop codons  for mRNA transcripts and genes. Default is true if CDSs are included.
+  Boolean flag to indicate whether or not to include start and stop codons  for mRNA transcripts and genes. Default is false.
 __
   __
 __--ucsc

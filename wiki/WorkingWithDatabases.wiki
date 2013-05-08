@@ -172,16 +172,16 @@ We use the *BioToolBox* script [Pod_get_features get_features.pl]. We must provi
 	# Program /usr/local/biotoolbox/scripts/get_features.pl
 	# Database zv9
 	# Feature gene:refGene
-	# Column_0 name=Name
-	# Column_1 name=Type
-	Name	Type
-	tec	gene:refGene
-	ppp4r1	gene:refGene
-	etv6	gene:refGene
-	zgc:165507	gene:refGene
+	# Column_0 name=Primary_ID
+	# Column_1 name=Name
+	# Column_2 name=Type
+	Primary_ID	Name	Type
+	1052992	zgc:163025	gene:refGene
+	1053018	f7	gene:refGene
+	1053040	f7i	gene:refGene
 </pre>
 
-The output file is a simple tab-delimited text file of the feature Name or Identifier, and the GFF type:source (representing columns 3 and 2 in the source GFF, respectively). The file has a column header as well as metadata lines, which are prefixed with a `#` symbol. You can learn more about this format [TimDataFormat here]. 
+The output file is a simple tab-delimited text file of the found features and their unique identifiers, including the database specific Primary_ID, Name and Aliases (if any), and the GFF type:source (representing columns 3 and 2 in the source GFF, respectively). The file has a column header as well as metadata lines, which are prefixed with a `#` symbol. You can learn more about this format [TimDataFormat here]. 
 
 We can also modify the output depending on what we want. If we want genomic coordinates, or output as BED or GFF format, we can specify that through additional command line options. If we want to include, for example, 1 kb of flanking region for each gene, we can provide start and stop adjustment coordinates, like so.
 <pre>
@@ -200,15 +200,15 @@ We can also modify the output depending on what we want. If we want genomic coor
 	# Column_0 name=Name
 	# Column_1 name=Type
 	# Column_2 name=Chromosome
-	# Column_3 name=Start;start_adjustment=-1000
-	# Column_4 name=End;stop_adjustment=1000
-	# Column_5 name=Strand
+	# Column_3 name=Start
+	# Column_4 name=End;position=53;start_adjustment=-1000
+	# Column_5 name=Strand;position=53;stop_adjustment=1000
 	Name	Type	Chromosome	Start	End	Strand
-	tec	gene:refGene	Zv9_NA110	2370	26536	1
-	ppp4r1	gene:refGene	Zv9_NA119	3883	3883	-1
-	etv6	gene:refGene	Zv9_NA122	13196	13196	-1
-	zgc:165507	gene:refGene	Zv9_NA123	44920	44920	-1
-	plgrkt	gene:refGene	Zv9_NA15	17565	22757	1
+	zgc:163025	gene:refGene	chr1	2800	16140	1
+	f7	gene:refGene	chr1	14962	22248	1
+	f7i	gene:refGene	chr1	22260	31081	1
+	f10	gene:refGene	chr1	31089	38349	1
+	pcid2	gene:refGene	chr1	47009	54546	-1
 	localhost:~ tim$
 </pre>
 Note that the output now includes start and stop coordinates for each gene, and that each have been adjusted by 1000 bp. The `--pos` option indicates the reference point from which the coordinates will be adjusted; in this case, we have indicated `53`, which means use the `5'` end for the start adjustment and the `3'` end for the stop adjustment. See the documentation for more examples. Note that the reported start and end coordinates are absolute (start `<` stop), but that the adjustment factors are based on the strand of the feature. 
@@ -228,23 +228,24 @@ To continue our example, we want the number of exons and the gene status. We're 
 
 	 Loading feature list from 'gene_refGene.txt'....
 	 These are the attributes which may be collected:
-	   1	chromo
-	   2	start
-	   3	stop
-	   4	midpoint
-	   5	length
-	   6	strand
-	   7	phase
-	   8	score
-	   9	rna_count
-	   10	exon_count
-	   11	transcript_length
-	   12	parent
-	   13	Alias
-	   14	load_id
-	   15	status
-	 Enter the attribute number(s) to collect, comma-delimited or range  10, 15
-	 Retrieving exon_count, status
+	   1	Chromosome
+	   2	Start
+	   3	Stop
+	   4	Strand
+	   5	Score
+	   6	Length
+	   7	Midpoint
+	   8	Phase
+	   9	RNA_count
+	   10	Exon_count
+	   11	Transcript_length
+	   12	Parent
+	   13	Primary_ID
+	   14	Dbxref
+	   15	Note
+	   16	load_id
+	 Enter the attribute number(s) to collect, comma-delimited or range  10,14
+	 Retrieving Exon_count, Dbxref
 	 Wrote file './gene_refGene.txt'
 	 That's it!
 	localhost:~ tim$
@@ -252,13 +253,13 @@ To continue our example, we want the number of exons and the gene status. We're 
 	# Program /usr/local/biotoolbox/scripts/get_features.pl
 	# Database zv9
 	# Feature gene:refGene
-	# Column_0 name=Name
-	# Column_1 name=Type
-	# Column_2 name=exon_count
-	# Column_3 name=status
-	Name	Type	exon_count	status
-	tec	gene:refGene	15	Provisional
-	ppp4r1	gene:refGene	4	Provisional
+	# Column_0 name=Primary_ID
+	# Column_1 name=Name
+	# Column_2 name=Type
+	# Column_3 name=Exon_count
+	# Column_4 name=Dbxref
+	Primary_ID	Name	Type	Exon_count	Dbxref
+	1052992	zgc:163025	gene:refGene	10	RefSeq:NM_001089558
 	localhost:~ tim$ 
 </pre>
 

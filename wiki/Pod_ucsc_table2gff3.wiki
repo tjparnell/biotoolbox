@@ -31,7 +31,7 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --(no)gene
   --(no)cds
   --(no)utr
-  --(no)codon
+  --codon
   --gz
   --version
   --help
@@ -129,10 +129,10 @@ __
   Specify whether (or not) to include three_prime_utr and five_prime_utr  features in the transcript heirarchy. If not defined, the GFF interpreter  must infer the UTRs from the CDS and exon features. The default is true.
 __
   __
-__--(no)codon
+__--codon
 
 __
-  Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is true.
+  Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is false.
 __
   __
 __--gz
