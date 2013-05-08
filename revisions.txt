@@ -1,5 +1,24 @@
 ######## BioToolBox revision history #############
 
+v.1.11 (svn 603)
+	- Major revision of how features are now retrieved from the database 
+	using primary_IDs rather than relying on unique names in the database. 
+	Generating lists of features will now return Primary_ID, Name, and Type. 
+	The Primary_ID is unique to a database and is usually non-portable. 
+	Current feature lists with only Name and Type will still work, and are 
+	subject to limitations of non-unique Names in the database. This affects 
+	all scripts that work with database features, including get_features.pl, 
+	get_feature_info.pl, get_datasets.pl, get_relative_data.pl, 
+	average_gene.pl, get_intersecting_features.pl, and correlate_position_data.pl.
+	- GFF3 annotation scripts get_ensembl_annotation.pl and ucsc_table2gff3.pl 
+	now produce GFF3 files that better match the GFF3 specification. Names 
+	are no longer made unique (which broke ties with the originating data), 
+	proper Dbxref tags are attributed when external sources could be 
+	identified, and chromosomes are now sorted by name. Other minor 
+	improvements were also made.
+	- Fixed critical bug that prevented spliced alignments from being 
+	counted in script bam2wig.pl. Thanks to Pinal K. for reporting.
+
 v.1.10.3 (svn 597)
 	- Unified column names and improved their recognition in scripts 
 	get_feature_info.pl and the graphing scripts graph_data.pl, 
