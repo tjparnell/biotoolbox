@@ -1588,7 +1588,8 @@ The keys include
               a reference to an established database object. 
   id       => Provide the primary_id tag. In the 
               Bio::DB::SeqFeature::Store database schema this is a 
-              non-portable, unique identifier specific to a database.
+              (usually) non-portable, unique identifier specific to a 
+              database. It provides the fastest lookup.
   name     => A scalar value representing the feature display_name. 
               Aliases may be appended with semicolon delimiters. 
   type     => Provide the feature type, which is typically expressed 
@@ -1597,7 +1598,7 @@ The keys include
 
 While it is possible to identify features with any two attributes 
 (or possibly just name or ID), the best performance is obtained with 
-name and type or all three together. A search for ID is more intensive. 
+all three together.
 
 The first SeqFeature object is returned if found.
 
