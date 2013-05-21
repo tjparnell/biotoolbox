@@ -1078,13 +1078,18 @@ object. This database will be checked for the indicated dataset, and
 the first returned feature checked for an attribute pointing to a 
 supported file.
 
+For multi-threaded execution pass a third value, the number of CPU cores 
+available to count Bam files. The default is 2 for environments where 
+Parallel::ForkManager is installed, or 1 where it is not.
+
 =cut
 
 sub check_dataset_for_rpm_support {
 	
 	# get passed dataset and databases
-	my $dataset = shift;
+	my $dataset  = shift;
 	my $database = shift;
+	my $cpu      = shift;
 	
 	# check that we haven't done this already
 	
@@ -1107,7 +1112,7 @@ sub check_dataset_for_rpm_support {
 		if ($BAM_OK) {
 			# tim_db_helper::bam was loaded ok
 			# sum the number of reads in the dataset
-			$rpm_read_sum = sum_total_bam_alignments($dataset);
+			$rpm_read_sum = sum_total_bam_alignments($dataset, 0, 0, $cpu);
 		}
 		else {
 			carp " Bam support is not available! " . 
@@ -1179,7 +1184,7 @@ sub check_dataset_for_rpm_support {
 			if ($BAM_OK) {
 				# tim_db_helper::bam was loaded ok
 				# sum the number of reads in the dataset
-				$rpm_read_sum = sum_total_bam_alignments($bamfile);
+				$rpm_read_sum = sum_total_bam_alignments($bamfile, 0, 0, $cpu);
 			}
 			else {
 				carp " Bam support is not available! " . 
@@ -1775,6 +1780,11 @@ The keys include
               strand relative to the feature should be collected. 
               Acceptable values include sense, antisense, or all.
               Default is 'all'.
+  rpm_sum  => When collecting rpm or rpkm values, the total number  
+              of alignments may be provided here. Especially 
+              useful when collecting via parallel forked processes, 
+              otherwise each fork will sum the number of alignments 
+              independently, an expensive proposition. 
          	  
 The subroutine will return the region score if successful.
 
@@ -1835,6 +1845,13 @@ sub get_chromo_region_score {
 			# otherwise assume it is non-log
 			# unsafe, but what else to do? we'll put the onus on the user
 			$args{'log'} = 0;
+		}
+	}
+	
+	# set RPM sum value if necessary
+	if (exists $args{'rpm_sum'} and defined $args{'rpm_sum'}) {
+		unless (exists $total_read_number{ $args{'dataset'} }) {
+			$total_read_number{ $args{'dataset'} = $args{'rpm_sum'} };
 		}
 	}
 	
@@ -2045,10 +2062,8 @@ sub get_region_dataset_hash {
 	
 	# Extend a named database feature
 	if (
-		( defined $args{'id'} or 
-			( defined $args{'name'} and defined $args{'type'} ) 
-		) and
-		defined $args{'extend'}
+		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
+		$args{'extend'}
 	) {
 		
 		# first define the feature to get endpoints
@@ -2086,13 +2101,9 @@ sub get_region_dataset_hash {
 		
 	# Specific start and stop coordinates of a named database feature
 	elsif (
-		( defined $args{'id'} or 
-			( defined $args{'name'} and defined $args{'type'} ) 
-		) and
-		defined $args{'start'} and 
-		defined $args{'stop'}
+		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
+		$args{'start'} and $args{'stop'}
 	) {
-		
 		# first define the feature to get endpoints
 		my $feature = get_feature(
 			'db'    => $db,
@@ -2164,10 +2175,7 @@ sub get_region_dataset_hash {
 	}
 	
 	# an entire named database feature
-	elsif (
-		defined $args{'id'} or 
-		( defined $args{'name'} and defined $args{'type'} ) 
-	) {
+	elsif ( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) {
 		
 		# first define the feature to get endpoints
 		my $feature = get_feature(
@@ -2205,11 +2213,7 @@ sub get_region_dataset_hash {
 	}
 	
 	# a genomic region
-	elsif (
-		defined $args{'chromo'} and
-		defined $args{'start'} and 
-		defined $args{'stop'}
-	) {
+	elsif ( $args{'chromo'} and $args{'start'} and $args{'stop'} ) {
 		# coordinates are easy
 		$fchromo   = $args{'chromo'};
 		if ($args{'extend'}) {
@@ -3461,6 +3465,9 @@ sub _get_segment_score {
 	
 	# single region score
 	else {
+		# check that we have scores
+		return _return_null($method) unless (@scores);
+		
 		# requested a single score for this region
 		# we need to combine the data
 		my $region_score;
@@ -3469,9 +3476,6 @@ sub _get_segment_score {
 		if ($log) {
 			@scores = map {2 ** $_} @scores;
 		}
-		
-		# check that we have scores
-		return _return_null($method) unless (@scores);
 		
 		# determine the region score according to method
 		# we are using subroutines from Statistics::Lite
