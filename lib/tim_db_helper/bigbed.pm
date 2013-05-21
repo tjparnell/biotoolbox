@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.9.0';
+our $VERSION = '1.12';
 
 
 # Exported names
@@ -270,36 +270,27 @@ sub sum_total_bigbed_features {
 	
 	
 	# Open BigBed file if necessary
-	my $bed;
+	my $bb;
 	my $bb_ref = ref $bb_file;
 	if ($bb_ref =~ /Bio::DB::BigBed/) {
 		# we have an opened bigbed db object
-		$bed = $bb_file;
+		$bb = $bb_file;
 	}
 	else {
 		# we have a name of a sam file
-		$bed = open_bigbed_db($bb_file);
-		return unless ($bed);
+		$bb = open_bigbed_db($bb_file);
+		return unless ($bb);
 	}
 	
 	# Count the number of alignments
 	my $total_read_number = 0;
 	
 	# loop through the chromosomes
-	my @chroms = $bed->seq_ids;
+	my @chroms = $bb->features(-type => 'bin');
+		# each requested bin is an entire chromosome
 	foreach my $chrom (@chroms) {
-		
-		# use an iterator to speed things up
-		my $iterator = $bed->features(
-			-seq_id    => $chrom,
-			-iterator  => 1,
-		);
-		
-		# count the number of bed features we go through
-		while (my $f = $iterator->next_seq) {
-			# we don't actually do anything with them
-			$total_read_number++;
-		}
+		# score method is the statistical method hash
+		$total_read_number += $chrom->score->{validCount};
 	}
 	
 	return $total_read_number;
