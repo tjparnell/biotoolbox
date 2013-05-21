@@ -3,7 +3,6 @@ package tim_db_helper;
 use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
-use File::Spec;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
@@ -23,7 +22,7 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.11';
+our $VERSION = '1.12';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
