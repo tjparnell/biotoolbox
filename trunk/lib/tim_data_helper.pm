@@ -14,12 +14,13 @@ our @EXPORT = qw(
 our @EXPORT_OK = qw(
 	generate_tim_data_structure
 	verify_data_structure
+	splice_data_structure
 	index_data_table
 	find_column_index
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.10.2';
+our $VERSION = '1.12';
 
 
 
@@ -373,6 +374,55 @@ sub verify_data_structure {
 	return 1;
 }
 
+
+
+### Split a data structure into an ordinal part for forking and parallel execution
+sub splice_data_structure {
+	my ($data, $part, $total_parts) = @_;
+	unless ($data) {
+		confess "no data structure passed for splicing\n";
+	}
+	unless ($part and $total_parts) {
+		confess "ordinal part and total number of parts not passed\n";
+	}
+	my $part_length = int($data->{'last_row'} / $total_parts);
+	
+	# splicing based on which part we do 
+	if ($part == 1) {
+		# remove all but the first part
+		splice( 
+			@{$data->{'data_table'}}, 
+			$part_length + 1 
+		);
+	}
+	elsif ($part == $total_parts) {
+		# remove all but the last part
+		splice( 
+			@{$data->{'data_table'}}, 
+			1,
+			$part_length * ($total_parts - 1) 
+		);
+	}
+	else {
+		# splicing in the middle requires two rounds
+		
+		# remove the last parts
+		splice( 
+			@{$data->{'data_table'}}, 
+			($part * $part_length) + 1
+		);
+		
+		# remove the first parts
+		splice( 
+			@{$data->{'data_table'}}, 
+			1,
+			$part_length * ($part - 1) 
+		);
+	}
+	
+	# update last row metadata
+	$data->{'last_row'} = scalar(@{$data->{'data_table'}}) - 1;
+}
 
 
 
@@ -773,6 +823,41 @@ some simple errors, and complain about others.
 
 Pass the data structure reference. It will return 1 if successfully 
 verified, or false if not.
+
+=item splice_data_structure()
+
+This function will splice an ordinal section out of a data structure in 
+preparation for forking and parallel execution. Pass the function 
+three parameters:
+    1. the data structure reference, as described here
+    2. the 1-based ordinal index to keep
+    3. the total number of parts to split the data structure
+Each spliced data structure will maintain the same metadata and 
+column headings (data table row 0), but the data table will have 
+only a fraction of the original data. 
+
+For example, to split a data table into four segments for parallel 
+execution in four children processes, call this function once in 
+each child, increasing the index (second parameter) each time.
+	
+	my $data = load_tim_data_file($file);
+	my $pm = Parallel::ForkManager->new(4);
+	for my $i (1..4) {
+		$pm->start and next;
+		### in child
+		splice_data_structure($data, $i, 4);
+		# do something with this fraction
+		write_tim_data_file('data' => $data, 'filename' => "file#$i");
+		$pm->finish;
+	}
+	$pm->wait_all_children;
+	
+The child data structure will be lost upon exiting the child process 
+unless it is saved somehow. The easiest thing is to write it to disk. 
+The biotoolbox script join_data_file.pl may then be used to join 
+the file segments back into a single file. The Parallel::ForkManager 
+also has a method of merging the data structure into the parent 
+process using a disk file intermediate.
 
 =item index_data_table()
 
