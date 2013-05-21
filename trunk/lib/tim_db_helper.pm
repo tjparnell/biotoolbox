@@ -29,44 +29,32 @@ our $WIGGLE_OK = 0;
 eval {
 	require tim_db_helper::wiggle;
 	tim_db_helper::wiggle->import;
-};
-unless ($@) {
 	$WIGGLE_OK = 1;
-}; 
-undef $@;
+};
 
 # check for BigWig support
 our $BIGWIG_OK = 0;
 eval { 
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
-};
-unless ($@) {
 	$BIGWIG_OK = 1;
-}; 
-undef $@;
+};
 
 # check for BigBed support
 our $BIGBED_OK = 0;
 eval { 
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
-};
-unless ($@) {
 	$BIGBED_OK = 1;
-}; 
-undef $@;
+};
 
 # check for Bam support
 our $BAM_OK = 0;
 eval { 
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
-};
-unless ($@) {
 	$BAM_OK = 1;
-}; 
-undef $@;
+};
 
 
 
