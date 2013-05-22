@@ -9,7 +9,7 @@ use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper qw(open_to_write_fh);
+use tim_file_helper qw(open_to_read_fh open_to_write_fh);
 use tim_data_helper qw(format_with_commas);
 use tim_big_helper qw(wig_to_bigwig_conversion);
 eval {
@@ -17,10 +17,16 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
+my $parallel;
+eval {
+	# check for parallel support
+	require Parallel::ForkManager;
+	$parallel = 1;
+};
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.11',
+	VERSION         => '1.12',
 	LOG2            => log(2),
 	LOG10           => log(10),
 	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
@@ -71,6 +77,7 @@ my (
 	$bigwig,
 	$bwapp,
 	$gz,
+	$cpu,
 	$verbose,
 	$help,
 	$print_version,
@@ -98,6 +105,7 @@ GetOptions(
 	'bw!'       => \$bigwig, # generate bigwig file
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
 	'gz!'       => \$gz, # compress text output
+	'cpu=i'     => \$cpu, # number of cpu cores to use
 	'verbose!'  => \$verbose, # print sample correlations
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -139,8 +147,6 @@ unless (exists &open_bam_db) {
 	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
 }
 my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
-my $bam = $sam->bam;
-my $index = $sam->bam_index;
 
 
 
@@ -151,7 +157,10 @@ my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
 	print " Calculating total number of aligned fragments... this may take a while...\n";
-	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired);
+	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired, $cpu);
+		# this is multi-threaded as well so pass the cpu number available
+	
+	# print result
 	print "   ", format_with_commas($total_read_number), " total mapped fragments\n";
 	printf " counted in %.1f minutes\n", (time - $start_time)/60;
 }
@@ -160,6 +169,7 @@ if ($rpm) {
 
 ### Calculate shift value
 if ($shift and !$shift_value) {
+	# this must be done single-threaded
 	print " Calculating 3' shift value...\n";
 	$shift_value = determine_shift_value();
 	
@@ -177,22 +187,40 @@ if ($shift and !$shift_value) {
 
 ### Process bam file
 # process according to type of data collected and alignment type
-if ($use_coverage) {
-	# special, speedy, low-level, single-bp coverage 
-	process_bam_coverage();
-}
-elsif ($splice) {
-	# single end alignments with splices require special callbacks
-	# we must do this with the high level API
-	$sam->split_splices($splice);
-	warn " WARNING: enabling splices will increase processing times\n";
-	process_split_alignments();
+if ($cpu > 1) {
+	# multiple cpu core execution
+	
+	if ($use_coverage) {
+		# special, speedy, low-level, single-bp coverage 
+		parallel_process_bam_coverage();
+	}
+	else {
+		# process alignments individually
+		if ($splice) {
+			# enable splices, which will use special callbacks
+			$sam->split_splices($splice);
+			print " WARNING: enabling splices will increase processing times\n";
+		}
+		parallel_process_alignments();
+	}
+	
 }
 else {
-	# all other alignments, single, paired, mid, start, span
-	process_alignments();
+	# single-thread execution
+	if ($use_coverage) {
+		# special, speedy, low-level, single-bp coverage 
+		process_bam_coverage();
+	}
+	else {
+		# process alignments individually
+		if ($splice) {
+			# enable splices, which will use special callbacks
+			$sam->split_splices($splice);
+			print " WARNING: enabling splices will increase processing times\n";
+		}
+		process_alignments();
+	}
 }
-
 
 
 
@@ -217,6 +245,17 @@ sub check_defaults {
 	}
 	unless ($infile =~ /\.bam$/i) {
 		die " must provide a .bam file as input!\n";
+	}
+	
+	# check parallel support
+	if ($parallel) {
+		# conservatively enable 2 cores
+		$cpu ||= 2;
+	}
+	else {
+		# disable cores
+		print " disabling parallel CPU execution, no support present\n" if $cpu;
+		$cpu = 0;
 	}
 	
 	# check log number
@@ -512,9 +551,9 @@ sub check_defaults {
 
 ### Open the output file handle 
 sub open_wig_file {
+	my ($name, $track) = @_;
 	
-	# generate name
-	my $name = shift;
+	# add extension to filename
 	$name .= $bedgraph ? '.bdg' : '.wig';
 	$name .= '.gz', if $gz;
 		
@@ -525,10 +564,10 @@ sub open_wig_file {
 		
 	# write track line
 	if ($bedgraph) {
-		$fh->print("track type=bedGraph\n");
+		$fh->print("track type=bedGraph\n") if $track;
 	}
 	else {
-		$fh->print("track type=wiggle_0\n");
+		$fh->print("track type=wiggle_0\n") if $track;
 	}
 	
 	# finished, return ref to names array, and 1 or 2 filehandles
@@ -567,8 +606,8 @@ sub determine_shift_value {
 			$end = $size if $end > $size;
 		
 			# using the low level interface for a little more performance
-			my $coverage = $index->coverage(
-				$bam,
+			my $coverage = $sam->bam_index->coverage(
+				$sam->bam,
 				$tid, # need the low level target ID
 				$start, 
 				$end,
@@ -627,7 +666,8 @@ sub determine_shift_value {
 			'count'   => 0,
 			'print'   => 0, # we will not print this data to file
 		};
-		$index->fetch($bam, $tid, $start, $end, \&record_stranded_start, \%data);
+		$sam->bam_index->fetch(
+			$sam->bam, $tid, $start, $end, \&record_stranded_start, \%data);
 		unless ($data{'count'}) {
 			die " no stranded data collected for calculating shift value!\n";
 		}
@@ -701,7 +741,7 @@ sub process_bam_coverage {
 	# using the low level bam coverage method, not strand specific
 	
 	# open wig file
-	my ($filename, $fh) = open_wig_file($outfile);
+	my ($filename, $fh) = open_wig_file($outfile, 1);
 	
 	# determine the dump size
 	# the dump size indicates how much of the genome we take before we 
@@ -709,56 +749,12 @@ sub process_bam_coverage {
 	# this is based on the requested bin_size, default should be 1 bp 
 	# but we want to keep the coverage array reasonable size, 10000 elements
 	# is plenty. we'll do some math to make it a multiple of bin_size to fit
-	my $multiplier = int( 10000 / $bin_size);
-	my $dump = $bin_size * $multiplier; 
+	my $dump = $bin_size * int( 10000 / $bin_size); 
 	
 	# loop through the chromosomes
 	for my $tid (0 .. $sam->n_targets - 1) {
 		# each chromosome is internally represented in the bam file as an integer
-		
-		# get sequence info
-		my $seq_length = $sam->target_len($tid);
-		my $seq_id = $sam->target_name($tid);
-		
-		# prepare definition line for fixedStep
-		$fh->print(
-			"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-		);
-		
-		# walk through the chromosome
-		for (my $start = 0; $start < $seq_length; $start += $dump) {
-			
-			# the low level interface works with 0-base indexing
-			my $end = $start + $dump -1;
-			$end = $seq_length if $end > $seq_length;
-			
-			# using the low level interface for a little more performance
-			my $coverage = $index->coverage(
-				$bam,
-				$tid,
-				$start,
-				$end,
-			);
-			
-			# now dump the coverage out to file
-			if ($bin) {
-				for (my $i = 0; $i < scalar(@{ $coverage }); $i += $bin_size) {
-				
-					# sum the reads within our bin
-					my $sum = sum( map {$coverage->[$_]} ($i .. $i + $bin_size - 1));
-				
-					# print the wig line
-					$fh->print("$sum\n");
-				}
-			}
-			else {
-				for my $i (0 .. scalar(@$coverage)-1) {
-					# print the wig line
-					$fh->print("$coverage->[$i]\n");
-				}
-			}
-		}
-		printf " Converted reads on $seq_id in %.3f minutes\n", (time - $start_time)/60;
+		process_bam_coverage_on_chromosome($fh, $tid, $dump);
 	}
 	
 	$fh->close;
@@ -772,17 +768,132 @@ sub process_bam_coverage {
 
 
 
+### Parallel process coverage
+sub parallel_process_bam_coverage {
+	# using the low level bam coverage method, not strand specific
+	# parallel multiple core execution
+	
+	# determine the dump size
+	# the dump size indicates how much of the genome we take before we 
+	# dump to file
+	# this is based on the requested bin_size, default should be 1 bp 
+	# but we want to keep the coverage array reasonable size, 10000 elements
+	# is plenty. we'll do some math to make it a multiple of bin_size to fit
+	my $dump = $bin_size * int( 10000 / $bin_size); 
+	
+	# we don't want child files to be compressed, takes too much CPU time
+	my $original_gz = $gz;
+	$gz = 0;
+	
+	# prepare ForkManager
+	print " Forking into $cpu children for parallel conversion\n";
+	my $pm = Parallel::ForkManager->new($cpu);
+	
+	# loop through the chromosomes
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# each chromosome is internally represented in the bam file as an integer
+		
+		# run each chromosome in a separate fork
+		$pm->start and next;
+		
+		### in child ###
+		# first clone the Bam file object to make it safe for forking
+		$sam->clone;
+		
+		# then write the chromosome coverage in separate chromosome file
+		my ($filename, $fh) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
+		process_bam_coverage_on_chromosome($fh, $tid, $dump);
+		
+		# finished with this chromosome
+		$fh->close;
+		$pm->finish;
+	}
+	$pm->wait_all_children;
+	
+	# merge the children files back into one output file
+	print " merging separate chromosome files\n";
+	my @files = glob "$outfile#*";
+	die "can't find children files!\n" unless (@files);
+	$gz = $original_gz;
+	my ($filename, $fh) = open_wig_file($outfile, 1);
+	while (@files) {
+		my $file = shift @files;
+		my $in = open_to_read_fh($file);
+		while (<$in>) {$fh->print($_)}
+		$in->close;
+		unlink $file;
+	}
+	print " Wrote file $filename\n";
+	
+	# convert to bigwig if requested
+	if ($bigwig) {
+		convert_to_bigwig($filename);
+	}
+}
+
+
+
+### Process bam coverage for a specific chromosome
+sub process_bam_coverage_on_chromosome {
+	my ($fh, $tid, $dump) = @_;
+	
+	# get sequence info
+	my $seq_length = $sam->target_len($tid);
+	my $seq_id = $sam->target_name($tid);
+	
+	# prepare definition line for fixedStep
+	$fh->print(
+		"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+	);
+	
+	# walk through the chromosome
+	for (my $start = 0; $start < $seq_length; $start += $dump) {
+		
+		# the low level interface works with 0-base indexing
+		my $end = $start + $dump -1;
+		$end = $seq_length if $end > $seq_length;
+		
+		# using the low level interface for a little more performance
+		my $coverage = $sam->bam_index->coverage(
+			$sam->bam,
+			$tid,
+			$start,
+			$end,
+		);
+		
+		# now dump the coverage out to file
+		if ($bin) {
+			for (my $i = 0; $i < scalar(@{ $coverage }); $i += $bin_size) {
+			
+				# sum the reads within our bin
+				my $sum = sum( map {$coverage->[$_]} ($i .. $i + $bin_size - 1));
+			
+				# print the wig line
+				$fh->print("$sum\n");
+			}
+		}
+		else {
+			for my $i (0 .. scalar(@$coverage)-1) {
+				# print the wig line
+				$fh->print("$coverage->[$i]\n");
+			}
+		}
+	}
+	printf " Converted reads on $seq_id in %.3f minutes\n", (time - $start_time)/60;
+}
+
+
 ### Process alignments
 sub process_alignments {
 	
 	# open wig files
 	my ($filename1, $filename2, $fh1, $fh2);
 	if ($strand) {
-		($filename1, $fh1) = open_wig_file("$outfile\_f");
-		($filename2, $fh2) = open_wig_file("$outfile\_r");
+		($filename1, $fh1) = open_wig_file("$outfile\_f", 1);
+		($filename2, $fh2) = open_wig_file("$outfile\_r", 1);
 	}
 	else {
-		($filename1, $fh1) = open_wig_file($outfile);
+		($filename1, $fh1) = open_wig_file($outfile, 1);
 	}
 	
 	# loop through the chromosomes
@@ -792,46 +903,13 @@ sub process_alignments {
 		# we can easily convert this to an actual sequence name
 		# we will force the conversion to go one chromosome at a time
 		
-		# sequence info
-		my $seq_id = $sam->target_name($tid);
-		my $seq_length = $sam->target_len($tid);
-		
-		# print chromosome line
-		if ($use_start or $use_mid) {
-			foreach ($fh1, $fh2) {
-				next unless defined $_;
-				if ($bin) {
-					$_->print(
-						"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-					);
-				}
-				else {
-					$_->print("variableStep chrom=$seq_id\n");
-				}
-			}
+		# processing depends on whether we need to split splices or not
+		if ($splice) {
+			process_split_alignments_on_chromosome($fh1, $fh2, $tid);
 		}
-		
-		# process the chromosome alignments
-		my %data = (
-			'f'       => {},
-			'r'       => {},
-			'fhf'     => $fh1,
-			'fhr'     => $fh2,
-			'bufferf' => [],
-			'bufferr' => [],
-			'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
-			'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
-			'count'   => 0,
-			'seq_id'  => $seq_id,
-			'seq_length' => $seq_length,
-			'print'   => 1,
-		);
-		$index->fetch($bam, $tid, 0, $seq_length, $callback, \%data);
-		
-		# finish up this chromosome
-		&$write_wig(\%data, 1); # final write
-		printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-			format_with_commas( $data{'count'}), (time - $start_time)/60;
+		else {
+			process_alignments_on_chromosome($fh1, $fh2, $tid);
+		}
 	}
 	
 	# finished
@@ -848,94 +926,224 @@ sub process_alignments {
 
 
 
-
-### Walk through the alignments on each chromosome
-sub process_split_alignments {
+### Process alignments in parallel
+sub parallel_process_alignments {
 	
-	# open wig files
-	my ($filename1, $filename2, $fh1, $fh2);
-	if ($strand) {
-		($filename1, $fh1) = open_wig_file("$outfile\_f");
-		($filename2, $fh2) = open_wig_file("$outfile\_r");
-	}
-	else {
-		($filename1, $fh1) = open_wig_file($outfile);
-	}
+	# we don't want child files to be compressed, takes too much CPU time
+	my $original_gz = $gz;
+	$gz = 0;
+	
+	# prepare ForkManager
+	print " Forking into $cpu children for parallel conversion\n";
+	my $pm = Parallel::ForkManager->new($cpu);
 	
 	# loop through the chromosomes
 	for my $tid (0 .. $sam->n_targets - 1) {
 		# each chromosome is internally represented in the bam file as 
 		# a numeric target identifier
-		# we can easily convert this to an actual sequence name
-		# we will force the conversion to go one chromosome at a time
+		# run each chromosome in a separate fork
+		$pm->start and next;
 		
-		# sequence info
-		my $seq_id = $sam->target_name($tid);
-		my $seq_length = $sam->target_len($tid);
+		### in child ###
+		# first clone the Bam file object to make it safe for forking
+		$sam->clone;
 		
-		# print chromosome line
-		if ($use_start or $use_mid) {
-			foreach ($fh1, $fh2) {
-				next unless defined $_;
-				if ($bin) {
-					$_->print(
-						"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-					);
-				}
-				else {
-					$_->print("variableStep chrom=$seq_id\n");
-				}
-			}
+		# open chromosome wig files
+		my ($filename1, $filename2, $fh1, $fh2);
+		if ($strand) {
+			($filename1, $fh1) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
+			($filename2, $fh2) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
+		}
+		else {
+			($filename1, $fh1) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
+		}
+	
+		# processing depends on whether we need to split splices or not
+		if ($splice) {
+			process_split_alignments_on_chromosome($fh1, $fh2, $tid);
+		}
+		else {
+			process_alignments_on_chromosome($fh1, $fh2, $tid);
 		}
 		
-		# process the reads across the chromosome
-		# Due to requiring split splices, we need to use the high-level API
-		# it's easier to use the high-level than try and re-invent my own code 
-		# for dealing with splices <sigh>
-		# this will increase processing time as each alignment must be incorporated 
-		# into AlignWrapper objects
-		
-		# to make things even more complicated, the split alignment subfeatures
-		# are no longer bam alignments, but essentially SeqFeature objects
-		# which means we must use special callbacks to record them (sigh....)
-		
-		# since the high level API does not allow for a data structure to be passed 
-		# to the callback, we'll have to link it to a global variable
-		my %data = (
-			'f'       => {},
-			'r'       => {},
-			'fhf'     => $fh1,
-			'fhr'     => $fh2,
-			'bufferf' => [],
-			'bufferr' => [],
-			'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
-			'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
-			'count'   => 0,
-			'seq_id'  => $seq_id,
-			'seq_length' => $seq_length,
-			'print'   => 1,
-		);
-		$data_ref = \%data;
-		
-		# fetch using the high level API
-		$sam->fetch("$seq_id:1..$seq_length", \&single_end_spliced_callback);
-		
-		# finish up this chromosome
-		&$write_wig(\%data, 1); # final write
-		printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-			format_with_commas( $data{'count'}), (time - $start_time)/60;
+		# finished with this chromosome
+		$fh1->close;
+		$fh2->close if $fh2;
+		$pm->finish;
 	}
+	$pm->wait_all_children;
 	
-	# finished
-	$fh1->close;
-	$fh2->close if $fh2;
-	print " Wrote file $filename1\n";
-	print " Wrote file $filename2\n" if $filename2;
+	# merge the children files back into one output file
+	print " merging separate chromosome files\n";
+	my ($filename1, $filename2);
+	if ($strand) {
+		# separate stranded files
+		
+		my @ffiles = glob "$outfile\_f#*";
+		my @rfiles = glob "$outfile\_r#*";
+		die "can't find children files!\n" unless (@ffiles and @rfiles);
+		
+		$gz = $original_gz;
+		my $fh;
+		
+		# combine forward files
+		($filename1, $fh) = open_wig_file("$outfile\_f", 1);
+		while (@ffiles) {
+			my $file = shift @ffiles;
+			my $in = open_to_read_fh($file);
+			while (<$in>) {$fh->print($_)}
+			$in->close;
+			unlink $file;
+		}
+		$fh->close;
+		print " Wrote file $filename1\n";
+		
+		# combine reverse files
+		($filename2, $fh) = open_wig_file("$outfile\_r", 1);
+		while (@rfiles) {
+			my $file = shift @rfiles;
+			my $in = open_to_read_fh($file);
+			while (<$in>) {$fh->print($_)}
+			$in->close;
+			unlink $file;
+		}
+		$fh->close;
+		print " Wrote file $filename2\n";
+	}
+	else {
+		# single wig file
+		
+		my @files = glob "$outfile#*";
+		die "can't find children files!\n" unless (@files);
+		$gz = $original_gz;
+		my $fh;
+		($filename1, $fh) = open_wig_file($outfile, 1);
+		while (@files) {
+			my $file = shift @files;
+			my $in = open_to_read_fh($file);
+			while (<$in>) {$fh->print($_)}
+			$in->close;
+			unlink $file;
+		}
+		$fh->close;
+		print " Wrote file $filename1\n";
+	}
 	
 	# convert to bigwig if requested
 	if ($bigwig) {
 		convert_to_bigwig($filename1, $filename2);
 	}
+}
+
+
+
+### Process alignments for a specific chromosome
+sub process_alignments_on_chromosome {
+	my ($fh1, $fh2, $tid) = @_;
+	
+	# sequence info
+	my $seq_id = $sam->target_name($tid);
+	my $seq_length = $sam->target_len($tid);
+	
+	# print chromosome line
+	if ($use_start or $use_mid) {
+		foreach ($fh1, $fh2) {
+			next unless defined $_;
+			if ($bin) {
+				$_->print(
+					"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+				);
+			}
+			else {
+				$_->print("variableStep chrom=$seq_id\n");
+			}
+		}
+	}
+	
+	# process the chromosome alignments
+	my %data = (
+		'f'       => {},
+		'r'       => {},
+		'fhf'     => $fh1,
+		'fhr'     => $fh2,
+		'bufferf' => [],
+		'bufferr' => [],
+		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
+		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
+		'count'   => 0,
+		'seq_id'  => $seq_id,
+		'seq_length' => $seq_length,
+		'print'   => 1,
+	);
+	$sam->bam_index->fetch($sam->bam, $tid, 0, $seq_length, $callback, \%data);
+	
+	# finish up this chromosome
+	&$write_wig(\%data, 1); # final write
+	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
+		format_with_commas( $data{'count'}), (time - $start_time)/60;
+}
+
+
+
+### Process split alignments for a specific chromosome
+sub process_split_alignments_on_chromosome {
+	my ($fh1, $fh2, $tid) = @_;
+	
+	# sequence info
+	my $seq_id = $sam->target_name($tid);
+	my $seq_length = $sam->target_len($tid);
+	
+	# print chromosome line
+	if ($use_start or $use_mid) {
+		foreach ($fh1, $fh2) {
+			next unless defined $_;
+			if ($bin) {
+				$_->print(
+					"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+				);
+			}
+			else {
+				$_->print("variableStep chrom=$seq_id\n");
+			}
+		}
+	}
+	
+	# process the reads across the chromosome
+	# Due to requiring split splices, we need to use the high-level API
+	# it's easier to use the high-level than try and re-invent my own code 
+	# for dealing with splices <sigh>
+	# this will increase processing time as each alignment must be incorporated 
+	# into AlignWrapper objects
+	
+	# to make things even more complicated, the split alignment subfeatures
+	# are no longer bam alignments, but essentially SeqFeature objects
+	# which means we must use special callbacks to record them (sigh....)
+	
+	# since the high level API does not allow for a data structure to be passed 
+	# to the callback, we'll have to link it to a global variable
+	my %data = (
+		'f'       => {},
+		'r'       => {},
+		'fhf'     => $fh1,
+		'fhr'     => $fh2,
+		'bufferf' => [],
+		'bufferr' => [],
+		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
+		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
+		'count'   => 0,
+		'seq_id'  => $seq_id,
+		'seq_length' => $seq_length,
+		'print'   => 1,
+	);
+	$data_ref = \%data;
+	
+	# fetch using the high level API
+	$sam->fetch("$seq_id:1..$seq_length", \&single_end_spliced_callback);
+	
+	# finish up this chromosome
+	&$write_wig(\%data, 1); # final write
+	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
+		format_with_commas( $data{'count'}), (time - $start_time)/60;
 }
 
 
@@ -1657,6 +1865,7 @@ bam2wig.pl [--options...] <filename.bam>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --gz
+  --cpu <integer>
   --verbose
   --version
   --help
@@ -1821,6 +2030,12 @@ paths may be set in the biotoolbox.cfg file.
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
 requested.
+
+=item --cpu <integer>
+
+Specify the number of CPU cores to execute in parallel. This requires 
+the installation of Parallel::ForkManager. With support enabled, the 
+default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --verbose
 
