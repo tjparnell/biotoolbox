@@ -50,6 +50,7 @@ our %BAM_CHROMOS;
 sub open_bam_db {
 	
 	my $bamfile = shift;
+	my $forget  = shift;
 	
 	# check if we have seen this bam file before
 	if (exists $OPENED_BAMFILES{$bamfile} ) {
@@ -74,11 +75,13 @@ sub open_bam_db {
 		};
 		return unless $sam;
 		
-		# store the opened object for later use
-		$OPENED_BAMFILES{$bamfile} = $sam;
+		unless ($forget) {
+			# store the opened object for later use
+			$OPENED_BAMFILES{$bamfile} = $sam;
 			
-		# collect the chromosomes for this bam
-		%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
+			# collect the chromosomes for this bam
+			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
+		}
 		
 		# done
 		return $sam;
@@ -258,7 +261,8 @@ sub sum_total_bam_alignments {
 	}
 	else {
 		# we have a name of a sam file
-		$sam = open_bam_db($sam_file);
+		# open the file but do not remember it
+		$sam = open_bam_db($sam_file, 1);
 		return unless ($sam);
 	}
 	
@@ -786,6 +790,10 @@ local path to a Bam file (.bam extension) or the URL of a remote Bam
 file. A remote bam file must be indexed. A local bam file may be 
 automatically indexed upon opening if the user has write permissions 
 in the parent directory. 
+
+The opened Bio::DB::Sam object will be cached for later use. If 
+you do not want this to happen (in the case of forks, for example), 
+pass a second true argument.
 
 It will return the opened database object.
 

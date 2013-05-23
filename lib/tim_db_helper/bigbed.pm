@@ -229,6 +229,7 @@ sub collect_bigbed_position_scores {
 sub open_bigbed_db {
 	
 	my $bedfile = shift;
+	my $forget  = shift;
 	
 	# check whether the file has been opened or not
 	if (exists $OPENED_BEDFILES{$bedfile} ) {
@@ -246,11 +247,13 @@ sub open_bigbed_db {
 		};
 		return unless $bb;
 		
-		# store the opened object for later use
-		$OPENED_BEDFILES{$bedfile} = $bb;
+		unless ($forget) {
+			# store the opened object for later use
+			$OPENED_BEDFILES{$bedfile} = $bb;
 		
-		# collect the chromosomes for this bigBed file
-		%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
+			# collect the chromosomes for this bigBed file
+			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
+		}
 		
 		return $bb;
 	}
@@ -277,23 +280,18 @@ sub sum_total_bigbed_features {
 		$bb = $bb_file;
 	}
 	else {
-		# we have a name of a sam file
-		$bb = open_bigbed_db($bb_file);
+		# we have a name of a bigbed file
+		# open it but do not remember it
+		$bb = open_bigbed_db($bb_file, 1);
 		return unless ($bb);
 	}
 	
-	# Count the number of alignments
-	my $total_read_number = 0;
-	
-	# loop through the chromosomes
-	my @chroms = $bb->features(-type => 'bin');
-		# each requested bin is an entire chromosome
-	foreach my $chrom (@chroms) {
-		# score method is the statistical method hash
-		$total_read_number += $chrom->score->{validCount};
-	}
-	
-	return $total_read_number;
+	# Return the item count for the bigBed
+	# wow, this is easy!
+	return $bb->bf->bigBedItemCount;
+		# this is the itemCount available to the low level bigFile object
+		# the validCount method from summary or bin features simple records
+		# the number of covered bases, not entirely useful here
 }
 
 
@@ -379,6 +377,9 @@ position, a simple mean (for score or length data methods) or sum
 This subroutine will open a BigBed database connection. Pass either the 
 local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
 file. It will return the opened database object.
+
+The opened BigBed object is cached for later use. If you do not want this 
+(for example, when forking), pass a second true argument.
 
 =item sum_total_bigbed_features()
 
