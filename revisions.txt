@@ -1,5 +1,26 @@
 ######## BioToolBox revision history #############
 
+v.1.12 (svn 619)
+	- Major improvements to performance of some data collection scripts by 
+	adding multi-threaded options. These include get_datasets.pl, 
+	get_relative_data.pl, average_gene.pl, and bam2wig.pl. The number of 
+	CPU forks may be specified with the --cpu option (default 2). This option 
+	requires the installation of Parallel::ForkManager, available through 
+	CPAN. Run the check_dependencies.pl script to install it.
+	- All gzip compression read and writes are now forked through an 
+	external gzip utility for a considerable boost in performance (2-5X). 
+	The gzip executable must be in your path for this to work (it usually 
+	is on most Unix-like environments).
+	- Added --long option when collecting data from long features in script 
+	average_gene.pl.
+	- Improved efficiency when collecting data from very large windows in 
+	both get_relative_data.pl and average_gene.pl.
+	- Summing the total number of read alignments in Bam files is also  
+	multi-threaded. Summing the total number of intervals in a BigBed file 
+	is also improved.
+	- Fixed a critical error where not all windows had data collected when 
+	using the script get_relative_data.pl
+
 v.1.11 (svn 603)
 	- Major revision of how features are now retrieved from the database 
 	using primary_IDs rather than relying on unique names in the database. 
