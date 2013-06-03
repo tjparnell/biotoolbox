@@ -33,6 +33,7 @@ get_relative_data.pl --in <**in_filename> --out <**out_filename> `[`--options`]`
   --smooth
   --log
   --gz
+  --cpu <integer>
   --version
   --help
 }}}
@@ -157,6 +158,12 @@ __--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
 __
   __
 __--version

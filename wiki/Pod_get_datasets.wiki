@@ -35,6 +35,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --step <integer>
   --force_strand
   --gz
+  --cpu <integer>
   --version
   --help
 }}}
@@ -212,6 +213,12 @@ __--gz
 
 __
   Indicate whether the output file should (not) be compressed by gzip.  If compressed, the extension '.gz' is appended to the filename. If a compressed  file is opened, the compression status is preserved unless specified otherwise.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
 __
   __
 __--version

@@ -29,10 +29,13 @@ A program to generate class average summaries for a list of genes or features.
   --extsize <integer>
   --min <integer>
   --strand [all|sense|antisense]
+  --long
   --sum
   --smooth
   --force_strand
   --(no)log
+  --gz
+  --cpu <integer>
   --version
   --help
 }}}
@@ -139,6 +142,12 @@ __
   Specify whether stranded data should be collected. Three values are  allowed: all datasets should be collected (default), only sense  datasets, or only antisense datasets should be collected.
 __
   __
+__--long
+
+__
+  Indicate that the dataset from which scores are collected are  long features (counting genomic annotation for example) and not point  data (microarray data or sequence coverage). Normally long features are  only recorded at their midpoint, leading to inaccurate representation at  some windows. This option forces the program to collect data separately  at each window, rather than once for each file feature or region and  subsequently assigning scores to windows. Execution times may be  longer than otherwise. Default is false.
+__
+  __
 __--sum
 
 __
@@ -163,6 +172,18 @@ __
   Dataset values are (not) in log2 space and should be treated  accordingly. Output values will be in the same space.
 __
   __
+__--gz
+
+__
+  Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
+__
+  __
 __--version
 
 __
@@ -176,7 +197,7 @@ __
 __
   __
 ==DESCRIPTION==
-This program will collect data across a gene or feature body into numerous  percentile bins to. It is used to determine if there is a spatial  distribution preference for the dataset over gene bodies. The number  of bins may be specified as a command argument (default 10). Additionally,  extra bins may be extended on either side of the gene (default 0 on either  side). The bin size is determined as a percentage of gene length.
+This program will collect data across a gene or feature body into numerous  percentile bins. It is used to determine if there is a spatial  distribution preference for the dataset over gene bodies. The number  of bins may be specified as a command argument (default 10). Additionally,  extra bins may be extended on either side of the gene (default 0 on either  side). The bin size is determined as a percentage of gene length.
 
 The program writes out a tim data formatted text file. It will also  optionally generate a "summed" or average profile for all of the features.
 

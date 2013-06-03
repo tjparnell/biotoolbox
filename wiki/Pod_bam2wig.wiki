@@ -32,6 +32,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --gz
+  --cpu <integer>
   --verbose
   --version
   --help
@@ -174,6 +175,12 @@ __--gz
 
 __
   Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
 __
   __
 __--verbose
