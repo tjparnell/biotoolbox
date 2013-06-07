@@ -7,7 +7,7 @@
 
 These are a collection of various perl script programs for processing, converting, analyzing, and manipulating genomic data and/or features. These programs include the following capabilities
 	
-	* Tools for converting data formats between popular formats, including GFF3, wig, bed, BAM, bigWig, bigBed, and Bar
+	* Tools for converting data formats between popular formats, including GFF3, wig, bed, BAM, bigWig, bigBed, and others
 	* Collecting data relative to any annotated genomic feature
 	* Manipulation and analysis of collected data
 	* Generating simple graphs of collected data
@@ -67,20 +67,10 @@ Please contact the author for bugs. Feature requests are also accepted, within t
 ==Online Documentation==
 
 	* [BioToolBoxSetUp Setting] up a computer for BioToolBox
-	
 	* Setting up [SetupForMacOSX Mac OS X] for bioinformatics
-	
 	* Up to date list of BioToolBox [ProgramList programs]
-	
-	* Setting up a Bio::DB::SeqFeature::Store [WorkingWithDatabases database]
-	
+	* Working with annotation in [WorkingWithDatabases databases]
+	* Working with data files and [WorkingWithDatasets datasets]
 	* Description of supported data [DataFileFormats file formats]
-	
-	* Example Data [ExampleFeatureDataCollection collection]
-	
-	* Example working with [ExampleNextGenerationSequencing Next Generation Sequencing] Data
-	
-	* Explanation of the text data [TimDataFormat report format]
-	
 	* [MappingSNPs Mapping SNPs]
-
+	* Description of the text data [TimDataFormat report format]
