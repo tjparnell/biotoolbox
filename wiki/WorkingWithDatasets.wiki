@@ -8,9 +8,9 @@ This HowTo describes some possible scenarios for collecting data and working wit
 
 ==Contents==
 	# [WorkingWithDatasets#Data_File_Formats Data File Formats]
-		# [WorkingWithDatabases#Single_File_Formats Single File Formats]
+		# [WorkingWithDatasets#Single_File_Formats Single File Formats]
 		# [WorkingWithDatasets#Database_Scores Database Scores]
-		# [WorkingWithDatasets#A_Directory_of_BigWig_Files A Directory of BigWig Files]
+		# [WorkingWithDatasets#Directory_of_Bigwig_Files Directory of BigWig Files]
 	# [WorkingWithDatasets#Collecting_Scores Collecting Scores]
 		# [WorkingWithDatasets#Collecting_Single_Scores Collecting Single Scores]
 		# [WorkingWithDatasets#Collecting_Class_Averages Collecting Class Averages]
@@ -52,7 +52,7 @@ In *BioToolBox* scripts the database is specified using the `--db` or `--ddb` op
 
 The advantage of storing dataset scores in a relational database is that many different scores from different sources may be stored in a single database. Usually different datasets are identified through the use of the GFF3 `type` and `source` attributes (GFF3 columns 3 and 2 respectively). In *BioToolBox* scripts, the specific dataset may be identified on the command line (using the `--data` option) or selected from a list interactively.
 
-===A Directory of BigWig Files===
+===Directory of Bigwig Files===
 One of the advantages of databases is storing multiple datasets within them, or assigning metadata, such as strand, to datasets. We can accomplish similar goals with a directory of multiple BigWig files, whereupon it is referred to as a BigWigSet. The metadata may be assigned using a special INI-style `metadata.index` file in the directory along with the BigWig files. Here, we can take advantage of interactively choosing just the few datasets (BigWig files) amongst an entire directory of files. We can also collect stranded data, since BigWig files do not inherently support stranded information.
 
 To work with a BigWigSet, specify the directory using the `--ddb` option. More information can be found in the documentation for [http://search.cpan.org/perldoc?Bio%3A%3ADB%3A%3ABigWigSet Bio::DB::BigWigSet]. 
@@ -85,18 +85,22 @@ A single score may be collected for each feature or genomic interval using the [
 
 Through the use of options, we can adjust where we collect the scores. For example, to collect in the 500 bp region upstream of each interval
 <pre>
-	get_datasets.pl --data path/to/Enrichment.bw --method mean --start=-500 --stop=-1 --in my_regions.bed
+	get_datasets.pl --data path/to/Enrichment.bw --method mean --start=-500 \
+	--stop=-1 --in my_regions.bed
 </pre>
 If the input Bed file is a BED6 format file complete with strand information, then the orientation is taken into consideration when collecting the upstream data.
 
 If we wish to collect stranded RNASeq transcription data for genes, then we might use a Bam file and an annotation database. Here we will let the script collect the list of genes for us, in this case genes from UCSC. 
 <pre>
-	get_datasets.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam --method rpkm --strand sense --out my_expression_data
+	get_datasets.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam \
+	--method rpkm --strand sense --out my_expression_data
+</pre>
 This will collect coverage over each exon and normalize to length and sequence depth.
 
 If we have a list of putative transcription factor binding sites in a BigBed file (perhaps identified using the [http://emboss.sourceforge.net/apps/cvs/emboss/apps/profit.html EMBOSS profit] utility), then we can count their occurrence in the promoter.
 <pre>
-	get_datasets.pl --data path/to/binding_sites.bb --method sum --value count --start=-500 --stop=-1 --in promoters.txt
+	get_datasets.pl --data path/to/binding_sites.bb --method sum --value count \
+	--start=-500 --stop=-1 --in promoters.txt
 </pre>
 
 The get_datasets.pl script may also collect multiple datasets at a time. Provide a comma delimited list to the `--data` option, or provide multiple `--data` options, and each dataset will be appended as a new column to the output file.
@@ -113,14 +117,16 @@ Both programs will output two files. The first data file is the collected scores
 ====Averaging Over Features====
 The [Pod_average_gene average_gene.pl] script will collect data in percentile bins across the length of the feature. For example, to collect normalized RNASeq read counts across a gene in 10 percentile bins (each corresponding to 10% of the length of the feature), run
 <pre>
-	average_gene.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam --method rpm --strand sense --out my_average_gene_profile
+	average_gene.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam \
+	--method rpm --strand sense --out my_average_gene_profile
 </pre>
 
 For a list features with variable lengths, e.g. genes, each bin will be a different size, as it is based on a percentage of the length. A minimum size may be imposed before dividing into bins if this is a concern.
 
 We may also extend the bins beyond the borders of the feature, if desired. These may also be based on the percentage length, or set at a specific length. This example will extend two additional bins of 100 bp.
 <pre>
-	average_gene.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam --method rpm --strand sense --ext 2 --extsize 100 --out my_average_gene_profile
+	average_gene.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam \
+	--method rpm --strand sense --ext 2 --extsize 100 --out my_average_gene_profile
 </pre>
 
 ====Averaging Around A Specific Point====
@@ -128,7 +134,8 @@ The [Pod_get_relative_data get_relative_data.pl] script will also collect scores
 
 To collect enrichment data in a radius of 1 kb in 10 bins relative to the transcription start site, we can run
 <pre>
-	get_relative_data.pl --db annotation --feature gene:SGD --data path/to/ChIP.bw --num 10 --win 100 --pos 5 --out my_tss_profile
+	get_relative_data.pl --db annotation --feature gene:SGD --data path/to/ChIP.bw \
+	--num 10 --win 100 --pos 5 --out my_tss_profile
 </pre>
 
 Sometimes we want to avoid interference from neighboring genes. For example, the yeast genome is extremely compact, with intergenic distances commonly only a few hundred basepairs. In this case, in our example above, we would collect data overlapping neighboring genes. We can avoid collecting this overlapping data by adding the `--avoid` option, which ensures that neighboring features are avoided. Note that this only works when collecting data for features in a database, where other neighboring features may be queried; it does not work with input files using genomic coordinates, e.g. BED files.
@@ -137,9 +144,9 @@ Sometimes we want to avoid interference from neighboring genes. For example, the
 We can graph the data we just collected for visual inspection. These are simple graphs, suitable for getting a quick answer or for a lab meeting, but not really for publication. 
 
 There are three types of graphs that may be generated.
-	* XY plots (line or dot) between two samples
-	* Profile plots along a linear (gene) scale
-	* Histogram plots of counts or frequencies
+	# XY plots (line or dot) between two samples
+	# Profile plots along a linear (gene) scale
+	# Histogram plots of counts or frequencies
 
 Each program takes an input file of data. It will generate a PNG file (800x600 pixels) in a new directory named after the basename of the input file. Each PNG file is named after the dataset (column) name or names. You may specify the datasets on the command line or in an interactive mode where the datasets (column) names are presented as a list to the user. Each program has a number of command line options for adjusting axes parameters. 
 
@@ -152,7 +159,9 @@ Two datasets can be compared to each other by generating a XY plot using the [Po
 Only those points with both a valid X and Y value are plotted. Pairs may be identified on the command line using the `--pair` or `--index` options, selected interactively from a list, or all available combinations may be graphed automatically using the `--all` option. For example
 <pre>
 	graph_datasets.pl --pair 3,4 --pair 3,5 --type scatter --in my_datasets.txt
+	
 	graph_datasets.pl --index "3&4,3&5" --type scatter --in my_datasets.txt
+	
 	graph_datasets.pl --all --type scatter --in my_datasets.txt
 </pre>
 
@@ -190,11 +199,12 @@ If a histogram is desired but you wish to use a separate graphing program, then 
 
 ==Manipulating Datasets==
 Once you have collected your datasets, you may reach a point where you wish to manipulate the values in the file. These manipulations could include 
-	# delete or reorder columns
-	# perform simple mathematical or statistical data transformations
-	# combine columns using mathematical or statistical methods
-	# delete rows that match certain value criteria
-	# export into another format
+	* delete or reorder columns
+	* perform simple mathematical or statistical data transformations
+	* combine columns using mathematical or statistical methods
+	* delete rows that match certain value criteria
+	* export into another format
+
 While the [TimDataFormat BioToolBox Data Format] generated by these scripts is a simple tab-delimited text format (with column headers and metadata comment lines at the top) that could be opened in a text editor or spreadsheet program, sometimes it is more convenient to quickly make manipulations on the command line. In this case, the [Pod_manipulate_datasets manipulate_datasets.pl] script will work for you.
 
 The script is designed to work in two modes. The first, and most convenient, is a menu-driven interactive mode, where functions may be selected by key and indices chosen from a list. Multiple manipulations may be performed in this manner before writing the file. 
@@ -205,7 +215,9 @@ The script is designed to work in two modes. The first, and most convenient, is 
 The second mode is command line driven, where a single function may be specified through options. Multiple, sequential functions may only be performed by repeated execution on the same file. Here are three manipulations: deleting a column, generating a ratio (index 3 / index 4), and summing the values in columns 3 through 8, inclusive.
 <pre>
 	manipulate_datasets.pl --func delete --index 3 my_datasets.txt
+	
 	manipulate_datasets.pl --func ratio --exp 3 --con 4 --in my_datasets.txt
+	
 	manipulate_datasets.pl --func combine --index 3-8 --target sum --in my_datasets.txt
 </pre>
 	
@@ -247,7 +259,8 @@ With a KGG file, all clusters are written to separate files, with the output nam
 
 This program will optionally generate a new summary file for the pulled rows, just as with [Pod_get_relative_data get_relative_data.pl] or [Pod_average_gene average_gene.pl] scripts. In this case, specify the starting and ending indices for the data columns to be summarized (these may be automatically determined).
 <pre>
-	pull_features.pl --data my_TSS_data.txt --list TSS_cluster_K_G6.kgg --out pulled_data.txt --sum --starti 3
+	pull_features.pl --data my_TSS_data.txt --list TSS_cluster_K_G6.kgg --out \
+	pulled_data.txt --sum --starti 3
 </pre>
 
 ==Generating Clusters==
@@ -255,7 +268,8 @@ One common method of high level analysis is to generate a k-means cluster of the
 
 This clustering algorithm requires a tab delimited text file, with one column of unique identifiers, two or more data columns, and a column header line. Extraneous columns, lines, and metadata lines are not allowed. The file is checked before passing it to the algorithm. The easiest way to dealing with this is to use the [Pod_manipulate_datasets manipulate_datasets.pl] script and export your data file as a Cluster Data file (`.cdt`).
 <pre>
-	manipulate_datasets.pl --func treeview --index 0,3-82 --target n0,cg --in my_TSS_data.txt
+	manipulate_datasets.pl --func treeview --index 0,3-82 --target n0,cg \
+	--in my_TSS_data.txt
 </pre>
 A unique identifier column and a range of data columns is provided as the index. Some simple manipulations may be performed prior to exporting, which can be defined using special codes with the `--target` option (see the help document). The manipulations specified above is to convert nulls to 0.0 (`n0`, helpful in clustering) and median center the genes or rows (`cg`, aids in visualizing differences). These manipulations could also be done interactively, allowing you more control in preparing the data for cluster analysis.
 

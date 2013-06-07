@@ -297,7 +297,6 @@ If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/
 ===Additional modules for BioToolBox===
 There are a few additional modules that are required by the BioToolBox scripts. The easiest way to check for these is to run the BioToolBox script [Pod_check_dependencies check_dependencies.pl], located in the BioToolBox root directory. You can download the latest BioToolBox version  [http://code.google.com/p/BioToolBox/downloads/list here]. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for BioToolBox; the dependencies depend on which BioToolBox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
 	* `Config::Simple`
-	* `IO::Zlib`
 	* `Statistics::Lite`
 	* `Statistics::Descriptive`
 	* `Archive::Zip`

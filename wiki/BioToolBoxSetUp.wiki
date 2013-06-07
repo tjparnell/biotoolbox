@@ -110,7 +110,6 @@ First, you can run the [Pod_check_dependencies check_dependencies.pl] script in 
 
 Second, you can install them manually through the CPAN shell. Here is a list of basic requirements.
 	* `Config::Simple`
-	* `IO::Zlib`
 	* `Statistics::Lite`
 	* `Statistics::Descriptive`
 	* BioPerl (see below)
@@ -154,7 +153,7 @@ To work with next generation sequencing data, you'll need to install [http://sam
 
 Download the source code for the latest version from the samtools [http://sourceforge.net/projects/samtools/files/samtools/ SourceForge] project, and unpack it in your directory.
 
-If you are using 64-bit Perl, you'll need to compile samtools as a 64-bit executable. Using your favorite text editor (`nano` is a very simple and easy to use text editor through the terminal), edit the `Makefile` file. At the beginning, find the line that begins with `CFLAGS`. Delete the comment `#` character in front of `-m64`, and save the file.
+*Note* For samtools `<` v0.1.19 only. If you'll be working with 64-bit executables (likely), edit the `Makefile` to un-comment out the `-m64` on the line containing `CLFAGS`. This ensures the program will compile as a 64-bit executable.
 
 Next, compile the program.
 <pre>
@@ -166,7 +165,7 @@ The samtools `make` does not include test or install methods. For a system-wide 
 
 To install the Bio-SamTools Perl module, you'll need access to the header and library folders in the samtools directory (this is why you need to keep it handy). Do a search for Bio-SamTools from within the CPAN Shell, and install the latest version you find. During the installation, the Installer will ask for the location of the samtools headers and libraries. Enter the full path to where you've placed it, and it should compile and install fine.
 
-One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, re-edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
+One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
 <pre>
 	make clean
 	make
