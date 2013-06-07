@@ -1,5 +1,5 @@
 #summary A guide to working with datasets
-#labels Featured HowTo
+#labels Featured,HowTo
 
 =HOWTO: Working with dataset files=
 The *BioToolBox* scripts are designed to work with a variety of data file formats for collecting data associated with a list of sequence features: genes, transcripts, promoters, etc. See the [WorkingWithDatabases Working with Databases] document for more information on obtaining lists of sequence features to work with. Using this list, we are able to collect genomic data for each item in the list, be it expression data (RNA), factor occupancy data (ChIP), or even the number of discrete sequences (predicted binding sites).
