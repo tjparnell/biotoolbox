@@ -33,7 +33,7 @@ Ideally, the annotation should be provided in GFF3 format, making loading in the
 
 BioPerl includes some converters. For example, there is a converter for the NCBI GenBank format, `genbank2gff3.pl`. For files in GTF format (a variation of GFF v.2), there is a GTF to GFF3 [http://www.sequenceontology.org/cgi-bin/converter.cgi converter] available.
 
-====Annotation from UCSC====
+===Annotation from UCSC===
 Annotation may be downloaded from the UCSC Table Browser in a simple tab-delimited gene table format. It's also possible to download as a GTF, but it is not compatible with the above GTF converter.
 
 The GBrowse distribution provides a script, ucsc_genes2gff.pl, which will convert the gene table. However, it produces fairly simple annotation, and in my experience has some issues. The Chado distribution also includes a different [http://gmod.svn.sourceforge.net/viewvc/gmod/schema/trunk/chado/bin/ucsc_genes2gff.pl?revision=21190&view=markup ucsc_genes2gff.pl] script, which, although I have not used it, appears to produce more complete GFF3 features.
@@ -52,7 +52,7 @@ This will fetch the relevant annotation tables from their FTP server and process
 	danRer7_chromo.gff3
 </pre>
 
-====Annotation from Ensembl====
+===Annotation from Ensembl===
 Ensembl conveniently provides GTF files for their annotated genomes. However, the information content is limited in the GTF file. Nevertheless, it is compatible with the above GTF to GFF3 converter.
 
 To obtain more complete annotation, however, use the *BioToolBox* script, [Pod_get_ensembl_annotation get_ensembl_annotation.pl], which connects directly to the Ensembl public database and downloads the annotation, converting it to a GFF3 file. The information content is more complete compared to that provided in the GTF.
@@ -61,6 +61,7 @@ You must have the latest  [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Ensem
 <pre>
 	biotoolbox/scripts/get_ensembl_annotation.pl --species danio_rerio
 </pre>
+
 You should get out one file: `danio_rerio.gff3`.
 
 ===Sequence information===
@@ -116,6 +117,7 @@ For a MySQL database, the following example session shows creating a new databas
 	Bye
 	admin@gbrowse-vm:~$
 </pre>
+
 See the documentation for your database server for more details.
 
 *IMPORTANT* For *BioToolBox* scripts, you must enter the read-only user name and password in the `biotoolbox.cfg` configuration file. 
@@ -125,12 +127,14 @@ The SQL database may then be loaded using the BioPerl provided script, [http://s
 <pre>
 	bp_seqfeature_load.pl -c -f -d zv9 -u admin -p password danRer7_refGene.gff3 ...
 </pre>
+
 Provide as many input annotation and sequence files as you would like. The only requirement is that the GFF3 file with the reference sequences should be loaded first. Note that you must enter the password on the command line; you may wish to use a priveleged user rather than `root` if you're concerned with security.
 
 A typical command for loading a SQLite database would look like this
 <pre>
 	bp_seqfeature_load.pl -c -f -a DBI::SQLite -d ./zv9.sqlite danRer7_refGene.gff3 ...
 </pre>
+
 Note that the dsn option is the name of the SQLite file, and that a user and password are not necessary. 
 
 Both commands above use the `-f` or fast loading option to increase loading time. This will dramatically decrease loading time, sometimes by orders of magnitude for extremely large datasets. For hierarchical gene annotation, this presumes parent and child features are clustered within the file; otherwise, this trick won't work.
@@ -139,6 +143,7 @@ After loading the database, you may check the contents with the *BioToolBox* scr
 <pre>
 	biotoolbox/scripts/print_features.pl zv9
 </pre>
+
 This should generate a list of feature types sorted by their source tags printed to standard out. 
 
 ==Getting a gene list==
@@ -211,6 +216,7 @@ We can also modify the output depending on what we want. If we want genomic coor
 	pcid2	gene:refGene	chr1	47009	54546	-1
 	localhost:~ tim$
 </pre>
+
 Note that the output now includes start and stop coordinates for each gene, and that each have been adjusted by 1000 bp. The `--pos` option indicates the reference point from which the coordinates will be adjusted; in this case, we have indicated `53`, which means use the `5'` end for the start adjustment and the `3'` end for the stop adjustment. See the documentation for more examples. Note that the reported start and end coordinates are absolute (start `<` stop), but that the adjustment factors are based on the strand of the feature. 
 
 Also note that the coordinates are in base (not interbase, or 0-based) format. This is standard for all *BioToolBox* programs and BioPerl in general, and different from the UCSC-style BED format. A standard BED file may be written using `--bed` option.
@@ -305,6 +311,7 @@ Here, we need to specify two things. First, the feature type in the database tha
 	zgc:165507	NM_001099419	NM_001099419.exon0	Zv9_NA123	44693	44920	-1
 	localhost:~ tim$ 
 </pre>
+
 The program collected the first exon from mRNA subfeature of the requested gene type, and reported the exon Name, its parent gene and transcript, and coordinates. Note that in this context, we are referring to the 5' intron with respect to gene orientation. 
 
 This program can also be used to conveniently obtain the promoter regions by specifying the Transcription Start Site (tss) region and adjusting the coordinates with `--start` and `--stop` parameters (otherwise it will return a 1 bp region). But what if there are multiple alternative transcripts and/or promoters for a gene? You could specify mRNA as the feature type, but there may be lots of identical regions. Specify the `--unique` and `--slop` parameters to collect just the unique alternative promoter regions of genes. See the [Pod_get_gene_regions documentation] for more details.
