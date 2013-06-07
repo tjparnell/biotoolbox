@@ -1,5 +1,5 @@
 #summary An example guide to working with Next Generation Sequencing data
-#labels Featured 
+#labels HowTo 
 
 =HOWTO: Working with Next Generation Sequencing data=
 

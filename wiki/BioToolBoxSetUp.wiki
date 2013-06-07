@@ -1,5 +1,5 @@
 #summary A new users guide for installing BioToolBox and its prerequisites.
-#labels Featured 
+#labels Featured SetUp
 
 =Installing bioperl and other prerequisites for BioToolBox=
 

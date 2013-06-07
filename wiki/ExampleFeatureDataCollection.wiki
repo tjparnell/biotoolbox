@@ -1,5 +1,5 @@
 #summary An example guide to generating a feature list and collecting data from the database.
-#labels Featured 
+#labels HowTo 
 
 =HOWTO: Generating a feature list and collecting data=
 

@@ -1,5 +1,5 @@
 #summary Mapping sequence variants and mutations using next generation sequencing technologies. 
-#labels Featured 
+#labels Featured HowTo
 
 =HOWTO: Mapping unidentified mutations by whole genome sequencing=
 

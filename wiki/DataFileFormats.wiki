@@ -1,7 +1,7 @@
 #summary A description of different data formats and how to use them
 #labels Featured 
 
-The *biotoolbox* scripts, as well as [http://www.gmod.org/wiki/GBrowse GBrowse], can utilize data stored in a number of different file formats. This is a brief list of these formats and how to use them.
+The *BioToolBox* scripts, as well as [http://www.gmod.org/wiki/GBrowse GBrowse], can utilize data stored in a number of different file formats. This is a brief list of these formats and how to use them.
 
 ==Genomic Features and Intervals==
 These data formats describe genomic regions or intervals that usually describe a feature or function encoded in the genomic DNA. For example, a gene may be comprised of several features, including but not limited to exons, introns, coding sequence (CDS), start and stop codons, untranslated regions, etc. They may also describe artificial constraints, such as a region of enrichment for a particular factor or mark, or an oligo binding site. 
@@ -37,7 +37,7 @@ In [http://www.sequenceontology.org/gff3.shtml GFF version 3], the specification
 
 To convert data to the GFF3 format, the [Pod_data2gff data2gff.pl] script may be used. Additionally, genome annotation may be obtained from Ensembl and written to GFF3 format using [Pod_get_ensembl_annotation get_ensembl_annotation.pl]. Or a gene table may be obtained from the UCSC Genome [http://genome.ucsc.edu/cgi-bin/hgTables Table Browser] and converted to GFF3 using [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. 
 
-GFF files are best used by loading them into a SQL database (SQLite, MySQL, memory, etc) using the `Bio::DB::SeqFeature::Store` schema; they cannot be directly used by any of the *biotoolbox* analysis programs.
+GFF files are best used by loading them into a SQL database (SQLite, MySQL, memory, etc) using the `Bio::DB::SeqFeature::Store` schema; they cannot be directly used by any of the *BioToolBox* analysis programs.
 
 ===BED===
 The [http://genome.ucsc.edu/FAQ/FAQformat.html#format1 Browser Extensible Data] (BED) format was developed for use by the UCSC Genome Browser. Like the GFF format, it is a text-based, tab-delimited data format. It has at minimum three columns (chromosome, start, stop), and up to 12 columns (for specifying exonic and intronic gene structure). The most common format with regards to data is the 6 column format, with the following columns:
@@ -49,14 +49,13 @@ The [http://genome.ucsc.edu/FAQ/FAQformat.html#format1 Browser Extensible Data] 
 	* strand ('+' or '-')
 It uses interbase (0-based) numbering system.
 
-BED files may be generated using the [Pod_data2bed data2bed.pl] script. They cannot be used directly by any of the *biotoolbox* analysis programs, and are best converted to a GFF3 file for loading into a database or converted to a bigBed format, below.
+BED files may be generated using the [Pod_data2bed data2bed.pl] script. They cannot be used directly by any of the *BioToolBox* analysis programs, and are best converted to a GFF3 file for loading into a database or converted to a bigBed format, below.
 
 ===bigBed===
-The [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] format is a compressed, indexed, binary format of the BED file developed by the UCSC genome center. It's primary advantage is for rapid, random access by a genome browser or analysis program, either remotely or locally. BigBed files may be generated from BED files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedToBigBed]
-converter. 
+The [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] format is a compressed, indexed, binary format of the BED file developed by the UCSC genome center. It's primary advantage is for rapid, random access by a genome browser or analysis program, either remotely or locally. BigBed files may be generated from BED files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedToBigBed] converter. 
 
 ===UCSC Gene Table===
-Genome annotation may be obtained from the UCSC Genome [http://genome.ucsc.edu/cgi-bin/hgTables Table Browser]. While this format cannot be used directly, it can be converted to a GFF3 file using the *biotoolbox* script [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. Numerous other data tables may also be downloaded from the Table Browser, although the format of each table is variable. While the gene table from refSeq or ensGene may be converted using [Pod_ucsc_table2gff3 ucsc_table2gff3.pl], other tables may or may not work. In that case, you may be able to use [Pod_data2gff data2gff.pl] and select the appropriate tables to generate a GFF3 file.
+Genome annotation may be obtained from the UCSC Genome [http://genome.ucsc.edu/cgi-bin/hgTables Table Browser]. While this format cannot be used directly, it can be converted to a GFF3 file using the *BioToolBox* script [Pod_ucsc_table2gff3 ucsc_table2gff3.pl]. Numerous other data tables may also be downloaded from the Table Browser, although the format of each table is variable. While the gene table from refSeq or ensGene may be converted using [Pod_ucsc_table2gff3 ucsc_table2gff3.pl], other tables may or may not work. In that case, you may be able to use [Pod_data2gff data2gff.pl] and select the appropriate tables to generate a GFF3 file.
 
 In the odd case that you need to back convert from GFF3 to gene table for some reason, there is also a [Pod_gff3_to_ucsc_table gff3_to_ucsc_table.pl] script. This is useful, for example, when Ensembl releases a new genome update and UCSC hasn't yet, and your friends are using the [http://useq.sourceforge.net USeq] package that requires a gene table.
 
@@ -77,10 +76,10 @@ Wig files use base (1-base) numbering.
 
 Most genome browsers compress the scores to 8-bit precision (256 values) or less, such that the retrieved value may not be identical to the original input value; This may be sufficient for browsing (where the generated plot can only show a limited amount of vertical resolution) but not ideal for analysis.
 
-Wig files may be generated using the [Pod_data2wig data2wig.pl] script. The *biotoolbox* analysis programs require that `.wig` files be converted to binary `.wib` files using the `wiggle2gff3.pl` script included with [http://www.gmod.org/wiki/GBrowse GBrowse]. The `.wib` files are accessed through a generated GFF3 file, which in turn must be loaded in a SQL or memory database. The `.wib` files only have 8-bit precision, making analysis adequate for most purposes but perhaps not ideal. Alternatively they can be converted to bigWig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ wigToBigWig] converter (see below).
+Wig files may be generated using the [Pod_data2wig data2wig.pl] script. The *BioToolBox* analysis programs require that `.wig` files be converted to binary `.wib` files using the `wiggle2gff3.pl` script included with [http://www.gmod.org/wiki/GBrowse GBrowse]. The `.wib` files are accessed through a generated GFF3 file, which in turn must be loaded in a SQL or memory database. The `.wib` files only have 8-bit precision, making analysis adequate for most purposes but perhaps not ideal. Alternatively they can be converted to bigWig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ wigToBigWig] converter (see below).
 
 ===bedGraph===
-The [http://genome.ucsc.edu/goldenPath/help/bedgraph.html bedGraph] file format is essentially a cross between the wig and BED files. It is used a wig file, but looks like a BED file. It is a four-column, tab-delimited text file. The four columns are
+The [http://genome.ucsc.edu/goldenPath/help/bedgraph.html bedGraph] file format is essentially a cross between the wig and BED files. It is used as a wig file, but looks like a BED file. It is a four-column, tab-delimited text file. The four columns are
 	* chromosome
 	* start
 	* end
@@ -92,19 +91,19 @@ BedGraph files may be generated using the [Pod_data2bed data2bed.pl] script. The
 To use BedGraph files, they must be converted to `.wib` files as with `.wig` files using the [http://search.cpan.org/~lds/GBrowse-2.44/bin/wiggle2gff3.pl wiggle2gff3.pl script] included with GBrowse. Alternatively, they can be converted to bigWig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedGraphToBigWig] program.
 
 ===bigWig===
-Like the bigBed file, the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] file format is a compressed, indexed, binary format of the wig file developed by the UCSC genome center. It's primary advantage is for rapid, random access by a genome browser or analysis program, either remotely or locally. These files maintain the numeric precision and are much faster in accession than the old `.wib` files used by the Bio::Graphics module. Furthermore, they can be used by both GBrowse and *biotoolbox* analysis scripts. Their use is highly recommended.
+Like the bigBed file, the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] file format is a compressed, indexed, binary format of the wig file developed by the UCSC genome center. It's primary advantage is for rapid, random access by a genome browser or analysis program, either remotely or locally. These files maintain the numeric precision and are much faster in accession than the old `.wib` files used by the Bio::Graphics module. Furthermore, they can be used by both GBrowse and *BioToolBox* analysis scripts. Their use is highly recommended.
 
-BigWig files may be generated from either wig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ wigToBigWig] converter or from bedGraph files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedGraphToBigWig] converter. The *biotoolbox* script [Pod_data2wig data2wig.pl] also includes the option to generate bigWig files, as do several other scripts, including [Pod_bar2wig bar2wig.pl], [Pod_bam2wig bam2wig.pl], and [Pod_useq2bigfile useq2bigfile.pl].
+BigWig files may be generated from either wig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ wigToBigWig] converter or from bedGraph files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedGraphToBigWig] converter. The *BioToolBox* script [Pod_data2wig data2wig.pl] also includes the option to generate bigWig files, as do several other scripts, including [Pod_bam2wig bam2wig.pl] and [Pod_bar2wig bar2wig.pl].
 
 ===Bar files===
 Bar files are binary, serial float files used by David Nix's [http://useq.sourceforge.net USeq] and [http://http://timat2.sourceforge.net/ T2] suites of analysis programs. Each chromosome strand is represented by one bar file, so that a genome is represented by a directory of multiple bar files. The bar files are usually compressed with zip. Bar files internally store the score values along with an offset from the previous position. Unlike wig files, the format tolerates multiple values at the same position.
 
-Bar files are not directly usable by any other genome browser other than [http://bioviz.org/igb/ IGB], necessitating their export to a more universal format, such as wig. The *biotoolbox* script [Pod_bar2wig bar2wig.pl] will facilitate this.
+Bar files are not directly usable by any other genome browser other than [http://bioviz.org/igb/ IGB], necessitating their export to a more universal format, such as wig. The *BioToolBox* script [Pod_bar2wig bar2wig.pl] will facilitate this.
 
 ===USeq files===
 [http://useq.sourceforge.net/useqArchiveFormat.html USeq archives] (.useq) are indexed, compressed archives generated by David Nix's [http://useq.sourceforge.net USeq] package and primarily developed for DAS/2 servers such as [http://bioserver.hci.utah.edu/BioInfo/index.php/Software:DAS2 GenoPub], as well as [http://bioviz.org/igb/ IGB]. USeq archives can be generated from Bar files, wig files, BED files, or other text files using various utilities in the [http://useq.sourceforge.net USeq] package.
 
-Like Bar files, they are not directly usable by other genome browsers or *biotoolbox* scripts. The current version of USeq includes a utility, USeq2UCSCBig, that can create an appropriate Big file.
+Like Bar files, they are not directly usable by other genome browsers or *BioToolBox* scripts. The current version of USeq includes a utility, USeq2UCSCBig, that can create an appropriate Big file.
 
 ===GR files===
 This is a simple text format generated by exporting Bar files to a text graph format. It is comprised of a two-column tab-delimited text format, position and score. Like Bar files, each file represents a single chromosome, and multiple values are tolerated at a single position. The [Pod_bar2wig bar2wig.pl] script uses this as an intermediate when converting Bar files to wig files.
@@ -123,11 +122,11 @@ This is a binary, compressed format of the SAM file. BAM files may be sorted and
 
 BAM files may be generated from SAM files using the C-based [http://samtools.sourceforge.net/ samtools] program, or the Java-based [http://picard.sourceforge.net/ Picard]. Both collections also include tools for sorting, indexing, manipulating, and viewing SAM and BAM files. 
 
-There are several *biotoolbox* scripts for working with bam files, including data analysis, conversions, and some manipulation.
+There are several *BioToolBox* scripts for working with bam files, including data analysis, conversions, and some manipulation.
 
 ===BAM coverage===
 While not a file format, many people are interested in where the sequence tags align and how many align to specific loci. A coverage map is simply a summation of the number of alignments at each position across the genome. It typically represents a count of alignments over each basepair in the genome, although alignments can also be counted only once at the alignment's midpoint or start point. Mathematical manipulations of the counts may also be performed.
 
-There are several programs which will calculate genome coverage from a BAM file, including programs in the [http://search.cpan.org/dist/Bio-SamTools/ Bio-Samtools] module, [http://code.google.com/p/bedtools bedtools] package, and [http://useq.sourceforge.net USeq] package. The *biotoolbox* script [Pod_bam2wig bam2wig.pl] will also calculate coverage as well as perform many other manipulations not present in the previously listed programs.
+There are several programs which will calculate genome coverage from a BAM file, including programs in the [http://search.cpan.org/dist/Bio-SamTools/ Bio-Samtools] module, [http://code.google.com/p/bedtools bedtools] package, and [http://useq.sourceforge.net USeq] package. The *BioToolBox* script [Pod_bam2wig bam2wig.pl] will also calculate coverage as well as perform many other manipulations not present in the previously listed programs.
 
-In most cases, you will want to output the coverage graph as a wig (or bigWig) file. The advantages of using a wig file are speed and efficiency. While the *biotoolbox* data analysis scripts and GBrowse use the Bio-SamTools module and can calculate coverage on demand from a BAM file, it does so by parsing through the alignments in BAM which can be time-consuming. Pre-calculating the coverage as a wig file and using that is substantially faster. 
+In most cases, you will want to output the coverage graph as a wig (or bigWig) file. The advantages of using a wig file are speed and efficiency. While the *BioToolBox* data analysis scripts and GBrowse use the Bio-SamTools module and can calculate coverage on demand from a BAM file, it does so by parsing through the alignments in BAM which can be time-consuming. Pre-calculating the coverage as a wig file and using that is substantially faster. 

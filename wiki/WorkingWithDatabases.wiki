@@ -1,5 +1,5 @@
 #summary A guide to working with databases containing annotation and data
-#labels Featured 
+#labels Featured HowTo
 
 =HOWTO: Working with an annotation database=
 The *BioToolBox* scripts are designed to work with annotation from a relational database. This is designed to simplify data collection by not having to maintain separate annotation files, e.g. Bed files, for every gene, transcript, promoter, and everything else you're possibly interested in. Keeping those files properly annotated, labeled, and up-to-date with the latest genome version can be difficult. 

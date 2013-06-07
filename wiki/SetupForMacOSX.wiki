@@ -1,4 +1,5 @@
 #summary My own guide for setting up a Mac OS X computer with bioperl and GBrowse for bioinformatics analysis.
+#labels SetUp
 
 =Preparing a Mac OS X computer for bioinformatics analysis using bioperl=
 
