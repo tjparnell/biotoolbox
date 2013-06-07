@@ -34,6 +34,7 @@ The *BioToolBox* programs can work with a number of common data file formats rep
 	* BigBed
 	* Bam
 	* GFF
+
 For a more detailed look at these file types, including what they represent, how they can be used, and how to generate them, please refer to the [DataFileFormats Data File Formats] document.
 
 ===Single File Formats===
@@ -41,6 +42,7 @@ Some file formats are self-contained, indexed formats that can be accessed direc
 	* BigWig
 	* BigBed
 	* Bam
+
 By virtue of being indexed, scores may be collected quickly at any point in the genome. This makes data collection simple, as the file may be directly specified on the command line of the data collection program, usually using the `--data` option.
 
 ===Database Scores===
@@ -114,7 +116,7 @@ Unlike the get_datasets.pl script, these scripts only take a single dataset at a
 
 Both programs will output two files. The first data file is the collected scores in each bin across the feature for the entire list of input features. The second data file is a summary profile, or the mean score for each bin across the entire list of features. This summary file is transposed, such that the bins becomes rows and the dataset becomes a single column. The reasoning behind this is that we can combine the profiles from multiple datasets into a single file for generating graphs with overlapping plots. See [WorkingWithDatasets#Graphing_A_Profile Graphing A Profile] below for how to do this.
 
-====Averaging Over Features====
+===Averaging Over Features===
 The [Pod_average_gene average_gene.pl] script will collect data in percentile bins across the length of the feature. For example, to collect normalized RNASeq read counts across a gene in 10 percentile bins (each corresponding to 10% of the length of the feature), run
 <pre>
 	average_gene.pl --db annotation --feature gene:UCSC --data path/to/RNASeq.bam \
@@ -129,7 +131,7 @@ We may also extend the bins beyond the borders of the feature, if desired. These
 	--method rpm --strand sense --ext 2 --extsize 100 --out my_average_gene_profile
 </pre>
 
-====Averaging Around A Specific Point====
+===Averaging Around A Specific Point===
 The [Pod_get_relative_data get_relative_data.pl] script will also collect scores in bins, but centered around a specific point. Hence, all scores are relative to this reference point. Common applications include collecting histone modification data around a Transcription Start Site of a gene. Here, we provide the number of windows to collect and the size of each window in bp. Note that these numbers are essentially the radius, and that twice the number of bins are collected, both upstream and downstream of the reference point. As with the other scripts, strand is always considered when calculating upstream and downstream points. 
 
 To collect enrichment data in a radius of 1 kb in 10 bins relative to the transcription start site, we can run
@@ -271,6 +273,7 @@ This clustering algorithm requires a tab delimited text file, with one column of
 	manipulate_datasets.pl --func treeview --index 0,3-82 --target n0,cg \
 	--in my_TSS_data.txt
 </pre>
+
 A unique identifier column and a range of data columns is provided as the index. Some simple manipulations may be performed prior to exporting, which can be defined using special codes with the `--target` option (see the help document). The manipulations specified above is to convert nulls to 0.0 (`n0`, helpful in clustering) and median center the genes or rows (`cg`, aids in visualizing differences). These manipulations could also be done interactively, allowing you more control in preparing the data for cluster analysis.
 
 When you have a prepared data file, you can run cluster. The number of clusters should be specified. There is no magic number; rather, I will repeat the clustering to find the optimum number of interesting looking clusters. Usually between 2 and 10 is ideal. It is fun to watch the progression as clusters are split into new ones, often revealing important distinguishing groups. Too many clusters may yield redundancy and diminishing information content.
