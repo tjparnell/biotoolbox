@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.2';
+our $VERSION = '1.12.1';
 
 
 ### Variables
@@ -913,7 +913,9 @@ sub write_tim_data_file {
 	$args{'data'}     ||= undef;
 	$args{'filename'} ||= undef;
 	$args{'format'}   ||= undef;
-	unless (exists $args{'gz'}) {$args{'gz'} = undef}
+	unless (exists $args{'gz'}) {$args{'gz'} = undef} 
+		# this is a boolean value, need to be cognizant of 0
+		# this will be checked below
 	
 	# check the data
 	my $data = $args{'data'};
@@ -1130,6 +1132,9 @@ sub write_tim_data_file {
 	# adjust gzip extension as necessary
 	if ($args{'gz'} and $extension !~ m/\.gz$/i) {
 		$extension .= '.gz';
+	}
+	elsif (not $args{'gz'} and $extension =~ /\.gz$/i) {
+		$extension =~ s/\.gz$//i;
 	}
 	
 	# check filename length
