@@ -59,7 +59,7 @@ __
 __
   __
 {{{
-    start     the 5' position of the alignment
+    start     the 5 prime position of the alignment
     mid       the midpoint of the alignment
     span      along the length of the alignment (coverage)
     extend    along the length of the predicted fragment
@@ -229,7 +229,7 @@ __
 Single-end ChIP-Seq
 
 __
-  When sequencing Chromatin Immuno-Precipitation products, one generally  performs a 3' shift adjustment to center the fragment's end reads  over the predicted center and putative target. To adjust the positions  of tag count peaks, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
+  When sequencing Chromatin Immuno-Precipitation products, one generally  performs a 3 prime shift adjustment to center the fragment's end reads  over the predicted center and putative target. To adjust the positions  of tag count peaks, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
 __
   __
   Depending on your downstream applications and/or preferences, you  can record strict enumeration (start positions) or coverage (extend  position).
@@ -296,7 +296,7 @@ __
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  }}}
 ==SHIFT VALUE DETERMINATION==
-To determine the shift value, the top 500 bp regions (the default number is 200 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 400 bp regions (1.3 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 400 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R^2 value to keep is 0.25, and not all sampled regions may return a significant R^2 value. A trimmed mean is then calculated from all of the calculated shift values to be used used as the final shift value. This approach works best with clean, distinct peaks. The peak shift may be evaluated by viewing separate, stranded wig files together with the shifted wig file in a genome browser.
+To determine the shift value, the top 500 bp regions (the default number is 200 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 400 bp regions (1.3 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 400 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R squared value to keep is 0.25, and not all sampled  regions may return a significant R squared value. A trimmed mean is  then calculated from all of the calculated shift values to be used used  as the final shift value. This approach works best with clean, distinct  peaks. The peak shift may be evaluated by viewing separate, stranded wig  files together with the shifted wig file in a genome browser.
 
 ==AUTHOR==
 {{{
