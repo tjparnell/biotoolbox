@@ -26,7 +26,7 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.12',
+	VERSION         => '1.12.1',
 	LOG2            => log(2),
 	LOG10           => log(10),
 	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
@@ -600,6 +600,7 @@ sub determine_shift_value {
 		# sort largest to smallest
 		last if $chrom_count == $chr_number; 
 		my $tid = $size2chrom{$size};
+		my $current_min = 0;
 		for (my $start = 0; $start < $size; $start += 500) {
 		
 			my $end = $start + 500;
@@ -623,9 +624,13 @@ sub determine_shift_value {
 			}
 			else {
 				# we already have the maximum number
-			
+				
+				# check that we have a current minimum value
+				unless ($current_min) {
+					$current_min = min( keys %coverage2region );
+				}
+				
 				# find the lowest one
-				my $current_min = min( keys %coverage2region );
 				if ($sum_coverage > $current_min) {
 					# it's a new high over the lowest minimum
 				
@@ -635,6 +640,7 @@ sub determine_shift_value {
 					# add the current region
 					# record the coordinates for this region
 					$coverage2region{$sum_coverage} = [$tid, $start, $end];
+					$current_min = min( keys %coverage2region );
 				}
 			}
 		}
@@ -1891,7 +1897,7 @@ the input file.
 Specify the position of the alignment coordinate which should be 
 recorded. Several positions are accepted: 
      
-    start     the 5' position of the alignment
+    start     the 5 prime position of the alignment
     mid       the midpoint of the alignment
     span      along the length of the alignment (coverage)
     extend    along the length of the predicted fragment
@@ -2112,7 +2118,7 @@ settings:
 =item Single-end ChIP-Seq
 
 When sequencing Chromatin Immuno-Precipitation products, one generally 
-performs a 3' shift adjustment to center the fragment's end reads 
+performs a 3 prime shift adjustment to center the fragment's end reads 
 over the predicted center and putative target. To adjust the positions 
 of tag count peaks, let the program empirically determine the shift 
 value from the sequence data (recommended). Otherwise, if you know 
@@ -2198,12 +2204,12 @@ read counts are collected in 10 bp bins over the region and flanking
 coefficient is then reiteratively determined between the stranded data
 as the bins are shifted from 30 to 400 bp. The shift corresponding to
 the highest R squared value is retained for each sampled region. The
-default minimum R^2 value to keep is 0.25, and not all sampled regions
-may return a significant R^2 value. A trimmed mean is then calculated
-from all of the calculated shift values to be used used as the final
-shift value. This approach works best with clean, distinct peaks. The
-peak shift may be evaluated by viewing separate, stranded wig files
-together with the shifted wig file in a genome browser.
+default minimum R squared value to keep is 0.25, and not all sampled 
+regions may return a significant R squared value. A trimmed mean is 
+then calculated from all of the calculated shift values to be used used 
+as the final shift value. This approach works best with clean, distinct 
+peaks. The peak shift may be evaluated by viewing separate, stranded wig 
+files together with the shifted wig file in a genome browser.
 
 =head1 AUTHOR
 
