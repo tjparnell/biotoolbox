@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.12.1';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -308,7 +308,7 @@ sub interactive_execution {
 	print " Enter the symbol for the function you would like to perform   ";
 	my $response = <STDIN>;
 	chomp $response;
-	while ($response) {
+	while (1) {
 		if (exists $letter_to_function{$response} ) {
 			# first check that the letter corresponds to a function
 			
@@ -338,7 +338,7 @@ sub interactive_execution {
 		
 		else {
 			# unrecognized command
-			print " unrecognized command. Try again  ";
+			print " unrecognized command. [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
@@ -2536,7 +2536,7 @@ sub combine_function {
 	if (exists $main_data_ref->{ $indices[0] }{'log2'}) {
 		$log = $main_data_ref->{ $indices[0] }{'log2'};
 		foreach my $index (@indices) {
-			if ($main_data_ref->{ $indices[$index] }{'log2'} != $log) {
+			if ($main_data_ref->{$index}{'log2'} != $log) {
 				warn " unmatched log status between datasets! nothing done\n";
 				return;
 			}
@@ -3552,8 +3552,8 @@ sub export_treeview_function {
 	# First check for previous modifications
 	if ($modification) {
 		print " There are existing unsaved changes to the data. Do you want to\n";
-		print " save these first before making required, irreversible changes?".
-			"y or n   ";
+		print " save these first before making required, irreversible changes? ".
+			"y/n  ";
 		my $answer = <STDIN>;
 		chomp $answer;
 		if ($answer =~ /^y/i) {
