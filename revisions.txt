@@ -1,5 +1,13 @@
 ######## BioToolBox revision history #############
 
+v.1.12.1 (svn 635)
+	- Fixed bugs were gzip status and file extensions may be inappropriately 
+	inherited. This may cause problems when joining children files from 
+	parallel process forks.
+	- Fixed bug where the interactive menu would exit upon an empty value
+	in script manipulate_datasets.pl. A "q" must now be provided to exit.
+	- Minor optimization when calculating shift values in script bam2wig.pl.
+
 v.1.12 (svn 619)
 	- Major improvements to performance of some data collection scripts by 
 	adding multi-threaded options. These include get_datasets.pl, 
