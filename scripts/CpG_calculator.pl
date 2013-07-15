@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.10.1';
+my $VERSION = '1.12.2';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -294,18 +294,28 @@ sub process_regions {
 		
 		# record the statistics
 		# we subtract 1 from the length because we added 1 when we generated the seq
-		$data->{'data_table'}->[$row][$fgc_i] = 
-			sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
+		if (length($seq) > 1) {
+			# must have reasonable length to avoid div by 0 errors
+			$data->{'data_table'}->[$row][$fgc_i] = 
+				sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
 		
-		$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
+			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
 		
-		$data->{'data_table'}->[$row][$exp_i] = 
-			sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
+			$data->{'data_table'}->[$row][$exp_i] = 
+				sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
 		
-		$data->{'data_table'}->[$row][$oe_i]  = 
-			$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
-			sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
-			0; # obs/exp ratio
+			$data->{'data_table'}->[$row][$oe_i]  = 
+				$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
+				sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
+				0; # obs/exp ratio
+		}
+		else {
+			# a sequence of 1 bp? odd, just record default values
+			$data->{'data_table'}->[$row][$fgc_i] = 0;
+			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
+			$data->{'data_table'}->[$row][$exp_i] = 0;
+			$data->{'data_table'}->[$row][$oe_i]  = 0;
+		}
 	}
 	
 }
