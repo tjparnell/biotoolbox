@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.12.1';
+my $VERSION = '1.12.2';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -117,7 +117,7 @@ my $out_base_ext = $outfile_extension;
 my $in_base_ext = $first_data->{'extension'};
 $out_base_ext =~ s/\.gz$//; # strip any gz extension to make it a fair comparison
 $in_base_ext =~ s/\.gz$//;
-if ($out_base_ext ne $in_base_ext) {
+if ($out_base_ext and $out_base_ext ne $in_base_ext) {
 	print " changing output file extension $out_base_ext to match input" . 
 		" extension $in_base_ext\n";
 	$outfile =~ s/$out_base_ext/$in_base_ext/;
