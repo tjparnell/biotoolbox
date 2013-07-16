@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.12.1';
+my $VERSION = '1.12.2';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -204,6 +204,7 @@ sub print_menu {
 		"  D  (D)elete a dataset\n" .
 		"  n  Re(n)ame a dataset\n" .
 		"  b  Num(b)er the datapoints\n" .
+		"  C  Generate (C)oordinate string\n" .
 		"  o  S(o)rt all datasets by a specific dataset\n" .
 		"  g  (g)enomic sort by chromosome, start\n" .
 		"  N  Toss data lines with (N)ull values\n" .
@@ -242,7 +243,7 @@ sub print_menu {
 		"  Q  (Q)uit without saving changes\n"
 		#  m  print this (m)enu
 	;
-	# unused letters: C E F G H jJ kK L O S V Y 
+	# unused letters: E F G H jJ kK L O S V Y 
 	return; # return 0, nothing done
 }
 
@@ -589,6 +590,56 @@ sub rename_function {
 	$main_data_ref->{$index}{'name'} = $newname; # assign metadata
 	$data_table_ref->[0][$index] = $newname; # assign the column header
 	print " $oldname re-named to $newname\n";
+	return 1;
+}
+
+
+sub coordinate_function {
+	# this subroutine will generate a coordinate string from coordinate values
+	
+	# identify the coordinates
+	my $chr_i   = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
+	my $start_i = find_column_index($main_data_ref, '^start|position');
+	my $stop_i  = find_column_index($main_data_ref, '^stop|end');
+	unless (defined $chr_i and defined $start_i) {
+		# cannot add coordinate column, do without ?
+		warn " cannot generate coordinates, no chromosome or start column found\n";
+		return;
+	}
+	
+	# the new index position is equivalent to the number of columns
+	my $new_position = $main_data_ref->{'number_columns'};
+	
+	# generate coordinates
+	if (defined $stop_i) {
+		# merge chromosome:start-stop
+		for my $row (1 .. $main_data_ref->{'last_row'}) {
+			$data_table_ref->[$row][$new_position] = join("", 
+				$data_table_ref->[$row][$chr_i], ':', 
+				$data_table_ref->[$row][$start_i], '-',
+				$data_table_ref->[$row][$stop_i]
+			);
+		}
+	}
+	else {
+		# merge chromosome:start
+		for my $row (1 .. $main_data_ref->{'last_row'}) {
+			$data_table_ref->[$row][$new_position] = join("", 
+				$data_table_ref->[$row][$chr_i], ':', 
+				$data_table_ref->[$row][$start_i]
+			);
+		}
+	}
+	
+	# generate new metadata
+	$main_data_ref->{$new_position} = {
+		'name'   => 'Coordinate',
+		'index'  => $new_position,
+	};
+	$main_data_ref->{'number_columns'}++;
+	$data_table_ref->[0][$new_position] = 'Coordinate';
+		
+	print " Coordinate string generated as new column $new_position\n";
 	return 1;
 }
 
@@ -3954,6 +4005,7 @@ sub _get_letter_to_function_hash {
 		'D' => "delete",
 		'n' => "rename",
 		'b' => "number",
+		'C' => "coordinate",
 		'o' => "sort",
 		'g' => "gsort",
 		'N' => "null",
@@ -4004,6 +4056,7 @@ sub _get_function_to_subroutine_hash {
 		'delete'      => \&delete_function,
 		'rename'      => \&rename_function,
 		'number'      => \&number_function,
+		'coordinate'  => \&coordinate_function,
 		'sort'        => \&sort_function,
 		'gsort'       => \&genomic_sort_function,
 		'null'        => \&toss_nulls_function,
@@ -4344,12 +4397,12 @@ manipulate_datasets.pl [--options ...] <input_filename>
 
   Options:
   --in <input_filename>
-  --func [ stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | cnull | absolute | minimum | 
-          maximum | add | subtract | multiply | divide | scale | pr | 
-          zscore | log2 | delog2 | format | combine | subsample | ratio | 
-          diff | normdiff | strandsign | mergestrand | center | new | 
-          summary | export | rewrite | treeview ]
+  --func [ stat | reorder | delete | rename | number | coordinate | sort |
+          gsort | null | duplicate | above | below | cnull | absolute | 
+          minimum | maximum | add | subtract | multiply | divide | scale | 
+          pr | zscore | log2 | delog2 | format | combine | subsample | 
+          ratio | diff | normdiff | strandsign | mergestrand | center | 
+          new | summary | export | rewrite | treeview ]
   --index <integers>
   --exp | --num <integer>
   --con | --den <integer>
@@ -4398,6 +4451,7 @@ other required options. These functions include the following.
   delete
   rename
   number
+  coordinate
   sort
   gsort
   null
@@ -4584,6 +4638,13 @@ column's new name may be explicitly defined with this option.
 Assign a number to each datapoint (or line), incrementing from 1 
 to the end. The numbered column will be inserted after the requested 
 column index.
+
+=item B<coordinate> (menu option 'C')
+
+Generate a coordinate string from the chromosome, start, and, if 
+present, stop coordinate values as a new column. The string will 
+have the format "chr:start-stop" or "chr:start". This is useful 
+in making unique identifiers or working with genome browsers.
 
 =item B<sort> (menu option 'o')
 
