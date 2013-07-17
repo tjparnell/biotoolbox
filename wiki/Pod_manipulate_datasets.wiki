@@ -13,12 +13,12 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
 {{{
   Options:
   --in <input_filename>
-  --func [ stat | reorder | delete | rename | number | sort | gsort | 
-          null | duplicate | above | below | cnull | absolute | minimum | 
-          maximum | add | subtract | multiply | divide | scale | pr | 
-          zscore | log2 | delog2 | format | combine | subsample | ratio | 
-          diff | normdiff | strandsign | mergestrand | center | new | 
-          summary | export | rewrite | treeview ]
+  --func [ stat | reorder | delete | rename | number | coordinate | sort |
+          gsort | null | duplicate | above | below | cnull | absolute | 
+          minimum | maximum | add | subtract | multiply | divide | scale | 
+          pr | zscore | log2 | delog2 | format | combine | subsample | 
+          ratio | diff | normdiff | strandsign | mergestrand | center | 
+          new | summary | export | rewrite | treeview ]
   --index <integers>
   --exp | --num <integer>
   --con | --den <integer>
@@ -61,6 +61,7 @@ __
   delete
   rename
   number
+  coordinate
   sort
   gsort
   null
@@ -231,6 +232,12 @@ _*_number_*_ (menu option 'b')
 
 __
   Assign a number to each datapoint (or line), incrementing from 1  to the end. The numbered column will be inserted after the requested  column index.
+__
+  __
+_*_coordinate_*_ (menu option 'C')
+
+__
+  Generate a coordinate string from the chromosome, start, and, if  present, stop coordinate values as a new column. The string will  have the format "chr:start-stop" or "chr:start". This is useful  in making unique identifiers or working with genome browsers.
 __
   __
 _*_sort_*_ (menu option 'o')

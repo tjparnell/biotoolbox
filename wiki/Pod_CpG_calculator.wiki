@@ -19,6 +19,7 @@ A script to calculate observed vs expected CpG dinucleotides
   --win <integer>
   --out <filename> 
   --gz
+  --cpu <integer>
   --version
   --help
 }}}
@@ -28,7 +29,10 @@ The command line flags and descriptions:
 __--db <**name|file|directory>
 
 __
-  Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. A relational database name, SQLite file, or  GFF3 file with sequence may be provided. Alternatively, provide the name  of an uncompressed Fasta file (multi-fasta is ok) or directory containing  multiple fasta files representing the genomic sequence. The directory  must be writeable for a small index file to be written. Required.
+  Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. A relational database name, SQLite file, or  GFF3 file with sequence may be provided. Alternatively, provide the name  of an uncompressed Fasta file (multi-fasta is ok) or directory containing  multiple fasta files representing the genomic sequence. The directory  must be writeable for a small index file to be written.
+__
+  __
+  The database may be provided in the metadata of an input file.
 __
   __
 __--in <**filename>
@@ -53,6 +57,12 @@ __--gz
 
 __
   Specify whether (or not) the output file should be compressed with gzip.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
 __
   __
 __--version
