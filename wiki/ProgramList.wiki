@@ -125,7 +125,7 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 [Pod_data2bed data2bed.pl] converts any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
 
 ====data2fasta.pl====
-[Poddata2fasta data2fasta.pl] converts any data text file into a fasta file. Sequences may be provided as a column of data within the text file, or they may be retrieved from a genome fasta file given chromosomal coordinates.
+[Pod_data2fasta data2fasta.pl] converts any data text file into a fasta file. Sequences may be provided as a column of data within the text file, or they may be retrieved from a genome fasta file given chromosomal coordinates.
 
 ====data2gff.pl====
 [Pod_data2gff data2gff.pl] converts any data text file into a GFF file, so long as there are genomic coordinates within the file.

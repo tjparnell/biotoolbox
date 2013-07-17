@@ -14,6 +14,7 @@ This guide is for new users looking to set up bioperl and BioToolBox. Advanced u
 	# [BioToolBoxSetUp#Installing_database_modules Installing database modules]
 	# [BioToolBoxSetUp#Installing_Bioperl Installing Bioperl]
 	# [BioToolBoxSetUp#Installing_Graphing_Modules Installing Graphing Modules]
+	# [BioToolBoxSetUp#Installing_Bam_file_support Installing Bam file support]
 	# [BioToolBoxSetUp#Installing_bigWig_and_bigBed_support Installing bigWig and bigBed support]
 	# [BioToolBoxSetUp#Installing_support_for_legacy_wig_files Installing support for legacy wig files]
 	# [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Installing the Ensembl Perl API]
@@ -148,7 +149,7 @@ Once the GD libraries are installed, you can then install the GD Perl modules us
 
 Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to force install (ignoring errors), and everything seems to still work. 
 
-==Installing Sam/Bam file support==
+==Installing Bam file support==
 To work with next generation sequencing data, you'll need to install [http://samtools.sourceforge.net samtools] and the corresponding Perl module [http://search.cpan.org/dist/Bio-SamTools/ Bio-SamTools]. This will allow you to use the ubiquitous Bam file format in conversions and analysis.
 
 Download the source code for the latest version from the samtools [http://sourceforge.net/projects/samtools/files/samtools/ SourceForge] project, and unpack it in your directory.
