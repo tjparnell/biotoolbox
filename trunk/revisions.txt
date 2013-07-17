@@ -1,5 +1,20 @@
 ######## BioToolBox revision history #############
 
+v.1.12.2 (svn 642)
+	- Scripts find_enriched_regions.pl and CpG_calculator.pl are now 
+	multi-threaded. The find_enriched_regions.pl also has additional 
+	optimizations to reduce memory usage.
+	- The script merge_datasets.pl now has the option to use a coordinate 
+	string as a unique identifier when looking up features. This is 
+	particularly helpful with BED, GFF, and other files with genomic 
+	coordinates that do not have unique name identifiers.
+	- A coordinate string in the format chromo:start-stop may now be 
+	generated from coordinate values in data files using a new function 
+	in the script manipulate_datasets.pl.
+	- Fixed a bug regarding changing file extensions in script 
+	join_data_file.pl, which gave odd output file names with scripts that 
+	executed in parallel.
+
 v.1.12.1 (svn 635)
 	- Fixed bugs were gzip status and file extensions may be inappropriately 
 	inherited. This may cause problems when joining children files from 
