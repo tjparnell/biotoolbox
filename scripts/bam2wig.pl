@@ -26,7 +26,7 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.12.1',
+	VERSION         => '1.12.3',
 	LOG2            => log(2),
 	LOG10           => log(10),
 	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
@@ -1664,23 +1664,28 @@ sub write_fixstep {
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - BUFFER_MIN; 
 		
-		# write the data
+		# write binned data
+		# only binned data is ever written as a fixedStep wig file
 		for (
 			my $pos = $data->{$offset}; 
 			$pos < $maximum - $bin_size; 
 			$pos += $bin_size
 		) {
-			
+		
 			# sum the counts in the bin interval
-			my $score = sum( 
-				map { $data->{$s}{$_} ||= 0 } ($pos .. $pos + $bin_size -1) );
-			$score = $score > $max_dup ? $max_dup : $score;
+			my $score = 0;
+			for ($pos .. $pos + $bin_size -1) {
+				next unless exists $data->{$s}{$_};
 			
+				# only take the maximum read count
+				$score += $data->{$s}{$_} > $max_dup ? $max_dup : $data->{$s}{$_};
+			
+				# clean up
+				delete $data->{$s}{$_};
+			}
+		
 			# write line
 			$data->{$fh}->print( &$convertor($score) . "\n" );
-			
-			# clean up
-			delete $data->{$s}{$pos};
 		}
 		
 		# warn about tossed values at the chromosome end
@@ -2001,6 +2006,8 @@ checked. The default value is 0 (accept everything).
 =item --max <integer>
 
 Set a maximum number of duplicate alignments tolerated at a single position. 
+This uses the alignment start (or midpoint if recording midpoint) position 
+to determine duplicity. Note that this does not affect coverage mode. 
 The default is 1000. 
 
 =item --rpm
