@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.12.1';
+our $VERSION = '1.12.3';
 
 
 ### Variables
@@ -99,6 +99,17 @@ sub load_tim_data_file {
 		
 		# the current file position should be at the beginning of the
 		# data table information
+		
+		# skip comment lines
+		if ($line =~ /^#/) {
+			push @{ $inputdata->{'other'} }, $line;
+			next;
+		}
+		
+		# no real line, just empty space
+		if ($line !~ m/\w+/) {
+			next;
+		}
 		
 		# simply read each line in the file, explode the line into an 
 		# anonymous array and push it to the data_table array
