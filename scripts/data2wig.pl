@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.12.3';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -38,6 +38,7 @@ my (
 	$infile, 
 	$outfile,
 	$step,
+	$bedgraph,
 	$step_size,
 	$span,
 	$chr_index,
@@ -55,6 +56,7 @@ my (
 	$bw_app_path,
 	$database,
 	$chromo_file,
+	$keep,
 	$gz,
 	$help,
 	$print_version,
@@ -66,6 +68,7 @@ GetOptions(
 	'in=s'      => \$infile, # name of input file
 	'out=s'     => \$outfile, # name of output gff file 
 	'step=s'    => \$step, # wig step method
+	'bed|bdg!'  => \$bedgraph, # write a bedgraph file
 	'size=i'    => \$step_size, # wig step size
 	'span=i'    => \$span, # the wig span size
 	'chr=i'     => \$chr_index, # index for the chromosome column
@@ -83,6 +86,7 @@ GetOptions(
 	'db=s'      => \$database, # database for bigwig file generation
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
+	'keep!'     => \$keep, # keep the wig file after converting to bigWig
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -147,9 +151,9 @@ unless ($outfile) {
 	# automatically generate output file name based on track name
 	$outfile = $track_name;
 }
-unless ($outfile =~ /\.wig$/i) {
+unless ($outfile =~ /\.(?:wig|bdg|bedgraph)(?:\.gz)?$/i) {
 	# add extension
-	$outfile .= '.wig';
+	$outfile .= $bedgraph ? '.bdg' : '.wig';
 }
 my $out_fh = open_to_write_fh($outfile, $gz) or 
 	die " unable to open output file '$outfile' for writing!\n";
@@ -163,7 +167,10 @@ if ($use_track) {
 
 ### Start the conversion 
 print " converting '" . $metadata_ref->{$score_index}{'name'} . "'....\n";
-if ($step eq 'fixed') {
+if ($bedgraph) {
+	convert_to_bedgraph();
+}
+elsif ($step eq 'fixed') {
 	convert_to_fixedStep();
 }
 elsif ($step eq 'variable') {
@@ -348,7 +355,19 @@ sub check_step {
 	
 	
 	# check step 
-	if ($step eq 'variable') {
+	if ($bedgraph) {
+		# write a bedgraph file
+		$step = 'bed';
+		$use_track = 0; # no track data
+		return;
+	}
+	elsif ($step eq 'bed') {
+		# write a bedgraph file
+		$bedgraph = 1;
+		$use_track = 0; # no track data
+		return;
+	}
+	elsif ($step eq 'variable') {
 		# this is ok, we can work with it
 	}
 	elsif ($step eq 'fixed') {
@@ -707,6 +726,74 @@ sub convert_to_variableStep {
 }
 
 
+sub convert_to_bedgraph {
+	
+	# check for indices
+	unless (defined $chr_index and defined $start_index and defined $stop_index) {
+		die " One or more indices for chromosome, start, or stop is not defined" . 
+			" or found!\n Unable to write a bedgraph file!\n";
+	}
+	
+	# variables to check for overlap
+	my $current_chr; # current chromosome
+	my $previous_pos; # previous position to avoid overlap
+	while (my $line = $in_fh->getline) {
+		chomp $line;
+		my @data = split /\t/, $line;
+		
+		# adjust start position
+		unless ($interbase) {
+			$data[$start_index]--;
+		}
+		
+		# check coordinates
+		if (defined $previous_pos and defined $current_chr) {
+			
+			# check if on the same chromosome
+			if ($current_chr eq $data[$chr_index]) {
+				# check for overlap
+				if ($data[$start_index] < $previous_pos) {
+					die " There are overlapping intervals or the file is not sorted by" .
+						" coordinates!\n Compare $data[$chr_index]:$data[$start_index]" . 
+						" with previous stop position $previous_pos\n";
+				}
+				# otherwise it is ok
+				$previous_pos = $data[$stop_index];
+			}
+			else {
+				# new chromosome
+				$current_chr = $data[$chr_index];
+				$previous_pos = $data[$stop_index];
+			}
+		}
+		else {
+			# define the current 
+			$current_chr = $data[$chr_index];
+			$previous_pos = $data[$stop_index];
+		}
+		
+		# collect the score
+		my $score;
+		if ($data[$score_index] eq '.') {
+			# internal null value, skip these
+			next;
+		}
+		if (defined $format) {
+			# format if requested
+			$score = format_score( $data[$score_index] );
+		}
+		else {
+			# no formatting, take as is
+			$score = $data[$score_index];
+		}
+		
+		# write the feature line
+		$out_fh->print(join("\t", $data[$chr_index], $data[$start_index], 
+			$data[$stop_index], $score), "\n");
+	}
+}
+
+
 sub calculate_position {
 	my @data = @_;
 	my $position;
@@ -772,7 +859,7 @@ sub convert_to_bigwig {
 	# confirm
 	if ($bw_file) {
 		print " bigwig file '$bw_file' generated\n";
-		unlink $outfile; # remove the wig file
+		unlink $outfile unless $keep; # remove the wig file
 	}
 	else {
 		die " bigwig file not generated! see standard error\n";
@@ -798,7 +885,8 @@ data2wig.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
-  --step [fixed | variable]
+  --step [fixed | variable | bed]
+  --bed | --bdg
   --size <integer>
   --span <integer>
   --index | --score <column_index>
@@ -816,6 +904,7 @@ data2wig.pl [--options...] <filename>
   --chromof <filename>
   --db <database>
   --bwapp </path/to/wigToBigWig>
+  --keep
   --gz
   --version
   --help
@@ -840,15 +929,28 @@ be compressed with gzip.
 Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.
 
-=item --step [fixed | variable]
+=item --step [fixed | variable | bed]
 
-The type of step progression for the wig file. Two wig formats are available:
-'fixedStep' where data points are positioned at equal distances along the 
-chromosome, and 'variableStep' where data points are not equally spaced 
-along the chromosome. The 'fixedStep' wig file has one column of data 
-values (score), while the 'variableStep' wig file has two columns
-(position and score). If the option is not defined, then the format is 
-automatically determined from the metadata of the file.
+The type of step progression for the wig file. Three wig formats are 
+available: 
+  - fixedStep: where data points are positioned at equal distances 
+        along the chromosome
+  - variableStep: where data points are variably positioned along 
+        the chromosome. 
+  - bed (bedGraph): where scores are associated with intervals 
+        defined by start and stop coordinates.
+The fixedStep wig file has one column of data (score), the variableStep 
+wig file has two columns (position and score), and the bedGraph has 
+four columns of data (chromosome, start, stop, score). If the option 
+is not defined, then the format is automatically determined from the 
+metadata of the file.
+
+=item --bed
+
+=item --bdg
+
+Convenience option to specify a bedGraph file should be written. Same as 
+specifying --step=bed.
 
 =item --size <integer>
 
@@ -967,11 +1069,16 @@ data file.
 
 =item --bwapp </path/to/wigToBigWig>
 
-Specify the path to the Jim Kent's wigToBigWig conversion utility. The 
-default is to first check the BioToolBox  configuration 
+Specify the path to the UCSC wigToBigWig or bedGraphToBigWig conversion 
+utility. The default is to first check the BioToolBox configuration 
 file C<biotoolbox.cfg> for the application path. Failing that, it will 
 search the default environment path for the utility. If found, it will 
 automatically execute the utility to convert the wig file.
+
+=item --keep
+
+Keep the wig or bedGraph file after converting to a bigWig file. The 
+default is to delete the file if the bigWig conversion is successful.
 
 =item --gz
 
@@ -998,10 +1105,9 @@ columns (if appropriately labeled) or they can be specified. An option
 exists to use the midpoint of a region, e.g. microarray probe.
 
 The wig file format is specified by documentation supporting the UCSC 
-Genome Browser and detailed at this location:
-http://genome.ucsc.edu/goldenPath/help/wiggle.html
-Two formats are supported, 'fixedStep' and 'variableStep'. The format 
-may be requested or determined empirically from the input file 
+Genome Browser and detailed here: http://genome.ucsc.edu/goldenPath/help/wiggle.html.
+Three formats are supported, 'fixedStep', 'variableStep', and 'bedGraph'. 
+The format may be requested or determined empirically from the input file 
 metadata. Genomic bin files generated with C<BioToolBox> scripts record 
 the window and step values in the metadata, which are used to determine 
 the span and step wig values, respectively. The variableStep format 
@@ -1020,8 +1126,8 @@ text wiggle file. The binary format is preferential to the text version
 for a variety of reasons, including fast, random access and no loss in 
 data value precision. More information can be found at this location:
 http://genome.ucsc.edu/goldenPath/help/bigWig.html. Conversion requires 
-BigWig file support, supplied by the external C<wigToBigWig> utility 
-available from UCSC.
+BigWig file support, supplied by the external C<wigToBigWig> or 
+C<bedGraphToBigWig> utility available from UCSC.
 
 =head1 AUTHOR
 
