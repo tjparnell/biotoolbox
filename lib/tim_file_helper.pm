@@ -1184,31 +1184,30 @@ sub write_tim_data_file {
 		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			eval {
-				if ($data->{'data_table'}->[$row][5] >= 0 ) {
-					$data->{'data_table'}->[$row][5] = '+';
-				}
-				elsif ($data->{'data_table'}->[$row][5] == -1 ) {
-					$data->{'data_table'}->[$row][5] = '-';
-				}
-			};
+			if ($data->{'data_table'}->[$row][5] =~ m/\A [f \+ 1 w 0 \.]/xi) {
+				$data->{'data_table'}->[$row][5] = '+';
+			}
+			elsif ($data->{'data_table'}->[$row][5] =~ m/\A [r \- c]/xi) {
+				$data->{'data_table'}->[$row][5] = '-';
+			}
 		}
 	}	
 	if ($extension =~ /.g[tf]f/i and $data->{'gff'}) {
 		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			eval {
-				if ($data->{'data_table'}->[$row][6] == 1 ) {
-					$data->{'data_table'}->[$row][6] = '+';
-				}
-				elsif ($data->{'data_table'}->[$row][6] == -1 ) {
-					$data->{'data_table'}->[$row][6] = '-';
-				}
-				elsif ($data->{'data_table'}->[$row][6] == 0 ) {
-					$data->{'data_table'}->[$row][6] = '.';
-				}
-			};
+			if ($data->{'data_table'}->[$row][6] =~ m/\A [f \+ 1 w]/xi) {
+				$data->{'data_table'}->[$row][6] = '+';
+			}
+			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [r \- c]/xi) {
+				$data->{'data_table'}->[$row][6] = '-';
+			}
+			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [0 \.]/xi) {
+				$data->{'data_table'}->[$row][6] = '.';
+			}
+			else {
+				$data->{'data_table'}->[$row][6] = '.';
+			}
 		}
 	}	
 	
