@@ -1,5 +1,23 @@
 ######## BioToolBox revision history #############
 
+v.1.12.3 (svn 651)
+	- Added user options to control the size of the memory buffer 
+	when writing bedGraph files and the disk write frequency in 
+	script bam2wig.pl.
+	- Added option to control the output order of the features from 
+	script pull_features.pl. The order may match either the input 
+	list or input data file. Also improved automatic column identification 
+	and avoid empty output files.
+	- Script data2wig.pl will now write bedGraph files.
+	- Fixed bug leading to excessive memory usage when writing a 
+	fixedStep wig file from script bam2wig.pl. Thanks to Jeff for 
+	reporting.
+	- Fixed bug where writing strand values for gff or bed files may 
+	not be written correctly.
+	- Fixed bug leading to errors loading input files with comment or 
+	empty lines in the middle of data lines.
+	- Fixed bug to avoid log of 0 errors in script bam2wig.pl.
+
 v.1.12.2 (svn 642)
 	- Scripts find_enriched_regions.pl and CpG_calculator.pl are now 
 	multi-threaded. The find_enriched_regions.pl also has additional 
