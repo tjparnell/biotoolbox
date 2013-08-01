@@ -29,14 +29,6 @@ use constant {
 	VERSION         => '1.12.3',
 	LOG2            => log(2),
 	LOG10           => log(10),
-	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
-	                            # to file. Increasing this number may improve 
-	                            # performance at the cost of memory usage.
-	BUFFER_MIN      => 1_200, # Leave this much in bp in the coverage buffer when
-	                          # writing a bedGraph file to account for additional 
-	                          # future coverage. Increase this if alignment length, 
-	                          # paired-end span, or 2 x read shift is greater than 
-	                          # this value.
 };
 	
 	
@@ -78,6 +70,8 @@ my (
 	$bwapp,
 	$gz,
 	$cpu,
+	$buffer_min,
+	$alignment_count,
 	$verbose,
 	$help,
 	$print_version,
@@ -106,6 +100,8 @@ GetOptions(
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
 	'gz!'       => \$gz, # compress text output
 	'cpu=i'     => \$cpu, # number of cpu cores to use
+	'buffer=i'  => \$buffer_min, # minimum buffer length
+	'count=i'   => \$alignment_count, # number of alignments before writing to disk
 	'verbose!'  => \$verbose, # print sample correlations
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -276,6 +272,16 @@ sub check_defaults {
 	# maximum duplicates
 	unless (defined $max_dup) {
 		$max_dup = 1000;
+	}
+	
+	# check minimum buffer
+	unless (defined $buffer_min) {
+		$buffer_min = 1200;
+	}
+	
+	# check alignment count
+	unless (defined $alignment_count) {
+		$alignment_count = 200000;
 	}
 	
 	# check position
@@ -521,13 +527,13 @@ sub check_defaults {
 	elsif ($rpm and $log == 2) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return log( ( ($_[0] * 1_000_000) / $total_read_number) ) + 1 / LOG2;
+			return log( ( ($_[0] * 1_000_000) / $total_read_number) + 1 ) / LOG2;
 		};
 	}
 	elsif ($rpm and $log == 10) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return log( ( ($_[0] * 1_000_000) / $total_read_number) ) + 1 / LOG10;
+			return log( ( ($_[0] * 1_000_000) / $total_read_number) + 1 ) / LOG10;
 		};
 	}
 	elsif (!$rpm and $log == 2) {
@@ -1603,7 +1609,7 @@ sub check_data {
 	$data->{'count'}++;
 	
 	# write when we reach buffer maximum number of alignments read
-	if ($data->{'print'} and $data->{'count'} % ALIGN_COUNT_MAX == 0) {
+	if ($data->{'print'} and $data->{'count'} % $alignment_count == 0) {
 		&$write_wig($data, 0);
 	}
 }
@@ -1621,7 +1627,7 @@ sub write_varstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - BUFFER_MIN; 
+			max(keys %{$data->{$s}}) - $buffer_min; 
 		
 		# write the data
 		foreach my $pos (sort {$a <=> $b} keys %{$data->{$s}}) {
@@ -1662,7 +1668,7 @@ sub write_fixstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - BUFFER_MIN; 
+			max(keys %{$data->{$s}}) - $buffer_min; 
 		
 		# write binned data
 		# only binned data is ever written as a fixedStep wig file
@@ -1714,7 +1720,7 @@ sub write_bedgraph {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - BUFFER_MIN; 
+			max(keys %{$data->{$s}}) - $buffer_min; 
 		
 		# convert read lengths to coverage in the buffer array
 		foreach my $pos (sort {$a <=> $b} keys %{ $data->{$s} }) {
@@ -1746,7 +1752,7 @@ sub write_bedgraph {
 		my $current_value = shift @{ $data->{$buffer} } || 0;
 		my $current_offset = 0;
 		while (
-			scalar( @{ $data->{$buffer} } ) > BUFFER_MIN or 
+			scalar( @{ $data->{$buffer} } ) > $buffer_min or 
 				# keep at least minimum length in the buffer
 			( $final and scalar @{ $data->{$buffer} } )
 				# or we're at the end of the chromosome and need to write everything
@@ -1877,6 +1883,8 @@ bam2wig.pl [--options...] <filename.bam>
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --gz
   --cpu <integer>
+  --buffer <integer>
+  --count <integer>
   --verbose
   --version
   --help
@@ -2042,13 +2050,31 @@ paths may be set in the biotoolbox.cfg file.
 
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
-requested.
+requested. Disable with --nogz.
 
 =item --cpu <integer>
 
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of Parallel::ForkManager. With support enabled, the 
 default is 2. Disable multi-threaded execution by setting to 1. 
+
+=item --buffer <integer>
+
+Specify the length in bp to reserve as buffer when writing a bedGraph 
+file to account for future read coverage. This value must be greater 
+than the expected alignment length (including split alignments), 
+paired-end span length (especially RNA-Seq), or extended coverage 
+(2 x alignment shift). This is only relevant when the position 
+option is set to span or extend. Increasing this value may result in 
+increased memory usage, but will avoid errors with duplicate positions 
+written to the wig file. The default is 1200 bp. 
+
+=item --count <integer>
+
+Specify the number of alignments processed before writing to file. 
+Increasing this count will reduce the number of disk writes and increase 
+performance at the cost of increased memory usage. Lowering will 
+decrease memory usage. The default is 200,000 alignments.
 
 =item --verbose
 
@@ -2081,18 +2107,18 @@ Alignment counts may be separated by strand, facilitating analysis of
 RNA-Seq experiments. 
 
 For ChIP-Seq experiments, the alignment position may be shifted 
-in the 3' direction. This effectively merges the separate peaks 
+in the 3 prime direction. This effectively merges the separate peaks 
 (representing the ends of the enriched fragments) on each strand 
 into a single peak centered over the target locus. Alternatively, 
 the entire predicted fragment may be recorded across its span. 
 This extended method of recording is analogous to the approach 
-used by the MACS2 program. The shift value may be empirically 
+used by the MACS program. The shift value may be empirically 
 determined from the sequencing data (see below). 
 
 The output wig file may be either a variableStep, fixedStep, or 
 bedGraph format. The file format is dictated by where the alignment 
-position is recorded. Recording start and midpoint at 
-single base-pair resolution writes a variableStep wig file. Binned start 
+position is recorded. Recording start and midpoint at single 
+base-pair resolution writes a variableStep wig file. Binned start 
 or midpoint counts and coverage are written as a fixedStep wig file. 
 Span and extended positions are written as a bedGraph file. 
 
@@ -2197,6 +2223,10 @@ bam2wig.pl will use this to set the strand.
 
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  
+When using the position span option, you may wish to increase the 
+buffer size (see --buffer) to account for reads that may span very 
+large introns.
+
 =back
 
 =head1 SHIFT VALUE DETERMINATION
