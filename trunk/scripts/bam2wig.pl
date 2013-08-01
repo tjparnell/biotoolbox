@@ -2064,9 +2064,8 @@ Specify the length in bp to reserve as buffer when writing a bedGraph
 file to account for future read coverage. This value must be greater 
 than the expected alignment length (including split alignments), 
 paired-end span length (especially RNA-Seq), or extended coverage 
-(2 x alignment shift). This is only relevant when the position 
-option is set to span or extend. Increasing this value may result in 
-increased memory usage, but will avoid errors with duplicate positions 
+(2 x alignment shift). Increasing this value may result in increased 
+memory usage, but will avoid errors with duplicate positions 
 written to the wig file. The default is 1200 bp. 
 
 =item --count <integer>
@@ -2223,9 +2222,9 @@ bam2wig.pl will use this to set the strand.
 
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  
-When using the position span option, you may wish to increase the 
-buffer size (see --buffer) to account for reads that may span very 
-large introns.
+You may also wish to increase the buffer size (see --buffer) to account 
+for reads that may span very large introns and avoid recording 
+duplicate positions.
 
 =back
 
