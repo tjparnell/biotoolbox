@@ -17,6 +17,7 @@ pull_features.pl --data <**filename> --list <**filename> --out <**filename>
   --out <filename>
   --dindex <integer>
   --lindex <integer>
+  --order [list | data]
   --sum
   --starti <integer>
   --stopi <integer>
@@ -52,6 +53,12 @@ __--lindex <**integer>
 
 __
   Specify the index numbers of the columns in the data and list  files, respectively, containing the identifiers to match features.  If not specified, then the program will attempt to identify   appropriate matching columns with the same header name. If none  are specified, the user must select interactively from a list of  available column names.
+__
+  __
+__--order `[`list | data`]`
+
+__
+  Optionally specify the order of features in the output file. Two  options are available. Specify 'list' to match the order of features  in the list file. Or specify 'data' to match the order of features  in the data file. The default is list.
 __
   __
 __--sum
@@ -91,7 +98,7 @@ __
 __
   __
 ==DESCRIPTION==
-Given a list of requested feature identifiers, this program will pull  out those features (rows) from a datafile and write a new file. This  program compares in function to a popular spreadsheet VLOOKUP command.  The list is provided as a separate text file, either as a single column  file or a multi-column tab-delimited from which one column is selected.  All rows from the source data file that match an identifier in the list  will be written to the new file.
+Given a list of requested unique feature identifiers, this program will  pull out those features (rows) from a datafile and write a new file. This  program compares in function to a popular spreadsheet VLOOKUP command.  The list is provided as a separate text file, either as a single column  file or a multi-column tab-delimited from which one column is selected.  All rows from the source data file that match an identifier in the list  will be written to the new file. The order of the features in the output  file may match either the list file or the data file.
 
 The program will also accept a Cluster gene file (with .kgg extension)  as a list file. In this case, all of the genes for each cluster are  written into separate files, with the output file name appended with the  cluster number.
 

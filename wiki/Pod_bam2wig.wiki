@@ -33,6 +33,8 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --gz
   --cpu <integer>
+  --buffer <integer>
+  --count <integer>
   --verbose
   --version
   --help
@@ -144,7 +146,7 @@ __
 __--max <**integer>
 
 __
-  Set a maximum number of duplicate alignments tolerated at a single position.  The default is 1000.
+  Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this does not affect coverage mode.  The default is 1000.
 __
   __
 __--rpm
@@ -174,13 +176,25 @@ __
 __--gz
 
 __
-  Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested.
+  Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested. Disable with --nogz.
 __
   __
 __--cpu <**integer>
 
 __
   Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
+__
+  __
+__--buffer <**integer>
+
+__
+  Specify the length in bp to reserve as buffer when writing a bedGraph  file to account for future read coverage. This value must be greater  than the expected alignment length (including split alignments),  paired-end span length (especially RNA-Seq), or extended coverage  (2 x alignment shift). This is only relevant when the position  option is set to span or extend. Increasing this value may result in  increased memory usage, but will avoid errors with duplicate positions  written to the wig file. The default is 1200 bp.
+__
+  __
+__--count <**integer>
+
+__
+  Specify the number of alignments processed before writing to file.  Increasing this count will reduce the number of disk writes and increase  performance at the cost of increased memory usage. Lowering will  decrease memory usage. The default is 200,000 alignments.
 __
   __
 __--verbose
@@ -206,9 +220,9 @@ This program will enumerate aligned sequence tags and generate a wig,  or option
 
 Both paired-end and single-end alignments may be counted. Alignments  with splices (e.g. RNA-Seq) may be counted singly or separately.  Alignment counts may be separated by strand, facilitating analysis of  RNA-Seq experiments.
 
-For ChIP-Seq experiments, the alignment position may be shifted  in the 3' direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS2 program. The shift value may be empirically  determined from the sequencing data (see below).
+For ChIP-Seq experiments, the alignment position may be shifted  in the 3 prime direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS program. The shift value may be empirically  determined from the sequencing data (see below).
 
-The output wig file may be either a variableStep, fixedStep, or  bedGraph format. The file format is dictated by where the alignment  position is recorded. Recording start and midpoint at  single base-pair resolution writes a variableStep wig file. Binned start  or midpoint counts and coverage are written as a fixedStep wig file.  Span and extended positions are written as a bedGraph file.
+The output wig file may be either a variableStep, fixedStep, or  bedGraph format. The file format is dictated by where the alignment  position is recorded. Recording start and midpoint at single  base-pair resolution writes a variableStep wig file. Binned start  or midpoint counts and coverage are written as a fixedStep wig file.  Span and extended positions are written as a bedGraph file.
 
 The wig file may be further converted into a compressed, indexed, binary  bigWig format, dependent on the availability of the appropriate  conversion utilities.
 
@@ -295,6 +309,9 @@ __
 {{{
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  }}}
+  When using the position span option, you may wish to increase the  buffer size (see --buffer) to account for reads that may span very  large introns.
+__
+  __
 ==SHIFT VALUE DETERMINATION==
 To determine the shift value, the top 500 bp regions (the default number is 200 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 400 bp regions (1.3 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 400 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R squared value to keep is 0.25, and not all sampled  regions may return a significant R squared value. A trimmed mean is  then calculated from all of the calculated shift values to be used used  as the final shift value. This approach works best with clean, distinct  peaks. The peak shift may be evaluated by viewing separate, stranded wig  files together with the shifted wig file in a genome browser.
 
