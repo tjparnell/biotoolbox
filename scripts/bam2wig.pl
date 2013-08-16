@@ -26,7 +26,7 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.12.3',
+	VERSION         => '1.12.4',
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
@@ -152,7 +152,7 @@ my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
 my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
-	print " Calculating total number of aligned fragments... this may take a while...\n";
+	print " Pre-counting total number of aligned fragments... \n";
 	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired, $cpu);
 		# this is multi-threaded as well so pass the cpu number available
 	
@@ -294,6 +294,10 @@ sub check_defaults {
 		}
 		elsif ($position eq 'span') {
 			$use_span = 1;
+			if ($shift) {
+				# essentially the same thing as extend
+				$position eq 'extend';
+			}
 		}
 		elsif ($position eq 'extend') {
 			if ($paired) {
@@ -366,6 +370,10 @@ sub check_defaults {
 		else {
 			$correlation_min = 0.25;
 		}
+		if ($strand) {
+			warn " disabling strand with shift enabled\n";
+			$strand = 0;
+		}
 	}
 	
 	# check bin size
@@ -408,43 +416,42 @@ sub check_defaults {
 	}
 	$outfile =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # strip extension if present
 	
-	# determine the alignment callback method
+	
+	### Determine the alignment callback method
 	# and the wig writing method
 	# based on the position used, strandedness, and/or shift
 	if ($use_coverage) {
 		# no callbacks necessary, special mode
 		print " recording coverage spanning alignments\n";
 	}
-	elsif ($use_start and $strand and $shift) {
-		$callback  = \&record_stranded_shifted_start;
-		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, shifted-start positions\n";
+	elsif ($strand and $shift) {
+		# this should not happen, strand is disabled with shift
+		die " programming error!\n";
 	}
-	elsif ($use_start and $strand and !$shift) {
-		$callback  = \&record_stranded_start;
-		$split_callback = \&record_split_stranded_start;
-		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, start positions\n";
+	elsif ($use_start and $paired) {
+		# this should not happen, paired start is changed to paired mid
+		die " programming error!\n";
 	}
-	elsif ($use_start and !$strand and $shift) {
-		$callback  = \&record_shifted_start;
-		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording shifted-start positions\n";
+	elsif ($shift and $paired) {
+		# this should not happen, shift is disabled with paired
+		die " programming error!\n";
 	}
-	elsif ($use_start and !$strand and !$shift) {
+	elsif ($use_start and !$strand and !$shift and !$paired) {
 		$callback  = \&record_start;
 		$split_callback = \&record_split_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording start positions\n";
 	}
-	elsif ($use_mid and $strand and $shift and $paired) {
-		# this should not happen, shift is disabled with paired
-		die " programming error!\n";
-	}
-	elsif ($use_mid and $strand and $shift and !$paired) {
-		$callback  = \&record_stranded_shifted_mid;
+	elsif ($use_start and $strand and !$shift and !$paired) {
+		$callback  = \&record_stranded_start;
+		$split_callback = \&record_split_stranded_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, shifted-mid positions\n";
+		print " recording stranded, start positions\n";
+	}
+	elsif ($use_start and !$strand and $shift and !$paired) {
+		$callback  = \&record_shifted_start;
+		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+		print " recording shifted-start positions\n";
 	}
 	elsif ($use_mid and $strand and !$shift and $paired) {
 		$callback = \&record_stranded_paired_mid;
@@ -456,10 +463,6 @@ sub check_defaults {
 		$split_callback = \&record_split_stranded_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording stranded, mid positions\n";
-	}
-	elsif ($use_mid and !$strand and $shift and $paired) {
-		# this should not happen, shift is disabled with paired
-		die " programming error!\n";
 	}
 	elsif ($use_mid and !$strand and $shift and !$paired) {
 		$callback  = \&record_shifted_mid;
@@ -477,7 +480,7 @@ sub check_defaults {
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording mid position\n";
 	}
-	elsif ($use_span and $strand and $paired) {
+	elsif ($use_span and $strand and !$shift and $paired) {
 		$callback  = \&record_stranded_paired_span;
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning paired alignments\n";
@@ -488,7 +491,7 @@ sub check_defaults {
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning alignments\n";
 	}
-	elsif ($use_span and !$strand and $paired) {
+	elsif ($use_span and !$strand and !$shift and $paired) {
 		$callback  = \&record_paired_span;
 		$write_wig = \&write_bedgraph;
 		print " recording positions spanning paired alignments\n";
@@ -518,7 +521,8 @@ sub check_defaults {
 		die " programming error!\n";
 	}
 	
-	# determine the convertor callback
+	
+	### Determine the convertor callback
 	if ($rpm and !$log) {
 		$convertor = sub {
 			return ($_[0] * 1_000_000) / $total_read_number;
@@ -576,7 +580,7 @@ sub open_wig_file {
 		$fh->print("track type=wiggle_0\n") if $track;
 	}
 	
-	# finished, return ref to names array, and 1 or 2 filehandles
+	# finished
 	return ($name, $fh);
 }
 
@@ -584,28 +588,29 @@ sub open_wig_file {
 ### Determine the shift value
 sub determine_shift_value {
 	
-	# find the biggest chromosome to sample
-		# this is assuming all the chromosomes have different sizes ;-)
-	my %size2chrom;
-	for my $tid (0 .. $sam->n_targets - 1) {
-		# key is chromosome size, value is its name
-		$size2chrom{ $sam->target_len($tid) } = $tid;
-	}
-	
 	# identify top regions to score
 	# we will walk through the largest chromosome(s) looking for the top  
 	# 1 kb regions containing the highest unstranded coverage to use
+	print "  sampling the top $sample_number coverage regions " .
+		"on the largest $chr_number chromosomes...\n";
+	
+	# first sort the chromosomes by size
+		# this is assuming all the chromosomes have different sizes ;-)
+	my @chromsomes = 
+		map { $_->[0] }
+		sort { $b->[1] <=> $a->[1] }
+		map { [$_, $sam->target_len($_)] }
+		(0 .. $sam->n_targets - 1);
+	
 	my %coverage2region;
 	
 	# look for test regions
 	# sampling the number of requested regions from number of requested chromosomes
-	print "  searching for the top $sample_number coverage regions\n" .
-		"   on the largest $chr_number chromosomes to sample...\n";
-	my $chrom_count = 0;
-	for my $size (sort {$b <=> $a} keys %size2chrom) {
-		# sort largest to smallest
-		last if $chrom_count == $chr_number; 
-		my $tid = $size2chrom{$size};
+	for my $tid (1 .. $chr_number) {
+		
+		$tid -= 1; # convert tid to 0-based indexing
+		my $size = $sam->target_len($tid);
+		
 		my $current_min = 0;
 		for (my $start = 0; $start < $size; $start += 500) {
 		
@@ -618,15 +623,16 @@ sub determine_shift_value {
 				$tid, # need the low level target ID
 				$start, 
 				$end,
+				1, # return mean coverage in a single bin
 			);
-			my $sum_coverage = sum( @{$coverage} );
-			next if $sum_coverage == 0;
+			my $sum_coverage = $coverage->[0];
+			next if $coverage->[0] == 0;
 		
 			# check if our coverage exceeds the lowest region
 			if (scalar keys %coverage2region < $sample_number) {
 				# less than requested regions found so far, so keep it
 				# record the coordinates for this region
-				$coverage2region{$sum_coverage} = [$tid, $start, $end];
+				$coverage2region{$coverage->[0]} = [$tid, $start, $end];
 			}
 			else {
 				# we already have the maximum number
@@ -637,7 +643,7 @@ sub determine_shift_value {
 				}
 				
 				# find the lowest one
-				if ($sum_coverage > $current_min) {
+				if ($coverage->[0] > $current_min) {
 					# it's a new high over the lowest minimum
 				
 					# remove the previous lowest region
@@ -645,12 +651,11 @@ sub determine_shift_value {
 				
 					# add the current region
 					# record the coordinates for this region
-					$coverage2region{$sum_coverage} = [$tid, $start, $end];
+					$coverage2region{$coverage->[0]} = [$tid, $start, $end];
 					$current_min = min( keys %coverage2region );
 				}
 			}
 		}
-		$chrom_count++;
 	}
 	printf "    done in %.1f minutes\n", (time - $start_time)/60;
 	
@@ -1598,7 +1603,25 @@ sub record_extended {
 	return if $a->qual < $min_mapq;
 	
 	# start based on strand, record on forward
-	$data->{f}{ $a->pos } .= "$shift_value,";
+	if ($a->reversed) {
+		# reverse strand
+		# must calculate the start position of the 3 prime extended fragment
+		# taking care not to extend beyond the start of the chromosome
+		if ($a->calend < $shift_value) {
+			# the calculated start position will be beyond the beginning of the 
+			# chromosome, must compensate for this
+			# start will be 0 and the extension will be the difference
+			$data->{f}{0} .= abs($a->calend - $shift_value) . ',';
+		}
+		else {
+			# no worries, we are beyond the beginning of the chromosome
+			$data->{f}{ $a->calend - $shift_value } .= "$shift_value,";
+		}
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos } .= "$shift_value,";
+	}
 	check_data($data);
 }
 
@@ -1733,15 +1756,30 @@ sub write_bedgraph {
 			if (scalar @lengths > $max_dup) {
 				splice(@lengths, $max_dup + 1); # delete the extra ones
 			}
-			foreach my $len (@lengths) {
-				# generate coverage
-				# we're relying on autovivification of the buffer array here
-				# this is what makes Perl both great and terrible at the same time
-				# this could also balloon memory usage - oh dear
-				for (0 .. $len -1) { 
+			
+			# we will take a shortcut if all lengths are the same
+			if ( all_equal(\@lengths) ) {
+				# all the lengths are equal
+				# each position will get the same pileup number
+				for (0 .. $lengths[0] - 1) {
+					# generate coverage
+					# we're relying on autovivification of the buffer array here
+					# this is what makes Perl both great and terrible at the same time
+					# this could also balloon memory usage - oh dear
 					my $p = $pos - $data->{$offset} + $_;
-					$data->{$buffer}->[$p] += 1 if $p >= 0;
+					$data->{$buffer}->[$p] += scalar(@lengths) if $p >= 0;
 					# avoid modifying array subscript -1 in rare situations
+				}
+			}
+			else {
+				# not all the lengths are equal, must slog through all of them
+				foreach my $len (@lengths) {
+					# generate coverage same as above
+					for (0 .. $len -1) { 
+						my $p = $pos - $data->{$offset} + $_;
+						$data->{$buffer}->[$p] += 1 if $p >= 0;
+						# avoid modifying array subscript -1 in rare situations
+					}
 				}
 			}
 			delete $data->{$s}{$pos};
@@ -1825,6 +1863,17 @@ sub write_bedgraph {
 		# remember the current position for next writing
 		$data->{$offset} = $current_pos + $current_offset + 1;
 	}
+}
+
+
+### A simple test to confirm if all elements in an array ref are equal
+sub all_equal {
+	my $array = shift;
+	my $value = $array->[0];
+	foreach (@$array) {
+		return 0 if $_ != $value;
+	}
+	return 1;
 }
 
 
