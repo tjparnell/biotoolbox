@@ -617,7 +617,8 @@ sub determine_shift_value {
 	my @f_profile;
 	my @r_profile;
 	my @shifted_profile;
-	my @seq_ids;
+	my @r2_values;
+	my @seq_ids; 
 	
 	# look for high coverage regions to sample
 	# do this in multi-threaded fashion if possible
@@ -636,7 +637,8 @@ sub determine_shift_value {
 			push @f_profile, $result->[1]; # just the reference for now
 			push @r_profile, $result->[2];
 			push @shifted_profile, $result->[3];
-			push @seq_ids, $result->[4];
+			push @r2_values, $result->[4];
+			push @seq_ids, [$result->[5], scalar( @{$result->[0]} ) ];
 		} );
 		
 		# scan the chromosomes in parallel
@@ -677,7 +679,8 @@ sub determine_shift_value {
 			push @f_profile, $result->[1]; # just the reference for now
 			push @r_profile, $result->[2];
 			push @shifted_profile, $result->[3];
-			push @seq_ids, $result->[4];
+			push @r2_values, $result->[4];
+			push @seq_ids, [$result->[5], scalar( @{$result->[0]} ) ];
 		}
 	}
 	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
@@ -686,19 +689,19 @@ sub determine_shift_value {
 	# determine the optimal shift value
 	# we will be using a trimmed mean value to avoid outliers
 	@shift_values = sort {$a <=> $b} @shift_values;
-	my $cut = int( ( scalar(@shift_values) / 10 ) + 0.5); # take 10%
+	my $number_values = scalar @shift_values;
+	my $cut = int( ( $number_values / 10 ) + 0.5); # take 10%
 	$cut++ if ($cut % 2); # make an even number
 	splice(@shift_values, 0, $cut);
-	splice(@shift_values, scalar(@shift_values) - $cut);
+	splice(@shift_values, $number_values - $cut);
 	my $best_value = sprintf("%.0f", mean(@shift_values) );
 	printf "  The mean shift value is %s +/- %.0f bp\n", 
 		$best_value, stddev(@shift_values);
 	
 	# write out the shift model data file
 	if ($model) {
-		my $model_file = write_model_file($best_value, \@f_profile, \@r_profile, 
-			\@shifted_profile, \@seq_ids);
-		print "  Wrote shift model data file $model_file\n" if $model_file;
+		write_model_file($best_value, \@f_profile, \@r_profile, 
+			\@shifted_profile, \@r2_values, \@seq_ids);
 	}
 	
 	# done
@@ -768,6 +771,7 @@ sub calculate_strand_correlation {
 	my $coverage2region = shift;
 	
 	my @shift_values;
+	my @all_r2_values;
 	my @f_profile;
 	my @r_profile;
 	my @shifted_profile;
@@ -812,6 +816,7 @@ sub calculate_strand_correlation {
 		my $best_r = 0;
 		my $best_shift = 0;
 		my @best_profile;
+		my @r2_values;
 		
 		# calculate correlations
 		for (my $i = 1; $i <= 40; $i++) {
@@ -830,6 +835,7 @@ sub calculate_strand_correlation {
 			my $stat = Statistics::LineFit->new();
 			$stat->setData(\@r, \@f) or warn " bad data!\n";
 			my $r2 = $stat->rSquared();
+			push @r2_values, $r2;
 			
 			# check correlation
 			if ($r2 >= $correlation_min and $r2 > $best_r) {
@@ -865,6 +871,7 @@ sub calculate_strand_correlation {
 				push @f_profile, \@original_f;
 				push @r_profile, \@original_r;
 				push @shifted_profile, \@best_profile;
+				push @all_r2_values, \@r2_values;
 			}
 		}
 	}
@@ -873,6 +880,7 @@ sub calculate_strand_correlation {
 	my @final_f_profile;
 	my @final_r_profile;
 	my @final_shifted_profile;
+	my @final_r2_values;
 	if ($model) {
 		# generate average profiles if the model is requested
 		for my $i (0 .. 129) {
@@ -883,81 +891,142 @@ sub calculate_strand_correlation {
 			$final_r_profile[$i] = mean( map { $r_profile[$_][$i] } (0 .. $#r_profile) );
 			$final_shifted_profile[$i] = 
 				mean( map { $shifted_profile[$_][$i] } (0 .. $#shifted_profile) );
+			
+			# generate average of r2 values
+			for my $i (0 .. 37) {
+				$final_r2_values[$i] = 
+					mean( map { $all_r2_values[$_][$i] } (0 .. $#all_r2_values) );
+			}
 		}
 	}
 	
 	return [ \@shift_values, \@final_f_profile, \@final_r_profile, 
-		\@final_shifted_profile, $chrom ];
+		\@final_shifted_profile, \@final_r2_values, $chrom ];
 }
 
 
 ### Write a text data file with the shift model data
 sub write_model_file {
-	my ($value, $f_profile, $r_profile, $shifted_profile, $seq_ids) = @_;
+	my ($value, $f_profile, $r_profile, $shifted_profile, $r2_values, $seq_ids) = @_;
 	
-	# prepared data structure
-	my $data = generate_tim_data_structure( qw(
+	### Profile model
+	# prepare the data structure
+	my $profile = generate_tim_data_structure( qw(
 		shift_model_profile Start Forward_Profile Reverse_Profile Shifted_Profile) );
-	$data->{'db'} = $infile;
-	push @{ $data->{'other'} }, "# Average profile of read start point sums\n";
-	push @{ $data->{'other'} }, "# Final shift value calculated as $value bp\n";
-	$data->{2}{'minimum_r2'} = $correlation_min;
-	$data->{2}{'sample_number'} = $sample_number;
-	$data->{2}{'number_chromosomes_sampled'} = $chr_number;
+	$profile->{'db'} = $infile;
+	push @{ $profile->{'other'} }, "# Average profile of read start point sums\n";
+	push @{ $profile->{'other'} }, "# Final shift value calculated as $value bp\n";
+	$profile->{2}{'minimum_r2'} = $correlation_min;
+	$profile->{2}{'number_of_chromosomes_sampled'} = $chr_number;
+	$profile->{2}{'regions_sampled'} = sum( map {$seq_ids->[$_][1]} (0 .. $#{$seq_ids}) );
 	
 	# load data table
 	# first we will put the mean value for all the chromosomes
 	for my $i (0 .. 129) {
 		# generate the start position
-		$data->{'data_table'}->[$i+1][0] = $i * 10;
+		$profile->{'data_table'}->[$i+1][0] = $i * 10;
 		
 		# generate the mean value for each chromosome tested at each position
-		$data->{'data_table'}->[$i+1][1] = mean( map { $f_profile->[$_][$i] } 
+		$profile->{'data_table'}->[$i+1][1] = mean( map { $f_profile->[$_][$i] } 
 			(0 .. $#{$f_profile} ) );
-		$data->{'data_table'}->[$i+1][2] = mean( map { $r_profile->[$_][$i] } 
+		$profile->{'data_table'}->[$i+1][2] = mean( map { $r_profile->[$_][$i] } 
 			(0 .. $#{$r_profile} ) );
-		$data->{'data_table'}->[$i+1][3] = mean( map { $shifted_profile->[$_][$i] } 
-			(0 .. $#{$shifted_profile} ) );
+		$profile->{'data_table'}->[$i+1][3] = 
+			mean( map { $shifted_profile->[$_][$i] } (0 .. $#{$shifted_profile} ) );
 	}
-	$data->{'last_row'} = 130;
+	$profile->{'last_row'} = 130;
+	
+	# next add the chromosome specific profiles
+	for my $s (0 .. $#{$seq_ids}) {
+		# this array is comprised of arrays of chromosome name and region count
+		
+		# add column specific metadata
+		my $column = $profile->{'number_columns'};
+		$profile->{$column} = {
+			'name'  => $seq_ids->[$s][0] . '_Forward_profile',
+			'index' => $column,
+		};
+		$profile->{$column + 1} = {
+			'name'  => $seq_ids->[$s][0] . '_Reverse_profile',
+			'index' => $column + 1,
+		};
+		$profile->{$column + 2} = {
+			'name'  => $seq_ids->[$s][0] . '_Shifted_profile',
+			'index' => $column + 2,
+			'region_count' => $seq_ids->[$s][1]
+		};
+		$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
+		$profile->{'data_table'}->[0][$column+1] = $profile->{$column+1}{'name'};
+		$profile->{'data_table'}->[0][$column+2] = $profile->{$column+2}{'name'};
+		
+		# fill in the columns
+		for my $i (0 .. 129) {
+			$profile->{'data_table'}->[$i+1][$column]   = $f_profile->[$s][$i];
+			$profile->{'data_table'}->[$i+1][$column+1] = $r_profile->[$s][$i];
+			$profile->{'data_table'}->[$i+1][$column+2] = $shifted_profile->[$s][$i];
+		}
+		
+		$profile->{'number_columns'} += 3;
+	}
+	
+	# write the model file
+	my $profile_file = write_tim_data_file( 
+		'data'     => $profile,
+		'filename' => "$outfile\_model.txt",
+		'gz'       => 0,
+	);
+	print "  Wrote shift profile model data file $profile_file\n" if $profile_file;
+	
+	
+	### R squared data
+	# prepare the data structure
+	my $r2_data = generate_tim_data_structure( qw(Shift_correlations Shift Mean_rSquared) );
+	$r2_data->{'db'} = $infile;
+	push @{ $r2_data->{'other'} }, "# Average R Squared values for each shift\n";
+	push @{ $r2_data->{'other'} }, "# Final shift value calculated as $value bp\n";
+	$r2_data->{1}{'minimum_r2'} = $correlation_min;
+	$r2_data->{1}{'number_of_chromosomes_sampled'} = $chr_number;
+	$r2_data->{1}{'regions_sampled'} = sum( map {$seq_ids->[$_][1]} (0 .. $#{$seq_ids}) );
+	
+	# load data table
+	# first we will put the mean value for all the r squared values
+	for my $i (0 .. 37) {
+		# generate the start position
+		$r2_data->{'data_table'}->[$i+1][0] = ($i + 3) * 10;
+		
+		# generate the mean value for each chromosome
+		$r2_data->{'data_table'}->[$i+1][1] = mean( map { $r2_values->[$_][$i] } 
+			(0 .. $#{$r2_values} ) );
+	}
+	$r2_data->{'last_row'} = 38;
 	
 	# next add the chromosome specific profiles
 	for my $s (0 .. $#{$seq_ids}) {
 		
 		# add column specific metadata
-		my $column = $data->{'number_columns'};
-		$data->{$column} = {
-			'name'  => $seq_ids->[$s] . '_Forward_profile',
+		my $column = $r2_data->{'number_columns'};
+		$r2_data->{$column} = {
+			'name'  => $seq_ids->[$s][0] . '_mean_rSquared',
 			'index' => $column,
+			'region_count' => $seq_ids->[$s][1],
 		};
-		$data->{$column + 1} = {
-			'name'  => $seq_ids->[$s] . '_Reverse_profile',
-			'index' => $column + 1,
-		};
-		$data->{$column + 2} = {
-			'name'  => $seq_ids->[$s] . '_Shifted_profile',
-			'index' => $column + 2,
-		};
-		$data->{'data_table'}->[0][$column]   = $data->{$column}{'name'};
-		$data->{'data_table'}->[0][$column+1] = $data->{$column+1}{'name'};
-		$data->{'data_table'}->[0][$column+2] = $data->{$column+2}{'name'};
+		$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
 		
 		# fill in the columns
-		for my $i (0 .. 129) {
-			$data->{'data_table'}->[$i+1][$column]   = $f_profile->[$s][$i];
-			$data->{'data_table'}->[$i+1][$column+1] = $r_profile->[$s][$i];
-			$data->{'data_table'}->[$i+1][$column+2] = $shifted_profile->[$s][$i];
+		for my $i (0 .. 37) {
+			$r2_data->{'data_table'}->[$i+1][$column]   = $r2_values->[$s][$i];
 		}
 		
-		$data->{'number_columns'} += 3;
+		$r2_data->{'number_columns'}++;
 	}
 	
-	# write the model file
-	return write_tim_data_file( 
-		'data'     => $data,
-		'filename' => "$outfile\_model.txt",
+	# write the r squared file
+	my $rSquared_file = write_tim_data_file( 
+		'data'     => $r2_data,
+		'filename' => "$outfile\_shift_correlations.txt",
 		'gz'       => 0,
 	);
+	print "  Wrote shift correlation data file $rSquared_file\n" if $rSquared_file;
 }
 
 
