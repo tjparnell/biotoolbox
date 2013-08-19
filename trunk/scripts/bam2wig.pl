@@ -9,8 +9,15 @@ use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper qw(open_to_read_fh open_to_write_fh);
-use tim_data_helper qw(format_with_commas);
+use tim_file_helper qw(
+	open_to_read_fh 
+	open_to_write_fh 
+	write_tim_data_file
+);
+use tim_data_helper qw(
+	format_with_commas
+	generate_tim_data_structure
+);
 use tim_big_helper qw(wig_to_bigwig_conversion);
 eval {
 	# check for bam support
@@ -60,6 +67,7 @@ my (
 	$sample_number,
 	$chr_number,
 	$correlation_min,
+	$model,
 	$strand,
 	$bin_size,
 	$min_mapq,
@@ -90,6 +98,7 @@ GetOptions(
 	'sample=i'  => \$sample_number, # number of samples to test for shift
 	'chrom=i'   => \$chr_number, # number of chromosomes to sample
 	'minr=f'    => \$correlation_min, # R^2 minimum value for shift
+	'model!'    => \$model, # write the strand shift model data
 	'strand!'   => \$strand, # separate strands
 	'bin=i'     => \$bin_size, # size of bin to make
 	'qual=i'    => \$min_mapq, # minimum mapping quality
@@ -590,87 +599,190 @@ sub determine_shift_value {
 	
 	# identify top regions to score
 	# we will walk through the largest chromosome(s) looking for the top  
-	# 1 kb regions containing the highest unstranded coverage to use
+	# 500 bp regions containing the highest unstranded coverage to use
 	print "  sampling the top $sample_number coverage regions " .
 		"on the largest $chr_number chromosomes...\n";
 	
 	# first sort the chromosomes by size
 		# this is assuming all the chromosomes have different sizes ;-)
-	my @chromsomes = 
+		# use a Schwartzian transform
+	my @chromosomes = 
 		map { $_->[0] }
 		sort { $b->[1] <=> $a->[1] }
 		map { [$_, $sam->target_len($_)] }
 		(0 .. $sam->n_targets - 1);
 	
-	my %coverage2region;
+	# result arrays
+	my @shift_values;
+	my @f_profile;
+	my @r_profile;
+	my @shifted_profile;
+	my @seq_ids;
 	
-	# look for test regions
-	# sampling the number of requested regions from number of requested chromosomes
-	for my $tid (1 .. $chr_number) {
+	# look for high coverage regions to sample
+	# do this in multi-threaded fashion if possible
+	
+	if ($cpu > 1) {
+		# do each chromosome in parallel
+		print "   Forking into children for parallel scanning\n";
 		
-		$tid -= 1; # convert tid to 0-based indexing
-		my $size = $sam->target_len($tid);
+		# set up 
+		my $pm = Parallel::ForkManager->new($cpu);
+		$pm->run_on_finish( sub {
+			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result) = @_;
+			
+			# record the chromosome results
+			push @shift_values, @{ $result->[0] }; # push the actual values
+			push @f_profile, $result->[1]; # just the reference for now
+			push @r_profile, $result->[2];
+			push @shifted_profile, $result->[3];
+			push @seq_ids, $result->[4];
+		} );
 		
-		my $current_min = 0;
-		for (my $start = 0; $start < $size; $start += 500) {
-		
-			my $end = $start + 500;
-			$end = $size if $end > $size;
-		
-			# using the low level interface for a little more performance
-			my $coverage = $sam->bam_index->coverage(
-				$sam->bam,
-				$tid, # need the low level target ID
-				$start, 
-				$end,
-				1, # return mean coverage in a single bin
-			);
-			my $sum_coverage = $coverage->[0];
-			next if $coverage->[0] == 0;
-		
-			# check if our coverage exceeds the lowest region
-			if (scalar keys %coverage2region < $sample_number) {
-				# less than requested regions found so far, so keep it
-				# record the coordinates for this region
-				$coverage2region{$coverage->[0]} = [$tid, $start, $end];
+		# scan the chromosomes in parallel
+		for my $chromosome_index (1 .. $chr_number) {
+			$pm->start and next;
+			
+			### In child
+			$sam->clone; # to make it fork safe
+			
+			# scan
+			my $tid = $chromosomes[$chromosome_index - 1]; # convert to 0-based indexing
+			print "   Scanning ", $sam->target_name($tid), "\n";
+			my %coverage2region; 
+			scan_high_coverage($tid, \%coverage2region);
+			
+			# calculate the correlation
+			my $result = calculate_strand_correlation(\%coverage2region);
+			
+			$pm->finish(0, $result); 
+		}
+		$pm->wait_all_children;
+	}
+	else {
+		# one chromosome at a time
+		for my $chromosome_index (1 .. $chr_number) {
+			
+			# scan
+			my $tid = $chromosomes[$chromosome_index - 1]; # convert to 0-based indexing
+			print "   Scanning ", $sam->target_name($tid), "\n";
+			my %coverage2region; 
+			scan_high_coverage($tid, \%coverage2region);
+			
+			# calculate the correlation
+			my $result = calculate_strand_correlation(\%coverage2region);
+			
+			# record the results for this chromosome
+			push @shift_values, @{ $result->[0] }; # push the actual values
+			push @f_profile, $result->[1]; # just the reference for now
+			push @r_profile, $result->[2];
+			push @shifted_profile, $result->[3];
+			push @seq_ids, $result->[4];
+		}
+	}
+	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
+		format_with_commas(scalar @shift_values), (time - $start_time)/60;
+	
+	# determine the optimal shift value
+	# we will be using a trimmed mean value to avoid outliers
+	@shift_values = sort {$a <=> $b} @shift_values;
+	my $cut = int( ( scalar(@shift_values) / 10 ) + 0.5); # take 10%
+	$cut++ if ($cut % 2); # make an even number
+	splice(@shift_values, 0, $cut);
+	splice(@shift_values, scalar(@shift_values) - $cut);
+	my $best_value = sprintf("%.0f", mean(@shift_values) );
+	printf "  The mean shift value is %s +/- %.0f bp\n", 
+		$best_value, stddev(@shift_values);
+	
+	# write out the shift model data file
+	if ($model) {
+		my $model_file = write_model_file($best_value, \@f_profile, \@r_profile, 
+			\@shifted_profile, \@seq_ids);
+		print "  Wrote shift model data file $model_file\n" if $model_file;
+	}
+	
+	# done
+	return $best_value;
+}
+
+
+
+### Scan chromosome for high coverage regions
+sub scan_high_coverage {
+	my ($tid, $coverage2region) = @_;
+	
+	my $size = $sam->target_len($tid);
+	
+	my $current_min = 0;
+	for (my $start = 0; $start < $size; $start += 500) {
+	
+		my $end = $start + 500;
+		$end = $size if $end > $size;
+	
+		# using the low level interface for a little more performance
+		my $coverage = $sam->bam_index->coverage(
+			$sam->bam,
+			$tid, # need the low level target ID
+			$start, 
+			$end,
+			1, # return mean coverage in a single bin
+		);
+		my $sum_coverage = $coverage->[0];
+		next if $coverage->[0] == 0;
+	
+		# check if our coverage exceeds the lowest region
+		if (scalar keys %{$coverage2region} < $sample_number) {
+			# less than requested regions found so far, so keep it
+			# record the coordinates for this region
+			$coverage2region->{$coverage->[0]} = [$tid, $start, $end];
+		}
+		else {
+			# we already have the maximum number
+			
+			# check that we have a current minimum value
+			unless ($current_min) {
+				$current_min = min( keys %{$coverage2region} );
 			}
-			else {
-				# we already have the maximum number
-				
-				# check that we have a current minimum value
-				unless ($current_min) {
-					$current_min = min( keys %coverage2region );
-				}
-				
-				# find the lowest one
-				if ($coverage->[0] > $current_min) {
-					# it's a new high over the lowest minimum
-				
-					# remove the previous lowest region
-					delete $coverage2region{ $current_min };
-				
-					# add the current region
-					# record the coordinates for this region
-					$coverage2region{$coverage->[0]} = [$tid, $start, $end];
-					$current_min = min( keys %coverage2region );
-				}
+			
+			# find the lowest one
+			if ($coverage->[0] > $current_min) {
+				# it's a new high over the lowest minimum
+			
+				# remove the previous lowest region
+				delete $coverage2region->{ $current_min };
+			
+				# add the current region
+				# record the coordinates for this region
+				$coverage2region->{$coverage->[0]} = [$tid, $start, $end];
+				$current_min = min( keys %{$coverage2region} );
 			}
 		}
 	}
-	printf "    done in %.1f minutes\n", (time - $start_time)/60;
+
+}
+
+
+
+### Calculate the cross strand correlation for the sample regions
+sub calculate_strand_correlation {
+	my $coverage2region = shift;
 	
-		
-	# now determine the optimal shift for each of the test regions
 	my @shift_values;
-	foreach my $i (sort {$a <=> $b} keys %coverage2region) {
+	my @f_profile;
+	my @r_profile;
+	my @shifted_profile;
+	my $chrom;
+	
+	# determine the optimal shift for each of the test regions
+	foreach my $i (keys %{$coverage2region}) {
 		
 		# get the start and end positions
 		# we're adjusting them by 400 bp in both directions to actually 
 		# sample a 1.3 kb region centered over the original region
-		my $tid   = $coverage2region{$i}->[0];
-		my $chrom = $sam->target_name($tid);
-		my $start = $coverage2region{$i}->[1] - 400;
-		my $end   = $coverage2region{$i}->[2] + 400;
+		my $tid   = $coverage2region->{$i}->[0];
+		$chrom = $sam->target_name($tid) unless $chrom; 
+		my $start = $coverage2region->{$i}->[1] - 400;
+		my $end   = $coverage2region->{$i}->[2] + 400;
 		# just in case we go over
 		$start = 0 if $start < 1;
 		$end = $sam->target_len($tid) if $end > $sam->target_len($tid);
@@ -685,9 +797,6 @@ sub determine_shift_value {
 		};
 		$sam->bam_index->fetch(
 			$sam->bam, $tid, $start, $end, \&record_stranded_start, \%data);
-		unless ($data{'count'}) {
-			die " no stranded data collected for calculating shift value!\n";
-		}
 		
 		# generate data arrays
 		my @f;
@@ -698,9 +807,13 @@ sub determine_shift_value {
 			push @f, sum( map { $data{f}{$_} ||= 0 } ($i .. $i+9) );
 			push @r, sum( map { $data{r}{$_} ||= 0 } ($i .. $i+9) );
 		}
+		my @original_f = @f;
+		my @original_r = @r;
+		my $best_r = 0;
+		my $best_shift = 0;
+		my @best_profile;
 		
 		# calculate correlations
-		my %r2shift;
 		for (my $i = 1; $i <= 40; $i++) {
 			# check shift from 10 to 400 bp
 			
@@ -718,40 +831,136 @@ sub determine_shift_value {
 			$stat->setData(\@r, \@f) or warn " bad data!\n";
 			my $r2 = $stat->rSquared();
 			
-			# store rsquared
-			if ($r2 >= $correlation_min) {
-				$r2shift{$r2} = $i * 10;
+			# check correlation
+			if ($r2 >= $correlation_min and $r2 > $best_r) {
+				# record new values
+				$best_shift = $i * 10;
+				$best_r = $r2;
+				
+				# record the best profile, average of f and r values
+				if ($model) {
+					# this is only required when reporting the model
+					for my $i (0 .. 129) {
+						$best_profile[$i] = mean( $f[$i], $r[$i] );
+					}
+				}
 			}
 		}
 		
-		# determine best shift
-		my $string = "  sampling $chrom:$start..$end  ";
-		if (%r2shift) {
-			my $max_r = max(keys %r2shift);
-			push @shift_values, $r2shift{$max_r};
-			if ($verbose) {
-				printf "$string shift %s bp (r^2 %.3f)\n", $r2shift{$max_r}, $max_r;
+		# print result
+		if ($verbose) {
+			my $string = "  sampling $chrom:$start..$end  ";
+			if ($best_r) {
+				printf "$string shift $best_shift bp (r^2 %.3f)\n", $best_r;
+			}
+			else {
+				print "$string\n";
 			}
 		}
-		else {
-			print "$string\n" if $verbose;
+		
+		# record result
+		if ($best_r) {
+			push @shift_values, $best_shift;
+			if ($model) {
+				push @f_profile, \@original_f;
+				push @r_profile, \@original_r;
+				push @shifted_profile, \@best_profile;
+			}
 		}
 	}
 	
-	# determine the optimal shift value
-	# we will be using a trimmed mean value to avoid outliers
-	@shift_values = sort {$a <=> $b} @shift_values;
-	my $cut = int( ( scalar(@shift_values) / 10 ) + 0.5); # take 10%
-	$cut++ if ($cut % 2); # make an even number
-	splice(@shift_values, 0, $cut);
-	splice(@shift_values, scalar(@shift_values) - $cut);
-	my $best_value = sprintf("%.0f", mean(@shift_values) );
-	printf "  The mean shift value is %s +/- %.0f bp\n", 
-		$best_value, stddev(@shift_values);
+	# generate composite profile for this chromosome
+	my @final_f_profile;
+	my @final_r_profile;
+	my @final_shifted_profile;
+	if ($model) {
+		# generate average profiles if the model is requested
+		for my $i (0 .. 129) {
+			# for each relative 10 bp profile step, we will generate an average value
+			# from all those regions that we collected
+			# do this for the forward, reverse, and shifted profiles
+			$final_f_profile[$i] = mean( map { $f_profile[$_][$i] } (0 .. $#f_profile) );
+			$final_r_profile[$i] = mean( map { $r_profile[$_][$i] } (0 .. $#r_profile) );
+			$final_shifted_profile[$i] = 
+				mean( map { $shifted_profile[$_][$i] } (0 .. $#shifted_profile) );
+		}
+	}
 	
-	# done
-	return $best_value;
+	return [ \@shift_values, \@final_f_profile, \@final_r_profile, 
+		\@final_shifted_profile, $chrom ];
 }
+
+
+### Write a text data file with the shift model data
+sub write_model_file {
+	my ($value, $f_profile, $r_profile, $shifted_profile, $seq_ids) = @_;
+	
+	# prepared data structure
+	my $data = generate_tim_data_structure( qw(
+		shift_model_profile Start Forward_Profile Reverse_Profile Shifted_Profile) );
+	$data->{'db'} = $infile;
+	push @{ $data->{'other'} }, "# Average profile of read start point sums\n";
+	push @{ $data->{'other'} }, "# Final shift value calculated as $value bp\n";
+	$data->{2}{'minimum_r2'} = $correlation_min;
+	$data->{2}{'sample_number'} = $sample_number;
+	$data->{2}{'number_chromosomes_sampled'} = $chr_number;
+	
+	# load data table
+	# first we will put the mean value for all the chromosomes
+	for my $i (0 .. 129) {
+		# generate the start position
+		$data->{'data_table'}->[$i+1][0] = $i * 10;
+		
+		# generate the mean value for each chromosome tested at each position
+		$data->{'data_table'}->[$i+1][1] = mean( map { $f_profile->[$_][$i] } 
+			(0 .. $#{$f_profile} ) );
+		$data->{'data_table'}->[$i+1][2] = mean( map { $r_profile->[$_][$i] } 
+			(0 .. $#{$r_profile} ) );
+		$data->{'data_table'}->[$i+1][3] = mean( map { $shifted_profile->[$_][$i] } 
+			(0 .. $#{$shifted_profile} ) );
+	}
+	$data->{'last_row'} = 130;
+	
+	# next add the chromosome specific profiles
+	for my $s (0 .. $#{$seq_ids}) {
+		
+		# add column specific metadata
+		my $column = $data->{'number_columns'};
+		$data->{$column} = {
+			'name'  => $seq_ids->[$s] . '_Forward_profile',
+			'index' => $column,
+		};
+		$data->{$column + 1} = {
+			'name'  => $seq_ids->[$s] . '_Reverse_profile',
+			'index' => $column + 1,
+		};
+		$data->{$column + 2} = {
+			'name'  => $seq_ids->[$s] . '_Shifted_profile',
+			'index' => $column + 2,
+		};
+		$data->{'data_table'}->[0][$column]   = $data->{$column}{'name'};
+		$data->{'data_table'}->[0][$column+1] = $data->{$column+1}{'name'};
+		$data->{'data_table'}->[0][$column+2] = $data->{$column+2}{'name'};
+		
+		# fill in the columns
+		for my $i (0 .. 129) {
+			$data->{'data_table'}->[$i+1][$column]   = $f_profile->[$s][$i];
+			$data->{'data_table'}->[$i+1][$column+1] = $r_profile->[$s][$i];
+			$data->{'data_table'}->[$i+1][$column+2] = $shifted_profile->[$s][$i];
+		}
+		
+		$data->{'number_columns'} += 3;
+	}
+	
+	# write the model file
+	return write_tim_data_file( 
+		'data'     => $data,
+		'filename' => "$outfile\_model.txt",
+		'gz'       => 0,
+	);
+}
+
+
 
 ### Collect alignment coverage
 sub process_bam_coverage {
@@ -1191,27 +1400,6 @@ sub single_end_spliced_callback {
 }
 
 
-### Record stranded at shifted start position
-sub record_stranded_shifted_start {
-	my ($a, $data) = @_;
-	
-	# check
-	return if $a->qual < $min_mapq;
-	return if $a->calend <= $shift_value; # cannot have negative positions
-	
-	# record based on the strand
-	if ($a->reversed) {
-		# reverse strand
-		$data->{r}{ $a->calend - $shift_value }++;
-	}
-	else {
-		# forward strand
-		$data->{f}{ $a->pos + 1 + $shift_value }++;
-	}
-	check_data($data);
-}
-
-
 ### Record stranded at start position
 sub record_stranded_start {
 	my ($a, $data) = @_;
@@ -1302,30 +1490,6 @@ sub record_split_start {
 	else {
 		# reverse strand
 		$data->{f}{ $part->end }++;
-	}
-	check_data($data);
-}
-
-
-### Record stranded at shifted mid position
-sub record_stranded_shifted_mid {
-	my ($a, $data) = @_;
-	
-	# check
-	return if $a->qual < $min_mapq;
-	
-	# calculate mid position
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	return if $pos <= $shift_value; # cannot have negatives
-	
-	# record based on the strand
-	if ($a->reversed) {
-		# reverse strand
-		$data->{r}{ $pos - $shift_value }++;
-	}
-	else {
-		# forward strand
-		$data->{f}{ $pos + $shift_value }++;
 	}
 	check_data($data);
 }
@@ -1923,6 +2087,7 @@ bam2wig.pl [--options...] <filename.bam>
   --sample <integer>
   --chrom <integer>
   --minr <float>
+  --model
   --strand
   --qual <integer>
   --max <integer>
@@ -2043,6 +2208,15 @@ empirically determining the shift value. Enter a decimal value
 between 0 and 1. Higher values are more stringent. The default 
 is 0.25.
 
+=item --model
+
+Indicate that the shift model profile data should be written to 
+file for examination. The average profile, including for each 
+sampled chromosome, are reported for the forward and reverse strands, 
+as  well as the shifted profile. A standard text file is generated 
+using the output base name. The default is to not write the model 
+shift data.
+
 =item --strand
 
 Indicate that separate wig files should be written for each strand. 
@@ -2065,7 +2239,9 @@ checked. The default value is 0 (accept everything).
 Set a maximum number of duplicate alignments tolerated at a single position. 
 This uses the alignment start (or midpoint if recording midpoint) position 
 to determine duplicity. Note that this does not affect coverage mode. 
-The default is 1000. 
+You may want to increase this value when working with MNase digested 
+material, or decrease when working with random fragments (sonication) to 
+avoid PCR bias. The default is 1000. 
 
 =item --rpm
 
@@ -2161,7 +2337,9 @@ into a single peak centered over the target locus. Alternatively,
 the entire predicted fragment may be recorded across its span. 
 This extended method of recording is analogous to the approach 
 used by the MACS program. The shift value may be empirically 
-determined from the sequencing data (see below). 
+determined from the sequencing data (see below). If requested, the 
+shift model profile may be written to file. Use the BioToolBox 
+script C<graph_profile.pl> to graph the data.
 
 The output wig file may be either a variableStep, fixedStep, or 
 bedGraph format. The file format is dictated by where the alignment 
@@ -2279,22 +2457,29 @@ duplicate positions.
 
 =head1 SHIFT VALUE DETERMINATION
 
-To determine the shift value, the top 500 bp regions (the default
-number is 200 regions) with the highest coverage are collected from
-the largest chromosome or sequence represented in the Bam file. The
-largest chromosome is used merely as a representative fraction of the
-genome for performance reasons rather than random sampling. Stranded
-read counts are collected in 10 bp bins over the region and flanking
-400 bp regions (1.3 kb total). A Pearson product-moment correlation
-coefficient is then reiteratively determined between the stranded data
-as the bins are shifted from 30 to 400 bp. The shift corresponding to
-the highest R squared value is retained for each sampled region. The
-default minimum R squared value to keep is 0.25, and not all sampled 
-regions may return a significant R squared value. A trimmed mean is 
-then calculated from all of the calculated shift values to be used used 
-as the final shift value. This approach works best with clean, distinct 
-peaks. The peak shift may be evaluated by viewing separate, stranded wig 
-files together with the shifted wig file in a genome browser.
+To determine the shift value, regions with the highest read coverage 
+are sampled from one or more chromosomes represented in the Bam file. 
+The default number of regions is 200 sampled from each of the two 
+largest chromosomes. The largest chromosomes are used merely as a 
+representative fraction of the genome for performance reasons. Stranded
+read counts are collected in 10 bp bins over a 1300 bp region (the 
+initial 500 bp high coverage region plus flanking 400 bp). A Pearson 
+product-moment correlation coefficient is then reiteratively determined 
+between the stranded data sets as the bins are shifted from 30 to 400 bp. 
+The shift corresponding to the highest R squared value is recorded for 
+each sampled region. The default minimum R squared value to record an 
+optimal shift is 0.25, and not all sampled regions may return a 
+significant R squared value. A trimmed mean from all recorded shift 
+values is then calculated and used as the final shift value. 
+
+This approach works best with clean, distinct peaks, although even 
+noisy data can generate a reasonably good shift model. If requested, 
+a text file containing the average read count profiles for the forward 
+strand, reverse strand, and shifted data are written so that a model 
+graph may be generated. You may use the BioToolBox script 
+C<graph_profile.pl> to graph the model profiles. The peak shift may 
+also be evaluated by viewing separate, stranded wig files together with 
+the shifted wig file in a genome browser.
 
 =head1 AUTHOR
 
