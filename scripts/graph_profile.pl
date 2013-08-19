@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.10.3';
+my $VERSION = '1.12.4';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -232,16 +232,13 @@ else {
 sub find_x_index {
 	
 	# automatically identify the X index if these columns are available
-	$x_index = 
-		find_column_index($main_data_ref, '^midpoint$') || 
-		find_column_index($main_data_ref, '^start$')   ||
-		find_column_index($main_data_ref, '^window$')   ||
-		find_column_index($main_data_ref, '^name');
+	$x_index = find_column_index($main_data_ref, 
+		'^(?:midpoint|start|position|window|name)$');
 	
 	# request from the user
 	unless (defined $x_index) {
 		print " These are the indices of the data file:\n";
-		foreach my $i (sort {$a <=> $b} keys %dataset_by_id) {
+		foreach my $i (0 .. $main_data_ref->{'number_columns'} -1 ) {
 			print "   $i\t$dataset_by_id{$i}\n";
 		}
 		print " Please enter the X index:  \n";
