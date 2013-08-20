@@ -279,18 +279,10 @@ sub check_defaults {
 	}
 	
 	# maximum duplicates
-	if ($rpm) {
-		# we effectively disable maximum duplicates if rpm is set
-		# we don't control for duplicates when pre-counting (everything is counted)
-		# there is no real disabling, so we just set it to unreasonably high value
-		if (defined $max_dup) {
-			warn " disabling maximum duplicates with rpm enabled\n" . 
-				"  please filter your bam file if you wish to limit duplicates\n";
-		}
-		$max_dup = 100000000; # 100 million reads at one position seems astronomical
-	}
-	unless (defined $max_dup) {
-		$max_dup = 1000;
+	if ($rpm and $max_dup) {
+		print " WARNING: The read count for rpm normalization includes all duplicates." . 
+			"\n  Please filter your bam file if you wish to limit duplicates and have\n" . 
+			"  an accurate rpm normalization.\n";
 	}
 	
 	# check minimum buffer
@@ -393,6 +385,9 @@ sub check_defaults {
 			warn " disabling strand with shift enabled\n";
 			$strand = 0;
 		}
+	}
+	if ($shift_value and !$shift) {
+		undef $shift_value;
 	}
 	
 	# check bin size
@@ -1522,7 +1517,6 @@ sub record_shifted_start {
 	
 	# check
 	return if $a->qual < $min_mapq;
-	return if $a->calend <= $shift_value; # cannot have negative positions
 	
 	# shift based on strand, record on forward
 	if ($a->reversed) {
@@ -1562,6 +1556,7 @@ sub record_split_start {
 	my ($part, $data) = @_;
 	
 	# start based on strand, record on forward
+	# these are high level objects
 	if ($part->strand == 1) {
 		# forward strand
 		$data->{f}{ $part->start }++;
@@ -1626,7 +1621,6 @@ sub record_shifted_mid {
 	
 	# calculate mid position
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	return if $pos <= $shift_value; # cannot have negatives
 	
 	# shift based on strand, record on forward
 	if ($a->reversed) {
@@ -1849,17 +1843,7 @@ sub record_extended {
 	if ($a->reversed) {
 		# reverse strand
 		# must calculate the start position of the 3 prime extended fragment
-		# taking care not to extend beyond the start of the chromosome
-		if ($a->calend < $shift_value) {
-			# the calculated start position will be beyond the beginning of the 
-			# chromosome, must compensate for this
-			# start will be 0 and the extension will be the difference
-			$data->{f}{0} .= abs($a->calend - $shift_value) . ',';
-		}
-		else {
-			# no worries, we are beyond the beginning of the chromosome
-			$data->{f}{ $a->calend - $shift_value } .= "$shift_value,";
-		}
+		$data->{f}{ $a->calend - $shift_value } .= "$shift_value,";
 	}
 	else {
 		# forward strand
@@ -1895,6 +1879,12 @@ sub write_varstep {
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - $buffer_min; 
 		
+		# print warning about negative positions
+		if ($verbose and min( keys %{ $data->{$s} }) < 0) {
+			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
+				" from the beginning of chromosome " . $data->{'seq_id'} . "\n";
+		}
+		
 		# write the data
 		foreach my $pos (sort {$a <=> $b} keys %{$data->{$s}}) {
 			
@@ -1902,7 +1892,10 @@ sub write_varstep {
 			last if ($pos > $maximum);
 			
 			# write line
-			my $score = $data->{$s}{$pos} > $max_dup ? $max_dup : $data->{$s}{$pos};
+			my $score = $data->{$s}{$pos};
+			if ($max_dup) {
+				$score = $score > $max_dup ? $max_dup : $score;
+			}
 			$data->{$fh}->print( join("\t", 
 				$pos, 
 				&$convertor($score) # convert RPM or log before writing
@@ -1913,9 +1906,10 @@ sub write_varstep {
 		}
 		
 		# warn about tossed values at the chromosome end
-		if ($final and keys(%{ $data->{$s} }) ) {
-			warn "  Warning: " . scalar keys(%{ $data->{$s} }) . " data points trimmed" .
-				" from " . $data->{'seq_id'} . " end\n";
+		if ($verbose and $final and keys(%{ $data->{$s} }) ) {
+			print "  Warning: " . (max( keys(%{ $data->{$s} }) ) - $maximum) . 
+				" bp trimmed" . " from the end of chromosome " . $data->{'seq_id'} .
+				 "\n";
 		}
 	}
 }
@@ -1923,6 +1917,7 @@ sub write_varstep {
 
 ### Write a fixedStep wig file
 sub write_fixstep {
+	# only binned data is ever written as a fixedStep wig file
 	my ($data, $final) = @_;
 	
 	# do each strand one at a time
@@ -1936,8 +1931,19 @@ sub write_fixstep {
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - $buffer_min; 
 		
+		# deal with negative positions
+		if (min( keys %{ $data->{$s} }) < 0) {
+			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
+				" from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
+				if $verbose ;
+			
+			# delete the negative positions
+			foreach ( keys %{ $data->{$s} } ) {
+				delete $data->{$s}{$_} if $_ < 0;
+			}
+		}
+		
 		# write binned data
-		# only binned data is ever written as a fixedStep wig file
 		for (
 			my $pos = $data->{$offset}; 
 			$pos < $maximum - $bin_size; 
@@ -1945,25 +1951,39 @@ sub write_fixstep {
 		) {
 		
 			# sum the counts in the bin interval
-			my $score = 0;
-			for ($pos .. $pos + $bin_size -1) {
-				next unless exists $data->{$s}{$_};
-			
-				# only take the maximum read count
-				$score += $data->{$s}{$_} > $max_dup ? $max_dup : $data->{$s}{$_};
-			
-				# clean up
-				delete $data->{$s}{$_};
+			my $score;
+			if ($max_dup) {
+				$score = sum(
+					map { 
+						my $a = $data->{$s}{$_} ||= 0;
+						return $a > $max_dup ? $max_dup : $a;
+					} ($pos .. $pos + $bin_size -1 )
+				);
+			}
+			else {
+				$score = sum(
+					map { $data->{$s}{$_} ||= 0 } ($pos .. $pos + $bin_size -1 ) );
 			}
 		
 			# write line
 			$data->{$fh}->print( &$convertor($score) . "\n" );
 		}
 		
+		# clean up
+		for (
+			my $pos = $data->{$offset}; 
+			$pos < $maximum; 
+			$pos++
+		) {
+			next unless exists $data->{$s}{$_};
+			delete $data->{$s}{$pos};
+		}		
+		
 		# warn about tossed values at the chromosome end
-		if ($final and keys(%{ $data->{$s} }) ) {
-			warn "  Warning: " . scalar keys(%{ $data->{$s} }) . " data points trimmed" .
-				" from " . $data->{'seq_id'} . " end\n";
+		if ($verbose and $final and keys(%{ $data->{$s} }) ) {
+			print "  Warning: " . (max( keys(%{ $data->{$s} }) ) - $maximum) . 
+				" bp trimmed" . " from the end of chromosome " . $data->{'seq_id'} .
+				 "\n";
 		}
 	}
 }
@@ -1988,6 +2008,12 @@ sub write_bedgraph {
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - $buffer_min; 
 		
+		# print warning about negative positions
+		if ($verbose and min( keys %{ $data->{$s} }) < 0) {
+			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
+				" from the beginning of chromosome " . $data->{'seq_id'} . "\n";
+		}
+		
 		# convert read lengths to coverage in the buffer array
 		foreach my $pos (sort {$a <=> $b} keys %{ $data->{$s} }) {
 			
@@ -1996,12 +2022,12 @@ sub write_bedgraph {
 			
 			# split the lengths, limit to max, and generate coverage
 			my @lengths = split(',', $data->{$s}{$pos});
-			if (scalar @lengths > $max_dup) {
+			if ($max_dup and scalar @lengths > $max_dup) {
 				splice(@lengths, $max_dup + 1); # delete the extra ones
 			}
 			
 			# we will take a shortcut if all lengths are the same
-			if ( all_equal(\@lengths) ) {
+			if ( $shift_value or all_equal(\@lengths) ) {
 				# all the lengths are equal
 				# each position will get the same pileup number
 				for (0 .. $lengths[0] - 1) {
@@ -2011,7 +2037,7 @@ sub write_bedgraph {
 					# this could also balloon memory usage - oh dear
 					my $p = $pos - $data->{$offset} + $_;
 					$data->{$buffer}->[$p] += scalar(@lengths) if $p >= 0;
-					# avoid modifying array subscript -1 in rare situations
+					# avoid modifying negative positions
 				}
 			}
 			else {
@@ -2021,7 +2047,7 @@ sub write_bedgraph {
 					for (0 .. $len -1) { 
 						my $p = $pos - $data->{$offset} + $_;
 						$data->{$buffer}->[$p] += 1 if $p >= 0;
-						# avoid modifying array subscript -1 in rare situations
+						# avoid modifying modifying negative positions
 					}
 				}
 			}
@@ -2054,8 +2080,9 @@ sub write_bedgraph {
 					$end = $data->{'seq_length'};
 					
 					# dump anything left in the array to finish up
-					warn "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
-						" from " . $data->{'seq_id'} . " end\n";
+					print "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
+						" from the end of chromosome " . $data->{'seq_id'} . "\n" 
+						if $verbose;
 					$data->{$buffer} = [];
 				}
 				
@@ -2318,19 +2345,20 @@ checked. The default value is 0 (accept everything).
 Set a maximum number of duplicate alignments tolerated at a single position. 
 This uses the alignment start (or midpoint if recording midpoint) position 
 to determine duplicity. Note that this does not affect coverage mode. 
-You may want to increase this value when working with MNase digested 
-material, or decrease when working with random fragments (sonication) to 
-avoid PCR bias. Note that this option is effectively disabled when using 
-the --rpm option. The default is 1000. 
+You may want to set a limit when working with random fragments (sonication) to 
+avoid PCR bias. Note that setting this value in conjunction with the --rpm 
+option may result in slightly lower coverage than anticipated, since the 
+pre-count does not account for duplicity. The default is undefined (no limit). 
 
 =item --rpm
 
 Convert the data to Reads (or Fragments) Per Million mapped. This is useful 
-for comparing read coverage between different datasets. This conversion 
-is applied before converting to log, if requested. This will increase 
-processing time, as the alignments must first be counted. Only mapped reads 
-with a minimum mapping quality are counted. All duplicates are counted, 
-and the --max option is disabled. The default is no RPM conversion. 
+for comparing read coverage between different datasets. Only alignments 
+that match the minimum mapping quality are counted. Only proper paired-end 
+alignments are counted, they are counted as one fragment. The conversion is 
+applied before converting to log, if requested. This will increase processing 
+time, as the alignments must first be counted. Note that all duplicate reads 
+are counted during the pre-count. The default is no RPM conversion. 
 
 =item --log [2|10]
 
@@ -2382,8 +2410,9 @@ decrease memory usage. The default is 200,000 alignments.
 
 =item --verbose
 
-Print the sample correlations when determining the shift value. 
-The default is false.
+Print warnings when read counts go off the end of the chromosomes, 
+particularly with shifted read counts. Also print the sample 
+correlations when determining the shift value. The default is false.
 
 =item --version
 
