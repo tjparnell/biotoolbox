@@ -184,7 +184,7 @@ if ($shift and !$shift_value) {
 		print " Reads will be extended by $shift_value bp\n";
 	}
 	else {
-		print " Reads will be shifted by $shift_value bp\n";
+		print " Read counts will be shifted by $shift_value bp\n";
 	}
 }
 
@@ -279,6 +279,16 @@ sub check_defaults {
 	}
 	
 	# maximum duplicates
+	if ($rpm) {
+		# we effectively disable maximum duplicates if rpm is set
+		# we don't control for duplicates when pre-counting (everything is counted)
+		# there is no real disabling, so we just set it to unreasonably high value
+		if (defined $max_dup) {
+			warn " disabling maximum duplicates with rpm enabled\n" . 
+				"  please filter your bam file if you wish to limit duplicates\n";
+		}
+		$max_dup = 100000000; # 100 million reads at one position seems astronomical
+	}
 	unless (defined $max_dup) {
 		$max_dup = 1000;
 	}
@@ -2310,7 +2320,8 @@ This uses the alignment start (or midpoint if recording midpoint) position
 to determine duplicity. Note that this does not affect coverage mode. 
 You may want to increase this value when working with MNase digested 
 material, or decrease when working with random fragments (sonication) to 
-avoid PCR bias. The default is 1000. 
+avoid PCR bias. Note that this option is effectively disabled when using 
+the --rpm option. The default is 1000. 
 
 =item --rpm
 
@@ -2318,8 +2329,8 @@ Convert the data to Reads (or Fragments) Per Million mapped. This is useful
 for comparing read coverage between different datasets. This conversion 
 is applied before converting to log, if requested. This will increase 
 processing time, as the alignments must first be counted. Only mapped reads 
-with a minimum mapping quality are counted. All duplicates are counted. 
-The default is no RPM conversion. 
+with a minimum mapping quality are counted. All duplicates are counted, 
+and the --max option is disabled. The default is no RPM conversion. 
 
 =item --log [2|10]
 
@@ -2453,6 +2464,10 @@ value from the sequence data (recommended). Otherwise, if you know
 the mean size of your ChIP eluate fragments, you can use the --shiftval 
 option. 
 
+To evaluate the empirically determined shift value, be sure to include 
+the --model option to examine the profiles of stranded and shifted read 
+counts and the distribution of cross-strand correlations.
+
 Depending on your downstream applications and/or preferences, you 
 can record strict enumeration (start positions) or coverage (extend 
 position).
@@ -2461,9 +2476,9 @@ Finally, to compare ChIP-Seq alignments from multiple experiments,
 convert your reads to Reads Per Million Mapped, which will help to 
 normalize read counts.
  
- bam2wig.pl --pos start --shift --rpm --in <bamfile>
+ bam2wig.pl --pos start --shift --model --rpm --in <bamfile>
  
- bam2wig.pl --pos extend --rpm --in <bamfile>
+ bam2wig.pl --pos extend --model --rpm --in <bamfile>
 
 =item Paired-end ChIP-Seq
 
@@ -2526,8 +2541,9 @@ duplicate positions.
 
 =head1 SHIFT VALUE DETERMINATION
 
-To determine the shift value, regions with the highest read coverage 
-are sampled from one or more chromosomes represented in the Bam file. 
+To empirically determine the shift value, a cross-strand correlation 
+method is employed. Regions with the highest read coverage 
+are sampled from one or more chromosomes listed in the Bam file. 
 The default number of regions is 200 sampled from each of the two 
 largest chromosomes. The largest chromosomes are used merely as a 
 representative fraction of the genome for performance reasons. Stranded
