@@ -24,6 +24,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --sample <integer>
   --chrom <integer>
   --minr <float>
+  --model
   --strand
   --qual <integer>
   --max <integer>
@@ -131,6 +132,12 @@ __
   Provide the minimum R^2 value to accept a shift value when  empirically determining the shift value. Enter a decimal value  between 0 and 1. Higher values are more stringent. The default  is 0.25.
 __
   __
+__--model
+
+__
+  Indicate that the shift model profile data should be written to  file for examination. The average profile, including for each  sampled chromosome, are reported for the forward and reverse strands,  as  well as the shifted profile. A standard text file is generated  using the output base name. The default is to not write the model  shift data.
+__
+  __
 __--strand
 
 __
@@ -146,13 +153,13 @@ __
 __--max <**integer>
 
 __
-  Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this does not affect coverage mode.  The default is 1000.
+  Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this does not affect coverage mode.  You may want to set a limit when working with random fragments (sonication) to  avoid PCR bias. Note that setting this value in conjunction with the --rpm  option may result in slightly lower coverage than anticipated, since the  pre-count does not account for duplicity. The default is undefined (no limit).
 __
   __
 __--rpm
 
 __
-  Convert the data to Reads (or Fragments) Per Million mapped. This is useful  for comparing read coverage between different datasets. This conversion  is applied before converting to log, if requested. This will increase  processing time, as the alignments must first be counted. Only mapped reads  with a minimum mapping quality are counted. All duplicates are counted.  The default is no RPM conversion.
+  Convert the data to Reads (or Fragments) Per Million mapped. This is useful  for comparing read coverage between different datasets. Only alignments  that match the minimum mapping quality are counted. Only proper paired-end  alignments are counted, they are counted as one fragment. The conversion is  applied before converting to log, if requested. This will increase processing  time, as the alignments must first be counted. Note that all duplicate reads  are counted during the pre-count. The default is no RPM conversion.
 __
   __
 __--log `[`2|10`]`
@@ -200,7 +207,7 @@ __
 __--verbose
 
 __
-  Print the sample correlations when determining the shift value.  The default is false.
+  Print warnings when read counts go off the end of the chromosomes,  particularly with shifted read counts. Also print the sample  correlations when determining the shift value. The default is false.
 __
   __
 __--version
@@ -220,7 +227,7 @@ This program will enumerate aligned sequence tags and generate a wig,  or option
 
 Both paired-end and single-end alignments may be counted. Alignments  with splices (e.g. RNA-Seq) may be counted singly or separately.  Alignment counts may be separated by strand, facilitating analysis of  RNA-Seq experiments.
 
-For ChIP-Seq experiments, the alignment position may be shifted  in the 3 prime direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS program. The shift value may be empirically  determined from the sequencing data (see below).
+For ChIP-Seq experiments, the alignment position may be shifted  in the 3 prime direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS program. The shift value may be empirically  determined from the sequencing data (see below). If requested, the  shift model profile may be written to file. Use the !BioToolBox**  script `graph_profile.pl` to graph the data.
 
 The output wig file may be either a variableStep, fixedStep, or  bedGraph format. The file format is dictated by where the alignment  position is recorded. Recording start and midpoint at single  base-pair resolution writes a variableStep wig file. Binned start  or midpoint counts and coverage are written as a fixedStep wig file.  Span and extended positions are written as a bedGraph file.
 
@@ -246,6 +253,9 @@ __
   When sequencing Chromatin Immuno-Precipitation products, one generally  performs a 3 prime shift adjustment to center the fragment's end reads  over the predicted center and putative target. To adjust the positions  of tag count peaks, let the program empirically determine the shift  value from the sequence data (recommended). Otherwise, if you know  the mean size of your ChIP eluate fragments, you can use the --shiftval  option.
 __
   __
+  To evaluate the empirically determined shift value, be sure to include  the --model option to examine the profiles of stranded and shifted read  counts and the distribution of cross-strand correlations.
+__
+  __
   Depending on your downstream applications and/or preferences, you  can record strict enumeration (start positions) or coverage (extend  position).
 __
   __
@@ -253,10 +263,10 @@ __
 __
   __
 {{{
- bam2wig.pl --pos start --shift --rpm --in <bamfile>
+ bam2wig.pl --pos start --shift --model --rpm --in <bamfile>
  }}}
 {{{
- bam2wig.pl --pos extend --rpm --in <bamfile>
+ bam2wig.pl --pos extend --model --rpm --in <bamfile>
 }}}
 Paired-end ChIP-Seq
 
@@ -313,7 +323,9 @@ __
 __
   __
 ==SHIFT VALUE DETERMINATION==
-To determine the shift value, the top 500 bp regions (the default number is 200 regions) with the highest coverage are collected from the largest chromosome or sequence represented in the Bam file. The largest chromosome is used merely as a representative fraction of the genome for performance reasons rather than random sampling. Stranded read counts are collected in 10 bp bins over the region and flanking 400 bp regions (1.3 kb total). A Pearson product-moment correlation coefficient is then reiteratively determined between the stranded data as the bins are shifted from 30 to 400 bp. The shift corresponding to the highest R squared value is retained for each sampled region. The default minimum R squared value to keep is 0.25, and not all sampled  regions may return a significant R squared value. A trimmed mean is  then calculated from all of the calculated shift values to be used used  as the final shift value. This approach works best with clean, distinct  peaks. The peak shift may be evaluated by viewing separate, stranded wig  files together with the shifted wig file in a genome browser.
+To empirically determine the shift value, a cross-strand correlation  method is employed. Regions with the highest read coverage  are sampled from one or more chromosomes listed in the Bam file.  The default number of regions is 200 sampled from each of the two  largest chromosomes. The largest chromosomes are used merely as a  representative fraction of the genome for performance reasons. Stranded read counts are collected in 10 bp bins over a 1300 bp region (the  initial 500 bp high coverage region plus flanking 400 bp). A Pearson  product-moment correlation coefficient is then reiteratively determined  between the stranded data sets as the bins are shifted from 30 to 400 bp.  The shift corresponding to the highest R squared value is recorded for  each sampled region. The default minimum R squared value to record an  optimal shift is 0.25, and not all sampled regions may return a  significant R squared value. A trimmed mean from all recorded shift  values is then calculated and used as the final shift value.
+
+This approach works best with clean, distinct peaks, although even  noisy data can generate a reasonably good shift model. If requested,  a text file containing the average read count profiles for the forward  strand, reverse strand, and shifted data are written so that a model  graph may be generated. You may use the !BioToolBox** script  `graph_profile.pl` to graph the model profiles. The peak shift may  also be evaluated by viewing separate, stranded wig files together with  the shifted wig file in a genome browser.
 
 ==AUTHOR==
 {{{

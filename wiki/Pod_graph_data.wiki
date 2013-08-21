@@ -34,6 +34,7 @@ graph_data.pl `[`--options`]` <**filename>
   --yformat <integer>
   --out <base_filename>
   --dir <foldername>
+  --cpu <integer>
   --version
   --help
 }}}
@@ -67,7 +68,7 @@ __
 __--all
 
 __
-  Indicate that all available datasets in the input file should be plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.
+  Indicate that all available datasets in the input file should be plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y. If you wish to graph only a subset of datasets, provide a list  and/or range using the --index option.
 __
   __
 __--log
@@ -146,6 +147,12 @@ __--dir <**foldername>
 
 __
   Specify an optional name for the output subdirectory name. Default is the input filename base with '`_`graphs' appended.
+__
+  __
+__--cpu <**integer>
+
+__
+  Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.  Parallel execution is only applicable when a list of datasets are  provided or the --all option is enabled; interactive execution is  performed serially.
 __
   __
 __--version
