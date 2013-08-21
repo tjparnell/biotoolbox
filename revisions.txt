@@ -1,5 +1,23 @@
 ######## BioToolBox revision history #############
 
+v.1.12.4 (svn 662)
+	- Improved the efficiency of scanning for high coverage regions 
+	and calculating 3 prime shift values in script bam2wig.pl; Each 
+	reference sequence is now scanned in parallel. Also added a new 
+	option to write the shift profile model and correlation data. 
+	The efficiency of writing bedGraph files was improved, giving 
+	up to 2X increase in performance. The default maximum duplicate 
+	value is now unlimited. Warnings about coverage beyond the ends 
+	of chromosomes are now silenced unless verbose is turned on.
+	- The script graph_data.pl can now execute in parallel to improve 
+	efficiency when a list of datasets are provided in advance. A 
+	list may now be provided in conjunction with the --all option. 
+	- Improved recognition of the X-axis column in script 
+	graph_profile.pl.
+	- Fixed critical error when writing extended position bedGraph 
+	files from script bam2wig.pl where reverse reads were not 
+	extended appropriately in the 3 prime direction.
+
 v.1.12.3 (svn 651)
 	- Added user options to control the size of the memory buffer 
 	when writing bedGraph files and the disk write frequency in 
