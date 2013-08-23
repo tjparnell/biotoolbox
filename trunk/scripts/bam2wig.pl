@@ -33,7 +33,7 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.12.4',
+	VERSION         => '1.12.5',
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
@@ -1879,16 +1879,22 @@ sub write_varstep {
 		my $maximum = $final ?  $data->{'seq_length'} : 
 			max(keys %{$data->{$s}}) - $buffer_min; 
 		
-		# print warning about negative positions
-		if ($verbose and min( keys %{ $data->{$s} }) < 0) {
-			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
-				" from the beginning of chromosome " . $data->{'seq_id'} . "\n";
+		# deal with negative positions
+		if (min( keys %{ $data->{$s} }) <= 0) {
+			print "  Warning: " . (abs( min( keys %{ $data->{$s} } )) + 1) . 
+				" bp trimmed from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
+				if $verbose ;
+			
+			# delete the negative positions
+			foreach ( keys %{ $data->{$s} } ) {
+				delete $data->{$s}{$_} if $_ <= 0;
+			}
 		}
 		
 		# write the data
 		foreach my $pos (sort {$a <=> $b} keys %{$data->{$s}}) {
 			
-			# first check the position and bail when we've gone far enough
+			# first check the position and bail when we've gone off the chromosome end
 			last if ($pos > $maximum);
 			
 			# write line
@@ -1932,14 +1938,14 @@ sub write_fixstep {
 			max(keys %{$data->{$s}}) - $buffer_min; 
 		
 		# deal with negative positions
-		if (min( keys %{ $data->{$s} }) < 0) {
-			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
-				" from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
+		if (min( keys %{ $data->{$s} }) <= 0) {
+			print "  Warning: " . (abs( min( keys %{ $data->{$s} } )) + 1) . 
+				" bp trimmed from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
 				if $verbose ;
 			
 			# delete the negative positions
 			foreach ( keys %{ $data->{$s} } ) {
-				delete $data->{$s}{$_} if $_ < 0;
+				delete $data->{$s}{$_} if $_ <= 0;
 			}
 		}
 		
