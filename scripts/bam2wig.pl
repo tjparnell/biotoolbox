@@ -173,10 +173,11 @@ if ($rpm) {
 
 
 ### Calculate shift value
-if ($shift and !$shift_value) {
-	# this must be done single-threaded
-	print " Calculating 3' shift value...\n";
-	$shift_value = determine_shift_value();
+if ($shift) {
+	if (not $shift_value) {
+		print " Calculating 3' shift value...\n";
+		$shift_value = determine_shift_value();
+	}
 	
 	# precalculate double shift when recording extended position
 	if ($position eq 'extend') {
@@ -623,7 +624,7 @@ sub determine_shift_value {
 	my @r_profile;
 	my @shifted_profile;
 	my @r2_values;
-	my @seq_ids; 
+	my @regions; 
 	
 	# look for high coverage regions to sample
 	# do this in multi-threaded fashion if possible
@@ -639,11 +640,11 @@ sub determine_shift_value {
 			
 			# record the chromosome results
 			push @shift_values, @{ $result->[0] }; # push the actual values
-			push @f_profile, $result->[1]; # just the reference for now
-			push @r_profile, $result->[2];
-			push @shifted_profile, $result->[3];
-			push @r2_values, $result->[4];
-			push @seq_ids, [$result->[5], scalar( @{$result->[0]} ) ];
+			push @f_profile, @{ $result->[1] }; 
+			push @r_profile, @{ $result->[2] };
+			push @shifted_profile, @{ $result->[3] };
+			push @r2_values, @{ $result->[4] };
+			push @regions, @{ $result->[5] };
 		} );
 		
 		# scan the chromosomes in parallel
@@ -681,11 +682,11 @@ sub determine_shift_value {
 			
 			# record the results for this chromosome
 			push @shift_values, @{ $result->[0] }; # push the actual values
-			push @f_profile, $result->[1]; # just the reference for now
-			push @r_profile, $result->[2];
-			push @shifted_profile, $result->[3];
-			push @r2_values, $result->[4];
-			push @seq_ids, [$result->[5], scalar( @{$result->[0]} ) ];
+			push @f_profile, @{ $result->[1] }; 
+			push @r_profile, @{ $result->[2] };
+			push @shifted_profile, @{ $result->[3] };
+			push @r2_values, @{ $result->[4] };
+			push @regions, @{ $result->[5] };
 		}
 	}
 	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
@@ -693,20 +694,38 @@ sub determine_shift_value {
 	
 	# determine the optimal shift value
 	# we will be using a trimmed mean value to avoid outliers
-	@shift_values = sort {$a <=> $b} @shift_values;
-	my $number_values = scalar @shift_values;
-	my $cut = int( ( $number_values / 10 ) + 0.5); # take 10%
-	$cut++ if ($cut % 2); # make an even number
-	splice(@shift_values, 0, $cut);
-	splice(@shift_values, $number_values - $cut);
-	my $best_value = sprintf("%.0f", mean(@shift_values) );
-	printf "  The mean shift value is %s +/- %.0f bp\n", 
-		$best_value, stddev(@shift_values);
+	my $raw_mean = mean(@shift_values);
+	my $raw_sd = stddev(@shift_values);
+	printf "  The collected mean shift value is %.0f +/- %.0f bp\n", 
+		$raw_mean, $raw_sd;
+	my $raw_min = $raw_mean - (1.5 * $raw_sd);
+	$raw_min = 0 if $raw_min < 0;
+	my $raw_max = $raw_mean + (1.5 * $raw_sd);
+	my @trimmed_shift_values;
+	my @trimmed_f_profile;
+	my @trimmed_r_profile;
+	my @trimmed_shifted_profile;
+	my @trimmed_r2_values;
+	my @trimmed_regions;
+	foreach my $i (0 .. $#shift_values) {
+		if ($shift_values[$i] >= $raw_min and $shift_values[$i] <= $raw_max) {
+			push @trimmed_shift_values, $shift_values[$i];
+			push @trimmed_f_profile, $f_profile[$i];
+			push @trimmed_r_profile, $r_profile[$i];
+			push @trimmed_shifted_profile, $shifted_profile[$i];
+			push @trimmed_r2_values, $r2_values[$i];
+			push @trimmed_regions, $regions[$i];
+		}
+	}
+	my $best_value = sprintf("%.0f", mean(@trimmed_shift_values) );
+	printf "  The trimmed mean shift value is %s +/- %.0f bp from %s regions\n", 
+		$best_value, stddev(@trimmed_shift_values), 
+		format_with_commas(scalar @trimmed_shift_values);
 	
 	# write out the shift model data file
 	if ($model) {
-		write_model_file($best_value, \@f_profile, \@r_profile, 
-			\@shifted_profile, \@r2_values, \@seq_ids);
+		write_model_file($best_value, \@trimmed_f_profile, \@trimmed_r_profile, 
+			\@trimmed_shifted_profile, \@trimmed_r2_values, \@trimmed_regions);
 	}
 	
 	# done
@@ -780,7 +799,7 @@ sub calculate_strand_correlation {
 	my @f_profile;
 	my @r_profile;
 	my @shifted_profile;
-	my $chrom;
+	my @regions;
 	
 	# determine the optimal shift for each of the test regions
 	foreach my $i (keys %{$coverage2region}) {
@@ -789,9 +808,9 @@ sub calculate_strand_correlation {
 		# we're adjusting them by 400 bp in both directions to actually 
 		# sample a 1.3 kb region centered over the original region
 		my $tid   = $coverage2region->{$i}->[0];
-		$chrom = $sam->target_name($tid) unless $chrom; 
 		my $start = $coverage2region->{$i}->[1] - 400;
 		my $end   = $coverage2region->{$i}->[2] + 400;
+		my $region = $sam->target_name($tid) . ":$start..$end";
 		# just in case we go over
 		$start = 0 if $start < 1;
 		$end = $sam->target_len($tid) if $end > $sam->target_len($tid);
@@ -824,17 +843,16 @@ sub calculate_strand_correlation {
 		my @r2_values;
 		
 		# calculate correlations
-		for (my $i = 1; $i <= 40; $i++) {
-			# check shift from 10 to 400 bp
+		for (my $i = 0; $i <= 40; $i++) {
+			# check shift from 0 to 400 bp
 			
 			# adjust the arrays, mimicking shifting arrays towards the 3'
-			unshift @f, 0;
-			pop @f;
-			shift @r;
-			push @r, 0;
-			
-			# skip the first 20 bp
-			next if $i < 3;
+			if ($i) {
+				unshift @f, 0;
+				pop @f;
+				shift @r;
+				push @r, 0;
+			}
 			
 			# calculate correlation
 			my $stat = Statistics::LineFit->new();
@@ -860,7 +878,7 @@ sub calculate_strand_correlation {
 		
 		# print result
 		if ($verbose) {
-			my $string = "  sampling $chrom:$start..$end  ";
+			my $string = "  sampling $region  ";
 			if ($best_r) {
 				printf "$string shift $best_shift bp (r^2 %.3f)\n", $best_r;
 			}
@@ -877,104 +895,122 @@ sub calculate_strand_correlation {
 				push @r_profile, \@original_r;
 				push @shifted_profile, \@best_profile;
 				push @all_r2_values, \@r2_values;
+				push @regions, $region;
 			}
 		}
 	}
 	
-	# generate composite profile for this chromosome
-	my @final_f_profile;
-	my @final_r_profile;
-	my @final_shifted_profile;
-	my @final_r2_values;
-	if ($model) {
-		# generate average profiles if the model is requested
-		for my $i (0 .. 129) {
-			# for each relative 10 bp profile step, we will generate an average value
-			# from all those regions that we collected
-			# do this for the forward, reverse, and shifted profiles
-			$final_f_profile[$i] = mean( map { $f_profile[$_][$i] } (0 .. $#f_profile) );
-			$final_r_profile[$i] = mean( map { $r_profile[$_][$i] } (0 .. $#r_profile) );
-			$final_shifted_profile[$i] = 
-				mean( map { $shifted_profile[$_][$i] } (0 .. $#shifted_profile) );
-			
-			# generate average of r2 values
-			for my $i (0 .. 37) {
-				$final_r2_values[$i] = 
-					mean( map { $all_r2_values[$_][$i] } (0 .. $#all_r2_values) );
-			}
-		}
-	}
-	
-	return [ \@shift_values, \@final_f_profile, \@final_r_profile, 
-		\@final_shifted_profile, \@final_r2_values, $chrom ];
+	return [ \@shift_values, \@f_profile, \@r_profile, 
+		\@shifted_profile, \@all_r2_values, \@regions];
 }
 
 
 ### Write a text data file with the shift model data
 sub write_model_file {
-	my ($value, $f_profile, $r_profile, $shifted_profile, $r2_values, $seq_ids) = @_;
+	my ($value, $f_profile, $r_profile, $shifted_profile, $r2_values, $regions) = @_;
 	
 	### Profile model
-	# prepare the data structure
+	# Prepare the centered profiles from the raw profiles
+	# these will be -450 to +450, with 0 being the shifted profile peak
+	my @centered_f_profile;
+	my @centered_r_profile;
+	my @centered_shifted_profile;
+	for my $r (0 .. $#{$regions}) {
+		# first identify the peak in the shifted profile
+		my $peak = 0;
+		my $peak_i;
+		for my $i (0 .. 129) {
+			if ($shifted_profile->[$r][$i] > $peak) {
+				$peak = $shifted_profile->[$r][$i];
+				$peak_i = $i;
+			}
+		}
+		
+		# collect the centered profiles
+		for my $i (0 .. 90) {
+			my $current_i = $peak_i - 45 + $i;
+			if ($current_i >= 0 and $current_i <= 129) {
+				# check that the current index is within the raw index range
+				$centered_f_profile[$r][$i] = $f_profile->[$r][$current_i];
+				$centered_r_profile[$r][$i] = $r_profile->[$r][$current_i];
+				$centered_shifted_profile[$r][$i] = $shifted_profile->[$r][$current_i];
+			}
+			else {
+				# otherwise record zeros
+				$centered_f_profile[$r][$i] = 0;
+				$centered_r_profile[$r][$i] = 0;
+				$centered_shifted_profile[$r][$i] = 0;
+			}
+		}
+	}
+	
+	
+	# Prepare the data structure
 	my $profile = generate_tim_data_structure( qw(
 		shift_model_profile Start Forward_Profile Reverse_Profile Shifted_Profile) );
 	$profile->{'db'} = $infile;
 	push @{ $profile->{'other'} }, "# Average profile of read start point sums\n";
+	push @{ $profile->{'other'} }, 
+		"# Only profiles of trimmed shift value samples included\n";
 	push @{ $profile->{'other'} }, "# Final shift value calculated as $value bp\n";
 	$profile->{2}{'minimum_r2'} = $correlation_min;
 	$profile->{2}{'number_of_chromosomes_sampled'} = $chr_number;
-	$profile->{2}{'regions_sampled'} = sum( map {$seq_ids->[$_][1]} (0 .. $#{$seq_ids}) );
+	$profile->{2}{'regions_sampled'} = scalar(@$f_profile);
 	
-	# load data table
-	# first we will put the mean value for all the chromosomes
-	for my $i (0 .. 129) {
+	
+	# Load data table
+	# first we will put the mean value for all the regions
+	for my $i (0 .. 90) {
 		# generate the start position
-		$profile->{'data_table'}->[$i+1][0] = $i * 10;
+		$profile->{'data_table'}->[$i+1][0] = ($i - 45) * 10;
 		
 		# generate the mean value for each chromosome tested at each position
-		$profile->{'data_table'}->[$i+1][1] = mean( map { $f_profile->[$_][$i] } 
-			(0 .. $#{$f_profile} ) );
-		$profile->{'data_table'}->[$i+1][2] = mean( map { $r_profile->[$_][$i] } 
-			(0 .. $#{$r_profile} ) );
+		$profile->{'data_table'}->[$i+1][1] = mean( map { $centered_f_profile[$_][$i] } 
+			(0 .. $#centered_f_profile ) );
+		$profile->{'data_table'}->[$i+1][2] = mean( map { $centered_r_profile[$_][$i] } 
+			(0 .. $#centered_r_profile ) );
 		$profile->{'data_table'}->[$i+1][3] = 
-			mean( map { $shifted_profile->[$_][$i] } (0 .. $#{$shifted_profile} ) );
+			mean( map { $centered_shifted_profile[$_][$i] } 
+			(0 .. $#centered_shifted_profile ) );
 	}
-	$profile->{'last_row'} = 130;
+	$profile->{'last_row'} = 91;
 	
-	# next add the chromosome specific profiles
-	for my $s (0 .. $#{$seq_ids}) {
-		# this array is comprised of arrays of chromosome name and region count
+	
+	# Add the region specific profiles if verbose if requested
+	if ($verbose) {
+		for my $r (0 .. $#{$regions}) {
 		
-		# add column specific metadata
-		my $column = $profile->{'number_columns'};
-		$profile->{$column} = {
-			'name'  => $seq_ids->[$s][0] . '_Forward_profile',
-			'index' => $column,
-		};
-		$profile->{$column + 1} = {
-			'name'  => $seq_ids->[$s][0] . '_Reverse_profile',
-			'index' => $column + 1,
-		};
-		$profile->{$column + 2} = {
-			'name'  => $seq_ids->[$s][0] . '_Shifted_profile',
-			'index' => $column + 2,
-			'region_count' => $seq_ids->[$s][1]
-		};
-		$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
-		$profile->{'data_table'}->[0][$column+1] = $profile->{$column+1}{'name'};
-		$profile->{'data_table'}->[0][$column+2] = $profile->{$column+2}{'name'};
+			# add column specific metadata
+			my $column = $profile->{'number_columns'};
+			$profile->{$column} = {
+				'name'  => $regions->[$r] . '_Forward',
+				'index' => $column,
+			};
+			$profile->{$column + 1} = {
+				'name'  => $regions->[$r] . '_Reverse',
+				'index' => $column + 1,
+			};
+			$profile->{$column + 2} = {
+				'name'  => $regions->[$r] . '_Shifted',
+				'index' => $column + 2,
+			};
+			$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
+			$profile->{'data_table'}->[0][$column+1] = $profile->{$column+1}{'name'};
+			$profile->{'data_table'}->[0][$column+2] = $profile->{$column+2}{'name'};
 		
-		# fill in the columns
-		for my $i (0 .. 129) {
-			$profile->{'data_table'}->[$i+1][$column]   = $f_profile->[$s][$i];
-			$profile->{'data_table'}->[$i+1][$column+1] = $r_profile->[$s][$i];
-			$profile->{'data_table'}->[$i+1][$column+2] = $shifted_profile->[$s][$i];
+			# fill in the columns
+			for my $i (0 .. 90) {
+				$profile->{'data_table'}->[$i+1][$column]   = $centered_f_profile[$r][$i];
+				$profile->{'data_table'}->[$i+1][$column+1] = $centered_r_profile[$r][$i];
+				$profile->{'data_table'}->[$i+1][$column+2] = 
+					$centered_shifted_profile[$r][$i];
+			}
+		
+			$profile->{'number_columns'} += 3;
 		}
-		
-		$profile->{'number_columns'} += 3;
 	}
 	
-	# write the model file
+	# Write the model file
 	my $profile_file = write_tim_data_file( 
 		'data'     => $profile,
 		'filename' => "$outfile\_model.txt",
@@ -991,38 +1027,39 @@ sub write_model_file {
 	push @{ $r2_data->{'other'} }, "# Final shift value calculated as $value bp\n";
 	$r2_data->{1}{'minimum_r2'} = $correlation_min;
 	$r2_data->{1}{'number_of_chromosomes_sampled'} = $chr_number;
-	$r2_data->{1}{'regions_sampled'} = sum( map {$seq_ids->[$_][1]} (0 .. $#{$seq_ids}) );
+	$r2_data->{1}{'regions_sampled'} = scalar(@$f_profile);
 	
 	# load data table
 	# first we will put the mean value for all the r squared values
-	for my $i (0 .. 37) {
+	for my $i (0 .. 40) {
 		# generate the start position
-		$r2_data->{'data_table'}->[$i+1][0] = ($i + 3) * 10;
+		$r2_data->{'data_table'}->[$i+1][0] = $i * 10;
 		
 		# generate the mean value for each chromosome
 		$r2_data->{'data_table'}->[$i+1][1] = mean( map { $r2_values->[$_][$i] } 
-			(0 .. $#{$r2_values} ) );
+			(0 ..  $#{$regions}) );
 	}
-	$r2_data->{'last_row'} = 38;
+	$r2_data->{'last_row'} = 41;
 	
-	# next add the chromosome specific profiles
-	for my $s (0 .. $#{$seq_ids}) {
+	# add the chromosome specific profiles
+	if ($verbose) {
+		for my $r (0 .. $#{$regions}) {
 		
-		# add column specific metadata
-		my $column = $r2_data->{'number_columns'};
-		$r2_data->{$column} = {
-			'name'  => $seq_ids->[$s][0] . '_mean_rSquared',
-			'index' => $column,
-			'region_count' => $seq_ids->[$s][1],
-		};
-		$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
+			# add column specific metadata
+			my $column = $r2_data->{'number_columns'};
+			$r2_data->{$column} = {
+				'name'  => $regions->[$r] . '_rSquared',
+				'index' => $column,
+			};
+			$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
 		
-		# fill in the columns
-		for my $i (0 .. 37) {
-			$r2_data->{'data_table'}->[$i+1][$column]   = $r2_values->[$s][$i];
+			# fill in the columns
+			for my $i (0 .. 40) {
+				$r2_data->{'data_table'}->[$i+1][$column]   = $r2_values->[$r][$i];
+			}
+		
+			$r2_data->{'number_columns'}++;
 		}
-		
-		$r2_data->{'number_columns'}++;
 	}
 	
 	# write the r squared file
@@ -2271,7 +2308,9 @@ increase processing time.
 =item --pe
 
 The Bam file consists of paired-end alignments, and only properly 
-mapped pairs of alignments will be counted. The default is to 
+mapped pairs of alignments will be counted. Properly mapped pairs 
+include FR reads on the same chromosome, and not FF, RR, RF, or 
+pairs aligning to separate chromosomes. The default is to 
 treat all alignments as single-end.
 
 =item --bin <integer>
@@ -2295,7 +2334,7 @@ value.
 
 =item --shiftval <integer>
 
-Provide the value in bp that the record position should be shifted. 
+Provide the value in bp that the recorded position should be shifted. 
 The value should be 1/2 the average length of the insert library 
 that was sequenced. The default is to empirically determine the 
 appropriate shift value. See below for the approach.
@@ -2417,8 +2456,10 @@ decrease memory usage. The default is 200,000 alignments.
 =item --verbose
 
 Print warnings when read counts go off the end of the chromosomes, 
-particularly with shifted read counts. Also print the sample 
-correlations when determining the shift value. The default is false.
+particularly with shifted read counts. Also print the correlations 
+for each sampled region as they are calculated when determining the 
+shift value. When writing the model file, data from each region is 
+also written. The default is false.
 
 =item --version
 
@@ -2585,12 +2626,13 @@ representative fraction of the genome for performance reasons. Stranded
 read counts are collected in 10 bp bins over a 1300 bp region (the 
 initial 500 bp high coverage region plus flanking 400 bp). A Pearson 
 product-moment correlation coefficient is then reiteratively determined 
-between the stranded data sets as the bins are shifted from 30 to 400 bp. 
+between the stranded data sets as the bins are shifted from 0 to 400 bp. 
 The shift corresponding to the highest R squared value is recorded for 
 each sampled region. The default minimum R squared value to record an 
 optimal shift is 0.25, and not all sampled regions may return a 
-significant R squared value. A trimmed mean from all recorded shift 
-values is then calculated and used as the final shift value. 
+significant R squared value. After collection, outlier shift values 
+E<gt> 1.5 standard deviations from the mean are removed, and the trimmed 
+mean is used as the final shift value.
 
 This approach works best with clean, distinct peaks, although even 
 noisy data can generate a reasonably good shift model. If requested, 
