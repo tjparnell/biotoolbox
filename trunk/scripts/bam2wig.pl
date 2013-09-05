@@ -7,6 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
+use File::Spec;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
@@ -136,7 +137,7 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # global variables
 my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, 
-	$split_callback, $write_wig, $convertor, $data_ref);
+	$split_callback, $write_wig, $convertor, $data_ref, $outbase);
 check_defaults();
 
 # record start time
@@ -152,7 +153,6 @@ unless (exists &open_bam_db) {
 	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
 }
 my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
-
 
 
 
@@ -429,7 +429,9 @@ sub check_defaults {
 		# then the file is only temporary anyway
 		$gz = $bigwig ? 0 : 1;
 	}
+	(undef, undef, $outbase) = File::Spec->splitpath($outfile);
 	$outfile =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # strip extension if present
+	$outbase =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # splitpath doesn't do extensions
 	
 	
 	### Determine the alignment callback method
@@ -946,8 +948,13 @@ sub write_model_file {
 	
 	
 	# Prepare the data structure
-	my $profile = generate_tim_data_structure( qw(
-		shift_model_profile Start Forward_Profile Reverse_Profile Shifted_Profile) );
+	my $profile = generate_tim_data_structure(
+		'shift_model_profile',
+		'Start',
+		"$outbase\_F",
+		"$outbase\_R",
+		"$outbase\_shift"
+	);
 	$profile->{'db'} = $infile;
 	push @{ $profile->{'other'} }, "# Average profile of read start point sums\n";
 	push @{ $profile->{'other'} }, 
@@ -983,15 +990,15 @@ sub write_model_file {
 			# add column specific metadata
 			my $column = $profile->{'number_columns'};
 			$profile->{$column} = {
-				'name'  => $regions->[$r] . '_Forward',
+				'name'  => $regions->[$r] . '_F',
 				'index' => $column,
 			};
 			$profile->{$column + 1} = {
-				'name'  => $regions->[$r] . '_Reverse',
+				'name'  => $regions->[$r] . '_R',
 				'index' => $column + 1,
 			};
 			$profile->{$column + 2} = {
-				'name'  => $regions->[$r] . '_Shifted',
+				'name'  => $regions->[$r] . '_Shift',
 				'index' => $column + 2,
 			};
 			$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
@@ -1021,7 +1028,11 @@ sub write_model_file {
 	
 	### R squared data
 	# prepare the data structure
-	my $r2_data = generate_tim_data_structure( qw(Shift_correlations Shift Mean_rSquared) );
+	my $r2_data = generate_tim_data_structure(
+		'Shift_correlations',
+		'Shift',
+		"$outbase\_R2"
+	);
 	$r2_data->{'db'} = $infile;
 	push @{ $r2_data->{'other'} }, "# Average R Squared values for each shift\n";
 	push @{ $r2_data->{'other'} }, "# Final shift value calculated as $value bp\n";
@@ -1048,7 +1059,7 @@ sub write_model_file {
 			# add column specific metadata
 			my $column = $r2_data->{'number_columns'};
 			$r2_data->{$column} = {
-				'name'  => $regions->[$r] . '_rSquared',
+				'name'  => $regions->[$r] . '_R2',
 				'index' => $column,
 			};
 			$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
@@ -1065,7 +1076,7 @@ sub write_model_file {
 	# write the r squared file
 	my $rSquared_file = write_tim_data_file( 
 		'data'     => $r2_data,
-		'filename' => "$outfile\_shift_correlations.txt",
+		'filename' => "$outfile\_correlations.txt",
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $rSquared_file\n" if $rSquared_file;
@@ -2265,8 +2276,9 @@ genomic position and indexed, although it may be indexed automatically.
 
 =item --out <filename>
 
-Specify the output base filename. By default it uses the base name of 
-the input file.
+Specify the output base filename. An appropriate extension will be 
+added automatically. By default it uses the base name of the 
+input file.
 
 =item --position [start|mid|span|extend]
 
@@ -2638,10 +2650,13 @@ This approach works best with clean, distinct peaks, although even
 noisy data can generate a reasonably good shift model. If requested, 
 a text file containing the average read count profiles for the forward 
 strand, reverse strand, and shifted data are written so that a model 
-graph may be generated. You may use the BioToolBox script 
-C<graph_profile.pl> to graph the model profiles. The peak shift may 
-also be evaluated by viewing separate, stranded wig files together with 
-the shifted wig file in a genome browser.
+graph may be generated. You can generate a visual graph of the shift 
+model profiles using the following command:
+ 
+ graph_profile.pl --skip 4 --offset 1 --in <shift_model.txt>
+ 
+The peak shift may also be evaluated by viewing separate, stranded wig 
+files together with the shifted wig file in a genome browser.
 
 =head1 AUTHOR
 
