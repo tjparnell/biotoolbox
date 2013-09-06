@@ -52,7 +52,7 @@ __
 __--out <**filename>
 
 __
-  Specify the output base filename. By default it uses the base name of  the input file.
+  Specify the output base filename. An appropriate extension will be  added automatically. By default it uses the base name of the  input file.
 __
   __
 __--position `[`start|mid|span|extend`]`
@@ -90,7 +90,7 @@ __
 __--pe
 
 __
-  The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be counted. The default is to  treat all alignments as single-end.
+  The Bam file consists of paired-end alignments, and only properly  mapped pairs of alignments will be counted. Properly mapped pairs  include FR reads on the same chromosome, and not FF, RR, RF, or  pairs aligning to separate chromosomes. The default is to  treat all alignments as single-end.
 __
   __
 __--bin <**integer>
@@ -111,7 +111,7 @@ __
 __--shiftval <**integer>
 
 __
-  Provide the value in bp that the record position should be shifted.  The value should be 1/2 the average length of the insert library  that was sequenced. The default is to empirically determine the  appropriate shift value. See below for the approach.
+  Provide the value in bp that the recorded position should be shifted.  The value should be 1/2 the average length of the insert library  that was sequenced. The default is to empirically determine the  appropriate shift value. See below for the approach.
 __
   __
 __--sample <**integer>
@@ -207,7 +207,7 @@ __
 __--verbose
 
 __
-  Print warnings when read counts go off the end of the chromosomes,  particularly with shifted read counts. Also print the sample  correlations when determining the shift value. The default is false.
+  Print warnings when read counts go off the end of the chromosomes,  particularly with shifted read counts. Also print the correlations  for each sampled region as they are calculated when determining the  shift value. When writing the model file, data from each region is  also written. The default is false.
 __
   __
 __--version
@@ -323,9 +323,14 @@ __
 __
   __
 ==SHIFT VALUE DETERMINATION==
-To empirically determine the shift value, a cross-strand correlation  method is employed. Regions with the highest read coverage  are sampled from one or more chromosomes listed in the Bam file.  The default number of regions is 200 sampled from each of the two  largest chromosomes. The largest chromosomes are used merely as a  representative fraction of the genome for performance reasons. Stranded read counts are collected in 10 bp bins over a 1300 bp region (the  initial 500 bp high coverage region plus flanking 400 bp). A Pearson  product-moment correlation coefficient is then reiteratively determined  between the stranded data sets as the bins are shifted from 30 to 400 bp.  The shift corresponding to the highest R squared value is recorded for  each sampled region. The default minimum R squared value to record an  optimal shift is 0.25, and not all sampled regions may return a  significant R squared value. A trimmed mean from all recorded shift  values is then calculated and used as the final shift value.
+To empirically determine the shift value, a cross-strand correlation  method is employed. Regions with the highest read coverage  are sampled from one or more chromosomes listed in the Bam file.  The default number of regions is 200 sampled from each of the two  largest chromosomes. The largest chromosomes are used merely as a  representative fraction of the genome for performance reasons. Stranded read counts are collected in 10 bp bins over a 1300 bp region (the  initial 500 bp high coverage region plus flanking 400 bp). A Pearson  product-moment correlation coefficient is then reiteratively determined  between the stranded data sets as the bins are shifted from 0 to 400 bp.  The shift corresponding to the highest R squared value is recorded for  each sampled region. The default minimum R squared value to record an  optimal shift is 0.25, and not all sampled regions may return a  significant R squared value. After collection, outlier shift values  > 1.5 standard deviations from the mean are removed, and the trimmed  mean is used as the final shift value.
 
-This approach works best with clean, distinct peaks, although even  noisy data can generate a reasonably good shift model. If requested,  a text file containing the average read count profiles for the forward  strand, reverse strand, and shifted data are written so that a model  graph may be generated. You may use the !BioToolBox** script  `graph_profile.pl` to graph the model profiles. The peak shift may  also be evaluated by viewing separate, stranded wig files together with  the shifted wig file in a genome browser.
+This approach works best with clean, distinct peaks, although even  noisy data can generate a reasonably good shift model. If requested,  a text file containing the average read count profiles for the forward  strand, reverse strand, and shifted data are written so that a model  graph may be generated. You can generate a visual graph of the shift  model profiles using the following command:
+
+{{{
+ graph_profile.pl --skip 4 --offset 1 --in <shift_model.txt>
+ }}}
+The peak shift may also be evaluated by viewing separate, stranded wig  files together with the shifted wig file in a genome browser.
 
 ==AUTHOR==
 {{{
