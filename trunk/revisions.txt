@@ -1,5 +1,12 @@
 ######## BioToolBox revision history #############
 
+v.1.12.5 (svn 667)
+	- Improved the shift value determination to make it more robust 
+	against outliers in script bam2wig.pl. Additionally, the model 
+	data that is written is now centered over the shift peak to 
+	make evaluations more interpretable. 
+	- Fixed a bug where 0 or negative coordinates may be written 
+	to varStep wig files in script bam2wig.pl.
 v.1.12.4 (svn 662)
 	- Improved the efficiency of scanning for high coverage regions 
 	and calculating 3 prime shift values in script bam2wig.pl; Each 
