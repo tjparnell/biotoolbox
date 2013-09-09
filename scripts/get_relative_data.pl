@@ -40,7 +40,7 @@ use constant (DATASET_HASH_LIMIT => 3000);
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.12';
+my $VERSION = '1.12.6';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -397,15 +397,7 @@ sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
 	
 	# generate base name for child processes
-	my $child_base_name; 
-	if (exists $main_data_ref->{'basename'}) {
-		# use the pre-existing file name appended with parent process ID number
-		$child_base_name = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . ".$$";
-	}
-	else {
-		# use the program name appended with parent process ID number
-		$child_base_name = "get_relative_data.$$";
-	}
+	my $child_base_name = $outfile . ".$$"; 
 
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i (1 .. $cpu) {
