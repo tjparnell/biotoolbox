@@ -26,7 +26,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.12.2';
+my $VERSION = '1.12.6';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -95,6 +95,9 @@ unless ($window) {
 }
 if (!$infile and !$outfile) {
 	die " must define an output file name!\n";
+}
+unless ($outfile) {
+	$outfile = $infile;
 }
 unless (defined $gz) {
 	$gz = 0;
@@ -199,15 +202,7 @@ sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
 	
 	# generate base name for child processes
-	my $child_base_name; 
-	if (exists $data->{'basename'}) {
-		# use the pre-existing file name appended with parent process ID number
-		$child_base_name = $data->{'path'} . $data->{'basename'} . ".$$";
-	}
-	else {
-		# use the program name appended with parent process ID number
-		$child_base_name = "CpG_calculator.$$";
-	}
+	my $child_base_name = $outfile . ".$$"; 
 
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i (1 .. $cpu) {
@@ -245,10 +240,6 @@ sub parallel_execution {
 	$pm->wait_all_children;
 	
 	# reassemble children files into output file
-	unless ($outfile) {
-		# re-use the input file basename, no path
-		$outfile = $data->{'basename'};
-	}
 	my @files = glob "$child_base_name.*";
 	unless (@files) {
 		die "unable to find children files!\n";
@@ -267,10 +258,6 @@ sub single_execution {
 	process_regions();
 	
 	# write the data file
-	unless ($outfile) {
-		# re-use the input file basename, no path
-		$outfile = $data->{'basename'};
-	}
 	my $written_file = write_tim_data_file(
 		# we will write a tim data file
 		# appropriate extensions and compression should be taken care of

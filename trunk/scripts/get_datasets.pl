@@ -42,7 +42,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.12';
+my $VERSION = '1.12.6';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -614,15 +614,7 @@ sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
 	
 	# generate base name for child processes
-	my $child_base_name; 
-	if (exists $main_data_ref->{'basename'}) {
-		# use the pre-existing file name appended with parent process ID number
-		$child_base_name = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . ".$$";
-	}
-	else {
-		# use the program name appended with parent process ID number
-		$child_base_name = "get_datasets.$$";
-	}
+	my $child_base_name = $outfile . ".$$"; 
 
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i (1 .. $cpu) {
