@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.12.4';
+my $VERSION = '1.12.6';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -232,8 +232,13 @@ else {
 sub find_x_index {
 	
 	# automatically identify the X index if these columns are available
-	$x_index = find_column_index($main_data_ref, 
-		'^(?:midpoint|start|position|window|name)$');
+	$x_index = find_column_index($main_data_ref, '^midpoint|start|position$');
+	$x_index = find_column_index($main_data_ref, '^window|name$') unless defined $x_index; 
+		# we are searching independently because summary files have the window
+		# column come before the midpoint column, and we prefer the midpoint
+	if (defined $x_index) {
+		print " using ", $main_data_ref->{$x_index}{'name'}, " as the X index column\n";
+	}
 	
 	# request from the user
 	unless (defined $x_index) {
