@@ -14,7 +14,7 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.12.3';
+our $VERSION = '1.12.6';
 
 
 ### Variables
@@ -2526,6 +2526,7 @@ sub write_summary_data {
 			'gene'            => 1,
 			'strand'          => 1,
 			'length'          => 1,
+			'primary_id'      => 1,
 		);
 		
 		# walk through the dataset names
@@ -2586,7 +2587,7 @@ sub write_summary_data {
 	) { 
 		
 		# determine the midpoint position of the window
-		my $midpoint = mean(
+		my $midpoint = int mean(
 			# this assumes the column metadata has start and stop
 			$data->{$column}{'start'},	
 			$data->{$column}{'stop'},	
