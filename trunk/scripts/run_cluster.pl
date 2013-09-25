@@ -246,8 +246,8 @@ Specify the number of clusters to identify. Default value is 6.
 
 =item --run <integer>
 
-Enter the number of times to run the cluster algorithm to find a solution. 
-The default value is 500.
+Enter the number of iterations to run the cluster algorithm to find an 
+optimal solution. The default value is 500.
 
 =item --method [a|m]
 
@@ -288,7 +288,20 @@ requested.
 
 Please refer to the Cluster 3 documentation for more detailed information 
 regarding the implementation and detailed methods. Documentation may be 
-found at http://bonsai.hgc.jp/~mdehoon/software/cluster/.
+found at L<http://bonsai.hgc.jp/~mdehoon/software/cluster/>.
+
+Select the desired number of clusters that are appropriate for your dataset 
+and an appropriate number of iterations. The default values are fine to 
+start with, but should be customized for your dataset. In general, empirically 
+test a range of cluster numbers, e.g. 2 to 12, to find the optimal cluster 
+number that is both informative and manageable. Increasing the number of 
+iterations will increase confidence at the expense of compute time. The goal  
+is to find an optimal solution more than once; the more times a solution 
+has been found, the higher the confidence. Note that noisy or very large 
+datasets may never yield more than 1 solution.
+ 
+The resulting CDT files may be visualized using the Java Treeview program, 
+found at L<http://jtreeview.sourceforge.net>. 
 
 =head1 AUTHOR
 
