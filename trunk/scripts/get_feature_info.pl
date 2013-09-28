@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.11';
+my $VERSION = '1.12.6';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -324,14 +324,23 @@ sub collect_attributes_for_list {
 		);
 		
 		# get the attribute(s)
-		for (my $i = 0; $i < scalar @list; $i++) {
- 			# for each request in the list, we will collect the attribute
- 			# we'll use the method sub defined in the methods
- 			# pass both the feature and the name of the attribute
- 			# only the tag value actually needs the name of the attribute
- 			push @{ $table->[$row] }, 
- 				&{ $methods[$i] }($feature, $list[$i]);
- 		}
+		if ($feature) {
+			for (my $i = 0; $i < scalar @list; $i++) {
+				# for each request in the list, we will collect the attribute
+				# we'll use the method sub defined in the methods
+				# pass both the feature and the name of the attribute
+				# only the tag value actually needs the name of the attribute
+				push @{ $table->[$row] }, 
+					&{ $methods[$i] }($feature, $list[$i]);
+			}
+		}
+		else {
+			# no feature found, cannot collect attributes
+			# record nulls
+			for (my $i = 0; $i < scalar @list; $i++) {
+				push @{ $table->[$row] }, '.';
+			}
+		}
 	}
 	
 	# record the metadata
