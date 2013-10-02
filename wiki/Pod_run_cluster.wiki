@@ -45,7 +45,7 @@ __
 __--run <**integer>
 
 __
-  Enter the number of times to run the cluster algorithm to find a solution.  The default value is 500.
+  Enter the number of iterations to run the cluster algorithm to find an  optimal solution. The default value is 500.
 __
   __
 __--method `[`a|m`]`
@@ -88,7 +88,11 @@ __
 ==DESCRIPTION==
 This program is a wrapper around the Cluster 3.0 C library, which identifies  clusters between genes. Currently the program performs the k-means or  k-medians functions, although other functions could be implemented if  requested.
 
-Please refer to the Cluster 3 documentation for more detailed information  regarding the implementation and detailed methods. Documentation may be  found at http://bonsai.hgc.jp/~mdehoon/software/cluster/.
+Please refer to the Cluster 3 documentation for more detailed information  regarding the implementation and detailed methods. Documentation may be  found at <[http://bonsai.hgc.jp/~mdehoon/software/cluster/]>.
+
+Select the desired number of clusters that are appropriate for your dataset  and an appropriate number of iterations. The default values are fine to  start with, but should be customized for your dataset. In general, empirically  test a range of cluster numbers, e.g. 2 to 12, to find the optimal cluster  number that is both informative and manageable. Increasing the number of  iterations will increase confidence at the expense of compute time. The goal   is to find an optimal solution more than once; the more times a solution  has been found, the higher the confidence. Note that noisy or very large  datasets may never yield more than 1 solution.
+
+The resulting CDT files may be visualized using the Java Treeview program,  found at <[http://jtreeview.sourceforge.net]>.
 
 ==AUTHOR==
 {{{

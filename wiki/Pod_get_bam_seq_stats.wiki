@@ -1,0 +1,63 @@
+#summary Converted POD documentation.
+#labels ManPage
+_This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
+
+==NAME==
+get_bam_seq_stats.pl
+
+A script to report the alignment sequence nucleotide frequencies.
+
+==SYNOPSIS==
+get_bam_seq_stats.pl <**file.bam>
+
+{{{
+  Options:
+  --in <file.bam>
+  --out <filename>
+  --version
+  --help
+}}}
+==OPTIONS==
+The command line flags and descriptions:
+
+__--in <**file.bam>
+
+__
+  Specify the file name of a binary Bam file of alignments as  described for Samtools. It will be automatically indexed if  necessary.
+__
+  __
+__--out <**filename>
+
+__
+  Optionally specify the base name of the output file. The default is to use  input base name. The output file names are appended with '.seq_stats.txt'.
+__
+  __
+__--version
+
+__
+  Print the version number.
+__
+  __
+__--help
+
+__
+  Display the POD documentation
+__
+  __
+==DESCRIPTION==
+This program will generate some statistics about the alignment  sequences associated with a Bam file. This is using the the  query sequence reported in the Bam file, not the genomic  sequence or alignment. Only aligned sequences are analyzed.
+
+The number and fraction of total for each length of the query  sequences are reported. Additionally, the nucleotide composition  for each position in the query sequences are also reported in  a table, which should be suitable for generating a sequence logo,  if desired.
+
+The input file must be a BAM file as described by the Samtools  project (http://samtools.sourceforge.net).
+
+==AUTHOR==
+{{{
+ Timothy J. Parnell, PhD
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+}}}
+This package is free software; you can redistribute it and/or modify it under the terms of the GPL (either version 1, or at your option, any later version) or the Artistic License 2.0.
+
