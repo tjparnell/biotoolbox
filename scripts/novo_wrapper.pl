@@ -14,11 +14,17 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+my $parallel;
+eval {
+	# check for parallel support
+	require Parallel::ForkManager;
+	$parallel = 1;
+};
 
-my $VERSION = '1.9.1';
+my $VERSION = '1.12.6';
 
 
-print "\n This script is a wrapper for the Novoaligner program\n\n";
+print "\n This script is a wrapper for the Novoalign program\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -44,7 +50,6 @@ my (
 	$options,
 	$novo_path,
 	$sam_path,
-	$parallel_path,
 	$help,
 	$print_version,
 ); # command line variables
@@ -62,7 +67,6 @@ GetOptions(
 	'opt=s'       => \$options, # additional novoalign options
 	'novo=s'      => \$novo_path, # location of novoalign executable
 	'sam=s'       => \$sam_path, # location of samtools executable
-	'parallel=s'  => \$parallel_path, # location of parallel executable
 	'help'        => \$help, # print the help
 	'version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -149,8 +153,16 @@ sub check_defaults {
 	}
 	
 	# cores
-	unless ($cores) {
+	if ($split) {
+		$split = 0 unless $parallel;
+	}
+	if ($cores) {
 		if ($split) {
+			$cores = 1 unless $parallel;
+		}
+	}
+	else {
+		if ($split and $parallel) {
 			# running multiple instances
 			# pretend everyone has a quad-core processor
 			$cores = 4;
@@ -199,23 +211,6 @@ sub check_defaults {
 		}
 	}
 	
-	# parallel executable
-	if ($split) {
-		unless ($parallel_path) {
-			$parallel_path = $TIM_CONFIG->param('applications.parallel') || undef;
-			
-			# try the environment path
-			unless ($parallel_path) {
-				$parallel_path = `which parallel` || undef;
-				chomp $parallel_path;
-			}
-			
-			# fail
-			unless ($parallel_path) {
-				die " unable to find GNU parallel tool for split execution\n";
-			}
-		}
-	 }
 }
 
 
@@ -339,27 +334,31 @@ sub run_single_split_alignments {
 			die " unable to find split files for $basename!\n";
 		}
 		
-		# prepare novoalign execution using GNU parallel
-		my $novo_command = "$parallel_path -j $cores --progress $novo_path" . 
-			" -d $index -o SAM -r $repeat -s 2 $options -f {}";
-			# set the number of parallel jobs
-			# set progress indicator
-			# execute novoalign with index
-			# output to SAM
-			# read trimming of 2 nt for unaligned reads
+		# Prepare Parallel::ForkManager
+		print " Forking into $cores children for parallel alignment\n";
+		my $pm = Parallel::ForkManager->new($cores);
 		
-		# piping to samtools
-		$novo_command .= " '|' $sam_path view -bS - '>' {}.unsorted.bam";
+		foreach my $split_file (@split_files) {
+			# run each split file in a separate fork
+			$pm->start and next;
 		
-		# add split files, and hope this doesn't exceed the command line length
-		# parallel does accept an input list as a file (the -a argument), 
-		# but it breaks with too many pipes or something?!
-		$novo_command .= " ::: " . join(" ", @split_files);
+			### in child ###
+			# prepare novoalign execution  
+			my $novo_command = "$novo_path -d $index -o SAM -r $repeat -s 2 $options " . 
+				"-f $split_file | $sam_path view -bS - > $split_file.unsorted.bam";
+				# execute novoalign with index
+				# output to SAM
+				# read trimming of 2 nt for unaligned reads
+				# pipe to samtools
+			
+			# executing alignment
+			warn "#### Executing alignment: \"$novo_command\"\n";
+			system($novo_command) == 0 or
+				warn " unable to execute novoalign: $!\n";
+			$pm->finish;
+		}
+		$pm->wait_all_children;
 		
-		# executing alignment
-		warn "#### Executing alignment: \"$novo_command\"\n";
-		system($novo_command) == 0 or
-			die " unable to execute novoalign: $!\n";
 		
 		# check for alignment files
 		my @alignments;
@@ -514,7 +513,6 @@ A parallelized wrapper program for Novocraft's novoaligner.
   --opt <"text">
   --novo </path/to/novoalign>
   --sam </path/to/samtools>
-  --parallel </path/to/parallel>
   --version
   --help
 
@@ -576,12 +574,6 @@ Optionally specify the full path to the 'samtools' executable
 file. It may also be specified in the 'biotoolbox.cfg' file, or it may 
 be automatically identified by searching the environment path. 
 
-=item --parallel </path/to/parallel>
-
-Optionally specify the full path to the GNU 'parallel' executable 
-file. It may also be specified in the 'biotoolbox.cfg' file, or it may 
-be automatically identified by searching the environment path. 
-
 =item --version
 
 Print the program version number.
@@ -601,13 +593,15 @@ alignments into a sorted, indexed, Bam file using samtools.
 When using the unlicensed, free, academic version of Novoalign that is 
 limited to single-thread execution, novo_wrapper.pl can split the input 
 file into numerous smaller versions and execute multiple instances of 
-Novoalign. This requires the GNU parallel utility for managing multiple 
-executions. 
+Novoalign. This requires the Parallel::ForkManager module for managing 
+multiple executions. Note that only a limited number of instances 
+should be run simultaneously; too many and your system may come to a 
+standstill.
 
 Licensed versions of Novoalign are multi-threaded and do not need to be 
 split.
 
-Novoalign is executed with the "-s 2", "-k", and "-r None" as default 
+Novoalign is executed with the "-s 2", and "-r None" as default 
 options. Additional custom options may be passed on to Novoalign by 
 using the --opt flag above.
 
