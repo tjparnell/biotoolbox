@@ -1,5 +1,18 @@
 ######## BioToolBox revision history #############
 
+v.1.12.6 (svn 680)
+	- Updated the script novo_wrapper.pl to use Parallel::ForkManager 
+	instead of GNU Parallel. This should make it more stable, 
+	particularly under nohup.
+	- Consolidated the standard out results when functions were 
+	applied to multiple columns in script manipulate_datasets.pl. 
+	This will make the script much less chatty.
+	- Fixed bug with naming temporary forked children file names.
+	- Fixed bugs with the generation of summary files.
+	- Fixed bug with the automatic identification of the X axis in 
+	script graph_profile.pl.
+	- Fixed bug where features not found in a database could crash 
+	the script get_feature_info.pl.
 v.1.12.5 (svn 667)
 	- Improved the shift value determination to make it more robust 
 	against outliers in script bam2wig.pl. Additionally, the model 
