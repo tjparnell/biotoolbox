@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.12.6';
+my $VERSION = '1.13';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -2554,16 +2554,11 @@ sub format_function {
 	}
 	else {
 		# interactively ask the user
-		print " Format the numbers to 0, 1, 2, or 3 decimal positions?  ";
+		print " Format the numbers to how many decimal positions?  ";
 		$positions = <STDIN>;
 		chomp $positions;
 	}
-	unless (
-		$positions == 0 or
-		$positions == 1 or
-		$positions == 2 or
-		$positions == 3
-	) {
+	unless ($positions =~ /^\d+$/) {
 		warn " Unknown number of positions; formatting NOT done\n";
 		return;
 	}
@@ -4922,10 +4917,9 @@ new values or added as a new column.
 =item B<format> (menu option 'f')
 
 Format the numbers of a column to a given number of decimal places. 
-Acceptable numbers of decimal places include 0, 1, 2, or 3.
-The column may either be replaced or added as a new column. For 
-automatic execution, use the --target option to specify the number 
-decimal places.
+An integer must be provided. The column may either be replaced or 
+added as a new column. For automatic execution, use the --target 
+option to specify the number decimal places.
 
 =item B<combine> (menu option 'c')
 
