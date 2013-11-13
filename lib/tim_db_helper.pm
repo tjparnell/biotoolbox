@@ -379,6 +379,12 @@ sub open_db_connection {
 			}
 		}
 		
+		# a remote useq file
+		elsif ($database =~ /\.useq$/) {
+			# uh oh! remote useq files are not supported
+			$error = " ERROR: remote useq files are not supported!\n";
+		}
+		
 		# a presumed remote directory, presumably of bigwig files
 		else {
 			# open using BigWigSet adaptor
