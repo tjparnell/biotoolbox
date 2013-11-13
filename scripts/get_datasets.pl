@@ -282,6 +282,20 @@ if ($method eq 'rpm' or $method eq 'rpkm') {
 # check that we have a dataset
 if ($datasets[0] eq 'none') {
 	print " Nothing to collect!\n";
+	if ($new) {
+		my $success = write_tim_data_file(
+			'data'     => $main_data_ref,
+			'filename' => $outfile,
+			'gz'       => $gz,
+		);
+		if ($success) {
+			printf " wrote file $success\n";
+		}
+		else {
+			# failure! the subroutine will have printed error messages
+			print " unable to write file!\n";
+		}
+	}
 	exit;
 }
 
@@ -1871,8 +1885,8 @@ Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the
 features' scores may be used in data collection.
 
 Alternatively, the dataset may be a database file, including bigWig (.bw), 
-bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
-remote (specified with a http: or ftp: prefix).
+bigBed (.bb), useq (.useq), or Bam alignment (.bam) files. The files may 
+be local or remote (specified with a http: or ftp: prefix).
 
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
