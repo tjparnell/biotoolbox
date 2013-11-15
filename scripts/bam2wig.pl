@@ -34,10 +34,10 @@ eval {
 
 # Declare constants for this program
 use constant {
-	VERSION         => '1.12.5',
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
+my $VERSION = '1.13';
 	
 	
 
@@ -128,7 +128,7 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script bam2wig.pl, version " . VERSION . "\n\n";
+	print " Biotoolbox script bam2wig.pl, version $VERSION\n\n";
 	exit;
 }
 
@@ -548,23 +548,27 @@ sub check_defaults {
 	elsif ($rpm and $log == 2) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return log( ( ($_[0] * 1_000_000) / $total_read_number) + 1 ) / LOG2;
+			return 0 if $_[0] == 0;
+			return log( ($_[0] * 1_000_000) / $total_read_number) / LOG2;
 		};
 	}
 	elsif ($rpm and $log == 10) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return log( ( ($_[0] * 1_000_000) / $total_read_number) + 1 ) / LOG10;
+			return 0 if $_[0] == 0;
+			return log( ($_[0] * 1_000_000) / $total_read_number) / LOG10;
 		};
 	}
 	elsif (!$rpm and $log == 2) {
 		$convertor = sub {
-			return log($_[0] + 1) / LOG2;
+			return 0 if $_[0] == 0;
+			return log($_[0]) / LOG2;
 		};
 	}
 	elsif (!$rpm and $log == 10) {
 		$convertor = sub {
-			return log($_[0] + 1) / LOG10;
+			return 0 if $_[0] == 0;
+			return log($_[0]) / LOG10;
 		};
 	}
 	elsif (!$rpm and !$log) {
@@ -2420,9 +2424,8 @@ are counted during the pre-count. The default is no RPM conversion.
 =item --log [2|10]
 
 Transform the count to a log scale. Specify the base number, 2 or 
-10. The counts are increased by 1 before taking a log transformation, 
-thus avoiding taking a log of 0. Only really useful with Bam alignment 
-files with high count numbers. Default is to not transform the count.
+10. Only really useful with Bam alignment files with high count numbers. 
+Default is to not transform the count.
 
 =item --bw
 
