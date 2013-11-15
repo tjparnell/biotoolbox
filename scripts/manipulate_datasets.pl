@@ -2791,7 +2791,13 @@ sub ratio_function {
 	# check if log2 numbers
 	# log2 ratios performed by subtraction, regular number ratios by division
 	my $log;
-	if (
+	if (defined $opt_log) {
+		# if unable to identify the log2 status in metadata
+		# use the command line option variable if set
+		$log = $opt_log;
+	}
+	
+	elsif (
 		exists $main_data_ref->{$numerator}{'log2'} and
 		exists $main_data_ref->{$denominator}{'log2'}
 	) {
@@ -2819,12 +2825,6 @@ sub ratio_function {
 			warn " datasets have different log status! nothing done";
 			return;
 		}
-	}
-	
-	elsif (defined $opt_log) {
-		# if unable to identify the log2 status in metadata
-		# use the command line option variable if set
-		$log = $opt_log;
 	}
 	
 	else {
