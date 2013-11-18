@@ -132,7 +132,6 @@ unless (defined $gz) {
 ### Begin writing file
 # Rewrite the first file using the new file output name
 my $line_count = $first_data->{'last_row'};
-print "writing $first_file to $outfile with gz of $gz\n";
 my $new_outfile = write_tim_data_file(
 	'data'     => $first_data,
 	'filename' => $outfile,
