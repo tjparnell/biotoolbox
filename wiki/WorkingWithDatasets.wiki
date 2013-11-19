@@ -33,6 +33,7 @@ The *BioToolBox* programs can work with a number of common data file formats rep
 	* Bed
 	* BigBed
 	* Bam
+	* USeq
 	* GFF
 
 For a more detailed look at these file types, including what they represent, how they can be used, and how to generate them, please refer to the [DataFileFormats Data File Formats] document.
@@ -42,6 +43,7 @@ Some file formats are self-contained, indexed formats that can be accessed direc
 	* BigWig
 	* BigBed
 	* Bam
+	* USeq
 
 By virtue of being indexed, scores may be collected quickly at any point in the genome. This makes data collection simple, as the file may be directly specified on the command line of the data collection program, usually using the `--data` option.
 

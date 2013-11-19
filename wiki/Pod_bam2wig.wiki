@@ -165,7 +165,7 @@ __
 __--log `[`2|10`]`
 
 __
-  Transform the count to a log scale. Specify the base number, 2 or  10. The counts are increased by 1 before taking a log transformation,  thus avoiding taking a log of 0. Only really useful with Bam alignment  files with high count numbers. Default is to not transform the count.
+  Transform the count to a log scale. Specify the base number, 2 or  10. Only really useful with Bam alignment files with high count numbers.  Default is to not transform the count.
 __
   __
 __--bw

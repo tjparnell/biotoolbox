@@ -21,7 +21,6 @@ A parallelized wrapper program for Novocraft's novoaligner.
   --opt <"text">
   --novo </path/to/novoalign>
   --sam </path/to/samtools>
-  --parallel </path/to/parallel>
   --version
   --help
 }}}
@@ -79,12 +78,6 @@ __
   Optionally specify the full path to the 'samtools' executable  file. It may also be specified in the 'biotoolbox.cfg' file, or it may  be automatically identified by searching the environment path.
 __
   __
-__--parallel </path/to/parallel>
-
-__
-  Optionally specify the full path to the GNU 'parallel' executable  file. It may also be specified in the 'biotoolbox.cfg' file, or it may  be automatically identified by searching the environment path.
-__
-  __
 __--version
 
 __
@@ -100,11 +93,11 @@ __
 ==DESCRIPTION==
 This program is a wrapper for Novocraft's Novoalign alignment tool. It also  performs a number of post-alignment functions, including converting the  alignments into a sorted, indexed, Bam file using samtools.
 
-When using the unlicensed, free, academic version of Novoalign that is  limited to single-thread execution, novo_wrapper.pl can split the input  file into numerous smaller versions and execute multiple instances of  Novoalign. This requires the GNU parallel utility for managing multiple  executions.
+When using the unlicensed, free, academic version of Novoalign that is  limited to single-thread execution, novo_wrapper.pl can split the input  file into numerous smaller versions and execute multiple instances of  Novoalign. This requires the Parallel::!ForkManager** module for managing  multiple executions. Note that only a limited number of instances  should be run simultaneously; too many and your system may come to a  standstill.
 
 Licensed versions of Novoalign are multi-threaded and do not need to be  split.
 
-Novoalign is executed with the "-s 2", "-k", and "-r None" as default  options. Additional custom options may be passed on to Novoalign by  using the --opt flag above.
+Novoalign is executed with the "-s 2", and "-r None" as default  options. Additional custom options may be passed on to Novoalign by  using the --opt flag above.
 
 ==AUTHOR==
 {{{

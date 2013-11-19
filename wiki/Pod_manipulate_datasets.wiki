@@ -357,7 +357,7 @@ __
 _*_format_*_ (menu option 'f')
 
 __
-  Format the numbers of a column to a given number of decimal places.  Acceptable numbers of decimal places include 0, 1, 2, or 3. The column may either be replaced or added as a new column. For  automatic execution, use the --target option to specify the number  decimal places.
+  Format the numbers of a column to a given number of decimal places.  An integer must be provided. The column may either be replaced or  added as a new column. For automatic execution, use the --target  option to specify the number decimal places.
 __
   __
 _*_combine_*_ (menu option 'c')

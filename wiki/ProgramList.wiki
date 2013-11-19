@@ -57,7 +57,9 @@ Lists of programs organized by function.
 	* [ProgramList#bam2gff_bed.pl bam2gff_bed.pl]
 	* [ProgramList#bam2wig.pl bam2wig.pl]
 	* [ProgramList#bin_genomic_data.pl bin_genomic_data.pl]
+	* [ProgramList#filter_bam.pl filter_bam.pl]
 	* [ProgramList#get_actual_nuc_sizes.pl get_actual_nuc_sizes.pl]
+	* [ProgramList#get_bam_seq_stats.pl get_bam_seq_stats.pl]
 	* [ProgramList#novo_wrapper.pl novo_wrapper.pl]
 	* [ProgramList#split_bam_by_isize.pl split_bam_by_isize.pl]
 
@@ -133,11 +135,17 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 ====data2wig.pl====
 [Pod_data2wig data2wig.pl] converts any data text file into into a text wiggle file, so long as it has genomic coordinates. Both fixed and variable step files may be generated depending on the source file coordinates. Alternatively, binary bigwig files may be generated.
 
+====filter_bam.pl====
+[Pod_filter_bam filter_bam.pl] will filter alignments based on one or more boolean critera, including attributes, score, length, sequence composition at specific positions, etc., and write a new Bam file. 
+
 ====find_enriched_regions.pl====
 [Pod_find_enriched_regions find_enriched_regions.pl] scans across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
 
 ====get_actual_nuc_sizes.pl====
 [Pod_get_actual_nuc_sizes get_actual_nuc_sizes.pl] determines the actual size of mapped nucleosomes based on the mean size of paired-end sequence alignments representing nucleosome fragments. Uses the output of [ProgramList#map_nucleosomes.pl map_nucleosomes.pl] as input.
+
+====get_bam_seq_stats.pl====
+[Pod_get_bam_seq_stats get_bam_seq_stats.pl] collects sequence alignment statistics and summarizes the sequence composition and nucleotide frequencies, suitable for generating sequence logos. 
 
 ====get_datasets.pl====
 [Pod_get_datasets get_datasets.pl] collects data data stored in bioperl databases relative to any feature or genomic coordinate. Genomic features and annotation present in a database are automatically converted into genomic coordinates for data collection. Coordinates may be adjusted in a variety of ways: start and stop positions, fractional coordinates, 5' or 3' relative positions, etc. Data points within the coordinates are combined into a single value by one of a variety of statistical methods.
