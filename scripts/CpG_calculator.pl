@@ -10,7 +10,6 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
 	find_column_index
-	splice_data_structure
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -20,13 +19,7 @@ use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-my $VERSION = '1.12.6';
+my $VERSION = '1.10.1';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -49,7 +42,6 @@ my (
 	$window,
 	$outfile,
 	$gz,
-	$cpu,
 	$help,
 	$print_version,
 );
@@ -61,7 +53,6 @@ GetOptions(
 	'win=i'     => \$window, # window size to take
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
-	'cpu=i'     => \$cpu, # number of execution threads
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -84,6 +75,9 @@ if ($print_version) {
 
 
 ### Check for requirements
+unless ($database) {
+	die " no database or fasta file given! use --help for more information\n";
+}
 unless ($window) {
 	# default window size
 	# could get from biotoolbox.cfg but I'm lazy right now
@@ -96,54 +90,34 @@ unless ($window) {
 if (!$infile and !$outfile) {
 	die " must define an output file name!\n";
 }
-unless ($outfile) {
-	$outfile = $infile;
-}
 unless (defined $gz) {
 	$gz = 0;
 }
 
-# check parallel support
-if ($parallel) {
-	# conservatively enable 2 cores
-	$cpu ||= 2;
+
+
+
+### Open the database
+my $db = open_db_connection($database) or 
+		die " unable to open database connection!\n";
+my $db_ref = ref $db;
+unless ($db_ref =~ /SeqFeature|Fasta/) {
+	die " unsupported database type $db_ref!\n";
 }
-else {
-	# disable cores
-	print " disabling parallel CPU execution, no support present\n" if $cpu;
-	$cpu = 0;
-}
-
-my $start_time = time;
-	
 
 
 
-### Prepare the database and main data structure
-my $db;
+
+### Prepare the main data structure
 my $data;
 if ($infile) {
 	# an input file of regions is provided
 	$data = load_tim_data_file($infile) or 
 		die " unable to open input file '$infile'!\n";
-	
-	# check database
-	unless ($database) {
-		$database = $data->{'db'} or 
-			die " no database or fasta file given! use --help for more information\n";
-	}
-	
-	# open database
-	$db = open_db_connection($database) or 
-		die " unable to open database connection!\n";
 }
 else {
 	# make a new genome list based on the type of database we're using
 	if ($database) {
-		# first open the database
-		$db = open_db_connection($database) or 
-			die " unable to open database connection!\n";
-		
 		# get the list from the database
 		$data = get_new_genome_list(
 			'db'   => $db,
@@ -151,126 +125,47 @@ else {
 		) or die " unable to generate genome window list!\n";
 	}
 	else {
-		# no database, cannot continue
-		die " no database or fasta file given! use --help for more information\n";
+		# working with a fasta db
+		# custom subroutine
+		$data = get_genome_list_from_fasta_db();
 	}
 }
 
-# check the database
-my $db_ref = ref $db;
-unless ($db_ref =~ /SeqFeature|Fasta/) {
-	die " unsupported database type $db_ref!\n";
-}
-
-# check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $data->{'last_row'}/$cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
-		# splits to something more worthwhile
-		$cpu--;
-	}
-}
 
 
 
 ### Process regions
-print " Calculating CpG statistics....\n";
-if ($cpu > 1) {
-	# parallel execution
-	print " Forking into $cpu children for parallel execution\n";
-	parallel_execution();
-}
+print " Processing regions....\n";
+my $start_time = time;
+process_regions();
 
-else {
-	# single threaded execution
-	single_execution();
-}
 
 
 
 ### Finished
-printf " in %.2f minutes\n", (time - $start_time) / 60;
+unless ($outfile) {
+	# re-use the input file basename, no path
+	$outfile = $data->{'basename'};
+}
+
+my $written_file = write_tim_data_file(
+	# we will write a tim data file
+	# appropriate extensions and compression should be taken care of
+	'data'     => $data,
+	'filename' => $outfile,
+);
+if ($written_file) {
+	print " Wrote data file '$written_file' ";
+}
+else {
+	print " unable to write data file! ";
+}
+printf "in %.2f minutes\n", (time - $start_time) / 60;
 
 
 
 
 ########################   Subroutines   ###################################
-
-
-sub parallel_execution {
-	my $pm = Parallel::ForkManager->new($cpu);
-	
-	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
-
-	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
-		$pm->start and next;
-	
-		#### In child ####
-	
-		# splice the data structure
-		splice_data_structure($data, $i, $cpu);
-		
-		# re-open database objects to make them clone safe
-		$db = open_db_connection($database);
-		
-		# Collect the data
-		process_regions();
-		
-		# write out result
-		my $success = write_tim_data_file(
-			'data'     => $data,
-			'filename' => "$child_base_name.$i",
-			'gz'       => 0, # faster to write without compression
-		);
-		if ($success) {
-			printf " wrote child file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
-		}
-		
-		# Finished
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-	# reassemble children files into output file
-	my @files = glob "$child_base_name.*";
-	unless (@files) {
-		die "unable to find children files!\n";
-	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-}
-
-
-sub single_execution {
-	
-	# execute
-	process_regions();
-	
-	# write the data file
-	my $written_file = write_tim_data_file(
-		# we will write a tim data file
-		# appropriate extensions and compression should be taken care of
-		'data'     => $data,
-		'filename' => $outfile,
-	);
-	if ($written_file) {
-		print " Wrote data file '$written_file' ";
-	}
-	else {
-		print " unable to write data file! ";
-	}
-}
 
 
 sub identify_indices {
@@ -399,28 +294,18 @@ sub process_regions {
 		
 		# record the statistics
 		# we subtract 1 from the length because we added 1 when we generated the seq
-		if (length($seq) > 1) {
-			# must have reasonable length to avoid div by 0 errors
-			$data->{'data_table'}->[$row][$fgc_i] = 
-				sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
+		$data->{'data_table'}->[$row][$fgc_i] = 
+			sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
 		
-			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
+		$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
 		
-			$data->{'data_table'}->[$row][$exp_i] = 
-				sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
+		$data->{'data_table'}->[$row][$exp_i] = 
+			sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
 		
-			$data->{'data_table'}->[$row][$oe_i]  = 
-				$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
-				sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
-				0; # obs/exp ratio
-		}
-		else {
-			# a sequence of 1 bp? odd, just record default values
-			$data->{'data_table'}->[$row][$fgc_i] = 0;
-			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
-			$data->{'data_table'}->[$row][$exp_i] = 0;
-			$data->{'data_table'}->[$row][$oe_i]  = 0;
-		}
+		$data->{'data_table'}->[$row][$oe_i]  = 
+			$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
+			sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
+			0; # obs/exp ratio
 	}
 	
 }
@@ -446,7 +331,6 @@ CpG_calculator.pl --db <text> [--options...]
   --win <integer>
   --out <filename> 
   --gz
-  --cpu <integer>
   --version
   --help
 
@@ -463,9 +347,7 @@ collect the genomic sequence. A relational database name, SQLite file, or
 GFF3 file with sequence may be provided. Alternatively, provide the name 
 of an uncompressed Fasta file (multi-fasta is ok) or directory containing 
 multiple fasta files representing the genomic sequence. The directory 
-must be writeable for a small index file to be written. 
-
-The database may be provided in the metadata of an input file.
+must be writeable for a small index file to be written. Required.
 
 =item --in <filename>
 
@@ -489,12 +371,6 @@ name if provided. Required if no input file is provided.
 =item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --version
 

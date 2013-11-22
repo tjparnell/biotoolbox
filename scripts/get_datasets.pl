@@ -20,7 +20,6 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 	format_with_commas
-	splice_data_structure
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -28,7 +27,6 @@ use tim_db_helper qw(
 	check_dataset_for_rpm_support
 	get_new_feature_list 
 	get_new_genome_list 
-	get_feature
 	get_chromo_region_score
 	get_region_dataset_hash
 );
@@ -36,13 +34,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-my $VERSION = '1.13';
+my $VERSION = '1.10';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -83,7 +75,6 @@ my (
 	$step,
 	$set_strand,
 	$gz,
-	$cpu,
 	$help,
 	$print_version,
 ); 
@@ -115,7 +106,6 @@ GetOptions(
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
 				# force_strand is preferred option, but respect the old option
 	'gz!'        => \$gz, # compress output file
-	'cpu=i'      => \$cpu, # number of execution threads
 	'help'       => \$help, # request help
 	'version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -168,25 +158,35 @@ if (defined $fstart or defined $fstop) {
 
 # Assign default values
 set_defaults();
-my $start_time = time;
 
-# Assign database for new feature lists
-if ($new and not defined $main_database) {
-	# creating a new feature list requires a main database 
-	# otherwise we will postpone this till after loading the input file
-	
-	if (defined $data_database) {
-		# reuse the data database
-		$main_database = $data_database;
+# Assign database if possible
+unless (defined $main_database) {
+	# we can get the database from somewhere else
+	if ($new) {
+		
+		if (defined $data_database) {
+			# reuse the data database
+			$main_database = $data_database;
+		}
+		elsif (@datasets) {
+			# we could use a dataset file
+			# get the first dataset listed to use as a database
+			# this only works, of course, with certain BigFile files
+			if ($datasets[0] =~ /,/) {
+				# seems to be a comma delimited list
+				# take the first element
+				$main_database = (split /,/, $datasets[0])[0];
+			}
+			else {
+				# take the first element
+				$main_database = $datasets[0];
+			}
+		}
+		else {
+			die " You must define a database or an appropriate dataset file! see help\n";
+		}
 	}
-	elsif (@datasets and $feature eq 'genome') {
-		# we could use a dataset file only if we're collecting genome windows
-		# take the first element
-		$main_database = $datasets[0];
-	}
-	else {
-		die " You must define a database or an appropriate dataset file! see help\n";
-	}
+	# or else we can get the database from the input file metadata
 }
 
 
@@ -200,7 +200,6 @@ my (
 	$main_data_ref, 
 	$name_i, 
 	$type_i, 
-	$id_i,
 	$chromo_i, 
 	$start_i, 
 	$stop_i, 
@@ -214,14 +213,14 @@ unless ($main_database) {
 	# command line, or a source data file
 	# lacking that, we'll attempt to use the first dataset provided
 	# and hope for the best 
-	if ($data_database) {
-		# use data database if defined instead of main database
-		$main_database = $data_database;
-	}
-	elsif (@datasets) {
+	if (@datasets) {
 		# we hope this some sort of indexed data file like bigWig or Bam
 		$main_database = $datasets[0];
 		print " no database defined, using $main_database\n";
+	}
+	elsif ($data_database) {
+		# use data database if defined instead of main database
+		$main_database = $data_database;
 	}
 	else {
 		die " no database defined! see help\n";
@@ -252,79 +251,53 @@ unless ($datasets[0] eq 'none') {
 	);
 }
 
+# Total reads in Bam file when using rpkm method
+my $rpkm_read_sum = 0;
 
-# Working with RPM and RPKM value datasets
-# global values
-my %dataset2sum; # for tot
-# total reads in Bam file when using rpkm method
-if ($method eq 'rpm' or $method eq 'rpkm') {
-	foreach my $d (@datasets) {
-		print " Checking RPM support for dataset '$d'...\n";
-		my $sum = check_dataset_for_rpm_support($d, $ddb, $cpu);
-		if ($sum) {
-			$dataset2sum{$d} = $sum;
-			printf "   %s total features\n", format_with_commas($sum);
-		}
-		else {
-			warn " $method method requested but not supported for " .
-				"dataset '$d'\n using summed count instead\n";
-			$method = 'sum'; 
-				# this could negatively impact any subsequent datasets
-			last;
-		}
-	}
-}
+# record start time
+my $start_time = time;
+
 
 
 
 ### Collect the data from each datasets
 
-# check that we have a dataset
-if ($datasets[0] eq 'none') {
-	print " Nothing to collect!\n";
-	if ($new) {
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
-			'filename' => $outfile,
-			'gz'       => $gz,
-		);
-		if ($success) {
-			printf " wrote file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			print " unable to write file!\n";
-		}
+# datasets
+foreach my $dataset (@datasets) {
+	
+	# collect the dataset
+	unless ($dataset eq 'none') {
+		print " Collecting $method $value_type from dataset '$dataset'...\n";
+		collect_dataset($dataset);
 	}
-	exit;
-}
-
-# check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $main_data_ref->{'last_row'}/$cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
-		# splits to something more worthwhile
-		$cpu--;
+	
+	# write the output file
+	# we will rewrite the file after each collection
+	# appropriate extensions and compression should be taken care of
+	my $success = write_tim_data_file(
+		'data'     => $main_data_ref,
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+	if ($success) {
+		printf " wrote file '%s' in %.1f minutes\n", $success, (time - $start_time)/60;
+		# update file name
+		$outfile = $success;
 	}
+	else {
+		# failure! the subroutine will have printed error messages
+		print " unable to write file!\n";
+		exit; # no need to continue
+	}
+	
+	last if $dataset eq 'none';
 }
 
-# execute data collection in 1 or more processes
-if ($cpu > 1) {
-	# parallel execution
-	print " Collecting $method $value_type from datasets @datasets...\n";
-	print " Forking into $cpu children for parallel data collection\n";
-	parallel_execution();
-}
-
-else {
-	# single threaded execution
-	single_execution();
-}
 
 
 ### Finished
-printf " Finished in %.1f minutes\n", (time - $start_time)/60;
+# writing output file has been moved to after each dataset collection
+print " Finished data collection\n";
 
 
 
@@ -338,32 +311,11 @@ sub set_defaults {
 	# these are all global values that could've been assigned on the 
 	# command line
 	
-	# check parallel support
-	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
-	}
-	else {
-		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 0;
-	}
-	
-	# check datasets
-	if ($datasets[0] =~ /,/) {
-		# seems to be a comma delimited list, possibly more than one?????
-		my @list;
-		foreach my $d (@datasets) {
-			push @list, (split /,/, $d);
-		}
-		@datasets = @list;
-	}
-	
 	# check method
 	if ($method) {
 		# check the method that was defined on the command line
 		unless ($method =~ 
-			m/^(?:median|mean|stddev|min|max|range|sum|count|enumerate|rpm|rpkm)$/
+			m/^median|mean|stddev|min|max|range|sum|count|enumerate|rpm|rpkm$/x
 		) {
 			die " unknown method '$method'!";
 		}
@@ -447,14 +399,13 @@ sub set_defaults {
 		# overwrite the input file
 		$outfile = $infile;
 	}
+	
 }
-
-
 
 ### Collect the feature list and populate the 
 sub get_main_data_ref {
 	
-	my ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
+	my ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
 	
 	# Generate new input file from the database
 	if ($new) { 
@@ -492,9 +443,8 @@ sub get_main_data_ref {
 			);
 			
 			# assign the column indices
-			$id     = 0;
-			$name   = 1;
-			$type   = 2;
+			$name   = 0;
+			$type   = 1;
 		}
 		
 		# check
@@ -514,9 +464,8 @@ sub get_main_data_ref {
 			die "no file data loaded!";
 		
 		# identify relevant feature data columns 
-		$name   = find_column_index($data_ref, '^name');
+		$name   = find_column_index($data_ref, '^name|id');
 		$type   = find_column_index($data_ref, '^type|class');
-		$id     = find_column_index($data_ref, '^primary_id');
 		$chromo = find_column_index($data_ref, '^chr|seq|ref|ref.?seq');
 		$start  = find_column_index($data_ref, '^start|position');
 		$stop   = find_column_index($data_ref, '^stop|end');
@@ -568,7 +517,7 @@ sub get_main_data_ref {
 			# some named feature
 			
 			# must have name and type columns
-			unless (defined $id or (defined $name and defined $type)) {
+			unless (defined $name and defined $type) {
 				# no name or type defined!?
 				
 				# do we at least have coordinates?
@@ -579,7 +528,7 @@ sub get_main_data_ref {
 				else {
 					# nothing recognized
 					die " File suggests '$feature' features but name and" . 
-						" type column headers cannot be found!\n";
+						" type column headers can not be found!\n";
 				}
 			}
 		}
@@ -588,7 +537,7 @@ sub get_main_data_ref {
 			# feature was not explicitly defined
 			
 			# determine empirically from column names
-			if (defined $id or (defined $name and defined $type)) {
+			if (defined $name and defined $type) {
 				# named features!
 				$feature = "Named feature";
 			}
@@ -618,104 +567,9 @@ sub get_main_data_ref {
 	}
 	
 	# done
-	return ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
+	return ($data_ref, $name, $type, $chromo, $start, $stop, $strand);
 }
 
-
-
-sub parallel_execution {
-	my $pm = Parallel::ForkManager->new($cpu);
-	
-	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
-
-	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
-		$pm->start and next;
-	
-		#### In child ####
-	
-		# splice the data structure
-		splice_data_structure($main_data_ref, $i, $cpu);
-		
-		# re-open database objects to make them clone safe
-		$mdb = open_db_connection($main_database);
-		if ($data_database) {
-			$ddb = open_db_connection($data_database);
-		}
-		else {
-			$ddb = $mdb;
-		}
-		
-		# collect the dataset
-		foreach my $dataset (@datasets) {
-			unless ($dataset eq 'none') {
-				collect_dataset($dataset);
-			}
-		}
-		
-		# write out result
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
-			'filename' => "$child_base_name.$i",
-			'gz'       => 0, # faster to write without compression
-		);
-		if ($success) {
-			printf " wrote child file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
-		}
-		
-		# Finished
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-	# reassemble children files into output file
-	my @files = glob "$child_base_name.*";
-	unless (@files) {
-		die "unable to find children files!\n";
-	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	# done
-}
-
-
-
-sub single_execution {
-	foreach my $dataset (@datasets) {
-	
-		# collect the dataset
-		unless ($dataset eq 'none') {
-			print " Collecting $method $value_type from dataset '$dataset'...\n";
-			collect_dataset($dataset);
-		}
-		last if $dataset eq 'none';
-	}
-	
-	# write the output file
-	# we will rewrite the file after each collection
-	# appropriate extensions and compression should be taken care of
-	my $success = write_tim_data_file(
-		'data'     => $main_data_ref,
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($success) {
-		printf " wrote file $success\n";
-	}
-	else {
-		# failure! the subroutine will have printed error messages
-		print " unable to write file!\n";
-	}
-}
 
 
 
@@ -784,7 +638,20 @@ sub collect_dataset {
 		if ($subfeature) {
 			# collect feature subfeatures
 			
+			# check if we're doing RPKM
+			if ($method =~ /^rpk?m$/) {
+				# check that we have an appropriate dataset
+				$rpkm_read_sum = check_dataset_for_rpm_support($dataset, $ddb);
+				unless ($rpkm_read_sum) {
+					warn " $method method requested but not supported for " .
+						"dataset '$dataset'\n using summed count instead\n";
+					$method = 'sum'; 
+						# this could negatively impact any subsequent datasets
+				}
+			}
+			
 			get_subfeature_dataset($dataset, $index);
+			$rpkm_read_sum = 0; # reset for next dataset
 		}
 		
 		elsif (defined $extend) {
@@ -1113,21 +980,33 @@ sub get_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# get the feature from the database
+		my @features = $mdb->features( 
+				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
+				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
-		unless ($feature) {
-			# record a null value and move on
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n";
+			
+			# record a null value
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
+			
+			# move on
 			next;
 		}
+		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1167,21 +1046,33 @@ sub get_extended_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# get the feature from the database
+		my @features = $mdb->features( 
+				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
+				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
-		unless ($feature) {
-			# record a null value and move on
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n";
+			
+			# record a null value
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
+			
+			# move on
 			next;
 		}
+		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1220,21 +1111,33 @@ sub get_adjusted_feature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# get the feature from the database
+		my @features = $mdb->features( 
+				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
+				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
-		unless ($feature) {
-			# record a null value and move on
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n";
+			
+			# record a null value
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
+			
+			# move on
 			next;
 		}
+		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1329,21 +1232,33 @@ sub get_fractionated_feature_dataset {
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# get the feature from the database
+		my @features = $mdb->features( 
+				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
+				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
-		unless ($feature) {
-			# record a null value and move on
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n";
+			
+			# record a null value
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
+			
+			# move on
 			next;
 		}
+		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1445,21 +1360,33 @@ sub get_subfeature_dataset {
 	# Loop through the list of features
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# Get the feature from the database
+		my @features = $mdb->features( 
+				-name => $main_data_ref->{'data_table'}->[$row][$name_i],
+				-type => $main_data_ref->{'data_table'}->[$row][$type_i],
 		);
-		unless ($feature) {
-			# record a null value and move on
+		if (scalar @features > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .  
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n Using the first feature only!\n";
+		}
+		elsif (!@features) {
+			warn " Found no " . 
+				$main_data_ref->{'data_table'}->[$row][$type_i] . " features" .
+				" named " . $main_data_ref->{'data_table'}->[$row][$name_i] . 
+				" in the database!\n";
+			
+			# record a null value
 			$main_data_ref->{'data_table'}->[$row][$index] = '.';
+			
+			# move on
 			next;
 		}
+		my $feature = shift @features; 
 		
 		# reassign strand value if requested
 		if ($set_strand) {
@@ -1518,20 +1445,12 @@ sub get_subfeature_dataset {
 		
 		
 		# Collect the subfeature values and summed length
-		my %feature_values;
-		my %duplicate_check;
+		my @subf_values;
 		my $gene_length = 0;
 		foreach my $subfeat (@features_to_check) {
 			# we don't want a single value for each subfeature
 			# rather we will collect the raw scores and then combine them
 			# ourselves later
-			
-			# since there may be duplicate subfeatures, for example 
-			# shared exons form alternate mRNA transcripts, we need to 
-			# avoid these
-			next if exists $duplicate_check{ $subfeat->start }{ $subfeat->end };
-			# then record this one
-			$duplicate_check{ $subfeat->start }{ $subfeat->end } = 1;
 			
 			# we will use the indexed score function, which returns a 
 			# hash of postions and scores, but we'll just take the scores
@@ -1548,21 +1467,12 @@ sub get_subfeature_dataset {
 				'strand'    => $subfeat->strand,
 				'value'     => $value_type,
 				'stranded'  => $stranded,
-				'absolute'  => 1, # do not convert to relative positions
 			);
 			
 			# record the values
-			# we need to make sure we don't take duplicate scores, thus inappropriately 
-			# inflating the score values for duplicate subfeature, for example with 
-			# shared exons between alternate transcripts
-			# this hash might get really big
-			foreach my $p (keys %pos2scores) {
-				# we might overwrite identical positions, but they should be same
-				$feature_values{$p} = $pos2scores{$p};
-			}
+			push @subf_values, values %pos2scores;
 			
 			# record the subfeature length
-				# potential bug if we have overlapping sub features <sigh>
 			$gene_length += $subfeat->length;
 		}
 	
@@ -1571,7 +1481,7 @@ sub get_subfeature_dataset {
 		# Calculate the final score
 		
 		# no data collected!? record null or zero value
-		unless (%feature_values) {
+		unless (@subf_values) {
 			if ($method =~ /sum|count|rpm|rpkm/) {
 				$main_data_ref->{'data_table'}->[$row][$index] = 0;
 			}
@@ -1583,56 +1493,54 @@ sub get_subfeature_dataset {
 		
 		# convert log2 values if necessary
 		if ($main_data_ref->{$index}{'log2'}) {
-			foreach (keys %feature_values) {
-				$feature_values{$_} = 2 ** $feature_values{$_};
-			}
+			@subf_values = map {2 ** $_} @subf_values;
 		}
 		
 		# final score is calculated according to the requested method
 		my $parent_score;
 		if ($method eq 'median') {
 			# take the median value
-			$parent_score = median(values %feature_values);
+			$parent_score = median(@subf_values);
 		}
 		elsif ($method eq 'mean') {
 			# or take the mean value
-			$parent_score = mean(values %feature_values);
+			$parent_score = mean(@subf_values);
 		} 
 		elsif ($method eq 'range') {
 			# or take the range value
 			# this is 'min-max'
-			$parent_score = range(values %feature_values);
+			$parent_score = range(@subf_values);
 		}
 		elsif ($method eq 'stddev') {
 			# or take the standard deviation value
 			# we are using the standard deviation of the population, 
 			# since these are the only scores we are considering
-			$parent_score = stddevp(values %feature_values);
+			$parent_score = stddevp(@subf_values);
 		}
 		elsif ($method eq 'min') {
 			# or take the minimum value
-			$parent_score = min(values %feature_values);
+			$parent_score = min(@subf_values);
 		}
 		elsif ($method eq 'max') {
 			# or take the maximum value
-			$parent_score = max(values %feature_values);
+			$parent_score = max(@subf_values);
 		}
 		elsif ($method eq 'count') {
 			# count the number of values
-			$parent_score = sum(values %feature_values);
+			$parent_score = sum(@subf_values);
 		}
 		elsif ($method eq 'sum') {
 			# sum the number of values
-			$parent_score = sum(values %feature_values);
+			$parent_score = sum(@subf_values);
 		}
 		elsif ($method eq 'rpm') {
 			# calculate reads per per million
-			$parent_score = ( sum(values %feature_values) * 10^6 ) / $dataset2sum{$dataset};
+			$parent_score = ( sum(@subf_values) * 10^6 ) / $rpkm_read_sum;
 		}
 		elsif ($method eq 'rpkm') {
 			# calculate reads per kb per million
-			$parent_score = ( sum(values %feature_values) * 10^9 ) / 
-								( $gene_length * $dataset2sum{$dataset});
+			$parent_score = ( sum(@subf_values) * 10^9 ) / 
+								( $gene_length * $rpkm_read_sum);
 		}
 	
 		# convert back to log2 if necessary
@@ -1644,6 +1552,8 @@ sub get_subfeature_dataset {
 		$main_data_ref->{'data_table'}->[$row][$index] = $parent_score;
 	}
 }
+
+
 
 
 # subroutine to record the metadata for a dataset
@@ -1797,7 +1707,6 @@ get_datasets.pl [--options...] [<filename>]
   --step <integer>
   --force_strand
   --gz
-  --cpu <integer>
   --version
   --help
 
@@ -1819,7 +1728,7 @@ genomic coordinates for which to collect data. The file should be a
 tab-delimited text file, one row per feature, with columns representing 
 feature identifiers, attributes, coordinates, and/or data values. The 
 first row should be column headers. Bed files are acceptable, as are 
-text files generated with this program or get_features.pl.
+text files generated with this program.
 
 =item --out <filename>
 
@@ -1885,8 +1794,8 @@ Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the
 features' scores may be used in data collection.
 
 Alternatively, the dataset may be a database file, including bigWig (.bw), 
-bigBed (.bb), useq (.useq), or Bam alignment (.bam) files. The files may 
-be local or remote (specified with a http: or ftp: prefix).
+bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
+remote (specified with a http: or ftp: prefix).
 
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
@@ -2016,12 +1925,6 @@ regions (e.g. BED files). Default is false.
 Indicate whether the output file should (not) be compressed by gzip. 
 If compressed, the extension '.gz' is appended to the filename. If a compressed 
 file is opened, the compression status is preserved unless specified otherwise.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --version
 

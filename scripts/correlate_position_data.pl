@@ -17,14 +17,13 @@ use tim_data_helper qw(
 use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
-	get_feature
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.11';
+my $VERSION = '1.10';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -240,14 +239,13 @@ sub identify_indices {
 	# Identify columns in the input file
 	
 	my %index;
-	$index{name}   = find_column_index($mainData, "^name");
+	$index{name}   = find_column_index($mainData, "^name|id");
 	$index{type}   = find_column_index($mainData, "^type");
-	$index{id}     = find_column_index($mainData, "^primary_id");
-	$index{chrom}  = find_column_index($mainData, "^chr|seq");
+	$index{chrom}    = find_column_index($mainData, "^chr|seq");
 	$index{start}  = find_column_index($mainData, "^start");
 	$index{stop}   = find_column_index($mainData, "^stop|end");
 	$index{strand} = find_column_index($mainData, "strand");
-	unless (defined $index{id} or defined $index{name} or defined $index{chrom}) {
+	unless (defined $index{name} or defined $index{chrom}) {
 		die " unable to identify at least name or chromosome column index!\n";
 	}
 	if ($set_strand and not defined $index{strand}) {
@@ -274,7 +272,7 @@ sub collect_correlations {
 	
 	# set coordinate collection method
 	my $collect_coordinates;
-	if (defined $index{id} or (defined $index{name} and defined $index{type}) ) {
+	if (defined $index{name} and defined $index{type}) {
 		# using named features
 		# retrieve the coordinates from the database
 		$collect_coordinates = \&collect_coordinates_from_db;
@@ -300,17 +298,6 @@ sub collect_correlations {
 		
 		# Determine coordinates
 		my ($chromo, $start, $stop, $strand) = &{$collect_coordinates}($row);
-		unless ($chromo and $start and $stop) {
-			# verify coordinates
-			$mainData->{'data_table'}->[$row][$index{r}]       = '.';
-			if ($find_shift) {
-				$mainData->{'data_table'}->[$row][$index{shiftval}] = '.';
-				$mainData->{'data_table'}->[$row][$index{shiftr}]  = '.';
-			}
-			$not_enough_data++;
-			next;
-		}
-		
 		
 		# determine reference point
 		my $ref_point;
@@ -621,19 +608,27 @@ sub add_new_columns {
 sub collect_coordinates_from_db {
 	my $row = shift;
 	
-	# retrieve the coordinates from named features in the database
-	my $feature = get_feature(
-		'db'    => $db,
-		'id'    => defined $index{id} ? 
-			$mainData->{'data_table'}->[$row][$index{id}] : undef,
-		'name'  => defined $index{name} ? 
-			$mainData->{'data_table'}->[$row][$index{name}] : undef,
-		'type'  => defined $index{type} ? 
-			$mainData->{'data_table'}->[$row][$index{type}] : undef,
+	# using named features
+	# retrieve the coordinates from the database
+	my @features = $db->features( 
+		-name  => $mainData->{'data_table'}->[$row][$index{name}],
+		-type  => $mainData->{'data_table'}->[$row][$index{type}],
 	);
-	return unless ($feature);
+	if (scalar @features > 1) {
+		# there should only be one feature found
+		# if more, there's redundant or duplicated data in the db
+		# warn the user, this should be fixed
+		warn " Found more than one feature of type " . 
+			$mainData->{'data_table'}->[$row][$index{type}] . ", name " . 
+			$mainData->{'data_table'}->[$row][$index{name}] . 
+			" in the database!\n Using the first feature only!\n";
+	}
+	my $feature = shift @features; 
 	
-	# calculate strand
+	# collect coordinates
+	my $chromo = $feature->seq_id;
+	my $start  = $feature->start;
+	my $stop   = $feature->end;
 	my $strand;
 	if ($set_strand) {
 		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
@@ -643,15 +638,17 @@ sub collect_coordinates_from_db {
 		$strand = $feature->strand;
 	}
 	
-	# return coordinates
-	return ($feature->seq_id, $feature->start, $feature->end, $strand);
+	return ($chromo, $start, $stop, $strand);
 }
 
 
 sub collect_coordinates_from_file {
 	my $row = shift;
 	
-	# calculate strand
+	# genomic coordinates defined in the table
+	my $chromo = $mainData->{'data_table'}->[$row][$index{chrom}];
+	my $start  = $mainData->{'data_table'}->[$row][$index{start}];
+	my $stop   = $mainData->{'data_table'}->[$row][$index{stop}];
 	my $strand;
 	if (defined $index{strand}) {
 		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
@@ -660,14 +657,8 @@ sub collect_coordinates_from_file {
 	else {
 		$strand = 0;
 	}
-	
-	# return coordinates defined in the table
-	return (
-		$mainData->{'data_table'}->[$row][$index{chrom}], 
-		$mainData->{'data_table'}->[$row][$index{start}], 
-		$mainData->{'data_table'}->[$row][$index{stop}], 
-		$strand
-	);
+
+	return ($chromo, $start, $stop, $strand);
 }
 
 

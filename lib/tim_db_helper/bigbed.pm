@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.12';
+our $VERSION = '1.9.0';
 
 
 # Exported names
@@ -229,7 +229,6 @@ sub collect_bigbed_position_scores {
 sub open_bigbed_db {
 	
 	my $bedfile = shift;
-	my $forget  = shift;
 	
 	# check whether the file has been opened or not
 	if (exists $OPENED_BEDFILES{$bedfile} ) {
@@ -247,13 +246,11 @@ sub open_bigbed_db {
 		};
 		return unless $bb;
 		
-		unless ($forget) {
-			# store the opened object for later use
-			$OPENED_BEDFILES{$bedfile} = $bb;
+		# store the opened object for later use
+		$OPENED_BEDFILES{$bedfile} = $bb;
 		
-			# collect the chromosomes for this bigBed file
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
+		# collect the chromosomes for this bigBed file
+		%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
 		
 		return $bb;
 	}
@@ -273,25 +270,39 @@ sub sum_total_bigbed_features {
 	
 	
 	# Open BigBed file if necessary
-	my $bb;
+	my $bed;
 	my $bb_ref = ref $bb_file;
 	if ($bb_ref =~ /Bio::DB::BigBed/) {
 		# we have an opened bigbed db object
-		$bb = $bb_file;
+		$bed = $bb_file;
 	}
 	else {
-		# we have a name of a bigbed file
-		# open it but do not remember it
-		$bb = open_bigbed_db($bb_file, 1);
-		return unless ($bb);
+		# we have a name of a sam file
+		$bed = open_bigbed_db($bb_file);
+		return unless ($bed);
 	}
 	
-	# Return the item count for the bigBed
-	# wow, this is easy!
-	return $bb->bf->bigBedItemCount;
-		# this is the itemCount available to the low level bigFile object
-		# the validCount method from summary or bin features simple records
-		# the number of covered bases, not entirely useful here
+	# Count the number of alignments
+	my $total_read_number = 0;
+	
+	# loop through the chromosomes
+	my @chroms = $bed->seq_ids;
+	foreach my $chrom (@chroms) {
+		
+		# use an iterator to speed things up
+		my $iterator = $bed->features(
+			-seq_id    => $chrom,
+			-iterator  => 1,
+		);
+		
+		# count the number of bed features we go through
+		while (my $f = $iterator->next_seq) {
+			# we don't actually do anything with them
+			$total_read_number++;
+		}
+	}
+	
+	return $total_read_number;
 }
 
 
@@ -377,9 +388,6 @@ position, a simple mean (for score or length data methods) or sum
 This subroutine will open a BigBed database connection. Pass either the 
 local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
 file. It will return the opened database object.
-
-The opened BigBed object is cached for later use. If you do not want this 
-(for example, when forking), pass a second true argument.
 
 =item sum_total_bigbed_features()
 

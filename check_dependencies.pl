@@ -8,7 +8,7 @@ use Getopt::Long;
 use Pod::Usage;
 require CPAN;
 
-my $VERSION = '1.13';
+my $VERSION = '1.8.1';
 
 # Initialize values
 my (
@@ -101,7 +101,7 @@ if ($bio_ensembl) {
 }
 else {
 	print " not installed\n";
-	print "  Optional, required for the 'get_ensembl_annotation.pl' script\n";
+	print "  Optional, only required for the script 'get_ensembl_annotation.pl'\n";
 	print "  It is not available through CPAN, but you can obtain it from\n" .
 		"  http://www.ensembl.org/info/docs/api/api_installation.html\n";
 }
@@ -111,7 +111,7 @@ else {
 # offer to install
 print "\n\n";
 if (@install_list) {
-	print "Would you like to install missing dependencies? y or n  "; 
+	print "Would you like me to help install missing dependencies? y or n  "; 
 	my $answer = <STDIN>;
 	if ($answer =~ /^n/i) {
 		print "OK. Here is a list of the missing dependencies I found\n";
@@ -171,6 +171,10 @@ sub get_list_of_modules {
 qq(  Required for biotoolbox configuration file
 )
 		],
+		['IO::Zlib', 
+qq(  Required for reading and writing gzipped files
+)
+		],
 		['Statistics::Lite', 
 qq(  Required for all data collection and analysis programs
 )
@@ -184,15 +188,12 @@ qq(  Required for some conversion scripts
 )
 		],
 		['Bio::Root::Version', 
-qq(  Required for all BioPerl database interactions and GFF3 processing
-)
-		],
-		['Parallel::ForkManager', 
-qq(  Optional, recommended for multi-threaded execution of some scripts 
+qq(  Required for all BioPerl database interactions and most GFF3 processing
 )
 		],
 		['GD', 
 qq(  Optional, required for graphing scripts. 
+  Requires that GD2 C libraries be installed.
 )
 		],
 		['GD::Graph', 
@@ -216,23 +217,25 @@ qq(  Required for BioPerl SQL database functions
 )
 		],
 		['DBD::mysql', 
-qq(  Optional, required for interacting with MySQL databases
+qq(  Optional, but required for interacting with MySQL databases
+)
+		],
+		['DBD::Pg', 
+qq(  Optional, but required for interacting with PostgreSQL databases
 )
 		],
 		['DBD::SQLite', 
-qq(  Optional, required for interacting with SQLite databases
+qq(  Optional, but required for interacting with SQLite databases
 )
 		],
 		['Bio::DB::Sam', 
-qq(  Optional, required for working with BAM files.
+qq(  Optional, but required for working with Next Generation Sequencing BAM 
+  data files. Requires building the SamTools C libraries from source.
 )
 		],
 		['Bio::DB::BigFile', 
-qq(  Optional, required for working with bigWig and bigBed files.
-)
-		],
-		['Bio::DB::USeq', 
-qq(  Optional, required for working with useq files.
+qq(  Optional, but required and highly recommended for working with bigWig and 
+  bigBed files. Requires building Jim Kent's source tree and executables.
 )
 		],
 	);

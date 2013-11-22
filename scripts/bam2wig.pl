@@ -7,37 +7,31 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
-use File::Spec;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_file_helper qw(
-	open_to_read_fh 
-	open_to_write_fh 
-	write_tim_data_file
-);
-use tim_data_helper qw(
-	format_with_commas
-	generate_tim_data_structure
-);
+use tim_file_helper qw(open_to_write_fh);
+use tim_data_helper qw(format_with_commas);
 use tim_big_helper qw(wig_to_bigwig_conversion);
 eval {
 	# check for bam support
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
 
 # Declare constants for this program
 use constant {
+	VERSION         => '1.10',
 	LOG2            => log(2),
 	LOG10           => log(10),
+	ALIGN_COUNT_MAX => 200_000, # Maximum number of alignments processed before writing 
+	                            # to file. Increasing this number may improve 
+	                            # performance at the cost of memory usage.
+	BUFFER_MIN      => 1_200, # Leave this much in bp in the coverage buffer when
+	                          # writing a bedGraph file to account for additional 
+	                          # future coverage. Increase this if alignment length, 
+	                          # paired-end span, or 2 x read shift is greater than 
+	                          # this value.
 };
-my $VERSION = '1.13';
 	
 	
 
@@ -68,7 +62,6 @@ my (
 	$sample_number,
 	$chr_number,
 	$correlation_min,
-	$model,
 	$strand,
 	$bin_size,
 	$min_mapq,
@@ -78,9 +71,6 @@ my (
 	$bigwig,
 	$bwapp,
 	$gz,
-	$cpu,
-	$buffer_min,
-	$alignment_count,
 	$verbose,
 	$help,
 	$print_version,
@@ -99,7 +89,6 @@ GetOptions(
 	'sample=i'  => \$sample_number, # number of samples to test for shift
 	'chrom=i'   => \$chr_number, # number of chromosomes to sample
 	'minr=f'    => \$correlation_min, # R^2 minimum value for shift
-	'model!'    => \$model, # write the strand shift model data
 	'strand!'   => \$strand, # separate strands
 	'bin=i'     => \$bin_size, # size of bin to make
 	'qual=i'    => \$min_mapq, # minimum mapping quality
@@ -109,9 +98,6 @@ GetOptions(
 	'bw!'       => \$bigwig, # generate bigwig file
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
 	'gz!'       => \$gz, # compress text output
-	'cpu=i'     => \$cpu, # number of cpu cores to use
-	'buffer=i'  => \$buffer_min, # minimum buffer length
-	'count=i'   => \$alignment_count, # number of alignments before writing to disk
 	'verbose!'  => \$verbose, # print sample correlations
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -128,7 +114,7 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script bam2wig.pl, version $VERSION\n\n";
+	print " Biotoolbox script bam2wig.pl, version " . VERSION . "\n\n";
 	exit;
 }
 
@@ -137,7 +123,7 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # global variables
 my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, 
-	$split_callback, $write_wig, $convertor, $data_ref, $outbase);
+	$write_wig, $convertor, $data_ref);
 check_defaults();
 
 # record start time
@@ -153,6 +139,9 @@ unless (exists &open_bam_db) {
 	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
 }
 my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
+my $bam = $sam->bam;
+my $index = $sam->bam_index;
+
 
 
 
@@ -161,11 +150,8 @@ my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
 my $total_read_number = 0;
 if ($rpm) {
 	# this is only required when calculating reads per million
-	print " Pre-counting total number of aligned fragments... \n";
-	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired, $cpu);
-		# this is multi-threaded as well so pass the cpu number available
-	
-	# print result
+	print " Calculating total number of aligned fragments... this may take a while...\n";
+	$total_read_number = sum_total_bam_alignments($sam, $min_mapq, $paired);
 	print "   ", format_with_commas($total_read_number), " total mapped fragments\n";
 	printf " counted in %.1f minutes\n", (time - $start_time)/60;
 }
@@ -173,11 +159,9 @@ if ($rpm) {
 
 
 ### Calculate shift value
-if ($shift) {
-	if (not $shift_value) {
-		print " Calculating 3' shift value...\n";
-		$shift_value = determine_shift_value();
-	}
+if ($shift and !$shift_value) {
+	print " Calculating 3' shift value...\n";
+	$shift_value = determine_shift_value();
 	
 	# precalculate double shift when recording extended position
 	if ($position eq 'extend') {
@@ -185,7 +169,7 @@ if ($shift) {
 		print " Reads will be extended by $shift_value bp\n";
 	}
 	else {
-		print " Read counts will be shifted by $shift_value bp\n";
+		print " Reads will be shifted by $shift_value bp\n";
 	}
 }
 
@@ -193,40 +177,22 @@ if ($shift) {
 
 ### Process bam file
 # process according to type of data collected and alignment type
-if ($cpu > 1) {
-	# multiple cpu core execution
-	
-	if ($use_coverage) {
-		# special, speedy, low-level, single-bp coverage 
-		parallel_process_bam_coverage();
-	}
-	else {
-		# process alignments individually
-		if ($splice) {
-			# enable splices, which will use special callbacks
-			$sam->split_splices($splice);
-			print " WARNING: enabling splices will increase processing times\n";
-		}
-		parallel_process_alignments();
-	}
-	
+if ($use_coverage) {
+	# special, speedy, low-level, single-bp coverage 
+	process_bam_coverage();
+}
+elsif ($splice) {
+	# single end alignments with splices require special callbacks
+	# we must do this with the high level API
+	$sam->split_splices($splice);
+	warn " WARNING: enabling splices will increase processing times\n";
+	process_split_alignments();
 }
 else {
-	# single-thread execution
-	if ($use_coverage) {
-		# special, speedy, low-level, single-bp coverage 
-		process_bam_coverage();
-	}
-	else {
-		# process alignments individually
-		if ($splice) {
-			# enable splices, which will use special callbacks
-			$sam->split_splices($splice);
-			print " WARNING: enabling splices will increase processing times\n";
-		}
-		process_alignments();
-	}
+	# all other alignments, single, paired, mid, start, span
+	process_alignments();
 }
+
 
 
 
@@ -253,17 +219,6 @@ sub check_defaults {
 		die " must provide a .bam file as input!\n";
 	}
 	
-	# check parallel support
-	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
-	}
-	else {
-		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 0;
-	}
-	
 	# check log number
 	if ($log) {
 		unless ($log == 2 or $log == 10) {
@@ -280,20 +235,8 @@ sub check_defaults {
 	}
 	
 	# maximum duplicates
-	if ($rpm and $max_dup) {
-		print " WARNING: The read count for rpm normalization includes all duplicates." . 
-			"\n  Please filter your bam file if you wish to limit duplicates and have\n" . 
-			"  an accurate rpm normalization.\n";
-	}
-	
-	# check minimum buffer
-	unless (defined $buffer_min) {
-		$buffer_min = 1200;
-	}
-	
-	# check alignment count
-	unless (defined $alignment_count) {
-		$alignment_count = 200000;
+	unless (defined $max_dup) {
+		$max_dup = 1000;
 	}
 	
 	# check position
@@ -306,10 +249,6 @@ sub check_defaults {
 		}
 		elsif ($position eq 'span') {
 			$use_span = 1;
-			if ($shift) {
-				# essentially the same thing as extend
-				$position eq 'extend';
-			}
 		}
 		elsif ($position eq 'extend') {
 			if ($paired) {
@@ -382,13 +321,6 @@ sub check_defaults {
 		else {
 			$correlation_min = 0.25;
 		}
-		if ($strand) {
-			warn " disabling strand with shift enabled\n";
-			$strand = 0;
-		}
-	}
-	if ($shift_value and !$shift) {
-		undef $shift_value;
 	}
 	
 	# check bin size
@@ -429,46 +361,43 @@ sub check_defaults {
 		# then the file is only temporary anyway
 		$gz = $bigwig ? 0 : 1;
 	}
-	(undef, undef, $outbase) = File::Spec->splitpath($outfile);
 	$outfile =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # strip extension if present
-	$outbase =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # splitpath doesn't do extensions
 	
-	
-	### Determine the alignment callback method
+	# determine the alignment callback method
 	# and the wig writing method
 	# based on the position used, strandedness, and/or shift
 	if ($use_coverage) {
 		# no callbacks necessary, special mode
 		print " recording coverage spanning alignments\n";
 	}
-	elsif ($strand and $shift) {
-		# this should not happen, strand is disabled with shift
-		die " programming error!\n";
-	}
-	elsif ($use_start and $paired) {
-		# this should not happen, paired start is changed to paired mid
-		die " programming error!\n";
-	}
-	elsif ($shift and $paired) {
-		# this should not happen, shift is disabled with paired
-		die " programming error!\n";
-	}
-	elsif ($use_start and !$strand and !$shift and !$paired) {
-		$callback  = \&record_start;
-		$split_callback = \&record_split_start;
+	elsif ($use_start and $strand and $shift) {
+		$callback  = \&record_stranded_shifted_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording start positions\n";
+		print " recording stranded, shifted-start positions\n";
 	}
-	elsif ($use_start and $strand and !$shift and !$paired) {
+	elsif ($use_start and $strand and !$shift) {
 		$callback  = \&record_stranded_start;
-		$split_callback = \&record_split_stranded_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording stranded, start positions\n";
 	}
-	elsif ($use_start and !$strand and $shift and !$paired) {
+	elsif ($use_start and !$strand and $shift) {
 		$callback  = \&record_shifted_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording shifted-start positions\n";
+	}
+	elsif ($use_start and !$strand and !$shift) {
+		$callback  = \&record_start;
+		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+		print " recording start positions\n";
+	}
+	elsif ($use_mid and $strand and $shift and $paired) {
+		# this should not happen, shift is disabled with paired
+		die " programming error!\n";
+	}
+	elsif ($use_mid and $strand and $shift and !$paired) {
+		$callback  = \&record_stranded_shifted_mid;
+		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+		print " recording stranded, shifted-mid positions\n";
 	}
 	elsif ($use_mid and $strand and !$shift and $paired) {
 		$callback = \&record_stranded_paired_mid;
@@ -477,9 +406,12 @@ sub check_defaults {
 	}
 	elsif ($use_mid and $strand and !$shift and !$paired) {
 		$callback = \&record_stranded_mid;
-		$split_callback = \&record_split_stranded_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording stranded, mid positions\n";
+	}
+	elsif ($use_mid and !$strand and $shift and $paired) {
+		# this should not happen, shift is disabled with paired
+		die " programming error!\n";
 	}
 	elsif ($use_mid and !$strand and $shift and !$paired) {
 		$callback  = \&record_shifted_mid;
@@ -493,28 +425,26 @@ sub check_defaults {
 	}
 	elsif ($use_mid and !$strand and !$shift and !$paired) {
 		$callback  = \&record_mid;
-		$split_callback = \&record_split_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording mid position\n";
 	}
-	elsif ($use_span and $strand and !$shift and $paired) {
+	elsif ($use_span and $strand and $paired) {
 		$callback  = \&record_stranded_paired_span;
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning paired alignments\n";
 	}
 	elsif ($use_span and $strand and !$shift and !$paired) {
 		$callback  = \&record_stranded_span;
-		$split_callback = \&record_split_stranded_span;
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning alignments\n";
 	}
-	elsif ($use_span and !$strand and !$shift and $paired) {
+	elsif ($use_span and !$strand and $paired) {
 		$callback  = \&record_paired_span;
 		$write_wig = \&write_bedgraph;
 		print " recording positions spanning paired alignments\n";
 	}
 	elsif ($use_span and !$strand and !$shift and !$paired) {
-		if (!$rpm and !$log and !$splice) {
+		if (!$rpm and !$log) {
 			# this is actually coverage
 			undef $use_span;
 			undef $bedgraph; # no bedgraph file, coverage uses fixedStep
@@ -523,7 +453,6 @@ sub check_defaults {
 		}
 		else {
 			$callback  = \&record_span;
-			$split_callback = \&record_split_span;
 			$write_wig = \&write_bedgraph;
 			print " recording positions spanning alignments\n";
 		}
@@ -538,8 +467,7 @@ sub check_defaults {
 		die " programming error!\n";
 	}
 	
-	
-	### Determine the convertor callback
+	# determine the convertor callback
 	if ($rpm and !$log) {
 		$convertor = sub {
 			return ($_[0] * 1_000_000) / $total_read_number;
@@ -548,27 +476,23 @@ sub check_defaults {
 	elsif ($rpm and $log == 2) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return 0 if $_[0] == 0;
-			return log( ($_[0] * 1_000_000) / $total_read_number) / LOG2;
+			return log( ( ($_[0] * 1_000_000) / $total_read_number) ) + 1 / LOG2;
 		};
 	}
 	elsif ($rpm and $log == 10) {
 		# calculate rpm first before log
 		$convertor = sub {
-			return 0 if $_[0] == 0;
-			return log( ($_[0] * 1_000_000) / $total_read_number) / LOG10;
+			return log( ( ($_[0] * 1_000_000) / $total_read_number) ) + 1 / LOG10;
 		};
 	}
 	elsif (!$rpm and $log == 2) {
 		$convertor = sub {
-			return 0 if $_[0] == 0;
-			return log($_[0]) / LOG2;
+			return log($_[0] + 1) / LOG2;
 		};
 	}
 	elsif (!$rpm and $log == 10) {
 		$convertor = sub {
-			return 0 if $_[0] == 0;
-			return log($_[0]) / LOG10;
+			return log($_[0] + 1) / LOG10;
 		};
 	}
 	elsif (!$rpm and !$log) {
@@ -582,9 +506,9 @@ sub check_defaults {
 
 ### Open the output file handle 
 sub open_wig_file {
-	my ($name, $track) = @_;
 	
-	# add extension to filename
+	# generate name
+	my $name = shift;
 	$name .= $bedgraph ? '.bdg' : '.wig';
 	$name .= '.gz', if $gz;
 		
@@ -595,13 +519,13 @@ sub open_wig_file {
 		
 	# write track line
 	if ($bedgraph) {
-		$fh->print("track type=bedGraph\n") if $track;
+		$fh->print("track type=bedGraph\n");
 	}
 	else {
-		$fh->print("track type=wiggle_0\n") if $track;
+		$fh->print("track type=wiggle_0\n");
 	}
 	
-	# finished
+	# finished, return ref to names array, and 1 or 2 filehandles
 	return ($name, $fh);
 }
 
@@ -609,214 +533,82 @@ sub open_wig_file {
 ### Determine the shift value
 sub determine_shift_value {
 	
+	# find the biggest chromosome to sample
+		# this is assuming all the chromosomes have different sizes ;-)
+	my %size2chrom;
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# key is chromosome size, value is its name
+		$size2chrom{ $sam->target_len($tid) } = $tid;
+	}
+	
 	# identify top regions to score
 	# we will walk through the largest chromosome(s) looking for the top  
-	# 500 bp regions containing the highest unstranded coverage to use
-	print "  sampling the top $sample_number coverage regions " .
-		"on the largest $chr_number chromosomes...\n";
+	# 1 kb regions containing the highest unstranded coverage to use
+	my %coverage2region;
 	
-	# first sort the chromosomes by size
-		# this is assuming all the chromosomes have different sizes ;-)
-		# use a Schwartzian transform
-	my @chromosomes = 
-		map { $_->[0] }
-		sort { $b->[1] <=> $a->[1] }
-		map { [$_, $sam->target_len($_)] }
-		(0 .. $sam->n_targets - 1);
-	
-	# result arrays
-	my @shift_values;
-	my @f_profile;
-	my @r_profile;
-	my @shifted_profile;
-	my @r2_values;
-	my @regions; 
-	
-	# look for high coverage regions to sample
-	# do this in multi-threaded fashion if possible
-	
-	if ($cpu > 1) {
-		# do each chromosome in parallel
-		print "   Forking into children for parallel scanning\n";
+	# look for test regions
+	# sampling the number of requested regions from number of requested chromosomes
+	print "  searching for the top $sample_number coverage regions\n" .
+		"   on the largest $chr_number chromosomes to sample...\n";
+	my $chrom_count = 0;
+	for my $size (sort {$b <=> $a} keys %size2chrom) {
+		# sort largest to smallest
+		last if $chrom_count == $chr_number; 
+		my $tid = $size2chrom{$size};
+		for (my $start = 0; $start < $size; $start += 500) {
 		
-		# set up 
-		my $pm = Parallel::ForkManager->new($cpu);
-		$pm->run_on_finish( sub {
-			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result) = @_;
-			
-			# record the chromosome results
-			push @shift_values, @{ $result->[0] }; # push the actual values
-			push @f_profile, @{ $result->[1] }; 
-			push @r_profile, @{ $result->[2] };
-			push @shifted_profile, @{ $result->[3] };
-			push @r2_values, @{ $result->[4] };
-			push @regions, @{ $result->[5] };
-		} );
+			my $end = $start + 500;
+			$end = $size if $end > $size;
 		
-		# scan the chromosomes in parallel
-		for my $chromosome_index (1 .. $chr_number) {
-			$pm->start and next;
-			
-			### In child
-			$sam->clone; # to make it fork safe
-			
-			# scan
-			my $tid = $chromosomes[$chromosome_index - 1]; # convert to 0-based indexing
-			print "   Scanning ", $sam->target_name($tid), "\n";
-			my %coverage2region; 
-			scan_high_coverage($tid, \%coverage2region);
-			
-			# calculate the correlation
-			my $result = calculate_strand_correlation(\%coverage2region);
-			
-			$pm->finish(0, $result); 
-		}
-		$pm->wait_all_children;
-	}
-	else {
-		# one chromosome at a time
-		for my $chromosome_index (1 .. $chr_number) {
-			
-			# scan
-			my $tid = $chromosomes[$chromosome_index - 1]; # convert to 0-based indexing
-			print "   Scanning ", $sam->target_name($tid), "\n";
-			my %coverage2region; 
-			scan_high_coverage($tid, \%coverage2region);
-			
-			# calculate the correlation
-			my $result = calculate_strand_correlation(\%coverage2region);
-			
-			# record the results for this chromosome
-			push @shift_values, @{ $result->[0] }; # push the actual values
-			push @f_profile, @{ $result->[1] }; 
-			push @r_profile, @{ $result->[2] };
-			push @shifted_profile, @{ $result->[3] };
-			push @r2_values, @{ $result->[4] };
-			push @regions, @{ $result->[5] };
-		}
-	}
-	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
-		format_with_commas(scalar @shift_values), (time - $start_time)/60;
-	
-	# determine the optimal shift value
-	# we will be using a trimmed mean value to avoid outliers
-	my $raw_mean = mean(@shift_values);
-	my $raw_sd = stddev(@shift_values);
-	printf "  The collected mean shift value is %.0f +/- %.0f bp\n", 
-		$raw_mean, $raw_sd;
-	my $raw_min = $raw_mean - (1.5 * $raw_sd);
-	$raw_min = 0 if $raw_min < 0;
-	my $raw_max = $raw_mean + (1.5 * $raw_sd);
-	my @trimmed_shift_values;
-	my @trimmed_f_profile;
-	my @trimmed_r_profile;
-	my @trimmed_shifted_profile;
-	my @trimmed_r2_values;
-	my @trimmed_regions;
-	foreach my $i (0 .. $#shift_values) {
-		if ($shift_values[$i] >= $raw_min and $shift_values[$i] <= $raw_max) {
-			push @trimmed_shift_values, $shift_values[$i];
-			push @trimmed_f_profile, $f_profile[$i];
-			push @trimmed_r_profile, $r_profile[$i];
-			push @trimmed_shifted_profile, $shifted_profile[$i];
-			push @trimmed_r2_values, $r2_values[$i];
-			push @trimmed_regions, $regions[$i];
-		}
-	}
-	my $best_value = sprintf("%.0f", mean(@trimmed_shift_values) );
-	printf "  The trimmed mean shift value is %s +/- %.0f bp from %s regions\n", 
-		$best_value, stddev(@trimmed_shift_values), 
-		format_with_commas(scalar @trimmed_shift_values);
-	
-	# write out the shift model data file
-	if ($model) {
-		write_model_file($best_value, \@trimmed_f_profile, \@trimmed_r_profile, 
-			\@trimmed_shifted_profile, \@trimmed_r2_values, \@trimmed_regions);
-	}
-	
-	# done
-	return $best_value;
-}
-
-
-
-### Scan chromosome for high coverage regions
-sub scan_high_coverage {
-	my ($tid, $coverage2region) = @_;
-	
-	my $size = $sam->target_len($tid);
-	
-	my $current_min = 0;
-	for (my $start = 0; $start < $size; $start += 500) {
-	
-		my $end = $start + 500;
-		$end = $size if $end > $size;
-	
-		# using the low level interface for a little more performance
-		my $coverage = $sam->bam_index->coverage(
-			$sam->bam,
-			$tid, # need the low level target ID
-			$start, 
-			$end,
-			1, # return mean coverage in a single bin
-		);
-		my $sum_coverage = $coverage->[0];
-		next if $coverage->[0] == 0;
-	
-		# check if our coverage exceeds the lowest region
-		if (scalar keys %{$coverage2region} < $sample_number) {
-			# less than requested regions found so far, so keep it
-			# record the coordinates for this region
-			$coverage2region->{$coverage->[0]} = [$tid, $start, $end];
-		}
-		else {
-			# we already have the maximum number
-			
-			# check that we have a current minimum value
-			unless ($current_min) {
-				$current_min = min( keys %{$coverage2region} );
-			}
-			
-			# find the lowest one
-			if ($coverage->[0] > $current_min) {
-				# it's a new high over the lowest minimum
-			
-				# remove the previous lowest region
-				delete $coverage2region->{ $current_min };
-			
-				# add the current region
+			# using the low level interface for a little more performance
+			my $coverage = $index->coverage(
+				$bam,
+				$tid, # need the low level target ID
+				$start, 
+				$end,
+			);
+			my $sum_coverage = sum( @{$coverage} );
+			next if $sum_coverage == 0;
+		
+			# check if our coverage exceeds the lowest region
+			if (scalar keys %coverage2region < $sample_number) {
+				# less than requested regions found so far, so keep it
 				# record the coordinates for this region
-				$coverage2region->{$coverage->[0]} = [$tid, $start, $end];
-				$current_min = min( keys %{$coverage2region} );
+				$coverage2region{$sum_coverage} = [$tid, $start, $end];
+			}
+			else {
+				# we already have the maximum number
+			
+				# find the lowest one
+				my $current_min = min( keys %coverage2region );
+				if ($sum_coverage > $current_min) {
+					# it's a new high over the lowest minimum
+				
+					# remove the previous lowest region
+					delete $coverage2region{ $current_min };
+				
+					# add the current region
+					# record the coordinates for this region
+					$coverage2region{$sum_coverage} = [$tid, $start, $end];
+				}
 			}
 		}
+		$chrom_count++;
 	}
-
-}
-
-
-
-### Calculate the cross strand correlation for the sample regions
-sub calculate_strand_correlation {
-	my $coverage2region = shift;
+	printf "    done in %.1f minutes\n", (time - $start_time)/60;
 	
+		
+	# now determine the optimal shift for each of the test regions
 	my @shift_values;
-	my @all_r2_values;
-	my @f_profile;
-	my @r_profile;
-	my @shifted_profile;
-	my @regions;
-	
-	# determine the optimal shift for each of the test regions
-	foreach my $i (keys %{$coverage2region}) {
+	foreach my $i (sort {$a <=> $b} keys %coverage2region) {
 		
 		# get the start and end positions
 		# we're adjusting them by 400 bp in both directions to actually 
 		# sample a 1.3 kb region centered over the original region
-		my $tid   = $coverage2region->{$i}->[0];
-		my $start = $coverage2region->{$i}->[1] - 400;
-		my $end   = $coverage2region->{$i}->[2] + 400;
-		my $region = $sam->target_name($tid) . ":$start..$end";
+		my $tid   = $coverage2region{$i}->[0];
+		my $chrom = $sam->target_name($tid);
+		my $start = $coverage2region{$i}->[1] - 400;
+		my $end   = $coverage2region{$i}->[2] + 400;
 		# just in case we go over
 		$start = 0 if $start < 1;
 		$end = $sam->target_len($tid) if $end > $sam->target_len($tid);
@@ -829,8 +621,10 @@ sub calculate_strand_correlation {
 			'count'   => 0,
 			'print'   => 0, # we will not print this data to file
 		};
-		$sam->bam_index->fetch(
-			$sam->bam, $tid, $start, $end, \&record_stranded_start, \%data);
+		$index->fetch($bam, $tid, $start, $end, \&record_stranded_start, \%data);
+		unless ($data{'count'}) {
+			die " no stranded data collected for calculating shift value!\n";
+		}
 		
 		# generate data arrays
 		my @f;
@@ -841,259 +635,67 @@ sub calculate_strand_correlation {
 			push @f, sum( map { $data{f}{$_} ||= 0 } ($i .. $i+9) );
 			push @r, sum( map { $data{r}{$_} ||= 0 } ($i .. $i+9) );
 		}
-		my @original_f = @f;
-		my @original_r = @r;
-		my $best_r = 0;
-		my $best_shift = 0;
-		my @best_profile;
-		my @r2_values;
 		
 		# calculate correlations
-		for (my $i = 0; $i <= 40; $i++) {
-			# check shift from 0 to 400 bp
+		my %r2shift;
+		for (my $i = 1; $i <= 40; $i++) {
+			# check shift from 10 to 400 bp
 			
 			# adjust the arrays, mimicking shifting arrays towards the 3'
-			if ($i) {
-				unshift @f, 0;
-				pop @f;
-				shift @r;
-				push @r, 0;
-			}
+			unshift @f, 0;
+			pop @f;
+			shift @r;
+			push @r, 0;
+			
+			# skip the first 20 bp
+			next if $i < 3;
 			
 			# calculate correlation
 			my $stat = Statistics::LineFit->new();
 			$stat->setData(\@r, \@f) or warn " bad data!\n";
 			my $r2 = $stat->rSquared();
-			push @r2_values, $r2;
 			
-			# check correlation
-			if ($r2 >= $correlation_min and $r2 > $best_r) {
-				# record new values
-				$best_shift = $i * 10;
-				$best_r = $r2;
-				
-				# record the best profile, average of f and r values
-				if ($model) {
-					# this is only required when reporting the model
-					for my $i (0 .. 129) {
-						$best_profile[$i] = mean( $f[$i], $r[$i] );
-					}
-				}
+			# store rsquared
+			if ($r2 >= $correlation_min) {
+				$r2shift{$r2} = $i * 10;
 			}
 		}
 		
-		# print result
-		if ($verbose) {
-			my $string = "  sampling $region  ";
-			if ($best_r) {
-				printf "$string shift $best_shift bp (r^2 %.3f)\n", $best_r;
-			}
-			else {
-				print "$string\n";
+		# determine best shift
+		my $string = "  sampling $chrom:$start..$end  ";
+		if (%r2shift) {
+			my $max_r = max(keys %r2shift);
+			push @shift_values, $r2shift{$max_r};
+			if ($verbose) {
+				printf "$string shift %s bp (r^2 %.3f)\n", $r2shift{$max_r}, $max_r;
 			}
 		}
-		
-		# record result
-		if ($best_r) {
-			push @shift_values, $best_shift;
-			if ($model) {
-				push @f_profile, \@original_f;
-				push @r_profile, \@original_r;
-				push @shifted_profile, \@best_profile;
-				push @all_r2_values, \@r2_values;
-				push @regions, $region;
-			}
+		else {
+			print "$string\n" if $verbose;
 		}
 	}
 	
-	return [ \@shift_values, \@f_profile, \@r_profile, 
-		\@shifted_profile, \@all_r2_values, \@regions];
+	# determine the optimal shift value
+	# we will be using a trimmed mean value to avoid outliers
+	@shift_values = sort {$a <=> $b} @shift_values;
+	my $cut = int( ( scalar(@shift_values) / 10 ) + 0.5); # take 10%
+	$cut++ if ($cut % 2); # make an even number
+	splice(@shift_values, 0, $cut);
+	splice(@shift_values, scalar(@shift_values) - $cut);
+	my $best_value = sprintf("%.0f", mean(@shift_values) );
+	printf "  The mean shift value is %s +/- %.0f bp\n", 
+		$best_value, stddev(@shift_values);
+	
+	# done
+	return $best_value;
 }
-
-
-### Write a text data file with the shift model data
-sub write_model_file {
-	my ($value, $f_profile, $r_profile, $shifted_profile, $r2_values, $regions) = @_;
-	
-	### Profile model
-	# Prepare the centered profiles from the raw profiles
-	# these will be -450 to +450, with 0 being the shifted profile peak
-	my @centered_f_profile;
-	my @centered_r_profile;
-	my @centered_shifted_profile;
-	for my $r (0 .. $#{$regions}) {
-		# first identify the peak in the shifted profile
-		my $peak = 0;
-		my $peak_i;
-		for my $i (0 .. 129) {
-			if ($shifted_profile->[$r][$i] > $peak) {
-				$peak = $shifted_profile->[$r][$i];
-				$peak_i = $i;
-			}
-		}
-		
-		# collect the centered profiles
-		for my $i (0 .. 90) {
-			my $current_i = $peak_i - 45 + $i;
-			if ($current_i >= 0 and $current_i <= 129) {
-				# check that the current index is within the raw index range
-				$centered_f_profile[$r][$i] = $f_profile->[$r][$current_i];
-				$centered_r_profile[$r][$i] = $r_profile->[$r][$current_i];
-				$centered_shifted_profile[$r][$i] = $shifted_profile->[$r][$current_i];
-			}
-			else {
-				# otherwise record zeros
-				$centered_f_profile[$r][$i] = 0;
-				$centered_r_profile[$r][$i] = 0;
-				$centered_shifted_profile[$r][$i] = 0;
-			}
-		}
-	}
-	
-	
-	# Prepare the data structure
-	my $profile = generate_tim_data_structure(
-		'shift_model_profile',
-		'Start',
-		"$outbase\_F",
-		"$outbase\_R",
-		"$outbase\_shift"
-	);
-	$profile->{'db'} = $infile;
-	push @{ $profile->{'other'} }, "# Average profile of read start point sums\n";
-	push @{ $profile->{'other'} }, 
-		"# Only profiles of trimmed shift value samples included\n";
-	push @{ $profile->{'other'} }, "# Final shift value calculated as $value bp\n";
-	$profile->{2}{'minimum_r2'} = $correlation_min;
-	$profile->{2}{'number_of_chromosomes_sampled'} = $chr_number;
-	$profile->{2}{'regions_sampled'} = scalar(@$f_profile);
-	
-	
-	# Load data table
-	# first we will put the mean value for all the regions
-	for my $i (0 .. 90) {
-		# generate the start position
-		$profile->{'data_table'}->[$i+1][0] = ($i - 45) * 10;
-		
-		# generate the mean value for each chromosome tested at each position
-		$profile->{'data_table'}->[$i+1][1] = mean( map { $centered_f_profile[$_][$i] } 
-			(0 .. $#centered_f_profile ) );
-		$profile->{'data_table'}->[$i+1][2] = mean( map { $centered_r_profile[$_][$i] } 
-			(0 .. $#centered_r_profile ) );
-		$profile->{'data_table'}->[$i+1][3] = 
-			mean( map { $centered_shifted_profile[$_][$i] } 
-			(0 .. $#centered_shifted_profile ) );
-	}
-	$profile->{'last_row'} = 91;
-	
-	
-	# Add the region specific profiles if verbose if requested
-	if ($verbose) {
-		for my $r (0 .. $#{$regions}) {
-		
-			# add column specific metadata
-			my $column = $profile->{'number_columns'};
-			$profile->{$column} = {
-				'name'  => $regions->[$r] . '_F',
-				'index' => $column,
-			};
-			$profile->{$column + 1} = {
-				'name'  => $regions->[$r] . '_R',
-				'index' => $column + 1,
-			};
-			$profile->{$column + 2} = {
-				'name'  => $regions->[$r] . '_Shift',
-				'index' => $column + 2,
-			};
-			$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
-			$profile->{'data_table'}->[0][$column+1] = $profile->{$column+1}{'name'};
-			$profile->{'data_table'}->[0][$column+2] = $profile->{$column+2}{'name'};
-		
-			# fill in the columns
-			for my $i (0 .. 90) {
-				$profile->{'data_table'}->[$i+1][$column]   = $centered_f_profile[$r][$i];
-				$profile->{'data_table'}->[$i+1][$column+1] = $centered_r_profile[$r][$i];
-				$profile->{'data_table'}->[$i+1][$column+2] = 
-					$centered_shifted_profile[$r][$i];
-			}
-		
-			$profile->{'number_columns'} += 3;
-		}
-	}
-	
-	# Write the model file
-	my $profile_file = write_tim_data_file( 
-		'data'     => $profile,
-		'filename' => "$outfile\_model.txt",
-		'gz'       => 0,
-	);
-	print "  Wrote shift profile model data file $profile_file\n" if $profile_file;
-	
-	
-	### R squared data
-	# prepare the data structure
-	my $r2_data = generate_tim_data_structure(
-		'Shift_correlations',
-		'Shift',
-		"$outbase\_R2"
-	);
-	$r2_data->{'db'} = $infile;
-	push @{ $r2_data->{'other'} }, "# Average R Squared values for each shift\n";
-	push @{ $r2_data->{'other'} }, "# Final shift value calculated as $value bp\n";
-	$r2_data->{1}{'minimum_r2'} = $correlation_min;
-	$r2_data->{1}{'number_of_chromosomes_sampled'} = $chr_number;
-	$r2_data->{1}{'regions_sampled'} = scalar(@$f_profile);
-	
-	# load data table
-	# first we will put the mean value for all the r squared values
-	for my $i (0 .. 40) {
-		# generate the start position
-		$r2_data->{'data_table'}->[$i+1][0] = $i * 10;
-		
-		# generate the mean value for each chromosome
-		$r2_data->{'data_table'}->[$i+1][1] = mean( map { $r2_values->[$_][$i] } 
-			(0 ..  $#{$regions}) );
-	}
-	$r2_data->{'last_row'} = 41;
-	
-	# add the chromosome specific profiles
-	if ($verbose) {
-		for my $r (0 .. $#{$regions}) {
-		
-			# add column specific metadata
-			my $column = $r2_data->{'number_columns'};
-			$r2_data->{$column} = {
-				'name'  => $regions->[$r] . '_R2',
-				'index' => $column,
-			};
-			$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
-		
-			# fill in the columns
-			for my $i (0 .. 40) {
-				$r2_data->{'data_table'}->[$i+1][$column]   = $r2_values->[$r][$i];
-			}
-		
-			$r2_data->{'number_columns'}++;
-		}
-	}
-	
-	# write the r squared file
-	my $rSquared_file = write_tim_data_file( 
-		'data'     => $r2_data,
-		'filename' => "$outfile\_correlations.txt",
-		'gz'       => 0,
-	);
-	print "  Wrote shift correlation data file $rSquared_file\n" if $rSquared_file;
-}
-
-
 
 ### Collect alignment coverage
 sub process_bam_coverage {
 	# using the low level bam coverage method, not strand specific
 	
 	# open wig file
-	my ($filename, $fh) = open_wig_file($outfile, 1);
+	my ($filename, $fh) = open_wig_file($outfile);
 	
 	# determine the dump size
 	# the dump size indicates how much of the genome we take before we 
@@ -1101,12 +703,56 @@ sub process_bam_coverage {
 	# this is based on the requested bin_size, default should be 1 bp 
 	# but we want to keep the coverage array reasonable size, 10000 elements
 	# is plenty. we'll do some math to make it a multiple of bin_size to fit
-	my $dump = $bin_size * int( 10000 / $bin_size); 
+	my $multiplier = int( 10000 / $bin_size);
+	my $dump = $bin_size * $multiplier; 
 	
 	# loop through the chromosomes
 	for my $tid (0 .. $sam->n_targets - 1) {
 		# each chromosome is internally represented in the bam file as an integer
-		process_bam_coverage_on_chromosome($fh, $tid, $dump);
+		
+		# get sequence info
+		my $seq_length = $sam->target_len($tid);
+		my $seq_id = $sam->target_name($tid);
+		
+		# prepare definition line for fixedStep
+		$fh->print(
+			"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+		);
+		
+		# walk through the chromosome
+		for (my $start = 0; $start < $seq_length; $start += $dump) {
+			
+			# the low level interface works with 0-base indexing
+			my $end = $start + $dump -1;
+			$end = $seq_length if $end > $seq_length;
+			
+			# using the low level interface for a little more performance
+			my $coverage = $index->coverage(
+				$bam,
+				$tid,
+				$start,
+				$end,
+			);
+			
+			# now dump the coverage out to file
+			if ($bin) {
+				for (my $i = 0; $i < scalar(@{ $coverage }); $i += $bin_size) {
+				
+					# sum the reads within our bin
+					my $sum = sum( map {$coverage->[$_]} ($i .. $i + $bin_size - 1));
+				
+					# print the wig line
+					$fh->print("$sum\n");
+				}
+			}
+			else {
+				for my $i (0 .. scalar(@$coverage)-1) {
+					# print the wig line
+					$fh->print("$coverage->[$i]\n");
+				}
+			}
+		}
+		printf " Converted reads on $seq_id in %.3f minutes\n", (time - $start_time)/60;
 	}
 	
 	$fh->close;
@@ -1120,132 +766,17 @@ sub process_bam_coverage {
 
 
 
-### Parallel process coverage
-sub parallel_process_bam_coverage {
-	# using the low level bam coverage method, not strand specific
-	# parallel multiple core execution
-	
-	# determine the dump size
-	# the dump size indicates how much of the genome we take before we 
-	# dump to file
-	# this is based on the requested bin_size, default should be 1 bp 
-	# but we want to keep the coverage array reasonable size, 10000 elements
-	# is plenty. we'll do some math to make it a multiple of bin_size to fit
-	my $dump = $bin_size * int( 10000 / $bin_size); 
-	
-	# we don't want child files to be compressed, takes too much CPU time
-	my $original_gz = $gz;
-	$gz = 0;
-	
-	# prepare ForkManager
-	print " Forking into $cpu children for parallel conversion\n";
-	my $pm = Parallel::ForkManager->new($cpu);
-	
-	# loop through the chromosomes
-	for my $tid (0 .. $sam->n_targets - 1) {
-		# each chromosome is internally represented in the bam file as an integer
-		
-		# run each chromosome in a separate fork
-		$pm->start and next;
-		
-		### in child ###
-		# first clone the Bam file object to make it safe for forking
-		$sam->clone;
-		
-		# then write the chromosome coverage in separate chromosome file
-		my ($filename, $fh) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
-		process_bam_coverage_on_chromosome($fh, $tid, $dump);
-		
-		# finished with this chromosome
-		$fh->close;
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-	# merge the children files back into one output file
-	print " merging separate chromosome files\n";
-	my @files = glob "$outfile#*";
-	die "can't find children files!\n" unless (@files);
-	$gz = $original_gz;
-	my ($filename, $fh) = open_wig_file($outfile, 1);
-	while (@files) {
-		my $file = shift @files;
-		my $in = open_to_read_fh($file);
-		while (<$in>) {$fh->print($_)}
-		$in->close;
-		unlink $file;
-	}
-	print " Wrote file $filename\n";
-	
-	# convert to bigwig if requested
-	if ($bigwig) {
-		convert_to_bigwig($filename);
-	}
-}
-
-
-
-### Process bam coverage for a specific chromosome
-sub process_bam_coverage_on_chromosome {
-	my ($fh, $tid, $dump) = @_;
-	
-	# get sequence info
-	my $seq_length = $sam->target_len($tid);
-	my $seq_id = $sam->target_name($tid);
-	
-	# prepare definition line for fixedStep
-	$fh->print(
-		"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-	);
-	
-	# walk through the chromosome
-	for (my $start = 0; $start < $seq_length; $start += $dump) {
-		
-		# the low level interface works with 0-base indexing
-		my $end = $start + $dump -1;
-		$end = $seq_length if $end > $seq_length;
-		
-		# using the low level interface for a little more performance
-		my $coverage = $sam->bam_index->coverage(
-			$sam->bam,
-			$tid,
-			$start,
-			$end,
-		);
-		
-		# now dump the coverage out to file
-		if ($bin) {
-			for (my $i = 0; $i < scalar(@{ $coverage }); $i += $bin_size) {
-			
-				# sum the reads within our bin
-				my $sum = sum( map {$coverage->[$_]} ($i .. $i + $bin_size - 1));
-			
-				# print the wig line
-				$fh->print("$sum\n");
-			}
-		}
-		else {
-			for my $i (0 .. scalar(@$coverage)-1) {
-				# print the wig line
-				$fh->print("$coverage->[$i]\n");
-			}
-		}
-	}
-	printf " Converted reads on $seq_id in %.3f minutes\n", (time - $start_time)/60;
-}
-
-
 ### Process alignments
 sub process_alignments {
 	
 	# open wig files
 	my ($filename1, $filename2, $fh1, $fh2);
 	if ($strand) {
-		($filename1, $fh1) = open_wig_file("$outfile\_f", 1);
-		($filename2, $fh2) = open_wig_file("$outfile\_r", 1);
+		($filename1, $fh1) = open_wig_file("$outfile\_f");
+		($filename2, $fh2) = open_wig_file("$outfile\_r");
 	}
 	else {
-		($filename1, $fh1) = open_wig_file($outfile, 1);
+		($filename1, $fh1) = open_wig_file($outfile);
 	}
 	
 	# loop through the chromosomes
@@ -1255,13 +786,46 @@ sub process_alignments {
 		# we can easily convert this to an actual sequence name
 		# we will force the conversion to go one chromosome at a time
 		
-		# processing depends on whether we need to split splices or not
-		if ($splice) {
-			process_split_alignments_on_chromosome($fh1, $fh2, $tid);
+		# sequence info
+		my $seq_id = $sam->target_name($tid);
+		my $seq_length = $sam->target_len($tid);
+		
+		# print chromosome line
+		if ($use_start or $use_mid) {
+			foreach ($fh1, $fh2) {
+				next unless defined $_;
+				if ($bin) {
+					$_->print(
+						"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+					);
+				}
+				else {
+					$_->print("variableStep chrom=$seq_id\n");
+				}
+			}
 		}
-		else {
-			process_alignments_on_chromosome($fh1, $fh2, $tid);
-		}
+		
+		# process the chromosome alignments
+		my %data = (
+			'f'       => {},
+			'r'       => {},
+			'fhf'     => $fh1,
+			'fhr'     => $fh2,
+			'bufferf' => [],
+			'bufferr' => [],
+			'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
+			'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
+			'count'   => 0,
+			'seq_id'  => $seq_id,
+			'seq_length' => $seq_length,
+			'print'   => 1,
+		);
+		$index->fetch($bam, $tid, 0, $seq_length, $callback, \%data);
+		
+		# finish up this chromosome
+		&$write_wig(\%data, 1); # final write
+		printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
+			format_with_commas( $data{'count'}), (time - $start_time)/60;
 	}
 	
 	# finished
@@ -1278,224 +842,90 @@ sub process_alignments {
 
 
 
-### Process alignments in parallel
-sub parallel_process_alignments {
+
+### Walk through the alignments on each chromosome
+sub process_split_alignments {
 	
-	# we don't want child files to be compressed, takes too much CPU time
-	my $original_gz = $gz;
-	$gz = 0;
-	
-	# prepare ForkManager
-	print " Forking into $cpu children for parallel conversion\n";
-	my $pm = Parallel::ForkManager->new($cpu);
+	# open wig files
+	my ($filename1, $filename2, $fh1, $fh2);
+	if ($strand) {
+		($filename1, $fh1) = open_wig_file("$outfile\_f");
+		($filename2, $fh2) = open_wig_file("$outfile\_r");
+	}
+	else {
+		($filename1, $fh1) = open_wig_file($outfile);
+	}
 	
 	# loop through the chromosomes
 	for my $tid (0 .. $sam->n_targets - 1) {
 		# each chromosome is internally represented in the bam file as 
 		# a numeric target identifier
-		# run each chromosome in a separate fork
-		$pm->start and next;
+		# we can easily convert this to an actual sequence name
+		# we will force the conversion to go one chromosome at a time
 		
-		### in child ###
-		# first clone the Bam file object to make it safe for forking
-		$sam->clone;
+		# sequence info
+		my $seq_id = $sam->target_name($tid);
+		my $seq_length = $sam->target_len($tid);
 		
-		# open chromosome wig files
-		my ($filename1, $filename2, $fh1, $fh2);
-		if ($strand) {
-			($filename1, $fh1) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
-			($filename2, $fh2) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
+		# print chromosome line
+		if ($use_start or $use_mid) {
+			foreach ($fh1, $fh2) {
+				next unless defined $_;
+				if ($bin) {
+					$_->print(
+						"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
+					);
+				}
+				else {
+					$_->print("variableStep chrom=$seq_id\n");
+				}
+			}
 		}
-		else {
-			($filename1, $fh1) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
-		}
+		
+		# process the reads across the chromosome
+		# Due to requiring split splices, we need to use the high-level API
+		# it's easier to use the high-level than try and re-invent my own code 
+		# for dealing with splices <sigh>
+		# this will increase processing time as each alignment must be incorporated 
+		# into AlignWrapper objects
+		
+		# since the high level API does not allow for a data structure to be passed 
+		# to the callback, we'll have to link it to a global variable
+		my %data = (
+			'f'       => {},
+			'r'       => {},
+			'fhf'     => $fh1,
+			'fhr'     => $fh2,
+			'bufferf' => [],
+			'bufferr' => [],
+			'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
+			'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
+			'count'   => 0,
+			'seq_id'  => $seq_id,
+			'seq_length' => $seq_length,
+			'print'   => 1,
+		);
+		$data_ref = \%data;
+		
+		# fetch using the high level API
+		$sam->fetch("$seq_id:1..$seq_length", \&single_end_spliced_callback);
+		
+		# finish up this chromosome
+		&$write_wig(\%data, 1); # final write
+		printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
+			format_with_commas( $data{'count'}), (time - $start_time)/60;
+	}
 	
-		# processing depends on whether we need to split splices or not
-		if ($splice) {
-			process_split_alignments_on_chromosome($fh1, $fh2, $tid);
-		}
-		else {
-			process_alignments_on_chromosome($fh1, $fh2, $tid);
-		}
-		
-		# finished with this chromosome
-		$fh1->close;
-		$fh2->close if $fh2;
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-	# merge the children files back into one output file
-	print " merging separate chromosome files\n";
-	my ($filename1, $filename2);
-	if ($strand) {
-		# separate stranded files
-		
-		my @ffiles = glob "$outfile\_f#*";
-		my @rfiles = glob "$outfile\_r#*";
-		die "can't find children files!\n" unless (@ffiles and @rfiles);
-		
-		$gz = $original_gz;
-		my $fh;
-		
-		# combine forward files
-		($filename1, $fh) = open_wig_file("$outfile\_f", 1);
-		while (@ffiles) {
-			my $file = shift @ffiles;
-			my $in = open_to_read_fh($file);
-			while (<$in>) {$fh->print($_)}
-			$in->close;
-			unlink $file;
-		}
-		$fh->close;
-		print " Wrote file $filename1\n";
-		
-		# combine reverse files
-		($filename2, $fh) = open_wig_file("$outfile\_r", 1);
-		while (@rfiles) {
-			my $file = shift @rfiles;
-			my $in = open_to_read_fh($file);
-			while (<$in>) {$fh->print($_)}
-			$in->close;
-			unlink $file;
-		}
-		$fh->close;
-		print " Wrote file $filename2\n";
-	}
-	else {
-		# single wig file
-		
-		my @files = glob "$outfile#*";
-		die "can't find children files!\n" unless (@files);
-		$gz = $original_gz;
-		my $fh;
-		($filename1, $fh) = open_wig_file($outfile, 1);
-		while (@files) {
-			my $file = shift @files;
-			my $in = open_to_read_fh($file);
-			while (<$in>) {$fh->print($_)}
-			$in->close;
-			unlink $file;
-		}
-		$fh->close;
-		print " Wrote file $filename1\n";
-	}
+	# finished
+	$fh1->close;
+	$fh2->close if $fh2;
+	print " Wrote file $filename1\n";
+	print " Wrote file $filename2\n" if $filename2;
 	
 	# convert to bigwig if requested
 	if ($bigwig) {
 		convert_to_bigwig($filename1, $filename2);
 	}
-}
-
-
-
-### Process alignments for a specific chromosome
-sub process_alignments_on_chromosome {
-	my ($fh1, $fh2, $tid) = @_;
-	
-	# sequence info
-	my $seq_id = $sam->target_name($tid);
-	my $seq_length = $sam->target_len($tid);
-	
-	# print chromosome line
-	if ($use_start or $use_mid) {
-		foreach ($fh1, $fh2) {
-			next unless defined $_;
-			if ($bin) {
-				$_->print(
-					"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-				);
-			}
-			else {
-				$_->print("variableStep chrom=$seq_id\n");
-			}
-		}
-	}
-	
-	# process the chromosome alignments
-	my %data = (
-		'f'       => {},
-		'r'       => {},
-		'fhf'     => $fh1,
-		'fhr'     => $fh2,
-		'bufferf' => [],
-		'bufferr' => [],
-		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
-		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
-		'count'   => 0,
-		'seq_id'  => $seq_id,
-		'seq_length' => $seq_length,
-		'print'   => 1,
-	);
-	$sam->bam_index->fetch($sam->bam, $tid, 0, $seq_length, $callback, \%data);
-	
-	# finish up this chromosome
-	&$write_wig(\%data, 1); # final write
-	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-		format_with_commas( $data{'count'}), (time - $start_time)/60;
-}
-
-
-
-### Process split alignments for a specific chromosome
-sub process_split_alignments_on_chromosome {
-	my ($fh1, $fh2, $tid) = @_;
-	
-	# sequence info
-	my $seq_id = $sam->target_name($tid);
-	my $seq_length = $sam->target_len($tid);
-	
-	# print chromosome line
-	if ($use_start or $use_mid) {
-		foreach ($fh1, $fh2) {
-			next unless defined $_;
-			if ($bin) {
-				$_->print(
-					"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
-				);
-			}
-			else {
-				$_->print("variableStep chrom=$seq_id\n");
-			}
-		}
-	}
-	
-	# process the reads across the chromosome
-	# Due to requiring split splices, we need to use the high-level API
-	# it's easier to use the high-level than try and re-invent my own code 
-	# for dealing with splices <sigh>
-	# this will increase processing time as each alignment must be incorporated 
-	# into AlignWrapper objects
-	
-	# to make things even more complicated, the split alignment subfeatures
-	# are no longer bam alignments, but essentially SeqFeature objects
-	# which means we must use special callbacks to record them (sigh....)
-	
-	# since the high level API does not allow for a data structure to be passed 
-	# to the callback, we'll have to link it to a global variable
-	my %data = (
-		'f'       => {},
-		'r'       => {},
-		'fhf'     => $fh1,
-		'fhr'     => $fh2,
-		'bufferf' => [],
-		'bufferr' => [],
-		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
-		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
-		'count'   => 0,
-		'seq_id'  => $seq_id,
-		'seq_length' => $seq_length,
-		'print'   => 1,
-	);
-	$data_ref = \%data;
-	
-	# fetch using the high level API
-	$sam->fetch("$seq_id:1..$seq_length", \&single_end_spliced_callback);
-	
-	# finish up this chromosome
-	&$write_wig(\%data, 1); # final write
-	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-		format_with_commas( $data{'count'}), (time - $start_time)/60;
 }
 
 
@@ -1505,17 +935,13 @@ sub single_end_spliced_callback {
 	
 	# check alignment
 	return if $a->unmapped;
-	return if $a->qual < $min_mapq;
-		# we need to check the quality here instead of later
-		# because the subfeatures lose this quality score
 	
 	# check for subfeatures
 	my @subfeatures = $a->get_SeqFeatures;
 	if (@subfeatures) {
 		# process each subfeature
 		foreach my $subf (@subfeatures) {
-			# use special split callbacks since these are no longer bam alignments
-			&$split_callback($subf, $data_ref);
+			&$callback($subf, $data_ref);
 		}
 	}
 	else {
@@ -1523,6 +949,27 @@ sub single_end_spliced_callback {
 		# treat this as a single read
 		&$callback($a, $data_ref);
 	}
+}
+
+
+### Record stranded at shifted start position
+sub record_stranded_shifted_start {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	return if $a->calend <= $shift_value; # cannot have negative positions
+	
+	# record based on the strand
+	if ($a->reversed) {
+		# reverse strand
+		$data->{r}{ $a->calend - $shift_value }++;
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + 1 + $shift_value }++;
+	}
+	check_data($data);
 }
 
 
@@ -1546,29 +993,13 @@ sub record_stranded_start {
 }
 
 
-### Record split stranded at start position
-sub record_split_stranded_start {
-	my ($part, $data) = @_;
-	
-	# record based on the strand
-	if ($part->strand == 1) {
-		# forward strand
-		$data->{f}{ $part->start }++;
-	}
-	else {
-		# reverse strand
-		$data->{r}{ $part->end }++;
-	}
-	check_data($data);
-}
-
-
 ### Record at shifted start position
 sub record_shifted_start {
 	my ($a, $data) = @_;
 	
 	# check
 	return if $a->qual < $min_mapq;
+	return if $a->calend <= $shift_value; # cannot have negative positions
 	
 	# shift based on strand, record on forward
 	if ($a->reversed) {
@@ -1603,19 +1034,25 @@ sub record_start {
 }
 
 
-### Record split at start position
-sub record_split_start {
-	my ($part, $data) = @_;
+### Record stranded at shifted mid position
+sub record_stranded_shifted_mid {
+	my ($a, $data) = @_;
 	
-	# start based on strand, record on forward
-	# these are high level objects
-	if ($part->strand == 1) {
-		# forward strand
-		$data->{f}{ $part->start }++;
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# calculate mid position
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	return if $pos <= $shift_value; # cannot have negatives
+	
+	# record based on the strand
+	if ($a->reversed) {
+		# reverse strand
+		$data->{r}{ $pos - $shift_value }++;
 	}
 	else {
-		# reverse strand
-		$data->{f}{ $part->end }++;
+		# forward strand
+		$data->{f}{ $pos + $shift_value }++;
 	}
 	check_data($data);
 }
@@ -1644,26 +1081,6 @@ sub record_stranded_mid {
 }
 
 
-### Record split stranded at mid position
-sub record_split_stranded_mid {
-	my ($part, $data) = @_;
-	
-	# calculate mid position
-	my $pos = int( ($part->start + $part->end) / 2);
-	
-	# record based on the strand
-	if ($part->strand == 1) {
-		# forward strand
-		$data->{f}{ $pos }++;
-	}
-	else {
-		# reverse strand
-		$data->{r}{ $pos }++;
-	}
-	check_data($data);
-}
-
-
 ### Record at shifted mid position
 sub record_shifted_mid {
 	my ($a, $data) = @_;
@@ -1673,6 +1090,7 @@ sub record_shifted_mid {
 	
 	# calculate mid position
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	return if $pos <= $shift_value; # cannot have negatives
 	
 	# shift based on strand, record on forward
 	if ($a->reversed) {
@@ -1760,17 +1178,6 @@ sub record_mid {
 }
 
 
-### Record at mid position
-sub record_split_mid {
-	my ($part, $data) = @_;
-	
-	# record mid position
-	$data->{f}{ int( ($part->start + $part->end) / 2) }++;
-	
-	check_data($data);
-}
-
-
 ### Record stranded across alignment for paired end
 sub record_stranded_paired_span {
 	my ($a, $data) = @_;
@@ -1827,23 +1234,6 @@ sub record_stranded_span {
 }
 
 
-### Record stranded across alignment
-sub record_split_stranded_span {
-	my ($part, $data) = @_;
-	
-	# record length at the start position based on strand
-	if ($part->strand == 1) {
-		# forward strand
-		$data->{f}{ $part->start } .= $part->length . ',';
-	}
-	else {
-		# reverse strand
-		$data->{r}{ $part->start } .= $part->length . ',';
-	}
-	check_data($data);
-}
-
-
 ### Record across alignment for paired end
 sub record_paired_span {
 	my ($a, $data) = @_;
@@ -1874,15 +1264,6 @@ sub record_span {
 }
 
 
-### Record across alignment
-sub record_split_span {
-	my ($part, $data) = @_;
-	
-	# record the length
-	$data->{f}{ $part->start } .= $part->length . ',';
-	check_data($data);
-}
-
 
 ### Record extended alignment
 sub record_extended {
@@ -1892,15 +1273,7 @@ sub record_extended {
 	return if $a->qual < $min_mapq;
 	
 	# start based on strand, record on forward
-	if ($a->reversed) {
-		# reverse strand
-		# must calculate the start position of the 3 prime extended fragment
-		$data->{f}{ $a->calend - $shift_value } .= "$shift_value,";
-	}
-	else {
-		# forward strand
-		$data->{f}{ $a->pos } .= "$shift_value,";
-	}
+	$data->{f}{ $a->pos } .= "$shift_value,";
 	check_data($data);
 }
 
@@ -1911,7 +1284,7 @@ sub check_data {
 	$data->{'count'}++;
 	
 	# write when we reach buffer maximum number of alignments read
-	if ($data->{'print'} and $data->{'count'} % $alignment_count == 0) {
+	if ($data->{'print'} and $data->{'count'} % ALIGN_COUNT_MAX == 0) {
 		&$write_wig($data, 0);
 	}
 }
@@ -1929,31 +1302,16 @@ sub write_varstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
-		
-		# deal with negative positions
-		if (min( keys %{ $data->{$s} }) <= 0) {
-			print "  Warning: " . (abs( min( keys %{ $data->{$s} } )) + 1) . 
-				" bp trimmed from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
-				if $verbose ;
-			
-			# delete the negative positions
-			foreach ( keys %{ $data->{$s} } ) {
-				delete $data->{$s}{$_} if $_ <= 0;
-			}
-		}
+			max(keys %{$data->{$s}}) - BUFFER_MIN; 
 		
 		# write the data
 		foreach my $pos (sort {$a <=> $b} keys %{$data->{$s}}) {
 			
-			# first check the position and bail when we've gone off the chromosome end
+			# first check the position and bail when we've gone far enough
 			last if ($pos > $maximum);
 			
 			# write line
-			my $score = $data->{$s}{$pos};
-			if ($max_dup) {
-				$score = $score > $max_dup ? $max_dup : $score;
-			}
+			my $score = $data->{$s}{$pos} > $max_dup ? $max_dup : $data->{$s}{$pos};
 			$data->{$fh}->print( join("\t", 
 				$pos, 
 				&$convertor($score) # convert RPM or log before writing
@@ -1964,10 +1322,9 @@ sub write_varstep {
 		}
 		
 		# warn about tossed values at the chromosome end
-		if ($verbose and $final and keys(%{ $data->{$s} }) ) {
-			print "  Warning: " . (max( keys(%{ $data->{$s} }) ) - $maximum) . 
-				" bp trimmed" . " from the end of chromosome " . $data->{'seq_id'} .
-				 "\n";
+		if ($final and keys(%{ $data->{$s} }) ) {
+			warn "  Warning: " . scalar keys(%{ $data->{$s} }) . " data points trimmed" .
+				" from " . $data->{'seq_id'} . " end\n";
 		}
 	}
 }
@@ -1975,7 +1332,6 @@ sub write_varstep {
 
 ### Write a fixedStep wig file
 sub write_fixstep {
-	# only binned data is ever written as a fixedStep wig file
 	my ($data, $final) = @_;
 	
 	# do each strand one at a time
@@ -1987,61 +1343,31 @@ sub write_fixstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
+			max(keys %{$data->{$s}}) - BUFFER_MIN; 
 		
-		# deal with negative positions
-		if (min( keys %{ $data->{$s} }) <= 0) {
-			print "  Warning: " . (abs( min( keys %{ $data->{$s} } )) + 1) . 
-				" bp trimmed from the beginning of chromosome " . $data->{'seq_id'} . "\n" 
-				if $verbose ;
-			
-			# delete the negative positions
-			foreach ( keys %{ $data->{$s} } ) {
-				delete $data->{$s}{$_} if $_ <= 0;
-			}
-		}
-		
-		# write binned data
+		# write the data
 		for (
 			my $pos = $data->{$offset}; 
 			$pos < $maximum - $bin_size; 
 			$pos += $bin_size
 		) {
-		
+			
 			# sum the counts in the bin interval
-			my $score;
-			if ($max_dup) {
-				$score = sum(
-					map { 
-						my $a = $data->{$s}{$_} ||= 0;
-						return $a > $max_dup ? $max_dup : $a;
-					} ($pos .. $pos + $bin_size -1 )
-				);
-			}
-			else {
-				$score = sum(
-					map { $data->{$s}{$_} ||= 0 } ($pos .. $pos + $bin_size -1 ) );
-			}
-		
+			my $score = sum( 
+				map { $data->{$s}{$_} ||= 0 } ($pos .. $pos + $bin_size -1) );
+			$score = $score > $max_dup ? $max_dup : $score;
+			
 			# write line
 			$data->{$fh}->print( &$convertor($score) . "\n" );
+			
+			# clean up
+			delete $data->{$s}{$pos};
 		}
 		
-		# clean up
-		for (
-			my $pos = $data->{$offset}; 
-			$pos < $maximum; 
-			$pos++
-		) {
-			next unless exists $data->{$s}{$_};
-			delete $data->{$s}{$pos};
-		}		
-		
 		# warn about tossed values at the chromosome end
-		if ($verbose and $final and keys(%{ $data->{$s} }) ) {
-			print "  Warning: " . (max( keys(%{ $data->{$s} }) ) - $maximum) . 
-				" bp trimmed" . " from the end of chromosome " . $data->{'seq_id'} .
-				 "\n";
+		if ($final and keys(%{ $data->{$s} }) ) {
+			warn "  Warning: " . scalar keys(%{ $data->{$s} }) . " data points trimmed" .
+				" from " . $data->{'seq_id'} . " end\n";
 		}
 	}
 }
@@ -2064,13 +1390,7 @@ sub write_bedgraph {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
-		
-		# print warning about negative positions
-		if ($verbose and min( keys %{ $data->{$s} }) < 0) {
-			print "  Warning: " . abs( min( keys %{ $data->{$s} } )) . " bp trimmed" .
-				" from the beginning of chromosome " . $data->{'seq_id'} . "\n";
-		}
+			max(keys %{$data->{$s}}) - BUFFER_MIN; 
 		
 		# convert read lengths to coverage in the buffer array
 		foreach my $pos (sort {$a <=> $b} keys %{ $data->{$s} }) {
@@ -2080,33 +1400,18 @@ sub write_bedgraph {
 			
 			# split the lengths, limit to max, and generate coverage
 			my @lengths = split(',', $data->{$s}{$pos});
-			if ($max_dup and scalar @lengths > $max_dup) {
+			if (scalar @lengths > $max_dup) {
 				splice(@lengths, $max_dup + 1); # delete the extra ones
 			}
-			
-			# we will take a shortcut if all lengths are the same
-			if ( $shift_value or all_equal(\@lengths) ) {
-				# all the lengths are equal
-				# each position will get the same pileup number
-				for (0 .. $lengths[0] - 1) {
-					# generate coverage
-					# we're relying on autovivification of the buffer array here
-					# this is what makes Perl both great and terrible at the same time
-					# this could also balloon memory usage - oh dear
+			foreach my $len (@lengths) {
+				# generate coverage
+				# we're relying on autovivification of the buffer array here
+				# this is what makes Perl both great and terrible at the same time
+				# this could also balloon memory usage - oh dear
+				for (0 .. $len -1) { 
 					my $p = $pos - $data->{$offset} + $_;
-					$data->{$buffer}->[$p] += scalar(@lengths) if $p >= 0;
-					# avoid modifying negative positions
-				}
-			}
-			else {
-				# not all the lengths are equal, must slog through all of them
-				foreach my $len (@lengths) {
-					# generate coverage same as above
-					for (0 .. $len -1) { 
-						my $p = $pos - $data->{$offset} + $_;
-						$data->{$buffer}->[$p] += 1 if $p >= 0;
-						# avoid modifying modifying negative positions
-					}
+					$data->{$buffer}->[$p] += 1 if $p >= 0;
+					# avoid modifying array subscript -1 in rare situations
 				}
 			}
 			delete $data->{$s}{$pos};
@@ -2117,7 +1422,7 @@ sub write_bedgraph {
 		my $current_value = shift @{ $data->{$buffer} } || 0;
 		my $current_offset = 0;
 		while (
-			scalar( @{ $data->{$buffer} } ) > $buffer_min or 
+			scalar( @{ $data->{$buffer} } ) > BUFFER_MIN or 
 				# keep at least minimum length in the buffer
 			( $final and scalar @{ $data->{$buffer} } )
 				# or we're at the end of the chromosome and need to write everything
@@ -2138,9 +1443,8 @@ sub write_bedgraph {
 					$end = $data->{'seq_length'};
 					
 					# dump anything left in the array to finish up
-					print "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
-						" from the end of chromosome " . $data->{'seq_id'} . "\n" 
-						if $verbose;
+					warn "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
+						" from " . $data->{'seq_id'} . " end\n";
 					$data->{$buffer} = [];
 				}
 				
@@ -2194,17 +1498,6 @@ sub write_bedgraph {
 }
 
 
-### A simple test to confirm if all elements in an array ref are equal
-sub all_equal {
-	my $array = shift;
-	my $value = $array->[0];
-	foreach (@$array) {
-		return 0 if $_ != $value;
-	}
-	return 1;
-}
-
-
 ### Convert to BigWig format
 sub convert_to_bigwig {
 	my @files = @_;
@@ -2251,7 +1544,6 @@ bam2wig.pl [--options...] <filename.bam>
   --sample <integer>
   --chrom <integer>
   --minr <float>
-  --model
   --strand
   --qual <integer>
   --max <integer>
@@ -2260,9 +1552,6 @@ bam2wig.pl [--options...] <filename.bam>
   --bw
   --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
   --gz
-  --cpu <integer>
-  --buffer <integer>
-  --count <integer>
   --verbose
   --version
   --help
@@ -2280,16 +1569,15 @@ genomic position and indexed, although it may be indexed automatically.
 
 =item --out <filename>
 
-Specify the output base filename. An appropriate extension will be 
-added automatically. By default it uses the base name of the 
-input file.
+Specify the output base filename. By default it uses the base name of 
+the input file.
 
 =item --position [start|mid|span|extend]
 
 Specify the position of the alignment coordinate which should be 
 recorded. Several positions are accepted: 
      
-    start     the 5 prime position of the alignment
+    start     the 5' position of the alignment
     mid       the midpoint of the alignment
     span      along the length of the alignment (coverage)
     extend    along the length of the predicted fragment
@@ -2324,9 +1612,7 @@ increase processing time.
 =item --pe
 
 The Bam file consists of paired-end alignments, and only properly 
-mapped pairs of alignments will be counted. Properly mapped pairs 
-include FR reads on the same chromosome, and not FF, RR, RF, or 
-pairs aligning to separate chromosomes. The default is to 
+mapped pairs of alignments will be counted. The default is to 
 treat all alignments as single-end.
 
 =item --bin <integer>
@@ -2350,7 +1636,7 @@ value.
 
 =item --shiftval <integer>
 
-Provide the value in bp that the recorded position should be shifted. 
+Provide the value in bp that the record position should be shifted. 
 The value should be 1/2 the average length of the insert library 
 that was sequenced. The default is to empirically determine the 
 appropriate shift value. See below for the approach.
@@ -2375,15 +1661,6 @@ empirically determining the shift value. Enter a decimal value
 between 0 and 1. Higher values are more stringent. The default 
 is 0.25.
 
-=item --model
-
-Indicate that the shift model profile data should be written to 
-file for examination. The average profile, including for each 
-sampled chromosome, are reported for the forward and reverse strands, 
-as  well as the shifted profile. A standard text file is generated 
-using the output base name. The default is to not write the model 
-shift data.
-
 =item --strand
 
 Indicate that separate wig files should be written for each strand. 
@@ -2404,28 +1681,23 @@ checked. The default value is 0 (accept everything).
 =item --max <integer>
 
 Set a maximum number of duplicate alignments tolerated at a single position. 
-This uses the alignment start (or midpoint if recording midpoint) position 
-to determine duplicity. Note that this does not affect coverage mode. 
-You may want to set a limit when working with random fragments (sonication) to 
-avoid PCR bias. Note that setting this value in conjunction with the --rpm 
-option may result in slightly lower coverage than anticipated, since the 
-pre-count does not account for duplicity. The default is undefined (no limit). 
+The default is 1000. 
 
 =item --rpm
 
 Convert the data to Reads (or Fragments) Per Million mapped. This is useful 
-for comparing read coverage between different datasets. Only alignments 
-that match the minimum mapping quality are counted. Only proper paired-end 
-alignments are counted, they are counted as one fragment. The conversion is 
-applied before converting to log, if requested. This will increase processing 
-time, as the alignments must first be counted. Note that all duplicate reads 
-are counted during the pre-count. The default is no RPM conversion. 
+for comparing read coverage between different datasets. This conversion 
+is applied before converting to log, if requested. This will increase 
+processing time, as the alignments must first be counted. Only mapped reads 
+with a minimum mapping quality are counted. All duplicates are counted. 
+The default is no RPM conversion. 
 
 =item --log [2|10]
 
 Transform the count to a log scale. Specify the base number, 2 or 
-10. Only really useful with Bam alignment files with high count numbers. 
-Default is to not transform the count.
+10. The counts are increased by 1 before taking a log transformation, 
+thus avoiding taking a log of 0. Only really useful with Bam alignment 
+files with high count numbers. Default is to not transform the count.
 
 =item --bw
 
@@ -2443,38 +1715,12 @@ paths may be set in the biotoolbox.cfg file.
 
 Specify whether (or not) the output file should be compressed with 
 gzip. The default is compress the output unless a BigWig file is 
-requested. Disable with --nogz.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
-
-=item --buffer <integer>
-
-Specify the length in bp to reserve as buffer when writing a bedGraph 
-file to account for future read coverage. This value must be greater 
-than the expected alignment length (including split alignments), 
-paired-end span length (especially RNA-Seq), or extended coverage 
-(2 x alignment shift). Increasing this value may result in increased 
-memory usage, but will avoid errors with duplicate positions 
-written to the wig file. The default is 1200 bp. 
-
-=item --count <integer>
-
-Specify the number of alignments processed before writing to file. 
-Increasing this count will reduce the number of disk writes and increase 
-performance at the cost of increased memory usage. Lowering will 
-decrease memory usage. The default is 200,000 alignments.
+requested.
 
 =item --verbose
 
-Print warnings when read counts go off the end of the chromosomes, 
-particularly with shifted read counts. Also print the correlations 
-for each sampled region as they are calculated when determining the 
-shift value. When writing the model file, data from each region is 
-also written. The default is false.
+Print the sample correlations when determining the shift value. 
+The default is false.
 
 =item --version
 
@@ -2502,20 +1748,18 @@ Alignment counts may be separated by strand, facilitating analysis of
 RNA-Seq experiments. 
 
 For ChIP-Seq experiments, the alignment position may be shifted 
-in the 3 prime direction. This effectively merges the separate peaks 
+in the 3' direction. This effectively merges the separate peaks 
 (representing the ends of the enriched fragments) on each strand 
 into a single peak centered over the target locus. Alternatively, 
 the entire predicted fragment may be recorded across its span. 
 This extended method of recording is analogous to the approach 
-used by the MACS program. The shift value may be empirically 
-determined from the sequencing data (see below). If requested, the 
-shift model profile may be written to file. Use the BioToolBox 
-script C<graph_profile.pl> to graph the data.
+used by the MACS2 program. The shift value may be empirically 
+determined from the sequencing data (see below). 
 
 The output wig file may be either a variableStep, fixedStep, or 
 bedGraph format. The file format is dictated by where the alignment 
-position is recorded. Recording start and midpoint at single 
-base-pair resolution writes a variableStep wig file. Binned start 
+position is recorded. Recording start and midpoint at 
+single base-pair resolution writes a variableStep wig file. Binned start 
 or midpoint counts and coverage are written as a fixedStep wig file. 
 Span and extended positions are written as a bedGraph file. 
 
@@ -2548,16 +1792,12 @@ settings:
 =item Single-end ChIP-Seq
 
 When sequencing Chromatin Immuno-Precipitation products, one generally 
-performs a 3 prime shift adjustment to center the fragment's end reads 
+performs a 3' shift adjustment to center the fragment's end reads 
 over the predicted center and putative target. To adjust the positions 
 of tag count peaks, let the program empirically determine the shift 
 value from the sequence data (recommended). Otherwise, if you know 
 the mean size of your ChIP eluate fragments, you can use the --shiftval 
 option. 
-
-To evaluate the empirically determined shift value, be sure to include 
-the --model option to examine the profiles of stranded and shifted read 
-counts and the distribution of cross-strand correlations.
 
 Depending on your downstream applications and/or preferences, you 
 can record strict enumeration (start positions) or coverage (extend 
@@ -2567,9 +1807,9 @@ Finally, to compare ChIP-Seq alignments from multiple experiments,
 convert your reads to Reads Per Million Mapped, which will help to 
 normalize read counts.
  
- bam2wig.pl --pos start --shift --model --rpm --in <bamfile>
+ bam2wig.pl --pos start --shift --rpm --in <bamfile>
  
- bam2wig.pl --pos extend --model --rpm --in <bamfile>
+ bam2wig.pl --pos extend --rpm --in <bamfile>
 
 =item Paired-end ChIP-Seq
 
@@ -2624,42 +1864,26 @@ bam2wig.pl will use this to set the strand.
 
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  
-You may also wish to increase the buffer size (see --buffer) to account 
-for reads that may span very large introns and avoid recording 
-duplicate positions.
-
 =back
 
 =head1 SHIFT VALUE DETERMINATION
 
-To empirically determine the shift value, a cross-strand correlation 
-method is employed. Regions with the highest read coverage 
-are sampled from one or more chromosomes listed in the Bam file. 
-The default number of regions is 200 sampled from each of the two 
-largest chromosomes. The largest chromosomes are used merely as a 
-representative fraction of the genome for performance reasons. Stranded
-read counts are collected in 10 bp bins over a 1300 bp region (the 
-initial 500 bp high coverage region plus flanking 400 bp). A Pearson 
-product-moment correlation coefficient is then reiteratively determined 
-between the stranded data sets as the bins are shifted from 0 to 400 bp. 
-The shift corresponding to the highest R squared value is recorded for 
-each sampled region. The default minimum R squared value to record an 
-optimal shift is 0.25, and not all sampled regions may return a 
-significant R squared value. After collection, outlier shift values 
-E<gt> 1.5 standard deviations from the mean are removed, and the trimmed 
-mean is used as the final shift value.
-
-This approach works best with clean, distinct peaks, although even 
-noisy data can generate a reasonably good shift model. If requested, 
-a text file containing the average read count profiles for the forward 
-strand, reverse strand, and shifted data are written so that a model 
-graph may be generated. You can generate a visual graph of the shift 
-model profiles using the following command:
- 
- graph_profile.pl --skip 4 --offset 1 --in <shift_model.txt>
- 
-The peak shift may also be evaluated by viewing separate, stranded wig 
-files together with the shifted wig file in a genome browser.
+To determine the shift value, the top 500 bp regions (the default
+number is 200 regions) with the highest coverage are collected from
+the largest chromosome or sequence represented in the Bam file. The
+largest chromosome is used merely as a representative fraction of the
+genome for performance reasons rather than random sampling. Stranded
+read counts are collected in 10 bp bins over the region and flanking
+400 bp regions (1.3 kb total). A Pearson product-moment correlation
+coefficient is then reiteratively determined between the stranded data
+as the bins are shifted from 30 to 400 bp. The shift corresponding to
+the highest R squared value is retained for each sampled region. The
+default minimum R^2 value to keep is 0.25, and not all sampled regions
+may return a significant R^2 value. A trimmed mean is then calculated
+from all of the calculated shift values to be used used as the final
+shift value. This approach works best with clean, distinct peaks. The
+peak shift may be evaluated by viewing separate, stranded wig files
+together with the shifted wig file in a genome browser.
 
 =head1 AUTHOR
 

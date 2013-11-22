@@ -14,7 +14,17 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.12.6';
+our $VERSION = '1.10.2';
+
+# check for IO gzip support
+our $GZIP_OK = 0;
+eval {
+	use IO::Zlib;
+};
+unless ($@) {
+	$GZIP_OK = 1;
+}; 
+undef $@;
 
 
 ### Variables
@@ -40,7 +50,6 @@ our @EXPORT_OK = qw(
 our @SUFFIX_LIST = qw(
 	\.txt
 	\.txt\.gz
-	\.txt\.bz2
 	\.gff
 	\.gff\.gz
 	\.gtf
@@ -99,17 +108,6 @@ sub load_tim_data_file {
 		
 		# the current file position should be at the beginning of the
 		# data table information
-		
-		# skip comment lines
-		if ($line =~ /^#/) {
-			push @{ $inputdata->{'other'} }, $line;
-			next;
-		}
-		
-		# no real line, just empty space
-		if ($line !~ m/\w+/) {
-			next;
-		}
 		
 		# simply read each line in the file, explode the line into an 
 		# anonymous array and push it to the data_table array
@@ -924,9 +922,7 @@ sub write_tim_data_file {
 	$args{'data'}     ||= undef;
 	$args{'filename'} ||= undef;
 	$args{'format'}   ||= undef;
-	unless (exists $args{'gz'}) {$args{'gz'} = undef} 
-		# this is a boolean value, need to be cognizant of 0
-		# this will be checked below
+	unless (exists $args{'gz'}) {$args{'gz'} = undef}
 	
 	# check the data
 	my $data = $args{'data'};
@@ -1141,11 +1137,32 @@ sub write_tim_data_file {
 	}
 	
 	# adjust gzip extension as necessary
-	if ($args{'gz'} and $extension !~ m/\.gz$/i) {
-		$extension .= '.gz';
+	if ($args{'gz'}) {
+		# requesting gzip compression
+		
+		# check for support
+		if ($GZIP_OK) {
+			# it is there
+			# add gz extension if necessary
+			unless ($extension =~ m/\.gz$/i) {
+				$extension .= '.gz';
+			}
+		}
+		else {
+			# support is not there
+			# complain to user
+			carp " IO::ZLIB is not installed for gz support! writing non-compressed file\n";
+			
+			# reset gzip
+			$args{'gz'} = 0;
+			
+			# strip gz extension if present
+			$extension =~ s/\.gz$//i; 
+		}
 	}
-	elsif (not $args{'gz'} and $extension =~ /\.gz$/i) {
-		$extension =~ s/\.gz$//i;
+	else {
+		# strip gz extension if present
+		$extension =~ s/\.gz$//i; 
 	}
 	
 	# check filename length
@@ -1184,30 +1201,31 @@ sub write_tim_data_file {
 		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][5] =~ m/\A [f \+ 1 w 0 \.]/xi) {
-				$data->{'data_table'}->[$row][5] = '+';
-			}
-			elsif ($data->{'data_table'}->[$row][5] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][5] = '-';
-			}
+			eval {
+				if ($data->{'data_table'}->[$row][5] >= 0 ) {
+					$data->{'data_table'}->[$row][5] = '+';
+				}
+				elsif ($data->{'data_table'}->[$row][5] == -1 ) {
+					$data->{'data_table'}->[$row][5] = '-';
+				}
+			};
 		}
 	}	
 	if ($extension =~ /.g[tf]f/i and $data->{'gff'}) {
 		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][6] =~ m/\A [f \+ 1 w]/xi) {
-				$data->{'data_table'}->[$row][6] = '+';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][6] = '-';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [0 \.]/xi) {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
-			else {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
+			eval {
+				if ($data->{'data_table'}->[$row][6] == 1 ) {
+					$data->{'data_table'}->[$row][6] = '+';
+				}
+				elsif ($data->{'data_table'}->[$row][6] == -1 ) {
+					$data->{'data_table'}->[$row][6] = '-';
+				}
+				elsif ($data->{'data_table'}->[$row][6] == 0 ) {
+					$data->{'data_table'}->[$row][6] = '.';
+				}
+			};
 		}
 	}	
 	
@@ -1399,22 +1417,28 @@ sub open_to_read_fh {
 	
 	# Open filehandle object as appropriate
 	my $fh; # filehandle
-	if ($filename =~ /\.gz$/i) {
+	if ($filename =~ /\.gz$/i and $GZIP_OK) {
 		# the file is compressed with gzip
-		$fh = IO::File->new("gzip -dc $filename |") or 
-			carp "unable to read '$filename' $!\n";
+		$fh = IO::Zlib->new;
 	} 
-	elsif ($filename =~ /\.bz2$/i) {
-		# the file is compressed with bzip2
-		$fh = IO::File->new("bzip2 -dc $filename |") or 
-			carp "unable to read '$filename' $!\n";
-	} 
+	elsif ($filename =~ /\.gz$/i and !$GZIP_OK) {
+		# gzip file support is not installed
+		croak " gzipped files are not supported!\n" .
+			" Either gunzip $filename or install IO::Zlib\n";
+	}
 	else {
 		# the file is uncompressed and space hogging
-		$fh = IO::File->new($filename, 'r') or 
-			carp "unable to read '$filename' $!\n";
+		$fh = IO::File->new;
 	}
-	return $fh if defined $fh;	
+	
+	# Open file and return
+	if ($fh->open($filename, "r") ) {
+		return $fh;
+	}
+	else {
+		carp "unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
 }
 
 
@@ -1461,31 +1485,65 @@ sub open_to_write_fh {
 		$append = 0;
 	}
 	
-	# add gz extension if necessary
-	if ($gz and $filename !~ m/\.gz$/i) {
-		$filename .= '.gz';
+	# determine write mode
+	my $mode;
+	if ($gz and $append) {
+		# append a gzip file
+		$mode = 'ab';
 	}
-	
-	
-	# Generate appropriate filehandle object
-	my $fh;
-	if (not $gz and not $append) {
-		$fh = IO::File->new($filename, 'w') or 
-			carp "cannot write to file '$filename' $!\n";
+	elsif (!$gz and $append) {
+		# append a normal file
+		$mode = 'a';
 	}
 	elsif ($gz and !$append) {
-		$fh = IO::File->new("| gzip >$filename") or 
-			carp "cannot write to compressed file '$filename' $!\n";
+		# write a new gzip file
+		$mode = 'wb';
 	}
-	elsif (not $gz and $append) {
-		$fh = IO::File->new(">> $filename") or 
-			carp "cannot append to file '$filename' $!\n";
+	else {
+		# write a new normal file
+		$mode = 'w';
 	}
-	elsif ($gz and $append) {
-		$fh = IO::File->new("| gzip >>$filename") or 
-			carp "cannot append to compressed file '$filename' $!\n";
+	
+	
+	# Generate appropriate filehandle object and name
+	my $fh;
+	if ($gz and $GZIP_OK) {
+		# write a space-saving compressed file
+		
+		# add gz extension if necessary
+		unless ($filename =~ m/\.gz$/i) {
+			$filename .= '.gz';
+		}
+		
+		$fh = new IO::Zlib;
 	}
-	return $fh if defined $fh;
+	elsif ($gz and !$GZIP_OK) {
+		# we wanted to write a compressed file but support is not there
+		
+		carp " IO::ZLIB not installed for gz support! writing non-compressed file\n";
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}	
+	else {
+		# write a normal space-hogging file
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}
+	
+	# Open file for writing and return
+	if ($fh->open($filename, $mode) ) {
+		return $fh;
+	}
+	else {
+		carp " unable to open file '$filename': error " . $fh->error . "\n";
+		return;
+	}
 }
 
 
@@ -2526,7 +2584,6 @@ sub write_summary_data {
 			'gene'            => 1,
 			'strand'          => 1,
 			'length'          => 1,
-			'primary_id'      => 1,
 		);
 		
 		# walk through the dataset names
@@ -2587,7 +2644,7 @@ sub write_summary_data {
 	) { 
 		
 		# determine the midpoint position of the window
-		my $midpoint = int mean(
+		my $midpoint = mean(
 			# this assumes the column metadata has start and stop
 			$data->{$column}{'start'},	
 			$data->{$column}{'stop'},	

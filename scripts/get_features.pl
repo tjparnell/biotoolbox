@@ -21,7 +21,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 );
 use tim_db_helper::config;
-my $VERSION = '1.11';
+my $VERSION = '1.10.2';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -258,33 +258,49 @@ sub prepare_data_structure_or_output {
 				$data->{2}{'position'} = $position;
 			}
 		}
-		
-		elsif ($include_coordinates) {
-			# generic tim data structure with coordinates
-			
-			$data = generate_tim_data_structure(
-				qw(region Name Type Chromosome Start End Strand)
-			);
-		
-			# position adjustments
-			if ($start_adj) {
-				$data->{4}{'start_adjustment'} = $start_adj;
-				$data->{4}{'position'} = $position;
-			}
-			if ($stop_adj) {
-				$data->{5}{'stop_adjustment'} = $stop_adj;
-				$data->{5}{'position'} = $position;
-			}
-		}
-			
 		else {
-			# just name and type, thank you very much
-			$data = generate_tim_data_structure(
-				join(',', @features), qw(Primary_ID Name Type) );
+			# generic structure
+			
+			# set the main feature string to be used in the output file
+			my $feature_string;
+			if ($include_coordinates) {
+				# collecting coordinates, which takes precedence 
+				# over the named features, especially if adjusting coordinates
+				$feature_string = 'region';
+			}
+			else {
+				# named features
+				$feature_string = join(',', @features);
+			}
+			
+			# depends on whether we want coordinates or not
+			if ($include_coordinates) {
+				# don't forget the coordinates
+				$data = generate_tim_data_structure(
+					$feature_string, 
+					qw(Name Type Chromosome Start End Strand)
+				);
+			
+				# position adjustments
+				if ($start_adj) {
+					$data->{3}{'start_adjustment'} = $start_adj;
+					$data->{3}{'position'} = $position;
+				}
+				if ($stop_adj) {
+					$data->{4}{'stop_adjustment'} = $stop_adj;
+					$data->{4}{'position'} = $position;
+				}
+			}
+			
+			else {
+				# just name and type, thank you very much
+				$data = generate_tim_data_structure(
+					$feature_string, qw(Name Type) );
+			}
+			
+			# add database
+			$data->{'db'} = $database;
 		}
-		
-		# add database
-		$data->{'db'} = $database;
 	}
 }
 
@@ -382,7 +398,7 @@ sub record_standard_coordinate_feature {
 		
 	# record the feature
 	push @{ $data->{'data_table'} }, [
-		$seqfeature->display_name,
+		$seqfeature->display_name || $seqfeature->primary_id,
 		$seqfeature->type,
 		$seqfeature->seq_id,
 		$seqfeature->start,
@@ -406,8 +422,7 @@ sub record_standard_feature {
 	
 	# record the feature
 	push @{ $data->{'data_table'} }, [
-		$seqfeature->primary_id,
-		join(';', $seqfeature->display_name, ($seqfeature->get_tag_values('Alias'))),
+		$seqfeature->display_name || $seqfeature->primary_id,
 		$seqfeature->type,
 	];
 	$data->{'last_row'} += 1;

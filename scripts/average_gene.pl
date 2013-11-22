@@ -10,14 +10,11 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
-	splice_data_structure
 );
 use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_new_feature_list
-	get_feature
-	get_chromo_region_score
 	get_region_dataset_hash
 	check_dataset_for_rpm_support
 );
@@ -26,20 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-use constant (DATASET_HASH_LIMIT => 3000);
-		# This constant determines the maximum size of the dataset hash to be 
-		# returned from the get_region_dataset_hash(). To increase performance, 
-		# the program normally queries the database once for each feature or 
-		# region, and a hash returned with potentially a score for each basepair. 
-		# This may become unwieldy for very large regions, which may be better 
-		# served by separate database queries for each window.
-my $VERSION = '1.12.6';
+my $VERSION = '1.10';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -71,13 +55,11 @@ my (
 	$extension,
 	$extension_size,
 	$min_length,
-	$long_data,
 	$smooth,
 	$sum,
 	$log,
 	$set_strand,
-	$gz,
-	$cpu,
+	$raw,
 	$help,
 	$print_version,
 ); # command line variables
@@ -97,14 +79,12 @@ GetOptions(
 	'ext=i'       => \$extension, # number of bins to extend beyond the feature
 	'extsize=i'   => \$extension_size, # explicit size of extended bins
 	'min=i'       => \$min_length, # minimum feature size
-	'long!'       => \$long_data, # collecting long data features
 	'smooth!'     => \$smooth, # do not interpolate over missing values
 	'sum'         => \$sum, # determine a final average for all the features
 	'log!'        => \$log, # dataset is in log2 space
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'gz!'         => \$gz, # compress the output file
-	'cpu=i'       => \$cpu, # number of execution threads
+	'raw'         => \$raw, # output raw data
 	'help'        => \$help, # print the help
 	'version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -128,8 +108,102 @@ if ($print_version) {
 
 
 ### Check for required values
-check_defaults();
-my $start_time = time;
+
+unless ($main_database or $infile) {
+	# a database must be defined
+	# a tim data file used as an input file would also define one
+	die " You must define a database or input file!\n";
+}
+
+unless ($feature or $infile) {
+	# the feature must be defined
+	# a tim data file used as an input file would also define one
+	die " You must define a feature!\n Use --help for more information\n";
+}
+
+unless ($outfile) {
+	die " You must define an output filename !\n Use --help for more information\n";
+}
+
+if ($stranded) {
+	unless (
+		$stranded eq 'sense' or 
+		$stranded eq 'antisense' or 
+		$stranded eq 'all'
+	) {
+		die " '$stranded' is not recognized for strand\n Use --help for more information\n";
+	}
+} 
+else {
+	$stranded = 'all'; # default is no strand information
+}
+
+if (defined $value_type) {
+	# validate the requested value type
+	unless (
+		$value_type eq 'score' or
+		$value_type eq 'count' or
+		$value_type eq 'length'
+	) {
+		die " unknown value type '$value_type'!\n";
+	}
+}
+else {
+	# default value
+	print " Collecting default data 'score' values\n";
+	$value_type = 'score';
+}
+
+if (defined $method) {
+	unless (
+		$method eq 'mean' or 
+		$method eq 'median' or 
+		$method eq 'sum' or 
+		$method eq 'min' or 
+		$method eq 'max' or 
+		$method eq 'stddev' or
+		$method eq 'rpkm' or
+		$method eq 'rpm'
+	) {
+		die " '$method' is not recognized for method\n Use --help for more information\n";
+	}
+	
+	if ($method =~ /rpk?m/) {
+		# make sure we collect the right values
+		$value_type = 'count';
+	}
+} 
+else {
+	# set default method
+	if ($value_type eq 'count') {
+		$method = 'sum';
+	}
+	else {
+		$method = 'mean';
+	}
+}
+
+# assign default values
+unless (defined $bins) {
+	# dividing gene into 10 (10%) bins seems reasonable to me
+	$bins = 10;
+} 
+
+unless (defined $extension) {
+	# default is no extension
+	$extension = 0;
+}
+
+unless (defined $log) {
+	# default is that data is not in log 2
+	$log = 0;
+}
+
+unless (defined $smooth) {
+	# default is to not include smoothing
+	$smooth = 0;
+}
+
 
 
 
@@ -140,6 +214,11 @@ if ($infile) {
 	print " Loading feature set from file $infile....\n";
 	$main_data_ref = load_tim_data_file($infile);
 	
+	# update program name
+	unless ($main_data_ref->{'program'} eq $0) {
+		$main_data_ref->{'program'} = $0;
+	}
+	
 	# define database if necessary
 	unless ($main_database) {
 		$main_database = $main_data_ref->{'db'};
@@ -147,19 +226,11 @@ if ($infile) {
 } 
 else {
 	# we will start a new file with a new dataset
-	$main_data_ref = get_new_feature_list(
-			'db'       => $main_database,
-			'features' => $feature,
-	);
+	generate_a_new_feature_dataset();
 }
 unless ($main_data_ref) {
 	# check for data
 	die " No data loaded! Nothing to do!\n";
-}
-
-# update program name
-unless ($main_data_ref->{'program'} eq $0) {
-	$main_data_ref->{'program'} = $0;
 }
 
 # the number of columns already in the data array
@@ -220,8 +291,7 @@ $dataset = verify_or_request_feature_types(
 my $rpm_read_sum;
 if ($method eq 'rpm') {
 	print " Checking RPM support for dataset '$dataset'...\n";
-	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb, $cpu);
-		# this step can be multi-threaded
+	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb);
 	if ($rpm_read_sum) {
 		printf " %s total features\n", format_with_commas($rpm_read_sum);
 	}
@@ -235,29 +305,61 @@ if ($method eq 'rpm') {
 
 
 
-## Collect the relative data
+## Collect the binned data
+my $start_time = time;
+if ($raw) {
+	open RAWFILE, ">$outfile\_raw.txt";
+}
 print " Collecting $method data from $dataset in " . 
 	($bins + 2 * $extension) . " bins....\n"; 
+collect_binned_data();
+close RAWFILE;
 
-# check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $main_data_ref->{'last_row'}/$cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
-		# splits to something more worthwhile
-		$cpu--;
+
+
+## Interpolate values
+if ($smooth) {
+	print " Smoothing data by interpolation....\n";
+	go_interpolate_values();
+}
+
+
+
+## Generate summed data - 
+# an average across all features at each position suitable for plotting
+if ($sum) {
+	print " Generating final summed data....\n";
+	my $sumfile = write_summary_data(
+		'data'        => $main_data_ref,
+		'filename'    => $outfile,
+		'startcolumn' => $startcolumn,
+		'dataset'     => $dataset,
+		'log'         => $log,
+	);
+	if ($sumfile) {
+		print " Wrote summary file '$sumfile'\n";
+	}
+	else {
+		print " Unable to write summary file!\n";
 	}
 }
 
-if ($cpu > 1) {
-	# parallel execution
-	print " Forking into $cpu children for parallel data collection\n";
-	parallel_execution();
-}
 
+
+## Output the data
+
+# write main output
+my $written_file = write_tim_data_file(
+	# we will write a tim data file
+	# appropriate extensions and compression should be taken care of
+	'data'     => $main_data_ref,
+	'filename' => $outfile,
+);
+if ($written_file) {
+	print " Wrote data file '$written_file'\n";
+}
 else {
-	# single process execution
-	single_execution();
+	print " unable to write data file!\n";
 }
 
 # print completion
@@ -267,242 +369,19 @@ printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 #### Subroutines #######
 
-sub check_defaults {
-	unless ($main_database or $infile) {
-		# a database must be defined
-		# a tim data file used as an input file would also define one
-		die " You must define a database or input file!\n";
-	}
-
-	unless ($feature or $infile) {
-		# the feature must be defined
-		# a tim data file used as an input file would also define one
-		die " You must define a feature!\n Use --help for more information\n";
-	}
-
-	unless ($outfile) {
-		die " You must define an output filename !\n Use --help for more information\n";
-	}
-
-	if ($stranded) {
-		unless (
-			$stranded eq 'sense' or 
-			$stranded eq 'antisense' or 
-			$stranded eq 'all'
-		) {
-			die " '$stranded' is not recognized for strand\n Use --help for more information\n";
-		}
-	} 
-	else {
-		$stranded = 'all'; # default is no strand information
-	}
-
-	if (defined $value_type) {
-		# validate the requested value type
-		unless (
-			$value_type eq 'score' or
-			$value_type eq 'count' or
-			$value_type eq 'length'
-		) {
-			die " unknown value type '$value_type'!\n";
-		}
-	}
-	else {
-		# default value
-		print " Collecting default data 'score' values\n";
-		$value_type = 'score';
-	}
-
-	if (defined $method) {
-		unless (
-			$method eq 'mean' or 
-			$method eq 'median' or 
-			$method eq 'sum' or 
-			$method eq 'min' or 
-			$method eq 'max' or 
-			$method eq 'stddev' or
-			$method eq 'rpkm' or
-			$method eq 'rpm'
-		) {
-			die " '$method' is not recognized for method\n Use --help for more information\n";
-		}
+## generate a feature dataset if one was not loaded
+sub generate_a_new_feature_dataset {
+	# a subroutine to generate a new feature dataset
 	
-		if ($method =~ /rpk?m/) {
-			# make sure we collect the right values
-			$value_type = 'count';
-		}
-	} 
-	else {
-		# set default method
-		if ($value_type eq 'count') {
-			$method = 'sum';
-		}
-		else {
-			$method = 'mean';
-		}
-	}
-
-	# assign default values
-	unless (defined $bins) {
-		# dividing gene into 10 (10%) bins seems reasonable to me
-		$bins = 10;
-	} 
-
-	unless (defined $extension) {
-		# default is no extension
-		$extension = 0;
-	}
-
-	unless (defined $log) {
-		# default is that data is not in log 2
-		$log = 0;
-	}
-
-	unless (defined $smooth) {
-		# default is to not include smoothing
-		$smooth = 0;
-	}
-
-	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
-	}
-	else {
-		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 0;
-	}
-}
-
-
-
-## Parallel execution for efficiency
-sub parallel_execution {
-	my $pm = Parallel::ForkManager->new($cpu);
-	
-	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
-
-	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
-		$pm->start and next;
-	
-		#### In child ####
-	
-		# splice the data structure
-		splice_data_structure($main_data_ref, $i, $cpu);
-		
-		# re-open database objects to make them clone safe
-		$mdb = open_db_connection($main_database);
-		if ($data_database) {
-			$ddb = open_db_connection($data_database);
-		}
-		else {
-			$ddb = $mdb;
-		}
-		
-		# Collect the data
-		collect_binned_data();
-		
-		# Interpolate values
-		if ($smooth) {
-			go_interpolate_values();
-		}
-		
-		# write out result
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
-			'filename' => "$child_base_name.$i",
-			'gz'       => 0, # faster to write without compression
-		);
-		if ($success) {
-			printf " wrote child file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
-		}
-		
-		# Finished
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-	# reassemble children files into output file
-	my @files = glob "$child_base_name.*";
-	unless (@files) {
-		die "unable to find children files!\n";
-	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	
-	# generate summary file
-	if ($sum) {
-		print " Generating final summed data....\n";
-		# we will do this via manipulate_datasets.pl
-		@args = (
-			"$Bin/manipulate_datasets.pl", 
-			'--func', 
-			'summary', 
-			'--index', 
-			$startcolumn . '-' . $main_data_ref->{'number_columns'} - 1,
-			$outfile
-		);
-	}
-	# done
-}
-
-
-## Run in single thread
-sub single_execution {
-	
-	# Collect the data
-	collect_binned_data();
-	
-	# Interpolate values
-	if ($smooth) {
-		print " Smoothing data by interpolation....\n";
-		go_interpolate_values();
-	}
-
-	# Generate summed data - 
-	# an average across all features at each position suitable for plotting
-	if ($sum) {
-		print " Generating final summed data....\n";
-		my $sumfile = write_summary_data(
-			'data'        => $main_data_ref,
-			'filename'    => $outfile,
-			'startcolumn' => $startcolumn,
-			'dataset'     => $dataset,
-			'log'         => $log,
-		);
-		if ($sumfile) {
-			print " Wrote summary file '$sumfile'\n";
-		}
-		else {
-			print " Unable to write summary file!\n";
-		}
-	}
-
-	# write main output
-	my $written_file = write_tim_data_file(
-		# we will write a tim data file
-		'data'     => $main_data_ref,
-		'filename' => $outfile,
-		'gz'       => $gz,
+	$main_data_ref = get_new_feature_list(
+			'db'       => $main_database,
+			'features' => $feature,
 	);
-	if ($written_file) {
-		print " Wrote data file '$written_file'\n";
-	}
-	else {
-		print " unable to write data file!\n";
-	}
-	# done
+	
+	# set the current program
+	$main_data_ref->{'program'} = $0;
 }
+
 
 
 ## Collect the binned data across the gene
@@ -514,17 +393,15 @@ sub collect_binned_data {
 	
 	
 	## Identify columns for feature identification
-	my $name   = find_column_index($main_data_ref, '^name');
+	my $name = find_column_index($main_data_ref, '^name|id');
 	
-	my $type   = find_column_index($main_data_ref, '^type|class');
-	
-	my $id     = find_column_index($main_data_ref, '^primary_id');
+	my $type = find_column_index($main_data_ref, '^type|class');
 	
 	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
 	
-	my $start  = find_column_index($main_data_ref, '^start|position');
+	my $start = find_column_index($main_data_ref, '^start|position');
 	
-	my $stop   = find_column_index($main_data_ref, '^stop|end');
+	my $stop = find_column_index($main_data_ref, '^stop|end');
 	
 	my $strand = find_column_index($main_data_ref, '^strand');
 	
@@ -532,6 +409,15 @@ sub collect_binned_data {
 	
 	## Select the appropriate method for data collection
 	if (
+		defined $name and
+		defined $type
+	) {
+		# using named features
+		collect_binned_data_for_features(
+			$binsize, $name, $type, $strand);
+	}
+	
+	elsif (
 		defined $start and
 		defined $stop  and
 		defined $chromo
@@ -539,17 +425,6 @@ sub collect_binned_data {
 		# using genome segments
 		collect_binned_data_for_regions(
 			$binsize, $chromo, $start, $stop, $strand);
-	}
-	
-	elsif (
-		defined $id or (
-			defined $name and 
-			defined $type
-		)
-	) {
-		# using named features
-		collect_binned_data_for_features(
-			$binsize, $id, $name, $type, $strand);
 	}
 	
 	else {
@@ -563,7 +438,7 @@ sub collect_binned_data {
 sub collect_binned_data_for_features {	
 	
 	## Passed data
-	my ($binsize, $id_index, $name_index, $type_index, $strand_index) = @_;
+	my ($binsize, $name_index, $type_index, $strand_index) = @_;
 	
 	
 	## Collect the data
@@ -571,25 +446,31 @@ sub collect_binned_data_for_features {
 		# walk through each feature
 		
 		# identify the feature first
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_index ? 
-				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
-			'name'  => defined $name_index ? 
-				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
-			'type'  => defined $type_index ? 
-				$main_data_ref->{'data_table'}->[$row][$type_index] : undef,
+		my $name = $data_table_ref->[$row][$name_index]; # name
+		my $type = $data_table_ref->[$row][$type_index]; # class
+		
+		# start printing raw data
+		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
+		
+		# pull gene from database
+		my @genes = $mdb->features( 
+				-name  => $name,
+				-type => $type,
 		);
-		unless ($feature) {
-			# record null values
-			for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
-				$data_table_ref->[$row][$column] = '.';
-			}
-			next;
+		if (scalar @genes > 1) {
+			# there should only be one feature found
+			# if more, there's redundant or duplicated data in the db
+			# warn the user, this should be fixed
+			warn " Found more than one feature of '$type => $name' in " .
+				"the database!\n Using the first feature only!\n";
+		}
+		my $gene = shift @genes; 
+		unless ($gene) {
+			die " unable to establish db region for $type feature $name!\n";
 		}
 		
 		# define the starting and ending points based on gene length
-		my $length = $feature->length;
+		my $length = $gene->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -600,6 +481,8 @@ sub collect_binned_data_for_features {
 			for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
 				$data_table_ref->[$row][$column] = '.';
 			}
+			
+			# move on to next feature
 			next;
 		}
 		
@@ -618,37 +501,28 @@ sub collect_binned_data_for_features {
 			}
 		}
 		
-		# collect the data based on whether we want a hash or separate scores
-		if ($length + (2 * $extra) > DATASET_HASH_LIMIT or $long_data) {
-			# we will be collecting scores for each bin as separate db queries
-			record_individual_bin_values(
-				$row, 
-				$feature->seq_id, 
-				$feature->start, 
-				$feature->end, 
-				$set_strand ? $data_table_ref->[$row][$strand_index] : $feature->strand, 
-				$length,
-			);
-		}
-		else {
-			# collect the region scores in a single db query
-			my %regionscores = get_region_dataset_hash(
-						'db'        => $mdb,
-						'ddb'       => $ddb,
-						'dataset'   => $dataset,
-						'value'     => $value_type,
-						'chromo'    => $feature->seq_id,
-						'start'     => $feature->start,
-						'stop'      => $feature->end,
-						'extend'    => $extra,
-						'stranded'  => $stranded,
-						'strand'    => $set_strand ? 
-							$data_table_ref->[$row][$strand_index] : $feature->strand,
-			);
 		
-			# record the scores for each bin
-			record_the_bin_values($row, $length, \%regionscores);
+		# collect the region scores
+		my %regionscores = get_region_dataset_hash(
+					'db'        => $mdb,
+					'ddb'       => $ddb,
+					'dataset'   => $dataset,
+					'value'     => $value_type,
+					'name'      => $name,
+					'type'      => $type,
+					'extend'    => $extra,
+					'stranded'  => $stranded,
+					'strand'    => $set_strand ? 
+						$data_table_ref->[$row][$strand_index] : undef,
+		);
+		if ($raw) {
+			foreach (sort {$a <=> $b} keys %regionscores) {
+				print RAWFILE "\tdb: $regionscores{$_} \@ $_";
+			}
 		}
+		
+		# record the scores for each bin
+		record_the_bin_values($row, $length, \%regionscores);
 	}	
 }
 
@@ -664,9 +538,17 @@ sub collect_binned_data_for_regions {
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		# walk through each feature
 		
+		# identify the coordinates
+		my $chromo = $data_table_ref->[$row][$chromo_index]; 
+		my $start  = $data_table_ref->[$row][$start_index]; 
+		my $stop   = $data_table_ref->[$row][$stop_index]; 
+		my $strand = $data_table_ref->[$row][$strand_index] || 1; # default +1
+		
+		# start printing raw data
+		if ($raw) { print RAWFILE join "\t", @{ $data_table_ref->[$row] } } 
+		
 		# determine the segment length
-		my $length = $data_table_ref->[$row][$stop_index] - 
-			$data_table_ref->[$row][$start_index] + 1;
+		my $length = $stop - $start + 1;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -685,45 +567,57 @@ sub collect_binned_data_for_regions {
 		# the starting and ending points will be calculated from the number of
 		# extensions, the binsize (multiply by 0.01 to get fraction), and the gene
 		# length. No extensions should give just the length of the gene.
-		my $extra;
+		my ($startingpoint, $endingpoint);
 		if ($extension_size) {
 			# extension is specific bp in size
-			$extra = int( ($extension_size * $binsize) + 0.5);
+			my $extra = $extension_size * $binsize;
+			$startingpoint = int( $start - $extra + 0.5 );
+			$endingpoint   = int( $stop + $extra + 0.5 );
 		}
 		else {
 			# extension is dependent on feature length
-			my $extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
+			my $extra = $extension * $binsize * 0.01 * $length;
+			$startingpoint = int( $start - $extra + 0.5);
+			$endingpoint   = int( $stop + $extra + 0.5);
 		}
 		
-		# collect the data based on whether we want a hash or separate scores
-		if ($length + (2 * $extra) > DATASET_HASH_LIMIT or $long_data) {
-			# we will be collecting scores for each bin as separate db queries
-			record_individual_bin_values(
-				$row, 
-				$data_table_ref->[$row][$chromo_index], 
-				$data_table_ref->[$row][$start_index], 
-				$data_table_ref->[$row][$stop_index], 
-				$data_table_ref->[$row][$chromo_index] || 0, 
-				$length,
-			);
+		# collect the region scores
+		my %regionscores = get_region_dataset_hash(
+					'db'       => $ddb,
+					'dataset'  => $dataset,
+					'value'    => $value_type,
+					'chromo'   => $chromo,
+					'start'    => $startingpoint,
+					'stop'     => $endingpoint,
+					'absolute' => 1,
+					'stranded' => $stranded,
+					'strand'   => $strand,
+		);
+		if ($raw) {
+			foreach (sort {$a <=> $b} keys %regionscores) {
+				print RAWFILE "\tdb: $regionscores{$_} \@ $_";
+			}
+		}
+		
+		# convert absolute scores to relative scores
+		# must be done here because we have the original coordinates
+		my %relative_scores;
+		if ($strand >= 0) {
+			# forward strand
+			foreach my $pos (keys %regionscores) {
+				$relative_scores{ $pos - $start } = $regionscores{$pos};
+			}
 		}
 		else {
-			# collect the region scores in a single db query
-			my %regionscores = get_region_dataset_hash(
-						'db'       => $ddb,
-						'dataset'  => $dataset,
-						'value'    => $value_type,
-						'chromo'   => $data_table_ref->[$row][$chromo_index],
-						'start'    => $data_table_ref->[$row][$start_index],
-						'stop'     => $data_table_ref->[$row][$stop_index],
-						'extend'   => $extra,
-						'stranded' => $stranded,
-						'strand'   => $data_table_ref->[$row][$chromo_index],
-			);
-		
-			# record the scores for each bin
-			record_the_bin_values($row, $length, \%regionscores);
+			# reverse strand
+			foreach my $pos (keys %regionscores) {
+				$relative_scores{ $stop - $pos } = $regionscores{$pos};
+			}
 		}
+		
+		# record the scores for each bin
+		record_the_bin_values($row, $length, \%relative_scores);
+		
 	}
 }
 
@@ -794,6 +688,8 @@ sub record_the_bin_values {
 				# either the count or the sum methods require that the 
 				# scores be summed
 				$window_score = sum(@scores);
+				# raw output
+				if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
 				
 			}
 			
@@ -832,6 +728,9 @@ sub record_the_bin_values {
 						($length * $rpm_read_sum);
 				}
 				
+				# raw output
+				if ($raw) { print RAWFILE "\tfound: " . join(",", @scores) }
+				
 				# convert back to log if necessary
 				if ($log) {
 					if ($window_score != 0) {
@@ -858,95 +757,15 @@ sub record_the_bin_values {
 		
 		# record the value
 		$data_table_ref->[$row][$column] = $window_score;
+		if ($raw) { print RAWFILE "\tscore for col $column start $start: $window_score" }
 	}
-}
-
-
-
-
-## Record individual bin scores using separate db queries
-sub record_individual_bin_values {
-	my ($row, $chromo, $fstart, $fstop, $strand, $length) = @_;
 	
-	# collect the scores to the bins in the region
-	for my $column ($startcolumn..($main_data_ref->{'number_columns'} - 1) ) {
-		# we will step through each data column, representing each window (bin)
-		# across the feature's region
-		# any scores within this window will be collected and the mean 
-		# value reported
-		
-		# convert the window start and stop coordinates (as percentages) to
-		# actual bp
-		# this depends on whether the binsize is explicitly defined in bp or
-		# is a fraction of the feature length
-		my ($start, $stop);
-		if ($main_data_ref->{$column}{'bin_size'} =~ /bp$/) {
-			# the bin size is explicitly defined
-			
-			# the start and stop points are relative to either the feature
-			# start (always 0) or the end (the feature length), depending
-			# upon whether the 5' or 3' end of the feature
-			
-			# determine this by the sign of the start position
-			if ($main_data_ref->{$column}{'start'} < 0 and $strand >= 0) {
-				# the start position is less than 0, implying the 5' end
-				# the reference position will be the feature start on plus strand
-				$start = $fstart + $main_data_ref->{$column}{'start'};
-				$stop  = $fstart + $main_data_ref->{$column}{'stop'};
-			}
-			elsif ($main_data_ref->{$column}{'start'} < 0 and $strand < 0) {
-				# the start position is less than 0, implying the 5' end
-				# the reference position will be the feature end on minus strand
-				$start = $fstop - $main_data_ref->{$column}{'start'};
-				$stop  = $fstop - $main_data_ref->{$column}{'stop'};
-			}
-			elsif ($main_data_ref->{$column}{'start'} > 0 and $strand >= 0) {
-				# the start position is greather than 0, implying the 3' end
-				# the reference position will be the feature start on plus strand
-				$start = $fstop + $main_data_ref->{$column}{'start'};
-				$stop  = $fstop + $main_data_ref->{$column}{'stop'};
-			}
-			elsif ($main_data_ref->{$column}{'start'} > 0 and $strand < 0) {
-				# the start position is greather than 0, implying the 3' end
-				# the reference position will be the feature end on minus strand
-				$start = $fstart - $main_data_ref->{$column}{'start'};
-				$stop  = $fstart - $main_data_ref->{$column}{'stop'};
-			}
+	# finish the raw line
+	if ($raw) { print RAWFILE "\n" }
 
-		}
-		else {
-			# otherwise the bin size is based on feature length
-			if ($strand >= 0) {
-				# forward plus strand
-				$start = int( $fstart + 
-					($main_data_ref->{$column}{'start'} * 0.01 * $length) + 0.5);
-				$stop  = int( $fstart + 
-					($main_data_ref->{$column}{'stop'} * 0.01 * $length) - 1 + 0.5);
-			}
-			else {
-				# reverse minus strand
-				$start = int( $fstop - 
-					($main_data_ref->{$column}{'start'} * 0.01 * $length) + 0.5);
-				$stop  = int( $fstop - 
-					($main_data_ref->{$column}{'stop'} * 0.01 * $length) + 1 + 0.5);
-			}
-		}
-		
-		# collect the data for this bin
-		$data_table_ref->[$row][$column] = get_chromo_region_score(
-			'db'          => $ddb,
-			'dataset'     => $dataset,
-			'chromo'      => $chromo,
-			'start'       => $start,
-			'stop'        => $stop,
-			'strand'      => $strand,
-			'method'      => $method,
-			'value'       => $value_type,
-			'stranded'    => $stranded,
-			'log'         => $log,
-		);
-	}
 }
+
+
 
 
 
@@ -1239,13 +1058,10 @@ A program to generate class average summaries for a list of genes or features.
   --extsize <integer>
   --min <integer>
   --strand [all|sense|antisense]
-  --long
   --sum
   --smooth
   --force_strand
   --(no)log
-  --gz
-  --cpu <integer>
   --version
   --help
 
@@ -1373,17 +1189,6 @@ Specify whether stranded data should be collected. Three values are
 allowed: all datasets should be collected (default), only sense 
 datasets, or only antisense datasets should be collected.
 
-=item --long
-
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. Execution times may be 
-longer than otherwise. Default is false.
-
 =item --sum
 
 Indicate that the data should be averaged across all features at
@@ -1411,16 +1216,6 @@ regions (e.g. BED files). Default is false.
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space.
 
-=item --gz
-
-Specify whether (or not) the output file should be compressed with gzip.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
-
 =item --version
 
 Print the version number.
@@ -1434,7 +1229,7 @@ This help text.
 =head1 DESCRIPTION
 
 This program will collect data across a gene or feature body into numerous 
-percentile bins. It is used to determine if there is a spatial 
+percentile bins to. It is used to determine if there is a spatial 
 distribution preference for the dataset over gene bodies. The number 
 of bins may be specified as a command argument (default 10). Additionally, 
 extra bins may be extended on either side of the gene (default 0 on either 

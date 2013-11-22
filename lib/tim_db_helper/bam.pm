@@ -6,13 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
-our $parallel;
-eval {
-	# check for parallel support, when counting bam alignments
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-our $VERSION = '1.12';
+our $VERSION = '1.10';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -50,7 +44,6 @@ our %BAM_CHROMOS;
 sub open_bam_db {
 	
 	my $bamfile = shift;
-	my $forget  = shift;
 	
 	# check if we have seen this bam file before
 	if (exists $OPENED_BAMFILES{$bamfile} ) {
@@ -75,13 +68,11 @@ sub open_bam_db {
 		};
 		return unless $sam;
 		
-		unless ($forget) {
-			# store the opened object for later use
-			$OPENED_BAMFILES{$bamfile} = $sam;
+		# store the opened object for later use
+		$OPENED_BAMFILES{$bamfile} = $sam;
 			
-			# collect the chromosomes for this bam
-			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
-		}
+		# collect the chromosomes for this bam
+		%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
 		
 		# done
 		return $sam;
@@ -244,8 +235,6 @@ sub sum_total_bam_alignments {
 	my $sam_file = shift;
 	my $min_mapq = shift || 0; # by default we take all alignments
 	my $paired   = shift || 0; # by default we assume all alignments are single-end
-	my $cpu      = shift || 2; # number of forks to execute in parallel
-	$cpu = 1 unless ($parallel);
 	unless ($sam_file) {
 		carp " no Bam file or bam db object passed!\n";
 		return;
@@ -261,20 +250,23 @@ sub sum_total_bam_alignments {
 	}
 	else {
 		# we have a name of a sam file
-		# open the file but do not remember it
-		$sam = open_bam_db($sam_file, 1);
+		$sam = open_bam_db($sam_file);
 		return unless ($sam);
 	}
+	my $index = $sam->bam_index;
 	
-	# prepare the counting subroutine
-	my $counter = sub {
-		my $tid = shift;
-		my $number = 0;
+	# Count the number of alignments
+	my $total_read_number = 0;
+	
+	# loop through the chromosomes
+	for my $tid (0 .. $sam->n_targets - 1) {
+		# each chromosome is internally represented in the bam file as 
+		# a numeric target identifier
 		
 		# process the reads according to single or paired-end
 		# paired end alignments
 		if ($paired) {
-			$sam->bam_index->fetch(
+			$index->fetch(
 				$sam->bam, 
 				$tid, 
 				0, 
@@ -290,13 +282,13 @@ sub sum_total_bam_alignments {
 					# count this fragment
 					$$number++;
 				}, 
-				\$number
+				\$total_read_number
 			);
 		}
 		
 		# single end alignments
 		else {
-			$sam->bam_index->fetch(
+			$index->fetch(
 				$sam->bam, 
 				$tid, 
 				0, 
@@ -311,59 +303,8 @@ sub sum_total_bam_alignments {
 					# count this fragment
 					$$number++;
 				}, 
-				\$number
+				\$total_read_number
 			);
-		}
-		return $number;
-	};
-	
-	# Count the alignments on each chromosome
-	my $total_read_number = 0;
-	if ($cpu > 1) {
-		# count each chromosome in multiple parallel threads to speed things up 
-		
-		# generate relatively equal lists of chromosome for each process based on length
-		my @chromosomes = map { $_->[0] }
-			sort { $b->[1] <=> $a->[1] }
-			map { [$_, $sam->target_len($_)] } 
-			(0 .. $sam->n_targets - 1);
-		my @list; # array of arrays, [process][chromosome id]
-		my $i = 1;
-		while (@chromosomes) {
-			push @{ $list[$i] }, shift @chromosomes;
-			$i++;
-			$i = 1 if $i > $cpu;
-		}
-		
-		# we will use Parallel ForkManager for convenience
-		my $pm = Parallel::ForkManager->new($cpu);
-		$pm->run_on_finish( sub {
-			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $count) = @_;
-			$total_read_number += $$count;
-		});
-		
-		# Count the chromosomes in parallel processess
-		foreach my $n (1 .. $cpu) {
-			$pm->start and next;
-	
-			### In child
-			$sam->clone; # to make it fork safe
-			my $count = 0;
-			foreach ( @{$list[$n]} ) {
-				# count each chromosome in this process list
-				$count += &{$counter}($_);
-			}
-			$pm->finish(0, \$count); 
-		}
-		$pm->wait_all_children;
-	}
-	
-	else {
-		# loop through all the chromosomes in one execution thread
-		for my $tid (0 .. $sam->n_targets - 1) {
-			# each chromosome is internally represented in the bam file as 
-			# a numeric target identifier
-			$total_read_number += &{$counter}($tid);
 		}
 	}
 	
@@ -791,10 +732,6 @@ file. A remote bam file must be indexed. A local bam file may be
 automatically indexed upon opening if the user has write permissions 
 in the parent directory. 
 
-The opened Bio::DB::Sam object will be cached for later use. If 
-you do not want this to happen (in the case of forks, for example), 
-pass a second true argument.
-
 It will return the opened database object.
 
 =item collect_bam_scores
@@ -842,7 +779,7 @@ position, a simple mean (for length data methods) or sum
 =item sum_total_bam_alignments()
 
 This subroutine will sum the total number of properly mapped alignments 
-in a bam file. Pass the subroutine one to four arguments. 
+in a bam file. Pass the subroutine one to three arguments. 
     
     1) The name of the Bam file which should be counted. Alternatively,  
        an opened Bio::DB::Sam object may also be given. Required.
@@ -852,11 +789,6 @@ in a bam file. Pass the subroutine one to four arguments.
        the Bam file represents paired-end alignments. Only proper 
        alignment pairs are counted. The default is to treat all 
        alignments as single-end.
-    4) Optionally pass the number of parallel processes to execute 
-       when counting alignments. Walking through a Bam file is 
-       time consuming but can be easily parallelized. The module 
-       Parallel::ForkManager is required, and the default is a 
-       conservative two processes when it is installed.
        
 The subroutine will return the number of alignments.
 
