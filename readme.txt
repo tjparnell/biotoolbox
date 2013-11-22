@@ -7,7 +7,7 @@ converting, analyzing, and manipulating genomic data and/or features.
 These programs include the following capabilities
 	
 	* Tools for converting data formats between popular formats, including
-	  GFF3, wig, bed, BAM, bigWig, bigBed, and others
+	  GFF3, wig, bed, BAM, bigWig, bigBed, Bar, and USeq
 	* Collecting data relative to any annotated genomic feature
 	* Manipulation and analysis of collected data
 	* Generating simple graphs of collected data
@@ -134,19 +134,22 @@ http://code.google.com/p/biotoolbox/wiki/SetupForMacOSX
 Up to data list of BioToolBox programs
 http://code.google.com/p/biotoolbox/wiki/ProgramList
 
-Working with annotation in databases
-http://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases
-
-Working with data files and datasets
-http://code.google.com/p/biotoolbox/wiki/WorkingWithDatasets
+Setting up a Bio::DB::SeqFeature::Store database
+http://code.google.com/p/biotoolbox/wiki/LoadingDatabase
 
 Description of supported data file formats
 http://code.google.com/p/biotoolbox/wiki/DataFileFormats
 
+Example Data collection
+http://code.google.com/p/biotoolbox/wiki/ExampleFeatureDataCollection
+
+Example working with Next Generation Sequencing Data
+http://code.google.com/p/biotoolbox/wiki/ExampleNextGenerationSequencing
+
+Explanation of the text data report format
+http://code.google.com/p/biotoolbox/wiki/TimDataFormat
+
 Mapping SNPs 
 http://code.google.com/p/biotoolbox/wiki/MappingSNPs
-
-Description of the text data report format
-http://code.google.com/p/biotoolbox/wiki/TimDataFormat
 
 

@@ -14,7 +14,8 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types
+	get_dataset_list
+	validate_dataset_list
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
@@ -22,7 +23,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.5.4';
 
 print "\n This script will identify nucleosome movement\n\n";
 
@@ -131,18 +132,13 @@ unless ($outfile) {
 
 
 # Identify the dataset to use
-$dataset = verify_or_request_feature_types( {
-	'db'      => $database,
-	'feature' => $dataset,
-	'prompt'  => "Enter the data set you would like to analyze  ",
-	'single'  => 1,
-} ) or die " No valid dataset provided! see help\n";
-print " Using data set '$dataset'....\n";
-
+if ($database) {
+	validate_or_request_dataset();
+}
 
 
 # Initialize data structures
-my $source_data_ref   = initialize_source_data_hash();
+my $source_data_ref = initialize_source_data_hash();
 my $movement_data_ref = initialize_movement_data_hash();
 
 
@@ -192,6 +188,55 @@ else {
 
 
 ############################# Subroutines #####################################
+
+
+
+
+###### Validate an offered dataset name or interactively ask for a new one
+
+sub validate_or_request_dataset {
+	
+	if ($dataset) {
+		# first validate the dataset name
+		my $bad_dataset = validate_dataset_list($database, $dataset);
+		
+		# this will return the name(s) of the bad datasets
+		if ($bad_dataset) {
+			die " The requested dataset '$bad_dataset' is not valid!\n";
+		} 
+		else {
+			# returning nothing from the subroutine is good
+			print " Using requested data set $dataset....\n";
+		}
+	}	
+	
+	# Otherwise ask for the data set
+	else {
+		
+		# Present the data set list to the user and get an answer
+		my %datasethash = get_dataset_list($database); # list of data sets
+		print "\n These are the microarray data sets in the database:\n";
+		foreach (sort {$a <=> $b} keys %datasethash) {
+			# print out the list of microarray data sets
+			print "  $_\t$datasethash{$_}\n"; 
+		}
+		
+		# get answer 
+		print " Enter the number of the data set you would like to analyze  ";
+		my $answer = <STDIN>;
+		chomp $answer;
+		
+		# check answer
+		if (exists $datasethash{$answer}) {
+			$dataset = $datasethash{$answer};
+			print " Using data set '$dataset'....\n";
+		} 
+		else {
+			die " Unrecognized dataset request!\n";
+		}
+	}
+}
+
 
 
 
@@ -503,6 +548,9 @@ __END__
 
 find_nucleosome_movement.pl
 
+A script to map nucleosome movement based on mononucleosome DNA hybridzed 
+to Agilent cerevisiae 244K arrays.
+
 =head1 SYNOPSIS
 
 find_nucleosome_movement.pl [--options...]
@@ -518,6 +566,8 @@ find_nucleosome_movement.pl [--options...]
   --delta <number>
   --win <integer>
   --help
+
+
 
 =head1 OPTIONS
 
@@ -606,6 +656,9 @@ difference between the adjacent probe values).
 A tim data file will be written and a GFF file suitable for 
 loading in GBrowse are written.
 
+
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -618,4 +671,12 @@ loading in GBrowse are written.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+=head1 TODO
+
+
+
+
+
 

@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to map nucleosomes
+
 
 use strict;
 use Pod::Usage;
@@ -13,8 +14,8 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types
-	get_chromosome_list
+	get_dataset_list
+	process_and_verify_dataset
 	get_region_dataset_hash
 	get_chromo_region_score
 );
@@ -23,7 +24,7 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.10.2';
+my $VERSION = '1.8.3';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -43,8 +44,10 @@ unless (@ARGV) {
 my (
 	$database,
 	$dataset,
+	$scan_dataset,
+	$tag_dataset,
 	$outfile,
-	$threshold,
+	$thresh,
 	$window,
 	$buffer,
 	$bin,
@@ -60,10 +63,13 @@ my (
 GetOptions( 
 	'db=s'     => \$database, # database name
 	'data=s'   => \$dataset, # the dataset to look for movement
+	'sdata=s'  => \$scan_dataset, # the dataset for scanning for nucs
+	'tdata=s'  => \$tag_dataset, # the dataset containing nuc tag counts
 	'out=s'    => \$outfile, # output file name
-	'thresh=f' => \$threshold, # the nucleosome signal to call a nuc
+	'thresh=f' => \$thresh, # the nucleosome signal to call a nuc
 	'win=i'    => \$window, # size of the window to scan the genome
 	'buf=i'    => \$buffer, # the buffer between previous nuc and next window
+	'bin!'     => \$bin, # allow for binning data to find nuc peaks
 	'gff!'     => \$gff, # boolean to write gff file
 	'type=s'   => \$type, # the GFF type for the movement
 	'source=s' => \$source, # the GFF source for the movement
@@ -90,7 +96,7 @@ if ($print_version) {
 
 
 # Check for Requirements and assign default variables
-unless (defined $threshold) {
+unless ($thresh) {
 	die " You must define the threshold!\n Use --help for more information\n";
 }
 
@@ -99,9 +105,12 @@ unless ($window) {
 	print " Using default window size of 145 bp\n";
 	$window = 145;
 } 
-unless (defined $buffer) {
+unless ($buffer) {
 	print " Using default buffer size of 5 bp\n";
 	$buffer = 5;
+}
+unless (defined $bin) {
+	$bin = 0;
 }
 
 
@@ -114,13 +123,14 @@ if ($database) {
 		die " unable to connect to database 'database'!\n";
 }
 else {
-	if ($dataset) {
+	if ($dataset or $scan_dataset) {
 		# we might be able to use an input bigwig file
+		my $alternate = $dataset || $scan_dataset;
 		
-		unless ($dataset =~ m/\.bw$/i) {
+		unless ($alternate =~ m/\.bw$/i) {
 			die " You must define a database\n Use --help for more information\n";
 		}
-		$db = open_db_connection($dataset) or 
+		$db = open_db_connection($alternate) or 
 			die " unable to connect to database 'database'!\n";
 	}
 	else {
@@ -131,16 +141,7 @@ else {
 
 
 # Identify the dataset to use
-$dataset = verify_or_request_feature_types(
-		'db'      => $database,
-		'feature' => $dataset,
-		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks ",
-		'single'  => 1,
-);
-unless ($dataset) {
-	die " A valid scan dataset must be provided!\n";
-}
-
+validate_or_request_dataset();
 
 
 
@@ -166,12 +167,12 @@ if ($debug) {
 # a tim data file
 exit unless $found_nucs;
 unless ($outfile) {
-	$outfile = $dataset . '_nucleosome';
+	$outfile = $scan_dataset . '_nucleosome';
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'     => $nucleosomes_ref,
 	'filename' => $outfile,
-);
+} );
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -184,7 +185,7 @@ if ($gff) {
 	unless ($type) {
 		if ($dataset) {
 			# use the dataset name
-			$type = $dataset . '_nucleosome';
+			$type = $scan_dataset . '_nucleosome';
 		}
 		else {
 			# default GFF3 compatible SO term
@@ -195,7 +196,7 @@ if ($gff) {
 		# set default source, the name of this program
 		$source = 'map_nucleosomes.pl';
 	}
-	$success = convert_and_write_to_gff_file(
+	$success = convert_and_write_to_gff_file( {
 		'data'     => $nucleosomes_ref,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -204,7 +205,7 @@ if ($gff) {
 		'type'     => $type,
 		'source'   => $source,
 		'tag'      => [6],
-	);
+	} );
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -223,12 +224,12 @@ if ($gff) {
 ############################# Subroutines #####################################
 
 
-
-###### Initialize the primary output data hash
 sub initialize_nucleosome_data {
 	
 	# generate the data structure based on what datasets were provided
-	my $data = generate_tim_data_structure(
+	my $data;
+	if ($tag_dataset) {
+		$data = generate_tim_data_structure(
 			'nucleosome',
 			qw(
 				Chromosome
@@ -239,24 +240,82 @@ sub initialize_nucleosome_data {
 				Occupancy
 				Fuzziness
 			)
-	) or die " unable to generate tim data structure!\n";
+		) or die " unable to generate tim data structure!\n";
+	}
+	else {
+		# no nucleosome statistics will be collected
+		$data = generate_tim_data_structure(
+			'nucleosome',
+			qw(
+				Chromosome
+				Start
+				Stop
+				Midpoint
+				NucleosomeID
+			)
+		) or die " unable to generate tim data structure!\n";
+	}
 	
 	# add additional metadata
 	$data->{'db'}               = $database;
+	$data->{4}{'scan_dataset'}  = $scan_dataset,
 	$data->{4}{'window'}        = $window;
 	$data->{4}{'buffer'}        = $buffer;
-	$data->{4}{'threshold'}     = $threshold;
-	$data->{5}{'dataset'}       = $dataset;
-	$data->{6}{'dataset'}       = $dataset;
+	$data->{4}{'threshold'}     = $thresh;
+	if ($tag_dataset) {
+		$data->{5}{'dataset'}   = $tag_dataset;
+		$data->{6}{'dataset'}   = $tag_dataset;
+	}
 	
 	return $data;
 }
 
 
 
+###### Validate an offered dataset name or interactively ask for a new one
+
+sub validate_or_request_dataset {
+	
+	# Process the scan dataset
+	if ($dataset and !$scan_dataset) {
+		# only one dataset provided, then assign it to scan
+		$scan_dataset = $dataset;
+	}
+	$scan_dataset = process_and_verify_dataset( {
+		'db'      => $database,
+		'dataset' => $scan_dataset,
+		'prompt'  => "Enter the dataset to use for scanning for nucleosome peaks",
+		'single'  => 1,
+	} );
+	unless ($scan_dataset) {
+		die " A valid scan dataset must be provided!\n";
+	}
+	
+	
+	# Process the tag dataset
+	if ($dataset and !$tag_dataset) {
+		# only one dataset provided, then assign it to scan
+		$tag_dataset = $dataset;
+	}
+	if ($tag_dataset or $database) {
+		$tag_dataset = process_and_verify_dataset( {
+			'db'      => $database,
+			'dataset' => $tag_dataset,
+			'prompt'  => "Enter the dataset of tag count data for calculating nucleosome stats",
+			'single'  => 1,
+		} );
+	}
+}
+
+
+
+
+
+###### Initialize the primary output data hash
 
 
 ###### Now map those nucleosomes!
+
 sub map_nucleosomes {
 	# The principle of this method is essentially to find peaks of  
 	# enrichment that are relatively periodic along the length of the 
@@ -275,17 +334,16 @@ sub map_nucleosomes {
 	my $found_nucleosomes = 0;
 	
 	# Walk through each chromosome
-	my @chromosomes = get_chromosome_list($db, 1) or 
+	my @chromosomes = $db->seq_ids or 
 		die " unable to find sequences in database!\n";
-		# force the database to discard unwanted chromosomes
-	foreach (@chromosomes) {
-		
-		# we have chromosome name and length
-		my ($chromo, $chr_length) = @{$_};
+	foreach my $chromo (@chromosomes) {
 		
 		# skip mitochrondrial chromosome
-			# just in case it wasn't excluded by default above
 		if ($chromo =~ /^chrm|chrmt|mt|mito/i) {next}
+		
+		# get chromosome length
+		my $chr_segment = $db->segment($chromo);
+		my $chr_length = $chr_segment->length;
 		
 		# Limit to one chromosome if debug
 		if ($debug) {
@@ -295,7 +353,7 @@ sub map_nucleosomes {
 				last;
 			}
 			
-			# artificially set chr_length to small number for debug purposes
+			# artificially set chr_length to small number
 			# $chr_length = 5000;
 		}
 		
@@ -308,34 +366,17 @@ sub map_nucleosomes {
 			
 			# determine the window stop position
 			my $win_stop = $position + $window - 1;
-			$win_stop = $chr_length if $win_stop > $chr_length;
 			
-			# collect the scores
-			my %pos2score = get_region_dataset_hash(
-					'db'       => $db,
-					'dataset'  => $dataset,
-					'chromo'   => $chromo,
-					'start'    => $position,
-					'stop'     => $win_stop,
-					'value'    => 'score',
-					'absolute' => 1,
-			);
-			
-			if ($debug) {
-				print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
-				print DEBUG_FH "  Window scores:\n  ";
-				foreach (sort {$a <=> $b} keys %pos2score) {
-					print DEBUG_FH "$_:$pos2score{$_}, ";
-				}
-				print DEBUG_FH "\n";
-			}
 			
 			# scan the window for a potential nucleosome peak
-			if ( max(values %pos2score) >= $threshold ) {
-				# we have a peak, acurately map it with tag data
-				# identify the peak position
+			my $found_peak = scan_window($chromo, $position, $win_stop);
+
+			
+			# identify the peak position
+			if ($found_peak) {
+				# we found a peak, acurately map it with tag data
 				my $peak_position = identify_peak_position(
-					$chromo, $position, $win_stop, \%pos2score);
+					$chromo, $position, $win_stop);
 				
 				# now process the peak and return a new position
 				$position = process_nucleosome($chromo, $peak_position);
@@ -361,24 +402,121 @@ sub map_nucleosomes {
 
 
 
+sub scan_window {
+	
+	# the window we're looking at
+	my ($chromo, $position, $win_stop) = @_;
+	
+	# collect the window scanning scores
+	my %window_pos2score = get_region_dataset_hash( {
+			'db'       => $db,
+			'dataset'  => $scan_dataset,
+			'chromo'   => $chromo,
+			'start'    => $position,
+			'stop'     => $win_stop,
+			'value'    => 'score',
+			'absolute' => 1,
+	} );
+	if ($debug) {
+		print DEBUG_FH "### Window $chromo:$position..$win_stop\n";
+		print DEBUG_FH "  Window scores:\n  ";
+		foreach (sort {$a <=> $b} keys %window_pos2score) {
+			print DEBUG_FH "$_:$window_pos2score{$_}, ";
+		}
+		print DEBUG_FH "\n";
+	}
+	
+	# check whether we actually have a valid nucleosome peak
+	# if not, then try again after binning the data
+	my $window_scan_max = max(values %window_pos2score);
+	
+	if ( $window_scan_max >= $thresh) {
+		# we have a peak that passes the threshold
+		# yeah, a nucleosome
+		return 1;
+	}
+	elsif ($window_scan_max < $thresh and $bin) {
+		# no obvious peak, so we will try binning to find a peak
+		
+		my %binned_pos2score;
+		my @positions = sort {$a <=> $b} keys %window_pos2score;
+		for (my $i = 0; $i < scalar(@positions); $i += 3) {
+			# we will bin three positions into one
+			# the sum of three positions' score indexed at the 
+			# middle position
+			$binned_pos2score{ $positions[ $i + 1 ] } = 
+				sum(
+					$window_pos2score{ $positions[$i] },
+					$window_pos2score{ $positions[$i + 1] },
+					$window_pos2score{ $positions[$i + 2] },
+				);
+		}
+		
+		# look again for a peak
+		$window_scan_max = max(values %binned_pos2score);
+		if ($window_scan_max >= $thresh) {
+			# we found one
+			
+			if ($debug) {
+				print DEBUG_FH "  Binned window scores:\n  ";
+				foreach (sort {$a <=> $b} keys %binned_pos2score) {
+					print DEBUG_FH "$_:$window_pos2score{$_}, ";
+				}
+			}
+			
+			# return success
+			return 1;
+		}
+		else {
+			# still no nucleosome
+			return 0;
+		}
+	}
+	else {
+		# no peak
+		return 0;
+	}
+}
+
+
+
 
 sub identify_peak_position {
 	# we know there is at least one peak within this window, now must find it
 	
 	# the window we're looking at
-	my ($chromo, $position, $win_stop, $pos2score) = @_;
+	my ($chromo, $position, $win_stop) = @_;
+	
+	# only process if we have a tag dataset
+	if (!$tag_dataset) {
+		# just use the position that was found from the scan dataset
+		return $position;
+	}
+	
+	# collect the tag scores for the window
+	# the scan data scores may not be reliable, as the statistical 
+	# method used to identify peaks may not directly correspond to
+	# the actual peak of tags, which is what we really want
+	# this is true for False Discovery Rate scores
+	my %window_pos2tags = get_region_dataset_hash( {
+			'db'       => $db,
+			'dataset'  => $tag_dataset,
+			'chromo'   => $chromo,
+			'start'    => $position,
+			'stop'     => $win_stop,
+			'value'    => 'score',
+			'absolute' => 1,
+	} );
 	
 	# get all of the positions that correspond to that peak value
-	my $tag_peak_value = max(values %{$pos2score});
+	my $tag_peak_value = max(values %window_pos2tags);
 	my @peak_positions;
-	foreach (keys %{$pos2score}) {
-		if ($pos2score->{$_} == $tag_peak_value) {
+	foreach (keys %window_pos2tags) {
+		if ($window_pos2tags{$_} == $tag_peak_value) {
 			push @peak_positions, $_;
 		}
 	}
-	if ($debug) {
-		print DEBUG_FH "  Max peak of $tag_peak_value at @peak_positions\n";
-	}
+	
 	# now identify the best peak position, ideally this is just one
 	my $peak_position;
 	if (scalar @peak_positions == 1) {
@@ -393,7 +531,6 @@ sub identify_peak_position {
 		if (range(@peak_positions) <= 10) {
 			# the range between the peaks is 10 bp or less
 			# 10 bp is totally arbitrary but reasonable
-			# so take the closest one
 			$peak_position = min(@peak_positions);
 		}
 		
@@ -445,28 +582,26 @@ sub verify_peak_position {
 	# coordinates
 	my ($chromo, $scan_start, $peak_position) = @_;
 	
-	# collect the raw data for +/- 50 bp around the supposed peak position
-	# this distance is arbitrarily about 2/3rd nucleosome size
-	# tried 1/2 and still getting offset nucleosomes
+	# collect the raw data for +/- 35 bp around the supposed peak position
+	# this distance is arbitrarily about 1/2 nucleosome size
 	# limit this by not going further backwards than the original window scan 
 	# start - do not want to overlap previous nucleosome
-	my %pos2score = get_region_dataset_hash(
-			'db'       => $db,
-			'dataset'  => $dataset,
-			'chromo'   => $chromo,
-			'start'    => $peak_position - 50 < $scan_start ? $scan_start : 
-							$peak_position - 50,
-			'stop'     => $peak_position + 50,
-			'value'    => 'score',
-			'absolute' => 1,
-	);
-
+	my %pos_data = get_region_dataset_hash( {
+		'db'         => $db,
+		'dataset'    => $tag_dataset,
+		'chromo'     => $chromo,
+		'start'      => $peak_position - 35 < $scan_start ? $scan_start : 
+						$peak_position - 35,
+		'stop'       => $peak_position + 35,
+		'value'      => 'score',
+		'absolute'   => 1,
+	});
 	
 	# find the max peak
 	my @peaks;
-	my $max = max(values %pos2score);
-	foreach my $pos (keys %pos2score) {
-		if ($pos2score{$pos} == $max) {
+	my $max = max(values %pos_data);
+	foreach my $pos (keys %pos_data) {
+		if ($pos_data{$pos} == $max) {
 			# one of the peaks, 
 			# very likely there will only be one, but there may be more
 			# record all the positions with this peak value
@@ -518,77 +653,85 @@ sub process_nucleosome {
 	my $score;
 	my $fuzziness;
 	
-	# Determine the fuzziness of this nucleosome
-		# This is essentially the standard deviation of the counts
-		# around the midpoint of the nuclesome. Well positioned 
-		# nucleosomes will have all their midpoints centered in 
-		# position, whereas fuzzy nucleosomes will have their 
-		# midpoints spread out across the region. 
-		
-		# We will need to collect new scores surrounding the 
-		# new found nucleosome peak.
-		# arbitrarily collecting 40 bp worth of scores from each
-		# side of the peak
-		
-		# we will skip moving average here if it was enabled
-		# we want real data, not averaged
-	my %pos2score = get_region_dataset_hash(
-		'db'       => $db,
-		'dataset'  => $dataset,
-		'chromo'   => $chromo,
-		'start'    => $peak_position - 40,
-		'stop'     => $peak_position + 40,
-		'value'    => 'score',
-		'absolute' => 1,
-	);
-	
-	my @nucleosome_positions;
-	for (my $i = -37; $i <= 37; $i++) {
-		# we will advance along the relative position around the 
-		# nucleosome peak and record the number of nucleosome 
-		# midpoints found at each relative position
-		
-		# The size of the relative window to look for fuzziness
-		# is a little more than 1/2 of a nucleosome length (81 bp). This
-		# is totally arbitrary, but reasonable.
-		
-		# convert relative to absolute
-		my $pos = $peak_position + $i; 
-		
-		# collect the counts
-		if (exists $pos2score{$pos} and $pos2score{$pos} > 0) {
-			foreach (1 .. int(100 * $pos2score{$pos} )) {
-				# for each position, we are going to add the 
-				# relative position to the array of nucleosome_positions
-				# for each tag count
-				# to account for rpm counts (decimals) we will 
-				# multiply by 100 - this shouldn't affect 
-				# real number counts
-				push @nucleosome_positions, $i;
+	# we can only determine these statistics if we have a tag dataset
+	if ($tag_dataset) {
+		# Determine the fuzziness of this nucleosome
+			# This is essentially the standard deviation of the counts
+			# around the midpoint of the nuclesome. Well positioned 
+			# nucleosomes will have all their midpoints centered in 
+			# position, whereas fuzzy nucleosomes will have their 
+			# midpoints spread out across the region. 
+			
+			# We will need to collect new scores surrounding the 
+			# new found nucleosome peak.
+			# arbitrarily collecting 40 bp worth of scores from each
+			# side of the peak
+			# we can't use the previously collected tag scores because
+			# the nucleosome peak may have been at the edge of the window
+		my %nucleosome_pos2score = get_region_dataset_hash( {
+			'db'       => $db,
+			'dataset'  => $tag_dataset,
+			'chromo'   => $chromo,
+			'start'    => $peak_position - 40,
+			'stop'     => $peak_position + 40,
+			'value'    => 'score',
+			'absolute' => 1,
+			# collecting values based on absolute, not relative, coord
+		} );
+		my @nucleosome_positions;
+		for (my $i = -37; $i <= 37; $i++) {
+			# we will advance along the relative position around the 
+			# nucleosome peak and record the number of nucleosome 
+			# midpoints found at each relative position
+			
+			# The size of the relative window to look for fuzziness
+			# is essentially 1/2 of a nucleosome length (~74 bp). This
+			# is totally arbitrary, but reasonable.
+			
+			# convert relative to absolute
+			my $pos = $peak_position + $i; 
+			
+			# collect the counts
+			if ($nucleosome_pos2score{$pos} > 0) {
+				foreach (1 .. int(100 * $nucleosome_pos2score{$pos} )) {
+					# for each position, we are going to add the 
+					# relative position to the array of nucleosome_positions
+					# for each tag count
+					# to account for rpm counts (decimals) we will 
+					# multiply by 100 - this shouldn't affect 
+					# real number counts
+					push @nucleosome_positions, $i;
+				}
 			}
 		}
+		
+		# calculate fuzziness
+		if (@nucleosome_positions) {
+			$fuzziness = sprintf "%.0f", stddevp(@nucleosome_positions);
+		}
+		else {
+			# nothing found!? not acceptable
+			$fuzziness = '.';
+		}
+		
+		# Calculate the number of nucleosome midpoints used in calling 
+		# this nucleosome, this will be the score
+		$score = get_chromo_region_score( {
+			'db'       => $db,
+			'dataset'  => $tag_dataset,
+			'chromo'   => $chromo,
+			'start'    => $peak_position - 37,
+			'stop'     => $peak_position + 37,
+			'value'    => 'score',
+			'method'   => 'sum',
+		} );
 	}
 	
-	# calculate fuzziness
-	if (@nucleosome_positions) {
-		$fuzziness = sprintf "%.0f", stddevp(@nucleosome_positions);
-	}
+	# no tag dataset
 	else {
-		# nothing found!? not acceptable
+		$score = '.';
 		$fuzziness = '.';
 	}
-	
-	# Calculate the number of nucleosome midpoints used in calling 
-	# this nucleosome, this will be the score
-	$score = get_chromo_region_score(
-		'db'       => $db,
-		'dataset'  => $dataset,
-		'chromo'   => $chromo,
-		'start'    => $peak_position - 37,
-		'stop'     => $peak_position + 37,
-		'value'    => 'score',
-		'method'   => 'sum',
-	);
 	
 	# Determine the nucleosome coordinates
 		# we are assuming a standard 147 bp sized nucleosome
@@ -641,15 +784,16 @@ A script to map nucleosomes.
 =head1 SYNOPSIS
 
 map_nucleosomes.pl --db <text> --thresh <number> [--options...]
-
-map_nucleosomes.pl --data <text|file> --thresh <number> [--options...]
+map_nucleosomes.pl --sdata <text|file> --thresh <number> [--options...]
   
-  Options:
   --db <text>
+  --sdata <text|file>
+  --tdata <text|file>
   --data <text|file>
   --thesh <number>
   --win <integer>
   --buf <integer>
+  --(no)bin
   --gff
   --type <gff_type>
   --source <gff_source>
@@ -670,12 +814,23 @@ and/or chromsomes. A SeqFeature::Store database may be supplied,
 or a BigWigSet directory. Required unless data is pulled from 
 a bigWig file (.bw).
 
+=item --sdata <text|file>
+
+=item --tdata <text|file>
+
 =item --data <text|file>
 
-Provide the name of the dataset and/or data files (bigWig format)
+Provide the name of the dataset(s) and/or data files (bigWig format)
 containing the nucleosome midpoint occupancy data from which to
 identify nucleosomal positions. If data is obtained from a database,
-the name or type should be provided.
+the type or primary_tag should be provided.
+
+The scan dataset (--sdata) is required, while the tag dataset
+(--tdata) is only used to collect nucleosome statistics. The same
+dataset could be used for both, in which case both may be set simultaneously 
+using the --data option. See L<DATASETS> section for details regarding
+the datasets. If the datasets are not specified on the commandline,
+then they may be interactively chosen from a list from the database.
 
 =item --thresh <number>
 
@@ -694,6 +849,15 @@ Provide the buffer size in bp which will be added between the end of the
 previous found nucleosome and the beginning of the window to scan for the 
 next nucleosome. Setting this value may limit the number of overlapping 
 nucleosomes. Default is 5 bp.
+
+=item --bin
+
+Indicate whether the scan data should be binned in an attempt to find 
+and map a nucleosome midpoint peak. Binning only occurs when a single 
+position fails to pass the threshold value. Bins are generated from 
+three adjacent positions and their values summed. This may help  
+those genomic regions with very few nucleosome reads. The default is 
+to not bin the scan data.
 
 =item --gff
 
@@ -753,14 +917,31 @@ statistical smoothing.
 
 =head1 DATASETS
 
-This programs expects to work with enumerated midpoint counts of 
-nucleosomal sequence fragments at a single bp resolution. Typically, 
-nucleosome fragments are sequenced using massively parallel sequencing 
-technologies, and the mapped alignments are converted to predicted 
-midpoint occupancy counts. The midpoints may be precisely mapped with 
-paired-end sequencing, or estimated by 3' end shifting of single-end 
-sequence alignments. See the BioToolBox script bam2wig.pl for one 
-approach.
+Two datasets must be provided for the mapping, although the same could
+be used for both functions. The datasets should represent sequenced
+nucleosome fragment midpoints. For the most accurate mapping, the
+midpoints should be mapped at 1 bp resolution, but lower resolutions
+(5 or 10 bp) could also work.
+
+The scan dataset (--sdata) is used to scan for a potential nucleosome.
+The dataset may be a simple difference, normalized difference, ratio, 
+P-value, Q-Value, False Discovery Rate, or raw or normalized tag 
+counts. Probability scores should be converted using -10Log10(P) for
+proper interpretation.
+
+The optional tag dataset (--tdata) is used for calculating nucleosome
+statistics, including the precise nucleosome midpoint peak, occupancy,
+and fuzziness. The tag dataset should be enumerated counts of nucleosome
+midpoints. Normalized counts (for example, Reads Per Million mapped or
+RPM) or difference counts (experiment minus control) may be used, but
+P-value scores should not.
+
+When working with next generation sequencing tags from nucleosomes, tags 
+may be enumerated using the BioToolBox script L<bam2wig.pl>.
+
+For genomic regions with few nucleosome reads and no positions that
+pass the threshold value, the window positions may optionally be
+binned together to increase sensitivity (see the --bin option).
 
 =head1 REPORTING
 

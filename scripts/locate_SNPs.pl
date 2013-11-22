@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to identify and locate the position of SNPs
 
 use strict;
 use Getopt::Long;
@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.8.1';
 
 
 
@@ -289,11 +289,11 @@ foreach my $infile (@infiles) {
 	my $outfile = $infile;
 	$outfile = $metadata->{'basename'};
 	$outfile .= '_summary.txt';
-	my $written_file = write_tim_data_file(
+	my $written_file = write_tim_data_file( {
 		'data'     => $output,
 		'filename' => $outfile,
 		'format'   => 'simple',
-	);
+	} );
 	if ($written_file) {
 		print " wrote file '$written_file'\n";
 	}
@@ -529,6 +529,7 @@ sub determine_codon_change {
 			# this may be a real codon change
 			
 			# get more feature info
+			my $strand = $feature->strand;
 			my $phase = $feature->phase;
 			my $start = $feature->start;
 			my $stop = $feature->stop;
@@ -540,8 +541,7 @@ sub determine_codon_change {
 			# collect the original codon
 			my $codon_segment;
 			my $pos_phase;
-			my $codon;
-			if ($feature->strand >= 0) {
+			if ($strand > 0) {
 				# watson or forward strand
 				$pos_phase = ($pos - $start - $phase) % 3;
 				if ($pos_phase == 0) {
@@ -553,39 +553,27 @@ sub determine_codon_change {
 				elsif ($pos_phase == 2) {
 					$codon_segment = $db->segment($chr, $pos - 2, $pos);
 				}
-				
-				# obtain the codon sequence
-				$codon = $codon_segment->seq->seq;
 			}
 			else {
 				# crick or reverse strand
 				$pos_phase = ($stop - $pos - $phase) % 3;
 				if ($pos_phase == 0) {
-					$codon_segment = $db->segment($chr, $pos - 2, $pos);
+					$codon_segment = $db->segment($chr, $pos + 2, $pos);
 				} 
 				elsif ($pos_phase == 1) {
-					$codon_segment = $db->segment($chr, $pos - 1, $pos + 1);
+					$codon_segment = $db->segment($chr, $pos + 1, $pos - 1);
 				} 
 				elsif ($pos_phase == 2) {
-					$codon_segment = $db->segment($chr, $pos, $pos + 2);
+					$codon_segment = $db->segment($chr, $pos, $pos - 2);
 				}
-				
-				# obtain the reverse complement codon sequence
-				$codon = $codon_segment->seq->revcom->seq;
 			}
-			
-			# generate the corresponding translated product
+			my $codon = $codon_segment->seq->seq;
 			my $aa = $codontable->translate($codon);
 			
 			# make the substitution into the mutant
-			if ($feature->strand < 0) {
-				# don't forget to take the complement of the SNP
-				# the SNP will always be the top strand base
-				$snp =~ tr/agctAGCT/tcgaTCGA/;
-				
-			}
-			my $mutant_codon = $codon;
-			substr($mutant_codon, $pos_phase, 1, $snp);
+			my @triplet = split //, $codon;
+			$triplet[$pos_phase] = $snp; # change the appropriate codon
+			my $mutant_codon = join q(), @triplet;
 			my $mutant_aa = $codontable->translate($mutant_codon);
 			
 			# report the change
@@ -617,8 +605,6 @@ __END__
 =head1 NAME
 
 locate_SNPs.pl
-
-A script to locate the position of SNPs and identify codon changes.
 
 =head1 SYNOPSIS
  
@@ -721,3 +707,22 @@ feature is found overlapping the SNP, then both features are reported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

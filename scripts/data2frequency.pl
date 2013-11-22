@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to convert a datafile into a frequency distribution
 
 use strict;
 use Getopt::Long;
@@ -16,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.8.2';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -165,10 +165,10 @@ unless ($outfile) {
 	$outfile = $infile; # use input name
 	$outfile = $in_data_ref->{'basename'} . '_frequency';
 }
-my $write_results = write_tim_data_file(
+my $write_results = write_tim_data_file( {
 	'data'      => $out_data_ref,
 	'filename'  => $outfile,
-);
+} );
 # report write results
 if ($write_results) {
 	print "  Wrote new datafile '$write_results'\n";
@@ -245,7 +245,6 @@ sub ask_for_index {
 
 ### Prepare the output tim data structure
 sub prepare_output_data_structure {
-	print " Defining $binnumber bins of size $binsize from $start to $max\n";
 	
 	# generate a new data structure
 	my $data = generate_tim_data_structure(
@@ -260,22 +259,15 @@ sub prepare_output_data_structure {
 	$data->{0}{'bin_number'} = $binnumber;
 	$data->{0}{'bin_size'}   = $binsize;
 	
-	# determine formatting 
-	my $format = 0;
-	if ($binsize =~ /\.(\d+)$/) {
-		$format = length $1;
-	}
 	
 	# Calculate and record the bins
-	for my $i (1 .. $binnumber) {
-		my $bin_start = sprintf "%.$format" . "f", 
-			$start + ( ($i - 1) * $binsize);
-		my $bin_end   = sprintf "%.$format" . "f", $start + ($i * $binsize);
-		push @bins, $bin_end;
+	for (my $i = $start; $i <= $max; $i += $binsize) {
+		push @bins, $i + $binsize;
 		push @{ $data->{'data_table'} }, [
-			$bin_end,
-			$bin_start . '..' . $bin_end, 
+			($i + $binsize),
+			$i . '-' . ($i + $binsize), 
 		];
+		# $data->{'data_table'}->[$row][0] = $bins[$row - 1];
 		$data->{'last_row'} += 1;
 	}
 	
@@ -350,12 +342,9 @@ A script to convert data into a frequency distribution, useful for graphing.
 =head1 SYNOPSIS
 
 data2frequency.pl --bins <integer> --size <number> <filename> 
-
 data2frequency.pl --bins <integer> --max <number> <filename> 
-
 data2frequency.pl --size <number> --max <number> <filename> 
   
-  Options:
   --in <filename>
   --bins <integer>
   --size <number>
@@ -365,6 +354,7 @@ data2frequency.pl --size <number> --max <number> <filename>
   --out <filename>
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -455,3 +445,4 @@ listed in subsequent columns for each dataset requested.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

@@ -14,7 +14,6 @@ Lists of programs organized by function.
 
 === Data analysis ===
 	* compare_subfeature_scores.pl
-	* correlate_position_data.pl
 	* data2frequency.pl
 	* graph_data.pl
 	* graph_histogram.pl
@@ -41,7 +40,6 @@ Lists of programs organized by function.
 
 === Finding features ===
 	* find_enriched_regions.pl
-	* get_features.pl
 	* get_gene_regions.pl
 	* get_intersecting_features.pl
 	* map_transcripts.pl
@@ -89,295 +87,142 @@ An alphabetical list of the scripts available in the biotoolbox suite.
 
 
 average_gene.pl
-	Generate class average summaries for a list of genes or
-	features. Each gene is divided into a set number of bins and data
-	is summarized in each bin. Use graph_profile.pl to plot the
-	summary.
+	Generate class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use graph_profile.pl to plot the summary.
 	
 bam2gff_bed.pl
-	Convert alignments in a BAM file to genomic features in either
-	a GFF3 or UCSC-style BED file format. Both single- and paired-end
-	alignments are supported. Additional conversion to the UCSC BigBed
-	format is also supported.
+	Convert alignments in a BAM file to genomic features in either a GFF3 or UCSC-style BED file format. Both single- and paired-end alignments are supported. Additional conversion to the UCSC BigBed format is also supported.
 
 bam2wig.pl
-	Enumerates alignments in a BAM file and writes a wig, or
-	BigWig, file representing the tag counts. Alignments may be
-	counted once at either the start or mid position, or across the
-	entire alignment (resulting in a coverage map). It can process
-	single-end, paired-end, and spliced alignments.
+	Enumerates alignments in a BAM file and writes a wig, or BigWig, file representing the tag counts. Alignments may be counted once at either the start or mid position, or across the entire alignment (resulting in a coverage map). It can process single-end, paired-end, and spliced alignments. 
 
 bar2wig.pl
-	Convert binary bar data files from David Nix's USeq or T2
-	package to a more universal text wiggle (.wig) format.
-	Alternatively, binary bigwig files (.bw) may be generated.
+	Convert binary bar data files from David Nix's USeq or T2 package to a more universal text wiggle (.wig) format. Alternatively, binary bigwig files (.bw) may be generated.
 	
 bin_genomic_data.pl
-	Collect genomic data from various sources into bins across the
-	genome. Data may come from a .gff, .sgr, or .bam alignment file.
-	The data values may be combined into one value for the bin, or
-	features within the bin may be enumerated.
+	Collect genomic data from various sources into bins across the genome. Data may come from a .gff, .sgr, or .bam alignment file. The data values may be combined into one value for the bin, or features within the bin may be enumerated.
 	
 big_file2gff3.pl
-	Given a binary BigFile, including either a BigBed, BAM, or
-	BigWig file, a GFF3 file is generated suitable for loading into a
-	Bio::DB database. Each chromosome has one feature spanning its
-	length, and the feature records the location of the BigFile in the
-	host's file system. This allows data to be collected from the
-	Bio::DB database using biotoolbox scripts without needing to
-	specify multiple databases. Compare with the wiggle2gff3.pl
-	program distributed with GBrowse.
+	Given a binary BigFile, including either a BigBed, BAM, or BigWig file, a GFF3 file is generated suitable for loading into a Bio::DB database. Each chromosome has one feature spanning its length, and the feature records the location of the BigFile in the host's file system. This allows data to be collected from the Bio::DB database using biotoolbox scripts without needing to specify multiple databases. Compare with the wiggle2gff3.pl program distributed with GBrowse.
 	
 change_chr_prefix.pl
-	Changes the chromosome name by either adding or stripping a
-	prefix. Useful when converting between different genome source
-	repositories. Handles Fasta, GFF, BED, wig, Sam, and Bam files.
+	Changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
 
 compare_subfeature_scores.pl
-	Compares the scores of all the subfeatures of a parent feature to
-	find the minimum and maximum subfeature score. For example,
-	identify expressed and not-expressed alternative transcripts of a
-	gene.
+	Compares the scores of all the subfeatures of a parent feature to find the minimum and maximum subfeature score. For example, identify expressed and not-expressed alternative transcripts of a gene.
 
 convert_yeast_genome_version.pl
-	Convert genomic coordinates of popular file formats between a
-	limited set of S. cerevisiae SGD genome releases.
-
-correlate_position_data.pl
-	Calculates a Pearson correlation between the score values at
-	identical positions along a feature between two datasets. This
-	helps in identifying changes in spatial distribution of values. An
-	option for calculating shifts is also available.
+	Convert genomic coordinates of popular file formats between a limited set of S. cerevisiae SGD genome releases.
 
 CpG_calculator.pl
-	Counts observed and expected CpG dinucleotides in genomic
-	sequences for defined regions or windows across a genome.
+	Counts observed and expected CpG dinucleotides in genomic sequences for defined regions or windows across a genome.
 
 data2frequency.pl
-	Convert data into a frequency distribution, useful for graphing a
-	histogram plot using a program such as graph_histogram.pl.
+	Convert data into a frequency distribution, useful for graphing a histogram plot using a program such as graph_histogram.pl.
 	
 data2bed.pl
-	Convert any data text file into a UCSC-style BED file, so long as
-	there are genomic coordinates within the file. Only 6-column or
-	less BED files are supported. Further conversion to BigBed files
-	is supported.
+	Convert any data text file into a UCSC-style BED file, so long as there are genomic coordinates within the file. Only 6-column or less BED files are supported. Further conversion to BigBed files is supported.
 
 data2fasta.pl
-	Convert any data text file into a fasta file. Sequences may be
-	provided 	as a column of data within the text file, or they may
-	be retrieved from a genome fasta file given chromosomal
-	coordinates.
+	Convert any data text file into a fasta file. Sequences may be provided 	as a column of data within the text file, or they may be retrieved from a genome fasta file given chromosomal coordinates.
 
 data2gff.pl
-	Convert any data text file into a GFF file, so long as there are
-	genomic coordinates within the file.
+	Convert any data text file into a GFF file, so long as there are genomic coordinates within the file.
 	
 data2wig.pl
-	Convert any data text file into into a text wiggle file, so long
-	as it has genomic coordinates. Both fixed and variable step files
-	may be generated depending on the source file coordinates.
-	Alternatively, binary bigwig files may be generated.
+	Convert any data text file into into a text wiggle file, so long as it has genomic coordinates. Both fixed and variable step files may be generated depending on the source file coordinates. Alternatively, binary bigwig files may be generated.
 	
 find_enriched_regions.pl
-	Scan across the genome with a sliding window and identify regions
-	of enrichment (or depletion). Regions are identified when the
-	window value exceeds a simple threshold. Overlapping or adjacent
-	windows are merged.
+	Scan across the genome with a sliding window and identify regions of enrichment (or depletion). Regions are identified when the window value exceeds a simple threshold. Overlapping or adjacent windows are merged. 
 	
 get_actual_nuc_sizes.pl
-	Given mapped nucleosomes from the map_nucleosomes.pl program and a
-	BAM file representing paired-end sequencing alignments of genomic
-	nucleosomes, the actual sizes from the nucleosome sequencing are
-	collected for each mapped nucleosome.
+	Given mapped nucleosomes from the map_nucleosomes.pl program and a BAM file representing paired-end sequencing alignments of genomic nucleosomes, the actual sizes from the nucleosome sequencing are collected for each mapped nucleosome.
 	
 get_datasets.pl
-	The workhorse program for collecting data stored in a Bio::DB
-	database relative to any feature described in the database: genes,
-	promoters, genomic bins, etc. The data is combined in one of a
-	variety of statistical methods.
+	The workhorse program for collecting data stored in a Bio::DB database relative to any feature described in the database: genes, promoters, genomic bins, etc. The data is combined in one of a variety of statistical methods.
 	
 get_ensembl_annotation.pl
-	This script will connect to the public Ensembl MySQL database,
-	download the genome annotation for the given species, and write a
-	GFF3 file suitable for loading into a database. The resulting file
-	will have more information than their published GTF file.
+	This script will connect to the public Ensembl MySQL database, download the genome annotation for the given species, and write a GFF3 file suitable for loading into a database. The resulting file will have more information than their published GTF file. 
 
 get_feature_info.pl
-	Given a table of database features, additional information may be
-	collected from the database for each feature. Infomation may
-	include basic attributes such as chromosome, start, stop, strand,
-	etc. Feature specific attributes (stored in the 9th column of the
-	source GFF) may also be collected.
-
-get_features.pl
-	Generates a list of features for one or more feature types from a
-	database. Information about the features may be returned,
-	including name, type, and coordinates. Sub features may be
-	included. The data may be written as a BioToolBox formatted text
-	file, GFF or BED.
+	Given a table of database features, additional information may be collected from the database for each feature. Infomation may include basic attributes such as chromosome, start, stop, strand, etc. Feature specific attributes (stored in the 9th column of the source GFF) may also be collected.
 
 get_gene_regions.pl
-	Retrieve specific regions associated with gene annotations from a
-	database that may not be explicitly annotated, including
-	transcription start and stop sites, first and last exons, splice
-	site junctions, and introns. Unique regions from genes with
-	alternative transcripts may be requested.
+	Retrieve specific regions associated with gene annotations from a database that may not be explicitly annotated, including transcription start and stop sites, first and last exons, splice site junctions, and introns. Unique regions from genes with alternative transcripts may be requested.
 
 get_intersecting_features.pl
-	Given a table of database features, intersecting features of the
-	specified type may be collected. The region corresponding to the
-	first list of features may be limited or expanded as desired.
-	Useful in identifying, for example, genes which overlap enriched
-	regions.
+	Given a table of database features, intersecting features of the specified type may be collected. The region corresponding to the first list of features may be limited or expanded as desired. Useful in identifying, for example, genes which overlap enriched regions.
 
 get_relative_data.pl
-	Similar to get_datasets.pl, data stored in a database may be
-	collected in bins flanking a specific landmark or coordinate of
-	genomic features. For example, mapping histone modification data
-	surrounding all transcription start sites in the genome.
+	Similar to get_datasets.pl, data stored in a database may be collected in bins flanking a specific landmark or coordinate of genomic features. For example, mapping histone modification data surrounding all transcription start sites in the genome.
 	
 gff3_to_ucsc_table.pl
-	Convert a GFF3 file into a UCSC-style gene table, similar to those
-	for refGene or ensGene tables. Useful for programs such as
-	[http://useq.sourceforge.net USeq] which require a gene table.
+	Convert a GFF3 file into a UCSC-style gene table, similar to those for refGene or ensGene tables. Useful for programs such as [http://useq.sourceforge.net USeq] which require a gene table. 
 	
 graph_data.pl
-	Generate a XY line or scatter plot between two datasets. For
-	scatter plots, a linear regression line is also plotted.
-	Statistics on the correlation between the two datasets are also
-	reported.
+	Generate a XY line or scatter plot between two datasets. For scatter plots, a linear regression line is also plotted. Statistics on the correlation between the two datasets are also reported.
 	
 graph_histogram.pl
-	Generate a histogram plot for one or two datasets. The data is
-	binned into the designated number of bins and the graph plotted.
-	The graph may be a line or bar plot.
+	Generate a histogram plot for one or two datasets. The data is binned into the designated number of bins and the graph plotted. The graph may be a line or bar plot.
 	
 graph_profile.pl
-	Generate a graph of data plotted against a specific X-axis, such
-	as genomic coordinates. Useful for plotting data that was
-	collected relative to a specific position, such as a transcription
-	start site. The data is plotted as a smoothed line.
+	Generate a graph of data plotted against a specific X-axis, such as genomic coordinates. Useful for plotting data that was collected relative to a specific position, such as a transcription start site. The data is plotted as a smoothed line.
 	
 intersect_nucs.pl
-	A program to intersect two lists of called, identified
-	nucleosomes. Overlapping nucleosomes are identified, and the
-	distance of midpoint movement reported.
+	A program to intersect two lists of called, identified nucleosomes. Overlapping nucleosomes are identified, and the distance of midpoint movement reported. 
 
 intersect_SNPs.pl
-	Intersect two or more SNP files in VCF format and pull out unique
-	and common sequence variants.
+	Intersect two or more SNP files in VCF format and pull out unique and common sequence variants. 
 	
 join_data_file.pl
-	Join two or more data files that were split using the
-	split_data_file.pl program. The data files must have equal number
-	of datasets (columns) and identical metadata.
+	Join two or more data files that were split using the split_data_file.pl program. The data files must have equal number of datasets (columns) and identical metadata.
 	
 locate_SNPs.pl
-	Identifies the overlapping gene(s) or other annotation and
-	evaluates potential changes in coding sequence associated with
-	sequence variations. Uses SNP files in the VCF text format.
+	Identifies the overlapping gene(s) or other annotation and evaluates potential changes in coding sequence associated with sequence variations. Uses SNP files in the VCF text format.
 
 manipulate_datasets.pl
-	A program to manipulate datasets (columns) in a data file. A wide
-	variety of manipulations may be performed, from re-ordering the
-	columns to mathematically converting the data values to generating
-	ratios between datasets. Multiple functions may be performed
-	interactively or single functions performed automatically by
-	command line options, allowing for easy scripting of
-	manipulations.
+	A program to manipulate datasets (columns) in a data file. A wide variety of manipulations may be performed, from re-ordering the columns to mathematically converting the data values to generating ratios between datasets. Multiple functions may be performed interactively or single functions performed automatically by command line options, allowing for easy scripting of manipulations.
 	
 map_nucleosomes.pl
-	Similar to find_enriched_regions.pl, but specific for nucleosomes.
-	Given a dataset of nucleosome occupancies, peaks of occupancy data
-	are mapped and assigned to a nucleosome of standard 147 bp size.
-	The next nucleosome occupancy peak is identified relative to the
-	position of the prior identified nucleosome, assuming that
-	nucleosomes are relatively regularly spaced.
+	Similar to find_enriched_regions.pl, but specific for nucleosomes. Given a dataset of nucleosome occupancies, peaks of occupancy data are mapped and assigned to a nucleosome of standard 147 bp size. The next nucleosome occupancy peak is identified relative to the position of the prior identified nucleosome, assuming that nucleosomes are relatively regularly spaced.
 	
 map_oligo_data2gff.pl
-	Map the processed microarray oligo data value (for example, from
-	process_agilent.pl) to a genomic coordinate represented by the
-	oligo probe. A GFF3 file is generated, which could be converted to
-	wig file using data2wig.pl if desired. A GFF file representing the
-	oligo probes is required.
+	Map the processed microarray oligo data value (for example, from process_agilent.pl) to a genomic coordinate represented by the oligo probe. A GFF3 file is generated, which could be converted to wig file using data2wig.pl if desired. A GFF file representing the oligo probes is required. 
 	
 map_transcripts.pl
-	Given a dataset of transcriptome data (either RNA-hybridized
-	tiling microarray or RNA-Sequencing), regions of enrichment
-	(transcribed) are associated with annotated ORFs to identify
-	transcription start and stop sites. Introns, alternative splicing,
-	and intron-embedded unique genes are not identified.
+	Given a dataset of transcriptome data (either RNA-hybridized tiling microarray or RNA-Sequencing), regions of enrichment (transcribed) are associated with annotated ORFs to identify transcription start and stop sites. Introns, alternative splicing, and intron-embedded unique genes are not identified.
 	
 merge_datasets.pl
-	Merge the datasets (columns) of two or more data files into one
-	file. The datasets may be interactively chosen. Each file must
-	have the same number of features (rows).
+	Merge the datasets (columns) of two or more data files into one file. The datasets may be interactively chosen. Each file must have the same number of features (rows).
 	
 novo_wrapper.pl
-	A wrapper program for the alignment of raw Fastq files by the
-	Novoalign program from Novocraft. If requested, it will split
-	input files and run parallel instances of Novoalign to improve
-	throughput. Alignment files are automatically converted to Bam
-	format, sorted, and indexed.
+	A wrapper program for the alignment of raw Fastq files by the Novoalign program from Novocraft. If requested, it will split input files and run parallel instances of Novoalign to improve throughput. Alignment files are automatically converted to Bam format, sorted, and indexed.
 
 print_feature_types.pl
-	Quickly queries a given Bio::DB database and prints out the
-	feature types present in the database. When datasets are stored in
-	the database using unique feature types (breaking GFF3
-	conventions), this program provides a quick check of what datasets
-	are currently stored and available.
+	Quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 	
 process_microarray.pl
-	Process raw Agilent, NimbleGen, or GenePix data text files from
-	one or two-color microarray hybridizations. Multiple data
-	experiments (biological or technical replicates) may be combined
-	and quantile normalized together.
+	Process raw Agilent, NimbleGen, or GenePix data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together.
 	
 pull_features.pl
-	Given a list of feature names, those features may be pulled from a
-	large data file and re-written as a separate new file. Compare
-	with Microsoft's Excel VLOOKUP function.
+	Given a list of feature names, those features may be pulled from a large data file and re-written as a separate new file. Compare with Microsoft's Excel VLOOKUP function.
 	
 run_cluster.pl
-	run_cluster.pl is a wrapper for running the C Clustering Library,
-	which generates hierarchical and k-means clusters, among others.
+	run_cluster.pl is a wrapper for running the C Clustering Library, which generates hierarchical and k-means clusters, among others.
 
 split_bam_by_isize.pl
-	Split a paired-end sequencing BAM alignment file into one or more
-	separate files based on the predicted size of the insert. Useful
-	for sorting paired-end sequencing of genomic nucleosomes by size.
+	Split a paired-end sequencing BAM alignment file into one or more separate files based on the predicted size of the insert. Useful for sorting paired-end sequencing of genomic nucleosomes by size.
 	
 split_data_file.pl
-	Split a text data file into two or more files based on specific
-	values in one of the datasets (columns). For example, splitting a
-	data file of genomic binned data by chromosome. Metadata is
-	preserved in each split file. Useful for breaking extremely large
-	data files into smaller, more easily managed files.
+	Split a text data file into two or more files based on specific values in one of the datasets (columns). For example, splitting a data file of genomic binned data by chromosome. Metadata is preserved in each split file. Useful for breaking extremely large data files into smaller, more easily managed files.
 	
 ucsc_cytoband2gff3.pl
-	A simple script to conver the UCSC cytobands file into a GFF3 file
-	that can be used by the ideogram glyph of GBrowse. Useful with
-	human genome databases where cytobands are annotated.
+	A simple script to conver the UCSC cytobands file into a GFF3 file that can be used by the ideogram glyph of GBrowse. Useful with human genome databases where cytobands are annotated.
 	
 ucsc_table2gff3.pl
-	A program to convert a gene table from UCSC into a GFF3 file
-	suitable for loading into a Bio::SeqFeature::Store database. Any
-	gene table should work, but refSeq and ensGene gene tables have
-	been tested. Additional refSeq data may also be included (summary
-	note, status, etc). Complete gene feature objects are generated
-	(gene -> mRNA -> exon). Some identification of non-coding
-	transcript types is done by inference from the gene name.
+	A program to convert a gene table from UCSC into a GFF3 file suitable for loading into a Bio::SeqFeature::Store database. Any gene table should work, but refSeq and ensGene gene tables have been tested. Additional refSeq data may also be included (summary note, status, etc). Complete gene feature objects are generated (gene -> mRNA -> exon). Some identification of non-coding transcript types is done by inference from the gene name.
 
 verify_nucleosome_mapping.pl
-	This script will verify the accuracy of mapped nucleosomes
-	generated with the script 'map_nucleosomes.pl'. It will identify
-	the overlap between neighboring nucleosomes, as well check the
-	distance between the peak of nucleosome occupancy in the dataset
-	with the mapped nucleosome midpoint. This is useful when
-	emperically determining the best mapping parameters.
+	This script will verify the accuracy of mapped nucleosomes generated with the script 'map_nucleosomes.pl'. It will identify the overlap between neighboring nucleosomes, as well check the distance between the peak of nucleosome occupancy in the dataset with the mapped nucleosome midpoint. This is useful when emperically determining the best mapping parameters.
 
 wig2data.pl
-	Convert a text wiggle file into a tab-delimited tim data format
-	text file. FixedStep, variableStep, and BedGraph style wig files 
-	are allowed.
+	Convert a text wiggle file into a tab-delimited tim data format text file. Fixed, variable, and BED style wig files are allowed.

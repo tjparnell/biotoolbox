@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to bin genomic data from either gff, wig, sgr, or bam files
+# the data may be counted or statistically combined
 
 use strict;
 use Getopt::Long;
@@ -26,7 +27,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.13';
+my $VERSION = '1.8.2';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -215,7 +216,7 @@ if ($gffout) {
 	# the file should be gff format
 	# we will need to convert the data table into gff format
 	print " Writing gff format...\n";
-	$write_success = convert_and_write_to_gff_file(
+	$write_success = convert_and_write_to_gff_file( {
 			'data'     => $main_data,
 			'score'    => $column,
 			'source'   => $datafile,
@@ -223,14 +224,14 @@ if ($gffout) {
 			'filename' => $outfile,
 			'version'  => 2,
 			'gz'       => $gz,
-	);
+	} );
 }
 else {
-	$write_success = write_tim_data_file(
+	$write_success = write_tim_data_file( {
 		'data'      => $main_data,
 		'filename'  => $outfile,
 		'gz'        => $gz,
-	);
+	} );
 }
 
 # conclusion
@@ -256,11 +257,11 @@ sub prepare_data_structure {
 	if ($new) {
 		print " Generating a new set of genomic bins....\n";
 		# generate new data table
-		$main_data = get_new_genome_list(
+		$main_data = get_new_genome_list( {
 				'db'        => $dbname, 
 				'win'       => $win, 
 				'step'      => $step,
-		);
+		} );
 		unless ($main_data) {
 			die "Unable to generate a new data table!\n";
 		}
@@ -931,7 +932,7 @@ sub secondary_processing {
 			}
 			else {
 				# no data
-				$table_ref->[$row][$column] = 0;
+				$table_ref->[$row][$column] = '.';
 			}
 		}
 	}
@@ -1108,12 +1109,11 @@ __END__
 
 bin_genomic_data.pl
 
-A script to bin genomic data into windows.
+A script to bin genomic data into windows
 
 =head1 SYNOPSIS
  
  bin_genomic_data.pl --data <filename> --in <filename> --method [method]
- 
  bin_genomic_data.pl --data <filename> --new --win <integer> --db <db_name>
      --out <filename> --method [method]
  
@@ -1131,12 +1131,13 @@ A script to bin genomic data into windows.
   --midpoint
   --shift <integer>
   --interpolate
-  --log
+  --(no)log
   --gff
-  --gz
+  --(no)gz
   --version
   --help
 
+ 
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1220,9 +1221,9 @@ sequencing library.
 
 Optionally interpolate missing bin values from flanking bins. 
 
-=item --log
+=item --(no)log
 
-Flag to indicate that source data is log2, and to calculate 
+Flag to indicate that source data is (not) log2, and to calculate 
 accordingly and report as log2 data.
 
 =item --gff

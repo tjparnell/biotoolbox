@@ -1,6 +1,11 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert a GFF3 file to a UCSC style gene table
+
+# This should complement the biotoolbox scripts ucsc_table2gff3.pl and
+# get_ensembl_annotation.pl
+# 
+
 
 use strict;
 use Getopt::Long;
@@ -847,8 +852,6 @@ __END__
 
 gff3_to_ucsc_table.pl
 
-A script to convert a GFF3 file to a UCSC style gene table
-
 =head1 SYNOPSIS
 
 gff3_to_ucsc_table.pl [--options...] <filename>
@@ -860,6 +863,7 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   --gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -876,14 +880,14 @@ Specify the input GFF3 file. The file may be compressed with gzip.
 Specify the output filename. By default it uses input file base name 
 appened with '_ucsc_genetable.txt'.
 
-=item --bin
+=item --(no)bin
 
 Specify whether the UCSC table-specific column bin should be included as 
 the first column in the table. This column is reserved for internal 
 UCSC database use, and, if included here, will simply be populated with 
 0s. The default behavior is to not include it.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip. 
 The default is to mimic the status of the input file
@@ -937,3 +941,4 @@ in the GFF3 file is ignored.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

@@ -1,26 +1,24 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to convert a tim data file to a fasta file
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::Seq;
 use Bio::SeqIO;
+use Bio::DB::Fasta;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
-);
-use tim_db_helper qw(
-	open_db_connection
 );
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
 
-my $VERSION = '1.10.1';
+my $VERSION = '1.7.0';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -40,7 +38,7 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
-	$database,
+	$fasta,
 	$id_i,
 	$desc_i,
 	$seq_i,
@@ -57,7 +55,7 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # the solexa data file
 	'out=s'     => \$outfile, # name of output file 
-	'db|fasta=s'=> \$database, # database name or genomic fasta file
+	'fasta=s'   => \$fasta, # genomic fasta file
 	'id=i'      => \$id_i, # id index
 	'desc=i'    => \$desc_i, # description index
 	'seq=i'     => \$seq_i, # sequence index
@@ -102,9 +100,7 @@ unless (defined $gz) {
 ### Open file ####
 my ($in_fh, $metadata_ref) = open_tim_data_file($infile) or 
 	die "unable to open input file!\n";
-unless ($database) {
-	$database = $metadata_ref->{'db'};
-}
+
 
 
 
@@ -184,12 +180,12 @@ sub write_direct_fasta {
 sub fetch_seq_and_write_fasta {
 	
 	# Open fasta database
-	unless ($database) {
-		die " Must provide a database or genomic fasta file(s)!\n";
+	unless ($fasta) {
+		die " Must provide a genomic fasta file(s)!\n";
 	}
 	print " Indexing Fasta database for sequence collection....\n";
-	my $db = open_db_connection($database) or 
-		die " Unable to open database '$database'!\n";
+	my $db = Bio::DB::Fasta->new($fasta) or 
+		die " Unable to open Fasta database!\n";
 	
 	# open output file
 	my $seq_io = open_output_fasta();
@@ -266,26 +262,24 @@ __END__
 
 data2fasta.pl
 
-A script to retrieve sequences from a list of features
-
 =head1 SYNOPSIS
 
 data2fasta.pl [--options...] <filename>
   
   Options:
   --in <filename>
-  --db <name|file|directory>
+  --fasta <filename>
   --id <index>
   --seq <index>
   --desc <index>
   --chr <index>
   --start <index>
   --stop <index>
-  --strand <index>
   --out <filename> 
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -300,15 +294,11 @@ with columns representing the sequence id or name, sequence, description,
 chromosome, start, stop, and/or strand information. The file may be 
 compressed with gzip.
 
-=item --db <name|file|directory>
+-item --fasta <filename|directory>
 
-Provide the name of a Bio::DB::SeqFeature::Store database from which to 
-collect the genomic sequence. A relational database name, SQLite file, or 
-GFF3 file with sequence may be provided. Alternatively, provide the name 
-of an uncompressed Fasta file (multi-fasta is ok) or directory containing 
-multiple fasta files representing the genomic sequence. The directory 
-must be writeable for a small index file to be written. The database 
-name may be obtained from the input file metadata. Required.
+Optionally specify the genomic fasta file or a directory of fasta files 
+from which to retrieve the sequence when only chromosome, start, and 
+stop information is provided.
 
 =item --id <index>
 
@@ -340,16 +330,11 @@ automatically determined from the column header.
 Optionally specify the index for the stop position column. It may be 
 automatically determined from the column header.
 
-=item --strand <index>
-
-Optionally specify the index for the strand column. It may be 
-automatically determined from the column header.
-
 =item --out <filename>
 
 Specify the output filename. By default it uses the input file basename.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -375,10 +360,8 @@ the fasta file directly from the file content.
 
 If only genomic position information (chromosome, start, stop, and 
 optionally strand) is present in the file, then the sequence will be 
-retrieved from a database, either a Bio::DB::SeqFeature::Store database, 
-a genomic sequence multi-fasta, or a directory of multiple fasta files. 
-If strand information is provided, then the sequence reverse complement 
-is returned for reverse strand coordinates.
+retrieved from one or more genomic fasta files. The fasta file(s) must 
+be in a writeable directory to create an index for efficient retrieval.
 
 =head1 AUTHOR
 
@@ -391,3 +374,4 @@ is returned for reverse strand coordinates.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

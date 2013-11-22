@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to convert a generic data file into a gff file
+# this presumes it has chromosomal coordinates to convert
 
 use strict;
 use Getopt::Long;
@@ -9,7 +10,6 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
-	format_with_commas
 );
 use tim_file_helper qw(
 	open_tim_data_file
@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.8.5';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -126,6 +126,42 @@ unless ($in_fh) {
 
 ### Determine indices
 
+# automatically identify sgr format
+if ($metadata_ref->{'extension'} =~ /sgr/) {
+	$chr_index = 0 unless defined $chr_index;
+	$start_index = 1 unless defined $start_index;
+	$stop_index = 1 unless defined $stop_index; # same as start
+	$score_index = 2 unless defined $score_index;
+	$type ||= 'region'; # default
+}
+
+# automatically identify bed format
+elsif ($metadata_ref->{'bed'}) {
+	
+	# standard columns
+	$chr_index = 0;
+	$start_index = 1;
+	$stop_index = 2; # same as start
+	
+	# optional columns
+	# we are assuming standard BED columns
+	if ($metadata_ref->{'bed'} >= 4) {
+		$name_index = 3;
+	}
+	if ($metadata_ref->{'bed'} >= 5) {
+		$score_index = 4;
+	}
+	if ($metadata_ref->{'bed'} >= 6) {
+		$strand_index = 5;
+	}
+	
+	# assign type
+	$type ||= 'region';
+	
+	# bedfiles are 0-based
+	$zero_based = 1;
+}
+
 # Ask user interactively
 if ($ask) {
 	# the user has specified that we should ask for specific indices
@@ -140,13 +176,12 @@ if ($ask) {
 	# request chromosome index
 	unless (defined $chr_index) {
 		my $suggestion = find_column_index($metadata_ref, '^chr|seq|refseq');
-		print " Enter the index for the chromosome column (Required) [$suggestion]  ";
+		print " Enter the index for the chromosome column [$suggestion]  ";
 		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$chr_index = $in;
+		if ($in =~ /(\d+)/) {
+			$chr_index = $1;
 		}
-		elsif (not $in and defined $suggestion) {
+		elsif (defined $suggestion) {
 			$chr_index = $suggestion;
 		}
 		else {
@@ -157,13 +192,12 @@ if ($ask) {
 	# request start index
 	unless (defined $start_index) {
 		my $suggestion = find_column_index($metadata_ref, 'start');
-		print " Enter the index for the start column (Required) [$suggestion]  ";
+		print " Enter the index for the start column [$suggestion]  ";
 		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$start_index = $in;
+		if ($in =~ /(\d+)/) {
+			$start_index = $1;
 		}
-		elsif (not $in and defined $suggestion) {
+		elsif (defined $suggestion) {
 			$start_index = $suggestion;
 		}
 		else {
@@ -174,13 +208,12 @@ if ($ask) {
 	# request stop index
 	unless (defined $stop_index) {
 		my $suggestion = find_column_index($metadata_ref, 'stop|end');
-		print " Enter the index for the stop or end column (Required) [$suggestion]  ";
+		print " Enter the index for the stop or end column [$suggestion]  ";
 		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$stop_index = $in;
+		if ($in =~ /(\d+)/) {
+			$stop_index = $1;
 		}
-		elsif (not $in and defined $suggestion) {
+		elsif (defined $suggestion) {
 			$stop_index = $suggestion;
 		}
 		else {
@@ -188,76 +221,52 @@ if ($ask) {
 		}
 	}
 	
-	# request source text
-	unless (defined $source) {
-		print " Enter the text string or column index for the GFF source (Suggested)  ";
-		$source = <STDIN>;
-		chomp $source;
-	}
-	
-	# request type text
-	unless (defined $type) {
-		print " Enter the text string or column index for the GFF type (Suggested)  ";
-		$type = <STDIN>;
-		chomp $type;
-	}
-	
 	# request score index
 	unless (defined $score_index) {
-		my $suggestion = find_column_index($metadata_ref, '^score$');
-		print " Enter the index for the feature score column [$suggestion]  ";
+		print " Enter the index for the feature score column  ";
 		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$score_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$score_index = $suggestion;
-		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
-		}
-	}
-	
-	# request strand index
-	unless (defined $strand_index) {
-		my $suggestion = find_column_index($metadata_ref, 'strand');
-		print " Enter the index for the feature strand column [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{exists}) {
-			$strand_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$strand_index = $suggestion;
-		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
+		if ($in =~ /(\d+)/) {
+			$score_index = $1;
 		}
 	}
 	
 	# request name index or text
 	unless (defined $name) {
-		my $suggestion = find_column_index($metadata_ref, '^name|id');
-		print " Enter the index for the feature name column or the text (Suggested) [$suggestion]  ";
+		print " Enter the index for the feature name column or the text  ";
 		$name = <STDIN>;
 		chomp $name;
-		if (not $name and defined $suggestion) {
-			$name = $suggestion;
+	}
+	
+	# request name index
+	unless (defined $id_index) {
+		print " Enter the index for the feature ID column  ";
+		my $in = <STDIN>;
+		if ($in =~ /(\d+)/) {
+			$id_index = $1;
 		}
 	}
 	
-	# request ID index
-	unless (defined $id_index) {
-		print " Enter the index for the feature unique ID column  ";
+	# request strand index
+	unless (defined $strand_index) {
+		print " Enter the index for the feature strand column  ";
 		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$id_index = $in;
+		if ($in =~ /(\d+)/) {
+			$strand_index = $1;
 		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
-		}
+	}
+	
+	# request type text
+	unless (defined $type) {
+		print " Enter the text string or column index for the GFF type  ";
+		$type = <STDIN>;
+		chomp $type;
+	}
+	
+	# request source text
+	unless (defined $source) {
+		print " Enter the text string for the GFF source  ";
+		$source = <STDIN>;
+		chomp $source;
 	}
 	
 	# request tags
@@ -268,43 +277,6 @@ if ($ask) {
 		$tag =~ s/\s+//g; # remove whitespace
 	}
 }
-
-# otherwise attempt to identify indices automatically
-else {
-	unless (defined $chr_index) {
-		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
-	}
-	unless (defined $start_index) {
-		$start_index = find_column_index($metadata_ref, '^start');
-	}
-	unless (defined $stop_index) {
-		$stop_index = find_column_index($metadata_ref, '^stop|end');
-	}
-	unless (defined $strand_index) {
-		$strand_index = find_column_index($metadata_ref, '^strand');
-	}
-	unless (defined $name or defined $name_index) {
-		$name_index = find_column_index($metadata_ref, '^name|ID');
-		unless (defined $name_index) {
-			$name_index = find_column_index($metadata_ref, 'name|ID$');
-		}
-	}
-	unless (defined $score_index) {
-		$score_index = find_column_index($metadata_ref, '^score$');
-	}
-	unless (defined $type) {
-		$type = $metadata_ref->{'feature'} || 'region';
-	}
-	unless (defined $source) {
-		$source = $metadata_ref->{'basename'};
-	}
-}
-
-if ($metadata_ref->{'bed'}) {
-	# bedfiles are 0-based
-	$zero_based = 1;
-}
-
 
 # Convert tag text to list of indices
 my @tag_indices;
@@ -320,7 +292,7 @@ if ($tag) {
 if (
 	defined $name and 
 	$name =~/^\d+$/ and 
-	exists $metadata_ref->{$name}
+	$name <= $metadata_ref->{'number_columns'}
 ) {
 	# looks like a number, so assume it is the index
 	$name_index = $name;
@@ -342,50 +314,59 @@ if ($unique and not defined $name_index) {
 
 # Generate the output file name
 unless ($outfile) {
-	# re-use the input file name
-	$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
+	# generate an output file name based on provided data
+	if (defined $type and $type =~ /[a-z]+/i and $type ne 'region') {
+		# user has provide a GFF type, use that preferentially as the 
+		# the filename
+		# this is ignored if a column index or default region is used
+		if ($source) {
+			# user has provided source, combine that
+			$outfile = $source . '_' . $type;
+		}
+		else {
+			# just use the type
+			$outfile = $type;
+		}
+	}
+	else {
+		# re-use the input file name
+		$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
+	}
 }
 
 
 
 ### Print the user or auto-generated options
 print " converting to GFF using\n";
-print "  - '", $metadata_ref->{$chr_index}{name}, "' column for chromosome\n" 
+print "  - '", $metadata_ref->{$chr_index}{name}, "' for chromosome\n" 
 	if defined $chr_index;
-print "  - '", $metadata_ref->{$start_index}{name}, "' column for start\n" 
+print "  - '", $metadata_ref->{$start_index}{name}, "' for start\n" 
 	if defined $start_index;
-print "  - '", $metadata_ref->{$stop_index}{name}, "' column for stop\n" 
+print "  - '", $metadata_ref->{$stop_index}{name}, "' for stop\n" 
 	if defined $stop_index;
-print "  - '", $metadata_ref->{$strand_index}{name}, "' column for strand\n" 
+print "  - '", $metadata_ref->{$strand_index}{name}, "' for strand\n" 
 	if defined $strand_index;
-print "  - '", $metadata_ref->{$score_index}{name}, "' column for score\n" 
+print "  - '", $metadata_ref->{$score_index}{name}, "' for score\n" 
 	if defined $score_index;
 if (defined $name_index) {
-	print "  - '", $metadata_ref->{$name_index}{name}, "' column for name\n" 
+	print "  - '", $metadata_ref->{$name_index}{name}, "' for name\n" 
 }
 elsif (defined $name) {
 	print "  - '$name' for name\n" 
 }
-print "  - '", $metadata_ref->{$id_index}{name}, "' column for ID\n" 
+print "  - '", $metadata_ref->{$id_index}{name}, "' for ID\n" 
 	if defined $id_index;
-if ($type =~ /^\d+$/ and exists $metadata_ref->{$type}) {
+if ($type =~ /^\d+$/ and $type <= $metadata_ref->{'number_columns'}) {
 	# type looks like a column index
-	print "  - '", $metadata_ref->{$type}{name}, "' column for GFF type\n";
+	print "  - '", $metadata_ref->{$type}{name}, "' for GFF type\n";
 }
 else {
 	# type must be a text string
 	print "  - '$type' for type\n" if defined $type;
 }
-if ($source =~ /^\d+$/ and exists $metadata_ref->{$source}) {
-	# type looks like a column index
-	print "  - '", $metadata_ref->{$source}{name}, "' column for GFF source\n";
-}
-else {
-	# type must be a text string
-	print "  - '$source' for GFF source\n" if defined $source;
-}
+print "  - '$source' for source\n" if defined $source;
 print "  - '", join(", ", map { $metadata_ref->{$_}{name} } @tag_indices ), 
-	"' columns for group tags\n" if $tag;
+	"' for group tags\n" if $tag;
 
 
 
@@ -477,11 +458,10 @@ $total_count += $count;
 ### Finish
 $in_fh->close;
 $out_fh->close;
-printf " Converted %s lines of input data to GFF file '$outfile'\n", 
-	format_with_commas($total_count);
+print " Converted $total_count lines of input data to GFF file '$outfile'\n";
 if ($unique) {
-	printf " There were %s original unique names\n", 
-		format_with_commas(scalar keys %unique_name_counter);
+	print " There were ", scalar keys %unique_name_counter, 
+		" original unique names\n";
 }
 # That's it!
 
@@ -520,15 +500,15 @@ sub write_gff_data {
 	# a subroutine to progressively write out the converted gff data
 	
 	# convert to gff
-	my @arguments = (
+	my %arguments = (
 		'data'     => \%output_data,
 		'chromo'   => $chr_index,
 		'start'    => $start_index,
 		'stop'     => $stop_index,
 		'score'    => $score_index,
 		'strand'   => $strand_index,
-		'source'   => $source, # will interpret as either text or index
-		'type'     => $type, # will interpret as either text or index
+		'source'   => $source,
+		'type'     => $type,
 		'midpoint' => $midpoint,
 		'version'  => $version,
 		'tags'     => [ @tag_indices ],
@@ -537,17 +517,17 @@ sub write_gff_data {
 	);
 	if ($unique) {
 		# we've generated a new name index
-		push @arguments, 'name' => $name_index;
+		$arguments{'name'} = $name_index;
 	}
 	elsif (defined $name_index) {
 		# supplied name index
-		push @arguments, 'name' => $name_index;
+		$arguments{'name'} = $name_index;
 	}
 	else {
 		# text name
-		push @arguments, 'name' => $name;
+		$arguments{'name'} = $name;
 	}
-	convert_genome_data_2_gff_data( @arguments ) or 
+	convert_genome_data_2_gff_data( \%arguments ) or 
 		die " Unable to convert to GFF format!\n";
 	
 	# format the numbers
@@ -599,11 +579,11 @@ sub write_gff_data {
 		
 		# rather than generating new code for writing the gff file,
 		# we will simply use the write_tim_data_file sub
-		$outfile = write_tim_data_file(
+		$outfile = write_tim_data_file( {
 			'data'      => \%output_data,
 			'filename'  => $outfile,
 			'gz'        => $gz,
-		);
+		} );
 		
 		# but now we will have to reopen the file for appended writing
 		$out_fh = open_to_write_fh($outfile, $gz, 1);
@@ -655,8 +635,6 @@ __END__
 
 data2gff.pl
 
-A script to convert a generic data file to GFF format.
-
 =head1 SYNOPSIS
 
 data2gff.pl [--options...] <filename>
@@ -674,15 +652,16 @@ data2gff.pl [--options...] <filename>
   --tags <column_index,column_index,...>
   --source <text>
   --type <text | column_index>
-  --zero
+  --(no)zero
   --format [0,1,2,3]
-  --midpoint
-  --unique
+  --(no)midpoint
+  --(no)unique
   --out <filename> 
   --version [2,3]
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -698,10 +677,11 @@ although any format should work. The file may be compressed with gzip.
 
 =item --ask
 
-Indicate that the program should interactively ask for column indices or
-text strings for the GFF attributes, including coordinates, source, type, 
-etc. It will present a list of the column names to choose from. Enter 
-nothing for non-relevant columns or to accept default values.
+Indicate that the program should interactively ask for the indices for 
+feature score, name, and strand. It will present a list of the column 
+names to choose from. It will also ask for the source, and type
+or method text strings. Enter nothing for non-relevant columns or to 
+accept default values.
 
 =item --chr <column_index>
 
@@ -752,21 +732,21 @@ Provide a comma delimited list of column indices that contain
 values to be included as group tags in the GFF features. The 
 key will be the column name.
 
-=item --source <text | column_index>
+=item --source <text>
 
-Enter either a text string or a column index representing the 
-GFF source that should be used for the features. The default is 
-'data'.
+A scalar value to be used as the text in the 'source' 
+column. Default is 'data'.
 
 =item --type <text | column_index>
 
-Enter either a text string or a column index representing the 
-GFF 'type' or 'method' that should be used for the features. If 
-not defined, it will use the column name for either 
-the 'score' or 'name' column, if defined. As a last resort, it 
+Enter either a text string to be used as the GFF 'method'
+or 'type' column, or a column index representing the 
+feature type when one simply won't due. If not defined, 
+it will use the name of the dataset used for either the 'score' 
+or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
 
-=item --zero
+=item --(no)zero
 
 Indicate whether the source data is in interbase or 0-based 
 coordinates, as is used with UCSC source data or USeq data 
@@ -780,14 +760,14 @@ Indicate the number of decimal places the score value should
 be formatted. Acceptable values include 0, 1, 2, or 3 places.
 Anything else is ignored.
 
-=item --midpoint
+=item --(no)midpoint
 
 A boolean (1 or 0) value to indicate whether the 
 midpoint between the actual 'start' and 'stop' values
 should be used instead of the actual values. Default 
 is false.
 
-=item --unique
+=item --(no)unique
 
 Indicate whether the feature names should be made unique. A count 
 number is appended to the name of subsequent features to make them 
@@ -805,7 +785,7 @@ added if required.
 
 Specify the GFF version. The default is version 3.
 
-=item --gz
+=item --(no)gz
 
 Indicate whether the output file should (not) be compressed with gzip.
 
@@ -824,12 +804,17 @@ Display the POD documentation
 This program will convert a data file into a GFF formatted text file. 
 Only simple conversions are performed, where each data line is converted 
 to a single feature. Complex features with parent-child relationships (such 
-as genes) should be converted with something more advanced.
+as genes) should be converted with something else.
 
-The input file should have chromosomal coordinates, i.e. chromosome, 
+The source file should have chromosomal coordinates, i.e. chromosome, 
 start, and (optionally) stop or end coordinates. They may be specified 
 upon execution or identified automatically. If they are not found, the 
 GFF conversion will fail. 
+
+Additional feature information may be specified using appropriate command-line 
+arguments, including score values, strand, name, ID, source, type, etc. See 
+the L<OPTIONS> for more details. 
+
 
 =head1 AUTHOR
 
@@ -843,3 +828,8 @@ GFF conversion will fail.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+

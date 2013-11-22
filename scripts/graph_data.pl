@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to graph correlation plots for two microarray data sets
 
 use strict;
 use Pod::Usage;
@@ -16,18 +16,11 @@ eval {
 use Statistics::Descriptive;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_data_helper qw(parse_list);
 use tim_file_helper qw(
 	load_tim_data_file
 	open_to_write_fh
 );
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-my $VERSION = '1.12.4';
+my $VERSION = '1.8.4';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -69,7 +62,6 @@ my (
 	$directory,
 	$out,
 	$numbers,
-	$cpu,
 	$help,
 	$print_version,
 );
@@ -98,7 +90,6 @@ GetOptions(
 	'dir=s'     => \$directory, # optional name of the graph directory
 	'out=s'     => \$out, # output file name
 	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
-	'cpu=i'     => \$cpu, # number of parallel threads to execute
 	'help'      => \$help, # flag to print help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -132,7 +123,14 @@ unless ($infile) {
 
 ### set defaults
 if ($type) {
-	unless ($type =~ /scatter|line|smooth/i ) {
+	# check the requested type
+	my %accepted_types = (
+		# a quickie hash to look up valid graph types, add more here
+		'scatter'  => 1,
+		'line'     => 1,
+		'smooth'   => 1,
+	);
+	unless (exists $accepted_types{$type} ) {
 		die " Unknown graph type '$type'!\n Please use --help for more information\n";
 	}
 }
@@ -178,20 +176,7 @@ unless (defined $x_format) {
 unless (defined $y_format) {
 	$y_format = defined $format ? $format : 0;
 }
-if ($moving_average) {
-	unless ( $moving_average =~ /^(\d+),(\d+)$/ and $1 >= $2 ) {
-		die " moving average values is not (well) defined!\n Use --help for more information\n";
-	}
-}
-if ($parallel) {
-	# conservatively enable 2 cores
-	$cpu ||= 2;
-}
-else {
-	# disable cores
-	print " disabling parallel CPU execution, no support present\n" if $cpu;
-	$cpu = 0;
-}
+
 
 
 
@@ -210,15 +195,21 @@ my $data_table_ref = $main_data_ref->{'data_table'};
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
 for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
-	
-	# check column header names for gene or window attribute information
-	# these won't be used for graph generation, so we'll skip them
-	next if $main_data_ref->{$i}{'name'} =~ /^(?:name|id|class|type|alias|probe|chr|
-		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand)$/xi;
-	
-	# record the data set name
-	$dataset_by_id{$i} = $main_data_ref->{$i}{'name'};
+	my $name = $main_data_ref->{$i}{'name'};
+	if (
+		# check column header names for gene or window attribute information
+		# these won't be used for graph generation, so we'll skip them
+		$name =~ /^name|id|class|type|alias|probe$/i or
+		$name =~ /^chr|chromo|chromosome|seq|sequence|refseq|contig|scaffold$/i or
+		$name =~ /^start|stop|end|strand$/i
+	) { 
+		# skip on to the next header
+		next; 
+	} 
+	else { 
+		# record the data set name
+		$dataset_by_id{$i} = $name;
+	}
 }	
 
 
@@ -226,7 +217,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 unless ($directory) {
 	# directory may be specified from a command line argument, otherwise
 	# generate default directory from input file name
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory '$directory'\n";
@@ -243,39 +234,34 @@ my @correlation_output;
 
 ### Get the list of datasets to pairwise compare
 
-if ($all) {
-	# All datasets in the input file will be compared to each other
-	print " Comparing all data set pairwise combinations....\n";
-	graph_all_datasets();
+# A list of dataset pairs was provided upon execution
+if ($index) {
+	my @list = split /,/, $index;
+	push @pairs, @list;
 }
-elsif ($index or @pairs) {
-	# A list of dataset pairs was provided upon execution
-	
-	# provided as a string in the index option
-	if ($index) {
-		push @pairs, split /,/, $index;
-	}
-	
-	# walk through each 
-	my @to_do;
+if (@pairs) {
 	foreach my $pair (@pairs) {
 		my ($x, $y) = split /,|&/, $pair;
 		if ( 
 			(exists $dataset_by_id{$x}) and 
 			(exists $dataset_by_id{$y}) 
 		) {
-			push @to_do, [$x, $y];
+			graph_this($x, $y);
 		} 
 		else {
 			print " One of these numbers ($x, $y) is not valid\n";
 		}
 	}
-	
-	# graph the pairs
-	graph_provided_datasets(@to_do);
 }
+
+# All datasets in the input file will be compared to each other
+elsif ($all) {
+	print " Comparing all data set pairwise combinations....\n";
+	graph_all_datasets();
+}
+
+# Interactive session
 else {
-	# Interactive session
 	graph_datasets_interactively();
 }
 
@@ -331,85 +317,17 @@ if ($stat_fh) {
 ## subroutine to graph all the data sets in the loaded data file
 sub graph_all_datasets {
 	
-	# a list of all the datasets to work with
-	my @list;
-	if ($index) {
-		# user provided a list to work with
-		@list = parse_list($index);
-	}
-	else {
-		# put the dataset IDs into sorted array
-		@list = sort {$a <=> $b} keys %dataset_by_id; 
-	}
+	# put the dataset IDs into sorted array
+	my @list = sort {$a <=> $b} keys %dataset_by_id; 
 	
 	# Now process through the list 
 	# the first dataset will be x, and the subsequent will by y
 	# all of the ys will be done for a given x, then x is incremented and the ys repeated
 	# any y less than the current x will be skipped to avoid repeats
-	my @to_do;
 	for (my $x = 0; $x < (scalar @list - 1); $x++) {
 		for (my $y = 1; $y < (scalar @list); $y++) {
 			if ($y <= $x) {next}; # skip pairs we've already done
-			push @to_do, [$list[$x], $list[$y]];
-		}
-	}
-	
-	# graph the datasets
-	graph_provided_datasets(@to_do);
-}
-
-
-## Graph the dataset pairs provided by the user
-sub graph_provided_datasets {
-	my @to_do = @_;
-	# the to_do list is an array of [x,y] arrays
-	
-	
-	# We can graph either in parallel or serially
-	
-	# Parallel Execution
-	if ($cpu > 1 and scalar(@to_do) >= $cpu) {
-		
-		# prepare ForkManager
-		print " Forking into $cpu children for parallel graph generation\n";
-		my $pm = Parallel::ForkManager->new($cpu);
-		$pm->run_on_finish( sub {
-			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result) = @_;
-			
-			push @correlation_output, $$result if $exit_code == 1;
-		});
-		
-		# run in parallel
-		foreach (@to_do) {
-			$pm->start and next;
-			
-			# in child
-			my $result = graph_this($_->[0], $_->[1]);
-			if ($result) {
-				# return exit code of 1 means success
-				$pm->finish(1, \$result); 
-			}
-			else {
-				# exit code of 0 means failure, no correlation to report
-				print " Failed to generate graph for ", $dataset_by_id{$_->[0]}, 
-					" and ", $dataset_by_id{$_->[1]}, "\n";
-				$pm->finish(0);
-			}
-		}
-		$pm->wait_all_children;
-	}
-	
-	# Serial Execution
-	else {
-		foreach (@to_do) {
-			my $result = graph_this($_->[0], $_->[1]); 
-			if ($result) {
-				push @correlation_output, $result;
-			}
-			else {
-				print " Failed to generate graph for ", $dataset_by_id{$_->[0]}, 
-					" and ", $dataset_by_id{$_->[1]}, "\n";
-			}
+			graph_this($list[$x], $list[$y]);
 		}
 	}
 }
@@ -439,15 +357,7 @@ sub graph_datasets_interactively {
 			(exists $dataset_by_id{$x}) and 
 			(exists $dataset_by_id{$y}) 
 		) {
-			# generate the graph, and return the correlation stats as a string
-			my $result = graph_this($x, $y);
-			if ($result) {
-				push @correlation_output, $result;
-			}
-			else {
-				print " Failed to generate graph for ", $dataset_by_id{$x}, 
-					" and ", $dataset_by_id{$y}, "\n";
-			}
+			graph_this($x, $y);
 		} 
 		else {
 			print " One of these numbers is not valid\n";
@@ -470,6 +380,7 @@ sub graph_this {
 	# get the name of the datasets
 	my $xname = $dataset_by_id{$xid}; 
 	my $yname = $dataset_by_id{$yid};
+	print " Preparing graph for $xname vs. $yname....\n";
 	
 	# collect the values
 	my (@xvalues, @yvalues);
@@ -554,16 +465,17 @@ sub graph_this {
 	
 	
 	# Determine graph type and plot accordingly
-	# the correlation statistics will be returned as a string
 	if ($type eq 'scatter') {
-		return graph_scatterplot($xname, $yname, \@xvalues, \@yvalues);
+		graph_scatterplot($xname, $yname, \@xvalues, \@yvalues);
 	} 
 	elsif ($type eq 'line') {
-		return graph_line_plot($xname, $yname, \@xvalues, \@yvalues);
+		graph_line_plot($xname, $yname, \@xvalues, \@yvalues);
 	}
 	elsif ($type eq 'smooth') {
-		return graph_smoothed_line_plot($xname, $yname, \@xvalues, \@yvalues);
+		graph_smoothed_line_plot($xname, $yname, \@xvalues, \@yvalues);
 	}
+	
+	
 }
 
 
@@ -622,6 +534,15 @@ sub smooth_data {
 	
 	# Determine the moving average values from command line argument
 	my ($window, $step) = split /,/, $moving_average;
+	unless (
+		defined $window and      # both values are defined
+		defined $step and 
+		$window =~ /^\d+$/ and   # both values are numbers
+		$step =~ /^\d+$/ and 
+		$step <= $window         # step is less or equal to window
+	){
+		die " moving average values is not (well) defined!\n Use --help for more information\n";
+	}
 	my $halfstep = sprintf "%.0f", ($window / 2);
 	
 	# Smooth the Y data by taking a moving average
@@ -755,13 +676,25 @@ sub graph_scatterplot {
 	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	open IMAGE, ">$filename" or do {
-		warn " Can't open output file '$filename'!\n";
-		return;
-	};
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
+	
+	# record stats
+	print "  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
+	push @correlation_output, join("\t", (
+		$infile,
+		$filename,
+		'scatter',
+		$norm,
+		$xname,
+		$yname,
+		$q,
+		$m,
+		$r,
+		$rsquared
+	) );
 	
 	# write the graph numbers if requested
 	if ($numbers) {
@@ -776,22 +709,6 @@ sub graph_scatterplot {
 			$fh->close;
 		}
 	}
-	
-	# return stats
-	print " Generated graph for $xname vs $yname\n" . 
-		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
-		$infile,
-		$filename,
-		'scatter',
-		$norm,
-		$xname,
-		$yname,
-		$q,
-		$m,
-		$r,
-		$rsquared
-	) );
 }
 
 
@@ -841,13 +758,25 @@ sub graph_line_plot {
 	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	open IMAGE, ">$filename" or do {
-		warn " Can't open output file '$filename'!\n";
-		return;
-	};
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
+	
+	# record stats
+	print "  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
+	push @correlation_output, join("\t", (
+		$infile,
+		$filename,
+		'line',
+		$norm,
+		$xname,
+		$yname . ' (smoothed)',
+		$q,
+		$m,
+		$r,
+		$rsquared
+	) );
 	
 	# write the graph numbers if requested
 	if ($numbers) {
@@ -862,22 +791,6 @@ sub graph_line_plot {
 			$fh->close;
 		}
 	}
-	
-	# return stats
-	print " Generated graph for $xname vs $yname\n" . 
-		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
-		$infile,
-		$filename,
-		'line',
-		$norm,
-		$xname,
-		$yname . ' (smoothed)',
-		$q,
-		$m,
-		$r,
-		$rsquared
-	) );
 }
 
 
@@ -925,13 +838,25 @@ sub graph_smoothed_line_plot {
 	
 	# Write the graph file
 	my $gd = $graph->plot(\@data) or warn $graph->error;
-	open IMAGE, ">$filename" or do {
-		warn " Can't open output file '$filename'!\n";
-		return;
-	};
+	open IMAGE, ">$filename" or die " Can't open output file '$filename'!\n";
 	binmode IMAGE;
 	print IMAGE $gd->png;
 	close IMAGE;
+	
+	# record stats
+	print "  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
+	push @correlation_output, join("\t", (
+		$infile,
+		$filename,
+		'line',
+		$norm,
+		$xname,
+		$yname . ' (smoothed)',
+		$q,
+		$m,
+		$r,
+		$rsquared
+	) );
 	
 	# write the graph numbers if requested
 	if ($numbers) {
@@ -946,22 +871,6 @@ sub graph_smoothed_line_plot {
 			$fh->close;
 		}
 	}
-	
-	# return stats
-	print " Generated graph for $xname vs $yname\n" . 
-		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
-		$infile,
-		$filename,
-		'line',
-		$norm,
-		$xname,
-		$yname . ' (smoothed)',
-		$q,
-		$m,
-		$r,
-		$rsquared
-	) );
 }
 
 
@@ -1065,11 +974,9 @@ __END__
 
 graph_data.pl
 
-A script to graph XY line or dot plots between data sets.
-
 =head1 SYNOPSIS
-
-graph_data.pl [--options] <filename>
+ 
+  graph_data.pl [--options] <filename>
   
   Options:
   --in <filename>
@@ -1078,8 +985,8 @@ graph_data.pl [--options] <filename>
   --index <X_index&Y_index,...>
   --all
   --ma <window>,<step>
-  --norm
-  --log
+  --(no)norm
+  --(no)log
   --min=<value>
   --xmin=<value>
   --ymin=<value>
@@ -1094,7 +1001,6 @@ graph_data.pl [--options] <filename>
   --yformat <integer>
   --out <base_filename>
   --dir <foldername>
-  --cpu <integer>
   --version
   --help
 
@@ -1103,6 +1009,7 @@ graph_data.pl [--options] <filename>
 The command line flags and descriptions:
 
 =over 4
+
 
 =item --in <filename>
 
@@ -1142,17 +1049,15 @@ set, then the lists may be selected interactively from a list.
 
 Indicate that all available datasets in the input file should be
 plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.
-If you wish to graph only a subset of datasets, provide a list 
-and/or range using the --index option.
 
-=item --log
+=item --(no)log
 
 Indicate whether dataset values are in log2 space or not. If set 
 to true and the log2 status is indicated in the metadata, then 
 the metadata status is preserved. Default is false (and metadata 
 ignored).
 
-=item --norm
+=item --(no)norm
 
 Datasets should (not) be normalized by converting to percentile 
 rank values (0..1). This is helpful when the two datasets are 
@@ -1218,15 +1123,6 @@ Optionally specify the output filename prefix.
 Specify an optional name for the output subdirectory name. Default
 is the input filename base with '_graphs' appended.
 
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
-Parallel execution is only applicable when a list of datasets are 
-provided or the --all option is enabled; interactive execution is 
-performed serially.
-
 =item --version
 
 Print the version number.
@@ -1271,6 +1167,7 @@ converting to a percent rank (--norm), try explicitly setting the --min and
 automatically, but sometimes does funny things, particularly with log2 data 
 that spans 0.
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1283,3 +1180,9 @@ that spans 0.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+

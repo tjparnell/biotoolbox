@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A program to merge two or more dataset files
+
 
 use strict;
 use Getopt::Long;
@@ -15,7 +16,7 @@ use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.12.2';
+my $VERSION = '1.8.7';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -36,7 +37,6 @@ my (
 	$automatic,
 	$manual,
 	$user_lookup_name,
-	$use_coordinate,
 	$outfile,
 	$gz,
 	$help,
@@ -50,7 +50,6 @@ GetOptions(
 	'auto!'     => \$automatic, # select columns automatically
 	'manual!'   => \$manual, # always run interactively
 	'lookupname|lun=s' => \$user_lookup_name, # alternate lookup column name
-	'coordinate!' => \$use_coordinate, # use coordinates for lookup
 	'index=s'   => \@order_requests, # determine order in advance
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
@@ -105,9 +104,6 @@ my $output_data_ref; # the reference scalar for the output data structure
 # name of lookup column to be used for all files
 my $lookup_name;
 my $output_lookup_i;
-if ($use_coordinate) {
-	$lookup_name = 'Coordinate';
-}
 
 
 ### Process and merge the files
@@ -125,8 +121,8 @@ else {
 	my $input_data1_ref = read_file(shift @ARGV);
 	my $input_data2_ref = read_file(shift @ARGV);
 	merge_two_datasets($input_data1_ref, $input_data2_ref);
-	undef $input_data1_ref;
-	undef $input_data2_ref;
+	$input_data1_ref = undef;
+	$input_data2_ref = undef;
 	
 	# merge the subsequent files
 	foreach (@ARGV) {
@@ -135,22 +131,6 @@ else {
 	}
 }
 
-# clean up coordinate column
-if (
-	$lookup_name =~ /^coordinate$/i and 
-	$output_data_ref->{0}{'name'} =~ /^coordinate$/i
-) {
-	# delete the coordinate metadata
-	for my $i (1 .. $output_data_ref->{'number_columns'}-1) {
-		$output_data_ref->{$i-1} = $output_data_ref->{$i};
-	}
-	$output_data_ref->{'number_columns'}--;
-	
-	# delete the table column
-	for my $row (0 .. $output_data_ref->{'last_row'}) {
-		shift @{ $output_data_ref->{'data_table'}->[$row] };
-	}
-} 
 
 
 
@@ -183,11 +163,11 @@ unless ($outfile) {
 }
 
 # write the file
-my $file_written = write_tim_data_file(
+my $file_written = write_tim_data_file( {
 	'data'      => $output_data_ref,
 	'filename'  => $outfile,
 	'gz'        => $gz,
-);
+} );
 if ($file_written) {
 	print " Wrote file '$file_written'\n";
 }
@@ -221,55 +201,6 @@ sub read_file {
 	for (my $i = 0; $i < $file_data_ref->{'number_columns'}; $i++) {
 		if (exists $file_data_ref->{$i}{'original_file'}) {
 			delete $file_data_ref->{$i}{'original_file'};
-		}
-	}
-	
-	# add coordinates if necessary
-	if ($file_data_ref->{'bed'} or $file_data_ref->{'gff'} or $use_coordinate) {
-		
-		# refuse if user does not want to use coordinates
-		if (defined $use_coordinate and $use_coordinate == 0) {
-			return $file_data_ref;
-		}
-		
-		# identify coordinate columns
-		my $coord_i = $file_data_ref->{'number_columns'};
-		my $chr_i   = find_column_index($file_data_ref, '^chr|seq|ref|ref.?seq');
-		my $start_i = find_column_index($file_data_ref, '^start|position');
-		my $stop_i  = find_column_index($file_data_ref, '^stop|end');
-		unless (defined $chr_i and defined $start_i) {
-			# cannot add coordinate column, do without ?
-			warn " cannot generate coordinates for file\n";
-			return $file_data_ref;
-		}
-		
-		# add new metadata
-		$file_data_ref->{$coord_i} = {
-			'name'      => 'Coordinate',
-			'index'     => $coord_i,
-		};
-		$file_data_ref->{'data_table'}->[0][$coord_i] = 'Coordinate';
-		$file_data_ref->{'number_columns'}++;
-		
-		# generate coordinates
-		if (defined $stop_i) {
-			# merge chromosome:start-stop
-			for my $row (1 .. $file_data_ref->{'last_row'}) {
-				$file_data_ref->{'data_table'}->[$row][$coord_i] = join("", 
-					$file_data_ref->{'data_table'}->[$row][$chr_i], ':', 
-					$file_data_ref->{'data_table'}->[$row][$start_i], '-',
-					$file_data_ref->{'data_table'}->[$row][$stop_i]
-				);
-			}
-		}
-		else {
-			# merge chromosome:start
-			for my $row (1 .. $file_data_ref->{'last_row'}) {
-				$file_data_ref->{'data_table'}->[$row][$coord_i] = join("", 
-					$file_data_ref->{'data_table'}->[$row][$chr_i], ':', 
-					$file_data_ref->{'data_table'}->[$row][$start_i]
-				);
-			}
 		}
 	}
 	
@@ -387,18 +318,6 @@ sub merge_two_datasets_by_lookup {
 	else {
 		# manual selection from user
 		@order = request_new_order($input_data1_ref, $input_data2_ref);
-	}
-	
-	# add coordinate column to output if necessary
-	if ($lookup_name =~ /^coordinate$/i) {
-		
-		# check if we taking from file 1 or 2
-		if ($order[0] =~ /[a-z]+/i) {
-			unshift @order, $lookup_i2;
-		}
-		else {
-			unshift @order, $lookup_i1;
-		} 
 	}
 	
 	# rearrange as necessary to make the first data structure dominant
@@ -742,11 +661,12 @@ sub request_lookup_indices {
 		
 		# First try some known column identifiers we could use automatically
 		# don't forget to add the user-requested lookup name
-		my @name_list = qw(coordinate name id transcript gene);
+		my @name_list = qw(name id transcript gene);
 		if ($user_lookup_name) {
 			unshift @name_list, $user_lookup_name;
 		}
 		foreach my $name (@name_list) {
+			print " checking for lookup column name $name...\n";
 			
 			# identify possibilities
 			my $possible_index1 = find_column_index($data1, "^$name\$");
@@ -789,9 +709,9 @@ sub request_lookup_indices {
 		
 		# Print the index headers
 		# use numbers for the first one
-		print_datasets($data1, 'number', 1);
+		print_datasets($data1, 'number');
 		# use letters for the second one
-		print_datasets($data2, 'letter', 1);
+		print_datasets($data2, 'letter');
 	
 		# Request first index responses from user
 		print " Enter the unique identifier index for lookup in the first file   ";
@@ -811,7 +731,7 @@ sub request_lookup_indices {
 			die " unknown index value!\n";
 		}
 		$index2 = $number_of->{$index2}; # convert to a number
-		unless (exists $data2->{$index2}) {
+		unless (exists $data1->{$index2}) {
 			# check that it's valid
 			die " unknown index value!\n";
 		}
@@ -957,39 +877,30 @@ sub parse_list {
 sub print_datasets {
 	
 	# pass the data structure reference and the index type ('number' or 'letter')
-	my ($data_ref, $index_type, $include_coordinate) = @_;
+	my ($data_ref, $index_type) = @_;
 	
 	# array to be used in the default order
 	my @order;
 	
 	# print the dataset names for this datafile
 	print " These are the headers in file '" . $data_ref->{'filename'} . "'\n";
-	
-	# print Numbers
-	if ($index_type eq 'number') {
-		foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
-			# skip the coordinate
-			next if ($data_ref->{$i}{'name'} eq 'Coordinate' and not $include_coordinate);
-			
-			# print the dataset name and it's index
-			# and record the index in the order array for the default order
+	foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
+		# walk through each dataset (column) in file
+		
+		# print the dataset name and it's index
+		# and record the index in the order array for the default order
+		if ($index_type eq 'number') {
 			print '  ', $i, "\t", $data_ref->{$i}{'name'}, "\n";
 			push @order, $i;
 		}
-	}
-	
-	# print letters
-	else {
-		foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
-			# skip the coordinate
-			next if ($data_ref->{$i}{'name'} eq 'Coordinate' and not $include_coordinate);
-			
+		else {
 			# use letters instead of numbers as the index key
 			my $letter = $letter_of->{$i};
 			print '  ', $letter, "\t", $data_ref->{$i}{'name'}, "\n";
 			push @order, $letter;
 		}
 	}
+	
 	return @order;
 }
 
@@ -1037,8 +948,7 @@ sub initialize_output_data_structure {
 	$output_data->{'program'}   = $data_ref->{'program'};
 	$output_data->{'db'}        = $data_ref->{'db'};
 	$output_data->{'last_row'}  = $data_ref->{'last_row'}; # should be identical
-	$output_data->{'headers'}   = $data_ref->{'headers'};
-	
+
 	# assign the filename
 	if ($outfile) {
 		# use the new output file name
@@ -1183,8 +1093,6 @@ __END__
 
 merge_datasets.pl
 
-A program to merge two or more data files by appending columns.
-
 =head1 SYNOPSIS
 
 merge_datasets.pl [--options...] <file1> <file2> ...
@@ -1195,11 +1103,11 @@ merge_datasets.pl [--options...] <file1> <file2> ...
   --manual
   --index <number,letter,range>
   --lookupname | --lun <text>
-  --coordinate
   --out <filename> 
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -1245,22 +1153,12 @@ in the input files containing the lookup values when performing the
 lookup. Each file should have the same lookup column name. Default 
 values include 'Name', 'ID', 'Transcript', or 'Gene'.
 
-=item --coordinate
-
-Force using genomic coordinates when performing a lookup. This effectively 
-merges the chromosome:start-stop coordinates into a single string for 
-lookup matching. The Coordinates column is temporary. This is automatically 
-enabled when working with BED or GFF files that may or may not have unique 
-names but will have unique coordinates. This may be disabled, for example 
-to force using a BED feature name as the lookup value, by specifying 
---nocoordinate.
-
 =item --out <filename>
 
 Specify the output filename. By default it uses the first file name.
 Required in automatic mode.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -1297,10 +1195,8 @@ then dataset values are looked up first using specified lookup values before
 merging (compare with Excel VLOOKUP function). In this case, the dataset 
 lookup indices from each file are identified automatically. Potential 
 lookup columns include 'Name', 'ID', 'Transcript', 'Gene', or any user 
-provided name (using the --lookupname option). Files with genomic coordinates, 
-including GFF and BED, may use a temporary coordinate string derived from the 
-features coordinates. If a lookup column can not be identified automatically, 
-then they are chosen interactively.
+provided name (using the --lookupname option). Failing that, they are 
+chosen interactively.
 
 When a lookup is performed, the first index in the order determines which 
 file is dominant, meaning that all rows from that file are included, and only 

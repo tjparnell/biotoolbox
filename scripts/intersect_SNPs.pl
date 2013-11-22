@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to combine pileup SNPs from multiple sequencing reads
+# and identify unique and common SNPs
 
 use strict;
 use Getopt::Long;
@@ -16,7 +17,7 @@ use tim_data_helper qw(
 	generate_tim_data_structure
 );
 use Data::Dumper;
-my $VERSION = '1.10';
+my $VERSION = '1.8.0';
 
 print "\n A script to intersect and pull unique SNPs from multiple lists\n\n";
 
@@ -125,11 +126,11 @@ foreach my $name (sort {$a cmp $b} keys %samples) {
 		" unique SNPs for '$name'\n";
 	
 	# print
-	my $success = write_tim_data_file(
+	my $success = write_tim_data_file( {
 		'data'     => $samples{$name},
 		'filename' => $name . '_unique.vcf',
 		'gz'       => $gz,
-	);
+	} );
 	if ($success) {
 		print " Wrote file $success\n";
 	}
@@ -144,11 +145,11 @@ foreach my $name (sort {$a cmp $b} keys %samples) {
 	print " There were ", $common->{'last_row'}, " common SNPs\n";
 	
 	# print
-	my $success = write_tim_data_file(
+	my $success = write_tim_data_file( {
 		'data'     => $common,
 		'filename' => join('_', keys %samples) . '_common.vcf',
 		'gz'       => $gz,
-	);
+	} );
 	if ($success) {
 		print " Wrote file $success\n";
 	}
@@ -324,15 +325,13 @@ __END__
 
 intersect_SNPs.pl
 
-A script to identify unique and common SNPs from multiple sequence runs.
-
 =head1 SYNOPSIS
  
 intersect_SNPs.pl <file1.vcf> <file2.vcf> ...
   
   Options:
   --in <filename>
-  --gz
+  --(no)gz
   --version
   --help
   
@@ -348,7 +347,7 @@ Specify the input SNP files. The files should be in the .vcf
 format, and may be gzipped. Each SNP file is assumed to contain 
 one sample or strain only. 
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output files should be compressed 
 with gzip. 

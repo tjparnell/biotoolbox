@@ -1,27 +1,27 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will verify nucleosome mapping
+# It will identify overlaps and accuracy
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Statistics::Lite qw(min max mean stddev);
+use Statistics::Lite qw(min max statsinfo);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
-	format_with_commas
 );
 use tim_db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types
+	process_and_verify_dataset
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.8.3';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
@@ -42,9 +42,6 @@ my (
 	$infile,
 	$database,
 	$dataset,
-	$filter,
-	$recenter,
-	$max_overlap,
 	$outfile,
 	$gz,
 	$help,
@@ -56,9 +53,6 @@ GetOptions(
 	'in=s'      => \$infile, # the input data file
 	'db=s'      => \$database, # the database
 	'data=s'    => \$dataset, # the dataset to verify
-	'filter!'   => \$filter, # remover overlapping nucleosomes
-	'recenter!' => \$recenter, # correct off center nucleosomes
-	'max=i'     => \$max_overlap, # maximum overlap allowed
 	'out=s'     => \$outfile, # the output file name
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -88,12 +82,8 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use --help\n";
 }
-unless (defined $max_overlap) {
-	$max_overlap = 30;
-}
-if ($filter and !$outfile) {
-	die " You should specify an output file name when filtering nucleosomes\n";
-}
+
+
 
 ### Load the nucleosome file
 my $data_ref = load_tim_data_file($infile) or die 
@@ -151,12 +141,12 @@ else {
 # defined in the Occupancy 
 if ($dataset) {
 	# dataset defined on the command line
-	$dataset = verify_or_request_feature_types(
+	$dataset = process_and_verify_dataset( {
 		'db'        => $db,
-		'feature'   => $dataset,
+		'dataset'   => $dataset,
 		'prompt'    => "Enter the dataset to use for verifying nucleosome maps",
 		'single'    => 1,
-	);
+	} );
 }	
 else {	
 	# use a dataset defined in the input metadata
@@ -174,12 +164,8 @@ else {
 	$dataset = $data_ref->{$index}{'dataset'} || 
 			   $data_ref->{$index}{'scan_dataset'} || 
 			   undef; 
-	$dataset = verify_or_request_feature_types(
-		'db'        => $db,
-		'feature'   => $dataset,
-		'prompt'    => "Enter the dataset to use for verifying nucleosome maps",
-		'single'    => 1,
-	);
+	# this should already have appropriate prefix if necessary
+	# hopefully we don't need to verify it
 }
 unless ($dataset) {
 	die " unable to identify the dataset in the input file metadata!\n";
@@ -193,9 +179,6 @@ $data_ref->{$overlap_i} = {
 	'name'       => 'overlap_length',
 	'index'      => '$overlap_i',
 };
-if ($filter) {
-	$data_ref->{$overlap_i}{'max_overlap'} = $max_overlap;
-}
 my $mapping_i = $overlap_i + 1;
 $data_ref->{$mapping_i} = {
 	'name'       => 'center_peak_mapping',
@@ -219,21 +202,43 @@ my $overlap_count = 0;
 my @overlaps;
 my @peak_distances;
 my $on_target_count = 0;
-my $recenter_count  = 0;
 
 # Identify indices
 my $chrom_i = find_column_index($data_ref, '^chrom|chr|seq|ref');
 my $start_i = find_column_index($data_ref, '^start');
 my $stop_i  = find_column_index($data_ref, '^stop|end');
 my $mid_i   = find_column_index($data_ref, '^midpoint|mid');
-my $score_i = find_column_index($data_ref, '^score|occupancy');
-my $name_i  = find_column_index($data_ref, '^NucleosomeID|name|ID');
 unless (defined $chrom_i and defined $start_i and defined $stop_i) {
 	die " Unable to identify Chromosome, Start, and Stop columns!\n";
 }
 
 # main loop through data
 foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
+	
+	## Check overlaps
+	if ($row < $data_ref->{last_row} and 
+		$table->[$row][$chrom_i] eq $table->[$row + 1][$chrom_i]) {
+		
+		if (
+			# next start less than current stop
+			$table->[$row + 1][$start_i] < $table->[$row][$stop_i] and 
+			# current start greater than previous start (should be)
+			$table->[$row + 1][$start_i] > $table->[$row][$start_i]
+		) {
+			# there is overlap
+			my $overlap =  # calculate
+				$table->[$row][$stop_i] - $table->[$row + 1][$start_i];
+			
+			# record
+			$table->[$row][$overlap_i] = $overlap;
+			push @overlaps, $overlap;
+			$overlap_count++;
+		}
+		else {
+			# no overlap
+			$table->[$row][$overlap_i] = '.';
+		}
+	}
 	
 	## Check midpoint
 	# determine midpoint
@@ -242,7 +247,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	
 	# collect the raw data for 71 bp around the mapped midpoint
 	# this distance is arbitrary but about 1/2 a nucleosome
-	my %nuc_data = get_region_dataset_hash(
+	my %nuc_data = get_region_dataset_hash( {
 		'db'         => $db,
 		'dataset'    => $dataset,
 		'chromo'     => $table->[$row][$chrom_i],
@@ -250,7 +255,7 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 		'stop'       => $midpoint + 35,
 		'value'      => 'score',
 		'absolute'   => 1,
-	);
+	});
 	
 	# find the max peak
 	my @distances;
@@ -267,293 +272,55 @@ foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
 	# record the minimum distance from the recorded midpoint and occupancy peak
 	if (scalar @distances == 1) {
 		# only one peak found
-		if (abs($distances[0]) <= 1) {
-			# our tolerance is an arbitrary 1 bp to consider on target
+		if (abs($distances[0]) <= 10) {
+			# our tolerance is an arbitrary 10 bp to consider on target
 			$on_target_count++;
 			$table->[$row][$mapping_i] = 'centered';
 		}
-		elsif ($recenter) {
-			# an off-center nucleosome and user requested to correct it
-			$table->[$row][$start_i] += $distances[0];
-			$table->[$row][$stop_i]  += $distances[0];
-			$midpoint += $distances[0];
-			if (defined $mid_i) {
-				$table->[$row][$mid_i] = $midpoint;
-			}
-			$table->[$row][$name_i] =~ s/\:\d+$/:$midpoint/;
-			$table->[$row][$mapping_i] = 'recentered';
-			$distances[0] = 0; # reset for recording below
-			$recenter_count++;
-		}
 		else {
-			# record off-center nucleosome
 			push @peak_distances, abs($distances[0]);
 			$table->[$row][$mapping_i] = 'offset';
 		}
+		
+		# record the distance
+		$table->[$row][$offset_i] = $distances[0];
 	}
 	elsif (scalar @distances > 1) {
 		# more than one peak found
 		
 		# we'll use the closest one
-		# sort the distances by their absolute value
-		@distances = sort { abs($a) <=> abs($b) } @distances;
-		if (abs($distances[0]) <= 1) {
-			# our tolerance is an arbitrary 1 bp to consider on target
+		my $distance = min(map { abs($_) } @distances);
+		if ($distance <= 10) {
+			# our tolerance is an arbitrary 10 bp to consider on target
 			$on_target_count++;
 			$table->[$row][$mapping_i] = 'centered';
 		}
-		elsif ($recenter) {
-			# an off-center nucleosome and user requested to correct it
-			$table->[$row][$start_i] += $distances[0];
-			$table->[$row][$stop_i]  += $distances[0];
-			$midpoint += $distances[0];
-			if (defined $mid_i) {
-				$table->[$row][$mid_i] = $midpoint;
-			}
-			$table->[$row][$name_i] =~ s/\:\d+$/:$midpoint/;
-			$table->[$row][$mapping_i] = 'recentered';
-			$distances[0] = 0; # reset for recording below
-			$recenter_count++;
-		}
 		else {
-			# record off-center nucleosome
-			push @peak_distances, $distances[0];
+			push @peak_distances, $distance;
 			$table->[$row][$mapping_i] = 'offset';
 		}
-	}
-	# record the distance
-	$table->[$row][$offset_i] = $distances[0];
-	
-	# recalculate overlap of previous nucleosome if recentered
-	if ($recenter and $table->[$row][$mapping_i] eq 'recentered') {
-		# the previous nucleosome would've calculated an overlap value 
-		# based on the old position
-		# now that we have re-centered the current nucleosome, we need 
-		# to go back and re-calculate the overlap
 		
-		# re-calculate
-		if ($table->[$row - 1][$chrom_i] eq $table->[$row][$chrom_i]
-		) {
-		
-			# first adjust the count if necessary
-			if ($table->[$row - 1][$overlap_i] =~ /\d+/) {
-				$overlap_count--;
-				pop @overlaps;
-			}
-		
-			if ( $table->[$row - 1][$stop_i] > $table->[$row][$start_i] ) {
-				# previous stop greater than current start
-				# there is overlap
-				my $overlap =  # calculate
-					$table->[$row - 1][$stop_i] - $table->[$row][$start_i];
-			
-				# record
-				$table->[$row - 1][$overlap_i] = $overlap;
-				push @overlaps, $overlap;
-				$overlap_count++;
-			}
-			else {
-				# no overlap
-				$table->[$row - 1][$overlap_i] = '.';
-			}
-		}
-	}
-	
-	
-	## Check overlaps
-	if ($row < $data_ref->{last_row} and 
-		$table->[$row][$chrom_i] eq $table->[$row + 1][$chrom_i]
-	) {
-		
-		if ( $table->[$row][$stop_i] > $table->[$row + 1][$start_i] ) {
-			# current stop greater than next start
-			# there is overlap
-			my $overlap =  # calculate
-				$table->[$row][$stop_i] - $table->[$row + 1][$start_i];
-			
-			# record
-			$table->[$row][$overlap_i] = $overlap;
-			push @overlaps, $overlap;
-			$overlap_count++;
-		}
-		else {
-			# no overlap
-			$table->[$row][$overlap_i] = '.';
-		}
+		# record the distance
+		$table->[$row][$offset_i] = $distances[0];
 	}
 	
 }
-
 
 ### digest results
-printf " %s (%.0f%%) nucleosomes were overlapping\n" . 
-	"   the overlap mean was %.0f +/- %.0f bp\n", 
-	format_with_commas($overlap_count), ($overlap_count / $data_ref->{last_row}) * 100, 
-	mean(@overlaps), stddev(@overlaps);
 
-if ($recenter) {
-	printf "\n %s (%.0f%%) nucleosomes were accurately mapped\n" . 
-		" %s nucleosomes were re-centered on the data peak\n",
-		format_with_commas($on_target_count),
-		($on_target_count / $data_ref->{last_row}) * 100,
-		format_with_commas($recenter_count);
-}
-else { 
-	printf "\n %s (%.0f%%) nucleosomes were accurately mapped\n" . 
-		" %s (%.0f%%) nucleosomes were offcenter\n" .
-		"   the offset distance mean was %.0f +/- %.0f bp\n", 
-		format_with_commas($on_target_count),
-		($on_target_count / $data_ref->{last_row}) * 100, 
-		format_with_commas($data_ref->{last_row} - $on_target_count), 
-		( ($data_ref->{last_row} - $on_target_count) / $data_ref->{last_row}) * 100,
-		mean(@peak_distances), stddev(@peak_distances);
-}
+my $percent = sprintf "%.0f%%", ($overlap_count / $data_ref->{last_row}) * 100;
+
+print "  There are $overlap_count overlapping fragments out of a total of " . 
+	"$data_ref->{last_row} ($percent)\n";
+
+print "  overlaps:\n" . statsinfo(@overlaps) . "\n";
 
 
-
-### Filter out the overlapping nucleosomes if requested
-if ($filter and !defined $score_i) {
-	warn " unable to identify score or Occupancy column, cannot filter\n";
-}
-elsif ($filter) {
-	
-	# we will identify those that need to be deleted and put them in this array
-	my @to_delete;
-	my $offset_count    = 0;
-	my $occupancy_count = 0;
-	my $dual_count      = 0;
-	
-	# walk through the list again
-	foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
-		
-		# check for overlap
-		next if $table->[$row][$overlap_i] eq '.';
-		if ($table->[$row][$overlap_i] > $max_overlap) {
-			# overlap with the next nucleosome is too much
-			
-			# decide which one to delete
-			if ($table->[$row + 1][$overlap_i] > $max_overlap) {
-				# next nucleosome is also overlapping
-				# we'll presume the next nucleosome is the oddball since it overlaps
-				# two nucleosomes, so delete that one and we should be ok
-				push @to_delete, $row + 1;
-				
-				# advance ahead
-				$row++;
-				$dual_count++;
-			}
-			elsif (
-				$table->[$row][$mapping_i] eq 'offset' and 
-				$table->[$row + 1][$mapping_i] eq 'offset'
-			) {
-				# both nucleosomes are offset
-				# delete whichever one is offset more
-				if ( $table->[$row][$offset_i] > $table->[$row+1][$offset_i] ) {
-					# current one is more offset, delete this one
-					push @to_delete, $row;
-				}
-				else {
-					# next one is more offset or at least equal
-					# delete that one
-					push @to_delete, $row+1;
-					
-					# advance ahead
-					$row++;
-				}
-				$offset_count++;
-			}
-			elsif ($table->[$row][$mapping_i] eq 'offset') {
-				# current nucleosome is offset, so delete that one
-				push @to_delete, $row;
-				$offset_count++;
-			}
-			elsif ($table->[$row + 1][$mapping_i] eq 'offset') {
-				# next nucleosome is offset, so delete that one
-				push @to_delete, $row + 1;
-				
-				# advance ahead
-				$row++;
-				$offset_count++;
-			}
-			else {
-				# both nucleosomes are centered, so take whichever one is more occupied
-				if ( $table->[$row][$score_i] < $table->[$row+1][$score_i] ) {
-					# current one is less occupied, delete this one
-					push @to_delete, $row;
-				}
-				else {
-					# next one is less occupied or at least equal
-					# delete that one
-					push @to_delete, $row+1;
-					
-					# advance ahead
-					$row++;
-				}
-				$occupancy_count++;
-			}
-		}
-	}
-	
-	
-	# proceed to delete nucleosomes
-	my $deleted = 0;
-	while (@to_delete) {
-		# take from the end, highest rows first
-		my $row = pop @to_delete;
-		splice( @{$table}, $row, 1);
-		$deleted++;
-		$data_ref->{last_row}--;
-	}
-	
-	# recalculate overlaps
-	undef @overlaps;
-	$overlap_count = 0;
-	foreach (my $row = 1; $row <= $data_ref->{last_row}; $row++) {
-	
-		## Check overlaps
-		if ($row < $data_ref->{last_row} and 
-			$table->[$row][$chrom_i] eq $table->[$row + 1][$chrom_i]
-		) {
-		
-			if (
-				# next start less than current stop
-				$table->[$row + 1][$start_i] < $table->[$row][$stop_i] and 
-				# current start greater than previous start (should be)
-				$table->[$row + 1][$start_i] > $table->[$row][$start_i]
-			) {
-				# there is overlap
-				my $overlap =  # calculate
-					$table->[$row][$stop_i] - $table->[$row + 1][$start_i];
-			
-				# record
-				$table->[$row][$overlap_i] = $overlap;
-				push @overlaps, $overlap;
-				$overlap_count++;
-			}
-			else {
-				# no overlap
-				$table->[$row][$overlap_i] = '.';
-			}
-		}
-	}
-	
-	
-	# report
-	printf " %s were filtered out due to extensive overlap\n", 
-		format_with_commas($deleted);
-	printf "   %s were tossed because they were offset\n", 
-		format_with_commas($offset_count) if $offset_count;
-	printf "   %s were tossed because of low occupancy\n", 
-		format_with_commas($occupancy_count) if $occupancy_count;
-	printf "   %s were tossed because of overlap with two nucleosomes\n",
-		format_with_commas($dual_count) if $dual_count;
-	printf " %s nucleosomes are remaining\n", format_with_commas($data_ref->{last_row});
-	printf " %s nucleosomes (%.0f%%) are overlapping \n" . 
-		"   the overlap mean is %.0f +/- %.0f bp\n", 
-		format_with_commas($overlap_count),
-		($overlap_count / $data_ref->{last_row}) * 100, 
-		mean(@overlaps), stddev(@overlaps);
-}
+$percent = sprintf "%.0f%%", ($on_target_count / $data_ref->{last_row}) * 100;
+print "\n There were $on_target_count ($percent) perfectly mapped nucleosomes\n";
+print "  of the remaining " . ($data_ref->{last_row} - $on_target_count) .
+	" nucleosomes, the offset peak distances stats are:\n" . 
+	statsinfo(@peak_distances) . "\n";
 
 
 ### Write results
@@ -563,11 +330,11 @@ unless ($outfile) {
 }
 my $success;
 if (
-	$success = write_tim_data_file(
+	$success = write_tim_data_file( {
 		'data'     => $data_ref,
 		'filename' => $outfile,
 		'gz'       => $gz,
-	) 
+	}) 
 ) {
 	print " wrote data file $success\n";
 }
@@ -584,8 +351,6 @@ __END__
 
 verify_nucleosome_mapping.pl
 
-A script to verify nucleosome mapping and identify overlaps.
-
 =head1 SYNOPSIS
 
 verify_nucleosome_mapping.pl [--options...] <filename>
@@ -594,13 +359,11 @@ verify_nucleosome_mapping.pl [--options...] <filename>
   --in <filename>
   --db <text>
   --data <text | filename>
-  --filter
-  --max <integer>
-  --recenter
   --out <filename> 
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -630,22 +393,6 @@ containing the nucleosome midpoint occupancy data with which to
 verify nucleosomal positions. If data is obtained from a database,
 the type or primary_tag should be provided. Default is to use the 
 dataset defined in the input file metadata.
-
-=item --filter
-
-Optionally filter out nucleosomes that exceed a maximum allowed 
-overlap. Filtered nucleosomes are deleted from the file. Default is 
-no filtering.
-
-=item --max <integer>
-
-Specify the maximum allowed overlap in bp when filtering out 
-overlapping nucleosomes. The default is 30 bp.
-
-=item --recenter
-
-Optionally re-center those nucleosomes determined to be offset 
-from the actual peak in the data. 
 
 =item --out <filename>
 
@@ -683,19 +430,6 @@ the dataset is being scanned in windows from left to right. Adjusting
 the parameters for window and buffer in map_nucleosomes.pl can limit
 the number of overlapping nucleosomes.
 
-The program can optionally re-center those nucleosomes considered to 
-be offset from their actual data peak. The start, end, midpoint, and 
-name is changed to reflect the new position.
-
-The program can also optionally filter out nucleosomes which exceed a 
-set limit of overlap. The overlapping nucleosome to be deleted is 
-chosen based on a set of rules: offset nucleosomes are deleted, or if 
-both nucleosomes are offset, then the one with the greatest offset is 
-deleted. If neither nucleosome is offset, then the nucleosome with the 
-lowest occupancy is deleted, or if both occupancies are equal, then 
-the rightmost is deleted. Overlap statistics are then recalculated after 
-filtering. 
-
 The same data file is re-written or a new file written with three 
 additional columns appended, overlap_length, center_peak_mapping, and 
 center_peak_offset. 
@@ -706,10 +440,10 @@ nucleosomes indicates either an error in mapping or multiple phasing of
 nucleosomes. 
 
 Center_peak_mapping records whether the nucleosome was properly mapped or 
-not. One of three values is recorded: centered, recentered, or offset.
+not. One of two values is recorded: centered or offset.
 
-Center_peak_offset records the distance in bp between the observed data 
-peak and the recorded midpoint.
+Center_peak_offset records the distance in bp between the nucleosome peak 
+and the recorded midpoint.
 
 Basic statistics are reported to Standard Output for the overlap and 
 offset lengths.
