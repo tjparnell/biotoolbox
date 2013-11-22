@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a quick and dirty program to print out the feature types in the current database
 
 use strict;
 use Pod::Usage;
@@ -11,7 +11,7 @@ use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.5.8';
 
 print "\n A script to print all available feature types in a database\n\n";
 
@@ -74,10 +74,11 @@ my $count = 0;
 my %source2type;
 
 # Get the features
-my @types = get_dataset_list($dbname);
-	# this returns an array of database types
+my %types = get_dataset_list($dbname, 'all');
+	# this returns a hash where key is a unique number and the value
+	# is the actual gff type
 	
-foreach my $type (@types) {
+foreach my $type (values %types) {
 	
 	# each type is usually comprised of primary_tag:source_tag
 	# although sometimes it is just the primary_tag
@@ -124,17 +125,15 @@ __END__
 
 print_feature_types.pl
 
-A script to print out the available feature types in a database.
-
 =head1 SYNOPSIS
 
 print_feature_types.pl <database>
   
-  Options:
   --db <database>
   --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -177,3 +176,4 @@ metadata file, are also supported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

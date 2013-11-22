@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to map data around a feature start position
 
 use strict;
 use Pod::Usage;
@@ -11,15 +11,12 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 	format_with_commas
-	splice_data_structure
 );
 use tim_db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types
+	process_and_verify_dataset
 	get_new_feature_list
-	get_feature
 	get_region_dataset_hash
-	get_chromo_region_score
 	check_dataset_for_rpm_support
 );
 use tim_file_helper qw(
@@ -27,20 +24,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-use constant (DATASET_HASH_LIMIT => 3000);
-		# This constant determines the maximum size of the dataset hash to be 
-		# returned from the get_region_dataset_hash(). To increase performance, 
-		# the program normally queries the database once for each feature or 
-		# region, and a hash returned with potentially a score for each basepair. 
-		# This may become unwieldy for very large regions, which may be better 
-		# served by separate database queries for each window.
-my $VERSION = '1.12.6';
+my $VERSION = '1.6.2';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -62,8 +46,7 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile, 
 	$outfile, 
-	$main_database, 
-	$data_database,
+	$database, 
 	$dataset, 
 	$feature, 
 	$value_type,
@@ -74,12 +57,10 @@ my (
 	$strand_sense,
 	$set_strand,
 	$avoid,
-	$long_data,
 	$smooth,
 	$sum,
 	$log,
 	$gz,
-	$cpu,
 	$help,
 	$print_version,
 ); # command line variables
@@ -88,8 +69,7 @@ my (
 GetOptions( 
 	'out=s'      => \$outfile, # output file name
 	'in=s'       => \$infile, # input file name
-	'db=s'       => \$main_database, # main or annotation database name
-	'ddb=s'      => \$data_database, # data database
+	'db=s'       => \$database, # database name
 	'data=s'     => \$dataset, # dataset name
 	'feature=s'  => \$feature, # type of feature
 	'value=s'    => \$value_type, # the type of data to collect
@@ -98,15 +78,12 @@ GetOptions(
 	'number=i'   => \$number, # number of windows
 	'position=s' => \$position, # indicate relative location of the feature
 	'strand=s'   => \$strand_sense, # collected stranded data
-	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
-				# force_strand is preferred option, but respect the old option
+	'set_strand' => \$set_strand, # enforce an artificial strand
 	'avoid!'     => \$avoid, # avoid conflicting features
-	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
 	'log!'       => \$log, # data is in log2 space
 	'gz!'        => \$gz, # compress the output file
-	'cpu=i'      => \$cpu, # number of execution threads
 	'help'       => \$help, # print help
 	'version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -133,7 +110,120 @@ if ($print_version) {
 
 
 ## Check for required values
-check_defaults();
+unless ($database or $infile) {
+	die " You must define a database or input file!\n Use --help for more information\n";
+}
+
+unless ($outfile) {
+	if ($infile) {
+		$outfile = $infile;
+	}
+	else {
+		die " You must define an output filename !\n Use --help for more information\n";
+	}
+}
+$outfile =~ s/\.txt$//; # strip extension, we'll add it later
+
+unless ($feature or $infile) {
+	die " You must define a feature or use an input file!\n Use --help for more information\n";
+}
+
+unless ($win) {
+	print " Using default window size of 50 bp\n";
+	$win = 50;
+}
+
+unless ($number) {
+	print " Using default window number of 20 per side\n";
+	$number = 20;
+}
+
+unless (defined $log) {
+	# default is to assume not log2
+	$log = 0;
+}
+
+if (defined $value_type) {
+	# check the region method or type of data value to collect
+	unless (
+			$value_type eq 'score' or
+			$value_type eq 'length' or
+			$value_type eq 'count'
+	) {
+		die " Unknown data value '$value_type'!\n " . 
+			"Use --help for more information\n";
+	}
+}
+else {
+	# default is to take the score
+	$value_type = 'score';
+}
+
+if (defined $method) {
+	# check the requested method
+	unless (
+			$method eq 'mean' or
+			$method eq 'median' or
+			$method eq 'sum' or
+			$method eq 'min' or
+			$method eq 'max' or
+			$method eq 'stddev' or
+			$method eq 'rpm'
+	) {
+		die " Unknown method '$method'!\n Use --help for more information\n";
+	}
+	
+	if ($method eq 'rpm') {
+		# make sure we collect the right values
+		$value_type = 'count';
+	}
+}
+else {
+	# set default method
+	if ($value_type eq 'count') {
+		$method = 'sum';
+	}
+	else {
+		$method = 'mean';
+	}
+}
+
+if (defined $position) {
+	# check the position value
+	unless (
+		$position == 5 or
+		$position == 3 or
+		$position == 4 or
+		$position eq 'm'
+	) {
+		die " Unknown relative position '$position'!\n";
+	}
+	if ($position eq 'm') {$position = 4} # change to match internal usage
+}
+else {
+	# default position to use the 5' end
+	$position = 5;
+}
+
+if (defined $strand_sense) {
+	unless (
+		$strand_sense eq 'sense' or
+		$strand_sense eq 'antisense' or
+		$strand_sense eq 'all'
+	) {
+		die " Unknown strand value '$strand_sense'!\n";
+	}
+}
+else {
+	# default
+	$strand_sense = 'all';
+}
+
+unless (defined $sum) {
+	# assume to write a summary file, nearly always want this, at least I do
+	$sum = 1;
+}
+
 my $start_time = time;
 
 
@@ -145,22 +235,19 @@ if ($infile) {
 	# load the gene dataset from existing file
 	print " Loading feature set from file $infile....\n";
 	$main_data_ref = load_tim_data_file($infile);
+	
+	# update program name
+	unless ($main_data_ref->{'program'} eq $0) {
+		$main_data_ref->{'program'} = $0;
+	}
 } 
 else {
 	# we will start a new file with a new dataset
-	$main_data_ref = get_new_feature_list(
-			'db'       => $main_database,
-			'features' => $feature,
-	);
+	generate_a_new_feature_dataset();
 }
 unless ($main_data_ref) {
 	# check for data
 	die " No data loaded! Nothing to do!\n";
-}
-
-# update program name
-unless ($main_data_ref->{'program'} eq $0) {
-	$main_data_ref->{'program'} = $0;
 }
 
 # simple reference to the data table
@@ -173,59 +260,44 @@ my $startcolumn = $main_data_ref->{'number_columns'};
 
 
 
-## Prepare to collect data
+## Collect the data
 
-# Open main database connection
-unless ($main_database) {
+# Open database connection
+unless ($database) {
 	# define the database 
 	if ( $main_data_ref->{'db'} ) {
 		# from the input file if possible
-		$main_database = $main_data_ref->{'db'};
+		$database = $main_data_ref->{'db'};
 	}
 	elsif ($dataset) {
 		# or use the dataset if possible
-		$main_database = $dataset;
+		$database = $dataset;
 	}
 	else {
 		die " You must define a database or dataset!\n" . 
 			" Use --help for more information\n";
 	}
 }
-my $mdb = open_db_connection($main_database);
-unless ($mdb) {
+my $db = open_db_connection($database);
+unless ($db) {
 	die " You must define a database or dataset!\n" . 
 		" Use --help for more information\n";
 }
 
-# Open data database
-my $ddb;
-if (defined $data_database) {
-	# specifically defined a data database
-	$ddb = open_db_connection($data_database) or 
-		die "unable to establish data database connection to $data_database!\n";
-}
-else {
-	# reuse the main database connection
-	$ddb = $mdb;
-}
-
 # Check the dataset
-$dataset = verify_or_request_feature_types(
-	'db'      => $ddb,
-	'feature' => $dataset,
+$dataset = process_and_verify_dataset( {
+	'db'      => $db,
+	'dataset' => $dataset,
 	'single'  => 1,
-	'prompt'  => " Enter the number of the feature or dataset from which to" . 
-					" collect data   ",
-);
+} );
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
 if ($method eq 'rpm') {
 	print " Checking RPM support for dataset '$dataset'...\n";
-	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb, $cpu);
-		# this step can be multi-threaded
+	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $db);
 	if ($rpm_read_sum) {
-		printf "   %s total features\n", format_with_commas($rpm_read_sum);
+		printf " %s total features\n", format_with_commas($rpm_read_sum);
 	}
 	else {
 		die " RPM method not supported! Try something else\n";
@@ -233,27 +305,63 @@ if ($method eq 'rpm') {
 }
 
 
-## Collect the relative data
+# Collect the relative data
+map_relative_data();
 
-# check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $main_data_ref->{'last_row'}/$cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
-		# splits to something more worthwhile
-		$cpu--;
+
+
+## Interpolate values
+if ($smooth) {
+	print " Interpolating missing values....\n";
+	go_interpolate_values();
+}
+# convert null values to zero if necessary
+if ($method eq 'sum' or $method eq 'rpm') {
+	null_to_zeros();
+}
+
+
+## Generate summed data - 
+# an average across all features at each position suitable for plotting
+if ($sum) {
+	print " Generating final summed data....\n";
+	my $sumfile = write_summary_data( {
+		'data'        => $main_data_ref,
+		'filename'    => $outfile,
+		'startcolumn' => $startcolumn,
+		'dataset'     => $dataset,
+		'log'         => $log,
+	} );
+	if ($sumfile) {
+		print " Wrote summary file '$sumfile'\n";
+	}
+	else {
+		print " Unable to write summary file!\n";
 	}
 }
 
-if ($cpu > 1) {
-	# parallel execution
-	print " Forking into $cpu children for parallel data collection\n";
-	parallel_execution();
+
+
+## Output the data
+# reset the program metadata
+$main_data_ref->{'program'} = $0;
+
+# we will write a standard tim data file
+# appropriate extensions and compression should be taken care of
+my $written_file = write_tim_data_file( {
+	'data'     => $main_data_ref,
+	'filename' => $outfile,
+	'gz'       => $gz,
+} );
+if ($written_file) {
+	# success!
+	print " wrote file $written_file\n";
 }
 else {
-	# single process execution
-	single_execution();
+	# failure! the subroutine will have printed error messages
+	print " unable to write output file!\n";
 }
+
 
 ## Conclusion
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
@@ -264,274 +372,19 @@ printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 #### Subroutines #######
 
-## check required variables and assign default values
-sub check_defaults {
-	unless ($main_database or $infile) {
-		die " You must define a database or input file!\n Use --help for more information\n";
-	}
-
-	unless ($outfile) {
-		if ($infile) {
-			$outfile = $infile;
-		}
-		else {
-			die " You must define an output filename !\n Use --help for more information\n";
-		}
-	}
-	$outfile =~ s/\.txt$//; # strip extension, we'll add it later
-
-	unless ($feature or $infile) {
-		die " You must define a feature or use an input file!\n Use --help for more information\n";
-	}
-
-	unless ($win) {
-		print " Using default window size of 50 bp\n";
-		$win = 50;
-	}
-
-	unless ($number) {
-		print " Using default window number of 20 per side\n";
-		$number = 20;
-	}
-
-	unless (defined $log) {
-		# default is to assume not log2
-		$log = 0;
-	}
-
-	if (defined $value_type) {
-		# check the region method or type of data value to collect
-		unless (
-				$value_type eq 'score' or
-				$value_type eq 'length' or
-				$value_type eq 'count'
-		) {
-			die " Unknown data value '$value_type'!\n " . 
-				"Use --help for more information\n";
-		}
-	}
-	else {
-		# default is to take the score
-		$value_type = 'score';
-	}
-
-	if (defined $method) {
-		# check the requested method
-		unless (
-				$method eq 'mean' or
-				$method eq 'median' or
-				$method eq 'sum' or
-				$method eq 'min' or
-				$method eq 'max' or
-				$method eq 'stddev' or
-				$method eq 'rpm'
-		) {
-			die " Unknown method '$method'!\n Use --help for more information\n";
-		}
+## generate a feature dataset if one was not loaded
+sub generate_a_new_feature_dataset {
+	# a subroutine to generate a new feature dataset
 	
-		if ($method eq 'rpm') {
-			# make sure we collect the right values
-			$value_type = 'count';
-		}
-	}
-	else {
-		# set default method
-		if ($value_type eq 'count') {
-			$method = 'sum';
-		}
-		else {
-			$method = 'mean';
-		}
-	}
-
-	if (defined $position) {
-		# check the position value
-		unless (
-			$position == 5 or
-			$position == 3 or
-			$position == 4 or
-			$position eq 'm'
-		) {
-			die " Unknown relative position '$position'!\n";
-		}
-		if ($position eq 'm') {$position = 4} # change to match internal usage
-	}
-	else {
-		# default position to use the 5' end
-		$position = 5;
-	}
-
-	if (defined $strand_sense) {
-		unless (
-			$strand_sense eq 'sense' or
-			$strand_sense eq 'antisense' or
-			$strand_sense eq 'all'
-		) {
-			die " Unknown strand value '$strand_sense'!\n";
-		}
-	}
-	else {
-		# default
-		$strand_sense = 'all';
-	}
-
-	unless (defined $sum) {
-		# assume to write a summary file, nearly always want this, at least I do
-		$sum = 1;
-	}
-
-	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
-	}
-	else {
-		# disable cores
-		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 0;
-	}
+	$main_data_ref = get_new_feature_list( {
+			'db'       => $database,
+			'features' => $feature,
+	} );
+	
+	# set the current program
+	$main_data_ref->{'program'} = $0;
 }
 
-
-## Run in parallel
-sub parallel_execution {
-	my $pm = Parallel::ForkManager->new($cpu);
-	
-	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
-
-	# Split the input data into parts and execute in parallel in separate forks
-	for my $i (1 .. $cpu) {
-		$pm->start and next;
-	
-		#### In child ####
-	
-		# splice the data structure
-		splice_data_structure($main_data_ref, $i, $cpu);
-		
-		# re-open database objects to make them clone safe
-		$mdb = open_db_connection($main_database);
-		if ($data_database) {
-			$ddb = open_db_connection($data_database);
-		}
-		else {
-			$ddb = $mdb;
-		}
-		
-		# Collect the data
-		map_relative_data();
-
-	
-		# Interpolate values
-		if ($smooth) {
-			print " Interpolating missing values....\n";
-			go_interpolate_values();
-		}
-		# convert null values to zero if necessary
-		if ($method eq 'sum' or $method eq 'rpm') {
-			null_to_zeros();
-		}
-		
-		# write out result
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
-			'filename' => "$child_base_name.$i",
-			'gz'       => 0, # faster to write without compression
-		);
-		if ($success) {
-			printf " wrote child file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
-		}
-		
-		# Finished
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-		
-	# reassemble children files into output file
-	my @files = glob "$child_base_name.*";
-	unless (@files) {
-		die "unable to find children files!\n";
-	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	
-	# generate summary file
-	if ($sum) {
-		# we will do this via manipulate_datasets.pl
-		@args = (
-			"$Bin/manipulate_datasets.pl", 
-			'--func', 
-			'summary', 
-			'--index', 
-			$startcolumn . '-' . $main_data_ref->{'number_columns'} - 1,
-			$outfile
-		);
-	}
-	# done
-}
-
-
-## Run in single thread
-sub single_execution {
-	
-	# Collect the data
-	map_relative_data();
-
-	
-	# Interpolate values
-	if ($smooth) {
-		print " Interpolating missing values....\n";
-		go_interpolate_values();
-	}
-	# convert null values to zero if necessary
-	if ($method eq 'sum' or $method eq 'rpm') {
-		null_to_zeros();
-	}
-
-
-	# Generate summed data - 
-	# an average across all features at each position suitable for plotting
-	if ($sum) {
-		print " Generating final summed data....\n";
-		my $sumfile = write_summary_data(
-			'data'        => $main_data_ref,
-			'filename'    => $outfile,
-			'startcolumn' => $startcolumn,
-			'dataset'     => $dataset,
-			'log'         => $log,
-		);
-		if ($sumfile) {
-			print " Wrote summary file '$sumfile'\n";
-		}
-		else {
-			print " Unable to write summary file!\n";
-		}
-	}
-
-
-	## Output the data
-	my $written_file = write_tim_data_file(
-		'data'     => $main_data_ref,
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($written_file) {
-		# success!
-		print " wrote file $written_file\n";
-	}
-	else {
-		# failure! the subroutine will have printed error messages
-		print " unable to write output file!\n";
-	}
-	# done
-}
 
 
 ## Prepare columns for each window
@@ -623,9 +476,6 @@ sub prepare_window_datasets {
 		if ($strand_sense =~ /sense/) {
 			$metadata{'strand'} = $strand_sense;
 		}
-		if ($data_database) {
-			$metadata{'db'} = $data_database;
-		}
 		$main_data_ref->{$new_index} = \%metadata;
 		
 		# set the column header
@@ -650,77 +500,43 @@ sub map_relative_data {
 	
 	
 	# Identify columns for feature identification
-	my $name   = find_column_index($main_data_ref, '^name');
+	my $name = find_column_index($main_data_ref, '^name|id');
 	
-	my $type   = find_column_index($main_data_ref, '^type|class');
-	
-	my $id     = find_column_index($main_data_ref, '^primary_id');
+	my $type = find_column_index($main_data_ref, '^type|class');
 	
 	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
 	
-	my $start  = find_column_index($main_data_ref, '^start|position');
+	my $start = find_column_index($main_data_ref, '^start|position');
 	
-	my $stop   = find_column_index($main_data_ref, '^stop|end');
+	my $stop = find_column_index($main_data_ref, '^stop|end');
 	
 	my $strand = find_column_index($main_data_ref, '^strand');
-	
-	
-	# determine long data collection for very large regions
-	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-		# This could potentially create performance issues where returned hashes   
-		# for each feature or interval are too big for efficient data collection.
-		# Better to collect data for individual windows using the long data method.
-		$long_data = 1;
-	}
 	
 	
 	
 	# Select the appropriate method for data collection
 	if (
+		defined $name and
+		defined $type
+	) {
+		# using named features
+		map_relative_data_for_features(
+			$starting_point, $ending_point, $name, $type, $strand);
+	}
+	
+	elsif (
 		defined $start and
 		defined $stop  and
-		defined $chromo and
-		not $long_data
+		defined $chromo
 	) {
-		# mapping point data features using genome segments
+		# using genome segments
 		map_relative_data_for_regions(
 			$starting_point, $ending_point, $chromo, $start, $stop, $strand);
 	}
 	
-	elsif (
-		defined $start and
-		defined $stop  and
-		defined $chromo and
-		$long_data
-	) {
-		# mapping long data features using genome segments
-		map_relative_long_data_for_regions($chromo, $start, $stop, $strand);
-	}
-	
-	elsif (
-		(defined $id or 
-			( defined $name and defined $type ) 
-		) and 
-		not $long_data
-	) {
-		# mapping point data features using named features
-		map_relative_data_for_features(
-			$starting_point, $ending_point, $name, $type, $id, $strand);
-	}
-	
-	elsif (
-		(defined $id or 
-			( defined $name and defined $type ) 
-		) and 
-		$long_data
-	) {
-		# mapping long data features using named features
-		map_relative_long_data_for_features($name, $type, $id, $strand);
-	}
-	
 	else {
 		die " Unable to identify columns with feature identifiers!\n" .
-			" File must have Primary_ID or Name and Type, or Chromo, Start, Stop columns\n";
+			" File must have Name and Type, or Chromo, Start, Stop columns\n";
 	}
 	
 }
@@ -734,7 +550,6 @@ sub map_relative_data_for_features {
 		$ending_point, 
 		$name_index, 
 		$type_index, 
-		$id_index,
 		$strand_index
 	) = @_;
 	
@@ -743,86 +558,29 @@ sub map_relative_data_for_features {
 	for my $row (1..$main_data_ref->{'last_row'}) {
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash(
-				'db'          => $mdb,
-				'ddb'         => $ddb,
+		my %regionscores = get_region_dataset_hash( {
+				'db'          => $db,
 				'dataset'     => $dataset,
-				'name'        => defined $name_index ? 
-									$data_table_ref->[$row][$name_index] : undef,
-				'type'        => defined $type_index ? 
-									$data_table_ref->[$row][$type_index] : undef,
-				'id'          => defined $id_index ?
-									$data_table_ref->[$row][$id_index] : undef,
+				'name'        => $data_table_ref->[$row][$name_index],
+				'type'        => $data_table_ref->[$row][$type_index],
 				'start'       => $starting_point,
 				'stop'        => $ending_point,
 				'position'    => $position,
 				'value'       => $value_type,
 				'stranded'    => $strand_sense,
-				'strand'      => $set_strand ? 
+				'set_strand'  => $set_strand ? 
 								$data_table_ref->[$row][$strand_index] : undef, 
 				'avoid'       => $avoid,
-		);
+		} );
 		
 		# record the scores
 		record_scores($row, \%regionscores);
+		
 	}
 }
 
 
 
-sub map_relative_long_data_for_features {
-	
-	# Get the feature indices
-	my (
-		$name_index, 
-		$type_index, 
-		$id_index,
-		$strand_index
-	) = @_;
-	
-	
-	### Collect the data
-	for my $row (1..$main_data_ref->{'last_row'}) {
-		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_index ? 
-				$data_table_ref->[$row][$id_index] : undef,
-			'name'  => defined $name_index ? 
-				$data_table_ref->[$row][$name_index] : undef,
-			'type'  => defined $type_index ? 
-				$data_table_ref->[$row][$type_index] : undef,
-		);
-		
-		# check that we have a feature
-		unless ($feature) {
-			
-			# record a null values
-			for (
-				my $column = $startcolumn; 
-				$column < $main_data_ref->{'number_columns'}; 
-				$column++
-			) {
-				$data_table_ref->[$row][$column] = '.';
-			}
-			
-			# move on
-			next;
-		}
-		
-		
-		# Collect the scores for each window
-		collect_long_data_window_scores(
-			$row,
-			$feature->seq_id,
-			$feature->start,
-			$feature->end,
-			$set_strand ? 
-				$data_table_ref->[$row][$strand_index] : $feature->strand
-		);
-	}
-}
 
 sub map_relative_data_for_regions {
 	
@@ -935,8 +693,8 @@ sub map_relative_data_for_regions {
 		}
 		
 		# collect the region scores
-		my %regionscores = get_region_dataset_hash(
-				'db'          => $ddb,
+		my %regionscores = get_region_dataset_hash( {
+				'db'          => $db,
 				'dataset'     => $dataset,
 				'chromo'      => $data_table_ref->[$row][$chr_index],
 				'start'       => $start,
@@ -944,7 +702,7 @@ sub map_relative_data_for_regions {
 				'strand'      => $strand,
 				'value'       => $value_type,
 				'stranded'    => $strand_sense,
-		);
+		} );
 		
 		# convert the regions scores back into relative scores
 		my %relative_scores;
@@ -957,80 +715,6 @@ sub map_relative_data_for_regions {
 		record_scores($row, \%relative_scores);
 		
 	}
-}
-
-
-
-sub map_relative_long_data_for_regions {
-	
-	# Get the feature indices
-	my (
-		$chr_index, 
-		$start_index, 
-		$stop_index, 
-		$strand_index
-	) = @_;
-	
-	
-	### Collect the data
-	for my $row (1..$main_data_ref->{'last_row'}) {
-		
-		# collect the given coordinates from the data table
-		my ($fstart, $fstop, $fstrand);
-		if (
-			$data_table_ref->[$row][$start_index] <= 
-			$data_table_ref->[$row][$stop_index]
-		) {
-			# proper orientation
-			$fstart = $data_table_ref->[$row][$start_index];
-			$fstop  = $data_table_ref->[$row][$stop_index];
-			
-			# set the strand if not defined
-			unless (defined $strand_index) {
-				$fstrand = 1;
-			}
-		}
-		else {
-			# not a proper orientation of values
-			# assume the user really meant this
-			$fstart = $data_table_ref->[$row][$stop_index];
-			$fstop  = $data_table_ref->[$row][$start_index];
-			
-			# set the strand if not defined
-			unless (defined $strand_index) {
-				$fstrand = -1;
-			}
-		}
-			
-		# determine strand
-		if (defined $strand_index) {
-			# the strand in the data table could be any one of several 
-			# characters denoting strand
-			if ($data_table_ref->[$row][$strand_index] =~ m/^[1|f|w|\+]/i) {
-				$fstrand = 1;
-			}
-			elsif ($data_table_ref->[$row][$strand_index] =~ m/^[r|c|\-]/i) {
-				$fstrand = -1;
-			}
-			else {
-				$fstrand = 0;
-			}
-		}
-		else {
-			$fstrand = 0 unless defined $fstrand;
-		}
-		
-		
-		# Collect the scores for each window
-		collect_long_data_window_scores(
-			$row,
-			$data_table_ref->[$row][$chr_index],
-			$fstart,
-			$fstop,
-			$fstrand,
-		);
-	}
-	
 }
 
 
@@ -1115,85 +799,6 @@ sub record_scores {
 }
 
 
-
-## Collecting long data in windows
-sub collect_long_data_window_scores {
-	
-	# passed row index and coordinates
-	my (
-		$row,
-		$fchromo,
-		$fstart,
-		$fstop,
-		$fstrand
-	) = @_;
-
-	# Translate the actual reference start position based on requested 
-	# reference position and region strand
-	my $reference;
-	if ($fstrand >= 0 and $position == 5) {
-		# 5' end of forward strand
-		$reference = $fstart;
-	}
-	
-	elsif ($fstrand == -1 and $position == 5) {
-		# 5' end of reverse strand
-		$reference = $fstop;
-	}
-	
-	elsif ($fstrand >= 0 and $position == 3) {
-		# 3' end of forward strand
-		$reference = $fstop;
-	}
-	
-	elsif ($fstrand == -1 and $position == 3) {
-		# 3' end of reverse strand
-		$reference = $fstart;
-	}
-	
-	elsif ($position == 4) {
-		# midpoint regardless of strand
-		$reference = int( ( ($fstop - $fstart) / 2) + 0.5);
-	}
-	
-	else {
-		# something happened
-		die " programming error!? feature " . 
-			" at data row $row\n";
-	}
-	
-	# collect the data
-	# we will be using the get_chromo_region_score() to collect data
-	# for every window 
-	for (
-		my $column = $startcolumn; 
-		$column < $main_data_ref->{'number_columns'}; 
-		$column++
-	) {
-		$data_table_ref->[$row][$column] = get_chromo_region_score(
-			'db'          => $ddb,
-			'dataset'     => $dataset,
-			'chromo'      => $fchromo,
-			'start'       => $fstrand >= 0 ? 
-								$reference + $main_data_ref->{$column}{'start'} :
-								$reference - $main_data_ref->{$column}{'start'},
-			'stop'        => $fstrand >= 0 ? 
-								$reference + $main_data_ref->{$column}{'stop'} : 
-								$reference - $main_data_ref->{$column}{'stop'},
-			'strand'      => $fstrand,
-			'method'      => $method,
-			'value'       => $value_type,
-			'stranded'    => $strand_sense,
-			'log'         => $log,
-		);
-	}
-}
-
-
-
-
-
-
 ## Interpolate the '.' values with the mean of the neighbors
 sub go_interpolate_values {
 	
@@ -1275,17 +880,13 @@ __END__
 
 get_relative_data.pl
 
-A script to collect data in bins around a relative position.
-
 =head1 SYNOPSIS
  
-get_relative_data.pl --db <database> --feature <name> --out <file> [--options]
-
-get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
+ map_data.pl --db <database> --feature <name> --out <file> [--options]
+ map_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options:
   --db <name|file.gff3>
-  --ddb <name|file.gff3>
   --feature [type, type:source]
   --in <filename> 
   --out <filename>
@@ -1296,14 +897,12 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --num <integer>
   --pos [5|3|m]
   --strand [sense|antisense|all]
-  --force_strand
-  --avoid
-  --long
+  --set_strand
+  --(no)avoid
   --(no)sum
-  --smooth
-  --log
+  --(no)smooth
+  --(no)log
   --gz
-  --cpu <integer>
   --version
   --help
 
@@ -1315,26 +914,16 @@ The command line flags and descriptions:
 
 =item --db <name | filename>
 
-Specify the name of a BioPerl database from which to obtain the 
-annotation, chromosomal information, and/or data. Typically a 
-Bio::DB::SeqFeature::Store database schema is used, either from a 
-relational database, SQLite file, or a single GFF3 file to be loaded 
-into memory. Alternatively, a BigWigSet directory, or a single BigWig, 
-BigBed, or Bam file may be specified. 
-
-A database is required for generating new files. When generating a new 
-genome interval file, a bigFile or Bam file listed as a data source 
-will be adopted as the database. 
-
-For input files, the database name may be obtained from the file 
-metadata. A different database may be specified from that listed in 
-the metadata when a different source is desired. 
-
-=item --ddb <name | filename>
-
-Optionally specify the name of an alternate data database from which 
-the data should be collected, separate from the primary annotation 
-database. The same options apply as to the --db option. 
+Specify the name of a BioPerl SeqFeature::Store database to use as
+source. Alternatively, an appropriate single file database file may be 
+provided. Acceptable databases may include a single GFF3 file (.gff or 
+.gff3) to be loaded into an in-memory database, a pre-loaded BioPerl 
+SeqFeature::Store SQLite file (.sqlite or .db), or a BigWigSet directory 
+(see Bio::DB::BigWigSet). Specifying the database is required for new 
+feature data files. For pre-existing input data files, this value may be 
+obtained from the input file metadata. However, if provided, it overrides 
+the database specified in the file; this is useful for collecting data 
+from multiple databases.
 
 =item --out <filename>
 
@@ -1355,7 +944,8 @@ text files generated with other biotoolbox programs.
 Specify the type of feature to map data around. The feature may be 
 listed either as GFF type or GFF type:source. The list 
 of features will be automatically generated from the database. 
-This is only required when an input file is not specified. 
+
+This is optional if the features are defined in the input file.
 
 =item --data <dataset_name | filename>
 
@@ -1380,7 +970,7 @@ count values.
 Optionally specify the type of data value to collect from the dataset or 
 data file. Three values are accepted: score, count, or length. Note that 
 some data sources only support certain types of data values. Wig and 
-BigWig files only support score and count; BigBed database features 
+BigWig files only support score and count; BigBed and database features 
 support count and length and optionally score; Bam files support basepair 
 coverage (score), count (number of alignments), and length. The default 
 value type is score. 
@@ -1410,17 +1000,17 @@ datasets. Either sense or antisense (relative to the feature) data
 may be collected. The default value is 'all', indicating all 
 data will be collected.
 
-=item --force_strand
+=item --set_strand
 
-For features that are not inherently stranded (strand value of 0)
-or that you want to impose a different strand, set this option when
-collecting stranded data. This will reassign the specified strand for
-each feature regardless of its original orientation. This requires the
-presence of a "strand" column in the input data file. This option only
-works with input file lists of database features, not defined genomic
-regions (e.g. BED files). Default is false.
+For features that are not inherently stranded (strand value of 0), 
+impose an artificial strand for each feature (1 or -1). This will 
+have the effect of enforcing a relative orientation for each feature, 
+or to collected stranded data. This requires the presence a 
+column in the input data file with a name of "strand". Hence, it 
+will not work with newly generated datasets, but only with input 
+data files. Default is false.
 
-=item --avoid
+=item --(no)avoid
 
 Indicate whether features of the same type should be avoided when 
 calculating values in a window. Each window is checked for 
@@ -1429,17 +1019,6 @@ another feature of the same type, no value is reported for the
 window. The default is false (return all values regardless of 
 overlap).
 
-=item --long
-
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. Execution times may be 
-longer than otherwise. Default is false.
-
 =item --(no)sum
 
 Indicate that the data should be averaged across all features at
@@ -1447,26 +1026,20 @@ each position, suitable for graphing. A separate text file will
 be written with the suffix '_summed' with the averaged data. 
 Default is true (sum).
 
-=item --smooth
+=item --(no)smooth
 
 Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false (nosmooth).
 
-=item --log
+=item --(no)log
 
 Dataset values are (not) in log2 space and should be treated 
 accordingly. Output values will be in the same space. The default is 
 false (nolog).
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --version
 
@@ -1518,3 +1091,4 @@ or merged with other summed data sets for comparison.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

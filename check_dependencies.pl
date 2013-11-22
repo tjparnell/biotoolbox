@@ -1,44 +1,9 @@
-#!/usr/bin/env perl
-
-# documentation at end of file
+#!/usr/bin/perl
 
 use strict;
 use Cwd;
-use Getopt::Long;
-use Pod::Usage;
 require CPAN;
-
-my $VERSION = '1.13';
-
-# Initialize values
-my (
-	$help,
-	$print_version,
-); # command line variables
-my @infiles; 
-
-
-# Command line options
-GetOptions( 
-	'help'        => \$help, # print the help
-	'version'     => \$print_version, # print the version
-);
-
-# Print help
-if ($help) {
-	# print entire POD
-	pod2usage( {
-		'-verbose' => 2,
-		'-exitval' => 1,
-	} );
-}
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script check_dependencies.pl, version $VERSION\n\n";
-	exit;
-}
-
+my $VERSION = '1.6.4';
 
 # get current working directory
 my $current = Cwd::cwd();
@@ -92,17 +57,17 @@ foreach ( get_list_of_modules() ) {
 print " checking for Bio::EnsEMBL modules          ";
 my $bio_ensembl = 0;
 eval {
-	require Bio::EnsEMBL::ApiVersion;
-	Bio::EnsEMBL::ApiVersion->import;
-	$bio_ensembl = software_version();
+	require Bio::EnsEMBL::Registry;
+	Bio::EnsEMBL::Registry->import;
+	$bio_ensembl = 1;
 };
 if ($bio_ensembl) {
-	print " core API version $bio_ensembl\n";
+	print " installed\n";
 }
 else {
 	print " not installed\n";
-	print "  Optional, required for the 'get_ensembl_annotation.pl' script\n";
-	print "  It is not available through CPAN, but you can obtain it from\n" .
+	print "  Optional, only required for the script 'get_ensembl_annotation.pl'\n";
+	print "  It is not available through CPAN, but you can obtain if from\n" .
 		"  http://www.ensembl.org/info/docs/api/api_installation.html\n";
 }
 
@@ -111,7 +76,7 @@ else {
 # offer to install
 print "\n\n";
 if (@install_list) {
-	print "Would you like to install missing dependencies? y or n  "; 
+	print "Would you like me to help install missing dependencies? y or n  "; 
 	my $answer = <STDIN>;
 	if ($answer =~ /^n/i) {
 		print "OK. Here is a list of the missing dependencies I found\n";
@@ -123,7 +88,7 @@ if (@install_list) {
 	}
 }
 else {
-	print "Everything appears up to date.\n";
+	print "Everything is up to date. You are good to go!\n";
 	exit;
 }
 
@@ -153,12 +118,7 @@ if ($not_installed) {
 	print " Some biotoolbox programs may not work properly\n";
 }
 else {
-	print " Some dependencies were installed. You may be ready.\n";
-	print " Would you like to recheck?  y/n    \n";
-	my $answer = <STDIN>;
-	if ($answer =~ /^y/i) {
-		exec $0;
-	}
+	print " You should be good to go!\n";
 }
 
 
@@ -171,28 +131,28 @@ sub get_list_of_modules {
 qq(  Required for biotoolbox configuration file
 )
 		],
+		['IO::Zlib', 
+qq(  Required for reading and writing gzipped files
+)
+		],
 		['Statistics::Lite', 
-qq(  Required for all data collection and analysis programs
+qq(  Required for numerous analysis programs
 )
 		],
 		['Statistics::Descriptive', 
-qq(  Required for analysis and graphing scripts
+qq(  Required for some analysis and graphing scripts
 )
 		],
 		['Statistics::LineFit', 
-qq(  Required for some conversion scripts
+qq(  Required for bam2wig.pl script
 )
 		],
 		['Bio::Root::Version', 
-qq(  Required for all BioPerl database interactions and GFF3 processing
-)
-		],
-		['Parallel::ForkManager', 
-qq(  Optional, recommended for multi-threaded execution of some scripts 
+qq(  Required for BioPerl database functions, data analysis, and GFF3 conversions
 )
 		],
 		['GD', 
-qq(  Optional, required for graphing scripts. 
+qq(  Optional, required for graphing scripts. Requires GD2 libraries to be installed
 )
 		],
 		['GD::Graph', 
@@ -204,11 +164,11 @@ qq(  Optional, required for graphing smooth bezier curve graphs
 )
 		],
 		['Archive::Zip', 
-qq(  Optional, required only for converting Bar files
+qq(  Optional, required only for script bar2wig.pl
 )
 		],
 		['Algorithm::Cluster', 
-qq(  Optional, required only for cluster analysis
+qq(  Optional, required only for the script run_cluster.pl
 )
 		],
 		['DBI', 
@@ -216,23 +176,21 @@ qq(  Required for BioPerl SQL database functions
 )
 		],
 		['DBD::mysql', 
-qq(  Optional, required for interacting with MySQL databases
+qq(  Optional, but required for interacting with MySQL databases
 )
 		],
 		['DBD::SQLite', 
-qq(  Optional, required for interacting with SQLite databases
+qq(  Optional, but required for interacting with SQLite databases
 )
 		],
 		['Bio::DB::Sam', 
-qq(  Optional, required for working with BAM files.
+qq(  Optional, but required for working with Next Generation Sequencing BAM 
+  data files. Requires building the SamTools C libraries.
 )
 		],
 		['Bio::DB::BigFile', 
-qq(  Optional, required for working with bigWig and bigBed files.
-)
-		],
-		['Bio::DB::USeq', 
-qq(  Optional, required for working with useq files.
+qq(  Optional, but required and highly recommended for working with bigWig and 
+  bigBed files. Requires building Jim Kent's source tree and executables.
 )
 		],
 	);
@@ -249,31 +207,13 @@ __END__
 
 check_dependencies.pl
 
-A script to check for BioToolBox prerequisites.
-
 =head1 SYNOPSIS
 
-[sudo] ./check_dependencies.pl
-  
-  Options:
-  --version
-  --help
+check_dependencies.pl
   
 =head1 OPTIONS
 
-The command line flags and descriptions:
-
-=over 4
-
-=item --version
-
-Print the program version number.
-
-=item --help
-
-This help text.
-
-=back
+None
 
 =head1 DESCRIPTION
 
@@ -289,9 +229,6 @@ missing with this program and then install manually with root privilages.
 
 This will require that CPAN is properly configured (proxies, mirrors, etc.).
 
-More information about setting up your computer may be found on the web at
-http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp.
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -304,4 +241,6 @@ http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
 

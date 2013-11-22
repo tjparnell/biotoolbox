@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to split a tim data file based on common unique data values
 
 use strict;
 use Pod::Usage;
@@ -12,7 +12,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10';
+my $VERSION = '1.6.4';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -86,10 +86,16 @@ unless (defined $gz) {
 
 
 ### Load file
+if ($infile =~ /\.store(?:\.gz)$/) {
+	die "Unable to split a binary store file! convert to text first\n";
+}
 my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
+
+# generate data table
+$metadata_ref->{'data_table'} = [];
 
 # add column headers
 push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
@@ -109,13 +115,14 @@ unless (defined $index) {
 	
 	# get user response
 	print "  Enter the column index number containing the values to split by   ";
-	$index = <STDIN>;
-	chomp $index;
-}
-
-# check index
-unless ($index =~ /^\d+$/ and exists $metadata_ref->{$index}) {
-	die " unknown column index!\n";
+	my $answer = <STDIN>;
+	chomp $answer;
+	if ($answer =~ /^\d+$/ and exists $metadata_ref->{$answer}) {
+		$index = $answer;
+	}
+	else {
+		die " unknown column index!\n";
+	}
 }
 
 
@@ -176,25 +183,17 @@ while (my $line = $in_fh->getline) {
 	}
 }
 
-
-
 ### Finish
+$in_fh->close;
 
 # Final write 
 write_current_data_to_file_part($previous_value);
-
-# Properly close out all file handles
-$in_fh->close;
-foreach my $value (keys %written_files) {
-	$written_files{$value}{'fh'}->close;
-}
-
 
 # report
 print " Split '$infile' into $split_count files\n";
 foreach my $value (sort {$a cmp $b} keys %written_files) {
 	print "  wrote $written_files{$value}{total} lines in " . 
-		"$written_files{$value}{parts} files for '$value'\n";
+		"$written_files{$value}{parts} file(s) for '$value'\n";
 }
 
 
@@ -204,7 +203,7 @@ sub write_current_data_to_file_part {
 
 	# get the current value we're working with
 	my $value = shift;
-	my $last_row = $metadata_ref->{'last_row'};
+	my $lines = $metadata_ref->{'last_row'};
 	
 	# open the file and write
 		# check for a pre-existing file to be added, or start a new one
@@ -219,7 +218,7 @@ sub write_current_data_to_file_part {
 		# maximum is defined but we'll have to do two writes
 		if (
 			defined $max and
-			($max - $written_files{$value}{'number'}) < $last_row
+			($max - $written_files{$value}{'number'}) < $lines
 		) {
 			# we'll have to do two writes
 			# finish up current, then write the remainder
@@ -231,6 +230,7 @@ sub write_current_data_to_file_part {
 					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
 				"\n");
 			}
+			$out_fh->close;
 			$written_files{$value}{'total'} += $limit;
 			
 			# clear the table contents of the written lines
@@ -252,7 +252,7 @@ sub write_current_data_to_file_part {
 			# we can write with impunity
 			
 			# write the lines
-			for (my $row = 1; $row <= $last_row; $row++) {
+			for (my $row = 1; $row <= $lines; $row++) {
 				$out_fh->print(
 					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
 				"\n");
@@ -262,8 +262,11 @@ sub write_current_data_to_file_part {
 				$written_files{$value}{'total'} += 1;
 			}
 			
+			# finished
+			$out_fh->close;
+			
 			# clear the table contents
-			splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
+			splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
 			$metadata_ref->{'last_row'} = 0;
 		}
 	}
@@ -274,29 +277,29 @@ sub write_current_data_to_file_part {
 		
 		# write the file
 		# this should be within the maximum line limit, so we should be safe
-		my $success = write_tim_data_file(
+		my $success = write_tim_data_file( {
 			'data'     => $metadata_ref,
 			'filename' => $written_files{$value}{'file'},
 			'gz'       => $gz,
-		);
+		} );
 		if ($success) {
 			# record the number of lines written
-			$written_files{$value}{'number'} += $last_row;
-			$written_files{$value}{'total'} += $last_row;
+			$written_files{$value}{'number'} += $lines;
+			$written_files{$value}{'total'} += $lines;
 			
 			# update the file name in case it was changed by the write method
 			$written_files{$value}{'file'} = $success;
 		}
 		else {
-			warn "   unable to write $last_row lines! data lost!\n";
+			warn "   unable to write $lines lines! data lost!\n";
 		}
 		
 		# clear the table contents
-		splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
+		splice( @{ $metadata_ref->{'data_table'} }, 1, $lines );
 		$metadata_ref->{'last_row'} = 0;
 		
 		# check whether we've filled up the file
-		if (defined $max and $last_row == $max) {
+		if (defined $max and $lines == $max) {
 			$written_files{$value}{'file'} = undef;
 			$written_files{$value}{'number'} = 0;
 		}
@@ -316,9 +319,8 @@ sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
 	my $value = shift;
 	my $filename_value = $value;
-	$filename_value =~ s/[\:\|\\\/\+\*\?\# ]+/_/g; # replace unsafe characters
-	my $file = $metadata_ref->{'path'} . $metadata_ref->{'basename'} . 
-		'#' . $filename_value;
+	$filename_value =~ s/[\:\|\\\/]+/_/g; # replace unsafe characters
+	my $file = $metadata_ref->{'basename'} . '#' . $filename_value;
 	
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
@@ -359,19 +361,17 @@ __END__
 
 split_data_file.pl
 
-A script to split a data file by rows based on common data values.
-
 =head1 SYNOPSIS
 
 split_data_file.pl [--options] <filename>
   
-  Options:
   --in <filename>
   --index <column_index>
   --max <integer>
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -400,7 +400,7 @@ file. Each group of specific value data is written to one or more files.
 Enter as an integer; underscores may be used as thousands separator, e.g. 
 100_000. 
 
-=item --gz
+=item --(no)gz
 
 Indicate whether the output files should be compressed 
 with gzip. Default behavior is to preserve the compression 
@@ -419,7 +419,7 @@ Display the POD documentation
 =head1 DESCRIPTION
 
 This program will split a data file into multiple files based on common 
-values in the data table. All rows with the same value will be 
+unique values in the data table. All rows with the same value will be 
 written into the same file. A good example is chromosome, where all 
 data points for a given chromosome will be written to a separate file, 
 resulting in multiple files representing each chromosome found in the 
@@ -442,6 +442,8 @@ metadata. The original file is preserved.
 
 This program is intended as the complement to 'join_data_files.pl'.
 
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -454,3 +456,15 @@ This program is intended as the complement to 'join_data_files.pl'.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
