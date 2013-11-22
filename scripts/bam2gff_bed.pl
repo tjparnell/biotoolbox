@@ -1,13 +1,13 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to convert bam paired_reads to a gff or bed file
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
+use Bio::DB::Sam;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_big_helper qw(bed_to_bigbed_conversion);
 use tim_data_helper qw(
 	format_with_commas
 );
@@ -15,15 +15,10 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 eval {
-	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	# check for bigbed file conversion support
+	require tim_db_helper::bigbed;
+	tim_db_helper::bigbed->import;
 };
-my $VERSION = '1.10';
-
-
-print "\n A script to convert Bam alignments to GFF or BED files\n\n";
-
 
 ### Quick help
 unless (@ARGV) { 
@@ -41,16 +36,14 @@ my (
 	$infile, 
 	$outfile,
 	$paired_end,
+	$type, 
+	$source,
 	$gff,
 	$bed,
 	$bigbed,
-	$type, 
-	$source,
-	$random_strand,
 	$bb_app_path,
 	$gz,
-	$help,
-	$print_version,
+	$help, 
 );
 GetOptions( 
 	'in=s'       => \$infile, # the input bam file path
@@ -58,15 +51,13 @@ GetOptions(
 	'pe'         => \$paired_end, # bam is paired end reads
 	'gff'        => \$gff, # output a GFF v.3 file
 	'bed'        => \$bed, # ouput a BED file
-	'bigbed|bb'  => \$bigbed, # generate a binary bigbed file
 	'type=s'     => \$type, # the GFF type or method
 	'source=s'   => \$source, # GFF source field
-	'randstr'    => \$random_strand, # assign strand randomly
+	'bigbed|bb'  => \$bigbed, # generate a binary bigbed file
 	'bbapp=s'    => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'        => \$gz, # gzip the output file
 	'help'       => \$help, # request help
-	'version'    => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 # Print help
 if ($help) {
@@ -75,12 +66,6 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
-}
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script bam2gff_bed.pl, version $VERSION\n\n";
-	exit;
 }
 
 
@@ -100,14 +85,11 @@ unless ($infile =~ /\.bam$/) {
 }
 
 # output type
-if (($gff and $bed) or ($gff and $bigbed)) {
+if ($gff and $bed) {
 	die " Can not, must not, specify both GFF and BED simultaneously!\n";
 }
-unless ($gff or $bed or $bigbed) {
+unless ($gff or $bed) {
 	print " Generating default BED formatted file\n";
-	$bed = 1;
-}
-if ($bigbed) {
 	$bed = 1;
 }
 
@@ -153,9 +135,9 @@ unless ($outfile) {
 
 # default is no compression
 unless (defined $gz) {
-	$gz = 1;
+	$gz = 0;
 }
-if ($bigbed and $gz) {
+if ($bed and $bigbed and $gz) {
 	# enforce no compression if wanting to write bigbed file
 	warn " compression not allowed when converting to BigBed format\n";
 	$gz = 0; 
@@ -168,10 +150,10 @@ if ($bigbed and $gz) {
 
 ### Load the BAM file
 print " Opening bam file....\n";
-unless (exists &open_bam_db) {
-	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
-}
-my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
+my $sam = Bio::DB::Sam->new( 
+	-bam        => $infile,
+	-autoindex  => 1,
+) or die " unable to open bam file '$infile'!\n";
 
 
 
@@ -199,11 +181,11 @@ my $out = open_to_write_fh($outfile, $gz) or
 # write metadata
 if ($gff) {
 	# print headers for GFF file
-	$out->print("##gff-version 3\n");
+	$out->print("##gff_version 3\n");
 	$out->print("# Program $0\n");
 	$out->print("# Converted from source file $infile\n");
 }
-elsif ($bed and !$bigbed) {
+else {
 	# bed file
 	$out->print("# Program $0\n");
 	$out->print("# Converted from source file $infile\n");
@@ -232,7 +214,7 @@ else {
 # Initialize output variables
 my $data_count = 0;
 my @output_data;
-my %gff_ids; # a hash to make unique identifiers
+
 
 
 
@@ -269,13 +251,45 @@ if ($bed and $bigbed) {
 	# requested to continue and generate a binary bigbed file
 	print " converting to bigbed file....\n";
 	
+	# check that bigbed conversion is supported
+	unless (exists &bed_to_bigbed_conversion) {
+		warn "\n  Support for converting to bigbed format is not available\n" . 
+			"  Please convert manually. See documentation for more info\n";
+		print " finished\n";
+		exit;
+	}
+	
+	
+	# generate chromosome sizes file from BAM data
+	my $chromo_fh = open_to_write_fh('chromosome_sizes.txt');
+	for my $tid (0 .. $sam->n_targets - 1) {
+		my $seq_id = $sam->target_name($tid);
+		my $length = $sam->target_len($tid);
+		$chromo_fh->print("$seq_id\t$length\n");
+	}
+	$chromo_fh->close;
+	
+	
+	# find bedToBigBed utility
+	unless ($bb_app_path) {
+		# check the system path
+		$bb_app_path = `which bedToBigBed` || undef;
+		chomp $bb_app_path if $bb_app_path;
+	}
+	unless ($bb_app_path) {
+		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
+			"  See documentation for more info\n";
+		print " Finished\n";
+		exit;
+	}
+		
 			
 	# perform the conversion
-	my $bb_file = bed_to_bigbed_conversion(
+	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
-			'db'        => $sam,
+			'chromo'    => 'chromosome_sizes.txt',
 			'bbapppath' => $bb_app_path,
-	);
+	} );
 
 	
 	# confirm
@@ -286,6 +300,7 @@ if ($bed and $bigbed) {
 	else {
 		warn " BigBed file not generated! see standard error\n";
 	}
+	unlink 'chromosome_sizes.txt';
 	
 }
 
@@ -315,7 +330,26 @@ sub process_single_end {
 	my $end    = $a->end;
 	my $name   = $a->display_name;
 	my $strand = $a->strand == 1 ? '+' : '-';
-	my $score  = $a->qual;
+	
+	# determine score from the CIGAR string
+		# since we're writing a 6-column BED file, we need a score value
+		# there is no inherent single score value with the alignment, so we'll 
+		# make one up - the percentage of matched bases in the alignment
+		# it's a reasonable one to make up
+	my $cigar_ref = $a->cigar_array;
+	my $match_count = 0;
+	foreach (@{ $cigar_ref }) {
+		# each element in this array is a reference to a two element array
+		# the first element is the CIGAR operation
+		# the second element is the count for the operation
+		if ($_->[0] eq 'M') {
+			# a match operation
+			$match_count += $_->[1];
+		}
+	}
+	# calculate the percent match out of the original query length
+	# format to whole intergers 0..100
+	my $score = int( ( ($match_count / $a->query->length) + 0.005) * 100);
 	
 	# write out the feature
 	&{$write_feature}(
@@ -346,32 +380,12 @@ sub process_paired_end {
 	my $seq    = $a->seq_id;
 	my $start  = $a->start;
 	my $name   = $a->display_name;
-	my $score  = $a->qual;
+	my $isize  = $a->isize; # insert size
 	
 	# calculate end
 		# I occasionally get errors if I call mate_end method
-		# just use the reported insert size listed in the original bam file
-	my $end = $start + $a->isize - 1;
-	
-	# identify strand if possible
-	my $strand;
-	if ($random_strand) {
-		if ( rand(1) > 0.5 ) {
-			$strand = '+';
-		}
-		else {
-			$strand = '-';
-		}
-	}
-	else {
-		# this is for paired-end RNA-Seq data aligned by TopHat, which records
-		# the original strand in a BAM record attribute under the flag XS
-		# this is either + or -
-		
-		# the default value will be +, as the proper paired-end fragments 
-		# don't have inherent strand
-		$strand = $a->get_tag_values('XS') || '+';
-	}
+		# rather trust the reported insert size listed in the original bam file
+	my $end = $start + $isize - 1;
 	
 	# write out the feature
 	&{$write_feature}(
@@ -379,8 +393,8 @@ sub process_paired_end {
 		$start,
 		$end,
 		$name,
-		$score, 
-		$strand
+		$isize, # using insert size as the score value
+		'+' # technically no strand, but treat it as forward strand
 	);
 }
 
@@ -397,21 +411,6 @@ sub write_gff_feature {
 		# $score,
 		# $strand
 	
-	# generate unique ID
-	my $id = $_[3]; # id will start off same as the name
-	if (exists $gff_ids{$id}) {
-		# must be duplicate alignment for this sequence read
-		# we will need to make it unique
-		# increment the counter by one
-		$gff_ids{$id}++;
-		# and then append this digit to the name to make a unique id
-		$id = $id . '.' . $gff_ids{$id};
-	}
-	else {
-		# record this name to check in the future
-		$gff_ids{$id} = 0;
-	}
-	
 	# generate GFF fields
 	push @output_data, [ (
 		$_[0],
@@ -422,7 +421,7 @@ sub write_gff_feature {
 		$_[4],
 		$_[5],
 		'.', # phase
-		"ID=$id; Name=$_[3]"
+		"Name=$_[3]"
 	) ];
 	
 	# increment counter
@@ -492,23 +491,20 @@ __END__
 
 bam2gff_bed.pl
 
-A script to convert bam paired_reads to a gff or bed file.
-
 =head1 SYNOPSIS
 
 bam2gff_bed.pl [--options...] <filename>
   
   Options:
   --in <filename>
-  --bed | --gff | --bigbed | --bb
+  --bed | --gff
   --pe
   --type <text>
   --source <text>
-  --randstr
   --out <filename> 
+  --bigbed | --bb
   --bbapp </path/to/bedToBigBed>
-  --gz
-  --version
+  --(no)gz
   --help
 
 =head1 OPTIONS
@@ -522,19 +518,10 @@ The command line flags and descriptions:
 Specify the file name of a .bam alignment file. The file should be indexed. 
 If not, the program will attempt to automatically index it.
 
-=item --bed
-
-=item --gff
-
-=item --bigbed
-
-=item --bb
+=item --bed | --gff
 
 Specify the output file format. Either a BED file (6-columns) or GFF v.3 
-file will be written. You can also specify a bigBed format (bigbed or bb), 
-where a BED text file will first be generated and then automatically 
-converted to a compressed, binary BigBed file. The default behavior is to 
-write a BED file.
+file will be written. The default behavior is to write a BED file.
 
 =item --pe
 
@@ -550,32 +537,32 @@ input file base name, appended with either '_reads' or '_paired_reads'.
 
 For GFF output files, specify the source tag. The default is 'Illumina'.
 
-=item --randstr
-
-For paired-end Bam files, specify that the strand of the alignment be 
-randomly assigned to either the forward or reverse strand.
-
 =item --out
 
 Specify the output file name. The default for GFF output files is to use 
 the GFF type; for BED output files the input file base name is used. A 
 '.bed' extension is added if necessary.
 
+=item --bigbed
+
+=item --bb
+
+When generating a BED formatted output file, optionally indicate that 
+a binary BigBed file should be generated instead of a text BED file. 
+A .bed file is first generated, then converted to a .bb file, and then 
+the .bed file is removed.
+
 =item --bbapp </path/to/bedToBigBed>
 
 Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
-default is to first check the biotoolbox.cfg configuration file for 
+default is to first check the tim_db_helper.cfg configuration file for 
 the application path. Failing that, it will search the default 
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -590,23 +577,17 @@ BED or GFF formatted feature file. For BED output, a 6-column BED file is
 generated. For GFF output, a v.3 GFF file is generated. In both cases, the
 alignment name, strand, and a score value is recorded.
 
-Both single- and paired-end alignments may be converted. For paired-end 
-alignments, the genomic coordinates of the entire insert fragment is recorded. 
-
-The mapping quality score is recorded as the GFF or BED score. For paired-end 
-alignments, only the left score is recorded for efficiency.
-
-The strand information is retained from the original alignment, except for 
-proper paired-end alignments. For paired-end alignments, the TopHat-specific 
-attribute XS is searched, and, if found, is used for the strand. Otherwise, 
-all features default to the forward strand. An option is available to 
-randomly assign a strand to paired-end features.
+Both single- and paired-end alignments may be converted. For single-end 
+alignments, the generated score is the percent of matched bases (1-100).
+For paired-end alignments, the genomic coordinates of the entire insert 
+fragment is recorded. The length of the insert is recorded as the score.
 
 For BED files, coordinates are adjusted to interbase format, according to 
 the specification.
 
 An option exists to further convert the BED file to an indexed, binary BigBed 
-format. Jim Kent's bedToBigBed conversion utility must be available.
+format. Jim Kent's bedToBigBed conversion utility must be available, and 
+either a chromosome definition file or access to a Bio::DB database is required.
 
 =head1 AUTHOR
 
@@ -620,3 +601,16 @@ format. Jim Kent's bedToBigBed conversion utility must be available.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+

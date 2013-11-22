@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to pull out feature attributes from a database
 
 use strict;
 use Getopt::Long;
@@ -13,15 +13,13 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	get_feature
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.12.6';
 
-print "\n This script will collect information for a list of features\n\n";
+print "\n This script will get additional information about features\n\n";
 
 
 
@@ -45,8 +43,7 @@ my (
 	$database,
 	$attrib_request,
 	$gz,
-	$help,
-	$print_version,
+	$help
 ); 
 
 # Command line options
@@ -57,8 +54,7 @@ GetOptions(
 	'db=s'     => \$database, # database name
 	'gz!'      => \$gz, # gzip status
 	'help'     => \$help, # help
-	'version'  => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 
 # Print help
@@ -69,14 +65,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script get_feature_info.pl, version $VERSION\n\n";
-	exit;
-}
-
-
 
 # Check for required values
 unless ($infile) {
@@ -97,9 +85,15 @@ unless ($main_data_ref) {
 }
 
 # identify indices
-my $name_index = find_column_index($main_data_ref, '^name');
-my $type_index = find_column_index($main_data_ref, '^type');
-my $id_index   = find_column_index($main_data_ref, '^primary_id');
+my $name_index = find_column_index($main_data_ref, 'name');
+my $type_index = find_column_index($main_data_ref, 'type');
+unless (
+	defined $name_index and
+	defined $type_index 
+) {
+	die 'unable to identify Name and/or Type columns in data table';
+}
+
 
 
 
@@ -135,10 +129,10 @@ unless ($outfile) {
 }
 
 # write the file
-my $file_success = write_tim_data_file(
+my $file_success = write_tim_data_file( {
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-);
+} );
 if ($file_success) {
 	# success
 	print " Wrote file '$file_success'\n";
@@ -178,8 +172,6 @@ sub get_attribute_list_from_user {
 		# store the tag keys in an example hash
 		my %tagexamples;
 		for (my $i = 1; $i < 50; $i++) {
-			last if $i == $main_data_ref->{'last_row'};
-			
 			my @examples = $db->features(
 				-name     => $main_data_ref->{'data_table'}->[$i][$name_index],
 				-type     => $main_data_ref->{'data_table'}->[$i][$type_index]
@@ -187,11 +179,9 @@ sub get_attribute_list_from_user {
 			unless (@examples) {
 				next;
 			}
-			foreach my $example (@examples) {
-				my %taghash = $example->attributes();
-				foreach (keys %taghash) {
-					$tagexamples{$_} += 1;
-				}
+			my %taghash = $examples[0]->attributes();
+			foreach (keys %taghash) {
+				$tagexamples{$_} += 1;
 			}
 		}
 		
@@ -201,8 +191,8 @@ sub get_attribute_list_from_user {
 		my %index2att;
 		# standard attributes for any user
 		foreach ( 
-			qw(Chromosome Start Stop Strand Score Length Midpoint Phase 
-				RNA_count Exon_count Transcript_length Parent Primary_ID
+			qw(chromo start stop midpoint length strand phase score 
+				exon_count transcript_length parent
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -211,7 +201,6 @@ sub get_attribute_list_from_user {
 		}
 		# specific attributes for these features
 		foreach (sort {$a cmp $b} keys %tagexamples) {
-			# all other attributes
 			print "   $i\t$_\n";
 			$index2att{$i} = $_;
 			$i++;
@@ -246,44 +235,38 @@ sub get_attribute_method {
 	
 	# set the appropriate attribute collection subroutine
 	my $method;
-	if ($attrib =~ /^chromo/i) {
+	if ($attrib eq 'chromo') {
 		$method = \&get_chromo;
 	} 
-	elsif ($attrib =~ /^start$/i) {
+	elsif ($attrib eq 'start') {
 		$method = \&get_start;
 	} 
-	elsif ($attrib =~ /^stop$/i) {
+	elsif ($attrib eq 'stop') {
 		$method = \&get_stop;
 	} 
-	elsif ($attrib =~ /^midpoint$/i) {
+	elsif ($attrib eq 'midpoint') {
 		$method = \&get_midpoint;
 	} 
-	elsif ($attrib =~ /^length$/i) {
+	elsif ($attrib eq 'length') {
 		$method = \&get_length;
 	} 
-	elsif ($attrib =~ /^transcript_length$/i) {
+	elsif ($attrib eq 'transcript_length') {
 		$method = \&get_transcript_length;
 	} 
-	elsif ($attrib =~ /^strand$/i) {
+	elsif ($attrib eq 'strand') {
 		$method = \&get_strand;
 	} 
-	elsif ($attrib =~ /^phase$/i) {
+	elsif ($attrib eq 'phase') {
 		$method = \&get_phase;
 	} 
-	elsif ($attrib =~ /^score$/i) {
+	elsif ($attrib eq 'score') {
 		$method = \&get_score;
 	} 
-	elsif ($attrib =~ /^rna_count$/i) {
-		$method = \&get_rna_number;
-	} 
-	elsif ($attrib =~ /^exon_count$/i) {
+	elsif ($attrib eq 'exon_count') {
 		$method = \&get_exon_number;
 	} 
-	elsif ($attrib =~ /^parent$/i) {
+	elsif ($attrib eq 'parent') {
 		$method = \&get_parent;
-	} 
-	elsif ($attrib =~ /^primary_id$/i) {
-		$method = \&get_primary_id;
 	} 
 	else {
 		# unrecognized, must be tag key
@@ -307,40 +290,34 @@ sub collect_attributes_for_list {
 	print " Retrieving ", join(", ", @list), "\n";
 	my $table = $main_data_ref->{'data_table'}; # shortcut reference
 	for my $row (1..$main_data_ref->{'last_row'}) {
-		
-		# get the name of the feature
-		my $name = $table->[$row][$name_index];
-		$name = (split(';', $name))[0] if $name =~ /;/; # take the first name only
-		
-		# pull the feature(s) from the database
-		my $feature = get_feature(
-			'db'    => $db,
-			'name'  => defined $name_index ? 
-				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
-			'type'  => defined $type_index ? 
-				$main_data_ref->{'data_table'}->[$row][$type_index] : undef,
-			'id'    => defined $id_index ? 
-				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
+		my @features = $db->features( 
+			# define the region
+			-name   => $table->[$row][$name_index],
+			-type  => $table->[$row][$type_index],
 		);
+		if (scalar @features == 0) {
+			warn " no features found for '$table->[$row][$name_index]'\n";
+			
+			# record null value(s)
+			foreach (@list) {
+				push @{ $table->[$row] }, '.'; 
+			}
+			next;
+		}
+		elsif (scalar @features > 1) {
+			warn " multiple features found for '$table->[$row][$name_index]'" .
+				". Using first one\n";
+		}
 		
 		# get the attribute(s)
-		if ($feature) {
-			for (my $i = 0; $i < scalar @list; $i++) {
-				# for each request in the list, we will collect the attribute
-				# we'll use the method sub defined in the methods
-				# pass both the feature and the name of the attribute
-				# only the tag value actually needs the name of the attribute
-				push @{ $table->[$row] }, 
-					&{ $methods[$i] }($feature, $list[$i]);
-			}
-		}
-		else {
-			# no feature found, cannot collect attributes
-			# record nulls
-			for (my $i = 0; $i < scalar @list; $i++) {
-				push @{ $table->[$row] }, '.';
-			}
-		}
+		for (my $i = 0; $i < scalar @list; $i++) {
+ 			# for each request in the list, we will collect the attribute
+ 			# we'll use the method sub defined in the methods
+ 			# pass both the feature and the name of the attribute
+ 			# only the tag value actually needs the name of the attribute
+ 			push @{ $table->[$row] }, 
+ 				&{ $methods[$i] }($features[0], $list[$i]);
+ 		}
 	}
 	
 	# record the metadata
@@ -354,14 +331,12 @@ sub collect_attributes_for_list {
 
 sub get_chromo {
 	my $feature = shift;
-	return '.' unless $feature;
 	return $feature->seq_id || '.';
 }
 
 
 sub get_start {
 	my $feature = shift;
-	return '.' unless $feature;
 	return $feature->start || '.';
 }
 
@@ -369,21 +344,18 @@ sub get_start {
 
 sub get_stop {
 	my $feature = shift;
-	return '.' unless $feature;
 	return $feature->end || '.';
 }
 
 
 sub get_length {
 	my $feature = shift;
-	return 0 unless $feature;
-	return $feature->length || 0;
+	return $feature->length || '.';
 }
 
 
 sub get_transcript_length {
 	my $feature = shift;
-	return 0 unless $feature;
 	my $exon_total = 0;
 	my $cds_total  = 0;
 	foreach my $subf ( $feature->get_SeqFeatures() ) {
@@ -408,49 +380,30 @@ sub get_transcript_length {
 
 sub get_midpoint {
 	my $feature = shift;
-	return '.' unless $feature;
 	return ($feature->start + int( $feature->length / 2) ) || '.';
 }
 
 
 sub get_strand {
 	my $feature = shift;
-	return '.' unless $feature;
-	return $feature->strand || 0;
+	return $feature->strand || '.';
 }
 
 
 sub get_phase {
 	my $feature = shift;
-	return '.' unless $feature;
 	return $feature->phase || '.';
 }
 
 
 sub get_score {
 	my $feature = shift;
-	return '.' unless $feature;
 	return $feature->score || '.';
-}
-
-
-sub get_rna_number {
-	my $feature = shift;
-	return 0 unless $feature;
-	my $rna_count = 0;
-	foreach my $f ($feature->get_SeqFeatures) {
-		if ($f->primary_tag =~ /rna/i) {
-			# an RNA transcript
-			$rna_count++;
-		}
-	}
-	return $rna_count;
 }
 
 
 sub get_exon_number {
 	my $feature = shift;
-	return 0 unless $feature;
 	my $exon_count = 0;
 	my $cds_count = 0;
 	foreach my $f ($feature->get_SeqFeatures) {
@@ -475,12 +428,20 @@ sub get_exon_number {
 	}
 	# return exon_count if non-zero, else return cds_count, zero or non-zero
 	return $exon_count ? $exon_count : $cds_count;
+# 	if ($exon_count) {
+# 		return $exon_count;
+# 	}
+# 	elsif ($cds_count) {
+# 		return $cds_count;
+# 	}
+# 	else {
+# 		return 0;
+# 	}
 }
 
 
 sub get_parent {
 	my $feature = shift;
-	return '.' unless $feature;
 	if ($feature->has_tag('parent_id')) {
 		# feature has a parent
 		my ($parent_id) = $feature->get_tag_values('parent_id');
@@ -507,18 +468,12 @@ sub get_parent {
 }
 
 
-sub get_primary_id {
-	my $feature = shift;
-	return $feature->primary_id || '.';
-}
-
-
 sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
-	return '.' unless $feature;
 	if ($feature->has_tag($attrib)) {
-		return join(';', ($feature->get_tag_values($attrib)) );
+		my @values = $feature->get_tag_values($attrib);
+		return join(';', @values) || '.';
 	}
 	else {
 		return '.';
@@ -565,36 +520,33 @@ __END__
 
 get_feature_info.pl
 
-A script to collect feature information from a BioPerl SeqFeature::Store db.
+A script to feature information from a Bioperl SeqFeature::Store db.
 
 =head1 SYNOPSIS
 
 get_feature_info.pl <filename> 
 
-  Options:
   --in <filename> 
   --db <name>
   --attrib <attribute1,attribute2,...>
   --out filename
-  --gz
-  --version
+  --(no)gz
   --help
 
 Attributes include:
-   Chromosome
-   Start
-   Stop
-   Strand
-   Score
-   Length
-   Midpoint
-   Phase
-   RNA_count
-   Exon_count
-   Transcript_length (sum of exon lengths)
-   Parent (name)
-   Primary_ID
+   chromo
+   start
+   stop
+   midpoint
+   length
+   strand
+   phase
+   score
+   exon_count
+   transcript_length (sum of exon lengths)
+   parent (name)
    <tag>
+
 
 =head1 OPTIONS
 
@@ -623,20 +575,17 @@ may be collected, as well as values from specific group tags. These tags
 are found in the group (ninth) column of the source GFF file. Standard 
 attributes include the following
    
-   -Chromosome
-   -Start
-   -Stop
-   -Strand
-   -Score
-   -Length
-   -Midpoint
-   -Phase
-   -RNA_count (number of RNA subfeatures)
-   -Exon_count (number of exons, or CDS, subfeatures)
-   -Transcript_length
-   -Parent (name)
-   -Primary_ID
-   -<tag>
+   -chromo
+   -start
+   -stop
+   -midpoint
+   -length
+   -strand
+   -phase
+   -score
+   -exon_count (number of exons, or CDS, subfeatures)
+   -transcript_length
+   -parent (name)
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
@@ -647,15 +596,11 @@ can't remember the feature's tag keys in the database.
 Optionally specify an alternate output file name. The default is to 
 overwrite the input file.
 
-=item --gz
+=item --(no)gz
 
 Indicate whether the output file should (not) be compressed by gzip. 
 If compressed, the extension '.gz' is appended to the filename. If a compressed 
 file is opened, the compression status is preserved unless specified otherwise.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -682,3 +627,4 @@ field of the original source GFF file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

@@ -1,12 +1,14 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to bin genomic data from either gff, wig, sgr, or bam files
+# the data may be counted or statistically combined
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
 use Statistics::Lite qw(mean median sum);
+eval { use Bio::DB::Sam; };
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
@@ -21,13 +23,6 @@ use tim_file_helper qw(
 	open_to_read_fh
 	convert_and_write_to_gff_file
 );
-eval {
-	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
-};
-my $VERSION = '1.13';
-
 
 print "\n This script will generate genomic binned data\n\n";
 
@@ -58,12 +53,12 @@ my (
 	$span,
 	$midpoint,
 	$shift,
+	$interbase,
 	$interpolate,
 	$log,
 	$gffout,
 	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 
@@ -81,13 +76,13 @@ GetOptions(
 	'span'        => \$span, # assign value across entire feature span
 	'midpoint'    => \$midpoint, # assign value at the feature midpoint
 	'shift=i'     => \$shift, # 3' shift value
+	'interbase!'  => \$interbase, # source is in interbase format
 	'interpolate' => \$interpolate, # interpolate missing data
 	'log!'        => \$log, # values in log2 space
 	'gff'         => \$gffout, # output a gff file
 	'gz!'         => \$gz, # compress output
-	'help'        => \$help, # request help
-	'version'     => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'        => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -98,36 +93,30 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script bin_genomic_data.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 ### Check for required values
 unless ($datafile) {
-	die "  OOPS! No source data file specified! \n use --help\n";
+	die "  OOPS! No source data file specified! \n use $0 --help\n";
 }
 unless ($infile or $new) {
-	die "  OOPS! Must specify bin data file or use new! \n use --help\n";
+	die "  OOPS! Must specify bin data file or use new! \n use $0 --help\n";
 }
 if ($new) {
 	unless ($dbname and $outfile and $win) {
-		die "  OOPS! missing parameters for new bin data! \n use --help\n";
+		die "  OOPS! missing parameters for new bin data! \n use $0 --help\n";
 	}
 }
-unless ($method =~ /enumerate|count|mean|median|sum/) {
-	die "  OOPS! unknown method '$method' specified! \n use --help\n";
-}
-if ($method eq 'enumerate') {
-	# count is just an alias, make internally consistent
-	$method = 'count';
+unless (
+	$method eq 'enumerate' or 
+	$method eq 'mean' or 
+	$method eq 'median'
+) {
+	die "  OOPS! unknown method '$method' specified! \n use $0 --help\n";
 }
 if (defined $log) {
-	if ($log and $method eq 'count') {
-		die "  OOPS! method 'count' must be used with non-log data!\n";
+	if ($log and $method eq 'enumerate') {
+		die "  OOPS! method 'enumerate' must be used with non-log data!\n";
 	}
 }
 else {
@@ -137,21 +126,6 @@ unless (defined $span) {$span = 0}
 unless (defined $midpoint) {$midpoint = 0}
 	# without these two options set we'll just use the read's start point
 
-
-
-
-
-### Prepare genomic bins
-my ($main_data, $column, $data_type) = prepare_data_structure(); 
-	# return the main data structure, column index, and data type
-
-# simple reference to the data table
-my $table_ref = $main_data->{'data_table'};
-
-
-
-
-### Collecting data into the genomic bins
 
 # Determine the feature processing method
 my $process_feature;
@@ -168,35 +142,175 @@ else {
 	$process_feature = \&process_feature_startpoint;
 }
 
+
+
+
+### Prepare genomic bins
+my $main_data_ref; # a reference to the main data structure
+
+# prepare a new data file
+if ($new) {
+	print " Generating a new set of genomic bins....\n";
+	# generate new data table
+	$main_data_ref = get_new_genome_list( {
+			'db'        => $dbname, 
+			'win'       => $win, 
+			'step'      => $step,
+	} );
+	unless ($main_data_ref) {
+		die "Unable to generate a new data table!\n";
+	}
+	# set program metadata
+	$main_data_ref->{'program'} = $0;
+} 
+
+# otherwise load a pre-existing file
+else {
+	print " Loading data file $infile....\n";
+	$main_data_ref = load_tim_data_file($infile);
+	unless ($main_data_ref) {
+		die "Unable to load data file!\n";
+	}
+	unless ($main_data_ref->{'feature'} eq 'genome') {
+		die " The input file was not generated with a genome data set\n";
+	}
+}
+
+# simple reference to the data table
+my $table_ref = $main_data_ref->{'data_table'};
+
+# index the data table
+print " Indexing data table....\n";
+index_data_table($main_data_ref) or 
+	die " unable to index the data table!\n";
+
+
+
+
+
+
+
+### Collecting data into the genomic bins
+
+# Determine name for the dataset
+	# we will simply use the basename of the data file
+	# also get the extension for recognizing the file type to use below
+my ($name, $path, $ext) = fileparse($datafile, 
+	qw(
+		.gff
+		.gff.gz
+		.gff3
+		.gff3.gz
+		.bed
+		.bed.gz
+		.sgr
+		.sgr.gz
+		.wig
+		.wig.gz
+		.bam
+	) 
+);
+
+# Set metadata
+my $column = $main_data_ref->{'number_columns'};
+$main_data_ref->{$column} = {
+		'datafile' => $datafile,
+		'log2'     => $log,
+		'method'   => $method,
+		'name'     => $name,
+		'index'    => $column,
+};
+if ($span) {
+	$main_data_ref->{$column}{'span'} = 1;
+}
+elsif ($midpoint) {
+	$main_data_ref->{$column}{'reference_point'} = 'midpoint';
+}
+else {
+	$main_data_ref->{$column}{'reference_point'} = 'start';
+}
+if ($shift) {
+	$main_data_ref->{$column}{'shift'} = $shift;
+}
+
+# insert column header name
+$table_ref->[0][$column] = $name; 
+# update number of columns
+$main_data_ref->{'number_columns'} += 1;
+
 # Walk through the source data file
 	# how we collect is based on the file type
 	# determine file type based on extension
-if ($data_type =~ /gff/) {
+if ($ext =~ /gff/) {
 	get_gff_data();
 } 
-elsif ($data_type =~ /bed/) {
+elsif ($ext =~ /bed/) {
 	get_bed_data();
 } 
-elsif ($data_type =~ /sgr/) {
+elsif ($ext =~ /sgr/) {
 	get_sgr_data();
 } 
-elsif ($data_type =~ /bam/) {
+elsif ($ext =~ /bam/) {
 	get_bam_data();
 } 
-elsif ($data_type =~ /wig|bdg/) {
+elsif ($ext =~ /wig/) {
 	get_wig_data();
 } 
 else {
 	die " unknown source file type!\n";
 }
 
-
 # Secondary processing
-secondary_processing();
+if ($method eq 'mean') {
+	print " Calculating genomic bin mean values....\n";
+	# we have only collected the raw data
+	# now need to calculate the mean values
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		if (defined $table_ref->[$row][$column]) {
+			# we have raw data, split and determine mean
+			my @data = split /;/, $table_ref->[$row][$column];
+			$table_ref->[$row][$column] = _calculate_mean(@data);
+		}
+		else {
+			# no data
+			$table_ref->[$row][$column] = '.';
+		}
+	}
+}
+elsif ($method eq 'median') {
+	print " Calculating genomic bin median values....\n";
+	# we have only collected the raw data
+	# now need to calculate the median values
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		if (defined $table_ref->[$row][$column]) {
+			# we have raw data, split and determine median
+			my @data = split /;/, $table_ref->[$row][$column];
+			$table_ref->[$row][$column] = _calculate_median(@data);
+		}
+		else {
+			# no data
+			$table_ref->[$row][$column] = '.';
+		}
+	}
+}
+elsif ($method eq 'enumerate') {
+	# make sure we have a value in each bin
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		unless (defined $table_ref->[$row][$column]) {
+			# no count was here
+			# then place a zero in here
+			$table_ref->[$row][$column] = 0;
+		}
+	}
+}
 
 
-# Interpolate missing binned data from neighbors
-if ($interpolate) {
+
+
+
+### Interpolate missing binned data from neighbors
+if ($interpolate and $method ne 'enumerate') {
+	# we only interpolate mean or median data
 	interpolate_data();
 }
 
@@ -215,22 +329,22 @@ if ($gffout) {
 	# the file should be gff format
 	# we will need to convert the data table into gff format
 	print " Writing gff format...\n";
-	$write_success = convert_and_write_to_gff_file(
-			'data'     => $main_data,
+	$write_success = convert_and_write_to_gff_file( {
+			'data'     => $main_data_ref,
 			'score'    => $column,
 			'source'   => $datafile,
-			'method'   => $main_data->{$column}{'name'},
+			'method'   => $name,
 			'filename' => $outfile,
 			'version'  => 2,
 			'gz'       => $gz,
-	);
+	} );
 }
 else {
-	$write_success = write_tim_data_file(
-		'data'      => $main_data,
+	$write_success = write_tim_data_file( {
+		'data'      => $main_data_ref,
 		'filename'  => $outfile,
 		'gz'        => $gz,
-	);
+	} );
 }
 
 # conclusion
@@ -246,99 +360,7 @@ else {
 
 
 
-#### Subroutines ###############################################################
-
-
-sub prepare_data_structure {
-	my $main_data;
-	
-	# prepare a new data file
-	if ($new) {
-		print " Generating a new set of genomic bins....\n";
-		# generate new data table
-		$main_data = get_new_genome_list(
-				'db'        => $dbname, 
-				'win'       => $win, 
-				'step'      => $step,
-		);
-		unless ($main_data) {
-			die "Unable to generate a new data table!\n";
-		}
-		# set program metadata
-		$main_data->{'program'} = $0;
-	} 
-	
-	# otherwise load a pre-existing file
-	else {
-		print " Loading data file $infile....\n";
-		$main_data = load_tim_data_file($infile);
-		unless ($main_data) {
-			die "Unable to load data file!\n";
-		}
-		unless ($main_data->{'feature'} eq 'genome') {
-			die " The input file was not generated with a genome data set\n";
-		}
-	}
-	
-	# index the data table
-	print " Indexing data table....\n";
-	index_data_table($main_data) or 
-		die " unable to index the data table!\n";
-	
-	# Determine name for the dataset
-		# we will simply use the basename of the data file
-		# also get the extension for recognizing the file type to use below
-	my ($name, $path, $ext) = fileparse($datafile, 
-		qw(
-			\.gff
-			\.gff\.gz
-			\.gff3
-			\.gff3\.gz
-			\.bed
-			\.bed\.gz
-			\.sgr
-			\.sgr\.gz
-			\.wig
-			\.wig\.gz
-			\.bdg
-			\.bdg\.gz
-			\.bam
-		) 
-	);
-	
-	# Set metadata
-	my $column = $main_data->{'number_columns'};
-	$main_data->{$column} = {
-			'datafile' => $datafile,
-			'log2'     => $log,
-			'method'   => $method,
-			'name'     => $name,
-			'index'    => $column,
-	};
-	if ($span) {
-		$main_data->{$column}{'span'} = 1;
-	}
-	elsif ($midpoint) {
-		$main_data->{$column}{'reference_point'} = 'midpoint';
-	}
-	else {
-		$main_data->{$column}{'reference_point'} = 'start';
-	}
-	if ($shift) {
-		$main_data->{$column}{'shift'} = $shift;
-	}
-	
-	# insert column header name
-	$main_data->{'data_table'}->[0][$column] = $name; 
-	
-	# update number of columns
-	$main_data->{'number_columns'} += 1;
-		
-	# finished
-	# return data structure, the new column index, and the data file extension
-	return ($main_data, $column, $ext);
-}
-
+#### Subroutines ######
 
 sub get_gff_data {
 	print " Collecting features from GFF file '$datafile'....\n";
@@ -373,6 +395,7 @@ sub get_gff_data {
 
 
 
+
 sub get_bed_data {
 	print " Collecting features from BED file '$datafile'....\n";
 	
@@ -389,21 +412,24 @@ sub get_bed_data {
 		if ($line =~ /^#/) {next} # skip comment lines
 		chomp $line;
 		my @data = split /\t/, $line;
+		my ($chromo, $start, $stop) = $data[0,1,2];
 		
-		# interbase conversion of start
-		$data[1] += 1;
+		# interbase conversion
+		if ($interbase) {
+			$start += 1;
+		}
 		
 		# the score column is optional
 		my $score;
-		if (scalar @data >= 5) {
+		if (defined $data[4]) {
 			$score = $data[4];
 		}
 		
 		# process the feature
 		$bin_count += &{$process_feature}(
-			$data[0],
-			$data[1],
-			$data[2],
+			$chromo,
+			$start,
+			$stop,
 			$score
 		);
 		$feature_count++;
@@ -412,6 +438,8 @@ sub get_bed_data {
 	$fh->close;
 	print "  $feature_count features loaded, a total of $bin_count bins were modified\n";
 }
+
+
 
 
 
@@ -432,6 +460,11 @@ sub get_sgr_data {
 		chomp $line;
 		my ($chromo, $start, $score) = split /\t/, $line;
 		
+		# interbase conversion
+		if ($interbase) {
+			$start += 1;
+		}
+		
 		# process the feature
 		$bin_count += &{$process_feature}(
 			$chromo,
@@ -448,14 +481,13 @@ sub get_sgr_data {
 
 
 
+
+
 sub get_bam_data {
 	print " Collecting features from BAM file '$datafile'....\n";
 	
 	# open bam io object
-	unless (exists &open_bam_db) {
-		die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
-	}
-	my $sam = open_bam_db($datafile) or 
+	my $sam = Bio::DB::Sam->new( -bam => $datafile) or 
 		die " unable to open BAM file '$datafile'!\n";
 	
 	# initialize counts
@@ -476,7 +508,7 @@ sub get_bam_data {
 		# check chromosome
 		my $refseq = $sam->target_name($tid);
 		print "    for chromosome $refseq....\n";
-		unless (exists $main_data->{index}{$refseq} ) {
+		unless (exists $main_data_ref->{index}{$refseq} ) {
 			# if it's not in the index, there's no need to check it
 			next;
 		}
@@ -496,12 +528,12 @@ sub get_bam_data {
 			}
 			
 			# check that this window is in the index
-			my $pos_check = int( $pos / $main_data->{index_increment} );
+			my $pos_check = int( $pos / $main_data_ref->{index_increment} );
 			my $end_pos_check = int( $end_pos / 
-				$main_data->{index_increment} );
+				$main_data_ref->{index_increment} );
 			if (
-				$main_data->{index}{$refseq}{$pos_check} or
-				$main_data->{index}{$refseq}{$end_pos_check}
+				$main_data_ref->{index}{$refseq}{$pos_check} or
+				$main_data_ref->{index}{$refseq}{$end_pos_check}
 			) {
 				# at least a portion of the segment is represented in the 
 				# index, so go ahead and proceed
@@ -630,7 +662,7 @@ sub get_bam_data {
 
 
 sub get_wig_data {
-	print " Collecting features from wig file '$datafile'....\n";
+	print " Collecting features from sgr file '$datafile'....\n";
 	
 	# open file io object
 	my $fh = open_to_read_fh($datafile);
@@ -641,11 +673,13 @@ sub get_wig_data {
 	# initialize variables
 	my $bin_count = 0;
 	my $feature_count = 0;
-	# reusuable variables
-	my $chromo;
-	my $fixstart;
-	my $step;
-	my $span = 1; # default of 1 bp
+	my (
+		# reusuable variables
+		$chromo,
+		$fixstart,
+		$step,
+		$span,
+	); 
 	
 	# collect the data
 	while (my $line = $fh->getline) {
@@ -702,7 +736,12 @@ sub get_wig_data {
 				die "Bad formatting! variable step data but chromosome not defined!\n";
 			}
 			$start = $data[0];
-			$stop = $start + $span - 1;
+			if ($span) {
+				$stop = $start + $span;
+			} 
+			else {
+				$stop = $start;
+			}
 			$score = $data[1];
 		} 
 		
@@ -719,7 +758,12 @@ sub get_wig_data {
 			}
 			$start = $fixstart;
 			$fixstart += $step; # prepare for next round
-			$stop = $start + $span - 1;
+			if ($span) {
+				$stop = $start + $span;
+			} 
+			else {
+				$stop = $start;
+			}
 			$score = $data[0];
 		}
 		
@@ -741,12 +785,88 @@ sub get_wig_data {
 
 
 
+
 sub process_feature_startpoint {
 	
 	# collect the feature elements
 	my ($chromo, $start, $stop, $score) = @_;
 	
-	return process_feature($chromo, $start, $score);
+	# calculate the index value
+		# this is used to quickly find the point in the data table 
+		# where the feature's coodinates may be found
+	my $index_value = int( $start / $main_data_ref->{'index_increment'} );
+	my $starting_row = $main_data_ref->{'index'}->{$chromo}{$index_value} 
+		|| undef;
+	unless (defined $starting_row) {
+		# no index, return 0
+		return 0;
+	} 
+	
+	# Process according to the method
+	my $found = 0;
+	if ($method eq 'enumerate') {
+		# enumeration is easy, we simply add the count
+		for (
+			my $row = $starting_row; 
+			$row < $main_data_ref->{'last_row'}; 
+			$row++
+		) {
+			# check each row to see whether our startpoint fits here
+			if (
+				# startpoint falls within this window
+				$table_ref->[$row][0] eq $chromo and
+				$table_ref->[$row][1] <= $start and
+				$table_ref->[$row][2] >= $start
+			) {
+				$table_ref->[$row][$column] += 1;
+				$found++;
+			}
+			elsif ($table_ref->[$row][0] ne $chromo) {
+				# looks like we've moved off this chromosome
+				last;
+			}
+			elsif ($table_ref->[$row][1] > $stop) {
+				# we've moved past the region of interest
+				last;
+			}
+		}
+	}
+	else {
+		# other methods require that we collect all the values first
+		# before actually calculating
+		# therefore we'll be adding the scores to each bin
+		# scores will be kept as a string to keep the data_table simpler
+		# we'll split them later
+		for (
+			my $row = $starting_row; 
+			$row < $main_data_ref->{'last_row'}; 
+			$row++
+		) {
+			# check each row to see whether our startpoint fits here
+			if (
+				$table_ref->[$row][0] eq $chromo and
+				$table_ref->[$row][1] <= $start and
+				$table_ref->[$row][2] >= $start
+			) {
+				if (defined $table_ref->[$row][$column]) {
+					$table_ref->[$row][$column] .= ";$score";
+				}
+				else {
+					$table_ref->[$row][$column] = $score;
+				}
+				$found++;
+			}
+			elsif ($table_ref->[$row][0] ne $chromo) {
+				# looks like we've moved off this chromosome
+				last;
+			}
+			elsif ($table_ref->[$row][1] > $stop) {
+				# we've moved past the region of interest
+				last;
+			}
+		}
+	}
+	return $found;
 }
 
 
@@ -766,60 +886,27 @@ sub process_feature_midpoint {
 		$position = int( ($start + $stop)/2 );
 	}
 	
-	return process_feature($chromo, $position, $score);
-}
-
-
-
-sub process_feature_span {
-	
-	# collect the feature elements
-	my ($chromo, $start, $stop, $score) = @_;
-	
-	# Process at each position along the feature
-	my $found = 0;
-	for (
-		my $position = $start; 
-		$position <= $stop; 
-		$position += $main_data->{1}{'step'}
-	) {
-		# process 
-		$found += process_feature($chromo, $position, $score);
-	}
-	
-	return $found;
-}
-
-
-sub process_feature {
-	
-	# collect the feature elements
-	my ($chromo, $position, $score) = @_;
-	
 	# calculate the index value
 		# this is used to quickly find the point in the data table 
 		# where the feature's coodinates may be found
-	my $index_value = int( $position / $main_data->{'index_increment'} );
-	my $starting_row = $main_data->{'index'}->{$chromo}{$index_value} 
+	my $index_value = int( $position / $main_data_ref->{'index_increment'} );
+	my $starting_row = $main_data_ref->{'index'}->{$chromo}{$index_value} 
 		|| undef;
 	unless (defined $starting_row) {
 		# no index, return 0
 		return 0;
 	} 
 	
-	# calculate the last reasonable position
-	my $last = $position + $main_data->{1}{'win'} + 1;
-	
 	# Process according to the method
 	my $found = 0;
-	if ($method eq 'count') {
+	if ($method eq 'enumerate') {
 		# enumeration is easy, we simply add the count
 		for (
 			my $row = $starting_row; 
-			$row < $main_data->{'last_row'}; 
+			$row < $main_data_ref->{'last_row'}; 
 			$row++
 		) {
-			# check each row to see whether our position fits here
+			# check each row to see whether our midpoint fits here
 			if (
 				# midpoint falls within this window
 				$table_ref->[$row][0] eq $chromo and
@@ -833,7 +920,7 @@ sub process_feature {
 				# looks like we've moved off this chromosome
 				last;
 			}
-			elsif ($table_ref->[$row][1] > $last) {
+			elsif ($table_ref->[$row][1] > $stop) {
 				# we've moved past the region of interest
 				last;
 			}
@@ -847,10 +934,10 @@ sub process_feature {
 		# we'll split them later
 		for (
 			my $row = $starting_row; 
-			$row < $main_data->{'last_row'}; 
+			$row < $main_data_ref->{'last_row'}; 
 			$row++
 		) {
-			# check each row to see whether our position fits here
+			# check each row to see whether our midpoint fits here
 			if (
 				$table_ref->[$row][0] eq $chromo and
 				$table_ref->[$row][1] <= $position and
@@ -868,86 +955,112 @@ sub process_feature {
 				# looks like we've moved off this chromosome
 				last;
 			}
-			elsif ($table_ref->[$row][1] > $last) {
+			elsif ($table_ref->[$row][1] > $stop) {
 				# we've moved past the region of interest
 				last;
 			}
 		}
 	}
-	
 	return $found;
 }
 
 
 
-sub secondary_processing {
+sub process_feature_span {
 	
-	# mean
-	if ($method eq 'mean') {
-		print " Calculating genomic bin mean values....\n";
-		# we have only collected the raw data
-		# now need to calculate the mean values
-		for (my $row = 1; $row <= $main_data->{'last_row'}; $row++) {
-			if (defined $table_ref->[$row][$column]) {
-				# we have raw data, split and determine mean
-				$table_ref->[$row][$column] = _calculate_mean(
-					split(/;/, $table_ref->[$row][$column]) );
-			}
-			else {
-				# no data
-				$table_ref->[$row][$column] = '.';
-			}
-		}
-	}
+	# collect the feature elements
+	my ($chromo, $start, $stop, $score) = @_;
 	
-	# median
-	elsif ($method eq 'median') {
-		print " Calculating genomic bin median values....\n";
-		# we have only collected the raw data
-		# now need to calculate the median values
-		for (my $row = 1; $row <= $main_data->{'last_row'}; $row++) {
-			if (defined $table_ref->[$row][$column]) {
-				# we have raw data, split and determine median
-				$table_ref->[$row][$column] = _calculate_median(
-					split(/;/, $table_ref->[$row][$column]) );
-			}
-			else {
-				# no data
-				$table_ref->[$row][$column] = '.';
-			}
-		}
-	}
 	
-	# sum
-	elsif ($method eq 'sum') {
-		print " Calculating genomic bin sums....\n";
-		# we have only collected the raw data
-		# now need to sum the values
-		for (my $row = 1; $row <= $main_data->{'last_row'}; $row++) {
-			if (defined $table_ref->[$row][$column]) {
-				# we have raw data, split and determine sum
-				$table_ref->[$row][$column] = _calculate_sum(
-					split(/;/, $table_ref->[$row][$column]) );
-			}
-			else {
-				# no data
-				$table_ref->[$row][$column] = 0;
-			}
-		}
-	}
+	# calculate the index value
+		# this is used to quickly find the point in the data table 
+		# where the feature's coodinates may be found
+		# also calculate the limit for the number of rows to look before 
+		# giving up
+	my $index_value = int( $start / $main_data_ref->{'index_increment'} );
+	my $starting_row = $main_data_ref->{'index'}->{$chromo}{$index_value} 
+		|| undef;
+	unless (defined $starting_row) {
+		# no index, return 0
+		return 0;
+	} 
 
-	# count
-	elsif ($method eq 'count') {
-		# make sure we have a value in each bin
-		for (my $row = 1; $row <= $main_data->{'last_row'}; $row++) {
-			unless (defined $table_ref->[$row][$column]) {
-				# no count was here
-				# then place a zero in here
-				$table_ref->[$row][$column] = 0;
+	
+	# Process according to the method
+	my $found = 0;
+	for (
+		my $position = $start; 
+		$position <= $stop; 
+		$position += $main_data_ref->{1}{'step'}
+	) {
+		# we will step across the length of the feature with the same 
+		# step size as the genomic bins to ensure the feature is only counted
+		# once in the bin
+		if ($method eq 'enumerate') {
+			# enumeration is easy, we simply add the count
+			for (
+				my $row = $starting_row; 
+				$row < $main_data_ref->{'last_row'}; 
+				$row++
+			) {
+				# check each row to see whether our startpoint fits here
+				if (
+					$table_ref->[$row][0] eq $chromo and
+					$table_ref->[$row][1] <= $position and
+					$table_ref->[$row][2] >= $position
+				) {
+					$table_ref->[$row][$column] += 1;
+					$found++;
+				}
+				elsif ($table_ref->[$row][0] ne $chromo) {
+					# looks like we've moved off this chromosome
+					last;
+				}
+				elsif ($table_ref->[$row][1] > $stop) {
+					# we've moved past the region of interest
+					last;
+				}
+			}
+		}
+		else {
+			# other methods require that we collect all the values first
+			# before actually calculating
+			# therefore we'll be adding the scores to each bin
+			# scores will be kept as a string to keep the data_table simpler
+			# we'll split them later
+			for (
+				my $row = $starting_row; 
+				$row < $main_data_ref->{'last_row'}; 
+				$row++
+			) {
+				# check each row to see whether our startpoint fits here
+				if (
+					$table_ref->[$row][0] eq $chromo and
+					$table_ref->[$row][1] <= $position and
+					$table_ref->[$row][2] >= $position
+				) {
+					if (defined $table_ref->[$row][$column]) {
+						$table_ref->[$row][$column] .= ";$score";
+					}
+					else {
+						$table_ref->[$row][$column] = $score;
+					}
+					$found++;
+				}
+				elsif ($table_ref->[$row][0] ne $chromo) {
+					# looks like we've moved off this chromosome
+					last;
+				}
+				elsif ($table_ref->[$row][1] > $stop) {
+					# we've moved past the region of interest
+					last;
+				}
 			}
 		}
 	}
+	return $found;
 }
+
 
 
 
@@ -959,7 +1072,7 @@ sub interpolate_data {
 	
 	# identify the first data row
 	my $row = 1;
-	while ($row < $main_data->{'last_row'}) {
+	while ($row < $main_data_ref->{'last_row'}) {
 		if ($table_ref->[$row][$column] eq '.') {
 			$row++;
 		}
@@ -970,7 +1083,7 @@ sub interpolate_data {
 	
 	# now start interpolating missing data
 	INTERPOLATE_LOOP:
-	while ($row < $main_data->{'last_row'}) {
+	while ($row < $main_data_ref->{'last_row'}) {
 		
 		# check for null values
 		if ($table_ref->[$row][$column] eq '.') {
@@ -978,7 +1091,7 @@ sub interpolate_data {
 			
 			# now we need to look for the next non-value
 			my $next_data = $row + 1;
-			while ($next_data < $main_data->{'last_row'}) {
+			while ($next_data < $main_data_ref->{'last_row'}) {
 				
 				# check for same chromosome
 				if ($table_ref->[$next_data][0] ne $table_ref->[$row][0]) {
@@ -1002,7 +1115,7 @@ sub interpolate_data {
 			if (!$next_data) {
 				# this means we moved on to the next chromosome
 				# need to find the first data point for this chromosome
-				while ($row < $main_data->{'last_row'}) {
+				while ($row < $main_data_ref->{'last_row'}) {
 					if ($table_ref->[$row][$column] eq '.') {
 						$row++;
 					}
@@ -1012,7 +1125,7 @@ sub interpolate_data {
 				}
 				next INTERPOLATE_LOOP;
 			}
-			if ($next_data == $main_data->{'last_row'}) {
+			if ($next_data == $main_data_ref->{'last_row'}) {
 				# that's it, we're done
 				last INTERPOLATE_LOOP;
 			}
@@ -1062,43 +1175,36 @@ sub interpolate_data {
 sub _calculate_mean {
 	# a subroutine to calculate the mean
 	# takes into account the log status
+	my @data = @_;
 	if ($log) { 
 		# working with log2 numbers
-		my @data = map { 2**$_ } @_; # de-log
-		return log( mean(@data) ) / log(2);
+		@data = map { 2**$_ } @data; # de-log
 	}
-	else {
-		return mean(@_);
+	my $value =  mean(@data);
+	if ($log) { 
+		# working with log2 numbers
+		$value = log($value)/log(2); # back to log2
 	}
+	return $value;
 }
 
 
 sub _calculate_median {
 	# a subroutine to calculate the median
 	# takes into account the log status
+	my @data = @_;
 	if ($log) { 
 		# working with log2 numbers
-		my @data = map { 2**$_ } @_; # de-log
-		return log( median(@data) ) / log(2);
+		@data = map { 2**$_ } @data; # de-log
 	}
-	else {
-		return median(@_);
-	}
-}
-
-
-sub _calculate_sum {
-	# a subroutine to calculate the sum
-	# takes into account the log status
+	my $value =  median(@data);
 	if ($log) { 
 		# working with log2 numbers
-		my @data = map { 2**$_ } @_; # de-log
-		return log( sum(@data) ) / log(2);
+		$value = log($value)/log(2); # back to log2
 	}
-	else {
-		return sum(@_);
-	}
+	return $value;
 }
+
 
 
 
@@ -1108,7 +1214,7 @@ __END__
 
 bin_genomic_data.pl
 
-A script to bin genomic data into windows.
+A script to bin genomic data into windows
 
 =head1 SYNOPSIS
  
@@ -1121,7 +1227,7 @@ A script to bin genomic data into windows.
   --data <filename>
   --in <filename>
   --new
-  --method [count | mean | median |sum]
+  --method [enumerate | mean | median]
   --out <filename>
   --db <database_name>
   --win <integer>
@@ -1130,13 +1236,14 @@ A script to bin genomic data into windows.
   --span
   --midpoint
   --shift <integer>
+  --interbase
   --interpolate
-  --log
+  --(no)log
   --gff
-  --gz
-  --version
+  --(no)gz
   --help
 
+ 
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1161,15 +1268,14 @@ unless --new is used.
 Indicate that a new data file should be generated. Required unless --in 
 is used.
 
-=item --method [count | mean | median |sum]
+=item --method [enumerate | mean | median]
 
 Indicate which method should be used to collect the binned data. 
 Acceptable values include:
  
- - count         Count the number of unique features in the bin.
+ - enumerate     Sum the number of unique features in the bin.
  - mean          Take the mean score of features in the bin.
  - median        Take the median score of features in the bin.
- - sum           Sum the scores of features in the bin
 
 =item --out <filename>
 
@@ -1216,13 +1322,24 @@ of tag counts is offset from the actual center of the sequenced
 fragments. Use a shift value of 1/2 the mean fragment length of the 
 sequencing library.
 
+=item --interbase
+
+Source data is in interbase coordinate (0-base) system. Shift the 
+start position to base coordinate (1-base) system. This only affects 
+BED and SGR source files, which may or may not be in interbase format 
+(the others normally are not if they follow specifications). Default 
+is false. 
+
 =item --interpolate
 
-Optionally interpolate missing bin values from flanking bins. 
+Flag to indicate that those bins lacking data should be interpolated 
+from neighboring bins. Only 'mean' or 'median' collected values are 
+interpolated. (we assume you don't want to interpolate enumerated 
+counts, right????).
 
-=item --log
+=item --(no)log
 
-Flag to indicate that source data is log2, and to calculate 
+Flag to indicate that source data is (not) log2, and to calculate 
 accordingly and report as log2 data.
 
 =item --gff
@@ -1233,13 +1350,10 @@ Write a new gff output file instead of a normal tim data file.
 
 Compress the output file through gzip.
 
-=item --version
-
-Print the version number.
-
 =item --help
 
 Display the POD documentation.
+
 
 =back
 
@@ -1261,8 +1375,8 @@ small (single bp) bins.
 
 Second, the program can statistically combine the scores (values) of features
 that overlap each genomic bin. Feature scores may be collected from GFF, BED, 
-WIG, or SGR files. Either the mean, median, or sum value can be recorded 
-for the genomic bin. 
+WIG, or SGR files. Either the mean or the median value can be recorded for the 
+genomic bin. 
 
 Genomic bins lacking a score may be interpolated from neighboring bins. Up to
 four consecutive non-value bins may interpolated from neighboring bins that
@@ -1271,6 +1385,7 @@ contain values.
 The program reads/writes a data file compatable with the 'get_datasets.pl' 
 program. It can optionally write a new GFF file based on the genomic binned
 data.
+
 
 =head1 AUTHOR
 
@@ -1284,3 +1399,6 @@ data.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+

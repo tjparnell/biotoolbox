@@ -6,7 +6,6 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.12';
 
 
 # Exported names
@@ -14,8 +13,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	collect_bigbed_scores
 	collect_bigbed_position_scores
-	open_bigbed_db
-	sum_total_bigbed_features
+	bed_to_bigbed_conversion
 );
 
 # Hashes of opened file objects
@@ -24,12 +22,6 @@ our %OPENED_BEDFILES; # opened bigbed file objects
 	# like I thought it would
 	# oh well, keep it anyway????
 
-# Hash of Bigfile chromosomes
-our %BIGBED_CHROMOS;
-	# sometimes user may request a chromosome that's not in the bigfile
-	# that could lead to an exception
-	# we will record the chromosomes list in this hash
-	# $BIGBED_CHROMOS{bigfile}{chromos}
 
 # The true statement
 1; 
@@ -43,75 +35,31 @@ our %BIGBED_CHROMOS;
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigBed scores!\n";
-	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
-		# method can be score, count, or length
+	# we will collect positioned values but
+	# only return the values
 	
-	# initialize the score array
-	# this will record score, count, or lengths per the method
-	my @scores;
+	# grab the method from the passed arguments
+	my $method = $_[3];
 	
-	# look at each bedfile
-	# usually there is only one, but for stranded data there may be 
-	# two bedfiles (+ and -), so we'll check each wig file for strand info
-	foreach my $bedfile (@bed_features) {
+	# collect the raw data
+	my %bed_data = _collect_bigbed_data(@_);
 	
-		# open the bedfile
-		my $bb = open_bigbed_db($bedfile) or 
-			croak "Unable to open bigBed file '$bedfile'! $!\n";
-			
-		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
-			next;
-		}
-		
-		# collect the features overlapping the region
-		my $bb_stream = $bb->features(
-			-seq_id   => $chromo, 
-			-start    => $start, 
-			-end      => $stop,
-			-iterator => 1,
-		);
-		
-		# process each feature
-		while (my $bed = $bb_stream->next_seq) {
-			
-			# First check whether the strand is acceptable
-			if (
-				$stranded eq 'all' # all data is requested
-				or $bed->strand == 0 # unstranded data
-				or ( 
-					# sense data
-					$strand == $bed->strand 
-					and $stranded eq 'sense'
-				) 
-				or (
-					# antisense data
-					$strand != $bed->strand  
-					and $stranded eq 'antisense'
-				)
-			) {
-				# we have acceptable data to collect
-			
-				# store the appropriate datapoint
-				if ($method eq 'score') {
-					push @scores, $bed->score;
-				}
-				elsif ($method eq 'count') {
-					push @scores, 1;
-				}
-				elsif ($method eq 'length') {
-					push @scores, $bed->length;
-				}
-			}
+	# combine multiple datapoints at the same position
+	my @values;
+	if ($method eq 'score' or $method eq 'length') {
+		# each value is an array of one or more datapoints
+		foreach my $position (keys %bed_data) {
+			push @values, mean( @{ $bed_data{$position} } );
 		}
 	}
-
+	elsif ($method eq 'count') {
+		# each value is a count
+		@values = values %bed_data;
+	}
+	
 	# return collected data
-	return @scores;
+	return @values;
+	
 }
 
 
@@ -120,11 +68,35 @@ sub collect_bigbed_scores {
 ### Collect positioned BigBed scores
 sub collect_bigbed_position_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigBed position scores!\n";
+	# grab the method from the passed arguments
+	my $method = $_[3];
+	
+	# collect the raw data
+	my %bed_data = _collect_bigbed_data(@_);
+	
+	# combine multiple datapoints at the same position
+	if ($method eq 'score' or $method eq 'length') {
+		# each value is an array of one or more datapoints
+		# we will take the simple mean
+		foreach my $position (keys %bed_data) {
+			$bed_data{$position} = mean( @{$bed_data{$position}} );
+		}
 	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
+	
+	# return collected data
+	return %bed_data;
+}
+
+
+
+### Actual collection of scores
+sub _collect_bigbed_data {
+	
+	# pass the required information
+	unless (scalar @_ >= 5) {
+		croak " At least five arguments must be passed to collect BigBed data!\n";
+	}
+	my ($region, $region_strand, $stranded, $method, @bed_features) = @_;
 		# method can be score, count, or length
 	
 	# set up hash, either position => count or position => [scores]
@@ -133,22 +105,56 @@ sub collect_bigbed_position_scores {
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
 	# two bedfiles (+ and -), so we'll check each wig file for strand info
-	foreach my $bedfile (@bed_features) {
+	foreach my $feature (@bed_features) {
 	
-		# check for opened bedfile
-		my $bb = open_bigbed_db($bedfile) or 
-			croak "Unable to open bigBed file '$bedfile'! $!\n";
-			
-		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
-			next;
-		}
+		# Get the name of the bigbed file
+		my $bedfile;
 		
+		if ($feature =~ /^file:(.+)$/) {
+			# the passed feature appears to specify a file
+			$bedfile = $1;
+			
+			# check the file
+			unless (-e $bedfile) {
+				croak " BigBed file '$bedfile' does not exist!\n";
+				return;
+			}
+		}
+		elsif ($feature =~ /^http|ftp/i) {
+			# a remote file
+			
+			# this should be supported by Bio::DB::BigBed
+			$bedfile = $feature;
+		}
+		else {
+			# otherwise we assume the passed feature is a database object
+			
+			# get bedfile name
+			($bedfile) = $feature->get_tag_values('bigbedfile');
+		}
+		croak " no bedfile passed!\n" unless $bedfile;
+		
+		# check for opened bedfile
+		my $bb;
+		if (exists $OPENED_BEDFILES{$bedfile} ) {
+			# this file is already opened, use it
+			$bb = $OPENED_BEDFILES{$bedfile};
+		}
+		else {
+			# this file has not been opened yet, open it
+			$bb = Bio::DB::BigBed->new($bedfile) or
+				croak " unable to open data BigBed file '$bedfile'";
+			
+			
+			# store the opened object for later use
+			$OPENED_BEDFILES{$bedfile} = $bb;
+		}
+			
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
-			-seq_id   => $chromo, 
-			-start    => $start, 
-			-end      => $stop,
+			-seq_id   => $region->seq_id, 
+			-start    => $region->start, 
+			-end      => $region->end,
 			-iterator => 1,
 		);
 		
@@ -161,12 +167,12 @@ sub collect_bigbed_position_scores {
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$strand == $bed->strand 
+					$region_strand == $bed->strand 
 					and $stranded eq 'sense'
 				) 
 				or (
 					# antisense data
-					$strand != $bed->strand  
+					$region_strand != $bed->strand  
 					and $stranded eq 'antisense'
 				)
 			) {
@@ -184,13 +190,6 @@ sub collect_bigbed_position_scores {
 						( ($bed->start + $bed->end) / 2) + 0.5
 					);
 				}
-				
-				# check the position
-				next unless (
-					# want to avoid those whose midpoint are not technically 
-					# within the region of interest
-					$position >= $start and $position <= $stop
-				);
 				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
@@ -210,14 +209,6 @@ sub collect_bigbed_position_scores {
 		}
 	}
 
-	# combine multiple datapoints at the same position
-	if ($method eq 'score' or $method eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
-		foreach my $position (keys %bed_data) {
-			$bed_data{$position} = mean( @{$bed_data{$position}} );
-		}
-	}
 	
 	# return collected data
 	return %bed_data;
@@ -225,78 +216,102 @@ sub collect_bigbed_position_scores {
 
 
 
-### Open a bigBed database connection
-sub open_bigbed_db {
+### Bed to BigBed file conversion
+sub bed_to_bigbed_conversion {
 	
-	my $bedfile = shift;
-	my $forget  = shift;
-	
-	# check whether the file has been opened or not
-	if (exists $OPENED_BEDFILES{$bedfile} ) {
-		# this file is already opened, use it
-		return $OPENED_BEDFILES{$bedfile};
-	}
-	
-	else {
-		# this file has not been opened yet, open it
-		my $path = $bedfile;
-		$path =~ s/^file://; # clean up file prefix if present
-		my $bb;
-		eval {
-			$bb = Bio::DB::BigBed->new($path);
-		};
-		return unless $bb;
-		
-		unless ($forget) {
-			# store the opened object for later use
-			$OPENED_BEDFILES{$bedfile} = $bb;
-		
-			# collect the chromosomes for this bigBed file
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
-		
-		return $bb;
-	}
-}
-
-
-
-### Sum the total number of features in the bigBed file
-sub sum_total_bigbed_features {
-	
-	# Passed arguments;
-	my $bb_file = shift;
-	unless ($bb_file) {
-		carp " no BigBed file or BigBed db object passed!\n";
+	# Collect passed arguments
+	my $argument_ref = shift;
+	unless ($argument_ref) {
+		carp "no arguments passed!";
 		return;
 	}
 	
+	# wigfile
+	my $bedfile = $argument_ref->{'bed'} || undef;
+	unless ($bedfile) {
+		carp "no bed file passed!";
+		return;
+	}
 	
-	# Open BigBed file if necessary
-	my $bb;
-	my $bb_ref = ref $bb_file;
-	if ($bb_ref =~ /Bio::DB::BigBed/) {
-		# we have an opened bigbed db object
-		$bb = $bb_file;
+	# identify bigbed conversion utility
+	my $bb_app_path = $argument_ref->{'bbapppath'} || undef;
+	unless ($bb_app_path) {
+		carp " bedToBigBed converter utility not specified; unable to proceed!\n";
+		return;
+	}
+	
+	# Generate list of chromosome sizes if necessary
+	my $chromo_file = $argument_ref->{'chromo'} || undef;
+	unless ($chromo_file) {
+		# a pre-generated list of chromosome sizes was not provided
+		# need to generate one from the database
+		print " generating chromosome file....\n";
+		
+		# check that we have tim_db_helper loaded
+		my $db = $argument_ref->{'db'} || undef;
+		unless ($db) {
+			carp " database or chromosome file not specified! " . 
+				"Unable to convert!\n";
+			return;
+		};
+		
+		# determine reference sequence type
+		my $ref_seq_type = $argument_ref->{'seq_type'} || 'chromosome';
+			# the annotation gff may have the reference sequences labeled
+			# as various types, such as chromosome, sequence, 
+			# contig, scaffold, etc
+			# this is set in the configuration file
+			# this could pose problems if more than one is present
+		
+		# generate chromosome lengths file
+		my @chromos = $db->features(-type => $ref_seq_type);
+		unless (@chromos) {
+			die " no '$ref_seq_type' features identified in database!\n";
+		}
+		open CHR_FILE, ">tim_helper_chr_lengths.txt";
+		foreach (@chromos) {
+			print CHR_FILE $_->name, "\t", $_->length, "\n";
+		}
+		close CHR_FILE;
+		$chromo_file = "tim_helper_chr_lengths.txt";
+	}
+	
+	# generate the bw file name
+	my $bb_file = $bedfile;
+	$bb_file =~ s/\.bed$/.bb/;
+	
+	# generate the bigbed file using Jim Kent's utility
+	# Bio::DB::BigFile does not support BigBed conversion, unlike BigWig files 
+	# execute
+	print " converting $bedfile to BigBed....\n";
+	system $bb_app_path, $bedfile, $chromo_file, $bb_file;
+	
+	# check the result
+	if (-e $bb_file) {
+		# conversion successful
+		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
+			# we no longer need our temp chromosome file
+			unlink $chromo_file;
+		}
+		return $bb_file;
 	}
 	else {
-		# we have a name of a bigbed file
-		# open it but do not remember it
-		$bb = open_bigbed_db($bb_file, 1);
-		return unless ($bb);
+		print " Conversion failed. You should try manually and watch for errors\n";
+		if ($chromo_file eq 'tim_helper_chr_lengths.txt') {
+			# leave the temp chromosome file as a courtesy
+			print " Leaving temporary chromosome file '$chromo_file'\n";
+		}
+		return;
 	}
-	
-	# Return the item count for the bigBed
-	# wow, this is easy!
-	return $bb->bf->bigBedItemCount;
-		# this is the itemCount available to the low level bigFile object
-		# the validCount method from summary or bin features simple records
-		# the number of covered bases, not entirely useful here
 }
+
 
 
 
 __END__
+
+
+
 
 =head1 NAME
 
@@ -304,9 +319,22 @@ tim_db_helper::bigbed
 
 =head1 DESCRIPTION
 
-This module supports the use of bigBed file in the biotoolbox scripts.
-It is used to collect the dataset scores from a binary 
-bigBed file (.bb). The file may be local or remote.
+This module supports the use of bigbed file in the biotoolbox scripts, both 
+in the collection of data from a bigbed file, as well as the generation of 
+bigbed files.
+
+=head2 Data collection
+
+This module is used to collect the dataset scores from a binary 
+bigbed file (.bb). The file may be identified in one of two ways. First,
+it may be referenced in the database. Typically, a single 
+feature representing the dataset is present across each chromosome. The 
+feature should contain an attribute ('bigbedfile') that references the 
+location of the binary file representing the dataset scores. Second, 
+the local location of the file may be directly passed to the subroutine. 
+
+In either case, the file is read using the Bio::DB::BigBed module, and 
+the values extracted from the region of interest. 
 
 Scores may be restricted to strand by specifying the desired strandedness. 
 For example, to collect transcription data over a gene, pass the strandedness 
@@ -320,6 +348,12 @@ script 'big_filegff3.pl'.
 To speed up the program and avoid repetitive opening and 
 closing of the files, the opened bigbed file object is stored in a global 
 hash in case it is needed again.
+
+=head2 File generation
+
+This module also supports the generation of bigbed files. This is dependent 
+on Jim Kent's UCSC commandline utility. It automates the collection of 
+chromosome information in prepration of conversion, if necessary.
 
 =head1 USAGE
 
@@ -340,31 +374,55 @@ for the specified database region. The positional information of the
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed seven or more arguments in the following order:
+The subroutine is passed five or more arguments in the following order:
     
-    1) The chromosome or seq_id
-    2) The start position of the segment to collect 
-    3) The stop or end position of the segment to collect 
-    4) The strand of the original feature (or region), -1, 0, or 1.
-    5) A scalar value representing the desired strandedness of the data 
+    1) The database object representing the genomic region of interest. 
+       This should be a Bio::DB::SeqFeature object that supports the 
+       start, end, and strand methods.
+    2) The strand of the original feature (or region), -1, 0, or 1.
+    3) A scalar value representing the desired strandedness of the data 
        to be collected. Acceptable values include "sense", "antisense", 
-       or "all". Only those scores which match the indicated 
+       "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
-    6) The method or type of data collected. 
+    4) The method or type of data collected. 
        Acceptable values include 'score' (returns the bed feature 
        score), 'count' (returns the number of bed features found), or 
-       'length' (returns the length of the bed features found).  
-    7) The paths, either local or remote, to one or more BigBed files.
+       'length' (returns the length of the bed features found). 
+    5) One or more database feature objects that contain the reference 
+       to the .bb file. They should contain the attribute 'bigbedfile' 
+       which has the path to the BigBed file. Alternatively, pass one 
+       or more filenames of .bb files. Each filename should be 
+       prefixed with 'file:' to indicate that it is a direct file 
+       reference, and not a database object.
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
 
 =item collect_bigbed_position_scores
 
-This subroutine will collect the score values from a binary bigBed file 
+This subroutine will collect the score values from a binary wig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed the same arguments as collect_bigbed_scores().
+The subroutine is passed five or more arguments in the following order:
+    
+    1) The database object representing the genomic region of interest. 
+       This should be a Bio::DB::SeqFeature object that supports the 
+       start, end, and strand methods.
+    2) The strand of the original feature (or region), -1, 0, or 1.
+    3) A scalar value representing the desired strandedness of the data 
+       to be collected. Acceptable values include "sense", "antisense", 
+       "none" or "no". Only those scores which match the indicated 
+       strandedness are collected.
+    4) The method or type of data collected. 
+       Acceptable values include 'score' (returns the bed feature 
+       score), 'count' (returns the number of bed features found), or 
+       'length' (returns the length of the bed features found). 
+    5) One or more database feature objects that contain the reference 
+       to the .bb file. They should contain the attribute 'bigbedfile' 
+       which has the path to the BigBed file. Alternatively, pass one 
+       or more filenames of .bb files. Each filename should be 
+       prefixed with 'file:' to indicate that it is a direct file 
+       reference, and not a database object.
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. The feature midpoint is used 
@@ -372,25 +430,58 @@ as the key position. When multiple features are found at the same
 position, a simple mean (for score or length data methods) or sum 
 (for count methods) is returned.
 
-=item open_bigbed_db()
+=item bed_to_bigbed_conversion
 
-This subroutine will open a BigBed database connection. Pass either the 
-local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
-file. It will return the opened database object.
+This subroutine will convert a bed file to a bigBed file. See the UCSC 
+documentation regarding bed (http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED)
+and bigBed (http://genome.ucsc.edu/goldenPath/help/bigBed.html) file formats. 
+It uses Jim Kent's bedToBigBed utility to perform the conversion. This 
+must be present on the system for the conversion to succeed. 
 
-The opened BigBed object is cached for later use. If you do not want this 
-(for example, when forking), pass a second true argument.
+The conversion requires a list of chromosome name and sizes in a simple text 
+file, where each line is comprised of two columns, "<chromosome name> 
+<size in bases>". This file may be specified, or automatically generated if 
+given a Bio::DB database name (preferred to ensure genome version 
+compatibility).
 
-=item sum_total_bigbed_features()
+The function returns the name of the bigBed file, which will be the 
+input bed file basename with the extension ".bb". Note that the it does 
+not check for success of writing the bigbed file. Check STDERR for errors 
+in bigbed file generation.
 
-This subroutine will sum the total number of bed features present in a 
-BigBed file. This may be useful, for example, in calculating fragments 
-(reads) per million mapped values when the bigbed file represents 
-sequence alignments.
+Pass the function an anonymous hash of arguments, including the following:
 
-Pass either the name of a bigBed file (.bb), either local or remote, or an 
-opened BigBed database object. A scalar value of the total number of features 
-is returned.
+  Required:
+  bed         => The name of the bed source file. 
+  db          => Provide an opened database object from which to generate 
+                 the chromosome sizes information.
+  Optional: 
+  seq_type    => The GFF type of the reference sequence in the database. 
+                 This is typically "chromosome", but could also be 
+                 "sequence", "scaffold", "contig", etc. The default 
+                 value is "chromosome". This value may be provided by 
+                 checking the entry in tim_db_helper.cfg configuration 
+                 file.
+  chromo      => The name of the chromosome sizes text file, described 
+                 above, as an alternative to providing the database name.
+  bbapppath   => Provide the full path to Jim Kent's bedToBigBed  
+                 utility. This parameter may instead be defined in the 
+                 configuration file "tim_db_helper.cfg". 
+
+Example
+
+	my $wig_file = 'example_wig';
+	my $bw_file = wig_to_bigwig_conversion( {
+			'wig'   => $wig_file,
+			'db'    => $database,
+	} );
+	if (-e $bw_file) {
+		print " success! wrote bigwig file $bw_file\n";
+		unlink $wig_file; # no longer necessary
+	}
+	else {
+		print " failure! see STDERR for errors\n";
+	};
 
 =back
 

@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a quick and dirty program to print out the feature types in the current database
 
 use strict;
 use Pod::Usage;
@@ -9,12 +9,7 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_db_helper qw(
 	open_db_connection
-	get_dataset_list
 );
-my $VERSION = '1.9.1';
-
-print "\n A script to print all available feature types in a database\n\n";
-
 
 ### Quick help
 unless (@ARGV) { 
@@ -31,16 +26,14 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my (
 	$dbname,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
 GetOptions( 
 	'db=s'      => \$dbname, # the database name
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -50,13 +43,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script print_feature_types.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
@@ -69,35 +55,25 @@ unless ($dbname) {
 
 
 
-# Initialize
+# Open database
+my $db = open_db_connection($dbname) or die " can't open db\n";
+
+# Get the database types
 my $count = 0;
 my %source2type;
-
-# Get the features
-my @types = get_dataset_list($dbname);
-	# this returns an array of database types
+foreach ($db->types) {
 	
-foreach my $type (@types) {
-	
-	# each type is usually comprised of primary_tag:source_tag
-	# although sometimes it is just the primary_tag
-	
-	# get individual tags
-	my ($primary, $source);
-	if ($type =~ /:/) {
-		($primary, $source) = split /:/, $type;
-	}
-	else {
-		$primary = $type;
-		$source  = 'NONE';
-	}
+	# the type is essentially method:source
+	# get individual values
+	my $source = $_->source;
+	my $type = $_->method;
 	
 	# store the type in an array under the source
 	if (exists $source2type{$source}) {
-		push @{ $source2type{$source} }, $primary;
+		push @{ $source2type{$source} }, $type;
 	}
 	else {
-		$source2type{$source} = [ ($primary) ];
+		$source2type{$source} = [ ($type) ];
 	}
 	$count++;
 }
@@ -124,17 +100,14 @@ __END__
 
 print_feature_types.pl
 
-A script to print out the available feature types in a database.
-
 =head1 SYNOPSIS
 
 print_feature_types.pl <database>
   
-  Options:
   --db <database>
-  --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -143,12 +116,7 @@ The command line flags and descriptions:
 
 =item --db <database>
 
-Specify the name of a Bio::DB::SeqFeature::Store database, or a BigWigSet 
-directory.
-
-=item --version
-
-Print the version number.
+Specify the name of the Bio::DB::SeqFeature::Store database.
 
 =item --help
 
@@ -162,9 +130,6 @@ This program will print a list of all of the known feature types present
 in a Bio::DB::SeqFeature::Store database. The types are organized into 
 groups by their source tag.
 
-BigWigSet databases, comprised of a directory of BigWig files and a 
-metadata file, are also supported.
-
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -177,3 +142,4 @@ metadata file, are also supported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

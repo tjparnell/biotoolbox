@@ -1,6 +1,10 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl 
 
-# documentation at end of file 
+# This script will convert a wiggle track file to a GFF file 
+
+# for use in the genome browser
+# The wig file is described at http://genome.ucsc.edu/goldenPath/help/wiggle.html
+# there are three types: BED format, variable step, and fixed step
 
 use strict;
 use Getopt::Long;
@@ -16,9 +20,8 @@ use tim_file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10';
 
-print "\n This program will convert wiggle files to a tabbed text file\n\n";
+print "\n This program will convert wiggle files to a tabbed text file\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -43,8 +46,7 @@ my (
 	$midpoint,
 	$version,
 	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
@@ -58,10 +60,8 @@ GetOptions(
 	'midpoint!' => \$midpoint, # use midpoint instead of start and stop
 	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
-
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -71,13 +71,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script wig2data.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
@@ -320,14 +313,14 @@ sub write_progressive_data {
 	
 	# convert to gff if requested
 	if ($gff) {
-		convert_genome_data_2_gff_data(
+		convert_genome_data_2_gff_data( {
 			'data'     => $out_data_ref,
 			'score'    => 3,
 			'source'   => $source,
 			'type'     => $type,
 			'midpoint' => $midpoint,
 			'version'  => $version,
-		) or die " Unable to convert to GFF format!\n";
+		} ) or die " Unable to convert to GFF format!\n";
 	}
 	
 	# check for filename
@@ -355,11 +348,11 @@ sub write_progressive_data {
 		
 		# rather than generating new code for writing the gff file,
 		# we will simply use the write_tim_data_file sub
-		my $new_outfile = write_tim_data_file(
+		my $new_outfile = write_tim_data_file( {
 			'data'      => $out_data_ref,
 			'filename'  => $outfile,
 			'gz'        => $gz,
-		);
+		} );
 		if ($new_outfile) {
 			# success
 			# reassign the name
@@ -379,12 +372,9 @@ sub write_progressive_data {
 
 
 __END__
-
 =head1 NAME
 
 wig2data.pl
-
-A script to convert a text wiggle file to a tab-delimited text file. 
 
 =head1 SYNOPSIS
 
@@ -393,15 +383,15 @@ wig2data.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
-  --gff
+  --(no)gff
   --type <text>
   --source <text>
   --format [0,1,2,3]
-  --midpoint
+  --(no)midpoint
   --version [2,3]
-  --gz
-  --version
+  --(no)gz
   --help
+
 
 =head1 OPTIONS
 
@@ -418,7 +408,7 @@ Specify the file name of a wig file. The file may be compressed with gzip.
 Specify the output filename. By default it uses the GFF type as the 
 basename.
 
-=item --gff
+=item --(no)gff
 
 Indicate whether the output file should be in GFF format. If false, a 
 standard tim data tab delimited text file will be written with four 
@@ -440,7 +430,7 @@ Specify the text string to be used as the GFF feature 'source'
 Specify the number of decimal places to which the wig file will be 
 formatted. Default is no formatting.
 
-=item --midpoint
+=item --(no)midpoint
 
 Specify whether (or not) a midpoint position should be calculated 
 between the start and stop positions and be used in the output GFF 
@@ -452,13 +442,9 @@ a span value is specified. The default value is false.
 
 Specify the GFF version. The default is version 3.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -497,3 +483,4 @@ formatted to the indicated number of decimal places.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

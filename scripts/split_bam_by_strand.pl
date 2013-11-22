@@ -3,7 +3,6 @@
 use strict;
 use Bio::DB::Sam;
 use Pod::Usage;
-my $VERSION = '1.4.2';
 
 
 print "\n A program to split a bam file into separate files based on strand\n";

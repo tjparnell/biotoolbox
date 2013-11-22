@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert David Nix's bar file to a wig file
 
 use strict;
 use Getopt::Long;
@@ -11,13 +11,19 @@ use Archive::Zip qw( :ERROR_CODES );
 use Statistics::Lite qw(mean median sum max);
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
+use tim_db_helper qw(
+	$TIM_CONFIG
+	open_db_connection
+);
 use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-use tim_db_helper::config;
-use tim_big_helper qw(wig_to_bigwig_conversion);
-my $VERSION = '1.10';
+eval {
+	# check for bigwig file conversion support
+	require tim_db_helper::bigwig;
+	tim_db_helper::bigwig->import;
+};
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -39,15 +45,13 @@ my (
 	$outfile,
 	$bar_app_path,
 	$method,
-	$log2,
 	$use_track,
 	$bigwig,
 	$database,
 	$chromo_file,
 	$bw_app_path,
 	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
@@ -56,16 +60,14 @@ GetOptions(
 	'out=s'     => \$outfile, # name of output file 
 	'barapp=s'  => \$bar_app_path, # path to David's Bar2Gr file
 	'method=s'  => \$method, # method for dealing with duplicate positions
-	'log!'      => \$log2, # data is in log2 format
 	'track!'    => \$use_track, # boolean to include a track line
 	'bw!'       => \$bigwig, # boolean for bigwig output
 	'db=s'      => \$database, # name of database to get chromo info
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
 	'gz!'       => \$gz, # boolean to compress output text file
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -76,11 +78,7 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script bar2wig.pl, version $VERSION\n\n";
-	exit;
-}
+
 
 
 
@@ -100,22 +98,6 @@ if (-d $infile) {
 	# we're working with a directory of files, # otherwise assume a file
 	$input_is_dir = 1;
 }
-
-# identify essential application paths
-my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
-if (defined $java) {
-	chomp $java; # the which command will have a newline character
-}
-else {
-	die " unable to identify java executable!\n";
-}
-unless ($bar_app_path) {
-	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
-}
-unless ($bar_app_path =~ /Bar2Gr$/) {
-	die "  Must define the path to the USeq or T2 java application Bar2Gr! see help\n";
-}
-
 
 # assign method subroutine
 my $method_sub;
@@ -154,6 +136,22 @@ unless (defined $use_track) {
 		$use_track = 1;
 	}
 }
+
+# identify application paths
+my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
+if (defined $java) {
+	chomp $java; # the which command will have a newline character
+}
+else {
+	die " unable to identify java executable!\n";
+}
+unless ($bar_app_path) {
+	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
+	unless ($bar_app_path) {
+		die "  Must define the path to the USeq/T2 java application Bar2Gr! see help\n";
+	}
+}
+
 
 
 
@@ -292,36 +290,18 @@ if ($input_is_dir) {
 else {
 	# a single file
 	
-	# identify the gr file
-	# we need to open up the parent directory of the input file and look for 
-	# an appropriate matching gr file
-	# we can't do a simple extension exchange since Bar2Gr will write the 
-	# genome version into the file name, and we don't know what that could be
-	my $grfile;
-	my (undef, $path, $original_file) = File::Spec->splitpath($infile);
-	unless ($path) {
-		$path = File::Spec->curdir; 
-		# if it can't find a path we assume it's current
-	}
-	$original_file =~ s/\.bar(?:\.zip)?$//; # strip known extensions
-	my $dir = new DirHandle $path;
-	foreach my $file ($dir->read) {
-		if ($file =~ /\.gr$/ and $file =~ /$original_file/) {
-			# found the corresponding gr file
-			$grfile = $file;
-			# no need to go on
-			last;
-		}
-	}
-	$dir->close;
+	# generate the gr file name
+	my (undef, $path, $grfile) = File::Spec->splitpath($infile);
+	$grfile =~ s/\.zip$//;
+	$grfile =~ s/\.bar$/.gr/; # exchange extension
 	
 	# confirm gr file existence
-	unless (-e File::Spec->catfile($path, $grfile) ) {
+	unless (-e $grfile) {
 		die " unable to find converted file '$grfile'!\n";
 	}
 	
 	# process according to strand
-	if ($grfile =~ /_\+_/) {
+	if ($infile =~ /_\+_/) {
 		# forward strand
 		my $wigfile = process_gr_files('forward', $path, $grfile);
 		if (defined $wigfile) {
@@ -329,7 +309,7 @@ else {
 			print " generated wig file '$wigfile'\n";
 		}
 	}
-	elsif ($grfile =~ /_\-_/) {
+	elsif ($infile =~ /_\-_/) {
 		# forward strand
 		my $wigfile = process_gr_files('reverse', $path, $grfile);
 		if (defined $wigfile) {
@@ -353,19 +333,42 @@ else {
 
 
 ### Convert to bigWig as requested
-if ($bigwig) {
+if ($bigwig and exists &wig_to_bigwig_conversion) {
 	
+	
+	# open database connection if necessary
+	my $db;
+	if ($database) {
+		$db = open_db_connection($database);
+	}
+	
+	# find wigToBigWig utility
+	unless ($bw_app_path) {
+		# check for an entry in the configuration file
+		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
+			undef;
+	}
+	unless ($bw_app_path) {
+		# next check the system path
+		$bw_app_path = `which wigToBigWig` || undef;
+	}
+			
+	# determine reference sequence type
+	my $ref_seq_type = 
+		$TIM_CONFIG->param("$database\.reference_sequence_type") ||
+		$TIM_CONFIG->param('default_db.reference_sequence_type');
 	
 	# perform the conversion
 	foreach my $wigfile (@wigfiles) {
 		
 		# conversion
-		my $bw_file = wig_to_bigwig_conversion(
+		my $bw_file = wig_to_bigwig_conversion( {
 				'wig'       => $wigfile,
-				'db'        => $database,
+				'db'        => $db,
+				'seq_type'  => $ref_seq_type,
 				'chromo'    => $chromo_file,
 				'bwapppath' => $bw_app_path,
-		);
+		} );
 		
 		# check whether successful
 		# since we're using an external utility, there's no easy way to 
@@ -380,6 +383,11 @@ if ($bigwig) {
 			# we won't delete the wigfile
 		}
 	}
+}
+elsif ($bigwig and !exists &wig_to_bigwig_conversion) {
+	# conversion to bigwig is requested but not supported
+	warn " Support for converting to bigwig format is not available\n" . 
+		" Please convert manually. See documentation for more info\n";
 }
 
 
@@ -512,7 +520,7 @@ sub process_gr_files {
 		# first identify the chromosome
 		# this is encoded in the gr file as the first element of the file name
 		my $chr;
-		if ($file =~ /^( (?:chr)? [\d a-z A-Z \-]+ )/x) {
+		if ($file =~ /^( (?:chr)? [\d a-z A-Z]+ )/x) {
 			$chr = $1;
 		}
 		else {
@@ -534,18 +542,18 @@ sub process_gr_files {
 		
 		# set reusuable variables
 		my @data;
-		my $current_pos;
+		my $position;
 		
 		# collect first line, load into variables
 		my $firstline = $gr_fh->getline;
 		chomp $firstline;
-		($current_pos, $data[0]) = split /\t/, $firstline;
+		($position, $data[0]) = split /\t/, $firstline;
 		
 		# collect subsequent lines
 		while (my $line = $gr_fh->getline) {
 			chomp $line;
 			my ($pos, $score) = split /\t/, $line;
-			if ($current_pos == $pos) {
+			if ($position == $pos) {
 				# another score value for the current position
 				push @data, $score;
 			}
@@ -553,77 +561,38 @@ sub process_gr_files {
 				# we've moved to another position
 				# time to write the data
 				
-				# combine values is necessary
-				my $newscore;
-				if (scalar @data > 1) {
-				
-					# check that we have a method sub
-					die " uh oh! This bar file has multiple values at identical " . 
-						"positions!\n Please define --method. See help for more info\n" 
-						unless defined $method_sub;
-					
-					# check for log status
-					if ($log2) {
-						@data = map {2 ** $_} @data;
-						# combine score values
-						$newscore = log( &{$method_sub}(@data) ) / log(2);
-					}
-					else {
-						# combine score values
-						$newscore = &{$method_sub}(@data);
-					}
-				}
-				else {
-					# only one value
-					$newscore = $data[0];
-				}
-					
-				# shift position, since wig files are 1-based and 
-				# gr files are 0-based
-				$current_pos += 1;
-				
-				# check for negative or zero positions, which are not tolerated
-				# especially when converting to bigwig
-				next if $current_pos <= 0;
-				
-				# print
-				$wig->print( "$current_pos\t$newscore\n");
-				
-				# reset to new current position
-				$current_pos = $pos;
-				@data = ($score);
-			}
-		}
-		
-		# final write if necessary
-		if (@data) {
-			# combine values is necessary
-			my $newscore;
-			if (scalar @data > 1) {
-			
 				# check that we have a method sub
 				die " uh oh! This bar file has multiple values at identical " . 
 					"positions!\n Please define --method. See help for more info\n" 
 					unless defined $method_sub;
 				
-				# check for log status
-				if ($log2) {
-					@data = map {2 ** $_} @data;
-					# combine score values
-					$newscore = log( &{$method_sub}(@data) ) / log(2);
-				}
-				else {
-					# combine score values
-					$newscore = &{$method_sub}(@data);
-				}
+				# combine score values
+				my $newscore = &{$method_sub}(@data);
+				
+				# shift position
+				$position += 1;
+				
+				# check for negative or zero positions, which are not tolerated
+				# especially when converting to bigwig
+				next if $position <= 0;
+				
+				# print
+				$wig->print( "$position\t$newscore\n");
+				
+				# reset
+				$position = $pos;
+				@data = q();
+				push @data, $score;
 			}
-			else {
-				# only one value
-				$newscore = $data[0];
-			}
+		}
+		
+		# final write if necessary
+		if (@data) {
+			# combine score values
+			my $newscore = &{$method_sub}(@data);
 			
 			# print
-			$wig->print( "$current_pos\t$newscore\n");
+			$wig->print( "$position\t$newscore\n");
 		}
 		
 		# close the gr file
@@ -645,25 +614,23 @@ __END__
 
 =head1 NAME
 
-bam2gff_bed.pl
-
-A script to convert bam paired_reads to a gff or bed file.
+bar2wig.pl
 
 =head1 SYNOPSIS
 
-bam2gff_bed.pl [--options...] <filename>
+bar2wig.pl [--options...] <filename>
   
   Options:
-  --in <filename>
-  --bed | --gff | --bigbed | --bb
-  --pe
-  --type <text>
-  --source <text>
-  --randstr
+  --in <filename> or <directory>
   --out <filename> 
-  --bbapp </path/to/bedToBigBed>
-  --gz
-  --version
+  --barapp </path/to/Bar2Gr>
+  --method [mean | median | sum | max]
+  --(no)track
+  --bw
+  --db <database>
+  --chromof <filename>
+  --bwapp </path/to/wigToBigWig>
+  --(no)gz
   --help
 
 =head1 OPTIONS
@@ -687,7 +654,7 @@ have a .wig or .bw file extension.
 
 Specify the full path to David Nix's USeq or T2 application Bar2Gr (it 
 is included in both software packages). By default it uses the path 
-defined in the biotoolbox configuration file, biotoolbox.cfg.
+defined in the biotoolbox configuration file, tim_db_helper.cfg.
 
 =item --method [mean | median | sum | max]
 
@@ -699,13 +666,7 @@ generation sequencing data). Typically, with FDR or microarray data,
 the mean or max value should be taken, while bar files representing 
 sequence tag PointData should be summed.
 
-=item --log
-
-If multiple data values need to be combined at a single identical 
-position, indicate whether the data is in log2 space or not. This 
-affects the mathematics behind the combination method.
-
-=item --track
+=item --(no)track
 
 Wig files typically include a track line at the beginning of the file which 
 defines the appearance. However, conversion of a wig file to bigWig 
@@ -734,18 +695,16 @@ delimited by whitespace, consisting of the chromosome name and size.
 
 Specify the full path to Jim Kent's wigToBigWig conversion utility. By 
 default it uses the path defined in the biotoolbox configuration file, 
-biotoolbox.cfg. If it is not defined here or in the config file, then 
-the system path is searched for the executable. 
+tim_db_helper.cfg. If it is not defined here or in the config file, then 
+the system path is searched for the executable. Finally, failing that, 
+it will attempt to use Lincoln Stein's Bio::DB::BigFile module for 
+conversion, if available.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output wig file should be compressed with gzip.
 This option does not affect bigWig files, but will affect intermediate 
 wig files.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -783,13 +742,9 @@ by _+_ and _-_ in the bar file names) is written to two stranded output
 files, appended with either '_f' or '_r' to the basename. The wig files 
 are in variableStep format.
 
-You may find the latest version of the USeq package, which contains the 
-Bar2Gr Java application, at http://sourceforge.net/projects/useq/. Specify 
-the path to the Bar2Gr file in the USeq/Apps directory. You may record this
-information in the BioToolBox configuration file biotoolbox.cfg.
-
 Conversion from wig to bigWig requires Jim Kent's wigToBigWig utility or 
 Lincoln Stein's Bio::DB::BigFile support.
+
 
 =head1 AUTHOR
 
@@ -803,3 +758,5 @@ Lincoln Stein's Bio::DB::BigFile support.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+

@@ -11,7 +11,6 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.5.7';
 
 
 print "\n This script will convert my data GFF v.2 files to GFF3\n";
@@ -34,8 +33,7 @@ my (
 	$type,
 	$source,
 	$mito,
-	$help,
-	$print_version,
+	$help
 );
 
 
@@ -44,9 +42,8 @@ GetOptions(
 	'type=s'    => \$type, # the new gff type
 	'source=s'  => \$source, # the new source
 	'mt=s'      => \$mito, # new chr17 name
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -56,13 +53,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script my_gff2gff3.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 ### Check for required values
 unless (@ARGV) {
@@ -82,7 +72,7 @@ foreach my $infile (@ARGV) {
 		warn "\n input file must be a gff file!\n";
 		next;
 	}
-	if ($metadata_ref->{gff} == 3) {
+	if ($metadata_ref->{gff} =~ /3/) {
 		warn "\n the input file is already version 3!\n";
 		next;
 	}
@@ -114,7 +104,7 @@ foreach my $infile (@ARGV) {
 		# Write the miscellaneous headers
 		foreach ( @{ $metadata_ref->{'other'} } ) {
 			# write remaining miscellaneous header lines if present
-			print {$out_fh} $_;
+			print {$out_fh} $_ . "\n";
 		}
 		
 		# Write the column metadata headers

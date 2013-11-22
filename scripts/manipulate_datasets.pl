@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A program to manipulate a (very large) data set file and avoid ExcHell
+
 
 use strict;
 use Pod::Usage;
@@ -15,13 +16,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
-	write_summary_data
 );
-my $VERSION = '1.13';
-
-print "\n A tool for manipulating datasets in data files\n";
-
-
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -42,15 +37,14 @@ my ( # command line option variables
 	$opt_numerator, 
 	$opt_denominator, 
 	$opt_target, 
-	$opt_placement,
+	$opt_placement, 
 	$opt_exception, 
-	$opt_zero, 
 	$opt_direction, 
 	$opt_name, 
 	$opt_log, 
 	$gz, 
 	$help,
-	$print_version,
+	$doc,
 );
 
 # Command line options
@@ -63,15 +57,13 @@ GetOptions(
 	'con|den=i' => \$opt_denominator, # index number of denominator dataset
 	'target=s'  => \$opt_target, # target
 	'place=s'   => \$opt_placement, # placement of transformed dataset
-	'except=s'  => \$opt_exception, # old argument exception to deal with 0 values
-	'zero!'     => \$opt_zero, # include 0 values
+	'except=s'  => \$opt_exception, # exception to deal with 0 values
 	'dir=s'     => \$opt_direction, # sort order
 	'name=s'    => \$opt_name, # new dataset name
 	'log!'      => \$opt_log, # data values are in log2 space
 	'gz!'       => \$gz, # write gzipped data file
 	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+) or die " unknown command line options!\n";
 
 # Get file name
 unless ($infile) {
@@ -88,18 +80,14 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script manipulate_datasets.pl, version $VERSION\n\n";
-	exit;
-}
-
-
 ### Check for required values
 unless ($infile) {
 	die "No file name supplied!";
 }
 
+
+### Print Greeting
+print "\n    A tool for manipulating datafiles\n";
 
 
 ### Load file
@@ -114,16 +102,7 @@ print "    Loaded '$infile' with ", $main_data_ref->{'last_row'},
 
 ### Initialize more variables
 # parse the requested index string in to an array of indices
-my @opt_indices;
-if (defined $opt_index) {
-	@opt_indices = parse_list($opt_index) or 
-		die " requested index '$opt_index' cannot be parsed!\n";
-}
-
-# set zero usage
-if ($opt_exception =~ /^y/i) {
-	$opt_zero = 1;
-}
+my @opt_indices = parse_list($opt_index);
 
 # initialize modification count
 my $modification = 0; 
@@ -167,11 +146,11 @@ if ($modification > 0) {
 	}
 	
 	# write the file
-	my $write_results = write_tim_data_file(
+	my $write_results = write_tim_data_file( {
 		'data'      => $main_data_ref,
 		'filename'  => $outfile,
 		'gz'        => $gz,
-	);
+	} );
 	
 	# report write results
 	print " $modification manipulations performed\n";
@@ -199,26 +178,17 @@ else {
 
 sub print_menu {
 	print " These are the functions available:\n" .
-		"  t  Print S(t)atistics on a dataset\n" .
+		"  a  Print St(a)tistics on a dataset\n" .
 		"  R  (R)eorder columns in a different order\n" .
 		"  D  (D)elete a dataset\n" .
 		"  n  Re(n)ame a dataset\n" .
 		"  b  Num(b)er the datapoints\n" .
-		"  C  Generate (C)oordinate string\n" .
 		"  o  S(o)rt all datasets by a specific dataset\n" .
 		"  g  (g)enomic sort by chromosome, start\n" .
 		"  N  Toss data lines with (N)ull values\n" .
 		"  P  Toss data lines with du(P)licate values\n" .
 		"  A  Toss data lines with values (A)bove threshold\n" .
 		"  B  Toss data lines with values (B)elow threshold\n" .
-		"  U  Convert n(U)ll values to a specific value\n" .
-		"  L  Convert signed values to an abso(L)ute value\n" .
-		"  I  Set a m(I)nimum value\n" .
-		"  X  Set a ma(X)imum value\n" .
-		"  a  (a)dd a specific value to a dataset\n" .
-		"  u  S(u)btract a specific value from a dataset\n" .
-		"  y  Multipl(y) a specific value with a dataset\n" .
-		"  v  Di(v)ide a dataset by a specific value\n" . 
 		"  s  Median (s)cale a dataset\n" .
 		"  p  (p)ercentile rank convert a dataset\n" .
 		"  Z  Generate (Z)-score values of a dataset\n" .
@@ -226,24 +196,24 @@ sub print_menu {
 		"  2  De-log(2) convert the dataset\n" .
 		"  f  (f)ormat decimal numbers in a dataset\n" .
 		"  c  (c)ombine datasets together\n" .
+		"  U  S(U)bsample a dataset\n" .
 		"  r  Generate a (r)atio between two datasets\n" .
 		"  d  Generate a (d)ifference between two datasets\n" .
 		"  z  Generate a normali(z)ed difference between two datasets\n" .
-		"  su (su)bsample a dataset\n" .
-		"  si Convert data to (si)gned data according to strand\n" .
-		"  st Merge (st)randed datasets into one\n" .
+		"  v  Di(v)ide \n" .
+		"  u  S(u)btract\n" . 
+		"  i  Convert data to s(i)gned data according to strand\n" .
+		"  t  Merge s(t)randed datasets into one\n" .
 		"  e  C(e)nter normalize feature datapoints \n" .
 		"  w  Generate a ne(w) column with a single identical value\n" .
-		"  Y  Write out a summar(Y) file of the data\n" .
 		"  x  E(x)port into a simple tab-delimited text file\n" .
 		"  W  Re(W)rite the file\n" .
 		"  T  Export for (T)reeview or Cluster analysis\n" .
 		"  h  (h)elp\n" .
-		"  q  (q)uit, saving changes if necessary\n" .
-		"  Q  (Q)uit without saving changes\n"
-		#  m  print this (m)enu
+		"  q  (q)uit\n" 
 	;
-	# unused letters: E F G H jJ kK L O S V Y 
+	# unused letters: C E F G H I jJ kK L M O Q S V X yY 
+	# m is not listed here but is for the menu
 	return; # return 0, nothing done
 }
 
@@ -273,7 +243,7 @@ sub automatic_execution {
 		'control'    => $opt_denominator, 
 		'target'     => $opt_target, 
 		'place'      => $opt_placement, 
-		'include zero' => $opt_zero, 
+		'exception'  => $opt_exception, 
 		'direction'  => $opt_direction, 
 		'name'       => $opt_name, 
 		'log'        => $opt_log, 
@@ -305,23 +275,18 @@ sub interactive_execution {
 	# interact with the user to perform an unlimited number of executions
 	
 	# Ask for the function
-	print " Functions are chosen by symbol. Use [m] for menu or [h] for help\n";
+	print " Functions are chosen by character. Use m for menu or h for help\n";
 	print " Enter the symbol for the function you would like to perform   ";
 	my $response = <STDIN>;
 	chomp $response;
-	while (1) {
+	while ($response) {
 		if (exists $letter_to_function{$response} ) {
 			# first check that the letter corresponds to a function
 			
 			# if the response is quit
-			if ($response eq 'Q') {
-				# quit without saving changes
-				$modification = 0; # pretend we never made changes
-				return;
-			}
-			elsif ($response eq 'q') {
-				# quit, saving changes if necessary
-				return;
+			if ($response eq 'q') {
+				$response = undef;
+				next;
 			}
 			
 			# perform the function
@@ -332,14 +297,14 @@ sub interactive_execution {
 			};
 			
 			# prepare for the next function
-			print " Which function is next? [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
+			print " Which function is next? [or (m)enu, (h)elp, (q)uit]  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
 		
 		else {
 			# unrecognized command
-			print " unrecognized command. [m]enu, [h]elp, just [Q]uit, save & [q]uit  ";
+			print " unrecognized command. Try again  ";
 			$response = <STDIN>;
 			chomp $response;
 		}
@@ -359,50 +324,61 @@ sub print_statistics_function {
 	
 	# request dataset(s)
 	my @indices = _request_indices(
-		" Enter one or more dataset index numbers to calculate statistics  "
+		" Enter the index number(s) of the dataset(s) for statistics  "
 	);
 	unless (@indices) {
 		warn " unknown index number(s).\n";
 		return;
 	}
 	
-	# determine what to do with zero values
-	my $zero = $opt_zero; 
+	my $exception = $opt_exception; # take global value if present
 	
 	# get statistics and print
 	foreach my $index (@indices) {
-		my %statdata = _get_statistics_hash($index, $zero);
+		my %statdata = _get_statistics_hash($index, $exception);
 		unless (%statdata) { 
 			warn " unable to get statistics for dataset index $index!\n"; 
 			return;
 		}
+# 		
+# 		# check log2 status
+# 		if ($main_data_ref->{$index}{'log2'} == 1) {
+# 			# values are in log2 space
+# 			# they would've been de-logged when the stats were calculated
+# 			# need to put back in log2 state
+# 			$statdata{mean}      = log( $statdata{'mean'} ) / log(2);
+# 			$statdata{'median'}  = log( $statdata{'median'} ) / log(2);
+# 			$statdata{'stddevp'} = log( $statdata{'stddevp'} ) / log(2);
+# 			$statdata{'min'}     = log( $statdata{'min'} ) / log(2);
+# 			$statdata{'max'}     = log( $statdata{'max'} ) / log(2);
+# 			$statdata{'mode'}    = log( $statdata{'mode'} ) / log(2);
+# 			$statdata{'sum'}     = log( $statdata{'sum'} ) / log(2);
+# 		}
 
 		# print the metadata and the calculated statistics
-		printf "  Statistics for dataset '%s'\n", $main_data_ref->{$index}{'name'};
-		print "   index => $index\n";
+		print "  Statistics for dataset index '$index'\n";
+		print "    Dataset name is '", $main_data_ref->{$index}{'name'}, "'\n";
 		foreach my $key (keys %{ $main_data_ref->{$index} } ) {
 			# print the metadata
-			if ($key eq 'name') {
-				next; # skip the name, it's been done
+			if ($key eq 'index') {
+				next; # skip the index
 			}
-			elsif ($key eq 'index') {
-				next; # skip the index, it's been done
-			}
-			elsif ($key eq 'AUTO') {
+			elsif ($key eq 'name') {
 				next; # skip the name, it's been done
 			}
 			else {
-				printf "   $key => '%s'\n", $main_data_ref->{$index}{$key};
+				print "    '$key' is '", $main_data_ref->{$index}{$key}, "'\n";
 			}
 		}
-		print "   count    = $statdata{count}\n" ;
-		print "   mean     = $statdata{mean}\n", ;
-		print "   median   = $statdata{median}\n", ;
-		print "   std dev  = $statdata{stddevp}\n", ;
-		print "   min      = $statdata{min}\n", ;
-		print "   max      = $statdata{max}\n";
-		print "   mode     = $statdata{mode}\n";
-		print "   sum      = $statdata{sum}\n";
+		print "     Count is $statdata{'count'}\n";
+		print "     Mean is " . sprintf("%.3f", $statdata{'mean'}) . "\n";
+		print "     Median is " . sprintf("%.3f", $statdata{'median'}) . "\n";
+		print "     Standard deviation is " . 
+			sprintf("%.3f", $statdata{'stddevp'}) . "\n";
+		print "     Min is " . sprintf("%.3f", $statdata{'min'}) . "\n";
+		print "     Max is " . sprintf("%.3f", $statdata{'max'}) . "\n";
+		print "     Mode is " . sprintf("%.3f", $statdata{'mode'}) . "\n";
+		print "     Sum is " . sprintf("%.3f", $statdata{'sum'}) . "\n";
 	}
 	
 	# we're returning 0 because the data file has not been modified
@@ -500,7 +476,7 @@ sub delete_function {
 	else {
 		# otherwise request list from user
 		@deletion_list = _request_indices(
-		" Enter one or more dataset index numbers to be deleted.\n  "
+		" Enter the index number(s) for each dataset to be deleted.\n  "
 		);
 	}
 	unless (@deletion_list) {
@@ -552,37 +528,27 @@ sub delete_function {
 sub rename_function {
 	# this subroutine will re-name a dataset name
 	
-	# determine or request dataset index and newname
-	my ($index, $newname);
-	if (scalar @_ == 2) {
-		# passed from internal subroutine
-		$index   = $_[0];
-		$newname = $_[1];
+	# determine or request dataset index
+	my $index = _request_index(
+		" Enter the index number of the dataset to rename  "
+	);
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
+		return;
+	}
+		
+	# ask for new name
+	my $newname;
+	if ($function and $opt_name) {
+		# new name is specified from the command line during automatic execution
+		# use this global value
+		$newname = $opt_name;
 	}
 	else {
-		# request from user
-		
-		# index
-		$index = _request_index(
-			" Enter the index number of the dataset to rename  "
-		);
-		if ($index == -1) {
-			warn " unknown index number. nothing done\n";
-			return;
-		}
-		
-		# name
-		if ($function and $opt_name) {
-			# new name is specified from the command line during automatic execution
-			# use this global value
-			$newname = $opt_name;
-		}
-		else {
-			# request a new name from the user
-			print " Enter a new name...  ";
-			$newname = <STDIN>;
-			chomp $newname;
-		}
+		# request a new name from the user
+		print " Enter a new name...  ";
+		$newname = <STDIN>;
+		chomp $newname;
 	}
 	
 	# assign new name
@@ -594,79 +560,35 @@ sub rename_function {
 }
 
 
-sub coordinate_function {
-	# this subroutine will generate a coordinate string from coordinate values
-	
-	# identify the coordinates
-	my $chr_i   = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
-	my $start_i = find_column_index($main_data_ref, '^start|position');
-	my $stop_i  = find_column_index($main_data_ref, '^stop|end');
-	unless (defined $chr_i and defined $start_i) {
-		# cannot add coordinate column, do without ?
-		warn " cannot generate coordinates, no chromosome or start column found\n";
-		return;
-	}
-	
-	# the new index position is equivalent to the number of columns
-	my $new_position = $main_data_ref->{'number_columns'};
-	
-	# generate coordinates
-	if (defined $stop_i) {
-		# merge chromosome:start-stop
-		for my $row (1 .. $main_data_ref->{'last_row'}) {
-			$data_table_ref->[$row][$new_position] = join("", 
-				$data_table_ref->[$row][$chr_i], ':', 
-				$data_table_ref->[$row][$start_i], '-',
-				$data_table_ref->[$row][$stop_i]
-			);
-		}
-	}
-	else {
-		# merge chromosome:start
-		for my $row (1 .. $main_data_ref->{'last_row'}) {
-			$data_table_ref->[$row][$new_position] = join("", 
-				$data_table_ref->[$row][$chr_i], ':', 
-				$data_table_ref->[$row][$start_i]
-			);
-		}
-	}
-	
-	# generate new metadata
-	$main_data_ref->{$new_position} = {
-		'name'   => 'Coordinate',
-		'index'  => $new_position,
-	};
-	$main_data_ref->{'number_columns'}++;
-	$data_table_ref->[0][$new_position] = 'Coordinate';
-		
-	print " Coordinate string generated as new column $new_position\n";
-	return 1;
-}
-
-
 sub median_scale_function {
 	# this subroutine will median scale a dataset
 	
 	
-	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to median scale  "
-		);
-	}
-	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
+	# Determine which dataset to scale
+	my $index = _request_index(
+		" Enter the index number of the dataset to median scale  "
+	);
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
 		return;
 	}
 	
-	# Where to put new values?
-	my $placement = _request_placement();
+	# Check log2 status
+	if ($main_data_ref->{$index}{'log2'} == 1) {
+		# values are in log2 space
+		warn " dataset appears to be in log2 space! Recommend to de-log first;"
+			. " nothing done.\n";
+		return;
+	}
+	
+	# Retrieve values and calculate median
+	my %statdata = _get_statistics_hash($index, 'n');
+	unless (%statdata) { 
+		warn " unable to get statistics!\n"; 
+		return;
+	}
+	print " The median value for dataset " . 
+		$main_data_ref->{$index}{'name'} . " is $statdata{'median'}\n";
 	
 	# Obtain the target median value
 	my $target;
@@ -681,110 +603,79 @@ sub median_scale_function {
 		chomp $target;
 	}
 	
-	# Work through the requested datasets
-	my @datasets_modified; # a list of which datasets were modified
-	INDEX_LOOP: foreach my $index (@indices) {
-		
-		# Check the log2 metadata status
-		if (exists $main_data_ref->{$index}{'log2'} ) {
-			if ( $main_data_ref->{$index}{'log2'} == 1 ) {
-				warn " dataset $main_data_ref->{$index}{'name'} metadata " .
-					"reports it is currently in log2 scale.\n" . 
-					" You should de-log prior median scaling. Continue with " . 
-					"median scaling? y/n\n";
-				my $response = <STDIN>;
-				next INDEX_LOOP if $response =~ /n/i;
-			}
-		}
+	# Calculate correction value
+	my $correction_value = $target / $statdata{median};
 	
-		# Retrieve values and calculate median
-		my %statdata = _get_statistics_hash($index, 'n');
-		unless (%statdata) { 
-			warn " unable to get statistics for dataset " . 
-				$main_data_ref->{$index}{'name'} . ", index $index!\n"; 
-			next INDEX_LOOP;
-		}
-		print " The median value for dataset " . 
-			$main_data_ref->{$index}{'name'} . " is $statdata{'median'}\n";
+	# Where to put new values?
+	my $placement = _request_placement();
 	
-		# Calculate correction value
-		my $correction_value = $target / $statdata{median};
-	
-		# Calculate all of the new values and place accordingly
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the current value
+	# Calculate all of the new values and place accordingly
+	if ($placement eq 'r' or $placement eq 'R') {
+		# Replace the current value
 		
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				if ( $data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					next;
-				}
-				else {
-					$data_table_ref->[$i][$index] = 
-						$correction_value * $data_table_ref->[$i][$index];
-				}
-			}
-		
-			# annotate metadata
-			$main_data_ref->{$index}{'median_scaled'} = $target;
-		
-			# results
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-	
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Place as a new dataset
-		
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-		
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				if ( $data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					$data_table_ref->[$i][$new_position] = '.';
-				}
-				else {
-					$data_table_ref->[$i][$new_position] = 
-						$correction_value * $data_table_ref->[$i][$index];
-				}
-			}
-		
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			if ( $data_table_ref->[$i][$index] eq '.') {
+				# null value, nothing to do
+				next;
 			}
 			else {
-				$new_name = $main_data_ref->{$index}{'name'} . '_scaled';
+				$data_table_ref->[$i][$index] = 
+					$correction_value * $data_table_ref->[$i][$index];
 			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'median_scaled',
-				$target,
-				$new_name,
-			);
-		
-			# results
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-	
-		else {
-			warn " median scaling NOT done; unknown placement request\n";
-			return;
 		}
+		
+		# annotate metadata
+		$main_data_ref->{$index}{'median_scaled'} = $target;
+		
+		# print conclusion
+		print " replaced values with median scaled values\n";
+	} 
+	
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Place as a new dataset
+		
+		# the new index position is equivalent to the number of columns
+		my $new_position = $main_data_ref->{'number_columns'};
+		
+		# calculate new values
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			if ( $data_table_ref->[$i][$index] eq '.') {
+				# null value, nothing to do
+				$data_table_ref->[$i][$new_position] = '.';
+			}
+			else {
+				$data_table_ref->[$i][$new_position] = 
+					$correction_value * $data_table_ref->[$i][$index];
+			}
+		}
+		
+		# copy the medadata hash and annotate
+		my $new_name;
+		if ($function and $opt_name) {
+			# automatic execution and new name was specifically given 
+			$new_name = $opt_name;
+		}
+		else {
+			$new_name = $main_data_ref->{$index}{'name'} . '_scaled';
+		}
+		_generate_new_metadata(
+			$index,
+			$new_position,
+			'median_scaled',
+			$target,
+			$new_name,
+		);
+		
+		# print conclusion
+		print " generated new dataset with median scaled values\n";
+	} 
+	
+	else {
+		warn " median scaling NOT done; unknown placement request\n";
+		return;
 	}
-	# report results
-	if (@datasets_modified) {
-		my $string = $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= " median scaled to $target";
-		$string .= $placement =~ /n/i ? " and written as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
+	
+	return 1;
 }
 
 
@@ -792,17 +683,9 @@ sub percentile_rank_function {
 	# this subroutine will convert a dataset into a percentile rank
 
 	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert to percentile rank  "
-		);
-	}
+	my @indices = &_request_indices(
+		" Enter the index number(s) of the dataset(s) to convert to percentile rank  "
+	);
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -812,8 +695,8 @@ sub percentile_rank_function {
 	my $placement = _request_placement();	
 	
 	# Process each index request
-	my @datasets_modified; # a list of which datasets were modified
-	INDEX_LOOP: foreach my $index (@indices) {
+	my $dataset_modification_count = 0; # a count of how many processed
+	foreach my $index (@indices) {
 		
 		# Retrieve values from the specified dataset
 		my %values; # these will be put in a hash
@@ -821,9 +704,9 @@ sub percentile_rank_function {
 			my $value = $data_table_ref->[$i][$index];
 			if ($value eq '.' or $value eq '') {
 				warn 
-					" There are null values in dataset index $index! " .
-					"Please toss them before proceeding.\n skipping\n";
-				next INDEX_LOOP;
+					" There are non-values in this dataset! " .
+					"Please toss them before proceeding.\n Nothing done\n";
+				return;
 			} else {
 				$values{$i} = $value;
 			}
@@ -851,8 +734,8 @@ sub percentile_rank_function {
 			# update metadata
 			$main_data_ref->{$index}{'converted'} = 'percent_rank';
 			
-			# done
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
+			# print conclusion
+			print " dataset $main_data_ref->{$index}{'name'} converted to percent rank\n";
 		} 
 		
 		elsif ($placement eq 'n' or $placement eq 'N') {
@@ -883,124 +766,70 @@ sub percentile_rank_function {
 				$new_name,
 			);
 			
-			# done
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
+			# print conclusion
+			print " percent rank of $main_data_ref->{$index}{'name'} added as new dataset\n";
 		} 
 		
 		else {
 			warn " percent rank conversion NOT done; unknown placement request\n";
 			return;
 		}
+		
+		$dataset_modification_count++;
 	}	
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= " converted to percent rank";
-		$string .= $placement =~ /n/i ? " and written as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
+	return $dataset_modification_count;
 }
 
 
 sub zscore_function {
 	# this subroutine will generate a z-score for each value in a dataset
 
-	# identify the datasets to convert
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert to z-scores  "
-		);
-	}
+	# request datasets
+	my @indices = &_request_indices(
+		" Enter the index number(s) of the dataset(s) to generate z-scores  "
+	);
 	unless (@indices) {
-		warn " Unknown datasets. Nothing done.\n";
+		warn " unknown index number(s). nothing done\n";
 		return;
 	}
 	
-	# Where to put new values?
-	my $placement = _request_placement();	
-	
 	# Process each index request
-	my @datasets_modified; # a list of which datasets were modified
+	my $dataset_modification_count = 0; # a count of how many processed
 	foreach my $index (@indices) {
 		
 		# generate statistics on the dataset
 		my %statdata = _get_statistics_hash($index, 'y');
 		unless (%statdata) {
-			warn " unable to generate statistics for index $index! skipping\n";
-			next;
-		}
-		
-		# Put new values back in
-		if ($placement eq 'r' or $placement eq 'R') {
-			
-			# Replace the current values
-			for my $row (1 .. $main_data_ref->{'last_row'}) {
-				next if $data_table_ref->[$row][$index] eq '.';
-				$data_table_ref->[$row][$index] = 
-					( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
-					$statdata{'stddevp'};
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'converted'} = 'Z-score';
-			
-			# done
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		}
-		
-		# Generate a new dataset
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			
-			# generate the z scores into a new dataset
-			my $new_position = $main_data_ref->{'number_columns'};
-			for my $row (1 .. $main_data_ref->{'last_row'}) {
-				if ($data_table_ref->[$row][$index] eq '.') {
-					$data_table_ref->[$row][$new_position] = '.';
-					next;
-				}
-				$data_table_ref->[$row][$new_position] = 
-					( $data_table_ref->[$row][$index] - $statdata{'mean'} ) / 
-					$statdata{'stddevp'};
-			}
-		
-			# copy the medadata hash and annotate
-			my $new_name = $main_data_ref->{$index}{'name'} . '_Zscore';
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'converted',
-				'Z-score',
-				$new_name,
-			);
-			
-			# done
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		}
-		
-		else {
-			warn " Z-score conversion NOT done; unknown placement request\n";
+			warn " unable to generate statistics! nothing done\n";
 			return;
 		}
+		
+		# generate the z scores into a new dataset
+		my $new_position = $main_data_ref->{'number_columns'};
+		for my $row (1 .. $main_data_ref->{'last_row'}) {
+			$data_table_ref->[$row][$new_position] = 
+				( 
+					abs( $statdata{'mean'} - $data_table_ref->[$row][$index] )
+				) / $statdata{'stddevp'};
+		}
+	
+		# copy the medadata hash and annotate
+		my $new_name = $main_data_ref->{$index}{'name'} . '_zscore';
+		_generate_new_metadata(
+			$index,
+			$new_position,
+			'generated',
+			'z-score',
+			$new_name,
+		);
+		
+		# print conclusion
+		$dataset_modification_count++;
+		print " z-scores of $main_data_ref->{$index}{'name'} added as new dataset\n";
 	}
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= " converted to Z-scores";
-		$string .= $placement =~ /n/i ? " and written as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
+	return $dataset_modification_count;
 }
 
 
@@ -1010,8 +839,8 @@ sub sort_function {
 	# This will sort the entire data table by the values in one dataset
 	
 	# Request dataset
-	my $index = _request_index(
-		" Enter the index number of a numeric dataset to sort by  ");
+	my $line = " Enter the index number of a numeric dataset to sort by  ";
+	my $index = _request_index($line);
 	if ($index == -1) {
 		warn " unknown index number. nothing done\n";
 		return;
@@ -1240,10 +1069,10 @@ sub genomic_sort_function {
 	
 	# attempt to automatically identify the chromo and start indices
 	my $chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq');
-	my $start_i = find_column_index($main_data_ref, '^start|position');
+	my $start_i = find_column_index($main_data_ref, 'start');
 	
 	# if unable to auto-identify columns, request from user
-	unless (defined $chromo_i and defined $start_i) {
+	unless (defined $chromo_i or defined $start_i) {
 		my $line = " Please enter the index numbers for chromosome and start," .
 			"\n separated by a comma   ";
 		($chromo_i, $start_i) = _request_indices($line);
@@ -1278,9 +1107,8 @@ sub genomic_sort_function {
 		}
 		
 		# put the dataline into the appropriate temporary hash
-		if ($data_table_ref->[$row][$chromo_i] =~ /^(?:chr)?(\d+)$/) {
+		if ($data_table_ref->[$row][$chromo_i] =~ /(\d+)/) {
 			# dealing with a numeric chromosome name
-			# restricting to either chr2 or just 2 but not 2-micron
 			my $chromovalue = $1;
 			while (exists $num_datahash{$chromovalue}{$startvalue}) { 
 				# if another item already exists at this location
@@ -1349,15 +1177,15 @@ sub toss_nulls_function {
 	# Toss out datapoints (lines) that have a non-value in the specified dataset
 	
 	# generate the list of datasets to check
-	my @order = _request_indices(
-		" Enter one or more dataset index numbers to check for non-values\n   "); 
+	my $line = " Enter the index number(s) of the dataset(s) to check for non-values\n   ";
+	my @order = _request_indices($line); 
 	unless (@order) {
 		warn " No valid datasets! Nothing done!\n";
 		return;
 	}
 	
 	# Collection exception rule from commandline
-	my $zero = $opt_zero;
+	my $exception = $opt_exception;
 	
 	# Begin checking and tossing
 	# We will walk through each row in the data table checking for non-values.
@@ -1386,18 +1214,17 @@ sub toss_nulls_function {
 			} 
 			elsif ($data_table_ref->[$row][$index] == 0) {
 				# we have a 0 value, what to do?
-				unless (defined $zero) {
+				unless (defined $exception) {
 					# ask the user if we haven't already
 					print " Also toss values of 0? y or n  ";
-					my $answer = <STDIN>;
-					if ($answer =~ /^y/i) {
-						$zero = 1;
-					}
-					else {
-						$zero = 0;
+					$exception = <STDIN>;
+					chomp $exception;
+					unless ($exception =~ /^[yn]$/i) {
+						warn " unknown exception response\n";
+						return;
 					}
 				}
-				if ($zero) { 
+				if ($exception eq 'y' or $exception eq 'Y') { 
 					# Yes, toss the 0 values
 					$check++;
 				}
@@ -1455,8 +1282,8 @@ sub toss_duplicates_function {
 	# Toss out datapoints (lines) that have a duplicate values
 	
 	# generate the list of datasets to check
-	my @order = _request_indices(
-		" Enter one or more dataset index numbers to check for duplicates\n   "); 
+	my $line = " Enter the index number(s) of the dataset(s) to check for duplicates\n   ";
+	my @order = _request_indices($line); 
 	unless (@order) {
 		warn " No valid datasets! Nothing done!\n";
 		return;
@@ -1531,8 +1358,8 @@ sub toss_threshold_function {
 	my $direction = shift;
 	
 	# generate the list of datasets to check
-	my @order = _request_indices(
-		" Enter one or more dataset index numbers to toss values $direction a value\n   "); 
+	my $line = " Enter the index number(s) of the dataset(s) to check values\n   ";
+	my @order = _request_indices($line); 
 	unless (@order) {
 		warn " No valid datasets! Nothing done!\n";
 		return;
@@ -1649,596 +1476,6 @@ sub toss_threshold_function {
 
 
 
-sub convert_nulls_function {
-	# Convert null values to something else
-	
-	# identify the datasets to check
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert null values  "
-		);
-	}
-	unless (@indices) {
-		warn " no valid indices. Nothing done.\n";
-		return;
-	}
-	
-	# request value
-	my $value;
-	if (defined $opt_target) {
-		# command line option
-		$value = $opt_target;
-	}
-	else {
-		# interactively ask the user
-		print " Enter the new value to convert nulls to  ";
-		$value = <STDIN>;
-		chomp $value;
-	}
-	
-	# check zero status
-	my $zero;
-	if (defined $opt_zero) {
-		# command line option
-		$zero = $opt_zero;
-	}
-	
-	
-	# request placement
-	my $placement = _request_placement();
-	
-	
-	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of resets done
-	foreach my $index (@indices) {
-		
-		# number of resets we do for this index
-		my $count  = 0; 
-		
-		# reset minimum values
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, need to change
-					# change it in situ
-					$data_table_ref->[$i][$index] = $value;
-					$count++;
-				}
-				elsif ($data_table_ref->[$i][$index] == 0) {
-					# zero value, what to do?
-					unless (defined $zero) {
-						# wasn't defined on the command line, so stop the program and ask the user
-						print " Include 0 values to convert? y or n  ";
-						my $answer = <STDIN>;
-						if ($answer =~ /^y/i) {
-							$zero = 1;
-						}
-						else {
-							$zero = 0;
-						}
-				
-						# remember for next time, chances are user may still want this
-						# value again in the future
-						$opt_zero = $zero;
-					}
-					
-					if ($zero) {
-						# change it in situ
-						$data_table_ref->[$i][$index] = $value;
-						$count++;
-					}
-				}
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'null_value'} = $value;
-			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for null values
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, need to change
-					$data_table_ref->[$i][$new_position] = $value;
-					$count++;
-				} 
-				elsif ($data_table_ref->[$i][$index] == 0) {
-					# zero value, what to do?
-					unless (defined $zero) {
-						# wasn't defined on the command line, so stop the program and ask the user
-						print " Include 0 values to convert? y or n  ";
-						my $answer = <STDIN>;
-						if ($answer =~ /^y/i) {
-							$zero = 1;
-						}
-						else {
-							$zero = 0;
-						}
-				
-						# remember for next time, chances are user may still want this
-						# value again in the future
-						$opt_zero = $zero;
-					}
-					
-					if ($zero) {
-						# change it in situ
-						$data_table_ref->[$i][$new_position] = $value;
-						$count++;
-					}
-				}
-				else {
-					# acceptable
-					$data_table_ref->[$i][$new_position] = 
-						$data_table_ref->[$i][$index];
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_convert_nulls";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'null_value',
-				$value,
-				$new_name,
-			);
-			
-			# results
-			$total_count += $count;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-		
-		else {
-			warn " null values NOT changed; unknown placement request\n";
-			return;
-		}
-	}
-	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count null values were converted for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
-}
-
-
-
-sub convert_absolute_function {
-	# Convert signed values to their absolute value
-	
-	# identify the datasets to check
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to make absolute  "
-		);
-	}
-	unless (@indices) {
-		warn " no valid indices. Nothing done.\n";
-		return;
-	}
-	
-	# request placement
-	my $placement = _request_placement();
-	
-	
-	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	my $total_failed = 0;
-	foreach my $index (@indices) {
-		
-		# number of resets we do
-		my $count  = 0; 
-		my $failed = 0;
-		
-		# reset minimum values
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, cannot change
-					next;
-				}
-				else {
-					# change it in situ
-					my $new_value;
-					eval { $new_value = abs( $data_table_ref->[$i][$index] ) };
-					if (defined $new_value) {
-						$data_table_ref->[$i][$index] = $new_value;
-						$count++;
-					}
-					else {
-						$failed++;
-					}
-				} 
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'convert'} = 'absolute';
-			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-			$total_failed += $failed;
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for null values
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, cannot change
-					$data_table_ref->[$i][$new_position] = '.';
-				} 
-				else {
-					# acceptable
-					my $new_value;
-					eval { $new_value = abs( $data_table_ref->[$i][$index] ) };
-					if (defined $new_value) {
-						$data_table_ref->[$i][$new_position] = $new_value;
-						$count++;
-					}
-					else {
-						$data_table_ref->[$i][$new_position] = 
-							$data_table_ref->[$i][$index];
-						$failed++;
-					}
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_absolute";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'convert',
-				'absolute',
-				$new_name,
-			);
-			
-			# results
-			$total_count += $count;
-			$total_failed += $failed;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-		
-		else {
-			warn " values NOT changed; unknown placement request\n";
-			return;
-		}
-	}
-	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values were converted to absolute values for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	if ($total_failed) {
-		print " $total_failed values could not be converted\n";
-	}
-	return scalar(@datasets_modified);
-}
-
-
-
-
-sub minimum_function {
-	# Set a minimum value 
-	
-	# request datasets
-	my @indices = _request_indices(
-		" Enter one or more dataset index numbers to reset minimum values  ");
-	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
-	}
-	
-	# request value
-	my $value;
-	if (defined $opt_target) {
-		# command line option
-		$value = $opt_target;
-	}
-	else {
-		# interactively ask the user
-		print " Enter the minimum value to accept  ";
-		$value = <STDIN>;
-		chomp $value;
-	}
-	
-	# request placement
-	my $placement = _request_placement();
-	
-	
-	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	foreach my $index (@indices) {
-		
-		# number of resets we do
-		my $count  = 0; 
-		
-		# reset minimum values
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					next;
-				} 
-				elsif ($data_table_ref->[$i][$index] < $value) {
-					# current value below minimum value
-					# change it in situ
-					$data_table_ref->[$i][$index] = $value;
-					$count++;
-				}
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'minimum_value'} = $value;
-			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					$data_table_ref->[$i][$new_position] = '.';
-				} 
-				elsif ($data_table_ref->[$i][$index] < $value) {
-					# current value below minimum value
-					$data_table_ref->[$i][$new_position] = $value;
-					$count++;
-				} 
-				else {
-					# acceptable
-					$data_table_ref->[$i][$new_position] = 
-						$data_table_ref->[$i][$index];
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_minimum_reset";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'minimum_value',
-				$value,
-				$new_name,
-			);
-			
-			# results
-			$total_count += $count;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-		
-		else {
-			warn " minimum value NOT reset; unknown placement request\n";
-			return;
-		}
-	}
-	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values were reset to a minimum value for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
-}
-
-
-
-
-sub maximum_function {
-	# Set a maximum value
-	
-	# request datasets
-	my @indices = _request_indices(
-		" Enter one or more dataset index numbers to reset maximum values  ");
-	unless (@indices) {
-		warn " no valid indices. nothing done\n";
-		return;
-	}
-	
-	# request value
-	my $value;
-	if (defined $opt_target) {
-		# command line option
-		$value = $opt_target;
-	}
-	else {
-		# interactively ask the user
-		print " Enter the maximum value to accept  ";
-		$value = <STDIN>;
-		chomp $value;
-	}
-	
-	# request placement
-	my $placement = _request_placement();
-	
-	
-	## Process the datasets and subtract their values
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	foreach my $index (@indices) {
-		
-		# number of resets we do
-		my $count  = 0; 
-		
-		# reset maximum values
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					next;
-				} 
-				elsif ($data_table_ref->[$i][$index] > $value) {
-					# current value below maximum value
-					# change it in situ
-					$data_table_ref->[$i][$index] = $value;
-					$count++;
-				}
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{'maximum_value'} = $value;
-			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# null value, nothing to do
-					$data_table_ref->[$i][$new_position] = '.';
-				} 
-				elsif ($data_table_ref->[$i][$index] > $value) {
-					# current value below maximum value
-					$data_table_ref->[$i][$new_position] = $value;
-					$count++;
-				} 
-				else {
-					# acceptable
-					$data_table_ref->[$i][$new_position] = 
-						$data_table_ref->[$i][$index];
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_maximum_reset";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'maximum_value',
-				$value,
-				$new_name,
-			);
-			
-			# results
-			$total_count += $count;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-		
-		else {
-			warn " maximum value NOT reset; unknown placement request\n";
-			return;
-		}
-	}
-	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values were reset to a maximum value for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
-}
-
 
 
 
@@ -2246,17 +1483,9 @@ sub log2_function {
 	# this subroutine will convert dataset values to log2 space
 	
 	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert to log2  "
-		);
-	}
+	my @indices = _request_indices(
+		" Enter the index number(s) of the dataset(s) to convert to log2  "
+	);
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -2266,24 +1495,22 @@ sub log2_function {
 	my $placement = _request_placement();
 	
 	# process each index request
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	my $total_failed = 0;
-	LOG2_LOOP: foreach my $index (@indices) {
+	my $dataset_modification_count = 0; # a count of how many processed
+	
+	LOG2_LOOP:
+	foreach my $index (@indices) {
 		
 		# check the log2 metadata status
 		if (exists $main_data_ref->{$index}{'log2'} ) {
 			if ( $main_data_ref->{$index}{'log2'} == 1 ) {
-				warn " dataset $main_data_ref->{$index}{'name'} metadata " .
-					"reports it is currently in log2 scale. Continue? y/n\n";
-				my $response = <STDIN>;
-				next LOG2_LOOP if $response =~ /n/i;
+				warn " dataset $main_data_ref->{$index}{'name'} allready " .
+					"appears to be in log2 space!\n";
+				next LOG2_LOOP;
 			}
 		}
 		
 		# Placement dictates method
-		my $count = 0; # conversion count
-		my $failed = 0;
+		my $count = 0; # exception count
 		if ($placement eq 'r' or $placement eq 'R') { 
 			# Replace the current dataset
 			
@@ -2296,29 +1523,24 @@ sub log2_function {
 					# cannot take log of 0
 					$data_table_ref->[$i][$index] = '.'; 
 					# change to null value
-					$failed++;
+					$count++;
 				} 
 				elsif ($data_table_ref->[$i][$index] eq '.') {
 					# a null value, do nothing
-					$failed++;
+					$count++;
 				} 
 				else {
 					# a numeric value, calculate the log2 value
 					$data_table_ref->[$i][$index] = 
 						log($data_table_ref->[$i][$index]) / log(2);
-					$count++;
 				}
 			}
 			
 			# update metadata
 			$main_data_ref->{$index}{'log2'} = 1;
 			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-			$total_failed += $failed;
+			# print conclusion
+			print " $main_data_ref->{$index}{'name'} values replaced with log2 values\n";
 		}
 		
 		elsif ($placement eq 'n' or $placement eq 'N') {
@@ -2336,18 +1558,17 @@ sub log2_function {
 					# cannot take log of 0
 					$data_table_ref->[$i][$new_index] = '.'; 
 					# change to null value
-					$failed++;
+					$count++;
 				} 
 				elsif ($data_table_ref->[$i][$index] eq '.') {
 					# a null value
 					$data_table_ref->[$i][$new_index] = '.';
-					$failed++;
+					$count++;
 				} 
 				else {
 					# a numeric value, calculate the log2 value
 					$data_table_ref->[$i][$new_index] = 
 						log($data_table_ref->[$i][$index]) / log(2);
-					$count++;
 				}
 			}
 			
@@ -2361,10 +1582,9 @@ sub log2_function {
 				$new_name,
 			);
 			
-			# results
-			$total_count += $count;
-			$total_failed += $failed;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
+			# print conclusion
+			print " $main_data_ref->{$index}{'name'} values converted to log2"
+				. "values as a new dataset\n";
 		}
 		
 		else {
@@ -2372,20 +1592,16 @@ sub log2_function {
 			warn " log2 conversion NOT done; unknown placement request\n";
 			return; # can't proceed with any index
 		}
+		
+		# print number of failures
+		if ($count > 0) { 
+			print " $count datapoints could not be converted to log scale\n";
+		}
+		
+		$dataset_modification_count++;
 	}
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values were converted to log2 scale for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	if ($total_failed) {
-		print " $total_failed values could not be converted\n";
-	}
-	return scalar(@datasets_modified);
+	return $dataset_modification_count;
 }
 
 
@@ -2394,17 +1610,9 @@ sub delog2_function {
 	# this subroutine will convert a dataset from log2 to normal base10 numbers
 	
 	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert from log2  "
-		);
-	}
+	my @indices = &_request_indices(
+		" Enter the index number(s) of the dataset(s) to convert from log2  "
+	);
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -2414,24 +1622,22 @@ sub delog2_function {
 	my $placement = _request_placement();
 	
 	# process each index request
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	my $total_failed = 0;
-	LOG2_LOOP: foreach my $index (@indices) {
+	my $dataset_modification_count = 0; # a count of how many processed
+	
+	LOG2_LOOP:
+	foreach my $index (@indices) {
 		
 		# check the log2 metadata status
 		if (exists $main_data_ref->{$index}{'log2'} ) {
 			unless ( $main_data_ref->{$index}{'log2'} == 1 ) {
-				warn " dataset $main_data_ref->{$index}{'name'} metadata " .
-					"reports it is not in log2 scale. Continue? y/n\n";
-				my $response = <STDIN>;
-				next LOG2_LOOP if $response =~ /n/i;
+				warn " dataset $main_data_ref->{$index}{'name'} does not appear " .
+					"to be in log2 space!\n";
+				next LOG2_LOOP;
 			}
 		}
 		
 		# Placement dictates method
-		my $count = 0; # conversion count
-		my $failed = 0;
+		my $count = 0; # exception count
 		if ($placement eq 'r' or $placement eq 'R') { 
 			# Replace the current dataset
 			
@@ -2442,25 +1648,20 @@ sub delog2_function {
 				# check the value contents and process appropriately
 				if ($data_table_ref->[$i][$index] eq '.') {
 					# a null value, do nothing
-					$failed++;
+					$count++;
 				} 
 				else {
 					# a numeric value, de-log2 the value
 					$data_table_ref->[$i][$index] = 
 						2 ** $data_table_ref->[$i][$index];
-					$count++;
 				}
 			}
 			
 			# update metadata
 			$main_data_ref->{$index}{'log2'} = 0;
 			
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
-			$total_failed += $failed;
+			# print conclusion
+			print " $main_data_ref->{$index}{'name'} values de-logged\n";
 		}
 		
 		elsif ($placement eq 'n' or $placement eq 'N') {
@@ -2477,13 +1678,12 @@ sub delog2_function {
 				if ($data_table_ref->[$i][$index] eq '.') {
 					# a null value
 					$data_table_ref->[$i][$new_index] = '.';
-					$failed++;
+					$count++;
 				} 
 				else {
 					# a numeric value, calculate the log2 value
 					$data_table_ref->[$i][$new_index] = 
 						2 ** $data_table_ref->[$i][$index];
-					$count++;
 				}
 			}
 			
@@ -2497,10 +1697,9 @@ sub delog2_function {
 				$new_name,
 			);
 			
-			# results
-			$total_count += $count;
-			$total_failed += $failed;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
+			# print conclusion
+			print " $main_data_ref->{$index}{'name'} values converted from log2"
+				. " as a new dataset\n";
 		}
 		
 		else {
@@ -2508,20 +1707,16 @@ sub delog2_function {
 			warn " log2 de-conversion NOT done; unknown placement request\n";
 			return; # can't proceed with any index
 		}
+		
+		# print number of failures
+		if ($count > 0) { 
+			print " $count datapoints could not be de-converted from log scale\n";
+		}
+		
+		$dataset_modification_count++;
 	}
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values were converted from log2 scale for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	if ($total_failed) {
-		print " $total_failed values could not be converted\n";
-	}
-	return scalar(@datasets_modified);
+	return $dataset_modification_count;
 }
 
 
@@ -2529,20 +1724,11 @@ sub delog2_function {
 sub format_function {
 	# this subroutine will format the numbers in a dataset using sprintf
 	
-	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to format  "
-		);
-	}
-	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
+	# request dataset
+	my $line = " Enter the index number of the dataset to format  ";
+	my $index = _request_index($line);
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
 		return;
 	}
 	
@@ -2554,89 +1740,109 @@ sub format_function {
 	}
 	else {
 		# interactively ask the user
-		print " Format the numbers to how many decimal positions?  ";
+		print " Format the numbers to 0, 1, 2, or 3 decimal positions?  ";
 		$positions = <STDIN>;
 		chomp $positions;
 	}
-	unless ($positions =~ /^\d+$/) {
+	unless (
+		$positions == 0 or
+		$positions == 1 or
+		$positions == 2 or
+		$positions == 3
+	) {
 		warn " Unknown number of positions; formatting NOT done\n";
 		return;
 	}
-	my $format_string = '%.' . $positions . 'f';
 	
 	# ask for placement
 	my $placement = _request_placement();
 	
-	# format each index request
-	my @datasets_modified; # a list of which datasets were modified
-	foreach my $index (@indices) {
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
+	# perform formatting
+	if ($placement eq 'r' or $placement eq 'R') {
+		# Replace the contents of the original dataset
 		
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				if ($data_table_ref->[$i][$index] ne '.') {
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			if ($data_table_ref->[$i][$index] ne '.') {
+				if ($positions == 0) {
 					$data_table_ref->[$i][$index] = 
-						sprintf $format_string, $data_table_ref->[$i][$index];
-				}
-			}
-		
-			# update metadata
-			$main_data_ref->{$index}{'formatted'} = $positions;
-		
-			# results
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-	
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-		
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-		
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				if ($data_table_ref->[$i][$index] eq '.') {
-					# working with a null value
-					$data_table_ref->[$i][$new_position] = '.';
+						sprintf "%.0f", $data_table_ref->[$i][$index];
 				} 
+				elsif ($positions == 1) {
+					$data_table_ref->[$i][$index] = 
+						sprintf "%.1f", $data_table_ref->[$i][$index];
+				}
+				elsif ($positions == 2) {
+					$data_table_ref->[$i][$index] = 
+						sprintf "%.2f", $data_table_ref->[$i][$index];
+				}
+				elsif ($positions == 3) {
+					$data_table_ref->[$i][$index] = 
+						sprintf "%.3f", $data_table_ref->[$i][$index];
+				} 
+			}
+		}
+		
+		# update metadata
+		$main_data_ref->{$index}{'formatted'} = $positions;
+		
+		# print conclusion
+		print " $main_data_ref->{$index}{'name'} values formatted to " . 
+			"$positions decimal places\n";
+	} 
+	
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Generate a new dataset
+		
+		# the new index position is equivalent to the number of columns
+		my $new_position = $main_data_ref->{'number_columns'};
+		
+		# calculate new values
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			if ($data_table_ref->[$i][$index] eq '.') {
+				# working with a null value
+				$data_table_ref->[$i][$new_position] = '.';
+			} 
 			
-				else {
-					# working with a real value
-					# let's hope it is a number that may formatted
+			else {
+				# working with a real value
+				# let's hope it is a number that may formatted
+				if ($positions == 0) {
 					$data_table_ref->[$i][$new_position] = 
-						sprintf $format_string, $data_table_ref->[$i][$index];
+						sprintf "%.0f", $data_table_ref->[$i][$index];
+				} elsif ($positions == 1) {
+					$data_table_ref->[$i][$new_position] = 
+						sprintf "%.1f", $data_table_ref->[$i][$index];
+				} elsif ($positions == 2) {
+					$data_table_ref->[$i][$new_position] = 
+						sprintf "%.2f", $data_table_ref->[$i][$index];
+				} elsif ($positions == 3) {
+					$data_table_ref->[$i][$new_position] = 
+						sprintf "%.3f", $data_table_ref->[$i][$index];
 				}
 			}
-		
-			# copy the medadata hash and annotate
-			my $new_name = $main_data_ref->{$index}{'name'} . '_formatted';
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				'formatted',
-				$positions,
-				$new_name,
-			);
-		
-			# results
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
-		} 
-	
-		else {
-			warn " formatting not done; unknown placement request\n";
-			return;
 		}
+		
+		# copy the medadata hash and annotate
+		my $new_name = $main_data_ref->{$index}{'name'} . '_formatted';
+		_generate_new_metadata(
+			$index,
+			$new_position,
+			'formatted',
+			$positions,
+			$new_name,
+		);
+		
+		# print conclusion
+		print " $main_data_ref->{$index}{'name'} formatted to $positions " . 
+			"decimal places added as new dataset\n";
+	} 
+	
+	else {
+		warn " formatting NOT done; unknown placement request\n";
+		return;
 	}
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= " formatted to $positions decimal positions";
-		$string .= $placement =~ /n/i ? " and written as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
+	return 1;
 }
 
 
@@ -2644,17 +1850,9 @@ sub combine_function {
 	# mathematically combine two or more datasets
 	
 	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter two or more dataset index numbers to mathematically combine  "
-		);
-	}
+	my @indices = &_request_indices(
+		" Enter the index numbers of the datasets to combine  "
+	);
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
 		return;
@@ -2695,7 +1893,7 @@ sub combine_function {
 	if (exists $main_data_ref->{ $indices[0] }{'log2'}) {
 		$log = $main_data_ref->{ $indices[0] }{'log2'};
 		foreach my $index (@indices) {
-			if ($main_data_ref->{$index}{'log2'} != $log) {
+			if ($main_data_ref->{ $indices[$index] }{'log2'} != $log) {
 				warn " unmatched log status between datasets! nothing done\n";
 				return;
 			}
@@ -2746,7 +1944,7 @@ sub combine_function {
 	$main_data_ref->{$new_position}{'name'} = $new_name;
 	$data_table_ref->[0][$new_position] = $new_name;
 	$main_data_ref->{$new_position}{'index'} = $new_position;
-	$main_data_ref->{$new_position}{'combine_method'} = $method;
+	$main_data_ref->{$new_position}{'method'} = "combined_by_$method";
 	$main_data_ref->{$new_position}{'log2'} = $log if defined $log;
 	$main_data_ref->{$new_position}{'datasets'} = join(',', 
 		map { $main_data_ref->{$_}{'name'} } @indices);
@@ -2779,9 +1977,9 @@ sub ratio_function {
 		}	
 	}
 	else {
-		($numerator, $denominator) = _request_indices(
-			" Enter two dataset index numbers for the ratio as " 
-			. "'numerator, denominator'\n  ");
+		my $line = " Enter the dataset index numbers for the ratio as " 
+			. "'experiment, control'\n  ";
+		($numerator, $denominator) = _request_indices($line);
 		unless (defined $numerator and defined $denominator) {
 			warn " unknown index number(s); nothing done\n";
 			return;
@@ -2791,13 +1989,7 @@ sub ratio_function {
 	# check if log2 numbers
 	# log2 ratios performed by subtraction, regular number ratios by division
 	my $log;
-	if (defined $opt_log) {
-		# if unable to identify the log2 status in metadata
-		# use the command line option variable if set
-		$log = $opt_log;
-	}
-	
-	elsif (
+	if (
 		exists $main_data_ref->{$numerator}{'log2'} and
 		exists $main_data_ref->{$denominator}{'log2'}
 	) {
@@ -2827,6 +2019,12 @@ sub ratio_function {
 		}
 	}
 	
+	elsif (defined $opt_log) {
+		# if unable to identify the log2 status in metadata
+		# use the command line option variable if set
+		$log = $opt_log;
+	}
+	
 	else {
 		# when all else fails, ask the user
 		print " Are these dataset values in log2 space? y/n   ";
@@ -2841,6 +2039,15 @@ sub ratio_function {
 			return;
 		}
 	}
+	
+	# define exception to handle denominator of 0 cases
+	my $exception;
+	if (defined $opt_exception) {
+		# use command line specified option
+		$exception = $opt_exception;
+	}
+		# otherwise wait and define it when/if it happens
+	
 	
 	# the new index position is equivalent to the number of columns
 	my $new_position = $main_data_ref->{'number_columns'};
@@ -2939,11 +2146,11 @@ sub difference_function {
 		# request from user
 		my $line;
 		if ($normalization) {
-			$line = " Enter two dataset index numbers to generate the normalized difference\n" 
+			$line = " Enter the dataset index numbers to generate the normalized difference\n" 
 				. " as 'experiment, control'\n  ";
 		}
 		else {
-			$line = " Enter two dataset index numbers to generate the difference\n" 
+			$line = " Enter the dataset index numbers to generate the difference\n" 
 				. " as 'experiment, control'\n  ";
 		}
 		($experiment_index, $control_index) = _request_indices($line);
@@ -2954,23 +2161,78 @@ sub difference_function {
 	}
 	
 	# Check for log2 status
-# 	if (
-# 		(
-# 			exists $main_data_ref->{$experiment_index}{'log2'} and
-# 			$main_data_ref->{$experiment_index}{'log2'} == 1
-# 		)
-# 		or
-# 		(
-# 			exists $main_data_ref->{$control_index}{'log2'} and
-# 			$main_data_ref->{$control_index}{'log2'} == 1
-# 		)
-# 	) {
-# 		# one or both datasets are in the log2 space
-# 		# we cannot proceed with log2 datasets
-# 		warn " one or both datasets are in log2 space; cannot proceed\n";
-# 		return;
-# 	}
-
+	if (
+		(
+			exists $main_data_ref->{$experiment_index}{'log2'} and
+			$main_data_ref->{$experiment_index}{'log2'} == 1
+		)
+		or
+		(
+			exists $main_data_ref->{$control_index}{'log2'} and
+			$main_data_ref->{$control_index}{'log2'} == 1
+		)
+	) {
+		# one or both datasets are in the log2 space
+		# we cannot proceed with log2 datasets
+		warn " one or both datasets are in log2 space; cannot proceed\n";
+		return;
+	}
+	
+	## Perform sub sampling as necessary
+		# Since we are generating a difference between two datasets of counts
+		# we want to have equal numbers of counts, i.e. equal sums
+		# The easiest and fairest way to do this is to subsample the larger
+		# dataset so they are equal
+	# Get statistics
+	print " checking statistics....\n";
+	my %experiment_stats = _get_statistics_hash($experiment_index, 'y');
+	my %control_stats = _get_statistics_hash($control_index, 'y');
+	unless (%experiment_stats and %control_stats) {
+		warn " unable to get statistics on datasets; nothing done\n";
+		return;
+	}
+	# Check sums
+	my $subsampled; # remember which dataset was subsampled
+	my $subsampled_index; # index of the subsampled dataset
+	if ($experiment_stats{'sum'} == $control_stats{'sum'}) {
+		# the sums are equal, we can continue
+		$subsampled = -1;
+	}
+	elsif ($experiment_stats{'sum'} > $control_stats{'sum'}) {
+		# numerator dataset has higher sum, subsample it
+		my $new_numerator = _subsample_dataset(
+			$experiment_index, 
+			$experiment_stats{'sum'},
+			$control_stats{'sum'}
+		);
+		if (defined $new_numerator) {
+			$subsampled = $experiment_index; # remember which one was subsampled
+			$experiment_index = $new_numerator; # assign new position
+			$subsampled_index = $new_numerator;
+		}
+		else {
+			warn " unable to sub sample dataset '$experiment_index'; nothing done\n";
+			return;
+		}
+	}
+	elsif ($experiment_stats{'sum'} < $control_stats{'sum'}) {
+		# denominator dataset has higher sum, subsample it
+		my $new_denominator = _subsample_dataset(
+			$control_index, 
+			$control_stats{'sum'},
+			$experiment_stats{'sum'}
+		);
+		if (defined $new_denominator) {
+			$subsampled = $control_index; # remember which one was subsampled
+			$control_index = $new_denominator; # assign new position
+			$subsampled_index = $new_denominator;
+		}
+		else {
+			warn " unable to sub sample dataset '$control_index'; nothing done\n";
+			return;
+		}
+	}
+	
 	
 	# the new index position is equivalent to the number of columns
 	my $new_position = $main_data_ref->{'number_columns'};
@@ -3022,10 +2284,12 @@ sub difference_function {
 	elsif ($normalization) {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_normdiff';
+		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	else {
 		$new_name = $main_data_ref->{$experiment_index}{'name'} . '_' .
 			$main_data_ref->{$control_index}{'name'} . '_diff';
+		$new_name =~ s/_subsampled//; # strip subsampled portion of name if present
 	}
 	
 	# Determine the new method for the dataset's metadata
@@ -3057,6 +2321,18 @@ sub difference_function {
 		print " $failure_count datapoints could not generate ratios\n";
 	}
 	
+	# Delete the duplicate sub-sampled dataset
+	if ($subsampled != -1) {
+		# sub sampling was performed
+		
+		# record metadata
+		$main_data_ref->{$new_position}{'subsampled'} = 
+			$main_data_ref->{$subsampled}{'name'};
+		
+		# delete the temporary subsampled dataset
+		delete_function($subsampled_index);
+	}	
+	
 	return 1;
 }
 
@@ -3077,223 +2353,276 @@ sub normalized_difference_function {
 
 
 
-sub add_function {
-	# add a specific value to dataset values
-	return math_function('add', @_);
-}
-
-
 sub subtract_function {
-	# subtract a specific value from dataset values
-	return math_function('subtract', @_);
-}
-
-
-sub multiply_function {
-	# multiply dataset values by a specific value
-	return math_function('multiply', @_);
-}
-
-
-sub divide_function {
-	# divide dataset values by a specific value
-	return math_function('divide', @_);
-}
-
-
-sub math_function {
-	# General function to perform simple math on each datapoint value 
-	# in a dataset by a specific value
+	# Subtract a specific value from each datapoint value in a dataset
 	
-	# determine the mathematical function
-		# function is one of add, subtract, multiply, divide
-	my $math = shift;
-	my $calculate; # a reference to the appropriate function
-	if ($math eq 'add') {
-		$calculate = sub {
-			return $_[0] + $_[1];
-		};
-	}
-	elsif ($math eq 'subtract') {
-		$calculate = sub {
-			return $_[0] - $_[1];
-		};
-	}
-	elsif ($math eq 'multiply') {
-		$calculate = sub {
-			return $_[0] * $_[1];
-		};
-	}
-	elsif ($math eq 'divide') {
-		$calculate = sub {
-			return $_[0] / $_[1];
-		};
-	}
-
-	
-	# request dataset indices
-	my $line = " Enter one or more dataset index numbers to $math  ";
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices($line);
-	}
-	unless (@indices) {
-		warn " no valid indices. nothing done\n";
+	# request dataset
+	my $line = " Enter the index number of the dataset to subtract  ";
+	my $index = _request_index($line);
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
 		return;
 	}
 	
-	# request the value to perform the mathematical function 
-	my $request_value;
+	# request value
+	my $value;
 	if (defined $opt_target) {
 		# command line option
-		$request_value = $opt_target;
+		$value = $opt_target;
 	}
 	else {
 		# interactively ask the user
-		print " Enter the numeric value, 'mean', 'median', or 'sum' to $math  ";
-		$request_value = <STDIN>;
-		chomp $request_value;
+		print " Enter the numeric value, 'mean', or 'median' to subtract  ";
+		$value = <STDIN>;
+		chomp $value;
 	}
 	
+	# determine the actual value to subtract
+	my $subtractor; # the actual number to subtract
+	if ($value =~ /median/i) { 
+		# use dataset median
+		my %stathash = _get_statistics_hash($index);
+		unless (%stathash) { 
+			warn " unable to get statistics! nothing done\n";
+			return;
+		}
+		$subtractor = $stathash{'median'};
+		print " subtracting median value $subtractor\n";
+	} 
+	elsif ($value =~ /mean/i) { 
+		# use dataset mean
+		my %stathash = _get_statistics_hash($index);
+		unless (%stathash) { 
+			warn " unable to get statistics! nothing done\n";
+			return;
+		}
+		$subtractor = $stathash{'mean'};
+		print " subtracting mean value $subtractor\n";
+	} 
+	elsif ($value =~ /^-?\d+\.?\d*$/) { 
+		# a numeric value
+		$subtractor = $value;
+	} 
+	else {
+		warn " unrecognized value; nothing done\n";
+		return;
+	}
 	
 	# request placement
 	my $placement = _request_placement();
 	
 	
-	# generate past tense verb
-	my $mathed = $math;
-	$mathed =~ s/^(multipl)y$/$1ied/;
-	$mathed =~ s/^(add)$/$1ed/;
-	$mathed =~ s/^(divide)$/$1d/;
-	$mathed =~ s/^(subtract)$/$1ed/;
+	# generate subtraction product
+	my $count = 0; # failed count  
+	if ($placement eq 'r' or $placement eq 'R') {
+		# Replace the contents of the original dataset
+		
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			# check for valid numbers
+			if ($data_table_ref->[$i][$index] eq '.') {
+				$count++;
+				next;
+			} else {
+				$data_table_ref->[$i][$index] = 
+					($data_table_ref->[$i][$index] - $subtractor);
+			}
+		}
+		
+		# update metadata
+		$main_data_ref->{$index}{'subtract'} = $value;
+		
+		# print conclusion
+		print " $value was subtracted from dataset $main_data_ref->{$index}{'name'}\n";
+	} 
 	
-	## Process the datasets and subtract their values
-	my $dataset_modification_count = 0; # a count of how many processed
-	foreach my $index (@indices) {
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Generate a new dataset
 		
-		# determine the actual value to divide by
-		my $value; # the actual number to divide by
-		if ($request_value =~ /median|mean|sum/i) { 
-			
-			# collect dataset statistics
-			my %stathash = _get_statistics_hash($index);
-			unless (%stathash) { 
-				warn " unable to get statistics! nothing done\n";
-				return;
+		# the new index position is equivalent to the number of columns
+		my $new_position = $main_data_ref->{'number_columns'};
+		
+		# calculate new values
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			# check for valid numbers
+			if ($data_table_ref->[$i][$index] eq '.') {
+				$data_table_ref->[$i][$new_position] = '.';
+				$count++;
+			} else {
+				$data_table_ref->[$i][$new_position] = 
+					($data_table_ref->[$i][$index] - $subtractor);
 			}
-			
-			# assign the appropriate value
-			if ($request_value eq 'median') {
-				$value = $stathash{'median'};
-				print "  median value for " . 
-					$main_data_ref->{$index}{'name'} . " is $value\n";
-			}
-			elsif ($request_value eq 'mean') {
-				$value = $stathash{'mean'};
-				print "  mean value for " . 
-					$main_data_ref->{$index}{'name'} . " is $value\n";
-			}
-			elsif ($request_value eq 'sum') {
-				$value = $stathash{'sum'};
-				print "  sum value for " . 
-					$main_data_ref->{$index}{'name'} . " is $value\n";
-			}
-		} 
-		elsif ($request_value =~ /^\-?\d+(?:\.\d+)?(?:[eE]\-?\d+)?$/) { 
-			# a numeric value, allowing for negatives, decimals, exponents
-			$value = $request_value;
-		} 
+		}
+		
+		# copy the medadata hash and annotate
+		my $new_name;
+		if ($function and $opt_name) {
+			# automatic execution and new name was specifically given 
+			$new_name = $opt_name;
+		}
 		else {
-			warn " unrecognized value '$request_value'; nothing done\n";
-			return;
+			$new_name = $main_data_ref->{$index}{'name'} . "-$value";
 		}
+		_generate_new_metadata(
+			$index,
+			$new_position,
+			'subtract',
+			$value,
+			$new_name,
+		);
 		
-		
-		# generate subtraction product
-		my $count = 0; # failed count  
-		if ($placement eq 'r' or $placement eq 'R') {
-			# Replace the contents of the original dataset
-			
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					$count++;
-					next;
-				} else {
-					$data_table_ref->[$i][$index] = 
-						&$calculate($data_table_ref->[$i][$index], $value);
-				}
-			}
-			
-			# update metadata
-			$main_data_ref->{$index}{$math} = $value;
-			
-			# print conclusion
-			print " dataset $main_data_ref->{$index}{'name'} was $mathed "
-				. "by value '$value'\n";
-			$dataset_modification_count++;
-		} 
-		
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
-			
-			# the new index position is equivalent to the number of columns
-			my $new_position = $main_data_ref->{'number_columns'};
-			
-			# calculate new values
-			for my $i (1..$main_data_ref->{'last_row'}) {
-				# check for valid numbers
-				if ($data_table_ref->[$i][$index] eq '.') {
-					$data_table_ref->[$i][$new_position] = '.';
-					$count++;
-				} else {
-					$data_table_ref->[$i][$new_position] = 
-						&$calculate($data_table_ref->[$i][$index], $value);
-				}
-			}
-			
-			# copy the medadata hash and annotate
-			my $new_name;
-			if ($function and $opt_name) {
-				# automatic execution and new name was specifically given 
-				$new_name = $opt_name;
-			}
-			else {
-				$new_name = $main_data_ref->{$index}{'name'} . "_$mathed\_$value";
-			}
-			_generate_new_metadata(
-				$index,
-				$new_position,
-				$math,
-				$value,
-				$new_name,
-			);
-			
-			# print conclusion
-			print " dataset '$main_data_ref->{$index}{'name'}' was $mathed by value " 
-				. "'$value' and generated as a new dataset\n";
-			$dataset_modification_count++;
-		} 
-		
-		else {
-			warn " $math NOT done; unknown placement request\n";
-			return;
-		}
-		
-		if ($count > 0) {
-			print " $count datapoints could not be $mathed\n";
-		}
+		# print conclusion
+		print " value '$value' was subtracted from dataset $main_data_ref->{$index}{'name'}" 
+			. " and generated as a new dataset\n";
+	} 
+	
+	else {
+		warn " subtraction NOT done; unknown placement request\n";
+		return;
 	}
 	
-	# done
-	return $dataset_modification_count;
+	if ($count > 0) {
+		print " $count datapoints could not be subtracted\n";
+	}
+	
+	return 1;
 }
 
+
+
+sub division_function {
+	# Divide each datapoint value in a dataset by a specific value
+	
+	# request dataset
+	my $line = " Enter the index number of the dataset to divide  ";
+	my $index = _request_index($line);
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
+		return;
+	}
+	
+	# request value
+	my $value;
+	if (defined $opt_target) {
+		# command line option
+		$value = $opt_target;
+	}
+	else {
+		# interactively ask the user
+		print " Enter the numeric value, 'mean', or 'median' to divide by  ";
+		$value = <STDIN>;
+		chomp $value;
+	}
+	
+	# determine the actual value to dvidie by
+	my $divisor; # the actual number to divide by
+	if ($value =~ /median/i) { 
+		# use dataset median
+		my %stathash = _get_statistics_hash($index);
+		unless (%stathash) { 
+			warn " unable to get statistics! nothing done\n";
+			return;
+		}
+		$divisor = $stathash{'median'};
+		print " dividing by median value $divisor\n";
+	} 
+	elsif ($value =~ /mean/i) { 
+		# use dataset mean
+		my %stathash = _get_statistics_hash($index);
+		unless (%stathash) { 
+			warn " unable to get statistics! nothing done\n";
+			return;
+		}
+		$divisor = $stathash{'mean'};
+		print " dividing by mean value $divisor\n";
+	} 
+	elsif ($value =~ /^-?\d+\.?\d*$/) { 
+		# a numeric value
+		$divisor = $value;
+	} 
+	else {
+		warn " unrecognized value; nothing done\n";
+		return;
+	}
+	
+	# request placement
+	my $placement = _request_placement();
+	
+	
+	# generate subtraction product
+	my $count = 0; # failed count  
+	if ($placement eq 'r' or $placement eq 'R') {
+		# Replace the contents of the original dataset
+		
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			# check for valid numbers
+			if ($data_table_ref->[$i][$index] eq '.') {
+				$count++;
+				next;
+			} else {
+				$data_table_ref->[$i][$index] = 
+					($data_table_ref->[$i][$index] / $divisor);
+			}
+		}
+		
+		# update metadata
+		$main_data_ref->{$index}{'divide'} = $value;
+		
+		# print conclusion
+		print " dataset $main_data_ref->{$index}{'name'} was divided by value "
+			. "'$value'\n";
+	} 
+	
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Generate a new dataset
+		
+		# the new index position is equivalent to the number of columns
+		my $new_position = $main_data_ref->{'number_columns'};
+		
+		# calculate new values
+		for my $i (1..$main_data_ref->{'last_row'}) {
+			# check for valid numbers
+			if ($data_table_ref->[$i][$index] eq '.') {
+				$data_table_ref->[$i][$new_position] = '.';
+				$count++;
+			} else {
+				$data_table_ref->[$i][$new_position] = 
+					($data_table_ref->[$i][$index] / $divisor);
+			}
+		}
+		
+		# copy the medadata hash and annotate
+		my $new_name;
+		if ($function and $opt_name) {
+			# automatic execution and new name was specifically given 
+			$new_name = $opt_name;
+		}
+		else {
+			$new_name = $main_data_ref->{$index}{'name'} . "/$value";
+		}
+		_generate_new_metadata(
+			$index,
+			$new_position,
+			'divide',
+			$value,
+			$new_name,
+		);
+		
+		# print conclusion
+		print " dataset $main_data_ref->{$index}{'name'} was divided by value " 
+			. "'$value' and generated as a new dataset\n";
+	} 
+	
+	else {
+		warn " division NOT done; unknown placement request\n";
+		return;
+	}
+	
+	if ($count > 0) {
+		print " $count datapoints could not be divided\n";
+	}
+	
+	return 1;
+}
 
 
 
@@ -3301,20 +2630,11 @@ sub convert_strand_to_sign {
 	# this subroutine will convert one dataset to a signed dataset according to 
 	# strand information
 	
-	# request datasets
-	my @indices;
-	if (@_) {
-		# provided from an internal subroutine
-		@indices = @_;
-	}
-	else {
-		# otherwise request from user
-		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert to signed data  "
-		);
-	}
-	unless (@indices) {
-		warn " unknown index number(s). nothing done\n";
+	# request dataset
+	my $index = _request_index(
+		" Enter the dataset index to convert to signed data   ");
+	if ($index == -1) {
+		warn " unknown index number. nothing done\n";
 		return;
 	}
 	
@@ -3334,128 +2654,114 @@ sub convert_strand_to_sign {
 	my $placement = _request_placement();
 	
 	# proceed with the conversions
-	my @datasets_modified; # a list of which datasets were modified
-	my $total_count = 0; # total number of conversions done
-	foreach my $index (@indices) {
-		my $count = 0;
+	my $change_count = 0;
+	if ($placement eq 'r' or $placement eq 'R') { 
+		# Replace the current dataset
 		
-		if ($placement eq 'r' or $placement eq 'R') { 
-			# Replace the current dataset
-		
-			# perform sign conversion
-			for my $row (1..$main_data_ref->{'last_row'}) {
-				# walk through each value in the table
+		# perform sign conversion
+		for my $row (1..$main_data_ref->{'last_row'}) {
+			# walk through each value in the table
 			
-				# check the value contents and process appropriately
-				if ($data_table_ref->[$row][$index] == 0) { 
-					# zero is inherently unsigned, skip
-					next;
-				} 
-				elsif ($data_table_ref->[$row][$index] eq '.') {
-					# a null value, do nothing
-					next;
-				} 
+			# check the value contents and process appropriately
+			if ($data_table_ref->[$row][$index] == 0) { 
+				# zero is inherently unsigned, skip
+				next;
+			} 
+			elsif ($data_table_ref->[$row][$index] eq '.') {
+				# a null value, do nothing
+				next;
+			} 
+			else {
+				# a presumed numeric value, change the sign
+				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+					# looks like it is reverse: (minus), (r)everse, (c)rick
+					# then prepend data value with a (minus)
+					$data_table_ref->[$row][$index] = 
+						-($data_table_ref->[$row][$index]);
+					$change_count++;
+				}
+				elsif ($data_table_ref->[$row][$strand_i] !~ /^+|1|f|w|0|\./i) {
+					warn " unrecognized strand symbol for data row $row!\n";
+					# do nothing for these
+				}
 				else {
-					# a presumed numeric value, change the sign
-					if ($data_table_ref->[$row][$strand_i] =~ /^\-|r|c/i) {
-						# looks like it is reverse: (minus), (r)everse, (c)rick
-						# then prepend data value with a (minus)
-						$data_table_ref->[$row][$index] = 
-							-($data_table_ref->[$row][$index]);
-						$count++;
-					}
-					elsif ($data_table_ref->[$row][$strand_i] !~ /^\+|1|f|w|0|\./i) {
-						warn " unrecognized strand symbol for data row $row!\n";
-						# do nothing for these
-					}
-					else {
-						# do nothing for forward or no strand
-					}
+					# do nothing for forward or no strand
 				}
 			}
-		
-			# update metadata
-			$main_data_ref->{$index}{'strand'} = 'signed';
-		
-			# results
-			if ($count) {
-				$total_count += $count;
-				push @datasets_modified, $main_data_ref->{$index}{'name'};
-			}
 		}
+		
+		# update metadata
+		$main_data_ref->{$index}{'strand'} = 'signed';
+		
+		# print conclusion
+		print " $change_count $main_data_ref->{$index}{'name'} reverse strand" .
+			" values' sign was changed\n";
+	}
 	
-		elsif ($placement eq 'n' or $placement eq 'N') {
-			# Generate a new dataset
+	elsif ($placement eq 'n' or $placement eq 'N') {
+		# Generate a new dataset
 
-			# the new index position is equivalent to the number of columns
-			my $new_index = $main_data_ref->{'number_columns'};
+		# the new index position is equivalent to the number of columns
+		my $new_index = $main_data_ref->{'number_columns'};
 		
-			# perform sign conversion
-			for my $row (1..$main_data_ref->{'last_row'}) {
-				# walk through each value in the table
+		# perform sign conversion
+		for my $row (1..$main_data_ref->{'last_row'}) {
+			# walk through each value in the table
 			
-				# check the value contents and process appropriately
-				if ($data_table_ref->[$row][$index] == 0) { 
-					# zero is inherently unsigned, skip
-					$data_table_ref->[$row][$new_index] = 0;
-				} 
-				elsif ($data_table_ref->[$row][$index] eq '.') {
-					# a null value, do nothing
-					$data_table_ref->[$row][$new_index] = '.';
-				} 
+			# check the value contents and process appropriately
+			if ($data_table_ref->[$row][$index] == 0) { 
+				# zero is inherently unsigned, skip
+				$data_table_ref->[$row][$new_index] = 0;
+			} 
+			elsif ($data_table_ref->[$row][$index] eq '.') {
+				# a null value, do nothing
+				$data_table_ref->[$row][$new_index] = '.';
+			} 
+			else {
+				# a presumed numeric value, change the sign
+				if ($data_table_ref->[$row][$strand_i] =~ /^-|r|c/i) {
+					# looks like it is reverse: (minus), (r)everse, (c)rick
+					# then prepend data value with a (minus)
+					$data_table_ref->[$row][$new_index] = 
+						-($data_table_ref->[$row][$index]);
+					$change_count++;
+				}
+				elsif ($data_table_ref->[$row][$strand_i] =~ /^+|1|f|w|0|\./i) {
+					# forward or no strand, simply copy as is
+					$data_table_ref->[$row][$new_index] = 
+						$data_table_ref->[$row][$index];
+				}
 				else {
-					# a presumed numeric value, change the sign
-					if ($data_table_ref->[$row][$strand_i] =~ /^\-|r|c/i) {
-						# looks like it is reverse: (minus), (r)everse, (c)rick
-						# then prepend data value with a (minus)
-						$data_table_ref->[$row][$new_index] = 
-							-($data_table_ref->[$row][$index]);
-						$count++;
-					}
-					elsif ($data_table_ref->[$row][$strand_i] =~ /^\+|1|f|w|0|\./i) {
-						# forward or no strand, simply copy as is
-						$data_table_ref->[$row][$new_index] = 
-							$data_table_ref->[$row][$index];
-					}
-					else {
-						warn " unrecognized strand symbol for data row $row!\n";
-						# go ahead and copy the data
-						$data_table_ref->[$row][$new_index] = 
-							$data_table_ref->[$row][$index];
-					}
+					warn " unrecognized strand symbol for data row $row!\n";
+					# go ahead and copy the data
+					$data_table_ref->[$row][$new_index] = 
+						$data_table_ref->[$row][$index];
 				}
 			}
-		
-			# annotate new metadata
-			my $new_name = $main_data_ref->{$index}{'name'} . '_signed';
-			_generate_new_metadata(
-				$index,
-				$new_index,
-				'strand',
-				'signed',
-				$new_name,
-			);
-		
-			# results
-			$total_count += $count;
-			push @datasets_modified, $main_data_ref->{$index}{'name'};
 		}
-		else {
-			# Unknown placement
-			warn " sign conversion NOT done; unknown placement request\n";
-			return; # can't proceed with any index
-		}
+		
+		# annotate new metadata
+		my $new_name = $main_data_ref->{$index}{'name'} . '_signed';
+		_generate_new_metadata(
+			$index,
+			$new_index,
+			'strand',
+			'signed',
+			$new_name,
+		);
+		
+		# print conclusion
+		print " $change_count $main_data_ref->{$index}{'name'} reverse strand" .
+			" values' sign was changed and recorded as a new dataset\n";
+	}
+	else {
+		# Unknown placement
+		warn " sign conversion NOT done; unknown placement request\n";
+		return; # can't proceed with any index
 	}
 	
-	# report results
-	if (@datasets_modified) {
-		my $string = " $total_count values reverse strand values' signs were changed for";
-		$string .= $#datasets_modified ? " datasets " : " dataset ";
-		$string .= join(", ", @datasets_modified);
-		$string .= $placement =~ /n/i ? " and generated as new datasets\n" : "\n";
-		print $string;
-	}
-	return scalar(@datasets_modified);
+	# done
+	return 1;
 }
 
 
@@ -3466,7 +2772,7 @@ sub merge_stranded_data {
 
 	# request datasets
 	my @indices = _request_indices(
-		" Enter the two indices for the forward and reverse strand datasets to merge   "
+		" Enter the forward, reverse strand datasets to merge   "
 	);
 	unless (@indices) {
 		warn " unknown index number(s). nothing done\n";
@@ -3492,6 +2798,7 @@ sub merge_stranded_data {
 			# both datasets either have zero or no data
 			# use forward dataset as the default
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
+			warn "  $row both are zero or null, using forward\n";
 		}
 		
 		elsif (
@@ -3502,6 +2809,7 @@ sub merge_stranded_data {
 			# use reverse dataset, reversing sign
 			$data_table_ref->[$row][$new] = 
 				-($data_table_ref->[$row][$r_index]);
+			warn "  $row forward only, using reverse\n";
 		}
 		
 		elsif (
@@ -3511,6 +2819,7 @@ sub merge_stranded_data {
 			# reverse dataset only has zero or no data
 			# use forward dataset 
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index];
+			warn "  $row reverse only, using forward\n";
 		}
 		
 		else {
@@ -3518,6 +2827,7 @@ sub merge_stranded_data {
 			# perform simple subtraction
 			$data_table_ref->[$row][$new] = $data_table_ref->[$row][$f_index] - 
 				$data_table_ref->[$row][$r_index];
+			warn "  $row both, calculating diff\n";
 		}
 	}
 	
@@ -3621,57 +2931,8 @@ sub number_function {
 
 
 
-sub write_summary_function {
-	# this will write out a summary file of the data
-	
-	# determine indices to summarize
-	my ($startcolumn, $stopcolumn);
-	if ($function) {
-		# running under automatic mode
-		# check if user supplied indices
-		if (scalar @opt_indices >= 2) {
-			# assume contiguous indices, use the first and last one
-			# it may also be simply the start and stop indices
-			$startcolumn = $opt_indices[0];
-			$stopcolumn  = $opt_indices[-1];
-		}
-		# otherwise the summary module will automatically deduce the columns
-	}
-	else {
-		# request indices only when running interactively and not automatically
-		($startcolumn, $stopcolumn) = _request_indices(
-			" Enter the starting and/or ending indices of the datasets to summarize\n". 
-			" Or nothing for automatic detection     "
-		);
-	}
-	
-	# write the summary
-	my $sumfile = write_summary_data(
-		'data'         => $main_data_ref,
-		'filename'     => $outfile,
-		'startcolumn'  => $startcolumn,
-		'endcolumn'    => $stopcolumn,
-		'log'          => $opt_log,
-	);
-	
-	# report outcome
-	if ($sumfile) {
-		print " wrote summary file '$sumfile'\n";
-	}
-	else {
-		print " unable to write summary file!\n";
-	}
-	
-	# since no changes have been made to the data structure, return 0
-	return;
-}
-
-
 sub export_function {
 	# this will export the file into an even simpler text format
-	
-	# generate a possible new name based on the input name
-	my $possible_name = $main_data_ref->{'basename'} . '_out.txt';
 	
 	# determine the export file name
 	my $outfilename;
@@ -3683,11 +2944,10 @@ sub export_function {
 		print " using export file name '$outfile'\n";
 		$outfilename = $outfile;
 	}
-	elsif ($function) {
-		# automatic execution, don't ask the user
-		$outfilename = $possible_name;
-	}
 	else {
+		# generate a possible new name based on the input name
+		my $possible_name = $main_data_ref->{'basename'} . '_out.txt';
+		
 		# ask for new filename
 		print " Exported file name? [$possible_name]  ";
 		my $answer = <STDIN>;
@@ -3704,12 +2964,12 @@ sub export_function {
 		
 	
 	# write the file
-	my $write_results = write_tim_data_file(
+	my $write_results = write_tim_data_file( {
 		'data'      => $main_data_ref,
 		'filename'  => $outfilename,
 		'gz'        => $gz,
 		'simple'    => 1,
-	);
+	} );
 	
 	# report write results
 	if ($write_results) {
@@ -3734,8 +2994,8 @@ sub export_treeview_function {
 	# First check for previous modifications
 	if ($modification) {
 		print " There are existing unsaved changes to the data. Do you want to\n";
-		print " save these first before making required, irreversible changes? ".
-			"y/n  ";
+		print " save these first before making changes required for exporting?".
+			"y or n   ";
 		my $answer = <STDIN>;
 		chomp $answer;
 		if ($answer =~ /^y/i) {
@@ -3743,14 +3003,10 @@ sub export_treeview_function {
 		}
 	}
 	
-	# Set options for placement for subsequent manipulations
-	$opt_placement = 'r';
-	
-	
-	### Get user information for processing
-	# Identify the dataset columns
 	# we need one unique name column, and a range of data columns
 	# the rest will be deleted
+	
+	# collect those indices that we want to keep
 	my @datasets = _request_indices(
 		" Enter one unique name column, followed by a range of data columns  "
 	);
@@ -3759,101 +3015,41 @@ sub export_treeview_function {
 		return;
 	}
 	
-	# Identify the manipulations requested
-	my @manipulations;
-	if ($function) {
-		# automatic function, use the command line target option
-		@manipulations = split /,/, $opt_target;
-	}
-	else {
-		# ask the user
-		print " Available dataset manipulations\n";
-		print "   cg - median center features (genes)\n";
-		print "   cd - median center datasets\n";
-		print "   zd - convert dataset to Z-scores\n";
-		print "   pd - convert dataset to percentile rank\n";
-		print "   L2 - convert dataset to log2\n";
-		print "   n0 - convert null values to 0\n";
-		print " Enter the manipulation(s) in order of desired execution   ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		@manipulations = split /[,\s]+/, $answer;
-	}
+	### First, center the data columns
+	# the first index in the datasets array should be the name column
+	# the remaining are datasets to be centered
+	my $name_index = shift @datasets;
+	print " median centering datasets....\n";
+	center_function(@datasets);
+	
+	# put the name index back
+	unshift @datasets, $name_index;
 	
 	
-	### First, delete extraneous datasets or columns
-	# the CDT format for Treeview expects a unique ID and NAME column
-	# we will duplicate the first column
-	unshift @datasets, $datasets[0];
-	
-	# perform a reordering of the columns
-	reorder_function(@datasets);
-	
-	# rename the first two columns
-	rename_function(0, 'ID');
-	rename_function(1, 'NAME');
-	
-	# we now have just the columns we want
-	# reset the dataset indices to what we currently have
-	# name and ID should be index 0 and 1
-	@datasets = (2 .. $main_data_ref->{'number_columns'} -1);
-	
-	
-	### Second, perform dataset manipulations
-	foreach (@manipulations) {
-		if (/^cg$/i) {
-			# Median center features
-			print " median centering features....\n";
-			center_function(@datasets);
+	### Second, delete extraneous datasets or columns
+	# identify the columns to delete
+	my @to_delete;
+	for my $i (0 .. ($main_data_ref->{'number_columns'} - 1) ) {
+		my $check = 1;
+		# walk though the keeper list in @datasets
+		foreach (@datasets) {
+			# set check to false if we want to keep
+			$check = 0 if $i == $_;
 		}
-		elsif (/^cd$/i) {
-			# Median center datasets
-			print " median centering datasets....\n";
-			$opt_target = 'median';
-			$opt_zero = 1;
-			subtract_function(@datasets);
-		}
-		elsif (/^zd$/i) {
-			# Z-score convert dataset
-			print " converting datasets to Z-scores....\n";
-			zscore_function(@datasets);
-		}
-		elsif (/^pd$/i) {
-			# convert dataset to percentile rank
-			print " converting datasets to percentile ranks....\n";
-			percentile_rank_function(@datasets);
-		}
-		elsif (/^l2$/i) {
-			# convert dataset to log2 values
-			print " converting datasets to log2 values....\n";
-			log2_function(@datasets);
-		}
-		elsif (/^n0$/i) {
-			# convert nulls to 0
-			print " converting null values to 0.0....\n";
-			$opt_target = '0.0';
-			$opt_zero   = 1 unless defined $opt_zero; # convert 0s too
-			convert_nulls_function(@datasets);
-		}
-		else {
-			warn " unkown manipulation '$_'!\n";
+		if ($check) {
+			# not in keeper list, so targeted for deletion
+			push @to_delete, $i;
 		}
 	}
+	
+	# delete the unneccessary columns
+	delete_function(@to_delete);
 	
 	
 	### Third, export a simple file
-	if ($outfile) {
-		unless ($outfile =~ /\.cdt$/i) {
-			# make sure it has .cdt extension
-			$outfile .= '.cdt';
-		}
+	unless ($outfile) {
+		$outfile = $main_data_ref->{'basename'} . '_tview.txt';
 	}
-	else {
-		# generate file name
-		$outfile = $main_data_ref->{'path'} . 
-			$main_data_ref->{'basename'} . '.cdt';
-	}
-	$gz = 0;
 	export_function();
 	
 	
@@ -4033,7 +3229,7 @@ sub subsample_function {
 			$target = $target_stats{'sum'};
 		}
 		else {
-			warn " nothing done\n";
+			" nothing done\n";
 			return;
 		}
 	}
@@ -4100,11 +3296,11 @@ sub rewrite_function {
 	}
 	
 	# write the file
-	my $write_results = write_tim_data_file(
+	my $write_results = write_tim_data_file( {
 		'data'      => $main_data_ref,
 		'filename'  => $rewrite_filename,
 		'gz'        => $gz,
-	);
+	} );
 	
 	# report write results
 	if ($write_results) {
@@ -4130,27 +3326,18 @@ sub _get_letter_to_function_hash {
 	# this hash converts the one-letter menu key to the function name
 	# the key is the menu letter
 	# the value is the function name
-	return (
-		't' => "stat",
+	my %hash = (
+		'a' => "stat",
 		'R' => "reorder",
 		'D' => "delete",
 		'n' => "rename",
 		'b' => "number",
-		'C' => "coordinate",
 		'o' => "sort",
 		'g' => "gsort",
 		'N' => "null",
 		'P' => "duplicate",
 		'A' => "above",
 		'B' => "below",
-		'U' => "cnull",
-		'L' => "absolute",
-		'I' => "minimum",
-		'X' => "maximum",
-		'a' => "add",
-		'u' => "subtract",
-		'y' => "multiply",
-		'v' => "divide",
 		's' => "scale",
 		'p' => "pr",
 		'Z' => "zscore",
@@ -4158,50 +3345,42 @@ sub _get_letter_to_function_hash {
 		'2' => "delog2",
 		'f' => "format",
 		'c' => "combine",
-		'su' => "subsample",
+		'U' => "subsample",
 		'r' => "ratio",
 		'd' => "diff",
 		'z' => "normdiff",
-		'si' => "strandsign",
-		'st' => "mergestrand",
+		'v' => "divide",
+		'u' => "subtract",
+		'i' => "strandsign",
+		't' => "mergestrand",
 		'e' => "center",
 		'w' => "new",
-		'Y' => "summary",
 		'x' => "export",
 		'W' => "rewrite",
 		'T' => "treeview",
 		'h' => "help",
 		'q' => "quit",
-		'Q' => "quit",
 		'm' => "menu",
 	);
+	return %hash;
 }
 
 sub _get_function_to_subroutine_hash {
 	# this hash converts the function name to the actual subroutine for the function
 	# the key is the function name
 	# the value is a scalar reference to the subroutine
-	return (
+	my %hash = (
 		'stat'        => \&print_statistics_function,
 		'reorder'     => \&reorder_function,
 		'delete'      => \&delete_function,
 		'rename'      => \&rename_function,
 		'number'      => \&number_function,
-		'coordinate'  => \&coordinate_function,
 		'sort'        => \&sort_function,
 		'gsort'       => \&genomic_sort_function,
 		'null'        => \&toss_nulls_function,
 		'duplicate'   => \&toss_duplicates_function,
 		'above'       => \&toss_above_threshold_function,
 		'below'       => \&toss_below_threshold_function,
-		'cnull'       => \&convert_nulls_function,
-		'absolute'    => \&convert_absolute_function,
-		'minimum'     => \&minimum_function,
-		'maximum'     => \&maximum_function,
-		'add'         => \&add_function,
-		'subtract'    => \&subtract_function,
-		'multiply'    => \&multiply_function,
-		'divide'      => \&divide_function,
 		'scale'       => \&median_scale_function,
 		'pr'          => \&percentile_rank_function,
 		'zscore'      => \&zscore_function,
@@ -4213,17 +3392,19 @@ sub _get_function_to_subroutine_hash {
 		'ratio'       => \&ratio_function,
 		'diff'        => \&difference_function,
 		'normdiff'    => \&normalized_difference_function,
+		'divide'      => \&division_function,
+		'subtract'    => \&subtract_function,
 		'strandsign'  => \&convert_strand_to_sign,
 		'mergestrand' => \&merge_stranded_data,
 		'center'      => \&center_function,
 		'new'         => \&new_column_function,
-		'summary'     => \&write_summary_function,
 		'export'      => \&export_function,
 		'rewrite'     => \&rewrite_function,
 		'treeview'    => \&export_treeview_function,
 		'help'        => \&print_online_help,
 		'menu'        => \&print_menu,
 	);
+	return %hash;
 }
 
 
@@ -4254,10 +3435,6 @@ sub _request_index {
 		# index array is specified on the command line
 		# use the first element in the global index array
 		$index = $opt_indices[0];
-		unless ( _validate_index_list($index) )  {
-			# return an error value
-			$index = -1;
-		}
 	}
 	
 	else {
@@ -4267,10 +3444,19 @@ sub _request_index {
 		print $line; # print the user prompt
 		$index = <STDIN>;
 		chomp $index;
-		unless ( _validate_index_list($index) )  {
+	}
+	
+	# check the index
+	if (defined $index) {
+		unless ( _validate_index_list($index) ) {
 			# return an error value
 			$index = -1;
 		}
+	}
+	else {
+		# no input
+		warn " nothing entered!\n";
+		$index = -1;
 	}
 	
 	return $index;
@@ -4301,7 +3487,7 @@ sub _request_indices {
 	
 	# check the list of indices
 	unless ( _validate_index_list(@indices) ) {
-		return;
+		@indices = q(); # clear the array
 	}
 	
 	return @indices;
@@ -4335,15 +3521,15 @@ sub _validate_index_list {
 	# actual columns, i.e., is each number < than the number of datasets in 
 	# the data table
 	
-	foreach my $number (@_) {
+	my @list = @_;
+	foreach my $number (@list) {
 		# check that each number represents a metadata hash 
 		# and presumably dataset
-		if (
-			$number =~ /^\d+$/ and 
-			exists $main_data_ref->{$number}
-		) {
-			# some integer number represented by a metadata hash is good
-			# nothing to do, it is ok
+		if (defined $number and $number == 0) {
+			# a number of 0 is good
+		}
+		elsif (exists $main_data_ref->{$number} )  {
+			# some other number represented by a metadata hash is good
 		}
 		else {
 			# any other number is not good
@@ -4359,12 +3545,12 @@ sub _validate_index_list {
 sub _get_statistics_hash {
 	# internal subroutine to get statistics
 	
-	my ($index, $zero) = @_;
+	my ($index, $exception) = @_;
 	# the index number (column) of the dataset
 	# the exception rule to work with 0 numbers
-	unless (defined $zero) {
+	unless (defined $exception) {
 		# use global command-line specified value if present
-		$zero = $opt_zero;
+		$exception = $opt_exception;
 	}
 	
 	# collect the values in the dataset
@@ -4377,22 +3563,23 @@ sub _get_statistics_hash {
 		} 
 		elsif ($value == 0) {
 			# we need to determine whether we can accept 0 values
-			unless (defined $zero) {
+			unless (defined $exception) {
 				# wasn't defined on the command line, so stop the program and ask the user
 				print " Include 0 values in the statistics? y or n  ";
-				my $answer = <STDIN>;
-				if ($answer =~ /^y/i) {
-					$zero = 1;
-				}
-				else {
-					$zero = 0;
+				$exception = <STDIN>;
+				chomp $exception;
+				unless ($exception =~ /^[yn]$/i) {
+					# enforce recognizable answer
+					warn " unknown exception response; nothing done\n";
+					return;
 				}
 				
 				# remember for next time, chances are user may still want this
 				# value again in the future
-				$opt_zero = $zero;
+				$opt_exception = $exception;
 			}
-			if ($zero) {
+			if ($exception eq 'y') {
+				# a yes value indicates 0 values should be included
 				push @values, $value;
 			}
 			# otherwise, we skip the 0 value and move on
@@ -4407,6 +3594,13 @@ sub _get_statistics_hash {
 		warn " no valid values collected from dataset index '$index'!";
 		return;
 	}
+# 	
+# 	# check log2 status
+# 	if ($main_data_ref->{$index}{'log2'} == 1) {
+# 		# values are in log2 space
+# 		# de-log them
+# 		@values = map { 2 ** $_ } @values;
+# 	}
 	
 	my %statdata = statshash(@values);
 	return %statdata;
@@ -4520,7 +3714,7 @@ __END__
 
 manipulate_datasets.pl
 
-A progam to manipulate tab-delimited data files.
+A progam to manipulate tab-delimited dataset files and avoid ExcHell.
 
 =head1 SYNOPSIS
 
@@ -4528,24 +3722,22 @@ manipulate_datasets.pl [--options ...] <input_filename>
 
   Options:
   --in <input_filename>
-  --func [ stat | reorder | delete | rename | number | coordinate | sort |
-          gsort | null | duplicate | above | below | cnull | absolute | 
-          minimum | maximum | add | subtract | multiply | divide | scale | 
-          pr | zscore | log2 | delog2 | format | combine | subsample | 
-          ratio | diff | normdiff | strandsign | mergestrand | center | 
-          new | summary | export | rewrite | treeview ]
+  --func [stat | reorder | delete | rename | sort | gsort | null | 
+          duplicate | above | below | scale | pr | zscore | log2 | 
+          delog2 | format | combine | subsample | ratio | diff | 
+          normdiff | divide | subtract | export | treeview | 
+          rewrite | center]
   --index <integers>
-  --exp | --num <integer>
-  --con | --den <integer>
+  --exp <integer>
+  --con <integer>
   --target <text> or <number>
   --place [r | n]
-  --(no)zero
+  --except [y | n]
   --dir [i | d]
   --name <text>
   --out <filename>
-  --log
-  --gz
-  --version
+  --(no)log
+  --(no)gz
   --help
   --doc
 
@@ -4557,19 +3749,21 @@ The command line flags and descriptions:
 
 =item --in <input_filename>
 
-Provide the name of an input file. The file must be a tab-delimited text file,
-with each row specifiying a genomic feature (gene) or region, and each column
-representing identifying information or a dataset value. The first row should
-include the name for each column, e.g. the name of the database dataset from
-which the values were collected.
+Provide the name of an input file. The file must be a tab-delimited text file, with each row 
+specifiying a genomic feature (gene) or region, and each column representing identifying 
+information or a dataset value. The first row should include the name for each column, e.g. the
+name of the database dataset from which the values were collected.
 
-If the file was generated using a BioToolBox script, then each column may have
-metadata stored in a header comment line at the beginning of the file.
-Manipulations on the data in a column dataset will be added to this metadata and
-recorded upon file write.
+If the file was generated using 'get_datasets.pl' and/or uses Tim's data file format, then each 
+column will have metadata stored in a header comment line at the beginning of the file. This line
+is prefixed with a # and is comprised of key=value pairs demarcated by semi-colons. Manipulations 
+on the data in a column dataset will be added to this metadata and recorded upon file write.
 
-The input file may be compressed using the gzip program and recognized with 
-the extension '.gz'.  
+If no metadata is present in the file, then it will be automatically generated with minimal 
+information upon opening the file.
+
+The input file may be compressed using the gzip program and recognized with the extension '.gz'. It 
+will be automatically decompressed upon reading. 
 
 =item --func <function>
 
@@ -4582,21 +3776,12 @@ other required options. These functions include the following.
   delete
   rename
   number
-  coordinate
   sort
   gsort
   null
   duplicate
   above
   below
-  cnull
-  absolute
-  minimum
-  maximum
-  add
-  subtract
-  multiply
-  divide
   scale
   pr
   zscore
@@ -4608,11 +3793,12 @@ other required options. These functions include the following.
   ratio
   diff
   normdiff
+  divide
+  subtract
   strandsign
   mergestrand
   center
   new
-  summary
   export
   rewrite
   treeview
@@ -4627,45 +3813,42 @@ list without spaces. Ranges of contiguous indices may be specified using a
 dash between the start and stop. For example, '1,2,5-7,9' would indicate 
 datasets '1, 2, 5, 6, 7, and 9'. 
 
-=item --exp <integer>
-
-=item --num <integer>
+=item --exp | --num <integer>
 
 Specify the 0-based index number to be used for the experiment or numerator 
-column with the 'ratio' or 'difference' functions. Both flags are aliases
+dataset with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
-=item --con <integer>
-
-=item --den <integer>
+=item --con | --den <integer>
 
 Specify the 0-based index number to be used for the control or denominator 
-column with the 'ratio' or 'difference' functions. Both flags are aliases
+dataset with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
 =item --target <string> or <number>
 
-Specify the target value when using various functions. This is a catch-all 
-option for a number of functions. Please refer to the function description 
-for more information.
+Specify the target value when using various functions, including the 
+'scale', 'subtract', 'divide', and 'format' functions. Please refer to the 
+function description for more information.
 
 =item --place [r | n]
 
-Specify the placement of a transformed column. Two values are accepted ('r' 
+Specify the placement of a transformed dataset. Two values are accepted ('r' 
 or 'n'):
   
-  - (r)eplace the original column with new values
-  - add as a (n)ew column
+  - (r)eplace the original dataset with the new one
+  - add as a (n)ew dataset
+  
 
-Defaults to new placement when executed automatically using the --func 
-option, or prompts the user when executed interactively.
+=item --except [y | n]
 
-=item --(no)zero
-
-Specify that zero values should or should not be included when 
-calculating statistics or converting null values on a column. The default is 
-undefined, meaning the program may ask the user interactively whether to 
-include zero values or not.
+Specify what to do when a calculation encounters a 0 value. Two exception 
+values are accepted: 
+  
+  - (y)es, include 0 values in the calculation
+  - (n)o, do not include 0 values in the calculation
+  
+If this is not specified, the program will ask interactively if this occurs.
 
 =item --dir [i | d]
 
@@ -4674,34 +3857,30 @@ Specify the direction of a sort:
   - (i)ncreasing
   - (d)ecreasing
   
+
 =item --name <string>
 
-Specify a new column name when re-naming a column using the rename function 
-from the command line. Also, when generating a new column using a defined 
-function (--func <function>) from the command line, the new column will use 
+Specify a new dataset name when re-naming a dataset using the rename function 
+from the command line. Also, when generating a new dataset using a defined 
+function (--func <function>) from the command line, the new dataset will use 
 this name.
 
 =item --out <filename>
 
-Optionally provide an alternative output file name. If no name is provided, 
-then the input file will be overwritten with a new file. Appropriate 
-extensions will be appended as necessary.
+Optionally provide an alternative output file name. If no name is provided, then the input file 
+will be overwritten with a new file. Appropriate extensions will be appended as necessary.
 
-=item --log 
+=item --(no)log 
 
-Indicate whether the data is (not) in log2 space. This is required to ensure 
-accurate mathematical calculations in some manipulations. This is not necessary 
-when the log status is appropriately recorded in the dataset metadata.
+Indicate whether the data is (not) in log2 space. This is required to ensure accurate mathematical 
+calculations in some manipulations. This is not necessary when the log status is appropriately 
+recorded in the dataset metadata.
 
-=item --gz 
+=item --(no)gz 
 
 Indicate whether the output file should (not) be compressed. The appropriate extension will be 
 added. If this option is not specified, then the compression status of the input file will be 
 preserved.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -4712,7 +3891,7 @@ Display the POD documentation using perldoc.
 =head1 DESCRIPTION
 
 This program allows some common mathematical and other manipulations on one
-or more columns in a datafile. The program is designed as a simple
+or more datasets in a datafile. The program is designed as a simple
 replacement for common manipulations performed in a full featured
 spreadsheet program, e.g. Excel, particularly with datasets too large to be
 loaded, all in a conveniant command line program. The program is designed
@@ -4729,57 +3908,51 @@ through a simple shell script.
 
 The program keeps track of the number of manipulations performed, and if 
 any are performed, will write out to file the changed data. Unless an 
-output file name is provided, it will overwrite the input file (NO backup is
+output file name is provided, it will overwrite the input file (NO BACKUP is
 made!).
+
 
 =head1 FUNCTIONS
 
-This is a list of the functions available for manipulating columns. These may 
+This is a list of the functions available for manipulating datasets. These may 
 be selected interactively from the main menu (note the case sensitivity!), 
 or specified on the command line using the --func option.
 
 =over 4
 
-=item B<stat> (menu option 't')
+=item B<stat> (menu option 'a')
 
-Print some basic statistics for a column, including mean, 
+Print some basic statistics for a dataset, including mean, 
 median, standard deviation, min, and max. If 0 values are present,
 indicate whether to include them (y or n)
 
 =item B<reorder> (menu option 'R')
 
-The column may be rewritten in a different order. The new order 
+The datasets may be rewritten in a different order. The new order 
 is requested as a string of index numbers in the desired order. 
-Also, a column may be deleted by skipping its number or duplicated
+Also, a dataset may be deleted by skipping its number or duplicated
 by including it twice.
 
 =item B<delete> (menu option 'D')
 
-One or more column may be selected for deletion.
+One or more datasets may be selected for deletion.
 
 =item B<rename> (menu option 'n')
 
-Assign a new name to a column. For automatic execution, use the --name 
+Assign a new name to a dataset. For automatic execution, use the --name 
 option to specify the new name. Also, for any automatically executed 
-function (using the --func option) that generates a new column, the 
-column's new name may be explicitly defined with this option.
+function (using the --func option) that generates a new dataset, the 
+dataset's new name may be explicitly defined with this option.
 
 =item B<number> (menu option 'b')
 
 Assign a number to each datapoint (or line), incrementing from 1 
-to the end. The numbered column will be inserted after the requested 
-column index.
-
-=item B<coordinate> (menu option 'C')
-
-Generate a coordinate string from the chromosome, start, and, if 
-present, stop coordinate values as a new column. The string will 
-have the format "chr:start-stop" or "chr:start". This is useful 
-in making unique identifiers or working with genome browsers.
+to the end. The numbered dataset will be inserted after the requested 
+dataset index.
 
 =item B<sort> (menu option 'o')
 
-The entire data table is sorted by a specific column. The first
+The entire data table is sorted by a specific dataset. The first
 datapoint is checked for the presence of letters, and the data 
 table is then sorted either asciibetically or numerically. If the 
 sort method cannot be automatically determined, it will ask. The 
@@ -4794,237 +3967,189 @@ and have recognizable names (e.g. 'chromo', 'chromosome', 'start').
 =item B<null> (menu option 'N')
 
 Toss datapoints (rows) that contain a null value in one or more 
-columns. Some of the other functions may not work properly if
+datasets (columns). Some of the other functions may not work properly if
 a non-value is present. If 0 values are present, indicate whether
 to toss them (y or n). This may also be specified as a command line 
 option using the --except flag.
 
 =item B<duplicate> (menu option 'P')
 
-Toss datapoints with duplicate values. One or more columns may be 
+Toss datapoints with duplicate values. One or more datasets may be 
 selected to search for duplicate values. Values are simply concatenated 
-when multiple columns are selected. Rows with duplicated values are 
+when multiple datasets are selected. Rows with duplicated values are 
 deleted, always leaving the first row.
 
 =item B<above> (menu option 'A')
 
 Toss datapoints with values that are above a certain threshold value. 
-One or more columns may be selected to test values for the 
+One or more datasets may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
 
 =item B<below> (menu option 'B')
 
 Toss datapoints with values that are below a certain threshold value. 
-One or more columns may be selected to test values for the 
+One or more datasets may be selected to test values for the 
 threshold. The threshold value may be requested interactively or 
 specified with the --target option.
 
-=item B<cnull> (menu option 'U')
-
-Convert null values to a specific value. One or more columns may 
-be selected to convert null values. The new value may be requested 
-interactively or defined with the --target option.  
-
-=item B<absolute> (menu option 'L')
-
-Convert signed values to their absolute value equivalents. One or 
-more columns may be selected to convert.
-
-=item B<minimum> (menu option 'I')
-
-Reset datapoints whose values are less than a specified minimum 
-value to the minimum value. One or more columns may be selected 
-to reset values to the minimum. The minimum value may be requested 
-interactively or specified with the --target option. 
-
-=item B<maximum> (menu option 'X')
-
-Reset datapoints whose values are greater than a specified maximum 
-value to the maximum value. One or more columns may be selected 
-to reset values to the maximum. The maximum value may be requested 
-interactively or specified with the --target option. 
-
-=item B<add> (menu option 'a')
-
-Add a value to a column. A real number may be supplied, or the words
-'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the column. The column may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
-=item B<subtract> (menu option 'u')
-
-Subtract a value from a column. A real number may be supplied, or the words
-'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the column. The column may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
-=item B<multiply> (menu option 'y')
-
-Multiply a column by a value. A real number may be supplied, or the words
-'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the column. The column may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
-=item B<divide> (menu option 'v')
-
-Divide a column by a value. A real number may be supplied, or the words
-'mean', 'median', or 'sum' may be entered as a proxy for those statistical
-values of the column. The column may either be replaced or added
-as a new one. For automatic execution, specify the number using the
---target option.
-
 =item B<scale> (menu option 's')
 
-A column may be a median scaled as a means of normalization 
-with other columns. The current median of the column requested is
-presented, and a new median target is requested. The column may 
+A dataset may be a median scaled as a means of normalization 
+with other datasets. The current median of the dataset requested is
+presented, and a new median target is requested. The dataset may 
 either be replaced with the median scaled values or added as a new 
-column. For automatic execution, specify the new median target 
+dataset. For automatic execution, specify the new median target 
 with the --target option.
 
 =item B<pr> (menu option 'p')
 
-A column may be converted to a percentile rank, whereby the
+A dataset may be converted to a percentile rank, whereby the
 data values are sorted in ascending order and assigned a new value 
-from 0..1 based on its rank in the sorted order. The column may 
+from 0..1 based on its rank in the sorted order. The dataset may 
 either be replaced with the percentile rank or added as a new
-column. The original order of the column is maintained.
+dataset. The original order of the dataset is maintained.
 
 =item B<zscore> (menu option 'Z')
 
-Generate a Z-score or standard score for each value in a column. The
-Z-score is the number of standard deviations the value is away from
-the column's mean, such that the new mean is 0 and the standard 
-deviation is 1. Provides a simple method of normalizing columns
-with disparate dynamic ranges.
+Generate a Z-score for each value in a dataset. The Z-score is 
+the number of standard deviations the value is away from the 
+dataset's mean. Provides a simple measure of identifying significant 
+outliers.
 
 =item B<log2> (menu option 'l')
 
-A column may be converted to log base 2 values. The column
+A dataset may be converted to log base 2 values. The dataset
 may either be replaced with the log2 values ar added as a new 
-column.
+dataset.
 
 =item B<delog2> (menu option '2')
 
-A column that is currently in log2 space may be converted back to
-normal base10 numbers. The column may either be replaced with the 
-new values or added as a new column.
+A dataset that is currently in log2 space may be converted back to
+normal base10 numbers. The dataset may either be replaced with the 
+new values or added as a new dataset.
 
 =item B<format> (menu option 'f')
 
-Format the numbers of a column to a given number of decimal places. 
-An integer must be provided. The column may either be replaced or 
-added as a new column. For automatic execution, use the --target 
-option to specify the number decimal places.
+Format the numbers of a dataset to a given number of decimal places. 
+Acceptable numbers of decimal places include 0, 1, 2, or 3.
+The dataset may either be replaced or added as a new dataset. For 
+automatic execution, use the --target option to specify the number 
+decimal places.
 
 =item B<combine> (menu option 'c')
 
-Mathematically combine the data values in two or more columns. The 
+Mathematically combine the data values in two or more datasets. The 
 methods for combining the values include mean, median, min, max, 
 stdev, or sum. The method may be specified on the command line 
 using the --target option. The combined data values are added as a 
-new column.
+new dataset.
 
-=item B<subsample> (menu option 'su')
+=item B<subsample> (menu option 'U')
 
-Subsample an enumerated dataset. Datapoints within a column are chosen 
-randomly and the values reduced by one until the target sum is reached. 
-This assumes an enumerated dataset, e.g. tag counts from
-Next-gen sequencing, where the sum of tags from two or more columns
+Subsample a dataset. Datapoints within a dataset are chosen randomly
+and the values reduced by one until the target sum is reached. This is
+useful for working with enumerated datasets, e.g. tag counts from
+Next-gen sequencing, where the sum of tags from two or more datasets
 must be normalized to each other. This function assumes that the data
-are positive integers; log2 columns will not be used. Provide a
+are positive integers; log2 datasets will not be used. Provide a
 target sum to reach using the --target option. If this number is less
-than or equal to the number of columns in the file, then it is
-assumed to be an index number and the sum of that column will be used
-as the target. The subsampled dataset is always added as new column.
+than or equal to the number of datasets in the file, then it is
+assumed to be an index number and the sum of that dataset will be used
+as the target. The subsampled dataset is always added as new dataset.
 
 =item B<ratio> (menu option 'r')
 
-A ratio may be generated between two columns. The experiment and 
-control columns are requested and the ratio is added as a new
-column. For log2 numbers, the control is subtracted from the
+A ratio may be generated between two datasets. The experiment and 
+control datasets are requested and the ratio is added as a new
+dataset. For log2 numbers, the control is subtracted from the
 experiment. The log2 status is checked in the metadata for the 
-specified columns, or may be specified as a command line option, or
+specified datasets, or may be specified as a command line option, or
 asked of the user.
 
 =item B<diff> (menu option 'd')
 
-A simple difference is generated between two existing columns. The 
-values in the 'control' column are simply subtracted from the 
-values in the 'experimental' column and recorded as a new column.
-For enumerated columns (e.g. tag counts from Next Generation 
-Sequencing), the columns should be subsampled to equalize the sums 
-of the two columns. The indices for the experimental and control columns 
+A simple difference is generated between two existing datasets. The 
+values in the 'control' dataset are simply subtracted from the 
+values in the 'experimental' dataset and recorded as a new dataset.
+Prior to calculation, the sums of the two datasets are checked for 
+equality, and, if not equal, the larger dataset is sub-sampled to 
+match the smaller dataset. This function should be applied only to 
+enumerated data sets (e.g. Illumina sequence tags) and not to 
+microarray value data sets; it will not function on datasets in the 
+log2 space. The indices for the experimental and control datasets 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
 =item B<normdiff> (menu option 'z')
 
-A normalized difference is generated between two existing columns. 
-The difference between 'control' and 'experimental' column values 
+A normalized difference is generated between two existing datasets. 
+The difference between 'control' and 'experimental' dataset values 
 is divided by the square root of the sum (an approximation of the 
 standard deviation). This is supposed to yield fewer false positives
 than a simple difference (see Nix et al, BMC Bioinformatics, 2008).
-For enumerated datasets (e.g. tag counts from Next Generation 
-Sequencing), the datasets should be subsampled to equalize the sums 
-of the two datasets. The indices for the experimental and control columns 
+Prior to calculation, the sums of the two datasets are checked for 
+equality, and, if not equal, the larger dataset is sub-sampled to 
+match the smaller dataset. This function should be applied only to 
+enumerated data sets (e.g. Illumina sequence tags) and not to 
+microarray value data sets; it will not function on datasets in the 
+log2 space. The indices for the experimental and control datasets 
 may either requested from the user or supplied by the --exp and 
 --con command line options. 
 
-=item B<strandsign> (menu option 'si')
 
-Convert a column's values to signed data according to strand. Forward 
+=item B<subtract> (menu option 'u')
+
+Subtract a value from a dataset. A real number may be supplied, or the words
+'mean' or 'median' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
+
+=item B<divide> (menu option 'v')
+
+Divide a value from a dataset. A real number may be supplied, or the words
+'mean' or 'median' may be entered as a proxy for those statistical
+values of the dataset. The dataset may either be replaced or added
+as a new one. For automatic execution, specify the number using the
+--target option.
+
+=item B<strandsign> (menu option 'i')
+
+Convert a dataset's values to signed data according to strand. Forward 
 strand data is positive, and reverse strand is negative. This function 
 may not be appropriate with logarithmic or other datasets that include 
-negative values. Provide the index of a single column to convert. A 
-second column should provide the strand information and be labeled 
+negative values. Provide the index of a single dataset to convert. A 
+second dataset should provide the strand information and be labeled 
 with a name that includes either 'strand' or 'direction'. Strand 
 information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded 
-data may overwrite the data or written to a new column.
+data may overwrite the data or written to a new dataset.
 
-=item B<mergestrand> (menu option 'st')
+=item B<mergestrand> (menu option 't')
 
-Merge two stranded columns into a single new column, with the forward 
+Merge two stranded datasets into a single new dataset, with the forward 
 dataset represented as a positive value, and the reverse dataset as a 
 negative value. Datapoints which contain values on both strands are 
 recorded as a simple difference (forward - reverse). This function may 
 not be appropriate with logarithmic or other datasets that include 
-negative values. Provide the indices of the two columns as forward, 
+negative values. Provide the indices of the two datasets as forward, 
 reverse. Metadata is not checked for validity. 
 
 =item B<center> (menu option 'e')
 
 Center normalize the datapoints in a row by subtracting the mean or
-median of the datapoints. The range of columns is requested or 
+median of the datapoints. The range of datasets is requested or 
 provided by the --index option. Old values are replaced by new 
 values. This is useful for visualizing data as a heat map, for example.
 
 =item B<new> (menu option 'w')
 
-Generate a new column which contains an identical value for 
+Generate a new dataset (column) which contains an identical value for 
 each datapoint (row). The value may be either requested interactively or 
 supplied using the --target option. This function may be useful for 
 assigning a common value to all of the data points before joining the 
 data file with another.
-
-=item B<summary> (menu option 'y')
-
-Write out a summary of collected windowed data file, in which the mean 
-for each of the data columns is calculated, transposed (columns become 
-rows), and written to a new data file. This is essentially identical to 
-the summary function from the biotoolbox analysis scripts 
-L<map_relative_data.pl> and L<pull_features.pl>. It assumes that each 
-column has start and stop metadata. The program will automatically 
-identify available columns to summarize based on their name. In 
-interactive mode, it will request the contiguous range of start and 
-ending columns to summarize. The contiguous columns may also be 
-indicated using the --index option. By default, a new file using the 
-input file base name appended with '_summary' is written, or a 
-filename may be specified using the --out option.
 
 =item B<export> (menu option 'x')
 
@@ -5040,32 +4165,26 @@ use the same name!
 
 =item B<treeview> (menu option 'T')
 
-Export the data to the CDT format compatible with both Treeview and 
-Cluster programs for visualizing and/or generating clusters. Specify the 
-columns containing a unique name and the columns to be analyzed (e.g. 
---index <name>,<start-stop>). Extraneous columns are removed. 
-Additional manipulations on the columns may be performed prior to 
-exporting. These may be chosen interactively or using the codes 
-listed below and specified using the --target option.
-  
-  cg - median center features (rows)
-  cd - median center datasets (columns)
-  zd - convert columns to Z-scores
-  pd - convert columns to percentile ranks
-  L2 - convert values to log2
-  n0 - convert nulls to 0.0
-
-A simple Cluster data text file is written (default file name 
-"<basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The 
-original file will not be rewritten.
+Export the data into a format compatible with the Treeview program for 
+visualizing the data either as a heatmap or a dendrogram (when combined 
+with the Cluster program to generate the clusters or tree). Specify the 
+columns containing a unique name and the datasets to be analyzed (use 
+--index <name>,<start-stop>). Prior to exporting, additional columns are 
+deleted and the dataset columns are center normalized. A simple text 
+file is written (default file name "<basename>_tview.txt"). No changes 
+are made to the original file.
 
 =item B<rewrite> (menu option 'W')
 
 Force the data file contents to be re-written. Useful if you want to 
-write an intermediate file during numerous interactive manipulations. 
-Consider this as a 'Save as...'.
+write an intermediate file during numerous interactive manipulations, 
+or if you want to quickly convert between binary data store file and 
+text file formats via a commmand line tool (in which case, give the 
+--out file name with the appropriate extension).
 
 =back
+
+
 
 =head1 AUTHOR
 
@@ -5079,3 +4198,6 @@ Consider this as a 'Save as...'.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+=head1 TODO

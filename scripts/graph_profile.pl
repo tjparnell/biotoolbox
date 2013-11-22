@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to graph bezier-curve smoothed profile plots for summed genomic 
+# data, e.g. average gene, TSS data, etc.
 
 use strict;
 use Getopt::Long;
@@ -12,12 +13,10 @@ use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	parse_list
-	find_column_index
 );
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.12.6';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -41,36 +40,22 @@ my (
 	$min, 
 	$max, 
 	$x_index,
-	$dcolor,
 	$log,
-	$x_skip,
-	$x_offset,
-	$x_format,
-	$y_format,
-	$y_ticks,
 	$directory,
-	$help,
-	$print_version,
+	$help, 
 );
 GetOptions( 
-	'in=s'        => \$infile, # the input file
-	'index=s'     => \$data, # a list of datasets to graph
-	'all'         => \$all, # flag to plot all data sets individually
-	'cen!'        => \$center, # flag to center normalize the datasets
-	'min=f'       => \$min, # mininum y axis coordinate
-	'max=f'       => \$max, # maximum y axis coordinate
-	'xindex=i'    => \$x_index, # index of the X-axis values
-	'color=s'     => \$dcolor, # data colors
-	'log!'        => \$log, # values are in log, respect log status
-	'skip=i'      => \$x_skip, # number of ticks to skip on x axis
-	'offset=i'    => \$x_offset, # skip number of x axis ticks before labeling
-	'xformat=i'   => \$x_format, # format decimal numbers of x axis
-	'yformat=i'   => \$y_format, # format decimal numbers of y axis
-	'ytick=i'     => \$y_ticks, # number of ticks on y axis
-	'dir=s'       => \$directory, # optional name of the graph directory
-	'help'        => \$help, # flag to print help
-	'version'     => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'in=s'    => \$infile, # the input file
+	'index=s' => \$data, # a list of datasets to graph
+	'all'     => \$all, # flag to plot all data sets individually
+	'cen!'    => \$center, # flag to center normalize the datasets
+	'min=f'   => \$min, # mininum y axis coordinate
+	'max=f'   => \$max, # maximum y axis coordinate
+	'x=i'     => \$x_index, # index of the X-axis values
+	'log!'    => \$log, # values are in log, respect log status
+	'dir=s'   => \$directory, # optional name of the graph directory
+	'help'    => \$help, # flag to print help
+);
 
 if ($help) {
 	# print entire POD
@@ -79,13 +64,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script graph_profile.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 ##### Check required and default variables
@@ -107,15 +85,6 @@ unless (defined $log) {
 	# default is no log
 	$log = 0;
 }
-unless (defined $x_skip) {
-	$x_skip = 1;
-}
-unless (defined $x_offset) {
-	$x_offset = 0;
-}
-unless (defined $y_ticks) {
-	$y_ticks = 8;
-}
 
 
 
@@ -134,35 +103,30 @@ my $data_table_ref = $main_data_ref->{'data_table'};
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
+my ($name_i, $midpoint_i); # index numbers for the window name and midpoint
 for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	# check column header names for gene or window attribute information
 	my $name = $main_data_ref->{$i}{'name'}; # name of the dataset
-	
-	# skip some common index names
-	next if $name =~ /^(?:window|midpoint|name|type|start|stop|end|chromosome)$/i;
-	
-	# record the data set name
-	$dataset_by_id{$i} = $name;
+	# identify the indices for the window or midpoint
+	if ($name =~ /window/i) {
+		$name_i = $i;
+	}
+	elsif ($name =~ /midpoint/i) {
+		$midpoint_i = $i;
+	}
+	else { 
+		# record the data set name
+		$dataset_by_id{$i} = $name;
+	}
 }	
 
-# find the x index
-unless (defined $x_index) {
-	find_x_index();
-}
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
-}
-
-
-# check colors
-my @colors;
-if (defined $dcolor) {
-	@colors = split /,/, $dcolor;
 }
 
 
@@ -228,36 +192,6 @@ else {
 
 ##### Subroutines ##########
 
-## Find the x index if possible
-sub find_x_index {
-	
-	# automatically identify the X index if these columns are available
-	$x_index = find_column_index($main_data_ref, '^midpoint|start|position$');
-	$x_index = find_column_index($main_data_ref, '^window|name$') unless defined $x_index; 
-		# we are searching independently because summary files have the window
-		# column come before the midpoint column, and we prefer the midpoint
-	if (defined $x_index) {
-		print " using ", $main_data_ref->{$x_index}{'name'}, " as the X index column\n";
-	}
-	
-	# request from the user
-	unless (defined $x_index) {
-		print " These are the indices of the data file:\n";
-		foreach my $i (0 .. $main_data_ref->{'number_columns'} -1 ) {
-			print "   $i\t$dataset_by_id{$i}\n";
-		}
-		print " Please enter the X index:  \n";
-		$x_index = <STDIN>;
-		chomp $x_index;
-		unless (exists $main_data_ref->{$x_index}) {
-			die " Invalid X index!\n";
-		}
-	}
-}
-
-
-
-
 
 ## Subroutine to interact with user and ask for data set pairs to graph sequentially
 sub graph_datasets_interactively {
@@ -322,6 +256,19 @@ sub graph_this {
 	
 	# first collect the x values, which may be either user defined, the 
 	# window midpoint, or the window name
+	unless (defined $x_index) {
+		if (defined $midpoint_i) {
+			# we'll use the midpoint preferentially, for now
+			$x_index = $midpoint_i;
+		} 
+		elsif (defined $name_i) {
+			# if we didn't find that, use the window name
+			$x_index = $name_i;
+		}
+		else {
+			die "WTH!? no x index found!\n";
+		}
+	}
 	push @graph_data, []; # first empty sub-array for the x values
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		# we'll walk through the data table
@@ -415,20 +362,17 @@ sub graph_this {
 	# Initialize the graph
 	my $graph = GD::Graph::smoothlines->new(800,600);
 	$graph->set(
-		'title'             => 'Profile' . $main_data_ref->{'feature'},
 		'x_label'           => $main_data_ref->{$x_index}{'name'},
-		'x_label_position'  => 0.5,
+		'title'             => 'Profile' . $main_data_ref->{'feature'},
 		'transparent'       => 0, # no transparency
-		'line_width'        => 2,
-		'zero_axis'         => 1, 
-		'y_tick_number'     => $y_ticks,
+		'y_tick_number'     => 8,
 		'y_long_ticks'      => 0,
-		'y_number_format'   => defined $y_format ? 
-								'%.' . $y_format . 'f' : undef, # "%.2f"
-		'x_label_skip'      => $x_skip,
-		'x_tick_offset'     => $x_offset,
-		'x_number_format'   => defined $x_format ? 
-								'%.' . $x_format . 'f' : undef, # "%.2f"
+		'zero_axis'         => 1, 
+		'y_number_format'   => "%.2f",
+		'x_label_position'  => 0.5,
+		'x_label_skip'      => 2,
+		'line_width'        => 2,
+		
 	) or warn $graph->error;
 	
 	# Set the legend
@@ -445,19 +389,6 @@ sub graph_this {
 	$graph->set_x_axis_font(GD::gdSmallFont) or warn $graph->error;
 	$graph->set_y_axis_font(GD::gdSmallFont) or warn $graph->error;
 	
-	# Set the color if specified
-	if (@colors) {
-		if (scalar @colors >= scalar @datasets) {
-			# user must have set at least the number of colors that we 
-			# datasets
-			# we are not checking names, presume GD::Graph will do 
-			# that for us and complain as necessary
-			$graph->set( 'dclrs' => \@colors ) or warn $graph->error;
-		}
-		else {
-			warn " not enough colors provided! using default\n";
-		}
-	}
 	
 	# Set min max values on the graph if explicitly defined
 	if (defined $min) {
@@ -516,30 +447,22 @@ __END__
 
 graph_profile.pl
 
-A script to graph Y values along a genomic coordinate X-axis.
+A script to graph values along a specific X-axis
 
 =head1 SYNOPSIS
 
 graph_profile.pl <filename> 
    
-  Options:
-  --in <filename>
-  --index <index1,index2,...>
-  --all
-  --cen
-  --log
-  --xindex <index>
-  --skip <integer>
-  --offset <integer>
-  --xformat <integer>
-  --min <number>
-  --max <number>
-  --yformat <integer>
-  --ytick <integer>
-  --color <name,name,...>
-  --dir <foldername>
-  --version
-  --help
+   --in <filename>
+   --index <index1,index2,...>
+   --all
+   --(no)cen
+   --(no)log
+   --min <number>
+   --max <number>
+   --x <integer>
+   --dir <foldername>
+   --help
 
 =head1 OPTIONS
 
@@ -566,75 +489,33 @@ and a combination 5 and 6 graph.
 If no dataset indices are specified, then they may be chosen 
 interactively from a list.
 
-=item --all
+=item --(no)log
 
-Automatically graph all available datasets present in the file. 
+Dataset values are (not) in log2 space, or status should be respected 
+if indicated in the file metadata.
 
 =item --cen
 
-Datasets should (not) be median centered prior to graphing. Useful when 
-graphing multiple datasets together when they have different medians. 
-Default is false.
+Datasets should be median centered prior to graphing. Useful when 
+graphing multiple datasets together when they have different 
+medians.
 
-=item --log
-
-Dataset values are in log2 space, or status should be respected 
-if indicated in the file metadata.
-
-=item --xindex <index>
-
-Specify the column index of the X-axis dataset. Unless specified, the 
-program automatically uses the columns labeled 'Midpoint' or 'Window', 
-if present. 
-
-=item --skip <integer>
-
-Specify the ordinal number of X axis major ticks to label. This 
-avoids overlapping labels. The default is 1 (every tick is labeled).
-
-=item --offset <integer>
-
-Specify the number of X axis ticks to skip at the beginning before starting 
-to label them. This may help in adjusting the look of the graph. The 
-default is 0.
-
-=item --xformat <integer>
-
-Specify the number of decimal places the X axis labels should be formatted. 
-The default is undefined (no formatting).
-
-=item --min <number>
-
-=item --max <number>
+=item --min <number>, --max <number>
 
 Specify the minimum and/or maximum values for the Y-axis. The default 
 values are automatically determined from the dataset.
 
-=item --yformat <integer>
+=item --x <index>
 
-Specify the number of decimal places the Y axis labels should be formatted. 
-The default is undefined (no formatting).
-
-=item --ytick <integer>
-
-Specify explicitly the number of major ticks for the Y axes. 
-The default is 8.
-
-=item --color <name,name,...>
-
-Optionally specify the colors for the data lines. The default set 
-is lred, lgreen, lblue, lyellow, lpurple, cyan, and lorange. See the 
-documentation for L<GD::Graph::colour> for a complete list.
+Specify the index of the X-axis dataset. Unless specified, the program 
+automatically uses the columns labeled 'Midpoint' or 'Window', if 
+present. 
 
 =item --dir
 
 Optionally specify the name of the target directory to place the 
 graphs. The default value is the basename of the input file 
 appended with "_graphs".
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -668,3 +549,8 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+

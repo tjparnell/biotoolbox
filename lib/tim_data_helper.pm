@@ -14,13 +14,12 @@ our @EXPORT = qw(
 our @EXPORT_OK = qw(
 	generate_tim_data_structure
 	verify_data_structure
-	splice_data_structure
 	index_data_table
 	find_column_index
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.12';
+
 
 
 
@@ -46,10 +45,9 @@ sub generate_tim_data_structure {
 		'feature'        => $feature,
 		'db'             => q(),
 		'gff'            => 0,
-		'bed'            => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
-		'headers'        => @datasets ? 1 : 0,
+		'headers'        => 1,
 		'other'          => [],
 		'data_table'     => [],
 	);
@@ -139,290 +137,15 @@ sub verify_data_structure {
 			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
 	}
 	
-	# check for proper gff structure
-	if ($datahash_ref->{'gff'}) {
-		# if any of these checks fail, we will reset the gff version to 
-		# the default of 0, or no gff
-		my $gff_check = 1; # start with assumption it is true
-		
-		# check number of columns
-		if ($datahash_ref->{'number_columns'} != 9) {
-			$gff_check = 0;
-		}
-		
-		# check column indices
-		if (
-			exists $datahash_ref->{0} and
-			$datahash_ref->{0}{'name'} !~ 
-			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{1} and
-			$datahash_ref->{1}{'name'} !~ m/^source/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{2} and
-			$datahash_ref->{2}{'name'} !~ m/^type|method/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{3} and
-			$datahash_ref->{3}{'name'} !~ m/^start/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{4} and
-			$datahash_ref->{4}{'name'} !~ m/^stop|end/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{5} and
-			$datahash_ref->{5}{'name'} !~ m/^score|value/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{6} and
-			$datahash_ref->{6}{'name'} !~ m/^strand/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{7} and
-			$datahash_ref->{7}{'name'} !~ m/^phase/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $datahash_ref->{8} and
-			$datahash_ref->{8}{'name'} !~ m/^group|attribute/i
-		) {
-			$gff_check = 0;
-		}
-		
-		# update gff value as necessary
-		if ($gff_check == 0) {
-			# reset metadata
-			$datahash_ref->{'gff'} = 0;
-			$datahash_ref->{'headers'} = 1;
-			
-			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-				if (exists $datahash_ref->{$i}{'AUTO'}) {
-					delete $datahash_ref->{$i}{'AUTO'};
-				}
-			}
-		}
-	}
-	
-	# check for proper BED structure
-	if ($datahash_ref->{'bed'}) {
-		# if any of these checks fail, we will reset the bed flag to 0
-		# to make it not a bed file format
-		my $bed_check = 1; # start with assumption it is correct
-		
-		# check number of columns
-		if (
-			$datahash_ref->{'number_columns'} < 3 and 
-			$datahash_ref->{'number_columns'} > 12 
-		) {
-			$bed_check = 0;
-		}
-		
-		# check column index names
-		# we're assuming these names are derived from tim_file_helper or 
-		# something like it
-		if (
-			exists $datahash_ref->{0} and
-			$datahash_ref->{0}{'name'} !~ 
-			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{1} and
-			$datahash_ref->{1}{'name'} !~ m/^start/i
-		) {
-			$bed_check = 0;
-		}
-		if (
-			exists $datahash_ref->{2} and
-			$datahash_ref->{2}{'name'} !~ m/^stop|end/i
-		) {
-			$bed_check = 0;
-		}
-		
-		# the remaining columns are tricky, as they may or may not be 
-		# named as I expect, especially if it was generated de novo
-		# so only check these if the original file extension was bed
-		if (
-			exists $datahash_ref->{'extension'} and 
-			$datahash_ref->{'extension'} =~ /bed|bdg/i
-		) {
-			if (
-				exists $datahash_ref->{3} and
-				$datahash_ref->{3}{'name'} !~ m/^name|id|score/i
-				# for bed this should be name or ID
-				# for bedgraph this should be score
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{4} and
-				$datahash_ref->{4}{'name'} !~ m/^score|value/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{5} and
-				$datahash_ref->{5}{'name'} !~ m/^strand/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{6} and
-				$datahash_ref->{6}{'name'} !~ m/^thickstart/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{7} and
-				$datahash_ref->{7}{'name'} !~ m/^thickend/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{8} and
-				$datahash_ref->{8}{'name'} !~ m/^itemrgb/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{9} and
-				$datahash_ref->{9}{'name'} !~ m/^blockcount/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{10} and
-				$datahash_ref->{10}{'name'} !~ m/^blocksizes/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $datahash_ref->{11} and
-				$datahash_ref->{11}{'name'} !~ m/^blockstarts/i
-			) {
-				$bed_check = 0;
-			}
-		}
-		
-		# reset the BED tag value as appropriate
-		if ($bed_check) {
-			$datahash_ref->{'bed'} = $datahash_ref->{'number_columns'};
-		}
-		else {
-			# reset metadata
-			$datahash_ref->{'bed'} = 0;
-			$datahash_ref->{'headers'} = 1;
-			
-			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-				if (exists $datahash_ref->{$i}{'AUTO'}) {
-					delete $datahash_ref->{$i}{'AUTO'};
-				}
-			}
-		}
-	}
-	
-	# check proper SGR file structure
-	if (
-		$datahash_ref->{'extension'} =~ /sgr/i or
-		$datahash_ref->{'filename'} =~ /sgr/i
-	) {
-		# there is no sgr field in the data structure
-		# so we're just checking for the extension
-		# we will change the extension as necessary if it doesn't conform
-		if (
-			$datahash_ref->{'number_columns'} != 3 or
-			$datahash_ref->{0}{'name'} !~ /^chr|seq|ref/i or
-			$datahash_ref->{1}{'name'} !~ /^start|position/i
-		) {
-			# doesn't smell like a SGR file
-			# change the extension so the write subroutine won't think it is
-			# make it a text file
-			$datahash_ref->{'extension'} =~ s/sgr/txt/i;
-			$datahash_ref->{'filename'}  =~ s/sgr/txt/i;
-			$datahash_ref->{'headers'} = 1;
-			
-			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
-				if (exists $datahash_ref->{$i}{'AUTO'}) {
-					delete $datahash_ref->{$i}{'AUTO'};
-				}
-			}
-		}
+	# check for gff 
+	unless (defined $datahash_ref->{'gff'}) {
+		# default value
+		$datahash_ref->{'gff'} = 0;
 	}
 	
 	return 1;
 }
 
-
-
-### Split a data structure into an ordinal part for forking and parallel execution
-sub splice_data_structure {
-	my ($data, $part, $total_parts) = @_;
-	unless ($data) {
-		confess "no data structure passed for splicing\n";
-	}
-	unless ($part and $total_parts) {
-		confess "ordinal part and total number of parts not passed\n";
-	}
-	my $part_length = int($data->{'last_row'} / $total_parts);
-	
-	# splicing based on which part we do 
-	if ($part == 1) {
-		# remove all but the first part
-		splice( 
-			@{$data->{'data_table'}}, 
-			$part_length + 1 
-		);
-	}
-	elsif ($part == $total_parts) {
-		# remove all but the last part
-		splice( 
-			@{$data->{'data_table'}}, 
-			1,
-			$part_length * ($total_parts - 1) 
-		);
-	}
-	else {
-		# splicing in the middle requires two rounds
-		
-		# remove the last parts
-		splice( 
-			@{$data->{'data_table'}}, 
-			($part * $part_length) + 1
-		);
-		
-		# remove the first parts
-		splice( 
-			@{$data->{'data_table'}}, 
-			1,
-			$part_length * ($part - 1) 
-		);
-	}
-	
-	# update last row metadata
-	$data->{'last_row'} = scalar(@{$data->{'data_table'}}) - 1;
-}
 
 
 
@@ -508,13 +231,6 @@ sub index_data_table {
 sub find_column_index {
 	my ($data_ref, $name) = @_;
 	
-	# the $name variable will be used as a regex in identifying the name
-	# fix it so that it will possible accept a # character at the beginning
-	# without a following space, in case the first column has a # prefix
-	# also place the remainder of the text in a non-capturing parentheses for 
-	# grouping purposes while maintaining the anchors
-	$name =~ s/ \A (\^?) (.+) (\$?)\Z /$1#?(?:$2)$3/x;
-	
 	# walk through each column index
 	my $index;
 	for (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
@@ -538,7 +254,6 @@ sub parse_list {
 	# hence 1,2,5-7 would become an array of 1,2,5,6,7
 	
 	my $string = shift;
-	return unless defined $string;
 	if ($string =~ /[^\d,\-\s\&]/) {
 		carp " the string contains characters that can't be parsed\n";
 		return;
@@ -571,7 +286,7 @@ sub format_with_commas {
 	my $number = shift;
 	if ($number =~ /[^\d,\-\.]/) {
 		carp " the string contains characters that can't be parsed\n";
-		return $number;
+		return;
 	}
 	
 	# check for decimals
@@ -657,17 +372,10 @@ line and describes the type of features in the data file.
 
 =item gff
 
-This includes a scalar value of the source GFF file version, obtained 
-from either the GFF file pragma or the file extension. 
-The default value is 0 (not a GFF file). As such, it may be treated 
-as a boolean value.
-
-=item bed
-
-If the source file is a BED file, then this tag value is set to the 
-number of columns in the original BED file, an integer of 3 to 12. 
-The default value is 0 (not a BED file). As such, it may be treated 
-as a boolean value.
+This includes a scalar value with a boolean value 
+indicating whether the data was from a GFF file or not. Additionally, 
+if there was a GFF version line in the GFF file, the entire line 
+is stored as the true value.
 
 =item number_columns
 
@@ -693,9 +401,9 @@ automatically added when writing out to a text file.
 
 =item filename
 
-The original path and filename of the file opened and parsed. (Just in 
-case you forgot ;) Joking aside, missing extensions may have been added 
-to the filename by the different functions upon opening (a convenience for 
+The original filename of the file opened and parsed. Just in case you 
+forgot ;) Joking aside, missing extensions may have been added to the 
+filename by the different functions upon opening (a convenience for 
 users) in the case that they weren't initially provided. The actual 
 complete name will be found here.
 
@@ -708,13 +416,8 @@ file name.
 =item extension
 
 The known extension(s) of the original file name. Known extensions 
-currently include '.txt, .gff, .gff3, .bed, .sgr' as well as 
+currently include '.txt, .store, .gff, .gff3, .bed, .sgr' as well as 
 their gzip equivalents.
-
-=item path
-
-The parent directories of the original file. The full filename can be 
-regenerated by concatenating the path, basename, and extension.
 
 =item headers
 
@@ -762,14 +465,15 @@ position within the data_table, but you will still need to step
 through the features (rows) starting at the indexed position 
 until you find the row you want. That should save you a little bit 
 of time, at least. The index is not stored upon writing to a 
-standard tim data text file.
+standard tim data text file, but is stored in a binary .store file.
 
 =item index_increment
 
 This is a single number representing the increment value to calculate 
 the index value for the index. It is generated along with the index 
 by the index_data_table() function. The index_increment value is not 
-stored upon writing to a standard tim data text file.
+stored upon writing to a standard tim data text file, but is stored in 
+a binary .store file.
 
 =back
 
@@ -815,49 +519,12 @@ Example
 This subroutine verifies the data structure. It checks items such as the
 presence of the data table array, the number of columns in the data table
 and metadata, the metadata index of the last row, the presence of basic
-metadata, and verification of dataset names for each column. For data 
-structures with the GFF or BED tags set to true, it will verify the 
-format, including column number and column names; if a check fails, it 
-will reset the GFF or BED key to false. It will automatically correct 
-some simple errors, and complain about others.
+metadata and verification of dataset names for each column, and the status
+of the gff value. It will automatically correct some simple errors, and
+complain about others.
 
 Pass the data structure reference. It will return 1 if successfully 
 verified, or false if not.
-
-=item splice_data_structure()
-
-This function will splice an ordinal section out of a data structure in 
-preparation for forking and parallel execution. Pass the function 
-three parameters:
-    1. the data structure reference, as described here
-    2. the 1-based ordinal index to keep
-    3. the total number of parts to split the data structure
-Each spliced data structure will maintain the same metadata and 
-column headings (data table row 0), but the data table will have 
-only a fraction of the original data. 
-
-For example, to split a data table into four segments for parallel 
-execution in four children processes, call this function once in 
-each child, increasing the index (second parameter) each time.
-	
-	my $data = load_tim_data_file($file);
-	my $pm = Parallel::ForkManager->new(4);
-	for my $i (1..4) {
-		$pm->start and next;
-		### in child
-		splice_data_structure($data, $i, 4);
-		# do something with this fraction
-		write_tim_data_file('data' => $data, 'filename' => "file#$i");
-		$pm->finish;
-	}
-	$pm->wait_all_children;
-	
-The child data structure will be lost upon exiting the child process 
-unless it is saved somehow. The easiest thing is to write it to disk. 
-The biotoolbox script join_data_file.pl may then be used to join 
-the file segments back into a single file. The Parallel::ForkManager 
-also has a method of merging the data structure into the parent 
-process using a disk file intermediate.
 
 =item index_data_table()
 

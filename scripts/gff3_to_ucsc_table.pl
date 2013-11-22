@@ -1,19 +1,20 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert a GFF3 file to a UCSC style gene table
+
+# This should complement the biotoolbox scripts ucsc_table2gff3.pl and
+# get_ensembl_annotation.pl
+# 
+
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_db_helper::gff3_parser;
-use tim_file_helper qw(
-	open_to_read_fh
-	open_to_write_fh
-);
+use IO::File;
+use Bio::Tools::GFF;
+use Bio::SeqFeature::Generic;
 
-my $VERSION = '1.8.1';
+#use Data::Dumper;
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -34,21 +35,15 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
-	$bin,
-	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
 GetOptions( 
 	'in=s'      => \$infile, # the gff3 data file
 	'out=s'     => \$outfile, # name of output file 
-	'bin!'      => \$bin, # ucsc specific bin column
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -59,12 +54,6 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script gff3_to_ucsc_table.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 ### Check for requirements
@@ -72,7 +61,7 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($infile =~ /\.gff 3? (?: \.gz )? $/xi) {
+unless ($infile =~ /\.gff3?$/i) {
 	die " input file doesn't have a gff extension! Is this a GFF3 file?\n";
 }
 
@@ -85,34 +74,27 @@ if ($outfile) {
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff 3? (?: \.gz )? $/_ucsc_genetable.txt/xi;
-}
-unless (defined $gz) {
-	# mimic the input file as far as compression is concerned
-	$gz = 1 if $infile =~ m/\.gz$/i;
+	$outfile =~ s/\.gff3?$/_ucsc_genetable.txt/;
 }
 
-unless (defined $bin) {
-	$bin = 0;
-}
+
 
 
 ### Open the input and ouput files
 # Open the input GFF file
-my $in_fh = open_to_read_fh($infile) or 
+my $in_fh = new IO::File $infile, 'r';
+unless ($in_fh) {
 	die " unable to open input file '$infile'!\n";
+}
 
 # Open the output gene table file
-my $outfh = open_to_write_fh($outfile, $gz) or 
+my $outfh = new IO::File $outfile, 'w';
+unless ($outfh) {
 	die " unable to open file handle for '$outfile'!\n";
+}
 
 # Print headers
-if ($bin) {
-	$outfh->print("#bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
-}
-else {
-	$outfh->print("#name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
-}
+$outfh->print("#bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
 
 
 
@@ -163,23 +145,14 @@ sub process_gff_file_to_table {
 	# Without the directives, all feature objects loaded from the GFF3 file 
 	# will be kept open until the end of the file is reached. 
 	
-	# open gff3 parser object
-	my $parser = tim_db_helper::gff3_parser->new($infile) or
-		die " unable to open input file '$infile'!\n";
+	my $gff = Bio::Tools::GFF->new(-gff_version => 3) or 
+		die " unable to create GFF object!\n";
 	
-	
-	# process the features
-	while (my @top_features = $parser->top_features() ) {
+	while (my @top_features = collect_top_features($gff) ) {
 		
 		# processing statement
-		print " Collected ", scalar(@top_features), " features from ";
-		if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
-			# check whether all the features came from the same top sequence
-			print "sequence ID '", $top_features[0]->seq_id, "'\n";
-		}
-		else {
-			print "multiple sequences\n";
-		}
+		print " Collected ", scalar(@top_features), " features from ",
+			" region '", $top_features[0]->seq_id, "'\n";
 		
 		# Process the top features
 		while (@top_features) {
@@ -192,7 +165,7 @@ sub process_gff_file_to_table {
 			}
 			
 			# process the features
-			if ($type eq 'gene' or $type eq 'pseudogene') {
+			if ($type eq 'gene') {
 				# a gene object, we will need to process it's transcript subfeatures
 				
 				# process the gene object
@@ -220,7 +193,7 @@ sub process_gff_file_to_table {
 				process_nc_transcript($ucsc_transcript, $feature);
 			}
 			
-			elsif ($type =~ /transcript/i) {
+			elsif ($type =~ /transcript/) {
 				# we'll assume this is a protein_coding transcript?
 				# hopefully noncoding transcripts will be caught earlier
 				
@@ -257,8 +230,15 @@ sub initialize_transcript {
 	my $feature = shift;
 	
 	# collect the name for the transcript
-	my $name = $feature->display_name || $feature->primary_id;
+	my $name;
+	if ($feature->has_tag('Name')) {
+		# Use the Name tag
+		($name) = $feature->get_tag_values('Name');
+	}
+	else {
 		# Or at the very least the ID, it does have an ID, right?
+		($name) = $feature->get_tag_values('ID');
+	}
 	
 	# Fill the data hash
 	my %transcript = (
@@ -297,8 +277,6 @@ sub process_gene {
 	# we need to process the child subfeature transcripts
 	# these should be the first level subfeatures
 	# walk through each one
-	my $transcript_success = 0;
-	my $cds_count = 0;
 	foreach my $subfeat ($gene->get_SeqFeatures) {
 		
 		# check the type, and process accordingly
@@ -315,8 +293,6 @@ sub process_gene {
 			
 			# process the transcript
 			process_transcript($ucsc, $subfeat);
-			
-			$transcript_success++;
 		}
 		
 		elsif ($type =~ /rna/i) {
@@ -331,8 +307,6 @@ sub process_gene {
 			
 			# process the transcript
 			process_nc_transcript($ucsc, $subfeat);
-			
-			$transcript_success++;
 		}
 		
 		elsif ($type eq 'exon') {
@@ -345,33 +319,13 @@ sub process_gene {
 			next;
 		}
 		
-		elsif ($type eq 'CDS') {
-			# there is a CDS feature in this gene
-			# no RNA transcript defined
-			# presumed gene transcript is gene -> CDS
-			$cds_count++;
-		}
-		
 		else {
 			# catchall for unrecognized feature types
 			# record and warn at end
 			$unknowns{$type} += 1;
 			next;
 		}
-	}
-	
-	# check that we have made a RNA transcript
-	if (!$transcript_success and $cds_count) {
-		# if not, make a presumed transcript from any CDSs
 		
-		# initialize the gene table line structure
-		my $ucsc = initialize_transcript($gene);
-		
-		# identify a second name from the gene
-		collect_second_name($ucsc, $gene);
-		
-		# assume the gene is a transcript and process as such
-		process_transcript($ucsc, $gene);
 	}
 }
 
@@ -387,11 +341,15 @@ sub collect_second_name {
 		my @aliases = $feature->get_tag_values('Alias');
 		$ucsc->{'name2'} = join(',', @aliases);
 	}
+	elsif ($feature->has_tag('Name')) {
+		# Or use the Name tag
+		my @names = $feature->get_tag_values('Name');
+		$ucsc->{'name2'} = $names[0];
+	}
 	else {
-		# Or use the Name or ID or if all else fails the main name
-		my $name2 = $feature->display_name || $feature->primary_id ||
-			$ucsc->{'name'};
-		$ucsc->{'name2'} = $name2;
+		# Or at the very least the ID, it does have an ID, right?
+		my @IDs = $feature->get_tag_values('ID');
+		$ucsc->{'name2'} = $IDs[0];
 	}
 }
 
@@ -464,11 +422,6 @@ sub process_nc_transcript {
 	$ucsc->{'cdsStart'} = $transcript->end; # no cds, so set to end
 	$ucsc->{'cdsEnd'}   = $transcript->end;
 	
-	# identify a second name from the transcript if necessary
-	unless (defined $ucsc->{'name2'}) {
-		collect_second_name($ucsc, $transcript);
-	}
-		
 	# Get the subfeatures of the transcript
 	# these should be non-coding exons
 	my @subfeatures = $transcript->get_SeqFeatures;
@@ -508,9 +461,6 @@ sub process_nc_transcript {
 
 
 
-
-
-
 ### process UTR
 sub process_utr {
 	my ($ucsc, $utr) = @_;
@@ -526,12 +476,12 @@ sub process_utr {
 
 ### process coding Exon
 sub process_cds_exon {
-	my ($ucsc, $exon) = @_;
+	my ($ucsc, $utr) = @_;
 	
 	# record the coordinates and information for this exon
-	push @{ $ucsc->{'exonStarts'} }, $exon->start;
-	push @{ $ucsc->{'exonEnds'} }, $exon->end;
-	push @{ $ucsc->{'exonFrames'} }, $exon->phase;
+	push @{ $ucsc->{'exonStarts'} }, $utr->start;
+	push @{ $ucsc->{'exonEnds'} }, $utr->end;
+	push @{ $ucsc->{'exonFrames'} }, $utr->frame;
 	$ucsc->{'exonCount'} += 1;
 }
 
@@ -811,12 +761,10 @@ sub print_table_item {
 	
 	
 	### We finally print
-	my $string;
-	if ($bin) {
-		$string = "0\t";
-	}
-	$string .= join("\t", (
+	#print Dumper($ucsc);
+	my $string = join("\t", (
 	# bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames
+		0, # bin is for UCSC internal db use, just use a dummy number here
 		$ucsc->{'name'},
 		$ucsc->{'chr'},
 		$ucsc->{'strand'},
@@ -841,13 +789,116 @@ sub print_table_item {
 
 
 
+sub collect_top_features {
+	
+	# the gff feature processor
+	my $gff = shift; 
+	
+	# initialize
+	my @top_features;
+	my @orphan_features;
+	my %loaded; # hash of loaded features
+	
+	# Collect the top features
+	# we will use a global input filehandle, that way we can repeatedly call 
+	# the subroutine and continue to subsequently read the file
+	# we will continue to read the file until we either reach the file end
+	# or we reach a close features directive (###)
+	while (my $line = $in_fh->getline) {
+		
+		chomp $line;
+		
+		# check the gff version
+		if ($line =~ /^##gff-version (\d)$/) {
+			unless ($1 == 3) {
+				die " Input GFF file is not version 3!\n" ;
+			}
+			next;
+		}
+		
+		# skip comment lines
+		next if $line =~ /^# /; 
+		
+		# close features directive line, all subfeatures have been loaded for 
+		# this chromosome/scaffold
+		last if $line =~ /^###/;
+		
+		# generate the SeqFeature object for this GFF line
+		my $feature = Bio::SeqFeature::Generic->new();
+			# sorry, we can't use SeqFeature::Lite, no frame method
+		$gff->from_gff_string($feature, $line);
+		
+		# process the feature
+		my ($id) = $feature->get_tag_values('ID');
+		if (exists $loaded{$id}) {
+			die " Feature ID '$id' occurs more than once in file!\n";
+		} 
+		else {
+			$loaded{$id} = $feature;
+		}
+		
+		# look for parents and children
+		if ($feature->has_tag('Parent')) {
+			# must be a child
+			my ($parent) = $feature->get_tag_values('Parent');
+			if (exists $loaded{$parent}) {
+				# we've seen this id
+				# associate the child with the parent
+				$loaded{$parent}->add_SeqFeature($feature);
+			}
+			else {
+				# can't find the parent, maybe not loaded yet?
+				# put 'em in the orphanage
+				push @orphan_features, $feature;
+			}
+		}
+		else {
+			# must be a parent
+			push @top_features, $feature;
+		}
+	}
+	# Finished loading the GFF lines (so far....)
+	
+	# check for orphans
+	if (@orphan_features) {
+		
+		my $lost_count = 0;
+		while (my $feature = shift @orphan_features) {
+			
+			# find the parent
+			my ($parent) = $feature->get_tag_values('Parent');
+			if (exists $loaded{$parent}) {
+				# we've seen this id
+				# associate the child with the parent
+				$loaded{$parent}->add_SeqFeature($feature);
+			}
+			else {
+				# can't find the parent
+				# forget about them, just another statistic
+				$lost_count++;
+			}
+		}
+		
+		# report
+		if ($lost_count) {
+			warn " $lost_count features could not be associated with" . 
+				" reported parents!\n";
+		}
+	}
+	
+	# finished (for now)
+	return @top_features;
+}
+
+
+
+
+
 __END__
 
 =head1 NAME
 
 gff3_to_ucsc_table.pl
-
-A script to convert a GFF3 file to a UCSC style gene table
 
 =head1 SYNOPSIS
 
@@ -856,10 +907,8 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
-  --bin
-  --gz
-  --version
   --help
+
 
 =head1 OPTIONS
 
@@ -869,28 +918,12 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the input GFF3 file. The file may be compressed with gzip.
+Specify the input GFF3 file. The file should not be compressed with gzip.
 
 =item --out <filename>
 
 Specify the output filename. By default it uses input file base name 
-appened with '_ucsc_genetable.txt'.
-
-=item --bin
-
-Specify whether the UCSC table-specific column bin should be included as 
-the first column in the table. This column is reserved for internal 
-UCSC database use, and, if included here, will simply be populated with 
-0s. The default behavior is to not include it.
-
-=item --gz
-
-Specify whether (or not) the output file should be compressed with gzip. 
-The default is to mimic the status of the input file
-
-=item --version
-
-Print the version number.
+appened with '_refseq.txt'.
 
 =item --help
 
@@ -910,7 +943,7 @@ transcript features in the GFF3 file. This assumes the standard
 parent->child relationship using the primary tags of 
 gene -> mRNA -> [CDS, five_prime_utr, three_prime_utr]. 
 Additional features (exon, start_codon, stop_codon, transcript) 
-will be safely ignored.  
+will be safely ignored. 
 
 It will also process non-coding transcripts, including all non-coding 
 RNAs; all subfeatures of non-coding RNAs will be considered as exons.
@@ -919,11 +952,10 @@ The cdsStartStat and cdsEndStat fields are populated depending on
 whether five- or three-prime UTRs exist; this may or may not reflect 
 the actual status according to UCSC. 
 
-For very large GFF3 files, it is helpful to include close feature 
-directive pragmas (lines with ###) after the annotation for each 
-reference sequence (see the GFF3 specification at 
-http://www.sequenceontology.org/resources/gff3.html). Fasta sequence 
-in the GFF3 file is ignored.
+The bin field is reserved for internal UCSC database use; it is 
+automatically filled with a generic 0 in the output file.
+
+
 
 =head1 AUTHOR
 
@@ -937,3 +969,4 @@ in the GFF3 file is ignored.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

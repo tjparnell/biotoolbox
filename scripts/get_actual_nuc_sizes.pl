@@ -1,12 +1,13 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to pull out actual nucleosome fragments and enumerate their sizes
 
 use strict;
 use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean stddevp median min max);
+eval {use Bio::DB::Sam};
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_file_helper qw(
@@ -14,15 +15,9 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-eval {
-	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
-};
-my $VERSION = '1.10';
 
 
-print "\n A script to get exact nucleosome fragment sizes from a Bam file\n\n";
+print "\n A script to get exact nucleosome fragment sizes from a bam file\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -47,8 +42,7 @@ my (
 	$type,
 	$source,
 	$outfile,
-	$help,
-	$print_version,
+	$help, 
 );
 GetOptions( 
 	'in=s'       => \$infile, # the input nucleosome data file
@@ -62,8 +56,7 @@ GetOptions(
 	'source=s'   => \$source, # the GFF source
 	'out=s'      => \$outfile, # output file name
 	'help'       => \$help, # request help
-	'version'    => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 # Print help
 if ($help) {
@@ -72,12 +65,6 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
-}
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script get_actual_nuc_sizes.pl, version $VERSION\n\n";
-	exit;
 }
 
 
@@ -104,10 +91,10 @@ unless (
 }
 
 # BAM file
-unless (exists &open_bam_db) {
-	die " unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
-}
-my $sam = open_bam_db($infile) or die " unable to open bam file '$infile'!\n";
+my $sam = Bio::DB::Sam->new( 
+	-bam        => $bamfile,
+	-autoindex  => 1,
+) or die " unable to open input bam file '$bamfile'!\n";
 
 
 
@@ -135,10 +122,10 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-);
+} );
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -164,7 +151,7 @@ if ($gff) {
 	}
 	
 	# write
-	$success = convert_and_write_to_gff_file(
+	$success = convert_and_write_to_gff_file( {
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -173,7 +160,7 @@ if ($gff) {
 		'type'     => $type,
 		'source'   => $source,
 		'tag'      => [6, $std_i], # fuzziness, stdev of length
-	);
+	} );
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -396,8 +383,6 @@ __END__
 
 get_actual_nuc_sizes.pl
 
-A script to pull out actual nucleosome fragments and enumerate their sizes.
-
 =head1 SYNOPSIS
 
   get_actual_nuc_sizes.pl --in <file1.txt> --bam <file2.bam> [--options]
@@ -413,8 +398,8 @@ A script to pull out actual nucleosome fragments and enumerate their sizes.
   --type <gff_type>
   --source <gff_source>
   --out <filename>
-  --version
   --help
+
 
 =head1 OPTIONS
 
@@ -478,10 +463,6 @@ GFF file. The default value is the name of this program.
 
 Provide a new output file name. By default it overwrites the input file.
 
-=item --version
-
-Print the version number.
-
 =item --help
 
 Display the POD documentation
@@ -508,6 +489,7 @@ sequence read-pair fragments, and the standard deviation of the fragment
 lengths. In addition to writing a new data file, it can optionally write 
 a GFF3 file.
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -520,3 +502,9 @@ a GFF3 file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
