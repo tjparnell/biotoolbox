@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to intersect two lists of nucleosomes
 
 use strict;
 use Getopt::Long;
@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.10';
+#use Data::Dumper;
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 
@@ -48,8 +48,7 @@ my (
 	$type,
 	$source,
 	$gz,
-	$help,
-	$print_version,
+	$help
 ); 
 
 # Command line options
@@ -57,15 +56,13 @@ GetOptions(
 	'in1=s'      => \$infile1, # input file one
 	'in2=s'      => \$infile2, # input file two
 	'out=s'      => \$outfile, # output filename
-	'force_strand|set_strand' => \$set_strand, # artificially enforce a strand for target
-				# force_strand is preferred option, but respect the old option
+	'set_strand' => \$set_strand, # artificially enforce a strand for target
 	'gff!'       => \$gff, # output gff file
 	'type=s'     => \$type, # the gff type
 	'source=s'   => \$source, # the gff source
 	'gz!'        => \$gz, # gzip status
 	'help'       => \$help, # help
-	'version'    => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 
 # Print help
@@ -76,14 +73,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script intersect_nucs.pl, version $VERSION\n\n";
-	exit;
-}
-
-
 
 # Check for required values
 unless ($infile1 and $infile2) {
@@ -148,10 +137,10 @@ unless ($outfile) {
 	$outfile = 'intersection_' . $data1->{'basename'} . '_' . 
 		$data2->{'basename'};
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'     => $output,
 	'filename' => $outfile,
-);
+} );
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -169,7 +158,7 @@ if ($gff) {
 		# set default source, the name of this program
 		$source = 'intersect_nucs.pl';
 	}
-	$success = convert_and_write_to_gff_file(
+	$success = convert_and_write_to_gff_file( {
 		'data'     => $output,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -177,7 +166,7 @@ if ($gff) {
 		'strand'   => 3,
 		'type'     => $type,
 		'source'   => $source,
-	);
+	} );
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -656,17 +645,17 @@ A script to intersect two lists of nucleosomes.
 
 intersect_nucs.pl [--options...] <filename_1> <filename_2>
   
-  Options:
   --in1 <filename1>
   --in2 <filename2>
+  --set_strand
   --out <filename>
-  --force_strand
   --gff
   --type <gff_type>
   --source <gff_source>
-  --gz
-  --version
+  --(no)gz
   --help
+
+
 
 =head1 OPTIONS
 
@@ -674,9 +663,7 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --in1 <filename>
-
-=item --in2 <filename>
+=item --in1 <filename>, --in2 <filename>
 
 Specify two files of nucleosome lists. The files must contain sorted
 genomic position coordinates for each nucleosome. Supported file formats
@@ -686,17 +673,17 @@ the target, while the file with the most is designated as the reference
 list. When files with equivalent numbers are provided, the first file 
 is target.
 
-=item --out <filename>
-
-Specify the output file name. The default is "intersection_" appended 
-with both input names.
-
-=item --force_strand
+=item --set_strand
 
 Force the target nucleosomes to be considered as stranded. This enforces 
 an orientation and affects the direction of any reported nucleosome shift. 
 A column with a label including 'strand' is required in the target file. 
 The default is false.
+
+=item --out <filename>
+
+Specify the output file name. The default is "intersection_" appended 
+with both input names.
 
 =item --gff
 
@@ -712,15 +699,6 @@ writing the GFF file. The default value is "nucleosome_intersection".
 
 Provide the text to be used as the GFF source used in writing the 
 GFF file. The default value is the name of this program.
-
-=item --gz
-
-Specify whether (or not) the output files should be compressed 
-with gzip. 
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -750,6 +728,8 @@ features, for example, nucleosomes flanking a transcription start site.
 A summary and statistics of the intersection are printed to standard output 
 upon completion.
 
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -762,3 +742,12 @@ upon completion.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+

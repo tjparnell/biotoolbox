@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to graph histogram plots for one or two microarray data sets
 
 use strict;
 use Getopt::Long;
@@ -17,7 +17,6 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.10.3';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -47,8 +46,7 @@ my (
 	$x_offset,
 	$x_format,
 	$directory,
-	$help,
-	$print_version,
+	$help
 );
 GetOptions( 
 	'in=s'        => \$infile, # the input file
@@ -66,8 +64,7 @@ GetOptions(
 	'format=i'    => \$x_format, # format decimal numbers of x axis
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
-	'version'     => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 if ($help) {
 	# print entire POD
@@ -76,13 +73,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script graph_histogram.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
@@ -124,10 +114,6 @@ unless (defined $x_skip) {
 }
 unless (defined $x_format) {
 	$x_format = 0;
-	# set it to equal the number of decimals in binsize
-	if ($binsize =~ /\.(\d+)$/) {
-		$x_format = length $1;
-	}
 }
 unless (defined $x_offset) {
 	$x_offset = 0;
@@ -159,7 +145,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'};
 	if (
 		# check column header names for gene or window attribute information
-		$name =~ /^(?:name|id|alias|chromosome|start|stop|end|strand|type|class)$/i
+		$name =~ /^name|id|alias|chr|ref|start|stop|end|strand|type|class/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -173,14 +159,13 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 
 # determine the bins for the frequency distribution
 my @bins; # an array for the bins
-my $format = $binsize =~ /\.(\d+)$/ ? length $1 : $x_format;
-for my $i (1 .. $binnumber) {
-	push @bins, sprintf "%.$format" . "f", $start + ($i * $binsize);
+for (my $i = $start; $i <= $max; $i += $binsize) {
+	push @bins, $i;
 }
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
@@ -317,11 +302,7 @@ sub graph_one {
 		my $y = $data_table_ref->[$i][$index];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
-		unless (
-			$y eq '.' or 
-			$y < $start or
-			$y > $max
-		) {
+		if ($y ne '.') {
 			push @values, $y; # put into the values array
 		}
 	}
@@ -368,18 +349,10 @@ sub graph_two {
 		my $value2 = $data_table_ref->[$i][$index2];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
-		unless (
-			$value1 eq '.' or
-			$value1 < $start or
-			$value1 > $max
-		) {
+		if ($value1 ne '.') {
 			push @values1, $value1; # put into the values array
 		}
-		unless (
-			$value2 eq '.' or
-			$value2 < $start or
-			$value2 > $max
-		) {
+		if ($value2 ne '.') {
 			push @values2, $value2; # put into the values array
 		}
 	}
@@ -572,33 +545,29 @@ __END__
 
 graph_histogram.pl
 
-A script to graph a histogram (bar or line) of one or more datasets.
+A script to graph a histogram of a dataset of values
 
 =head1 SYNOPSIS
 
 graph_histogram.pl --bins <integer> --size <number> <filename> 
-
 graph_histogram.pl --bins <integer> --max <number> <filename> 
-
 graph_histogram.pl --size <number> --max <number> <filename> 
    
-  Options:
-  --in <filename>
-  --index <column_index>
-  --bins <integer>
-  --size <number>
-  --min <number>
-  --max <number>
-  --ymax <integer>
-  --yticks <integer>
-  --skip <integer>
-  --offset <integer>
-  --format <integer>
-  --lines
-  --out <base_filename>
-  --dir <output_directory>
-  --version
-  --help
+   --in <filename>
+   --index <column_index>
+   --bins <integer>
+   --size <number>
+   --min <number>
+   --max <number>
+   --ymax <integer>
+   --yticks <integer>
+   --skip <integer>
+   --offset <integer>
+   --format <integer>
+   --lines
+   --out <base_filename>
+   --dir <output_directory>
+   --help
 
 =head1 OPTIONS
 
@@ -669,7 +638,7 @@ default is 0.
 =item --format <integer>
 
 Specify the number of decimal places the X axis labels should be formatted. 
-The default is the number of decimal places in the bin size parameter.
+The default is 0.
 
 =item --lines
 
@@ -686,10 +655,6 @@ Optionally specify the output filename prefix. The default value is
 Optionally specify the name of the target directory to place the 
 graphs. The default value is the basename of the input file 
 appended with "_graphs".
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -718,3 +683,18 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -6,7 +6,6 @@ require Exporter;
 use Carp;
 use Config::Simple;
 use FindBin qw($Bin);
-our $VERSION = '1.5.9';
 
 
 ### Get the Configuration File 

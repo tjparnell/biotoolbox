@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to graph bezier-curve smoothed profile plots for summed genomic 
+# data, e.g. average gene, TSS data, etc.
 
 use strict;
 use Getopt::Long;
@@ -17,7 +18,6 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.12.6';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -49,8 +49,7 @@ my (
 	$y_format,
 	$y_ticks,
 	$directory,
-	$help,
-	$print_version,
+	$help, 
 );
 GetOptions( 
 	'in=s'        => \$infile, # the input file
@@ -69,8 +68,7 @@ GetOptions(
 	'ytick=i'     => \$y_ticks, # number of ticks on y axis
 	'dir=s'       => \$directory, # optional name of the graph directory
 	'help'        => \$help, # flag to print help
-	'version'     => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+);
 
 if ($help) {
 	# print entire POD
@@ -79,13 +77,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script graph_profile.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 ##### Check required and default variables
@@ -139,7 +130,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'}; # name of the dataset
 	
 	# skip some common index names
-	next if $name =~ /^(?:window|midpoint|name|type|start|stop|end|chromosome)$/i;
+	next if $name =~ /window|midpoint|name|type/i;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
@@ -152,7 +143,7 @@ unless (defined $x_index) {
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
@@ -232,18 +223,15 @@ else {
 sub find_x_index {
 	
 	# automatically identify the X index if these columns are available
-	$x_index = find_column_index($main_data_ref, '^midpoint|start|position$');
-	$x_index = find_column_index($main_data_ref, '^window|name$') unless defined $x_index; 
-		# we are searching independently because summary files have the window
-		# column come before the midpoint column, and we prefer the midpoint
-	if (defined $x_index) {
-		print " using ", $main_data_ref->{$x_index}{'name'}, " as the X index column\n";
-	}
+	$x_index = 
+		find_column_index($main_data_ref, 'midpoint') || 
+		find_column_index($main_data_ref, 'window')   ||
+		find_column_index($main_data_ref, 'name');
 	
 	# request from the user
 	unless (defined $x_index) {
 		print " These are the indices of the data file:\n";
-		foreach my $i (0 .. $main_data_ref->{'number_columns'} -1 ) {
+		foreach my $i (sort {$a <=> $b} keys %dataset_by_id) {
 			print "   $i\t$dataset_by_id{$i}\n";
 		}
 		print " Please enter the X index:  \n";
@@ -516,30 +504,28 @@ __END__
 
 graph_profile.pl
 
-A script to graph Y values along a genomic coordinate X-axis.
+A script to graph values along a specific X-axis
 
 =head1 SYNOPSIS
 
 graph_profile.pl <filename> 
    
-  Options:
-  --in <filename>
-  --index <index1,index2,...>
-  --all
-  --cen
-  --log
-  --xindex <index>
-  --skip <integer>
-  --offset <integer>
-  --xformat <integer>
-  --min <number>
-  --max <number>
-  --yformat <integer>
-  --ytick <integer>
-  --color <name,name,...>
-  --dir <foldername>
-  --version
-  --help
+   --in <filename>
+   --index <index1,index2,...>
+   --all
+   --(no)cen
+   --(no)log
+   --xindex <index>
+   --skip <integer>
+   --offset <integer>
+   --xformat <integer>
+   --min <number>
+   --max <number>
+   --yformat <integer>
+   --ytick <integer>
+   --color <name,name,...>
+   --dir <foldername>
+   --help
 
 =head1 OPTIONS
 
@@ -570,15 +556,14 @@ interactively from a list.
 
 Automatically graph all available datasets present in the file. 
 
-=item --cen
+=item --(no)cen
 
 Datasets should (not) be median centered prior to graphing. Useful when 
-graphing multiple datasets together when they have different medians. 
-Default is false.
+graphing multiple datasets together when they have different medians.
 
-=item --log
+=item --(no)log
 
-Dataset values are in log2 space, or status should be respected 
+Dataset values are (not) in log2 space, or status should be respected 
 if indicated in the file metadata.
 
 =item --xindex <index>
@@ -632,10 +617,6 @@ Optionally specify the name of the target directory to place the
 graphs. The default value is the basename of the input file 
 appended with "_graphs".
 
-=item --version
-
-Print the version number.
-
 =item --help
 
 Print this help documenation
@@ -668,3 +649,8 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+

@@ -1,16 +1,12 @@
-#!/usr/bin/env perl
-
-# documentation at end of file
+#!/usr/bin/perl
 
 # this script was copied directly from Bio::Graphics::Glyph::ideogram 
 
 use strict;
-my $VERSION = '1.0.0';
 my %stains;
 my %centros;
 my %chrom_ends;
 
-print "\n A script to generate a GBrowse compatible GFF3 cytoband file\n\n";
 
 foreach (@ARGV) {
     if (/^(ftp|http|https):/) {

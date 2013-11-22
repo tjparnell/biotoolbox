@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to generate GFF3 files for bigwig, bigbed, and bam files
 
 use strict;
 use Getopt::Long;
@@ -33,7 +33,6 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.10';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -59,8 +58,7 @@ my (
 	$write_metadata,
 	$set_name,
 	$write_conf,
-	$help,
-	$print_version,
+	$help
 );
 my @infiles;
 my @types;
@@ -81,9 +79,8 @@ GetOptions(
 	'set!'      => \$write_metadata, # write a metadata index file for BigWigSet
 	'setname=s' => \$set_name, # name for the bigwigset
 	'conf!'     => \$write_conf, # write GBrowse conf stanzas
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -92,12 +89,6 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
-}
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script big_file2gff3.pl, version $VERSION\n\n";
-	exit;
 }
 
 
@@ -169,18 +160,8 @@ if (@strands) {
 
 # target directory
 if (defined $path) {
-	
-	# clean up path as necessary
 	$path = File::Spec->rel2abs($path);
 	$path = File::Spec->canonpath($path);
-	
-	# add the set name to the path to make a subdirectory
-	if ($set_name) {
-		unless ($path =~ m/$set_name\Z/) {
-			$path = File::Spec->catdir($path, $set_name);
-		}
-	}
-	
 	unless (-e $path) {
 		make_path($path) or die "unable to generate target directory: '$path'";
 	}
@@ -258,10 +239,7 @@ while (@infiles) {
 		$name = $infile_basename;
 	}
 	$name =~ s/[_\.\-]?sort(?:ed)?//i; # remove the sorted name if present
-	
-	# generate a display name without underscores, periods
-	my $display_name = $name;
-	$display_name =~ s/_|\./ /g; # substitute any underscores or periods with spaces
+	$name =~ s/_|\./ /g; # substitute any underscores or periods with spaces
 	
 	
 	# determine gff type
@@ -363,7 +341,7 @@ while (@infiles) {
 	}
 	
 	# convert the data structure to GFF for writing
-	convert_genome_data_2_gff_data(
+	convert_genome_data_2_gff_data( {
 		'data'       => $main_data_ref,
 		'version'    => 3,
 		'source'     => $source,
@@ -371,7 +349,7 @@ while (@infiles) {
 		'name'       => $name,
 		'strand'     => 3,
 		'tags'       => [4],
-	) or die " unable to convert data to GFF format!\n";
+	} ) or die " unable to convert data to GFF format!\n";
 	
 	# write new or append existing GFF file
 	if (-e $gff_file) {
@@ -403,10 +381,10 @@ while (@infiles) {
 			$main_data_ref->{'last_row'} += scalar(@chromodata);
 		}
 		
-		my $success = write_tim_data_file(
+		my $success = write_tim_data_file( {
 			'data'       => $main_data_ref,
 			'filename'   => $gff_file,
-		);
+		} );
 		if ($success) {
 			print "  wrote GFF3 file '$success'\n";
 		}
@@ -425,9 +403,9 @@ while (@infiles) {
 		push @metadata, "[$target_basename$infile_ext]\n";
 		
 		# add metadata
-		push @metadata, "type         = $gfftype\n";
+		push @metadata, "primary_tag  = $gfftype\n";
 		push @metadata, "source       = $source\n";
-		push @metadata, "display_name = $display_name\n";
+		push @metadata, "display_name = $name\n";
 		if ($strand =~ /^f|w|\+|1/) {
 			push @metadata, "strand       = 1\n";
 		}
@@ -467,7 +445,7 @@ while (@infiles) {
 			push @confdata, "# min_score  = 0\n";
 			push @confdata, "# max_score  = 50\n";
 			push @confdata, "height       = 50\n";
-			push @confdata, "key          = $display_name\n";
+			push @confdata, "key          = $name\n";
 			push @confdata, "category     = $set_name\n";
 			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
 			push @confdata, "\n\n";
@@ -497,7 +475,7 @@ while (@infiles) {
 			push @confdata, "glyph        = segments\n";
 			push @confdata, "stranded     = 1\n";
 			push @confdata, "label        = 1\n";
-			push @confdata, "key          = $display_name\n";
+			push @confdata, "key          = $name\n";
 			push @confdata, "category     = $set_name\n";
 			push @confdata, "citation     = Data file $infile_basename$infile_ext\n";
 			
@@ -524,7 +502,7 @@ while (@infiles) {
 			push @confdata, "mismatch_color = red\n";
 			push @confdata, "bgcolor        = blue\n";
 			push @confdata, "fgcolor        = white\n";
-			push @confdata, "key            = $display_name\n";
+			push @confdata, "key            = $name\n";
 			push @confdata, "category       = $set_name\n";
 			push @confdata, "citation       = Data file $infile_basename$infile_ext\n";
 			push @confdata, "\n";
@@ -578,29 +556,19 @@ if ($write_conf) {
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
-		# generate stanza name
-		my $stanza_name;
-		if ($set_name eq $source) {
-			# avoid duplication 
-			$stanza_name = $source;
-		}
-		else {
-			$stanza_name = "$source\_$set_name";
-		}
-		
 		# add the database stanza, in reverse order
-		push @confdata, "[$stanza_name\_db:database]\n";
+		push @confdata, "[$source\_$set_name\_db:database]\n";
 		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
 		push @confdata, "db_args      = -dir $path\n";
 		push @confdata, "               -feature_type summary\n\n";
 		
 		# generate the conf stanzas 
-		push @confdata, "[$stanza_name]\n";
-		push @confdata, "database     = $stanza_name\_db\n";
+		push @confdata, "[$source\_$set_name]\n";
+		push @confdata, "database     = $source\_$set_name\_db\n";
 		push @confdata, "feature      = " . 
 			# using the gfftype
 			join(" ", map {$_->[0]} @subtracks) . "\n";
-		push @confdata, "subtrack select = Feature type\n";
+		push @confdata, "subtrack select = Feature primary_tag\n";
 		for my $i (0 .. $#subtracks) {
 			# create subtrack table 
 			# each item has gfftype and name in anon array
@@ -861,13 +829,10 @@ __END__
 
 big_file2gff3.pl
 
-A script to generate GFF3 files for bigwig, bigbed, and bam files.
-
 =head1 SYNOPSIS
 
 big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   
-  Options:
   --in <file> or <file1,file2,...>
   --path </destination/path/for/bigfiles/>
   --source <text>
@@ -879,9 +844,9 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --set
   --setname <text>
   --conf
-  --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -904,7 +869,7 @@ destination does not exist, then it will created. This directory should be
 writeable by the user and readable by all (or at least the Apache and MySQL
 users). If the input files are not currently located here, they will be
 copied to the directory for you. Note that when generating a BigWigSet, a
-subdirectory with the set name (option --setname) will be made for you. The
+unique directory for just the indicated files should be provided. The
 default path is the current path for the input file.
 
 =item --source <text>
@@ -960,9 +925,8 @@ added if desired. The default is false.
 
 Optionally specify the name for the BigWigSet track when writing the 
 GBrowse configuration stanza. It is also used as the basename for the 
-GFF3 file, as well as the name of the new subdirectory in the target path 
-for use as the BigWigSet directory. The default is to use the name of 
-the last directory in the target path.
+GFF3 file. The default is to use the name of the last directory in the 
+target path.
 
 =item --conf
 
@@ -970,10 +934,6 @@ Write sample GBrowse database and track configuration stanzas. Each BigFile
 file will get individual stanzas, unless the --set option is enabled, where 
 a single stanza with subtracks for the BigWigSet is generated. This is 
 helpful when setting up GBrowse database and configurations. Default is false.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -1013,6 +973,8 @@ written to the current directory to facilitate setting up GBrowse. If a
 BigWigSet database is requested, then the track stanza will be set up with 
 subtrack tables representing each BigWig file. 
 
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1025,3 +987,6 @@ subtrack tables representing each BigWig file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+

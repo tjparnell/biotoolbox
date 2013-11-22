@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert a data file to a bed file
 
 use strict;
 use Getopt::Long;
@@ -10,12 +10,19 @@ use lib "$Bin/../lib";
 use tim_data_helper qw(
 	find_column_index
 );
-use tim_big_helper qw(bed_to_bigbed_conversion);
+use tim_db_helper qw(
+	open_db_connection
+);
 use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10.2';
+use tim_db_helper::config;
+eval {
+	# check for bigbed file conversion support
+	require tim_db_helper::bigbed;
+	tim_db_helper::bigbed->import;
+};
 
 print "\n This program will write a BED file\n";
 
@@ -48,8 +55,7 @@ my (
 	$database,
 	$chromo_file,
 	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
@@ -69,9 +75,8 @@ GetOptions(
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bbapp=s'   => \$bb_app_path, # path to bedToBigBed utility
 	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -80,12 +85,6 @@ if ($help) {
 		'-verbose' => 2,
 		'-exitval' => 1,
 	} );
-}
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script data2bed.pl, version $VERSION\n\n";
-	exit;
 }
 
 
@@ -209,9 +208,8 @@ if ($ask) {
 	
 	# request name index or text
 	unless (defined $name) {
-		my $suggestion = find_column_index($metadata_ref, 'name|ID');
 		print " Enter the index for the feature name column or\n" . 
-			"   the base text for auto-generated names [$suggestion]  ";
+			"   the base text for auto-generated names   ";
 		my $in = <STDIN>;
 		if ($in =~ /^(\d+)$/) {
 			$name_index = $1;
@@ -219,44 +217,44 @@ if ($ask) {
 		elsif ($in =~ /(\w+)/) {
 			$name_base = $1;
 		}
-		elsif (defined $suggestion) {
-			$name_index = $suggestion;
-		}
 	}
 	
 	# request score index
 	unless (defined $score_index) {
-		my $suggestion = find_column_index($metadata_ref, '^score$');
-		print " Enter the index for the feature score column [$suggestion]  ";
+		print " Enter the index for the feature score column  ";
 		my $in = <STDIN>;
 		if ($in =~ /(\d+)/) {
 			$score_index = $1;
-		}
-		elsif (defined $suggestion) {
-			$score_index = $suggestion;
 		}
 	}
 	
 	# request strand index
 	unless (defined $strand_index) {
-		my $suggestion = find_column_index($metadata_ref, 'strand');
-		print " Enter the index for the feature strand column [$suggestion]  ";
+		print " Enter the index for the feature strand column  ";
 		my $in = <STDIN>;
 		if ($in =~ /(\d+)/) {
 			$strand_index = $1;
 		}
-		elsif (defined $suggestion) {
-			$strand_index = $suggestion;
-		}
 	}
 }
 
-# otherwise attempt to identify indices automatically
+# automatically identify gff format
 elsif (
+	$metadata_ref->{'extension'} =~ /gff/ and
 	!defined $chr_index and
 	!defined $start_index and 
 	!defined $stop_index
 ) {
+	$chr_index    = 0 unless defined $chr_index;
+	$start_index  = 3 unless defined $start_index;
+	$stop_index   = 4 unless defined $stop_index;
+	$score_index  = 5 unless defined $score_index;
+	$strand_index = 6 unless defined $strand_index;
+	$name_index   = 8 unless defined $name_index;
+}
+
+# otherwise attempt to identify indices automatically
+else {
 	unless (defined $chr_index) {
 		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
 	}
@@ -266,20 +264,14 @@ elsif (
 	unless (defined $stop_index) {
 		$stop_index = find_column_index($metadata_ref, 'stop|end');
 	}
+	unless (defined $stop_index) {
+		$stop_index = find_column_index($metadata_ref, 'stop|end');
+	}
 	unless (defined $strand_index) {
 		$strand_index = find_column_index($metadata_ref, 'strand');
 	}
 	unless (defined $name_index) {
-		$name_index = find_column_index($metadata_ref, '^name|ID');
-	}
-	unless (defined $name_index) {
-		$name_index = find_column_index($metadata_ref, 'name|ID$');
-	}
-	if (not defined $name_index and $metadata_ref->{'gff'}) {
-		$name_index = 8;
-	}
-	unless (defined $score_index) {
-		$score_index = find_column_index($metadata_ref, '^score$');
+		$name_index = find_column_index($metadata_ref, 'name|ID');
 	}
 }
 
@@ -309,15 +301,8 @@ print "  - '", $metadata_ref->{$strand_index}{name}, "' for strand\n"
 
 # open output file handle
 unless ($outfile) {
-	$outfile = $metadata_ref->{'basename'};
-}
-unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
-	# check for .bed extension and add if necessary
-	$outfile .= '.bed';
-}
-if ($gz and $outfile !~ /\.gz$/i) {
-	# add gz extension as necessary
-	$outfile .= '.gz';
+	$outfile = $metadata_ref->{'basename'} . '.bed';
+	$outfile .= '.gz' if $gz;
 }
 my $out_fh = open_to_write_fh($outfile, $gz) or 
 	die " unable to open output file for writing!\n";
@@ -329,6 +314,7 @@ unless ($bigbed) {
 
 # parse through the data lines in the input data file
 my $count = 0; # the number of lines processed
+my $strand_warning = 0; # warning for strand of 0
 while (my $line = $in_fh->getline) {
 	
 	# Get the line data
@@ -348,7 +334,6 @@ while (my $line = $in_fh->getline) {
 		push @bed, $data[$start_index] - 1;
 		push @bed, $data[$stop_index];
 	}
-	$bed[1] = 0 if ($bed[1] < 0); # prevent negative coordinates !?
 	
 	# Convert the name 
 		# the name index could either be a simple one-word element
@@ -360,31 +345,12 @@ while (my $line = $in_fh->getline) {
 		# split the groups column into elements
 		# semi-colon delimited, space optional
 		my @groups = split / ?; ?/, $data[$name_index]; 
-		my ($name, $id); # one of two possible attributes to use
 		foreach my $element (@groups) {
 			my ($key, $value) = split / ?= ?/, $element;
-			# check keys
-			# this should be case sensitive, but just in case
-			if ($key =~ /^name$/i) { 
-				$name = $value;
+			if ($key =~ /^name$/i) {
+				push @bed, $value;
+				last;
 			}
-			elsif ($key =~ /^id$/i) {
-				$id = $value;
-			}
-			last if ($name and $id);
-		}
-		
-		# assign the bed feature name
-		if ($name) {
-			push @bed, $name;
-		}
-		elsif ($id) {
-			push @bed, $id;
-		}
-		else {
-			# nothing found
-			# autogenerate something
-			push @bed, "region_$count";
 		}
 	}
 	elsif (defined $name_index) {
@@ -393,16 +359,14 @@ while (my $line = $in_fh->getline) {
 	}
 	elsif (defined $name_base) {
 		# auto-generate the names
-		push @bed, $name_base . '_' . $count;
-	}
-	elsif (defined $score_index or defined $strand_index) {
-		# user is requesting subsequent columns
-		# so we must auto-generate the name
-		push @bed, "region_$count";
+		push @bed, $name_base . '_' . sprintf("%08d", $count);
 	}
 	
 	# Convert the score
-	if (defined $score_index) {
+	if (
+		(defined $name_index or defined $name_base) and 
+		defined $score_index
+	) {
 		if ($data[$score_index] eq '.') {
 			# bed files don't accept null values
 			push @bed, '0';
@@ -411,14 +375,13 @@ while (my $line = $in_fh->getline) {
 			push @bed, $data[$score_index];
 		}
 	}
-	elsif (defined $strand_index) {
-		# user is requesting strand index
-		# so we must auto-generate a fake score value
-		push @bed, '1';
-	}
 	
 	# Convert the strand
-	if (defined $strand_index) {
+	if (
+		(defined $name_index or defined $name_base) and 
+		defined $score_index and 
+		defined $strand_index
+	) {
 		my $value = $data[$strand_index];
 		if ($value =~ m/\A [f \+ 1 w]/xi) {
 			# forward, plus, one, watson
@@ -428,9 +391,21 @@ while (my $line = $in_fh->getline) {
 			# reverse, minus, crick
 			push @bed, '-';
 		}
+		elsif ($value =~ m/\A [0 \.]/xi) {
+			# zero, period
+			push @bed, '0';
+		}
 		else {
-			# unidentified, assume it's forward strand
-			push @bed, '+';
+			# unidentified, assume it's non-stranded
+			push @bed, '0';
+		}
+		
+		# print warning
+		if ($bed[5] eq '0') {
+			unless ($strand_warning) {
+				warn "   Using non-standard feature strand value of 0 at input data line ", $count + 1, "\n";
+				$strand_warning = 1;
+			}
 		}
 	}
 	
@@ -453,14 +428,46 @@ if ($bigbed) {
 	print " wrote $count lines to temporary bed file '$outfile'\n";
 	print " converting to bigbed file....\n";
 	
+	# check that bigbed conversion is supported
+	unless (exists &bed_to_bigbed_conversion) {
+		warn "\n  Support for converting to bigbed format is not available\n" . 
+			"  Please convert manually. See documentation for more info\n";
+		print " finished\n";
+		exit;
+	}
+	
+	
+	# open database connection if necessary
+	my $db;
+	if ($database) {
+		$db = open_db_connection($database);
+	}
+	
+	# find bedToBigBed utility
+	unless ($bb_app_path) {
+		# check for an entry in the configuration file
+		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
+			undef;
+	}
+	unless ($bb_app_path) {
+		# next check the system path
+		$bb_app_path = `which bedToBigBed` || undef;
+	}
+	unless ($bb_app_path) {
+		warn "\n  Unable to find conversion utility 'bedToBigBed'! Conversion failed!\n" . 
+			"  See documentation for more info\n";
+		print " finished\n";
+		exit;
+	}
+		
 			
 	# perform the conversion
-	my $bb_file = bed_to_bigbed_conversion(
+	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
-			'db'        => $database,
+			'db'        => $db,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
-	);
+	} );
 
 	
 	# confirm
@@ -484,8 +491,6 @@ __END__
 
 data2bed.pl
 
-A script to convert a data file to a bed file.
-
 =head1 SYNOPSIS
 
 data2bed.pl [--options...] <filename>
@@ -505,8 +510,7 @@ data2bed.pl [--options...] <filename>
   --chromof <filename>
   --db <database>
   --bbapp </path/to/bedToBigBed>
-  --gz
-  --version
+  --(no)gz
   --help
 
 =head1 OPTIONS
@@ -519,8 +523,7 @@ The command line flags and descriptions:
 
 Specify the file name of a data file. It must be a tab-delimited text file,
 preferably in the tim data format as described in 'tim_file_helper.pm', 
-although any format should work. The file may be compressed with gzip. 
-Sam files will not work, see L<bam2gff_bed.pl> for that.
+although any format should work. The file may be compressed with gzip.
 
 =item --ask
 
@@ -556,9 +559,7 @@ as the score column in the BED data.
 Supply either the index of the column in the data table to 
 be used as the name column in the BED data, or the base text 
 to be used when auto-generating unique feature names. The 
-auto-generated names are in the format 'text_00000001'. 
-If the source file is GFF3, it will automatically extract the 
-Name attribute.
+auto-generated names are in the format 'text_00000001'.
 
 =item --strand <column_index>
 
@@ -603,18 +604,14 @@ data file.
 =item --bbapp </path/to/bedToBigBed>
 
 Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
-default is to first check the BioToolBox  configuration 
-file C<biotoolbox.cfg> for the application path. Failing that, it will 
-search the default environment path for the utility. If found, it will 
-automatically execute the utility to convert the bed file.
+default is to first check the biotoolbox.cfg configuration file for 
+the application path. Failing that, it will search the default 
+environment path for the utility. If found, it will automatically 
+execute the utility to convert the bed file.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -626,31 +623,24 @@ Display this POD documentation.
 
 This program will convert a tab-delimited data file into a BED file,
 according to the specifications here
-L<http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED>. A minimum 
-of three and a maximum of six columns may be generated. Thin and
-thick block data (columns greater than 6) are not written. 
-
-Column identification may be specified on the command line, chosen 
-interactively, or automatically determined from the column headers. GFF 
-source files should have columns automatically identified. 
-
-All lower-numbered columns must be defined before writing higher-numbered 
-columns, as per the specification. Dummy data may be filled in for 
-Name and/or Score if a higher column is requested. 
-
-Browser and Track lines are not written. 
-
-Following specification, all coordinates are written in interbase
-(0-based) coordinates. Base (1-based) coordinates (the BioPerl standard) 
-will be converted. 
-
-Score values should be integers within the range 1..1000. Score values 
-are not converted in this script. However, the biotoolbox script 
-L<manipulate_datasets.pl> has tools to do this if required.
+http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED. A minimum of
+three and a maximum of six columns may be generated. Column identification 
+may be specified on the command line or interactively. GFF source files  
+have columns automatically identified. All lower-numbered
+columns must be defined before writing higher-numbered columns. Thin and
+thick block data are not written. Browser and Track lines are also not
+written. Following specification, all coordinates are written in interbase
+(0-based) coordinates. Base (1-based) coordinates (the BioPerl standard) will
+be converted. Score values are not converted, however, to a 1..1000 scale.
+The biotoolbox script C<manipulate_datasets.pl> has tools to do this if
+required.
 
 An option exists to further convert the BED file to an indexed, binary BigBed 
 format. Jim Kent's bedToBigBed conversion utility must be available, and 
 either a chromosome definition file or access to a Bio::DB database is required.
+
+
+
 
 =head1 AUTHOR
 
@@ -664,3 +654,5 @@ either a chromosome definition file or access to a Bio::DB database is required.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+

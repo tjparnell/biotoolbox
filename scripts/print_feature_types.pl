@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a quick and dirty program to print out the feature types in the current database
 
 use strict;
 use Pod::Usage;
@@ -11,10 +11,6 @@ use tim_db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-my $VERSION = '1.9.1';
-
-print "\n A script to print all available feature types in a database\n\n";
-
 
 ### Quick help
 unless (@ARGV) { 
@@ -31,16 +27,14 @@ unless (@ARGV) {
 ### Get command line options and initialize values
 my (
 	$dbname,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
 GetOptions( 
 	'db=s'      => \$dbname, # the database name
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -50,13 +44,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script print_feature_types.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
@@ -74,10 +61,11 @@ my $count = 0;
 my %source2type;
 
 # Get the features
-my @types = get_dataset_list($dbname);
-	# this returns an array of database types
+my %types = get_dataset_list($dbname, 'all');
+	# this returns a hash where key is a unique number and the value
+	# is the actual gff type
 	
-foreach my $type (@types) {
+foreach my $type (values %types) {
 	
 	# each type is usually comprised of primary_tag:source_tag
 	# although sometimes it is just the primary_tag
@@ -124,17 +112,14 @@ __END__
 
 print_feature_types.pl
 
-A script to print out the available feature types in a database.
-
 =head1 SYNOPSIS
 
 print_feature_types.pl <database>
   
-  Options:
   --db <database>
-  --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -145,10 +130,6 @@ The command line flags and descriptions:
 
 Specify the name of a Bio::DB::SeqFeature::Store database, or a BigWigSet 
 directory.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -177,3 +158,4 @@ metadata file, are also supported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

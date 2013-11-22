@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# convert ucsc refseq table file to gff3
+
 
 use strict;
 use Getopt::Long;
@@ -16,7 +17,6 @@ use tim_file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.11';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -43,8 +43,6 @@ my (
 	$do_chromo,
 	$refseqstatusf,
 	$refseqsumf,
-	$ensemblnamef,
-	$ensemblsourcef,
 	$kgxreff,
 	$chromof,
 	$user_source,
@@ -53,8 +51,7 @@ my (
 	$do_utr,
 	$do_codon,
 	$gz,
-	$help,
-	$print_version,
+	$help, 
 );
 my @genetables;
 GetOptions( 
@@ -66,8 +63,6 @@ GetOptions(
 	'status=s'   => \$refseqstatusf, # the refseqstatus file
 	'sum=s'      => \$refseqsumf, # the refseqsummary file
 	'kgxref=s'   => \$kgxreff, # the kgXref info file
-	'ensname=s'  => \$ensemblnamef, # the ensemblToGeneName file
-	'enssrc=s'   => \$ensemblsourcef, # the ensemblSource file
 	'chromo=s'   => \$chromof, # a chromosome file
 	'source=s'   => \$user_source, # user provided source
 	'gene!'      => \$do_gene, # include genes in output
@@ -76,8 +71,7 @@ GetOptions(
 	'codon!'     => \$do_codon, # include start & stop codons in output
 	'gz!'        => \$gz, # compress file
 	'help'       => \$help, # request help
-	'version'    => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+) or die " unrecognized options! use --help\n";
 
 # Print help
 if ($help) {
@@ -88,19 +82,13 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
 
 ### Check requirements and defaults
-unless (@genetables or $ftp_file or $chromof) {
-	die " Specify either an input table file, chromosome file, or a FTP table!\n";
+unless (@genetables or $ftp_file) {
+	die " Specify either an input table file or a FTP table!\n";
 }
 if ($ftp_file) {
 	unless ($ftp_file =~ m/^refgene|ensgene|xenorefgene|known|all$/i) {
@@ -124,9 +112,6 @@ unless (defined $do_utr) {
 }
 unless (defined $do_cds) {
 	$do_cds = 1;
-	unless (defined $do_codon) {
-		$do_codon = 0;
-	}
 }
 my $start_time = time;
 
@@ -141,7 +126,7 @@ if ($ftp_file) {
 	
 	# push file names into appropriate variables
 	foreach my $file (@files) {
-		if ($file =~ /refgene|ensgene|knowngene/i) {
+		if ($file =~ /gene/i) {
 			push @genetables, $file;
 		}
 		elsif ($file =~ /summary/i) {
@@ -149,12 +134,6 @@ if ($ftp_file) {
 		}
 		elsif ($file =~ /status/i) {
 			$refseqstatusf = $file;
-		}
-		elsif ($file =~ /ensembltogene/i) {
-			$ensemblnamef = $file;
-		}
-		elsif ($file =~ /ensemblsource/i) {
-			$ensemblsourcef = $file;
 		}
 		elsif ($file =~ /kgxref/i) {
 			$kgxreff = $file;
@@ -171,24 +150,17 @@ if ($ftp_file) {
 ### Process the gene tables
 
 # input accessory files
-	# the load_extra_data() will read the appropriate file, if available,
-	# and return the hash of the data
-	# it is generic for handling multiple data types
-	# pass the type of table we're working with
-my $refseqsum   = load_extra_data('summary');
+my $refseqsum  = load_refseq_extra_data('summary');
 
-my $refseqstat  = load_extra_data('status');
+my $refseqstat = load_refseq_extra_data('status');
 
-my $kgxref      = load_extra_data('kgxref');
-
-my $ensembldata = load_extra_ensembl_data();
-
+my $kgxref     = load_refseq_extra_data('kgxref');
 
 # initialize globals
-my $chromosome_done = 0; # boolean indicating chromosomes are written
-my $source; # a re-usable global, may change depending on input table
+my $chromosome_done = 0;
+my $source;
 
-# walk through the input tables
+# walk through the intput tables
 foreach my $file (@genetables) {
 	
 	# open output file
@@ -239,9 +211,6 @@ foreach my $file (@genetables) {
 		}
 		elsif ($file =~ /ensgene/i) {
 			$source = 'ensGene';
-		}
-		elsif ($file =~ /knowngene/i) {
-			$source = 'knownGene';
 		}
 		else {
 			$source = 'UCSC';
@@ -297,64 +266,42 @@ exit;
 
 sub fetch_files_by_ftp {
 	
-	
-	# generate ftp request list
-	my @ftp_files;
-	if ($ftp_file eq 'all') {
-		@ftp_files = qw(
-			refgene
-			ensgene
-			xenorefgene
-			known
-		);
-	}
-	elsif ($ftp_file =~ /,/) {
-		@ftp_files = split /,/, $ftp_file;
-	}
-	else {
-		push @ftp_files, $ftp_file;
-	}
-	
 	# generate list of files
 	my @files;
-	foreach my $item (@ftp_files) {
-		if ($item =~ m/^xeno/i) {
-			push @files, qw(
-				xenoRefGene.txt.gz 
-				refSeqStatus.txt.gz 
-				refSeqSummary.txt.gz
-			);
-		}
-		elsif ($item =~ m/refgene/i) {
-			push @files, qw(
-				refGene.txt.gz 
-				refSeqStatus.txt.gz 
-				refSeqSummary.txt.gz
-			);
-		}
-		elsif ($item =~ m/ensgene/i) {
-			push @files, qw(
-				ensGene.txt.gz 
-				ensemblToGeneName.txt.gz
-				ensemblSource.txt.gz
-			);
-		}
-		elsif ($item =~ m/known/i) {
-			push @files, qw(
-				knownGene.txt.gz 
-				kgXref.txt.gz 
-			);
-		}
+	if ($ftp_file =~ m/^xeno/i) {
+		@files = qw(
+			xenoRefGene.txt.gz 
+			refSeqStatus.txt.gz 
+			refSeqSummary.txt.gz
+		);
 	}
-	# this might seem convulated....
-	# but we're putting all the file names in a single array
-	# instead of specific global variables
-	# to make retrieving through FTP a little easier
-	# plus, not all files may be available for each species, e.g. knownGene
-	# we also rename the files after downloading them
-	
-	# we will sort out the list of downloaded files later and assign them 
-	# to specific global filename variables
+	elsif ($ftp_file =~ m/refgene/i) {
+		@files = qw(
+			refGene.txt.gz 
+			refSeqStatus.txt.gz 
+			refSeqSummary.txt.gz
+		);
+	}
+	elsif ($ftp_file =~ m/ensgene/i) {
+		push @files, 'ensGene.txt.gz';
+	}
+	elsif ($ftp_file =~ m/known/i) {
+		@files = qw(
+			knownGene.txt.gz 
+			kgXref.txt.gz 
+		);
+	}
+	elsif ($ftp_file =~ m/all/i) {
+		@files = qw(
+			refGene.txt.gz
+			xenoRefGene.txt.gz 
+			refSeqStatus.txt.gz 
+			refSeqSummary.txt.gz
+			ensGene.txt.gz
+			knownGene.txt.gz
+			kgXref.txt.gz
+		);
+	}
 	
 	# add chromosome file if requested
 	if ($do_chromo) {
@@ -386,13 +333,7 @@ sub fetch_files_by_ftp {
 			push @fetched_files, $new_file;
 		}
 		else {	
-			my $message = $ftp->message;
-			if ($message =~ /no such file/i) {
-				print "   file unavailable\n";
-			}
-			else {
-				warn $message;
-			}
+			warn "Cannot get file $file: " . $ftp->message;
 		}
 	}
 	$ftp->quit;
@@ -404,17 +345,9 @@ sub fetch_files_by_ftp {
 
 
 
-sub load_extra_data {
-	# this will load extra tables of information into hash tables
-	# this includes tables of descriptive information, such as 
-	# status, summaries, common gene names, etc.
+sub load_refseq_extra_data {
 	
-	# this sub is designed to be generic to be reusable for multiple 
-	# data files
-	
-	# identify the appropriate file to use based on the type of 
-	# table information being loaded
-	# the file name should've been provided by command line or ftp
+	# initialize 
 	my $type = shift;
 	my %data;
 	my $file;
@@ -427,9 +360,6 @@ sub load_extra_data {
 	elsif ($type eq 'kgxref') {
 		$file = $kgxreff;
 	}
-	
-	# the appropriate data table file wasn't provided for the requested 
-	# data table, return an empty hash
 	return \%data unless defined $file;
 	
 	# load file
@@ -438,14 +368,11 @@ sub load_extra_data {
 	
 	# load into hash
 	while (my $line = $fh->getline) {
-		
-		# process line
 		chomp $line;
 		next if ($line =~ /^#/);
-		my @line_data = split /\t/, $line;
 		
-		# the unique id should be the first element in the array
-		# take it off the array, since it doesn't need to be stored there too
+		# process line
+		my @line_data = split /\t/, $line;
 		my $id = shift @line_data;
 		
 		# check for duplicate lines
@@ -483,88 +410,8 @@ sub load_extra_data {
 	# 5	refseq	 RefSeq ID
 	# 6	protAcc	 NCBI protein Accession number
 	# 7	description	Description
-	
-	### ensemblToGeneName table
-	# 0 Ensembl transcript ID
-	# 1 gene name
-}
 
 
-sub load_extra_ensembl_data {
-	# we will combine the ensemblToGeneName and ensemblSource data tables
-	# into a single hash keyed by the ensGene transcript ID
-	# Both tables are very simple two columns, so just trying to conserve
-	# memory by combining them
-	
-	# initialize
-	my %data;
-		# key will be the ensembl transcript id
-		# value will be anonymous array of [name, source]
-	
-	# load ensemblToGeneName first
-	if ($ensemblnamef) {
-		
-		# open file
-		my $fh = open_to_read_fh($ensemblnamef) or 
-			die " unable to open file '$ensemblsourcef'!\n";
-		
-		# load into hash
-		my $count = 0;
-		while (my $line = $fh->getline) {
-			
-			# process line
-			chomp $line;
-			next if ($line =~ /^#/);
-			my @line_data = split /\t/, $line;
-			if (scalar @line_data != 2) {
-				die " file $ensemblnamef doesn't seem right!? Line has " .
-					scalar @line_data . " elements!\n";
-			}
-			
-			# store data into hash
-			$data{ $line_data[0] }->[0] = $line_data[1];
-			$count++;
-		}
-		
-		# finish
-		print " Loaded ", format_with_commas($count), 
-			" names from file '$ensemblnamef'\n";
-		$fh->close;
-	}
-	
-	# load ensemblSource second
-	if ($ensemblsourcef) {
-	
-		# open file
-		my $fh = open_to_read_fh($ensemblsourcef) or 
-			die " unable to open file '$ensemblsourcef'!\n";
-		
-		# load into hash
-		my $count = 0;
-		while (my $line = $fh->getline) {
-			
-			# process line
-			chomp $line;
-			next if ($line =~ /^#/);
-			my @line_data = split /\t/, $line;
-			if (scalar @line_data != 2) {
-				die " file $ensemblsourcef doesn't seem right!? Line has " .
-					scalar @line_data . " elements!\n";
-			}
-			
-			# store data into hash
-			$data{ $line_data[0] }->[1] = $line_data[1];
-			$count++;
-		}
-		
-		# finish
-		print " Loaded ", format_with_commas($count), 
-			" transcript types from file '$ensemblsourcef'\n";
-		$fh->close;
-	}
-	
-	# done
-	return \%data;
 }
 
 
@@ -574,11 +421,7 @@ sub open_output_gff {
 	# prepare output file name
 	my $file = shift;
 	my $outfile = $file;
-	$outfile =~ s/\.txt(?:\.gz)?$//i; # remove the extension
-	$outfile .= '.gff3';
-	if ($gz) {
-		$outfile .= '.gz';
-	}
+	$outfile =~ s/\.txt(?:\.gz)$/.gff3/; # exchange the extension
 	
 	# open file handle
 	my $fh = open_to_write_fh($outfile, $gz) or
@@ -586,7 +429,7 @@ sub open_output_gff {
 	
 	# print comments
 	$fh->print( "##gff-version 3\n");
-	$fh->print( "##genome-build UCSC $database\n") if $database;
+	$fh->print( "# Generated on " . localtime(time) . "\n");
 	$fh->print( "# UCSC table file $file\n");
 	
 	# finish
@@ -610,7 +453,7 @@ sub process_line_data {
 	# don't forget to convert start from 0 to 1-based coordinates
 	
 	if (scalar @linedata == 16) {
-		# a gene prediction table, e.g. refGene, ensGene, xenoRefGene
+		# a gene prediction table, e.g. refGene, ensGened, xenoRefGene
 		
 		# 0  bin
 		# 1  name
@@ -644,12 +487,9 @@ sub process_line_data {
 		$data{note}        = $refseqsum->{ $linedata[1] }->[1] || undef;
 		$data{status}      = $refseqstat->{ $linedata[1] }->[0] || undef;
 		$data{completeness} = $refseqsum->{ $linedata[1] }->[0] || undef;
-		if ($linedata[1] =~ /^N[MR]_\d+/) {
-			$data{refseq} = $linedata[1];
-		}
 	}
 	elsif (scalar @linedata == 12) {
-		# a knownGene table
+		# a known gene table
 		
 		# 0 name	known gene identifier
 		# 1 chrom	Reference sequence chromosome or scaffold
@@ -669,7 +509,7 @@ sub process_line_data {
 		$data{chrom}      = $linedata[1];
 		$data{strand}     = $linedata[2];
 		$data{txStart}    = $linedata[3] + 1;
-		$data{txEnd}      = $linedata[4];
+		$data{txEnd}      = $linedata[3];
 		$data{cdsStart}   = $linedata[5] + 1;
 		$data{cdsEnd}     = $linedata[6];
 		$data{exonCount}  = $linedata[7];
@@ -730,9 +570,11 @@ sub process_gene_table {
 		next if $line =~ /^#/;
 		my $linedata = process_line_data($line);
 		
+		
 		## generate the transcript
 		my $transcript = generate_new_transcript($linedata, \%id2count);
-				
+		
+		
 		## count the transcript type
 		my $type = $transcript->primary_tag;
 		if ($type eq 'mRNA') {
@@ -804,9 +646,6 @@ sub process_gene_table {
 						# update the transcription stop position
 						$gene->end( $linedata->{txEnd} );
 					}
-					
-					# update extra attributes as necessary
-					update_attributes($gene, $linedata);
 				}
 				
 				# NONE of the genes and our transcript overlap
@@ -879,53 +718,33 @@ sub process_gene_table {
 sub generate_new_gene {
 	my ($linedata, $id2counts) = @_;
 	
-	# Set the gene name
-	# in most cases this will be the name2 item from the gene table
-	# except for some ncRNA and ensGene transcripts
-	my ($name, $id);
-	if ($linedata->{name} =~ /^ENS/i) {
-		# an ensGene transcript, look up the common name if possible
-		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
-			
-			# use the common name as the gene name
-			$name  = $ensembldata->{ $linedata->{name} }->[0];
-			
-			# use the name2 identifier as the ID
-			$id = $linedata->{name2};   
-		}
-		else {
-			# use the name2 value
-			$name = $linedata->{name2};
-			$id   = $name;
-		}
-	}
-	elsif (!defined $linedata->{name2}) {
-		# some genes, notably some ncRNA genes, have no gene or name2 entry
+	# make sure we have a gene name
+	# some genes, notably some ncRNA genes, have no gene or name2 entry
+	unless ($linedata->{name2}) {
 		# we'll fake it and assign the transcript name
 		# change it in linedata hash to propagate it in downstream code
 		$linedata->{name2} = $linedata->{name};
-		$name = $linedata->{name};
-		$id   = $name;
-	}
-	else {
-		# default for everything else
-		$name = $linedata->{name2};
-		$id   = $name;
 	}
 	
 	# Uniqueify the gene ID
-	# the ID will be based on the gene name and must be unique in the GFF file
-	if (exists $id2counts->{ lc $id }) {
+	my ($id, $name, $alias);
+	if (exists $id2counts->{ lc $linedata->{name2} }) {
 		# we've encountered this transcript ID before
 		
-		# then make name unique by appending the count number
-		$id2counts->{ lc $id } += 1;
-		$id .= '.' . $id2counts->{ lc $id };
+		# now need to make ID unique by appending a number
+		$id    = $linedata->{name2} . '.' . 
+				$id2counts->{ lc $linedata->{name2} };
+		$name  = $id;
+		$alias = $linedata->{name2};
+		
+		# remember this one
+		$id2counts->{ lc $linedata->{name2} } += 1;
 	}
 	else {
 		# this is the first transcript with this id
-		# set the id counter
-		$id2counts->{lc $id} = 0;
+		$id = $linedata->{name2};
+		$name = $linedata->{name2};
+		$id2counts->{lc $id} = 1;
 	}
 	
 	
@@ -943,14 +762,40 @@ sub generate_new_gene {
 	);
 	
 	
-	# add the original ENS* identifier as an Alias in addition to ID
-	# for ensGene transcripts
-	if ($linedata->{name} =~ /^ENS/i) {
-		$gene->add_tag_value('Alias', $linedata->{name2});
+	# add original gene name as an alias
+	if (defined $alias) {
+		$gene->add_tag_value('Alias', $alias);
+	}
+		
+	# add status if possible
+	if (defined $linedata->{status} ) {
+		$gene->add_tag_value( 'status', $linedata->{status} );
 	}
 	
-	# update extra attributes as necessary
-	update_attributes($gene, $linedata);
+	# add Note if possible
+	if (defined $linedata->{note} ) {
+		$gene->add_tag_value( 'Note', $linedata->{note} );
+	}
+	
+	# add refSeq identifier if possible
+	if (defined $linedata->{refseq}) {
+		$gene->add_tag_value('refSeq', $linedata->{refseq});
+	}
+	
+	# add SwissProt identifier if possible
+	if (defined $linedata->{spid}) {
+		$gene->add_tag_value('swiss_prot', $linedata->{spid});
+	}
+	
+	# add SwissProt display identifier if possible
+	if (defined $linedata->{spdid}) {
+		$gene->add_tag_value('swiss_prot_display_id', $linedata->{spdid});
+	}
+	
+	# add NCBI protein access identifier if possible
+	if (defined $linedata->{protacc}) {
+		$gene->add_tag_value('ncbi_protein_access', $linedata->{protacc});
+	}
 	
 	# finished
 	return $gene;
@@ -962,17 +807,23 @@ sub generate_new_transcript {
 	my ($linedata, $id2counts) = @_;
 	
 	# Uniqueify the transcript ID and name
-	my $id = $linedata->{name};
-	if (exists $id2counts->{ lc $id } ) {
+	my ($id, $name, $alias);
+	if (exists $id2counts->{ lc $linedata->{name} } ) {
 		# we've encountered this transcript ID before
 		
 		# now need to make ID unique by appending a number
-		$id2counts->{ lc $id } += 1;
-		$id .= '.' . $id2counts->{ lc $id };
+		$id    = $linedata->{name} . '.' . $id2counts->{ lc $linedata->{name} };
+		$name  = $id;
+		$alias = $linedata->{name};
+		
+		# remember this one
+		$id2counts->{ lc $linedata->{name} } += 1;
 	}
 	else {
 		# this is the first transcript with this id
-		$id2counts->{lc $id} = 0;
+		$id   = $linedata->{name};
+		$name = $linedata->{name};
+		$id2counts->{lc $id} = 1;
 	}
 	
 	# Generate the transcript SeqFeature object
@@ -983,34 +834,32 @@ sub generate_new_transcript {
 		-end           => $linedata->{txEnd},
 		-strand        => $linedata->{strand} eq '+' ? 1 : -1,
 		-phase         => '.',
-		-display_name  => $linedata->{name},
+		-display_name  => $name,
 		-primary_id    => $id,
 	);
 	
 	# Attempt to identify the transcript type
-	if ( $linedata->{cdsStart} - 1 == $linedata->{cdsEnd} ) {
-		
+	if (
+		$linedata->{cdsStart} - 1 == $linedata->{txEnd} and 
+		$linedata->{cdsEnd} == $linedata->{txEnd}
+		# we need to subtract 1 to the cdsStart to compensate for converting 
+		# to 1-based coordinates
+	) {
 		# there appears to be no coding potential when 
 		# txEnd = cdsStart = cdsEnd
 		# if you'll look, all of the exon phases should also be -1
 		
-		# check if we have a ensGene transcript, we may have the type
-		if (
-			$linedata->{name} =~ /^ENS/i and 
-			defined $ensembldata->{ $linedata->{name} }->[1]
-		) {
-			# this is a ensGene transcript
-			
-			# these should be fairly typical standards
-			# snRNA, rRNA, pseudogene, etc
-			$transcript->primary_tag( 
-				$ensembldata->{ $linedata->{name} }->[1] );
+		# if we are using a RefSeq gene table, we may be able to infer
+		# some certain types from the gene name
+		
+		# in the mean time, we'll try to deduce from the gene name
+		if ($linedata->{name2} =~ /^LOC\d+/) {
+			# empirical testing seems to suggest that all the noncoding 
+			# genes with a name like LOC123456 are pseudogenes
+			# well, at least with hg18, it may not be true for others
+			$transcript->primary_tag('pseudogene');
 		}
-		
-		# otherwise, we may be able to infer some certain 
-		# types from the gene name
-		
-		elsif ($linedata->{name2} =~ /^mir/i) {
+		if ($linedata->{name2} =~ /^mir/i) {
 			# a noncoding gene whose name begins with mir is likely a 
 			# a micro RNA
 			$transcript->primary_tag('miRNA');
@@ -1036,15 +885,9 @@ sub generate_new_transcript {
 	}
 	
 	
-	# add the Ensembl Gene name if it is an ensGene transcript
-	if ($linedata->{name} =~ /^ENS/i) {
-		# if we have loaded the EnsemblGeneName data hash
-		# we should be able to find the real gene name
-		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
-			# we will put the common gene name as an alias
-			$transcript->add_tag_value('Alias', 
-				$ensembldata->{ $linedata->{name} }->[0] );
-		}
+	# add original transcript name as an alias
+	if (defined $alias) {
+		$transcript->add_tag_value('Alias', $alias);
 	}
 	
 	# add gene name as an alias
@@ -1052,17 +895,39 @@ sub generate_new_transcript {
 		$transcript->add_tag_value('Alias', $linedata->{name2});
 	}
 	
-	# update extra attributes as necessary
-	update_attributes($transcript, $linedata);
+	# add a status for the transcript
+	if (defined $linedata->{status} ) {
+		$transcript->add_tag_value( 'status', $linedata->{status} );
+	}
 	
 	# add the completeness value for the tag
 	if (defined $linedata->{completeness} ) {
 		$transcript->add_tag_value( 'completeness', $linedata->{completeness} );
 	}
 	
-	# add the completeness value for the tag
-	if (defined $linedata->{status} ) {
-		$transcript->add_tag_value( 'status', $linedata->{status} );
+	# add Note if possible
+	if (defined $linedata->{note} ) {
+		$transcript->add_tag_value( 'Note', $linedata->{note} );
+	}
+	
+	# add refSeq identifier if possible
+	if (defined $linedata->{refseq}) {
+		$transcript->add_tag_value('refSeq', $linedata->{refseq});
+	}
+	
+	# add SwissProt identifier if possible
+	if (defined $linedata->{spid}) {
+		$transcript->add_tag_value('swiss_prot', $linedata->{spid});
+	}
+	
+	# add SwissProt display identifier if possible
+	if (defined $linedata->{spdid}) {
+		$transcript->add_tag_value('swiss_prot_display_id', $linedata->{spdid});
+	}
+	
+	# add NCBI protein access identifier if possible
+	if (defined $linedata->{protacc}) {
+		$transcript->add_tag_value('ncbi_protein_access', $linedata->{protacc});
 	}
 	
 	# add the exons
@@ -1088,52 +953,6 @@ sub generate_new_transcript {
 	return $transcript;
 }
 
-
-sub update_attributes {
-	my ($seqf, $linedata) = @_;
-	
-	# add Note if possible
-	if (defined $linedata->{note} ) {
-		add_unique_attribute($seqf, 'Note', $linedata->{note} );
-	}
-	
-	# add refSeq identifier if possible
-	if (defined $linedata->{refseq}) {
-		add_unique_attribute($seqf, 'Dbxref', 'RefSeq:' . $linedata->{refseq});
-	}
-	
-	# add SwissProt identifier if possible
-	if (defined $linedata->{spid}) {
-		add_unique_attribute($seqf, 'Dbxref', 'Swiss-Prot:' . $linedata->{spid});
-	}
-	
-	# add SwissProt display identifier if possible
-	if (defined $linedata->{spdid}) {
-		add_unique_attribute($seqf, 'swiss-prot_display_id', $linedata->{spdid});
-	}
-	
-	# add NCBI protein access identifier if possible
-	if (defined $linedata->{protacc}) {
-		add_unique_attribute($seqf, 'Dbxref', 'RefSeq:' . $linedata->{protacc});
-	}
-}
-
-
-sub add_unique_attribute {
-	my ($seqf, $tag, $value) = @_;
-	
-	# look for a pre-existing identical tag value
-	my $check = 1;
-	foreach ($seqf->get_tag_values($tag)) {
-		if ($_ eq $value) {
-			$check = 0;
-			last;
-		}
-	}
-	
-	# add it if our value is unique
-	$seqf->add_tag_value($tag, $value) if $check;
-}
 
 
 sub add_exons {
@@ -1164,7 +983,7 @@ sub add_exons {
 			-end           => $linedata->{exonEnds}->[$i],
 			-strand        => $transcript->strand,
 			-primary_id    => $transcript->primary_id . ".exon$number",
-			-display_name  => $transcript->primary_id . ".exon$number",
+			-display_name  => $transcript->display_name . ".exon$number",
 		);
 		
 		# associate with transcript
@@ -1198,32 +1017,9 @@ sub add_utrs {
 		# to the exon coordinates
 		# the primary tag is determined by the exon strand orientation
 		my ($start, $stop, $tag);
-		# in case we need to build two UTRs
-		my ($start2, $stop2, $tag2);
-		
-		# Split 5'UTR, CDS, and 3'UTR all on the same exon
-		if (
-			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
-			and
-			$linedata->{exonEnds}->[$i] > $linedata->{cdsEnd}
-		) {
-			# the CDS is entirely within the exon, resulting in two UTRs 
-			# on either side of the exon
-			# we must build two UTRs
-			
-			# the left UTR
-			$start = $linedata->{exonStarts}->[$i];
-			$stop  = $linedata->{cdsStart} - 1;
-			$tag   = $transcript->strand == 1 ? 'five_prime_UTR' : 'three_prime_UTR';
-			
-			# the right UTR
-			$start2 = $linedata->{cdsEnd} + 1;
-			$stop2  = $linedata->{exonEnds}->[$i];
-			$tag2   = $transcript->strand == 1 ? 'three_prime_UTR' : 'five_prime_UTR';
-		}
 		
 		# 5'UTR forward, 3'UTR reverse
-		elsif (
+		if (
 			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
 			and
 			$linedata->{exonEnds}->[$i] < $linedata->{cdsStart}
@@ -1234,7 +1030,7 @@ sub add_utrs {
 			$tag   = $transcript->strand == 1 ? 'five_prime_UTR' : 'three_prime_UTR';
 		}
 		
-		# Split 5'UTR & CDS on forward, 3'UTR & CDS
+		# Split 5'UTR forward, 3'UTR reverse
 		elsif (
 			$linedata->{exonStarts}->[$i] < $linedata->{cdsStart}
 			and
@@ -1251,13 +1047,13 @@ sub add_utrs {
 		elsif (
 			$linedata->{exonStarts}->[$i] >= $linedata->{cdsStart}
 			and
-			$linedata->{exonEnds}->[$i] <= $linedata->{cdsEnd}
+			$linedata->{exonEnds}->[$i] < $linedata->{cdsEnd}
 		) {
 			# CDS only exon
 			next;
 		}
 		
-		# Split 3'UTR & CDS on forward, 5'UTR & CDS
+		# Split 3'UTR forward, 5'UTR reverse
 		elsif (
 			$linedata->{exonStarts}->[$i] <= $linedata->{cdsEnd}
 			and
@@ -1283,22 +1079,12 @@ sub add_utrs {
 			$tag   = $transcript->strand == 1 ? 'three_prime_UTR' : 'five_prime_UTR';
 		}
 		
-		# Something else?
 		else {
-			my $warning = "Here is an exon that doesn't match UTR criteria\n";
-			foreach (sort {$a cmp $b} keys %$linedata) {
-				if (ref $linedata->{$_} eq 'ARRAY') {
-					$warning .= "  $_ => " . join(',', @{$linedata->{$_}}) . "\n";
-				}
-				else {
-					$warning .= "  $_ => $linedata->{$_}\n";
-				}
-			}
-			warn $warning;
+			# something else?
 			next;
 		}
 			
-		# build the UTR object
+		# build the utr object
 		my $utr = Bio::SeqFeature::Lite->new(
 			-seq_id        => $transcript->seq_id,
 			-source        => $transcript->source,
@@ -1308,29 +1094,11 @@ sub add_utrs {
 			-phase         => '.',
 			-primary_tag   => $tag,
 			-primary_id    => $transcript->primary_id . ".utr$number",
-			-display_name  => $transcript->primary_id . ".utr$number",
+			-display_name  => $transcript->display_name . ".utr$number",
 		);
 		
 		# store this utr seqfeature in a temporary array
 		push @utrs, $utr;
-		
-		# build a second UTR object as necessary
-		if ($start2) {
-			my $utr2 = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-start         => $start2,
-				-end           => $stop2,
-				-strand        => $transcript->strand,
-				-phase         => '.',
-				-primary_tag   => $tag2,
-				-primary_id    => $transcript->primary_id . ".utr$number" . "a",
-				-display_name  => $transcript->primary_id . ".utr$number" . "a",
-			);
-		
-			# store this utr seqfeature in a temporary array
-			push @utrs, $utr2;
-		}
 	}
 	
 	# associate found UTRs with the transcript
@@ -1368,29 +1136,8 @@ sub add_cds {
 		# to the exon coordinates
 		my ($start, $stop);
 		
-		# Split 5'UTR, CDS, and 3'UTR all on the same exon
+		# Split 5'UTR & CDS on forward, 3'UTR & CDS on reverse
 		if (
-			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
-			and
-			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
-		) {
-			# exon contains the entire CDS
-			$start = $linedata->{cdsStart};
-			$stop  = $linedata->{cdsEnd};
-		}
-		
-		# 5'UTR forward, 3'UTR reverse
-		elsif (
-			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
-			and
-			$linedata->{exonEnds}->[$j] < $linedata->{cdsStart}
-		) {
-			# no CDS in this exon
-			next;
-		}
-		
-		# Split 5'UTR & CDS on forward, 3'UTR & CDS
-		elsif (
 			$linedata->{exonStarts}->[$j] < $linedata->{cdsStart}
 			and
 			$linedata->{exonEnds}->[$j] >= $linedata->{cdsStart}
@@ -1412,41 +1159,20 @@ sub add_cds {
 			$stop  = $linedata->{exonEnds}->[$j];
 		}
 	
-		# Split 3'UTR & CDS on forward, 5'UTR & CDS
+		# Split 3'UTR & CDS on forward, 5'UTR & CDS on reverse
 		elsif (
 			$linedata->{exonStarts}->[$j] <= $linedata->{cdsEnd}
 			and
 			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
 		) {
 			# the stop/start codon is in this exon
-			# we need to make the CDS out of a portion of this exon 
+			# we need to make the UTR out of a portion of this exon 
 			$start = $linedata->{exonStarts}->[$j];
 			$stop  = $linedata->{cdsEnd};
 		}
 	
-		# 3'UTR forward, 5'UTR reverse
-		elsif (
-			$linedata->{exonStarts}->[$j] > $linedata->{cdsEnd}
-			and
-			$linedata->{exonEnds}->[$j] > $linedata->{cdsEnd}
-		) {
-			# the exon start/end is entirely after the cdsStop
-			# we have entirely 5' or 3'UTR, no CDS
-			next;
-		}
-		
-		# Something else?
 		else {
-			my $warning = "Here is an exon that doesn't match CDS criteria\n";
-			foreach (sort {$a cmp $b} keys %$linedata) {
-				if (ref $linedata->{$_} eq 'ARRAY') {
-					$warning .= "  $_ => " . join(',', @{$linedata->{$_}}) . "\n";
-				}
-				else {
-					$warning .= "  $_ => $linedata->{$_}\n";
-				}
-			}
-			warn $warning;
+			# UTR exon
 			next;
 		}
 			
@@ -1461,7 +1187,7 @@ sub add_cds {
 			-phase         => $phase,
 			-primary_tag   => 'CDS',
 			-primary_id    => $transcript->primary_id . ".cds$i", 
-			-display_name  => $transcript->primary_id . ".cds$i",
+			-display_name  => $transcript->display_name . ".cds$i",
 		);
 		# the id and name still use $i for labeling to ensure numbering from 0
 		
@@ -1502,7 +1228,7 @@ sub add_codons {
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.start_codon',
-				-display_name  => $transcript->primary_id . '.start_codon',
+				-display_name  => $transcript->display_name . '.start_codon',
 		);
 		
 		# stop codon
@@ -1515,7 +1241,7 @@ sub add_codons {
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
-				-display_name  => $transcript->primary_id . '.stop_codon',
+				-display_name  => $transcript->display_name . '.stop_codon',
 		);
 	}
 	
@@ -1532,7 +1258,7 @@ sub add_codons {
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
-				-display_name  => $transcript->primary_id . '.stop_codon',
+				-display_name  => $transcript->display_name . '.stop_codon',
 		);
 		
 		# start codon
@@ -1545,7 +1271,7 @@ sub add_codons {
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.start_codon',
-				-display_name  => $transcript->primary_id . '.start_codon',
+				-display_name  => $transcript->display_name . '.start_codon',
 		);
 	}
 	
@@ -1569,75 +1295,40 @@ sub print_current_gene_list {
 		foreach my $t ( @{ $gene2seqf->{$g} } ) {
 		
 			# get coordinates
+			my $chr   = $t->seq_id;
 			my $start = $t->start;
-			my $chr;
-			my $key;
-			
-			# identify which key to put under
-			if ($t->seq_id =~ /^chr(\d+)$/i) {
-				$chr = $1;
-				$key = 'numeric_chr';
-			}
-			elsif ($t->seq_id =~ /^chr(\w+)$/i) {
-				$chr = $1;
-				$key = 'other_chr';
-			}
-			elsif ($t->seq_id =~ /(\d+)$/) {
-				$chr = $1;
-				$key = 'other_numeric';
-			}
-			else {
-				$chr = $t->seq_id;
-				$key = 'other';
-			}
-			
 			
 			# make sure start positions are unique, just in case
-			# these modifications won't make it into seqfeature object
-			while (exists $pos2seqf{$key}{$chr}{$start}) {
+			while (exists $pos2seqf{$chr}{$start}) {
 				$start++;
 			}
 			
 			# store the seqfeature
-			$pos2seqf{$key}{$chr}{$start} = $t;
+			$pos2seqf{$chr}{$start} = $t;
 		}
 	}
 	
 	# print in genomic order
-	# the gff_string method is undocumented in the POD, but is a 
-	# valid method. Passing 1 should force a recursive action to 
-	# print both parent and children.
 	print "  Writing features to GFF....\n";
-	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'numeric_chr'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'numeric_chr'}{$chr} }) {
-			# print the seqfeature recursively
-			$pos2seqf{'numeric_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff_string(1));
+	foreach my $chr (sort {$a cmp $b} keys %pos2seqf) {
+		# sort by chromosome first
+		# just simple ASCIIbetical sort
+		
+		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{$chr} }) {
+			# next sort by increasing start position
 			
-			# print directive to close out all previous features
-			$gff_fh->print("\n###\n"); 
+			# set gff version
+			$pos2seqf{$chr}{$start}->version(3); 
+			
+			# print the seqfeature recursively
+			$gff_fh->print( $pos2seqf{$chr}{$start}->gff_string(1) . "\n");
+				# the gff_string method is undocumented in the POD, but is a 
+				# valid method. Passing 1 should force a recursive action to 
+				# print both parent and children.
 		}
-	}
-	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other_chr'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_chr'}{$chr} }) {
-			$pos2seqf{'other_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff_string(1));
-			$gff_fh->print("\n###\n"); 
-		}
-	}
-	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'other_numeric'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_numeric'}{$chr} }) {
-			$pos2seqf{'other_numeric'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff_string(1));
-			$gff_fh->print("\n###\n"); 
-		}
-	}
-	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other'}} ) {
-		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other'}{$chr} }) {
-			$pos2seqf{'other'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff_string(1));
-			$gff_fh->print("\n###\n"); 
-		}
+		
+		# print directive to close out all previous genes
+		$gff_fh->print("###\n"); 
 	}
 }
 
@@ -1652,9 +1343,6 @@ sub print_chromosomes {
 		"unable to open specified chromosome file '$chromof'!\n";
 	
 	# convert the chromosomes into GFF features
-	# UCSC orders their chromosomes by chromosome length
-	# I would prefer to order by numeric ID if possible
-	my %chromosomes;
 	while (my $line = $chromo_fh->getline) {
 		next if ($line =~ /^#/);
 		chomp $line;
@@ -1667,53 +1355,21 @@ sub print_chromosomes {
 		my $chrom = Bio::SeqFeature::Lite->new(
 			-seq_id        => $chr,
 			-source        => 'UCSC', # using a generic source here
-			-primary_tag   => $chr =~ m/^chr/i ? 'chromosome' : 'scaffold',
+			-primary_tag   => $chr =~ m/scaffold/i ? 'scaffold' : 'chromosome',
 			-start         => 1,
 			-end           => $end,
 			-primary_id    => $chr,
 			-display_name  => $chr,
 		);
 		
-		# store the chromosome according to name
-		if ($chr =~ /^chr(\d+)$/i) {
-			$chromosomes{'numeric_chr'}{$1} = $chrom;
-		}
-		elsif ($chr =~ /^chr(\w+)$/i) {
-			$chromosomes{'other_chr'}{$1} = $chrom;
-		}
-		elsif ($chr =~ /(\d+)$/) {
-			$chromosomes{'other_numeric'}{$1} = $chrom;
-		}
-		else {
-			$chromosomes{'other'}{$chr} = $chrom;
-		}
-	}
-	$chromo_fh->close;
-	
-	# print the chromosomes
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'numeric_chr'} }) {
-		# numeric chromosomes
-		$chromosomes{'numeric_chr'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'numeric_chr'}{$key}->gff_string . "\n" );
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other_chr'} }) {
-		# other chromosomes
-		$chromosomes{'other_chr'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other_chr'}{$key}->gff_string . "\n" );
-	}
-	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'other_numeric'} }) {
-		# numbered contigs, etc
-		$chromosomes{'other_numeric'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other_numeric'}{$key}->gff_string . "\n" );
-	}
-	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other'} }) {
-		# contigs, etc
-		$chromosomes{'other'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other'}{$key}->gff_string . "\n" );
+		# print the gff
+		$chrom->version(3);
+		$out_fh->print( $chrom->gff_string . "\n" );
 	}
 	
 	# finished
 	$out_fh->print( "###\n" );
+	$chromo_fh->close;
 }
 
 
@@ -1721,11 +1377,9 @@ sub print_chromosomes {
 
 __END__
 
-=head1 NAME 
+=head1 NAME ucsc_table2gff3.pl
 
-ucsc_table2gff3.pl
 
-A script to convert UCSC gene tables to GFF3 annotation.
 
 =head1 SYNOPSIS
 
@@ -1740,8 +1394,6 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --table <filename>
   --status <filename>
   --sum <filename>
-  --ensname <filename>
-  --enssrc <filename>
   --kgxref <filename>
   --chromo <filename>
   --source <text>
@@ -1749,9 +1401,8 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --(no)gene
   --(no)cds
   --(no)utr
-  --codon
-  --gz
-  --version
+  --(no)codon
+  --(no)gz
   --help
 
 =head1 OPTIONS
@@ -1766,7 +1417,7 @@ Request that the current indicated tables and supporting files be
 downloaded from UCSC via FTP. Four different tables may be downloaded, 
 including refGene, ensGene, xenoRefGene mRNA gene prediction tables, and 
 the UCSC known gene table (if available). Specify all to download all 
-four tables. A comma delimited list may also be provided.
+four tables.
 
 =item --db <text>
 
@@ -1801,19 +1452,6 @@ provides additional information for the refSeq-based gene prediction
 tables, including refGene, xenoRefGene, and knownGene tables. The 
 file may be gzipped.
 
-=item --ensname <filename>
-
-Optionally provide the name of the ensemblToGeneName file. This file 
-provides a key to translate the Ensembl unique gene identifier to the 
-common gene name. The file may be gzipped.
-
-=item --enssrc <filename>
-
-Optionally provide the name of the ensemblSource file. This file 
-provides a key to translate the Ensembl unique gene identifier to the 
-type of transcript, provided by Ensembl as the source. The file may be 
-gzipped.
-
 =item --kgxref <filename>
 
 Optionally provide the name of the kgXref file. This file 
@@ -1843,11 +1481,11 @@ The default is true.
 
 Specify whether (or not) to assemble mRNA transcripts into genes. This 
 will create the canonical gene->mRNA->(exon,CDS) heirarchical structure. 
-Otherwise, mRNA transcripts are kept independent. The gene name, when 
+Otherwise, mRNA transcripts are kept independent. The gene names, when 
 available, are always associated with transcripts through the Alias tag. 
 The default is true.
 
-=item --(no)cds
+=item --no(cds)
 
 Specify whether (or not) to include CDS features in the output GFF file. 
 The default is true.
@@ -1858,18 +1496,14 @@ Specify whether (or not) to include three_prime_utr and five_prime_utr
 features in the transcript heirarchy. If not defined, the GFF interpreter 
 must infer the UTRs from the CDS and exon features. The default is true.
 
-=item --codon
+=item --(no)codon
 
 Specify whether (or not) to include start_codon and stop_codon features 
 in the transcript heirarchy. The default is false.
 
-=item --gz
+=item --(no)gz
 
 Specify whether the output file should be compressed with gzip.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -1889,7 +1523,7 @@ features, which are derived from supporting table files.
 Four table files are supported. Gene prediction tables, including refGene, 
 xenoRefGene, and ensGene, are supported. The UCSC knownGene gene table, if 
 available, is also supported. Supporting tables include refSeqStatus, 
-refSeqSummary, ensemblToGeneName, ensemblSource, and kgXref. 
+refSeqSummary, and kgXref. 
 
 The latest table files may be automatically downloaded using FTP from 
 UCSC or other host. Since these files are periodically updated, this may 
@@ -1905,6 +1539,7 @@ written.
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
+ Howard Hughes Medical Institute
  Dept of Oncological Sciences
  Huntsman Cancer Institute
  University of Utah

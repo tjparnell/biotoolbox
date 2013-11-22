@@ -24,7 +24,6 @@ eval {
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
 };
-my $VERSION = '1.5.8';
 
 
 print "\n This program will convert a useq archive to a bigwig/bigbed file\n\n";
@@ -56,8 +55,7 @@ my (
 	$useq_app_path,
 	$big_app_path,
 	$java_app_path,
-	$help,
-	$print_version,
+	$help
 );
 
 # Command line options
@@ -74,9 +72,8 @@ GetOptions(
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bigapp=s'  => \$big_app_path, # path to bigfile conversion utility
 	'useqapp=s' => \$useq_app_path, # path to useq2text jar file
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'      => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -86,13 +83,6 @@ if ($help) {
 		'-exitval' => 1,
 	} );
 }
-
-# Print version
-if ($print_version) {
-	print " Biotoolbox script useq2bigfile.pl, version $VERSION\n\n";
-	exit;
-}
-
 
 
 
@@ -849,7 +839,7 @@ __END__
 
 =head1 NAME
 
-useq2bigfile.pl (DEPRECATED)
+useq2bigfile.pl
 
 =head1 SYNOPSIS
 
@@ -953,10 +943,6 @@ Display this POD documentation.
 =back
 
 =head1 DESCRIPTION
-
-NOTE: This program is deprecated. David now includes a USeq2UCSCBig App in 
-the USeq package. Furthermore, the USeq2Text App generates a different 
-output that is currently incompatible with this script. Such is progress.
 
 This program will convert a USeq archive into a Big file format, either
 bigWig or bigBed. This program is essentially a wrapper around two other

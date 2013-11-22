@@ -1,21 +1,16 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to convert microarray oligo data to GFF
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
-use tim_data_helper qw(
-	find_column_index
-);
 use tim_file_helper qw(
 	load_tim_data_file
-	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -46,8 +41,7 @@ my (
 	$places,
 	$outfile,
 	$gz,
-	$help,
-	$print_version,
+	$help
 );
 
 
@@ -64,9 +58,8 @@ GetOptions(
 	'places=i'    => \$places, # number of digits to format the data number
 	'out=s'       => \$outfile, # the output file name
 	'gz!'         => \$gz, # compress output file with gzip
-	'help'        => \$help, # request help
-	'version'     => \$print_version, # print the version
-) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
+	'help'        => \$help # request help
+);
 
 # Print help
 if ($help) {
@@ -77,13 +70,6 @@ if ($help) {
 	} );
 }
 
-# Print version
-if ($print_version) {
-	print " Biotoolbox script map_oligo_data2gff.pl, version $VERSION\n\n";
-	exit;
-}
-
-
 ### Check for required values
 unless ($oligo_file and $data_file) {
 	die " Both source oligo data and oligo feature files must be specified!\n";
@@ -91,13 +77,13 @@ unless ($oligo_file and $data_file) {
 
 
 ### Load Oligo data file
-my ($oligo_data_ref, $oligo_data_metadata) = load_microarray_data();
+my ($oligo_data_ref, $oligo_metadata) = load_microarray_data();
 
 
 
 ### Define default data
 unless ($name) {
-	$name = $oligo_data_metadata->{$column}{'name'};
+	$name = $oligo_metadata->{$column}{'name'};
 }
 unless ($type) {
 	$type = $name;
@@ -155,13 +141,11 @@ unless ($oligo_feature_ref->{gff}) {
 	# group column
 
 # check metadata
-if (scalar keys %{ $oligo_data_metadata->{$column} } > 2) {
+if (scalar keys %{ $oligo_metadata } > 2) {
 	# there appears to be more than the basic data in here
 	
 	# replace the metadata
-	$oligo_feature_ref->{5} = $oligo_data_metadata->{$column}; 
-		# replace the hash data
-		# and update the info
+	$oligo_feature_ref->{5} = $oligo_metadata; # replace the hash data
 	$oligo_feature_ref->{5}{name} = 'Score';
 	$oligo_feature_ref->{5}{index} = 5;
 }
@@ -271,11 +255,11 @@ $oligo_feature_ref->{'basename'} = undef;
 $oligo_feature_ref->{'filename'} = undef;
 $oligo_feature_ref->{'extension'} = undef;
 
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'       => $oligo_feature_ref,
 	'filename'   => $outfile,
 	'gz'         => $gz
-);
+} );
 if ($success) {
 	print " Wrote file '$success'\n";
 }
@@ -290,7 +274,7 @@ else {
 sub load_microarray_data {
 	
 	# open the data file
-	my ($data_fh, $data_ref) = open_tim_data_file($data_file) or 
+	my $data_ref = load_tim_data_file($data_file) or 
 		die " Unable to open oligo data file '$data_file'!\n";
 	
 	# Determine the column of microarray data
@@ -315,32 +299,25 @@ sub load_microarray_data {
 			die " Invalid response!\n";
 		}
 	}
+	# we are going to assume that the first column is the microarray 
+	# oligo unique identifier or name
 	
-	# identify the probe ID column index
-	my $probe_i = find_column_index($data_ref, "probe|oligo|id");
 	
 	# Load the microarray values data into a hash
 	my %hash;
-	while (my $line = $data_fh->getline) {
-		
-		# process line
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# check that the probe is unique
-		if (exists $hash{ $data[$probe_i] } ) {
-			warn " Probe '" . $data[$probe_i] . 
-				"' exists more than once! Using first value only\n";
-		}
-		else {
-			$hash{ $data[$probe_i] } = $data[$column];
-		}
+	foreach my $row (1 .. $data_ref->{'last_row'}) {
+		# we are assuming the first column is the oligo id
+		$hash{ $data_ref->{data_table}->[$row][0] } = 
+			$data_ref->{data_table}->[$row][$column];
 	}
-	$data_fh->close;
 	print " loaded " . scalar(keys %hash) . " microarray probe values from '$data_file'\n";
 	
 	# return
-	return (\%hash, $data_ref);
+	my %metadata = %{ $data_ref->{$column} };
+		# the metadata is simply the metadata hash for this column from the 
+		# data file
+	undef $data_ref;
+	return (\%hash, \%metadata);
 }
 
 
@@ -355,11 +332,9 @@ __END__
 
 map_oligo_data2gff.pl
 
-A script to assign processed microarray data to genomic coordinates.
-
 =head1 SYNOPSIS
 
-map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
+data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--options]
   
   Options:
   --oligo <oligo_file.gff>
@@ -368,14 +343,13 @@ map_oligo_data2gff.pl --oligo <oligo_file.gff> --data <oligo_data.txt> [--option
   --name <text>
   --type <text>
   --source <text>
-  --strand
+  --(no)strand
   --(no)mid
   --places [0,1,2,3]
   --out <filename> 
-  --gz
-  --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -419,9 +393,9 @@ Specify the output GFF type or method field value. By default, it uses the name.
 
 Specify the output GFF source field value. By default it is 'lab'.
 
-=item --strand
+=item --(no)strand
 
-Indicate whether the original strand information should be kept from the 
+Indicate whether the original strand information should (not) be kept from the 
 original oligo GFF file. The default is false, as most ChIP data is inherently 
 not stranded.
 
@@ -440,13 +414,9 @@ default is no formatting.
 
 Specify the output filename. The default is to use the name value.
 
-=item --gz
+=item --(no)gz
 
 Indicate whether the output file should (not) be compressed with gzip.
-
-=item --version
-
-Print the version number.
 
 =item --help
 
@@ -465,6 +435,7 @@ The score value may be formatted, and the GFF type, source, name, and strand
 may be set to new values. It will write a GFF v.3 file, regardless of the 
 source oligo GFF file version.
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -477,3 +448,5 @@ source oligo GFF file version.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+

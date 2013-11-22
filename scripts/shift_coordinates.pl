@@ -12,9 +12,8 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.0.0';
 
-print "\n A script to shift genomic coordinates by a specified value\n";
+print "\n This script will shift genomic coordinates by a specified value\n";
 
 # useage
 unless (@ARGV) {
