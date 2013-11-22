@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to associate transcription fragments from transcriptome data with 
+# current gene annotation
 
 use strict;
 use warnings;
@@ -24,7 +25,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.9.1';
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -225,10 +226,10 @@ if (defined $main_data_ref) {
 
 # write main data file
 {
-	my $written_file = write_tim_data_file(
+	my $written_file = write_tim_data_file( {
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
-	);
+	} );
 	if ($written_file) {
 		print " Wrote data file '$written_file'\n";
 	}
@@ -239,7 +240,7 @@ if (defined $main_data_ref) {
 
 # write gff file
 if ($gff) {	
-	my $gff_file = convert_and_write_to_gff_file(
+	my $gff_file = convert_and_write_to_gff_file( {
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -250,7 +251,7 @@ if ($gff) {
 		'type'     => 6,
 		'tags'     => [ (5, 8, 12, 14) ] 
 			# Tags: Transcript_Type, Extent, 5prime_UTR, 3prime_UTR
-	);
+	} );
 	if ($gff_file) {
 		print " Wrote GFF file '$gff_file'\n";
 	}
@@ -400,10 +401,10 @@ sub check_dataset {
 		else {
 			# maybe it's a funny named dataset?
 			# verify with the database
-			$data = verify_or_request_feature_types(
+			$data = verify_or_request_feature_types( {
 				'db'      => $db,
 				'feature' => $data,
-			);
+			} );
 			unless ($data) {
 				# if it wasn't returned, it is not valid
 				die " The requested file or dataset '$data' " . 
@@ -928,7 +929,7 @@ sub merge_multi_transfrags {
 	}
 	
 	# generate score for the reason
-	my $score = sprintf "%.3f", get_chromo_region_score(
+	my $score = sprintf "%.3f", get_chromo_region_score( {
 				'db'      => $db,
 				'chromo'  => $transcripts{$pcv}{$psv}{chromo},
 				'start'   => $start,
@@ -938,7 +939,7 @@ sub merge_multi_transfrags {
 				'dataset' => # assign the appropriate dataset based on strand
 					$transcripts{$pcv}{$psv}{strand} == 1 ? $fdata : $rdata,
 				'log'     => $log,
-	); # calculate a new score for the merged transcript
+	} ); # calculate a new score for the merged transcript
 	
 	
 	# update the information on the merged transcript
@@ -1279,11 +1280,10 @@ sub report_processing {
 
 __END__
 
+
 =head1 NAME
 
 map_transcripts.pl
-
-A script to associate enriched regions of transcription with gene annotation.
 
 =head1 SYNOPSIS
 
@@ -1292,6 +1292,7 @@ map_transcripts.pl --ffile <filename> --rfile <filename> --out <filename>
 map_transcripts.pl --db <name> --win <i> --step <i> --fdata <name> 
 --rdata <name> --thresh <i> --out <filename>
   
+ 
   Options:
   --out <filename>
   --ffile <filename>
@@ -1309,6 +1310,7 @@ map_transcripts.pl --db <name> --win <i> --step <i> --fdata <name>
   --version
   --help
 
+ 
 =head1 OPTIONS
 
 The command line flags and descriptions:

@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert a data file to a bed file
 
 use strict;
 use Getopt::Long;
@@ -15,7 +15,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.9.7';
 
 print "\n This program will write a BED file\n";
 
@@ -226,14 +226,10 @@ if ($ask) {
 	
 	# request score index
 	unless (defined $score_index) {
-		my $suggestion = find_column_index($metadata_ref, '^score$');
-		print " Enter the index for the feature score column [$suggestion]  ";
+		print " Enter the index for the feature score column  ";
 		my $in = <STDIN>;
 		if ($in =~ /(\d+)/) {
 			$score_index = $1;
-		}
-		elsif (defined $suggestion) {
-			$score_index = $suggestion;
 		}
 	}
 	
@@ -266,20 +262,14 @@ elsif (
 	unless (defined $stop_index) {
 		$stop_index = find_column_index($metadata_ref, 'stop|end');
 	}
+	unless (defined $stop_index) {
+		$stop_index = find_column_index($metadata_ref, 'stop|end');
+	}
 	unless (defined $strand_index) {
 		$strand_index = find_column_index($metadata_ref, 'strand');
 	}
 	unless (defined $name_index) {
-		$name_index = find_column_index($metadata_ref, '^name|ID');
-	}
-	unless (defined $name_index) {
-		$name_index = find_column_index($metadata_ref, 'name|ID$');
-	}
-	if (not defined $name_index and $metadata_ref->{'gff'}) {
-		$name_index = 8;
-	}
-	unless (defined $score_index) {
-		$score_index = find_column_index($metadata_ref, '^score$');
+		$name_index = find_column_index($metadata_ref, 'name|ID');
 	}
 }
 
@@ -455,12 +445,12 @@ if ($bigbed) {
 	
 			
 	# perform the conversion
-	my $bb_file = bed_to_bigbed_conversion(
+	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
 			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
-	);
+	} );
 
 	
 	# confirm
@@ -484,8 +474,6 @@ __END__
 
 data2bed.pl
 
-A script to convert a data file to a bed file.
-
 =head1 SYNOPSIS
 
 data2bed.pl [--options...] <filename>
@@ -505,7 +493,7 @@ data2bed.pl [--options...] <filename>
   --chromof <filename>
   --db <database>
   --bbapp </path/to/bedToBigBed>
-  --gz
+  --(no)gz
   --version
   --help
 
@@ -608,7 +596,7 @@ file C<biotoolbox.cfg> for the application path. Failing that, it will
 search the default environment path for the utility. If found, it will 
 automatically execute the utility to convert the bed file.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -652,6 +640,9 @@ An option exists to further convert the BED file to an indexed, binary BigBed
 format. Jim Kent's bedToBigBed conversion utility must be available, and 
 either a chromosome definition file or access to a Bio::DB database is required.
 
+
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -664,3 +655,5 @@ either a chromosome definition file or access to a Bio::DB database is required.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+

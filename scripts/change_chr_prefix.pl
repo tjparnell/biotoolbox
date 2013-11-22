@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will add/remove chromosome name prefixes
 
 use strict;
 use Getopt::Long;
@@ -27,7 +27,7 @@ eval {
 	$bam_support = 1;
 };
 
-my $VERSION = '1.10';
+my $VERSION = '1.8.7';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -567,11 +567,11 @@ sub process_text_file {
 	}
 	
 	# write out the file
-	my $success = write_tim_data_file(
+	my $success = write_tim_data_file( {
 		'data'      => $in_data,
 		'gz'        => $gz,
 		'filename'  => $outfile,
-	);
+	} );
 	
 	return $success;
 }
@@ -828,8 +828,6 @@ __END__
 
 change_chr_prefix.pl
 
-A script will add/remove chromosome name prefixes.
-
 =head1 SYNOPSIS
 
 change_chr_prefix.pl [--add | --strip] [--options...] <filename>
@@ -842,10 +840,11 @@ change_chr_prefix.pl [--add | --strip] [--options...] <filename>
   --roman
   --arabic
   --prefix <text>
-  --contig
-  --gz
+  --(no)contig
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -886,13 +885,13 @@ Only upper case are recognized. Higher numbers are ignored.
 
 Specify the chromosome prefix. The default value is 'chr'.
 
-=item --contig
+=item --(no)contig
 
-Indicate whether contig and scaffold names should be included 
+Indicate whether (or not) contig and scaffold names should be included 
 in the renaming process. These are recognized by the text 'contig', 
-'scaffold', or 'NA' in the name. The default value is false.
+'scaffold', or 'NA' in the name. The default value is false (nocontig).
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output text file should be compressed with gzip.
 
@@ -935,3 +934,4 @@ chromosomes or other funny named chromosomes may need to be changed manually.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

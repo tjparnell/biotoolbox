@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will correlate the positions of occupancy from two datasets
+# for a region (nucleosome)
 
 use strict;
 use Getopt::Long;
@@ -17,14 +18,13 @@ use tim_data_helper qw(
 use tim_db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
-	get_feature
 	get_region_dataset_hash
 );
 use tim_file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.11';
+my $VERSION = '1.9.4';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -189,11 +189,11 @@ collect_correlations();
 unless ($outfile) {
 	$outfile = $infile;
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'     => $mainData,
 	'filename' => $outfile,
 	'gz'       => $gz,
-);
+} );
 if ($success) {
 	print " wrote output file $success\n";
 }
@@ -212,24 +212,24 @@ printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 sub validate_or_request_dataset {
 	
 	# Process the reference dataset
-	$refDataSet = verify_or_request_feature_types(
+	$refDataSet = verify_or_request_feature_types( {
 		'db'      => $ddb,
 		'feature' => $refDataSet,
 		'prompt'  => "Enter the reference data set  ",
 		'single'  => 1,
-	);
+	} );
 	unless ($refDataSet) {
 		die " A valid reference data set must be provided!\n";
 	}
 	
 	
 	# Process the test dataset
-	$testDataSet = verify_or_request_feature_types(
+	$testDataSet = verify_or_request_feature_types( {
 		'db'      => $ddb,
 		'feature' => $testDataSet,
 		'prompt'  => "Enter the test data set  ",
 		'single'  => 1,
-	);
+	} );
 	unless ($testDataSet) {
 		die " A valid test data set must be provided!\n";
 	}
@@ -240,14 +240,13 @@ sub identify_indices {
 	# Identify columns in the input file
 	
 	my %index;
-	$index{name}   = find_column_index($mainData, "^name");
+	$index{name}   = find_column_index($mainData, "^name|id");
 	$index{type}   = find_column_index($mainData, "^type");
-	$index{id}     = find_column_index($mainData, "^primary_id");
-	$index{chrom}  = find_column_index($mainData, "^chr|seq");
+	$index{chrom}    = find_column_index($mainData, "^chr|seq");
 	$index{start}  = find_column_index($mainData, "^start");
 	$index{stop}   = find_column_index($mainData, "^stop|end");
 	$index{strand} = find_column_index($mainData, "strand");
-	unless (defined $index{id} or defined $index{name} or defined $index{chrom}) {
+	unless (defined $index{name} or defined $index{chrom}) {
 		die " unable to identify at least name or chromosome column index!\n";
 	}
 	if ($set_strand and not defined $index{strand}) {
@@ -274,7 +273,7 @@ sub collect_correlations {
 	
 	# set coordinate collection method
 	my $collect_coordinates;
-	if (defined $index{id} or (defined $index{name} and defined $index{type}) ) {
+	if (defined $index{name} and defined $index{type}) {
 		# using named features
 		# retrieve the coordinates from the database
 		$collect_coordinates = \&collect_coordinates_from_db;
@@ -300,17 +299,6 @@ sub collect_correlations {
 		
 		# Determine coordinates
 		my ($chromo, $start, $stop, $strand) = &{$collect_coordinates}($row);
-		unless ($chromo and $start and $stop) {
-			# verify coordinates
-			$mainData->{'data_table'}->[$row][$index{r}]       = '.';
-			if ($find_shift) {
-				$mainData->{'data_table'}->[$row][$index{shiftval}] = '.';
-				$mainData->{'data_table'}->[$row][$index{shiftr}]  = '.';
-			}
-			$not_enough_data++;
-			next;
-		}
-		
 		
 		# determine reference point
 		my $ref_point;
@@ -332,7 +320,7 @@ sub collect_correlations {
 			# collecting data in a radius around a reference point
 			
 			# collect data
-			%ref_pos2data = get_region_dataset_hash(
+			%ref_pos2data = get_region_dataset_hash( {
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
@@ -340,8 +328,8 @@ sub collect_correlations {
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
 				'value'     => 'score',
-			);
-			%test_pos2data = get_region_dataset_hash(
+			} );
+			%test_pos2data = get_region_dataset_hash( {
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
@@ -349,12 +337,12 @@ sub collect_correlations {
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
 				'value'     => 'score',
-			);
+			} );
 		}
 		else {
 			# just collect data over the region
 			# collect data
-			%ref_pos2data = get_region_dataset_hash(
+			%ref_pos2data = get_region_dataset_hash( {
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
@@ -364,8 +352,8 @@ sub collect_correlations {
 				'strand'    => $strand,
 				'position'  => 5, 
 				'value'     => 'score',
-			);
-			%test_pos2data = get_region_dataset_hash(
+			} );
+			%test_pos2data = get_region_dataset_hash( {
 				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
@@ -375,7 +363,7 @@ sub collect_correlations {
 				'strand'    => $strand,
 				'position'  => 5, 
 				'value'     => 'score',
-			);
+			} );
 		}
 		
 		# Verify minimum data count 
@@ -621,19 +609,27 @@ sub add_new_columns {
 sub collect_coordinates_from_db {
 	my $row = shift;
 	
-	# retrieve the coordinates from named features in the database
-	my $feature = get_feature(
-		'db'    => $db,
-		'id'    => defined $index{id} ? 
-			$mainData->{'data_table'}->[$row][$index{id}] : undef,
-		'name'  => defined $index{name} ? 
-			$mainData->{'data_table'}->[$row][$index{name}] : undef,
-		'type'  => defined $index{type} ? 
-			$mainData->{'data_table'}->[$row][$index{type}] : undef,
+	# using named features
+	# retrieve the coordinates from the database
+	my @features = $db->features( 
+		-name  => $mainData->{'data_table'}->[$row][$index{name}],
+		-type  => $mainData->{'data_table'}->[$row][$index{type}],
 	);
-	return unless ($feature);
+	if (scalar @features > 1) {
+		# there should only be one feature found
+		# if more, there's redundant or duplicated data in the db
+		# warn the user, this should be fixed
+		warn " Found more than one feature of type " . 
+			$mainData->{'data_table'}->[$row][$index{type}] . ", name " . 
+			$mainData->{'data_table'}->[$row][$index{name}] . 
+			" in the database!\n Using the first feature only!\n";
+	}
+	my $feature = shift @features; 
 	
-	# calculate strand
+	# collect coordinates
+	my $chromo = $feature->seq_id;
+	my $start  = $feature->start;
+	my $stop   = $feature->end;
 	my $strand;
 	if ($set_strand) {
 		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
@@ -643,15 +639,17 @@ sub collect_coordinates_from_db {
 		$strand = $feature->strand;
 	}
 	
-	# return coordinates
-	return ($feature->seq_id, $feature->start, $feature->end, $strand);
+	return ($chromo, $start, $stop, $strand);
 }
 
 
 sub collect_coordinates_from_file {
 	my $row = shift;
 	
-	# calculate strand
+	# genomic coordinates defined in the table
+	my $chromo = $mainData->{'data_table'}->[$row][$index{chrom}];
+	my $start  = $mainData->{'data_table'}->[$row][$index{start}];
+	my $stop   = $mainData->{'data_table'}->[$row][$index{stop}];
 	my $strand;
 	if (defined $index{strand}) {
 		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
@@ -660,14 +658,8 @@ sub collect_coordinates_from_file {
 	else {
 		$strand = 0;
 	}
-	
-	# return coordinates defined in the table
-	return (
-		$mainData->{'data_table'}->[$row][$index{chrom}], 
-		$mainData->{'data_table'}->[$row][$index{start}], 
-		$mainData->{'data_table'}->[$row][$index{stop}], 
-		$strand
-	);
+
+	return ($chromo, $start, $stop, $strand);
 }
 
 
@@ -907,8 +899,6 @@ __END__
 
 correlate_position_data.pl
 
-A script to calculate correlations between two datasets along the length of a feature.
-
 =head1 SYNOPSIS
 
 correlate_position_data.pl [--options] <filename>
@@ -926,9 +916,10 @@ correlate_position_data.pl [--options] <filename>
   --norm [rank | sum ]
   --force_strand
   --(no)interpolate
-  --gz
+  --(no)gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -1019,7 +1010,7 @@ Interpolate missing or zero positioned values in each window for both
 reference and test data. This will improve the Pearson correlation 
 values, especially for sparse data. Enabled by default.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -1072,3 +1063,4 @@ shift value that generated it.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

@@ -23,7 +23,7 @@ our @EXPORT_OK = qw(
 );
 
 
-our $VERSION = '1.10';
+our $VERSION = '1.9.0';
 
 1;
 
@@ -32,59 +32,52 @@ our $VERSION = '1.10';
 sub wig_to_bigwig_conversion {
 	
 	# Collect passed arguments
-	my %args = @_; 
-	unless (%args) {
+	my $argument_ref = shift;
+	unless ($argument_ref) {
 		cluck "no arguments passed!";
 		return;
 	}
 	
 	# wigfile
-	$args{'wig'} ||= undef;
-	unless ($args{'wig'}) {
+	my $wigfile = $argument_ref->{'wig'} || q();
+	unless ($wigfile) {
 		cluck "no wig file passed!";
 		return;
 	}
 	
 	
 	# Identify bigwig conversion utility
-	my $utility = $args{'wig'} =~ /\.(?:bdg|bedgraph|bed)$/i ? 'bedGraphToBigWig' :
-				'wigToBigWig';
-	$args{'bwapppath'} ||= undef;
-	unless ($args{'bwapppath'}) {
+	my $bw_app_path = $argument_ref->{'bwapppath'} || q();
+	unless ($bw_app_path) {
 		# check for an entry in the configuration file
-		$args{'bwapppath'} = $TIM_CONFIG->param("applications.$utility") || 
-				undef;
+		$bw_app_path = $TIM_CONFIG->param('applications.wigToBigWig') || 
+			undef;
 	}
-	unless ($args{'bwapppath'}) {
+	unless ($bw_app_path) {
 		# try checking the system path as a final resort
-		$args{'bwapppath'} = `which $utility`;
-		chomp $args{'bwapppath'};
+		$bw_app_path = `which wigToBigWig`;
+		chomp $bw_app_path;
 	}
-	unless ($args{'bwapppath'}) {
-		carp " Utility '$utility' not specified and can not be found!" . 
+	unless ($bw_app_path) {
+		carp " Utility 'wigToBigWig' not specified and can not be found!" . 
 			" Conversion failed!\n";
 		return;
 	}
 	
-	# verify utility
-	unless ($args{'bwapppath'} =~ /$utility\Z/) {
-		carp " Wrong utility for the type of wig file! Unable to convert!\n";
-		return;
-	}
 	
 	# Generate list of chromosome sizes if necessary
-	$args{'chromo'} ||= undef;
-	unless ($args{'chromo'}) {
+	my $chromo_file = $argument_ref->{'chromo'} || q();
+	unless ($chromo_file) {
 		# a pre-generated list of chromosome sizes was not provided
 		# need to generate one from the database
-		$args{'db'} ||= undef;
-		unless ($args{'db'}) {
+		my $database = $argument_ref->{'db'} || q();
+		unless ($database) {
 			carp " No requisite database or chromosome info file provided!" .
 				" Conversion failed\n";
 			return;
 		}
-		$args{'chromo'} = generate_chromosome_file($args{'db'});
-		unless ($args{'chromo'}) {
+		$chromo_file = generate_chromosome_file($database);
+		unless ($chromo_file) {
 			carp " Cannot generate chromosome info file! Conversion failed\n";
 			return;
 		}
@@ -93,41 +86,41 @@ sub wig_to_bigwig_conversion {
 	
 	# Generate the bw file name
 	# we can substitute one of three possible names for bw
-	my $bw_file = $args{'wig'};
+	my $bw_file = $wigfile;
 	$bw_file =~ s/\.(?:bed|bdg|bedgraph|wig)$/.bw/;
 	
 	
 	# Generate the bigwig file 
-	print " converting $args{'wig'} to bigWig....\n";
-	if ($args{'bwapppath'} =~ /wigToBigWig$/) {
+	print " converting $wigfile to bigWig....\n";
+	if ($bw_app_path =~ /wigToBigWig$/) {
 		# include the -clip option in case there are any positions 
 		# out of bounds of the chromosome
 		# it will just warn instead of fail
-		system $args{'bwapppath'}, '-clip', $args{'wig'}, $args{'chromo'}, $bw_file;
+		system $bw_app_path, '-clip', $wigfile, $chromo_file, $bw_file;
 	}
-	elsif ($args{'bwapppath'} =~ /bedGraphToBigWig$/) {
+	elsif ($bw_app_path =~ /bedGraphToBigWig$/) {
 		# this doesn't have the -clip option, too bad
-		system $args{'bwapppath'}, $args{'wig'}, $args{'chromo'}, $bw_file;
+		system $bw_app_path, $wigfile, $chromo_file, $bw_file;
 	}
 	
 	# check the result
 	if (-e $bw_file and -s $bw_file) {
 		# conversion successful
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($chromo_file =~ /^chr_sizes\w{5}/) {
 			# we no longer need our temp chromosome file
-			unlink $args{'chromo'};
+			unlink $chromo_file;
 		}
 		return $bw_file;
 	}
 	else {
-		warn " Conversion failed. You should try manually and watch for errors\n";
+		carp " Conversion failed. You should try manually and watch for errors\n";
 		if (-e $bw_file) {
 			# 0-byte file was created
 			unlink $bw_file;
 		}
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($chromo_file =~ /^chr_sizes\w{5}/) {
 			# leave the temp chromosome file as a courtesy
-			warn " Leaving temporary chromosome file '$args{'chromo'}'\n";
+			carp " Leaving temporary chromosome file '$chromo_file'\n";
 		}
 		return;
 	}
@@ -138,33 +131,33 @@ sub wig_to_bigwig_conversion {
 sub bed_to_bigbed_conversion {
 	
 	# Collect passed arguments
-	my %args = @_; 
-	unless (%args) {
-		cluck "no arguments passed!";
+	my $argument_ref = shift;
+	unless ($argument_ref) {
+		carp "no arguments passed!";
 		return;
 	}
 	
 	# bedfile
-	$args{'bed'} ||= undef;
-	unless ($args{'bed'}) {
+	my $bedfile = $argument_ref->{'bed'} || undef;
+	unless ($bedfile) {
 		carp "no bed file passed!";
 		return;
 	}
 	
 	
 	# identify bigbed conversion utility
-	$args{'bbapppath'} ||= undef;
-	unless ($args{'bbapppath'}) {
+	my $bb_app_path = $argument_ref->{'bbapppath'} || undef;
+	unless ($bb_app_path) {
 		# check for an entry in the configuration file
-		$args{'bbapppath'} = $TIM_CONFIG->param('applications.bedToBigBed') || 
+		$bb_app_path = $TIM_CONFIG->param('applications.bedToBigBed') || 
 			undef;
 	}
-	unless ($args{'bbapppath'}) {
+	unless ($bb_app_path) {
 		# try checking the system path as a final resort
-		$args{'bbapppath'} = `which bedToBigBed`;
-		chomp $args{'bbapppath'};
+		$bb_app_path = `which bedToBigBed`;
+		chomp $bb_app_path;
 	}
-	unless ($args{'bbapppath'}) {
+	unless ($bb_app_path) {
 		carp " Utility 'bedToBigBed' not specified and can not be found!" . 
 			" Conversion failed!\n";
 		return;
@@ -172,18 +165,18 @@ sub bed_to_bigbed_conversion {
 	
 	
 	# Generate list of chromosome sizes if necessary
-	$args{'chromo'} ||= undef;
-	unless ($args{'chromo'}) {
+	my $chromo_file = $argument_ref->{'chromo'} || undef;
+	unless ($chromo_file) {
 		# a pre-generated list of chromosome sizes was not provided
 		# need to generate one from the database
-		$args{'db'} ||= undef;
-		unless ($args{'db'}) {
+		my $database = $argument_ref->{'db'} || q();
+		unless ($database) {
 			carp " No requisite database or chromosome info file provided!" .
 				" Conversion failed\n";
 			return;
 		}
-		$args{'chromo'} = generate_chromosome_file($args{'db'});
-		unless ($args{'chromo'}) {
+		$chromo_file = generate_chromosome_file($database);
+		unless ($chromo_file) {
 			carp " Cannot generate chromosome info file! Conversion failed\n";
 			return;
 		}
@@ -191,33 +184,33 @@ sub bed_to_bigbed_conversion {
 	
 	
 	# Generate the bb file name
-	my $bb_file = $args{'bed'};
+	my $bb_file = $bedfile;
 	$bb_file =~ s/\.bed$/.bb/;
 	
 	
 	# Generate the bigBed file using Jim Kent's utility
-	print " converting $args{'bed'} to BigBed....\n";
-	system $args{'bbapppath'}, $args{'bed'}, $args{'chromo'}, $bb_file;
+	print " converting $bedfile to BigBed....\n";
+	system $bb_app_path, $bedfile, $chromo_file, $bb_file;
 	
 	
 	# Check the result
 	if (-e $bb_file and -s $bb_file) {
 		# conversion successful
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($chromo_file =~ /^chr_sizes\w{5}/) {
 			# we no longer need our temp chromosome file
-			unlink $args{'chromo'};
+			unlink $chromo_file;
 		}
 		return $bb_file;
 	}
 	else {
-		warn " Conversion failed. You should try manually and watch for errors\n";
+		print " Conversion failed. You should try manually and watch for errors\n";
 		if (-e $bb_file) {
 			# 0-byte file was created
 			unlink $bb_file;
 		}
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($chromo_file =~ /^chr_sizes\w{5}/) {
 			# leave the temp chromosome file as a courtesy
-			warn " Leaving temporary chromosome file '$args{'chromo'}'\n";
+			print " Leaving temporary chromosome file '$chromo_file'\n";
 		}
 		return;
 	}
@@ -240,7 +233,7 @@ sub generate_chromosome_file {
 	# prepare temp file
 	my $chr_fh = new File::Temp(
 		'UNLINK'   => 0,
-		'TEMPLATE' => 'chr_sizes_XXXXX',
+		'TEMPLATE' => 'chr_sizesXXXXX',
 	);
 	my $chromo_file = $chr_fh->filename;
 
@@ -287,9 +280,8 @@ names of the subroutines to export. None are automatically exported.
 This subroutine will convert a wig file to a bigWig file. See the UCSC 
 documentation regarding wig (http://genome.ucsc.edu/goldenPath/help/wiggle.html)
 and bigWig (http://genome.ucsc.edu/goldenPath/help/bigWig.html) file formats. 
-It uses Jim Kent's wigToBigWig or bedGraphToBigWig utility to perform the 
-conversion, depending on the format of the wig file. The utility must be 
-available on the system for the conversion to succeed. 
+It uses Jim Kent's wigToBigWig utility to perform the conversion. 
+This must be present on the system for the conversion to succeed. 
 
 The conversion requires a list of chromosome name and sizes in a simple text 
 file, where each line is comprised of two columns, "<chromosome name> 
@@ -297,9 +289,10 @@ file, where each line is comprised of two columns, "<chromosome name>
 given a Bio::DB database name (preferred to ensure genome version 
 compatibility).
 
-After running the utility, the existence of a non-zero byte bigWig file 
-is checked. If it does, then the name of the file is returned. If not, 
-an error is printed and nothing is returned. 
+The function returns the name of the bigWig file, which will be the 
+input wig file basename with the BigWig ".bw". Note that the it does 
+not check for success of writing the bigwig file. Check STDERR for errors 
+in bigwig file generation.
 
 Pass the function an anonymous hash of arguments, including the following:
 
@@ -343,9 +336,10 @@ file, where each line is comprised of two columns, "<chromosome name>
 given a Bio::DB database name (preferred to ensure genome version 
 compatibility).
 
-After running the utility, the existence of a non-zero byte bigBed file 
-is checked. If it does, then the name of the file is returned. If not, 
-an error is printed and nothing is returned. 
+The function returns the name of the bigBed file, which will be the 
+input bed file basename with the extension ".bb". Note that the it does 
+not check for success of writing the bigbed file. Check STDERR for errors 
+in bigbed file generation.
 
 Pass the function an anonymous hash of arguments, including the following:
 
@@ -362,13 +356,14 @@ Pass the function an anonymous hash of arguments, including the following:
 
 Example
 
-	my $bed_file = 'example.bed';
-	my $bb_file = bed_to_bigbed_conversion( {
-			'bed'   => $bed_file,
+	my $wig_file = 'example_wig';
+	my $bw_file = wig_to_bigwig_conversion( {
+			'wig'   => $wig_file,
 			'db'    => $database,
 	} );
-	if ($bb_file) {
-		print " success! wrote bigBed file $bb_file\n";
+	if (-e $bw_file) {
+		print " success! wrote bigwig file $bw_file\n";
+		unlink $wig_file; # no longer necessary
 	}
 	else {
 		print " failure! see STDERR for errors\n";

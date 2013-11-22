@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to identify and locate the position of SNPs
 
 use strict;
 use Getopt::Long;
@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.9.2';
 
 
 
@@ -289,11 +289,11 @@ foreach my $infile (@infiles) {
 	my $outfile = $infile;
 	$outfile = $metadata->{'basename'};
 	$outfile .= '_summary.txt';
-	my $written_file = write_tim_data_file(
+	my $written_file = write_tim_data_file( {
 		'data'     => $output,
 		'filename' => $outfile,
 		'format'   => 'simple',
-	);
+	} );
 	if ($written_file) {
 		print " wrote file '$written_file'\n";
 	}
@@ -618,8 +618,6 @@ __END__
 
 locate_SNPs.pl
 
-A script to locate the position of SNPs and identify codon changes.
-
 =head1 SYNOPSIS
  
  locate_SNPs.pl --db <database> <snp_file1> ...
@@ -721,3 +719,22 @@ feature is found overlapping the SNP, then both features are reported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

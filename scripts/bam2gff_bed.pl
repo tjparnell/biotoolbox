@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to convert bam paired_reads to a gff or bed file
 
 use strict;
 use Getopt::Long;
@@ -19,7 +19,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.9.0';
 
 
 print "\n A script to convert Bam alignments to GFF or BED files\n\n";
@@ -271,11 +271,11 @@ if ($bed and $bigbed) {
 	
 			
 	# perform the conversion
-	my $bb_file = bed_to_bigbed_conversion(
+	my $bb_file = bed_to_bigbed_conversion( {
 			'bed'       => $outfile,
 			'db'        => $sam,
 			'bbapppath' => $bb_app_path,
-	);
+	} );
 
 	
 	# confirm
@@ -492,8 +492,6 @@ __END__
 
 bam2gff_bed.pl
 
-A script to convert bam paired_reads to a gff or bed file.
-
 =head1 SYNOPSIS
 
 bam2gff_bed.pl [--options...] <filename>
@@ -507,7 +505,7 @@ bam2gff_bed.pl [--options...] <filename>
   --randstr
   --out <filename> 
   --bbapp </path/to/bedToBigBed>
-  --gz
+  --(no)gz
   --version
   --help
 
@@ -569,7 +567,7 @@ the application path. Failing that, it will search the default
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the bed file.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 

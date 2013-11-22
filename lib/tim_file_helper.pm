@@ -14,7 +14,17 @@ use tim_data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.12.6';
+our $VERSION = '1.9.5';
+
+# check for IO gzip support
+our $GZIP_OK = 0;
+eval {
+	use IO::Zlib;
+};
+unless ($@) {
+	$GZIP_OK = 1;
+}; 
+$@ = undef;
 
 
 ### Variables
@@ -40,7 +50,6 @@ our @EXPORT_OK = qw(
 our @SUFFIX_LIST = qw(
 	\.txt
 	\.txt\.gz
-	\.txt\.bz2
 	\.gff
 	\.gff\.gz
 	\.gtf
@@ -80,9 +89,16 @@ sub load_tim_data_file {
 		return;
 	}
 	
+	# split filename into its base components
+	my ($basename, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
+	
+	# The resulting data structure
+	my $inputdata_ref;
+	
 	# open the file and parse the metadata
 	# this will return the metadata hash and an open filehandle
-	my ($fh, $inputdata) = open_tim_data_file($filename);
+	my $fh; # open filehandle for processing the data table
+	($fh, $inputdata_ref) = open_tim_data_file($filename);
 	unless ($fh) {
 		return;
 	}
@@ -91,50 +107,27 @@ sub load_tim_data_file {
 	my @datatable;
 	
 	# put the column names into the data table
-	push @datatable, $inputdata->{'column_names'};
-	delete $inputdata->{'column_names'}; # we no longer need this
+	push @datatable, $inputdata_ref->{'column_names'};
+	delete $inputdata_ref->{'column_names'}; # we no longer need this
 	
 	# load the data table
 	while (my $line = $fh->getline) {		
+		$line =~ s/\r|\n$//g;
 		
 		# the current file position should be at the beginning of the
 		# data table information
-		
-		# skip comment lines
-		if ($line =~ /^#/) {
-			push @{ $inputdata->{'other'} }, $line;
-			next;
-		}
-		
-		# no real line, just empty space
-		if ($line !~ m/\w+/) {
-			next;
-		}
 		
 		# simply read each line in the file, explode the line into an 
 		# anonymous array and push it to the data_table array
 		my @linedata = split /\t/, $line;
 		
-		# check the number of elements
-		if (scalar @linedata != $inputdata->{'number_columns'} ) {
-			carp "File '$filename' is inconsistent! line $. has ", scalar(@linedata),
-				" columns instead of expected ", $inputdata->{'number_columns'}, "\n";
-			return;
-		}
-		
-		# chomp the last element
-		# we do this here to ensure the tab split above gets all of the values
-		# otherwise trailing null values aren't included in @linedata
-		# be sure to handle both newlines and carriage returns
-		$linedata[-1] =~ s/[\r\n]+$//;
-		
 		# convert null values to internal '.'
-		for (my $i = 0; $i < $inputdata->{'number_columns'}; $i++ ) {
+		for (my $i = 0; $i < $inputdata_ref->{'number_columns'}; $i++ ) {
 			if (!defined $linedata[$i]) {
 				# not defined position in the array?
 				$linedata[$i] = '.';
 			}
-			elsif ($linedata[$i] eq '') {
+			if ($linedata[$i] eq '') {
 				# a null value
 				$linedata[$i] = '.';
 			}
@@ -144,17 +137,24 @@ sub load_tim_data_file {
 			}
 		}
 		
+		# check the number of elements
+		if (scalar @linedata != $inputdata_ref->{'number_columns'} ) {
+			carp "line $. has wrong number of columns! " .
+				scalar(@linedata) . " instead of " . 
+				$inputdata_ref->{'number_columns'};
+		}
+		
 		# store the array
 		push @datatable, [ @linedata ];
 	}
 	
 	# convert 0-based starts to 1-base for BED source files
-	if ($inputdata->{'bed'}) {
+	if ($inputdata_ref->{'bed'}) {
 		for (my $row = 1; $row < scalar @datatable; $row++) {
 			# add 1 to each start position
 			$datatable[$row][1] += 1;
 		}
-		$inputdata->{1}{'base'} = 1;
+		$inputdata_ref->{1}{'base'} = 1;
 	}
 	
 	
@@ -162,7 +162,7 @@ sub load_tim_data_file {
 	# NOTE: this may change original data if file is written again
 		# with the exception of GFF and BED, which should be automatically
 		# converted back if the format is maintained
-	my $strand_i = find_column_index($inputdata, '^strand$');
+	my $strand_i = find_column_index($inputdata_ref, '^strand$');
 	if (defined $strand_i) {
 		# should be true for BED and GFF files or any other file with strand
 		for (my $row = 1; $row < scalar @datatable; $row++) {
@@ -184,19 +184,16 @@ sub load_tim_data_file {
 	
 		
 	# associate the data table with the data hash
-	$inputdata->{'data_table'} = \@datatable;
+	$inputdata_ref->{'data_table'} = \@datatable;
 	
 	# record the index number of the last data row
-	$inputdata->{'last_row'} = scalar @datatable - 1;
+	$inputdata_ref->{'last_row'} = scalar @datatable - 1;
 	
 	# completed loading the file
 	$fh->close;
 	
-	# verify the structure
-	verify_data_structure($inputdata);
-	
 	# finished
-	return $inputdata;
+	return $inputdata_ref;
 }
 
 
@@ -271,21 +268,21 @@ sub open_tim_data_file {
 		# the generating program
 		elsif ($line =~ m/^# Program (.+)$/) {
 			$inputdata->{'program'} = $1;
-			$inputdata->{'program'} =~ s/[\r\n]+$//;
+			$inputdata->{'program'} =~ s/\r|\n$//g; 
 			$header_line_count++;
 		}
 		
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
 			$inputdata->{'db'} = $1;
-			$inputdata->{'db'} =~ s/[\r\n]+$//;
+			$inputdata->{'db'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
 			$inputdata->{'feature'} = $1;
-			$inputdata->{'feature'} =~ s/[\r\n]+$//;
+			$inputdata->{'feature'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
@@ -301,7 +298,7 @@ sub open_tim_data_file {
 			
 			# strip the Column metadata identifier
 			my $metadataline = $line; # to avoid manipulating $line
-			$metadataline =~ s/[\r\n]+$//;
+			$metadataline =~ s/\r|\n$//g;
 			$metadataline =~ s/^# Column_\d+ //; 
 			
 			# break up the column metadata
@@ -383,7 +380,7 @@ sub open_tim_data_file {
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
 			$inputdata->{'gff'} = $1;
-			$inputdata->{'gff'} =~ s/[\r\n]+$//;
+			$inputdata->{'gff'} =~ s/\r|\n$//g;
 			$header_line_count++;
 		}
 		
@@ -395,7 +392,7 @@ sub open_tim_data_file {
 		}
 		
 		# a track line 
-		elsif ($line =~ /^track\s+/i) {
+		elsif ($line =~ /^track\s+/) {
 			# common with wig, bed, or bedgraph files for use with
 			# the UCSC genome browser
 			# treat as a comment line, there's not that much useful info
@@ -413,74 +410,8 @@ sub open_tim_data_file {
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
 			
-			# Data tables with a commented header line
-				# including data table files from UCSC Table Browser
-				# also VCF files as well
-				# these will have one comment line marked with #
-				# that really contains the column headers
-			if ( _commented_header_line($inputdata, $line) ) {
-				# lots of requirements, but this checks that (column 
-				# metadata has not already been loaded), there is at least one 
-				# unknown comment line, and that the last comment line is 
-				# splitable and has the same number of elements as the first 
-				# data line
-				
-				# process the real header line
-				my $header_line = pop @{ $inputdata->{'other'} };
-				$header_line =~ s/[\r\n]+$//;
-				
-				# generate the metadata
-				my $i = 0;
-				foreach (split /\t/, $header_line) {
-					$inputdata->{$i} = { 
-						'name'   => $_,
-						'index'  => $i,
-						'AUTO'   => 3,
-					} unless exists $inputdata->{$i};
-					
-					push @{ $inputdata->{'column_names'} }, $_;
-					$i++;
-				}
-				$inputdata->{'number_columns'} = $i;
-				
-				# we do not count the current line as a header
-				
-				# set headers flag to true
-				$inputdata->{'headers'} = 1;
-				
-				# check for special formatted files
-					# these include GFF and BED, which don't normally have 
-					# header lines, even commented ones, but you never know 
-					# what crazy users like Sue will feed these programs
-					# we set the gff or bed flag
-				if ($extension =~ /gtf|gff3?/) {
-					# set the gff version based on the extension
-					unless ($inputdata->{'gff'}) {
-						$inputdata->{'gff'} = 
-							$extension =~ /gtf/  ? 2.5 :
-							$extension =~ /gff3/ ? 3   :
-							2;
-					}
-					
-					# set the feature type
-					unless (defined $inputdata->{'feature'}) {
-						$inputdata->{'feature'} = 'region';
-					}
-				}
-				elsif ($extension =~ /bed|bdg|bedgraph/) {
-					$inputdata->{'bed'} = $inputdata->{'number_columns'};
-					
-					# set the feature type
-					unless (defined $inputdata->{'feature'}) {
-						$inputdata->{'feature'} = 'region';
-					}
-				}
-				
-				last PARSE_HEADER_LOOP;
-			}
-			
 			# a GFF file
-			elsif ($extension =~ /g[tf]f/i) {
+			if ($extension =~ /g[tf]f/i) {
 				# gff files have nine defined columns
 				# there are different specifications and variants:
 				# gff (v.1), gff v.2, gff v.2.5 (aka gtf), gff v.3 (gff3)
@@ -488,15 +419,20 @@ sub open_tim_data_file {
 				# more info on gff can be found here
 				# http://gmod.org/wiki/GFF3
 				
-				# set column number
+				# set values
 				$inputdata->{'number_columns'} = 9; # supposed to be 9 columns
-				
-				# set the gff version based on the extension
-				unless ($inputdata->{'gff'}) {
-					$inputdata->{'gff'} = 
-						$extension =~ /gtf/  ? 2.5 :
-						$extension =~ /gff3/ ? 3   :
-						2;
+				if ($inputdata->{'gff'} == 0) { 
+					# try and determine type based on extension (yeah, right)
+					if ($extension =~ /gtf/) {
+						$inputdata->{'gff'} = 2.5;
+					}
+					elsif ($extension =~ /gff3/) {
+						$inputdata->{'gff'} = 3;
+					}
+					else {
+						# likely version 2, never really encounter v. 1
+						$inputdata->{'gff'} = 2;
+					}
 				}
 				
 				# a list of gff column names
@@ -554,17 +490,12 @@ sub open_tim_data_file {
 				# these only have four columns, no more, no less
 				# the fourth column is score, not name
 				
-				# first check for a commented header line, in case someone like 
-				# Sue puts one in (geez)
-				
 				# first determine the number of columns we're working
 				my @elements = split /\s+/, $line;
 					# normally tab-delimited, but the specs are not explicit
 				my $column_count = scalar @elements;
 				$inputdata->{'number_columns'} = $column_count; 
 				$inputdata->{'bed'} = $column_count;
-				
-				
 				
 				# Define the columns and metadata
 				if ($column_count >= 3) {
@@ -839,13 +770,49 @@ sub open_tim_data_file {
 				last PARSE_HEADER_LOOP;
 			}
 			
+			# Data table files from UCSC Table Browser
+				# also VCF files as well
+				# these will have one comment line marked with #
+				# that really contains the column headers
+			elsif ( _commented_header_line($inputdata, $line) ) {
+				# lots of requirements, but this checks that (column 
+				# metadata has not already been loaded), there is at least one 
+				# unknown comment line, and that the last comment line is 
+				# splitable and has the same number of elements as the first 
+				# data line
+				
+				# process the real header line
+				my $header_line = pop @{ $inputdata->{'other'} };
+				$header_line =~ s/\r|\n$//g;
+				
+				# generate the metadata
+				my $i = 0;
+				foreach (split /\t/, $header_line) {
+					$inputdata->{$i} = { 
+						'name'   => $_,
+						'index'  => $i,
+						'AUTO'   => 3,
+					};
+					push @{ $inputdata->{'column_names'} }, $_;
+					$i++;
+				}
+				$inputdata->{'number_columns'} = $i;
+				
+				# we do not count the current line as a header
+				
+				# set headers flag to true
+				$inputdata->{'headers'} = 1;
+				
+				last PARSE_HEADER_LOOP;
+			}
+			
 			# all other file formats, including tim data files
 			else {
 				# we have not yet parsed the row of data column names
 				# we will do so now
 				
 				my @namelist = split /\t/, $line;
-				$namelist[-1] =~ s/[\r\n]+$//;
+				$namelist[-1] =~ s/\r|\n$//g;
 				
 				# we will define the columns based on
 				for my $i (0..$#namelist) {
@@ -920,34 +887,34 @@ sub open_tim_data_file {
 sub write_tim_data_file {
 	
 	# collect passed arguments
-	my %args = @_; 
-	$args{'data'}     ||= undef;
-	$args{'filename'} ||= undef;
-	$args{'format'}   ||= undef;
-	unless (exists $args{'gz'}) {$args{'gz'} = undef} 
-		# this is a boolean value, need to be cognizant of 0
-		# this will be checked below
+	my $argument_ref = shift;
+	unless ($argument_ref) {
+		cluck "no arguments passed!";
+		return;
+	}
+	my $datahash_ref = $argument_ref->{'data'}     || undef;
+	my $filename     = $argument_ref->{'filename'} || undef;
+	my $format       = $argument_ref->{'format'}   || undef;
+	my $gz           = $argument_ref->{'gz'};
 	
-	# check the data
-	my $data = $args{'data'};
-	unless ($data) {
+	unless (defined $datahash_ref) {
 		# we need data to write
 		cluck "no data to write!\n";
 		return;
 	}
-	unless (verify_data_structure($data) ) {
+	unless (verify_data_structure($datahash_ref) ) {
 		cluck "bad data structure!";
 		return;
 	}
 	
 	# determine filename
-	unless ($args{'filename'}) {
+	unless ($filename) {
 		# we need a filename to write
 		
 		# check for a filename in the metadata
-		if (exists $data->{'filename'}) {
+		if (exists $datahash_ref->{'filename'}) {
 			# re-use the original file name 
-			$args{'filename'} = $data->{'filename'};
+			$filename = $datahash_ref->{'filename'};
 		}
 		else {
 			# complain about no file name
@@ -957,7 +924,7 @@ sub write_tim_data_file {
 	}
 	
 	# split filename into its base components
-	my ($name, $path, $extension) = fileparse($args{'filename'}, @SUFFIX_LIST);
+	my ($name, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
 	
 	# Adjust filename extension if necessary
 	if ($extension) {
@@ -966,13 +933,13 @@ sub write_tim_data_file {
 		
 		# GFF file
 		if ($extension =~ /gff/i) {
-			unless ($data->{'gff'}) {
+			unless ($datahash_ref->{'gff'}) {
 				# it's not set as a gff data
 				# let's set it to true and see if it passes verification
-				$data->{'gff'} = 3; # default
+				$datahash_ref->{'gff'} = 3; # default
 				if ( 
-					verify_data_structure($data) and
-					$data->{'gff'}
+					verify_data_structure($datahash_ref) and
+					$datahash_ref->{'gff'}
 				) {
 					# keep the gff extension, it seems  good
 				}
@@ -986,13 +953,13 @@ sub write_tim_data_file {
 		
 		# BED file
 		elsif ($extension =~ /bed|bdg/i) {
-			unless ($data->{'bed'}) {
+			unless ($datahash_ref->{'bed'}) {
 				# it's not set as a bed data
 				# let's set it to true and see if it passes verification
-				$data->{'bed'} = 1; # a fake true
+				$datahash_ref->{'bed'} = 1; # a fake true
 				if ( 
-					verify_data_structure($data) and
-					$data->{'bed'}
+					verify_data_structure($datahash_ref) and
+					$datahash_ref->{'bed'}
 				) {
 					# keep the bed extension, it seems  good
 				}
@@ -1008,8 +975,8 @@ sub write_tim_data_file {
 		# SGR file
 		elsif ($extension =~ /sgr/i) {
 			if (
-				exists $data->{'extension'} and
-				$data->{'extension'} =~ /sgr/i
+				exists $datahash_ref->{'extension'} and
+				$datahash_ref->{'extension'} =~ /sgr/i
 			) {
 				# if the original file extension was sgr
 				# then it likely passed verification above
@@ -1020,16 +987,16 @@ sub write_tim_data_file {
 				# let's pretend it was and see if still passes 
 				# verification
 				# the sgr verification relies on the recorded extension
-				$data->{'extension'} = '.sgr';
+				$datahash_ref->{'extension'} = '.sgr';
 				
 				# re-verify the structure
-				verify_data_structure($data);
+				verify_data_structure($datahash_ref);
 				
 				# we'll take the extension the verification sets
-				if ($data->{'extension'} =~ /txt/) {
+				if ($datahash_ref->{'extension'} =~ /txt/) {
 					warn " re-setting extension from $extension to .txt\n";
 				}
-				$extension = $data->{'extension'};
+				$extension = $datahash_ref->{'extension'};
 			}
 		}
 		
@@ -1040,21 +1007,21 @@ sub write_tim_data_file {
 		# try and determine one
 				
 		# a gff file
-		if ($data->{'gff'}) {
+		if ($datahash_ref->{'gff'}) {
 			$extension = '.gff';
 			
 			# for GFF3 files only
-			if ($data->{'gff'} == 3) {
+			if ($datahash_ref->{'gff'} == 3) {
 				$extension .= '3';
 			}
 		} 
 		
 		# a bed file
-		elsif ($data->{'bed'}) {
+		elsif ($datahash_ref->{'bed'}) {
 			# check whether it's a real bed or bedgraph file
 			if (
-				$data->{'number_columns'} == 4 and 
-				$data->{3}{'name'} =~ /score/i
+				$datahash_ref->{'number_columns'} == 4 and 
+				$datahash_ref->{3}{'name'} =~ /score/i
 			) {
 				# a bedgraph file
 				$extension = '.bdg';
@@ -1066,14 +1033,14 @@ sub write_tim_data_file {
 		}
 		
 		# original file had an extension, re-use it
-		elsif (exists $data->{'extension'}) {
+		elsif (exists $datahash_ref->{'extension'}) {
 			
 			# structure is gff
-			if ($data->{'extension'} =~ /gff/i) {
+			if ($datahash_ref->{'extension'} =~ /gff/i) {
 				
 				# check to see that we still have a valid gff structure
-				if ($data->{'gff'}) {
-					$extension = $data->{'extension'};
+				if ($datahash_ref->{'gff'}) {
+					$extension = $datahash_ref->{'extension'};
 				}
 				else {
 					# not valid gff, write a txt file
@@ -1082,10 +1049,10 @@ sub write_tim_data_file {
 			}
 			
 			# structure is bed
-			elsif ($data->{'extension'} =~ /bed|bdg/i) {
+			elsif ($datahash_ref->{'extension'} =~ /bed/i) {
 				# check to see that we still have a valid bed structure
-				if ($data->{'bed'}) {
-					$extension = $data->{'extension'};
+				if ($datahash_ref->{'bed'}) {
+					$extension = $datahash_ref->{'extension'};
 				}
 				else {
 					# not valid bed, write a txt file
@@ -1095,7 +1062,7 @@ sub write_tim_data_file {
 			
 			# unstructured format
 			else {
-				$extension = $data->{'extension'};
+				$extension = $datahash_ref->{'extension'};
 			}
 		}
 		
@@ -1106,150 +1073,163 @@ sub write_tim_data_file {
 	}
 	
 	# determine format 
-	unless ($args{'format'}) {
-		if (defined $args{'simple'}) {
+	unless ($format) {
+		if (defined $argument_ref->{'simple'}) {
 			# an old method of specifying simple
-			$args{'format'} = 'simple';
+			$format = 'simple';
 		}
 		elsif ($extension) {
 			# check extension from the parsed filename, if present
 			if ($extension =~ /sgr|cdt/i) {
 				# sgr is simple format, no headers 
-				$args{'format'} = 'simple';
+				$format = 'simple';
 			}
 			else {
 				# everything else is text
-				$args{'format'} = 'text';
+				$format = 'text';
 			}
 		}
 		else {
 			# somehow we got this far without defining? use default text
-			$args{'format'} = 'text';
+			$format = 'text';
 		}
 	}
 	
 	# check zip status if necessary
-	unless (defined $args{'gz'}) {
+	unless (defined $gz) {
 		# look at filename extension as a clue
 		# in case we're overwriting the input file, keep the zip status
 		if ($extension =~ m/\.gz$/i) {
-			$args{'gz'} = 1;
+			$gz = 1;
 		}
 		else {
-			$args{'gz'} = 0; # default
+			$gz = 0; # default
 		}
 	}
 	
 	# adjust gzip extension as necessary
-	if ($args{'gz'} and $extension !~ m/\.gz$/i) {
-		$extension .= '.gz';
+	if ($gz) {
+		# requesting gzip compression
+		
+		# check for support
+		if ($GZIP_OK) {
+			# it is there
+			# add gz extension if necessary
+			unless ($extension =~ m/\.gz$/i) {
+				$extension .= '.gz';
+			}
+		}
+		else {
+			# support is not there
+			# complain to user
+			carp " IO::ZLIB is not installed for gz support! writing non-compressed file\n";
+			
+			# reset gzip
+			$gz = 0;
+			
+			# strip gz extension if present
+			$extension =~ s/\.gz$//i; 
+		}
 	}
-	elsif (not $args{'gz'} and $extension =~ /\.gz$/i) {
-		$extension =~ s/\.gz$//i;
+	else {
+		# strip gz extension if present
+		$extension =~ s/\.gz$//i; 
 	}
-	
-	# check filename length
-	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
-	if (length($name . $extension) > 255) {
-		my $limit = 253 - length($extension);
-		$name = substr($name, 0, $limit) . '..';
-		warn " filename too long! Truncating to $limit characters\n";
-	}
-	
 	
 	# generate the new filename
 	my $newname = $path . $name . $extension;
 	
 	
 	# Convert base to interbase coordinates if necessary
-	if ($extension =~ /\.bed|bdg/i and $data->{'bed'} > 0) {
+	if ($extension =~ /\.bed|bdg/i and $datahash_ref->{'bed'} > 0) {
 		# we are writing a confirmed bed file 
 		if (
-			exists $data->{1}{'base'} and 
-			$data->{1}{'base'} == 1
+			exists $datahash_ref->{1}{'base'} and 
+			$datahash_ref->{1}{'base'} == 1
 		) {
 			# the start coordinates are in base format
 			# need to convert back to interbase
-			for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
+			for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
 				# subtract 1 to each start position
-				$data->{'data_table'}->[$row][1] -= 1;
+				$datahash_ref->{'data_table'}->[$row][1] -= 1;
 			}
-			delete $data->{1}{'base'};
+			delete $datahash_ref->{1}{'base'};
 		}
 	}
 	
 	
 	# Convert strand information
-	if ($extension =~ /.bed/i and $data->{'bed'} >= 6) {
-		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
+	if ($extension =~ /.bed/i and $datahash_ref->{'bed'} >= 6) {
+		for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][5] =~ m/\A [f \+ 1 w 0 \.]/xi) {
-				$data->{'data_table'}->[$row][5] = '+';
-			}
-			elsif ($data->{'data_table'}->[$row][5] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][5] = '-';
-			}
+			eval {
+				if ($datahash_ref->{'data_table'}->[$row][5] >= 0 ) {
+					$datahash_ref->{'data_table'}->[$row][5] = '+';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][5] == -1 ) {
+					$datahash_ref->{'data_table'}->[$row][5] = '-';
+				}
+			};
 		}
 	}	
-	if ($extension =~ /.g[tf]f/i and $data->{'gff'}) {
-		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
+	if ($extension =~ /.g[tf]f/i and $datahash_ref->{'gff'}) {
+		for (my $row = 1; $row <= $datahash_ref->{'last_row'}; $row++) {
 			# convert from signed integer back to sign
 			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][6] =~ m/\A [f \+ 1 w]/xi) {
-				$data->{'data_table'}->[$row][6] = '+';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][6] = '-';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [0 \.]/xi) {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
-			else {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
+			eval {
+				if ($datahash_ref->{'data_table'}->[$row][6] == 1 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '+';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][6] == -1 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '-';
+				}
+				elsif ($datahash_ref->{'data_table'}->[$row][6] == 0 ) {
+					$datahash_ref->{'data_table'}->[$row][6] = '.';
+				}
+			};
 		}
 	}	
 	
 	
 	# Open file for writing
-	my $fh = open_to_write_fh($newname, $args{'gz'});
+	my $fh = open_to_write_fh($newname, $gz);
 	unless (defined $fh) { 
 		return;
 	}
 	
 	
 	# Write the headers
-	if ($args{'format'} eq 'text') {
+	if ($format eq 'text') {
 		# default text format has metadata headers
 		# 'simple format
 		
 		# write gff statement if gff format
-		if ($data->{'gff'}) {
+		if ($datahash_ref->{'gff'}) {
 			# write gff statement
-			$fh->print("##gff-version $data->{gff}\n");
+			$fh->print("##gff-version $datahash_ref->{gff}\n");
 		}
 		
 		# Write the primary headers
 		unless ($extension =~ m/gff|bed|bdg|sgr|kgg|cdt/i) {
 			# we only write these for text files, not gff or bed files
 			
-			if ($data->{'program'}) {
+			if ($datahash_ref->{'program'}) {
 				# write program header if present
-				$fh->print('# Program ' . $data->{'program'} . "\n");
+				$fh->print('# Program ' . $datahash_ref->{'program'} . "\n");
 			}
-			if ($data->{'db'}) {
+			if ($datahash_ref->{'db'}) {
 				# write database header if present
-				$fh->print('# Database ' . $data->{'db'} . "\n");
+				$fh->print('# Database ' . $datahash_ref->{'db'} . "\n");
 			}
-			if ($data->{'feature'}) {
+			if ($datahash_ref->{'feature'}) {
 				# write feature header if present
-				$fh->print('# Feature ' . $data->{'feature'} . "\n");
+				$fh->print('# Feature ' . $datahash_ref->{'feature'} . "\n");
 			}
 		}
 		
 		# Write the miscellaneous headers
-		foreach ( @{ $data->{'other'} } ) {
+		foreach ( @{ $datahash_ref->{'other'} } ) {
 			# write remaining miscellaneous header lines if present
 			# we do this for all files
 			
@@ -1267,7 +1247,7 @@ sub write_tim_data_file {
 		}
 	
 		# Write the column metadata headers
-		for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+		for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
 			# each column metadata in the hash is referenced by the column's
 			# index number as the key
 			# we will take each index one at a time in increasing order
@@ -1283,9 +1263,9 @@ sub write_tim_data_file {
 				next;
 			}
 			elsif (
-				exists $data->{$i}{'AUTO'} and
-				scalar( keys %{ $data->{$i} } ) == 
-					$data->{$i}{'AUTO'}
+				exists $datahash_ref->{$i}{'AUTO'} and
+				scalar( keys %{ $datahash_ref->{$i} } ) == 
+					$datahash_ref->{$i}{'AUTO'}
 			) {
 				# some of the metadata values were autogenerated and 
 				# we have the same number of keys as were autogenerated
@@ -1294,7 +1274,7 @@ sub write_tim_data_file {
 			}
 			elsif (
 				$extension =~ m/gff|bed|bdg/i and
-				scalar( keys %{ $data->{$i} } ) == 2
+				scalar( keys %{ $datahash_ref->{$i} } ) == 2
 			) {
 				# only two metadata keys exist, name and index
 				# GFF and BED files do not these to be written
@@ -1306,13 +1286,13 @@ sub write_tim_data_file {
 			my @pairs; # an array of the key value pairs from the metadata hash
 			# put name first
 			# we are no longer writing the index number
-			push @pairs, 'name=' . $data->{$i}{'name'};
+			push @pairs, 'name=' . $datahash_ref->{$i}{'name'};
 			# put remainder in alphabetical order
-			foreach (sort {$a cmp $b} keys %{ $data->{$i} } ) {
+			foreach (sort {$a cmp $b} keys %{ $datahash_ref->{$i} } ) {
 				next if $_ eq 'name'; # already written
 				next if $_ eq 'index'; # internal use only
 				next if $_ eq 'AUTO'; # internal use only
-				push @pairs,  $_ . '=' . $data->{$i}{$_};
+				push @pairs,  $_ . '=' . $datahash_ref->{$i}{$_};
 			}
 			
 			# Finally write the header line, joining the pairs with a 
@@ -1326,29 +1306,29 @@ sub write_tim_data_file {
 	
 	# Write the table column headers
 	if (
-		$data->{'headers'} and
-		$data->{'gff'} == 0 and
-		$data->{'bed'} == 0 and
+		$datahash_ref->{'headers'} and
+		$datahash_ref->{'gff'} == 0 and
+		$datahash_ref->{'bed'} == 0 and
 		$extension !~ /sgr/i
 	) {
 		# table headers existed in original source file, 
 		# and this is not a GFF, BED, or SGR file,
 		# therefore headers should be written
 		$fh->print( 
-			join("\t", @{ $data->{'data_table'}[0] }), "\n");
+			join("\t", @{ $datahash_ref->{'data_table'}[0] }), "\n");
 	}
 		
 	
 	# Write the data table
-	if ($args{'format'} eq 'simple') {
+	if ($format eq 'simple') {
 		
 		# the simple format will strip the non-value '.' from the table
-		for (my $i = 1; $i <= $data->{'last_row'}; $i++) {
+		for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
 			# we will step though the data_table array one row at a time
 			# convert the non-value '.' to undefined
 			# and print using a tab-delimited format
 			my @linedata;
-			foreach ( @{ $data->{'data_table'}[$i] }) {
+			foreach ( @{ $datahash_ref->{'data_table'}[$i] }) {
 				if ($_ eq '.') {
 					push @linedata, q{}; # an undefined value
 				} else {
@@ -1361,12 +1341,12 @@ sub write_tim_data_file {
 	
 	else {
 		# normal data files
-		for (my $i = 1; $i <= $data->{'last_row'}; $i++) {
+		for (my $i = 1; $i <= $datahash_ref->{'last_row'}; $i++) {
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
 			# using a tab-delimited format
 			$fh->print( 
-				join("\t", @{ $data->{'data_table'}[$i] }), "\n");
+				join("\t", @{ $datahash_ref->{'data_table'}[$i] }), "\n");
 		}
 	}
 	
@@ -1399,22 +1379,28 @@ sub open_to_read_fh {
 	
 	# Open filehandle object as appropriate
 	my $fh; # filehandle
-	if ($filename =~ /\.gz$/i) {
+	if ($filename =~ /\.gz$/i and $GZIP_OK) {
 		# the file is compressed with gzip
-		$fh = IO::File->new("gzip -dc $filename |") or 
-			carp "unable to read '$filename' $!\n";
+		$fh = IO::Zlib->new;
 	} 
-	elsif ($filename =~ /\.bz2$/i) {
-		# the file is compressed with bzip2
-		$fh = IO::File->new("bzip2 -dc $filename |") or 
-			carp "unable to read '$filename' $!\n";
-	} 
+	elsif ($filename =~ /\.gz$/i and !$GZIP_OK) {
+		# gzip file support is not installed
+		croak " gzipped files are not supported!\n" .
+			" Either gunzip $filename or install IO::Zlib\n";
+	}
 	else {
 		# the file is uncompressed and space hogging
-		$fh = IO::File->new($filename, 'r') or 
-			carp "unable to read '$filename' $!\n";
+		$fh = IO::File->new;
 	}
-	return $fh if defined $fh;	
+	
+	# Open file and return
+	if ($fh->open($filename, "r") ) {
+		return $fh;
+	}
+	else {
+		carp "unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
 }
 
 
@@ -1432,14 +1418,6 @@ sub open_to_write_fh {
 	# check filename
 	unless ($filename) {
 		carp " no filename to write!";
-		return;
-	}
-	
-	# check filename length
-	# assuming a maximum of 256, at least on Mac with HFS+, don't know about Linux
-	my $name = fileparse($filename);
-	if (length $name > 255) {
-		carp " filename is too long! please shorten\n";
 		return;
 	}
 	
@@ -1461,31 +1439,65 @@ sub open_to_write_fh {
 		$append = 0;
 	}
 	
-	# add gz extension if necessary
-	if ($gz and $filename !~ m/\.gz$/i) {
-		$filename .= '.gz';
+	# determine write mode
+	my $mode;
+	if ($gz and $append) {
+		# append a gzip file
+		$mode = 'ab';
 	}
-	
-	
-	# Generate appropriate filehandle object
-	my $fh;
-	if (not $gz and not $append) {
-		$fh = IO::File->new($filename, 'w') or 
-			carp "cannot write to file '$filename' $!\n";
+	elsif (!$gz and $append) {
+		# append a normal file
+		$mode = 'a';
 	}
 	elsif ($gz and !$append) {
-		$fh = IO::File->new("| gzip >$filename") or 
-			carp "cannot write to compressed file '$filename' $!\n";
+		# write a new gzip file
+		$mode = 'wb';
 	}
-	elsif (not $gz and $append) {
-		$fh = IO::File->new(">> $filename") or 
-			carp "cannot append to file '$filename' $!\n";
+	else {
+		# write a new normal file
+		$mode = 'w';
 	}
-	elsif ($gz and $append) {
-		$fh = IO::File->new("| gzip >>$filename") or 
-			carp "cannot append to compressed file '$filename' $!\n";
+	
+	
+	# Generate appropriate filehandle object and name
+	my $fh;
+	if ($gz and $GZIP_OK) {
+		# write a space-saving compressed file
+		
+		# add gz extension if necessary
+		unless ($filename =~ m/\.gz$/i) {
+			$filename .= '.gz';
+		}
+		
+		$fh = new IO::Zlib;
 	}
-	return $fh if defined $fh;
+	elsif ($gz and !$GZIP_OK) {
+		# we wanted to write a compressed file but support is not there
+		
+		carp " IO::ZLIB not installed for gz support! writing non-compressed file\n";
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}	
+	else {
+		# write a normal space-hogging file
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}
+	
+	# Open file for writing and return
+	if ($fh->open($filename, $mode) ) {
+		return $fh;
+	}
+	else {
+		carp " unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
 }
 
 
@@ -1498,65 +1510,60 @@ sub convert_genome_data_2_gff_data {
 	# a subroutine to convert the data table format from genomic bins or
 	# windows to a gff format for writing as a gff file
 	
+	### Establish general gff variables
+	
 	# get passed arguments
-	my %args = @_; 
-	unless (%args) {
+	my $arg_ref = shift;
+	unless ($arg_ref) {
 		cluck "no arguments passed!";
 		return;
 	}
-	
-	# check data structure
-	$args{'data'} ||= undef;
-	my $data = $args{'data'};
-	unless (verify_data_structure($data) ) {
+	my $input_data_ref = $arg_ref->{'data'};
+	unless (verify_data_structure($input_data_ref) ) {
 		cluck "bad data structure!";
 		return;
 	}
 	
-	
-	### Establish general gff variables
-	
 	# chromosome
 	my $chr_index;
 	if (
-		exists $args{'chromo'} and 
-		$args{'chromo'} =~ /^\d+$/ and
-		exists $data->{ $args{'chromo'} }
+		exists $arg_ref->{'chromo'} and 
+		$arg_ref->{'chromo'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'chromo'} }
 	) {
-		$chr_index = $args{'chromo'};
+		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
-		$chr_index = find_column_index($data, '^chr|seq|refseq');
+		$chr_index = find_column_index($input_data_ref, '^chr|seq|refseq');
 	}
 		
 	# start position
 	my $start_index;
 	if (
-		exists $args{'start'} and 
-		$args{'start'} =~ /^\d+$/ and
-		exists $data->{ $args{'start'} }
+		exists $arg_ref->{'start'} and 
+		$arg_ref->{'start'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'start'} }
 	) {
-		$start_index = $args{'start'};
+		$start_index = $arg_ref->{'start'};
 	}
 	else {
-		$start_index = find_column_index($data, 'start');
+		$start_index = find_column_index($input_data_ref, 'start');
 	}
 		
 	# stop position
 	my $stop_index;
 	if (
-		exists $args{'stop'} and 
-		$args{'stop'} =~ /^\d+$/ and
-		exists $data->{ $args{'stop'} }
+		exists $arg_ref->{'stop'} and 
+		$arg_ref->{'stop'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'stop'} }
 	) {
-		$stop_index = $args{'stop'};
+		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
-		$stop_index = find_column_index($data, 'stop|end');
+		$stop_index = find_column_index($input_data_ref, 'stop|end');
 	}
 	
-	
-	# check that we have required coordinates
+	# check that we have coordinates
 	unless ( defined $chr_index ) {
 		cluck " unable to identify chromosome index!";
 		return;
@@ -1569,80 +1576,80 @@ sub convert_genome_data_2_gff_data {
 	# score
 	my $score_index;
 	if (
-		exists $args{'score'} and 
-		$args{'score'} =~ /^\d+$/ and
-		exists $data->{ $args{'score'} }
+		exists $arg_ref->{'score'} and 
+		$arg_ref->{'score'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'score'} }
 	) {
-		$score_index = $args{'score'};
+		$score_index = $arg_ref->{'score'};
 	}
 	
 	# name
 	my $name;
 	my $name_index;
-	if (exists $args{'name'} and $args{'name'} ne q()) {
+	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
 		if (
-			$args{'name'} =~ /^\d+$/ and
-			exists $data->{ $args{'name'} }
+			$arg_ref->{'name'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'name'} }
 		) {
 			# name is a single digit, most likely a index
-			$name_index = $args{'name'};
+			$name_index = $arg_ref->{'name'};
 		}
 		else {
 			# name is likely a string
-			$name = _escape( $args{'name'} );
+			$name = _escape( $arg_ref->{'name'} );
 		}
 	}
 	
 	# strand
 	my $strand_index;
 	if (
-		exists $args{'strand'} and 
-		$args{'strand'} =~ /^\d+$/ and
-		exists $data->{ $args{'strand'} }
+		exists $arg_ref->{'strand'} and 
+		$arg_ref->{'strand'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'strand'} }
 	) {
-		$strand_index = $args{'strand'};
+		$strand_index = $arg_ref->{'strand'};
 	}
 	
 	# set gff version, default is 3
-	my $gff_version = $args{'version'} || 3;
+	my $gff_version = $arg_ref->{'version'} || 3;
 	
 	
 	# get array of tag indices
 	my @tag_indices;
-	if (exists $args{'tags'}) {
-		@tag_indices = @{ $args{'tags'} };
+	if (exists $arg_ref->{'tags'}) {
+		@tag_indices = @{ $arg_ref->{'tags'} };
 	}
 	
 	# identify the unique ID index
 	my $id_index;
 	if (
-		exists $args{'id'} and 
-		$args{'id'} =~ /^\d+$/ and
-		exists $data->{ $args{'id'} }
+		exists $arg_ref->{'id'} and 
+		$arg_ref->{'id'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'id'} }
 	) {
-		$id_index = $args{'id'} ;
+		$id_index = $arg_ref->{'id'} ;
 	}
 	
 	# reference to the data table
-	my $data_table = $data->{'data_table'};
+	my $data_table_ref = $input_data_ref->{'data_table'};
 	
 	
 	### Identify default values
 	
 	# gff source tag
 	my ($source, $source_index);
-	if (exists $args{'source'} and $args{'source'} ne q() ) {
+	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
 		if (
-			$args{'source'} =~ /^\d+$/ and 
-			exists $data->{ $args{'source'} }
+			$arg_ref->{'source'} =~ /^\d+$/ and 
+			exists $input_data_ref->{ $arg_ref->{'source'} }
 		) {
 			# looks like an index
-			$source_index = $args{'source'};
+			$source_index = $arg_ref->{'source'};
 		}
 		else {
 			# a text string
-			$source = $args{'source'};
+			$source = $arg_ref->{'source'};
 		}
 	}
 	else {
@@ -1652,32 +1659,32 @@ sub convert_genome_data_2_gff_data {
 	
 	# gff method or type column
 	my ($method, $method_index);
-	if (exists $args{'method'} and $args{'method'} ne q() ) {
+	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
 		if (
-			$args{'method'} =~ /^\d+$/ and
-			exists $data->{ $args{'method'} }
+			$arg_ref->{'method'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'method'} }
 		) {
 			# the method looks like a single digit, most likely an index value
-			$method_index = $args{'method'};
+			$method_index = $arg_ref->{'method'};
 		}
 		else {
 			# explicit method string
-			$method = $args{'method'};
+			$method = $arg_ref->{'method'};
 		}
 	}
-	elsif (exists $args{'type'} and $args{'type'} ne q() ) {
+	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
 		if (
-			$args{'type'} =~ /^\d+$/ and
-			exists $data->{ $args{'type'} }
+			$arg_ref->{'type'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'type'} }
 		) {
 			# the method looks like a single digit, most likely an index value
-			$method_index = $args{'type'};
+			$method_index = $arg_ref->{'type'};
 		}
 		else {
 			# explicit method string
-			$method = $args{'type'};
+			$method = $arg_ref->{'type'};
 		}
 	}
 	elsif (defined $name) {
@@ -1686,11 +1693,11 @@ sub convert_genome_data_2_gff_data {
 	}
 	elsif (defined $name_index) {
 		# the name of the dataset for the features' name
-		$method = $data->{$name_index}{'name'};
+		$method = $input_data_ref->{$name_index}{'name'};
 	}
 	elsif (defined $score_index) {
 		# the name of the dataset for the score
-		$method = $data->{$score_index}{'name'};
+		$method = $input_data_ref->{$score_index}{'name'};
 	}
 	else {
 		$method = 'Experiment';
@@ -1704,7 +1711,7 @@ sub convert_genome_data_2_gff_data {
 	
 	### Other processing
 	# convert the start postion to 1-based from 0-based
-	my $convert_zero_base = $args{'zero'} || 0;
+	my $convert_zero_base = $arg_ref->{'zero'} || 0;
 	
 	
 	### Reorganize the data table
@@ -1714,19 +1721,19 @@ sub convert_genome_data_2_gff_data {
 		# don't want this data later....
 	
 	# relabel the data table headers
-	$data_table->[0] = [ 
+	$data_table_ref->[0] = [ 
 		qw( Chromosome Source Type Start Stop Score Strand Phase Group) 
 	];
 	
 	# re-write the data table
-	for my $row (1..$data->{'last_row'}) {
+	for my $row (1..$input_data_ref->{'last_row'}) {
 		
 		# collect coordinate information
-		my $refseq = $data_table->[$row][$chr_index];
-		my $start = $data_table->[$row][$start_index];
+		my $refseq = $data_table_ref->[$row][$chr_index];
+		my $start = $data_table_ref->[$row][$start_index];
 		my $stop;
 		if (defined $stop_index) {
-			$stop = $data_table->[$row][$stop_index];
+			$stop = $data_table_ref->[$row][$stop_index];
 		}
 		else {
 			$stop = $start;
@@ -1735,7 +1742,7 @@ sub convert_genome_data_2_gff_data {
 			# coordinates are 0-based, shift the start postion
 			$start += 1;
 		}
-		if ($args{'midpoint'} and $start != $stop) {
+		if ($arg_ref->{'midpoint'} and $start != $stop) {
 			# if the midpoint is requested, then assign the midpoint to both
 			# start and stop
 			my $position = sprintf "%.0f", ( ($start + $stop) / 2 );
@@ -1746,7 +1753,7 @@ sub convert_genome_data_2_gff_data {
 		# collect strand information
 		my $strand;
 		if (defined $strand_index) {
-			my $value = $data_table->[$row][$strand_index];
+			my $value = $data_table_ref->[$row][$strand_index];
 			if ($value =~ m/\A [f \+ 1 w]/xi) {
 				# forward, plus, one, watson
 				$strand = '+';
@@ -1773,7 +1780,7 @@ sub convert_genome_data_2_gff_data {
 		my $gff_method;
 		if (defined $method_index) {
 			# variable method, index was defined
-			$gff_method = $data_table->[$row][$method_index];
+			$gff_method = $data_table_ref->[$row][$method_index];
 		}
 		else {
 			# explicit method
@@ -1784,7 +1791,7 @@ sub convert_genome_data_2_gff_data {
 		my $gff_source;
 		if (defined $source_index) {
 			# variable source tag
-			$gff_source = $data_table->[$row][$source_index];
+			$gff_source = $data_table_ref->[$row][$source_index];
 		}
 		else {
 			# static source tag
@@ -1794,7 +1801,7 @@ sub convert_genome_data_2_gff_data {
 		# collect score information
 		my $score;
 		if (defined $score_index) {
-			$score = $data_table->[$row][$score_index];
+			$score = $data_table_ref->[$row][$score_index];
 		}
 		else {
 			$score = '.';
@@ -1808,14 +1815,14 @@ sub convert_genome_data_2_gff_data {
 			if (defined $id_index) {
 				# this assumes that the $id_index values are all unique
 				# user's responsibility to fix it otherwise
-				$group = 'ID=' . $data_table->[$row][$id_index] . ';';
+				$group = 'ID=' . $data_table_ref->[$row][$id_index] . ';';
 			}
 			
 			# define and record the GFF Name
 			if (defined $name_index) {
 				# a name is provided for each feature
 				$group .= 'Name=' . _escape( 
-					$data_table->[$row][$name_index] );
+					$data_table_ref->[$row][$name_index] );
 			}
 			elsif (defined $name) {
 				# a name string was explicitly defined
@@ -1829,7 +1836,7 @@ sub convert_genome_data_2_gff_data {
 		else { 
 			# gff_version 2
 			if (defined $name_index) {
-				$group = "$gff_method \"" . $data_table->[$row][$name_index] . "\"";
+				$group = "$gff_method \"" . $data_table_ref->[$row][$name_index] . "\"";
 			}
 			else {
 				$group = "Experiment $gff_method";
@@ -1838,15 +1845,15 @@ sub convert_genome_data_2_gff_data {
 		
 		# add group tag information if present
 		foreach (@tag_indices) {
-			unless ($data_table->[$row][$_] eq '.') {
+			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
-				$group .= ';' . lc($data->{$_}{name}) . '=' . 
-					_escape( $data_table->[$row][$_] );
+				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
+					_escape( $data_table_ref->[$row][$_] );
 			}
 		}
 		
 		# rewrite in gff format
-		$data_table->[$row] = [ (
+		$data_table_ref->[$row] = [ (
 			$refseq,
 			$gff_source, 
 			$gff_method,
@@ -1871,84 +1878,84 @@ sub convert_genome_data_2_gff_data {
 	# also keep any metadata from the score and name columns, if defined
 	
 	# keep some current metadata
-	my $start_metadata_ref = $data->{$start_index};
+	my $start_metadata_ref = $input_data_ref->{$start_index};
 	my $score_metadata_ref; # new empty hashes
 	my $group_metadata_ref;
 	if (defined $score_index) {
-		$score_metadata_ref = $data->{$score_index};
+		$score_metadata_ref = $input_data_ref->{$score_index};
 	}
 	if (defined $name_index) {
-		$group_metadata_ref = $data->{$name_index};
+		$group_metadata_ref = $input_data_ref->{$name_index};
 	}
 	
 	# delete old metadata
-	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+	for (my $i = 0; $i < $input_data_ref->{'number_columns'}; $i++) {
 		# delete the existing metadata hashes
 		# they will be replaced with new ones
-		delete $data->{$i};
+		delete $input_data_ref->{$i};
 	}
 	
 	# define new metadata
-	$data->{0} = {
+	$input_data_ref->{0} = {
 		'name'  => 'Chromosome',
 		'index' => 0,
 		'AUTO'  => 3,
 	};
-	$data->{1} = {
+	$input_data_ref->{1} = {
 		'name'  => 'Source',
 		'index' => 1,
 		'AUTO'  => 3,
 	};
-	$data->{2} = {
+	$input_data_ref->{2} = {
 		'name'  => 'Type',
 		'index' => 2,
 		'AUTO'  => 3,
 	};
-	$data->{3} = $start_metadata_ref;
-	$data->{3}{'name'} = 'Start';
-	$data->{3}{'index'} = 3;
-	if (keys %{ $data->{3} } == 2) {
-		$data->{3}{'AUTO'} = 3;
+	$input_data_ref->{3} = $start_metadata_ref;
+	$input_data_ref->{3}{'name'} = 'Start';
+	$input_data_ref->{3}{'index'} = 3;
+	if (keys %{ $input_data_ref->{3} } == 2) {
+		$input_data_ref->{3}{'AUTO'} = 3;
 	}
-	$data->{4} = {
+	$input_data_ref->{4} = {
 		'name'  => 'Stop',
 		'index' => 4,
 		'AUTO'  => 3,
 	};
-	$data->{5} = $score_metadata_ref;
-	$data->{5}{'name'} = 'Score';
-	$data->{5}{'index'} = 5;
-	if (keys %{ $data->{5} } == 2) {
-		$data->{5}{'AUTO'} = 3;
+	$input_data_ref->{5} = $score_metadata_ref;
+	$input_data_ref->{5}{'name'} = 'Score';
+	$input_data_ref->{5}{'index'} = 5;
+	if (keys %{ $input_data_ref->{5} } == 2) {
+		$input_data_ref->{5}{'AUTO'} = 3;
 	}
-	$data->{6} = {
+	$input_data_ref->{6} = {
 		'name'  => 'Strand',
 		'index' => 6,
 		'AUTO'  => 3,
 	};
-	$data->{7} = {
+	$input_data_ref->{7} = {
 		'name'  => 'Phase',
 		'index' => 7,
 		'AUTO'  => 3,
 	};
-	$data->{8} = $group_metadata_ref;
-	$data->{8}{'name'} = 'Group';
-	$data->{8}{'index'} = 8;
-	if (keys %{ $data->{8} } == 2) {
-		$data->{8}{'AUTO'} = 3;
+	$input_data_ref->{8} = $group_metadata_ref;
+	$input_data_ref->{8}{'name'} = 'Group';
+	$input_data_ref->{8}{'index'} = 8;
+	if (keys %{ $input_data_ref->{8} } == 2) {
+		$input_data_ref->{8}{'AUTO'} = 3;
 	}
 	
 	# reset the number of columns
-	$data->{'number_columns'} = 9;
+	$input_data_ref->{'number_columns'} = 9;
 	
 	# set the gff metadata to write a gff file
-	$data->{'gff'} = $gff_version;
+	$input_data_ref->{'gff'} = $gff_version;
 	
 	# reset feature
-	$data->{'feature'} = 'region';
+	$input_data_ref->{'feature'} = 'region';
 	
 	# set headers to false
-	$data->{'headers'} = 0;
+	$input_data_ref->{'headers'} = 0;
 	
 	# success
 	return 1;
@@ -1961,62 +1968,65 @@ sub convert_and_write_to_gff_file {
 	# a subroutine to export the data table format from genomic bins or
 	# windows to a gff file
 	
+	## Establish general variables
+	
 	# get passed arguments
-	my %args = @_; 
-	unless (%args) {
+	my $arg_ref = shift;
+	unless ($arg_ref) {
 		cluck "no arguments passed!";
 		return;
 	}
 	
-	# check data structure
-	$args{'data'} ||= undef;
-	my $data = $args{'data'};
-	unless (verify_data_structure($data) ) {
+	# basics
+	my $input_data_ref = $arg_ref->{'data'};
+	unless ($input_data_ref) {
+		cluck "no data structure passed!";
+		return;
+	}
+	unless (verify_data_structure($input_data_ref) ) {
 		cluck "bad data structure!";
 		return;
 	}
-	my $data_table = $data->{'data_table'};
-	
-	
-	## Establish general variables
+	# reference to the data table
+	my $data_table_ref = $input_data_ref->{'data_table'};
 	
 	# chromosome
 	my $chr_index;
 	if (
-		exists $args{'chromo'} and 
-		$args{'chromo'} =~ /^\d+$/ and
-		exists $data->{ $args{'chromo'} }
+		exists $arg_ref->{'chromo'} and 
+		$arg_ref->{'chromo'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'chromo'} }
 	) {
-		$chr_index = $args{'chromo'};
+		$chr_index = $arg_ref->{'chromo'};
 	}
 	else {
-		$chr_index = find_column_index($data, '^chr|seq|refseq');
+		$chr_index = find_column_index($input_data_ref, '^chr|seq|refseq');
 	}
 		
 	# start position
 	my $start_index;
 	if (
-		exists $args{'start'} and 
-		$args{'start'} =~ /^\d+$/ and
-		exists $data->{ $args{'start'} }
+		exists $arg_ref->{'start'} and 
+		$arg_ref->{'start'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'start'} }
 	) {
-		$start_index = $args{'start'};
+		$start_index = $arg_ref->{'start'};
 	}
 	else {
-		$start_index = find_column_index($data, 'start');
+		$start_index = find_column_index($input_data_ref, 'start');
 	}
 		
 	# stop position
 	my $stop_index;
 	if (
-		exists $args{'stop'} and 
-		$args{'stop'} =~ /^\d+$/ and
-		exists $data->{ $args{'stop'} }
+		exists $arg_ref->{'stop'} and 
+		$arg_ref->{'stop'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'stop'} }
 	) {
-		$stop_index = $args{'stop'};
+		$stop_index = $arg_ref->{'stop'};
 	}
 	else {
-		$stop_index = find_column_index($data, 'stop|end');
+		$stop_index = find_column_index($input_data_ref, 'stop|end');
 	}
 	
 	# check that we have coordinates
@@ -2032,57 +2042,57 @@ sub convert_and_write_to_gff_file {
 	# score
 	my $score_index;
 	if (
-		exists $args{'score'} and 
-		$args{'score'} =~ /^\d+$/ and
-		exists $data->{ $args{'score'} }
+		exists $arg_ref->{'score'} and 
+		$arg_ref->{'score'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'score'} }
 	) {
-		$score_index = $args{'score'};
+		$score_index = $arg_ref->{'score'};
 	}
 	
 	# name
 	my $name;
 	my $name_index;
-	if (exists $args{'name'} and $args{'name'} ne q()) {
+	if (exists $arg_ref->{'name'} and $arg_ref->{'name'} ne q()) {
 		if (
-			$args{'name'} =~ /^\d+$/ and
-			exists $data->{ $args{'name'} }
+			$arg_ref->{'name'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'name'} }
 		) {
 			# name is a single digit, most likely a index
-			$name_index = $args{'name'};
+			$name_index = $arg_ref->{'name'};
 		}
 		else {
 			# name is likely a string
-			$name = _escape( $args{'name'} );
+			$name = _escape( $arg_ref->{'name'} );
 		}
 	}
 	
 	# strand
 	my $strand_index;
 	if (
-		exists $args{'strand'} and 
-		$args{'strand'} =~ /^\d+$/ and
-		exists $data->{ $args{'strand'} }
+		exists $arg_ref->{'strand'} and 
+		$arg_ref->{'strand'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'strand'} }
 	) {
-		$strand_index = $args{'strand'};
+		$strand_index = $arg_ref->{'strand'};
 	}
 	
 	# GFF file version, default is 3
-	my $gff_version = $args{'version'} || 3;
+	my $gff_version = $arg_ref->{'version'} || 3;
 	
 	# get array of tag indices
 	my @tag_indices;
-	if (exists $args{'tags'}) {
-		@tag_indices = @{ $args{'tags'} };
+	if (exists $arg_ref->{'tags'}) {
+		@tag_indices = @{ $arg_ref->{'tags'} };
 	}
 	
 	# identify the unique ID index
 	my $id_index;
 	if (
-		exists $args{'id'} and 
-		$args{'id'} =~ /^\d+$/ and
-		exists $data->{ $args{'id'} }
+		exists $arg_ref->{'id'} and 
+		$arg_ref->{'id'} =~ /^\d+$/ and
+		exists $input_data_ref->{ $arg_ref->{'id'} }
 	) {
-		$id_index = $args{'id'} ;
+		$id_index = $arg_ref->{'id'} ;
 	}
 	
 	
@@ -2091,18 +2101,18 @@ sub convert_and_write_to_gff_file {
 	
 	# gff source tag
 	my ($source, $source_index);
-	if (exists $args{'source'} and $args{'source'} ne q() ) {
+	if (exists $arg_ref->{'source'} and $arg_ref->{'source'} ne q() ) {
 		# defined in passed arguments
 		if (
-			$args{'source'} =~ /^\d+$/ and 
-			exists $data->{ $args{'source'} }
+			$arg_ref->{'source'} =~ /^\d+$/ and 
+			exists $input_data_ref->{ $arg_ref->{'source'} }
 		) {
 			# looks like an index
-			$source_index = $args{'source'};
+			$source_index = $arg_ref->{'source'};
 		}
 		else {
 			# a text string
-			$source = $args{'source'};
+			$source = $arg_ref->{'source'};
 		}
 	}
 	else {
@@ -2112,32 +2122,32 @@ sub convert_and_write_to_gff_file {
 	
 	# gff method or type column
 	my ($method, $method_index);
-	if (exists $args{'method'} and $args{'method'} ne q() ) {
+	if (exists $arg_ref->{'method'} and $arg_ref->{'method'} ne q() ) {
 		# defined in passed arguments
 		if (
-			$args{'method'} =~ /^\d+$/ and
-			exists $data->{ $args{'method'} }
+			$arg_ref->{'method'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'method'} }
 		) {
 			# the method looks like a single digit, most likely an index value
-			$method_index = $args{'method'};
+			$method_index = $arg_ref->{'method'};
 		}
 		else {
 			# explicit method string
-			$method = $args{'method'};
+			$method = $arg_ref->{'method'};
 		}
 	}
-	elsif (exists $args{'type'} and $args{'type'} ne q() ) {
+	elsif (exists $arg_ref->{'type'} and $arg_ref->{'type'} ne q() ) {
 		# defined in passed arguments, alternate name
 		if (
-			$args{'type'} =~ /^\d+$/ and
-			exists $data->{ $args{'type'} }
+			$arg_ref->{'type'} =~ /^\d+$/ and
+			exists $input_data_ref->{ $arg_ref->{'type'} }
 		) {
 			# the method looks like a single digit, most likely an index value
-			$method_index = $args{'type'};
+			$method_index = $arg_ref->{'type'};
 		}
 		else {
 			# explicit method string
-			$method = $args{'type'};
+			$method = $arg_ref->{'type'};
 		}
 	}
 	elsif (defined $name) {
@@ -2146,11 +2156,11 @@ sub convert_and_write_to_gff_file {
 	}
 	elsif (defined $name_index) {
 		# the name of the dataset for the features' name
-		$method = $data->{$name_index}{'name'};
+		$method = $input_data_ref->{$name_index}{'name'};
 	}
 	elsif (defined $score_index) {
 		# the name of the dataset for the score
-		$method = $data->{$score_index}{'name'};
+		$method = $input_data_ref->{$score_index}{'name'};
 	}
 	else {
 		$method = 'Experiment';
@@ -2164,8 +2174,8 @@ sub convert_and_write_to_gff_file {
 	## Open output file
 	# get the filename
 	my $filename;
-	if ( $args{'filename'} ne q() ) {
-		$filename = $args{'filename'};
+	if ( $arg_ref->{'filename'} ne q() ) {
+		$filename = $arg_ref->{'filename'};
 		# remove unnecessary extensions
 		$filename =~ s/\.gz$//;
 		$filename =~ s/\.txt$//;
@@ -2182,9 +2192,9 @@ sub convert_and_write_to_gff_file {
 		# use the method name, so long as it is not the default Experiment
 		$filename = $method . '.gff';
 	}
-	elsif (defined $data->{'basename'}) {
+	elsif (defined $input_data_ref->{'basename'}) {
 		# use the base file name for lack of a better name
-		$filename = $data->{'basename'} . '.gff';
+		$filename = $input_data_ref->{'basename'} . '.gff';
 	}
 	else {
 		# what, still no name!!!????
@@ -2195,15 +2205,15 @@ sub convert_and_write_to_gff_file {
 	}
 	
 	# open the file for writing 
-	my $gz = $args{'gz'};
+	my $gz = $arg_ref->{'gz'};
 	my $output_gff = open_to_write_fh($filename, $gz);
 	
 	# write basic headers
 	print {$output_gff} "##gff-version $gff_version\n";
-	if (exists $data->{'filename'}) {
+	if (exists $input_data_ref->{'filename'}) {
 		# record the original file name for reference
 		print {$output_gff} "# Exported from file '", 
-			$data->{'filename'}, "'\n";
+			$input_data_ref->{'filename'}, "'\n";
 	}
 	
 	
@@ -2216,11 +2226,11 @@ sub convert_and_write_to_gff_file {
 	# substituting the column name and index appropriate for a gff file
 	
 	# check the chromosome metadata
-	if (scalar( keys %{ $data->{$chr_index} } ) > 2) {
+	if (scalar( keys %{ $input_data_ref->{$chr_index} } ) > 2) {
 		# chromosome has extra keys of info
 		print {$output_gff} "# Column_0 ";
 		my @pairs;
-		foreach (sort {$a cmp $b} keys %{ $data->{$chr_index} } ) {
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$chr_index} } ) {
 			if ($_ eq 'index') {
 				next;
 			}
@@ -2228,18 +2238,18 @@ sub convert_and_write_to_gff_file {
 				push @pairs, "name=Chromosome";
 			}
 			else {
-				push @pairs,  $_ . '=' . $data->{$chr_index}{$_};
+				push @pairs,  $_ . '=' . $input_data_ref->{$chr_index}{$_};
 			}
 		}
 		print {$output_gff} join(";", @pairs), "\n";
 	}
 	
 	# check the start metadata
-	if (scalar( keys %{ $data->{$start_index} } ) > 2) {
+	if (scalar( keys %{ $input_data_ref->{$start_index} } ) > 2) {
 		# start has extra keys of info
 		print {$output_gff} "# Column_3 ";
 		my @pairs;
-		foreach (sort {$a cmp $b} keys %{ $data->{$start_index} } ) {
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$start_index} } ) {
 			if ($_ eq 'index') {
 				next;
 			}
@@ -2247,7 +2257,7 @@ sub convert_and_write_to_gff_file {
 				push @pairs, "name=Start";
 			}
 			else {
-				push @pairs,  $_ . '=' . $data->{$start_index}{$_};
+				push @pairs,  $_ . '=' . $input_data_ref->{$start_index}{$_};
 			}
 		}
 		print {$output_gff} join(";", @pairs), "\n";
@@ -2256,12 +2266,12 @@ sub convert_and_write_to_gff_file {
 	# check the score metadata
 	if (
 		defined $score_index and
-		scalar( keys %{ $data->{$score_index} } ) > 2
+		scalar( keys %{ $input_data_ref->{$score_index} } ) > 2
 	) {
 		# score has extra keys of info
 		print {$output_gff} "# Column_5 ";
 		my @pairs;
-		foreach (sort {$a cmp $b} keys %{ $data->{$score_index} } ) {
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$score_index} } ) {
 			if ($_ eq 'index') {
 				next;
 			}
@@ -2269,7 +2279,7 @@ sub convert_and_write_to_gff_file {
 				push @pairs, "name=Score";
 			}
 			else {
-				push @pairs,  $_ . '=' . $data->{$score_index}{$_};
+				push @pairs,  $_ . '=' . $input_data_ref->{$score_index}{$_};
 			}
 		}
 		print {$output_gff} join(";", @pairs), "\n";
@@ -2278,12 +2288,12 @@ sub convert_and_write_to_gff_file {
 	# check the name metadata
 	if (
 		defined $name_index and
-		scalar( keys %{ $data->{$name_index} } ) > 2
+		scalar( keys %{ $input_data_ref->{$name_index} } ) > 2
 	) {
 		# score has extra keys of info
 		print {$output_gff} "# Column_8 ";
 		my @pairs;
-		foreach (sort {$a cmp $b} keys %{ $data->{$name_index} } ) {
+		foreach (sort {$a cmp $b} keys %{ $input_data_ref->{$name_index} } ) {
 			if ($_ eq 'index') {
 				next;
 			}
@@ -2291,7 +2301,7 @@ sub convert_and_write_to_gff_file {
 				push @pairs, "name=Group";
 			}
 			else {
-				push @pairs,  $_ . '=' . $data->{$name_index}{$_};
+				push @pairs,  $_ . '=' . $input_data_ref->{$name_index}{$_};
 			}
 		}
 		print {$output_gff} join(";", @pairs), "\n";
@@ -2300,19 +2310,19 @@ sub convert_and_write_to_gff_file {
 			
 	
 	### Write the gff features
-	for my $row (1..$data->{'last_row'}) {
+	for my $row (1..$input_data_ref->{'last_row'}) {
 		
 		# collect coordinate information
-		my $refseq = $data_table->[$row][$chr_index];
-		my $start = $data_table->[$row][$start_index];
+		my $refseq = $data_table_ref->[$row][$chr_index];
+		my $start = $data_table_ref->[$row][$start_index];
 		my $stop;
 		if (defined $stop_index) {
-			$stop = $data_table->[$row][$stop_index];
+			$stop = $data_table_ref->[$row][$stop_index];
 		}
 		else {
 			$stop = $start;
 		}
-		if ($args{'midpoint'} and $stop != $stop) {
+		if ($arg_ref->{'midpoint'} and $stop != $stop) {
 			# if the midpoint is requested, then assign the midpoint to both
 			# start and stop
 			my $position = sprintf "%.0f", ($start + $stop)/2;
@@ -2323,7 +2333,7 @@ sub convert_and_write_to_gff_file {
 		# collect score information
 		my $score;
 		if (defined $score_index) {
-			$score = $data_table->[$row][$score_index];
+			$score = $data_table_ref->[$row][$score_index];
 		}
 		else {
 			$score = '.';
@@ -2332,7 +2342,7 @@ sub convert_and_write_to_gff_file {
 		# collect strand information
 		my $strand;
 		if (defined $strand_index) {
-			my $value = $data_table->[$row][$strand_index];
+			my $value = $data_table_ref->[$row][$strand_index];
 			if ($value =~ m/\A [f \+ 1 w]/xi) {
 				# forward, plus, one, watson
 				$strand = '+';
@@ -2359,7 +2369,7 @@ sub convert_and_write_to_gff_file {
 		my $gff_method;
 		if (defined $method_index) {
 			# variable method, index was defined
-			$gff_method = $data_table->[$row][$method_index];
+			$gff_method = $data_table_ref->[$row][$method_index];
 		}
 		else {
 			# explicit method
@@ -2370,7 +2380,7 @@ sub convert_and_write_to_gff_file {
 		my $gff_source;
 		if (defined $source_index) {
 			# variable source tag
-			$gff_source = $data_table->[$row][$source_index];
+			$gff_source = $data_table_ref->[$row][$source_index];
 		}
 		else {
 			# static source tag
@@ -2385,14 +2395,14 @@ sub convert_and_write_to_gff_file {
 			if (defined $id_index) {
 				# this assumes that the $id_index values are all unique
 				# user's responsibility to fix it otherwise
-				$group = 'ID=' . $data_table->[$row][$id_index] . ';';
+				$group = 'ID=' . $data_table_ref->[$row][$id_index] . ';';
 			}
 			
 			# define and record the GFF Name
 			if (defined $name_index) {
 				# a name is provided for each feature
 				$group .= 'Name=' . _escape( 
-					$data_table->[$row][$name_index] );
+					$data_table_ref->[$row][$name_index] );
 			}
 			elsif (defined $name) {
 				# a name string was explicitly defined
@@ -2409,7 +2419,7 @@ sub convert_and_write_to_gff_file {
 				$group = "$gff_method \"$name\"";
 			}
 			elsif (defined $name_index) {
-				$group = "$gff_method \"" . $data_table->[$row][$name_index] . "\"";
+				$group = "$gff_method \"" . $data_table_ref->[$row][$name_index] . "\"";
 			}
 			else {
 				# really generic
@@ -2419,10 +2429,10 @@ sub convert_and_write_to_gff_file {
 		
 		# add group tag information if present
 		foreach (@tag_indices) {
-			unless ($data_table->[$row][$_] eq '.') {
+			unless ($data_table_ref->[$row][$_] eq '.') {
 				# no tag if null value
-				$group .= ';' . lc($data->{$_}{name}) . '=' . 
-					_escape( $data_table->[$row][$_] );
+				$group .= ';' . lc($input_data_ref->{$_}{name}) . '=' . 
+					_escape( $data_table_ref->[$row][$_] );
 			}
 		}
 		
@@ -2453,44 +2463,36 @@ sub convert_and_write_to_gff_file {
 sub write_summary_data {
 	
 	# Collect passed arguments
-	my %args = @_; 
-	unless (%args) {
+	my $argument_ref = shift;
+	unless ($argument_ref) {
 		cluck "no arguments passed!";
 		return;
 	}
-	
-	# check data structure
-	$args{'data'} ||= undef;
-	my $data = $args{'data'};
-	unless (verify_data_structure($data) ) {
-		cluck "bad data structure!";
-		return;
-	}
-	
-	# parameters
-	my $outfile =        $args{'filename'}    || undef;
-	my $dataset =        $args{'dataset'}     || undef;
-	my $startcolumn =    $args{'startcolumn'} || undef;
-	my $endcolumn =      $args{'endcolumn'}   || $args{'stopcolumn'}  || undef;
-	my $log =            $args{'log'}         || undef;
+	my $datahash_ref =   $argument_ref->{'data'} || undef;
+	my $outfile =        $argument_ref->{'filename'} || undef;
+	my $dataset =        $argument_ref->{'dataset'} || undef;
+	my $startcolumn =    $argument_ref->{'startcolumn'} || undef;
+	my $endcolumn =      $argument_ref->{'endcolumn'} ||
+	                     $argument_ref->{'stopcolumn'} || undef;
+	my $log =            $argument_ref->{'log'} || undef;
 	
 	
 	
 	# Check required values
-	unless (defined $data) {
+	unless (defined $datahash_ref) {
 		cluck "no data structure passed!\n";
 		return;
 	}
-	unless (verify_data_structure($data) ) {
+	unless (verify_data_structure($datahash_ref) ) {
 		cluck "bad data structure!";
 		return;
 	}
 	unless (defined $outfile) {
-		if (defined $data->{'basename'}) {
+		if (defined $datahash_ref->{'basename'}) {
 			# use the opened file's filename if it exists
 			# prepend the path if it exists
 			# the extension will be added later
-			$outfile = $data->{'path'} . $data->{'basename'};
+			$outfile = $datahash_ref->{'path'} . $datahash_ref->{'basename'};
 		}
 		else {
 			cluck "no filename passed to write_summary_data!\n";
@@ -2526,12 +2528,11 @@ sub write_summary_data {
 			'gene'            => 1,
 			'strand'          => 1,
 			'length'          => 1,
-			'primary_id'      => 1,
 		);
 		
 		# walk through the dataset names
-		for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-			unless (exists $skip{ lc $data->{$i}{'name'} } ) {
+		for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+			unless (exists $skip{ lc $datahash_ref->{$i}{'name'} } ) {
 				# if the dataset name is not in the hash of skip names
 				push @acceptable_indices, $i;
 			}
@@ -2545,18 +2546,18 @@ sub write_summary_data {
 	}
 	unless (defined $endcolumn) {
 		# take the last or rightmost column
-		$endcolumn = $data->{'number_columns'} - 1;
+		$endcolumn = $datahash_ref->{'number_columns'} - 1;
 	}
 	unless ($dataset) {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) should be the same 
 		# in all the columns
-		$dataset = $data->{$startcolumn}{'dataset'} || 'data_scores';
+		$dataset = $datahash_ref->{$startcolumn}{'dataset'} || 'data_scores';
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
 		# same in all
-		$log = $data->{$startcolumn}{'log2'} || 0;
+		$log = $datahash_ref->{$startcolumn}{'log2'} || 0;
 	}
 	
 	# Prepare score column name
@@ -2571,8 +2572,8 @@ sub write_summary_data {
 		'Midpoint',
 		$data_name
 	);
-	$summed_data->{'db'} = $data->{'database'};
-	$summed_data->{0}{'number_features'} = $data->{'last_row'};
+	$summed_data->{'db'} = $datahash_ref->{'database'};
+	$summed_data->{0}{'number_features'} = $datahash_ref->{'last_row'};
 	$summed_data->{2}{'log2'} = $log;
 	$summed_data->{2}{'dataset'} = $dataset;
 	
@@ -2587,17 +2588,17 @@ sub write_summary_data {
 	) { 
 		
 		# determine the midpoint position of the window
-		my $midpoint = int mean(
+		my $midpoint = mean(
 			# this assumes the column metadata has start and stop
-			$data->{$column}{'start'},	
-			$data->{$column}{'stop'},	
+			$datahash_ref->{$column}{'start'},	
+			$datahash_ref->{$column}{'stop'},	
 		) or undef; 
 		
 		
 		# collect the values in the column
 		my @values;
-		for my $row (1..$data->{'last_row'}) {
-			my $value = $data->{'data_table'}->[$row][$column];
+		for my $row (1..$datahash_ref->{'last_row'}) {
+			my $value = $datahash_ref->{'data_table'}->[$row][$column];
 			unless ($value eq '.') { 
 				push @values, $value;
 			}
@@ -2616,7 +2617,7 @@ sub write_summary_data {
 		
 		# push to summed output
 		push @{ $summed_data->{'data_table'} }, [ (
-			$data->{$column}{'name'}, 
+			$datahash_ref->{$column}{'name'}, 
 			$midpoint, 
 			$window_mean
 		) ];
@@ -2625,11 +2626,11 @@ sub write_summary_data {
 	
 	# Write summed data
 	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
-	my $written_file = write_tim_data_file(
+	my $written_file = write_tim_data_file( {
 		'data'      => $summed_data,
 		'filename'  => $outfile . '_summed',
 		'gz'        => 0,
-	);
+	} );
 	
 	# Return
 	if ($written_file) {
@@ -2745,11 +2746,11 @@ tim_file_helper
   
   my $output_fh = open_to_write_fh($file, $gz, $append);
   
-  my $success = write_tim_data_file(
-    'data'       => $data,
-    'filename'   => $file,
-    'gz'         => $gz,
-  );
+  my $success = write_tim_data_file( {
+    data       => $data,
+    filename   => $file,
+    gz         => $gz,
+  } );
 
 =head1 DESCRIPTION
 
@@ -3022,11 +3023,11 @@ Example
 	my $filename = 'my_data.txt.gz';
 	my $data_ref = load_tim_data_file($filename);
 	...
-	my $success_write = write_tim_data_file(
+	my $success_write = write_tim_data_file( {
 		'data'     => $data_ref,
 		'filename' => $filename,
 		'format'   => 'simple',
-	);
+	} );
 	if ($success_write) {
 		print "wrote $success_write!";
 	}
@@ -3168,17 +3169,17 @@ Example
 
 	my $data_ref = load_tim_data_file($filename);
 	...
-	my $success = convert_genome_data_2_gff_data(
+	my $success = convert_genome_data_2_gff_data( {
 		'data'     => $data_ref,
 		'score'    => 3,
 		'midpoint' => 1,
-	);
+	} );
 	if ($success) {
 		# write a gff file
-		my $success_write = write_tim_data_file(
+		my $success_write = write_tim_data_file( {
 			'data'     => $data_ref,
 			'filename' => $filename,
-		);
+		} );
 		if ($success_write) {
 			print "wrote $success_write!";
 		}
@@ -3271,13 +3272,13 @@ Example
 
 	my $data_ref = load_tim_data_file($filename);
 	...
-	my $success = convert_and_write_to_gff_file(
+	my $success = convert_and_write_to_gff_file( {
 		'data'     => $data_ref,
 		'score'    => 3,
 		'midpoint' => 1,
 		'filename' => "$filename.gff",
 		'version'  => 2,
-	);
+	} );
 	if ($success) {
 		print "wrote file '$success'!";
 	}
@@ -3326,11 +3327,11 @@ Example
 
 	my $main_data_ref = load_tim_data_file($filename);
 	...
-	my $summary_success = write_summary_data(
+	my $summary_success = write_summary_data( {
 		'data'         => $main_data_ref,
 		'filename'     => $outfile,
 		'startcolumn'  => 4,
-	);
+	} );
 
 
 =back

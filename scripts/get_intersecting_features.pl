@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to pull out overlapping features from the database
 
 use strict;
 use warnings;
@@ -18,13 +18,12 @@ use tim_db_helper qw(
 	verify_or_request_feature_types 
 	get_chromosome_list
 	validate_included_feature
-	get_feature
 );
 use tim_file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.11';
+my $VERSION = '1.9.1';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -137,12 +136,12 @@ my $db = open_db_connection($database) ||
 
 
 ### Identify the Features to Search
-@search_features = verify_or_request_feature_types(
+@search_features = verify_or_request_feature_types( {
 	'db'      => $db,
 	'feature' => [ @search_features ],
 	'prompt'  => "Enter the number(s) to the intersecting feature(s) to" . 
 				" search.\n Enter as comma delimited list and/or range   ",
-);
+} );
 
 
 
@@ -164,10 +163,10 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-);
+} );
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -193,9 +192,8 @@ sub find_overlapping_features {
 	my $start_i  = find_column_index($main_data_ref, '^start');
 	my $stop_i   = find_column_index($main_data_ref, '^stop|end');
 	my $strand_i = find_column_index($main_data_ref, '^strand');
-	my $name_i   = find_column_index($main_data_ref, '^name');
-	my $type_i   = find_column_index($main_data_ref, '^type');
-	my $id_i     = find_column_index($main_data_ref, '^primary_id');
+	my $name_i   = find_column_index($main_data_ref, 'name');
+	my $type_i   = find_column_index($main_data_ref, 'type');
 	
 	# genomic coordinates
 	if (
@@ -210,17 +208,17 @@ sub find_overlapping_features {
 	
 	# named database features
 	elsif (
-		defined $id_i or 
-		(defined $name_i and defined $type_i)
+		defined $name_i and 
+		defined $type_i
 	) {
 		# we're working with named features
 		print " Input file '$infile' has named features\n";
-		intersect_named_features($id_i, $name_i, $type_i);
+		intersect_named_features($name_i, $type_i);
 	}
 	else {
 		# unable to identify
 		die " unable to identify feature information columns in source file " .
-			"'$infile'\n No chromosome, start, stop, name, ID,  and/or type columns\n";
+			"'$infile'\n No chromosome, start, stop, name and/or type columns\n";
 	}
 }
 	
@@ -231,7 +229,7 @@ sub intersect_named_features {
 	# Named features 
 	
 	# search feature indices
-	my ($search_id_i, $search_name_i, $search_type_i) = @_;
+	my ($search_name_i, $search_type_i) = @_;
 	
 	# shortcut reference
 	my $table = $main_data_ref->{'data_table'};
@@ -245,13 +243,14 @@ sub intersect_named_features {
 	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# identify feature first
-		my $feature = get_feature(
-			'db'    => $db,
-			'id'    => defined $search_id_i   ? $table->[$row][$search_id_i]   : undef,
-			'name'  => defined $search_name_i ? $table->[$row][$search_name_i] : undef,
-			'type'  => defined $search_type_i ? $table->[$row][$search_type_i] : undef,
+		my @features = $db->features(
+			-name   => $table->[$row][$search_name_i],
+			-type   => $table->[$row][$search_type_i],
 		);
-		unless ($feature) {
+		my $feature;
+		if (scalar @features == 0) {
+			warn " no features found for $table->[$row][$search_type_i] " . 
+				"$table->[$row][$search_name_i]\n";
 			process_no_feature(
 				$row, 
 				$number_i, 
@@ -262,6 +261,15 @@ sub intersect_named_features {
 				$overlap_i,
 			);
 			next;
+		}
+		elsif (scalar @features > 1) {
+			warn " more than one feature found for $table->[$row][$search_type_i] " .
+				"$table->[$row][$search_name_i]; using first one\n";
+			$feature = shift @features;
+		}
+		else {
+			# only one feature - as it should be
+			$feature = shift @features;
 		}
 		
 		# Establish the region based on the found feature
@@ -445,7 +453,7 @@ sub intersect_genome_features {
 			# succesfully established a region, find features
 			process_region(
 				$region,
-				defined $search_strand_i ? $table->[$row][$search_strand_i] : 0, 
+				defined $search_chrom_i ? $table->[$row][$search_strand_i] : 0, 
 					# use strand if available in source data file, otherwise
 					# it is non-stranded region
 				$row, 
@@ -804,15 +812,13 @@ sub summarize_found_features {
 
 __END__
 
-=head1 NAME 
+=head1 NAME get_intersecting_features.pl
 
-get_intersecting_features.pl
 
-A script to pull out overlapping features from the database.
 
 =head1 SYNOPSIS
 
-get_intersecting_features.pl [--options] <filename>
+   get_intersecting_features.pl [--options] <filename>
   
   Options:
   --in <filename>
@@ -823,7 +829,7 @@ get_intersecting_features.pl [--options] <filename>
   --extend <integer>
   --ref [start | mid]
   --out <filename>
-  --gz
+  --(no)gz
   --version
   --help
 
@@ -880,7 +886,7 @@ features. Valid options include "start" (or 5' end for stranded features) and
 Optionally specify a new filename. A standard tim data text file is written. 
 The default is to rewrite the input file.
 
-=item --gz
+=item --(no)gz
 
 Specify whether the output file should (not) be compressed with gzip.
 
@@ -917,6 +923,7 @@ measurement is relative to the coordinates after adjustment with the --start,
 
 A standard tim data text file is written.
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -929,3 +936,14 @@ A standard tim data text file is written.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+

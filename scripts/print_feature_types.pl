@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a quick and dirty program to print out the feature types in the current database
 
 use strict;
 use Pod::Usage;
@@ -124,17 +124,15 @@ __END__
 
 print_feature_types.pl
 
-A script to print out the available feature types in a database.
-
 =head1 SYNOPSIS
 
 print_feature_types.pl <database>
   
-  Options:
   --db <database>
   --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -177,3 +175,4 @@ metadata file, are also supported.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

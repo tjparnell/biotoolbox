@@ -1,6 +1,7 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to pull out a specific subset or list of features or lines of data 
+# from a data file. Compare to Excel's VLOOKUP command, only faster.
 
 use strict;
 use Getopt::Long;
@@ -12,11 +13,10 @@ use tim_data_helper qw(
 );
 use tim_file_helper qw(
 	open_tim_data_file
-	load_tim_data_file
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.12.3';
+my $VERSION = '1.9.1';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -39,7 +39,6 @@ my (
 	$outfile,
 	$data_index,
 	$list_index,
-	$order,
 	$sum,
 	$startcolumn,
 	$stopcolumn,
@@ -53,7 +52,6 @@ GetOptions(
 	'out=s'      => \$outfile, # the new output file name
 	'dindex=i'   => \$data_index, # index to look up in the data file
 	'lindex=i'   => \$list_index, # index of look up values in list file
-	'order=s'    => \$order, # the order to keep the values
 	'sum'        => \$sum, # flag to re-sum the pulled values
 	'starti=i'   => \$startcolumn, # index of column to start summarizing
 	'stopi=i'    => \$stopcolumn, # index of column to stop summarizing
@@ -92,28 +90,12 @@ unless (defined $outfile) {
 	die " no output data file name given!\n";
 }
 
-my $list_order;
-if ($order) {
-	if ($order eq 'list') {
-		$list_order = 1;
-	}
-	elsif ($order eq 'data') {
-		$list_order = 0;
-	}
-	else {
-		die " unrecognized order request '$order'! Enter list or data\n";
-	}
-}
-else {
-	# default is the list order
-	$list_order = 1;
-}
 
 
 
 ### Open files
 # file handles and metadata
-my $list_data = load_tim_data_file($listfile) or
+my ($list_fh, $list_md) = open_tim_data_file($listfile) or
 	die " unable to open list file!\n";
 
 my ($data_fh, $data_md) = open_tim_data_file($datafile) or
@@ -128,10 +110,14 @@ identify_indices();
 
 ### Load the list of specified values
 print " Collecting lookup values from file '$listfile'...\n";
-my ($requests, $pulled) = collect_request_list();
-	# these are global references to two data hashes
-	# the first is for a lookup for the feature requests and identify the group number
-	# the second is for storing all the found pulled data
+my ($requests, $number_output_files) = collect_request_list();
+
+
+
+### Open output files
+# this is an array of one or more output data structures
+my @out_datas = generate_output_data_structures($number_output_files);
+
 
 
 ### Pull out the desired features
@@ -146,9 +132,6 @@ if ($notfound_count > 0) {
 
 ### Write the output files
 if ($found_count) {
-	# first generate output structures
-	generate_output_data_structures();
-	# then
 	write_files();
 }
 else {
@@ -165,19 +148,19 @@ else {
 sub identify_indices {
 	
 	# first check whether we have a simple list file
-	if ($list_data->{'number_columns'} == 1) {
+	if ($list_md->{'number_columns'} == 1) {
 		# simple one-column file
 		# the answer is obvious
 		print "  list file only has 1 column, using it\n";
 		$list_index = 0;
-		# be VERY careful, though, it may not have a column header name
+		return;
 	}
 	elsif ($listfile =~ /\.kgg$/i) {
 		# a cluster gene file
 		# the answer is obvious
 		print "  using .kgg file as list\n";
 		$list_index = 0;
-		# KGG files have column headers
+		return;
 	}
 		
 	
@@ -189,14 +172,14 @@ sub identify_indices {
 		my $lookup = $data_md->{$data_index}{'name'};
 		
 		# find it in the list
-		my $possible = find_column_index($list_data, "^$lookup\$");
+		my $possible = find_column_index($list_md, "^$lookup\$");
 		
 		# check
 		if (defined $possible) {
 			# found something
 			$list_index = $possible;
-			print "  found column '", $list_data->{$list_index}{'name'}, 
-				"', using list index $list_index\n";
+			print "  found list column '", $list_md->{$list_index}{'name'}, 
+				"', using index $list_index\n";
 			return;
 		}
 	}
@@ -206,7 +189,7 @@ sub identify_indices {
 		# we have the list index but need the data index
 		
 		# get the column header name
-		my $lookup = $list_data->{$list_index}{'name'};
+		my $lookup = $list_md->{$list_index}{'name'};
 		
 		# find it in the list
 		my $possible = find_column_index($data_md, "^$lookup\$");
@@ -215,23 +198,9 @@ sub identify_indices {
 		if (defined $possible) {
 			# found something
 			$data_index = $possible;
-			print "  found column '", $data_md->{$data_index}{'name'}, 
-				"', using data index $data_index\n";
+			print "  found data column '", $data_md->{$data_index}{'name'}, 
+				"', using index $data_index\n";
 			return;
-		}
-		else {
-			# did not find something
-			# is it possible it is a simple list of names?
-			if ($list_data->{'number_columns'} == 1) {
-				# we likely only have a simple list of features
-				# adjust the data table accordingly by adding a name
-				# this will avoid not finding the first element in the output file
-				# if this is not true, then the user will just get an error that 
-				# one feature cannot be found.....
-				unshift @{ $list_data->{'data_table'} }, 'Name';
-				$list_data->{0}{'name'} = 'Name';
-				$list_data->{'last_row'}++;
-			}
 		}
 	}
 	
@@ -243,7 +212,7 @@ sub identify_indices {
 			
 			# identify possibilities
 			my $possible_data_i = find_column_index($data_md, "^$name\$");
-			my $possible_list_i = find_column_index($list_data, "^$name\$");
+			my $possible_list_i = find_column_index($list_md, "^$name\$");
 			
 			# check if something was found
 			if (defined $possible_data_i and defined $possible_list_i) {
@@ -254,7 +223,7 @@ sub identify_indices {
 				
 				# report
 				print " found identical columns\n";
-				print "  using list column '", $list_data->{$list_index}{'name'}, 
+				print "  using list column '", $list_md->{$list_index}{'name'}, 
 					"', index $list_index\n";
 				print "  using data column '", $data_md->{$data_index}{'name'}, 
 					"', index $data_index\n";
@@ -263,16 +232,12 @@ sub identify_indices {
 		}
 	}
 	
-	# End automatic guessing of index numbers, ask the user
-	foreach ( ['list', $list_data], ['data', $data_md] ) {
-		# a complicated foreach loop to look for either one
+	# Give up and ask the user
+	foreach ( ['list', $list_md], ['data', $data_md] ) {
 		
 		# the type and metadata structure
-		my ($type, $metadata) = @$_;
-		
-		# skip the ones we already know
-		next if ($type eq 'list' and defined $list_index);
-		next if ($type eq 'data' and defined $data_index);
+		my $type = $_->[0];
+		my $metadata = $_->[1];
 		
 		# print the headers
 		print "\n These are the columns in the $type file.\n";
@@ -281,7 +246,7 @@ sub identify_indices {
 		}
 	
 		# process the answer
-		print " Enter the unique identifier lookup column index from the $type file    ";
+		print " Enter the $type column index to use    ";
 		my $answer = <STDIN>;
 		chomp $answer;
 		
@@ -307,80 +272,52 @@ sub identify_indices {
 sub collect_request_list {
 	
 	my %requests; # the identifier values to look up
-	# request{ unique_id } = group#
-		# for KGG lists where we are splitting each of the groups into 
-		# separate files, we need to know how many and which ones
-		# can't trust whether all groups are in the KGG file or just a few
-	my %pulled;
-	# pulled_data{ group# } -> { unique_id } = [ line_data ]
-	# still need a list of the order:
-	# pulled_data{ group# } -> { 'feature_order' } = [unique_id,...]
-	
+	my %number_of_clusters; # the number of clusters (output files)
 	
 	# Check whether we're working with a Cluster .kgg file
 	if ($listfile =~ /\.kgg$/i) {
-		for my $row (1 .. $list_data->{'last_row'}) {
+		while (my $line = $list_fh->getline) {
+			chomp $line;
+			my @d = split /\t/, $line;
 			
-			my $id    = $list_data->{'data_table'}->[$row][0];
-			my $group = $list_data->{'data_table'}->[$row][1];
+			# the gene identifier is the key, the cluster number is the value
+			$requests{ $d[0] } = $d[1];
 			
-			# store the identifier in the requests hash
-			# the gene identifier is the key, the cluster group number is the value
-			$requests{$id} = $group;
-			
-			# prepare the pulled data hash
-			$pulled{$group}->{$id} = [];
-			
-			# record the ID for use in writing in the file list order
-			if (exists $pulled{$group}{'list_order'} ) {
-				push @{ $pulled{$group}{'list_order'} }, $id;
-			}
-			else {
-				$pulled{$group}{'list_order'} = [ ($id) ];
-			}
+			# record the number clusters
+			$number_of_clusters{ $d[1] } += 1;
 		}
 	}
 	
 	# otherwise a simple text file
 	else {
-		# prepare the order array
-		# using group ID of 0
-		$pulled{0}{'feature_order'} = [];
-		
 		# collect the identifiers
-		for my $row (1 .. $list_data->{'last_row'}) {
-			my $id = $list_data->{'data_table'}->[$row][$list_index];
-			
-			$requests{$id} = 0;
-			$pulled{0}{$id} = [];
-			push @{ $pulled{0}{'list_order'} }, $id;
+		while (my $line = $list_fh->getline) {
+			chomp $line;
+			my @d = split /\t/, $line;
+			$requests{ $d[ $list_index ] } = 0;
 		}
+		
+		# we have just one cluster
+		$number_of_clusters{0} = 1; 
 	}
 	
-	# prepare the dump array for keeping the features in data file order 
-	# instead of list file order
-	foreach my $group (keys %pulled) {
-		$pulled{$group}{'data_dump'} = [];
-	}
-	
-	return (\%requests, \%pulled);
+	return (\%requests, scalar(keys %number_of_clusters) );
 }
 
 
 
 ### Subroutine to generate the output data structures
 sub generate_output_data_structures {
+	my $number = shift;
 	
-	# we will simply duplicate the current data metadata structure 
-	# for each output data structure
-	# there may be more than one output data structure, primarily with 
-	# kgg source files where each group will be put into a new file
-	
-	# we will store the output data structure in the %pulled hash structure
-	# under the key 'output_data' under the appropriate group id
+	my @outputs; # array of output structures
+		# we will simply duplicate the current data metadata structure 
+		# for each output data structure
+		# there may be more than one output data structure, primarily with 
+		# kgg source files where each group will be put into a new file
 	
 	# only one output data structure
-	if (scalar keys %{$pulled} == 1) {
+	if ($number == 1) {
 		
 		# copy
 		my %new_md = %{ $data_md };
@@ -402,12 +339,12 @@ sub generate_output_data_structures {
 		push @{ $new_md{'data_table'} }, [ @{ $data_md->{'column_names'} } ];
 		
 		# store the structure
-		$pulled->{0}{'output_data'} = \%new_md;
+		push @outputs, \%new_md;
 	}
 	
 	# multiple data structures
 	else {
-		foreach my $group (keys %$pulled) {
+		for my $i (0 .. $number-1) {
 			# copy
 			my %new_md = %{ $data_md };
 			
@@ -415,7 +352,7 @@ sub generate_output_data_structures {
 			my $newfile = $outfile;
 			my $ext = $data_md->{'extension'};
 			$newfile =~ s/$ext\Z//; # remove the extension if present
-			$new_md{'filename'} = $newfile . '_g' . $group . $ext;
+			$new_md{'filename'} = $newfile . '_g' . $i . $ext;
 			$new_md{'basename'} = undef;
 			$new_md{'path'} = undef;
 			
@@ -425,9 +362,11 @@ sub generate_output_data_structures {
 			push @{ $new_md{'data_table'} }, [ @{ $data_md->{'column_names'} } ];
 			
 			# store the structure
-		$pulled->{$group}{'output_data'} = \%new_md;
+			push @outputs, \%new_md;
 		}
 	}
+	
+	return @outputs;
 }
 
 
@@ -440,30 +379,29 @@ sub pull_requested_features {
 	my $found = 0;
 	my $notfound = 0;
 	while (my $line = $data_fh->getline) {
-		$line =~ s/[\r\n]+$//; # chomp
+		chomp $line;
 		my @d = split /\t/, $line;
 		
 		# check if the identifier exists in our requests hash
 		if (exists $requests->{ $d[$data_index] } ) {
 			# found
-			my $id = $d[$data_index];
-			my $group = $requests->{ $d[$data_index] };
-						
+			
+			# determine which output data table to store it
+			my $out = $out_datas[ $requests->{ $d[$data_index] } ];
+			
 			# record the line data
-			if ($list_order) {
-				# store by ID so that it can be sorted later
-				push @{ $pulled->{$group}{$id} }, \@d;
-			}
-			else {
-				# just dump it in the same order as the data file
-				push @{ $pulled->{$group}{'data_dump'} }, \@d;
-			}
+			push @{ $out->{'data_table'} }, \@d;
 			$found++;
 		}
 		else {
 			# not found
 			$notfound++;
 		}
+	}
+	
+	# re-calculate the last row index
+	foreach my $out (@out_datas) {
+		$out->{'last_row'} = scalar(@{ $out->{'data_table'} }) - 1;
 	}
 	
 	return ($found, $notfound);
@@ -475,32 +413,16 @@ sub pull_requested_features {
 sub write_files {
 	# Write the files
 	
-	foreach my $group (keys %$pulled) {
+	foreach my $out (@out_datas) {
 		
-		# de-reference the output data for ease
-		my $data = $pulled->{$group}{'output_data'};
-		
-		# copy the pulled data lines into the output data structure
-		if ($list_order) {
-			# we will use the list order in the output file
-			foreach my $id (@{ $pulled->{$group}{'list_order'} }) {
-				# this is a list of the feature ids in the same order as the input 
-				# list file 
-				push @{ $data->{'data_table'} }, @{ $pulled->{$group}{$id} };
-			}
-		}
-		else {
-			# we will use the data file order in the output file
-			# just copy the contents over
-			push @{ $data->{'data_table'} }, @{ $pulled->{$group}{'data_dump'} };
-		}
-		$data->{'last_row'} = scalar @{ $data->{'data_table'} } - 1;
+		# check if there's any data in here
+		next unless $out->{'last_row'} > 0; # nothing but the header
 		
 		# write the file
-		my $write_results = write_tim_data_file(
-			'data'      => $data,
+		my $write_results = write_tim_data_file( {
+			'data'      => $out,
 			# no file name, using the filename recorded in the out data
-		);
+		} );
 		if ($write_results) {
 			print "  Wrote new datafile '$write_results'\n";
 		}
@@ -511,13 +433,13 @@ sub write_files {
 		# Summarize the pulled data
 		if ($sum) {
 			print " Generating final summed data...\n";
-			my $sumfile = write_summary_data(
-				'data'         => $data,
-				'filename'     => $data->{'filename'}, # must provide
+			my $sumfile = write_summary_data( {
+				'data'         => $out,
+				'filename'     => $out->{'filename'}, # must provide
 				'startcolumn'  => $startcolumn,
 				'endcolumn'    => $stopcolumn,
 				'log'          => $log,
-			);
+			} );
 			if ($sumfile) {
 				print "  Wrote summary file '$sumfile'\n";
 			}
@@ -536,8 +458,6 @@ __END__
 
 pull_features.pl
 
-A script to pull out a specific list of data rows from a data file.
-
 =head1 SYNOPSIS
 
 pull_features.pl --data <filename> --list <filename> --out <filename>
@@ -548,7 +468,6 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
   --out <filename>
   --dindex <integer>
   --lindex <integer>
-  --order [list | data]
   --sum
   --starti <integer>
   --stopi <integer>
@@ -590,13 +509,6 @@ appropriate matching columns with the same header name. If none
 are specified, the user must select interactively from a list of 
 available column names. 
 
-=item --order [list | data]
-
-Optionally specify the order of features in the output file. Two 
-options are available. Specify 'list' to match the order of features 
-in the list file. Or specify 'data' to match the order of features 
-in the data file. The default is list.
-
 =item --sum
 
 Indicate that the pulled data should be averaged across all 
@@ -633,14 +545,13 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-Given a list of requested unique feature identifiers, this program will 
-pull out those features (rows) from a datafile and write a new file. This 
+Given a list of requested feature identifiers, this program will pull 
+out those features (rows) from a datafile and write a new file. This 
 program compares in function to a popular spreadsheet VLOOKUP command. 
 The list is provided as a separate text file, either as a single column 
 file or a multi-column tab-delimited from which one column is selected. 
 All rows from the source data file that match an identifier in the list 
-will be written to the new file. The order of the features in the output 
-file may match either the list file or the data file. 
+will be written to the new file. 
 
 The program will also accept a Cluster gene file (with .kgg extension) 
 as a list file. In this case, all of the genes for each cluster are 
@@ -664,3 +575,11 @@ biotoolbox scripts L<get_relative_data.pl> or L<average_gene.pl>.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+

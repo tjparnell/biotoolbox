@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to pull out actual nucleosome fragments and enumerate their sizes
 
 use strict;
 use warnings;
@@ -19,7 +19,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.5.4';
 
 
 print "\n A script to get exact nucleosome fragment sizes from a Bam file\n\n";
@@ -135,10 +135,10 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-);
+} );
 if ($success) {
 	print " Wrote data file '$success'\n";
 }
@@ -164,7 +164,7 @@ if ($gff) {
 	}
 	
 	# write
-	$success = convert_and_write_to_gff_file(
+	$success = convert_and_write_to_gff_file( {
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
 		'version'  => 3,
@@ -173,7 +173,7 @@ if ($gff) {
 		'type'     => $type,
 		'source'   => $source,
 		'tag'      => [6, $std_i], # fuzziness, stdev of length
-	);
+	} );
 	if ($success) {
 		print " Wrote GFF file '$success'\n";
 	}
@@ -396,8 +396,6 @@ __END__
 
 get_actual_nuc_sizes.pl
 
-A script to pull out actual nucleosome fragments and enumerate their sizes.
-
 =head1 SYNOPSIS
 
   get_actual_nuc_sizes.pl --in <file1.txt> --bam <file2.bam> [--options]
@@ -415,6 +413,7 @@ A script to pull out actual nucleosome fragments and enumerate their sizes.
   --out <filename>
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -508,6 +507,7 @@ sequence read-pair fragments, and the standard deviation of the fragment
 lengths. In addition to writing a new data file, it can optionally write 
 a GFF3 file.
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -520,3 +520,9 @@ a GFF3 file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+

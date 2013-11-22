@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# A script to graph histogram plots for one or two microarray data sets
 
 use strict;
 use Getopt::Long;
@@ -17,7 +17,7 @@ use tim_data_helper qw(
 use tim_file_helper qw(
 	load_tim_data_file
 );
-my $VERSION = '1.10.3';
+my $VERSION = '1.9.0';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -159,7 +159,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	my $name = $main_data_ref->{$i}{'name'};
 	if (
 		# check column header names for gene or window attribute information
-		$name =~ /^(?:name|id|alias|chromosome|start|stop|end|strand|type|class)$/i
+		$name =~ /^name|id|alias|chr|ref|start|stop|end|strand|type|class/i
 	) { 
 		# skip on to the next header
 		next; 
@@ -180,7 +180,7 @@ for my $i (1 .. $binnumber) {
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
@@ -572,32 +572,29 @@ __END__
 
 graph_histogram.pl
 
-A script to graph a histogram (bar or line) of one or more datasets.
+A script to graph a histogram of a dataset of values
 
 =head1 SYNOPSIS
 
 graph_histogram.pl --bins <integer> --size <number> <filename> 
-
 graph_histogram.pl --bins <integer> --max <number> <filename> 
-
 graph_histogram.pl --size <number> --max <number> <filename> 
    
-  Options:
-  --in <filename>
-  --index <column_index>
-  --bins <integer>
-  --size <number>
-  --min <number>
-  --max <number>
-  --ymax <integer>
-  --yticks <integer>
-  --skip <integer>
-  --offset <integer>
-  --format <integer>
-  --lines
-  --out <base_filename>
-  --dir <output_directory>
-  --version
+   --in <filename>
+   --index <column_index>
+   --bins <integer>
+   --size <number>
+   --min <number>
+   --max <number>
+   --ymax <integer>
+   --yticks <integer>
+   --skip <integer>
+   --offset <integer>
+   --format <integer>
+   --lines
+   --out <base_filename>
+   --dir <output_directory>
+   --version
   --help
 
 =head1 OPTIONS
@@ -718,3 +715,18 @@ header) with a prefix.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

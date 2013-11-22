@@ -1,24 +1,19 @@
 package tim_db_helper::gff3_parser;
 
 use strict;
+require Exporter;
 use Carp qw(carp cluck croak confess);
 use Bio::SeqFeature::Lite;
-use IO::File;
-
-our $GZIP_OK = 0;
-eval {
-	use IO::Zlib;
-};
-unless ($@) {
-	$GZIP_OK = 1;
-}; 
-undef $@;
-
-my $VERSION = '1.10.2';
+use FindBin qw($Bin);
+use lib "$Bin/../lib";
+use tim_file_helper qw(
+	open_to_read_fh
+);
+my $VERSION = '1.8.1';
 
 sub new {
 	my $class = shift;
-	my $self = {'fh' => undef};
+	my $self = {};
 	bless $self, $class;
 	
 	# check for a file name
@@ -34,90 +29,28 @@ sub parse_file {
 	my $self = shift;
 	
 	# check file
-	my $filename = shift;
-	unless ($filename) {
+	my $file = shift;
+	unless ($file) {
 		cluck("no file name passed!\n");
 		return;
 	}
-	unless ($filename =~ /\.gff3?(?:\.gz)?$/i) {
+	unless ($file =~ /\.gff3?(?:\.gz)?$/) {
 		cluck("file doesn't look like a GFF file!\n");
 		return;
 	}
 	
-	# Open filehandle object as appropriate
-	my $fh; # filehandle
-	if ($filename =~ /\.gz$/i and $GZIP_OK) {
-		# the file is compressed with gzip
-		$fh = IO::Zlib->new($filename, 'r') or 
-			croak " cannot open file '$filename'!\n";
-	} 
-	elsif ($filename =~ /\.gz$/i and !$GZIP_OK) {
-		# gzip file support is not installed
-		croak " gzipped files are not supported!\n" .
-			" Either gunzip $filename or install IO::Zlib\n";
-	}
-	else {
-		# the file is uncompressed and space hogging
-		$fh = IO::File->new($filename, "r") or 
-			croak "unable to open file '$filename'\n";
-	}
+	# open file
+	my $fh = open_to_read_fh($file) or 
+		croak("unable to open file '$file'!\n");
 	
-	$self->fh($fh);
+	$self->{'fh'} = $fh;
 }
 
-sub fh {
-	my $self = shift;
-	if (@_) {
-		$self->{'fh'} = shift;
-	}
-	return $self->{'fh'};
-}
-
-sub next_feature {
-	my $self = shift;
-	
-	# check that we have an open filehandle
-	unless ($self->fh) {
-		croak("no GFF3 file loaded to parse!");
-	}
-	
-	# look for the next feature line
-	while (my $line = $self->fh->getline) {
-		
-		chomp $line;
-		
-		# skip any comment and pragma lines that we might encounter
-		if ($line =~ /^#/) {
-			# either a pragma or a comment line
-			next;
-		}
-		elsif ($line =~ /^$/) {
-			# an empty line
-			next;
-		}
-		elsif ($line =~ /^>/) {
-			# fasta header line, skip
-			next;
-		}
-		elsif ($line =~ /^[agctn]+$/i) {
-			# fasta sequence, skip
-			next;
-		}
-		
-		# line must be a GFF feature
-		# generate the SeqFeature object for this GFF line and return it
-		return $self->from_gff3_string($line);
-	}
-	return;
-}
 
 sub top_features {
 	my $self = shift;
 	
-	# check that we have an open filehandle
-	unless ($self->fh) {
-		croak("no GFF3 file loaded to parse!");
-	}
+	my $in_fh = $self->{fh};
 	
 	# initialize
 	my @top_features;
@@ -135,7 +68,8 @@ sub top_features {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
-	while (my $line = $self->fh->getline) {
+	while (my $line = $in_fh->getline) {
+		
 		chomp $line;
 		
 		# process comment and pragma lines
@@ -159,10 +93,6 @@ sub top_features {
 		elsif ($line =~ /^#/) {
 			# some other unrecognized pragma or a comment line
 			# skip
-			next;
-		}
-		elsif ($line =~ /^$/) {
-			# an empty line
 			next;
 		}
 		elsif ($line =~ /^>/) {
@@ -257,11 +187,11 @@ sub from_gff3_string {
 	
 	# get the string
 	my $string = shift;
-	chomp $string;
 	unless ($string) {
 		cluck("must pass a string!\n");
 		return;
 	}
+	chomp $string;
 	
 	# parse the string
 	my (
@@ -406,23 +336,6 @@ opened by calling parse_file().
 
 Pass the name of a GFF3 file to be parsed. The file must have a .gff or 
 .gff3 extension, and may optionally be gzipped (.gz extension). 
-
-=item fh()
-
-=item fh($filehandle)
-
-This method returns the IO::File object of the opened GFF file. A new 
-file may be parsed by passing an opened IO::File or other object that 
-inherits IO::Handle methods.  
-
-=item next_feature()
-
-This method will return a Bio::SeqFeature::Lite object representation of 
-the next feature in the file. Parent - child relationships are NOT 
-assembled. This is best used with simple GFF files with no hierarchies 
-present. This may be used in a while loop until the end of the file 
-is reached. Pragmas are ignored and comment lines and sequence are 
-automatically skipped. 
 
 =item top_features()
 
