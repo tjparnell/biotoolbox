@@ -8,7 +8,7 @@ use Getopt::Long;
 use Pod::Usage;
 require CPAN;
 
-my $VERSION = '1.13';
+my $VERSION = '1.12';
 
 # Initialize values
 my (
@@ -229,10 +229,6 @@ qq(  Optional, required for working with BAM files.
 		],
 		['Bio::DB::BigFile', 
 qq(  Optional, required for working with bigWig and bigBed files.
-)
-		],
-		['Bio::DB::USeq', 
-qq(  Optional, required for working with useq files.
 )
 		],
 	);

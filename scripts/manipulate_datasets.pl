@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.13';
+my $VERSION = '1.12.6';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -2554,11 +2554,16 @@ sub format_function {
 	}
 	else {
 		# interactively ask the user
-		print " Format the numbers to how many decimal positions?  ";
+		print " Format the numbers to 0, 1, 2, or 3 decimal positions?  ";
 		$positions = <STDIN>;
 		chomp $positions;
 	}
-	unless ($positions =~ /^\d+$/) {
+	unless (
+		$positions == 0 or
+		$positions == 1 or
+		$positions == 2 or
+		$positions == 3
+	) {
 		warn " Unknown number of positions; formatting NOT done\n";
 		return;
 	}
@@ -2791,13 +2796,7 @@ sub ratio_function {
 	# check if log2 numbers
 	# log2 ratios performed by subtraction, regular number ratios by division
 	my $log;
-	if (defined $opt_log) {
-		# if unable to identify the log2 status in metadata
-		# use the command line option variable if set
-		$log = $opt_log;
-	}
-	
-	elsif (
+	if (
 		exists $main_data_ref->{$numerator}{'log2'} and
 		exists $main_data_ref->{$denominator}{'log2'}
 	) {
@@ -2825,6 +2824,12 @@ sub ratio_function {
 			warn " datasets have different log status! nothing done";
 			return;
 		}
+	}
+	
+	elsif (defined $opt_log) {
+		# if unable to identify the log2 status in metadata
+		# use the command line option variable if set
+		$log = $opt_log;
 	}
 	
 	else {
@@ -4917,9 +4922,10 @@ new values or added as a new column.
 =item B<format> (menu option 'f')
 
 Format the numbers of a column to a given number of decimal places. 
-An integer must be provided. The column may either be replaced or 
-added as a new column. For automatic execution, use the --target 
-option to specify the number decimal places.
+Acceptable numbers of decimal places include 0, 1, 2, or 3.
+The column may either be replaced or added as a new column. For 
+automatic execution, use the --target option to specify the number 
+decimal places.
 
 =item B<combine> (menu option 'c')
 

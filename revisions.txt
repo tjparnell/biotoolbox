@@ -1,36 +1,5 @@
 ######## BioToolBox revision history #############
 
-v.1.13 (svn 691)
-	- Updated to include native support for USeq archive files 
-	with data collection scripts. USeq files may be used in 
-	the same manner as BigWig, BigBed, or Bam files for data 
-	collection. USeq files may be generated using tools from 
-	the USeq package (useq.sourceforge.net). The 
-	Bio::DB::USeq adaptor is available via CPAN. 
-	- Added new script filter_bam.pl, which can filter alignments 
-	based on various criteria and write a new Bam file. Filters 
-	are one or more boolean tests, including attributes, scores, 
-	lengths, sequence, etc.
-	- Added new script get_bam_seq_stats.pl, which collects 
-	information about the read sequences themselves and summarizes 
-	the sequence composition and nucleotide frequencies, suitable 
-	for generating sequence logos.
-	- Updated script manipulate_datasets.pl to allow any integer 
-	to be used when formatting decimal values.
-	- Restored ability to write a new data file without collecting 
-	data from script get_datasets.pl.
-	- Changed the log conversion step to avoid having to increase 
-	read count by 1 to avoid log of 0 errors in script bam2wig.pl.
-	- Use the command line --log argument in preference over 
-	metadata in script manipulate_datasets.pl.
-	- Method sum now writes 0 instead of null in script 
-	bin_genomic_data.pl.
-	- Fixed issue where joining data files may not maintain gzip 
-	status. This had issues with combining forked children files.
-	- Fixed bug where a provided, indexed data source file 
-	(e.g. BigWig) could not be used as a database in script 
-	get_datasets.pl
-
 v.1.12.6 (svn 680)
 	- Updated the script novo_wrapper.pl to use Parallel::ForkManager 
 	instead of GNU Parallel. This should make it more stable, 

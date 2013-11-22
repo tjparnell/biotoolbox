@@ -17,7 +17,7 @@ use tim_file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.13';
+my $VERSION = '1.12.2';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -72,6 +72,15 @@ if ($print_version) {
 unless (scalar @ARGV > 1) {
 	die "  OOPS! Two or more data files must be given!\n use $0 --help\n";
 }
+unless (defined $gz) {
+	if ($ARGV[0] =~ /\.gz$/) {
+		# first input file is compressed, so keep it that way
+		$gz = 1;
+	}
+	else {
+		$gz = 0;
+	}
+}
 
 
 
@@ -103,7 +112,7 @@ unless ($outfile) {
 }
 
 # compare file extensions
-my (undef, undef, $outfile_extension) = fileparse($outfile, qr/\.[^.]*(?:\.gz)?$/);
+my (undef, undef, $outfile_extension) = fileparse($outfile, qr/\.[^.]*(?:\.gz)?/);
 my $out_base_ext = $outfile_extension;
 my $in_base_ext = $first_data->{'extension'};
 $out_base_ext =~ s/\.gz$//; # strip any gz extension to make it a fair comparison
@@ -114,17 +123,6 @@ if ($out_base_ext and $out_base_ext ne $in_base_ext) {
 	$outfile =~ s/$out_base_ext/$in_base_ext/;
 }
 
-# check extension
-unless (defined $gz) {
-	if ($outfile =~ /\.gz$/) {
-		$gz = 1;
-	}
-	elsif ($ARGV[0] =~ /\.gz$/) {
-		# first input file is compressed, so keep it that way
-		$gz = 1;
-	}
-	# otherwise, keep it undefined
-}
 
 
 

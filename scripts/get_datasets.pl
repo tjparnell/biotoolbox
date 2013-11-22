@@ -42,7 +42,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.13';
+my $VERSION = '1.12.6';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -170,23 +170,34 @@ if (defined $fstart or defined $fstop) {
 set_defaults();
 my $start_time = time;
 
-# Assign database for new feature lists
-if ($new and not defined $main_database) {
-	# creating a new feature list requires a main database 
-	# otherwise we will postpone this till after loading the input file
-	
-	if (defined $data_database) {
-		# reuse the data database
-		$main_database = $data_database;
+# Assign database if possible
+unless (defined $main_database) {
+	# we can get the database from somewhere else
+	if ($new) {
+		
+		if (defined $data_database) {
+			# reuse the data database
+			$main_database = $data_database;
+		}
+		elsif (@datasets) {
+			# we could use a dataset file
+			# get the first dataset listed to use as a database
+			# this only works, of course, with certain BigFile files
+			if ($datasets[0] =~ /,/) {
+				# seems to be a comma delimited list
+				# take the first element
+				$main_database = (split /,/, $datasets[0])[0];
+			}
+			else {
+				# take the first element
+				$main_database = $datasets[0];
+			}
+		}
+		else {
+			die " You must define a database or an appropriate dataset file! see help\n";
+		}
 	}
-	elsif (@datasets and $feature eq 'genome') {
-		# we could use a dataset file only if we're collecting genome windows
-		# take the first element
-		$main_database = $datasets[0];
-	}
-	else {
-		die " You must define a database or an appropriate dataset file! see help\n";
-	}
+	# or else we can get the database from the input file metadata
 }
 
 
@@ -214,14 +225,14 @@ unless ($main_database) {
 	# command line, or a source data file
 	# lacking that, we'll attempt to use the first dataset provided
 	# and hope for the best 
-	if ($data_database) {
-		# use data database if defined instead of main database
-		$main_database = $data_database;
-	}
-	elsif (@datasets) {
+	if (@datasets) {
 		# we hope this some sort of indexed data file like bigWig or Bam
 		$main_database = $datasets[0];
 		print " no database defined, using $main_database\n";
+	}
+	elsif ($data_database) {
+		# use data database if defined instead of main database
+		$main_database = $data_database;
 	}
 	else {
 		die " no database defined! see help\n";
@@ -282,20 +293,6 @@ if ($method eq 'rpm' or $method eq 'rpkm') {
 # check that we have a dataset
 if ($datasets[0] eq 'none') {
 	print " Nothing to collect!\n";
-	if ($new) {
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
-			'filename' => $outfile,
-			'gz'       => $gz,
-		);
-		if ($success) {
-			printf " wrote file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			print " unable to write file!\n";
-		}
-	}
 	exit;
 }
 
@@ -347,16 +344,6 @@ sub set_defaults {
 		# disable cores
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
 		$cpu = 0;
-	}
-	
-	# check datasets
-	if ($datasets[0] =~ /,/) {
-		# seems to be a comma delimited list, possibly more than one?????
-		my @list;
-		foreach my $d (@datasets) {
-			push @list, (split /,/, $d);
-		}
-		@datasets = @list;
 	}
 	
 	# check method
@@ -1885,8 +1872,8 @@ Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the
 features' scores may be used in data collection.
 
 Alternatively, the dataset may be a database file, including bigWig (.bw), 
-bigBed (.bb), useq (.useq), or Bam alignment (.bam) files. The files may 
-be local or remote (specified with a http: or ftp: prefix).
+bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
+remote (specified with a http: or ftp: prefix).
 
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
