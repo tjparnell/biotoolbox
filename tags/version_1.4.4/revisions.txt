@@ -1,0 +1,57 @@
+######## biotoolbox revision history #############
+
+v1.4.4 (svn r162)
+	- Added reads per million option to script bam2wig.pl
+	- Added parent, exon, and transcript_length attributes to script get_feature_info.pl
+	- Updated scripts find_enriched_regions.pl and map_transcripts.pl to work with with standalone data files (BigWig, BigBed, Bam)
+	- Added configuration, description, and capabilities to working with SQLite database files in tim_db_helper
+	- Added midpoint as acceptable coordinate in script data2wig.pl
+	- Bug fixes to script locate_SNPs.pl and bam2wig.pl; library tim_db_helper::bam
+
+v1.4.3 (svn r144)
+	- Changed script bar2wig.pl to require method for combining values and removed interbase option
+	- Updated peak indentification in script map_nucleosomes.pl to use the tag dataset and not the scan dataset
+	- Updated script big_file2gff3.pl to produce more useful conf files with BigWigSets
+	- Added overlap data column to ouput of script get_intersecting_features.pl and added --set_strand option to enforce directionality
+	- Added three new functions to script manipulate_datasets.pl, including new column, strandsign, and mergestrand
+	- Fixed script wig2data.pl so it works now
+	- Updated script get_feature_info.pl to parse an attribute list from the command line
+	- Improved handling of metadata when opening tim data files
+
+v1.4.2 (svn r129)
+	- Added fast low level coverage function to the script bam2wig.pl
+	- Fixed script pull_features.pl to keep the order of features in the list file.
+	- Fixed script bar2wig.pl to correctly identify the chromosome name.
+	- Various bug fixes to the database library helper tim_db_helper.pm.
+
+v1.4.1 (svn r119)
+	- Fixed bug with get_ensembl_annotation.pl where a protein_coding gene encoding a transcript lacking a CDS will write inappropriate coordinates. These transcripts will not write start_codon, stop_codon, or CDS subfeatures.
+	- Fixed bug with script get_intersecting_features.pl where selecting regions with a start, stop modifier was not being selected properly.
+	- Fixed bug with tim_db_helper modules that prevented working with source data files specified in a database feature
+	- Added log transformation of count in script bam2wig.pl
+
+v1.4 (svn r111)
+	- Added script bam2wig.pl for enumerating alignments and writing a wig file of the counts. 
+	- Added script change_chr_prefix.pl for adding or stripping chromosome prefixes from data and annotation files.
+	- Bug fixes to ucsc_table2gff3.pl.
+
+v1.3 (svn r104)
+	- Added ability to restrict data collection to exon subfeatures to script get_datasets.pl. Useful for RNA-seq analysis.
+	- Added exon count as attribute to script get_feature_info.pl.
+	- Bug fixes to get_datasets.pl.
+
+v1.2 (svn r98)
+	- Added support for bam files as a data source.
+	- Updated data collection scripts to allow direct referencing of data source files, including bigWig, bigBed, and Bam files, on the command line, without having to reference the files from within the database.
+
+v1.1 (svn r92)
+	- Updated script ucsc_table2gff3.pl to use Bio::SeqFeature::Lite. Now outputs exon and codon features.
+	- Updated script get_ensembl_annotation.pl to collect RNA features from Ensembl as well as generate exon and codon features.
+	- Added script gff3_to_ucsc_table.pl to generate UCSC style refSeq tables from GFF3 formatted data.
+
+v1.0.2 (svn r91)
+	- Bug fixes to libs tim_file_helper and tim_db_helper
+	- Bug fixes to scripts print_feature_types.pl, get_intersecting_features.pl, big_file2gff3.pl, graph_data.pl, graph_histogram.pl, graph_profile.pl
+
+v1.0 (svn r68)
+	- Initial public release of an archive. Previous versions were only available through SVN.
