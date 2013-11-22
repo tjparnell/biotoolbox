@@ -1,7 +1,7 @@
-#!/usr/bin/env perl
-
-# documentation at end of file
+#!/usr/bin/perl
  
+# A script to process microarrays.
+
 use strict;
 use Getopt::Long;
 use Pod::Usage;
@@ -19,7 +19,7 @@ use tim_file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.6.2';
 
 print "\n A script to process microarray files\n\n";
 
@@ -247,12 +247,12 @@ if (%cvalues) {
 ### Write output
 $outfile =~ s/\.txt$//; # strip extension if present
 # write main output
-my $written_file = write_tim_data_file(
+my $written_file = write_tim_data_file( {
 	# we will write a tim data file
 	'data'     => $output,
 	'filename' => $outfile,
 	'gz'       => $gz,
-);
+} );
 if ($written_file) {
 	print " Wrote data file '$written_file'\n";
 	push @report, "\nWrote output file to $written_file\n\n\n";
@@ -1596,8 +1596,6 @@ __END__
 
 process_microarray.pl
 
-A script to quantile normalize two or more raw microarray data sets.
-
 =head1 SYNOPSIS
 
 process_microarray.pl --in <filename1>,<filename2> --channel <redgreen> 
@@ -1619,6 +1617,7 @@ process_microarray.pl --recipe <file>
   --gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -1685,7 +1684,7 @@ should (not) be converted to a log2 ratio. The default is true.
 Optionally indicate that the Processed values in an Agilent text file 
 should be used. The default is to use the Raw values.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
@@ -1761,6 +1760,7 @@ An example is below
  # two-channel file, red is experiment, green is not used
  path/to/file.txt	en
  
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1773,3 +1773,5 @@ An example is below
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+

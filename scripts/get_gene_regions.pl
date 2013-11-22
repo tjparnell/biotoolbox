@@ -1,11 +1,13 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will collect specific regions from features
+
 
 use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
+use Bio::SeqFeature::Lite;
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
@@ -13,14 +15,14 @@ use tim_data_helper qw(
 );
 use tim_db_helper qw(
 	open_db_connection
-	verify_or_request_feature_types
+	get_dataset_list
 );
 use tim_db_helper::gff3_parser;
 use tim_file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.7.0';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -48,7 +50,6 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
-	$bed,
 	$gz,
 	$help,
 	$print_version,
@@ -66,7 +67,6 @@ GetOptions(
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
-	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -148,11 +148,11 @@ print "  collected ", format_with_commas($outdata->{'last_row'}), " regions\n";
 
 
 ### Finished
-my $success = write_tim_data_file(
+my $success = write_tim_data_file( {
 	'data'     => $outdata,
 	'filename' => $outfile,
 	'gz'       => $gz,
-);
+} );
 if ($success) {
 	print " wrote file '$success'\n";
 }
@@ -162,28 +162,9 @@ else {
 }
 
 
-### Convert to bed format if requested
-# rather than taking the time to modify the data structures and all the 
-# the data collection subroutines to a BED format, we'll just simply 
-# take advantage of the data2bed.pl program as a convenient cop-out
-if ($bed and $success) {
-	system(
-		"$Bin/data2bed.pl",
-		"--chr",
-		3,
-		"--start",
-		4,
-		"--stop",
-		5,
-		"--strand",
-		6,
-		"--name",
-		2,
-		"--in",
-		$success,
-		$gz ? "--gz" : "",
-	) == 0 or warn " unable to execute data2bed.pl for converting to bed!\n";
-}
+
+
+
 
 
 
@@ -193,7 +174,14 @@ sub determine_method {
 	
 	# determine the region request from user if necessary
 	unless ($request) {
-		$request = collect_method_from_user();
+		$request = collect_list_item_from_user( {
+			1	=> 'first exon',
+			2	=> 'last exon',
+			3	=> 'transcription start site',
+			4	=> 'transcription stop site',
+			5	=> 'splice sites',
+			6	=> 'introns',
+		} );
 	}
 	
 	# determine the method
@@ -228,52 +216,11 @@ sub determine_method {
 	elsif ($request =~ /^introns?$/i) {
 		$method = \&collect_introns;
 	}
-	elsif ($request =~ /^first ?intron/i) {
-		$request = 'first intron';
-		$method = \&collect_first_intron;
-	}
-	elsif ($request =~ /^last ?intron/i) {
-		$request = 'last intron';
-		$method = \&collect_last_intron;
-	}
 	else {
 		die " unknown region request!\n";
 	}
 	
 	return $method;
-}
-
-
-
-sub collect_method_from_user {
-	
-	my %list = (
-		1	=> 'first exon',
-		2	=> 'last exon',
-		3	=> 'transcription start site',
-		4	=> 'transcription stop site',
-		5	=> 'splice sites',
-		6	=> 'introns',
-		7   => 'first intron',
-		8   => 'last intron',
-	);
-	
-	# request feature from the user
-	print " These are the available feature types in the database:\n";
-	foreach my $i (sort {$a <=> $b} keys %list ) {
-		print "   $i\t$list{$i}\n";
-	}
-	print " Enter the type of region to collect   ";
-	my $answer = <STDIN>;
-	chomp $answer;
-	
-	# verify and return answer
-	if (exists $list{$answer}) {
-		return $list{$answer};
-	}
-	else {
-		die " unknown request!\n";
-	}
 }
 
 
@@ -337,12 +284,14 @@ sub collect_from_database {
 		die " unable to open database connection!\n";
 	
 	# get feature type if necessary
-	$feature = verify_or_request_feature_types(
-		'db'      => $db,
-		'feature' => $feature,
-		'prompt'  => 'Enter the gene feature from which to collect regions   ',
-		'single'  => 1,
-	) or die "No valid gene feature type was provided! see help\n";
+	unless ($feature) {
+		
+		# get the types present in the database
+		my %types = get_dataset_list($db, 1); # collect all features
+		
+		# get feature from user
+		$feature = collect_list_item_from_user(\%types);
+	}
 	
 	# generate output data
 	my $output = generate_output_structure();
@@ -435,6 +384,30 @@ sub collect_from_file {
 	
 	# finished
 	return $output;
+}
+
+
+
+sub collect_list_item_from_user {
+	
+	my $list = shift;
+	
+	# request feature from the user
+	print " These are the available feature types in the database:\n";
+	foreach my $i (sort {$a <=> $b} keys %{$list} ) {
+		print "   $i\t$list->{$i}\n";
+	}
+	print " Enter the feature type to use\n";
+	my $answer = <STDIN>;
+	chomp $answer;
+	
+	# verify and return answer
+	if (exists $list->{$answer}) {
+		return $list->{$answer};
+	}
+	else {
+		die " unknown request!\n";
+	}
 }
 
 
@@ -810,12 +783,12 @@ sub collect_introns {
 	my $transcript = shift;
 	
 	# find the exons and/or CDSs
-	my $exons = _collect_exons($transcript);
-	return unless $exons;
-	return if (scalar(@$exons) == 1);
+	my $list = _collect_exons($transcript);
+	return unless $list;
+	return if (scalar(@$list) == 1);
 	
 	# identify the last exon index position
-	my $last = scalar(@$exons) - 1;
+	my $last = scalar(@$list) - 1;
 	
 	# collect the introns
 	my @introns;
@@ -824,13 +797,13 @@ sub collect_introns {
 	if ($transcript->strand == 1) {
 		
 		# walk through each exon
-		for (my $i = 0; $i < $last; $i++) {
+		for (my $i = 0; $i < $last -1; $i++) {
 			push @introns, _adjust_positions( [ 
 				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
-				$exons->[$i]->end + 1, 
-				$exons->[$i + 1]->start - 1,
+				$list->[$i]->end + 1, 
+				$list->[$i + 1]->start - 1,
 				$transcript->strand,
 			] );
 		}
@@ -840,13 +813,13 @@ sub collect_introns {
 	else {
 	
 		# walk through each exon
-		for (my $i = 0; $i < $last; $i++) {
+		for (my $i = 0; $i < $last -1; $i++) {
 			push @introns, _adjust_positions( [ 
 				$transcript->display_name,
 				$transcript->display_name . ".intron$i", 
 				$transcript->seq_id, 
-				$exons->[$i + 1]->end + 1,
-				$exons->[$i]->start - 1, 
+				$list->[$i]->start - 1, 
+				$list->[$i + 1]->end + 1,
 				$transcript->strand,
 			] );
 		}
@@ -854,32 +827,6 @@ sub collect_introns {
 	
 	# finished
 	return @introns;
-}
-
-
-sub collect_first_intron {
-	
-	# seqfeature object
-	my $transcript = shift;
-	
-	# collect all of the introns
-	my @introns = collect_introns($transcript);
-	
-	# return the first one
-	return shift @introns;
-}
-
-
-sub collect_last_intron {
-	
-	# seqfeature object
-	my $transcript = shift;
-	
-	# collect all of the introns
-	my @introns = collect_introns($transcript);
-	
-	# return the first one
-	return pop @introns;
 }
 
 
@@ -1016,29 +963,24 @@ __END__
 
 get_gene_regions.pl
 
-A script to collect specific, often un-annotated regions from genes.
-
 =head1 SYNOPSIS
 
 get_gene_regions.pl [--options...] --db <text> --out <filename>
-
-get_gene_regions.pl [--options...] --in <filename> --out <filename>
   
   Options:
   --db <text>
-  --in <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
-  --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
+  --region [tss|tts|firstExon|lastExon|splice|intron]
   --start=<integer>
   --stop=<integer>
   --unique
   --slop <integer>
-  --bed
   --gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -1049,14 +991,10 @@ The command line flags and descriptions:
 =item --db <text>
 
 Specify the name of a BioPerl SeqFeature::Store database to use as an 
-annotation source. 
-
-=item --in <filename>
-
-Alternative to a database, a GFF3 annotation file may be provided. 
+annotation source. Alternatively, a GFF3 annotation file may be provided. 
 For best results, the database or file should include hierarchical 
-parent-child annotation in the form of gene -> mRNA -> [exon or CDS]. 
-The GFF3 file may be gzipped.
+annotation in the form of gene -> mRNA -> [exon or CDS]. The GFF3 file 
+may be gzipped.
 
 =item --out <filename>
 
@@ -1064,12 +1002,12 @@ Specify the output filename.
 
 =item --feature <type | type:source>
 
-Specify the parental gene feature type (primary_tag) or type:source when
-using a database. If not specified, a list of available types will be
-presented interactively to the user for selection. This is not relevant for
-GFF3 source files (all gene or transcript features are considered). Helpful
-when gene annotation from multiple sources are listed in the same database,
-e.g. refSeq and ensembl sources.
+Specify the feature type (primary_tag) or type:source when using a database. 
+If not specified, a list of available types will be presented interactively 
+to the user for selection. This is not relevant for GFF3 source files (all 
+gene or transcript features are considered). Helpful when gene annotation 
+from multiple sources are listed in the same database, e.g. refSeq and 
+ensembl sources.
 
 =item --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
 
@@ -1077,20 +1015,18 @@ Specify the transcript feature or gene subfeature type from which to
 collect the regions. Multiple types may be specified as a comma-delimited 
 list, or 'all' may be specified. The default value is mRNA.
 
-=item --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
+=item --region [tss|tts|firstExon|lastExon|splice|intron]
 
 Specify the type of region to retrieve. If not specified on the command 
 line, the list is presented interactively to the user for selection. Six 
 possibilities are possible.
      
-     tss         The first base of transcription
-     tts         The last base of transcription
-     firstExon   The first exon of each transcript
-     lastExon    The last exon of each transcript
-     splice      The first and last base of each intron
-     intron      Each intron (usually not defined in the GFF3)
-     firstIntron The first intron of each transcript
-     lastIntron  The last intron of each transcript
+     tss        The first base of transcription
+     tts        The last base of transcription
+     firstExon  The first exon of each transcript
+     lastExon   The last exon of each transcript
+     splice     The first and last base of each intron
+     intron     Each intron (usually not defined in the GFF3)
 
 =item --start=<integer>
 
@@ -1099,9 +1035,6 @@ possibilities are possible.
 Optionally specify adjustment values to adjust the reported start and 
 end coordinates of the collected regions. A negative value is shifted 
 upstream (5' direction), and a positive value is shifted downstream.
-Adjustments are made relative to the feature's strand, such that 
-a start adjustment will always modify the feature's 5'end, either 
-the feature startpoint or endpoint, depending on its orientation. 
 
 =item --unique
 
@@ -1115,13 +1048,8 @@ add and subtract to the start position (the slop or fudge factor)
 of the regions when considering duplicates. Any other region 
 within this window will be considered a duplicate. Useful, for 
 example, when start sites of transcription are not precisely mapped, 
-but not useful with defined introns and exons. This does not take 
-into consideration transcripts from other genes, only the current 
-gene. The default is 0 (no sloppiness).
-
-=item --bed
-
-Automatically convert the output file to a BED file.
+but not useful with defined introns and exons. The default is 0 
+(no sloppiness).
 
 =item --gz
 
@@ -1168,3 +1096,4 @@ data collection.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

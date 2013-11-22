@@ -1,6 +1,11 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# This script will convert a GFF3 file to a UCSC style gene table
+
+# This should complement the biotoolbox scripts ucsc_table2gff3.pl and
+# get_ensembl_annotation.pl
+# 
+
 
 use strict;
 use Getopt::Long;
@@ -13,7 +18,7 @@ use tim_file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.8.1';
+my $VERSION = '1.7.0';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -172,14 +177,8 @@ sub process_gff_file_to_table {
 	while (my @top_features = $parser->top_features() ) {
 		
 		# processing statement
-		print " Collected ", scalar(@top_features), " features from ";
-		if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
-			# check whether all the features came from the same top sequence
-			print "sequence ID '", $top_features[0]->seq_id, "'\n";
-		}
-		else {
-			print "multiple sequences\n";
-		}
+		print " Collected ", scalar(@top_features), " features from ",
+			" region '", $top_features[0]->seq_id, "'\n";
 		
 		# Process the top features
 		while (@top_features) {
@@ -526,12 +525,12 @@ sub process_utr {
 
 ### process coding Exon
 sub process_cds_exon {
-	my ($ucsc, $exon) = @_;
+	my ($ucsc, $utr) = @_;
 	
 	# record the coordinates and information for this exon
-	push @{ $ucsc->{'exonStarts'} }, $exon->start;
-	push @{ $ucsc->{'exonEnds'} }, $exon->end;
-	push @{ $ucsc->{'exonFrames'} }, $exon->phase;
+	push @{ $ucsc->{'exonStarts'} }, $utr->start;
+	push @{ $ucsc->{'exonEnds'} }, $utr->end;
+	push @{ $ucsc->{'exonFrames'} }, $utr->phase;
 	$ucsc->{'exonCount'} += 1;
 }
 
@@ -847,8 +846,6 @@ __END__
 
 gff3_to_ucsc_table.pl
 
-A script to convert a GFF3 file to a UCSC style gene table
-
 =head1 SYNOPSIS
 
 gff3_to_ucsc_table.pl [--options...] <filename>
@@ -860,6 +857,7 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   --gz
   --version
   --help
+
 
 =head1 OPTIONS
 
@@ -876,14 +874,14 @@ Specify the input GFF3 file. The file may be compressed with gzip.
 Specify the output filename. By default it uses input file base name 
 appened with '_ucsc_genetable.txt'.
 
-=item --bin
+=item --(no)bin
 
 Specify whether the UCSC table-specific column bin should be included as 
 the first column in the table. This column is reserved for internal 
 UCSC database use, and, if included here, will simply be populated with 
 0s. The default behavior is to not include it.
 
-=item --gz
+=item --(no)gz
 
 Specify whether (or not) the output file should be compressed with gzip. 
 The default is to mimic the status of the input file
@@ -937,3 +935,4 @@ in the GFF3 file is ignored.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+

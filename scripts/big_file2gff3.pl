@@ -1,6 +1,6 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
-# documentation at end of file
+# a script to generate GFF3 files for bigwig, bigbed, and bam files
 
 use strict;
 use Getopt::Long;
@@ -33,7 +33,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.6.2';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -363,7 +363,7 @@ while (@infiles) {
 	}
 	
 	# convert the data structure to GFF for writing
-	convert_genome_data_2_gff_data(
+	convert_genome_data_2_gff_data( {
 		'data'       => $main_data_ref,
 		'version'    => 3,
 		'source'     => $source,
@@ -371,7 +371,7 @@ while (@infiles) {
 		'name'       => $name,
 		'strand'     => 3,
 		'tags'       => [4],
-	) or die " unable to convert data to GFF format!\n";
+	} ) or die " unable to convert data to GFF format!\n";
 	
 	# write new or append existing GFF file
 	if (-e $gff_file) {
@@ -403,10 +403,10 @@ while (@infiles) {
 			$main_data_ref->{'last_row'} += scalar(@chromodata);
 		}
 		
-		my $success = write_tim_data_file(
+		my $success = write_tim_data_file( {
 			'data'       => $main_data_ref,
 			'filename'   => $gff_file,
-		);
+		} );
 		if ($success) {
 			print "  wrote GFF3 file '$success'\n";
 		}
@@ -425,7 +425,7 @@ while (@infiles) {
 		push @metadata, "[$target_basename$infile_ext]\n";
 		
 		# add metadata
-		push @metadata, "type         = $gfftype\n";
+		push @metadata, "primary_tag  = $gfftype\n";
 		push @metadata, "source       = $source\n";
 		push @metadata, "display_name = $display_name\n";
 		if ($strand =~ /^f|w|\+|1/) {
@@ -578,29 +578,19 @@ if ($write_conf) {
 	if ($write_metadata) {
 		# write a conf stanza for the bigwig set
 		
-		# generate stanza name
-		my $stanza_name;
-		if ($set_name eq $source) {
-			# avoid duplication 
-			$stanza_name = $source;
-		}
-		else {
-			$stanza_name = "$source\_$set_name";
-		}
-		
 		# add the database stanza, in reverse order
-		push @confdata, "[$stanza_name\_db:database]\n";
+		push @confdata, "[$source\_$set_name\_db:database]\n";
 		push @confdata, "db_adaptor   = Bio::DB::BigWigSet\n";
 		push @confdata, "db_args      = -dir $path\n";
 		push @confdata, "               -feature_type summary\n\n";
 		
 		# generate the conf stanzas 
-		push @confdata, "[$stanza_name]\n";
-		push @confdata, "database     = $stanza_name\_db\n";
+		push @confdata, "[$source\_$set_name]\n";
+		push @confdata, "database     = $source\_$set_name\_db\n";
 		push @confdata, "feature      = " . 
 			# using the gfftype
 			join(" ", map {$_->[0]} @subtracks) . "\n";
-		push @confdata, "subtrack select = Feature type\n";
+		push @confdata, "subtrack select = Feature primary_tag\n";
 		for my $i (0 .. $#subtracks) {
 			# create subtrack table 
 			# each item has gfftype and name in anon array
@@ -861,13 +851,10 @@ __END__
 
 big_file2gff3.pl
 
-A script to generate GFF3 files for bigwig, bigbed, and bam files.
-
 =head1 SYNOPSIS
 
 big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   
-  Options:
   --in <file> or <file1,file2,...>
   --path </destination/path/for/bigfiles/>
   --source <text>
@@ -882,6 +869,7 @@ big_file2gff3.pl [--options...] <filename1.bw> <filename2.bb> ...
   --version
   --help
   
+
 =head1 OPTIONS
 
 The command line flags and descriptions:
@@ -1013,6 +1001,8 @@ written to the current directory to facilitate setting up GBrowse. If a
 BigWigSet database is requested, then the track stanza will be set up with 
 subtrack tables representing each BigWig file. 
 
+
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -1025,3 +1015,6 @@ subtrack tables representing each BigWig file.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
+
+
+
