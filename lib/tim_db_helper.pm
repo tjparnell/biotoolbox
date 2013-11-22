@@ -3,6 +3,7 @@ package tim_db_helper;
 use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
+use File::Spec;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 use Statistics::Lite qw(
@@ -22,47 +23,51 @@ use tim_data_helper qw(
 	parse_list
 );
 use tim_db_helper::config;
-our $VERSION = '1.13';
+our $VERSION = '1.11';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
 eval {
 	require tim_db_helper::wiggle;
 	tim_db_helper::wiggle->import;
-	$WIGGLE_OK = 1;
 };
+unless ($@) {
+	$WIGGLE_OK = 1;
+}; 
+undef $@;
 
 # check for BigWig support
 our $BIGWIG_OK = 0;
 eval { 
 	require tim_db_helper::bigwig;
 	tim_db_helper::bigwig->import;
-	$BIGWIG_OK = 1;
 };
+unless ($@) {
+	$BIGWIG_OK = 1;
+}; 
+undef $@;
 
 # check for BigBed support
 our $BIGBED_OK = 0;
 eval { 
 	require tim_db_helper::bigbed;
 	tim_db_helper::bigbed->import;
-	$BIGBED_OK = 1;
 };
+unless ($@) {
+	$BIGBED_OK = 1;
+}; 
+undef $@;
 
 # check for Bam support
 our $BAM_OK = 0;
 eval { 
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
+};
+unless ($@) {
 	$BAM_OK = 1;
-};
-
-# check for USeq support
-our $USEQ_OK = 0;
-eval { 
-	require tim_db_helper::useq;
-	tim_db_helper::useq->import;
-	$USEQ_OK = 1;
-};
+}; 
+undef $@;
 
 
 
@@ -122,8 +127,11 @@ score value in the source GFF file.
 References to local, binary, indexed files may also be included as 
 attributes to features stored in the database. Supported files 
 include binary wig files (.wib, see Bio::Graphics::Wiggle) using the 
-'wigfile' attribute, or bigWig files using the 'wigfile' or 'bigwigfile' 
-attribute. The attribute values must be full paths. 
+'wigfile' attribute, bigWig files using the 'wigfile' or 'bigwigfile' 
+attribute, bigBed files using the 'bigbedfile' attribute, and Bam 
+files using the 'bamfile' attribute. The attribute values must be 
+full paths. This method is considered deprecated (but still supported) 
+for bigWig, bigBed, and Bam files as the files can now be accessed directly.
 
 SeqFeature::Store databases are usually hosted by a relational database 
 server (MySQL or PostGreSQL), SQLite file, or an in-memory database 
@@ -154,13 +162,6 @@ Bam files are compressed, binary, indexed versions of the text SAM file,
 or sequence alignment map. They are used with next generation sequencing 
 technologies. They support individual alignment retrieval as well as 
 read depth coverage. 
-
-=item USeq files
-
-USeq files are compressed, binary, indexed files that support BED type 
-annotations or wig type scores distributed across the genome. They 
-support rapid, random access across the genome and are comparable to 
-both BigWig and BigBed files.
 
 =back
 
@@ -236,7 +237,7 @@ may be either local or remote (prefixed with http:// or ftp://).
 =item Bio::DB::BigWig database
 
 A self-contained database of scores represented by a BigWig (file.bw). See
-L<http://genome.ucsc.edu/goldenPath/help/bigWig.html> for more information.
+http://genome.ucsc.edu/goldenPath/help/bigWig.html for more information.
 Files may be either local or remote (prefixed with http:// or ftp://).
 
 =item Bio::DB::BigWigSet database
@@ -250,15 +251,8 @@ more information on the formatting of the metadata file.
 =item Bio::DB::BigBed database
 
 A self-contained database of regions represented by a BigBed (file.bb). See
-L<http://genome.ucsc.edu/goldenPath/help/bigBed.html> for more information.
+http://genome.ucsc.edu/goldenPath/help/bigBed.html for more information.
 Files may be either local or remote (prefixed with http:// or ftp://).
-
-=item Bio::DB::USeq database
-
-A self-contained database file of indexed regions or scores represented by 
-a useq archive file (file.useq). See 
-L<http://useq.sourceforge.net/useqArchiveFormat.html> for more information. 
-Files may only be local.
 
 =item Bio::DB::Fasta Database
 
@@ -310,9 +304,12 @@ sub open_db_connection {
 			# a Bam database
 			$db_name = $database->{'bam_path'};
 		}
+		else {
 			# determining the database name from other sources is
 			# either not possible or not easy, so won't bother unless
 			# there is a really really good need
+			$db_name = q(); # undefined
+		}
 		
 		# return as appropriate either both object and name or just object
 		return wantarray ? ($database, $db_name) : $database;
@@ -379,12 +376,6 @@ sub open_db_connection {
 			}
 		}
 		
-		# a remote useq file
-		elsif ($database =~ /\.useq$/) {
-			# uh oh! remote useq files are not supported
-			$error = " ERROR: remote useq files are not supported!\n";
-		}
-		
 		# a presumed remote directory, presumably of bigwig files
 		else {
 			# open using BigWigSet adaptor
@@ -430,7 +421,7 @@ sub open_db_connection {
 	}
 	
 	# check for a known file type
-	elsif ($database =~ /gff3|bw|bb|bam|useq|db|sqlite|fa|fasta/i) {
+	elsif ($database =~ /gff3|bw|bb|bam|db|sqlite|fa|fasta/i) {
 		
 		# first check that it exists
 		if (-e $database and -r _) {
@@ -509,22 +500,6 @@ sub open_db_connection {
 				else {
 					$error = " BigWig database cannot be loaded because\n" . 
 						" Bio::DB::BigWig is not installed\n";
-				}
-			}
-			
-			# a useq database
-			elsif ($database =~ /\.useq$/i) {
-				# open using USeq adaptor
-				if ($USEQ_OK) {
-					$db = open_useq_db($database);
-					unless ($db) {
-						$error = " ERROR: could not open local useq file" .
-							" '$database'! $!\n";
-					}
-				}
-				else {
-					$error = " Useq database cannot be loaded because\n" . 
-						" Bio::DB::USeq is not installed\n";
 				}
 			}
 			
@@ -869,8 +844,8 @@ sub verify_or_request_feature_types {
 			}
 			
 			# a local file
-			elsif ($dataset =~ /\.(?:bw|bb|bam|useq)$/i) {
-				# presume we have a local indexed data file
+			elsif ($dataset =~ /\.(?:bw|bb|bam)$/i) {
+				# presume we have a local bigfile or aligment file
 				
 				# user may have requested two or more files to be merged
 				# these should be combined with an ampersand
@@ -1103,18 +1078,13 @@ object. This database will be checked for the indicated dataset, and
 the first returned feature checked for an attribute pointing to a 
 supported file.
 
-For multi-threaded execution pass a third value, the number of CPU cores 
-available to count Bam files. The default is 2 for environments where 
-Parallel::ForkManager is installed, or 1 where it is not.
-
 =cut
 
 sub check_dataset_for_rpm_support {
 	
 	# get passed dataset and databases
-	my $dataset  = shift;
+	my $dataset = shift;
 	my $database = shift;
-	my $cpu      = shift;
 	
 	# check that we haven't done this already
 	
@@ -1137,7 +1107,7 @@ sub check_dataset_for_rpm_support {
 		if ($BAM_OK) {
 			# tim_db_helper::bam was loaded ok
 			# sum the number of reads in the dataset
-			$rpm_read_sum = sum_total_bam_alignments($dataset, 0, 0, $cpu);
+			$rpm_read_sum = sum_total_bam_alignments($dataset);
 		}
 		else {
 			carp " Bam support is not available! " . 
@@ -1209,7 +1179,7 @@ sub check_dataset_for_rpm_support {
 			if ($BAM_OK) {
 				# tim_db_helper::bam was loaded ok
 				# sum the number of reads in the dataset
-				$rpm_read_sum = sum_total_bam_alignments($bamfile, 0, 0, $cpu);
+				$rpm_read_sum = sum_total_bam_alignments($bamfile);
 			}
 			else {
 				carp " Bam support is not available! " . 
@@ -1805,11 +1775,6 @@ The keys include
               strand relative to the feature should be collected. 
               Acceptable values include sense, antisense, or all.
               Default is 'all'.
-  rpm_sum  => When collecting rpm or rpkm values, the total number  
-              of alignments may be provided here. Especially 
-              useful when collecting via parallel forked processes, 
-              otherwise each fork will sum the number of alignments 
-              independently, an expensive proposition. 
          	  
 The subroutine will return the region score if successful.
 
@@ -1870,13 +1835,6 @@ sub get_chromo_region_score {
 			# otherwise assume it is non-log
 			# unsafe, but what else to do? we'll put the onus on the user
 			$args{'log'} = 0;
-		}
-	}
-	
-	# set RPM sum value if necessary
-	if (exists $args{'rpm_sum'} and defined $args{'rpm_sum'}) {
-		unless (exists $total_read_number{ $args{'dataset'} }) {
-			$total_read_number{ $args{'dataset'} = $args{'rpm_sum'} };
 		}
 	}
 	
@@ -2087,8 +2045,10 @@ sub get_region_dataset_hash {
 	
 	# Extend a named database feature
 	if (
-		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
-		$args{'extend'}
+		( defined $args{'id'} or 
+			( defined $args{'name'} and defined $args{'type'} ) 
+		) and
+		defined $args{'extend'}
 	) {
 		
 		# first define the feature to get endpoints
@@ -2126,9 +2086,13 @@ sub get_region_dataset_hash {
 		
 	# Specific start and stop coordinates of a named database feature
 	elsif (
-		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
-		$args{'start'} and $args{'stop'}
+		( defined $args{'id'} or 
+			( defined $args{'name'} and defined $args{'type'} ) 
+		) and
+		defined $args{'start'} and 
+		defined $args{'stop'}
 	) {
+		
 		# first define the feature to get endpoints
 		my $feature = get_feature(
 			'db'    => $db,
@@ -2200,7 +2164,10 @@ sub get_region_dataset_hash {
 	}
 	
 	# an entire named database feature
-	elsif ( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) {
+	elsif (
+		defined $args{'id'} or 
+		( defined $args{'name'} and defined $args{'type'} ) 
+	) {
 		
 		# first define the feature to get endpoints
 		my $feature = get_feature(
@@ -2238,7 +2205,11 @@ sub get_region_dataset_hash {
 	}
 	
 	# a genomic region
-	elsif ( $args{'chromo'} and $args{'start'} and $args{'stop'} ) {
+	elsif (
+		defined $args{'chromo'} and
+		defined $args{'start'} and 
+		defined $args{'stop'}
+	) {
 		# coordinates are easy
 		$fchromo   = $args{'chromo'};
 		if ($args{'extend'}) {
@@ -2640,8 +2611,8 @@ First, the data may be stored directly in the Bio::DB::SeqFeature::Store
 (using the original GFF score value). Second, the feature may reference 
 a data file as an attribute (e.g., wigfile=/path/to/file.wib). Finally, 
 the name(s) of a data file may be passed from which to collect the data. 
-Supported data files include BigWig (.bw), BigBed (.bb), USeq (.useq), 
-and Bam (.bam). A Bio::DB::BigWigSet database is also supported.
+Supported data files include BigWig (.bw), BigBed (.bb), and Bam (.bam). 
+A Bio::DB::BigWigSet database is also supported.
 
 The subroutine is passed an array of ten specific values, all of which 
 must be defined and presented in this order. These values include
@@ -2896,48 +2867,6 @@ sub _get_segment_score {
 			else {
 				croak " Bam support is not enabled! " . 
 					"Is Bio::DB::Sam installed?\n";
-			}
-		}
-		
-		# USeq Data file
-		elsif ($datasetlist[0] =~ /\.useq$/i) {
-			# data is in useq format
-			# this uses the Bio::DB::USeq adaptor
-			
-			# check that we have bigbed support
-			if ($USEQ_OK) {
-				# get the dataset scores using tim_db_helper::useq
-				
-				if ($method eq 'indexed') {
-					# warn " using collect_useq_position_scores() with file\n";
-					return collect_useq_position_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
-				}
-				
-				else {
-					# warn " using collect_useq_scores() with file\n";
-					@scores = collect_useq_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
-					$dataset_type = 'useq';
-				}
-			}
-			else {
-				croak " USeq support is not enabled! " . 
-					"Is Bio::DB::USeq installed?\n";
 			}
 		}
 		
@@ -3219,6 +3148,203 @@ sub _get_segment_score {
 		}
 		
 		
+		## BigWig Data
+		elsif ( $feature->has_tag('bigwigfile') ) {
+			# data is in bigwig format
+			# this uses the Bio::DB::BigWig adaptor
+			
+			# collect the wigfile paths
+			# also check strand while we're at it
+			my @wigfiles;
+			while ($feature) {
+				
+				# check if we can take this feature
+				if (
+					$strandedness eq 'all' # stranded data not requested
+					or $feature->strand == 0 # unstranded data
+					or ( 
+						# sense data
+						$strand == $feature->strand 
+						and $strandedness eq 'sense'
+					) 
+					or (
+						# antisense data
+						$strand != $feature->strand  
+						and $strandedness eq 'antisense'
+					)
+				) {
+					# we can take this file, it passes the strand test
+					my ($file) = $feature->get_tag_values('bigwigfile');
+					push @wigfiles, "file:$file";
+				}
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
+			
+			# if no wigfiles are found
+			# should only happen if the strands don't match
+			return _return_null($method) unless (@wigfiles);
+			
+			# check that we have bigwig support
+			if ($BIGWIG_OK) {
+				# get the dataset scores using tim_db_helper::bigwig
+				
+				# the data collection depends on the method
+				if ($value_type eq 'score' and 
+					$method =~ /min|max|mean|sum|count/
+				) {
+					# we can use the low-level, super-speedy, summary method 
+					return collect_bigwig_score(
+						$chromo,
+						$start,
+						$stop,
+						$method,
+						@wigfiles
+					);
+				}
+				
+				elsif ($value_type eq 'count' and $method eq 'sum') {
+					# we can use the low-level, super-speedy, summary method 
+					return collect_bigwig_score(
+						$chromo,
+						$start,
+						$stop,
+						'count', # special method
+						@wigfiles
+					);
+				}
+				
+				elsif ($method eq 'indexed') {
+					return collect_bigwig_position_scores(
+						$chromo,
+						$start,
+						$stop,
+						@wigfiles
+					);
+				}
+				
+				else {
+					# use the longer region collection method
+					@scores = collect_bigwig_scores(
+						$chromo,
+						$start,
+						$stop,
+						@wigfiles
+					);
+					$dataset_type = 'bw';
+				}
+			}
+			else {
+				croak " BigWig support is not enabled! " . 
+					"Is Bio::DB::BigWig installed?\n";
+			}
+		}
+		
+		
+		## BigBed Data
+		elsif ( $feature->has_tag('bigbedfile') ) {
+			# data is in bigbed format
+			# this uses the Bio::DB::BigBed adaptor
+			
+			# collect the bedfile paths
+			my @bedfiles;
+			while ($feature) {
+				my ($file) = $feature->get_tag_values('bigbedfile');
+				push @bedfiles, "file:$file";
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
+			
+			# check that we have bigbed support
+			if ($BIGBED_OK) {
+				# get the dataset scores using tim_db_helper::bigbed
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bigbed_position_scores() from tag\n";
+					return collect_bigbed_position_scores(
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
+						$strandedness, 
+						$value_type,
+						@bedfiles
+					);
+				}
+				else {
+					# warn " using collect_bigbed_scores() from tag\n";
+					@scores = collect_bigbed_scores(
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
+						$strandedness, 
+						$value_type,
+						@bedfiles
+					);
+					$dataset_type = 'bb';
+				}
+			}
+			else {
+				croak " BigBed support is not enabled! " . 
+					"Is Bio::DB::BigBed installed?\n";
+			}
+		}
+		
+		# Bam Data
+		elsif ( $feature->has_tag('bamfile') ) {
+			# data is in bam format
+			# this uses the Bio::DB::Sam adaptor
+			
+			# collect the bamfile paths
+			my @bamfiles;
+			while ($feature) {
+				my ($file) = $feature->get_tag_values('bamfile');
+				push @bamfiles, "file:$file";
+				
+				# prepare for next
+				$feature = $iterator->next_seq || undef;
+			}
+			
+			# check that we have bam support
+			if ($BAM_OK) {
+				# get the dataset scores using tim_db_helper::bigbed
+				
+				if ($method eq 'indexed') {
+					# warn " using collect_bam_position_scores() from tag\n";
+					return collect_bam_position_scores(
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
+						$strandedness, 
+						$value_type,
+						@bamfiles
+					);
+				}
+				else {
+					# warn " using collect_bam_scores() from tag\n";
+					@scores = collect_bam_scores(
+						$chromo,
+						$start,
+						$stop,
+						$strand, 
+						$strandedness, 
+						$value_type,
+						@bamfiles
+					);
+					$dataset_type = 'bam';
+				}
+			}
+			else {
+				croak " Bam support is not enabled! " . 
+					"Is Bio::DB::Sam installed?\n";
+			}
+		}
+		
+		
 		## Database Data
 		else {
 			# Working with data stored directly in the database
@@ -3335,9 +3461,6 @@ sub _get_segment_score {
 	
 	# single region score
 	else {
-		# check that we have scores
-		return _return_null($method) unless (@scores);
-		
 		# requested a single score for this region
 		# we need to combine the data
 		my $region_score;
@@ -3346,6 +3469,9 @@ sub _get_segment_score {
 		if ($log) {
 			@scores = map {2 ** $_} @scores;
 		}
+		
+		# check that we have scores
+		return _return_null($method) unless (@scores);
 		
 		# determine the region score according to method
 		# we are using subroutines from Statistics::Lite

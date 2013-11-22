@@ -7,11 +7,11 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median stddevp);
 use Pod::Usage;
 use File::Basename qw(fileparse);
+use Bio::Range;
 use FindBin qw($Bin);
 use lib "$Bin/../lib";
 use tim_data_helper qw(
 	generate_tim_data_structure
-	format_with_commas
 );
 use tim_db_helper qw(
 	open_db_connection
@@ -26,14 +26,8 @@ use tim_file_helper qw(
 	convert_and_write_to_gff_file
 );
 use tim_db_helper::config;
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
 # use Data::Dumper;
-my $VERSION = '1.12.2';
+my $VERSION = '1.10.2';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -75,7 +69,6 @@ my (
 	$gff,
 	$gz,
 	$help,
-	$cpu,
 	$print_version,
 	$debug,
 ); # command line variables
@@ -104,7 +97,6 @@ GetOptions(
 	'gff'       => \$gff, # write out a gff file
 	'gz!'       => \$gz, # write compressed file
 	'debug'     => \$debug, # limit to chromosome 1 for debugging purposes
-	'cpu=i'     => \$cpu, # number of execution threads
 	'help'      => \$help, # print help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -222,17 +214,6 @@ else {
 	$strandedness = 'sense';
 }
 
-# check parallel support
-if ($parallel) {
-	# conservatively enable 2 cores
-	$cpu ||= 2;
-}
-else {
-	# disable cores
-	print " disabling parallel CPU execution, no support present\n" if $cpu;
-	$cpu = 0;
-}
-
 
 
 #### Main #####
@@ -317,7 +298,6 @@ else {
 	# a database feature
 	$dataset_name = $dataset;
 }
-my $start_time = time;
 
 
 
@@ -343,36 +323,71 @@ unless ($outfile) {
 
 
 ## Find the enriched regions
-# print messages
-if ($deplete) {
-	print " Looking for depleted regions ";
-} 
-else {
-	print " Looking for enriched regions ";
+go_find_enriched_regions();
+unless (@windows) { # exit the program if nothing found
+	warn " No windows found!\n";
+	exit;
 }
-print "using window $method $value values\n";
+
+# DEBUGGING: printing out the intermediate @windows array
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_windows.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
+
+
+
+## Merge the windows into larger regions
+# this will merge the overlapping windows in @windows and put them into back
+go_merge_windows();
+print " Merged windows into " . scalar @windows . " windows\n";
+
+# DEBUGGING: printing out the intermediate @windows array
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_merge1.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
+
+
+
+## Trim the merged windows of datapoints that are below the threshold
+if ($trim) {
+	print " Trimming windows....\n";
+	go_trim_windows();
 	
-# execute based on the number of CPUs available
-if ($cpu > 1) {
-	# parallel execution
-	print " Forking into $cpu children for parallel execution\n";
-	parallel_execution();
+	# DEBUGGING: printing out the intermediate @windows array
+# 	if ($debug) {
+# 		open FILE, ">$outfile.debug.post_trim.txt";
+# 		print FILE Dumper(\@windows);
+# 		close FILE;
+# 	}
+	
+	# Double check the merging
+	# Go back quickly through double-checking that we don't have two neighboring windows
+	# I still seem to have some slip through....
+	go_merge_windows(\@windows);
+	print " Merged trimmed windows into " . scalar @windows . " windows\n";
 }
 
-else {
-	# single threaded execution
-	single_execution();
-}
+# DEBUGGING: printing out the intermediate @windows array
+# if ($debug) {
+# 	open FILE, ">$outfile.debug.post_merge2.txt";
+# 	print FILE Dumper(\@windows);
+# 	close FILE;
+# }
 
+
+## Get score for final window
+print " Calculating final score of merged, trimmed windows....\n";
+get_final_window_score();
 
 
 ## Sort the array by the final score of the windows
 if ($sort) {
 	print " Sorting windows by score....\n";
 	sort_data_by_final_score();
-}
-else {
-	@windows = sort { $a->[0] cmp $b->[0] or $a->[1] <=> $b->[1] } @windows;
 }
 
 ## Name the windows
@@ -440,7 +455,7 @@ if ($gff) {
 	}
 }
 
-printf " Finished in %.1f minutes\n", (time - $start_time)/60;
+print " All done!\n\n";
 
 
 
@@ -521,190 +536,145 @@ sub go_determine_cutoff {
 }
 
 
-### Single threaded execution
-sub single_execution {
-	
-	## collect chromosomes and data
-	# walk through each chromosome
-	foreach ( get_chromosome_list($ddb, 1) ) {
-		
-		# this is an array of chromosome name and length
-		my ($chr, $length) = @$_;
-		go_find_enriched_regions($chr, $length);
-	}
-	print " Found " . format_with_commas(scalar @windows) . " total windows for $dataset.\n";
-	
-	# check for windows
-	unless (@windows) { # exit the program if nothing found
-		exit;
-	}
-}
-
-
-### Parallel forked execution
-sub parallel_execution {
-	
-	# Initiate the fork manager
-	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_finish( sub {
-		my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $child_windows) = @_;
-		push @windows, @{$child_windows};
-	});
-	
-	# the chromosome list
-	my @chromosomes = sort { $b->[1] <=> $a->[1] } get_chromosome_list($ddb, 1);
-		# get_chromosome_list() returns arrays of chromosome [name, length]
-		# sort decreasing by the length
-	# generate an execution list based on size 
-		# the idea is to equalize the amount of work to do for each child process
-	my @list; # array of arrays, [process][name,length]
-	my $i = 1;
-	while (@chromosomes) {
-		push @{ $list[$i] }, shift @chromosomes;
-		$i++;
-		$i = 1 if $i > $cpu;
-	}
-	
-	# Count the chromosomes in parallel processess
-	foreach my $n (1 .. $cpu) {
-		$pm->start and next;
-
-		### In child
-		foreach ( @{$list[$n]} ) {
-			# process each chromosome in this child list
-			go_find_enriched_regions( @{$_} );
-		}
-		$pm->finish(0, \@windows); 
-	}
-	$pm->wait_all_children;
-	
-	# check for windows
-	print " Found " . format_with_commas(scalar @windows) . " total windows for $dataset.\n";
-	unless (@windows) { # exit the program if nothing found
-		exit;
-	}
-}
-
-
 
 ### Walk through each chromosome sequentially looking for windows of enrichment
 sub go_find_enriched_regions {
 	
-	# passed chromosome name and length
-	my ($chr, $length) = @_;
+	# print messages
+	if ($deplete) {
+		print " Looking for depleted regions ";
+	} 
+	else {
+		print " Looking for enriched regions ";
+	}
+	print "using window $method values\n";
 	
-	# collect the dataset values for the current chromosome
-	my @chr_windows; # an array of windows for the current chromosome
 	
-	# walk windows along the chromosome and find enriched windows
-	$chrom2length{$chr} = $length; # remember this length for later
-	for (my $start = 1; $start < $length; $start += $step) {
-		# define the window to look in
-		my $end = $start + $win -1;
-		# ensure don't go over chromosome length
-		if ($end > $length) {
-			$end = $length;
-		} 
-					
-		# determine window value
-		my $window_score = get_chromo_region_score(
-			'db'         => $ddb,
-			'dataset'    => $dataset,
-			'method'     => $method,
-			'value'      => $value,
-			'chromo'     => $chr,
-			'start'      => $start,
-			'stop'       => $end,
-			'log'        => $log,
-			'strand'     => $strand,
-			'stranded'   => $strandedness,
-		);
-		next unless (defined $window_score);
+	## collect chromosomes and data
+	
+	# walk through each chromosome
+	my $chr_count = 1;
+	foreach ( get_chromosome_list($ddb, 1) ) {
 		
-		# calculate if window passes threshold
-		if ($deplete) { 
-			# depleted regions
-			if ($window_score <= $threshold) { 
-				# score passes our threshold
-				push @chr_windows, [$chr, $start, $end, $window_score];
+		# this is an array of chromosome name and length
+		my ($chr, $length) = @$_;
+		
+		# START DEBUGGING # 
+		if ($debug) {
+			# LIMIT TO ONE CHROMOSOME
+			last if ($chr_count == 2); 
+		}
+		# END DEBUGGING #
+		
+		# collect the dataset values for the current chromosome
+		# store in a hash the position (key) and values
+		print "  Searching $chr....\n";
+		
+		# walk windows along the chromosome and find enriched windows
+		$chrom2length{$chr} = $length; # remember this length for later
+		for (my $start = 1; $start < $length; $start += $step) {
+			# define the window to look in
+			my $end = $start + $win -1;
+			# ensure don't go over chromosome length
+			if ($end > $length) {
+				$end = $length;
+			} 
+						
+			# determine window value
+			my $window_score = get_chromo_region_score(
+				'db'         => $ddb,
+				'dataset'    => $dataset,
+				'method'     => $method,
+				'value'      => $value,
+				'chromo'     => $chr,
+				'start'      => $start,
+				'stop'       => $end,
+				'log'        => $log,
+				'strand'     => $strand,
+				'stranded'   => $strandedness,
+			);
+			unless (defined $window_score) {
+				# print "no values at $chr:$start..$end!\n"; 
+				next;
 			}
-		} 
-		else { 
-			# enriched regions
-			if ($window_score >= $threshold) { 
-				# score passes our threshold
-				push @chr_windows, [$chr, $start, $end, $window_score];
+			# print "  collected score $window_score at $chr:$start..$end!\n"; 
+			
+			# calculate if window passes threshold
+			if ($deplete) { 
+				# depleted regions
+				if ($window_score <= $threshold) { 
+					# score passes our threshold
+					push @windows, [$chr, $start, $end, $window_score];
+				}
+			} 
+			else { 
+				# enriched regions
+				if ($window_score >= $threshold) { 
+					# score passes our threshold
+					push @windows, [$chr, $start, $end, $window_score];
+				}
 			}
 		}
+		
+		$chr_count++;
 	}
-	
-	# Check for windows
-	return unless @chr_windows;
-	
-	# Merge the windows into larger regions
-	go_merge_windows(\@chr_windows);
-	
-	# Trim the merged windows of datapoints that are below the threshold
-	if ($trim) {
-		go_trim_windows(\@chr_windows);
-	
-		# Double check the merging
-		# I still seem to have some slip through....
-		go_merge_windows(\@chr_windows);
-	}
-	
-	# Get score for final window
-	get_final_window_score(\@chr_windows);
-	
-	# finished
-	push @windows, @chr_windows;
-	print " Found ", format_with_commas(scalar @windows), " merged", 
-		 $trim ? ", trimmed " : " ", "windows passing threshold on chromosome $chr\n"; 
+	print " Found " . scalar @windows . " windows for $dataset.\n";
 }
 
 
 ### Condense the list of overlapping windows
 sub go_merge_windows {
  	
- 	my $window_ref = shift;
- 	
  	# set up new target array and move first item over
  	my @merged; 
- 	push @merged, shift @{$window_ref};
+ 	push @merged, shift @windows;
  	
- 	while (@{$window_ref}) {
- 		my $window = shift @{$window_ref};
+ 	while (@windows) {
+ 		my $window = shift @windows;
  		
-		# check for overlap
-		if ( $merged[-1]->[2] + $tolerance >= $window->[1] ) {
-			# we have overlap with current end and new window start
-			# merge them
-			$merged[-1]->[2] = $window->[2];
+ 		# first check whether chromosomes are equal
+ 		if ( $merged[-1]->[0] eq $window->[0] ) {
+ 			# same chromosome
+ 			
+ 			# generate Range objects
+ 			my $range1 = Bio::Range->new(
+ 				-start  => $merged[-1]->[1],
+ 				-end    => $merged[-1]->[2] + $tolerance
+ 				# we add tolerance only on side where merging might occur
+ 			);
+ 			my $range2 = Bio::Range->new(
+ 				-start  => $window->[1],
+ 				-end    => $window->[2]
+ 			);
 			
-			# score no longer relavent
-			$merged[-1]->[3] = '.';
-			
-			if ( $merged[-1]->[1] > $window->[1] ) {
-				# in the very rare (unlikely) situation where next window has lower 
-				# start than the current window, adjust accordingly
+			# check for overlap
+			if ( $range1->overlaps($range2) ) {
+				# we have overlap
 				# merge second range into first
-				$merged[-1]->[1] = $window->[1];
+				my ($mstart, $mstop, $mstrand) = $range1->union($range2);
+				
+				# update the merged window
+				$merged[-1]->[1] = $mstart;
+				$merged[-1]->[2] = $mstop;
+				
+				# score is no longer relevent
+				$merged[-1]->[3] = '.';
 			}
-		}
-		elsif ( $merged[-1]->[1] > $window->[1] ) {
-			# in the very rare (unlikely) situation where next window has lower 
-			# start than the current window, adjust accordingly
-			# merge second range into first
-			$merged[-1]->[1] = $window->[1];
-		}
-		else {
-			# no overlap
-			push @merged, $window;
-		}
+			else {
+				# no overlap
+				push @merged, $window;
+			}
+ 		}
+ 		
+		# not on same chromosome
+ 		else {
+ 			# move onto old array
+ 			push @merged, $window;
+ 		}
  	}
  	
  	# Put the merged windows back
- 	push @{$window_ref}, @merged;
+ 	@windows = @merged;
 }
 
 	
@@ -719,10 +689,8 @@ sub go_trim_windows {
 	# note that this method won't work well if the dataset is noisy
 	
 	
- 	my $window_ref = shift;
- 	
 	# Walk through the list of merged windows
-	foreach my $window ( @{$window_ref} ) {
+	foreach my $window (@windows) {
 		
 		# calculate extended window size
 		my $start = $window->[1] - $tolerance;
@@ -834,26 +802,24 @@ sub go_trim_windows {
 	
 ### Get the final score for the merged window and other things
 sub get_final_window_score {
-	my $window_ref = shift; 
-	
-	for my $i (0 .. scalar(@$window_ref)-1) {
+	for my $i (0..$#windows) {
 		# arrays currently have $chr, $start, $end, $region_score
 		# we will calculate a new region score, as well as the window size
 		
 		# replace the current score with the window size
-		$window_ref->[$i][3] = $window_ref->[$i][2] - $window_ref->[$i][1] + 1;
+		$windows[$i][3] = $windows[$i][2] - $windows[$i][1] + 1;
 		# arrays now have $chr, $start, $end, $size
 		
 		# add the strand column
-		$window_ref->[$i][4] = $strand;
+		$windows[$i][4] = $strand;
 		
 		# re-calculate window score
-		$window_ref->[$i][5] = get_chromo_region_score(
+		$windows[$i][5] = get_chromo_region_score(
 				'db'       => $ddb,
 				'dataset'  => $dataset, 
-				'chromo'   => $window_ref->[$i][0],
-				'start'    => $window_ref->[$i][1],
-				'stop'     => $window_ref->[$i][2],
+				'chromo'   => $windows[$i][0],
+				'start'    => $windows[$i][1],
+				'stop'     => $windows[$i][2],
 				'method'   => $method,
 				'value'    => $value,
 				'log'      => $log,
@@ -1118,7 +1084,6 @@ A script to find enriched regions in a dataset using a simple threshold.
   --genes
   --gff
   --gz
-  --cpu <integer>
   --version
   --help
 
@@ -1259,12 +1224,6 @@ accordingly and report as log2 data.
 =item --gz
 
 Compress the output file through gzip.
-
-=item --cpu <integer>
-
-Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --version
 

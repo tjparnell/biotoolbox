@@ -26,7 +26,7 @@ eval {
 	require tim_db_helper::bam;
 	tim_db_helper::bam->import;
 };
-my $VERSION = '1.13';
+my $VERSION = '1.10';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -931,7 +931,7 @@ sub secondary_processing {
 			}
 			else {
 				# no data
-				$table_ref->[$row][$column] = 0;
+				$table_ref->[$row][$column] = '.';
 			}
 		}
 	}
