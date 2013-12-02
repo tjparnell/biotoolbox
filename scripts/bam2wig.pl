@@ -37,7 +37,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.13';
+my $VERSION = '1.13.1';
 	
 	
 
@@ -73,6 +73,7 @@ my (
 	$bin_size,
 	$min_mapq,
 	$max_dup,
+	$max_count,
 	$rpm,
 	$log,
 	$bigwig,
@@ -104,6 +105,7 @@ GetOptions(
 	'bin=i'     => \$bin_size, # size of bin to make
 	'qual=i'    => \$min_mapq, # minimum mapping quality
 	'max=i'     => \$max_dup, # maximum duplicate positions
+	'max_cnt=i' => \$max_count, # maximum pileup count in coverage mode only
 	'rpm!'      => \$rpm, # calculate reads per million
 	'log=i'     => \$log, # transform count to log scale
 	'bw!'       => \$bigwig, # generate bigwig file
@@ -1198,6 +1200,9 @@ sub process_bam_coverage_on_chromosome {
 		"fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n"
 	);
 	
+	# set maximum pileup count if requested, default is 8000
+	$sam->max_pileup_cnt($max_count) if $max_count;
+	
 	# walk through the chromosome
 	for (my $start = 0; $start < $seq_length; $start += $dump) {
 		
@@ -2255,6 +2260,7 @@ bam2wig.pl [--options...] <filename.bam>
   --strand
   --qual <integer>
   --max <integer>
+  --max_cnt <integer>
   --rpm
   --log [2|10]
   --bw
@@ -2405,11 +2411,16 @@ checked. The default value is 0 (accept everything).
 
 Set a maximum number of duplicate alignments tolerated at a single position. 
 This uses the alignment start (or midpoint if recording midpoint) position 
-to determine duplicity. Note that this does not affect coverage mode. 
-You may want to set a limit when working with random fragments (sonication) to 
-avoid PCR bias. Note that setting this value in conjunction with the --rpm 
-option may result in slightly lower coverage than anticipated, since the 
-pre-count does not account for duplicity. The default is undefined (no limit). 
+to determine duplicity. Note that this has no effect in coverage mode. 
+You may want to set a limit when working with random fragments (sonication) 
+to avoid PCR bias. Note that setting this value in conjunction with the --rpm 
+option may result in lower coverage than anticipated, since the pre-count 
+does not account for duplicity. The default is undefined (no limit). 
+
+=item --max_cnt <integer>
+
+In special coverage mode only, this option sets the maximum coverage count 
+at any given base. The default is 8000 (set by the bam adaptor).
 
 =item --rpm
 
