@@ -40,7 +40,7 @@ use constant (DATASET_HASH_LIMIT => 3000);
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.12.6';
+my $VERSION = '1.13.1';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -464,15 +464,26 @@ sub parallel_execution {
 	
 	# generate summary file
 	if ($sum) {
-		# we will do this via manipulate_datasets.pl
-		@args = (
-			"$Bin/manipulate_datasets.pl", 
-			'--func', 
-			'summary', 
-			'--index', 
-			$startcolumn . '-' . $main_data_ref->{'number_columns'} - 1,
-			$outfile
+		# reopen the combined file
+		my $data = load_tim_data_file($outfile);
+		unless ($data) {
+			warn " cannot re-open $outfile to generate summary file!\n";
+			return;
+		}
+		print " Generating final summed data....\n";
+		my $sumfile = write_summary_data(
+			'data'        => $main_data_ref,
+			'filename'    => $outfile,
+			'startcolumn' => $startcolumn,
+			'dataset'     => $dataset,
+			'log'         => $log,
 		);
+		if ($sumfile) {
+			print " Wrote summary file '$sumfile'\n";
+		}
+		else {
+			print " Unable to write summary file!\n";
+		}
 	}
 	# done
 }
