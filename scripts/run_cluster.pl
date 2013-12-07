@@ -5,16 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Algorithm::Cluster::Record;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	find_column_index
-);
-use tim_file_helper qw(
-	open_tim_data_file
-);
-my $VERSION = '1.8.6';
+use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::file_helper qw(open_tim_data_file);
+my $cluster_ok;
+eval {
+	require Algorithm::Cluster::Record;
+	$cluster_ok = 1;
+};
+
+my $VERSION = '1.14';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 
@@ -75,6 +74,10 @@ if ($print_version) {
 
 
 ### Check for requirements
+unless ($cluster_ok) {
+	die "Module Algorithm::Cluster must be installed to run this script.\n";
+} 
+
 # check input file
 unless ($infile) {
 	$infile = shift @ARGV or
@@ -99,7 +102,6 @@ unless ($distribution) {
 	# it looks like this is the default for the module as well
 	$distribution = 'e';
 }
-
 
 
 ### Check the input file format

@@ -1,13 +1,12 @@
-package tim_db_helper::useq;
+package Bio::ToolBox::db_helper::useq;
 
 # modules
 require Exporter;
 use strict;
 use Carp;
 use Statistics::Lite qw(mean);
-use lib '/Users/tim/Documents/Tim-yeaster/github/Bio-DB-USeq/lib/';
 use Bio::DB::USeq;
-our $VERSION = '1.13';
+our $VERSION = '1.14';
 
 
 # Exported names

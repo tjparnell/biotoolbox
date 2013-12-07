@@ -6,19 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Temp qw( tempfile );
-
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	find_column_index
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	open_to_read_fh
 	open_to_write_fh
 );
-use tim_db_helper::config;
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
 # check for Bam support
 my $bam_support = 0;
@@ -27,7 +22,7 @@ eval {
 	$bam_support = 1;
 };
 
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -213,8 +208,15 @@ sub process_bam_file {
 	);
 	
 	# look for the samtools application
-	my $samtools = $TIM_CONFIG->param('applications.samtools') || 
-		`which samtools` || undef; # check config and the path
+	my $samtools = $BTB_CONFIG->param('applications.samtools') ||undef; 
+	unless ($samtools) {
+		# try looking for it
+		eval {
+			use File::Which;
+			$samtools = which('samtools');
+		};
+		add_program($samtools) if $samtools; # remember for next time
+	}
 	if ($samtools) {
 		# samtools was found in the path, yeah!
 		chomp $samtools;
@@ -232,10 +234,6 @@ sub process_bam_file {
 		system ($samtools, 'view', '-S', '-h', '-b', '-o', $outfile, 
 			$converted_sam_file) == 0 or
 			die " could not execute samtools automatically for sam -> bam!\n";
-		
-		# re-sort bam, is this really necessary?
-# 		system ($samtools, 'sort', $outfile, $sort_outfile) == 0 or
-# 			die " unable to execute samtools sort!\n";
 		
 		# re-index bam
 		system ($samtools, 'index', "$outfile") == 0 or

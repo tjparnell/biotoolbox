@@ -6,21 +6,20 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	format_with_commas
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
-use tim_db_helper::gff3_parser;
-use tim_file_helper qw(
+use Bio::ToolBox::db_helper::gff3_parser;
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -403,7 +402,7 @@ sub collect_from_file {
 	push @{ $output->{'other'} }, "Source data file $infile\n";
 	
 	# open gff3 parser object
-	my $parser = tim_db_helper::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::db_helper::gff3_parser->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
 	

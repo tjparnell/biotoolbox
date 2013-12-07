@@ -5,18 +5,16 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(find_column_index);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 	open_to_write_fh
 );
-use tim_big_helper qw(wig_to_bigwig_conversion);
-use tim_db_helper::config;
+use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This script will convert yeast genomic coordinates\n";
 
@@ -110,19 +108,26 @@ my %old2new = (
 
 # find bigWigToBedGraph utility
 	# check for an entry in the configuration file
-my $bdg_app_path = $TIM_CONFIG->param('applications.bigWigToBedGraph') || undef;
+my $bdg_app_path = $BTB_CONFIG->param('applications.bigWigToBedGraph') || undef;
 unless ($bdg_app_path) {
 	# next check the system path
-	$bdg_app_path = `which bigWigToBedGraph` || undef;
-	chomp $bdg_app_path if $bdg_app_path;
+	eval {
+		use File::Which;
+		$bdg_app_path = which('bigWigToBedGraph');
+	};
+	add_program($bdg_app_path) if $bdg_app_path; # remember for next time
 }
 
 # find bedGraphToBigWig utility
 	# check for an entry in the configuration file
-my $bw_app_path = $TIM_CONFIG->param('applications.bedGraphToBigWig') || undef;
+my $bw_app_path = $BTB_CONFIG->param('applications.bedGraphToBigWig') || undef;
 unless ($bw_app_path) {
 	# next check the system path
-	$bw_app_path = `which bedGraphToBigWig` || undef;
+	eval {
+		use File::Which;
+		$bw_app_path = which('bigWigToBedGraph');
+	};
+	add_program($bw_app_path) if $bw_app_path; # remember for next time
 }
 		
 

@@ -9,15 +9,13 @@ use DirHandle;
 use File::Spec;
 use Archive::Zip qw( :ERROR_CODES );
 use Statistics::Lite qw(mean median sum max);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-use tim_db_helper::config;
-use tim_big_helper qw(wig_to_bigwig_conversion);
-my $VERSION = '1.10';
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
+use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
+my $VERSION = '1.14';
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -102,15 +100,21 @@ if (-d $infile) {
 }
 
 # identify essential application paths
-my $java = $TIM_CONFIG->param('applications.java') || `which java` || undef;
-if (defined $java) {
-	chomp $java; # the which command will have a newline character
+my $java = $BTB_CONFIG->param('applications.java') || undef;
+unless (defined $java) {
+	eval {
+		use File::Which;
+		$java = which('java');
+	};
+	add_program($java) if $java; # remember this for next time
 }
-else {
+unless (defined $java) {
 	die " unable to identify java executable!\n";
 }
 unless ($bar_app_path) {
-	$bar_app_path = $TIM_CONFIG->param('applications.Bar2Gr') || undef;
+	$bar_app_path = $BTB_CONFIG->param('applications.Bar2Gr') || undef;
+	# this is not an executable but a jar file
+	# we cannot search for this using which
 }
 unless ($bar_app_path =~ /Bar2Gr$/) {
 	die "  Must define the path to the USeq or T2 java application Bar2Gr! see help\n";

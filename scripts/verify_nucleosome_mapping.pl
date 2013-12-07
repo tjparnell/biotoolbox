@@ -6,22 +6,20 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(min max mean stddev);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	find_column_index
 	format_with_commas
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_region_dataset_hash
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.14';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 

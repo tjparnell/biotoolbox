@@ -7,19 +7,17 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median);
 use Statistics::Descriptive;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	find_column_index
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n A script to process microarray files\n\n";
 

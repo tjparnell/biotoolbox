@@ -5,11 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Sam;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(format_with_commas);
-my $VERSION = '1.10';
+use Bio::ToolBox::data_helper qw(format_with_commas);
+my $bam_ok;
+eval {
+	# check for Bam support
+	require Bio::DB::Sam;
+	$bam_ok = 1;
+};
+my $VERSION = '1.14';
 
 # constant for memory usage while sorting
 # this increases default from 500Mb to 1Gb
@@ -71,6 +74,9 @@ if ($print_version) {
 
 
 ### Check for required values and set defaults
+unless ($bam_ok) {
+	die "Bio::DB::Sam must be installed to run this script.\n";
+}
 # input file
 unless ($infile) {
 	if (@ARGV) {

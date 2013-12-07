@@ -5,15 +5,13 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_db_helper::gff3_parser;
-use tim_file_helper qw(
+use Bio::ToolBox::db_helper::gff3_parser;
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
 
-my $VERSION = '1.8.1';
+my $VERSION = '1.14';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -164,7 +162,7 @@ sub process_gff_file_to_table {
 	# will be kept open until the end of the file is reached. 
 	
 	# open gff3 parser object
-	my $parser = tim_db_helper::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::db_helper::gff3_parser->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
 	

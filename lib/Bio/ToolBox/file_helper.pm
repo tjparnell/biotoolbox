@@ -1,4 +1,4 @@
-package tim_file_helper;
+package Bio::ToolBox::file_helper;
 
 ### modules
 require Exporter;
@@ -7,14 +7,12 @@ use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use IO::File;
 use Statistics::Lite qw(mean min);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.12.6';
+our $VERSION = '1.14';
 
 
 ### Variables
@@ -1866,7 +1864,7 @@ sub convert_genome_data_2_gff_data {
 	# will be pertinant to the re-generated gff data
 	# we need to keep this metadata, toss the rest, and re-write new
 	
-	# from the tim_db_helper, get_new_genome_list() only really has useful
+	# from the Bio::ToolBox::db_helper, get_new_genome_list() only really has useful
 	# metadata from the start column, index 1
 	# also keep any metadata from the score and name columns, if defined
 	
@@ -2507,7 +2505,7 @@ sub write_summary_data {
 		
 		my @acceptable_indices; # array of acceptable indices
 		my %skip = (
-			# these are example names generated from subs in tim_db_helper.pm
+			# these are example names generated from subs in Bio::ToolBox::db_helper
 			'systematicname'  => 1,
 			'name'            => 1,
 			'id'              => 1,
@@ -2720,11 +2718,11 @@ __END__
 
 =head1 NAME
 
-tim_file_helper
+Bio::ToolBox::file_helper
 
 =head1 SYNOPSIS
 
-  use tim_file_helper qw(
+  use Bio::ToolBox::file_helper qw(
     load_tim_data_file
     write_tim_data_file
     open_to_read_fh
@@ -2892,7 +2890,7 @@ generated for conveniance.
 Call the module at the beginning of your perl script and pass a list of the 
 desired modules to import. None are imported by default.
   
-  use tim_db_helper qw(load_tim_data_file write_tim_data_file);
+  use Bio::ToolBox::db_helper qw(load_tim_data_file write_tim_data_file);
   
 The specific usage for each subroutine is detailed below.
 
@@ -2984,7 +2982,7 @@ arguments. The keys include
 
   Required:
   data     => A scalar reference to the tim data structure ad described
-              in B<tim_data_helper.pm>. 
+              in C<Bio::ToolBox::data_helper>. 
   Optional: 
   filename => A scalar value containing the name of the file to 
               write. This value is required for new data files and 
@@ -3101,7 +3099,7 @@ Since the gff data structure requires genomic coordinates, this data must be
 present as identifiable datasets in the data table and metadata. It looks 
 specifically for datasets labeled 'Chromosome', 'Start', and 'Stop' or 'End'. 
 Failure to identify these datasets will simply return nothing. A dataset 
-generated with get_new_genome_list() in 'tim_db_helper.pm' will generate these
+generated with get_new_genome_list() in Bio::ToolBox::db_helper will generate these
 datasets. 
 
 The subroutine must be passed a reference to an anonymous hash with the 
@@ -3201,7 +3199,7 @@ present as identifiable datasets in the data table and metadata. It looks
 specifically for datasets labeled 'Chromosome', 'Start', and optionally 
 'Stop' or 'End'. Failure to identify these datasets will simply return 
 nothing. A dataset generated with get_new_genome_list() in 
-'tim_db_helper.pm' will generate these coordinate datasets. 
+Bio::ToolBox::db_helper will generate these coordinate datasets. 
 
 If successful, the subroutine will return the name of the output gff file
 written.
@@ -3312,7 +3310,7 @@ Pass the subroutine an anonymous hash of arguments. These include:
                  data to summarized. This may be automatically 
                  calculated by taking the leftmost column without
                  a known feature-description name (using examples 
-                 from tim_db_helper.pm).
+                 from Bio::ToolBox::db_helper).
   stopcolumn  => The index of the last dataset containing the 
                  data to summarized. This may be automatically 
                  calculated by taking the rightmost column. 

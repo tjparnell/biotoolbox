@@ -7,17 +7,17 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
 use Statistics::Lite qw(mean median);
-use GD::Graph::smoothlines; # for bezier smoothed line graph
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	parse_list
 	find_column_index
 );
-use tim_file_helper qw(
-	load_tim_data_file
-);
-my $VERSION = '1.12.6';
+use Bio::ToolBox::file_helper qw(load_tim_data_file);
+my $gd_ok;
+eval {
+	require GD::Graph::smoothlines; 
+	$gd_ok = 1;
+};
+my $VERSION = '1.14';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -89,6 +89,9 @@ if ($print_version) {
 
 
 ##### Check required and default variables
+unless ($gd_ok) {
+	die "Module GD::Graph::smoothlines must be installed to run this script.\n";
+}
 
 unless ($infile) {
 	if (@ARGV) {
@@ -124,7 +127,6 @@ unless (defined $y_ticks) {
 ####### Main ###########
 
 ### Load the file
-# load the file using subroutine from tim_file_helper.pm
 print " Loading data from file $infile....\n";
 my $main_data_ref = load_tim_data_file($infile);
 unless ($main_data_ref) {
@@ -551,7 +553,7 @@ The command line flags and descriptions:
 
 Specify the file name of a previously generated feature dataset.
 The tim data format is preferable, although any other tab-delimited text 
-data formats may be usable. See the file description in C<tim_db_helper.pm>.
+data formats may be usable. 
 
 =item --index <index>
 

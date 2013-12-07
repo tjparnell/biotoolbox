@@ -1,4 +1,4 @@
-package tim_db_helper::gff3_parser;
+package Bio::ToolBox::db_helper::gff3_parser;
 
 use strict;
 use Carp qw(carp cluck croak confess);
@@ -14,7 +14,7 @@ unless ($@) {
 }; 
 undef $@;
 
-my $VERSION = '1.10.2';
+my $VERSION = '1.14';
 
 sub new {
 	my $class = shift;
@@ -353,7 +353,7 @@ __END__
 
 =head1 NAME
 
-tim_db_helper::gff3_parser
+Bio::ToolBox::db_helper::gff3_parser
 
 =head1 DESCRIPTION
 
@@ -375,10 +375,10 @@ Refer to that documentation for more information.
 
 =head1 SYNOPSIS
 
-  use tim_db_helper::gff3_parser;
+  use Bio::ToolBox::db_helper::gff3_parser;
   my $filename = 'file.gff3';
   
-  my $parser = tim_db_helper::gff3_parser->new($filename) or 
+  my $parser = Bio::ToolBox::db_helper::gff3_parser->new($filename) or 
   	die "unable to open gff file!\n";
   
   while (my @top_features = $parser->top_features() ) {

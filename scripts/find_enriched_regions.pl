@@ -7,13 +7,11 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median stddevp);
 use Pod::Usage;
 use File::Basename qw(fileparse);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	format_with_commas
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_chromosome_list
@@ -21,11 +19,11 @@ use tim_db_helper qw(
 	get_chromo_region_score
 	get_chromosome_list
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-use tim_db_helper::config;
+use Bio::ToolBox::db_helper::config;
 my $parallel;
 eval {
 	# check for parallel support
@@ -33,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 # use Data::Dumper;
-my $VERSION = '1.12.2';
+my $VERSION = '1.14';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -133,9 +131,9 @@ $outfile =~ s/\.txt$//; # strip extension, it'll be added later
 # window defaults
 unless ($win) {
 	# collect the window size from biotoolbox.cfg
-	$win = $TIM_CONFIG->param("$main_database\.window") || 
-			$TIM_CONFIG->param("$data_database\.window") || 
-			$TIM_CONFIG->param("default_db.window") || 500;
+	$win = $BTB_CONFIG->param("$main_database\.window") || 
+			$BTB_CONFIG->param("$data_database\.window") || 
+			$BTB_CONFIG->param("default_db.window") || 500;
 }
 unless ($step) {
 	# default is to use the window size
@@ -239,7 +237,7 @@ else {
 
 ## Preparing global variables
 	# This program predates my development of the tim data file and memory
-	# data structures described in 'tim_file_helper.pm'. These structures
+	# data structures described in Bio::ToolBox::file_helper. These structures
 	# were bolted on afterwards. As such, the program still uses lots of
 	# arrays described immediately below, and only at the end prior to 
 	# output is a tim data structure generated.
@@ -388,9 +386,9 @@ if ($feat) {
 
 ## Generate the final primary data hash
 # this data hash is compatible with the tim data text format described in
-# tim_data_helper.pm and tim_file_helper.pm
+# Bio::ToolBox::data_helper and Bio::ToolBox::file_helper
 # converting to this structure makes it easier for writing files 
-# via tim_file_helper
+# via Bio::ToolBox::file_helper
 # can you tell that this was bolted on long after writing the original script?
 my $main_data_ref = generate_main_data_hash();
 unless ($main_data_ref) {
@@ -980,9 +978,9 @@ sub name_the_windows {
 
 
 
-### Generate the main data hash compatible with tim_file_helper.pm
+### Generate the main data hash compatible with Bio::ToolBox::file_helper
 # this is bolted on after writing the main script for compatibility with 
-# tim_file_helper modules
+# Bio::ToolBox::file_helper modules
 sub generate_main_data_hash {
 	
 	# determine the data feature

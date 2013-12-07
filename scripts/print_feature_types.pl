@@ -5,13 +5,11 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-my $VERSION = '1.9.1';
+my $VERSION = '1.14';
 
 print "\n A script to print all available feature types in a database\n\n";
 

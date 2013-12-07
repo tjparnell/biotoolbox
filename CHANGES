@@ -1,4 +1,15 @@
-######## BioToolBox revision history #############
+######## Bio::ToolBox revision history #############
+
+v.1.14
+	- Massive reorganization of the entire package into a proper 
+	Perl module distribution that is installed using standard 
+	Module::Build methods. This will install the libraries into 
+	site-specific Perl library directories as Bio::ToolBox::*. 
+	All scripts have been updated to reflect these changes.
+	- Added max_count option to script bam2wig.pl to control for 
+	high Bam coverage
+	- Fixed bug where the summary file was not created for 
+	script get_relative_data.pl
 
 v.1.13 (svn 691)
 	- Updated to include native support for USeq archive files 

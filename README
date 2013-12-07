@@ -1,8 +1,37 @@
-README for Tim's BioToolBox
+Bio::ToolBox - Tools for querying and analysis of genomic data
 
 DESCRIPTION
 
-These are a collection of various perl script programs for processing, 
+This is a collection of libraries and high-quality end-user 
+scripts for bioinformatic analysis, particularly of genomic data 
+obtained from microarray and next-generation sequencing.
+
+The original project was focused primarily on the generation of 
+functional end-user scripts for bioinformatic data conversion, 
+processing, collection, and analysis. The libraries were initially 
+simply shared code for these scripts. However, they are fully 
+documented, and may be used as the basis for writing additional 
+analysis scripts.
+
+In many cases, the Bio::ToolBox scripts provide an abstraction 
+layer over a variety of different specialized BioPerl-style 
+modules. For example, there is a special emphasis on the collection 
+data values for defined genomic coordinate regions, regardless of 
+whether the values come from a GFF database, Bam file, BigWig file, 
+etc. 
+
+There is also an emphasis on using industry-standard file formats, 
+such as BED and GFF3, as well as simple tab-delimited text files 
+that may be imported or exported from a variety of other applications. 
+Retention of metadata is accomplished by simply prefixing comment 
+lines at the beginning of the file.
+
+Currently the libraries are implemented as simple subroutines that 
+must be imported into a script's namespace. They are not implemented 
+as object-oriented modules, although that may be partially rectified 
+in the future.
+
+The included scripts are production-quality programs for processing, 
 converting, analyzing, and manipulating genomic data and/or features. 
 These programs include the following capabilities
 	
@@ -17,62 +46,46 @@ These programs include the following capabilities
 
 
 
-INSTALLATION
+REQUIREMENTS
 
-*Platform 
 The programs have been developed and used on Mac OS X versions 10.5 through
-10.7. The programs should work on any sane unix-like environment, including
+10.8. The programs should work on any sane unix-like environment, including
 Linux; Microsoft Windows compatability is not tested nor guaranteed.
 
-*Perl 
 A working Perl environment is, of course, also required, and usually
 present in virtually every unix-like operating system distribution. Perl
 versions 5.10 and 5.12 have been tested. 64-bit executable is desireable, but 
 not required, if only because some of the data files can get particularly
 large, leading to out-of-memory errors with 32-bit Perl.
 
-*Perl Module Dependencies 
 Several different Perl modules are required for specific programs to work, 
-most notably BioPerl, among a few others.
+most notably BioPerl, among a few others. Most of these dependencies can 
+be taken care of by the Installer.
 
-To check for these dependencies, run the script 'check_dependencies.pl'
-located in the biotoolbox root directory. The script will helpfully assist 
-in installing or upgrading missing or out-of-date modules through CPAN, with
-only one exception. Depending upon your installation, you may need to
-execute with administrative privelages: run 'sudo check_dependencies.pl'
-and enter the password.
+A C compiler such as gcc is preferred and required for many of the Perl 
+modules. Limited functions may be available without it. On Linux, these 
+tools may be readily installed through your distribution package manager. 
+On Mac OS X, you will need to install the XCode application (available 
+from the Mac App Store) and specifically install the Command Line Tools 
+through its Preferences (optional documentation is not needed).
 
-Note that not all of the modules are required. The best way to find out if 
-a dependency is required is to try running the desired script. Perl will 
-appropriately complain if it can't find the module.
+INSTALLATION
 
-*No install 
-There is no installation script or compilation required. The scripts are
-designed to be run as is from the scripts directory. Biotoolbox-specific
-libraries are included in the lib directory and should be automatically
-found if the directory structure is maintained. The biotoolbox libraries 
-were not intended for general consumption (they do not have a friendly 
-object-oriented API), but they are fully documented in case someone dares 
-to use them.
+Installation is simple with the standard Perl incantation.
+    perl ./Build.PL
+    ./Build
+    ./Build install
 
-For those who need additional guidance in setting up their system, there 
-is an online HowTo manual located here: 
-http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp
-
-
-
-USAGE
+USAGE OF PROVIDED SCRIPTS
 
 *Configuration 
 There is a configuration file that may be customized for your particular
-installation. The default file is biotoolbox.cfg. It is a simple
+installation. The default file is written to ~/.biotoolbox.cfg. It is a simple
 INI-style file that is used to set up database connection profiles, feature
 aliases, helper application locations, etc. The file is intended to be
-edited by users. More documentation can be found within the file itself.
-
-There are three locations where the file may be stored: 1) in the biotoolbox 
-root directory, 2) in the user's home root directory, or 3) a custom 
-location defined by the environment variable 'BIOTOOLBOX'.
+edited by users. More documentation can be found in the 
+Bio::ToolBox::db_helper::config documentation. This file is automatically 
+written as needed; it is not installed by the Installer.
 
 *Execution 
 All biotoolbox scripts are designed to be run from the command line or

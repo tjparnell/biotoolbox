@@ -6,24 +6,20 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(count min max range sum mean stddevp);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	generate_tim_data_structure
-);
-use tim_db_helper qw(
+use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_chromosome_list
 	get_region_dataset_hash
 	get_chromo_region_score
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.10.2';
+my $VERSION = '1.14';
 
 print "\n This script will map nucleosomes\n\n";
 

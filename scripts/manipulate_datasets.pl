@@ -6,18 +6,16 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(:all);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	find_column_index
 	parse_list
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.13';
+my $VERSION = '1.14';
 
 print "\n A tool for manipulating datasets in data files\n";
 

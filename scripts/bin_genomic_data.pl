@@ -7,15 +7,11 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
 use Statistics::Lite qw(mean median sum);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	index_data_table
-);
-use tim_db_helper qw(
+use Bio::ToolBox::data_helper qw(index_data_table);
+use Bio::ToolBox::db_helper qw(
 	get_new_genome_list
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	open_to_read_fh
@@ -23,10 +19,10 @@ use tim_file_helper qw(
 );
 eval {
 	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.13';
+my $VERSION = '1.14';
 
 
 print "\n This script will generate genomic binned data\n\n";

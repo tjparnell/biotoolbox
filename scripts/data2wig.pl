@@ -6,17 +6,15 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	find_column_index
 );
-use tim_big_helper qw(wig_to_bigwig_conversion);
-use tim_file_helper qw(
+use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.12.3';
+my $VERSION = '1.14';
 
 print "\n This script will export a data file to a wig file\n\n";
 

@@ -1,11 +1,11 @@
-package tim_db_helper::wiggle;
+package Bio::ToolBox::db_helper::wiggle;
 
 # modules
 require Exporter;
 use strict;
 use Carp;
 use Bio::Graphics::Wiggle;
-our $VERSION = '1.7.0';
+our $VERSION = '1.14';
 
 
 # Exported names
@@ -157,7 +157,7 @@ __END__
 
 =head1 NAME
 
-tim_db_helper::wiggle
+Bio::ToolBox::db_helper::wiggle
 
 =head1 DESCRIPTION
 
@@ -189,7 +189,7 @@ The module requires Lincoln Stein's Bio::Graphics to be installed.
 
 Load the module at the beginning of your program.
 
-	use tim_db_helper::wiggle;
+	use Bio::ToolBox::db_helper::wiggle;
 
 It will automatically export the name of the subroutines. 
 

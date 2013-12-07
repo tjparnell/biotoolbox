@@ -5,23 +5,21 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	format_with_commas
 	generate_tim_data_structure
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	validate_included_feature
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
 	write_tim_data_file
 );
-use tim_db_helper::config;
-my $VERSION = '1.11';
+use Bio::ToolBox::db_helper::config;
+my $VERSION = '1.14';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -297,10 +295,10 @@ sub collect_features {
 	
 	# Get the names of chromosomes to avoid
 	my @excluded_chromosomes = 
-		$TIM_CONFIG->param("$database\.chromosome_exclude");
+		$BTB_CONFIG->param("$database\.chromosome_exclude");
 	unless (@excluded_chromosomes) {
 		@excluded_chromosomes = 
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
+			$BTB_CONFIG->param('default_db.chromosome_exclude');
 	}
 	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 	

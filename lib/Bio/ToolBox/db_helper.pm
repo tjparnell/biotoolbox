@@ -1,4 +1,4 @@
-package tim_db_helper;
+package Bio::ToolBox::db_helper;
 
 use strict;
 require Exporter;
@@ -14,53 +14,51 @@ use Statistics::Lite qw(
 	range
 	stddevp
 );
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure 
 	format_with_commas
 	parse_list
 );
-use tim_db_helper::config;
+use Bio::ToolBox::db_helper::config;
 our $VERSION = '1.13';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
 eval {
-	require tim_db_helper::wiggle;
-	tim_db_helper::wiggle->import;
+	require Bio::ToolBox::db_helper::wiggle;
+	Bio::ToolBox::db_helper::wiggle->import;
 	$WIGGLE_OK = 1;
 };
 
 # check for BigWig support
 our $BIGWIG_OK = 0;
 eval { 
-	require tim_db_helper::bigwig;
-	tim_db_helper::bigwig->import;
+	require Bio::ToolBox::db_helper::bigwig;
+	Bio::ToolBox::db_helper::bigwig->import;
 	$BIGWIG_OK = 1;
 };
 
 # check for BigBed support
 our $BIGBED_OK = 0;
 eval { 
-	require tim_db_helper::bigbed;
-	tim_db_helper::bigbed->import;
+	require Bio::ToolBox::db_helper::bigbed;
+	Bio::ToolBox::db_helper::bigbed->import;
 	$BIGBED_OK = 1;
 };
 
 # check for Bam support
 our $BAM_OK = 0;
 eval { 
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 	$BAM_OK = 1;
 };
 
 # check for USeq support
 our $USEQ_OK = 0;
 eval { 
-	require tim_db_helper::useq;
-	tim_db_helper::useq->import;
+	require Bio::ToolBox::db_helper::useq;
+	Bio::ToolBox::db_helper::useq->import;
 	$USEQ_OK = 1;
 };
 
@@ -94,7 +92,7 @@ our @EXPORT_OK = qw(
 
 =head1 NAME
 
-tim_db_helper
+Bio::ToolBox::db_helper
 
 =head1 DESCRIPTION
 
@@ -168,7 +166,7 @@ While the functions within this library may appear to be simply a rehashing of
 the methods and functions in Bio::DB::SeqFeature::Store and other modules, they 
 either provide a simpler function to often used database methodologies or are 
 designed to work intimately with the BioToolBox data format file and data structures 
-(see C<tim_file_helper.pm>). One key advantage to these functions is the ability
+(see C<Bio::ToolBox::file_helper>). One key advantage to these functions is the ability
 to work with datasets that are stranded (transcriptome data, for example).
 
 Historically, this module was initially written to use Bio::DB::GFF for 
@@ -183,7 +181,7 @@ Complete usage and examples for the functions are provided below.
 Call the module at the beginning of your perl script and include the module 
 names to export. None are exported by default.
 
-  use tim_db_helper qw(
+  use Bio::ToolBox::db_helper qw(
 	  get_new_feature_list 
 	  get_feature
   );
@@ -564,12 +562,12 @@ sub open_db_connection {
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
 		# the db_default parameters
-		my $adaptor = $TIM_CONFIG->param($database . '.adaptor') || 
-			$TIM_CONFIG->param('default_db.adaptor');
-		my $user = $TIM_CONFIG->param($database . '.user') || 
-			$TIM_CONFIG->param('default_db.user');
-		my $pass = $TIM_CONFIG->param($database . '.pass') ||
-			$TIM_CONFIG->param('default_db.pass') || undef;
+		my $adaptor = $BTB_CONFIG->param($database . '.adaptor') || 
+			$BTB_CONFIG->param('default_db.adaptor');
+		my $user = $BTB_CONFIG->param($database . '.user') || 
+			$BTB_CONFIG->param('default_db.user');
+		my $pass = $BTB_CONFIG->param($database . '.pass') ||
+			$BTB_CONFIG->param('default_db.pass') || undef;
 		
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
@@ -577,11 +575,11 @@ sub open_db_connection {
 		
 		# set up the dsn
 		# it can be specifically defined
-		my $dsn = $TIM_CONFIG->param($database . '.dsn') || undef;
+		my $dsn = $BTB_CONFIG->param($database . '.dsn') || undef;
 		unless (defined $dsn) {
 			# or dsn can be generated with the dsn_prefix
-			$dsn = $TIM_CONFIG->param($database . '.dsn_prefix') || 
-				$TIM_CONFIG->param('default_db.dsn_prefix');
+			$dsn = $BTB_CONFIG->param($database . '.dsn_prefix') || 
+				$BTB_CONFIG->param('default_db.dsn_prefix');
 			$dsn .= $database;
 		}
 		
@@ -740,7 +738,7 @@ If no list was provided, then a list of available feature types in the
 provided database will be presented to the user, and the user prompted 
 to make a selection. One or more types may be selected, and a single 
 item may be enforced if requested. The response is filtered through 
-the parse_list() method from B<tim_db_helper>, so a mix of single 
+the parse_list() method from C<Bio::ToolBox::db_helper>, so a mix of single 
 numbers or a range of numbers may be accepted. The responses are then 
 validated.
 
@@ -1135,7 +1133,7 @@ sub check_dataset_for_rpm_support {
 		# a bam file dataset
 		
 		if ($BAM_OK) {
-			# tim_db_helper::bam was loaded ok
+			# Bio::ToolBox::db_helper::bam was loaded ok
 			# sum the number of reads in the dataset
 			$rpm_read_sum = sum_total_bam_alignments($dataset, 0, 0, $cpu);
 		}
@@ -1150,7 +1148,7 @@ sub check_dataset_for_rpm_support {
 		# a bigbed file dataset
 		
 		if ($BIGBED_OK) {
-			# tim_db_helper::bigbed was loaded ok
+			# Bio::ToolBox::db_helper::bigbed was loaded ok
 			# sum the number of features in the dataset
 			$rpm_read_sum = sum_total_bigbed_features($dataset);
 		}
@@ -1207,7 +1205,7 @@ sub check_dataset_for_rpm_support {
 			my ($bamfile) = $features[0]->get_tag_values('bamfile');
 			
 			if ($BAM_OK) {
-				# tim_db_helper::bam was loaded ok
+				# Bio::ToolBox::db_helper::bam was loaded ok
 				# sum the number of reads in the dataset
 				$rpm_read_sum = sum_total_bam_alignments($bamfile, 0, 0, $cpu);
 			}
@@ -1223,7 +1221,7 @@ sub check_dataset_for_rpm_support {
 			my ($bedfile) = $features[0]->get_tag_values('bigbedfile');
 			
 			if ($BIGBED_OK) {
-				# tim_db_helper::bigbed was loaded ok
+				# Bio::ToolBox::db_helper::bigbed was loaded ok
 				# sum the number of features in the dataset
 				$rpm_read_sum = sum_total_bigbed_features($bedfile);
 			}
@@ -1272,7 +1270,7 @@ Once the list of genomic features is generated, then data may be collected
 for each item in the list. 
 
 The subroutine will generate and return a data hash as described in 
-tim_file_helper.pm. The data table will have two or three columns. The 
+C<Bio::ToolBox::file_helper>. The data table will have two or three columns. The 
 feature name and type:source are listed in columns one and two, respectively.
 If the features have an Alias tag, then a third column is included with 
 a comma delimited list of the feature aliases.
@@ -1354,10 +1352,10 @@ sub get_new_feature_list {
 	
 	# Get the names of chromosomes to avoid
 	my @excluded_chromosomes = 
-		$TIM_CONFIG->param("$db_name\.chromosome_exclude");
+		$BTB_CONFIG->param("$db_name\.chromosome_exclude");
 	unless (@excluded_chromosomes) {
 		@excluded_chromosomes = 
-			$TIM_CONFIG->param('default_db.chromosome_exclude');
+			$BTB_CONFIG->param('default_db.chromosome_exclude');
 	}
 	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 	
@@ -1414,7 +1412,7 @@ is split into intervals of a specified size that is moved along the
 genome in specified step sizes.
 
 The subroutine will generate and return a data hash as described in 
-tim_file_helper.pm. The data table will have 3 columns, including 
+C<Bio::ToolBox::file_helper>. The data table will have 3 columns, including 
 Chromosome, Start, and Stop.
 
 The subroutine is passed an array containing the arguments. 
@@ -1467,8 +1465,8 @@ sub get_new_genome_list {
 	$args{'win'} ||= undef;
 	unless ($args{'win'}) {
 		$args{'win'} = 
-			$TIM_CONFIG->param("$db_name\.window") ||
-			$TIM_CONFIG->param('default_db.window');
+			$BTB_CONFIG->param("$db_name\.window") ||
+			$BTB_CONFIG->param('default_db.window');
 		print "  Using default window size $args{win} bp\n";
 	}
 	$args{'step'} ||= $args{'win'};
@@ -1553,7 +1551,7 @@ sub validate_included_feature {
 	
 	# get the list of feature exclusion tags
 	unless (defined $TAG_EXCEPTIONS) {
-		$TAG_EXCEPTIONS = $TIM_CONFIG->get_block('exclude_tags');
+		$TAG_EXCEPTIONS = $BTB_CONFIG->get_block('exclude_tags');
 	}
 	
 	# Check the tag exceptions
@@ -2442,10 +2440,10 @@ sub get_chromosome_list {
 	my %excluded_chr_lookup;
 	if ($limit) {
 		my @excluded_chromosomes = 
-			$TIM_CONFIG->param("$db_name\.chromosome_exclude");
+			$BTB_CONFIG->param("$db_name\.chromosome_exclude");
 		unless (@excluded_chromosomes) {
 			@excluded_chromosomes = 
-				$TIM_CONFIG->param('default_db.chromosome_exclude');
+				$BTB_CONFIG->param('default_db.chromosome_exclude');
 		}
 		%excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
 	}
@@ -2583,7 +2581,7 @@ Pass the subroutine the feature category name as a scalar value. The
 actual list of feature types will be collected and returned as an array. 
 Multiple values may be passed as a comma-delimited string (no spaces).
 
-The aliases and feature lists are specified in the tim_db_helper 
+The aliases and feature lists are specified in the Bio::ToolBox::db_helper 
 configuration file, biotoolbox.cfg. Additional lists and aliases 
 may be placed there. The lists are database specific, or they can be 
 added to the default database.
@@ -2602,7 +2600,7 @@ sub _features_to_classes {
 	my $feature = shift;
 	my @types;
 		
-	my $alias2types = $TIM_CONFIG->get_block('features');
+	my $alias2types = $BTB_CONFIG->get_block('features');
 	if (exists $alias2types->{$feature} ) {
 		# looks like the feature is an alias for a list of features
 		# defined in the config file
@@ -2758,7 +2756,7 @@ sub _get_segment_score {
 			
 			# check that we have bigwig support
 			if ($BIGWIG_OK) {
-				# get the dataset scores using tim_db_helper::bigwig
+				# get the dataset scores using Bio::ToolBox::db_helper::bigwig
 				
 				# the data collection depends on the method
 				if ($value_type eq 'score' and 
@@ -2823,7 +2821,7 @@ sub _get_segment_score {
 			
 			# check that we have bigbed support
 			if ($BIGBED_OK) {
-				# get the dataset scores using tim_db_helper::bigbed
+				# get the dataset scores using Bio::ToolBox::db_helper::bigbed
 				
 				if ($method eq 'indexed') {
 					# warn " using collect_bigbed_position_scores() with file\n";
@@ -2865,7 +2863,7 @@ sub _get_segment_score {
 			
 			# check that we have Bam support
 			if ($BAM_OK) {
-				# get the dataset scores using tim_db_helper::bam
+				# get the dataset scores using Bio::ToolBox::db_helper::bam
 				
 				if ($method eq 'indexed') {
 					# warn " using collect_bam_position_scores() with file\n";
@@ -2906,7 +2904,7 @@ sub _get_segment_score {
 			
 			# check that we have bigbed support
 			if ($USEQ_OK) {
-				# get the dataset scores using tim_db_helper::useq
+				# get the dataset scores using Bio::ToolBox::db_helper::useq
 				
 				if ($method eq 'indexed') {
 					# warn " using collect_useq_position_scores() with file\n";
@@ -3087,7 +3085,7 @@ sub _get_segment_score {
 				
 				# check that we have wiggle support
 				if ($WIGGLE_OK) {
-					# get the dataset scores using tim_db_helper::wiggle
+					# get the dataset scores using Bio::ToolBox::db_helper::wiggle
 					
 					if ($method eq 'indexed') {
 						# warn " using collect_wig_position_scores() from tag\n";
