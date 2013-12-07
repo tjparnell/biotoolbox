@@ -9,31 +9,27 @@ use File::Copy;
 use File::Spec;
 use File::Path 'make_path';
 use File::Basename qw(fileparse);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	generate_tim_data_structure
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
 eval {
 	# check for bigWig support
-	require tim_db_helper::bigwig;
-	tim_db_helper::bigwig->import;
+	require Bio::ToolBox::db_helper::bigwig;
+	Bio::ToolBox::db_helper::bigwig->import;
 	
 	# check for bigBed support
-	require tim_db_helper::bigbed;
-	tim_db_helper::bigbed->import;
+	require Bio::ToolBox::db_helper::bigbed;
+	Bio::ToolBox::db_helper::bigbed->import;
 };
 eval {
 	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -988,7 +984,7 @@ BigFile file. Two types of BigFiles are supported: BigWig and BigBed. BAM
 files are also supported. The generated features will encompass the entire 
 length of each chromosome represented in the data file. The name of the data 
 file and its absolute path is stored as a tag value in each feature. This 
-tag value can be used by B<tim_db_helper.pm> to collect data from the file 
+tag value can be used by C<Bio::ToolBox::db_helper> to collect data from the file 
 with respect to various locations and features in the database. 
 
 The source data file is copied to the destination directory. The file may be 

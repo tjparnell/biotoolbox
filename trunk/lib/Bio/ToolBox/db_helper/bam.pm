@@ -1,4 +1,4 @@
-package tim_db_helper::bam;
+package Bio::ToolBox::db_helper::bam;
 
 # modules
 require Exporter;
@@ -12,7 +12,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.12';
+our $VERSION = '1.14';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -744,7 +744,7 @@ __END__
 
 =head1 NAME
 
-tim_db_helper::bam
+Bio::ToolBox::db_helper::bam
 
 =head1 DESCRIPTION
 
@@ -777,7 +777,7 @@ The module requires Lincoln Stein's Bio::DB::Sam to be installed.
 
 Load the module at the beginning of your program.
 
-	use tim_db_helper::bam;
+	use Bio::ToolBox::db_helper::bam;
 
 It will automatically export the name of the subroutines. 
 

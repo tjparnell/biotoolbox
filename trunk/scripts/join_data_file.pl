@@ -5,19 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
 use File::Basename qw(fileparse);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	format_with_commas
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(format_with_commas);
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	open_tim_data_file
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.13';
+my $VERSION = '1.14';
 
 print "\n This script will concatenate two or more data files\n\n";
 

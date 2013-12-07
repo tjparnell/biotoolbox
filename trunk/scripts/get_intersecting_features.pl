@@ -7,24 +7,22 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::Range;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	parse_list
 	find_column_index
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types 
 	get_chromosome_list
 	validate_included_feature
 	get_feature
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.11';
+my $VERSION = '1.14';
 
 
 print "\n A script to pull out overlapping features\n\n";

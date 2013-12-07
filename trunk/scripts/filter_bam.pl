@@ -5,11 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::DB::Sam;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(parse_list format_with_commas);
-my $VERSION = 'beta';
+use Bio::ToolBox::data_helper qw(parse_list format_with_commas);
+my $bam_ok;
+eval {
+	# check for Bam support
+	require Bio::DB::Sam;
+	$bam_ok = 1;
+};
+my $VERSION = '1.14';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 
@@ -82,6 +85,9 @@ if ($print_version) {
 
 
 ### Check for required values and set defaults
+unless ($bam_ok) {
+	die "Module Bio::DB::Sam must be installed to run this script.\n";
+}
 my ($true_file, $false_file);
 my @lengths;
 my @filters;

@@ -6,28 +6,26 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use File::Spec;
-use GD::Graph::lines; # for the line type graph
-use GD::Graph::mixed; # for the scatter plot
-eval {
-	# for bezier smoothed line graph, an optional install
-	require GD::Graph::smoothlines; 
-	GD::Graph::smoothlines->import;
-};
 use Statistics::Descriptive;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(parse_list);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(parse_list);
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	open_to_write_fh
 );
+my $gd_ok;
+eval {
+	require GD::Graph::lines; # for the line type graph
+	require GD::Graph::mixed; # for the scatter plot
+	require GD::Graph::smoothlines; 
+	$gd_ok = 1;
+};
 my $parallel;
 eval {
 	# check for parallel support
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.12.4';
+my $VERSION = '1.14';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -120,6 +118,10 @@ if ($print_version) {
 
 
 ### check requirements
+unless ($gd_ok) {
+	die "Module GD::Graph must be installed to run this script.\n";
+}
+
 unless ($infile) {
 	if (@ARGV) {
 		$infile = shift @ARGV;
@@ -199,7 +201,6 @@ else {
 
 ### Prepare global variables and set up for execution
 
-# load the file using subroutine from tim_file_helper.pm
 print " Loading data from file $infile....\n";
 my $main_data_ref = load_tim_data_file($infile);
 unless ($main_data_ref) {

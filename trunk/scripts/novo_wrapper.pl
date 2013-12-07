@@ -7,10 +7,8 @@ use Pod::Usage;
 use Getopt::Long;
 use IO::Dir;
 use File::Basename qw(fileparse);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_db_helper::config;
-use tim_file_helper qw(
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
@@ -21,7 +19,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.12.6';
+my $VERSION = '1.14';
 
 
 print "\n This script is a wrapper for the Novoalign program\n\n";
@@ -181,12 +179,15 @@ sub check_defaults {
 	
 	# novo executable
 	unless ($novo_path) {
-		$novo_path = $TIM_CONFIG->param('applications.novoalign') || undef;
+		$novo_path = $BTB_CONFIG->param('applications.novoalign') || undef;
 		
 		# try the environment path
 		unless ($novo_path) {
-			$novo_path = `which novoalign` || undef;
-			chomp $novo_path;
+			eval {
+				use File::Which;
+				$novo_path = which('novoalign');
+			};
+			add_program($novo_path) if $novo_path; # remember for next time
 		}
 		
 		# fail
@@ -197,7 +198,7 @@ sub check_defaults {
 	
 	# samtools executable
 	unless ($sam_path) {
-		$sam_path = $TIM_CONFIG->param('applications.samtools') || undef;
+		$sam_path = $BTB_CONFIG->param('applications.samtools') || undef;
 		
 		# try the environment path
 		unless ($sam_path) {

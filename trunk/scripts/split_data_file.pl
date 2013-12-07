@@ -5,14 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -382,7 +380,7 @@ The command line flags and descriptions:
 =item --in <filename>
 
 Specify the file name of a data file. It must be a tab-delimited text file,
-preferably in the tim data format as described in 'tim_file_helper.pm', 
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
 although any format should work. The file may be compressed with gzip.
 
 =item --index <column_index>

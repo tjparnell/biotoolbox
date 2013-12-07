@@ -6,17 +6,15 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(min max range);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	find_column_index
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file 
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This program will compare scores from multiple subfeatures\n\n";
 

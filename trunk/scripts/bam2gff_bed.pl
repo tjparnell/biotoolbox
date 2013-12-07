@@ -5,21 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_big_helper qw(bed_to_bigbed_conversion);
-use tim_data_helper qw(
-	format_with_commas
-);
-use tim_file_helper qw(
-	open_to_write_fh
-);
+use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
+use Bio::ToolBox::data_helper qw(format_with_commas);
+use Bio::ToolBox::file_helper qw(open_to_write_fh);
 eval {
 	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 
 print "\n A script to convert Bam alignments to GFF or BED files\n\n";

@@ -7,19 +7,17 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean stddevp median min max);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
 eval {
 	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 
 print "\n A script to get exact nucleosome fragment sizes from a Bam file\n\n";

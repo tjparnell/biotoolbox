@@ -6,18 +6,16 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
-use GD::Graph::lines;
-use GD::Graph::bars;
 use Statistics::Descriptive;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	parse_list
-);
-use tim_file_helper qw(
-	load_tim_data_file
-);
-my $VERSION = '1.10.3';
+use Bio::ToolBox::data_helper qw(parse_list);
+use Bio::ToolBox::file_helper qw(load_tim_data_file);
+my $gd_ok;
+eval {
+	require GD::Graph::lines; 
+	require GD::Graph::bars; 
+	$gd_ok = 1;
+};
+my $VERSION = '1.14';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -87,6 +85,10 @@ if ($print_version) {
 
 
 ### Check required and default values
+unless ($gd_ok) {
+	die "Module GD::Graph must be installed to run this script.\n";
+}
+
 unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
@@ -145,7 +147,6 @@ unless (defined $y_ticks) {
 ####### Main ###########
 
 ### Load the file
-# load the file using subroutine from tim_db_helper.pm
 print " Loading data from file $infile....\n";
 my $main_data_ref = load_tim_data_file($infile);
 unless ($main_data_ref) {
@@ -610,7 +611,7 @@ The command line flags and descriptions:
 
 Specify the file name of a previously generated feature dataset.
 The tim data format is preferable, although any other tab-delimited text 
-data formats may be usable. See the file description in C<tim_db_helper.pm>.
+data formats may be usable.
 
 =item --index <column_index>
 

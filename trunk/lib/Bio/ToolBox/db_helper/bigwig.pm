@@ -1,4 +1,4 @@
-package tim_db_helper::bigwig;
+package Bio::ToolBox::db_helper::bigwig;
 
 # modules
 require Exporter;
@@ -7,7 +7,7 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-our $VERSION = '1.9.0';
+our $VERSION = '1.14';
 
 
 # Exported names
@@ -608,7 +608,7 @@ sub open_bigwigset_db {
 	
 	# open the database connection 
 	# we're using the region feature type because that's what the rest of 
-	# tim_db_helper modules expect and work with
+	# Bio::ToolBox::db_helper modules expect and work with
 	my $bws;
 	eval {
 		$bws = Bio::DB::BigWigSet->new(
@@ -821,7 +821,7 @@ __END__
 
 =head1 NAME
 
-tim_db_helper::bigwig
+Bio::ToolBox::db_helper::bigwig
 
 =head1 DESCRIPTION
 
@@ -859,7 +859,7 @@ The module requires Lincoln Stein's Bio::DB::BigWig to be installed.
 
 Load the module at the beginning of your program.
 
-	use tim_db_helper::bigwig;
+	use Bio::ToolBox::db_helper::bigwig;
 
 It will automatically export the name of the subroutines. 
 
@@ -998,7 +998,7 @@ with unique attributes (type, source, strand, etc).
 
 Pass the subroutine a scalar value representing the local path to the 
 directory. It presumes a feature_type of 'region', as expected by the other 
-tim_db_helper subroutines and modules. It will return the opened database 
+Bio::ToolBox::db_helper subroutines and modules. It will return the opened database 
 object.
 
 

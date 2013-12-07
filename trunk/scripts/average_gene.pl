@@ -5,14 +5,13 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean median sum min max stddev);
 use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Statistics::Lite qw(mean median sum min max stddev);
+use Bio::ToolBox::data_helper qw(
 	find_column_index
 	splice_data_structure
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	get_new_feature_list
@@ -21,7 +20,7 @@ use tim_db_helper qw(
 	get_region_dataset_hash
 	check_dataset_for_rpm_support
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	write_summary_data
@@ -39,7 +38,7 @@ use constant (DATASET_HASH_LIMIT => 3000);
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.12.6';
+my $VERSION = '1.14';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 

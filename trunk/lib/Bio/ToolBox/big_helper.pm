@@ -1,14 +1,13 @@
-package tim_big_helper;
+package Bio::ToolBox::big_helper;
 
 ### modules
 require Exporter;
 use strict;
 use Carp qw(carp cluck);
+use File::Which;
 use File::Temp;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_db_helper qw(get_chromosome_list);
-use tim_db_helper::config;
+use Bio::ToolBox::db_helper qw(get_chromosome_list);
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
 
 
@@ -23,7 +22,7 @@ our @EXPORT_OK = qw(
 );
 
 
-our $VERSION = '1.10';
+our $VERSION = '1.14';
 
 1;
 
@@ -52,13 +51,14 @@ sub wig_to_bigwig_conversion {
 	$args{'bwapppath'} ||= undef;
 	unless ($args{'bwapppath'}) {
 		# check for an entry in the configuration file
-		$args{'bwapppath'} = $TIM_CONFIG->param("applications.$utility") || 
+		$args{'bwapppath'} = $BTB_CONFIG->param("applications.$utility") || 
 				undef;
 	}
 	unless ($args{'bwapppath'}) {
 		# try checking the system path as a final resort
-		$args{'bwapppath'} = `which $utility`;
+		$args{'bwapppath'} = which($utility);
 		chomp $args{'bwapppath'};
+		add_program($args{'bwapppath'}) if $args{'bwapppath'};
 	}
 	unless ($args{'bwapppath'}) {
 		carp " Utility '$utility' not specified and can not be found!" . 
@@ -156,13 +156,14 @@ sub bed_to_bigbed_conversion {
 	$args{'bbapppath'} ||= undef;
 	unless ($args{'bbapppath'}) {
 		# check for an entry in the configuration file
-		$args{'bbapppath'} = $TIM_CONFIG->param('applications.bedToBigBed') || 
+		$args{'bbapppath'} = $BTB_CONFIG->param('applications.bedToBigBed') || 
 			undef;
 	}
 	unless ($args{'bbapppath'}) {
 		# try checking the system path as a final resort
-		$args{'bbapppath'} = `which bedToBigBed`;
+		$args{'bbapppath'} = which('bedToBigBed');
 		chomp $args{'bbapppath'};
+		add_program($args{'bbapppath'}) if $args{'bbapppath'};
 	}
 	unless ($args{'bbapppath'}) {
 		carp " Utility 'bedToBigBed' not specified and can not be found!" . 
@@ -261,7 +262,7 @@ __END__
 
 =head1 NAME
 
-tim_big_helper
+Bio::ToolBox::big_helper
 
 =head1 DESCRIPTION
 
@@ -277,7 +278,7 @@ Two exported subroutines are available for wig and bed conversions.
 Load the module at the beginning of your program and include the name or 
 names of the subroutines to export. None are automatically exported.
 
-	use tim_big_helper qw(wig_to_bigwig_conversion);
+	use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 
 
 =over
@@ -384,7 +385,7 @@ current directory with a name of "chr_sizesXXXXX", where X are random
 characters as defined by File::Temp. 
 
 The chromosome names and lengths are obtained from a Bio::DB 
-database using the L<tim_db_helper::get_chromosome_list()> 
+database using the C<Bio::ToolBox::db_helper::get_chromosome_list()> 
 subroutine.
 
 Pass the subroutine a database name, path to a supported database file, 

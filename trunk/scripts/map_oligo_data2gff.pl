@@ -5,17 +5,13 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	find_column_index
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -392,7 +388,7 @@ field.
 =item --data <oligo_data.tx>
 
 Specify the file name of a data file. It must be a tab-delimited text file,
-preferably in the tim data format as described in 'tim_file_helper.pm', 
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
 although any format should work. The file may be compressed with gzip. The 
 first column MUST be the oligo or probe unique name or ID.
 

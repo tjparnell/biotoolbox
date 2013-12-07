@@ -5,18 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	generate_tim_data_structure 
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	open_to_read_fh
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This program will convert wiggle files to a tabbed text file\n\n";
 

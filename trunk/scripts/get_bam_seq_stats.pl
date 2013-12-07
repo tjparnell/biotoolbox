@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-my $VERSION = 'beta';
+my $VERSION = '1.14';
 
 print "\n A script to report the alignment sequence nucleotide frequencies\n\n";
 
@@ -75,7 +75,8 @@ unless ($outfile) {
 
 
 ### Run the program
-my $seq_counter = get_bam_seq_stats::counter->new($infile);
+my $seq_counter = get_bam_seq_stats::counter->new($infile) or 
+	die "Unable to open Bam file. Is Bio::DB::Bam installed?\n";
 
 $seq_counter->count_stats;
 

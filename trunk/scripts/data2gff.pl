@@ -5,19 +5,17 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	find_column_index
 	format_with_commas
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.10.2';
+my $VERSION = '1.14';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -391,7 +389,7 @@ print "  - '", join(", ", map { $metadata_ref->{$_}{name} } @tag_indices ),
 
 
 ### Generate a temporary gff data structure based on the input metadata
-# doing this manually rather than calling tim_data_helper to make a new 
+# doing this manually rather than calling Bio::ToolBox::data_helper to make a new 
 # structure, because we're basing this off the input file metadata, 
 # and we populate, empty, and regenerate numerous times as we walk 
 # through the file. Ugh, it's complicated, and very old un-optimized, crazy code
@@ -693,7 +691,7 @@ The command line flags and descriptions:
 =item --in <filename>
 
 Specify the file name of a data file. It must be a tab-delimited text file,
-preferably in the tim data format as described in 'tim_file_helper.pm', 
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
 although any format should work. The file may be compressed with gzip.
 
 =item --ask

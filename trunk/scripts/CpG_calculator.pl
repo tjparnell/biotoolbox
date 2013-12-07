@@ -6,17 +6,16 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	find_column_index
 	splice_data_structure
 );
-use tim_db_helper qw(
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_new_genome_list 
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file 
 	write_tim_data_file 
 );
@@ -26,7 +25,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.12.6';
+my $VERSION = '1.14';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 

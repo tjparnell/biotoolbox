@@ -7,20 +7,16 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::Seq;
 use Bio::SeqIO;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	find_column_index
-);
-use tim_db_helper qw(
+use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
 
-my $VERSION = '1.10.1';
+my $VERSION = '1.14';
 
 print "\n This program will convert a data file to fasta\n\n";
 

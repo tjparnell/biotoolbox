@@ -8,22 +8,20 @@ use Pod::Usage;
 use Statistics::Lite qw(sum min max mean stddev);
 use Statistics::LineFit;
 use File::Spec;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh 
 	open_to_write_fh 
 	write_tim_data_file
 );
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	format_with_commas
 	generate_tim_data_structure
 );
-use tim_big_helper qw(wig_to_bigwig_conversion);
+use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 eval {
 	# check for bam support
-	require tim_db_helper::bam;
-	tim_db_helper::bam->import;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 };
 my $parallel;
 eval {
@@ -37,7 +35,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.13.1';
+my $VERSION = '1.14';
 	
 	
 

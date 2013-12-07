@@ -1,4 +1,4 @@
-package tim_data_helper;
+package Bio::ToolBox::data_helper;
 
 ### modules
 require Exporter;
@@ -237,8 +237,6 @@ sub verify_data_structure {
 		}
 		
 		# check column index names
-		# we're assuming these names are derived from tim_file_helper or 
-		# something like it
 		if (
 			exists $datahash_ref->{0} and
 			$datahash_ref->{0}{'name'} !~ 
@@ -612,13 +610,14 @@ __END__
 
 =head1 NAME
 
-tim_data_helper
+Bio::ToolBox::data_helper
 
 =head1 DESCRIPTION
 
 These are general subroutines for working with data, and specifically the 
 tim data structure. It also provides a catchall location for common 
-subroutines that don't fit in either tim_file_helper or tim_db_helper.
+subroutines that don't fit in either Bio::ToolBox::file_helper or 
+Bio::ToolBox::db_helper.
 
 =head1 TIM DATA STRUCTURE
 
@@ -778,7 +777,7 @@ stored upon writing to a standard tim data text file.
 Call the module at the beginning of your perl script. Include the name(s) 
 of the subroutines to import.
   
-  use tim_data_helper qw(generate_tim_data_structure);
+  use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
   
 
 The specific usage for each subroutine is detailed below.

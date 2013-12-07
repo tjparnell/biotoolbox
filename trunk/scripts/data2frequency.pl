@@ -6,17 +6,15 @@ use strict;
 use Getopt::Long;
 use Statistics::Descriptive;
 use Pod::Usage;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
+use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	parse_list
 );
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.10';
+my $VERSION = '1.14';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -113,7 +111,6 @@ unless (defined $max) {
 ####### Main ###########
 
 ### Load the file
-# load the file using subroutine from tim_db_helper.pm
 print " Loading data from file $infile....\n";
 my $in_data_ref = load_tim_data_file($infile);
 unless ($in_data_ref) {
@@ -374,9 +371,8 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the file name of a data file. It must be a tab-delimited text file,
-preferably in the tim data format as described in 'tim_data_helper.pm', 
-although any format should work. The file may be compressed with gzip.
+Specify the file name of an input data file. The file should be 
+a tab-delimited text file. The file may be compressed with gzip.
 
 =item --bins <integer>
 

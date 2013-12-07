@@ -6,17 +6,12 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_file_helper qw(
+use Bio::ToolBox::file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file 
 );
-use tim_data_helper qw(
-	generate_tim_data_structure
-);
-use Data::Dumper;
-my $VERSION = '1.10';
+use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+my $VERSION = '1.14';
 
 print "\n A script to intersect and pull unique SNPs from multiple lists\n\n";
 

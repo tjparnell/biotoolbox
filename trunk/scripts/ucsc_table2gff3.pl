@@ -7,16 +7,12 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
 use Bio::SeqFeature::Lite;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	format_with_commas
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(format_with_commas);
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.11';
+my $VERSION = '1.14';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 

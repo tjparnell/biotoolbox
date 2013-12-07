@@ -5,16 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use FindBin qw($Bin);
-use lib "$Bin/../lib";
-use tim_data_helper qw(
-	parse_list
-);
-use tim_file_helper qw(
+use Bio::ToolBox::data_helper qw(parse_list);
+use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = 'beta';
+my $VERSION = 1.14;
 
 print "\n A tool for switching the order of cluster files\n";
 
