@@ -5,7 +5,10 @@ v.1.14
 	Perl module distribution that is installed using standard 
 	Module::Build methods. This will install the libraries into 
 	site-specific Perl library directories as Bio::ToolBox::*. 
-	All scripts have been updated to reflect these changes.
+	Scripts will install into a site-specific bin directory. All 
+	scripts have been updated to reflect these changes.
+	- Added new script db_setup.pl to ease generating an annotation 
+	database with UCSC data
 	- Added max_count option to script bam2wig.pl to control for 
 	high Bam coverage
 	- Fixed bug where the summary file was not created for 
