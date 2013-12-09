@@ -20,7 +20,7 @@ our @EXPORT_OK = qw(
 	parse_list
 	format_with_commas
 );
-our $VERSION = '1.12';
+our $VERSION = '1.14';
 
 
 
@@ -614,8 +614,9 @@ Bio::ToolBox::data_helper
 
 =head1 DESCRIPTION
 
-These are general subroutines for working with data, and specifically the 
-tim data structure. It also provides a catchall location for common 
+These are general subroutines for working with data, and specifically what 
+was known colloquially as the "tim data structure", before it became 
+Bio::ToolBox. These subroutines provides a catchall location for common 
 subroutines that don't fit in either Bio::ToolBox::file_helper or 
 Bio::ToolBox::db_helper.
 
