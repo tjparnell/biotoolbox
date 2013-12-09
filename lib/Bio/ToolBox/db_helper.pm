@@ -20,7 +20,7 @@ use Bio::ToolBox::data_helper qw(
 	parse_list
 );
 use Bio::ToolBox::db_helper::config;
-our $VERSION = '1.13';
+our $VERSION = '1.14';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
