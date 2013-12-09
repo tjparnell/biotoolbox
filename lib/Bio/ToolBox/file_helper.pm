@@ -22,6 +22,7 @@ our @EXPORT = qw(
 );
 our @EXPORT_OK = qw(
 	load_tim_data_file 
+	parse_filename
 	open_tim_data_file 
 	write_tim_data_file 
 	open_to_read_fh
@@ -223,7 +224,7 @@ sub open_tim_data_file {
 	}
 	
 	# split filename into its base components
-	my ($basename, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
+	my ($basename, $path, $extension) = parse_filename($filename);
 	
 	# open the file
 	my $fh = open_to_read_fh($filename);
@@ -905,6 +906,16 @@ sub open_tim_data_file {
 	# now return the advanced filehandle and the parsed metadata
 	return ($fh, $inputdata);
 	
+}
+
+
+
+### Parse the filename using the list suffix list
+
+sub parse_filename {
+	my $filename = shift;
+	my ($basename, $path, $extension) = fileparse($filename, @SUFFIX_LIST);
+	return ($basename, $path, $extension);
 }
 
 
