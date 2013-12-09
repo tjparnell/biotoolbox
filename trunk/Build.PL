@@ -80,6 +80,7 @@ sub get_base_options {
 			'scripts/data2frequency.pl',
 			'scripts/data2gff.pl',
 			'scripts/data2wig.pl',
+			'scripts/db_setup.pl',
 			'scripts/filter_bam.pl',
 			'scripts/find_enriched_regions.pl',
 			'scripts/get_actual_nuc_sizes.pl',
