@@ -2468,14 +2468,6 @@ sub write_summary_data {
 		return;
 	}
 	
-	# check data structure
-	$args{'data'} ||= undef;
-	my $data = $args{'data'};
-	unless (verify_data_structure($data) ) {
-		cluck "bad data structure!";
-		return;
-	}
-	
 	# parameters
 	my $outfile =        $args{'filename'}    || undef;
 	my $dataset =        $args{'dataset'}     || undef;
@@ -2486,6 +2478,7 @@ sub write_summary_data {
 	
 	
 	# Check required values
+	my $data = $args{'data'} ||= undef;
 	unless (defined $data) {
 		cluck "no data structure passed!\n";
 		return;

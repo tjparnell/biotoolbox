@@ -471,8 +471,8 @@ sub parallel_execution {
 		}
 		print " Generating final summed data....\n";
 		my $sumfile = write_summary_data(
-			'data'        => $main_data_ref,
-			'filename'    => $outfile,
+			'data'        => $data,
+			# it will automatically define a new output name
 			'startcolumn' => $startcolumn,
 			'dataset'     => $dataset,
 			'log'         => $log,
