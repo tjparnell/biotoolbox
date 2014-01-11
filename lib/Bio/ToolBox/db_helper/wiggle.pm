@@ -46,7 +46,7 @@ sub collect_wig_scores {
 sub collect_wig_position_scores {
 	
 	# pass the required information
-	my ($start, $stop, $strand, $stranded, @wig_features) = @_;
+	my ($start, $stop, $strand, $stranded, $method, @wig_features) = @_;
 	
 	# set up hash, position => score
 	my %wig_data;
@@ -134,7 +134,18 @@ sub collect_wig_position_scores {
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						$wig_data{$pos} = $s;
+						if ($method eq 'score') {	
+							$wig_data{$pos} = $s;
+						}
+						elsif ($method eq 'count') {
+							$wig_data{$pos} = 1;
+						}
+						elsif ($method eq 'length') {
+							$wig_data{$pos} = $step;
+						}
+						else {
+							confess "unknown method $method!";
+						}
 					}
 					
 					# adjust position by the step size, 
@@ -211,7 +222,11 @@ The subroutine is passed three or more arguments in the following order:
        to be collected. Acceptable values include "sense", "antisense", 
        "none" or "no". Only those scores which match the indicated 
        strandedness are collected.
-    5) One or more database feature objects that contain the reference 
+    5) The method or type of data collected. 
+       Acceptable values include 'score' (returns the score), 
+       'count' (the number of defined positions with scores), or 
+       'length' (the wig step is used here).  
+    6) One or more database feature objects that contain the reference 
        to the wib file. They should contain the attribute 'wigfile'.
 
 The subroutine returns an array of the defined dataset values found within 
