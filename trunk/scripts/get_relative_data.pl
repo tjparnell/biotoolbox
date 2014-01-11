@@ -1208,48 +1208,54 @@ sub collect_long_data_window_scores {
 sub go_interpolate_values {
 	
 	# determine counts
-	my $lastwindow = $main_data_ref->{'number_columns'} - 2; 
-		# lastwindow is the index of the second to last column
+	my $lastwindow = $main_data_ref->{'number_columns'} - 1; 
+		# lastwindow is the index of the last column
 	
 	# walk through each data line and then each window
 	for my $row (1..$main_data_ref->{'last_row'}) {
-		
-		for my $col ($startcolumn..$lastwindow) {
+		warn "checking row $row\n";
+		my $col = $startcolumn + 1;
+		while ($col < $lastwindow) {
 			# walk through the windows of a data row
 			# skipping the very first and last windows (columns)
 			# we will look for null values
 			# if one is found, interpolate from neighbors
-			if ($data_table_ref->[$row][$col] eq '.') {
+			if (
+				$data_table_ref->[$row][$col] eq '.' and 
+				$data_table_ref->[$row][$col - 1] ne '.'
+			) {
 				# we will interpolate the value from the neighbors
 				# first, need to check that the neighbors have values
+				warn "  found null at index $col\n";
 				
-				# obtain the neighboring values
-				my $before = $data_table_ref->[$row][$col - 1];
-				my $after = $data_table_ref->[$row][$col + 1];
-				if (
-					$before ne '.' and 
-					$after ne '.'
-				) {
-					# neighboring values are not nulls
-					# then calculate the interpolated value
-					if ($log) { 
-						# working with log2 values
-						$before = 2 ** $before;
-						$after = 2 ** $after;
-						my $mean = mean($before, $after);
-						$data_table_ref->[$row][$col] = log($mean) / log(2);
-					} 
-					else { 
-						# otherwise calculate straight value
-						$data_table_ref->[$row][$col] = mean($before, $after);
+				# find the next real value
+				my $next_i;
+				for (my $i = $col + 1; $col <= $lastwindow; $i++) {
+					if ($data_table_ref->[$row][$i] ne '.') {
+						$next_i = $i;
+						last;
 					}
 				}
+				next unless defined $next_i;
+				warn "  found null at index $col and next value at $next_i\n";
+				
+				# determine fractional value
+				my $initial = $data_table_ref->[$row][$col - 1];
+				my $fraction = ($data_table_ref->[$row][$next_i] - $initial) / 
+					($next_i - $col + 1);
+				warn "    initial value $initial, fraction $fraction\n"; 
+				
+				# apply fractional values
+				for (my $n = $col; $n < $next_i; $n++) {
+					$data_table_ref->[$row][$n] = $initial + ($fraction * ($n - $col + 1));
+				}
+				
+				# jump ahead
+				$col = $next_i;
 			}
-			
+			$col++;
 		}
-		
 	}
-	
 }
 
 
