@@ -164,7 +164,11 @@ sub check_db {
 	$options->{'requires'}{'DBD::SQLite'} = 0;
 	
 	# add mysql as an advanced option
-	$options->{'recommends'}{'DBD::mysql'} = 0;
+	my $mysql_config = `mysql_config --libs --include`;
+	if ($mysql_config) {
+		# pretty good evidence that MySQL is installed
+		$options->{'recommends'}{'DBD::mysql'} = 0;
+	}
 }
 
 
