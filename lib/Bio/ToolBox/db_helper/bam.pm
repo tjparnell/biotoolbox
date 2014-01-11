@@ -378,9 +378,8 @@ sub _assign_callback {
 	# stranded data, collecting counts or length, or whether indexed data
 	# is wanted.
 	
-	# we performa a check of whether the alignment midpoint is within the 
-	# search region
-	# versions before 1.10 only did this check for indexed data
+	# we perform a check of whether the alignment midpoint is within the 
+	# search region for indexed data only
 	
 	# these subroutines are designed to work with the low level fetch API
 	
@@ -580,10 +579,7 @@ sub _all_count_indexed {
 
 sub _all_count_array {
 	my ($a, $data) = @_;
-	my $pos = int( ( ($a->pos + 1 + $a->calend) / 2 ) + 0.5);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, 1;
-	}
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _all_length_indexed {
@@ -596,10 +592,7 @@ sub _all_length_indexed {
 
 sub _all_length_array {
 	my ($a, $data) = @_;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-	}
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 sub _sense_forward_count_indexed {
@@ -613,9 +606,7 @@ sub _sense_forward_count_indexed {
 sub _sense_forward_count_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	push @{ $data->{'scores'} }, 1 if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _sense_forward_length_indexed {
@@ -630,10 +621,7 @@ sub _sense_forward_length_indexed {
 sub _sense_forward_length_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-	}
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 sub _sense_reverse_count_indexed {
@@ -647,9 +635,7 @@ sub _sense_reverse_count_indexed {
 sub _sense_reverse_count_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	push @{ $data->{'scores'} }, 1 if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _sense_reverse_length_indexed {
@@ -664,10 +650,7 @@ sub _sense_reverse_length_indexed {
 sub _sense_reverse_length_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-	}
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 sub _antisense_forward_count_indexed {
@@ -681,9 +664,7 @@ sub _antisense_forward_count_indexed {
 sub _antisense_forward_count_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	push @{ $data->{'scores'} }, 1 if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _antisense_forward_length_indexed {
@@ -698,10 +679,7 @@ sub _antisense_forward_length_indexed {
 sub _antisense_forward_length_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-	}
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 sub _antisense_reverse_count_indexed {
@@ -715,9 +693,7 @@ sub _antisense_reverse_count_indexed {
 sub _antisense_reverse_count_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	push @{ $data->{'scores'} }, 1 if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _antisense_reverse_length_indexed {
@@ -732,10 +708,7 @@ sub _antisense_reverse_length_indexed {
 sub _antisense_reverse_length_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-	}
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 
