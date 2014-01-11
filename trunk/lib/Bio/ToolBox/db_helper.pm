@@ -428,7 +428,7 @@ sub open_db_connection {
 	}
 	
 	# check for a known file type
-	elsif ($database =~ /gff3|bw|bb|bam|useq|db|sqlite|fa|fasta/i) {
+	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta/i) {
 		
 		# first check that it exists
 		if (-e $database and -r _) {
@@ -3036,6 +3036,7 @@ sub _get_segment_score {
 		# until I code in every single possibility
 		# let's just try a basic features method using whatever the 
 		# default type is and hope for the best
+		# warn "using other database $db_type!\n";
 		$iterator = $db->get_seq_stream(
 			-seq_id      => $chromo,
 			-start       => $start,
@@ -3094,6 +3095,7 @@ sub _get_segment_score {
 							$stop,
 							$strand, 
 							$strandedness, 
+							$value_type,
 							@features
 						);
 					}
@@ -3104,6 +3106,7 @@ sub _get_segment_score {
 							$stop,
 							$strand, 
 							$strandedness, 
+							$value_type,
 							@features
 						);
 						$dataset_type = 'wig';
