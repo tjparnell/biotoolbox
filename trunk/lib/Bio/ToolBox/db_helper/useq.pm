@@ -65,7 +65,32 @@ sub collect_useq_scores {
 	
 		# need to collect the scores based on the type of score requested
 		
-		if ($method eq 'length') {
+		if ($method eq 'score') {
+			# need to collect scores
+			my @region_scores = $useq->scores(
+				-seq_id     => $chromo,
+				-start      => $start,
+				-end        => $stop,
+				-strand     => $strand,
+			);
+			push @scores, @region_scores;
+		}
+		elsif ($method eq 'count') {
+			# need to collect features across the region
+			my $iterator = $useq->get_seq_stream(
+				-seq_id     => $chromo,
+				-start      => $start,
+				-end        => $stop,
+				-strand     => $strand,
+			);
+			return unless $iterator;
+			
+			# collect the lengths of each feature
+			while (my $f = $iterator->next_seq) {
+				push @scores, 1;
+			}
+		}
+		elsif ($method eq 'length') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
@@ -80,16 +105,8 @@ sub collect_useq_scores {
 				push @scores, $f->length;
 			}
 		}
-		
 		else {
-			# need to collect scores
-			my @region_scores = $useq->scores(
-				-seq_id     => $chromo,
-				-start      => $start,
-				-end        => $stop,
-				-strand     => $strand,
-			);
-			push @scores, @region_scores;
+			confess " unrecognized method $method!";
 		}
 	}
 	
