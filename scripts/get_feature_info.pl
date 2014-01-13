@@ -42,6 +42,7 @@ my (
 	$outfile,
 	$database,
 	$attrib_request,
+	$use_type,
 	$gz,
 	$help,
 	$print_version,
@@ -53,6 +54,7 @@ GetOptions(
 	'attrib=s' => \$attrib_request, # attribute
 	'out=s'    => \$outfile, # output filename
 	'db=s'     => \$database, # database name
+	'type=s'   => \$use_type, # force a type
 	'gz!'      => \$gz, # gzip status
 	'help'     => \$help, # help
 	'version'  => \$print_version, # print the version
@@ -199,8 +201,9 @@ sub get_attribute_list_from_user {
 		my %index2att;
 		# standard attributes for any user
 		foreach ( 
-			qw(Chromosome Start Stop Strand Score Length Midpoint Phase 
-				RNA_count Exon_count Transcript_length Parent Primary_ID
+			qw(Chromosome Start Stop Strand Score Name Alias Note Type Primary_tag Source 
+				Length Midpoint Phase RNA_count Exon_count Transcript_length Parent 
+				Primary_ID 
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -283,6 +286,18 @@ sub get_attribute_method {
 	elsif ($attrib =~ /^primary_id$/i) {
 		$method = \&get_primary_id;
 	} 
+	elsif ($attrib =~ /^name$/i) {
+		$method = \&get_display_name;
+	} 
+	elsif ($attrib =~ /^source$/i) {
+		$method = \&get_source;
+	} 
+	elsif ($attrib =~ /^type$/i) {
+		$method = \&get_type;
+	} 
+	elsif ($attrib =~ /^primary_tag$/i) {
+		$method = \&get_primary_tag;
+	} 
 	else {
 		# unrecognized, must be tag key
 		$method = \&get_tag_value;
@@ -316,7 +331,8 @@ sub collect_attributes_for_list {
 			'name'  => defined $name_index ? 
 				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
 			'type'  => defined $type_index ? 
-				$main_data_ref->{'data_table'}->[$row][$type_index] : undef,
+				$main_data_ref->{'data_table'}->[$row][$type_index] : 
+				defined $use_type ? $use_type : undef,
 			'id'    => defined $id_index ? 
 				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
 		);
@@ -511,6 +527,29 @@ sub get_primary_id {
 }
 
 
+sub get_display_name {
+	my $feature = shift;
+	return $feature->display_name || '.';
+}
+
+
+sub get_type {
+	my $feature = shift;
+	return $feature->type || $feature->primary_tag || '.';
+}
+
+
+sub get_primary_tag {
+	my $feature = shift;
+	return $feature->primary_tag || $feature->type || '.';
+}
+
+
+sub get_source {
+	my $feature = shift;
+	return $feature->source_tag || '.';
+}
+
 sub get_tag_value {
 	my $feature = shift;
 	my $attrib = shift;
@@ -573,17 +612,24 @@ get_feature_info.pl <filename>
   --in <filename> 
   --db <name>
   --attrib <attribute1,attribute2,...>
-  --out filename
+  --type <primary_tag>
+  --out <filename>
   --gz
   --version
   --help
-
-Attributes include:
+  
+  Attributes include:
    Chromosome
    Start
    Stop
    Strand
    Score
+   Name
+   Alias
+   Note
+   Type
+   Primary_tag
+   Source
    Length
    Midpoint
    Phase
@@ -621,25 +667,37 @@ may be collected, as well as values from specific group tags. These tags
 are found in the group (ninth) column of the source GFF file. Standard 
 attributes include the following
    
-   -Chromosome
-   -Start
-   -Stop
-   -Strand
-   -Score
-   -Length
-   -Midpoint
-   -Phase
-   -RNA_count (number of RNA subfeatures)
-   -Exon_count (number of exons, or CDS, subfeatures)
-   -Transcript_length
-   -Parent (name)
-   -Primary_ID
-   -<tag>
+   - Chromosome
+   - Start
+   - Stop
+   - Strand
+   - Score
+   - Name
+   - Alias
+   - Note
+   - Type
+   - Primary_tag
+   - Source
+   - Length
+   - Midpoint
+   - Phase
+   - RNA_count (number of RNA subfeatures)
+   - Exon_count (number of exons, or CDS, subfeatures)
+   - Transcript_length
+   - Parent (name)
+   - Primary_ID
+   - <tag>
 
 If attrib is not specified on the command line, then an interactive list 
 will be presented to the user for selection. Especially useful when you 
 can't remember the feature's tag keys in the database.
    
+=item --type <primary_tag>
+
+When the input file does not have a type column, a type or primary_tag 
+may be provided. This is especially useful to restrict the database 
+search when there are multiple features with the same name.
+
 =item --out <filename>
 
 Optionally specify an alternate output file name. The default is to 
