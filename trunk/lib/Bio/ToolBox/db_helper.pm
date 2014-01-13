@@ -68,6 +68,7 @@ eval {
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
 our %total_read_number; # for rpm calculations
 our $primary_id_warning; # for out of date primary IDs
+our %OPENED_DB; # cache for some opened Bio::DB databases
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -316,15 +317,19 @@ sub open_db_connection {
 		return wantarray ? ($database, $db_name) : $database;
 	}
 	
-	# determine type of database to connect to
-	my $db;
-	my $error;
+	# check to see if we have already opened it
+	if (exists $OPENED_DB{$database}) {
+		# return the cached database connection
+		return wantarray ? ($OPENED_DB{$database}, $database) : $OPENED_DB{$database};
+	}
 	
 	
 	### Attempt to open the database
 	# we go through a series of checks to determine if it is remote, local, 
 	# an indexed big data file, SQLite file, etc
 	# when all else fails, try to open a SQL connection
+	my $db;
+	my $error;
 	
 	# check if it is a remote file
 	if ($database =~ /^http|ftp/i) {
@@ -435,7 +440,6 @@ sub open_db_connection {
 		
 			# a single gff3 file that we can load into memory
 			if ($database =~ /\.gff3?(?:\.gz)?$/i) {
-				# open gff3 file using a memory adaptor
 				print " Loading file into memory database...\n";
 				eval {
 					$db = Bio::DB::SeqFeature::Store->new(
@@ -528,6 +532,7 @@ sub open_db_connection {
 			
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
+				# open using the Fasta adaptor
 				eval {
 					$db = Bio::DB::Fasta->new($database);
 				};
@@ -556,8 +561,10 @@ sub open_db_connection {
 		$error = " File '$database' type is not recognized\n";
 	}
 	
+	# otherwise assume the name of a database in the configuration
 	
-	# otherwise assume name of a database
+	# attempt to open using information from the configuration
+	# using default connection information as necessary
 	unless ($db) {
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
@@ -607,6 +614,9 @@ sub open_db_connection {
 	
 	# conditional return
 	if ($db) {
+		# cache the opened connection for use later
+		$OPENED_DB{$database} = $db;
+		
 		# return as appropriate either both object and name or just object
 		return wantarray ? ($db, $database) : $db;
 	} 
@@ -915,15 +925,13 @@ sub verify_or_request_feature_types {
 						
 						# verify
 						unless (%db_features) {
-							cluck " provided database has no feature types " . 
+							carp " provided database has no feature types " . 
 								"to verify dataset(s) against!\n";
-							return;
 						}
 					}
 					else {
 						# we need a database
-						cluck " no database provided to verify dataset(s) against!\n";
-						return;
+						carp " unable to verify dataset without database";
 					}
 				}
 				
@@ -971,14 +979,14 @@ sub verify_or_request_feature_types {
 			
 			# verify
 			unless (%db_features) {
-				cluck " provided database has no feature types " . 
+				carp " provided database has no feature types " . 
 					"to collect!\n";
 				return;
 			}
 		}
 		else {
 			# we need a database
-			cluck " no database provided to collect features from!\n";
+			carp " no database provided from which to collect features!\n";
 			return;
 		}
 		
@@ -1387,7 +1395,7 @@ sub get_new_feature_list {
 		# the specific database, and is not portable between databases
 		push @{ $new_data->{'data_table'} }, [
 			$feature->primary_id, 
-			join(';', $feature->display_name, ($feature->get_tag_values('Alias'))), 
+			$feature->display_name,  
 			$feature->type,
 		];
 		$new_data->{'last_row'} += 1;
@@ -1766,7 +1774,8 @@ The keys include
 
   Required:
   db       => The name of the database or a reference to an 
-              established database object. 
+              established database object. Optional if an 
+              indexed dataset file (Bam, BigWig, etc.) is provided.
   dataset  => The name of the dataset in the database to be 
               collected. The name should correspond to a feature 
               type in the database, either as type or type:source. 
@@ -1840,8 +1849,15 @@ sub get_chromo_region_score {
 	
 	# Open a db connection 
 	$args{'db'} ||= undef;
-	my $db = open_db_connection( $args{'db'} ) or 
-		confess "no database name or connection!!\n";
+	unless ($args{'db'} or $args{'dataset'} =~ /^(?:file|http|ftp)/) {
+		# database is only really necessary if we are not using an indexed file dataset
+		confess "no database provided!";
+	}
+	my $db;
+	if ($args{'db'}) {
+		$db = open_db_connection( $args{'db'} ) or 
+			confess "cannot open database!";
+	}
 	
 	# establish coordinates
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
@@ -2022,7 +2038,7 @@ sub get_region_dataset_hash {
 	### Initialize parameters
 	
 	# Open a db connection 
-	$args{'db'} ||= undef;
+	$args{'db'} ||= $args{'ddb'} || undef;
 	my $db = open_db_connection( $args{'db'} ) or 
 		confess "no database name or connection!!\n";
 	
@@ -2729,7 +2745,7 @@ sub _get_segment_score {
 	my %pos2data; # hash of position to scores
 	my $dataset_type; # remember what type of database the data is from
 	my $iterator; # seqfeature stream object for reiterating db features
-	my $db_type = ref $db; # source of the originating db 
+	my $db_type = $db ? ref $db : undef; # source of the originating db 
 	
 	my @datasetlist = split /[&,]/, $dataset; 
 		# multiple datasets may be combined into a single search, for example
@@ -3037,6 +3053,7 @@ sub _get_segment_score {
 		# let's just try a basic features method using whatever the 
 		# default type is and hope for the best
 		# warn "using other database $db_type!\n";
+		confess "no database passed!" unless $db;
 		$iterator = $db->get_seq_stream(
 			-seq_id      => $chromo,
 			-start       => $start,
