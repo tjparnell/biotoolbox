@@ -94,14 +94,49 @@ sub verify_data_structure {
 		return;
 	}
 	
-	# check for column index
-	if (defined $datahash_ref->{'number_columns'}) {
-		my $number = scalar @{ $datahash_ref->{'data_table'}->[0] };
-		if ($datahash_ref->{'number_columns'} != $number) {
-			warn " number of data columns [$number] doesn't match " . 
-				"metadata value [" . $datahash_ref->{'number_columns'} . "]!\n";
+	# check for last row index
+	if (defined $datahash_ref->{'last_row'}) {
+		my $number = scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
+		if ($datahash_ref->{'last_row'} != $number) {
+			warn " data table last_row index [$number] doesn't match " . 
+				"metadata value [" . $datahash_ref->{'last_row'} . "]!\n";
 			# fix it for them
-			$datahash_ref->{'number_columns'} = $number;
+			$datahash_ref->{'last_row'} = $number;
+		}
+	}
+	else {
+		# define it for them
+		$datahash_ref->{'last_row'} = 
+			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
+	}
+	
+	# check for consistent number of columns
+	if (defined $datahash_ref->{'number_columns'}) {
+		my $number = $datahash_ref->{'number_columns'};
+		my @problems;
+		my $too_low = 0;
+		my $too_high = 0;
+		for (my $row = 0; $row <= $datahash_ref->{'last_row'}; $row++) {
+			my $count = scalar @{ $datahash_ref->{'data_table'}->[$row] };
+			if ($count != $number) {
+				push @problems, $row;
+				$too_low++ if $count < $number;
+				$too_high++ if $count > $number;
+				while ($count < $number) {
+					# we can sort-of-fix this problem
+					$datahash_ref->{'data_table'}->[$row][$count] = '.';
+					$count++;
+				}
+			}
+		}
+		if ($too_low) {
+			warn " $too_low rows in data table had fewer than expected columns!\n" . 
+				 "  padded rows " . join(',', @problems) . " with null values\n";
+		}
+		if ($too_high) {
+			warn " $too_high rows in data table had more columns than expected!\n" . 
+				" rows " . join(',', @problems) . "\n";
+			return;
 		}
 	}
 	else {
@@ -121,22 +156,6 @@ sub verify_data_structure {
 				$datahash_ref->{'data_table'}->[0][$i] . "'\n";
 			return;
 		}
-	}
-	
-	# check for last row index
-	if (defined $datahash_ref->{'last_row'}) {
-		my $number = scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
-		if ($datahash_ref->{'last_row'} != $number) {
-			warn " data table last_row index [$number] doesn't match " . 
-				"metadata value [" . $datahash_ref->{'last_row'} . "]!\n";
-			# fix it for them
-			$datahash_ref->{'last_row'} = $number;
-		}
-	}
-	else {
-		# define it for them
-		$datahash_ref->{'last_row'} = 
-			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
 	}
 	
 	# check for proper gff structure
