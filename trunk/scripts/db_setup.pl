@@ -125,7 +125,8 @@ option --db $ucscdb.
 You can check the database now by running
   print_feature_types.pl $ucscdb
 SUCCESS
-;
+	;
+	}
 }
 else {
 	print "##### Something went wrong! Database could not be opened #####\n";
