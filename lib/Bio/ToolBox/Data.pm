@@ -52,9 +52,9 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   	  
   	  
   	  
-  	  my $value = $item->value($column);
+  	  my $value = $row->value($column);
   	  my $new_value = $value + 1;
-  	  $item->value($column, $new_value);
+  	  $row->value($column, $new_value);
   }
   
   
@@ -750,7 +750,6 @@ Flag to use the midpoint instead of actual start and stop coordinates.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-# use lib '/Users/tim/Documents/Tim-yeaster/scripts/biotoolbox/lib';
 
 use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
@@ -903,7 +902,7 @@ sub database {
 
 sub open_database {
 	my $self = shift;
-	return unless defined $self->{db};
+	return unless $self->{db};
 	if (exists $self->{db_connection}) {
 		return $self->{db_connection};
 	}
@@ -1156,8 +1155,8 @@ sub verify_dataset {
 		return $self->{verfied_dataset}{$dataset};
 	}
 	else {
-		if ($dataset =~ /^file:/) {
-			# local file already verified?
+		if ($dataset =~ /^(?:file|http|ftp)/) {
+			# local or remote file already verified?
 			$self->{verfied_dataset}{$dataset} = $dataset;
 			return $dataset;
 		}
@@ -1418,8 +1417,11 @@ sub get_score {
 	}
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database;
+	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
+	unless ($args{dataset}) {
+		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	}
 	
 	$args{db} ||= $self->{data}->open_database;
 	
@@ -1450,8 +1452,17 @@ sub get_position_scores {
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
+	unless ($args{dataset}) {
+		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	}
 	
 	$args{db} ||= $self->{data}->open_database;
+	unless ($args{db} or $args{ddb}) {
+		# make sure we provide a database
+		if ($self->{feature} eq 'coordinate' and $args{dataset} =~ /^(?:file|http|ftp)/) {
+			$args{ddb} = $args{dataset};
+		}
+	}
 	
 	return get_region_dataset_hash(%args);
 }
