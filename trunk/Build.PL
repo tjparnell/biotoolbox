@@ -164,7 +164,8 @@ sub check_db {
 	$options->{'requires'}{'DBD::SQLite'} = 0;
 	
 	# add mysql as an advanced option
-	my $mysql_config = `mysql_config --libs --include`;
+	my $mysql_config;
+	eval {$mysql_config = `mysql_config --libs --include`};
 	if ($mysql_config) {
 		# pretty good evidence that MySQL is installed
 		$options->{'recommends'}{'DBD::mysql'} = 0;
@@ -175,7 +176,8 @@ sub check_db {
 sub check_gd {
 	return unless $make_present;
 	
-	my $gd_config = `gdlib-config --all`;
+	my $gd_config;
+	eval {$gd_config = `gdlib-config --all`};
 	if ($gd_config) {
 		# pretty good evidence the libgd libraries are installed
 		$options->{'requires'}{'GD'} = 0;
