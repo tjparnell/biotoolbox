@@ -53,7 +53,7 @@ sub get_base_options {
 			'Statistics::Descriptive' => 3.0,
 			'Statistics::LineFit'     => 0,
 			'Parallel::ForkManager'   => 0,
-			'Bio::Root::Version'      => '1.0069001',
+			'Bio::Root::Version'      => '1.0069002',
 			'Bio::DB::USeq'           => 0.20, # only because this is pure perl
 		},
 		recommends        => {
