@@ -55,7 +55,7 @@ my $score = $row->get_score(
 	'method'   => 'sum',
 );
 # print "count sum for ", $row->name, " is $score\n";
-ok($score, 49);
+ok($score, 48);
 
 # score mean coverage
 $score = $row->get_score(
@@ -65,7 +65,7 @@ $score = $row->get_score(
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
-ok(sprintf("%.2f", $score), -0.14);
+ok(sprintf("%.2f", $score), -0.12);
 
 
 

@@ -66,11 +66,7 @@ ok($feature);
 # test get_score CDS count
 my $score = $row->get_score(
 	'db'      => $db,
-	'dataset' => ['cds', 'CDS'], # use both cases here
-	                             # upper is correct, but it won't be found
-	                             # some sort of case sensitive bug in memory adaptor
-	                             # it will properly give a warning about not finding it
-	                             # but the test will complete
+	'dataset' => 'cds',
 	'method'  => 'sum',
 	'value'   => 'count',
 );
@@ -81,7 +77,7 @@ $row->value($cds_index, $score);
 while ($row = $stream->next_row) {
 	my $score = $row->get_score(
 		'db'      => $db,
-		'dataset' => ['cds', 'CDS'], # use both cases here
+		'dataset' => 'cds',
 		'method'  => 'sum',
 		'value'   => 'count',
 	);
