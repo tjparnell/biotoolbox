@@ -4,7 +4,7 @@ author:
   - 'Timothy Parnell <parnell.tj@gmail.com>'
 build_requires: {}
 configure_requires:
-  Module::Build: 0.40
+  Module::Build: 0
 dynamic_config: 1
 generated_by: 'Module::Build version 0.4003, CPAN::Meta::Converter version 2.112621'
 license: perl
@@ -59,26 +59,26 @@ provides:
     file: lib/Bio/ToolBox/file_helper.pm
     version: 1.14
 recommends:
-  Archive::Zip: 0
-  Bio::Graphics: 0
+  Bio::Graphics: 2.29
   DBD::mysql: 0
-  File::Which: 0
-  Net::FTP: 0
 requires:
   Algorithm::Cluster: 0
+  Archive::Zip: 0
   Bio::DB::BigFile: 1.07
   Bio::DB::Sam: 1.36
   Bio::DB::USeq: 0.2
   Bio::Root::Version: 1.0069001
-  Config::Simple: 0
+  Config::Simple: 4.58
   DBD::SQLite: 0
   DBI: 0
-  GD: 0
-  GD::Graph: 0
-  GD::Graph::smoothlines: 0
-  Parallel::ForkManager: 0
+  File::Which: 0
+  GD: 2.44
+  GD::Graph: 1.44
+  GD::Graph::smoothlines: 1.6
+  Net::FTP: 0
+  Parallel::ForkManager: 1.02
   Statistics::Descriptive: 3
-  Statistics::LineFit: 0
+  Statistics::LineFit: 0.06
   Statistics::Lite: 3.2
 resources:
   license: http://dev.perl.org/licenses/
