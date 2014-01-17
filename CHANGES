@@ -5,10 +5,32 @@ v.1.14
 	Perl module distribution that is installed using standard 
 	Module::Build methods. This will install the libraries into 
 	site-specific Perl library directories as Bio::ToolBox::*. 
-	Scripts will install into a site-specific bin directory. All 
+	Scripts will install into a standard bin directory. All 
 	scripts have been updated to reflect these changes.
+	- Added new module Bio::ToolBox::Data, which provides an easy 
+	object-oriented interface to working with data files and the 
+	rest of the Bio::ToolBox functions. 
 	- Added new script db_setup.pl to ease generating an annotation 
 	database with UCSC data
+	- Added Build tests for all major library functions, including 
+	score collections from all binary database adaptors.
+	- Added capability to properly collect value types, including 
+	score, count, and length, from useq and wiggle database adaptors
+	- Loosened restriction for counting Bam alignments where the 
+	midpoint had to be within the query region; now any overlapping 
+	alignment that intersects the region will be counted.
+	- Reworked the interpolation algorithm to interpolate as many 
+	datapoints as possible in script get_relative_data.pl.
+	- Removed cryptic error messages when opening databases, and 
+	added database handle caching to avoid repeated openings
+	- Newly generated feature lists no longer append all aliases to 
+	the feature name
+	- Added additional attributes to the list of available ones to 
+	retrieve from the database in script get_feature_info.pl. Also 
+	added a --type command line option to set a feature type to 
+	named features.
+	- Improved data table checking to include a count of columns 
+	for every row.
 	- Added max_count option to script bam2wig.pl to control for 
 	high Bam coverage
 	- Fixed bug where the summary file was not created for 
