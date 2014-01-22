@@ -32,7 +32,25 @@ check_big();
 
 
 ### Build the script
-my $build = Module::Build->new(%$options);
+# my $build = Module::Build->new(%$options);
+my $class = Module::Build->subclass(
+	# we will create our own installdeps action here 
+	# so that we can export environment variables specific to 
+	# installing Bio-SamTools or Bio-BigFile that we found 
+	# during the configuration step
+	class       => 'Module::Build::customized',
+	code        => q{
+		sub ACTION_installdeps {
+			my $self = shift;
+			for my $name (qw(SAMTOOLS KENT_SRC MACHTYPE)) {
+				my $value = $self->config_data($name);
+				$ENV{$name} = $value if $value;
+			}
+			$self->SUPER::ACTION_installdeps;
+		}
+	},
+);
+my $build = $class->new(%$options);
 $build->create_build_script;
 exit 0;
 
@@ -42,15 +60,15 @@ exit 0;
 
 sub get_base_options {
 	my %options = (
-		build_class       => 'Module::Build',
+# 		build_class       => 'Module::Build',
 		module_name       => 'Bio::ToolBox',
 		license           => 'perl',
 		dist_version_from => 'lib/Bio/ToolBox.pm',
 		dist_author       => 'Timothy Parnell <parnell.tj@gmail.com>',
 		dist_abstract     => 'Tools for querying and analysis of genomic data',
-		configure_requires => {
-			'Module::Build'       => 0,
-		},
+# 		configure_requires => {
+# 			'Module::Build'       => 0,
+# 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
 			'Statistics::Lite'        => 3.2,
@@ -61,8 +79,8 @@ sub get_base_options {
 			'Net::FTP'                => 0,
 			'File::Which'             => 0,
 		},
-		recommends        => {
-		},
+		recommends        => {},
+		config_data       => {},
 		script_files => [
 			'scripts/average_gene.pl',
 			'scripts/bam2gff_bed.pl',
@@ -285,18 +303,11 @@ sub check_sam {
 			# we have libbam.a, I'm going to assume the include files 
 			# are present too
 			# go ahead and require it, I think we are good
-			print "Found samtools library at $samtools\n";
-			eval {system('export', "SAMTOOLS=$samtools")};
+			print "\nFound samtools library at $samtools\n\n";
+			$options->{'config_data'}{'SAMTOOLS'} = $samtools;
 			$options->{'requires'}{'Bio::DB::Sam'} = 1.36;
 		}
 		else {
-# 			warn <<SAM
-# 
-# A samtools library could not be found for building the Bio::DB::Sam 
-# module for working with Bam files. You can install it manually or 
-# run the install/install_samtools.sh to install it.
-# SAM
-# ;
 			$options->{'recommends'}{'Bio::DB::Sam'} = 1.36;
 		}	
 	}
@@ -338,26 +349,15 @@ sub check_big {
 A UCSC kent source directory was found at $kent
 so I will add Bio::DB::BigFile as a requirement. If the build 
 fails, then you will need to build Bio::DB::BigFile manually.
+
 KENT
 ;
+			$options->{'config_data'}{'KENT_SRC'} = $kent;
+			$options->{'config_data'}{'MACHTYPE'} = $machtype;
 			$options->{'requires'}{'Bio::DB::BigFile'} = 1.07;
-			eval {
-				# try exporting the paths for the module to find later
-				# this assumes a typical bash shell in a unix environment
-				# which is a reasonable 
-				system('export', "KENT_SRC=$kent");
-				system('export', "MACHTYPE=$machtype");
-			};
 		}
 		else {
 			$options->{'recommends'}{'Bio::DB::BigFile'} = 1.07;
-# 			print <<KENT
-# 
-# A UCSC kent source library could not be found for building the 
-# Bio::DB::BigFile module for working with BigWig and BigBed files. 
-# You can install it manually or run the included script 
-# to install it.
-# KENT
 		}	
 	}
 }
