@@ -112,7 +112,8 @@ my $bdg_app_path = $BTB_CONFIG->param('applications.bigWigToBedGraph') || undef;
 unless ($bdg_app_path) {
 	# next check the system path
 	eval {
-		use File::Which;
+		require File::Which;
+		File::Which->import;
 		$bdg_app_path = which('bigWigToBedGraph');
 	};
 	add_program($bdg_app_path) if $bdg_app_path; # remember for next time
@@ -124,7 +125,8 @@ my $bw_app_path = $BTB_CONFIG->param('applications.bedGraphToBigWig') || undef;
 unless ($bw_app_path) {
 	# next check the system path
 	eval {
-		use File::Which;
+		require File::Which;
+		File::Which->import;
 		$bw_app_path = which('bigWigToBedGraph');
 	};
 	add_program($bw_app_path) if $bw_app_path; # remember for next time
