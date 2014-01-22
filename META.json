@@ -21,27 +21,22 @@
       },
       "runtime" : {
          "recommends" : {
-            "Bio::Graphics" : "2.29",
-            "DBD::mysql" : 0
-         },
-         "requires" : {
             "Algorithm::Cluster" : 0,
-            "Archive::Zip" : 0,
             "Bio::DB::BigFile" : "1.07",
             "Bio::DB::Sam" : "1.36",
             "Bio::DB::USeq" : "0.2",
-            "Bio::Root::Version" : "1.0069001",
-            "Config::Simple" : "4.58",
             "DBD::SQLite" : 0,
-            "DBI" : 0,
             "File::Which" : 0,
-            "GD" : "2.44",
             "GD::Graph" : "1.44",
             "GD::Graph::smoothlines" : "1.6",
             "Net::FTP" : 0,
             "Parallel::ForkManager" : "1.02",
+            "Statistics::LineFit" : "0.06"
+         },
+         "requires" : {
+            "Bio::Root::Version" : "1.0069001",
+            "Config::Simple" : "4.58",
             "Statistics::Descriptive" : "3",
-            "Statistics::LineFit" : "0.06",
             "Statistics::Lite" : "3.2"
          }
       }
