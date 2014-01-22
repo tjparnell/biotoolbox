@@ -9,6 +9,18 @@ use File::Spec;
 use FindBin qw($Bin);
 use Bio::ToolBox::db_helper::config qw(add_database);
 use Bio::ToolBox::db_helper qw(open_db_connection);
+use Bio::DB::SeqFeature::Store;
+use Bio::DB::SeqFeature::Store::GFF3Loader;
+
+# check for additional requirements 
+my $sql;
+eval {
+	require DBD::SQLite;
+	$sql = 1;
+};
+
+
+
 my $VERSION = '1.14';
 
 print "\n This program will set up an annotation database\n\n";
@@ -61,6 +73,9 @@ if ($print_version) {
 
 
 ### Check for requirements
+unless ($sql) {
+	die " Please install Perl module DBD::SQLite to set up a database\n";
+}
 unless ($ucscdb) {
 	$ucscdb = shift @ARGV or
 		die " no database name provided! use --help for more information\n";
@@ -69,6 +84,9 @@ if ($path) {
 	$path = File::Spec->canonpath($path);
 	unless (-e $path) {
 		mkdir $path or die "unable to make database path $path\n$!\n"; 
+	}
+	unless (-w _) {
+		die " $path is not writable!\n";
 	}
 }
 else {
@@ -87,6 +105,7 @@ else {
 }
 
 
+
 ### Get UCSC annotation
 print "##### Fetching annotation from UCSC. This may take a while ######\n";
 system(File::Spec->catdir($Bin, 'ucsc_table2gff3.pl'), '--db', $ucscdb, '--ftp', 'all', 
@@ -97,12 +116,41 @@ unless (@gff) {
 	die "unable to find new GFF3 files!\n";
 }
 
+
+
 ### Build database
 print "##### Building database. This may take a while ######\n";
 my $database = File::Spec->catdir($path, "$ucscdb.sqlite");
-system('bp_seqfeature_load.pl', '--adaptor', 'DBI::SQLite', '--dsn', 
-	$database, '--create', '--fast', '--nosummary', @gff) == 0 
-	or die "unable to load database!\n";
+my $temp = File::Spec->tmpdir();
+
+# create a database
+my $store = Bio::DB::SeqFeature::Store->new(
+    -dsn        => $database,
+    -adaptor    => 'DBI::SQLite',
+    -tmpdir     => $temp,
+    -write      => 1,
+    -create     => 1,
+    -compress   => 0,
+) or die " Cannot create a SeqFeature database connection!\n";
+
+# load the database
+my $loader = Bio::DB::SeqFeature::Store::GFF3Loader->new(
+    -store              => $store,
+    -sf_class           => 'Bio::DB::SeqFeature',
+    -verbose            => 1,
+    -tmpdir             => $temp,
+    -fast               => 1,
+    -ignore_seqregion   => 0,
+    -index_subfeatures  => 1,
+    -noalias_target     => 0,
+    -summary_stats      => 0,
+)or die " Cannot create a GFF3 loader for the database!\n";
+
+# on signals, give objects a chance to call their DESTROY methods
+# borrowed from bp_seqfeature_load.pl
+$SIG{TERM} = $SIG{INT} = sub {  undef $loader; undef $store; die "Aborted..."; };
+$loader->load(@gff);
+
 
 
 ### Check database
@@ -122,6 +170,7 @@ if ($db) {
 The database configuration was added to the BioToolBox configuration 
 file. You may use the database in any BioToolBox script with the 
 option --db $ucscdb.
+
 You can check the database now by running
   print_feature_types.pl $ucscdb
 SUCCESS
@@ -197,8 +246,8 @@ Display this POD documentation.
 This program will simplify the task of generating an annotation database. You 
 provide the short name of the UCSC database for the species and genome version 
 you are interested in, and the script will automatically download gene annotation 
-and build a C<Bio::DB::SeqFeature::Store> database for use with BioToolBox 
-scripts. It may also be used with the GBrowse genome browser.
+and build a I<Bio::DB::SeqFeature::Store> database for use with BioToolBox 
+scripts. 
 
 =head1 AUTHOR
 
