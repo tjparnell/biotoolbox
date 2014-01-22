@@ -4,7 +4,6 @@ package Bio::ToolBox::big_helper;
 require Exporter;
 use strict;
 use Carp qw(carp cluck);
-use File::Which;
 use File::Temp;
 use Bio::ToolBox::db_helper qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
@@ -56,8 +55,11 @@ sub wig_to_bigwig_conversion {
 	}
 	unless ($args{'bwapppath'}) {
 		# try checking the system path as a final resort
-		$args{'bwapppath'} = which($utility);
-		chomp $args{'bwapppath'};
+		eval {
+			require File::Which;
+			File::Which->import;
+			$args{'bwapppath'} = which($utility);
+		};
 		add_program($args{'bwapppath'}) if $args{'bwapppath'};
 	}
 	unless ($args{'bwapppath'}) {
@@ -161,8 +163,11 @@ sub bed_to_bigbed_conversion {
 	}
 	unless ($args{'bbapppath'}) {
 		# try checking the system path as a final resort
-		$args{'bbapppath'} = which('bedToBigBed');
-		chomp $args{'bbapppath'};
+		eval {
+			require File::Which;
+			File::Which->import;
+			$args{'bbapppath'} = which('bedToBigBed');
+		};
 		add_program($args{'bbapppath'}) if $args{'bbapppath'};
 	}
 	unless ($args{'bbapppath'}) {

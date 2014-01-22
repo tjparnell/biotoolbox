@@ -103,7 +103,8 @@ if (-d $infile) {
 my $java = $BTB_CONFIG->param('applications.java') || undef;
 unless (defined $java) {
 	eval {
-		use File::Which;
+		require File::Which;
+		File::Which->import;
 		$java = which('java');
 	};
 	add_program($java) if $java; # remember this for next time

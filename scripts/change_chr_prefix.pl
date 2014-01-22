@@ -212,7 +212,8 @@ sub process_bam_file {
 	unless ($samtools) {
 		# try looking for it
 		eval {
-			use File::Which;
+			require File::Which;
+			File::Which->import;
 			$samtools = which('samtools');
 		};
 		add_program($samtools) if $samtools; # remember for next time
