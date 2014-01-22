@@ -7,12 +7,9 @@ use IO::File;
 
 our $GZIP_OK = 0;
 eval {
-	use IO::Zlib;
-};
-unless ($@) {
+	require IO::Zlib;
 	$GZIP_OK = 1;
-}; 
-undef $@;
+};
 
 my $VERSION = '1.14';
 
