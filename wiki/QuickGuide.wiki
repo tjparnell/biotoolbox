@@ -18,10 +18,11 @@ Experienced users who are familiar with Perl and [http://www.cpan.org CPAN] can 
 	* Make sure you have C compiler (GCC or equivalent and `make`). While in theory it is not absolutely required, you will not get far without it. Linux users can install it through their package manager; Mac OS X users should install XCode from the App Store and enable "Command Line Tools" in the preferences.
 
 ===Super easy install===
-To install BioToolBox in your home folder, using the default system-installed Perl, use the following commands.
+To install BioToolBox in your home folder, using the default system-installed Perl, copy and paste the following command in a terminal.
 <pre>
 	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::Perl Bio::ToolBox
 </pre>
+
 This may or may not fail, depending on the number of dependencies that must be installed. Repeat two or thee times as necessary until it installs correctly. Or follow the steps below or consult the guides listed above.
 
 ===Step by step easy install===

@@ -47,6 +47,8 @@ If you find yourself with a linux computer with a geriatric version of Perl (e.g
 </pre>
 The above commands will set up perlbrew, set up your environment to use perlbrew, install cpanminus package manager, install perl version 5.16 with threaded 64 bit support, clean up the installation files, and use the installed version. You can type `perlbrew help` on the command line for more information.
 
+Note that anytime you start a new terminal, you should run `perlbrew use perl-X.XX` to switch to that version of Perl, otherwise you will default to the system installed version.
+
 ==Local or Root==
 If you are an administrator on the computer, then you can install BioPerl and other Perl modules in the system directories for multiple users. This can sometimes make things easier and avoids multiple installations. However, it's easier to break something, especially if you're not sure what you are doing.
 
