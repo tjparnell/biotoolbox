@@ -47,7 +47,7 @@ If you find yourself with a linux computer with a geriatric version of Perl (e.g
 </pre>
 The above commands will set up perlbrew, set up your environment to use perlbrew, install cpanminus package manager, install perl version 5.16 with threaded 64 bit support, clean up the installation files, and use the installed version. You can type `perlbrew help` on the command line for more information.
 
-Note that anytime you start a new terminal, you should run `perlbrew use perl-X.XX` to switch to that version of Perl, otherwise you will default to the system installed version.
+Note that anytime you start a new terminal, you should run "`perlbrew use perl-X.XX`" to switch to that version of Perl, otherwise you will default to the system installed version.
 
 ==Local or Root==
 If you are an administrator on the computer, then you can install BioPerl and other Perl modules in the system directories for multiple users. This can sometimes make things easier and avoids multiple installations. However, it's easier to break something, especially if you're not sure what you are doing.
@@ -229,7 +229,7 @@ The samtools `make` does not include test or install methods. For a system-wide 
 
 To install the Bio-SamTools Perl module, you'll need access to the header and library folders in the samtools directory (this is why you need to keep it handy). Do a search for Bio-SamTools from within the CPAN Shell, and install the latest version you find. During the installation, the Installer will ask for the location of the samtools headers and libraries. Enter the full path to where you've placed it, and it should compile and install fine.
 
-One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
+One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "`-fPIC`". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, edit the CFLAGS line and add "`-fPIC`" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
 <pre>
 	make clean
 	make
@@ -253,7 +253,7 @@ You'll first need to compile the libraries used with big files. You can follow t
 
 Next, install Bio-BigFile using the CPAN Shell. During installation, it will need to know the location of the kent/src/ directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
 
-You may encounter the same error as with samtools above regarding "-fPIC". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, `make clean`, and `make` again. 
+You may encounter the same error as with samtools above regarding "`-fPIC`". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "`-fPIC`" to the line. Save, "`make clean`", and "`make`" again. 
 
 Now that you have Bio-BigFile installed, you should go ahead and compile some of the useful utilities for converting and working with bigFiles. First you will need to make the destination `bin` directory. 
 <pre>
@@ -261,7 +261,7 @@ Now that you have Bio-BigFile installed, you should go ahead and compile some of
 	mkdir ~/bin/x86_64     # this should be whatever you set your MACHTYPE
 </pre>
 
-Next, enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. Enter each one separately, and execute `make`. It will compile the executable, and place it in your bin directory. Here is a short list I would recommend.
+Next, enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. Enter each one separately, and execute "`make`". It will compile the executable, and place it in your bin directory. Here is a short list I would recommend.
 	* `wigToBigWig`
 	* `bedGraphToBigWig`
 	* `bedToBigBed`
@@ -274,7 +274,7 @@ Next, enter the `kent/src/util` directory, where you'll find numerous subdirecto
 ==Installing support for legacy wig files==
 There are a number of reasons to go with binary bigWig files over the original wiggle implementation, but if you have legacy data, BioToolBox will work with it. The legacy adaptor is [http://search.cpan.org/perldoc?Bio::Graphics::Wiggle Bio::Graphics::Wiggle], and was developed as part of the [http://gmod.org/wiki/GBrowse GBrowse] browser. The associated Perl script, [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl], is part of GBrowse and will take as input a text wiggle file (.wig) and generate binary files (.wib) referenced by a GFF3 file. This GFF3 file, in turn, will need to be loaded in a Bio::DB::SeqFeature::Store database.
 
-To install support, you'll need to install from CPAN at least  [http://search.cpan.org/dist/Bio-Graphics/ Bio-Graphics] and the [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl] script (or the complete [http://search.cpan.org/dist/GBrowse/ GBrowse]). These will require a number of other prerequisites, which the CPAN Shell should be able to handle.
+To install support, you'll need to install from CPAN at least  [http://search.cpan.org/dist/Bio-Graphics/ Bio-Graphics] and the [http://search.cpan.org/perldoc?wiggle2gff3.pl wiggle2gff3.pl] script (or the complete [http://search.cpan.org/dist/GBrowse/ GBrowse]). These will require a number of other prerequisites, including the GD library. 
 
 ==Installing the Ensembl Perl API==
 To retrieve genome annotation from Ensembl's public MySQL database using the BioToolBox script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
