@@ -36,7 +36,7 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip.  Sam files will not work, see [Pod_bam2gff_bed_pl bam2gff_bed.pl] for that.
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in Bio::!ToolBox**::file_helper,  although any format should work. The file may be compressed with gzip.  Sam files will not work, see [Pod_bam2gff_bed_pl bam2gff_bed.pl] for that.
 __
   __
 __--ask

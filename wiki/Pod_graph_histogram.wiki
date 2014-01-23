@@ -39,7 +39,7 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the file name of a previously generated feature dataset. The tim data format is preferable, although any other tab-delimited text  data formats may be usable. See the file description in `tim_db_helper.pm`.
+  Specify the file name of a previously generated feature dataset. The tim data format is preferable, although any other tab-delimited text  data formats may be usable.
 __
   __
 __--index <**column_index>

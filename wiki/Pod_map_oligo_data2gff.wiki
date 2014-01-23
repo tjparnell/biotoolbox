@@ -38,7 +38,7 @@ __
 __--data <**oligo_data.tx>
 
 __
-  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_file_helper.pm',  although any format should work. The file may be compressed with gzip. The  first column MUST be the oligo or probe unique name or ID.
+  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in Bio::!ToolBox**::file_helper,  although any format should work. The file may be compressed with gzip. The  first column MUST be the oligo or probe unique name or ID.
 __
   __
 __--index <**column_index>

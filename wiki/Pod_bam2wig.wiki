@@ -28,6 +28,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --strand
   --qual <integer>
   --max <integer>
+  --max_cnt <integer>
   --rpm
   --log [2|10]
   --bw
@@ -153,7 +154,13 @@ __
 __--max <**integer>
 
 __
-  Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this does not affect coverage mode.  You may want to set a limit when working with random fragments (sonication) to  avoid PCR bias. Note that setting this value in conjunction with the --rpm  option may result in slightly lower coverage than anticipated, since the  pre-count does not account for duplicity. The default is undefined (no limit).
+  Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this has no effect in coverage mode.  You may want to set a limit when working with random fragments (sonication)  to avoid PCR bias. Note that setting this value in conjunction with the --rpm  option may result in lower coverage than anticipated, since the pre-count  does not account for duplicity. The default is undefined (no limit).
+__
+  __
+__--max_cnt <**integer>
+
+__
+  In special coverage mode only, this option sets the maximum coverage count  at any given base. The default is 8000 (set by the bam adaptor).
 __
   __
 __--rpm

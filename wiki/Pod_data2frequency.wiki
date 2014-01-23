@@ -32,7 +32,7 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the file name of a data file. It must be a tab-delimited text file, preferably in the tim data format as described in 'tim_data_helper.pm',  although any format should work. The file may be compressed with gzip.
+  Specify the file name of an input data file. The file should be  a tab-delimited text file. The file may be compressed with gzip.
 __
   __
 __--bins <**integer>
