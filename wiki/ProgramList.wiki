@@ -47,6 +47,7 @@ Lists of programs organized by function.
 	* [ProgramList#map_transcripts.pl map_transcripts.pl]
 
 ===Genome annotation===
+	* [ProgramList#db_setup.pl db_setup.pl]
 	* [ProgramList#convert_yeast_genome_version.pl convert_yeast_genome_version.pl]
 	* [ProgramList#get_ensembl_annotation.pl get_ensembl_annotation.pl]
 	* [ProgramList#gff3_to_ucsc_table.pl gff3_to_ucsc_table.pl]
@@ -80,12 +81,13 @@ Lists of programs organized by function.
 ===Miscellaneous===
 	* [ProgramList#big_file2gff3.pl big_file2gff3.pl]
 	* [ProgramList#change_chr_prefix.pl change_chr_prefix.pl]
+	* [ProgramList#change_cluster_order.pl change_cluster_order.pl]
 	* [ProgramList#CpG_calculator.pl CpG_calculator.pl]
 	* [ProgramList#print_feature_types.pl print_feature_types.pl]
 
 =Program List=
 
-This is an alphabetical list of the scripts available in the *biotoolbox* scripts directory.
+This is an alphabetical list of the scripts available in the *BioToolBox* scripts directory.
 
 ====average_gene.pl====
 [Pod_average_gene average_gene.pl] generates class average summaries for a list of genes or features. Each gene is divided into a set number of bins and data is summarized in each bin. Use [ProgramList#graph_profile.pl graph_profile.pl] to plot the summary.
@@ -107,6 +109,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====change_chr_prefix.pl====
 [Pod_change_chr_prefix change_chr_prefix.pl] changes the chromosome name by either adding or stripping a prefix. Useful when converting between different genome source repositories. Handles Fasta, GFF, BED, Sam, and Bam files.
+
+====change_cluster_order.pl====
+[Pod_change_cluster_order change_cluster_order.pl] will easily re-order the clusters from a K-means cluster analysis to your desired order. A CDT and KGG file are required. 
 
 ====compare_subfeature_scores.pl====
 [Pod_compare_subfeature_scores compare_subfeature_scores.pl] compares the scores of all the subfeatures of a parent feature to find the minimum and maximum subfeature score. For example, identify expressed and not-expressed alternative transcripts of a gene.
@@ -134,6 +139,9 @@ This is an alphabetical list of the scripts available in the *biotoolbox* script
 
 ====data2wig.pl====
 [Pod_data2wig data2wig.pl] converts any data text file into into a text wiggle file, so long as it has genomic coordinates. Both fixed and variable step files may be generated depending on the source file coordinates. Alternatively, binary bigwig files may be generated.
+
+====db_setup.pl====
+[Pod_db_setup db_setup.pl] easily and automatically generates a new Bio::DB::SeqFeature::Store database using annotation from the UCSC Genome website. The script will download tables, convert to GFF3 format, fast load a SQLite database, and append the connection information to the BioToolBox configuration file .biotoolbox.cfg.
 
 ====filter_bam.pl====
 [Pod_filter_bam filter_bam.pl] will filter alignments based on one or more boolean critera, including attributes, score, length, sequence composition at specific positions, etc., and write a new Bam file. 
