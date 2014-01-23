@@ -44,7 +44,7 @@ If you find yourself with a linux computer with a geriatric version of Perl (e.g
 	perlbrew install -v --multi --thread --64all perl-5.16.4
 	perlbrew clean
 	perlbrew use perl-5.16.4
-<pre>
+</pre>
 The above commands will set up perlbrew, set up your environment to use perlbrew, install cpanminus package manager, install perl version 5.16 with threaded 64 bit support, clean up the installation files, and use the installed version. You can type `perlbrew help` on the command line for more information.
 
 ==Local or Root==

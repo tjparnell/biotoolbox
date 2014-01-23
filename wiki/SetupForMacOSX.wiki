@@ -3,6 +3,8 @@
 
 =Preparing a Mac OS X computer for bioinformatics analysis=
 
+These are notes specific for Mac OS X computers. For general information about setting up BioToolBox, please either the [QuickGuide Quick Guide] or the main [BioToolBoxSetUp Set Up Guide].
+
 ==Contents==
 	# [SetupForMacOSX#Prerequisites Prerequisites]
 	# [SetupForMacOSX#Mac_OS_X_Version_Specific_Notes Mac OS X Version Specific Notes]
@@ -34,7 +36,6 @@
 		# [SetupForMacOSX#Setting_up_GBrowse_user_accounts Setting up GBrowse user accounts]
 			# [SetupForMacOSX#Setting_up_PAM_Authentication_with_OS_X_accounts Setting up PAM Authentication with OS X accounts]
 		# [SetupForMacOSX#Cleaning_up_after_GBrowse Cleaning up after GBrowse]
-module]
 	# [SetupForMacOSX#Additional_Tools Additional Tools]
 		# [SetupForMacOSX#Compiling_a_64-bit_liftOver_tool_on_OS_X Compiling a 64-bit liftOver tool on OS X]
 		# [SetupForMacOSX#Installing_MACS_and_other_Python_tools Installing MACS and other Python tools]
