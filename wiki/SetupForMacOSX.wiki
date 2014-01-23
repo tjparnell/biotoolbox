@@ -1,7 +1,7 @@
 #summary Setting up a Mac OS X computer with Bioperl and GBrowse for bioinformatics.
 #labels SetUp
 
-=Preparing a Mac OS X computer for bioinformatics analysis using bioperl=
+=Preparing a Mac OS X computer for bioinformatics analysis=
 
 ==Contents==
 	# [SetupForMacOSX#Prerequisites Prerequisites]
@@ -9,21 +9,20 @@
 		# [SetupForMacOSX#Notes_for_OS_X_10.6_Snow_Leopard Notes for OS X 10.6 Snow Leopard]
 		# [SetupForMacOSX#Notes_for_OS_X_10.7_Lion Notes for OS X 10.7 Lion]
 		# [SetupForMacOSX#Notes_for_OS_X_10.8_Mountain_Lion Notes for OS X 10.8 Mountain Lion]
+		# [SetupForMacOSX#Notes_for_OS_X_10.9_Mavericks Notes for OS X 10.9 Mavericks]
 	# [SetupForMacOSX#A_note_about_backups A note about backups]
 	# [SetupForMacOSX#Installing_XCode Installing XCode]
-	# [SetupForMacOSX#Setting_up_Fink Setting up Fink]
-		# [SetupForMacOSX#Special_notes_for_Mac_OS_X_10.6_only Special notes for Mac OS X 10.6 only]
+	# [SetupForMacOSX#Using_Fink_or_MacPorts Using Fink or MacPorts]
+		# [SetupForMacOSX#Setting_up_Fink Setting up Fink]
+			# [SetupForMacOSX#Special_notes_for_Mac_OS_X_10.6_only Special notes for Mac OS X 10.6 only]
 		# [SetupForMacOSX#Using_Fink Using Fink]
 		# [SetupForMacOSX#Installing_other_programs_with_Fink Installing other programs with Fink]
 	# [SetupForMacOSX#Installing_a_database Installing a database]
 		# [SetupForMacOSX#Using_Mac_OS_X_Server_MySQL Using Mac OS X Server MySQL]
 		# [SetupForMacOSX#Installing_MySQL_on_a_client_system Installing MySQL on a client system]
 	# [SetupForMacOSX#Installing_GD_Libraries Installing GD Libraries]
-	# [SetupForMacOSX#Installing_Perl_modules_through_CPAN Installing Perl modules through CPAN]
-		# [SetupForMacOSX#Trouble_shooting_Perl_module_installation Trouble shooting Perl module installation]
-		# [SetupForMacOSX#Install_BioPerl Install BioPerl]
-		# [SetupForMacOSX#Additional_modules_for_BioToolBox Additional modules for BioToolBox]
-			# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
+	# [SetupForMacOSX#Installing_Perl_modules Installing Perl modules]
+		# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
 	# [SetupForMacOSX#Installing_GBrowse Installing GBrowse]
 		# [SetupForMacOSX#GBrowse_Prerequisites GBrowse Prerequisites]
 			# [SetupForMacOSX#Start_the_Apache_web_server Start the Apache web server]
@@ -35,26 +34,17 @@
 		# [SetupForMacOSX#Setting_up_GBrowse_user_accounts Setting up GBrowse user accounts]
 			# [SetupForMacOSX#Setting_up_PAM_Authentication_with_OS_X_accounts Setting up PAM Authentication with OS X accounts]
 		# [SetupForMacOSX#Cleaning_up_after_GBrowse Cleaning up after GBrowse]
-	# [SetupForMacOSX#Installing_Bam_file_support Installing Bam file support]
-		# [SetupForMacOSX#Installing_Samtools Installing Samtools]
-		# [SetupForMacOSX#Installing_Bio-Samtools Installing Bio-Samtools]
-	# [SetupForMacOSX#Installing_BigFile_Support Installing BigFile Support]
-		# [SetupForMacOSX#Building_the_Kent_libraries Building the Kent libraries]
-		# [SetupForMacOSX#Build_the_utilities Build the utilities]
-		# [SetupForMacOSX#Install_utilities_and_libraries_into_system_directories Install utilities and libraries into system directories]
-		# [SetupForMacOSX#Installing_Bio-BigFile_Perl_module Installing Bio-BigFile Perl module]
-	# [SetupForMacOSX#Ensembl_Perl_API Ensembl Perl API]
+module]
 	# [SetupForMacOSX#Additional_Tools Additional Tools]
 		# [SetupForMacOSX#Compiling_a_64-bit_liftOver_tool_on_OS_X Compiling a 64-bit liftOver tool on OS X]
 		# [SetupForMacOSX#Installing_MACS_and_other_Python_tools Installing MACS and other Python tools]
 		# [SetupForMacOSX#Installing_mfold Installing mfold]
 
 ==Prerequisites==
-	# A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc. There are both online and dead-tree resources available to learn this.
-	# Some very basic understanding of perl programs, modules, and how to install upgrade perl modules using CPAN. Knowing and writing the Perl language is not necessary.
-	# Access to an account with administrator privileges. While it’s possible to do everything in a local home directory, I think it’s just easier to install in the main system. Fortunately, these installations are pretty safe and shouldn't break the system. Simply installing perl modules rarely (if at all possible) breaks the system, particularly with recent versions (earlier versions were another story). Using the Fink (or MacPorts) package manager keeps everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. Finally, anything installed under `/usr/local/` is off-limits to Apple, so again there should be no conflicts with Apple system directories.
+	# A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc. There are both online and dead-tree resources available to learn this. You can access the command line from the Terminal.app located in `/Applications/Utilities`.
+	# You will need to install XCode from Apple. Many of tools we are installing require compiling executables from source code. See [SetupForMacOSX#Installing_XCode Installing XCode] below for more information. 
+	# Access to an account with administrator privileges is recommended, especially if want to use Fink or MacPorts to install additional software (recommended). These package managers keep everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. 
 	# A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist. For simple editing on the command line, try the `nano` editor.
-	# This may (or may not) be obvious, but you'll need to install the Developer Tools or XCode from Apple. See [SetupForMacOSX#Installing_XCode Installing XCode] below for more information. 
 
 ==Mac OS X Version Specific Notes==
 This guide was initially written with 10.6 in mind, and subsequently updated with each new version. I usually tend to wait to the 10.x.2 release to upgrade, so that the initial bugs can be ironed out before sacrificing a work computer to the whims of Apple. Since we're dealing mostly with Unix stuff, there's not much change between the versions, so most of what is written here should be applicable. If not, Google is your friend.
@@ -75,6 +65,11 @@ This guide was initially written with 10.6 in mind, and subsequently updated wit
 	# The graphical Web Sharing option was removed from the Sharing panel in System Preferences. You will need to start, stop, and restart Apache from the command line. See [SetupForMacOSX#Start_the_Apache_web_server Starting the Apache web server] for more information.
 	# If you want to install FastCGI using mod_fcgid, there is a bug with XCode when compiling code using apxs configuration detailed [http://apple.stackexchange.com/questions/58186/how-to-compile-mod-wsgi-mod-fastcgi-etc-on-mountain-lion-by-fixing-apxserror here]. Make the appropriate symbolic link described therein, and the build should work. See [SetupForMacOSX#Setting_up_FastCGI_with_GBrowse Setting up FastCGI with GBrowse] for more information.
 
+===Notes for OS X 10.9 Mavericks===
+	# The default Perl is now 5.16.4. At least Apple is keeping up with Perl distributions, which is more than can be said about some linux distributions (looking at you, Red Hat). Local perl libraries should be mostly ok, although modules installed in the system directories will have to be re-installed again.
+	# If you have Fink installed, you should be able to migrate the installation. You should probably update Fink to the latest version, before upgrading the Mac OS, to make things easier (although you could do it the other way around). See the Fink website for more details.
+	# You will likely also have to update XCode.
+
 ==A note about backups==
 Macs have a very handy integrated backup solution called Time Machine. While Time Machine works well with typical user files contained within their home directory, it doesn't always work so well with other, Unix-y things. Be prepared when you find something has not been restored properly. A full restore should work reasonably well; however, migrating from a Time Machine disk to a new installation or computer is much less thorough. For example, Perl modules are not restored (just like an upgrade), unrecognized files in `/var/lib` and anything in `/var/tmp` (default locations for GBrowse installations) are skipped, and not everything under `/usr/` is included. When restoring or migrating, be prepared to re-install a few or a lot of things. While Time Machine certainly has its benefits, also consider full disk cloning software as an alternative that may be less headache-inducing.
 
@@ -94,11 +89,16 @@ Next you must accept their license on the command line (yes, you already did thi
 </pre>
 Scroll to the bottom and accept it.
 
-==Setting up Fink==
-[http://www.finkproject.org/ Fink] is a convenient package manager for installing numerous open source software packages on Mac OS X. Using a package manager makes installation, upgrading, and removal of third party software much easier. 
+==Using Fink or MacPorts==
+[http://www.finkproject.org/ Fink] and [http://www.macports.org MacPorts] are convenient package managers for installing numerous open source software packages on Mac OS X, usually by building them from source code. Using a package manager makes installation, upgrading, and removal of third party software much easier. This is particularly important when the software you want has a ton of dependencies, since these are automatically handled for you. 
 
-An alternative package manager is [http://www.macports.org MacPorts], which should accomplish the same thing; I’m just more familiar with Fink for historical reasons. One other thing to keep in mind is that Fink tries to use many of the default Mac OS X libraries and executables whenever possible, whereas MacPorts sometimes wants to install everything on its own. This creates duplicates in your system, for example duplicate Perl installations. This can be good in that you get a newer version, but more complicated because you have to keep track of which version is executed.
+Deciding which one to use is up to you. Fink (I believe) has been around longer, but MacPorts appears to be a popular alternative. One thing to keep in mind is that Fink tries to reuse many of the default Mac OS X libraries and executables whenever possible, whereas MacPorts seems to bring in everything on its own, which can create duplicates in your system. This can be good in that you always get newer versions, but more complicated because you have to keep track of which version is executed.
 
+There is a third alternative, [http://brew.sh Homebrew], which seems to be much more bare bones compared to the fancy full-featured package managers of Fink and MacPorts. 
+
+For historical reasons, I will describe Fink, as that is what I use, but the concepts are similar with MacPorts.
+
+===Setting up Fink===
 To install Fink, [http://www.finkproject.org/download/srcdist.php download] the source file and follow their instructions. In general, run the following commands after downloading, extracting, and moving into the fink directory.
 <pre>
 	sudo ./bootstrap
@@ -150,7 +150,7 @@ Another generally useful tool is `wget`, which can be used to download file(s) u
 ==Installing a database==
 GBrowse as well as many of the BioToolBox programs require genome annotation to be put into a database. There are several choices.
 
-SQLite is a lightweight database system that stores all of the database tables in a single file. It's reasonably fast and easy to manage - one file per database. This is already installed in Mac OS X, although you will need to install the appropriate Perl modules to use it.
+SQLite is a lightweight database system that stores all of the database tables in a single file. It's reasonably fast and easy to manage - one file per database. This is by far the easiest solution to use.
 
 MySQL is a commonly used open source database that can be used from small databases to large enterprise databases. It uses a daemon to handle multiple simultaneous connections and read/write transactions. Note that if you are using Mac OS X Server, MySQL comes pre-installed for you. 
 
@@ -162,6 +162,8 @@ If you happen to be using the Server version (and not the normal client version 
 First, the standard socket location is different between Apple's Server MySQL and a typical install; you'll need to establish a symbolic link for `/var/mysql/mysql.sock` to the standard location of `/tmp/mysql.sock`. You may want to set up a simple startup bash script to do this for you at each restart.
 
 Second, you'll need to install the MySQL development headers, which are not included by default. For Mac OS X Server 10.6, check out this Apple support [http://support.apple.com/kb/HT4006 document].
+
+Note that I am not familiar with later versions of Mac OS X Server, so this information may be limited or out of date.
 
 ===Installing MySQL on a client system===
 You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So you will need to install from source and compile the executable for your machine. You can do this one of two ways; download the source files from the MySQL web site and follow their directions, or you can use Fink.
@@ -213,103 +215,17 @@ The third approach, and one that I favor, is to install them through Fink. Begin
 
 It should also install `libjpeg` and `libpng`, along with the appropriate libraries.
 
-==Installing Perl modules through CPAN==
-The [http://search.cpan.org/ Comprehensive Perl Archive Network] is an extensive repository of Perl modules. If you're faced with a difficult job of coding some project, chances are that someone else has either done it for you, or at least written some code that will make the job easier. There are thousands of Perl modules in CPAN, some of which are just right for you.
+==Installing Perl modules==
+For the most part, installing Perl modules on a Mac is not much different than any other unix-based computer. The system-installed Perl is located in `/System/Library/Perl`, which you should never touch. The site library is located at `/Library/Perl`, which is where modules will be installed when you use the `sudo` option. These libraries are specific to your version of Perl; upgrading the OS will likely upgrade the system Perl, hence all modules will have to be re-installed. 
 
-While it's possible to download any module's source code from CPAN and install it manually, there is an easier way using a package manager. To use the the CPAN Shell, run the following command
-<pre>
-	sudo cpan
-</pre>
+You are free to install Perl libraries in your home directory using `local::lib`. These libraries, for the most part, will be unaffected when you upgrade the OS.
 
-When you first run CPAN, it will ask to run through a bunch of configuration questions. It’s probably ok to let it do it for you automatically, but everyone should go through those questions once in their life, right? (according to Larry Wall, the original author of the Perl language). There may be things you want to change, such as CPAN mirror sites. Also, set both Make and Build arguments to uninstall previous versions when possible.
+Note that on Mac, many executables, including Perl oddly enough, are built with executable code for multiple machine architectures, including PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64). Typically, only one is executed; for modern Macs, that would be x86_64. You may note occasional errors when compiling C code extensions that certain architectures are missing; these are mostly harmless and can be safely ignored.
 
-CPAN shell will keep its files in one directory, by default `~/.cpan`. I usually set this to `/usr/local/cpan` to put it in a more generic location.
-
-All the modules should be installed under `/Library/Perl`. As of Mac OS X 10.6 (or was it 10.5.something?), upgrades of system-installed modules should be installed in `/Library/Perl/Updates`, thus avoiding conflicts and changes to `/System/Library/Perl`; these upgrades should take precedence over those installed in the system library. 
-
-Here is an extremely simplified primer for working with the CPAN Shell. You can also look at the inline help by typing `h` at the CPAN Shell prompt.
-
-You can search for modules by entering this command
-<pre>
-	m /something/
-</pre>
-
-You can also search for a distribution.
-<pre>
-	d /something/
-</pre>
-
-You can install a module or distribution this way
-<pre>
-	install some::module
-</pre>
-
-Or by specifying the exact version file
-<pre>
-	install SOMEBODY/SomeModule-1.0.1.tar.gz
-</pre>
-
-It's possible that CPAN will detect prerequisites for your module. If so, it will attempt to prepend their installation before installing your requested module. Just say yes to those.
-
-If the module was installed properly, you should find something like 
-<pre>
-	/usr/bin/make install -- OK
-</pre>
-somewhere near the end of all the text that goes by. If you see "`NOT OK`", then something went wrong and you will have to trouble shoot by looking back at the error messages. It's usually because something else was missing, or a C library is of the wrong architecture for the version you're using, e.g. 32-bit versus 64-bit, or i386 versus PPC.
-
-Some basic modules to upgrade or install right away (but probably not absolutely necessary) include the following. 
-	* `readline`
-	* `Term::ReadKey`
-	* `YAML`
-	* `CPAN`
-	* `Module::Build`
-	* `ExtUtils::MakeMaker`
-	* `Test::More`
-	* `Data::Stag`
-The last two are prerequisites for BioPerl, see below.
-
-===Trouble shooting	Perl module installation===
-Despite the ease of package manager for installing Perl modules, things don't always go right. All Perl modules have (or should have) tests which confirm that the module is compiled or set up properly. Sometimes these fail, for various reasons.
-
-Look back through the output for possible clues to the failure. Often times there is a missing prerequisite module (or version) that wasn't caught. Look for an error that complains about not finding XXX in @INC. Install the missing prerequisite and try again.
-
-Sometimes the module needs to compile a small binary executable extension, usually a program written in C, that can dramatically speed up certain functions. Many times these extensions need system or package libraries, which must be found in the environment path. Make sure those are available. For example, the perl module GD.pm needs access to the gd2 libraries, which can be installed (see above).
-
-Note that there may be warnings about missing or wrong file or machine architectures when compiling extensions. Mac OS X is funny in that it can run on PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64) machine architectures, and many executable programs and libraries include code for all three architectures (Universal Binary). However, libraries built under Fink as well as other compiled libraries will usually only have only one architecture, and the compiler will warn about this. You can safely ignore those warnings.
-
-Sometimes, making or building a Perl module under the CPAN shell just doesn't work quite right, but running it manually from the terminal (Bash prompt) does work. You can try grabbing the source tarball from the CPAN website, or from the source directory within the CPAN directory, and try it. Read the documentation that comes with the package. This has occasionally worked for me, for whatever reason. 
-
-Finally, it's possible that there is an error in the test that's preventing the module from installing, but that the module is, in fact, working just fine. You can always try a "`force install`", and then empirically test your program(s). I generally try to avoid this (being cautious), but have [SetupForMacOSX#Errors_regarding_GD resorted] to it successfully. 
-
-===Install BioPerl===
-Install [http://www.bioperl.org/wiki/Main_Page BioPerl]. You can do one of two things. Install the latest standard version from CPAN (`C/CJ/CJFIELDS/BioPerl-1.6.901.tar.gz`), which should be adequate for most purposes, or obtain the latest development version from GitHub. 
-
-Bioperl is a complex distribution, containing hundreds of modules, some with external dependencies, and numerous Perl scripts. It will warn you about missing prerequisites; Pay attention to the required ones, while the recommended ones can usually be safely ignored. The installation routine will ask you several questions. In general, the external dependencies are not necessary (you'll find out later if you need one when something doesn't work), internet-based tests are not necessary, and it doesn't hurt to install all of the scripts (some are useful). 
-
-If you download the latest live [http://github.com/bioperl/bioperl-live/tarball/master bioperl version], follow the instructions for installing, but it should go something like the following. Note that you will have to install the prerequisites manually before building bioperl.
-<pre>
-	perl Build.PL
-	./Build
-	./Build test
-	sudo ./Build install
-</pre>
-
-===Additional modules for BioToolBox===
-There are a few additional modules that are required by the BioToolBox scripts. The easiest way to check for these is to run the BioToolBox script [Pod_check_dependencies check_dependencies.pl], located in the BioToolBox root directory. You can download the latest BioToolBox version  [http://code.google.com/p/BioToolBox/downloads/list here]. It uses CPAN to check the latest available modules, and it will offer to install missing or upgrade out-of-date modules for you. Note that not all of the modules are required for BioToolBox; the dependencies depend on which BioToolBox script you wish to use. Some additional modules that my programs use but are not necessarily required for BioPerl or GBrowse include the following.
-	* `Config::Simple`
-	* `Statistics::Lite`
-	* `Statistics::Descriptive`
-	* `Archive::Zip`
-	* `Algorithm::Cluster`
-	* `DBI`
-	* `DBD::SQLite`
-	* `DBD::mysql`
-	* `GD`
-	* `GD::Graph`
-	* `GD::Graph::smoothlines`
+You can obtain more information about installing Perl modules by reading the corresponding documentation in the BioToolBox [BioToolBoxSetUp setup guide].
 
 ====Errors regarding GD====
-Note that on Mac OS X using GD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
+Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
 
 ==Installing GBrowse==
 [http://gmod.org/wiki/GBrowse GBrowse] is a web-based generic genome browser that can display genome annotation and genomic data from microarray or next generation sequencing. 
@@ -482,131 +398,6 @@ Save the file in `/Library/LaunchDaemons/`, make it owned by root, and load it b
 	sudo /bin/launchctl load /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
 </pre>
 You can also simply reboot the computer to load the job. It should now automatically clean up your GBrowse files at 10:00 PM every Sunday. Messages concerning its execution will be reported in the system log. 
-
-==Installing Bam file support==
-Next generation sequencing technologies, such as those from Illumina and others, are the current big technique for genomic analysis, including transcription, epigenetics, and mutation discovery. [http://samtools.sourceforge.net/index.shtml Samtools] is a collection of programs, libraries, and file format specifications for working with next generation sequencing. The text Sam and binary Bam file formats allow for convenient storage and access of sequence alignments. Samtools is required as a foundation for working with sequence alignments in both GBrowse and BioToolBox.
-
-===Installing Samtools===
-The Samtools program is available as a precompiled binary for OS X, but we need the headers and library when installing the perl modules for working with sam files. Additionally, we want to build it as a 64-bit executable. Unfortunately, the make file is not very complete, so I've ended up manually copying much of the files into appropriate directories.
-
-Download the source code tarball from [http://sourceforge.net/projects/samtools/files/ here]. Unpack into a working directory.
-
-*Note* For samtools `<` v0.1.19 only. If you'll be working with 64-bit executables (likely), edit the `Makefile` to un-comment out the `-m64` on the line containing `CLFAGS`. This ensures the program will compile as a 64-bit executable.
-
-Compile the program by running `make`. 
-
-You can also compile razip by executing `make razip`. This tool allows you to compress, for example, fasta files and still make them randomly accessible (not normally possible with gzip files) for use by samtools. 
-
-To make samtools generally accessible to all the users on the machine, move the samtools folder to `/usr/local/`. Since samtools is under continuous development, I'll append the version number to the folder name. Then, to make navigation easier, I'll create a symbolic link to the latest version directory to a general name. For example,
-<pre>
-	sudo cp ../samtools /usr/local/samtools-v0.1.18
-	sudo ln -s /usr/local/samtools-v0.1.18 /usr/local/samtools
-</pre>
-Now I can always reference `/usr/local/samtools/` and it will point to the latest version directory. When a new version comes out, I install it side by side in `/usr/local/`, and then simply update the `/usr/local/samtools` symlink.
-
-To install the Bio-Samtools module (see below), you'll need to put the libraries in an accessible location. Rather than copying the appropriate files, and then doing it again and again with each new version, we can simplify using symlinks.
-<pre>
-	sudo ln -s /usr/local/samtools/*.h /usr/local/include/
-	sudo ln -s /usr/local/samtools/libbam.a /usr/local/lib/
-	sudo ln -s /usr/local/samtools/samtools.1 /usr/local/share/man/man1/
-	sudo ln -s /usr/local/samtools/samtools /usr/local/bin/
-	sudo ln -s /usr/local/samtools/razip /usr/local/bin/
-</pre>
-This also copies the executables into the `/usr/local/bin/` directory for easy access through the path.
-
-===Installing Bio-Samtools===
-Once Samtools has been installed, then the Bio-Samtools module (which includes `Bio::DB::Sam` and `Bio::DB::Bam`) may be installed. It should automatically find the library and headers you copied into the `/usr/local` directories. You can obtain the latest released version from CPAN. Try "`d /bio-samtools/`" to get the list of versions available (as of this writing it is `L/LD/LDS/Bio-SamTools-1.20.tar.gz`).
-
-One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, re-edit the CFLAGS line and add "-fPIC" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
-<pre>
-	make clean
-	make
-	make razip
-</pre>
-Repeat the Bio-Samtools installation (you may need to issue the "`clean`" command from within CPAN Shell). It should work now.
-
-==Installing BigFile Support==
-Installing support for Jim Kent's big files, including [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] files, require a bit more work. This support is optional for BioToolBox, and is not required. However, it is encouraged if you are working with high density tiling or next generation sequencing data.
-
-===Building the Kent libraries===
-While Jim Kent provides pre-compiled executables, we need the libraries to build Lincoln Stein's Bio-BigFile Perl modules, which are required for big file support in GBrowse and BioToolBox. There are general instructions for building from source [http://genome.ucsc.edu/admin/jk-install.html here], and more specific instructions in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README file.
-
-Download Jim Kent's source [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip files]. Extract the files into a working directory. I built all the files in my home directory first (`~/Documents/kent`), and then moved them into the appropriate locations as necessary.
-
-Set up the environment variables. These are needed during both library compilation and building the Perl modules later. You can temporarily enter these commands in your current terminal session. The variables below assume a 64-bit Intel machine; change as appropriate. Also, it requires `libpng` to be found; this should have been installed along with the GD libraries. If you followed the above instructions, it was installed via Fink; if not, change the paths as appropriate.
-<pre>
-	export MACHTYPE=x86_64
-	export PNGLIB=/sw/lib/libpng.a  
-	export C_INCLUDE_PATH=/sw/include # only necessary for Fink installs
-</pre>
-
-Next, build the main library. 
-<pre>
-	cd kent/src/lib
-	make
-	cd ..
-</pre>
-
-===Build the utilities===
-You will also need to compile the utilities that work with the bigWig and bigBed files. The utilities are found in individual directories under `kent/src/utils`. Before you begin, you will need to make a destination directory for the executables.
-<pre>
-	mkdir ~/bin
-	mkdir ~/bin/x86_64
-</pre>
-
-Now enter each utility directory and issue the "`make`" command. It will automatically copy the compiled executable file into the executable directory you just made. This is a short, but not exhaustive, list of programs that I might recommend.
-	* `bedGraphToBigWig`
-	* `bedToBigBed`
-	* `bigBedInfo`
-	* `bigBedSummary`
-	* `bigBedToBed`
-	* `bigWigInfo`
-	* `bigWigSummary`
-	* `bigWigToBedGraph`
-	* `bigWigToWig`
-	* `wigToBedGraph`
-	* `wigToBigWig`
-
-===Install utilities and libraries into system directories===
-At the very least, move the utility executables into a system directory for other users to use.
-<pre>
-	sudo cp ~/bin/x86_64/`*` /usr/local/bin/
-</pre>
-
-
-The Kent libraries do not necessarily need to move into a common location; they are only needed during the building of the Bio-BigFile Perl module. However, if you do decide to move them, this is what I have done. I only moved the pertinent `lib` and `inc` folders. 
-<pre>
-	sudo mkdir /usr/local/kent
-	sudo mkdir /usr/local/kent/src
-	sudo mkdir /usr/local/kent/src/lib
-	sudo cp -r kent/src/lib/x86_64 /usr/local/kent/src/lib/
-	sudo cp -r inc /usr/local/kent/src/
-	export KENT_SRC=/usr/local/kent/src
-</pre>
-
-===Installing Bio-BigFile Perl module===
-Now you can install the Bio-BigFile Perl module. First, make sure your `MACHTYPE` environment variable is set. You can also set the full path to the `kent/src` directory using the environment variable `KENT_SRC`, which will make building the Perl module faster.
-
-The best way to install this is not through the CPAN Shell, but rather build it from the command line. Download the module from [http://search.cpan.org/dist/Bio-BigFile/ here]. Unpack, and enter the directory. Follow the below commands. If necessary, provide the full path to the `kent/src` directory. It must find the libraries in order to build.
-<pre>
-	perl Build.PL
-	./Build
-	./Build test
-	sudo ./Build install
-</pre>
-	
-One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "-fPIC". Some combinations of Perl and GCC don't mix well. In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "-fPIC" to the line. Save, go back to `kent/src/lib`, issue "`make clean`", and then "`make`" again to rebuild the library, then try the Perl module again. 
-
-==Ensembl Perl API==
-To retrieve genome annotation from Ensembl's public MySQL database using the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you will need to install Ensembl's Perl API modules. It is not available through CPAN, but you can find installation instructions [http://www.ensembl.org/info/docs/api/api_installation.html here]. 
-
-Ensembl is not very explicit about prerequisites, but you will need Perl modules `DBI` and `DBD::mysql` installed, as well as BioPerl. Their recommendation for BioPerl is an old version; the current CPAN or live version should work just as well, and it should be installed from the above instructions.
-
-Rather than following their instructions for setting up your environment, you can simply manually copy their `EnsEMBL/` directory and all its contents (found under `ensembl/modules/Bio/` after extracting their archive) into your `Perl5/lib` directory, or wherever your Perl modules are installed. The `EnsEMBL` directory will go into your `Bio/` directory, along with the rest of BioPerl.
-
-Note that because this is essentially a manual installation; any prerequisites or updates must also be done manually, and some functionality may be broken. With that said, I have not had any issues with at least the BioToolBox script `get_ensembl_annotation.pl`. Be forewarned.
-
-Ensembl publishes a new Core API with each database release. If you are not seeing the latest genome version in the *BioToolBox* script [Pod_get_ensembl_annotation get_ensembl_annotation.pl], you should update your Ensembl Perl API modules.
 
 ==Additional Tools==
 There are additional tools that are useful for bioinformatics analysis but are not necessarily needed for BioPerl, GBrowse, or BioToolBox. These are simply programs that I have found to be helpful in my own work.
