@@ -9,6 +9,7 @@ Instead, the *BioToolBox* scripts allow you to collect a list of gene names and 
 This HowTo describes some possible scenarios with working with databases. 
 
 ==Contents==
+	# [WorkingWithDatabases#Fast_and_easy_database_setup Fast and easy database setup]
 	# [WorkingWithDatabases#Annotation Annotation]
 		# [WorkingWithDatabases#Obtaining_Annotation Obtaining Annotation]
 			# [WorkingWithDatabases#Annotation_from_UCSC Annotation from UCSC]
@@ -22,6 +23,16 @@ This HowTo describes some possible scenarios with working with databases.
 		# [WorkingWithDatabases#Getting_nonannotated_regions Getting nonannotated regions]
 		# [WorkingWithDatabases#Collecting_sequences Collecting sequences]
 		# [WorkingWithDatabases#Calculating_CpG_frequency Calculating CpG frequency]
+
+==Fast and easy database setup==
+By far, the fastest, simplest, and easiest way to set up an annotation database is to run the *BioToolBox* script [Pod_db_setup db_setup.pl]. This script uses annotation from the UCSC Genome website, converts it to GFF3 format, fast loads a Bio::DB::SeqFeature::Store database using the SQLite engine, and appends the database information to the BioToolBox configuration file, `.biotoolbox.cfg`. For example, to load human genome annotation, run this command
+<pre>
+	db_setup.pl --db hg19
+</pre>
+
+For custom annotation or database configuration (e.g. custom annotation or using the MySQL engine), continue reading below on how to do this manually. 
+
+To work with your database, jump to [WorkingWithDatabases#Getting_a_gene_list Getting a gene list] or [WorkingWithDatabases#Getting_more_from_the_database Getting more from the database].
 
 ==Annotation==
 The *BioToolBox* scripts work primarily with the BioPerl [http://bioperl.org/wiki/Module:Bio::DB::SeqFeature::Store Bio::DB::SeqFeature::Store] schema, which was designed to use primarily annotation in the GFF3 format. 
@@ -120,7 +131,7 @@ For a MySQL database, the following example session shows creating a new databas
 
 See the documentation for your database server for more details.
 
-*IMPORTANT* For *BioToolBox* scripts, you must enter the read-only user name and password in the `biotoolbox.cfg` configuration file. 
+*IMPORTANT* For *BioToolBox* scripts, you must enter the read-only user name and password in the `.biotoolbox.cfg` configuration file. 
 
 ===Loading the database===
 The SQL database may then be loaded using the BioPerl provided script, [http://search.cpan.org/perldoc?bp_seqfeature_load.pl bp_seqfeature_load.pl]. A typical command for loading a MySQL database with zv9 annotation would look like this 
@@ -128,7 +139,7 @@ The SQL database may then be loaded using the BioPerl provided script, [http://s
 	bp_seqfeature_load.pl -c -f -d zv9 -u admin -p password danRer7_refGene.gff3 ...
 </pre>
 
-Provide as many input annotation and sequence files as you would like. The only requirement is that the GFF3 file with the reference sequences should be loaded first. Note that you must enter the password on the command line; you may wish to use a priveleged user rather than `root` if you're concerned with security.
+Provide as many input annotation and sequence files as you would like. The only requirement is that the GFF3 file with the reference sequences should be listed and loaded first. Note that you must enter the password on the command line; you may wish to use a priveleged user rather than `root` if you're concerned with security.
 
 A typical command for loading a SQLite database would look like this
 <pre>
