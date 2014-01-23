@@ -1,0 +1,962 @@
+######## Bio::ToolBox revision history #############
+
+v.1.14
+	- Massive reorganization of the entire package into a proper 
+	Perl module distribution that is installed using standard 
+	Module::Build methods. This will install the libraries into 
+	site-specific Perl library directories as Bio::ToolBox::*. 
+	Scripts will install into a standard bin directory. All 
+	scripts have been updated to reflect these changes.
+	- Added new module Bio::ToolBox::Data, which provides an easy 
+	object-oriented interface to working with data files and the 
+	rest of the Bio::ToolBox functions. 
+	- Added new script db_setup.pl to ease generating an annotation 
+	database with UCSC data
+	- Added Build tests for all major library functions, including 
+	score collections from all binary database adaptors.
+	- Added capability to properly collect value types, including 
+	score, count, and length, from useq and wiggle database adaptors
+	- Loosened restriction for counting Bam alignments where the 
+	midpoint had to be within the query region; now any overlapping 
+	alignment that intersects the region will be counted.
+	- Reworked the interpolation algorithm to interpolate as many 
+	datapoints as possible in script get_relative_data.pl.
+	- Removed cryptic error messages when opening databases, and 
+	added database handle caching to avoid repeated openings
+	- Newly generated feature lists no longer append all aliases to 
+	the feature name
+	- Added additional attributes to the list of available ones to 
+	retrieve from the database in script get_feature_info.pl. Also 
+	added a --type command line option to set a feature type to 
+	named features.
+	- Improved data table checking to include a count of columns 
+	for every row.
+	- Added max_count option to script bam2wig.pl to control for 
+	high Bam coverage
+	- Fixed bug where the summary file was not created for 
+	script get_relative_data.pl
+
+v.1.13 (svn 691)
+	- Updated to include native support for USeq archive files 
+	with data collection scripts. USeq files may be used in 
+	the same manner as BigWig, BigBed, or Bam files for data 
+	collection. USeq files may be generated using tools from 
+	the USeq package (useq.sourceforge.net). The 
+	Bio::DB::USeq adaptor is available via CPAN. 
+	- Added new script filter_bam.pl, which can filter alignments 
+	based on various criteria and write a new Bam file. Filters 
+	are one or more boolean tests, including attributes, scores, 
+	lengths, sequence, etc.
+	- Added new script get_bam_seq_stats.pl, which collects 
+	information about the read sequences themselves and summarizes 
+	the sequence composition and nucleotide frequencies, suitable 
+	for generating sequence logos.
+	- Updated script manipulate_datasets.pl to allow any integer 
+	to be used when formatting decimal values.
+	- Restored ability to write a new data file without collecting 
+	data from script get_datasets.pl.
+	- Changed the log conversion step to avoid having to increase 
+	read count by 1 to avoid log of 0 errors in script bam2wig.pl.
+	- Use the command line --log argument in preference over 
+	metadata in script manipulate_datasets.pl.
+	- Method sum now writes 0 instead of null in script 
+	bin_genomic_data.pl.
+	- Fixed issue where joining data files may not maintain gzip 
+	status. This had issues with combining forked children files.
+	- Fixed bug where a provided, indexed data source file 
+	(e.g. BigWig) could not be used as a database in script 
+	get_datasets.pl
+
+v.1.12.6 (svn 680)
+	- Updated the script novo_wrapper.pl to use Parallel::ForkManager 
+	instead of GNU Parallel. This should make it more stable, 
+	particularly under nohup.
+	- Consolidated the standard out results when functions were 
+	applied to multiple columns in script manipulate_datasets.pl. 
+	This will make the script much less chatty.
+	- Fixed bug with naming temporary forked children file names.
+	- Fixed bugs with the generation of summary files.
+	- Fixed bug with the automatic identification of the X axis in 
+	script graph_profile.pl.
+	- Fixed bug where features not found in a database could crash 
+	the script get_feature_info.pl.
+v.1.12.5 (svn 667)
+	- Improved the shift value determination to make it more robust 
+	against outliers in script bam2wig.pl. Additionally, the model 
+	data that is written is now centered over the shift peak to 
+	make evaluations more interpretable. 
+	- Fixed a bug where 0 or negative coordinates may be written 
+	to varStep wig files in script bam2wig.pl.
+v.1.12.4 (svn 662)
+	- Improved the efficiency of scanning for high coverage regions 
+	and calculating 3 prime shift values in script bam2wig.pl; Each 
+	reference sequence is now scanned in parallel. Also added a new 
+	option to write the shift profile model and correlation data. 
+	The efficiency of writing bedGraph files was improved, giving 
+	up to 2X increase in performance. The default maximum duplicate 
+	value is now unlimited. Warnings about coverage beyond the ends 
+	of chromosomes are now silenced unless verbose is turned on.
+	- The script graph_data.pl can now execute in parallel to improve 
+	efficiency when a list of datasets are provided in advance. A 
+	list may now be provided in conjunction with the --all option. 
+	- Improved recognition of the X-axis column in script 
+	graph_profile.pl.
+	- Fixed critical error when writing extended position bedGraph 
+	files from script bam2wig.pl where reverse reads were not 
+	extended appropriately in the 3 prime direction.
+
+v.1.12.3 (svn 651)
+	- Added user options to control the size of the memory buffer 
+	when writing bedGraph files and the disk write frequency in 
+	script bam2wig.pl.
+	- Added option to control the output order of the features from 
+	script pull_features.pl. The order may match either the input 
+	list or input data file. Also improved automatic column identification 
+	and avoid empty output files.
+	- Script data2wig.pl will now write bedGraph files.
+	- Fixed bug leading to excessive memory usage when writing a 
+	fixedStep wig file from script bam2wig.pl. Thanks to Jeff for 
+	reporting.
+	- Fixed bug where writing strand values for gff or bed files may 
+	not be written correctly.
+	- Fixed bug leading to errors loading input files with comment or 
+	empty lines in the middle of data lines.
+	- Fixed bug to avoid log of 0 errors in script bam2wig.pl.
+
+v.1.12.2 (svn 642)
+	- Scripts find_enriched_regions.pl and CpG_calculator.pl are now 
+	multi-threaded. The find_enriched_regions.pl also has additional 
+	optimizations to reduce memory usage.
+	- The script merge_datasets.pl now has the option to use a coordinate 
+	string as a unique identifier when looking up features. This is 
+	particularly helpful with BED, GFF, and other files with genomic 
+	coordinates that do not have unique name identifiers.
+	- A coordinate string in the format chromo:start-stop may now be 
+	generated from coordinate values in data files using a new function 
+	in the script manipulate_datasets.pl.
+	- Fixed a bug regarding changing file extensions in script 
+	join_data_file.pl, which gave odd output file names with scripts that 
+	executed in parallel.
+
+v.1.12.1 (svn 635)
+	- Fixed bugs were gzip status and file extensions may be inappropriately 
+	inherited. This may cause problems when joining children files from 
+	parallel process forks.
+	- Fixed bug where the interactive menu would exit upon an empty value
+	in script manipulate_datasets.pl. A "q" must now be provided to exit.
+	- Minor optimization when calculating shift values in script bam2wig.pl.
+
+v.1.12 (svn 619)
+	- Major improvements to performance of some data collection scripts by 
+	adding multi-threaded options. These include get_datasets.pl, 
+	get_relative_data.pl, average_gene.pl, and bam2wig.pl. The number of 
+	CPU forks may be specified with the --cpu option (default 2). This option 
+	requires the installation of Parallel::ForkManager, available through 
+	CPAN. Run the check_dependencies.pl script to install it.
+	- All gzip compression read and writes are now forked through an 
+	external gzip utility for a considerable boost in performance (2-5X). 
+	The gzip executable must be in your path for this to work (it usually 
+	is on most Unix-like environments).
+	- Added --long option when collecting data from long features in script 
+	average_gene.pl.
+	- Improved efficiency when collecting data from very large windows in 
+	both get_relative_data.pl and average_gene.pl.
+	- Summing the total number of read alignments in Bam files is also  
+	multi-threaded. Summing the total number of intervals in a BigBed file 
+	is also improved.
+	- Fixed a critical error where not all windows had data collected when 
+	using the script get_relative_data.pl
+
+v.1.11 (svn 603)
+	- Major revision of how features are now retrieved from the database 
+	using primary_IDs rather than relying on unique names in the database. 
+	Generating lists of features will now return Primary_ID, Name, and Type. 
+	The Primary_ID is unique to a database and is usually non-portable. 
+	Current feature lists with only Name and Type will still work, and are 
+	subject to limitations of non-unique Names in the database. This affects 
+	all scripts that work with database features, including get_features.pl, 
+	get_feature_info.pl, get_datasets.pl, get_relative_data.pl, 
+	average_gene.pl, get_intersecting_features.pl, and correlate_position_data.pl.
+	- GFF3 annotation scripts get_ensembl_annotation.pl and ucsc_table2gff3.pl 
+	now produce GFF3 files that better match the GFF3 specification. Names 
+	are no longer made unique (which broke ties with the originating data), 
+	proper Dbxref tags are attributed when external sources could be 
+	identified, and chromosomes are now sorted by name. Other minor 
+	improvements were also made.
+	- Fixed critical bug that prevented spliced alignments from being 
+	counted in script bam2wig.pl. Thanks to Pinal K. for reporting.
+
+v.1.10.3 (svn 597)
+	- Unified column names and improved their recognition in scripts 
+	get_feature_info.pl and the graphing scripts graph_data.pl, 
+	graph_histogram.pl, and graph_profile.pl.
+	- Graphing scripts now write the output graph directory in the input 
+	file parent directory instead of the current directory.
+
+v.1.10.2 (svn 591)
+	- Added a new option of position when adjusting coordinates of retrieved
+	features using the script get_features.pl. Coordinates may be adjusted
+	at the 5 prime, 3 prime, or both ends of stranded features. This also 
+	fixes bugs where collected features on the reverse strand with adjusted
+	coordinates were not reported properly.
+	- Improved automatic recognition of the name, score, and other columns
+	in the convertor scripts data2bed.pl, data2gff.pl, and data2wig.pl. 
+	- Improved the Cluster and Treeview export function in script
+	manipulate_datasets.pl. The CDT files generated now include separate ID
+	and NAME columns per the specification, and new manipulations are
+	included prior to exporting, including percentile rank and log2.
+	- The convert null function now also converts zero values if requested
+	in script manipulate_datasets.pl.
+	- Added new option of a minimum size when trimming windows in the script
+	find_enriched_regions.pl.
+	- Increased the radius from 35 bp to 50 bp when verifying a putative
+	mapped nucleosome in script map_nucleosomes.pl, leading to fewer
+	overlapping or offset nucleosomes.
+	- Added new option to re-center offset nucleosomes in script
+	verify_nucleosome_mapping.pl. Also improved report formatting.
+	- Added checks and warnings when writing file names longer than 256
+	characters. Some scripts automatically generate file names that may
+	exceed this limit, preventing writing. File names are now truncated.
+	Thanks to Adam F. for reporting.
+	- Added new methods and code improvements to the gff3 parsing library.
+	- Fixed a bug in script merge_datasets.pl where the column index for a
+	second file may not be properly validated leading to premature
+	termination.
+	- Fixed a bug where multiple datasets combined with an ampersand for
+	merging were not properly verified. 
+	- Fixed a bug where a user may not be prompted to select a dataset from
+	a database if none was supplied from the command line.
+	- Fixed a bug where files containing trailing nulls do not load
+	properly.
+	- Fixed a bug related to finding specific data columns by name.
+	- Fixed a bug with writing summary files.
+
+v.1.10.1 (svn 568)
+	- Added support for Bio::DB::Fasta in the main BioToolBox library, and
+	added the support to scripts data2fasta.pl and CpG_calculator.pl. Any
+	BioToolBox program that requires chromosome information or sequence can
+	now use a genomic multi-fasta or directory of fasta files in the --db
+	option.
+	- Fixed critical error in data2gff.pl that prevented files from being
+	converted to GFF format.
+	- Fixed critical error merge_datasets.pl that prevented column headers
+	from being written to the output file.
+	- Made the warning about unavailable files on the UCSC FTP server less
+	scary in the script ucsc_table2gff3.pl.
+	- Updated and clarified some script documentation.
+
+v.1.10 (svn 559)
+	- Significantly improved performance when collecting data from Bam files
+	by using a low level API. Improvements of at least 2X may be realized.
+	- Significantly improved the performance of the bam2wig.pl script by at
+	least 2X. Added a new option of recording extended regions across the
+	predicted fragment based on empirically determined shift values.
+	Sampling to determine shift values has been increased. BedGraph files
+	are now written more efficiently. Maximum number of identical reads are
+	now enforced.
+	- Significantly improved the performance of the split_bam_by_isize.pl
+	script to increase speed by at least 2X. Added an option to skip
+	checking of mates. Improved reporting of results.
+	- Added a filter option to remove overlapping nucleosomes in script
+	verify_nucleosome_mapping.pl; also fixed bugs in reporting offset
+	distances and improved output reporting.
+	- Removed confusing separate scan and tag datasets required for script
+	map_nucleosomes.pl. Cleaned up and organized code. Fixed bugs that
+	prevented datasets from being validated.
+	- Fixed critical bug where data was not collected for the final row in
+	script get_datasets.pl.
+	- Fixed bugs with parsing unusual input files, for example commented
+	header lines in bed files or inconsistent column numbers.
+	- Fixed bug in script get_intersecting_features.pl where a strand column
+	was expected even if it was not present.
+	- Changed all tim library calls to use arrays instead of anonymous
+	hashes for a cleaner API. 
+	- Changed shebang lines to use /usr/bin/env to improve portability on
+	systems with different Perl versions installed. 
+	- Cleaned up and made POD documentation more consistent.
+	- Add warnings about database users and passwords in configuration file. 
+
+v.1.9.7 (svn 539)
+	- Fixed critical bug where an exon containing all three 5'UTR, CDS, and
+	3'UTR was not properly parsed in the script get_ensembl_annotation.pl.
+	New command line options for to include or not CDS, UTR, and start/stop
+	codons were added. Significant changes to improve and organize the code
+	was also made.
+	- Changed the method of assigning the GFF type for chromosomes and
+	scaffolds based on their name in the script ucsc_table2gff3.pl.  Also
+	made the inclusion of start and stop  codons enabled by default.
+	- Removed annoying automatic column assignment for input GFF files in
+	script data2bed.pl. GFF files are still handled properly if no columns
+	are specified on the command line.
+
+v.1.9.6 (svn 533)
+	- Fixed critical bug in script ucsc_table2gff3.pl where single exons
+	containing all three 5'UTR, CDS, and 3'UTR subfeatures were not properly
+	parsed into GFF3. This had resulted in an extended CDS longer than
+	expected. Thanks to H. Stovall for reporting.
+	- Added warnings when a sequence could not be generated to avoid
+	division by 0 errors, and a slight correction to fraction calculations,
+	in script CpG_calculator.pl.
+
+v.1.9.5 (svn 525)
+	- Changed the non-intuitive --except option to a more intuitive --zero
+	option in script manipulate_datasets.pl; this is now a boolean option to
+	include or exclude zero values when calculating statistics. The printed
+	statistics output has also been cleaned up and no longer includes
+	decimal formatting. The export function will automatically generate a
+	name when executed automatically.
+	- Added capability to use a column of source values rather than a static
+	text string for the GFF source tag in script data2gff.pl. Also made
+	improvements to the interactive ask session.
+	- Added the capability to use a big file dataset as the database for
+	chromosome information in script find_enriched_regions.pl.
+	- Added an option to automatically convert the output file to a BED file
+	in script get_gene_regions.pl, and included a description of the --in
+	option in the POD documentation.
+
+v.1.9.4 (svn 519)
+	- Fixed first critical bug in script get_datasets.pl where strand
+	information in input files with genomic coordinates (e.g. BED files) was
+	not considered when adjusting coordinates (start, stop, or fractional). 
+	- Fixed second critical bug in script get_datasets.pl where collecting
+	fractional data for named database features resulted in data collection
+	over the entire feature.
+	- Improved interpretation of input file features as genomic regions or
+	named features in script get_datasets.pl.
+	- Changed the --set_strand option to --force_strand in multiple data
+	collection scripts. This should make the function a little more obvious
+	as to its purpose. Documentation changed as appropriate.
+
+v.1.9.3 (svn 516)
+	- Fixed bug where wig definition lines may not be written when no
+	alignments exist in the first 2 Mb of a chromosome when converting a bam
+	file to a wig file in script bam2wig.pl. Definition lines are now always
+	written. Thanks to Matt J. for reporting.
+	- Fixed bug where the format_with_commas sub was not properly imported
+	into the tim_db_helper library
+	- Fixed bug where the bed output from script get_features.pl did not
+	properly report strand information. 
+
+v.1.9.2 (svn 510)
+	- Fixed critical bug where codon changes were not reported correctly for
+	minus strand genes in script locate_SNPs.pl. Thanks to Craig K. for
+	reporting.
+
+v.1.9.1 (svn 507)
+	- Added critical code to interpret strand information from input files
+	such as Bed and GFF into BioPerl standards. Essential for collecting
+	stranded data. Also properly writes back strand information for valid
+	Bed and GFF files
+	- Updated and unified internal library methods for validating and
+	requesting database feature types. By default, all database features are
+	presented to the user as a list when selecting database features to
+	collect data. The source_exclude parameter in the biotoolbox.cfg
+	configuration file is now deprecated.
+	- Upgraded script get_intersecting_features.pl to automatically
+	recognize input file columns and search for more than 1 feature type
+	- Fixed bug in script get_datasets.pl where the program will not
+	continue when only a data database was provided
+	- Fixed bug of requesting index when using a .kgg file as a gene list in
+	script pull_features.pl
+	- Fixed bug in generating file name for Treeview export function in
+	script manipulate_datasets.pl
+	- Fixed behavior when reading files to prevent adding the current
+	program name to the metadata when the input file does not have this
+	metadata
+	- Minor updates to script novo_wrapper.pl
+	
+v.1.9.0 (svn 493)
+	- Added new script get_features.pl which generates a list of features
+	for one or more feature types from a database. Information about the
+	features may be returned, including name, type, and coordinates. Sub
+	features may be included. The data may be written as a BioToolBox
+	formatted text file, GFF or BED.
+	- Added new script correlate_position_data.pl that calculates a Pearson
+	correlation between the score values at identical positions along a
+	feature between two datasets. This helps in identifying changes in
+	spatial distribution of values. An option for calculating shifts is also
+	available.
+	- Improved Big File generation such that Bio::DB::BigWig or
+	Bio::DB::BigBed is no longer required just to generate the big file, as
+	conversion uses external utilities anyway.
+	- Fixed generation of bin values when calculating distribution
+	frequencies in scripts data2frequency.pl and graph_histogram.pl
+
+v.1.8.7 (svn 487)
+	- Added new command line options to script merge_datasets.pl to control
+	the program's behavior. The "--lookupname" option allows you to specify
+	the name of the lookup column, while "--manual" turns off all automatic
+	guessing of columns. Also improved handling of original_file metadata.
+	- Added a new option to collect data from long features (such as genomic
+	annotations) instead of point data (microarray or sequence data) in
+	script get_relative_data.pl.
+	- Added option to convert to and from Roman numerals in chromosome names
+	and support for wig files in script change_chr_prefix.pl
+	- Added option to change the IP port number when connecting to a remote
+	MySQL database host in script get_ensembl_annotation.pl
+	- Fixed bug to properly close opened files in script split_data_file.pl
+	and avoid unnecessary error messages.
+	- Modified statements and warnings regarding step and span values in
+	script data2wig.pl
+
+v.1.8.6 (svn 477)
+	- Added numerous enhancements and bug fixes to script data2wig.pl,
+	including automatically assigning the span parameter in the wig file,
+	identifying coordinate columns, adding command line options for
+	coordinate columns, and updating the POD documentation
+	- Improved the treeview export function in script manipulate_datasets.pl
+	to include different manipulations, including median center of genes or
+	datasets, converting to Z-scores, and converting null values. Also
+	changed the default output name to <basename>.cdt.
+	- Added advanced option to script merge_datasets.pl to specify the
+	column order on the command line instead of interactively. Also
+	increased the number of columns that can be specified as letters.
+	- Added the "value" command line option to specify the type of data to
+	collect to the script find_enriched_regions.pl. Also added the sum
+	method plus some improvements for identifying depleted regions.
+	- Updated the script run_cluster.pl to accept any file name as input,
+	and added basic file format validation checks prior to running the
+	cluster algorithm, among a few other minor improvements
+	- Improved handling of error messages when attempting to open databases
+	that do not exist or can not otherwise be opened.
+	- Added more support for reading bedgraph files, dealing with track
+	lines and possibly empty lines
+	- Collecting data from bigWig files that use spanned features (span > 1
+	bp) are now collected at every base rather than just the start position
+	- Fixed bug where more than two files were not properly merged using
+	lookup in script merge_datasets.pl
+	- Fixed bug to allow data to be collected for Bed files from indexed
+	data files without specifying a database in script get_datasets.pl
+
+v.1.8.5 (svn 461)
+	- Fixed critical bug where all knownGene feature strands are reversed in
+	script ucsc_table2gff3.pl
+	- Fixed critical bug where the sign is flipped when generating Z-scores
+	with script manipulate_datasets.pl
+	- Added new functions "convert null values" and "absolute value" to
+	script manipulate_datasets.pl
+	- Added additional file format checks when writing formatted files
+	including GFF, BED, and SGR. File extensions may automatically change to
+	default txt if the format does not match.
+	- Better handling of input Bed files and generating appropriate default
+	file names in script data2gff.pl
+	- Improved merging of datasets by lookup, and loosened restrictions on
+	metadata checking, issuing warnings instead, in script merge_datasets.pl
+	- Loosened restrictions on metadata differences and failures in script
+	join_data_file.pl
+	- Included fix for finding column indices when name is prefixed with #
+	- Added another check to avoid returning undefined values from BigWig
+	data collection
+
+v.1.8.4 (svn 448)
+	- Changed shift value determination to use trimmed mean to avoid
+	outliers, and added new option to control the minimum acceptable R^2
+	value in script bam2wig.pl
+	- Improved script merge_datasets.pl to identify appropriate lookup
+	columns automatically and successfully merge more than two files using
+	lookup
+	- Changed my implementation of Z-score generation so that signed values
+	are properly reported instead of absolute values in script
+	manipulate_datasets.pl
+	- Fixed critical bug where output files were prematurely closed when
+	splitting a data file in script split_data_file.pl
+	- Reduced some unnecessary error reporting when opening databases that
+	do not exist
+	- Updated list of column names to avoid in script graph_data.pl
+	- Updated interactive prompts in script manipulate_datasets.pl
+	- Fixed bug where the --pos option in script_datasets.pl did not accept
+	the 'm' argument
+	- Fixed bug where strand was reported as '.' instead of '0' in script
+	get_feature_info.pl
+	- Fixed bug regarding writing headers, especially with new BED files
+	- Fixed bug when providing an index of 0 on the command line with script
+	manipulate_datasets.pl
+
+v.1.8.3 (svn 431)
+	- Improved mapping efficiency, made tag dataset optional, added direct
+	support of BigWig and BigWigSet datasources, and updated documentation
+	to script map_nucleosomes.pl.
+	- Updated script verify_nucleosome_mapping.pl to accomodate changes in
+	map_nucleosomes.pl output, added support for generic input files, added
+	option for other datasources, and added direct support for BigWig and
+	BigWigSet datasources.
+	- Added multiply and add methods to script manipulate_datasets.pl.
+	- Added firstIntron and lastIntron to list of regions to collect in
+	script get_gene_regions.pl
+	- Fixed critical bug when collecting data about GFF features from a
+	database that caused a crash when no features were found.
+	- Fixed bug in get_gene_regions.pl when collecting introns where the
+	last intron was skipped and reverse strand coordinates were flipped
+	- Fixed bugs in manipulate_datasets.pl where a list of invalid index
+	numbers could still evaluate to index 0, and the start column may not be
+	recognized when performing a genomic sort.
+	- Fixed bug where text files with DOS/Windows line endings (CRLF) were
+	not loaded properly
+	- Fixed bug in data2wig.pl to skip positions less than or equal to 0
+	- Improved null value reporting when collecting data
+
+v.1.8.2 (svn r411)
+	- Added new script CpG_calculator.pl to count observed and expected CpG
+	dinucleotides across a genome sequence or defined regions.
+	- Added R61 SacCer2 to R64 SacCer3 conversion to script
+	convert_yeast_genome_version.pl. Also improved chromosome name
+	recognition and identification of columns in custom file structures.
+	- Fixed and improved bin generation and output in scripts
+	data2frequency.pl and graph_histogram.pl. Values outside of the
+	requested range are now ignored. Script data2frequency.pl also has
+	considerable code cleanup and reorganization.
+	- Added a sum method and made minor enhancements to wig data collection
+	to script bin_genomic_data.pl, along with considerable code cleanup.
+	- Added automatic capability to script merge_datasets.pl. All unique
+	columns are automatically merged without manual interaction. This is now
+	useful for automated shell scripts.
+	- Enforced no compression when generating bigWig files, and improved
+	column recognition in script data2wig.pl
+	- Changed 'primary_tag' to 'type' in the generated metadata and subtrack
+	selection for BigWigSet database output in script big_file2gff3.pl. Also
+	improved conf stanza renaming scheme for BigWigSets.
+	- Fixed bug in script bar2wig.pl that prevented the USeq App Bar2Gr from
+	being used.
+
+v.1.8.1 (svn r392)
+	- Updated script find_enriched_regions.pl to handle separate feature and
+	data databases if desired, and add capability to restrict searches to
+	specific strands.
+	- Updated script map_transcripts to handle chromosomes names without
+	integers in their names
+	- Brought script convert_yeast_genome.pl back out of retirement and
+	updated with R63 to R64 convertor
+	- Added chromosome and sequence sorting to GFF3 output from script
+	get_ensembl_annotation.pl. Also include Ensembl API version reporting.
+	- Updated script check_dependencies.pl to report the installed Ensembl
+	API version number
+	- Improved GFF3 parsing and minor improvements to script
+	gff3_to_ucsc_table.pl
+	- Fixed bugs when working with BigWigSet databases, where a trailing
+	slash in the directory name may lead to different behaviors, and
+	unexpected results when collecting data from BigWigSet databases using
+	two different methods in the same program
+	- Fixed bug where null values in tab-delimited text files are now
+	internally converted to null character .
+	- Fixed sorting issues in script split_bam_by_isize.pl
+	- Fixed bugs in script novo_wrapper.pl that prevented an uncompressed
+	Fastq input file from being split properly, split input files from being
+	removed after aligning, and a single unsorted Bam file is not further
+	processed
+
+v.1.8.0 (svn r378)
+	- Moved script novo_wrapper.pl out of retirement (due to popular demand)
+	and significantly updated it to handle parallel execution
+	- Retired old script merge_SNPs and replaced it with new
+	intersect_SNPs.pl script, which is an improved version that uses the VCF
+	format. 
+	- Updated script locate_SNPs.pl to work with multiple alternate
+	sequences, multiple features, and importantly with the VCF format
+	- Added .vcf and .bdg extensions as properly recognized file format
+	extensions. Changed default bedgraph extension to use .bdg in script
+	bam2wig.pl
+	- Stripped all code and mention of binary tim_data_formatted files based
+	on Storable. Not really a prominent feature and never lived up to its
+	hype anyway, so removing it
+
+v.1.7.4 (svn r363) (not released)
+	- Fixed critical bug that prevents local Bam files from opening for data
+	collection
+	- Added warnings if a chromosome segment failed to be found in a
+	database
+
+v.1.7.3 (svn r355)
+	- Fixed bugs in script bam2wig.pl that prevents it from finding its
+	libraries and compiling properly; and another bug that prevented
+	stranded start positions from being recorded properly
+
+v.1.7.2 (svn r351)
+	- Fixed bug in script ucsc_table2gff3.pl where the output file name may
+	not be properly generated, leading to an overwrite of the input file.
+	- Fixed bug in script bam2wig.pl where the recorded position is off by 1
+	bp
+	- Added recommended settings in the POD for bam2wig.pl
+
+v.1.7.1 (svn r346)
+	- Fixed critical bug in data collection library that allowed too many
+	datapoints to be collected by ignoring the stop position. This could
+	affect scripts get_datasets.pl, get_relative_data.pl, average_gene.pl,
+	find_enriched_regions.pl, and others.
+	- Major overhaul of script pull_features.pl to include better automatic
+	identification of identifier columns, the capability to match multiple
+	features, and to simultaneously write all groups from a .kgg list
+	- Updated script get_datasets.pl so that it would rewrite the output
+	file after each round of data collection.
+	- Minor bug fixes in script find_enriched_regions.pl
+	- Retired outdated script convert_yeast_genome_version.pl. Users should
+	use the liftOver program from UCSC and chain files from SGD.
+
+v.1.7.0 (svn r340)
+	- Added new program get_gene_regions.pl which helps in retrieving
+	regions not explicitly annotated in a database, including start and stop
+	sites of transcription and introns.
+	- Added new program data2fasta.pl which generates a multi-Fasta file
+	from a tab-delimited text file of coordinates or a list of sequences,
+	such as microarray probes.
+	- Added new program compare_subfeature_scores.pl which compares a list
+	of feature and subfeatures and find the subfeature with the minimum and
+	maximum score.
+	- Major update to the data collection scripts to improve memory
+	consumption and efficiency, and a significant boost in speed when
+	working with BigWig data sources (I have seen up to 10 fold increase,
+	depending on collection methods).
+	- Improvements when working with BigWigSet directories, including
+	working with impromptu directories of BigWig files that do not have a
+	defined metadata file.
+	- Added the option of using separate annotation and data databases when
+	using the data collection scripts. This greatly simplifies things when
+	you have, for example, an annotation SeqFeature::Store database and a
+	BigWigSet database of data.
+	- Added the rpkm method to work with any segment, not just genes with
+	exons, in data collection scripts get_datasets.pl and average_gene.pl
+	- Fixed bugs in script ucsc_table2gff3.pl, data2wig.pl,
+	find_enriched_regions.pl, and bar2wig.pl
+
+v.1.6.4 (svn r314)
+	- Major update to script bam2wig.pl to reduce memory consumption by
+	writing incremental portions. The strand option is now a boolean option,
+	and when enabled, automatically writes both strands simultaneously. The
+	binning of read counts into windows of user-selected size is now
+	possible. The optimal shift value for ChIP-Seq data can now be empically
+	determined from the reads using a statistical method.
+	- Added additional support for UCSC ensGene tables by including
+	ensemblToGeneName and ensemblSource supplemental tables in script
+	ucsc_table2gff2.pl. The common gene name is now included in the output
+	GFF3 file.
+	- Added rna_count function to script get_feature_info.pl
+	- Added minimum and maximum value functions to script
+	manipulate_datasets.pl
+	- Included a range option when generating a summary file in script
+	manipulate_datasets.pl
+	- Improved the regular expression matching of the chromosome name when
+	sorting by genomic coordinates in the script manipulate_datasets.pl
+	- Increased the number of available letters when requesting indices from
+	the second file in script merge_datasets.pl
+	- Updated script check_dependencies.pl to handle missing dependencies
+	more gracefully
+	- Updated error handling of missing Perl module dependencies, including
+	IO::Zlib
+	- Fixed bug where the default chromosome exclusion list in
+	biotoolbox.cfg wasn't being used when generating a new genome interval
+	list
+	- Fixed bug where where a script might ignore the --nogz option when the
+	original file was gzipped
+	- Fixed bug in script split_data_file.pl where a filename may get out of
+	sync with what was requested and what is written
+
+v.1.6.3 (svn r293)
+	- Added knownGene as a source in script ucsc_table2gff3.pl
+	- Improved handling of the chromosome exclusion list in library
+	tim_db_helper
+	- Fixed bug where an exception could occur if multiple genomic regions
+	on different chromosomes are returned from a database query. Included
+	logic to help identify the appropriate intended chromosome.
+	- Fixed bug where an exception and crash could occur if the query
+	chromosome is not present in a bigWig, bigBed, or Bam file when
+	collecting data. Chromosome names are now checked prior to query.
+	- Fixed bug in script get_datasets.pl where a null value is returned
+	instead of 0 when using the method of sum.
+	- Removed several minor bugs that could generate non-fatal Perl warnings
+
+v.1.6.2 (svn r282)
+	- Fixed bugs in script data2bed.pl that prevented a bigBed file from
+	being generated. Also improved autodetection of data columns and allowed
+	for dummy data to be inserted in lower column data when writing higher
+	column data. Also added ability to use either the GFF Name or ID
+	attribute as the Bed feature name.
+	- Added span option to script data2wig.pl when making wig files.
+	- Renamed script process_agilent.pl to process_microarray.pl. Completely
+	restructured internal data to accomodate multi-slide arrays and other
+	file formats, including NimbleGen and GenePix.
+	- Removed annoying verbose output from script split_data_file.pl and
+	improved efficiency.
+	- Stopped writing index keys in the metadata of tim data file formats.
+	Index is now automatically calculated and retained internally. Also
+	avoids writing metadata automatically if it wasn't present in the first
+	place.
+	- Added summary export function to script manipulate_datasets.pl. This
+	replicates the summary option from script get_relative_data.pl.
+	- Added multi-column support to the subtract and division functions in
+	script manipulate_datasets.pl.
+	- Minor bug fixes and improvements to script map_oligo_data2gff.pl.
+	- Improved script gff3_to_ucsc_table.pl to handle gzip files and make
+	the UCSC bin column optional.
+	- Added character escaping when generating GFF3 files.
+	- Improved handling of BigWigSet directories in script big_file2gff3.pl
+	where the set name is used as the final subdirectory in the target path.
+	Also improved name handling.
+	- Fixed bug in writing Sam files in script change_chr_prefix.pl. Also
+	added increased support for pragmas and fasta sequences in GFF3 files,
+	and support for non-standard text files.
+	- Changed the score column name to the more meaningful outfile basename
+	when writing summary files.
+	- Fixed data collection from Bed files in script bin_genomic_data.pl.
+	- Renamed script map_relative_data.pl to get_relative_data.pl; updated
+	the POD to be more helpful.
+
+v.1.6.1 (svn r258)
+	- updated the inline documentation for all perl scripts to include the
+	version option
+
+v1.6.0 (svn r253)
+	- added version numbers and reporting to all perl scripts and modules
+	- retired a number of outdated scripts
+	- renamed script map_data.pl to map_relative_data.pl
+
+v1.5.9 (svn r247)
+	- updated script big_file2gff3.pl to generate BigWigSet conf stanzas
+	with subtracks, also more thorough conf stanzas
+	- added additional axis formatting options to script graph_profile.pl
+	- fixed critical error in library tim_db_helper where relative
+	coordinates were not correctly reported in function
+	get_region_dataset_hash()
+	- improved handling of opening a bigwigset database in library
+	tim_db_helper::bigwig
+	- major overhaul of script average_gene.pl to work with bed files, add
+	new methods including rpm support, and general much-needed
+	reorganization
+	- improved error messaging in biotoolbox libraries by using confess
+	instead of croak
+	- reorganize the order of checking for the biotoolbox configuration in
+	tim_db_helper::config
+
+v1.5.8 (svn r240) (not released)
+	- fix some bugs with script graph_histogram.pl concerning the bins and
+	their labels
+	- updated script gff3_to_ucsc_table.pl to work with gene models without
+	transcripts and fix bugs handling comments and pragmas
+	- fixed bug with trimming windows in script find_enriched_regions.pl by
+	including absolute option to get_region_dataset_hash() function in
+	library tim_db_helper
+	- added option to randomly assign strand for paired-end features to
+	script bam2gff_bed.pl
+	- fix chromosome regex issue with non-standard chromosome names in
+	script bar2wig.pl
+	- updated methods to get chromosome sizes in libraries
+	tim_db_helper::bigwig and tim_db_helper::bigbed
+	- added new parameter chromosome_exclude in configuration file
+	biotoolbox.cfg, which allows specific chromosomes to be excluded when
+	generating new feature or genomic interval lists
+	- removed all references to key reference_sequence_type from config file
+	biotoolbox.cfg and associated scripts
+	- updated chromosome reference, and added logic to automatically
+	identify column indices in script data2bed.pl
+	- updated several scripts to use seq_ids to retrieve chromosome lists
+	- fixed bug in script get_feature_info.pl where short feature lists
+	would cause a failure when generating a list of possible attributes from
+	sample features
+
+v1.5.7 (svn r227) (not released)
+	- major overhaul of script get_datasets.pl
+	- removed subs get_feature_dataset() and get_genome_dataset() from
+	library tim_db_helper, functionality moved to script get_datasets.pl
+	- added data color options to script graph_profile.pl
+	- completely updated script map_data.pl to work with chromosome segments
+	rather than named features, and added rpm support
+	- added new sub to check datasets for rpm support in library
+	tim_db_helper
+	- fixed bug when specifying no datasets in script get_datasets.pl
+	- improved support for BigWigSet databases in library tim_db_helper and
+	script print_feature_types.pl
+
+v1.5.6 (svn r223) (not released)
+	- added rpm method to score functions in library tim_db_helper
+	- minor bug fixes and adjustments to help rpm method in tim_db_helper
+	bigwig, bigbed, and bam libraries
+	- minor bug fix in script find_enriched_regions.pl
+	- fixed export bug in library tim_db_helper::bigbed
+	- fixed bug in library tim_db_helper sub process_and_verify_dataset()
+	where new datasets would never be prompted
+	- corrected the method for counting bed features in library
+	tim_db_helper::bigbed
+	- fixed alignment collection to only take alignments with midpoint
+	positions within the requested region in library tim_db_helper::bam
+
+v1.5.5 (svn r219) (not released)
+	- added new avoid option to method get_region_dataset_hash() in library
+	tim_db_helper
+	- updated script map_data.pl to use get_region_dataset_hash()
+	- fixed bug in method validate_dataset_list() in library tim_db_helper
+	- fixed bug in script merge_datasets.pl where table headers may not be
+	written properly
+	- fixed bug in tim_db_helper::get_genome_dataset() if more than one
+	segment was found
+	- made numerous improvements in opening db connections in library
+	tim_db_helper
+	- made changes to assigning feature type when opening certain files in
+	library tim_file_helper
+	- fixed bug in library tim_db_helper where bed file coordinates were not
+	written out in interbase
+	- moved the sum_total_alignments() subroutine from the script bam2wig.pl
+	to the library tim_db_helper::bam
+	- added support for stranded paired-end RNA-Seq bam files aligned with
+	TopHat which use the XS attribute to record strand information in
+	scripts bam2wig.pl and bam2gff_bed.pl
+	- disabled splices on paired-end bam files in script bam2wig.pl
+
+v1.5.4 (svn r209) (not released)
+	- added more explicit support for bed files in the tim_file_helper and
+	tim_data_helper libraries, including data structure verification,
+	interbase to base conversion, and metadata handling
+	- generalized bam and bigfile database handling to tim_db_helper
+	libraries
+	- simplified generating genomic windows in tim_db_helper
+	-improved handling of collecting data from bigfile databases in
+	tim_db_helper libraries
+	- added chromosome feature output to script big_file2gff3.pl
+	- updated numerous scripts to reflect tim_db_helper changes; general
+	code cleanup
+	- further simplification and code cleanup of library tim_db_helper,
+	including database and dataset list verification, and removing redundant
+	code in collecting dataset values
+	- added new subroutine process_and_verify_dataset() to library
+	tim_db_helper
+	- updated scripts average_gene.pl, find_enriched_regions.pl, and
+	map_data.pl to use the new sub process_and_verify_dataset()
+
+v1.5.3 (svn r205)
+	- Fixed bug in script bam2wig.pl that prevented spliced alignments from
+	being properly checked and recorded. 
+	- Fixed numerous bugs in script ucsc_table2gff3.pl, including a bug
+	where the gene start coordinate may not be updated from interbase to
+	base, and not accurately converting the CDS phase
+	- Added new features to the script ucsc_table2gff3.pl, including
+	automatic table retrieval through FTP from UCSC to greatly simplify
+	conversion, adding support for knownGene and xenoRefGene tables,
+	customizing the type of features to output, properly handling features
+	with duplicate names by creating unique IDs, and optionally including
+	chromosome information in the output GFF3 file
+	- Deleted the now redundant script ucsc_chrom2gff3.pl
+
+v1.5.2 (svn r200)
+	- Updated several scripts and libraries to fix bugs in handling GFF
+	version numbers and pragmas.
+	- Added unique IDs to the gff3 output from bam2gff_bed.pl
+	- Added option to deal with multiple values at identical positions in
+	the script data2wig.pl
+	- Added support for log2 values when combining multiple values at
+	identical postions in scripts data2wig.pl, bar2wig.pl, and
+	useq2bigfile.pl.
+	- Retired the outdated script just_blast_oligos.pl.
+
+v1.5.1 (svn r193)
+	- Fixed critical bug in script bar2wig.pl where values from multiple
+	postions were not combined properly. Also fixed bug with processing a
+	single bar file.
+	- Removed required dependencies of bioperl for scripts bar2wig.pl and
+	useq2bigfile.pl
+	- Fixed small bug in tim_db_helper::bigbed library to ensure positions
+	were withing the region of interest
+	- Added mapping quality filter and other improvements to script
+	bam2wig.pl
+	- Changed score reporting to record mapping quality in script
+	bam2gff_bed.pl
+
+v1.5 (svn r184)
+	- Added script useq2bigfile.pl for converting USeq archives
+	- Added script check_dependencies.pl for assisting in checking for Perl
+	module dependencies. It will help install the latest versions through
+	CPAN
+	- Changed the biotoolbox configuration file from lib/tim_db_helper.cfg
+	to biotoolbox.cfg in the root directory.
+	- Moved the biotoolbox configuration loader into a separate module as
+	lib/tim_db_helper/config.pm. This avoids requiring installing BioPerl
+	and loading all of tim_db_helper.pm when it may not be necessary.
+	- Updated numerous scripts to reflect changes with the biotoolbox
+	configuration loader.
+	- added axes labeling options to scripts graph_data.pl and
+	graph_histogram.pl
+	- fixed bug in handling bed files in library tim_file_helper
+	- minor fixes in script data2wig.pl
+	- improved working with bigfile conversions
+	- fixed minor bug in script big_file2gff3.pl when leaving files in the
+	current directory
+
+v1.4.4 (svn r162)
+	- Added reads per million option to script bam2wig.pl
+	- Added parent, exon, and transcript_length attributes to script
+	get_feature_info.pl
+	- Updated scripts find_enriched_regions.pl and map_transcripts.pl to
+	work with with standalone data files (BigWig, BigBed, Bam)
+	- Added configuration, description, and capabilities to working with
+	SQLite database files in tim_db_helper
+	- Added midpoint as acceptable coordinate in script data2wig.pl
+	- Bug fixes to script locate_SNPs.pl and bam2wig.pl; library
+	tim_db_helper::bam
+
+v1.4.3 (svn r144)
+	- Changed script bar2wig.pl to require method for combining values and
+	removed interbase option
+	- Updated peak indentification in script map_nucleosomes.pl to use the
+	tag dataset and not the scan dataset
+	- Updated script big_file2gff3.pl to produce more useful conf files with
+	BigWigSets
+	- Added overlap data column to ouput of script
+	get_intersecting_features.pl and added --set_strand option to enforce
+	directionality
+	- Added three new functions to script manipulate_datasets.pl, including
+	new column, strandsign, and mergestrand
+	- Fixed script wig2data.pl so it works now
+	- Updated script get_feature_info.pl to parse an attribute list from the
+	command line
+	- Improved handling of metadata when opening tim data files
+
+v1.4.2 (svn r129)
+	- Added fast low level coverage function to the script bam2wig.pl
+	- Fixed script pull_features.pl to keep the order of features in the
+	list file.
+	- Fixed script bar2wig.pl to correctly identify the chromosome name.
+	- Various bug fixes to the database library helper tim_db_helper.pm.
+
+v1.4.1 (svn r119)
+	- Fixed bug with get_ensembl_annotation.pl where a protein_coding gene
+	encoding a transcript lacking a CDS will write inappropriate
+	coordinates. These transcripts will not write start_codon, stop_codon,
+	or CDS subfeatures.
+	- Fixed bug with script get_intersecting_features.pl where selecting
+	regions with a start, stop modifier was not being selected properly.
+	- Fixed bug with tim_db_helper modules that prevented working with
+	source data files specified in a database feature
+	- Added log transformation of count in script bam2wig.pl
+
+v1.4 (svn r111)
+	- Added script bam2wig.pl for enumerating alignments and writing a wig
+	file of the counts. 
+	- Added script change_chr_prefix.pl for adding or stripping chromosome
+	prefixes from data and annotation files.
+	- Bug fixes to ucsc_table2gff3.pl.
+
+v1.3 (svn r104)
+	- Added ability to restrict data collection to exon subfeatures to
+	script get_datasets.pl. Useful for RNA-seq analysis.
+	- Added exon count as attribute to script get_feature_info.pl.
+	- Bug fixes to get_datasets.pl.
+
+v1.2 (svn r98)
+	- Added support for bam files as a data source.
+	- Updated data collection scripts to allow direct referencing of data
+	source files, including bigWig, bigBed, and Bam files, on the command
+	line, without having to reference the files from within the database.
+
+v1.1 (svn r92)
+	- Updated script ucsc_table2gff3.pl to use Bio::SeqFeature::Lite. Now
+	outputs exon and codon features.
+	- Updated script get_ensembl_annotation.pl to collect RNA features from
+	Ensembl as well as generate exon and codon features.
+	- Added script gff3_to_ucsc_table.pl to generate UCSC style refSeq
+	tables from GFF3 formatted data.
+
+v1.0.2 (svn r91)
+	- Bug fixes to libs tim_file_helper and tim_db_helper
+	- Bug fixes to scripts print_feature_types.pl,
+	get_intersecting_features.pl, big_file2gff3.pl, graph_data.pl,
+	graph_histogram.pl, graph_profile.pl
+
+v1.0 (svn r68)
+	- Initial public release of an archive. Previous versions were only
+	available through SVN.
