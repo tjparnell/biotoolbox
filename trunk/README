@@ -6,95 +6,72 @@ This is a collection of libraries and high-quality end-user
 scripts for bioinformatic analysis, particularly of genomic data 
 obtained from microarray and next-generation sequencing.
 
-The original project was focused primarily on the generation of 
-functional end-user scripts for bioinformatic data conversion, 
-processing, collection, and analysis. The libraries were initially 
-simply shared code for these scripts. However, they are fully 
-documented, and may be used as the basis for writing additional 
-analysis scripts.
+The Bio::ToolBox libraries provide an abstraction layer over a variety
+of different specialized BioPerl-style modules. For example, there is
+a special emphasis on the collection data values for defined genomic
+coordinate regions, regardless of whether the values come from a GFF
+database, Bam file, BigWig file, etc. See the documentation with the
+Bio::ToolBox::Data module for more information on working with tables
+of information, for example BED files of genomic coordinates, and
+using that information to collect data from databases.
 
-In many cases, the Bio::ToolBox scripts provide an abstraction 
-layer over a variety of different specialized BioPerl-style 
-modules. For example, there is a special emphasis on the collection 
-data values for defined genomic coordinate regions, regardless of 
-whether the values come from a GFF database, Bam file, BigWig file, 
-etc. 
-
-There is also an emphasis on using industry-standard file formats, 
-such as BED and GFF3, as well as simple tab-delimited text files 
-that may be imported or exported from a variety of other applications. 
-Retention of metadata is accomplished by simply prefixing comment 
-lines at the beginning of the file.
-
-Currently the libraries are implemented as simple subroutines that 
-must be imported into a script's namespace. They are not implemented 
-as object-oriented modules, although that may be partially rectified 
-in the future.
-
-The included scripts are production-quality programs for processing, 
-converting, analyzing, and manipulating genomic data and/or features. 
-These programs include the following capabilities
-	
-	* Tools for converting data formats between popular formats, including
-	  GFF3, wig, bed, BAM, bigWig, bigBed, and others
-	* Collecting data relative to any annotated genomic feature
-	* Manipulation and analysis of collected data
-	* Generating simple graphs of collected data
-	* Processing raw microarray files
-	* Simple processing of Next Generation Sequencing alignment files
-	* Precise mapping of nucleosomes from paired-end sequencing
+The Bio::ToolBox package also includes a large number of high 
+quality scripts for setting up databases of annotation, collecting 
+annotated features, collecting genomic data relative to features, 
+manipulating and analyzing data, and data format conversion. 
+These scripts are installed in your local scripts bin directory. 
 
 
 
 REQUIREMENTS
 
-The programs have been developed and used on Mac OS X versions 10.5 through
-10.8. The programs should work on any sane unix-like environment, including
-Linux; Microsoft Windows compatability is not tested nor guaranteed.
+These are Perl modules and scripts. They require Perl and a unix-like 
+command-line environment. They have been developed and tested on Mac 
+OS X and linux; Microsoft Windows compatability is not tested nor 
+guaranteed.
 
-A working Perl environment is, of course, also required, and usually
-present in virtually every unix-like operating system distribution. Perl
-versions 5.10 and 5.12 have been tested. 64-bit executable is desireable, but 
-not required, if only because some of the data files can get particularly
-large, leading to out-of-memory errors with 32-bit Perl.
+Most recent versions of Perl will work; older versions will require 
+additional updating for compatibility.
 
 Several different Perl modules are required for specific programs to work, 
 most notably BioPerl, among a few others. Most of these dependencies can 
-be taken care of by the Installer.
+be taken care of by the installer.
 
-A C compiler such as gcc is preferred and required for many of the Perl 
-modules. Limited functions may be available without it. On Linux, these 
-tools may be readily installed through your distribution package manager. 
-On Mac OS X, you will need to install the XCode application (available 
-from the Mac App Store) and specifically install the Command Line Tools 
-through its Preferences (optional documentation is not needed).
+
 
 INSTALLATION
 
 Installation is simple with the standard Perl incantation.
     perl ./Build.PL
+    ./Build installdeps     # if necessary
     ./Build
+    ./Build test
     ./Build install
+
+Installation may also be managed through a package manager, either the 
+CPAN shell or a utility such as cpanminus.
+
+
 
 USAGE OF PROVIDED SCRIPTS
 
-*Configuration 
+* Configuration *
 There is a configuration file that may be customized for your particular
 installation. The default file is written to ~/.biotoolbox.cfg. It is a simple
 INI-style file that is used to set up database connection profiles, feature
-aliases, helper application locations, etc. The file is intended to be
-edited by users. More documentation can be found in the 
-Bio::ToolBox::db_helper::config documentation. This file is automatically 
-written as needed; it is not installed by the Installer.
+aliases, helper application locations, etc. The file may be edited by users. 
+More documentation can be found in the Bio::ToolBox::db_helper::config 
+documentation. This file is automatically written as needed; it is not 
+installed by the Installer.
 
-*Execution 
+* Execution *
 All biotoolbox scripts are designed to be run from the command line or
 executed from another script. Some programs, for example
 manipulate_datasets.pl, also provide an interactive interface to allow for
 spontaneous work or when the exact index number or name of the dataset in
 the file or database is not immediately known.
 
-*Help 
+* Help *
 All scripts require command line options for execution. Executing the
 program without any options will present a synopsis of the options that are
 available. Most programs also have a --help option, which will display
@@ -103,32 +80,21 @@ the internal POD). The options are given in the long format (--help, for
 example), but may be shortened to single letters if the first letter is
 unique (-h, for example).
 
-*File Formats 
-Many of the programs are designed to input and output a file format
-referred to in colloquial tems as a 'tim data format'. This is merely a
-tabbed-delimited text format (unix line endings), where the rows represent
-genomic features, bins, etc. and the columns represent descriptive
-information and data. The first line in the table are the column headings.
-
-At the beginning of the file are metadata lines, prefixed by a #, which
-describe the content in each column using a simple key=value system. This
-metadata is useful to describe how and where the data was obtained, and
-what format it is in, for example log2. This frees up having to cram all
-the metadata into the filename. The metadata lines are dispensible in most
-cases, and can be safely deleted before importing the file into another
-program, such as Excel. More detailed information can be found in the POD
-documentation of tim_file_helper.pm or online.
+* File Formats *
+Many of the programs are designed to input and output a tabbed-delimited 
+text format (unix line endings), where the rows represent genomic features, 
+bins, etc. and the columns represent descriptive information and data. The 
+first line in the table are the column headings. Metadata about each 
+column are recorded in header lines at the beginning of the file and 
+prefixed by a # symbol. The files may be compressed with gzip. More 
+information may be found Bio::ToolBox::file_helper.
 
 
 
+PROJECT WEBSITE
 
-UPDATES AND FIXES
-
-The biotoolbox scripts are under continual development by the author. The 
-latest distribution may be downloaded from the project website at 
+The BioToolBox project repository may be found at
 http://code.google.com/p/biotoolbox/. 
-
-The latest bugfixes and updates may also be obtained through SVN.
 
 Please contact the author for bugs. Feature requests are also accepted, 
 within time constraints. Contact information is at the project website.
