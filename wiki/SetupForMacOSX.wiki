@@ -13,7 +13,7 @@ These are notes specific for Mac OS X computers. For general information about s
 		# [SetupForMacOSX#Notes_for_OS_X_10.8_Mountain_Lion Notes for OS X 10.8 Mountain Lion]
 		# [SetupForMacOSX#Notes_for_OS_X_10.9_Mavericks Notes for OS X 10.9 Mavericks]
 	# [SetupForMacOSX#A_note_about_backups A note about backups]
-	# [SetupForMacOSX#Installing_XCode Installing XCode]
+	# [SetupForMacOSX#Installing_the_Command_Line_Tools Installing the Command Line Tools]
 	# [SetupForMacOSX#Using_Fink_or_MacPorts Using Fink or MacPorts]
 		# [SetupForMacOSX#Setting_up_Fink Setting up Fink]
 			# [SetupForMacOSX#Special_notes_for_Mac_OS_X_10.6_only Special notes for Mac OS X 10.6 only]
@@ -43,7 +43,7 @@ These are notes specific for Mac OS X computers. For general information about s
 
 ==Prerequisites==
 	# A relative familiarity with command line usage in the terminal. Users should be able to move around and understand the file system directory, view and manipulate files, run programs, etc. There are both online and dead-tree resources available to learn this. You can access the command line from the Terminal.app located in `/Applications/Utilities`.
-	# You will need to install XCode from Apple. Many of tools we are installing require compiling executables from source code. See [SetupForMacOSX#Installing_XCode Installing XCode] below for more information. 
+	# You will need to install the Command Line Tools from Apple. You can obtain them one of three ways. See [SetupForMacOSX# ] below for more information. 
 	# Access to an account with administrator privileges is recommended, especially if want to use Fink or MacPorts to install additional software (recommended). These package managers keep everything localized to a single directory (`/sw` for Fink, `/opt` for MacPorts) and never touches system directories. 
 	# A good text editor. Microsoft Word will not do, and TextEdit is too limited. I prefer the free and quite capable [http://www.barebones.com/products/textwrangler/ TextWrangler], but several other competent editors also exist. For simple editing on the command line, try the `nano` editor.
 
@@ -68,14 +68,20 @@ This guide was initially written with 10.6 in mind, and subsequently updated wit
 
 ===Notes for OS X 10.9 Mavericks===
 	# The default Perl is now 5.16.4. At least Apple is keeping up with Perl distributions, which is more than can be said about some linux distributions (looking at you, Red Hat). Local perl libraries should be mostly ok, although modules installed in the system directories will have to be re-installed again.
-	# If you have Fink installed, you should be able to migrate the installation. You should probably update Fink to the latest version, before upgrading the Mac OS, to make things easier (although you could do it the other way around). See the Fink website for more details.
-	# You will likely also have to update XCode.
+	# As of this writing, there is no upgrade path for a Fink installation to 10.9, which means, you guessed it, you have to wipe and reinstall ... everything `<sigh>`. Head over to the [http://www.finkproject.org/download/10.9-upgrade.php Fink upgrade] page for some guidance. I would recommend copying the `/sw/var/mysql` to a safe place before wiping, so that you can simply copy the tables back and get back up to speed quickly (only do this if your mysql was up to date in the first place). You can also copy `/sw/src` to save a little time with downloading packages.
+	# Most other stuff, including `/etc`, `/usr/local`, etc. should be safe.
 
 ==A note about backups==
 Macs have a very handy integrated backup solution called Time Machine. While Time Machine works well with typical user files contained within their home directory, it doesn't always work so well with other, Unix-y things. Be prepared when you find something has not been restored properly. A full restore should work reasonably well; however, migrating from a Time Machine disk to a new installation or computer is much less thorough. For example, Perl modules are not restored (just like an upgrade), unrecognized files in `/var/lib` and anything in `/var/tmp` (default locations for GBrowse installations) are skipped, and not everything under `/usr/` is included. When restoring or migrating, be prepared to re-install a few or a lot of things. While Time Machine certainly has its benefits, also consider full disk cloning software as an alternative that may be less headache-inducing.
 
-==Installing XCode==
-Since we will be compiling and installing a lot of software, it is *absolutely essential* to install the developer tools for Mac. On 10.6 and earlier versions, the Developer Tools came as an optional install on the system DVD that came with your computer, or as a download from their developer site. With 10.7 and later, XCode is Apple's development tool, and is available from their Mac App Store. It is currently free, although they have charged a fee for it in the past.
+==Installing the Command Line Tools==
+Many of the software packages we will be installing come only as source code. Therefore, it is *essential* to install the Command Line Tools for XCode. These include the necessary tools for compiling code into executable programs, including GNU make, a C compiler, and necessary libraries. 
+
+There are few different ways to install it.
+		# Download the Command Line Tools from the [https://developer.apple.com/opensource/ Apple Developer] website. This will require a free Developer account from Apple.
+		# On Mac OS X 10.9 Mavericks *only*, run the command "`xcode-select --install`" from the terminal. This should present a graphical prompt to install the Command Line Tools. Sweet!
+		# Install XCode from Mac App Store. It is currently free. Select this option only if you are interested in developing programs for Mac or iOS. Once it is installed, select the Command Line Tools from the Downloads tab in the XCode preferences.
+		# Mac OS X 10.6 Snow Leopard users will have to install the full XCode, available from the [https://developer.apple.com/ Apple Developer] site or maybe your install disc.
 
 You *must install* the Command Line Tools, which are a separate option under XCode. You can select to install it from the Downloads tab in the XCode Preferences. You do not need the SDKs for Mac OS X or iOS, unless, of course, you intend to do something with them. You can also avoid downloading the documentation, which will save you a considerable amount of disk space. 
 

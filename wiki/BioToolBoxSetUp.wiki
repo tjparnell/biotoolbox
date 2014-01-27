@@ -21,6 +21,7 @@ This guide is for new users looking to set up BioPerl and BioToolBox.
 	# [BioToolBoxSetUp#Installing_Graphing_Modules Installing Graphing Modules]
 	# [BioToolBoxSetUp#Installing_Bam_file_support Installing Bam file support]
 	# [BioToolBoxSetUp#Installing_bigWig_and_bigBed_support Installing bigWig and bigBed support]
+		# [BioToolBoxSetUp#Big_file_utilities Big file utilities]
 	# [BioToolBoxSetUp#Installing_support_for_legacy_wig_files Installing support for legacy wig files]
 	# [BioToolBoxSetUp#Installing_the_Ensembl_Perl_API Installing the Ensembl Perl API]
 
@@ -239,7 +240,15 @@ Repeat the Bio-Samtools installation (you may need to issue the clean command fr
 ==Installing bigWig and bigBed support==
 The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats for easy sharing and viewing of dense genomic data, such as from next generation sequencing technologies. These are self-contained, compressed, indexed, binary file formats, similar to a Bam file, that can be accessed locally or remotely. While they are tremendously helpful in viewing data, I have found they are also quite useful in genome analysis with the BioToolBox scripts. Their use, while not required, are highly recommended if you're using large datasets. 
 
-You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. First, make sure you have prerequisites, including the source headers (developer package) for the GD2 libraries. Next, download Jim Kent's [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip source] code. Then follow these instructions.
+You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. 
+
+First, make sure you have prerequisites, including the source headers (developer package) for the GD2 libraries, including `libpng`. If these are installed in an odd place, e.g [SetupForMacOSX#Using_Fink Fink on Mac OS X], you may need to specify their location. For example, 
+<pre>
+	export PNGLIB=/sw/lib/libpng.a 
+	export PNGINCL='-I/sw/include'
+</pre>
+
+Next, download Jim Kent's [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip source] code. Then follow these instructions.
 <pre>
 	unzip jksrc.zip
 	cd kent/src/
@@ -250,12 +259,23 @@ You'll first need to compile the libraries used with big files. You can follow t
 	make
 	cd ..
 </pre>
+You should get a `x86_64/jkweb.a` file.
 
 Next, install Bio-BigFile using the CPAN Shell. During installation, it will need to know the location of the kent/src/ directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
 
 You may encounter the same error as with samtools above regarding "`-fPIC`". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "`-fPIC`" to the line. Save, "`make clean`", and "`make`" again. 
 
-Now that you have Bio-BigFile installed, you should go ahead and compile some of the useful utilities for converting and working with bigFiles. First you will need to make the destination `bin` directory. 
+
+===Big file utilities===
+There are a number of utilities available for working with bigWig and bigBed files. The easiest way to obtain these is to download pre-compiled binaries for your platform from the [http://hgdownload.cse.ucsc.edu/admin/exe/ UCSC downloads] site.
+
+Alternatively, you can compile utilities yourself. Note that in recent versions, you will need additional prerequisites, notably MySQL headers, just to build these utilities. If they are located in standard locations, e.g. in some linux distributions, you should be safe. If not, e.g. MySQL is installed through [SetupForMacOSX#Installing_MySQL_on_a_client_system Fink on Mac OS X], export the necessary paths.
+<pre>
+	export MYSQLINC=/sw/include/mysql
+	MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
+</pre>
+ 
+ Next, you will need to make the destination `bin` directory. 
 <pre>
 	mkdir ~/bin
 	mkdir ~/bin/x86_64     # this should be whatever you set your MACHTYPE
