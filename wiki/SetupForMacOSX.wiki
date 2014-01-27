@@ -80,12 +80,10 @@ Many of the software packages we will be installing come only as source code. Th
 There are few different ways to install it.
 		# Download the Command Line Tools from the [https://developer.apple.com/opensource/ Apple Developer] website. This will require a free Developer account from Apple.
 		# On Mac OS X 10.9 Mavericks *only*, run the command "`xcode-select --install`" from the terminal. This should present a graphical prompt to install the Command Line Tools. Sweet!
-		# Install XCode from Mac App Store. It is currently free. Select this option only if you are interested in developing programs for Mac or iOS. Once it is installed, select the Command Line Tools from the Downloads tab in the XCode preferences.
+		# Install XCode from Mac App Store. It is currently free. Select this option only if you are interested in developing programs for Mac or iOS, as it is a hefty amount of disk space. Once it is installed, select the Command Line Tools from the Downloads tab in the XCode preferences.
 		# Mac OS X 10.6 Snow Leopard users will have to install the full XCode, available from the [https://developer.apple.com/ Apple Developer] site or maybe your install disc.
 
-You *must install* the Command Line Tools, which are a separate option under XCode. You can select to install it from the Downloads tab in the XCode Preferences. You do not need the SDKs for Mac OS X or iOS, unless, of course, you intend to do something with them. You can also avoid downloading the documentation, which will save you a considerable amount of disk space. 
-
-You will need to run a few commands to work with the command line tools, particularly Fink (below). Enter this command, assuming XCode is in the default Applications folder.
+You will need to run a few commands to work with the Command Line Tools, particularly Fink (below). Enter this command, assuming XCode is in the default Applications folder.
 <pre>
 	xcode-select -switch /Applications/Xcode.app/Contents/Developer
 </pre>
@@ -170,7 +168,7 @@ First, the standard socket location is different between Apple's Server MySQL an
 
 Second, you'll need to install the MySQL development headers, which are not included by default. For Mac OS X Server 10.6, check out this Apple support [http://support.apple.com/kb/HT4006 document].
 
-Note that I am not familiar with later versions of Mac OS X Server, so this information may be limited or out of date.
+Note that I am not familiar with versions of Mac OS X Server later than 10.6, so this information may be limited or out of date.
 
 ===Installing MySQL on a client system===
 You can download an installation package from the main [http://www.mysql.com MySQL] web site. While installing just the pre-compiled version is tempting, it probably won't work very well later on. The reason is that to install the Perl database driver modules you'll need some developer headers that are only included with the source install. So you will need to install from source and compile the executable for your machine. You can do this one of two ways; download the source files from the MySQL web site and follow their directions, or you can use Fink.
@@ -399,11 +397,13 @@ An even better option is to have `launchd`, the OS X equivalent of `init.d` and 
 </dict>
 </plist>
 }}}
+
 Save the file in `/Library/LaunchDaemons/`, make it owned by root, and load it by running the following commands.
 <pre>
 	sudo chown root:wheel /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
 	sudo /bin/launchctl load /Library/LaunchDaemons/org.gmod.gbrowse_clean.plist
 </pre>
+
 You can also simply reboot the computer to load the job. It should now automatically clean up your GBrowse files at 10:00 PM every Sunday. Messages concerning its execution will be reported in the system log. 
 
 ==Additional Tools==
