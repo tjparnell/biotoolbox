@@ -242,7 +242,7 @@ The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWi
 
 You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. 
 
-First, make sure you have prerequisites, including the source headers (developer package) for the GD2 libraries, including `libpng`. If these are installed in an odd place, e.g [SetupForMacOSX#Using_Fink Fink on Mac OS X], you may need to specify their location. For example, 
+First, make sure you have prerequisites, including the source headers (developer package) for the GD2 libraries, including `libpng`. If these are installed in an odd place, e.g via [SetupForMacOSX#Installing_GD_Libraries Fink on Mac OS X], you may need to specify their location. For example, 
 <pre>
 	export PNGLIB=/sw/lib/libpng.a 
 	export PNGINCL='-I/sw/include'
@@ -272,10 +272,10 @@ There are a number of utilities available for working with bigWig and bigBed fil
 Alternatively, you can compile utilities yourself. Note that in recent versions, you will need additional prerequisites, notably MySQL headers, just to build these utilities. If they are located in standard locations, e.g. in some linux distributions, you should be safe. If not, e.g. MySQL is installed through [SetupForMacOSX#Installing_MySQL_on_a_client_system Fink on Mac OS X], export the necessary paths.
 <pre>
 	export MYSQLINC=/sw/include/mysql
-	MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
+	export MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
 </pre>
- 
- Next, you will need to make the destination `bin` directory. 
+
+Next, you will need to make the destination `bin` directory. 
 <pre>
 	mkdir ~/bin
 	mkdir ~/bin/x86_64     # this should be whatever you set your MACHTYPE
