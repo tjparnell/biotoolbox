@@ -3,23 +3,25 @@
 _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gcw] and is not intended for editing._
 
 ==NAME==
-bam2gff_bed.pl
+bar2gff_bed.pl
 
-A script to convert bam paired_reads to a gff or bed file.
+A script to convert bar files to wig files.
 
 ==SYNOPSIS==
-bam2gff_bed.pl `[`--options...`]` <**filename>
+bar2gff_bed.pl `[`--options...`]` <**filename>
 
 {{{
   Options:
   --in <filename>
-  --bed | --gff | --bigbed | --bb
-  --pe
-  --type <text>
-  --source <text>
-  --randstr
   --out <filename> 
-  --bbapp </path/to/bedToBigBed>
+  --method [mean|median|sum|max]
+  --log
+  --track
+  --bw
+  --barapp </path/to/Bar2Gr>
+  --bwapp </path/to/wigToBigWig>
+  --db <database>
+  --chromof </path/to/chromosomes>
   --gz
   --version
   --help
@@ -37,12 +39,6 @@ __--out <**filename>
 
 __
   Specify the output filename. By default it uses the base name of the  input file or the input directory name. The output file will either  have a .wig or .bw file extension.
-__
-  __
-__--barapp </path/to/!Bar2Gr**>
-
-__
-  Specify the full path to David Nix's USeq or T2 application !Bar2Gr** (it  is included in both software packages). By default it uses the path  defined in the biotoolbox configuration file, biotoolbox.cfg.
 __
   __
 __--method `[`mean | median | sum | max`]`
@@ -69,16 +65,10 @@ __
   Flag to indicate that a binary bigWig file should be generated rather than  a text wig file.
 __
   __
-__--db <**database>
+__--barapp </path/to/!Bar2Gr**>
 
 __
-  Specify the name of a Bio::DB database from which to extract chromosome  names and sizes. This information is required when generating a bigWig  file.
-__
-  __
-__--chromof <**filename>
-
-__
-  Alternative to the --db argument, a pre-generated chromosome sizes text  file may be specified. This text file should consist of two columns,  delimited by whitespace, consisting of the chromosome name and size.
+  Specify the full path to David Nix's USeq or T2 application !Bar2Gr** (it  is included in both software packages). By default it uses the path  defined in the biotoolbox configuration file, biotoolbox.cfg.
 __
   __
 __--bwapp </path/to/wigToBigWig>
@@ -87,10 +77,22 @@ __
   Specify the full path to Jim Kent's wigToBigWig conversion utility. By  default it uses the path defined in the biotoolbox configuration file,  biotoolbox.cfg. If it is not defined here or in the config file, then  the system path is searched for the executable.
 __
   __
+__--db <**database>
+
+__
+  Specify the name or path to a Bio::DB database from which to extract  chromosome names and sizes. This information is only required when  generating a bigWig file.
+__
+  __
+__--chromof </path/to/chromosomes>
+
+__
+  Alternative to the --db argument, a pre-generated chromosome sizes text  file may be specified. This text file should consist of two columns,  delimited by whitespace, consisting of the chromosome name and size.
+__
+  __
 __--gz
 
 __
-  Specify whether (or not) the output wig file should be compressed with gzip. This option does not affect bigWig files, but will affect intermediate  wig files.
+  Specify whether (or not) the output wig file should be compressed with gzip. Default is false.
 __
   __
 __--version
