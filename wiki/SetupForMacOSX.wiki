@@ -313,9 +313,9 @@ It should install `mod_fcgid.so` into `/usr/libexec/apache2/` for you and automa
 
 Note that with XCode 4.x on 10.8, there is a bug with XCode when running the `./configure.apxs` step. You get an error from `libtool` saying that `cc` could not be found. The issue and solution is described  [http://apple.stackexchange.com/questions/58186/how-to-compile-mod-wsgi-mod-fastcgi-etc-on-mountain-lion-by-fixing-apxserror here]. You will need to make a symbolic link using the following command.
 <pre>
-	sudo ln -s /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/ /Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.8.xctoolchain
+	sudo ln -s /Applications/Xcode.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/ /Applications/Xcode.app/Contents/Developer/Toolchains/OSX10.9.xctoolchain
 </pre>
-The `configure` and `make` command should then complete correctly.
+If you are on OS X 10.8, substitute "OSX10.8" in the last part of the command above. You should "`make clean`", then run "`./configure.apxs`" and "`make`" commands again; it should compile successfully.
 
 ====FastCGI Permissions====
 Sometimes I have permissions problems executing the scripts, especially when using FastCGI. You will need to edit the file `/etc/apache2/other/gbrowse2.conf` (see above if it's not present). Find this entry in the file
