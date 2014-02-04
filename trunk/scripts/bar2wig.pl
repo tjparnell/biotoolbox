@@ -110,6 +110,16 @@ unless (defined $java) {
 	add_program($java) if $java; # remember this for next time
 }
 unless (defined $java) {
+	# typical location for java executable on a *nix environment
+	$java = File::Spec->catfile( File::Spec->rootdir, 'usr', 'bin', 'java');
+	if (-e $java and -x _) {
+		add_program($java);
+	}
+	else {
+		undef $java;
+	}
+}
+unless (defined $java) {
 	die " unable to identify java executable!\n";
 }
 unless ($bar_app_path) {
@@ -651,13 +661,13 @@ __END__
 
 =head1 NAME
 
-bar2gff_bed.pl
+bar2wig.pl
 
 A script to convert bar files to wig files.
 
 =head1 SYNOPSIS
 
-bar2gff_bed.pl [--options...] <filename>
+bar2wig.pl [--options...] <filename>
   
   Options:
   --in <filename>
