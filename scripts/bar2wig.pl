@@ -15,7 +15,7 @@ use Bio::ToolBox::file_helper qw(
 );
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n This program will convert bar files to a wig file\n";
 
@@ -148,6 +148,7 @@ if ($bigwig) {
 		die "  Must define a database name or provide a chromosome file \n" . 
 			"to use the bigwig option! see help\n";
 	}
+	$gz = 0;
 }
 unless (defined $use_track) {
 	if ($bigwig) {
@@ -650,23 +651,25 @@ __END__
 
 =head1 NAME
 
-bam2gff_bed.pl
+bar2gff_bed.pl
 
-A script to convert bam paired_reads to a gff or bed file.
+A script to convert bar files to wig files.
 
 =head1 SYNOPSIS
 
-bam2gff_bed.pl [--options...] <filename>
+bar2gff_bed.pl [--options...] <filename>
   
   Options:
   --in <filename>
-  --bed | --gff | --bigbed | --bb
-  --pe
-  --type <text>
-  --source <text>
-  --randstr
   --out <filename> 
-  --bbapp </path/to/bedToBigBed>
+  --method [mean|median|sum|max]
+  --log
+  --track
+  --bw
+  --barapp </path/to/Bar2Gr>
+  --bwapp </path/to/wigToBigWig>
+  --db <database>
+  --chromof </path/to/chromosomes>
   --gz
   --version
   --help
@@ -687,12 +690,6 @@ The bar files may be zipped (*.bar.zip).
 Specify the output filename. By default it uses the base name of the 
 input file or the input directory name. The output file will either 
 have a .wig or .bw file extension.
-
-=item --barapp </path/to/Bar2Gr>
-
-Specify the full path to David Nix's USeq or T2 application Bar2Gr (it 
-is included in both software packages). By default it uses the path 
-defined in the biotoolbox configuration file, biotoolbox.cfg.
 
 =item --method [mean | median | sum | max]
 
@@ -723,17 +720,11 @@ generating bigWig files manually. The default is to include for wig files
 Flag to indicate that a binary bigWig file should be generated rather than 
 a text wig file.
 
-=item --db <database>
+=item --barapp </path/to/Bar2Gr>
 
-Specify the name of a Bio::DB database from which to extract chromosome 
-names and sizes. This information is required when generating a bigWig 
-file.
-
-=item --chromof <filename>
-
-Alternative to the --db argument, a pre-generated chromosome sizes text 
-file may be specified. This text file should consist of two columns, 
-delimited by whitespace, consisting of the chromosome name and size.
+Specify the full path to David Nix's USeq or T2 application Bar2Gr (it 
+is included in both software packages). By default it uses the path 
+defined in the biotoolbox configuration file, biotoolbox.cfg.
 
 =item --bwapp </path/to/wigToBigWig>
 
@@ -742,11 +733,22 @@ default it uses the path defined in the biotoolbox configuration file,
 biotoolbox.cfg. If it is not defined here or in the config file, then 
 the system path is searched for the executable. 
 
+=item --db <database>
+
+Specify the name or path to a Bio::DB database from which to extract 
+chromosome names and sizes. This information is only required when 
+generating a bigWig file.
+
+=item --chromof </path/to/chromosomes>
+
+Alternative to the --db argument, a pre-generated chromosome sizes text 
+file may be specified. This text file should consist of two columns, 
+delimited by whitespace, consisting of the chromosome name and size.
+
 =item --gz
 
 Specify whether (or not) the output wig file should be compressed with gzip.
-This option does not affect bigWig files, but will affect intermediate 
-wig files.
+Default is false.
 
 =item --version
 
