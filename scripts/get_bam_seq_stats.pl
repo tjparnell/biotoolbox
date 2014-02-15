@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n A script to report the alignment sequence nucleotide frequencies\n\n";
 
@@ -95,18 +95,19 @@ exit 0;
 package get_bam_seq_stats::counter;
 use strict;
 use IO::File;
-use Bio::DB::Sam;
+eval {
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
+};
 1;
 
 sub new {
 	my $class = shift;
 	my $file  = shift;
+	return unless exists &open_bam_db;
 	
 	# open the bam object
-	my $sam = Bio::DB::Sam->new( 
-		-bam        => $file,
-		-autoindex  => 1,
-	) or die " unable to open input bam file '$infile'!\n";
+	my $sam = open_bam_db($file) or die " unable to open input bam file '$infile'!\n";
 	
 	# return the object
 	my $self = {
