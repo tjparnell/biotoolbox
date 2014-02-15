@@ -206,7 +206,7 @@ Their usage is detailed below.
 
 ### Open a connection to the SeqFeature Store MySQL database
 
-=item open_db_connection
+=item open_db_connection($database, $no_cache)
 
 This module will open a connection to a BioPerl style database.
 It returns an object that represents the connection. Several 
@@ -222,7 +222,7 @@ a SQLite database file (file.sqlite or file.db), or a single GFF3 file
 should only be used with small files as they demand a lot of memory.
 
 Parameters for connecting to a relational database are stored in the BioToolBox 
-configuration file, C<biotoolbox.cfg>. These include database adaptors, 
+configuration file, C<.biotoolbox.cfg>. These include database adaptors, 
 user name, password, etc. Information regarding the configuration file may 
 be found within the file itself. 
 
@@ -271,19 +271,30 @@ Pass the name of a relational database or the path of the database file to
 the subroutine. The opened database object is returned. If it fails, then 
 an error message should be generated and nothing is returned.
 
+B<Important!> If you are forking your perl process, B<always> re-open your 
+database objects in the child process, and pass a second true value 
+to avoid using the cached database object. By default, opened databases are 
+cached to improve efficiency, but this will be disastrous when crossing forks. 
+
 Example:
 
 	my $db_name = 'cerevisiae';
 	my $db = open_db_connection($db_name);
 	
-	my $file = 'file.bam';
+	my $file = '/path/to/file.bam';
 	my $db = open_db_connection($file);
+	
+	# within a forked child process
+	# reusing the same variable to simplify code
+	# pass second true value to avoid cache
+	$db = open_db_connection($file, 1); 
 
 
 =cut
 
 sub open_db_connection {
 	my $database = shift;
+	my $no_cache = shift || 0;
 	unless ($database) {
 		cluck 'no database name passed!';
 		return;
@@ -318,8 +329,10 @@ sub open_db_connection {
 	}
 	
 	# check to see if we have already opened it
-	if (exists $OPENED_DB{$database}) {
+	if (exists $OPENED_DB{$database} and not $no_cache) {
 		# return the cached database connection
+		# but only if user explicitly requested no cached databases
+		# DO NOT reuse databases if you have forked!!!
 		return wantarray ? ($OPENED_DB{$database}, $database) : $OPENED_DB{$database};
 	}
 	
@@ -606,7 +619,7 @@ sub open_db_connection {
 		
 		unless ($db) {
 			$error .= " ERROR: unknown $adaptor database '$database'\n";
-			if ($dsn =~ /my|pg/) {
+			if ($dsn =~ /mysql|pg/i) {
 				$error .= "   using user '$user' and password '$pass'\n";
 			}
 		}
@@ -615,7 +628,7 @@ sub open_db_connection {
 	# conditional return
 	if ($db) {
 		# cache the opened connection for use later
-		$OPENED_DB{$database} = $db;
+		$OPENED_DB{$database} = $db unless $no_cache;
 		
 		# return as appropriate either both object and name or just object
 		return wantarray ? ($db, $database) : $db;
