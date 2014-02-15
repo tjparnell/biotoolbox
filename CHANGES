@@ -1,6 +1,27 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.14
+v.1.14.1 (svn 763)
+	- Changed the method of caching database objects introduced 
+	in version 1.14, which wreaked havoc with forked child 
+	processes. All database connections are cached by default 
+	and returned if subsequently re-opened, unless explicitly 
+	told to not use the cached connection. Multiple scripts 
+	were updated to reflect the new connection caching. 
+	- Bio::ToolBox::Data now automatically re-clones existing 
+	database connections if you splice the data table.
+	- Bam file index files are now explicitly generated prior 
+	to opening the bam file database connection. Additionally, 
+	existing .bai files are copied as .bam.bai in preference 
+	to creating a new .bam.bai file. Thanks to Yixuan for 
+	reporting.
+	- Fixed POD errors in script bar2wig.pl and updated method 
+	for finding the java executable file. Thanks to Guillaume 
+	for reporting.
+	- Removed debugging warn statements in script 
+	get_relative_data.pl.
+	- Added POD documentation to Bio::ToolBox::db_helper::useq.
+
+v.1.14 (svn 737)
 	- Massive reorganization of the entire package into a proper 
 	Perl module distribution that is installed using standard 
 	Module::Build methods. This will install the libraries into 
