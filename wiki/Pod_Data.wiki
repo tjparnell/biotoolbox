@@ -472,13 +472,17 @@ __
 		$pm->start and next;
 		### in child
 		$Data->splice_data($i, 4);
+		$db = $Data->open_database; # a clone-safe new db object
 		# do something with this portion
 		$Data->save('filename' => "file#$i");
 		$pm->finish;
 	}
 	$pm->wait_all_children;
 }}}
-  There is no convenient method for merging the modified contents of the  table from each child process back into the original Data table, as  each child is essentially isolated from the parent. The Parallel::!ForkManager**  documentation recommends going through a disk file intermediate. See the  accompanying !BioToolBox** script join_data_file.pl for concatenating Data  table files together.
+  There is no convenient method for merging the modified contents of the  table from each child process back into the original Data table, as  each child is essentially isolated from the parent. The Parallel::!ForkManager**  documentation recommends going through a disk file intermediate. See the  accompanying !BioToolBox** script `join_data_file.pl` for concatenating Data  table files together.
+__
+  __
+  Remember that if you fork your script into child processes, any database  connections must be re-opened; they are typically not clone safe. If you  have an existing database connection by using the open_database() method,  it should be automatically re-opened for you when you use the splice_data()  method, but you will need to call open_database() again in the child  process to obtain the new database object.
 __
   __
 convert_gff(%options)
