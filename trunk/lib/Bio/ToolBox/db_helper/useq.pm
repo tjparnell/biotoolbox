@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
-our $VERSION = '1.14';
+our $VERSION = '1.14.1';
 
 
 # Exported names
@@ -16,9 +16,6 @@ our @EXPORT = qw(
 	collect_useq_position_scores
 	open_useq_db
 );
-
-# Hashes of opened file objects
-our %OPENED_USEQFILES; # opened useq file objects
 
 # Hash of Bigfile chromosomes
 our %USEQ_CHROMOS;
@@ -208,30 +205,132 @@ sub collect_useq_position_scores {
 
 sub open_useq_db {
 	
+	# path
 	my $useqfile = shift;
+	my $path = $useqfile;
+	$path =~ s/^file://; # clean up file prefix if present
+	
+	# open
 	my $useq;
+	eval {
+		$useq = Bio::DB::USeq->new($path);
+	};
+	return unless $useq;
 	
-	# check whether the file has been opened or not
-	if (exists $OPENED_USEQFILES{$useqfile} ) {
-		# this file is already opened, use it
-		$useq = $OPENED_USEQFILES{$useqfile};
-	}
-	
-	else {
-		# this file has not been opened yet, open it
-		my $path = $useqfile;
-		$path =~ s/^file://; # clean up file prefix if present
-		eval {
-			$useq = Bio::DB::USeq->new($path);
-		};
-		return unless $useq;
-		
-		# store the opened object for later use
-		$OPENED_USEQFILES{$useqfile} = $useq;
-		
-		# collect the chromosomes for this useq
-		%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
-	}
+	# collect the chromosomes for this useq
+	%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
 	
 	return $useq;
 }
+
+
+
+__END__
+
+=head1 NAME
+
+Bio::ToolBox::db_helper::useq
+
+=head1 DESCRIPTION
+
+This module supports the use of useq file in the Bio::ToolBox distribution.
+Useq files are zip archives representing either intervals or scores. They 
+may be used similarly to either bigWig or bigBed files. More information 
+about useq files may be found at L<http://useq.sourceforge.net/useqArchiveFormat.html>.
+USeq files use the extension F<.useq>.
+
+Scores from useq files may be collected using this module. Either a single 
+score from an interval, or a hash of scores associated with positions across 
+an interval. 
+
+Scores may be restricted to strand by specifying the desired strandedness. 
+For example, to collect transcription data over a gene, pass the strandedness 
+value 'sense'. If the strand of the region database object (representing the 
+gene) matches the strand of the bed feature, then the data for that bed 
+feature is collected.  
+
+=head1 USAGE
+
+The module requires the Bio::DB::USeq package to be installed. 
+
+Load the module at the beginning of your program.
+
+	use Bio::ToolBox::db_helper::useq;
+
+It will automatically export the name of the subroutines. 
+
+=over
+
+=item collect_useq_scores()
+
+This subroutine will collect only the data values from a binary useq file 
+for the specified database region. The positional information of the 
+scores is not retained, and the values are best further processed through 
+some statistical method (mean, median, etc.).
+
+The subroutine is passed seven or more arguments in the following order:
+    
+    1) The chromosome or seq_id
+    2) The start position of the segment to collect 
+    3) The stop or end position of the segment to collect 
+    4) The strand of the original feature (or region), -1, 0, or 1.
+    5) A scalar value representing the desired strandedness of the data 
+       to be collected. Acceptable values include "sense", "antisense", 
+       or "all". Only those scores which match the indicated 
+       strandedness are collected.
+    6) The method or type of data collected. 
+       Acceptable values include 'score', 'count' (returns the number 
+       of features found), or 'length' (returns the lengths of the 
+       features found).  
+    7) The paths to one or more USeq files. It's unlikely to collect 
+       from more than one, but, hey, if you want to....
+
+The subroutine returns an array of the defined dataset values found within 
+the region of interest. 
+
+=item collect_useq_position_scores()
+
+This subroutine will collect the score values from a binary useq file 
+for the specified database region keyed by position. 
+
+The subroutine is passed the same arguments as collect_useq_scores().
+
+The subroutine returns a hash of the defined dataset values found within 
+the region of interest keyed by position. The feature midpoint is used 
+as the key position. When multiple features are found at the same 
+position, a simple mean (for score or length data methods) or sum 
+(for count methods) is returned.
+
+=item open_useq_db()
+
+This subroutine will open a useq database connection. Pass the local 
+path to a useq file (.useq extension). It will return the opened 
+Bio::DB::USeq database object.
+
+=back
+
+=head1 AUTHOR
+
+ Timothy J. Parnell, PhD
+ Dept of Oncological Sciences
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+This package is free software; you can redistribute it and/or modify
+it under the terms of the GPL (either version 1, or at your option,
+any later version) or the Artistic License 2.0.  
+
+
+
+
+
+
+
+
+
+
+
+
+
+
