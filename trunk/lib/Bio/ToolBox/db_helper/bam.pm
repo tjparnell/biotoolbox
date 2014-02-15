@@ -4,6 +4,7 @@ package Bio::ToolBox::db_helper::bam;
 require Exporter;
 use strict;
 use Carp;
+use File::Copy;
 use Statistics::Lite qw(mean);
 use Bio::DB::Sam;
 our $parallel;
@@ -12,22 +13,18 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.14';
+our $VERSION = '1.14.1';
 
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
+	check_bam_index
+	write_new_bam_file
 	collect_bam_scores
 	collect_bam_position_scores
 	sum_total_bam_alignments
 );
-
-# Hashes of opened file objects
-our %OPENED_BAMFILES; # opened bam file objects
-	# in empirical testing, this doesn't really seem to speed things up
-	# like I thought it would
-	# oh well, keep it anyway????
 
 # Hash of Bigfile chromosomes
 our %BAM_CHROMOS;
@@ -48,44 +45,79 @@ our %BAM_CHROMOS;
 
 ### Open a bigWig database connection
 sub open_bam_db {
+	my $bamfile = shift;
+	
+	# check the path
+	my $path = $bamfile;
+	$path =~ s/^file://; # strip the file prefix if present
+	
+	# check for bam index
+	check_bam_index($path);
+	
+	# open the bam database object
+	my $sam;
+	eval {
+		$sam = Bio::DB::Sam->new(
+				-bam         => $path,
+		);
+	};
+	return unless $sam;
+	
+	# collect the chromosomes for this bam
+	%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
+	
+	# done
+	return $sam;
+}
+
+
+
+sub check_bam_index {
+	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that 
+	# doesn't always work as expected. Best to create the index BEFORE opening
 	
 	my $bamfile = shift;
-	my $forget  = shift;
+	return if ($bamfile =~ /^(?:http|ftp)/i); # I can't do much with remote files
 	
-	# check if we have seen this bam file before
-	if (exists $OPENED_BAMFILES{$bamfile} ) {
-		# this file is already opened, use it
-		return $OPENED_BAMFILES{$bamfile};
-	}
+	# we will check the modification time to make sure index is newer
+	my $bam_mtime = (stat($bamfile))[9];
 	
-	else {
-		# this file has not been opened yet, open it
-		
-		# check the path
-		my $path = $bamfile;
-		$path =~ s/^file://; # strip the file prefix if present
-		
-		# open the bam database object
-		my $sam;
-		eval {
-			$sam = Bio::DB::Sam->new(
-					-bam         => $path,
-					-autoindex   => 1,
-			);
-		};
-		return unless $sam;
-		
-		unless ($forget) {
-			# store the opened object for later use
-			$OPENED_BAMFILES{$bamfile} = $sam;
-			
-			# collect the chromosomes for this bam
-			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
+	# optional index names
+	my $bam_index = "$bamfile.bai";
+	my $alt_index = $bamfile;
+	$alt_index =~ s/bam$/bai/i; # picard uses .bai instead of .bam.bai as samtools does
+	
+	# check for existing index
+	if (-e $bam_index) {
+		if ( (stat($bam_index))[9] < $bam_mtime) {
+			# index is older than bam file !? re-index
+			Bio::DB::Bam->index_build($bamfile);
 		}
-		
-		# done
-		return $sam;
 	}
+	elsif (-e $alt_index) {
+		if ( (stat($alt_index))[9] < $bam_mtime) {
+			# index is older than bam file !? re-index
+			Bio::DB::Bam->index_build($bamfile);
+		}
+		else {
+			# reuse this index
+			copy($alt_index, $bam_index)
+		}
+	}
+	else {
+		# make a new index
+		Bio::DB::Bam->index_build($bamfile);
+	}
+}
+
+
+### Write a new bam file
+sub write_new_bam_file {
+	my $file = shift;
+	$file .= '.bam' unless $file =~ /\.bam$/i;
+	my $bam = Bio::DB::Bam->open($file, 'w');
+	carp "unable to open bam file $file!\n" unless $bam;
+	return $bam;
 }
 
 
@@ -261,8 +293,7 @@ sub sum_total_bam_alignments {
 	}
 	else {
 		# we have a name of a sam file
-		# open the file but do not remember it
-		$sam = open_bam_db($sam_file, 1);
+		$sam = open_bam_db($sam_file);
 		return unless ($sam);
 	}
 	
@@ -740,10 +771,6 @@ work well (search, strand, length, etc). If paired-end alignments are to
 be analyzed, they should be processed into another format (BigWig or BigBed). 
 See the biotoolbox scripts 'bam2gff_bed.pl' or 'bam2wig.pl' for solutions.
 
-To speed up the program and avoid repetitive opening and 
-closing of the files, the opened bam file object is stored in a global 
-hash in case it is needed again.
-
 =head1 USAGE
 
 The module requires Lincoln Stein's Bio::DB::Sam to be installed. 
@@ -764,11 +791,25 @@ file. A remote bam file must be indexed. A local bam file may be
 automatically indexed upon opening if the user has write permissions 
 in the parent directory. 
 
-The opened Bio::DB::Sam object will be cached for later use. If 
-you do not want this to happen (in the case of forks, for example), 
-pass a second true argument.
-
 It will return the opened database object.
+
+=item check_bam_index()
+
+This subroutine will check whether a bam index file is present and, 
+if not, generate one. The Bio::DB::Sam module uses the samtools 
+style index extension, F<.bam.bai>, as opposed to the picard style 
+extension, F<.bai>. If a F<.bai> index is present, it will copy the 
+file as F<.bam.bai> index. Unfortunately, a F<.bai> index cannot be 
+used directly.
+
+This method is called automatically prior to opening a bam database. 
+
+=item write_new_bam_file()
+
+This subroutine will open a new empty Bam file. Pass the name of the 
+new file as the argument. It will return a Bio::DB::Bam object to 
+which you can write a header followed by alignments. Be sure you know 
+what to do before using this method! 
 
 =item collect_bam_scores
 
