@@ -10,12 +10,13 @@ my $bam_ok;
 eval {
 	# check for Bam support
 	require Bio::DB::Sam;
+	use Bio::ToolBox::db_helper::bam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 # constant for memory usage while sorting
-# this increases default from 500Mb to 1Gb
+# this increases default from 500MB to 1GB
 use constant SORT_MEM => 1_000_000_000;
 
 print "\n A script to split a paired-end bam file by insert sizes\n\n";
@@ -147,14 +148,10 @@ my %buffer;
 
 ### Open BAM files
 print " Opening bam files....\n";
-# we are opening the bam files using the low level bam API
 
 # input file
-my $in_sam = Bio::DB::Sam->new( 
-	-bam        => $infile,
-	-autoindex  => 1,
-) or die " unable to open input bam file '$infile'!\n";
-	# we are opening the input bam file using the high level sam API
+my $in_sam = open_bam_db($infile) 
+	or die " unable to open input bam file '$infile'!\n";
 print "   input file '$infile'\n";
 
 # input header
@@ -179,7 +176,7 @@ foreach (@sizes) {
 	my $bam_file = $outfile . '.' . $_->[0] . '_' . $_->[1] . '.bam';
 	
 	# open bam file
-	my $bam = Bio::DB::Bam->open($bam_file, 'w') 
+	my $bam = write_new_bam_file($bam_file) 
 		or die "unable to open output bam file '$outfile' for writing!\n";
 	print "   output file '$bam_file'\n";
 	

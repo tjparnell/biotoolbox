@@ -9,10 +9,11 @@ use Bio::ToolBox::data_helper qw(parse_list format_with_commas);
 my $bam_ok;
 eval {
 	# check for Bam support
-	require Bio::DB::Sam;
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
 	$bam_ok = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 
@@ -196,20 +197,17 @@ sub check_defaults {
 sub open_bam_files {
 	
 	# input bam file
-	my $in = Bio::DB::Sam->new(
-		-bam => $infile,
-		-autoindex  => 1,
-	) or die " Cannot open input Bam file!\n";
+	my $in = open_bam_db($infile) or die " Cannot open input Bam file!\n";
 
 	# output bam files
 	my ($true, $false);
 	if ($write_true) {
-		$true = Bio::DB::Bam->open($true_file, 'w') or 
+		$true = write_new_bam_file($true_file) or 
 			die "Cannot open output file $true_file!\n";
 		$true->header_write( $in->header );
 	}
 	if ($write_false) {
-		$false = Bio::DB::Bam->open($false_file, 'w') or 
+		$false = write_new_bam_file($false_file) or 
 			die "Cannot open output file $false_file!\n";
 		$false->header_write( $in->header );
 	}
@@ -267,11 +265,11 @@ sub finish_bam_files {
 	# the output file(s) should also be sorted too
 	if ($write_true) {
 		undef $true_bam;
-		Bio::DB::Bam->index_build($true_file);
+		check_bam_index($true_file);
 	}
 	if ($write_false) {
 		undef $false_bam;
-		Bio::DB::Bam->index_build($false_file);
+		check_bam_index($false_file);
 	}
 }
 
