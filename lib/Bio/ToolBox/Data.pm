@@ -546,6 +546,7 @@ For example, to fork the program into four concurrent processes.
 		$pm->start and next;
 		### in child
 		$Data->splice_data($i, 4);
+		$db = $Data->open_database; # a clone-safe new db object
 		# do something with this portion
 		$Data->save('filename' => "file#$i");
 		$pm->finish;
@@ -556,8 +557,15 @@ There is no convenient method for merging the modified contents of the
 table from each child process back into the original Data table, as 
 each child is essentially isolated from the parent. The Parallel::ForkManager 
 documentation recommends going through a disk file intermediate. See the 
-accompanying BioToolBox script join_data_file.pl for concatenating Data 
+accompanying BioToolBox script F<join_data_file.pl> for concatenating Data 
 table files together.
+
+Remember that if you fork your script into child processes, any database 
+connections must be re-opened; they are typically not clone safe. If you 
+have an existing database connection by using the open_database() method, 
+it should be automatically re-opened for you when you use the splice_data() 
+method, but you will need to call open_database() again in the child 
+process to obtain the new database object.
 
 =item convert_gff(%options)
 
@@ -858,7 +866,13 @@ sub verify {
 
 sub splice_data {
 	my $self = shift;
-	return splice_data_structure($self, @_);
+	splice_data_structure($self, @_);
+	if ($self->{db} and exists $self->{db_connection}) {
+		# re-open a new un-cached database connection
+		my $db = open_db_connection($self->{db}, 1);
+		$self->{db_connection} = $db if $db;
+	}
+	return 1;
 }
 
 sub convert_gff {
@@ -894,7 +908,8 @@ sub database {
 	if (@_) {
 		$self->{db} = shift;
 		if (exists $self->{db_connection}) {
-			$self->{db_connection} = open_db_connection($self->{db});
+			my $db = open_db_connection($self->{db});
+			$self->{db_connection} = $db if $db;
 		}
 	}
 	return $self->{db};
