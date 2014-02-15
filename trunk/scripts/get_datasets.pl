@@ -41,7 +41,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -638,9 +638,10 @@ sub parallel_execution {
 		splice_data_structure($main_data_ref, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
-		$mdb = open_db_connection($main_database);
+		# pass second true to avoid cached database objects
+		$mdb = open_db_connection($main_database, 1);
 		if ($data_database) {
-			$ddb = open_db_connection($data_database);
+			$ddb = open_db_connection($data_database, 1);
 		}
 		else {
 			$ddb = $mdb;

@@ -25,7 +25,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -213,7 +213,8 @@ sub parallel_execution {
 		splice_data_structure($data, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
-		$db = open_db_connection($database);
+		# pass second true to avoid cached database objects
+		$db = open_db_connection($database, 1);
 		
 		# Collect the data
 		process_regions();
