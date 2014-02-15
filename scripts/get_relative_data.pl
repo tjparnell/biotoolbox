@@ -39,7 +39,7 @@ use constant (DATASET_HASH_LIMIT => 3000);
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -408,9 +408,10 @@ sub parallel_execution {
 		splice_data_structure($main_data_ref, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
-		$mdb = open_db_connection($main_database);
+		# pass second true to avoid cached database objects
+		$mdb = open_db_connection($main_database, 1);
 		if ($data_database) {
-			$ddb = open_db_connection($data_database);
+			$ddb = open_db_connection($data_database, 1);
 		}
 		else {
 			$ddb = $mdb;
@@ -1213,7 +1214,6 @@ sub go_interpolate_values {
 	
 	# walk through each data line and then each window
 	for my $row (1..$main_data_ref->{'last_row'}) {
-		warn "checking row $row\n";
 		my $col = $startcolumn + 1;
 		while ($col < $lastwindow) {
 			# walk through the windows of a data row
@@ -1226,7 +1226,6 @@ sub go_interpolate_values {
 			) {
 				# we will interpolate the value from the neighbors
 				# first, need to check that the neighbors have values
-				warn "  found null at index $col\n";
 				
 				# find the next real value
 				my $next_i;
@@ -1237,13 +1236,11 @@ sub go_interpolate_values {
 					}
 				}
 				next unless defined $next_i;
-				warn "  found null at index $col and next value at $next_i\n";
 				
 				# determine fractional value
 				my $initial = $data_table_ref->[$row][$col - 1];
 				my $fraction = ($data_table_ref->[$row][$next_i] - $initial) / 
 					($next_i - $col + 1);
-				warn "    initial value $initial, fraction $fraction\n"; 
 				
 				# apply fractional values
 				for (my $n = $col; $n < $next_i; $n++) {
