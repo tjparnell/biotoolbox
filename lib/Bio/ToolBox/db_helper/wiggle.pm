@@ -21,7 +21,9 @@ our %OPENED_WIGFILES; # opened wigfile objects
 	# in empirical testing, this doesn't really seem to speed things up
 	# like I thought it would
 	# oh well, keep it anyway????
-
+	# I think this is safe to keep opened wigfiles cached, even across forks,
+	# since they are being opened only during data collection, which should 
+	# only occur within child processes, and there is no explicit db open
 
 # The true statement
 1; 

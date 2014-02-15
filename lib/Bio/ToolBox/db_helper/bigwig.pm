@@ -7,7 +7,7 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-our $VERSION = '1.14';
+our $VERSION = '1.14.1';
 
 
 # Exported names
@@ -23,12 +23,6 @@ our @EXPORT = qw(
 	open_bigwigset_db
 );
 
-
-# Hashes of opened file objects
-our %OPENED_BIGFILES; # opened bigwig file objects
-	# in empirical testing, this doesn't really seem to speed things up
-	# like I thought it would
-	# oh well, keep it anyway????
 
 # Hash of Bigfile chromosomes
 our %BIGWIG_CHROMOS;
@@ -565,31 +559,21 @@ sub collect_bigwigset_position_scores {
 ### Open a bigWig database connection
 sub open_bigwig_db {
 	
+	# path
 	my $wigfile = shift;
+	my $path = $wigfile;
+	$path =~ s/^file://; # clean up file prefix if present
+	
+	# open
 	my $bw;
+	eval {
+		$bw = Bio::DB::BigWig->new( -bigwig => $path);
+	};
+	return unless $bw;
 	
-	# check whether the file has been opened or not
-	if (exists $OPENED_BIGFILES{$wigfile} ) {
-		# this file is already opened, use it
-		$bw = $OPENED_BIGFILES{$wigfile};
-	}
-	
-	else {
-		# this file has not been opened yet, open it
-		my $path = $wigfile;
-		$path =~ s/^file://; # clean up file prefix if present
-		eval {
-			$bw = Bio::DB::BigWig->new( -bigwig => $path);
-		};
-		return unless $bw;
-		
-		# store the opened object for later use
-		$OPENED_BIGFILES{$wigfile} = $bw;
-		
-		# collect the chromosomes for this bigwig
-		%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
-	}
-	
+	# collect the chromosomes for this bigwig
+	%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
+
 	return $bw;
 }
 
@@ -842,10 +826,6 @@ For loading bigwig files into a Bio::DB database, see the biotoolbox perl
 script 'big_file2gff3.pl'. This will prepare either a GFF3 file for loading 
 into a Bio::DB::SeqFeature::Store database, or a Bio::DB::BigWigSet 
 database.
-
-To speed up the program and avoid repetitive opening and 
-closing of the files, the opened bigwig file object is stored in a global 
-hash in case it is needed again.
 
 When a single score is requested for a region, then a special low-level 
 statistical method is employed to significantly reduce data collection 

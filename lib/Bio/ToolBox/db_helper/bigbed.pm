@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.14';
+our $VERSION = '1.14.1';
 
 
 # Exported names
@@ -17,12 +17,6 @@ our @EXPORT = qw(
 	open_bigbed_db
 	sum_total_bigbed_features
 );
-
-# Hashes of opened file objects
-our %OPENED_BEDFILES; # opened bigbed file objects
-	# in empirical testing, this doesn't really seem to speed things up
-	# like I thought it would
-	# oh well, keep it anyway????
 
 # Hash of Bigfile chromosomes
 our %BIGBED_CHROMOS;
@@ -228,35 +222,22 @@ sub collect_bigbed_position_scores {
 ### Open a bigBed database connection
 sub open_bigbed_db {
 	
+	# check path
 	my $bedfile = shift;
-	my $forget  = shift;
+	my $path = $bedfile;
+	$path =~ s/^file://; # clean up file prefix if present
 	
-	# check whether the file has been opened or not
-	if (exists $OPENED_BEDFILES{$bedfile} ) {
-		# this file is already opened, use it
-		return $OPENED_BEDFILES{$bedfile};
-	}
+	# open
+	my $bb;
+	eval {
+		$bb = Bio::DB::BigBed->new($path);
+	};
+	return unless $bb;
 	
-	else {
-		# this file has not been opened yet, open it
-		my $path = $bedfile;
-		$path =~ s/^file://; # clean up file prefix if present
-		my $bb;
-		eval {
-			$bb = Bio::DB::BigBed->new($path);
-		};
-		return unless $bb;
-		
-		unless ($forget) {
-			# store the opened object for later use
-			$OPENED_BEDFILES{$bedfile} = $bb;
-		
-			# collect the chromosomes for this bigBed file
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
-		
-		return $bb;
-	}
+	# collect the chromosomes for this bigBed file
+	%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
+	
+	return $bb;
 }
 
 
@@ -282,7 +263,7 @@ sub sum_total_bigbed_features {
 	else {
 		# we have a name of a bigbed file
 		# open it but do not remember it
-		$bb = open_bigbed_db($bb_file, 1);
+		$bb = open_bigbed_db($bb_file);
 		return unless ($bb);
 	}
 	
@@ -316,10 +297,6 @@ feature is collected.
 
 For loading bigbed files into a Bio::DB database, see the biotoolbox perl 
 script 'big_filegff3.pl'.
-
-To speed up the program and avoid repetitive opening and 
-closing of the files, the opened bigbed file object is stored in a global 
-hash in case it is needed again.
 
 =head1 USAGE
 
