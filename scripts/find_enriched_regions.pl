@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 # use Data::Dumper;
-my $VERSION = '1.14';
+my $VERSION = '1.14.1';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -569,6 +569,17 @@ sub parallel_execution {
 
 		### In child
 		foreach ( @{$list[$n]} ) {
+			
+			# re-open database objects to make them clone safe
+			# pass second true to avoid cached database objects
+			$fdb = open_db_connection($main_database, 1);
+			if ($data_database) {
+				$ddb = open_db_connection($data_database, 1);
+			}
+			else {
+				$ddb = $fdb;
+			}
+			
 			# process each chromosome in this child list
 			go_find_enriched_regions( @{$_} );
 		}
