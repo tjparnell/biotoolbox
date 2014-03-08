@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.14.1;
+our $VERSION = 1.15;
 
 =head1 NAME
 
@@ -140,9 +140,13 @@ Provide the name of the database from which to collect the
 features. It may be a short name, whereupon it is checked in 
 the Bio::ToolBox configuration file C<.biotoolbox.cfg> for 
 connection information. Alternatively, a path to a database 
-file or directory may be given. If you already have an opened 
-Bio::DB::SeqFeature::Store database object, you can simply 
-pass that. See Bio::ToolBox::db_helper for more information.
+file or directory may be given. 
+
+If you already have an opened Bio::DB::SeqFeature::Store database 
+object, you can simply pass that. See Bio::ToolBox::db_helper for 
+more information. However, this in general should be discouraged, 
+since the name of the database will not be properly recorded when 
+saving to file.
 
 =item win =E<gt> $integer
 
@@ -332,8 +336,17 @@ the beginning of the file.
 
 =item metadata($index, $key, $new_value)
 
-Returns or sets the metadata value for a specific key for a 
-specific column index.
+Returns or sets the metadata value for a specific $key for a 
+specific column $index.
+
+This may also be used to add a new metadata key. Simply provide 
+the name of a new $key that is not present
+
+=item delete_metadata($index, $key);
+
+Deletes a column-specific metadata $key and value for a specific 
+column $index. If a $key is not provided, then all metadata keys 
+for that index will be deleted.
 
 =item find_column($name)
 
@@ -1009,12 +1022,18 @@ sub metadata {
 	if ($key and $value) { 
 		# we are setting a new value
 		$self->{$index}{$key} = $value;
-		return 1;
+		return $value;
 	}
 	elsif ($key and not defined $value) {
-		# retrieve a value
-		return unless exists $self->{$index}{$key};
-		return $self->{$index}{$key};
+		if (exists $self->{$index}{$key}) {
+			# retrieve a value
+			return $self->{$index}{$key};
+		}
+		else {
+			# set a new empty key
+			$self->{$index}{$key} = q();
+			return 1;
+		}
 	}
 	else {
 		my %hash = %{ $self->{$index} };
@@ -1022,6 +1041,23 @@ sub metadata {
 	}
 }
 
+sub delete_metadata {
+	my $self = shift;
+	my ($index, $key) = @_;
+	return unless defined $index;
+	if (defined $key and exists $self->{$index}{$key}) {
+		return delete $self->{$index}{$key};
+	}
+	else {
+		# user wants to delete the metadata
+		# but we need to keep the basics name and index
+		foreach my $key (keys %{ $self->{$index} }) {
+			next if $key eq 'name';
+			next if $key eq 'index';
+			delete $self->{$index}{$key};
+		}
+	}
+}
 
 
 
