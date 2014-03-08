@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = 1.14.1;
+our $VERSION = 1.15;
 
 1;
 
@@ -187,6 +187,14 @@ The script could easily be modified to add or alter functionality. For
 example, use a different method of combining scores for each interval, or 
 restricting scoring to a fraction of the defined interval. For a fully-featured 
 version of this data collection script, see the BioToolBox script B<get_datasets.pl>.
+
+=head1 REPOSITORY
+
+Source code for the Bio::ToolBox package is maintained at 
+L<http://code.google.com/p/biotoolbox/>. Extensive documentation, including How To 
+documents, installation guides, and script documentation, can be found there as well.
+
+Bugs and issues should be submitted at L<https://code.google.com/p/biotoolbox/issues/list>.
 
 =head1 AUTHOR
 
