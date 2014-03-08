@@ -20,7 +20,7 @@ use Bio::ToolBox::data_helper qw(
 	parse_list
 );
 use Bio::ToolBox::db_helper::config;
-our $VERSION = '1.14';
+our $VERSION = '1.15';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -190,8 +190,6 @@ names to export. None are exported by default.
 This will export the indicated subroutine names into the current namespace. 
 Their usage is detailed below. 
 
-=over 4
-
 =cut
 
 
@@ -205,6 +203,10 @@ Their usage is detailed below.
 
 
 ### Open a connection to the SeqFeature Store MySQL database
+
+=head1 EXPORTED SUBROUTINES
+
+=over 4
 
 =item open_db_connection($database, $no_cache)
 
@@ -436,11 +438,12 @@ sub open_db_connection {
 		
 		# try opening with the Fasta adaptor
 		unless ($db) {
+			undef $@;
 			eval {
 				$db = Bio::DB::Fasta->new($database);
 			};
 			unless ($db) {
-				$error = " ERROR: could not open fasta directory '$database'! $!\n";
+				$error .= " ERROR: could not open fasta directory '$database'! $@\n";
 			}
 		}
 	}
@@ -454,6 +457,7 @@ sub open_db_connection {
 			# a single gff3 file that we can load into memory
 			if ($database =~ /\.gff3?(?:\.gz)?$/i) {
 				print " Loading file into memory database...\n";
+				undef $@;
 				eval {
 					$db = Bio::DB::SeqFeature::Store->new(
 						-adaptor => 'memory',
@@ -461,13 +465,14 @@ sub open_db_connection {
 					);
 				};
 				unless ($db) {
-					$error = " ERROR: could not load file '$database' into memory!\n";
+					$error = " ERROR: could not load file '$database' into memory! $@\n";
 				}
 			}
 			
 			# a SQLite database
 			elsif ($database =~ /\.(?:sqlite|db)$/i) {
 				# open using SQLite adaptor
+				undef $@;
 				eval {
 					$db = Bio::DB::SeqFeature::Store->new(
 						-adaptor  => 'DBI::SQLite',
@@ -475,7 +480,7 @@ sub open_db_connection {
 					);
 				};
 				unless ($db) {
-					$error = " ERROR: could not open SQLite file '$database'! $!\n";
+					$error = " ERROR: could not open SQLite file '$database'! $@\n";
 				}
 			}
 			
@@ -483,10 +488,11 @@ sub open_db_connection {
 			elsif ($database =~ /\.bam$/i) {
 				# open using BigWig adaptor
 				if ($BAM_OK) {
+					undef $@;
 					$db = open_bam_db($database);
 					unless ($db) {
 						$error = " ERROR: could not open local Bam file" .
-							" '$database'! $!\n";
+							" '$database'! $@\n";
 					}
 				}
 				else {
@@ -499,10 +505,11 @@ sub open_db_connection {
 			elsif ($database =~ /\.bb$/i) {
 				# open using BigBed adaptor
 				if ($BIGBED_OK) {
+					undef $@;
 					$db = open_bigbed_db($database);
 					unless ($db) {
 						$error = " ERROR: could not open local BigBed file" .
-							" '$database'! $!\n";
+							" '$database'! $@\n";
 					}
 				}
 				else {
@@ -515,10 +522,11 @@ sub open_db_connection {
 			elsif ($database =~ /\.bw$/i) {
 				# open using BigWig adaptor
 				if ($BIGWIG_OK) {
+					undef $@;
 					$db = open_bigwig_db($database);
 					unless ($db) {
 						$error = " ERROR: could not open local BigWig file" .
-							" '$database'! $!\n";
+							" '$database'! $@\n";
 					}
 				}
 				else {
@@ -546,11 +554,12 @@ sub open_db_connection {
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
 				# open using the Fasta adaptor
+				undef $@;
 				eval {
 					$db = Bio::DB::Fasta->new($database);
 				};
 				unless ($db) {
-					$error = " ERROR: could not open fasta file '$database'! $!\n";
+					$error = " ERROR: could not open fasta file '$database'! $@\n";
 				}
 			}
 		}
@@ -620,7 +629,7 @@ sub open_db_connection {
 		unless ($db) {
 			$error .= " ERROR: unknown $adaptor database '$database'\n";
 			if ($dsn =~ /mysql|pg/i) {
-				$error .= "   using user '$user' and password '$pass'\n";
+				$error .= "   using user '$user' and password\n";
 			}
 		}
 	}
@@ -2597,7 +2606,14 @@ sub get_chromosome_list {
 
 ### Internal subroutine to convert a feature category into a list of classes
 
+=back
 
+=head1 INTERNAL SUBROUTINES
+
+These are not intended for normal consumption but are documented here 
+so that we know what is going on.
+
+=over 4
 
 =item _features_to_classes
 
