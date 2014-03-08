@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
-our $VERSION = '1.14.1';
+our $VERSION = '1.15';
 
 
 # Exported names
@@ -17,12 +17,16 @@ our @EXPORT = qw(
 	open_useq_db
 );
 
-# Hash of Bigfile chromosomes
+# Hash of USeq chromosomes
 our %USEQ_CHROMOS;
 	# sometimes user may request a chromosome that's not in the useq file
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
 	# $USEQ_CHROMOS{useqfile}{chromos}
+
+# Opened USeq db objects
+our %OPENED_USEQ;
+	# a cache for opened USeq databases, primarily for collecting scores
 
 # The true statement
 1; 
@@ -55,7 +59,20 @@ sub collect_useq_scores {
 	
 	# unlikely there are more than one useq file, but just in case
 	foreach my $useqfile (@useqs) {
-		my $useq = open_useq_db($useqfile);
+		
+		# open a new db object
+		my $useq;
+		if (exists $OPENED_USEQ{$useqfile}) {
+			# use a cached object
+			$useq = $OPENED_USEQ{$useqfile};
+		}
+		else {
+			# open and cache the bigWig object
+			$useq = open_useq_db($useqfile) or 
+				croak " Unable to open USeq file '$useqfile'! $!\n";
+			$OPENED_USEQ{$useqfile} = $useq;
+			%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
+		}
 		
 		# check chromosome first
 		next unless exists $USEQ_CHROMOS{$useqfile}{$chromo};
@@ -138,7 +155,20 @@ sub collect_useq_position_scores {
 	
 	# unlikely there are more than one useq file, but just in case
 	foreach my $useqfile (@useqs) {
-		my $useq = open_useq_db($useqfile);
+		
+		# open a new db object
+		my $useq;
+		if (exists $OPENED_USEQ{$useqfile}) {
+			# use a cached object
+			$useq = $OPENED_USEQ{$useqfile};
+		}
+		else {
+			# open and cache the bigWig object
+			$useq = open_useq_db($useqfile) or 
+				croak " Unable to open USeq file '$useqfile'! $!\n";
+			$OPENED_USEQ{$useqfile} = $useq;
+			%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
+		}
 		
 		# check chromosome first
 		next unless exists $USEQ_CHROMOS{$useqfile}{$chromo};
@@ -216,9 +246,6 @@ sub open_useq_db {
 		$useq = Bio::DB::USeq->new($path);
 	};
 	return unless $useq;
-	
-	# collect the chromosomes for this useq
-	%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
 	
 	return $useq;
 }
@@ -320,17 +347,3 @@ Bio::DB::USeq database object.
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
 any later version) or the Artistic License 2.0.  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
