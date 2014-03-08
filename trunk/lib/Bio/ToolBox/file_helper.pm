@@ -12,7 +12,7 @@ use Bio::ToolBox::data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.14';
+our $VERSION = '1.15';
 
 
 ### Variables
@@ -93,6 +93,11 @@ sub load_tim_data_file {
 	push @datatable, $inputdata->{'column_names'};
 	delete $inputdata->{'column_names'}; # we no longer need this
 	
+	# determine strand column 
+		# should be true for BED and GFF files or any other file with strand
+	my $strand_i = find_column_index($inputdata, '^strand$');
+	my $plusminus_count = 0;
+	
 	# load the data table
 	while (my $line = $fh->getline) {		
 		
@@ -143,40 +148,53 @@ sub load_tim_data_file {
 			}
 		}
 		
+		# convert 0-based starts to 1-base for BED source files
+		if ($inputdata->{'bed'}) {
+			# add 1 to each start position
+			$linedata[1] += 1;
+		}
+		
+		# convert strand information to integers
+		if (defined $strand_i) {
+			# convert any interpretable value to signed value
+			if ($linedata[$strand_i] eq '+') {
+				# just a simple plus
+				$linedata[$strand_i] = 1;
+				$plusminus_count++;
+			}
+			elsif ($linedata[$strand_i] eq '-') {
+				# simple minus
+				$linedata[$strand_i] = -1;
+				$plusminus_count++;
+			}
+			elsif ($linedata[$strand_i] eq '.') {
+				# unstranded GFF format, not BED
+				$linedata[$strand_i] = 0;
+				$plusminus_count++;
+			}
+			# otherwise assume bioperl convention -1, 0, 1
+			# if it is not, then hope for the best
+			# I am dropping support for the ancient forward, watson, reverse, crick
+			# who uses those anyway?????
+			# some old bioperl scripts may still support it
+		}
+		
 		# store the array
 		push @datatable, [ @linedata ];
 	}
 	
-	# convert 0-based starts to 1-base for BED source files
+	# record metadata for base number and strand style
 	if ($inputdata->{'bed'}) {
-		for (my $row = 1; $row < scalar @datatable; $row++) {
-			# add 1 to each start position
-			$datatable[$row][1] += 1;
-		}
 		$inputdata->{1}{'base'} = 1;
 	}
-	
-	
-	# convert strand information to integers
-	# NOTE: this may change original data if file is written again
-		# with the exception of GFF and BED, which should be automatically
-		# converted back if the format is maintained
-	my $strand_i = find_column_index($inputdata, '^strand$');
 	if (defined $strand_i) {
-		# should be true for BED and GFF files or any other file with strand
-		for (my $row = 1; $row < scalar @datatable; $row++) {
-			# convert any interpretable value to signed value
-			if ($datatable[$row][$strand_i] =~ /^[\+1fw]/i) {
-				# plus, one, forward, watson
-				$datatable[$row][$strand_i] = 1;
-			}
-			elsif ($datatable[$row][$strand_i] =~ /^[\-rc]/i) {
-				# minus, reverse, crick
-				$datatable[$row][$strand_i] = -1;
-			}
-			else {
-				# uninterpretable value, including zero and dot, no strand
-				$datatable[$row][$strand_i] = 0;
+		# add an internal use only metadata value to indicate we've changed strand values
+		if ($plusminus_count == (scalar @datatable - 1)) {
+			# all the loaded lines are plusminus style
+			$inputdata->{$strand_i}{'strand_style'} = 'plusminus';
+			if (exists $inputdata->{$strand_i}{'AUTO'}) {
+				# update automatically generated metadata
+				$inputdata->{$strand_i}{'AUTO'}++;
 			}
 		}
 	}
@@ -1165,7 +1183,6 @@ sub write_tim_data_file {
 		warn " filename too long! Truncating to $limit characters\n";
 	}
 	
-	
 	# generate the new filename
 	my $newname = $path . $name . $extension;
 	
@@ -1189,36 +1206,26 @@ sub write_tim_data_file {
 	
 	
 	# Convert strand information
-	if ($extension =~ /.bed/i and $data->{'bed'} >= 6) {
+	my $strand_i = find_column_index($data, '^strand$');
+	if (
+		defined $strand_i and
+		exists $data->{$strand_i}{'strand_style'} and 
+		$data->{$strand_i}{'strand_style'} eq 'plusminus'
+	) {
+		# strand information was originally BED and GFF style +,.,-
+		# then convert back to that format before writing
 		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
-			# convert from signed integer back to sign
-			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][5] =~ m/\A [f \+ 1 w 0 \.]/xi) {
-				$data->{'data_table'}->[$row][5] = '+';
+			if ($data->{'data_table'}->[$row][$strand_i] == 1) {
+				$data->{'data_table'}->[$row][$strand_i] = '+';
 			}
-			elsif ($data->{'data_table'}->[$row][5] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][5] = '-';
+			elsif ($data->{'data_table'}->[$row][$strand_i] == -1) {
+				$data->{'data_table'}->[$row][$strand_i] = '-';
+			}
+			elsif ($data->{'data_table'}->[$row][$strand_i] == 0) {
+				$data->{'data_table'}->[$row][$strand_i] = '.';
 			}
 		}
-	}	
-	if ($extension =~ /.g[tf]f/i and $data->{'gff'}) {
-		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
-			# convert from signed integer back to sign
-			# can't guarantee value is integer, so put it under eval
-			if ($data->{'data_table'}->[$row][6] =~ m/\A [f \+ 1 w]/xi) {
-				$data->{'data_table'}->[$row][6] = '+';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [r \- c]/xi) {
-				$data->{'data_table'}->[$row][6] = '-';
-			}
-			elsif ($data->{'data_table'}->[$row][6] =~ m/\A [0 \.]/xi) {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
-			else {
-				$data->{'data_table'}->[$row][6] = '.';
-			}
-		}
-	}	
+	}
 	
 	
 	# Open file for writing
@@ -1321,6 +1328,7 @@ sub write_tim_data_file {
 				next if $_ eq 'name'; # already written
 				next if $_ eq 'index'; # internal use only
 				next if $_ eq 'AUTO'; # internal use only
+				next if $_ eq 'strand_style'; # internal use only
 				push @pairs,  $_ . '=' . $data->{$i}{$_};
 			}
 			
