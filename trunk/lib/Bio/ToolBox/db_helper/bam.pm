@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.14.1';
+our $VERSION = '1.15';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -33,6 +33,9 @@ our %BAM_CHROMOS;
 	# we will record the chromosomes list in this hash
 	# $BAM_CHROMOS{bigfile}{chromos}
 
+# Opened Bam db objects
+our %OPENED_BAM;
+	# a cache for opened Bam files, primarily for collecting scores
 
 # The true statement
 1; 
@@ -57,14 +60,9 @@ sub open_bam_db {
 	# open the bam database object
 	my $sam;
 	eval {
-		$sam = Bio::DB::Sam->new(
-				-bam         => $path,
-		);
+		$sam = Bio::DB::Sam->new(-bam => $path);
 	};
 	return unless $sam;
-	
-	# collect the chromosomes for this bam
-	%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $sam->seq_ids;
 	
 	# done
 	return $sam;
@@ -83,7 +81,7 @@ sub check_bam_index {
 	my $bam_mtime = (stat($bamfile))[9];
 	
 	# optional index names
-	my $bam_index = "$bamfile.bai";
+	my $bam_index = "$bamfile.bai"; # .bam.bai
 	my $alt_index = $bamfile;
 	$alt_index =~ s/bam$/bai/i; # picard uses .bai instead of .bam.bai as samtools does
 	
@@ -188,8 +186,17 @@ sub _collect_bam_data {
 	foreach my $bamfile (@bam_features) {
 	
 		## Open the Bam File
-		my $sam = open_bam_db($bamfile);
-		my $index = $sam->bam_index;
+		my $bam;
+		if (exists $OPENED_BAM{$bamfile}) {
+			# re-use the cached bam object
+			$bam = $OPENED_BAM{$bamfile};
+		}
+		else {
+			# open and cache the bam file
+			$bam = open_bam_db($bamfile);
+			$OPENED_BAM{$bamfile} = $bam;
+			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
+		}
 			
 		# first check that the chromosome is present
 		unless (exists $BAM_CHROMOS{$bamfile}{$chromo}) {
@@ -199,7 +206,7 @@ sub _collect_bam_data {
 		# convert coordinates into low level coordinates
 		# consumed by the low level Bam API
 		my ($tid, $zstart, $end) = 
-			$sam->header->parse_region("$chromo:$start\-$stop");
+			$bam->header->parse_region("$chromo:$start\-$stop");
 	
 		
 		## Collect the data according to the requested value type
@@ -212,8 +219,8 @@ sub _collect_bam_data {
 			# alignments over the requested region
 			
 			# generate the coverage, this will ignore strand
-			my $coverage = $index->coverage(
-				$sam->bam,
+			my $coverage = $bam->bam_index->coverage(
+				$bam->bam,
 				$tid,
 				$zstart, # 0-based coordinates
 				$end,
@@ -253,7 +260,7 @@ sub _collect_bam_data {
 			
 			# get the alignments
 			# we are using the low level API to eke out performance
-			$index->fetch($sam->bam, $tid, $zstart, $end, $callback, \%data);
+			$bam->bam_index->fetch($bam->bam, $tid, $zstart, $end, $callback, \%data);
 			
 		}
 	}

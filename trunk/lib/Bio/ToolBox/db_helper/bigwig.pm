@@ -7,7 +7,7 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-our $VERSION = '1.14.1';
+our $VERSION = '1.15';
 
 
 # Exported names
@@ -30,6 +30,10 @@ our %BIGWIG_CHROMOS;
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
 	# $BIGWIG_CHROMOS{bigfile}{chromos}
+
+# Opened bigWig db objects
+our %OPENED_BW;
+	# a cache for opened BigWig databases, primarily for collecting scores
 
 # The true statement
 1; 
@@ -61,8 +65,18 @@ sub collect_bigwig_score {
 	foreach my $wig (@wig_files) {
 		
 		# open a new db object
-		my $bw = open_bigwig_db($wig) or 
-			croak " Unable to open bigWig file '$wig'! $!\n";
+		my $bw;
+		if (exists $OPENED_BW{$wig}) {
+			# use a cached object
+			$bw = $OPENED_BW{$wig};
+		}
+		else {
+			# open and cache the bigWig object
+			$bw = open_bigwig_db($wig) or 
+				croak " Unable to open bigWig file '$wig'! $!\n";
+			$OPENED_BW{$wig} = $bw;
+			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
+		}
 		
 		# first check that the chromosome is present
 		if (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -108,8 +122,18 @@ sub collect_bigwig_scores {
 	foreach my $wig (@wig_files) {
 	
 		# Open the BigWig file
-		my $bw = open_bigwig_db($wig) or 
-			croak " Unable to open bigWig file '$wig'! $!\n";;
+		my $bw;
+		if (exists $OPENED_BW{$wig}) {
+			# use a cached object
+			$bw = $OPENED_BW{$wig};
+		}
+		else {
+			# open and cache the bigWig object
+			$bw = open_bigwig_db($wig) or 
+				croak " Unable to open bigWig file '$wig'! $!\n";
+			$OPENED_BW{$wig} = $bw;
+			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
+		}
 		
 		# first check that the chromosome is present
 		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -156,8 +180,18 @@ sub collect_bigwig_position_scores {
 	foreach my $wig (@wig_files) {
 	
 		# Open the BigWig file
-		my $bw = open_bigwig_db($wig) or 
-			croak " Unable to open bigWig file '$wig'! $!\n";;
+		my $bw;
+		if (exists $OPENED_BW{$wig}) {
+			# use a cached object
+			$bw = $OPENED_BW{$wig};
+		}
+		else {
+			# open and cache the bigWig object
+			$bw = open_bigwig_db($wig) or 
+				croak " Unable to open bigWig file '$wig'! $!\n";
+			$OPENED_BW{$wig} = $bw;
+			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
+		}
 		
 		# first check that the chromosome is present
 		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
@@ -571,9 +605,6 @@ sub open_bigwig_db {
 	};
 	return unless $bw;
 	
-	# collect the chromosomes for this bigwig
-	%{ $BIGWIG_CHROMOS{$wigfile} } = map { $_ => 1 } $bw->seq_ids;
-
 	return $bw;
 }
 
