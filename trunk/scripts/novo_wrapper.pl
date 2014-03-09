@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -19,7 +19,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 
 print "\n This script is a wrapper for the Novoalign program\n\n";

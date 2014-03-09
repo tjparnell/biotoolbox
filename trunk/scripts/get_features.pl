@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -19,7 +19,7 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 );
 use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This program will collect features from a database\n\n";
 

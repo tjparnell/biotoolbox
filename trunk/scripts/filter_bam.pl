@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -13,7 +13,7 @@ eval {
 	Bio::ToolBox::db_helper::bam->import;
 	$bam_ok = 1;
 };
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -41,7 +41,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 
 print "\n A program to collect data for a list of features\n\n";

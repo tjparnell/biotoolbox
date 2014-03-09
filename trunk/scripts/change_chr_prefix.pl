@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -22,7 +22,7 @@ eval {
 	$bam_support = 1;
 };
 
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 
 print "\n This program will adjust chromosome names of a data file\n";

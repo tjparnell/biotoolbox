@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -15,7 +15,7 @@ use Bio::ToolBox::file_helper qw(
 );
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 print "\n This program will convert bar files to a wig file\n";
 

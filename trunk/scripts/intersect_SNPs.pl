@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -11,7 +11,7 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file 
 );
 use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n A script to intersect and pull unique SNPs from multiple lists\n\n";
 

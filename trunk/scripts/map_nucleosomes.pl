@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -19,7 +19,7 @@ use Bio::ToolBox::file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will map nucleosomes\n\n";
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -39,7 +39,7 @@ use constant (DATASET_HASH_LIMIT => 3000);
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
