@@ -5,9 +5,8 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Statistics::Lite qw(sum min max mean stddev);
-use Statistics::LineFit;
 use File::Spec;
+use Statistics::Lite qw(sum min max mean stddev);
 use Bio::ToolBox::file_helper qw(
 	open_to_read_fh 
 	open_to_write_fh 
@@ -29,13 +28,19 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
+my $linefit;
+eval {
+	# required for calculating shift
+	require Statistics::LineFit;
+	$linefit = 1;
+};
 
 # Declare constants for this program
 use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 	
 	
 
@@ -68,6 +73,7 @@ my (
 	$correlation_min,
 	$model,
 	$strand,
+	$flip,
 	$bin_size,
 	$min_mapq,
 	$max_dup,
@@ -100,6 +106,7 @@ GetOptions(
 	'minr=f'    => \$correlation_min, # R^2 minimum value for shift
 	'model!'    => \$model, # write the strand shift model data
 	'strand!'   => \$strand, # separate strands
+	'flip!'     => \$flip, # flip the strands
 	'bin=i'     => \$bin_size, # size of bin to make
 	'qual=i'    => \$min_mapq, # minimum mapping quality
 	'max=i'     => \$max_dup, # maximum duplicate positions
@@ -366,7 +373,13 @@ sub check_defaults {
 		warn " disabling shift with splices enabled\n" if $splice;
 		undef $shift;
 	}
+	if ($shift_value and !$shift) {
+		$shift = 1;
+	}
 	if ($shift) {
+		die " Provide a shift value or install the Perl module Statistics::LineFit\n" . 
+			" to empirically determine the shift value.\n"
+			unless ($linefit or $shift_value);
 		unless ($sample_number) {
 			$sample_number = 200;
 		}
@@ -386,9 +399,6 @@ sub check_defaults {
 			warn " disabling strand with shift enabled\n";
 			$strand = 0;
 		}
-	}
-	if ($shift_value and !$shift) {
-		undef $shift_value;
 	}
 	
 	# check bin size
@@ -1243,9 +1253,13 @@ sub process_alignments {
 	
 	# open wig files
 	my ($filename1, $filename2, $fh1, $fh2);
-	if ($strand) {
+	if ($strand and not $flip) {
 		($filename1, $fh1) = open_wig_file("$outfile\_f", 1);
 		($filename2, $fh2) = open_wig_file("$outfile\_r", 1);
+	}
+	elsif ($strand and $flip) {
+		($filename1, $fh1) = open_wig_file("$outfile\_r", 1);
+		($filename2, $fh2) = open_wig_file("$outfile\_f", 1);
 	}
 	else {
 		($filename1, $fh1) = open_wig_file($outfile, 1);
@@ -1305,9 +1319,13 @@ sub parallel_process_alignments {
 		
 		# open chromosome wig files
 		my ($filename1, $filename2, $fh1, $fh2);
-		if ($strand) {
+		if ($strand and not $flip) {
 			($filename1, $fh1) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
 			($filename2, $fh2) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
+		}
+		if ($strand and $flip) {
+			($filename1, $fh1) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
+			($filename2, $fh2) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
 		}
 		else {
 			($filename1, $fh1) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
@@ -2256,6 +2274,7 @@ bam2wig.pl [--options...] <filename.bam>
   --minr <float>
   --model
   --strand
+  --flip
   --qual <integer>
   --max <integer>
   --max_cnt <integer>
@@ -2395,6 +2414,12 @@ The output file basename is appended with either '_f' or '_r' for
 both files. For paired-end RNA-Seq alignments that were generated with 
 TopHat, the XS attribute is honored for strand information. 
 The default is to take all alignments regardless of strand.
+
+=item --flip
+
+Flip the strand of the output files when generating stranded wig files. 
+Do this when RNA-Seq alignments map to the opposite strand of the 
+coding sequence. 
 
 =item --qual <integer>
 
@@ -2611,9 +2636,10 @@ If the library was generated in such a way as to preserve strand, then
 we can separate the counts based on the strand of the alignment. Note 
 that the reported strand may be accurate or flipped, depending upon 
 whether first-strand or second-strand synthesized cDNA was sequenced, 
-and whether your aligner took this into account. Please check the 
-output wig files in a genome browser to verify which one is which, and 
-rename appropriately.
+and whether your aligner took this into account. Check the Bam 
+alignments in a genome browser to confirm the orientation relative to 
+coding sequences. If alignments are opposite to the direction of 
+transcription, you can include the --flip option to switch the output.
  
  bam2wig --pos span --strand --rpm --in <bamfile>
 
