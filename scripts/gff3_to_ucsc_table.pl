@@ -11,7 +11,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -32,8 +32,9 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
-	$bin,
+	$use_alias,
 	$gz,
+	$verbose,
 	$help,
 	$print_version,
 );
@@ -42,8 +43,9 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # the gff3 data file
 	'out=s'     => \$outfile, # name of output file 
-	'bin!'      => \$bin, # ucsc specific bin column
+	'alias!'    => \$use_alias, # append aliases to geneName
 	'gz!'       => \$gz, # compress output
+	'verbose!'  => \$verbose, # verbose print statements
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -83,17 +85,12 @@ if ($outfile) {
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff 3? (?: \.gz )? $/_ucsc_genetable.txt/xi;
+	$outfile =~ s/\.gff 3? (?: \.gz )? $/.refFlat.txt/xi;
 }
 unless (defined $gz) {
 	# mimic the input file as far as compression is concerned
 	$gz = 1 if $infile =~ m/\.gz$/i;
 }
-
-unless (defined $bin) {
-	$bin = 0;
-}
-
 
 ### Open the input and ouput files
 # Open the input GFF file
@@ -105,12 +102,8 @@ my $outfh = open_to_write_fh($outfile, $gz) or
 	die " unable to open file handle for '$outfile'!\n";
 
 # Print headers
-if ($bin) {
-	$outfh->print("#bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
-}
-else {
-	$outfh->print("#name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames\n");
-}
+$outfh->print( join("\t", qw(#geneName name chrom strand txStart txEnd cdsStart 
+	cdsEnd exonCount exonStarts exonEnds) ) . "\n");
 
 
 
@@ -170,22 +163,24 @@ sub process_gff_file_to_table {
 	while (my @top_features = $parser->top_features() ) {
 		
 		# processing statement
-		print " Collected ", scalar(@top_features), " features from ";
-		if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
-			# check whether all the features came from the same top sequence
-			print "sequence ID '", $top_features[0]->seq_id, "'\n";
-		}
-		else {
-			print "multiple sequences\n";
+		if ($verbose) {
+			print " Collected ", scalar(@top_features), " features from ";
+			if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
+				# check whether all the features came from the same top sequence
+				print "sequence ID '", $top_features[0]->seq_id, "'\n";
+			}
+			else {
+				print "multiple sequences\n";
+			}
 		}
 		
 		# Process the top features
 		while (@top_features) {
 			my $feature = shift @top_features;
-			my $type = $feature->primary_tag;
+			my $type = lc $feature->primary_tag;
 			
 			# check for chromosome
-			if ($type =~ /chromosome|contig|scaffold|sequence|region/i) {
+			if ($type =~ /chromosome|contig|scaffold|sequence|region/) {
 				next;
 			}
 			
@@ -198,7 +193,7 @@ sub process_gff_file_to_table {
 				
 			}
 			
-			elsif ($type eq 'mRNA') {
+			elsif ($type eq 'mrna') {
 				# a coding transcript
 				
 				# first need to initialize the ucsc table object
@@ -208,7 +203,7 @@ sub process_gff_file_to_table {
 				process_transcript($ucsc_transcript, $feature);
 			}
 			
-			elsif ($type =~ /rna|noncoding/i) {
+			elsif ($type =~ /rna|noncoding/) {
 				# a non-coding RNA transcript
 				
 				# first need to initialize the ucsc table object
@@ -218,7 +213,7 @@ sub process_gff_file_to_table {
 				process_nc_transcript($ucsc_transcript, $feature);
 			}
 			
-			elsif ($type =~ /transcript/i) {
+			elsif ($type =~ /transcript/) {
 				# we'll assume this is a protein_coding transcript?
 				# hopefully noncoding transcripts will be caught earlier
 				
@@ -239,7 +234,7 @@ sub process_gff_file_to_table {
 		}
 		
 		# print running total
-		print "  wrote $count features so far\n";
+		print "  wrote $count features so far\n" if $verbose;
 	}
 }
 
@@ -249,21 +244,14 @@ sub process_gff_file_to_table {
 ### Initialize a data structure for the UCSC table line item
 sub initialize_transcript {
 	# a hash structure storing the fields to be used in an UCSC gene table
-	# these are UCSC gene table headers
-	# bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames
-	
 	my $feature = shift;
-	
-	# collect the name for the transcript
-	my $name = $feature->display_name || $feature->primary_id;
-		# Or at the very least the ID, it does have an ID, right?
 	
 	# Fill the data hash
 	my %transcript = (
-		'name'         => $name,
+		'name'         => undef,
 		'name2'        => undef,
 		'chr'          => $feature->seq_id,
-		'strand'       => $feature->strand == 1 ? '+' : '-',
+		'strand'       => $feature->strand > 0 ? '+' : '-', # let's hope there is no 0
 		'txStart'      => undef,
 		'txEnd'        => undef,
 		'cdsStart'     => undef,
@@ -271,10 +259,6 @@ sub initialize_transcript {
 		'exonCount'    => 0,
 		'exonStarts'   => [],
 		'exonEnds'     => [],
-		'score'        => 0,
-		'cdsStartStat' => undef,  
-		'cdsEndStat'   => undef, 
-		'exonFrames'   => [],
 	);
 	
 	# get score, rarely used, but just in case
@@ -300,16 +284,16 @@ sub process_gene {
 	foreach my $subfeat ($gene->get_SeqFeatures) {
 		
 		# check the type, and process accordingly
-		my $type = $subfeat->primary_tag;
+		my $type = lc($subfeat->primary_tag);
 		
-		if ($type eq 'mRNA') {
+		if ($type eq 'mrna') {
 			# a protein coding transcript
 			
 			# initialize the gene table line structure
 			my $ucsc = initialize_transcript($subfeat);
 			
-			# identify a second name from the gene
-			collect_second_name($ucsc, $gene);
+			# collect the names for the transcript and/or gene
+			collect_names($ucsc, $gene, $subfeat);
 			
 			# process the transcript
 			process_transcript($ucsc, $subfeat);
@@ -317,18 +301,50 @@ sub process_gene {
 			$transcript_success++;
 		}
 		
-		elsif ($type =~ /rna/i) {
+		elsif ($type =~ /rna|pseudogene|transcript/) {
 			# other types of non-coding RNA species
 			# should cover misc_RNA snRNA snoRNA ncRNA rRNA tRNA miRNA etc.
+			# also pseudogenes and processed_transcripts that do not have CDS
 			
 			# initialize the gene table line structure
 			my $ucsc = initialize_transcript($subfeat);
 			
-			# identify a second name from the gene
-			collect_second_name($ucsc, $gene);
+			# collect the names for the transcript and/or gene
+			collect_names($ucsc, $gene, $subfeat);
 			
 			# process the transcript
 			process_nc_transcript($ucsc, $subfeat);
+			
+			$transcript_success++;
+		}
+		
+		elsif ($subfeat->get_SeqFeatures) {
+			# there are some oddball subfeatures, particularly from ensGene, 
+			# that have their own defined exons - essentially their own transcripts
+			# examples include retained_intron, sense_overlapping, etc
+			# we should keep these
+			
+			my $exon_check = 0;
+			my $cds_check  = 0;
+			foreach my $sf ($subfeat->get_SeqFeatures) {
+				$exon_check++ if $sf->primary_tag =~ /^exon$/i;
+				$cds_check++  if $sf->primary_tag =~ /^cds$/i;
+			}
+			next unless $exon_check or $cds_check;
+			
+			# initialize the gene table line structure
+			my $ucsc = initialize_transcript($subfeat);
+			
+			# collect the names for the transcript and/or gene
+			collect_names($ucsc, $gene, $subfeat);
+			
+			# process the transcript
+			if ($cds_check) {
+				process_transcript($ucsc, $subfeat);
+			}
+			else {
+				process_nc_transcript($ucsc, $subfeat);
+			}
 			
 			$transcript_success++;
 		}
@@ -338,12 +354,12 @@ sub process_gene {
 			next;
 		}
 		
-		elsif ($type =~ /codon/) {
+		elsif ($type eq 'codon') {
 			# start_codon or stop_codon, skip for now
 			next;
 		}
 		
-		elsif ($type eq 'CDS') {
+		elsif ($type eq 'cds') {
 			# there is a CDS feature in this gene
 			# no RNA transcript defined
 			# presumed gene transcript is gene -> CDS
@@ -365,8 +381,8 @@ sub process_gene {
 		# initialize the gene table line structure
 		my $ucsc = initialize_transcript($gene);
 		
-		# identify a second name from the gene
-		collect_second_name($ucsc, $gene);
+		# collect the names for the transcript and/or gene
+		collect_names($ucsc, $gene, $gene);
 		
 		# assume the gene is a transcript and process as such
 		process_transcript($ucsc, $gene);
@@ -375,25 +391,35 @@ sub process_gene {
 
 
 
-### Find second or alternate name
-sub collect_second_name {
-	my ($ucsc, $feature) = @_;
+### Collect gene names
+sub collect_names {
+	my ($ucsc, $gene, $transcript) = @_;
 	
-	# check for alternate gene name, 
-	if ($feature->has_tag('Alias')) {
-		# Preferentially use the alias tag
-		my @aliases = $feature->get_tag_values('Alias');
-		$ucsc->{'name2'} = join(',', @aliases);
+	# these names may or may not be same
+	# we assume we will always have a primary_id
+	$ucsc->{'name'}  = $gene->display_name || $gene->primary_id;
+	$ucsc->{'name2'} = $transcript->display_name || $transcript->primary_id;
+	
+	# append additional names if requested and if possible
+	if ($use_alias) {
+		if ($gene->primary_id ne $ucsc->{'name'}) {
+			$ucsc->{'name'} .= "|" . $gene->primary_id;
+		}
+		if ($gene->has_tag('Alias')) {
+			foreach my $a ($gene->get_tag_values('Alias')) {
+				next if $a eq $gene->display_name;
+				next if $a eq $gene->primary_id;
+				$ucsc->{'name'} .= "|$a";
+			}
+		}
 	}
-	else {
-		# Or use the Name or ID or if all else fails the main name
-		my $name2 = $feature->display_name || $feature->primary_id ||
-			$ucsc->{'name'};
-		$ucsc->{'name2'} = $name2;
-	}
+	
+	# clean up name
+	$ucsc->{'name'} =~ s/ ?\(\d+ of \d+\)//; # remove (1 of 2)
+	$ucsc->{'name'} =~ s/ /_/;
+	$ucsc->{'name2'} =~ s/ ?\(\d+ of \d+\)//; # remove (1 of 2)
+	$ucsc->{'name2'} =~ s/ /_/;
 }
-
-
 
 
 
@@ -402,40 +428,31 @@ sub process_transcript {
 	my ($ucsc, $transcript) = @_;
 	
 	# Record coordinates for this transcript
-	$ucsc->{'txStart'} = $transcript->start;
+	$ucsc->{'txStart'} = $transcript->start - 1;
 	$ucsc->{'txEnd'}   = $transcript->end;
 	
-	# identify a second name from the transcript if necessary
-	unless (defined $ucsc->{'name2'}) {
-		collect_second_name($ucsc, $transcript);
-	}
-		
 	# Get the subfeatures of the transcript
 	# these should be utrs, cds, exons, introns
-	my @subfeatures = $transcript->get_SeqFeatures;
-	foreach my $subf (@subfeatures) {
+	my @exons;
+	my @cds;
+	my @utr;
+	foreach my $subf ($transcript->get_SeqFeatures) {
 		
 		# check the type
-		my $type = $subf->primary_tag;
+		my $type = lc $subf->primary_tag;
 		
-		# process accordingly
-		if ($type eq 'CDS') {
-			process_cds_exon($ucsc, $subf);
-		}
-		elsif ($type =~ /utr|untranslated/i) {
-			process_utr($ucsc, $subf);
+		# collect accordingly
+		if ($type eq 'cds') {
+			push @cds, $subf;
 		}
 		elsif ($type eq 'exon') {
-			# should I work with these? Best to work with CDS
+			push @exons, $subf;
 		}
-		elsif ($type eq 'start_codon') {
-			# should I work with these? Best to work with CDS
+		elsif ($type =~ /utr|untranslated/) {
+			push @utr, $subf;
 		}
-		elsif ($type eq 'stop_codon') {
-			# should I work with these? Best to work with CDS
-		}
-		elsif ($type eq 'intron') {
-			# ignore introns
+		elsif ($type =~ /codon|intron/) {
+			# ignore these
 		}
 		else {
 			# catchall for unrecognized feature types
@@ -443,6 +460,22 @@ sub process_transcript {
 			$unknowns{$type} += 1;
 			next;
 		}
+	}
+	
+	# process the subfeatures
+	if (@exons and @cds) {
+		# we prefer to use the exon and cds information 
+		return unless process_exon_cds($ucsc, \@exons, \@cds);
+	}
+	elsif (@cds) {
+		# we have at least CDSs and maybe UTRs
+		# we can calculate both exons and txStart and txEnd from these
+		# adjacent cds and utr in the same exon will be appropriately merged
+		merge_cds_utr_exons($ucsc, @cds, @utr);
+	}
+	else {
+		warn " transcript " . $ucsc->{'name'} . " does not have exon, cds, " .
+			"and/or utr subfeatures to process. Skipping\n";
 	}
 	
 	# the transcript should be finished now
@@ -457,16 +490,11 @@ sub process_nc_transcript {
 	my ($ucsc, $transcript) = @_;
 	
 	# Record coordinates for this transcript
-	$ucsc->{'txStart'}  = $transcript->start;
+	$ucsc->{'txStart'}  = $transcript->start - 1;
 	$ucsc->{'txEnd'}    = $transcript->end;
 	$ucsc->{'cdsStart'} = $transcript->end; # no cds, so set to end
 	$ucsc->{'cdsEnd'}   = $transcript->end;
 	
-	# identify a second name from the transcript if necessary
-	unless (defined $ucsc->{'name2'}) {
-		collect_second_name($ucsc, $transcript);
-	}
-		
 	# Get the subfeatures of the transcript
 	# these should be non-coding exons
 	my @subfeatures = $transcript->get_SeqFeatures;
@@ -478,9 +506,8 @@ sub process_nc_transcript {
 			# look for exons, could be exon or noncoding_exon
 			if ($subf->primary_tag =~ /exon/i) {
 				# record the coordinates and information for this exon
-				push @{ $ucsc->{'exonStarts'} }, $subf->start;
+				push @{ $ucsc->{'exonStarts'} }, $subf->start - 1;
 				push @{ $ucsc->{'exonEnds'} }, $subf->end;
-				push @{ $ucsc->{'exonFrames'} }, '-1';
 				$ucsc->{'exonCount'} += 1;
 			}
 			else {
@@ -492,10 +519,9 @@ sub process_nc_transcript {
 		}
 	}
 	else {
-		# no subfeatures? I guess it's just one exon
-		push @{ $ucsc->{'exonStarts'} }, $transcript->start;
+		# no exon subfeatures? I guess it's just one exon
+		push @{ $ucsc->{'exonStarts'} }, $transcript->start - 1;
 		push @{ $ucsc->{'exonEnds'} }, $transcript->end;
-		push @{ $ucsc->{'exonFrames'} }, '-1';
 		$ucsc->{'exonCount'} += 1;
 	}
 	
@@ -509,331 +535,199 @@ sub process_nc_transcript {
 
 
 
-### process UTR
-sub process_utr {
-	my ($ucsc, $utr) = @_;
+### process both exons and cds together
+sub process_exon_cds {
+	my ($ucsc, $exon, $cds) = @_;
+	return if (scalar @$cds > @$exon);
 	
-	# record the coordinates and information for this exon
-	push @{ $ucsc->{'exonStarts'} }, $utr->start;
-	push @{ $ucsc->{'exonEnds'} }, $utr->end;
-	push @{ $ucsc->{'exonFrames'} }, '-1';
-	$ucsc->{'exonCount'} += 1;
+	# sort both exons and cds by start position
+	my @exons = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @$exon;
+	my @cdss  = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @$cds;
+	
+	while (@exons) {
+		my $e = shift @exons;
+		
+		# check that we still have CDSs left
+		unless (@cdss) {
+			# no more CDSs left, all utr now
+			
+			# check that we had defined the cdsEnd
+			unless (defined $ucsc->{'cdsEnd'}) {
+				# the cdsEnd would be at the end of the previous exon
+				$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
+			}
+			
+			# add the utr
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+			next;
+		}
+		
+		# check if this exon overlaps a cds
+		if ($e->start < $cdss[0]->start and $e->end < $cdss[0]->start) {
+			# utr only
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+		}
+		elsif ($e->start < $cdss[0]->start and $e->end > $cdss[0]->end) {
+			# exon contains the entire CDS with UTR on either side
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+			$ucsc->{'cdsStart'} = $cdss[0]->start - 1;
+			$ucsc->{'cdsEnd'} = $cdss[0]->end;
+			shift @cdss; # finished with this cds
+		}
+		elsif ($e->start < $cdss[0]->start and $e->end == $cdss[0]->end) {
+			# exon with cdsStart and both cds and utr
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+			$ucsc->{'cdsStart'} = $cdss[0]->start - 1;
+			
+			# check txEnd
+			if ($e->end == $ucsc->{'txEnd'}) {
+				# in case there is no UTR at the end
+				$ucsc->{'cdsEnd'} = $e->end;
+			}
+			shift @cdss; # finished with this cds
+		}
+		elsif ($e->start == $cdss[0]->start and $e->end == $cdss[0]->end) {
+			# a CDS exon
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+			
+			# check txStart and txEnd
+			if ($e->start - 1 == $ucsc->{'txStart'}) {
+				# in case there is no UTR at the beginning
+				$ucsc->{'cdsStart'} = $e->start - 1;
+			}
+			if (not defined $ucsc->{'cdsStart'}) {
+				# cds starts with this exon
+				$ucsc->{'cdsStart'} = $e->start - 1;
+			}
+			if ($e->end == $ucsc->{'txEnd'}) {
+				# in case there is no UTR at the end
+				$ucsc->{'cdsEnd'} = $e->end;
+			}
+			
+			shift @cdss; # finished with this cds
+		}
+		elsif ($e->start == $cdss[0]->start and $e->end > $cdss[0]->end) {
+			# exon with cdsEnd and both cds and utr
+			push @{ $ucsc->{'exonStarts'} }, $e->start - 1;
+			push @{ $ucsc->{'exonEnds'} }, $e->end;
+			$ucsc->{'exonCount'} += 1;
+			$ucsc->{'cdsEnd'} = $cdss[0]->end;
+			
+			# check txStart
+			if ($e->start - 1 == $ucsc->{'txStart'}) {
+				# in case there is no UTR at the beginning
+				$ucsc->{'cdsStart'} = $e->start - 1;
+			}
+			if (not defined $ucsc->{'cdsStart'}) {
+				# cds starts with this exon
+				$ucsc->{'cdsStart'} = $e->start - 1;
+			}
+			shift @cdss; # finished with this cds
+		}
+		else {
+			warn "Programmer error! compare transcript " . $ucsc->{'name'} . ", exon " . 
+				$e->start . '..' . $e->end . " with next cds " . $cdss[0]->start . 
+				'..' . $cdss[0]->end . "\n";
+			return;
+		}
+	}
+	
+	return 1;
 }
 
 
 
-### process coding Exon
-sub process_cds_exon {
-	my ($ucsc, $exon) = @_;
+sub merge_cds_utr_exons {
+	my $ucsc = shift;
 	
-	# record the coordinates and information for this exon
-	push @{ $ucsc->{'exonStarts'} }, $exon->start;
-	push @{ $ucsc->{'exonEnds'} }, $exon->end;
-	push @{ $ucsc->{'exonFrames'} }, $exon->phase;
-	$ucsc->{'exonCount'} += 1;
+	# sort the mix of CDS and any UTR by increasing start position
+	my @exons = map {$_->[1]} sort {$a->[0] <=> $b->[0]} map { [$_->start, $_] } @_;
+	
+	while (@exons) {
+		my $e = shift @exons;
+		
+		# let's work backwards on this, always shift new exon and compare to previous
+		# better able to handle utr-cds-utr in one exon without so many conditionals
+		
+		# check for previous exons
+		if ( $ucsc->{'exonCount'} ) {
+			my $previous_end = $ucsc->{'exonEnds'}->[-1];
+			
+			#check for adjoining exons
+			if ($e->start - 1 == $previous_end) {
+				# adjoining
+				$ucsc->{'exonEnds'}->[-1] = $e->end;
+			}
+			else {
+				# not adjoining
+				push @{$ucsc->{'exonStarts'}}, $e->start - 1;
+				push @{$ucsc->{'exonEnds'}}, $e->end;
+				$ucsc->{'exonCount'} += 1;
+			}
+			
+			# check for cdsEnd
+			if (
+				defined $ucsc->{'cdsStart'} and
+				not defined $ucsc->{'cdsEnd'} and
+				$e->primary_tag !~ /cds/i
+			) {
+				# looks like the beginning of the utr
+				# set cdsEnd to previous end
+				$ucsc->{'cdsEnd'} = $previous_end;
+			}
+		}
+		else {
+			# first exon
+			push @{$ucsc->{'exonStarts'}}, $e->start - 1;
+			push @{$ucsc->{'exonEnds'}}, $e->end;
+			$ucsc->{'exonCount'} += 1;
+		}
+		
+		# check for cdsStart
+		if ($e->primary_tag =~ /cds/i and not defined $ucsc->{'cdsStart'}) {
+			# previous was utr, and now we have CDS
+			$ucsc->{'cdsStart'} = $e->start - 1;
+		}
+	}
+	
+	unless (defined $ucsc->{'cdsEnd'}) {
+		# set to the last exon end
+		$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
+	}
 }
-
 
 
 ### print the completed UCSC table line item
 sub print_table_item {
 	my $ucsc = shift;
 	
-	### Merge UTRs and CDS elements into exons
-		# The UCSC table works with exons, and explicitly defines coding starts 
-		# and stops, whereas the GFF3 gene structure typically has explicitly 
-		# defined UTRs and CDS, rather than simply exons. Thus, we'll need to 
-		# merge those adjoining UTRs and CDSs into a single exon.
-	my @starts; # to store final fixed coordinates
-	my @ends;
-	my @frames;
+	# assemble the required components
+	my @components = (
+		# name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds
+			$ucsc->{'name'},
+			$ucsc->{'name2'},
+			$ucsc->{'chr'},
+			$ucsc->{'strand'},
+			$ucsc->{'txStart'},
+			$ucsc->{'txEnd'},
+			$ucsc->{'cdsStart'},
+			$ucsc->{'cdsEnd'},
+			$ucsc->{'exonCount'},
+			join(",", @{$ucsc->{'exonStarts'}} ) . ',', 
+			join(",", @{$ucsc->{'exonEnds'}} ) . ',',
+	);
 	
-	# collect the list of subfeature starts and array positions
-	my %exonStarts;
-	for (my $i = 0; $i < $ucsc->{'exonCount'}; $i++) {
-		$exonStarts{$i} = $ucsc->{'exonStarts'}->[$i];
-	}
-	# sort by start position, since it's possible they weren't returned by 
-	# the gff parser in genomic order
-	foreach my $i (sort {$exonStarts{$a} <=> $exonStarts{$b}} keys %exonStarts) {
-		push @starts, $ucsc->{'exonStarts'}->[$i];
-		push @ends, $ucsc->{'exonEnds'}->[$i];
-		push @frames, $ucsc->{'exonFrames'}->[$i];
-	}
-	# empty the UCSC coordinates, we'll be replacing them
-	$ucsc->{'exonStarts'} = [];
-	$ucsc->{'exonEnds'}   = [];
-	$ucsc->{'exonFrames'} = [];
-	
-	# adjust starts for interbase
-	@starts = map {$_ -= 1} @starts;
-	$ucsc->{'txStart'} -= 1;
-	
-	# put the first exon in
-	push @{ $ucsc->{'exonStarts'} }, shift @starts;
-	push @{ $ucsc->{'exonEnds'} }, shift @ends;
-	push @{ $ucsc->{'exonFrames'} }, shift @frames;
-	
-	# Look for exons to merge, work by strand
-	if ($ucsc->{'strand'} eq '+') {
-		# forward strand
-		
-		# check start completeness
-		if ( $ucsc->{'exonFrames'}->[0] == -1) {
-			# the first exon looks to be a UTR it is probably complete
-			$ucsc->{'cdsStartStat'} = 'cmpl';
-		}
-		else {
-			# no utr
-			$ucsc->{'cdsStartStat'} = 'incmpl';
-			
-			# also set the cdsStart
-			$ucsc->{'cdsStart'} = $ucsc->{'exonStarts'}->[0];
-		}
-		
-		# check for potential exons to merge
-		while (@starts) {
-			
-			# get the next exon
-			my $start = shift @starts;
-			my $end   = shift @ends;
-			my $frame = shift @frames;
-			
-			# check for a utr-cds junction
-			if (
-				$ucsc->{'exonFrames'}->[-1] == -1 and
-				$frame != -1 and
-				$start - $ucsc->{'exonEnds'}->[-1] == 0
-			) {
-				# merge the exons
-				$ucsc->{'exonEnds'}->[-1] = $end;
-				$ucsc->{'exonFrames'}->[-1] = $frame;
-				
-				# set the cdsStart
-				$ucsc->{'cdsStart'} = $start;
-			}
-			
-			# check for cds-utr junction
-			elsif (
-				$ucsc->{'exonFrames'}->[-1] != -1 and
-				$frame == -1 and
-				$start - $ucsc->{'exonEnds'}->[-1] == 0
-			) {
-				# first set the cdsEnd
-				$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
-				
-				# next merge the exons
-				$ucsc->{'exonEnds'}->[-1] = $end;
-				
-				# set the cdsEndStat
-				$ucsc->{'cdsEndStat'} = 'cmpl';
-			}
-			
-			# else a regular exon
-			else {
-				push @{ $ucsc->{'exonStarts'} }, $start;
-				push @{ $ucsc->{'exonEnds'} }, $end;
-				push @{ $ucsc->{'exonFrames'} }, $frame;
-				
-				# check if we need to define cdsStart
-				# for those rare genes that the utr cds boundary falls on an intron
-				if (
-					$ucsc->{'exonFrames'}->[-2] == -1 and
-						# the [-1] frame was just added, so need to look at [-2]
-					$frame != -1 and 
-					!defined $ucsc->{'cdsStart'}
-				) {
-					$ucsc->{'cdsStart'} = $start;
-				}
-				
-				# check if we need to define cdsEnd
-				# for those rare genes that the cds utr boundary falls on an intron
-				if (
-					$ucsc->{'exonFrames'}->[-2] != -1 and
-						# the [-1] frame was just added, so need to look at [-2]
-					$frame == -1 and
-					!defined $ucsc->{'cdsEnd'}
-				) {
-					# set cdsEnd and cdsEndStat
-					$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-2];
-					$ucsc->{'cdsEndStat'} = 'cmpl';
-				}
-			}
-			
-		}
-		
-		# check end completeness
-		if ( $ucsc->{'exonFrames'}->[-1] == -1) {
-			# the last exon looks to be a UTR it is probably complete
-			$ucsc->{'cdsEndStat'} = 'cmpl' unless 
-				defined $ucsc->{'cdsEndStat'};
-		}
-		else {
-			# no utr
-			$ucsc->{'cdsEndStat'} = 'incmpl';
-			unless (defined $ucsc->{'cdsEnd'}) {
-				$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
-			}
-		}
-		
-	}
-	
-	
-	else {
-		# reverse strand
-		
-		# check end completeness
-		if ( $ucsc->{'exonFrames'}->[0] == -1) {
-			# the last exon looks to be a UTR it is probably complete
-			$ucsc->{'cdsStartStat'} = 'cmpl';
-		}
-		else {
-			# no utr
-			$ucsc->{'cdsStartStat'} = 'incmpl';
-			
-			# also set the cdsStart 
-				# contrary to what you might think, cdsStart doesn't indicate
-				# the ATG position, just the genomic start coordinate
-			$ucsc->{'cdsStart'} = $ucsc->{'exonStarts'}->[0];
-		}
-		
-		# check for potential exons to merge
-		while (@starts) {
-			
-			# get the next exon
-			my $start = shift @starts;
-			my $end   = shift @ends;
-			my $frame = shift @frames;
-			
-			# check for a utr-cds junction
-			if (
-				$ucsc->{'exonFrames'}->[-1] == -1 and
-				$frame != -1 and
-				$start - $ucsc->{'exonEnds'}->[-1] == 0
-			) {
-				# merge the exons
-				$ucsc->{'exonEnds'}->[-1] = $end;
-				$ucsc->{'exonFrames'}->[-1] = $frame;
-				
-				# set the cdsStart
-				$ucsc->{'cdsStart'} = $start; 
-			}
-			
-			# check for cds-utr junction
-			elsif (
-				$ucsc->{'exonFrames'}->[-1] != -1 and
-				$frame == -1 and
-				$start - $ucsc->{'exonEnds'}->[-1] == 0
-			) {
-				# first set the cdsEnd
-				$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
-				$ucsc->{'cdsEndStat'} = 'cmpl';
-				
-				# now merge the exons
-				$ucsc->{'exonEnds'}->[-1] = $end;
-				
-			}
-			
-			# else a regular exon
-			else {
-				push @{ $ucsc->{'exonStarts'} }, $start;
-				push @{ $ucsc->{'exonEnds'} }, $end;
-				push @{ $ucsc->{'exonFrames'} }, $frame;
-				
-				# check if we need to define cdsStart
-				# for those rare genes that the utr cds boundary falls on an intron
-				if (
-					$ucsc->{'exonFrames'}->[-2] == -1 and
-						# the [-1] frame was just added, so need to look at [-2]
-					$frame != -1 and 
-					!defined $ucsc->{'cdsStart'}
-				) {
-					$ucsc->{'cdsStart'} = $start;
-				}
-				
-				# check if we need to define cdsEnd
-				# for those rare genes that the cds utr boundary falls on an intron
-				if (
-					$ucsc->{'exonFrames'}->[-2] != -1 and
-						# the [-1] frame was just added, so need to look at [-2]
-					$frame == -1 and
-					!defined $ucsc->{'cdsEnd'}
-				) {
-					$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-2];
-					$ucsc->{'cdsEndStat'} = 'cmpl';
-				}
-			}
-			
-		}
-		
-		# check start completeness
-		if ( $ucsc->{'exonFrames'}->[-1] == -1) {
-			# the first exon looks to be a UTR it is probably complete
-			$ucsc->{'cdsEndStat'} = 'cmpl' unless 
-				defined $ucsc->{'cdsEndStat'};
-		}
-		else {
-			# no utr
-			$ucsc->{'cdsEndStat'} = 'incmpl';
-			unless (defined $ucsc->{'cdsEnd'}) {
-				$ucsc->{'cdsEnd'} = $ucsc->{'exonEnds'}->[-1];
-			}
-		}
-		
-	}
-	### Finished merging exons
-	
-	
-	# Update exonCount
-	$ucsc->{'exonCount'} = scalar @{ $ucsc->{'exonStarts'} };
-	
-	# check for non-coding genes
-	my $non_coding_check = 0;
-	foreach (@{ $ucsc->{'exonFrames'} }) {
-		if ($_ != -1) {
-			# a coding exon
-			$non_coding_check++;
-			last;
-		}
-	}
-	unless ($non_coding_check) {
-		# there are no coding exons
-		$ucsc->{'cdsStartStat'} = 'none';
-		$ucsc->{'cdsEndStat'} = 'none';
-		# the cdsStart and cdsEnd should already be set, but just in case
-		$ucsc->{'cdsStart'} = $ucsc->{'txEnd'};
-		$ucsc->{'cdsEnd'} = $ucsc->{'txEnd'};
-	}
-	
-	
-	
-	
-	### We finally print
-	my $string;
-	if ($bin) {
-		$string = "0\t";
-	}
-	$string .= join("\t", (
-	# bin	name	chrom	strand	txStart	txEnd	cdsStart	cdsEnd	exonCount	exonStarts	exonEnds	score	name2	cdsStartStat	cdsEndStat	exonFrames
-		$ucsc->{'name'},
-		$ucsc->{'chr'},
-		$ucsc->{'strand'},
-		$ucsc->{'txStart'},
-		$ucsc->{'txEnd'},
-		$ucsc->{'cdsStart'},
-		$ucsc->{'cdsEnd'},
-		$ucsc->{'exonCount'},
-		# example ucsc tables include a trailing comma in the lists, but why?
-		join(",", @{$ucsc->{'exonStarts'}} ) . ',', 
-		join(",", @{$ucsc->{'exonEnds'}} ) . ',',
-		$ucsc->{'score'},
-		$ucsc->{'name2'},
-		$ucsc->{'cdsStartStat'},
-		$ucsc->{'cdsEndStat'},
-		join(",", @{$ucsc->{'exonFrames'}} ) . ',',
-	) ) . "\n";
-	
-	$outfh->print($string);
+	$outfh->print(join("\t", @components) . "\n");
 	$count++; # increment global counter
 }
 
@@ -845,7 +739,7 @@ __END__
 
 gff3_to_ucsc_table.pl
 
-A script to convert a GFF3 file to a UCSC style gene table
+A script to convert a GFF3 file to a UCSC style refFlat table
 
 =head1 SYNOPSIS
 
@@ -854,7 +748,7 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
-  --bin
+  --alias
   --gz
   --version
   --help
@@ -871,15 +765,14 @@ Specify the input GFF3 file. The file may be compressed with gzip.
 
 =item --out <filename>
 
-Specify the output filename. By default it uses input file base name 
-appened with '_ucsc_genetable.txt'.
+Specify the output filename. By default it uses the input file base 
+name appended with '.refFlat'.
 
-=item --bin
+=item --alias
 
-Specify whether the UCSC table-specific column bin should be included as 
-the first column in the table. This column is reserved for internal 
-UCSC database use, and, if included here, will simply be populated with 
-0s. The default behavior is to not include it.
+Specify that any additional aliases, including the primary_ID, should 
+be appended to the gene name. They are concatenated using the pipe "|"
+symbol.
 
 =item --gz
 
@@ -899,29 +792,27 @@ Display this POD documentation.
 =head1 DESCRIPTION
 
 This program will convert a GFF3 annotation file to a UCSC-style 
-gene table, similar to that obtained through the UCSC Table Browser. 
-Specifically, it matches the format of the refGene (RefSeq Genes) and 
-ensGene (Ensembl Genes) tables. 
+gene table, using the refFlat format. This includes transcription 
+and translation start and stops, as well as exon start and stops, 
+but does not include coding exon frames. See the documentation at 
+L<http://genome.ucsc.edu/goldenPath/gbdDescriptionsOld.html#RefFlat> 
+for more information.
 
-It will assemble the exon starts, stops, and frames from the defined 
-transcript features in the GFF3 file. This assumes the standard 
-parent->child relationship using the primary tags of 
-gene -> mRNA -> [CDS, five_prime_utr, three_prime_utr]. 
-Additional features (exon, start_codon, stop_codon, transcript) 
-will be safely ignored.  
+The program assumes the input GFF3 file includes standard 
+parent-E<gt>child relationships using primary IDs and primary tags, 
+including gene, mRNA, exon, CDS, and UTRs. Non-standard genes, 
+including non-coding RNAs, will also be processed too. Chromosomes, 
+contigs, and embedded sequence are ignored. Non-pertinent features are 
+safely ignored but reported. Most pragmas are ignored, except for close 
+feature pragmas (###), which may aid in processing very large files. 
+See the documentation for the GFF3 file format at 
+L<http://www.sequenceontology.org/resources/gff3.html> for more 
+information. 
 
-It will also process non-coding transcripts, including all non-coding 
-RNAs; all subfeatures of non-coding RNAs will be considered as exons.
-
-The cdsStartStat and cdsEndStat fields are populated depending on 
-whether five- or three-prime UTRs exist; this may or may not reflect 
-the actual status according to UCSC. 
-
-For very large GFF3 files, it is helpful to include close feature 
-directive pragmas (lines with ###) after the annotation for each 
-reference sequence (see the GFF3 specification at 
-http://www.sequenceontology.org/resources/gff3.html). Fasta sequence 
-in the GFF3 file is ignored.
+Previous versions of this script attempted to export in the UCSC 
+genePredExt table format, often with inaccurate results. Users 
+who need this format should investigate the C<gff3ToGenePred> 
+program available at L<http://hgdownload.cse.ucsc.edu/admin/exe/>.
 
 =head1 AUTHOR
 
