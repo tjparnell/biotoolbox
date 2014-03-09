@@ -14,10 +14,15 @@ use Bio::ToolBox::file_helper qw(
 );
 my $gd_ok;
 eval {
+	require GD;
 	require GD::Graph::lines; # for the line type graph
 	require GD::Graph::mixed; # for the scatter plot
-	require GD::Graph::smoothlines; 
 	$gd_ok = 1;
+};
+my $gd_smooth;
+eval {
+	$gd_smooth = 1;
+	require GD::Graph::smoothlines; 
 };
 my $parallel;
 eval {
@@ -25,7 +30,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -216,7 +221,7 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 	# these won't be used for graph generation, so we'll skip them
 	next if $main_data_ref->{$i}{'name'} =~ /^(?:name|id|class|type|alias|probe|chr|
 		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand)$/xi;
+		midpoint|strand|primary_id)$/xi;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $main_data_ref->{$i}{'name'};
@@ -887,6 +892,9 @@ sub graph_smoothed_line_plot {
 	# the passed values
 	my ($xname, $yname, $xref, $yref) = @_;
 	
+	die "Perl module GD::Graph::smoothlines must be installed to graph smooth plots\n"
+		unless $gd_smooth;
+	
 	# calculate statistics
 	my ($q, $m, $r, $rsquared) = get_stats($xref, $yref);
 	my $r_formatted = sprintf "%.2f", $r;
@@ -1006,6 +1014,10 @@ sub set_graph_axes {
 		}
 	}
 	# otherwise we let it calculate automatic values
+	
+	# the default tiny font is too small for 800x600 graphic
+	$graph->set_x_axis_font(GD::Font->Small) or warn $graph->error;
+	$graph->set_y_axis_font(GD::Font->Small) or warn $graph->error;
 }
 
 
