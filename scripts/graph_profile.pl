@@ -14,10 +14,11 @@ use Bio::ToolBox::data_helper qw(
 use Bio::ToolBox::file_helper qw(load_tim_data_file);
 my $gd_ok;
 eval {
+	require GD;
 	require GD::Graph::smoothlines; 
 	$gd_ok = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -319,6 +320,14 @@ sub graph_this {
 	my $graph_name = join " & ", map { $dataset_by_id{$_} } @datasets;
 	print " Preparing graph for $graph_name....\n";
 	
+	# shorten if graph name is too long
+	if (length $graph_name > 30) {
+		# arbitrary length of 30 seems reasonable
+		# just use dataset index numbers in this case
+		# hell of a lot easier than trying to parse the unique portions of names
+		$graph_name = 'datasets_' . join(',', @datasets);
+	}
+	
 	# Collect the values
 	my @graph_data; # a complex array of arrays
 	
@@ -417,7 +426,7 @@ sub graph_this {
 	# Initialize the graph
 	my $graph = GD::Graph::smoothlines->new(800,600);
 	$graph->set(
-		'title'             => 'Profile' . $main_data_ref->{'feature'},
+		'title'             => 'Profile ' . $main_data_ref->{'feature'},
 		'x_label'           => $main_data_ref->{$x_index}{'name'},
 		'x_label_position'  => 0.5,
 		'transparent'       => 0, # no transparency
@@ -440,12 +449,11 @@ sub graph_this {
 	
 	# Set fonts
 	# the default tiny font is too small for 800x600 graphic
-	# possibilities: gdTinyFont gdSmallFont gdMediumBoldFont gdLargeFont gdGiantFont
-	$graph->set_legend_font(GD::gdMediumBoldFont) or warn $graph->error;
-	$graph->set_x_label_font(GD::gdLargeFont) or warn $graph->error;
-	$graph->set_title_font(GD::gdGiantFont) or warn $graph->error;
-	$graph->set_x_axis_font(GD::gdSmallFont) or warn $graph->error;
-	$graph->set_y_axis_font(GD::gdSmallFont) or warn $graph->error;
+	$graph->set_legend_font(GD::Font->MediumBold) or warn $graph->error;
+	$graph->set_x_label_font(GD::Font->Large) or warn $graph->error;
+	$graph->set_title_font(GD::Font->Giant) or warn $graph->error;
+	$graph->set_x_axis_font(GD::Font->Small) or warn $graph->error;
+	$graph->set_y_axis_font(GD::Font->Small) or warn $graph->error;
 	
 	# Set the color if specified
 	if (@colors) {
