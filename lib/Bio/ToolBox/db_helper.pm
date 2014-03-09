@@ -1886,10 +1886,15 @@ sub get_chromo_region_score {
 	$args{'start'}  ||= undef;
 	$args{'stop'}   ||= $args{'end'} || undef;
 	$args{'strand'} ||= 0;
-	unless ($args{chromo} and $args{start} and $args{stop}) {
+	unless (defined $args{chromo} and defined $args{start} and defined $args{stop}) {
 		cluck "one or more genomic region coordinates are missing!";
 		return;
 	};
+	if ($args{'start'} <= 0) {
+		warn " start value <= 0 provided! " . $args{'chromo'} . ':' . $args{'start'} .
+			'-' . $args{'stop'} . "\n";
+		$args{'start'} = 1;
+	}
 	
 	# define default values as necessary
 	$args{'value'}    ||= 'score';
@@ -2274,8 +2279,15 @@ sub get_region_dataset_hash {
 	}
 	
 	# a genomic region
-	elsif ( $args{'chromo'} and $args{'start'} and $args{'stop'} ) {
+	elsif ( $args{'chromo'} and defined $args{'start'} and defined $args{'stop'} ) {
 		# coordinates are easy
+		
+		if ($args{'start'} <= 0) {
+			warn " start value <= 0 provided! " . $args{'chromo'} . ':' . $args{'start'} .
+				'-' . $args{'stop'} . "\n";
+			$args{'start'} = 1;
+		}
+		
 		$fchromo   = $args{'chromo'};
 		if ($args{'extend'}) {
 			# user wants to extend
@@ -2286,6 +2298,7 @@ sub get_region_dataset_hash {
 			$fstart    = $args{'start'};
 			$fstop     = $args{'stop'};
 		}
+		$fstart = 1 if $fstart <= 0;
 		
 		# determine the strand
 		$fstrand   = $args{'strand'} ? $args{'strand'} : 0; # default is no strand
