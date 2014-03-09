@@ -646,6 +646,24 @@ sub open_bigwigset_db {
 		# collect the chromosomes for this bigwig
 		%{ $BIGWIG_CHROMOS{$paths[0]} } = map { $_ => 1 } $bw->seq_ids;
 		
+		# check for potential implied strandedness
+		my $md = $bws->metadata;
+		foreach my $i (keys %$md) {
+			my $f = $md->{$i}{'dbid'}; # the file path
+			if ($f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i) {
+				# implied forward strand 
+				unless (exists $md->{$i}{'strand'}) {
+					$bws->set_bigwig_attributes($f, {'strand' => 1});
+				}
+			}
+			elsif ($f =~ /(?:r|rev|reverse|bottom|minus|\-)\.bw$/i) {
+				# implied reverse strand 
+				unless (exists $md->{$i}{'strand'}) {
+					$bws->set_bigwig_attributes($f, {'strand' => -1});
+				}
+			}
+		}
+		
 		return $bws;
 	}
 	else {
