@@ -15,7 +15,8 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.14';
+use constant LOG2 => log(2);
+my $VERSION = '1.15';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1222,10 +1223,12 @@ sub sort_function {
 	
 	# annotate metadata
 	if ($direction =~ /i/i) {
-		$main_data_ref->{$index}{'sorted'} = $sortmethod . "_increasing";
+		$main_data_ref->{$index}{'sorted'} = $sortmethod . "_increasing" 
+			unless exists $main_data_ref->{$index}{'AUTO'};
 	}
 	else {
-		$main_data_ref->{$index}{'sorted'} = $sortmethod . "_decreasing";
+		$main_data_ref->{$index}{'sorted'} = $sortmethod . "_decreasing"
+			unless exists $main_data_ref->{$index}{'AUTO'};
 	}
 	
 	return 1;
@@ -1334,8 +1337,10 @@ sub genomic_sort_function {
 	}
 	
 	# annotate metadata
-	$main_data_ref->{$chromo_i}{'sorted'} = 'genomic';
-	$main_data_ref->{$start_i}{'sorted'} = 'genomic';
+	$main_data_ref->{$chromo_i}{'sorted'} = 'genomic' unless 
+		exists $main_data_ref->{$chromo_i}{'AUTO'};
+	$main_data_ref->{$start_i}{'sorted'} = 'genomic' unless 
+		exists $main_data_ref->{$start_i}{'AUTO'};
 	
 	print " Data table is sorted by genomic order\n";
 	return 1;
@@ -1425,7 +1430,8 @@ sub toss_nulls_function {
 	
 	# update metadata
 	foreach my $index (@order) {
-		$main_data_ref->{$index}{'tossed'} = $tosscount . '_non_value_features';
+		$main_data_ref->{$index}{'tossed'} = $tosscount . '_non_value_features'
+			unless exists $main_data_ref->{$index}{'AUTO'};
 	}
 	
 	# report
@@ -1498,8 +1504,8 @@ sub toss_duplicates_function {
 	
 	# update metadata
 	foreach my $index (@order) {
-		$main_data_ref->{$index}{'tossed'} = scalar(@rows2toss) . 
-			'_duplicate_features';
+		$main_data_ref->{$index}{'tossed'} = scalar(@rows2toss) . '_duplicate_features'
+			unless exists $main_data_ref->{$index}{'AUTO'};
 	}
 	
 	# print result
@@ -1625,8 +1631,9 @@ sub toss_threshold_function {
 	
 	# update metadata
 	foreach my $index (@order) {
-		$main_data_ref->{$index}{'tossed'} = $tosscount . '_lines_' . $direction 
-			. '_threshold_' . $threshold;
+		$main_data_ref->{$index}{'tossed'} = 
+			"$tosscount\_lines_$direction\_threshold_$threshold"
+			unless exists $main_data_ref->{$index}{'AUTO'};
 	}
 	
 	# report
@@ -2303,7 +2310,7 @@ sub log2_function {
 				else {
 					# a numeric value, calculate the log2 value
 					$data_table_ref->[$i][$index] = 
-						log($data_table_ref->[$i][$index]) / log(2);
+						log($data_table_ref->[$i][$index]) / LOG2;
 					$count++;
 				}
 			}
@@ -2344,7 +2351,7 @@ sub log2_function {
 				else {
 					# a numeric value, calculate the log2 value
 					$data_table_ref->[$i][$new_index] = 
-						log($data_table_ref->[$i][$index]) / log(2);
+						log($data_table_ref->[$i][$index]) / LOG2;
 					$count++;
 				}
 			}
