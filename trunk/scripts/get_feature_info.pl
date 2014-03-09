@@ -17,7 +17,7 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -106,7 +106,8 @@ my $id_index   = find_column_index($main_data_ref, '^primary_id');
 ### Establish database connection
 unless ($database) {
 	# define database if it wasn't on the command line
-	$database = $main_data_ref->{'db'};
+	$database = $main_data_ref->{'db'} or 
+		die "No database defined! See help\n";
 }
 my $db = open_db_connection($database);
 
