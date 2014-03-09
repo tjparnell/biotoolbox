@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -13,7 +13,7 @@ eval {
 	use Bio::ToolBox::db_helper::bam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 # constant for memory usage while sorting
 # this increases default from 500MB to 1GB

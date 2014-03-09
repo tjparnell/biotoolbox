@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -13,7 +13,7 @@ eval {
 	$cluster_ok = 1;
 };
 
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 

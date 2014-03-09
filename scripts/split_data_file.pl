@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -10,7 +10,7 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will split a data file by features\n\n";
 

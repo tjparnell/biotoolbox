@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -25,7 +25,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.14.1';
+my $VERSION = '1.15';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 

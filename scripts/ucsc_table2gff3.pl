@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -15,7 +15,7 @@ eval {
 	require GD::Graph::bars; 
 	$gd_ok = 1;
 };
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 

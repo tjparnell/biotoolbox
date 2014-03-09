@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 	write_summary_data
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n A script to pull out specific features from a data file\n";
 

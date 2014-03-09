@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file 
 
@@ -14,7 +14,7 @@ use Bio::ToolBox::file_helper qw(
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will convert yeast genomic coordinates\n";
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -9,7 +9,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n A script to print all available feature types in a database\n\n";
 

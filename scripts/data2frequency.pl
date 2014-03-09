@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file
 
@@ -14,7 +14,7 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 

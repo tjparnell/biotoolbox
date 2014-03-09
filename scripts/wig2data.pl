@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl
 
 # documentation at end of file 
 
@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.14';
+my $VERSION = '1.15';
 
 print "\n This program will convert wiggle files to a tabbed text file\n\n";
 
