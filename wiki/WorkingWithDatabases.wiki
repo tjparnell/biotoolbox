@@ -170,6 +170,8 @@ In many of the *BioToolBox* scripts, an annotation database is used to retrieve 
 
 For some *BioToolBox* data collection scripts, a second, data-specific database may be optionally specified using the `--ddb` option. The same options as above can be supplied. Note that this is not the same as collecting data from a Bam file, for example, which would be supplied separately as a `--data` option.
 
+The database name or path is typically recorded in the metadata of the output file, especially when new files are generated. When you reuse these files in additional scripts, the `--db` option can often be skipped in subsequent programs, since it can be readily obtained from the metadata.
+
 ==Getting a gene list==
 Getting a gene list out of the database is easy. It may be done separately or in conjunction with collecting data. To illustrate, we'll just collect a gene list. 
 
