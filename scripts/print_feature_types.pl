@@ -141,8 +141,10 @@ The command line flags and descriptions:
 
 =item --db <database>
 
-Specify the name of a Bio::DB::SeqFeature::Store database, or a BigWigSet 
-directory.
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+from which gene or feature annotation may be derived. For more information 
+about using annotation databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --version
 

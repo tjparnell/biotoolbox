@@ -745,9 +745,11 @@ the system path is searched for the executable.
 
 =item --db <database>
 
-Specify the name or path to a Bio::DB database from which to extract 
-chromosome names and sizes. This information is only required when 
-generating a bigWig file.
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
+length information may be obtained. For more information about using databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. It 
+is only required when generating a bigWig file.
 
 =item --chromof </path/to/chromosomes>
 

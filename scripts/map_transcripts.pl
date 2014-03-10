@@ -1333,9 +1333,13 @@ strands.
 
 =item --db <database_name>
 
-Specify a Bioperl Bio::DB::SeqFeature::Store database. Required for 
-generating the transcription fragment enriched_regions files. It may 
-be gleaned from the metadata of the provided enriched_region files.
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+from which gene or feature annotation may be derived. A database is 
+required for generating new data files with features. This option may 
+skipped when using coordinate information from an input file (e.g. BED 
+file), or when using an existing input file with the database indicated 
+in the metadata. For more information about using annotation databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --win <integer>
 
