@@ -1047,8 +1047,12 @@ The command line flags and descriptions:
 
 =item --db <text>
 
-Specify the name of a BioPerl SeqFeature::Store database to use as an 
-annotation source. 
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+from which gene or feature annotation may be derived. A database is 
+required for generating new data files with features. For more information 
+about using annotation databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+Also see C<--in> as an alternative.
 
 =item --in <filename>
 

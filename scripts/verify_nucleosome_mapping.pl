@@ -617,12 +617,9 @@ is allowed. The file may be compressed with gzip.
 =item --db <text>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. A database is 
-required for generating new data files with features. This option may 
-skipped when using coordinate information from an input file (e.g. BED 
-file), or when using an existing input file with the database indicated 
-in the metadata. For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+from which gene or feature annotation may be derived. For more 
+information about using annotation databases, see 
+L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --data <text | filename>
 

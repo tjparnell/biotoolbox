@@ -1147,14 +1147,14 @@ Text files may be gzipped.
 
 =item --in <filename>
 
-Specify the filename of an existing data table of genomic bins. It should 
-be in the tim data file format with metadata and have the feature 'genome'.
-It may be generated with this program or 'get_datasets.pl'. Required 
-unless --new is used.
+Specify the filename of an existing data table of genomic bins or intervals. 
+It may be generated using this program or B<get_datasets.pl>. A Bed file 
+may be acceptable. Required unless C<--new> is provided. The file may be 
+gzip compressed. 
 
 =item --new
 
-Indicate that a new data file should be generated. Required unless --in 
+Indicate that a new data file should be generated. Required unless C<--in> 
 is used.
 
 =item --method [count | mean | median |sum]
