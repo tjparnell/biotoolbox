@@ -95,6 +95,9 @@ Like the bigBed file, the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bi
 
 BigWig files may be generated from either wig files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ wigToBigWig] converter or from bedGraph files using the [http://hgdownload.cse.ucsc.edu/admin/exe/ bedGraphToBigWig] converter. The *BioToolBox* script [Pod_data2wig data2wig.pl] also includes the option to generate bigWig files, as do several other scripts, including [Pod_bam2wig bam2wig.pl] and [Pod_bar2wig bar2wig.pl].
 
+===BigWigSet directory===
+While not a format per se, this is a convenient collection of bigWig files that acts as a unified database. Simply, this is a directory containing two or more bigWig files and optionally a `metadata.txt` index file. When loaded, each bigWig file is assigned `type` and `display_name` attributes, and can be queried like any other BioPerl database. Additional attributes, such as `strand` or other identifying information, can be assigned using the `metadata.txt` index file. See the documentation for the [http://search.cpan.org/perldoc?Bio%3A%3ADB%3A%3ABigWigSet BigWigSet module] for more information.
+
 ===Bar files===
 Bar files are binary, serial float files used by David Nix's [http://useq.sourceforge.net USeq] and [http://http://timat2.sourceforge.net/ T2] suites of analysis programs. Each chromosome strand is represented by one bar file, so that a genome is represented by a directory of multiple bar files. The bar files are usually compressed with zip. Bar files internally store the score values along with an offset from the previous position. Unlike wig files, the format tolerates multiple values at the same position.
 

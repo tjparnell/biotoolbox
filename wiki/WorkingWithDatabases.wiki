@@ -17,6 +17,7 @@ This HowTo describes some possible scenarios with working with databases.
 		# [WorkingWithDatabases#Sequence_information Sequence information]
 		# [WorkingWithDatabases#Database_setup Database setup]
 		# [WorkingWithDatabases#Loading_the_database Loading the database]
+	# [WorkingWithDatabases#Specifying_and_using_a_database Specifying and using a database]
 	# [WorkingWithDatabases#Getting_a_gene_list Getting a gene list]
 	# [WorkingWithDatabases#Getting_more_from_the_database Getting more from the database]
 		# [WorkingWithDatabases#Additional_information Additional information]
@@ -131,7 +132,7 @@ For a MySQL database, the following example session shows creating a new databas
 
 See the documentation for your database server for more details.
 
-*IMPORTANT* For *BioToolBox* scripts, you must enter the read-only user name and password in the `.biotoolbox.cfg` configuration file. 
+*IMPORTANT* For BioToolBox scripts, you must enter the read-only user name and password in the `.biotoolbox.cfg` configuration file. Since this is a plain text file, a read-only user account would be critical here.
 
 ===Loading the database===
 The SQL database may then be loaded using the BioPerl provided script, [http://search.cpan.org/perldoc?bp_seqfeature_load.pl bp_seqfeature_load.pl]. A typical command for loading a MySQL database with zv9 annotation would look like this 
@@ -156,6 +157,18 @@ After loading the database, you may check the contents with the *BioToolBox* scr
 </pre>
 
 This should generate a list of feature types sorted by their source tags printed to standard out. 
+
+==Specifying and using a database==
+
+In many of the *BioToolBox* scripts, an annotation database is used to retrieve gene or feature information. Typically, the name of the database is specified using the `--db` option. Here, the value can be one of several things.
+	# The name of a database in the `.biotoolbox.cfg` configuration file. This file is typically located in your home folder, and includes stanzas of key = value pairs that specify the connection type and parameters for connecting to the database. For example, the database adaptor (MySQL, SQLite, etc.), path (SQLite file), or user and password (MySQL). If you used the [WorkingWithDatabases#Fast_and_easy_database_setup easy database setup] above, this connection information is added automatically.
+	# The direct path to a SQLite database. Typically, these have a `.db` or `.sqlite` extension.
+	# The path to a GFF3 annotation file that can be directly loaded into memory. While fast, this option should only be reserved for small genomes. Yeast is OK, human is not.
+	# When using a database for data collection, the path to a directory of bigWig files may be specified. Known as a [DataFileFormats#BigWigSet_directory BigWigSet directory], this allows a collection of two or more bigWig files to be treated as a BioPerl database, complete with metadata and attributes, including type and possibly strand, to be assigned to each bigWig file. 
+	# When only chromosome information or sequence is required, the path to a single uncompressed fasta (multi-fasta is OK) or a directory of fasta files may be supplied. The directory should be writable by the user for a small index file to be written.
+	# In some cases, when only coordinate information is required, a [DataFileFormats#BAM_file Bam], [DataFileFormats#bigWig bigWig], or [DataFileFormats#bigBed bigBed] file may be used.
+
+For some *BioToolBox* data collection scripts, a second, data-specific database may be optionally specified using the `--ddb` option. The same options as above can be supplied. Note that this is not the same as collecting data from a Bam file, for example, which would be supplied separately as a `--data` option.
 
 ==Getting a gene list==
 Getting a gene list out of the database is easy. It may be done separately or in conjunction with collecting data. To illustrate, we'll just collect a gene list. 
