@@ -80,7 +80,7 @@ __
 __--db <**database>
 
 __
-  Specify the name or path to a Bio::DB database from which to extract  chromosome names and sizes. This information is only required when  generating a bigWig file.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  or other indexed data file, e.g. Bam or bigWig file, from which chromosome  length information may be obtained. For more information about using databases,  see <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>. It  is only required when generating a bigWig file.
 __
   __
 __--chromof </path/to/chromosomes>

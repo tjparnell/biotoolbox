@@ -5,7 +5,7 @@ _This page was generated from POD using [http://code.google.com/p/pod2gcw pod2gc
 ==NAME==
 gff3_to_ucsc_table.pl
 
-A script to convert a GFF3 file to a UCSC style gene table
+A script to convert a GFF3 file to a UCSC style refFlat table
 
 ==SYNOPSIS==
 gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
@@ -14,7 +14,7 @@ gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
   Options:
   --in <filename>
   --out <filename> 
-  --bin
+  --alias
   --gz
   --version
   --help
@@ -31,13 +31,13 @@ __
 __--out <**filename>
 
 __
-  Specify the output filename. By default it uses input file base name  appened with '`_`ucsc_genetable.txt'.
+  Specify the output filename. By default it uses the input file base  name appended with '.refFlat'.
 __
   __
-__--bin
+__--alias
 
 __
-  Specify whether the UCSC table-specific column bin should be included as  the first column in the table. This column is reserved for internal  UCSC database use, and, if included here, will simply be populated with  0s. The default behavior is to not include it.
+  Specify that any additional aliases, including the primary_ID, should  be appended to the gene name. They are concatenated using the pipe "|" symbol.
 __
   __
 __--gz
@@ -59,15 +59,11 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a GFF3 annotation file to a UCSC-style  gene table, similar to that obtained through the UCSC Table Browser.  Specifically, it matches the format of the refGene (!RefSeq** Genes) and  ensGene (Ensembl Genes) tables.
+This program will convert a GFF3 annotation file to a UCSC-style  gene table, using the refFlat format. This includes transcription  and translation start and stops, as well as exon start and stops,  but does not include coding exon frames. See the documentation at  <[http://genome.ucsc.edu/goldenPath/gbdDescriptionsOld.html#RefFlat]>  for more information.
 
-It will assemble the exon starts, stops, and frames from the defined  transcript features in the GFF3 file. This assumes the standard  parent->child relationship using the primary tags of  gene -> mRNA -> `[`CDS, five_prime_utr, three_prime_utr`]`.  Additional features (exon, start_codon, stop_codon, transcript)  will be safely ignored.
+The program assumes the input GFF3 file includes standard  parent->child relationships using primary IDs and primary tags,  including gene, mRNA, exon, CDS, and UTRs. Non-standard genes,  including non-coding RNAs, will also be processed too. Chromosomes,  contigs, and embedded sequence are ignored. Non-pertinent features are  safely ignored but reported. Most pragmas are ignored, except for close  feature pragmas (###), which may aid in processing very large files.  See the documentation for the GFF3 file format at  <[http://www.sequenceontology.org/resources/gff3.html]> for more  information.
 
-It will also process non-coding transcripts, including all non-coding  RNAs; all subfeatures of non-coding RNAs will be considered as exons.
-
-The cdsStartStat and cdsEndStat fields are populated depending on  whether five- or three-prime UTRs exist; this may or may not reflect  the actual status according to UCSC.
-
-For very large GFF3 files, it is helpful to include close feature  directive pragmas (lines with ###) after the annotation for each  reference sequence (see the GFF3 specification at  http://www.sequenceontology.org/resources/gff3.html). Fasta sequence  in the GFF3 file is ignored.
+Previous versions of this script attempted to export in the UCSC  genePredExt table format, often with inaccurate results. Users  who need this format should investigate the `gff3ToGenePred`  program available at <[http://hgdownload.cse.ucsc.edu/admin/exe/]>.
 
 ==AUTHOR==
 {{{

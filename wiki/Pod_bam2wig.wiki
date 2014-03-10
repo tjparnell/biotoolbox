@@ -26,6 +26,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --minr <float>
   --model
   --strand
+  --flip
   --qual <integer>
   --max <integer>
   --max_cnt <integer>
@@ -143,6 +144,12 @@ __--strand
 
 __
   Indicate that separate wig files should be written for each strand.  The output file basename is appended with either '`_`f' or '`_`r' for  both files. For paired-end RNA-Seq alignments that were generated with  !TopHat**, the XS attribute is honored for strand information.  The default is to take all alignments regardless of strand.
+__
+  __
+__--flip
+
+__
+  Flip the strand of the output files when generating stranded wig files.  Do this when RNA-Seq alignments map to the opposite strand of the  coding sequence.
 __
   __
 __--qual <**integer>
@@ -305,7 +312,7 @@ __
 Stranded, single-end RNA-Seq
 
 __
-  If the library was generated in such a way as to preserve strand, then  we can separate the counts based on the strand of the alignment. Note  that the reported strand may be accurate or flipped, depending upon  whether first-strand or second-strand synthesized cDNA was sequenced,  and whether your aligner took this into account. Please check the  output wig files in a genome browser to verify which one is which, and  rename appropriately.
+  If the library was generated in such a way as to preserve strand, then  we can separate the counts based on the strand of the alignment. Note  that the reported strand may be accurate or flipped, depending upon  whether first-strand or second-strand synthesized cDNA was sequenced,  and whether your aligner took this into account. Check the Bam  alignments in a genome browser to confirm the orientation relative to  coding sequences. If alignments are opposite to the direction of  transcription, you can include the --flip option to switch the output.
 __
   __
 {{{

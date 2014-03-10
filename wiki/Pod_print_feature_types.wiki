@@ -22,7 +22,7 @@ The command line flags and descriptions:
 __--db <**database>
 
 __
-  Specify the name of a Bio::DB::!SeqFeature**::Store database, or a !BigWigSet**  directory.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  from which gene or feature annotation may be derived. For more information  about using annotation databases,  see <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.
 __
   __
 __--version

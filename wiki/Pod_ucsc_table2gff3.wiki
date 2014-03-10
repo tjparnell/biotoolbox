@@ -42,7 +42,7 @@ The command line flags and descriptions:
 __--ftp `[`refgene|ensgene|xenorefgene|known|all`]`
 
 __
-  Request that the current indicated tables and supporting files be  downloaded from UCSC via FTP. Four different tables may be downloaded,  including refGene, ensGene, xenoRefGene mRNA gene prediction tables, and  the UCSC known gene table (if available). Specify all to download all  four tables. A comma delimited list may also be provided.
+  Request that the current indicated tables and supporting files be  downloaded from UCSC via FTP. Four different tables may be downloaded,  including ___refGene___, ___ensGene___, ___xenoRefGene___ mRNA gene prediction  tables, and the UCSC ___knownGene___ table (if available). Specify all to  download all four tables. A comma delimited list may also be provided.
 __
   __
 __--db <**text>
@@ -60,37 +60,37 @@ __
 __--table <**filename>
 
 __
-  Provide the name of a UCSC gene or gene prediction table. Tables known  to work include the refGene, ensGene, xenoRefGene, and UCSC knownGene  tables. The file may be gzipped. When converting multiple tables, use  this option repeatedly for each table.
+  Provide the name of a UCSC gene or gene prediction table. Tables known  to work include the ___refGene___, ___ensGene___, ___xenoRefGene___, and UCSC  ___knownGene___ tables. The file may be gzipped. When converting multiple  tables, use this option repeatedly for each table. The `--ftp` option is  recommended over using this one.
 __
   __
 __--status <**filename>
 
 __
-  Optionally provide the name of the refSeqStatus table file. This file  provides additional information for the refSeq-based gene prediction  tables, including refGene, xenoRefGene, and knownGene tables. The  file may be gzipped.
+  Optionally provide the name of the ___refSeqStatus___ table file. This file  provides additional information for the ___refSeq_____-based gene prediction  tables, including ___refGene___, ___xenoRefGene___, and ___knownGene___ tables.  The file may be gzipped. The `--ftp` option is recommended over using this.
 __
   __
 __--sum <**filename>
 
 __
-  Optionally provide the name of the refSeqSummary file. This file  provides additional information for the refSeq-based gene prediction  tables, including refGene, xenoRefGene, and knownGene tables. The  file may be gzipped.
+  Optionally provide the name of the ___refSeqSummary___ file. This file  provides additional information for the ___refSeq_____-based gene prediction  tables, including ___refGene___, ___xenoRefGene___, and ___knownGene___ tables. The  file may be gzipped. The `--ftp` option is recommended over using this.
 __
   __
 __--ensname <**filename>
 
 __
-  Optionally provide the name of the ensemblToGeneName file. This file  provides a key to translate the Ensembl unique gene identifier to the  common gene name. The file may be gzipped.
+  Optionally provide the name of the ___ensemblToGeneName___ file. This file  provides a key to translate the Ensembl unique gene identifier to the  common gene name. The file may be gzipped. The `--ftp` option is  recommended over using this.
 __
   __
 __--enssrc <**filename>
 
 __
-  Optionally provide the name of the ensemblSource file. This file  provides a key to translate the Ensembl unique gene identifier to the  type of transcript, provided by Ensembl as the source. The file may be  gzipped.
+  Optionally provide the name of the ___ensemblSource___ file. This file  provides a key to translate the Ensembl unique gene identifier to the  type of transcript, provided by Ensembl as the source. The file may be  gzipped. The `--ftp` option is recommended over using this.
 __
   __
 __--kgxref <**filename>
 
 __
-  Optionally provide the name of the kgXref file. This file  provides additional information for the UCSC knownGene gene table. The file may be gzipped.
+  Optionally provide the name of the ___kgXref___ file. This file  provides additional information for the UCSC ___knownGene___ gene table. The file may be gzipped.
 __
   __
 __--chromo <**filename>
@@ -108,13 +108,13 @@ __
 __--(no)chr
 
 __
-  When downloading the current gene tables from UCSC using the --ftp  option, indicate whether (or not) to include the chromInfo table.  The default is true.
+  When downloading the current gene tables from UCSC using the `--ftp`  option, indicate whether (or not) to include the ___chromInfo___ table.  The default is true. The `--ftp` option is recommended over using this.
 __
   __
 __--(no)gene
 
 __
-  Specify whether (or not) to assemble mRNA transcripts into genes. This  will create the canonical gene->mRNA->(exon,CDS) heirarchical structure.  Otherwise, mRNA transcripts are kept independent. The gene name, when  available, are always associated with transcripts through the Alias tag.  The default is true.
+  Specify whether (or not) to assemble mRNA transcripts into genes. This  will create the canonical gene->mRNA->(exon,CDS) heirarchical  structure. Otherwise, mRNA transcripts are kept independent. The gene name,  when available, are always associated with transcripts through the Alias  tag. The default is true.
 __
   __
 __--(no)cds
@@ -154,13 +154,15 @@ __
 __
   __
 ==DESCRIPTION==
-This program will convert a UCSC gene or gene prediction table file into a GFF3 format file. It will build canonical gene->transcript->`[`exon, CDS, UTR`]` heirarchical structures. It will attempt to identify non-coding genes as to type using the gene name as inference. Various additional informational attributes may also be included with the gene and transcript features, which are derived from supporting table files.
+This program will convert a UCSC gene or gene prediction table file into a GFF3 format file. It will build canonical gene->transcript->`[`exon,  CDS, UTR`]` heirarchical structures. It will attempt to identify non-coding genes as to type using the gene name as inference. Various additional informational attributes may also be included with the gene and transcript features, which are derived from supporting table files.
 
-Four table files are supported. Gene prediction tables, including refGene,  xenoRefGene, and ensGene, are supported. The UCSC knownGene gene table, if  available, is also supported. Supporting tables include refSeqStatus,  refSeqSummary, ensemblToGeneName, ensemblSource, and kgXref.
+Four table files are supported. Gene prediction tables, including ___refGene___,  ___xenoRefGene___, and ___ensGene___, are supported. The UCSC ___knownGene___ gene  table, if available, is also supported. Supporting tables include ___refSeqStatus___,  ___refSeqSummary___, ___ensemblToGeneName___, ___ensemblSource___, and ___kgXref___.
 
-The latest table files may be automatically downloaded using FTP from  UCSC or other host. Since these files are periodically updated, this may  be the best option. Alternatively, individual files may be specified  through command line options. Files may be obtained manually through FTP,  HTTP, or the UCSC Table Browser.
+The latest table files may be automatically downloaded using FTP from  UCSC or other host. Since these files are periodically updated, this may  be the best option. Alternatively, individual files may be specified  through command line options. Files may be obtained manually through FTP,  HTTP, or the UCSC Table Browser. However, it is _*_highly recommended_*_ to  let the program obtain the necessary files using the `--ftp` option, as  using the wrong file format or manipulating the tables may prevent the  program from working properly.
 
 If provided, chromosome and/or scaffold features may also be written to a  GFF file. If only one table is being converted, then the chromosome features  are prepended to the GFF file; otherwise, a separate chromosome GFF file is  written.
+
+If you need to set up a database using UCSC annotation, you should first  take a look at the !BioToolBox** script _*_db_setup.pl_*_, which provides a  convenient automated database setup based on UCSC annotation.
 
 ==AUTHOR==
 {{{

@@ -35,7 +35,7 @@ The command line flags and descriptions:
 __--db <**text>
 
 __
-  Specify the name of a !BioPerl** !SeqFeature**::Store database to use as an  annotation source.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  from which gene or feature annotation may be derived. A database is  required for generating new data files with features. For more information  about using annotation databases,  see <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.  Also see `--in` as an alternative.
 __
   __
 __--in <**filename>

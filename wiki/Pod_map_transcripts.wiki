@@ -51,7 +51,7 @@ __
 __--db <**database_name>
 
 __
-  Specify a Bioperl Bio::DB::!SeqFeature**::Store database. Required for  generating the transcription fragment enriched_regions files. It may  be gleaned from the metadata of the provided enriched_region files.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  from which gene or feature annotation may be derived. For more  information about using annotation databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.
 __
   __
 __--win <**integer>

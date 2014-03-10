@@ -38,7 +38,7 @@ __
 __--db <**name|file|directory>
 
 __
-  Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. A relational database name, SQLite file, or  GFF3 file with sequence may be provided. Alternatively, provide the name  of an uncompressed Fasta file (multi-fasta is ok) or directory containing  multiple fasta files representing the genomic sequence. The directory  must be writeable for a small index file to be written. The database  name may be obtained from the input file metadata. Required.
+  Provide the name of an uncompressed Fasta file (multi-fasta is ok) or  directory containing multiple fasta files representing the genomic  sequence. The directory must be writeable for a small index file to be  written. Alternatively, the name of a Bio::DB::!SeqFeature**::Store  annotation database that contains genomic sequence may be provided.  For more information about using databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.   The database name may be obtained from the input file metadata. Required.
 __
   __
 __--id <**index>

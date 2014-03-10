@@ -46,13 +46,13 @@ __
 __--db <**name | filename>
 
 __
-  Specify the !BioPerl** database that contains the features listed in the  input file and potentially the reference and test datasets. A  Bio::DB::!SeqFeature**::Store database is typically used for  storing annotation. If genomic coordinates are provided instead, then  any database or bigFile may be provided. The default database is  obtained from the metadata of the input file.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  from which gene or feature annotation may be derived. A database is  required for generating new data files with features. This option may  skipped when using coordinate information from an input file (e.g. BED  file), or when using an existing input file with the database indicated  in the metadata. For more information about using annotation databases,  see <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.
 __
   __
 __--ddb <**name | filename>
 
 __
-  Optionally specify an alternative !BioPerl** database or !BigWigSet** directory  from which the reference and test datasets may be obtained.
+  If the data to be collected is from a second database that is separate  from the annotation database, provide the name of the data database here.  Typically, a second `Bio::DB::SeqFeature::Store` or !BigWigSet** database  is provided here.
 __
   __
 __--ref <**type | filename>

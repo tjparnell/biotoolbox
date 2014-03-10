@@ -48,13 +48,13 @@ __
 __--in <**filename>
 
 __
-  Specify the filename of an existing data table of genomic bins. It should  be in the tim data file format with metadata and have the feature 'genome'. It may be generated with this program or 'get_datasets.pl'. Required  unless --new is used.
+  Specify the filename of an existing data table of genomic bins or intervals.  It may be generated using this program or _*_get_datasets.pl_*_. A Bed file  may be acceptable. Required unless `--new` is provided. The file may be  gzip compressed.
 __
   __
 __--new
 
 __
-  Indicate that a new data file should be generated. Required unless --in  is used.
+  Indicate that a new data file should be generated. Required unless `--in`  is used.
 __
   __
 __--method `[`count | mean | median |sum`]`

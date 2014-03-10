@@ -35,7 +35,7 @@ __
 __--db <**text>
 
 __
-  Specify the name of a !BioPerl** database to pull the source data. A  !SeqFeature**::Store database or !BigWigSet** directory may be supplied.  The default is to use the database defined in the input file metadata  or the dataset file.
+  Specify the name of a `Bio::DB::SeqFeature::Store` annotation database  from which gene or feature annotation may be derived. For more  information about using annotation databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.
 __
   __
 __--data <**text | filename>
