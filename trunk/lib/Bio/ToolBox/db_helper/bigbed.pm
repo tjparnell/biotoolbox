@@ -54,7 +54,7 @@ sub collect_bigbed_scores {
 	
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
-	# two bedfiles (+ and -), so we'll check each wig file for strand info
+	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	foreach my $bedfile (@bed_features) {
 	
 		# open the bedfile
@@ -65,7 +65,7 @@ sub collect_bigbed_scores {
 		}
 		else {
 			# open and cache the bigWig object
-			$bb = open_bigwig_db($bedfile) or 
+			$bb = open_bigbed_db($bedfile) or 
 				croak " Unable to open bigBed file '$bedfile'! $!\n";
 			$OPENED_BB{$bedfile} = $bb;
 			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
@@ -140,7 +140,7 @@ sub collect_bigbed_position_scores {
 	
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
-	# two bedfiles (+ and -), so we'll check each wig file for strand info
+	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	foreach my $bedfile (@bed_features) {
 	
 		# open the bedfile
