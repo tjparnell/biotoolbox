@@ -1,5 +1,35 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.15 (svn 786)
+	- Added Bio::ToolBox::Data method to delete column metadata
+	and improved adding new metadata.
+	- Added back cached database objects for data collection, 
+	which brings back speed lost in the previous version. 
+	- Original strand format is now maintained when rewriting data 
+	files. For example, + and - from Bed and GFF files as opposed 
+	to 1 and -1.
+	- Passing a negative or zero start value to data collection 
+	methods in db_helper now issues a friendly warning and resets 
+	the value to 1.
+	- Opening a BigWigSet directory of bigWig files can now infer 
+	strand based on filename and set the metadata appropriately. 
+	For example, files whose basename ends in f, forward, or plus 
+	will be interpreted as strand 1. 
+	- Script gff3_to_ucsc_table.pl was significantly updated to 
+	address critical flaws and change the output format to refFlat.
+	- Script manipulate_datasets.pl no longer writes metadata for 
+	simple file formats when using certain functions that do not 
+	change data content.
+	- Script bam2wig.pl now includes a --flip strand option.
+	- Scripts graph_data.pl and graph_profile.pl have fixed errors 
+	and made improvements regarding fonts and sizes. 
+	- Various other small bug fixes and checks for optional Perl 
+	module installs.
+	- Updated shebang lines to use universal /usr/bin/perl
+	- Updated script POD documentation to make common options more 
+	uniform.
+	
+
 v.1.14.1 (svn 763)
 	- Changed the method of caching database objects introduced 
 	in version 1.14, which wreaked havoc with forked child 
