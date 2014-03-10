@@ -947,17 +947,20 @@ Specify the output filename. By default it rewrites the input file.
 
 =item --db <name | filename>
 
-Specify the BioPerl database that contains the features listed in the 
-input file and potentially the reference and test datasets. A 
-Bio::DB::SeqFeature::Store database is typically used for 
-storing annotation. If genomic coordinates are provided instead, then 
-any database or bigFile may be provided. The default database is 
-obtained from the metadata of the input file. 
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+from which gene or feature annotation may be derived. A database is 
+required for generating new data files with features. This option may 
+skipped when using coordinate information from an input file (e.g. BED 
+file), or when using an existing input file with the database indicated 
+in the metadata. For more information about using annotation databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --ddb <name | filename>
 
-Optionally specify an alternative BioPerl database or BigWigSet directory 
-from which the reference and test datasets may be obtained. 
+If the data to be collected is from a second database that is separate 
+from the annotation database, provide the name of the data database here. 
+Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
+is provided here. 
 
 =item --ref <type | filename>
 

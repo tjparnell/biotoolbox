@@ -1060,10 +1060,11 @@ Alternatively, provide a name of a database, below.
 
 =item --db <database>
 
-Specify the database from which chromosome lengths can be derived when 
-generating a bigwig file. This option is only required when generating 
-bigwig files. It may also be supplied from the metadata in the source 
-data file.
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
+length information may be obtained. For more information about using databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. It 
+may be supplied from the input file metadata.
 
 =item --bwapp </path/to/wigToBigWig>
 

@@ -661,10 +661,11 @@ The command line flags and descriptions:
 
 =item --db <database_name>
 
-Specify the name of the BioPerl database to pull the source data 
-and/or chromsomes. A SeqFeature::Store database may be supplied, 
-or a BigWigSet directory. Required unless data is pulled from 
-a bigWig file (.bw).
+Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
+length information may be obtained. For more information about using databases, 
+see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+Required unless data is pulled from a bigWig file (.bw).
 
 =item --data <text|file>
 
