@@ -130,7 +130,10 @@ __
   db => $database_object
 __
   __
-    Provide the name of the database from which to collect the  features. It may be a short name, whereupon it is checked in  the Bio::!ToolBox** configuration file `.biotoolbox.cfg` for  connection information. Alternatively, a path to a database  file or directory may be given. If you already have an opened  Bio::DB::!SeqFeature**::Store database object, you can simply  pass that. See Bio::!ToolBox**::db_helper for more information.
+    Provide the name of the database from which to collect the  features. It may be a short name, whereupon it is checked in  the Bio::!ToolBox** configuration file `.biotoolbox.cfg` for  connection information. Alternatively, a path to a database  file or directory may be given.
+  __
+    __
+    If you already have an opened Bio::DB::!SeqFeature**::Store database  object, you can simply pass that. See Bio::!ToolBox**::db_helper for  more information. However, this in general should be discouraged,  since the name of the database will not be properly recorded when  saving to file.
   __
     __
   win => $integer
@@ -292,7 +295,16 @@ __
 metadata($index, $key, $new_value)
 
 __
-  Returns or sets the metadata value for a specific key for a  specific column index.
+  Returns or sets the metadata value for a specific $key for a  specific column $index.
+__
+  __
+  This may also be used to add a new metadata key. Simply provide  the name of a new $key that is not present
+__
+  __
+delete_metadata($index, $key);
+
+__
+  Deletes a column-specific metadata $key and value for a specific  column $index. If a $key is not provided, then all metadata keys  for that index will be deleted.
 __
   __
 find_column($name)
