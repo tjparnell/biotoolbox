@@ -40,7 +40,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.15';
+my $VERSION = '1.16';
 	
 	
 
@@ -1253,7 +1253,7 @@ sub process_alignments {
 	
 	# open wig files
 	my ($filename1, $filename2, $fh1, $fh2);
-	if ($strand and not $flip) {
+	if ($strand and !$flip) {
 		($filename1, $fh1) = open_wig_file("$outfile\_f", 1);
 		($filename2, $fh2) = open_wig_file("$outfile\_r", 1);
 	}
@@ -1319,11 +1319,11 @@ sub parallel_process_alignments {
 		
 		# open chromosome wig files
 		my ($filename1, $filename2, $fh1, $fh2);
-		if ($strand and not $flip) {
+		if ($strand and !$flip) {
 			($filename1, $fh1) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
 			($filename2, $fh2) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
 		}
-		if ($strand and $flip) {
+		elsif ($strand and $flip) {
 			($filename1, $fh1) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
 			($filename2, $fh2) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
 		}
