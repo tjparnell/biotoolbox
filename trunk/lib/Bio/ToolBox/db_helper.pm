@@ -20,7 +20,7 @@ use Bio::ToolBox::data_helper qw(
 	parse_list
 );
 use Bio::ToolBox::db_helper::config;
-our $VERSION = '1.15';
+our $VERSION = '1.16';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -1886,15 +1886,15 @@ sub get_chromo_region_score {
 	$args{'start'}  ||= undef;
 	$args{'stop'}   ||= $args{'end'} || undef;
 	$args{'strand'} ||= 0;
-	unless (defined $args{chromo} and defined $args{start} and defined $args{stop}) {
-		cluck "one or more genomic region coordinates are missing!";
-		return;
-	};
-	if ($args{'start'} <= 0) {
-		warn " start value <= 0 provided! " . $args{'chromo'} . ':' . $args{'start'} .
-			'-' . $args{'stop'} . "\n";
+	if (defined $args{'start'} and $args{'start'} <= 0) {
+		warn " Invalid start coordinate for " . $args{'chromo'} . ':' . $args{'start'} .
+			'..' . $args{'stop'} . ". Resetting to 1.\n";
 		$args{'start'} = 1;
 	}
+	unless ($args{chromo} and $args{start} and $args{stop}) {
+		cluck "one or more required genomic coordinates are missing for !";
+		return;
+	};
 	
 	# define default values as necessary
 	$args{'value'}    ||= 'score';
@@ -2092,7 +2092,7 @@ sub get_region_dataset_hash {
 	$args{'type'}   ||= undef;
 	$args{'id'}     ||= undef;
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
-	$args{'start'}  ||= undef;
+	$args{'start'}  ||= 0;
 	$args{'stop'}   ||= $args{'end'} || undef;
 	$args{'strand'} ||= 0;
 	unless (
@@ -2281,12 +2281,6 @@ sub get_region_dataset_hash {
 	# a genomic region
 	elsif ( $args{'chromo'} and defined $args{'start'} and defined $args{'stop'} ) {
 		# coordinates are easy
-		
-		if ($args{'start'} <= 0) {
-			warn " start value <= 0 provided! " . $args{'chromo'} . ':' . $args{'start'} .
-				'-' . $args{'stop'} . "\n";
-			$args{'start'} = 1;
-		}
 		
 		$fchromo   = $args{'chromo'};
 		if ($args{'extend'}) {
