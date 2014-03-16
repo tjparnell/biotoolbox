@@ -13,7 +13,7 @@ eval {
 	Bio::ToolBox::db_helper::bam->import;
 	$bam_ok = 1;
 };
-my $VERSION = '1.15';
+my $VERSION = '1.16';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 
@@ -354,7 +354,7 @@ sub filter_for_length {
 	# return true if sequence length is equal to one that is requested
 	my $len = length $_[0]->qseq;
 	foreach my $l (@lengths) {
-		return $l == $len;
+		return 1 if $l == $len;
 	}
 	return 0;
 }
