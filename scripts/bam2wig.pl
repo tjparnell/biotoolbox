@@ -2330,8 +2330,8 @@ position is the default.
 Quickly calculates the coverage of the alignments over the genome, 
 either at single bp resolution (default) or in bins. This method ignores 
 the position, quality, strand, shift, and log options. It is 
-equivalent to specifying --position=span, --fix, --split, 
---nope, --noshift, --nostrand, --qual=0, --max=8000, --norpm, and no log. 
+equivalent to specifying --position=span, --split, --nope, --noshift, 
+--nostrand, --qual=0, --max=8000, --norpm, and no log. 
 
 =item --splice
 
