@@ -5,7 +5,13 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-my $VERSION = '1.15';
+my $BAM_OK = 0;
+eval { 
+	require Bio::ToolBox::db_helper::bam;
+	Bio::ToolBox::db_helper::bam->import;
+	$BAM_OK = 1;
+};
+my $VERSION = '1.16';
 
 print "\n A script to report the alignment sequence nucleotide frequencies\n\n";
 
@@ -71,12 +77,16 @@ unless ($outfile) {
 	$outfile =~ s/\.sorted//;
 	$outfile .= '.seq_stats.txt';
 }
-
+unless ($BAM_OK) {
+	die "Unable to load Bam file support! Is Bio::DB::Sam installed?\n"; 
+}
 
 
 ### Run the program
-my $seq_counter = get_bam_seq_stats::counter->new($infile) or 
-	die "Unable to open Bam file. Is Bio::DB::Bam installed?\n";
+# open the bam object
+my $sam = open_bam_db($infile) or die " unable to open input bam file '$infile'!\n";
+	
+my $seq_counter = get_bam_seq_stats::counter->new($sam);
 
 $seq_counter->count_stats;
 
@@ -95,19 +105,11 @@ exit 0;
 package get_bam_seq_stats::counter;
 use strict;
 use IO::File;
-eval {
-	require Bio::ToolBox::db_helper::bam;
-	Bio::ToolBox::db_helper::bam->import;
-};
 1;
 
 sub new {
 	my $class = shift;
-	my $file  = shift;
-	return unless exists &open_bam_db;
-	
-	# open the bam object
-	my $sam = open_bam_db($file) or die " unable to open input bam file '$infile'!\n";
+	my $sam  = shift;
 	
 	# return the object
 	my $self = {
