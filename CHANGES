@@ -1,5 +1,17 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.16 (svn 794)
+	- Fixed critical bug that prevented the forward strand from 
+	being written when generating stranded coverage in script 
+	bam2wig.pl. Thanks to Michael D. for reporting.
+	- Fixed critical bug that prevented the script get_bam_seq_stats.pl 
+	from compiling properly.
+	- Fixed bug that prevented filtering more than one length at 
+	a time in script filter_bam.pl. Thanks to Yixuan for reporting.
+	- Fixed again the bug where passing a negative or zero start 
+	to data collection methods issues a warning and resets the value 
+	to 1 in db_helper.
+
 v.1.15 (svn 786)
 	- Added Bio::ToolBox::Data method to delete column metadata
 	and improved adding new metadata.
