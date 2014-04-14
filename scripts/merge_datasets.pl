@@ -13,7 +13,7 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -426,19 +426,22 @@ sub merge_two_datasets_by_lookup {
 		# we'll be putting the lookup values into an index hash
 		# where the lookup value is the key and the row number is the value
 	$input_data2_ref->{'index'} = {};
+	my $index_warning = 0;
 	for (my $row = 1; $row <= $input_data2_ref->{'last_row'}; $row++) {
 		my $key = $input_data2_ref->{'data_table'}->[$row][$lookup_i2];
 		if (exists $input_data2_ref->{'index'}{$key}) {
 			# value is not unique
-			warn " lookup value '$key' in file " . 
-				$input_data2_ref->{'filename'} . 
-				", row $row is a duplicate!\n" . 
-				" Using the first occurence value\n";
+			$index_warning++;
 		}
 		else {
 			# value is ok
 			$input_data2_ref->{'index'}{$key} = $row;
 		}
+	}
+	if ($index_warning) {
+		warn " Warning: $index_warning rows had two or more duplicate lookup values\n" . 
+			"  for column $lookup_i2 in file " . $input_data2_ref->{'filename'} . 
+			"\n  Only the first occurence was used\n";
 	}
 	
 	# Initialize the output data structure if necessary
