@@ -40,7 +40,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.16';
+my $VERSION = '1.17';
 	
 	
 
@@ -2233,8 +2233,9 @@ sub convert_to_bigwig {
 	foreach my $file (@files) {
 		next unless defined $file;
 		my $bw_file = wig_to_bigwig_conversion(
-			'wig'   => $file,
-			'db'    => $sam,
+			'wig'       => $file,
+			'db'        => $sam,
+			'bwapppath' => $bwapp,
 		);
 		if ($bw_file) {
 			print " Converted to $bw_file\n";
