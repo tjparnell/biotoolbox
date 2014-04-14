@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl -w
 
 # Test script for Bio::ToolBox::Data
 
@@ -7,7 +7,7 @@ use Test;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 26;
+	plan tests => 47;
 	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
 }
 
@@ -38,6 +38,26 @@ ok($group_index, 8);
 # test column chromosome
 my $chromo_index = $Data->chromo_column;
 ok($chromo_index, 0);
+
+# test column names
+my @column_names = $Data->list_columns;
+ok(scalar @column_names, 9);
+ok($column_names[7], 'Phase');
+ok($Data->name(7), 'Phase');
+
+# metadata
+ok($Data->metadata(1, 'name'), 'Source');
+$Data->metadata(2, 'accuracy', 'bogus');
+my $md = $Data->metadata(2);
+ok($md);
+ok(ref $md, 'HASH');
+ok($md->{'accuracy'}, 'bogus');
+
+# column values
+my $cv = $Data->column_values(3);
+ok($cv);
+ok(scalar @$cv, 310);
+ok($cv->[1], 1);
 
 # test row_stream
 my $stream = $Data->row_stream;
@@ -74,20 +94,48 @@ ok($Data->number_columns, 8);
 # test add_column
 $Data->add_column('Name');
 ok($Data->number_columns, 9);
+ok($Data->value(1,8), undef);
+$Data->delete_column(8);
 
-# add the names
-$stream = $Data->row_stream;
-my $i = 1;
-while ($row = $stream->next_row) {
-	$row->value(8, "Feature$i");
-	$i++;
+# add the names as a new column
+my @names = qw(Name);
+for (my $i = 1; $i <= $Data->last_row; $i++) {
+	push @names, "Feature$i";
 }
+my $index = $Data->add_column(\@names);
+ok($index, 8);
 ok($Data->value(308,8), 'Feature308');
+
+# copy a column
+$index = $Data->copy_column(8);
+ok($index, 9);
+ok($Data->number_columns, 10);
+ok($Data->metadata(9, 'name'), 'Name');
+
+# change and copy metadata
+$Data->name(9, 'DuplicateName');
+$Data->copy_metadata(2,9);
+$md = $Data->metadata(9);
+ok($md->{name}, 'DuplicateName');
+ok($md->{accuracy}, 'bogus');
+ok($md->{'index'}, 9);
 
 # test reorder_column
 $Data->reorder_column(0,3,4,8);
 ok($Data->number_columns, 4);
 ok($Data->value(308,3), 'Feature308');
+
+# test iterate function
+my $offset = 1;
+my $start_i = $Data->start_column;
+ok($start_i, 1);
+my $iterate_success = $Data->iterate( sub {
+	my $row = shift;
+	my $new_start = $row->start - $offset;
+	$row->value($start_i, $new_start);
+} );
+ok($iterate_success);
+ok($Data->value(1, $start_i), 0);
 
 # test splice function
 $Data->splice_data(2,4); # second quarter of the data table

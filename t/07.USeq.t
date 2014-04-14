@@ -1,4 +1,4 @@
-#!/usr/bin/env perl
+#!/usr/bin/perl -w
 
 # Test script for Bio::ToolBox::Data 
 # working with USeq data
