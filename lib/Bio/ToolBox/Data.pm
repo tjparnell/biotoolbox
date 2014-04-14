@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.15;
+our $VERSION = 1.17;
 
 =head1 NAME
 
@@ -101,8 +101,9 @@ table to a new file.
 
 Initialize a new Data structure. This generally requires options, 
 provided as an array of key =E<gt> values. A new list of features 
-may be obtained from an annotation database, an existing file 
-may be loaded, or a new empty structure may be generated. 
+may be obtained from an annotation database or an existing file 
+may be loaded. If you do not pass any options, a new empty 
+structure will be generated for you to populate. 
 
 These are the options available.
 
@@ -253,9 +254,14 @@ delete. If an index is not provided, ALL comments will be deleted!
 =head2 The Data table
 
 The Data table is the array of arrays containing all of the 
-actual information. It has some metadata as well.
+actual information. 
 
 =over 4
+
+=item list_columns
+
+Returns an array or array reference of the column names 
+in ascending (left to right) order.
 
 =item number_columns
 
@@ -267,13 +273,35 @@ Returns the array index number of the last row.
 Since the header row is index 0, this is also the 
 number of actual content rows.
 
+=item column_values($index)
+
+Returns an array or array reference representing the values 
+in the specified column. This includes the column header as 
+the first element. Pass the method the column index.
+
 =item add_column($name)
 
-Appends a new empty column to the Data table at the 
+=item add_column(\@column_data)
+
+Appends a new column to the Data table at the 
 rightmost position (highest index). It adds the column 
 header name and creates a new column metadata hash. 
-But it doesn't actually fill values in every row. 
-It returns the new column index.
+Pass the method one of two possibilities. Pass a text 
+string representing the new column name, in which case 
+no data will be added to the column. Alternatively, pass 
+an array reference, and the contents of the array will 
+become the column data. If the Data table already has 
+rows, then the passed array reference must have the same 
+number of elements.
+
+It returns the new column index if successful.
+
+=item copy_column($index)
+
+This will copy a column, appending the duplicate column at 
+the rightmost position (highest index). It will duplicate 
+column metadata as well. It will return the new index 
+position.
 
 =item delete_column($index1, $index2, ...)
 
@@ -332,6 +360,11 @@ the beginning of the file.
 
 =over 4
 
+=item name($index)
+
+Convenient method to return the name of the column given the 
+index number.
+
 =item metadata($index, $key)
 
 =item metadata($index, $key, $new_value)
@@ -341,6 +374,15 @@ specific column $index.
 
 This may also be used to add a new metadata key. Simply provide 
 the name of a new $key that is not present
+
+If no key is provided, then a hash or hash reference is returned 
+representing the entire metadata for that column.
+
+=item copy_metadata($source, $target)
+
+This method will copy the metadata (everything except name and 
+index) between the source column and target column. Returns 1 if 
+successful.  
 
 =item delete_metadata($index, $key);
 
@@ -382,6 +424,21 @@ at a time, collecting data or processing information. These methods
 simplify the process.
 
 =over 4
+
+=item iterate(sub {})
+
+This method will process a code reference on every row in the data 
+table. Pass a subroutine or code reference. The subroutine will 
+receive the row as a Bio::ToolBox::Data::Feature object. With this 
+object, you can retrieve values, set values, and add new values. 
+For example
+    
+    $Data->iterate( sub {
+       my $row = shift;
+       my $number = $row->value($index);
+       my $log_number = log($number);
+       $row->value($index, $log_number);
+    } );
 
 =item row_stream()
 
@@ -803,7 +860,7 @@ use Bio::ToolBox::db_helper qw(
 sub new {
 	my $class = shift;
 	my %args  = @_;
-	$args{features} ||= $args{feature} || 'feature';
+	$args{features} ||= $args{feature} || undef;
 	
 	my $data;
 	if (exists $args{file} and -e $args{file}) {
@@ -811,7 +868,7 @@ sub new {
 		$data = load_tim_data_file($args{file}) or 
 			croak "Cannot load file $args{file}!\n";
 	}
-	elsif (exists $args{db} and exists $args{features}) {
+	elsif (exists $args{db} and exists $args{features} ) {
 		# generate new list
 		if ($args{features} eq 'genome') {
 			$data = get_new_genome_list(%args) or 
@@ -828,7 +885,11 @@ sub new {
 		if (exists $args{datasets}) {
 			@datasets = @{ $args{datasets} };
 		}
-		$data = generate_tim_data_structure($args{features}, @datasets);
+		elsif (exists $args{columns}) {
+			@datasets = @{ $args{columns} };
+		}
+		my $feature = $args{features} || 'feature';
+		$data = generate_tim_data_structure($feature, @datasets);
 	}
 	
 	return bless $data, $class;
@@ -842,7 +903,13 @@ sub new {
 
 sub write_file {
 	my $self = shift;
-	my %args = @_;
+	my %args;
+	if (scalar @_ == 1) {
+		$args{filename} = $_[0];
+	}
+	else {
+		%args = @_;
+	}
 	$args{data} = $self;
 	return write_tim_data_file(%args);
 }
@@ -1014,6 +1081,22 @@ sub delete_comment {
 	}
 }
 
+
+
+
+### Column Metadata
+
+sub name {
+	my $self = shift;
+	my ($index, $new_name) = @_;
+	return unless defined $index;
+	return unless exists $self->{$index}{name};
+	if ($new_name) {
+		$self->{$index}{name} = $new_name;
+	}
+	return $self->{$index}{name};
+}
+
 sub metadata {
 	my $self = shift;
 	my ($index, $key, $value) = @_;
@@ -1059,9 +1142,38 @@ sub delete_metadata {
 	}
 }
 
+sub copy_metadata {
+	my ($self, $source, $target) = @_;
+	return unless (exists $self->{$source}{name} and exists $self->{$target}{name});
+	my $md = $self->metadata($source);
+	delete $md->{name};
+	delete $md->{'index'};
+	delete $md->{'AUTO'} if exists $md->{'AUTO'}; # presume this is no longer auto index
+	foreach (keys %$md) {
+		$self->{$target}{$_} = $md->{$_};
+	}
+	return 1;
+}
 
 
 ### Columns or Datasets
+
+sub list_columns {
+	my $self = shift;
+	my @list;
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		push @list, $self->{$i}{'name'};
+	}
+	return wantarray ? @list : \@list;
+}
+
+sub column_values {
+	my ($self, $column) = @_;
+	return unless defined $column;
+	return unless exists $self->{$column}{name};
+	my @values = map {$self->value($_, $column)} (0 .. $self->last_row);
+	return wantarray ? @values : \@values;
+}
 
 sub find_column {
 	my ($self, $name) = @_;
@@ -1073,12 +1185,51 @@ sub add_column {
 	my ($self, $name) = @_;
 	return unless $name;
 	my $column = $self->{number_columns};
-	$self->{$column} = {
-		'name'      => $name,
-		'index'     => $column,
-	};
-	$self->{data_table}->[0][$column] = $name;
+	
+	# check for array of column data
+	if (ref $name eq 'ARRAY') {
+		if ($self->last_row > 1) {
+			# table has existing data beyond column headers
+			if ($self->last_row == (scalar @$name - 1)) {
+				# same number of elements, add it the table
+				$self->{$column} = {
+					'name'  => $name->[0],
+					'index' => $column,    
+				};
+				for (my $r = 0; $r <= $self->last_row; $r++) {
+					$self->{data_table}->[$r][$column] = $name->[$r];
+				}
+			}
+			else {
+				# different number of elements
+				cluck "array has different number of elements than Data table!\n"; 
+				return;
+			}
+		}
+		else {
+			# table has no existing data
+			$self->{$column} = {
+				'name'  => $name->[0],
+				'index' => $column,    
+			};
+			for (my $i = 0; $i < scalar @$name; $i++) {
+				$self->value($column, $i, $name->[$i]);
+			}
+			$self->{last_row} = scalar @$name - 1;
+		}
+	}
+	
+	else {
+		# just a name
+		$self->{$column} = {
+			'name'      => $name,
+			'index'     => $column,
+		};
+		$self->{data_table}->[0][$column] = $name;
+	}
+	
 	$self->{number_columns}++;
+	delete $self->{column_indices} if exists $self->{column_indices};
 	return $column;
 }
 
@@ -1128,7 +1279,18 @@ sub reorder_column {
 		$self->{$i}{'index'} = $i;
 	}
 	$self->{'number_columns'} = scalar @order;
+	delete $self->{column_indices} if exists $self->{column_indices};
 	return 1;
+}
+
+sub copy_column {
+	my $self = shift;
+	my $index = shift;
+	return unless defined $index;
+	my $data = $self->column_values($index);
+	my $new_index = $self->add_column($data);
+	$self->copy_metadata($index, $new_index);
+	return $new_index;
 }
 
 sub _find_column_indices {
@@ -1195,6 +1357,10 @@ sub id_column {
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{id};
 }
+
+
+
+### Other stuff
 
 sub verify_dataset {
 	my $self = shift;
@@ -1275,8 +1441,19 @@ sub row_stream {
 	return Bio::ToolBox::Data::Iterator->new($self);
 }
 
-
-
+sub iterate {
+	my $self = shift;
+	my $code = shift;
+	unless (ref $code eq 'CODE') {
+		cluck "iterate_function() method requires a code reference!";
+		return;
+	}
+	my $stream = $self->row_stream;
+	while (my $row = $stream->next_row) {
+		&$code($row);
+	}
+	return 1;
+}
 
 
 ####################################################
