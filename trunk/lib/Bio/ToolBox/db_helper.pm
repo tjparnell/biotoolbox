@@ -20,7 +20,7 @@ use Bio::ToolBox::data_helper qw(
 	parse_list
 );
 use Bio::ToolBox::db_helper::config;
-our $VERSION = '1.16';
+our $VERSION = '1.17';
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -428,7 +428,8 @@ sub open_db_connection {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
 				$error = " ERROR: could not open local BigWigSet " . 
-					"directory '$database'! $!\n";
+					"directory '$database'!\n";
+				$error .= "   Does directory contain bigWig .bw files?\n";
 			}
 		}
 		else {
@@ -440,10 +441,14 @@ sub open_db_connection {
 		unless ($db) {
 			undef $@;
 			eval {
+				# to prevent annoying error messages
+				local $SIG{__WARN__} = sub {}; 
 				$db = Bio::DB::Fasta->new($database);
 			};
 			unless ($db) {
-				$error .= " ERROR: could not open fasta directory '$database'! $@\n";
+				$error .= " ERROR: could not open fasta directory '$database'!\n";
+				$error .= "   Does directory contain fasta files? If it contains a" . 
+					" directory.index file,\n   try deleting it and try again.\n";
 			}
 		}
 	}
@@ -556,10 +561,15 @@ sub open_db_connection {
 				# open using the Fasta adaptor
 				undef $@;
 				eval {
+					# to prevent annoying error messages
+					local $SIG{__WARN__} = sub {}; 
 					$db = Bio::DB::Fasta->new($database);
 				};
 				unless ($db) {
-					$error = " ERROR: could not open fasta file '$database'! $@\n";
+					$error = " ERROR: could not open fasta file '$database'!\n";
+					if (-e "$database\.index") {
+						$error .= "   Try deleting $database\.index and try again\n";
+					}
 				}
 			}
 		}
@@ -1917,7 +1927,7 @@ sub get_chromo_region_score {
 	# set RPM sum value if necessary
 	if (exists $args{'rpm_sum'} and defined $args{'rpm_sum'}) {
 		unless (exists $total_read_number{ $args{'dataset'} }) {
-			$total_read_number{ $args{'dataset'} = $args{'rpm_sum'} };
+			$total_read_number{ $args{'dataset'} } = $args{'rpm_sum'};
 		}
 	}
 	
