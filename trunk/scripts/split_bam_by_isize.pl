@@ -13,7 +13,7 @@ eval {
 	use Bio::ToolBox::db_helper::bam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 # constant for memory usage while sorting
 # this increases default from 500MB to 1GB
@@ -510,8 +510,8 @@ split_bam_by_isize.pl [--options] <file.bam>
   
   Options:
   --in <file.bam>
-  --min <integer>
-  --max <integer>
+  --min <integer>       (100)
+  --max <integer>       (200)
   --size <min-max>
   --out <filename>
   --at

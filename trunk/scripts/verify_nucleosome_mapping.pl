@@ -19,7 +19,7 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
@@ -593,7 +593,7 @@ verify_nucleosome_mapping.pl [--options...] <filename>
   --db <text>
   --data <text | filename>
   --filter
-  --max <integer>
+  --max <integer>           (30)
   --recenter
   --out <filename> 
   --gz
