@@ -361,8 +361,10 @@ sub verify_data_structure {
 	
 	# check proper SGR file structure
 	if (
-		$datahash_ref->{'extension'} =~ /sgr/i or
-		$datahash_ref->{'filename'} =~ /sgr/i
+		( defined $datahash_ref->{'extension'} and 
+		$datahash_ref->{'extension'} =~ /sgr/i ) or
+		( defined $datahash_ref->{'filename'} and 
+		$datahash_ref->{'filename'} =~ /sgr/i )
 	) {
 		# there is no sgr field in the data structure
 		# so we're just checking for the extension
@@ -619,7 +621,9 @@ sub format_with_commas {
 	}
 	
 	# finished
-	return join("", @formatted) . $decimals;
+	my $final = join("", @formatted);
+	$final .= $decimals if defined $decimals;
+	return $final;
 }
 
 
