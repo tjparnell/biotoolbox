@@ -1,5 +1,22 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.17 (svn 806)
+	- Added six new method functions to Bio::ToolBox::Data for 
+	working with columns and metadata.
+	- Updated script correlate_position_data.pl with parallel 
+	execution plus an ANOVA statistical analysis between data.
+	- Fixed bug where the --bwapp option was not being used in 
+	script bam2wig.pl. Thanks to Michael D. for reporting.
+	- Removed extraneous BioPerl warnings when opening a fasta file 
+	or directory fails, and replaced with some suggestions.
+	- Fixed bug with RPM option that lead to warnings in db_helper.
+	- Simplified warning for duplicate lookup values in script 
+	merge_datasets.pl.
+	- Reorganized the POD summary and provided examples of usage 
+	for main data collection scripts, plus provide default values 
+	in POD summaries for a number of scripts. Thanks to Christian 
+	for the recommendation.
+
 v.1.16 (svn 794)
 	- Fixed critical bug that prevented the forward strand from 
 	being written when generating stranded coverage in script 
