@@ -19,7 +19,7 @@ use Bio::ToolBox::file_helper qw(
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -644,8 +644,8 @@ map_nucleosomes.pl --data <text|file> --thresh <number> [--options...]
   --db <text>
   --data <text|file>
   --thesh <number>
-  --win <integer>
-  --buf <integer>
+  --win <integer>       (145)
+  --buf <integer>       (5)
   --gff
   --type <gff_type>
   --source <gff_source>

@@ -13,7 +13,7 @@ eval {
 	$cluster_ok = 1;
 };
 
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 
@@ -214,10 +214,10 @@ run_cluster.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <jobname> 
-  --num <integer>
-  --run <integer>
-  --method [a|m]
-  --dist [c|a|u|x|s|k|e|b]
+  --num <integer>               (6)
+  --run <integer>               (200)
+  --method [a|m]                (m)
+  --dist [c|a|u|x|s|k|e|b]      (e)
   --version
   --help
 
