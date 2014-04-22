@@ -41,7 +41,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.15';
+my $VERSION = '1.17';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -1773,31 +1773,38 @@ A program to collect data for a list of features
 
 get_datasets.pl [--options...] [<filename>]
   
-  Options:
-  --new
+  Options for existing files:
   --in <filename>
-  --out filename
+  
+  Options for new files:
   --db <name | filename>
-  --ddb <name | filename>
   --feature <type | type:source | alias>, ...
+  --win <integer>                                           (500)
+  --step <integer>                                          (win)
+  
+  Options for data collection:
+  --ddb <name | filename>
   --data <none | file | type>, ...
-  --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
-  --value [score | count | length]
-  --log
-  --strand [all | sense | antisense]
+  --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]  (mean)
+  --value [score|count|length]                              (score)
+  --strand [all|sense|antisense]                            (all)
+  --force_strand
   --exons
+  --log
+  
+  Adjustments to features:
   --extend <integer>
   --start=<integer>
   --stop=<integer>
   --fstart=<decimal>
   --fstop=<decimal>
-  --pos [5 | m | 3]
+  --pos [5|m|3]                                             (5)
   --limit <integer>
-  --win <integer>
-  --step <integer>
-  --force_strand
+  
+  General options:
+  --out <filename>
   --gz
-  --cpu <integer>
+  --cpu <integer>                                           (2)
   --version
   --help
 
@@ -1806,11 +1813,6 @@ get_datasets.pl [--options...] [<filename>]
 The command line flags and descriptions:
 
 =over 4
-
-=item --new
-
-Generate a new table of features. Overrides any specified input file. 
-Requires a database and feature to be defined.
 
 =item --in <filename>
 
@@ -1838,13 +1840,6 @@ file), or when using an existing input file with the database indicated
 in the metadata. For more information about using annotation databases, 
 see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
-=item --ddb <name | filename>
-
-If the data to be collected is from a second database that is separate 
-from the annotation database, provide the name of the data database here. 
-Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
-is provided here. 
-
 =item --feature <type | type:source | alias>,...
 
 =item --feature genome
@@ -1859,6 +1854,24 @@ comma-delimited list (no spaces).
 
 To collect genomic intervals (or regions) simply specify 'genome' as 
 the feature type.
+
+=item --win <integer>
+
+When generating a new genome interval list (feature type 'genome'), 
+optionally specify the window size. The default size is defined in the 
+configuration file, biotoolbox.cfg. 
+
+=item --step <integer>
+
+Optionally indicate the step size when generating a new list of intervals 
+across the genome. The default is equal to the window size.
+
+=item --ddb <name | filename>
+
+If the data to be collected is from a second database that is separate 
+from the annotation database, provide the name of the data database here. 
+Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
+is provided here. 
 
 =item --data <type1,type2,type3&type4,...>
 
@@ -1886,7 +1899,7 @@ be local or remote (specified with a http: or ftp: prefix).
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
 
-=item --method [mean | median | stddev | min | max | range | sum | rpm | rpkm]
+=item --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -1906,7 +1919,7 @@ divided by the length of the feature requested (the Kilobase part in rpkm).
 Note that for mRNA or gene features, this will be the sum of the exon 
 lengths, not the gene or mRNA.
   
-=item --value [score | count | length]
+=item --value [score|count|length]
 
 Optionally specify the type of data value to collect from the dataset or 
 data file. Three values are accepted: score, count, or length. The default 
@@ -1915,13 +1928,6 @@ types of data values. Wig and BigWig files only support score and count;
 BigBed and database features support count and length and optionally 
 score; Bam files support basepair coverage (score), count (number of 
 alignments), and length.
-
-=item --log
-
-Indicate the dataset is (not) in log2 space. The log2 status of the dataset is 
-critical for accurately mathematically combining the dataset values in the 
-feature's genomic region. It may be determined automatically if the dataset 
-name includes the phrase "log2".
 
 =item --strand [all | sense | antisense]
 
@@ -1933,6 +1939,16 @@ attribute or Bio::DB::BigWigSet database) and Bam files (score coverage
 is not but count is). The default value is 'all', indicating all data 
 will be collected.  
 
+=item --force_strand
+
+For features that are not inherently stranded (strand value of 0)
+or that you want to impose a different strand, set this option when
+collecting stranded data. This will reassign the specified strand for
+each feature regardless of its original orientation. This requires the
+presence of a "strand" column in the input data file. This option only
+works with input file lists of database features, not defined genomic
+regions (e.g. BED files). Default is false.
+
 =item --exons
 
 Optionally indicate that data should be collected only over the exon 
@@ -1942,6 +1958,13 @@ are not defined, then CDS and UTR subfeatures are used, or the entire
 gene or transcript if no appropriate subfeatures are found. Note that 
 the options extend, start, stop, fstart, and fstop are ignored. 
 Default is false. 
+
+=item --log
+
+Indicate the dataset is (not) in log2 space. The log2 status of the dataset is 
+critical for accurately mathematically combining the dataset values in the 
+feature's genomic region. It may be determined automatically if the dataset 
+name includes the phrase "log2".
 
 =item --extend <integer>
 
@@ -1970,7 +1993,7 @@ fraction should be presented as a decimal number, e.g. 0.25. Prefix a
 negative sign to specify an upstream position. Both options must be 
 applied; one is not allowed. 
 
-=item --pos [5 | m | 3]
+=item --pos [5|m|3]
 
 Indicate the relative position of the feature with which the 
 data is collected when combined with the "start" and "stop" or "fstart" 
@@ -1984,27 +2007,6 @@ use the 5' end, or the start position of unstranded features.
 Optionally specify the minimum size limit for subfractionating a feature's 
 region. Used in combination with fstart and fstop to prevent taking a 
 subregion from a region too small to support it. The default is 1000 bp.
-
-=item --win <integer>
-
-When generating a new genome interval list (feature type 'genome'), 
-optionally specify the window size. The default size is defined in the 
-configuration file, biotoolbox.cfg. 
-
-=item --step <integer>
-
-Optionally indicate the step size when generating a new list of intervals 
-across the genome. The default is equal to the window size.
-
-=item --force_strand
-
-For features that are not inherently stranded (strand value of 0)
-or that you want to impose a different strand, set this option when
-collecting stranded data. This will reassign the specified strand for
-each feature regardless of its original orientation. This requires the
-presence of a "strand" column in the input data file. This option only
-works with input file lists of database features, not defined genomic
-regions (e.g. BED files). Default is false.
 
 =item --gz
 
@@ -2059,6 +2061,89 @@ The output file is a standard tim data formatted file, a tab delimited
 file format with each row a genomic feature and each column a dataset. 
 Metadata regarding the datasets are stored in comment lines at the beginning 
 of the file. The file may be gzipped.
+
+=head1 EXAMPLES
+
+These are some examples of some common scenarios for collecting data.
+
+=over 4
+
+=item Simple mean scores
+
+You want to collect the mean score from a bigWig file for each feature 
+in a BED file of intervals.
+
+  get_datasets.pl --data scores.bw --in input.bed
+
+=item Collect normalized counts
+
+You want to collect normalized read counts from a Bam file of alignments 
+for each feature in a BED file.
+
+  get_datasets.pl --data alignments.bam --method rpm --in input.bed
+
+=item Collect stranded RNASeq data
+
+You have stranded RNASeq data, and you would like to determine the 
+expression level for all genes in an annotation database.
+  
+  get_datasets.pl --db annotation --feature gene --data rnaseq.bam \
+  --strand sense --exons --method rpkm --out expression.txt
+
+=item Restrict to specific region
+
+You have ChIPSeq enrichment scores in a bigWig file and you now want 
+to score just the transcription start site of known transcripts in an 
+annotation database. Here you will restrict to 500 bp flanking the TSS.
+  
+  get_datasets.pl --db annotation --feature mRNA --start=-500 \
+  --stop=500 --pos 5 --data scores.bw --out tss_scores.txt
+
+=item Count intervals
+
+You have identified all possible transcription factor binding sites in 
+the genome and put them in a bigBed file. Now you want to count how 
+many exist in each upstream region of each gene.
+  
+  get_datasets.pl --db annotation --feature gene --start=-5000 \
+  --stop=0 --data tfbs.bb --method sum --value count --out tfbs_sums.txt
+
+=item Many datasets at once
+
+You can place multiple bigWig files in a single directory and treat it 
+as a data database, known as a BigWigSet. Each file becomes a database 
+feature, and you can interactively choose one or more from which to 
+collect. Each dataset is appended to the input file as new column.
+  
+  get_datasets.pl --ddb /path/to/bigwigset --in input.txt
+
+=item Stranded BigWig data
+
+You can generate stranded RNASeq coverage from a Bam file using the 
+BioToolBox script bam2wig.pl, which yields rnaseq_f.bw and rnaseq_r.bw 
+files. These are automatically interpreted as stranded datasets in a 
+BigWigSet context.
+  
+  get_datasets.pl --ddb /path/to/rnaseq/bigwigset --strand sense \
+  --in input.txt
+
+=item Binned coverage across the genome
+
+You are interested in sequencing depth across the genome to look for 
+depleted regions. You count reads in 1 kb intervals across the genome.
+  
+  get_datasets.pl --db genome.fasta --feature genome --win 1000 \
+  --data alignments.bam --value count --method sum --out coverage.txt
+
+=item Middle of feature
+
+You are interested in the maximum score in the central 50% of each 
+feature.
+  
+  get_datasets.pl --fstart=0.25 --fstop=0.75 --data scores.bw --in \
+  input.txt
+
+=back
 
 =head1 AUTHOR
 
