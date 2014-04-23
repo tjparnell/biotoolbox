@@ -1,6 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.17 (svn 806)
+v.1.17 (svn 808)
 	- Added six new method functions to Bio::ToolBox::Data for 
 	working with columns and metadata.
 	- Updated script correlate_position_data.pl with parallel 
