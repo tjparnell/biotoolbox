@@ -8,6 +8,7 @@ This guide is for new users looking to set up BioPerl and BioToolBox.
 ==Contents==
 	# [BioToolBoxSetUp#Before_you_begin Before you begin]
 	# [BioToolBoxSetUp#Version_of_Perl Version of Perl]
+		# [BioToolBoxSetUp#Using_PerlBrew_to_install_a_new_Perl Using PerlBrew to install a new Perl]
 	# [BioToolBoxSetUp#Local_or_Root Local or Root]
 		# [BioToolBoxSetUp#Installing_locally Installing locally]
 	# [BioToolBoxSetUp#Installing_Perl_Modules Installing Perl Modules]
@@ -36,19 +37,20 @@ This guide assumes a few things.
 ==Version of Perl==
 BioToolBox should run on any version of Perl that is at least version 5.8. Although, getting it installed is another issue. I have found that the older the version of Perl, the harder I have installing modules (more and more prerequisites need to be upgraded, sometimes with circular dependencies). This is especially true with 5.8. Version 5.10 doesn't seem too bad, and 5.12 and newer goes fairly smoothly.
 
+===Using PerlBrew to install a new Perl===
 If you find yourself with a linux computer with a geriatric version of Perl (e.g., Red Hat), you can try checking your package manager for a newer version that can be installed. If one is not available, you can install one from [http://www.cpan.org/src/README.html source]. But the absolute easiest way to do this, especially if you do not have administrative privileges on the server, is to use [http://perlbrew.pl Perlbrew]. To install, for example, perl 5.16 in your home directory, enter the following commands in a terminal.
 <pre>
 	curl -L http://install.perlbrew.pl | bash
 	echo "source ~/perl5/perlbrew/etc/bashrc" >> ~/.bashrc
 	source ~/.bashrc
 	perlbrew install-cpanm
-	perlbrew install -v --multi --thread --64all perl-5.16.4
+	perlbrew install -v --multi --thread --64all --as 5.16 perl-5.16.4
 	perlbrew clean
-	perlbrew use perl-5.16.4
+	perlbrew use 5.16
 </pre>
 The above commands will set up perlbrew, set up your environment to use perlbrew, install cpanminus package manager, install perl version 5.16 with threaded 64 bit support, clean up the installation files, and use the installed version. You can type `perlbrew help` on the command line for more information.
 
-Note that anytime you start a new terminal, you should run "`perlbrew use perl-X.XX`" to switch to that version of Perl, otherwise you will default to the system installed version.
+Note that anytime you start a new terminal session, you should run "`perlbrew use perl-X.XX`" to switch to that version of Perl, otherwise you will default to the system installed version. Alternatively, you can also use the command "`perlbrew switch`" command to always enable a specific Perl version whenever you start a new terminal session.
 
 ==Local or Root==
 If you are an administrator on the computer, then you can install BioPerl and other Perl modules in the system directories for multiple users. This can sometimes make things easier and avoids multiple installations. However, it's easier to break something, especially if you're not sure what you are doing.

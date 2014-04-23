@@ -24,6 +24,7 @@ These are notes specific for Mac OS X computers. For general information about s
 		# [SetupForMacOSX#Installing_MySQL_on_a_client_system Installing MySQL on a client system]
 	# [SetupForMacOSX#Installing_GD_Libraries Installing GD Libraries]
 	# [SetupForMacOSX#Installing_Perl_modules Installing Perl modules]
+		# [SetupForMacOSX#Notes_on_machine_architecture Notes on machine architecture]
 		# [SetupForMacOSX#Errors_regarding_GD Errors regarding GD]
 	# [SetupForMacOSX#Installing_GBrowse Installing GBrowse]
 		# [SetupForMacOSX#GBrowse_Prerequisites GBrowse Prerequisites]
@@ -38,7 +39,8 @@ These are notes specific for Mac OS X computers. For general information about s
 		# [SetupForMacOSX#Cleaning_up_after_GBrowse Cleaning up after GBrowse]
 	# [SetupForMacOSX#Additional_Tools Additional Tools]
 		# [SetupForMacOSX#Compiling_a_64-bit_liftOver_tool_on_OS_X Compiling a 64-bit liftOver tool on OS X]
-		# [SetupForMacOSX#Installing_MACS_and_other_Python_tools Installing MACS and other Python tools]
+		# [SetupForMacOSX#Installing_Python_via_Fink Installing Python via Fink]
+			# [SetupForMacOSX#Installing_MACS Installing MACS]
 		# [SetupForMacOSX#Installing_mfold Installing mfold]
 
 ==Prerequisites==
@@ -221,13 +223,16 @@ The third approach, and one that I favor, is to install them through Fink. Begin
 It should also install `libjpeg` and `libpng`, along with the appropriate libraries.
 
 ==Installing Perl modules==
-For the most part, installing Perl modules on a Mac is not much different than any other unix-based computer. The system-installed Perl is located in `/System/Library/Perl`, which you should never touch. The site library is located at `/Library/Perl`, which is where modules will be installed when you use the `sudo` option. These libraries are specific to your version of Perl; upgrading the OS will likely upgrade the system Perl, hence all modules will have to be re-installed. 
+For the most part, installing Perl modules on a Mac is not much different than any other unix-based computer. There are basically three different places where Perl modules may live.
+		# The system-installed Perl is located in `/System/Library/Perl`, which you basically cannot touch, nor should you ever.
+		# The site library is located at `/Library/Perl`, which is where modules will be installed when you use the `sudo` option. These libraries are specific to your version of Perl; upgrading the OS will likely upgrade the system Perl, hence all of these modules will have to be re-installed. If you plan on [SetupForMacOSX#Installing_GBrowse installing GBrowse], or you have a multi-user lab Mac, you should install your modules here using admin rights.
+		# If you are single user on a personal Mac and don't plan on installing GBrowse, then the simplest and easiest option is to install your Perl modules in your home directory using `local::lib`. These libraries, for the most part, will be unaffected when you upgrade the OS. Please refer to the 
+		# Technically, a fourth place to install modules is in a brand new Perl installation, either in your home directory, or someplace general, such as `/usr/local/`. You can use [http://perlbrew.pl Perlbrew] to manage and install newer versions of Perl.
 
-You are free to install Perl libraries in your home directory using `local::lib`. These libraries, for the most part, will be unaffected when you upgrade the OS.
+For more detailed information on [BioToolBoxSetUp#Installing_Perl_Modules installing Perl modules], either in your [BioToolBoxSetUp#Installing_locally home directory] or Site directory, or even [BioToolBoxSetUp#Using_PerlBrew_to_install_a_new_Perl installing your own Perl], please refer to the main BioToolBox [BioToolBoxSetUp setup guide].
 
+====Notes on machine architecture====
 Note that on Mac, many executables, including Perl oddly enough, are built with executable code for multiple machine architectures, including PowerPC (ppc), 32-bit Intel (i386), and 64-bit Intel (x86_64). Typically, only one is executed; for modern Macs, that would be x86_64. You may note occasional errors when compiling C code extensions that certain architectures are missing; these are mostly harmless and can be safely ignored.
-
-You can obtain more information about installing Perl modules by reading the corresponding documentation in the BioToolBox [BioToolBoxSetUp setup guide].
 
 ====Errors regarding GD====
 Note that on Mac OS X using libGD installed through Fink, I generally see test errors when installing the GD Perl module. I have been able to "`force install`" (ignoring the errors), and everything seems to still work. It seems to be just a bug with the test scripts, not with GD itself. Be forewarned.
@@ -444,31 +449,29 @@ To compile liftOver, move into its directory and issue "`make`".
 </pre>
 You should now have a 64-bit liftOver executable in `~/bin/x86_64/`.
 
-===Installing MACS and other Python tools===
-[http://liulab.dfci.harvard.edu/MACS/ MACS] is a popular tool for analyzing ChIP-Seq data. The author provides a pre-compiled package for Debian and Ubuntu linux, but for Mac OS X users, we will need to install through source. 
+===Installing Python via Fink===
+There are an increasing number of useful programs written in the Python language. One of my favorites is the  tool for analyzing ChIPSeq data. Mac OS X includes a Python interpretor, which you could use use, or you can install your own. If you are using an older version of OS X (like 10.6) I would recommend installing your own. The consensus from several different web sources suggest it's genrally better to install your own interpretor, probably much like Perl.
 
-MACS was written using the Python language. Mac OS X includes a Python interpretor, but the consensus from several web sources suggest it's better to install your own interpretor. I am not a Python expert, but in my experience trying to install Python libraries in the system directories have been frustrating (at least on 10.6), so I tend to agree with this view. The main problem is that 10.6 includes Python 2.6, but some programs (like MACS and bio-python) prefer the latest Python version 2.7. Note: OS X 10.7 now includes Python 2.7.
+Installing your own Python interpretor is easy with Fink. The nice thing about Finks is it takes care of all the dependencies for you and will install useful libraries, such as numpy and scipy. 
 
-Fortunately, I have found many of these libraries can be installed automatically using Fink. These instructions should generally work for any other Python-based programs as well. Use the commands below to install Python 2.7 and some popular Python libraries required for MACS.
+Issue the following command. Provide your `sudo` password when requested. Note that this will take a while, considering that it must compile some 50 packages, including an updated Gnu C Compiler (sigh).
 <pre>
-	sudo fink install python
-	sudo fink install setuptools-py27 numpy-py27 biopython-py27 cython-py27
+	fink install python python-py27 scipy-py27 numpy-py27 biopython-py27 
 </pre>
 
-To ensure that the Fink version of Python is used in programs and not the system version, especially for all users, edit the main Bash initialization script `/etc/bashrc` and add the following line. You could alternatively edit your `.bashrc` or `.profile` files in your home directory.
+You should now have python installed under `/sw/bin/`, which you can verify running the "`which python`" command.
+
+====Installing MACS====
+[http://liulab.dfci.harvard.edu/MACS/ MACS] is a popular tool for analyzing ChIP-Seq data. Currently, there are two versions available, the standard release 1.4, and the new, improved, beta version release 2.0. You can install both, or pick one. I recommend the version 2 release because of numerous improvements and because it is the preferred version going forward. You can obtain the version from the [https://github.com/taoliu/MACS/downloads GitHub repository] or by searching the [https://pypi.python.org/pypi?%3Aaction=search&term=macs2&submit=search Python Package Index]. 
+
+To install MACS, download the package, unpack the archive, and move into the directory. Issue the following command to install.
 <pre>
-	export PYTHONPATH=/sw/lib/python2.7/site-packages
+	python setup.py install
 </pre>
 
-To install MACS, download the source code packages from the MACS [https://github.com/taoliu/MACS/downloads GitHub repository]. Currently, there are two versions available, the standard release 1.4, and the new, improved, but experimental, release 2.0. You can install both, or pick one. Unpack the archive and move into the directory. Issue the following command to install.
-<pre>
-	sudo python setup.py install
-</pre>
+If you are installing into either the python library you installed under Fink or the system library, you will want to prepend the command with "`sudo`".
 
-The setup script will install the libraries under the Fink Python directories, as well as the executable scripts under `/sw`. However, I prefer to keep the scripts in package-specific directories under `/usr/local/`. To do this, I install with this option.
-<pre>
-	sudo python setup.py install --install-scripts=/usr/local/MACS
-</pre>
+If you using the system-installed Python, but don't have `sudo` access, you can install into your own home directory. Just add the option "`--prefix /Users/username/Library`" to the setup command.
 
 ===Installing mfold===
 [http://mfold.rna.albany.edu/?q=mfold/download-mfold mfold] is a venerable software for predicting secondary structures of nucleic acid, typically RNA but also DNA. It has been superseded by another package which requires a license, but mfold is still freely available. This is my guide for getting it installed.
