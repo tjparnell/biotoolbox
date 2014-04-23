@@ -16,7 +16,7 @@ verify_nucleosome_mapping.pl `[`--options...`]` <**filename>
   --db <text>
   --data <text | filename>
   --filter
-  --max <integer>
+  --max <integer>           (30)
   --recenter
   --out <filename> 
   --gz

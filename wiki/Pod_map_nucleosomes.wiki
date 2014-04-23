@@ -17,8 +17,8 @@ map_nucleosomes.pl --data <**text|file> --thresh <**number> `[`--options...`]`
   --db <text>
   --data <text|file>
   --thesh <number>
-  --win <integer>
-  --buf <integer>
+  --win <integer>       (145)
+  --buf <integer>       (5)
   --gff
   --type <gff_type>
   --source <gff_source>

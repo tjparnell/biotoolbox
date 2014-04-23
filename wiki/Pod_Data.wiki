@@ -94,7 +94,7 @@ This module works with the primary Bio::!ToolBox** Data structure. Simply, it  i
 new()
 
 __
-  Initialize a new Data structure. This generally requires options,  provided as an array of key => values. A new list of features  may be obtained from an annotation database, an existing file  may be loaded, or a new empty structure may be generated.
+  Initialize a new Data structure. This generally requires options,  provided as an array of key => values. A new list of features  may be obtained from an annotation database or an existing file  may be loaded. If you do not pass any options, a new empty  structure will be generated for you to populate.
 __
   __
   These are the options available.
@@ -224,8 +224,14 @@ __
 __
   __
 ===The Data table===
-The Data table is the array of arrays containing all of the  actual information. It has some metadata as well.
+The Data table is the array of arrays containing all of the  actual information.
 
+list_columns
+
+__
+  Returns an array or array reference of the column names  in ascending (left to right) order.
+__
+  __
 number_columns
 
 __
@@ -238,10 +244,28 @@ __
   Returns the array index number of the last row.  Since the header row is index 0, this is also the  number of actual content rows.
 __
   __
+column_values($index)
+
+__
+  Returns an array or array reference representing the values  in the specified column. This includes the column header as  the first element. Pass the method the column index.
+__
+  __
 add_column($name)
 
 __
-  Appends a new empty column to the Data table at the  rightmost position (highest index). It adds the column  header name and creates a new column metadata hash.  But it doesn't actually fill values in every row.  It returns the new column index.
+add_column(\@column_data)
+
+__
+  Appends a new column to the Data table at the  rightmost position (highest index). It adds the column  header name and creates a new column metadata hash.  Pass the method one of two possibilities. Pass a text  string representing the new column name, in which case  no data will be added to the column. Alternatively, pass  an array reference, and the contents of the array will  become the column data. If the Data table already has  rows, then the passed array reference must have the same  number of elements.
+__
+  __
+  It returns the new column index if successful.
+__
+  __
+copy_column($index)
+
+__
+  This will copy a column, appending the duplicate column at  the rightmost position (highest index). It will duplicate  column metadata as well. It will return the new index  position.
 __
   __
 delete_column($index1, $index2, ...)
@@ -289,6 +313,12 @@ __
 ===Column Metadata===
 Each column has metadata. Each metadata is a series of key =>  value pairs. The minimum keys are 'index' (the 0-based index  of the column) and 'name' (the column header name). Additional  keys and values may be queried or set as appropriate. When the  file is written, these are stored as commented metadata lines at  the beginning of the file.
 
+name($index)
+
+__
+  Convenient method to return the name of the column given the  index number.
+__
+  __
 metadata($index, $key)
 
 __
@@ -299,6 +329,15 @@ __
 __
   __
   This may also be used to add a new metadata key. Simply provide  the name of a new $key that is not present
+__
+  __
+  If no key is provided, then a hash or hash reference is returned  representing the entire metadata for that column.
+__
+  __
+copy_metadata($source, $target)
+
+__
+  This method will copy the metadata (everything except name and  index) between the source column and target column. Returns 1 if  successful.
 __
   __
 delete_metadata($index, $key);
@@ -340,6 +379,20 @@ __
 ===Efficient Data Access===
 Most of the time we need to iterate over the Data table, one row  at a time, collecting data or processing information. These methods  simplify the process.
 
+iterate(sub {})
+
+__
+  This method will process a code reference on every row in the data  table. Pass a subroutine or code reference. The subroutine will  receive the row as a Bio::!ToolBox**::Data::Feature object. With this  object, you can retrieve values, set values, and add new values.  For example
+__
+  __
+{{{
+    $Data->iterate( sub {
+       my $row = shift;
+       my $number = $row->value($index);
+       my $log_number = log($number);
+       $row->value($index, $log_number);
+    } );
+}}}
 row_stream()
 
 __
