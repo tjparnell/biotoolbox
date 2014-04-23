@@ -873,10 +873,12 @@ sub calculate_strand_correlation {
 			# calculate correlation
 			my $stat = Statistics::LineFit->new();
 			$stat->setData(\@r, \@f) or warn " bad data!\n";
-			my $r2 = $stat->rSquared();
-			push @r2_values, $r2;
+			my $r2 = $stat->rSquared() || 0;
+				# this may produce errors when all values are equal
+				# as might happen with high duplicate coverage 
 			
 			# check correlation
+			push @r2_values, $r2;
 			if ($r2 >= $correlation_min and $r2 > $best_r) {
 				# record new values
 				$best_shift = $i * 10;
@@ -2281,8 +2283,8 @@ bam2wig.pl [--options...] <filename.bam>
   Shift options:
   --shift
   --shiftval <integer>
-  --sample <integer>                                (200)
   --chrom <integer>                                 (2)
+  --sample <integer>                                (200)
   --minr <float>                                    (0.25)
   --model
   
@@ -2430,11 +2432,6 @@ The value should be 1/2 the average length of the insert library
 that was sequenced. The default is to empirically determine the 
 appropriate shift value. See below for the approach.
 
-=item --sample <integer>
-
-Indicate the number of top regions to sample when empirically 
-determining the shift value. The default is 200.
-
 =item --chrom <integer>
 
 Indicate the number of sequences or chromosomes to sample when 
@@ -2442,6 +2439,12 @@ empirically determining the shift value. The reference sequences
 listed in the Bam file header are taken in order of decreasing 
 length, and one or more are taken as a representative sample of 
 the genome. The default value is 2. 
+
+=item --sample <integer>
+
+Indicate the number of top coverage regions from each chromosome 
+scanned to sample when empirically determining the shift value. 
+The default is 200.
 
 =item --minr <float>
 
