@@ -20,7 +20,7 @@ Experienced users who are familiar with Perl and [http://www.cpan.org CPAN] can 
 ===Super easy install===
 To install BioToolBox in your home folder, using the default system-installed Perl, copy and paste the following command in a terminal.
 <pre>
-	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::Perl Bio::ToolBox
+	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::Root::Version Bio::ToolBox
 </pre>
 
 This may or may not fail, depending on the number of dependencies that must be installed. Repeat two or thee times as necessary until it installs correctly. Or follow the steps below or consult the guides listed above.
@@ -44,8 +44,10 @@ The following modules are not required to be installed, but they will likely inc
 
 I find installing BioPerl separately helps to confront potential issues up front, but this step is not required, as it would be installed anyway as a dependency for BioToolBox.
 <pre>
-	cpanm Bio::Perl
+	cpanm Bio::Root::Version
 </pre>
+
+*Note*: You may encounter issues installing the current version of Bio::Perl, version 1.6.923. The CPAN Testers report is riddled with failures for this version. Instead, install the previous version, [http://search.cpan.org/~cjfields/BioPerl-1.6.922/ 1.6.922]. The changes are minor, but you will save yourself headaches.
 
 Now you can install BioToolBox.
 <pre>

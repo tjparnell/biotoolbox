@@ -104,7 +104,7 @@ If you wish to install it into the system libraries, add a `-S` option. This wil
 This will install an executable, `cpanm`, which you will then use to install any other perl module. It should automatically identify and install dependencies as necessary. For example,
 <pre>
 	cpanm Some::Module
-	cpanm Bio::Perl Bio::ToolBox
+	cpanm Bio::Root::Version Bio::ToolBox
 </pre>
 That is pretty much all there is to it. Simple, right?
 
@@ -177,12 +177,14 @@ The BioToolBox package relies heavily on the [http://www.BioPerl.org/wiki/Main_P
 
 If you have cpanminus installed, you can use that.
 <pre>
-	cpanm Bio::Perl
+	cpanm Bio::Root::Version
 </pre>
 Or if you are using the cpan shell
 <pre>
-	> install Bio::Perl
+	> install Bio::Root::Version
 </pre>
+
+*Note*: You may encounter issues installing the current version of Bio::Perl, version 1.6.923. The CPAN Testers report is riddled with failures for this version. Instead, install the previous version, [http://search.cpan.org/~cjfields/BioPerl-1.6.922/ 1.6.922]. The changes are minor, but you will save yourself headaches.
 
 Alternatively, you can always download the source and build it following the instructions within. Depending upon your current setup, there may or may not be a number of dependencies, that should be automatically installed for you.
 
