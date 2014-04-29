@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.17;
+our $VERSION = 1.18;
 
 =head1 NAME
 
@@ -455,124 +455,14 @@ Called from a Bio::ToolBox::Data::Iterator object, it returns a
 Bio::ToolBox::Data::Feature object. This object represents the 
 values in the current Data table row.
 
-=back
-
-=head2 Bio::ToolBox::Data::Feature Methods
-
-These are methods for working with the current data row generated 
-using the next_row() method from a row_stream iterator.
-
-=over 4
-
-=item seq_id
-
-=item start
-
-=item end
-
-=item strand
-
-=item name
-
-=item type
-
-=item id
-
-These methods return the corresponding appropriate value, if 
-present. These rely on the corresponding find_column methods.
-
-=item value($index)
-
-=item value($index, $new_value)
-
-Returns or sets the value at a specific column index in the 
-current data row.
-
-=back
-
-The next three functions are convenience methods for using the 
-attributes in the current data row to interact with databases. 
-They are wrappers to methods in the Bio::ToolBox::db_helper 
-module.
-
-=over 4
-
-=item feature
-
-Returns a SeqFeature object from the database using the name and 
-type values in the current Data table row. The SeqFeature object 
-is requested from the database named in the general metadata. If 
-an alternate database is desired, you should change it first using  
-the general database() method. If the feature name or type is not 
-present in the table, then nothing is returned.
-
-=item segment
-
-Returns a database Segment object corresponding to the coordinates 
-defined in the Data table row. The database named in the general 
-metadata is used to establish the Segment object. If a different 
-database is desired, it should be changed first using the 
-general database() method. 
-
-=item get_score(%args)
-
-This is a convenience method for the 
-Bio::ToolBox::db_helper::get_chromo_region_score() method. It 
-will return a single score value for the region defined by the 
-coordinates or typed named feature in the current data row. If 
-the Data table has coordinates, then those will be automatically 
-used. If the Data table has typed named features, then the 
-coordinates will automatically be looked up for you by requesting 
-a SeqFeature object from the database.
-
-The name of the dataset from which to collect the data must be 
-provided. This may be a GFF type in a SeqFeature database, a 
-BigWig member in a BigWigSet database, or a path to a BigWig, 
-BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the Bio::ToolBox::db_helper::
-get_chromo_region_score() method for full details.
-
-Here is an example of collecting mean values from a BigWig 
-and adding the scores to the Data table.
-  
-  my $index = $Data->add_column('MyData');
-  my $stream = $Data->row_stream;
-  while (my $row = $stream->next_row) {
-     my $score = $row->get_score(
-        'method'    => 'mean',
-        'dataset'   => '/path/to/MyData.bw',
-     );
-     $row->value($index, $score);
-  }
-
-=item get_position_scores(%args)
-
-This is a convenience method for the Bio::ToolBox::db_helper::
-get_region_dataset_hash() method. It will return a hash of 
-positions =E<gt> scores over the region defined by the 
-coordinates or typed named feature in the current data row. 
-The coordinates for the interrogated region will be 
-automatically provided.
-
-Just like the get_score() method, the dataset from which to 
-collect the scores must be provided, along with any other 
-optional arguments. See the documentation for the 
-Bio::ToolBox::db_helper::get_region_dataset_hash() method 
-for more details.
-
-Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a BigWigSet directory.
+An example using the iterator is shown below.
   
   my $stream = $Data->row_stream;
   while (my $row = $stream->next_row) {
-     my %position2score = $row->get_position_scores(
-        'ddb'       => '/path/to/BigWigSet/',
-        'dataset'   => 'MyData',
-        'position'  => 5,
-        'start'     => -500,
-        'stop'      => 500,
-     )
-     # do something with %position2score
+     # each $row is a Bio::ToolBox::Data::Feature object
+     # representing the row in the data table
+     my $value = $row->value($index);
+     # do something with $value
   }
 
 =back
@@ -693,7 +583,7 @@ Flag to use the midpoint instead of actual start and stop coordinates.
 
 =back
 
-=head2 Data Table File Functions
+=head2 File Functions
 
 When you are finished modifying the Data table, it may then be written out 
 as a tabbed-delimited text file. If the format corresponds to a valide BED or 
@@ -823,6 +713,151 @@ Flag to use the midpoint instead of actual start and stop coordinates.
 =back
 
 =back
+
+=head1 Bio::ToolBox::Data::Feature METHODS
+
+A Bio::ToolBox::Data::Feature is an object representing a row in the 
+data table. Usually, this in turn represents an annotated feature or 
+segment in the genome. As such, this object provides shortcuts for 
+working with these features.
+
+Feature objects are generated using the next_row() method from a 
+Bio::ToolBox::Data::Iterator object (generated itself from the 
+$Data-E<gt>row_stream() function), or the $Data-E<gt>iterate() function.
+
+=head2 Methods to access row feature values
+
+=over 4
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item strand
+
+=item name
+
+=item type
+
+=item id
+
+These methods return the corresponding appropriate value, if 
+present. These rely on the corresponding find_column methods.
+
+=item value($index)
+
+=item value($index, $new_value)
+
+Returns or sets the value at a specific column index in the 
+current data row.
+
+=item row_values
+
+Returns an array or array reference representing all the values 
+in the current data row. 
+
+=item row_index
+
+Returns the index position of the current data row within the 
+data table. Useful for knowing where you are at within the data 
+table.
+
+=back
+
+=head2 Convenience Methods to database functions
+
+The next three functions are convenience methods for using the 
+attributes in the current data row to interact with databases. 
+They are wrappers to methods in the Bio::ToolBox::db_helper 
+module.
+
+=over 4
+
+=item feature
+
+Returns a SeqFeature object from the database using the name and 
+type values in the current Data table row. The SeqFeature object 
+is requested from the database named in the general metadata. If 
+an alternate database is desired, you should change it first using  
+the $Data-E<gt>database() method. If the feature name or type is not 
+present in the table, then nothing is returned.
+
+=item segment
+
+Returns a database Segment object corresponding to the coordinates 
+defined in the Data table row. The database named in the general 
+metadata is used to establish the Segment object. If a different 
+database is desired, it should be changed first using the 
+general database() method. 
+
+=item get_score(%args)
+
+This is a convenience method for the 
+Bio::ToolBox::db_helper::get_chromo_region_score() method. It 
+will return a single score value for the region defined by the 
+coordinates or typed named feature in the current data row. If 
+the Data table has coordinates, then those will be automatically 
+used. If the Data table has typed named features, then the 
+coordinates will automatically be looked up for you by requesting 
+a SeqFeature object from the database.
+
+The name of the dataset from which to collect the data must be 
+provided. This may be a GFF type in a SeqFeature database, a 
+BigWig member in a BigWigSet database, or a path to a BigWig, 
+BigBed, Bam, or USeq file. Additional parameters may also be 
+specified; please see the Bio::ToolBox::db_helper::
+get_chromo_region_score() method for full details.
+
+Here is an example of collecting mean values from a BigWig 
+and adding the scores to the Data table.
+  
+  my $index = $Data->add_column('MyData');
+  my $stream = $Data->row_stream;
+  while (my $row = $stream->next_row) {
+     my $score = $row->get_score(
+        'method'    => 'mean',
+        'dataset'   => '/path/to/MyData.bw',
+     );
+     $row->value($index, $score);
+  }
+
+=item get_position_scores(%args)
+
+This is a convenience method for the Bio::ToolBox::db_helper::
+get_region_dataset_hash() method. It will return a hash of 
+positions =E<gt> scores over the region defined by the 
+coordinates or typed named feature in the current data row. 
+The coordinates for the interrogated region will be 
+automatically provided.
+
+Just like the get_score() method, the dataset from which to 
+collect the scores must be provided, along with any other 
+optional arguments. See the documentation for the 
+Bio::ToolBox::db_helper::get_region_dataset_hash() method 
+for more details.
+
+Here is an example for collecting positioned scores around 
+the 5 prime end of a feature from a BigWigSet directory.
+  
+  my $stream = $Data->row_stream;
+  while (my $row = $stream->next_row) {
+     my %position2score = $row->get_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'start'     => -500,
+        'stop'      => 500,
+     )
+     # do something with %position2score
+  }
+
+=back
+
+
+
+
 
 =cut
 
