@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.15';
+my $VERSION = '1.18';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -559,8 +559,8 @@ sub load_extra_ensembl_data {
 		$fh->close;
 	}
 	
-	# done
-	return \%data;
+	# done, return reference if we loaded data
+	return %data ? \%data : undef; 
 }
 
 
@@ -878,16 +878,23 @@ sub generate_new_gene {
 	# Set the gene name
 	# in most cases this will be the name2 item from the gene table
 	# except for some ncRNA and ensGene transcripts
-	my ($name, $id);
-	if ($linedata->{name} =~ /^ENS/i) {
-		# an ensGene transcript, look up the common name if possible
+	my ($name, $id, $alias);
+	if ($ensembldata and exists $ensembldata->{ $linedata->{name} } ) {
+		# we will automatically check ensembl data for a matching name 
+		# this should not interfere with refGene names
+		# not all ensGene names may use an ENS prefix, e.g. fly transcripts
+		
+		# we may not actually have a name though....
 		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
 			
 			# use the common name as the gene name
 			$name  = $ensembldata->{ $linedata->{name} }->[0];
 			
 			# use the name2 identifier as the ID
-			$id = $linedata->{name2};   
+			$id = $linedata->{name2}; 
+			
+			# set the original identifier as an alias
+			$alias = $linedata->{name2};
 		}
 		else {
 			# use the name2 value
@@ -941,8 +948,8 @@ sub generate_new_gene {
 	
 	# add the original ENS* identifier as an Alias in addition to ID
 	# for ensGene transcripts
-	if ($linedata->{name} =~ /^ENS/i) {
-		$gene->add_tag_value('Alias', $linedata->{name2});
+	if ($alias) {
+		$gene->add_tag_value('Alias', $alias);
 	}
 	
 	# update extra attributes as necessary
@@ -992,10 +999,13 @@ sub generate_new_transcript {
 		
 		# check if we have a ensGene transcript, we may have the type
 		if (
-			$linedata->{name} =~ /^ENS/i and 
+			$ensembldata and 
+			exists $ensembldata->{ $linedata->{name} } and
 			defined $ensembldata->{ $linedata->{name} }->[1]
 		) {
-			# this is a ensGene transcript
+			# this looks like an ensGene transcript
+			# we just go ahead and check the ensembl data for a match
+			# since not all ensGene names use the ENS prefix and are easily identified
 			
 			# these should be fairly typical standards
 			# snRNA, rRNA, pseudogene, etc
@@ -1033,14 +1043,16 @@ sub generate_new_transcript {
 	
 	
 	# add the Ensembl Gene name if it is an ensGene transcript
-	if ($linedata->{name} =~ /^ENS/i) {
+	if (
+		$ensembldata and 
+		exists $ensembldata->{ $linedata->{name} } and
+		defined $ensembldata->{ $linedata->{name} }->[0]
+	) {
 		# if we have loaded the EnsemblGeneName data hash
 		# we should be able to find the real gene name
-		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
-			# we will put the common gene name as an alias
-			$transcript->add_tag_value('Alias', 
-				$ensembldata->{ $linedata->{name} }->[0] );
-		}
+		# we will put the common gene name as an alias
+		$transcript->add_tag_value('Alias', 
+			$ensembldata->{ $linedata->{name} }->[0] );
 	}
 	
 	# add gene name as an alias
