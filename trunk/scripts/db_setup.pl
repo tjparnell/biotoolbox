@@ -21,7 +21,7 @@ eval {
 
 
 
-my $VERSION = '1.15';
+my $VERSION = '1.18';
 
 print "\n This program will set up an annotation database\n\n";
 
@@ -45,11 +45,13 @@ my (
 	$help,
 	$print_version,
 );
+my @tables;
 
 # Command line options
 GetOptions( 
 	'db=s'      => \$ucscdb, # the UCSC database shortname
 	'path=s'    => \$path, # the optional path for the database
+	'table=s'   => \@tables, # which tables to collect
 	'keep!'     => \$keep, # keep the annotation files
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -103,13 +105,21 @@ else {
 		mkdir $path or die "unable to make database path $path\n$!\n"; 
 	}
 }
-
-
+if (@tables) {
+	if ($tables[0] =~ /,/) {
+		my $t = shift @tables;
+		@tables = split /,/, $t;
+	}
+}
+else {
+	@tables = qw(refgene ensgene knowngene);
+}
 
 ### Get UCSC annotation
 print "##### Fetching annotation from UCSC. This may take a while ######\n";
-system(File::Spec->catdir($Bin, 'ucsc_table2gff3.pl'), '--db', $ucscdb, '--ftp', 'all', 
-	'--gz') == 0 or die "unable to execute ucsc_table2gff3 script!\n";
+system(File::Spec->catdir($Bin, 'ucsc_table2gff3.pl'), '--db', $ucscdb, '--ftp', 
+	join(',', @tables), '--gz') == 0 or 
+	die "unable to execute ucsc_table2gff3 script!\n";
 my @gff = glob("$ucscdb*.gff3.gz");
 my @source = glob("$ucscdb*.txt.gz");
 unless (@gff) {
@@ -203,6 +213,7 @@ db_setup.pl [--options...] <UCSC database>
   Options:
   --db <UCSC database>
   --path </path/to/store/database> 
+  --table [refGene|ensGene|knownGene|xenoRefGene|all]
   --keep
   --version
   --help
@@ -225,6 +236,12 @@ sacCer3, etc.
 
 Specify the optional path to store the SQLite database file. The default 
 path is the C<~/lib>.
+
+=item --table [refGene|ensGene|knownGene|xenoRefGene|all]
+
+Provide one or more UCSC tables to load into the database. They may be 
+specified as comma-delimited list (no spaces) or as separate, repeated 
+arguments. The default is refGene, ensGene, and knownGene (if available).
 
 =item --keep
 
