@@ -559,17 +559,30 @@ sub open_db_connection {
 			
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
-				# open using the Fasta adaptor
-				undef $@;
-				eval {
-					# to prevent annoying error messages
-					local $SIG{__WARN__} = sub {}; 
-					$db = Bio::DB::Fasta->new($database);
-				};
+				# we have an option of using two different Fasta adaptors
+				
+				# we prefer to use the samtools fasta indexer because it is faster
+				# since it uses low level C code for indexing and retrieval
+				# if that's not available we can use the BioPerl index 
+				
+				if ($BAM_OK) {
+					# use Bio::DB::Sam::Fai
+					$db = open_sam_fasta($database);
+				}
+				
 				unless ($db) {
-					$error = " ERROR: could not open fasta file '$database'!\n";
-					if (-e "$database\.index") {
-						$error .= "   Try deleting $database\.index and try again\n";
+					# fall back to Bio::DB::Fasta
+					undef $@;
+					eval {
+						# to prevent annoying error messages
+						local $SIG{__WARN__} = sub {}; 
+						$db = Bio::DB::Fasta->new($database);
+					};
+					unless ($db) {
+						$error = " ERROR: could not open fasta file '$database'!\n";
+						if (-e "$database\.index") {
+							$error .= "   Try deleting $database\.index and try again\n";
+						}
 					}
 				}
 			}
