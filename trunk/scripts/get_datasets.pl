@@ -35,13 +35,16 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
+
 my $parallel;
 eval {
 	# check for parallel support
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.17';
+
+use constant LOG2 => log(2);
+my $VERSION = '1.18';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -134,35 +137,6 @@ if ($print_version) {
 	exit;
 }
 
-
-# Check for required values
-unless ($infile) {
-	if (@ARGV) {
-		$infile = shift @ARGV;
-	}
-	else {
-		# we will assume the user wants to make a new file
-		$new = 1;
-	}
-}
-if ($new) {
-	unless ($outfile) {
-		die " You must define an output filename!";
-	}
-	unless ($feature) {
-		die  " You must define an input file or new feature type! see help\n";
-	}
-}
-if (defined $start_adj or defined $stop_adj) {
-	unless (defined $start_adj and defined $stop_adj) {
-		die " You must define both start and stop coordinate adjustments!\n";
-	}
-}
-if (defined $fstart or defined $fstop) {
-	unless (defined $fstart and defined $fstop) {
-		die " You must define both fstart and fstop coordinate adjustments!\n";
-	}
-}
 
 
 # Assign default values
@@ -337,6 +311,35 @@ sub set_defaults {
 	# these are all global values that could've been assigned on the 
 	# command line
 	
+	# Check for required values
+	unless ($infile) {
+		if (@ARGV) {
+			$infile = shift @ARGV;
+		}
+		else {
+			# we will assume the user wants to make a new file
+			$new = 1;
+		}
+	}
+	if ($new) {
+		unless ($outfile) {
+			die " You must define an output filename!";
+		}
+		unless ($feature) {
+			die  " You must define an input file or new feature type! see help\n";
+		}
+	}
+	if (defined $start_adj or defined $stop_adj) {
+		unless (defined $start_adj and defined $stop_adj) {
+			die " You must define both start and stop coordinate adjustments!\n";
+		}
+	}
+	if (defined $fstart or defined $fstop) {
+		unless (defined $fstart and defined $fstop) {
+			die " You must define both fstart and fstop coordinate adjustments!\n";
+		}
+	}
+	
 	# check parallel support
 	if ($parallel) {
 		# conservatively enable 2 cores
@@ -395,7 +398,7 @@ sub set_defaults {
 	# check the type of value to collect
 	if (defined $value_type) {
 		# validate the requested value type
-		unless ($value_type =~ m/^score|count|length/) {
+		unless ($value_type =~ m/^(?:score|count|length)$/) {
 			die " unknown value type '$value_type'!\n";
 		}
 	}
@@ -409,7 +412,7 @@ sub set_defaults {
 	# check strandedness of data to collect
 	if (defined $stranded) { 
 		# check the strand request that was defined on the command line
-		unless ($stranded =~ m/^all|antisense|sense$/i) {
+		unless ($stranded =~ m/^(?:all|antisense|sense)$/i) {
 			die " unknown strand '$stranded'!";
 		}
 	} 
@@ -431,7 +434,7 @@ sub set_defaults {
 	# check the relative position
 	if (defined $position) {
 		# check the position value
-		unless ($position =~ m/^5|4|3|m$/i) {
+		unless ($position =~ m/^(?:5|4|3|m)$/i) {
 			die " Unknown relative position '$position'!\n";
 		}
 		$position =~ s/m/4/i # change to match internal usage
@@ -1517,21 +1520,42 @@ sub get_subfeature_dataset {
 		}
 		
 		
+		# Order and collapse the subfeatures
+		# we don't want overlapping features
+		my @sorted_features =   map {$_->[1]} 
+								sort {$a->[0] <=> $b->[0]} 
+								map { [$_->start, $_] } 
+								@features_to_check;
+		my @subfeatures;
+		my $current = shift @sorted_features;
+		while ($current) {
+			if (@sorted_features) {
+				my $next = shift @sorted_features;
+				if ($current->overlaps($next) ) {
+					# overlapping features, so reassign the end point to that of the next
+					$current->end($next->end);
+				}
+				else {
+					# no overlap, keep current, next becomes current
+					push @subfeatures, $current;
+					$current = $next;
+				}
+			}
+			else {
+				# no more features
+				push @subfeatures, $current;
+				undef $current;
+			}
+		}
+		
+		
 		# Collect the subfeature values and summed length
-		my %feature_values;
-		my %duplicate_check;
 		my $gene_length = 0;
-		foreach my $subfeat (@features_to_check) {
+		my @scores;
+		foreach my $subfeat (@subfeatures) {
 			# we don't want a single value for each subfeature
 			# rather we will collect the raw scores and then combine them
 			# ourselves later
-			
-			# since there may be duplicate subfeatures, for example 
-			# shared exons form alternate mRNA transcripts, we need to 
-			# avoid these
-			next if exists $duplicate_check{ $subfeat->start }{ $subfeat->end };
-			# then record this one
-			$duplicate_check{ $subfeat->start }{ $subfeat->end } = 1;
 			
 			# we will use the indexed score function, which returns a 
 			# hash of postions and scores, but we'll just take the scores
@@ -1552,14 +1576,7 @@ sub get_subfeature_dataset {
 			);
 			
 			# record the values
-			# we need to make sure we don't take duplicate scores, thus inappropriately 
-			# inflating the score values for duplicate subfeature, for example with 
-			# shared exons between alternate transcripts
-			# this hash might get really big
-			foreach my $p (keys %pos2scores) {
-				# we might overwrite identical positions, but they should be same
-				$feature_values{$p} = $pos2scores{$p};
-			}
+			push @scores, values %pos2scores;
 			
 			# record the subfeature length
 				# potential bug if we have overlapping sub features <sigh>
@@ -1571,7 +1588,7 @@ sub get_subfeature_dataset {
 		# Calculate the final score
 		
 		# no data collected!? record null or zero value
-		unless (%feature_values) {
+		unless (@scores) {
 			if ($method =~ /sum|count|rpm|rpkm/) {
 				$main_data_ref->{'data_table'}->[$row][$index] = 0;
 			}
@@ -1583,61 +1600,59 @@ sub get_subfeature_dataset {
 		
 		# convert log2 values if necessary
 		if ($main_data_ref->{$index}{'log2'}) {
-			foreach (keys %feature_values) {
-				$feature_values{$_} = 2 ** $feature_values{$_};
-			}
+			@scores = map {2 ** $_} @scores;
 		}
 		
 		# final score is calculated according to the requested method
 		my $parent_score;
 		if ($method eq 'median') {
 			# take the median value
-			$parent_score = median(values %feature_values);
+			$parent_score = median(@scores);
 		}
 		elsif ($method eq 'mean') {
 			# or take the mean value
-			$parent_score = mean(values %feature_values);
+			$parent_score = mean(@scores);
 		} 
 		elsif ($method eq 'range') {
 			# or take the range value
 			# this is 'min-max'
-			$parent_score = range(values %feature_values);
+			$parent_score = range(@scores);
 		}
 		elsif ($method eq 'stddev') {
 			# or take the standard deviation value
 			# we are using the standard deviation of the population, 
 			# since these are the only scores we are considering
-			$parent_score = stddevp(values %feature_values);
+			$parent_score = stddevp(@scores);
 		}
 		elsif ($method eq 'min') {
 			# or take the minimum value
-			$parent_score = min(values %feature_values);
+			$parent_score = min(@scores);
 		}
 		elsif ($method eq 'max') {
 			# or take the maximum value
-			$parent_score = max(values %feature_values);
+			$parent_score = max(@scores);
 		}
 		elsif ($method eq 'count') {
 			# count the number of values
-			$parent_score = sum(values %feature_values);
+			$parent_score = sum(@scores);
 		}
 		elsif ($method eq 'sum') {
 			# sum the number of values
-			$parent_score = sum(values %feature_values);
+			$parent_score = sum(@scores);
 		}
 		elsif ($method eq 'rpm') {
 			# calculate reads per per million
-			$parent_score = ( sum(values %feature_values) * 10^6 ) / $dataset2sum{$dataset};
+			$parent_score = ( sum(@scores) * 1000000 ) / $dataset2sum{$dataset};
 		}
 		elsif ($method eq 'rpkm') {
 			# calculate reads per kb per million
-			$parent_score = ( sum(values %feature_values) * 10^9 ) / 
+			$parent_score = ( sum(@scores) * 1000000000 ) / 
 								( $gene_length * $dataset2sum{$dataset});
 		}
 	
 		# convert back to log2 if necessary
 		if ($main_data_ref->{$index}{'log2'}) { 
-			$parent_score = log($parent_score) / log(2);
+			$parent_score = log($parent_score) / LOG2;
 		}
 			
 		# record the final score for the parent feature
