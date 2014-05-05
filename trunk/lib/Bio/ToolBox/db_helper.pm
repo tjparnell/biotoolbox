@@ -1835,8 +1835,8 @@ The keys include
   method   => The method used to combine the dataset values found
               in the defined region. Acceptable values include 
               sum, mean, median, range, stddev, min, max, rpm, 
-              and rpkm. See _get_segment_score() documentation 
-              for more info.
+              rpkm, and scores. See _get_segment_score() 
+              documentation for more info.
   chromo   => The name of the chromosome (reference sequence)
   start    => The start position of the region on the chromosome
   stop     => The stop position of the region on the chromosome
@@ -2756,6 +2756,7 @@ must be defined and presented in this order. These values include
          rpm (returns reads per million mapped, only valid with 
               bam and bigbed databases)
          rpkm (same as rpm but normalized for length in kb)
+         scores (returns an array reference of all the raw scores)
          
   [8] The strandedness of acceptable data. Genomic segments 
       established from an inherently stranded database feature 
@@ -3409,6 +3410,13 @@ sub _get_segment_score {
 		# we will simply return the data hash
 		# regardless whether there are scores or not
 		return %pos2data;
+	}
+	
+	# scores
+	elsif ($method eq 'scores') {
+		# just the scores are requested
+		# return an array reference
+		return \@scores;
 	}
 	
 	# single region score
