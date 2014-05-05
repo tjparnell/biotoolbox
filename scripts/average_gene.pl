@@ -31,14 +31,15 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant (DATASET_HASH_LIMIT => 3000);
+use constant LOG2 => log(2);
+use constant DATASET_HASH_LIMIT => 3000;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.17';
+my $VERSION = '1.18';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -825,17 +826,17 @@ sub record_the_bin_values {
 					$window_score = stddev(@scores);
 				}
 				elsif ($method eq 'rpm') {
-					$window_score = ( sum(@scores) * 10^6 ) / $rpm_read_sum;
+					$window_score = ( sum(@scores) * 1000000 ) / $rpm_read_sum;
 				}
 				elsif ($method eq 'rpkm') {
-					$window_score = ( sum(@scores) * 10^9 ) / 
+					$window_score = ( sum(@scores) * 1000000000 ) / 
 						($length * $rpm_read_sum);
 				}
 				
 				# convert back to log if necessary
 				if ($log) {
 					if ($window_score != 0) {
-						$window_score = log($window_score) / log(2);
+						$window_score = log($window_score) / LOG2;
 					}
 					else {
 						$window_score = '.';
@@ -985,7 +986,7 @@ sub go_interpolate_values {
 							( 2 ** $data_table_ref->[$row][$column - 1] ), 
 							( 2 ** $data_table_ref->[$row][$column + 1] )
 						);
-						$new_value = log($new_value) / log(2);
+						$new_value = log($new_value) / LOG2;
 					}
 					else {
 						# non-log values
@@ -1026,9 +1027,9 @@ sub go_interpolate_values {
 						
 						# calculate the intervening non-values
 						$data_table_ref->[$row][$column] = 
-							log( $begin_value + $third ) / log(2);
+							log( $begin_value + $third ) / LOG2;
 						$data_table_ref->[$row][$column+1] = 
-							log( $begin_value + (2 * $third) ) / log(2);
+							log( $begin_value + (2 * $third) ) / LOG2;
 					}
 					else {
 						# non-log values
@@ -1074,11 +1075,11 @@ sub go_interpolate_values {
 						
 						# calculate the intervening non-values
 						$data_table_ref->[$row][$column] = 
-							log( $begin_value + $fourth ) / log(2);
+							log( $begin_value + $fourth ) / LOG2;
 						$data_table_ref->[$row][$column+1] = 
-							log( $begin_value + (2 * $fourth) ) / log(2);
+							log( $begin_value + (2 * $fourth) ) / LOG2;
 						$data_table_ref->[$row][$column+2] = 
-							log( $begin_value + (3 * $fourth) ) / log(2);
+							log( $begin_value + (3 * $fourth) ) / LOG2;
 					}
 					else {
 						# non-log values
