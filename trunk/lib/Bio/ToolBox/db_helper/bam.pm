@@ -13,12 +13,13 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.15';
+our $VERSION = '1.18';
 
 # Exported names
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
+	open_sam_fasta
 	check_bam_index
 	write_new_bam_file
 	collect_bam_scores
@@ -46,7 +47,7 @@ our %OPENED_BAM;
 
 
 
-### Open a bigWig database connection
+### Open a bam database connection
 sub open_bam_db {
 	my $bamfile = shift;
 	
@@ -69,7 +70,21 @@ sub open_bam_db {
 }
 
 
+### Open a fasta file using the fast Sam index
+sub open_sam_fasta {
+	my $fasta = shift;
+	
+	my $fai;
+	eval {
+		$fai = Bio::DB::Sam::Fai->open($fasta);
+	};
+	return unless $fai;
+	
+	return $fai;
+}
 
+
+### Check for a bam index 
 sub check_bam_index {
 	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that 
 	# doesn't always work as expected. Best to create the index BEFORE opening
