@@ -17,7 +17,8 @@ use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+use constant LOG2 => log(2);
+my $VERSION = '1.18';
 
 print "\n A script to process microarray files\n\n";
 
@@ -1401,10 +1402,10 @@ sub output_combined_records {
 		
 		# calculate log2 ratios if requested
 		if ($log) { 
-			$experiment = ( log($experiment) / log(2) );
-			$control    = ( log($control) / log(2) );
+			$experiment = ( log($experiment) / LOG2 );
+			$control    = ( log($control) / LOG2 );
 			unless ($ratio eq '.') {
-				$ratio  = ( log($ratio) / log(2) );
+				$ratio  = ( log($ratio) / LOG2 );
 			}
 		}
 		
@@ -1478,7 +1479,7 @@ sub output_single_records {
 		
 		# calculate log2 ratios if requested
 		if ($log) { 
-			$experiment = ( log($experiment) / log(2) );
+			$experiment = ( log($experiment) / LOG2 );
 		}
 		
 		# store the data

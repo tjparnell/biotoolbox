@@ -30,7 +30,8 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.15';
+use constant LOG2 => log(2);
+my $VERSION = '1.18';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -551,10 +552,10 @@ sub graph_this {
 	elsif ($changed_x_log_status or $changed_y_log_status) {
 		# Values were originally log2, change them back before plotting
 		if ($changed_x_log_status) {
-			@xvalues = map { log($_) / log(2) } @xvalues;
+			@xvalues = map { log($_) / LOG2 } @xvalues;
 		}
 		if ($changed_y_log_status) {
-			@yvalues = map { log($_) / log(2) } @yvalues;
+			@yvalues = map { log($_) / LOG2 } @yvalues;
 		}
 	}
 	
