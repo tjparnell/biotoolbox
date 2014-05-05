@@ -20,7 +20,7 @@ use Bio::ToolBox::data_helper qw(
 	parse_list
 );
 use Bio::ToolBox::db_helper::config;
-our $VERSION = '1.17';
+use constant LOG2 => log(2);
 
 # check for wiggle support
 our $WIGGLE_OK = 0;
@@ -62,6 +62,7 @@ eval {
 	$USEQ_OK = 1;
 };
 
+our $VERSION = '1.18';
 
 
 # define reusable variables
@@ -3480,12 +3481,12 @@ sub _get_segment_score {
 			# calculate the region score according to the method
 			if ($method eq 'rpkm') {
 				$region_score = 
-					( sum(@scores) * 10^9 ) / 
+					( sum(@scores) * 1000000000 ) / 
 					( ($stop - $start + 1) * $total_read_number{$dataset} );
 			}
 			elsif ($method eq 'rpm') {
 				$region_score = 
-					( sum(@scores) * 10^6 ) / $total_read_number{$dataset};
+					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
 			}
 			else {
 				# this dataset doesn't support rpm methods
@@ -3500,7 +3501,7 @@ sub _get_segment_score {
 	
 		# convert back to log2 if necessary
 		if ($log) { 
-			$region_score = log($region_score) / log(2);
+			$region_score = log($region_score) / LOG2;
 		}
 		
 		# finished
