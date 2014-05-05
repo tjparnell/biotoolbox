@@ -32,14 +32,15 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant (DATASET_HASH_LIMIT => 3000);
+use constant LOG2 => log(2);
+use constant DATASET_HASH_LIMIT => 3000;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.17';
+my $VERSION = '1.18';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -1107,7 +1108,7 @@ sub record_scores {
 			# deal with log2 scores
 			if ($log) { 
 				# put back in log2 space if necessary
-				$winscore = log($winscore) / log(2);
+				$winscore = log($winscore) / LOG2;
 			}
 		}
 		else {
