@@ -1563,7 +1563,7 @@ sub get_subfeature_dataset {
 			# name and feature type, since we can't guarantee that the 
 			# subfeatures are indexed separately from the parent in the 
 			# database
-			my %pos2scores = get_region_dataset_hash(
+			my $score_ref = get_chromo_region_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $subfeat->seq_id,
@@ -1571,15 +1571,14 @@ sub get_subfeature_dataset {
 				'stop'      => $subfeat->end,
 				'strand'    => $subfeat->strand,
 				'value'     => $value_type,
+				'method'    => 'scores', # special method to return array ref of scores
 				'stranded'  => $stranded,
-				'absolute'  => 1, # do not convert to relative positions
 			);
 			
 			# record the values
-			push @scores, values %pos2scores;
+			push @scores, @$score_ref;
 			
 			# record the subfeature length
-				# potential bug if we have overlapping sub features <sigh>
 			$gene_length += $subfeat->length;
 		}
 	
