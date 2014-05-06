@@ -19,7 +19,6 @@ our $VERSION = '1.18';
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
-	open_sam_fasta
 	check_bam_index
 	write_new_bam_file
 	collect_bam_scores
@@ -67,20 +66,6 @@ sub open_bam_db {
 	
 	# done
 	return $sam;
-}
-
-
-### Open a fasta file using the fast Sam index
-sub open_sam_fasta {
-	my $fasta = shift;
-	
-	my $fai;
-	eval {
-		$fai = Bio::DB::Sam::Fai->open($fasta);
-	};
-	return unless $fai;
-	
-	return $fai;
 }
 
 
