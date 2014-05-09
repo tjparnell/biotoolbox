@@ -25,7 +25,13 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.15';
+my $BAM_OK;
+eval { 
+	# we want access to Bio::DB::Sam::Fai
+	require Bio::DB::Sam;
+	$BAM_OK = 0;
+};
+my $VERSION = '1.18';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -133,7 +139,7 @@ if ($infile) {
 	}
 	
 	# open database
-	$db = open_db_connection($database) or 
+	$db = open_sequence_db() or 
 		die " unable to open database connection!\n";
 }
 else {
@@ -157,7 +163,7 @@ else {
 
 # check the database
 my $db_ref = ref $db;
-unless ($db_ref =~ /SeqFeature|Fasta/) {
+unless ($db_ref =~ /SeqFeature|Fasta|Fai/) {
 	die " unsupported database type $db_ref!\n";
 }
 
@@ -213,8 +219,8 @@ sub parallel_execution {
 		splice_data_structure($data, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
-		# pass second true to avoid cached database objects
-		$db = open_db_connection($database, 1);
+		# pass true to avoid cached database objects
+		$db = open_sequence_db(1);
 		
 		# Collect the data
 		process_regions();
@@ -424,6 +430,25 @@ sub process_regions {
 	}
 	
 }
+
+
+# special sub to open a database or sequence file
+# with option to open a genomic fasta file using a fast sequence accessor
+sub open_sequence_db {
+	my $nocache = shift || 0;
+	my $db;
+	if ($database =~ /\.fa(?:sta)?$/i and $BAM_OK) {
+		# this is a limited but very fast sequence accessor
+		# based on samtools fasta index
+		$db = Bio::DB::Sam::Fai->open($database);
+	}
+	else {
+		# otherwise we use a standard database connection
+		$db = open_db_connection($database, $nocache);
+	}
+	return $db;
+}
+
 
 
 __END__

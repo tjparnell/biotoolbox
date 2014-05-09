@@ -15,6 +15,12 @@ use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	open_to_write_fh
 );
+my $BAM_OK;
+eval { 
+	# we want access to Bio::DB::Sam::Fai
+	require Bio::DB::Sam;
+	$BAM_OK = 1;
+};
 
 my $VERSION = '1.18';
 
@@ -226,7 +232,7 @@ sub fetch_seq_and_write_single_fasta {
 	unless ($database) {
 		die " Must provide a database or genomic fasta file(s)!\n";
 	}
-	my $db = open_db_connection($database) or 
+	my $db = open_sequence_db() or 
 		die " Unable to open database '$database'!\n";
 	
 	# concatenated sequence
@@ -288,7 +294,7 @@ sub fetch_seq_and_write_multi_fasta {
 	unless ($database) {
 		die " Must provide a database or genomic fasta file(s)!\n";
 	}
-	my $db = open_db_connection($database) or 
+	my $db = open_sequence_db() or 
 		die " Unable to open database '$database'!\n";
 	
 	# open output file
@@ -364,6 +370,18 @@ sub open_output_fasta {
 	return $seq_io;
 }
 
+
+sub open_sequence_db {
+	my $db;
+	if ($database =~ /\.fa(?:sta)?$/i and $BAM_OK) {
+		# this is a limited but very fast sequence accessor
+		$db = Bio::DB::Sam::Fai->open($database);
+	}
+	else {
+		$db = open_db_connection($database);
+	}
+	return $db;
+}
 
 __END__
 
