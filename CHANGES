@@ -1,5 +1,25 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.18 (svn 826)
+	- Fixed critical bug when calculating RPM and RPKM values in 
+	data collection scripts. This is a long-standing bug that 
+	produced erroneous values. The bug does not affect bam2wig.pl 
+	rpm reporting.
+	- Improved methods for collecting from subfeatures such as 
+	exons of genes or transcripts in script get_datasets.pl.
+	- Added option to specify which UCSC table(s) to use when 
+	setting up a new database in script db_setup.pl.
+	- Added new options to extend and concatenate sequences in 
+	script data2fasta.pl.
+	- Added ability to use the samtools fasta index when available 
+	in scripts data2fasta.pl and CpG_calculator.pl. This index is 
+	about 10-20% faster than the BioPerl fasta index.
+	- Fixed bug to avoid illegal characters in filenames when 
+	splitting data files, and added an option to use a custom 
+	file prefix in script split_data_file.pl.
+	- Fixed bug where ensembl gene names may not be properly 
+	recorded in the output GFF3 file in script ucsc_table2gff3.pl. 
+
 v.1.17 (svn 808)
 	- Added six new method functions to Bio::ToolBox::Data for 
 	working with columns and metadata.
