@@ -12,6 +12,7 @@ db_setup.pl `[`--options...`]` <**UCSC database>
   Options:
   --db <UCSC database>
   --path </path/to/store/database> 
+  --table [refGene|ensGene|knownGene|xenoRefGene|all]
   --keep
   --version
   --help
@@ -31,6 +32,12 @@ __--path </path/to/store/database>
 
 __
   Specify the optional path to store the SQLite database file. The default  path is the `~/lib`.
+__
+  __
+__--table `[`refGene|ensGene|knownGene|xenoRefGene|all`]`
+
+__
+  Provide one or more UCSC tables to load into the database. They may be  specified as comma-delimited list (no spaces) or as separate, repeated  arguments. The default is refGene, ensGene, and knownGene (if available).
 __
   __
 __--keep

@@ -21,6 +21,9 @@ data2fasta.pl `[`--options...`]` <**filename>
   --start <index>
   --stop <index>
   --strand <index>
+  --extend <integer>
+  --cat
+  --pad <integer>
   --out <filename> 
   --gz
   --version
@@ -38,7 +41,7 @@ __
 __--db <**name|file|directory>
 
 __
-  Provide the name of an uncompressed Fasta file (multi-fasta is ok) or  directory containing multiple fasta files representing the genomic  sequence. The directory must be writeable for a small index file to be  written. Alternatively, the name of a Bio::DB::!SeqFeature**::Store  annotation database that contains genomic sequence may be provided.  For more information about using databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.   The database name may be obtained from the input file metadata. Required.
+  Provide the name of an uncompressed Fasta file (multi-fasta is ok) or  directory containing multiple fasta files representing the genomic  sequence. The directory must be writeable for a small index file to be  written. Alternatively, the name of a Bio::DB::!SeqFeature**::Store  annotation database that contains genomic sequence may be provided.  For more information about using databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.   The database name may be obtained from the input file metadata.  Required only if collecting sequence from genomic coordinates.
 __
   __
 __--id <**index>
@@ -83,6 +86,24 @@ __
   Optionally specify the index for the strand column. It may be  automatically determined from the column header.
 __
   __
+__--extend <**integer>
+
+__
+  Optionally provide the number of extra base pairs to extend the start  and stop positions. This will then include the given number of base  pairs of flanking sequence from the database. This only applies when  sequence is obtained from the database.
+__
+  __
+__--cat
+
+__
+  Optionally indicate that all of the sequences should be concatenated  into a single Fasta sequence. The default is to write a multi-fasta  file with separate sequences.
+__
+  __
+__--pad <**integer>
+
+__
+  When concatenating sequences into a single Fasta sequence, optionally  indicate the number of 'N' bases to insert between the individual  sequences. The default is zero.
+__
+  __
 __--out <**filename>
 
 __
@@ -108,11 +129,11 @@ __
 __
   __
 ==DESCRIPTION==
-This program will take a tab-delimited text file (tim data formated file,  for example) and generate a multi-sequence fasta file containing the  sequences of each feature defined in the input file. This program has  two modes.
+This program will take a tab-delimited text file (tim data formated file,  for example) and generate either a multi-sequence fasta file containing the  sequences of each feature defined in the input file, or optionally a single  concatenated fasta file. If concatenating, the individual sequences may be  padded with the given number of 'N' bases.
 
-If the name and sequence is already present in the file, it will generate  the fasta file directly from the file content.
+This program has two modes. If the name and sequence is already present in  the file, it will generate the fasta file directly from the file content.
 
-If only genomic position information (chromosome, start, stop, and  optionally strand) is present in the file, then the sequence will be  retrieved from a database, either a Bio::DB::!SeqFeature**::Store database,  a genomic sequence multi-fasta, or a directory of multiple fasta files.  If strand information is provided, then the sequence reverse complement  is returned for reverse strand coordinates.
+Alternatively, if only genomic position information (chromosome, start,  stop, and optionally strand) is present in the file, then the sequence will  be retrieved from a database, either a Bio::DB::!SeqFeature**::Store database,  a genomic sequence multi-fasta, or a directory of multiple fasta files.  If strand information is provided, then the sequence reverse complement  is returned for reverse strand coordinates.
 
 ==AUTHOR==
 {{{

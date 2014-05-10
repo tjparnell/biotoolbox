@@ -15,6 +15,7 @@ split_data_file.pl `[`--options`]` <**filename>
   --in <filename>
   --index <column_index>
   --max <integer>
+  --prefix <text>
   --gz
   --version
   --help
@@ -41,6 +42,12 @@ __--max <**integer>
 
 __
   Optionally specify the maximum number of data lines to write to each  file. Each group of specific value data is written to one or more files.  Enter as an integer; underscores may be used as thousands separator, e.g.  100_000.
+__
+  __
+__--prefix <**text>
+
+__
+  Optionally provide a filename prefix for the output files. The default  prefix is the input filename base name. If no prefix is desired, using  just the values as filenames, then set the prefix to 'none'.
 __
   __
 __--gz
