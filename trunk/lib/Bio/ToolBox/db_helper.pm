@@ -62,7 +62,7 @@ eval {
 	$USEQ_OK = 1;
 };
 
-our $VERSION = '1.19';
+our $VERSION = '1.18';
 
 
 # define reusable variables
@@ -608,8 +608,6 @@ sub open_db_connection {
 			$BTB_CONFIG->param('default_db.user');
 		my $pass = $BTB_CONFIG->param($database . '.pass') ||
 			$BTB_CONFIG->param('default_db.pass') || undef;
-		my $gz = $BTB_CONFIG->param($database . '.compress') || 
-			$BTB_CONFIG->param('default_db.compress') || 0;
 		
 		# check for empty passwords
 		# config::simple passes an empty array when nothing was defined
@@ -636,7 +634,6 @@ sub open_db_connection {
 				-dsn     => $dsn,
 				-user    => $user,
 				-pass    => $pass,
-				-compress => $gz,
 			);
 		};
 		
