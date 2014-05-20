@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.18';
+our $VERSION = '1.19';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -89,13 +89,13 @@ sub check_bam_index {
 	if (-e $bam_index) {
 		if ( (stat($bam_index))[9] < $bam_mtime) {
 			# index is older than bam file !? re-index
-			Bio::DB::Bam->index_build($bamfile);
+			Bio::DB::Bam->reindex($bamfile);
 		}
 	}
 	elsif (-e $alt_index) {
 		if ( (stat($alt_index))[9] < $bam_mtime) {
 			# index is older than bam file !? re-index
-			Bio::DB::Bam->index_build($bamfile);
+			Bio::DB::Bam->reindex($bamfile);
 		}
 		else {
 			# reuse this index
@@ -104,7 +104,7 @@ sub check_bam_index {
 	}
 	else {
 		# make a new index
-		Bio::DB::Bam->index_build($bamfile);
+		Bio::DB::Bam->reindex($bamfile);
 	}
 }
 
