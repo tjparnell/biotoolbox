@@ -11,7 +11,7 @@ eval {
 	$GZIP_OK = 1;
 };
 
-my $VERSION = '1.14';
+my $VERSION = '1.19';
 
 sub new {
 	my $class = shift;
@@ -196,16 +196,18 @@ sub top_features {
 		# look for parents and children
 		if ($feature->has_tag('Parent')) {
 			# must be a child
-			my ($parent) = $feature->get_tag_values('Parent');
-			if (exists $loaded{$parent}) {
-				# we've seen this id
-				# associate the child with the parent
-				$loaded{$parent}->add_SeqFeature($feature);
-			}
-			else {
-				# can't find the parent, maybe not loaded yet?
-				# put 'em in the orphanage
-				push @orphan_features, $feature;
+			# there may be more than one parent, per the GFF3 specification
+			foreach my $parent ( $feature->get_tag_values('Parent') ) {
+				if (exists $loaded{$parent}) {
+					# we've seen this id
+					# associate the child with the parent
+					$loaded{$parent}->add_SeqFeature($feature);
+				}
+				else {
+					# can't find the parent, maybe not loaded yet?
+					# put 'em in the orphanage
+					push @orphan_features, $feature;
+				}
 			}
 		}
 		else {
