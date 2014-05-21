@@ -21,7 +21,7 @@ eval {
 
 
 
-my $VERSION = '1.18';
+my $VERSION = '1.19';
 
 print "\n This program will set up an annotation database\n\n";
 
@@ -42,6 +42,7 @@ my (
 	$ucscdb,
 	$path,
 	$keep,
+	$verbose,
 	$help,
 	$print_version,
 );
@@ -53,6 +54,7 @@ GetOptions(
 	'path=s'    => \$path, # the optional path for the database
 	'table=s'   => \@tables, # which tables to collect
 	'keep!'     => \$keep, # keep the annotation files
+	'verbose!'  => \$verbose, # show db loading
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -83,7 +85,7 @@ unless ($ucscdb) {
 		die " no database name provided! use --help for more information\n";
 }
 if ($path) {
-	$path = File::Spec->canonpath($path);
+	$path = File::Spec->rel2abs($path);
 	unless (-e $path) {
 		mkdir $path or die "unable to make database path $path\n$!\n"; 
 	}
@@ -114,6 +116,9 @@ if (@tables) {
 else {
 	@tables = qw(refgene ensgene knowngene);
 }
+my $start_time = time;
+
+
 
 ### Get UCSC annotation
 print "##### Fetching annotation from UCSC. This may take a while ######\n";
@@ -140,14 +145,14 @@ my $store = Bio::DB::SeqFeature::Store->new(
     -tmpdir     => $temp,
     -write      => 1,
     -create     => 1,
-    -compress   => 0,
+    -compress   => 0, # compression seems to be broken, cannot read db
 ) or die " Cannot create a SeqFeature database connection!\n";
 
 # load the database
 my $loader = Bio::DB::SeqFeature::Store::GFF3Loader->new(
     -store              => $store,
     -sf_class           => 'Bio::DB::SeqFeature',
-    -verbose            => 1,
+    -verbose            => $verbose,
     -tmpdir             => $temp,
     -fast               => 1,
     -ignore_seqregion   => 0,
@@ -170,21 +175,21 @@ if (-e $database and -s _) {
 }
 if ($db) {
 	print "\n##### Created database $database ######\n";
+	printf " Finished in %.1f minutes\n\n", (time - $start_time) / 60;
 	my $a = add_database(
 		'name'      => $ucscdb,
 		'dsn'       => $database,
 		'adaptor'   => 'DBI::SQLite',
 	);
 	if ($a) {
-		print <<SUCCESS
+		print <<SUCCESS;
 The database configuration was added to the BioToolBox configuration 
 file. You may use the database in any BioToolBox script with the 
 option --db $ucscdb.
 
 You can check the database now by running
-  print_feature_types.pl $ucscdb
+  db_types.pl $ucscdb
 SUCCESS
-	;
 	}
 }
 else {
@@ -215,6 +220,7 @@ db_setup.pl [--options...] <UCSC database>
   --path </path/to/store/database> 
   --table [refGene|ensGene|knownGene|xenoRefGene|all]
   --keep
+  --verbose
   --version
   --help
 
@@ -247,6 +253,10 @@ arguments. The default is refGene, ensGene, and knownGene (if available).
 
 Keep the downloaded UCSC tables and converted GFF3 files. Default is to 
 delete them.
+
+=item --verbose
+
+Show realtime database loading progress.
 
 =item --version
 
