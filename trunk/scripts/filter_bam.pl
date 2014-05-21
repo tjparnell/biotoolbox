@@ -9,11 +9,10 @@ use Bio::ToolBox::data_helper qw(parse_list format_with_commas);
 my $bam_ok;
 eval {
 	# check for Bam support
-	require Bio::ToolBox::db_helper::bam;
-	Bio::ToolBox::db_helper::bam->import;
+	require Bio::DB::Sam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.16';
+my $VERSION = '1.19';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 
@@ -43,6 +42,7 @@ my (
 	$do_mate_seqid,
 	$do_score,
 	$do_length,
+	$do_index,
 	$help,
 	$print_version,
 );
@@ -64,6 +64,7 @@ GetOptions(
 	'length=s'   => \$do_length, # check length
 	'seq=s'      => \@sequences, # check specific sequence
 	'attrib=s'   => \@attributes, # check attributes
+	'index!'     => \$do_index, # re-index the output files
 	'help'       => \$help, # request help
 	'version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -98,14 +99,14 @@ my $start_time = time;
 
 
 ### Open the Bam files
-my ($in_sam, $true_bam, $false_bam) = open_bam_files();
+my ($in_bam, $true_bam, $false_bam) = open_bam_files();
 
 
 
 ### Filter the Bam file
 filter_bam();
 
-finish_bam_files();
+finish_bam_files() if $do_index;
 
 printf " Finished in %.1f in minutes\n", (time - $start_time) / 60;
 
@@ -197,19 +198,20 @@ sub check_defaults {
 sub open_bam_files {
 	
 	# input bam file
-	my $in = open_bam_db($infile) or die " Cannot open input Bam file!\n";
+	my $in = Bio::DB::Bam->open($infile) or die " Cannot open input Bam file!\n";
+	my $header = $in->header; # must always get before reading alignments
 
 	# output bam files
 	my ($true, $false);
 	if ($write_true) {
-		$true = write_new_bam_file($true_file) or 
+		$true = Bio::DB::Bam->open($true_file, 'w') or 
 			die "Cannot open output file $true_file!\n";
-		$true->header_write( $in->header );
+		$true->header_write( $header );
 	}
 	if ($write_false) {
-		$false = write_new_bam_file($false_file) or 
+		$false = Bio::DB::Bam->open($false_file, 'w') or 
 			die "Cannot open output file $false_file!\n";
-		$false->header_write( $in->header );
+		$false->header_write( $header );
 	}
 	return ($in, $true, $false);
 }
@@ -217,12 +219,11 @@ sub open_bam_files {
 sub filter_bam {
 	my @counts = (0,0,0); # total, true, false counts
 	
-	# walk through each chromosome in the bam file
-	for my $tid (0 .. $in_sam->n_targets - 1) {
-		print "  chromosome ", $in_sam->target_name($tid), "...\n";
-		$in_sam->bam_index->fetch(
-			$in_sam->bam, $tid, 0, $in_sam->target_len($tid), \&callback, \@counts);
+	# walk through each alignment in the bam file
+	while (my $a = $in_bam->read1) {
+		callback($a, \@counts);
 	}
+	
 	
 	# report results
 	printf " %s (%.1f%%) alignments passed criteria %s", 
@@ -261,15 +262,14 @@ sub callback {
 
 sub finish_bam_files {
 	# close the output bam files and index them
-	# since the input file had to have been sorted,
-	# the output file(s) should also be sorted too
+	# they will be sorted as necessary
 	if ($write_true) {
 		undef $true_bam;
-		check_bam_index($true_file);
+		Bio::DB::Bam->reindex($true_file);
 	}
 	if ($write_false) {
 		undef $false_bam;
-		check_bam_index($false_file);
+		Bio::DB::Bam->reindex($false_file);
 	}
 }
 
@@ -427,6 +427,7 @@ filter_bam.pl <file.bam>
   --length <integer>
   --seq <pos:[ATCG]>
   --attrib <key:value>
+  --index
   --version
   --help
 
@@ -438,15 +439,15 @@ The command line flags and descriptions:
 
 =item --in <file.bam>
 
-Specify the file name of a binary Bam file of alignments as 
-described for Samtools. It does not need to be sorted.
+Specify the file name of a binary Bam file as described for 
+Samtools. It does not need to be sorted or indexed.
 
 =item --out <filename>
 
 Optionally specify the base name of the output file. The default is 
 to use input base name, appended with '.filter'. If both pass and 
 fail files are written, then they are appended with '.pass' and 
-'.fail', respectively. Output Bam files are re-sorted and indexed.
+'.fail', respectively. 
 
 =item --pass
 
@@ -548,6 +549,12 @@ attributes. Two or more key values are combined in a logical OR
 operation. Two or more attribute keys may be tested by specifying 
 multiple --attrib command line options; in this case, they are  
 combined in a logical AND operation.
+
+=item --index
+
+Optionally re-index the output bam file(s) when finished. If 
+necessary, the bam file is sorted by coordinate first. Default is 
+false.
 
 =item --version
 
