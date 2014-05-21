@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.18';
+my $VERSION = '1.19';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -48,6 +48,8 @@ my (
 	$do_cds,
 	$do_utr,
 	$do_codon,
+	$recycle,
+	$do_name,
 	$gz,
 	$help,
 	$print_version,
@@ -70,6 +72,8 @@ GetOptions(
 	'cds!'       => \$do_cds, # include CDS in output
 	'utr!'       => \$do_utr, # include UTRs in output
 	'codon!'     => \$do_codon, # include start & stop codons in output
+	'share!'     => \$recycle, # recycle common exons and UTRs
+	'name!'      => \$do_name, # assign names to CDSs, UTRs, and exons
 	'gz!'        => \$gz, # compress file
 	'help'       => \$help, # request help
 	'version'    => \$print_version, # print the version
@@ -116,13 +120,19 @@ unless (defined $do_gene) {
 	$do_gene = 1;
 }
 unless (defined $do_utr) {
-	$do_utr = 1;
+	$do_utr = 0;
 }
 unless (defined $do_cds) {
 	$do_cds = 1;
 	unless (defined $do_codon) {
 		$do_codon = 0;
 	}
+}
+unless (defined $recycle) {
+	$recycle = 1;
+}
+unless (defined $do_name) {
+	$do_name = 0;
 }
 my $start_time = time;
 
@@ -627,7 +637,7 @@ sub process_line_data {
 		
 		$data{name}        = $linedata[1];
 		$data{chrom}       = $linedata[2];
-		$data{strand}      = $linedata[3];
+		$data{strand}      = $linedata[3] eq '+' ? 1 : -1;
 		$data{txStart}     = $linedata[4] + 1;
 		$data{txEnd}       = $linedata[5];
 		$data{cdsStart}    = $linedata[6] + 1;
@@ -663,7 +673,7 @@ sub process_line_data {
 		$data{name}       = $kgxref->{ $linedata[0] }->[0] ||
 							$linedata[0];
 		$data{chrom}      = $linedata[1];
-		$data{strand}     = $linedata[2];
+		$data{strand}     = $linedata[2] eq '+' ? 1 : -1;
 		$data{txStart}    = $linedata[3] + 1;
 		$data{txEnd}      = $linedata[4];
 		$data{cdsStart}   = $linedata[5] + 1;
@@ -702,7 +712,6 @@ sub process_gene_table {
 	my ($table_fh, $gff_fh) = @_;
 	
 	# initialize 
-#	my $current_chrom;
 	my %gene2seqf; # hash to assemble genes and/or transcripts for this chromosome
 	my %id2count; # hash to aid in generating unique primary IDs
 	my %counts = (
@@ -726,9 +735,14 @@ sub process_gene_table {
 		next if $line =~ /^#/;
 		my $linedata = process_line_data($line);
 		
+		## find or generate gene as necessary
+		my $gene = find_gene($linedata, \%gene2seqf, \%id2count, \%counts);
+		
+		
 		## generate the transcript
-		my $transcript = generate_new_transcript($linedata, \%id2count);
-				
+		my $transcript = generate_new_transcript($linedata, \%id2count, $gene);
+		
+			
 		## count the transcript type
 		my $type = $transcript->primary_tag;
 		if ($type eq 'mRNA') {
@@ -760,87 +774,10 @@ sub process_gene_table {
 		}
 		
 		
-		## add transcript to gene if requested
+		## associate transcript with gene
 		if ($do_gene) {
-			# assemble transcripts into genes
-			# multiple transcripts may be associated with a single gene
-			# genes are store in the gene2seqf hash
-			# there may be more than one gene with each gene name, each with 
-			# a non-overlapping transcript (how complicated!)
-			
-			my $gene;
-			if (exists $gene2seqf{ lc $linedata->{name2} }) {
-				# we already have a gene for this transcript
-				
-				# pull out the gene seqfeature(s)
-				my $genes = $gene2seqf{ lc $linedata->{name2} };
-				
-				# check that the current transcript intersects with the gene
-				# sometimes we can have two separate transcripts with the 
-				# same gene name, but located on opposite ends of the chromosome
-				# part of a gene family, but unlikely the same gene 200 Mb in 
-				# length
-				foreach my $g (@$genes) {
-					if ( $g->overlaps($transcript, 'strong') ) {
-						# gene and transcript overlap on the same strand
-						# we found the intersecting gene
-						$gene = $g;
-						last;
-					}
-				}
-				
-				# we have a gene for our transcript
-				if ($gene) {
-					# update the gene coordinates if necessary
-					if ( ($linedata->{txStart}) < $gene->start) {
-						# update the transcription start position
-						$gene->start( $linedata->{txStart} );
-					}
-					if ($linedata->{txEnd} > $gene->end) {
-						# update the transcription stop position
-						$gene->end( $linedata->{txEnd} );
-					}
-					
-					# update extra attributes as necessary
-					update_attributes($gene, $linedata);
-				}
-				
-				# NONE of the genes and our transcript overlap
-				else {
-					# must make a new gene
-					$gene = generate_new_gene($linedata, \%id2count);
-					$counts{gene}++;
-					
-					# store the new gene oject into the gene hash
-					push @{ $genes }, $gene;
-				}
-			}
-			
-			else {
-				# generate new gene SeqFeature object
-				$gene = generate_new_gene($linedata, \%id2count);
-				$counts{gene}++;
-				
-				# store the gene oject into the gene hash
-				$gene2seqf{ lc $linedata->{name2} } = [ $gene ];
-			} 
-			
-			
 			# associate our transcript with the gene
 			$gene->add_SeqFeature($transcript);
-			
-			# Update gene note if necessary
-			unless ($gene->has_tag('Note')) {
-				# unless it somehow wasn't available for a previous transcript, 
-				# but is now, we'll add it now
-				# we won't check if transcripts for the same gene have the 
-				# same note or not, why wouldn't they????
-				if (defined $linedata->{note}) {
-					# make note if it exists
-					$gene->add_tag_value('Note', $linedata->{note});
-				}
-			} 
-			
 		}
 		else {
 			# do not assemble transcripts into genes
@@ -855,7 +792,6 @@ sub process_gene_table {
 				$gene2seqf{ lc $linedata->{name} } = [ $transcript ];
 			}
 		}
-		
 		
 	} # Finished working through the table
 	
@@ -872,8 +808,102 @@ sub process_gene_table {
 
 
 
+sub find_gene {
+	my ($linedata, $gene2seqf, $id2count, $counts) = @_;
+	
+	# go no further unless genes are requested
+	return unless $do_gene;
+	
+	# we want to assemble transcripts into genes
+	# multiple transcripts may be associated with a single gene
+	# genes are store in the gene2seqf hash
+	# there may be more than one gene with identical gene name, but with 
+	# non-overlapping transcripts! (how complicated!)
+	my $gene;
+	
+	## check if gene exists
+	if (exists $gene2seqf->{ lc $linedata->{name2} }) {
+		# we already have a gene for this transcript
+		
+		# pull out the gene seqfeature(s)
+		my $genes = $gene2seqf->{ lc $linedata->{name2} };
+		
+		# check that the current transcript intersects with the gene
+		# sometimes we can have two separate transcripts with the 
+		# same gene name, but located on opposite ends of the chromosome
+		# part of a gene family, but unlikely the same gene 200 Mb in 
+		# length
+		foreach my $g (@$genes) {
+			if ( 
+				# overlap method borrowed from Bio::RangeI
+				($g->strand == $linedata->{strand}) and not (
+					$g->start > $linedata->{txEnd} or 
+					$g->end < $linedata->{txStart}
+				)
+			) {
+				# gene and transcript overlap on the same strand
+				# we found the intersecting gene
+				$gene = $g;
+				last;
+			}
+		}
+		
+		# we have a gene for our transcript
+		if ($gene) {
+			# update the gene coordinates if necessary
+			if ( ($linedata->{txStart}) < $gene->start) {
+				# update the transcription start position
+				$gene->start( $linedata->{txStart} );
+			}
+			if ($linedata->{txEnd} > $gene->end) {
+				# update the transcription stop position
+				$gene->end( $linedata->{txEnd} );
+			}
+			
+			# update extra attributes as necessary
+			update_attributes($gene, $linedata);
+		}
+		
+		# NONE of the genes and our transcript overlap
+		else {
+			# must make a new gene
+			$gene = generate_new_gene($linedata, $id2count);
+			$counts->{gene}++;
+			
+			# store the new gene oject into the gene hash
+			push @{ $genes }, $gene;
+		}
+	}
+	
+	## no gene exists
+	else {
+		# generate new gene SeqFeature object
+		$gene = generate_new_gene($linedata, $id2count);
+		$counts->{gene}++;
+		
+		# store the gene oject into the gene hash
+		$gene2seqf->{ lc $linedata->{name2} } = [ $gene ];
+	} 
+	
+	
+	# Update gene note if necessary
+	unless ($gene->has_tag('Note')) {
+		# unless it somehow wasn't available for a previous transcript, 
+		# but is now, we'll add it now
+		# we won't check if transcripts for the same gene have the 
+		# same note or not, why wouldn't they????
+		if (defined $linedata->{note}) {
+			# make note if it exists
+			$gene->add_tag_value('Note', $linedata->{note});
+		}
+	} 
+	
+	return $gene;
+}
+
+
 sub generate_new_gene {
-	my ($linedata, $id2counts) = @_;
+	my ($linedata, $id2count) = @_;
 	
 	# Set the gene name
 	# in most cases this will be the name2 item from the gene table
@@ -918,17 +948,17 @@ sub generate_new_gene {
 	
 	# Uniqueify the gene ID
 	# the ID will be based on the gene name and must be unique in the GFF file
-	if (exists $id2counts->{ lc $id }) {
+	if (exists $id2count->{ lc $id }) {
 		# we've encountered this transcript ID before
 		
 		# then make name unique by appending the count number
-		$id2counts->{ lc $id } += 1;
-		$id .= '.' . $id2counts->{ lc $id };
+		$id2count->{ lc $id } += 1;
+		$id .= '.' . $id2count->{ lc $id };
 	}
 	else {
 		# this is the first transcript with this id
 		# set the id counter
-		$id2counts->{lc $id} = 0;
+		$id2count->{lc $id} = 0;
 	}
 	
 	
@@ -939,7 +969,7 @@ sub generate_new_gene {
 		-primary_tag   => 'gene',
 		-start         => $linedata->{txStart},
 		-end           => $linedata->{txEnd},
-		-strand        => $linedata->{strand} eq '+' ? 1 : -1,
+		-strand        => $linedata->{strand},
 		-phase         => '.',
 		-display_name  => $name,
 		-primary_id    => $id,
@@ -962,20 +992,20 @@ sub generate_new_gene {
 
 
 sub generate_new_transcript {
-	my ($linedata, $id2counts) = @_;
+	my ($linedata, $id2count, $gene) = @_;
 	
 	# Uniqueify the transcript ID and name
 	my $id = $linedata->{name};
-	if (exists $id2counts->{ lc $id } ) {
+	if (exists $id2count->{ lc $id } ) {
 		# we've encountered this transcript ID before
 		
 		# now need to make ID unique by appending a number
-		$id2counts->{ lc $id } += 1;
-		$id .= '.' . $id2counts->{ lc $id };
+		$id2count->{ lc $id } += 1;
+		$id .= '.' . $id2count->{ lc $id };
 	}
 	else {
 		# this is the first transcript with this id
-		$id2counts->{lc $id} = 0;
+		$id2count->{lc $id} = 0;
 	}
 	
 	# Generate the transcript SeqFeature object
@@ -984,7 +1014,7 @@ sub generate_new_transcript {
 		-source        => $source,
 		-start         => $linedata->{txStart},
 		-end           => $linedata->{txEnd},
-		-strand        => $linedata->{strand} eq '+' ? 1 : -1,
+		-strand        => $linedata->{strand},
 		-phase         => '.',
 		-display_name  => $linedata->{name},
 		-primary_id    => $id,
@@ -1074,17 +1104,17 @@ sub generate_new_transcript {
 	}
 	
 	# add the exons
-	add_exons($transcript, $linedata);
+	add_exons($gene, $transcript, $linedata);
 	
 	# add CDS, UTRs, and codons if necessary
 	if ($transcript->primary_tag eq 'mRNA') {
 		
-		if ($do_codon) {
-			add_codons($transcript, $linedata);
+		if ($do_utr) {
+			add_utrs($gene, $transcript, $linedata);
 		}
 		
-		if ($do_utr) {
-			add_utrs($transcript, $linedata);
+		if ($do_codon) {
+			add_codons($gene, $transcript, $linedata);
 		}
 		
 		if ($do_cds) {
@@ -1145,11 +1175,23 @@ sub add_unique_attribute {
 
 
 sub add_exons {
-	my ($transcript, $linedata) = @_;
+	my ($gene, $transcript, $linedata) = @_;
 	
 	
 	# Add the exons
 	for (my $i = 0; $i < $linedata->{exonCount}; $i++) {
+		
+		# first look for existing
+		if ($recycle) {
+			my $exon = find_existing_subfeature($gene, 'exon', 
+				$linedata->{exonStarts}->[$i], $linedata->{exonEnds}->[$i]);
+			if ($exon) {
+				# we found an existing exon to reuse
+				# associate with this transcript
+				$transcript->add_SeqFeature($exon);
+				next;
+			}
+		}
 			
 		# transform index for reverse strands
 		# this will allow numbering from 5'->3'
@@ -1172,8 +1214,12 @@ sub add_exons {
 			-end           => $linedata->{exonEnds}->[$i],
 			-strand        => $transcript->strand,
 			-primary_id    => $transcript->primary_id . ".exon$number",
-			-display_name  => $transcript->primary_id . ".exon$number",
 		);
+		
+		# add name if requested
+		if ($do_name) {
+			$exon->display_name( $transcript->primary_id . ".exon$number" );
+		}
 		
 		# associate with transcript
 		$transcript->add_SeqFeature($exon);
@@ -1183,7 +1229,7 @@ sub add_exons {
 
 
 sub add_utrs {
-	my ($transcript, $linedata) = @_;
+	my ($gene, $transcript, $linedata) = @_;
 	
 	# we will scan each exon and look for a potential utr and build it
 	my @utrs;
@@ -1305,36 +1351,57 @@ sub add_utrs {
 			warn $warning;
 			next;
 		}
+		
+		## Generate the UTR objects
+		my $utr;
 			
-		# build the UTR object
-		my $utr = Bio::SeqFeature::Lite->new(
-			-seq_id        => $transcript->seq_id,
-			-source        => $transcript->source,
-			-start         => $start,
-			-end           => $stop,
-			-strand        => $transcript->strand,
-			-phase         => '.',
-			-primary_tag   => $tag,
-			-primary_id    => $transcript->primary_id . ".utr$number",
-			-display_name  => $transcript->primary_id . ".utr$number",
-		);
+		# look for existing utr
+		if ($recycle) {
+			$utr = find_existing_subfeature($gene, $tag, $start, $stop); 
+		}
+			
+		# otherwise build the UTR object
+		unless ($utr) {
+			$utr = Bio::SeqFeature::Lite->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-start         => $start,
+				-end           => $stop,
+				-strand        => $transcript->strand,
+				-phase         => '.',
+				-primary_tag   => $tag,
+				-primary_id    => $transcript->primary_id . ".utr$number",
+			);
+			$utr->display_name( $transcript->primary_id . ".utr$number" ) if $do_name;
+		}
 		
 		# store this utr seqfeature in a temporary array
 		push @utrs, $utr;
 		
 		# build a second UTR object as necessary
 		if ($start2) {
-			my $utr2 = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-start         => $start2,
-				-end           => $stop2,
-				-strand        => $transcript->strand,
-				-phase         => '.',
-				-primary_tag   => $tag2,
-				-primary_id    => $transcript->primary_id . ".utr$number" . "a",
-				-display_name  => $transcript->primary_id . ".utr$number" . "a",
-			);
+			my $utr2;
+			
+			# look for existing utr
+			if ($recycle) {
+				$utr2 = find_existing_subfeature($gene, $tag2, $start2, $stop2); 
+			}
+			
+			# otherwise build the utr
+			unless ($utr2) {
+				$utr2 = Bio::SeqFeature::Lite->new(
+					-seq_id        => $transcript->seq_id,
+					-source        => $transcript->source,
+					-start         => $start2,
+					-end           => $stop2,
+					-strand        => $transcript->strand,
+					-phase         => '.',
+					-primary_tag   => $tag2,
+					-primary_id    => $transcript->primary_id . ".utr$number" . "a",
+				);
+				$utr2->display_name( $transcript->primary_id . ".utr$number" . "a" ) 
+					if $do_name;
+			}
 		
 			# store this utr seqfeature in a temporary array
 			push @utrs, $utr2;
@@ -1351,6 +1418,10 @@ sub add_utrs {
 
 sub add_cds {
 	my ($transcript, $linedata) = @_;
+	
+	# we will NOT collapse CDS features since we cannot guarantee that a shared 
+	# CDS will have the same phase, since phase is dependent on the translation 
+	# start 
 	
 	# we will scan each exon and look for a potential CDS and build it
 	my @cdss;
@@ -1493,7 +1564,7 @@ sub add_cds {
 
 sub add_codons {
 	
-	my ($transcript, $linedata) = @_;
+	my ($gene, $transcript, $linedata) = @_;
 	
 	# generate the start and stop codons
 	my ($start_codon, $stop_codon);
@@ -1501,65 +1572,121 @@ sub add_codons {
 		# forward strand
 		
 		# start codon
-		$start_codon = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'start_codon',
-				-start         => $linedata->{cdsStart},
-				-end           => $linedata->{cdsStart} + 2,
-				-strand        => 1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.start_codon',
-				-display_name  => $transcript->primary_id . '.start_codon',
-		);
+		$start_codon = find_existing_subfeature($gene, 'start_codon', 
+			$linedata->{cdsStart}, $linedata->{cdsStart} + 2) if $recycle;
+		
+		unless ($start_codon) {
+			$start_codon = Bio::SeqFeature::Lite->new(
+					-seq_id        => $transcript->seq_id,
+					-source        => $transcript->source,
+					-primary_tag   => 'start_codon',
+					-start         => $linedata->{cdsStart},
+					-end           => $linedata->{cdsStart} + 2,
+					-strand        => 1,
+					-phase         => 0,
+					-primary_id    => $transcript->primary_id . '.start_codon',
+			);
+			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+				$do_name;
+		}
 		
 		# stop codon
-		$stop_codon = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $linedata->{cdsEnd} - 2,
-				-end           => $linedata->{cdsEnd},
-				-strand        => 1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.stop_codon',
-				-display_name  => $transcript->primary_id . '.stop_codon',
-		);
+		$stop_codon = find_existing_subfeature($gene, 'stop_codon', 
+			$linedata->{cdsEnd} - 2, $linedata->{cdsEnd}) if $recycle;
+		
+		unless ($stop_codon) {
+			$stop_codon = Bio::SeqFeature::Lite->new(
+					-seq_id        => $transcript->seq_id,
+					-source        => $transcript->source,
+					-primary_tag   => 'stop_codon',
+					-start         => $linedata->{cdsEnd} - 2,
+					-end           => $linedata->{cdsEnd},
+					-strand        => 1,
+					-phase         => 0,
+					-primary_id    => $transcript->primary_id . '.stop_codon',
+			);
+			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+				$do_name;
+		}
 	}
 	
 	else {
 		# reverse strand
 		
 		# stop codon
-		$stop_codon = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'stop_codon',
-				-start         => $linedata->{cdsStart},
-				-end           => $linedata->{cdsStart} + 2,
-				-strand        => -1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.stop_codon',
-				-display_name  => $transcript->primary_id . '.stop_codon',
-		);
+		$stop_codon = find_existing_subfeature($gene, 'stop_codon', 
+			$linedata->{cdsStart}, $linedata->{cdsStart} + 2) if $recycle;
+		
+		unless ($stop_codon) {
+			$stop_codon = Bio::SeqFeature::Lite->new(
+					-seq_id        => $transcript->seq_id,
+					-source        => $transcript->source,
+					-primary_tag   => 'stop_codon',
+					-start         => $linedata->{cdsStart},
+					-end           => $linedata->{cdsStart} + 2,
+					-strand        => -1,
+					-phase         => 0,
+					-primary_id    => $transcript->primary_id . '.stop_codon',
+			);
+			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+				$do_name;
+		}
 		
 		# start codon
-		$start_codon = Bio::SeqFeature::Lite->new(
-				-seq_id        => $transcript->seq_id,
-				-source        => $transcript->source,
-				-primary_tag   => 'start_codon',
-				-start         => $linedata->{cdsEnd} - 2,
-				-end           => $linedata->{cdsEnd},
-				-strand        => -1,
-				-phase         => 0,
-				-primary_id    => $transcript->primary_id . '.start_codon',
-				-display_name  => $transcript->primary_id . '.start_codon',
-		);
+		$start_codon = find_existing_subfeature($gene, 'start_codon', 
+			$linedata->{cdsEnd} - 2, $linedata->{cdsEnd}) if $recycle;
+		
+		unless ($start_codon) {
+			$start_codon = Bio::SeqFeature::Lite->new(
+					-seq_id        => $transcript->seq_id,
+					-source        => $transcript->source,
+					-primary_tag   => 'start_codon',
+					-start         => $linedata->{cdsEnd} - 2,
+					-end           => $linedata->{cdsEnd},
+					-strand        => -1,
+					-phase         => 0,
+					-primary_id    => $transcript->primary_id . '.start_codon',
+					-display_name  => $transcript->primary_id . '.start_codon',
+			);
+			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+				$do_name;
+		}
 	}
 	
 	# associate with transcript
 	$transcript->add_SeqFeature($start_codon);
 	$transcript->add_SeqFeature($stop_codon);
+}
+
+
+
+sub find_existing_subfeature {
+	my ($gene, $type, $start, $stop) = @_;
+	
+	# we will try to find a pre-existing subfeature at identical coordinates
+	# to reuse
+	my $feature;
+	
+	# walk through transcripts
+	SUBF_LOOP: foreach my $transcript ($gene->get_SeqFeatures()) {
+		
+		# walk through subfeatures of transcripts
+		foreach my $subfeature ($transcript->get_SeqFeatures()) {
+			
+			# test
+			if (
+				$subfeature->primary_tag eq $type and
+				$subfeature->start == $start and 
+				$subfeature->end   == $stop
+			) {
+				# we found a match
+				$feature = $subfeature;
+				last SUBF_LOOP;
+			}
+		}
+	}
+	
+	return $feature;
 }
 
 
@@ -1753,11 +1880,13 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --kgxref <filename>
   --chromo <filename>
   --source <text>
-  --(no)chr
-  --(no)gene
-  --(no)cds
-  --(no)utr
-  --codon
+  --(no)chr             (true)
+  --(no)gene            (true)
+  --(no)cds             (true)
+  --(no)utr             (false)
+  --(no)codon           (false)
+  --(no)share           (true)
+  --(no)name            (false)
   --gz
   --version
   --help
@@ -1847,7 +1976,7 @@ automatically derived from the source table file name, if recognized, or
 
 When downloading the current gene tables from UCSC using the C<--ftp> 
 option, indicate whether (or not) to include the I<chromInfo> table. 
-The default is true. The C<--ftp> option is recommended over using this.
+The default is true. 
 
 =item --(no)gene
 
@@ -1866,12 +1995,28 @@ The default is true.
 
 Specify whether (or not) to include three_prime_utr and five_prime_utr 
 features in the transcript heirarchy. If not defined, the GFF interpreter 
-must infer the UTRs from the CDS and exon features. The default is true.
+must infer the UTRs from the CDS and exon features. The default is false.
 
-=item --codon
+=item --(no)codon
 
 Specify whether (or not) to include start_codon and stop_codon features 
 in the transcript heirarchy. The default is false.
+
+=item --(no)share
+
+Specify whether exons, UTRs, and codons that are common between multiple 
+transcripts of the same gene may be shared in the GFF3. Otherwise, each 
+subfeature will be represented individually. This will reduce the size of 
+the GFF3 file at the expense of increased complexity. If your parser 
+cannot handle multiple parents, set this to --noshare. Due to the 
+possibility of multiple translation start sites, CDS features are never 
+shared. The default is true.
+
+=item --(no)name
+
+Specify whether you want subfeatures, including exons, CDSs, UTRs, and 
+start and stop codons to have display names. In most cases, this 
+information is not necessary. The default is false.
 
 =item --gz
 
@@ -1917,7 +2062,9 @@ written.
 
 If you need to set up a database using UCSC annotation, you should first 
 take a look at the BioToolBox script B<db_setup.pl>, which provides a 
-convenient automated database setup based on UCSC annotation.
+convenient automated database setup based on UCSC annotation. You can also 
+find more information about loading a database in a How To document at 
+L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =head1 AUTHOR
 
