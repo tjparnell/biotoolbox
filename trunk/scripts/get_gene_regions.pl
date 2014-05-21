@@ -19,7 +19,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+my $VERSION = '1.19';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -614,7 +614,7 @@ sub collect_first_exon {
 	
 	# identify the exon name if it has one
 	my $name = $first->display_name || 
-		$transcript->display_name . "_lastExon";
+		$transcript->display_name . "_firstExon";
 	
 	# finished
 	return _adjust_positions( [ 
