@@ -44,7 +44,7 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.18"
+         "version" : "1.19"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
@@ -70,7 +70,7 @@
       },
       "Bio::ToolBox::db_helper::bam" : {
          "file" : "lib/Bio/ToolBox/db_helper/bam.pm",
-         "version" : "1.18"
+         "version" : "1.19"
       },
       "Bio::ToolBox::db_helper::bigbed" : {
          "file" : "lib/Bio/ToolBox/db_helper/bigbed.pm",
@@ -86,7 +86,7 @@
       },
       "Bio::ToolBox::db_helper::gff3_parser" : {
          "file" : "lib/Bio/ToolBox/db_helper/gff3_parser.pm",
-         "version" : "1.14"
+         "version" : "1.19"
       },
       "Bio::ToolBox::db_helper::useq" : {
          "file" : "lib/Bio/ToolBox/db_helper/useq.pm",
@@ -107,5 +107,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.18"
+   "version" : "1.19"
 }
