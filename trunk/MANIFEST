@@ -35,6 +35,7 @@ scripts/data2frequency.pl
 scripts/data2gff.pl
 scripts/data2wig.pl
 scripts/db_setup.pl
+scripts/db_types.pl
 scripts/filter_bam.pl
 scripts/find_enriched_regions.pl
 scripts/get_actual_nuc_sizes.pl
@@ -60,7 +61,6 @@ scripts/map_oligo_data2gff.pl
 scripts/map_transcripts.pl
 scripts/merge_datasets.pl
 scripts/novo_wrapper.pl
-scripts/print_feature_types.pl
 scripts/process_microarray.pl
 scripts/pull_features.pl
 scripts/run_cluster.pl
