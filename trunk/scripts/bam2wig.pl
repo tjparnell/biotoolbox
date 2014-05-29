@@ -40,7 +40,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.17';
+my $VERSION = '1.19';
 	
 	
 
@@ -295,7 +295,7 @@ sub check_defaults {
 	
 	# check minimum buffer
 	unless (defined $buffer_min) {
-		$buffer_min = 1200;
+		$buffer_min = 5000;
 	}
 	
 	# check alignment count
@@ -2486,13 +2486,13 @@ Specify whether (or not) the output file should be compressed with
 gzip. The default is compress the output unless a BigWig file is 
 requested. Disable with --nogz.
 
-item --cpu <integer>
+=item --cpu <integer>
 
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of Parallel::ForkManager. With support enabled, the 
 default is 2. Disable multi-threaded execution by setting to 1. 
 
-==item --max_cnt <integer>
+=item --max_cnt <integer>
 
 In special coverage mode only, this option sets the maximum coverage count 
 at any given base. The default is 8000 (set by the bam adaptor).
@@ -2505,7 +2505,7 @@ than the expected alignment length (including split alignments),
 paired-end span length (especially RNA-Seq), or extended coverage 
 (2 x alignment shift). Increasing this value may result in increased 
 memory usage, but will avoid errors with duplicate positions 
-written to the wig file. The default is 1200 bp. 
+written to the wig file. The default is 5000 bp. 
 
 =item --count <integer>
 
@@ -2671,11 +2671,14 @@ bam2wig.pl will use this to set the strand.
 
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  
-You may also wish to increase the buffer size (see --buffer) to account 
-for reads that may span very large introns and avoid recording 
-duplicate positions.
-
 =back
+
+=head1 TROUBLESHOOTING
+
+If you have spliced reads spanning introns from RNA-Seq data, you may 
+get warnings about duplicate positions in your wig or bedGraph file. 
+This is especially the case when converting to bigWig files. In this 
+case, increase the --buffer value to accomodate these large introns. 
 
 =head1 SHIFT VALUE DETERMINATION
 
