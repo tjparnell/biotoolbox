@@ -1,6 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.19 (svn 838)
+v.1.19 (svn 843)
 	- Implemented subfeature sharing and multiple parentage when 
 	exporting UCSC tables as GFF3. For example, exons can now be 
 	shared between multiple transcripts of the same gene. This 
@@ -9,14 +9,16 @@ v.1.19 (svn 838)
 	- Renamed script print_feature_types.pl to simply db_types.pl.
 	Known databases in the configuration file can now be 
 	interactively chosen from a list.
-	- Added support for multiple parentage in the gff3 parser.
+	- Added support for multiple parentage in the gff3 parser 
+	library and script gff3_to_ucsc_table.pl.
 	- Added a verbose option and improved path detection in script 
 	db_setup.pl.
 	- Script filter_bam.pl now works on unsorted and non-indexed 
 	bam files, making it more useful than before.
 	- Bam files opened using db_helper::bam may now be sorted as 
 	necessary before indexing.
-	- Fixed bug where firsExon features were misnamed as lastExon 
+	- Increase default buffer value in script bam2wig.pl.
+	- Fixed bug where firstExon features were misnamed as lastExon 
 	in script get_gene_regions.pl.
 
 v.1.18 (svn 826)
