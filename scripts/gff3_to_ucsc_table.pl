@@ -7,11 +7,10 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::db_helper::gff3_parser;
 use Bio::ToolBox::file_helper qw(
-	open_to_read_fh
 	open_to_write_fh
 );
 
-my $VERSION = '1.15';
+my $VERSION = '1.19';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -92,11 +91,7 @@ unless (defined $gz) {
 	$gz = 1 if $infile =~ m/\.gz$/i;
 }
 
-### Open the input and ouput files
-# Open the input GFF file
-my $in_fh = open_to_read_fh($infile) or 
-	die " unable to open input file '$infile'!\n";
-
+### Open the output files
 # Open the output gene table file
 my $outfh = open_to_write_fh($outfile, $gz) or 
 	die " unable to open file handle for '$outfile'!\n";
@@ -462,6 +457,13 @@ sub process_transcript {
 		}
 	}
 	
+	# report summary
+	if ($verbose) {
+		printf "  found %s exons, %s CDSs, and %s UTRs for transcript %s\n", 
+			scalar @exons, scalar @cds, scalar @utr, $transcript->display_name; 
+	}
+	
+	
 	# process the subfeatures
 	if (@exons and @cds) {
 		# we prefer to use the exon and cds information 
@@ -497,7 +499,11 @@ sub process_nc_transcript {
 	
 	# Get the subfeatures of the transcript
 	# these should be non-coding exons
-	my @subfeatures = $transcript->get_SeqFeatures;
+	# make sure they are sorted numerically
+	my @subfeatures = 	map {$_->[0]} 
+						sort { $a->[1] <=> $b->[1] }
+						map { [$_, $_->start] } 
+						$transcript->get_SeqFeatures;
 	
 	# process subfeatures, if there are any
 	if (@subfeatures) {
@@ -750,6 +756,7 @@ gff3_to_ucsc_table.pl [--options...] <filename>
   --out <filename> 
   --alias
   --gz
+  --verbose
   --version
   --help
 
@@ -779,6 +786,10 @@ symbol.
 Specify whether (or not) the output file should be compressed with gzip. 
 The default is to mimic the status of the input file
 
+=item --verbose
+
+Specify that extra information be printed as the GFF3 file is parsed.
+
 =item --version
 
 Print the version number.
@@ -804,8 +815,10 @@ including gene, mRNA, exon, CDS, and UTRs. Non-standard genes,
 including non-coding RNAs, will also be processed too. Chromosomes, 
 contigs, and embedded sequence are ignored. Non-pertinent features are 
 safely ignored but reported. Most pragmas are ignored, except for close 
-feature pragmas (###), which may aid in processing very large files. 
-See the documentation for the GFF3 file format at 
+feature pragmas (###), which will aid in processing very large files. 
+Multiple parentage and shared features, for example exons common to 
+multiple alternative transcripts, are properly handled. See the 
+documentation for the GFF3 file format at 
 L<http://www.sequenceontology.org/resources/gff3.html> for more 
 information. 
 
