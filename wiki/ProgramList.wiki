@@ -83,7 +83,7 @@ Lists of programs organized by function.
 	* [ProgramList#change_chr_prefix.pl change_chr_prefix.pl]
 	* [ProgramList#change_cluster_order.pl change_cluster_order.pl]
 	* [ProgramList#CpG_calculator.pl CpG_calculator.pl]
-	* [ProgramList#print_feature_types.pl print_feature_types.pl]
+	* [ProgramList#db_types.pl db_types.pl]
 
 =Program List=
 
@@ -142,6 +142,9 @@ This is an alphabetical list of the scripts available in the *BioToolBox* script
 
 ====db_setup.pl====
 [Pod_db_setup db_setup.pl] easily and automatically generates a new Bio::DB::SeqFeature::Store database using annotation from the UCSC Genome website. The script will download tables, convert to GFF3 format, fast load a SQLite database, and append the connection information to the BioToolBox configuration file .biotoolbox.cfg.
+
+====db_types.pl====
+[Pod_db_types db_types.pl] quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 
 ====filter_bam.pl====
 [Pod_filter_bam filter_bam.pl] will filter alignments based on one or more boolean critera, including attributes, score, length, sequence composition at specific positions, etc., and write a new Bam file. 
@@ -217,9 +220,6 @@ This is an alphabetical list of the scripts available in the *BioToolBox* script
 
 ====novo_wrapper.pl====
 [Pod_novo_wrapper novo_wrapper.pl] is a simple wrapper program for the alignment of raw Fastq files by the Novoalign program from Novocraft. If requested, it will split input files and run parallel instances of Novoalign to improve throughput. Alignment files are automatically converted to Bam format, sorted, and indexed.
-
-====print_feature_types.pl====
-[Pod_print_feature_types print_feature_types.pl] quickly queries a given Bio::DB database and prints out the feature types present in the database. When datasets are stored in the database using unique feature types (breaking GFF3 conventions), this program provides a quick check of what datasets are currently stored and available.
 
 ====process_microarray.pl====
 [Pod_process_microarray process_microarray.pl] process the raw data text files from one or two-color microarray hybridizations. Multiple data experiments (biological or technical replicates) may be combined and quantile normalized together. Supports Agilent, NimbleGen, and GenePix file formats.

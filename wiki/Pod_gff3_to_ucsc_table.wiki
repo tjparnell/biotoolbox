@@ -16,6 +16,7 @@ gff3_to_ucsc_table.pl `[`--options...`]` <**filename>
   --out <filename> 
   --alias
   --gz
+  --verbose
   --version
   --help
 }}}
@@ -46,6 +47,12 @@ __
   Specify whether (or not) the output file should be compressed with gzip.  The default is to mimic the status of the input file
 __
   __
+__--verbose
+
+__
+  Specify that extra information be printed as the GFF3 file is parsed.
+__
+  __
 __--version
 
 __
@@ -61,7 +68,7 @@ __
 ==DESCRIPTION==
 This program will convert a GFF3 annotation file to a UCSC-style  gene table, using the refFlat format. This includes transcription  and translation start and stops, as well as exon start and stops,  but does not include coding exon frames. See the documentation at  <[http://genome.ucsc.edu/goldenPath/gbdDescriptionsOld.html#RefFlat]>  for more information.
 
-The program assumes the input GFF3 file includes standard  parent->child relationships using primary IDs and primary tags,  including gene, mRNA, exon, CDS, and UTRs. Non-standard genes,  including non-coding RNAs, will also be processed too. Chromosomes,  contigs, and embedded sequence are ignored. Non-pertinent features are  safely ignored but reported. Most pragmas are ignored, except for close  feature pragmas (###), which may aid in processing very large files.  See the documentation for the GFF3 file format at  <[http://www.sequenceontology.org/resources/gff3.html]> for more  information.
+The program assumes the input GFF3 file includes standard  parent->child relationships using primary IDs and primary tags,  including gene, mRNA, exon, CDS, and UTRs. Non-standard genes,  including non-coding RNAs, will also be processed too. Chromosomes,  contigs, and embedded sequence are ignored. Non-pertinent features are  safely ignored but reported. Most pragmas are ignored, except for close  feature pragmas (###), which will aid in processing very large files.  Multiple parentage and shared features, for example exons common to  multiple alternative transcripts, are properly handled. See the  documentation for the GFF3 file format at  <[http://www.sequenceontology.org/resources/gff3.html]> for more  information.
 
 Previous versions of this script attempted to export in the UCSC  genePredExt table format, often with inaccurate results. Users  who need this format should investigate the `gff3ToGenePred`  program available at <[http://hgdownload.cse.ucsc.edu/admin/exe/]>.
 

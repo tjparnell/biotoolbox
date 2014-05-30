@@ -14,6 +14,7 @@ db_setup.pl `[`--options...`]` <**UCSC database>
   --path </path/to/store/database> 
   --table [refGene|ensGene|knownGene|xenoRefGene|all]
   --keep
+  --verbose
   --version
   --help
 }}}
@@ -44,6 +45,12 @@ __--keep
 
 __
   Keep the downloaded UCSC tables and converted GFF3 files. Default is to  delete them.
+__
+  __
+__--verbose
+
+__
+  Show realtime database loading progress.
 __
   __
 __--version

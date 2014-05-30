@@ -12,9 +12,9 @@ This is an example guide for collecting features and dataset from a Bio::DB::Seq
 	* A configuration file, `biotoolbox.cfg`, for defining database arguments, among other things, is included in the *biotoolbox* root directory. A custom copy may be placed in the root of your home directory, or specified using an environment variable `BIOTOOLBOX`.
 
 ===Generating a feature list===
-We want to collect a list of genes from the database. First, we need to identify the feature type we want from the database. We can use [Pod_print_feature_types print_feature_types.pl] to generate a list of features present in the database. We are using the database _cerevisiae_20100109_
+We want to collect a list of genes from the database. First, we need to identify the feature type we want from the database. We can use [Pod_db_types db_types.pl] to generate a list of features present in the database. We are using the database _cerevisiae_20100109_
 <pre>
-Elessar:~ tim$ print_feature_types.pl cerevisiae_20100109
+Elessar:~ tim$ db_types.pl cerevisiae_20100109
  Found 28 feature types in database 'cerevisiae_20100109'
   There are 2 feature types with source 'Publication'
      TF_binding_site

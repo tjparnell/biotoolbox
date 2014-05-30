@@ -206,24 +206,22 @@ __
   Specify whether (or not) the output file should be compressed with  gzip. The default is compress the output unless a !BigWig** file is  requested. Disable with --nogz.
 __
   __
-  item --cpu <**integer>
+__--cpu <**integer>
+
 __
-  __
   Specify the number of CPU cores to execute in parallel. This requires  the installation of Parallel::!ForkManager**. With support enabled, the  default is 2. Disable multi-threaded execution by setting to 1.
 __
   __
 __--max_cnt <**integer>
 
 __
-{{{
-}}}
   In special coverage mode only, this option sets the maximum coverage count  at any given base. The default is 8000 (set by the bam adaptor).
 __
   __
 __--buffer <**integer>
 
 __
-  Specify the length in bp to reserve as buffer when writing a bedGraph  file to account for future read coverage. This value must be greater  than the expected alignment length (including split alignments),  paired-end span length (especially RNA-Seq), or extended coverage  (2 x alignment shift). Increasing this value may result in increased  memory usage, but will avoid errors with duplicate positions  written to the wig file. The default is 1200 bp.
+  Specify the length in bp to reserve as buffer when writing a bedGraph  file to account for future read coverage. This value must be greater  than the expected alignment length (including split alignments),  paired-end span length (especially RNA-Seq), or extended coverage  (2 x alignment shift). Increasing this value may result in increased  memory usage, but will avoid errors with duplicate positions  written to the wig file. The default is 5000 bp.
 __
   __
 __--count <**integer>
@@ -347,9 +345,9 @@ __
 {{{
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  }}}
-  You may also wish to increase the buffer size (see --buffer) to account  for reads that may span very large introns and avoid recording  duplicate positions.
-__
-  __
+==TROUBLESHOOTING==
+If you have spliced reads spanning introns from RNA-Seq data, you may  get warnings about duplicate positions in your wig or bedGraph file.  This is especially the case when converting to bigWig files. In this  case, increase the --buffer value to accomodate these large introns.
+
 ==SHIFT VALUE DETERMINATION==
 To empirically determine the shift value, a cross-strand correlation  method is employed. Regions with the highest read coverage  are sampled from one or more chromosomes listed in the Bam file.  The default number of regions is 200 sampled from each of the two  largest chromosomes. The largest chromosomes are used merely as a  representative fraction of the genome for performance reasons. Stranded read counts are collected in 10 bp bins over a 1300 bp region (the  initial 500 bp high coverage region plus flanking 400 bp). A Pearson  product-moment correlation coefficient is then reiteratively determined  between the stranded data sets as the bins are shifted from 0 to 400 bp.  The shift corresponding to the highest R squared value is recorded for  each sampled region. The default minimum R squared value to record an  optimal shift is 0.25, and not all sampled regions may return a  significant R squared value. After collection, outlier shift values  > 1.5 standard deviations from the mean are removed, and the trimmed  mean is used as the final shift value.
 

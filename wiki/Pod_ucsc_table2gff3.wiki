@@ -27,11 +27,13 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --kgxref <filename>
   --chromo <filename>
   --source <text>
-  --(no)chr
-  --(no)gene
-  --(no)cds
-  --(no)utr
-  --codon
+  --(no)chr             (true)
+  --(no)gene            (true)
+  --(no)cds             (true)
+  --(no)utr             (false)
+  --(no)codon           (false)
+  --(no)share           (true)
+  --(no)name            (false)
   --gz
   --version
   --help
@@ -108,7 +110,7 @@ __
 __--(no)chr
 
 __
-  When downloading the current gene tables from UCSC using the `--ftp`  option, indicate whether (or not) to include the ___chromInfo___ table.  The default is true. The `--ftp` option is recommended over using this.
+  When downloading the current gene tables from UCSC using the `--ftp`  option, indicate whether (or not) to include the ___chromInfo___ table.  The default is true.
 __
   __
 __--(no)gene
@@ -126,13 +128,25 @@ __
 __--(no)utr
 
 __
-  Specify whether (or not) to include three_prime_utr and five_prime_utr  features in the transcript heirarchy. If not defined, the GFF interpreter  must infer the UTRs from the CDS and exon features. The default is true.
+  Specify whether (or not) to include three_prime_utr and five_prime_utr  features in the transcript heirarchy. If not defined, the GFF interpreter  must infer the UTRs from the CDS and exon features. The default is false.
 __
   __
-__--codon
+__--(no)codon
 
 __
   Specify whether (or not) to include start_codon and stop_codon features  in the transcript heirarchy. The default is false.
+__
+  __
+__--(no)share
+
+__
+  Specify whether exons, UTRs, and codons that are common between multiple  transcripts of the same gene may be shared in the GFF3. Otherwise, each  subfeature will be represented individually. This will reduce the size of  the GFF3 file at the expense of increased complexity. If your parser  cannot handle multiple parents, set this to --noshare. Due to the  possibility of multiple translation start sites, CDS features are never  shared. The default is true.
+__
+  __
+__--(no)name
+
+__
+  Specify whether you want subfeatures, including exons, CDSs, UTRs, and  start and stop codons to have display names. In most cases, this  information is not necessary. The default is false.
 __
   __
 __--gz
@@ -162,7 +176,7 @@ The latest table files may be automatically downloaded using FTP from  UCSC or o
 
 If provided, chromosome and/or scaffold features may also be written to a  GFF file. If only one table is being converted, then the chromosome features  are prepended to the GFF file; otherwise, a separate chromosome GFF file is  written.
 
-If you need to set up a database using UCSC annotation, you should first  take a look at the !BioToolBox** script _*_db_setup.pl_*_, which provides a  convenient automated database setup based on UCSC annotation.
+If you need to set up a database using UCSC annotation, you should first  take a look at the !BioToolBox** script _*_db_setup.pl_*_, which provides a  convenient automated database setup based on UCSC annotation. You can also  find more information about loading a database in a How To document at  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.
 
 ==AUTHOR==
 {{{

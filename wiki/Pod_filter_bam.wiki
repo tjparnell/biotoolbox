@@ -27,6 +27,7 @@ filter_bam.pl <**file.bam>
   --length <integer>
   --seq <pos:[ATCG]>
   --attrib <key:value>
+  --index
   --version
   --help
 }}}
@@ -36,13 +37,13 @@ The command line flags and descriptions:
 __--in <**file.bam>
 
 __
-  Specify the file name of a binary Bam file of alignments as  described for Samtools. It does not need to be sorted.
+  Specify the file name of a binary Bam file as described for  Samtools. It does not need to be sorted or indexed.
 __
   __
 __--out <**filename>
 
 __
-  Optionally specify the base name of the output file. The default is  to use input base name, appended with '.filter'. If both pass and  fail files are written, then they are appended with '.pass' and  '.fail', respectively. Output Bam files are re-sorted and indexed.
+  Optionally specify the base name of the output file. The default is  to use input base name, appended with '.filter'. If both pass and  fail files are written, then they are appended with '.pass' and  '.fail', respectively.
 __
   __
 __--pass
@@ -133,6 +134,12 @@ __--attrib <**key:value>
 
 __
   Indicate that only alignments that contain a specific optional  attribute shall pass. One or more values may also be provided for  the key, in which case only those alignments which match one of  the key values shall pass. The values may be provided as a comma  delimited list separated from the key by a colon. Attribute keys  are typically two letter codes; see the SAM specification at  <[http://samtools.sourceforge.net/SAM1.pdf]> for a list of standard  attributes. Two or more key values are combined in a logical OR  operation. Two or more attribute keys may be tested by specifying  multiple --attrib command line options; in this case, they are   combined in a logical AND operation.
+__
+  __
+__--index
+
+__
+  Optionally re-index the output bam file(s) when finished. If  necessary, the bam file is sorted by coordinate first. Default is  false.
 __
   __
 __--version
