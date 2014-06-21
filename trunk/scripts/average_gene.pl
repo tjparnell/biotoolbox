@@ -39,7 +39,7 @@ use constant DATASET_HASH_LIMIT => 3000;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.18';
+my $VERSION = '1.20';
 
 print "\n This script will collect binned values across genes to create an average gene\n\n";
 
@@ -443,16 +443,26 @@ sub parallel_execution {
 	
 	# generate summary file
 	if ($sum) {
+		# reopen the combined file
+		my $data = load_tim_data_file($outfile);
+		unless ($data) {
+			warn " cannot re-open $outfile to generate summary file!\n";
+			return;
+		}
 		print " Generating final summed data....\n";
-		# we will do this via manipulate_datasets.pl
-		@args = (
-			"$Bin/manipulate_datasets.pl", 
-			'--func', 
-			'summary', 
-			'--index', 
-			$startcolumn . '-' . $main_data_ref->{'number_columns'} - 1,
-			$outfile
+		my $sumfile = write_summary_data(
+			'data'        => $data,
+			# it will automatically define a new output name
+			'startcolumn' => $startcolumn,
+			'dataset'     => $dataset,
+			'log'         => $log,
 		);
+		if ($sumfile) {
+			print " Wrote summary file '$sumfile'\n";
+		}
+		else {
+			print " Unable to write summary file!\n";
+		}
 	}
 	# done
 }
@@ -704,7 +714,7 @@ sub collect_binned_data_for_regions {
 				$data_table_ref->[$row][$chromo_index], 
 				$data_table_ref->[$row][$start_index], 
 				$data_table_ref->[$row][$stop_index], 
-				$data_table_ref->[$row][$chromo_index] || 0, 
+				$data_table_ref->[$row][$strand_index] || 0, 
 				$length,
 			);
 		}
@@ -719,7 +729,7 @@ sub collect_binned_data_for_regions {
 						'stop'     => $data_table_ref->[$row][$stop_index],
 						'extend'   => $extra,
 						'stranded' => $stranded,
-						'strand'   => $data_table_ref->[$row][$chromo_index],
+						'strand'   => $data_table_ref->[$row][$strand_index],
 			);
 		
 			# record the scores for each bin
@@ -901,13 +911,13 @@ sub record_individual_bin_values {
 				$start = $fstop - $main_data_ref->{$column}{'start'};
 				$stop  = $fstop - $main_data_ref->{$column}{'stop'};
 			}
-			elsif ($main_data_ref->{$column}{'start'} > 0 and $strand >= 0) {
+			elsif ($main_data_ref->{$column}{'start'} >= 0 and $strand >= 0) {
 				# the start position is greather than 0, implying the 3' end
 				# the reference position will be the feature start on plus strand
 				$start = $fstop + $main_data_ref->{$column}{'start'};
 				$stop  = $fstop + $main_data_ref->{$column}{'stop'};
 			}
-			elsif ($main_data_ref->{$column}{'start'} > 0 and $strand < 0) {
+			elsif ($main_data_ref->{$column}{'start'} >= 0 and $strand < 0) {
 				# the start position is greather than 0, implying the 3' end
 				# the reference position will be the feature end on minus strand
 				$start = $fstart - $main_data_ref->{$column}{'start'};
