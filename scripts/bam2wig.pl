@@ -28,19 +28,14 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $linefit;
-eval {
-	# required for calculating shift
-	require Statistics::LineFit;
-	$linefit = 1;
-};
+# Statistics::LineFit is also required upon demand
 
 # Declare constants for this program
 use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.19';
+my $VERSION = '1.20';
 	
 	
 
@@ -305,6 +300,10 @@ sub check_defaults {
 	
 	# check position
 	if ($position) {
+		if ($use_coverage) {
+			die " Options --coverage and --position are mutually exclusive\n" . 
+				" Please pick one. See help for more information\n";
+		}
 		if ($position eq 'start') {
 			$use_start = 1;
 		}
@@ -377,11 +376,19 @@ sub check_defaults {
 		$shift = 1;
 	}
 	if ($shift) {
-		die " Provide a shift value or install the Perl module Statistics::LineFit\n" . 
-			" to empirically determine the shift value.\n"
-			unless ($linefit or $shift_value);
+		# set parameters for calculating shift value 
+		unless ($shift_value) {
+			# not provided by user, empirical calculation required
+			eval {
+				# required for calculating shift
+				require Statistics::LineFit;
+			};
+			die " Provide a shift value or install the Perl module Statistics::LineFit\n"
+				. " to empirically determine the shift value.\n"
+				if $@;
+		}
 		unless ($sample_number) {
-			$sample_number = 200;
+			$sample_number = 300;
 		}
 		unless ($chr_number) {
 			$chr_number = 2;
