@@ -935,7 +935,7 @@ sub map_relative_data_for_regions {
 		
 		elsif ($position == 4) {
 			# midpoint regardless of strand
-			$region_start = int( ( ($fstop - $fstart) / 2) + 0.5);
+			$region_start = int( ( ($fstop + $fstart) / 2) + 0.5);
 			$start = $region_start + $starting_point;
 			$stop  = $region_start + $ending_point;
 		}
@@ -1165,7 +1165,7 @@ sub collect_long_data_window_scores {
 	
 	elsif ($position == 4) {
 		# midpoint regardless of strand
-		$reference = int( ( ($fstop - $fstart) / 2) + 0.5);
+		$reference = int( ( ($fstop + $fstart) / 2) + 0.5);
 	}
 	
 	else {
