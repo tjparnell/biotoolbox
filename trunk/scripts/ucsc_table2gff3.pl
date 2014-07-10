@@ -12,7 +12,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-my $VERSION = '1.19';
+my $VERSION = '1.20';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -616,7 +616,8 @@ sub process_line_data {
 	# don't forget to convert start from 0 to 1-based coordinates
 	
 	if (scalar @linedata == 16) {
-		# a gene prediction table, e.g. refGene, ensGene, xenoRefGene
+		# an extended gene prediction table, e.g. refGene, ensGene, xenoRefGene
+		# as downloaded from the UCSC Table Browser or FTP site
 		
 		# 0  bin
 		# 1  name
@@ -637,21 +638,58 @@ sub process_line_data {
 		
 		$data{name}        = $linedata[1];
 		$data{chrom}       = $linedata[2];
-		$data{strand}      = $linedata[3] eq '+' ? 1 : -1;
+		$data{strand}      = $linedata[3];
 		$data{txStart}     = $linedata[4] + 1;
 		$data{txEnd}       = $linedata[5];
 		$data{cdsStart}    = $linedata[6] + 1;
 		$data{cdsEnd}      = $linedata[7];
 		$data{exonCount}   = $linedata[8];
-		$data{exonStarts}  = [ map {$_ += 1} ( split ",", $linedata[9] ) ];
-		$data{exonEnds}    = [ ( split ",", $linedata[10] ) ];
+		$data{exonStarts}  = $linedata[9];
+		$data{exonEnds}    = $linedata[10];
 		$data{name2}       = $linedata[12];
-#		$data{exonFrames}  = [ ( split ",", $linedata[15] ) ];
 		$data{note}        = $refseqsum->{ $linedata[1] }->[1] || undef;
 		$data{status}      = $refseqstat->{ $linedata[1] }->[0] || undef;
 		$data{completeness} = $refseqsum->{ $linedata[1] }->[0] || undef;
 		if ($linedata[1] =~ /^N[MR]_\d+/) {
 			$data{refseq} = $linedata[1];
+		}
+	}
+	elsif (scalar @linedata == 15) {
+		# an extended gene prediction table, e.g. refGene, ensGene, xenoRefGene
+		# without the bin value
+		
+		# 0  name
+		# 1  chrom
+		# 2  strand
+		# 3  txStart
+		# 4  txEnd
+		# 5  cdsStart
+		# 6  cdsEnd
+		# 7  exonCount
+		# 8  exonStarts
+		# 9 exonEnds
+		# 10 score
+		# 11 name2
+		# 12 cdsStartStat
+		# 13 cdsEndStat
+		# 14 exonFrames
+		
+		$data{name}        = $linedata[0];
+		$data{chrom}       = $linedata[1];
+		$data{strand}      = $linedata[2];
+		$data{txStart}     = $linedata[3] + 1;
+		$data{txEnd}       = $linedata[4];
+		$data{cdsStart}    = $linedata[5] + 1;
+		$data{cdsEnd}      = $linedata[6];
+		$data{exonCount}   = $linedata[7];
+		$data{exonStarts}  = $linedata[8];
+		$data{exonEnds}    = $linedata[9];
+		$data{name2}       = $linedata[11];
+		$data{note}        = $refseqsum->{ $linedata[0] }->[1] || undef;
+		$data{status}      = $refseqstat->{ $linedata[0] }->[0] || undef;
+		$data{completeness} = $refseqsum->{ $linedata[0] }->[0] || undef;
+		if ($linedata[0] =~ /^N[MR]_\d+/) {
+			$data{refseq} = $linedata[0];
 		}
 	}
 	elsif (scalar @linedata == 12) {
@@ -673,19 +711,18 @@ sub process_line_data {
 		$data{name}       = $kgxref->{ $linedata[0] }->[0] ||
 							$linedata[0];
 		$data{chrom}      = $linedata[1];
-		$data{strand}     = $linedata[2] eq '+' ? 1 : -1;
+		$data{strand}     = $linedata[2];
 		$data{txStart}    = $linedata[3] + 1;
 		$data{txEnd}      = $linedata[4];
 		$data{cdsStart}   = $linedata[5] + 1;
 		$data{cdsEnd}     = $linedata[6];
 		$data{exonCount}  = $linedata[7];
-		$data{exonStarts} = [ map {$_ += 1} ( split ",", $linedata[8] ) ];
-		$data{exonEnds}    = [ ( split ",", $linedata[9] ) ];
+		$data{exonStarts} = $linedata[8];
+		$data{exonEnds}    = $linedata[9];
 		$data{name2}       = $kgxref->{ $linedata[0] }->[3] || # geneSymbol
 							 $kgxref->{ $linedata[0] }->[0] || # mRNA id
 							 $kgxref->{ $linedata[0] }->[4] || # refSeq id
 							 $linedata[0]; # ugly default
-#		$data{exonFrames}  = undef; # not present in this table
 		$data{note}        = $kgxref->{ $linedata[0] }->[6] || undef;
 		$data{refseq}      = $kgxref->{ $linedata[0] }->[4] || undef;
 		$data{status}      = $refseqstat->{ $data{refseq} }->[0] || undef;
@@ -694,13 +731,91 @@ sub process_line_data {
 		$data{spdid}       = $kgxref->{ $linedata[0] }->[2] || undef; # SwissProt display ID
 		$data{protacc}     = $kgxref->{ $linedata[0] }->[5] || undef; # NCBI protein accession
 	}
-	
-	else {
-		# unrecognized
-		warn " Unrecognized line! There are " .  scalar(@linedata) . 
-			" columns for this line! skipping\n";
+	elsif (scalar @linedata == 11) {
+		# a refFlat gene prediction table
+		
+		# 0  name2 or gene name
+		# 1  name or transcript name
+		# 2  chrom
+		# 3  strand
+		# 4  txStart
+		# 5  txEnd
+		# 6  cdsStart
+		# 7  cdsEnd
+		# 8  exonCount
+		# 9  exonStarts
+		# 10 exonEnds
+		
+		$data{name2}       = $linedata[0];
+		$data{name}        = $linedata[1];
+		$data{chrom}       = $linedata[2];
+		$data{strand}      = $linedata[3];
+		$data{txStart}     = $linedata[4] + 1;
+		$data{txEnd}       = $linedata[5];
+		$data{cdsStart}    = $linedata[6] + 1;
+		$data{cdsEnd}      = $linedata[7];
+		$data{exonCount}   = $linedata[8];
+		$data{exonStarts}  = $linedata[9];
+		$data{exonEnds}    = $linedata[10];
+		$data{note}        = $refseqsum->{ $linedata[1] }->[1] || undef;
+		$data{status}      = $refseqstat->{ $linedata[1] }->[0] || undef;
+		$data{completeness} = $refseqsum->{ $linedata[1] }->[0] || undef;
+		if ($linedata[1] =~ /^N[MR]_\d+/) {
+			$data{refseq} = $linedata[1];
+		}
 	}
-
+	elsif (scalar @linedata == 10) {
+		# a simple gene prediction table, e.g. refGene, ensGene, xenoRefGene
+		
+		# 0  name
+		# 1  chrom
+		# 2  strand
+		# 3  txStart
+		# 4  txEnd
+		# 5  cdsStart
+		# 6  cdsEnd
+		# 7  exonCount
+		# 8  exonStarts
+		# 9  exonEnds
+		
+		$data{name}        = $linedata[0];
+		$data{chrom}       = $linedata[1];
+		$data{strand}      = $linedata[2];
+		$data{txStart}     = $linedata[3] + 1;
+		$data{txEnd}       = $linedata[4];
+		$data{cdsStart}    = $linedata[5] + 1;
+		$data{cdsEnd}      = $linedata[6];
+		$data{exonCount}   = $linedata[7];
+		$data{exonStarts}  = $linedata[8];
+		$data{exonEnds}    = $linedata[9];
+		$data{name2}       = $linedata[0]; # re-use transcript name
+		$data{note}        = $refseqsum->{ $linedata[0] }->[1] || undef;
+		$data{status}      = $refseqstat->{ $linedata[0] }->[0] || undef;
+		$data{completeness} = $refseqsum->{ $linedata[0] }->[0] || undef;
+		if ($linedata[0] =~ /^N[MR]_\d+/) {
+			$data{refseq} = $linedata[0];
+		}
+	}
+	else {
+		# unrecognized line format
+		return scalar @linedata;
+	}
+	
+	# verify
+# 	return unless $data{name}       =~ /^[\w\-]+$/;
+# 	return unless $data{strand}     =~ /^[\+\-]$/;
+# 	return unless $data{txStart}    =~ /^\d+$/;
+# 	return unless $data{txEnd}      =~ /^\d+$/;
+# 	return unless $data{cdsStart}   =~ /^\d+$/;
+# 	return unless $data{cdsEnd}     =~ /^\d+$/;
+# 	return unless $data{exonStarts} =~ /^[\d,]+$/;
+# 	return unless $data{exonEnds}   =~ /^[\d,]+$/;
+	
+	# fix values
+	$data{strand} = $data{strand} eq '+' ? 1 : -1;
+	$data{exonStarts}  = [ map {$_ += 1} ( split ",", $data{exonStarts} ) ];
+	$data{exonEnds}    = [ ( split ",", $data{exonEnds} ) ];
+	
 	return \%data;
 }
 
@@ -734,6 +849,11 @@ sub process_gene_table {
 		## process the row from the gene table
 		next if $line =~ /^#/;
 		my $linedata = process_line_data($line);
+		unless (ref $linedata eq 'HASH') {
+			warn " The following line is unrecognized as a valid table line! Has $linedata elements Skipping line\n";
+			warn $line;
+			next;
+		}
 		
 		## find or generate gene as necessary
 		my $gene = find_gene($linedata, \%gene2seqf, \%id2count, \%counts);
@@ -1921,9 +2041,10 @@ gene table files. The default is 'hgdownload.cse.ucsc.edu'.
 
 Provide the name of a UCSC gene or gene prediction table. Tables known 
 to work include the I<refGene>, I<ensGene>, I<xenoRefGene>, and UCSC 
-I<knownGene> tables. The file may be gzipped. When converting multiple 
-tables, use this option repeatedly for each table. The C<--ftp> option is 
-recommended over using this one.
+I<knownGene> tables. Both simple and extended gene prediction tables, as 
+well as refFlat tables are supported. The file may be gzipped. When 
+converting multiple tables, use this option repeatedly for each table. 
+The C<--ftp> option is recommended over using this one.
 
 =item --status <filename>
 
@@ -2045,6 +2166,11 @@ Four table files are supported. Gene prediction tables, including I<refGene>,
 I<xenoRefGene>, and I<ensGene>, are supported. The UCSC I<knownGene> gene 
 table, if available, is also supported. Supporting tables include I<refSeqStatus>, 
 I<refSeqSummary>, I<ensemblToGeneName>, I<ensemblSource>, and I<kgXref>. 
+
+Tables obtained from UCSC are typically in the extended GenePrediction 
+format, although simple genePrediction and refFlat formats are also 
+supported. See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9> regarding
+UCSC gene prediction table formats. 
 
 The latest table files may be automatically downloaded using FTP from 
 UCSC or other host. Since these files are periodically updated, this may 
