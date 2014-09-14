@@ -12,7 +12,7 @@ use Bio::ToolBox::data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.15';
+our $VERSION = '1.20';
 
 
 ### Variables
@@ -121,9 +121,15 @@ sub load_tim_data_file {
 		
 		# check the number of elements
 		if (scalar @linedata != $inputdata->{'number_columns'} ) {
-			carp "File '$filename' is inconsistent! line $. has ", scalar(@linedata),
-				" columns instead of expected ", $inputdata->{'number_columns'}, "\n";
-			return;
+			if ($line =~ /\r/ and $line !~ /\n/) {
+				croak "File '$filename' does not appear to have unix line endings!\n" . 
+					" Please convert to unix-style line endings and try again\n";
+			}
+			else {
+				carp "File '$filename' is inconsistent! line $. has ", scalar(@linedata),
+					" columns instead of expected ", $inputdata->{'number_columns'}, "\n";
+				return;
+			}
 		}
 		
 		# chomp the last element
@@ -276,6 +282,12 @@ sub open_tim_data_file {
 		# with UCSC tables where we have to count elements in the first line
 		# and potential header lines, and the first line has a null value at 
 		# the end
+		
+		# check for Mac-style return line endings
+		if ($line =~ /\r/ and $line !~ /\n/) {
+			croak "File '$filename' does not appear to have unix line endings!\n" . 
+				" Please convert to unix-style line endings and try again\n";
+		}
 		
 		# Parse the datafile metadata headers
 		
