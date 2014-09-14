@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.18;
+our $VERSION = 1.20;
 
 =head1 NAME
 
@@ -50,8 +50,7 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   	  # these coordinates 
   	  my $region = $db->segment($seq_id, $start, $stop);
   	  
-  	  
-  	  
+  	  # modify a row value
   	  my $value = $row->value($column);
   	  my $new_value = $value + 1;
   	  $row->value($column, $new_value);
@@ -65,19 +64,6 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   );
   print "wrote new file $success\n"; # file is new_data.txt.gz
   
-=head1 PREFACE
-
-This is an object-oriented interface to the Bio::ToolBox Data structure. 
-Most of the remaining Bio::ToolBox libraries are collections of 
-exported subroutines, and the data structures required a lot of 
-manual manipulation (and redundant code - sigh). They were written 
-before I learned to fully appreciate the benefits of OO-code. Hence, 
-this module is an attempt to right the wrongs of my early practices.
-
-Many of the provided scripts that accompany the Bio::ToolBox distribution 
-do not use the this OO interface. They can be cryptic, obtuse, and hard 
-to follow. New scripts should follow this interface instead.
-
 =head1 DESCRIPTION
 
 This module works with the primary Bio::ToolBox Data structure. Simply, it 
@@ -147,7 +133,9 @@ If you already have an opened Bio::DB::SeqFeature::Store database
 object, you can simply pass that. See Bio::ToolBox::db_helper for 
 more information. However, this in general should be discouraged, 
 since the name of the database will not be properly recorded when 
-saving to file.
+saving to file. It is better to simply pass the name of database 
+again; multiple connections to the same database are smartly handled 
+in the background.
 
 =item win =E<gt> $integer
 
@@ -156,6 +144,15 @@ saving to file.
 If generating a list of genomic intervals, optionally provide 
 the window and step values. Default values are defined in 
 the Bio::ToolBox configuration file C<.biotoolbox.cfg>.
+
+=item columns =E<gt> [qw(Column1 Column2 ...)]
+
+=item datasets =E<gt> [qw(Column1 Column2 ...)]
+
+When no file is given or database given to search, then a new, 
+empty Data object is returned. In this case, you may optionally 
+provide the column names in advance as an anonymous array. You 
+may also optionally provide a general feature name, if desired.
 
 =back
 
@@ -173,11 +170,31 @@ metadata properties.
 
 =over
 
+=item feature()
+
 =item feature($text)
 
 Returns or sets the name of the features used to collect 
 the list of features. The actual feature types are listed 
-in the table, so this is metadata is merely descriptive.
+in the table, so this metadata is merely descriptive.
+
+=item feature_type
+
+Returns one of three specific values describing the contents 
+of the data table inferred by the presence of specific column 
+names. This provides a clue as to whether the table features 
+represent genomic regions (defined by coordinate positions) or 
+named database features. The return values include:
+
+=over 4
+
+=item coordinate: Table includes at least chromosome and start
+
+=item named: Table includes name, type, and/or Primary_ID
+
+=item unknown: unrecognized
+
+=back
 
 =item program($name)
 
@@ -487,6 +504,27 @@ is set to null.
 
 This method is automatically called prior to writing the Data table to file.
 
+=item sort_data($index, $direction);
+
+This method will sort the Data table by the values in the indicated column. 
+It will automatically determine whether the contents of the column are 
+numbers or alphanumeric, and will sort accordingly, either numerically or 
+asciibetically. The first non-null value in the column is used to determine. 
+The sort may fail if the values are not consistent. Pass a second optional 
+value to indicate the direction of the sort. The value should be either 
+'i' for 'increasing' or 'd' for 'decreasing'. The default order is 
+increasing. 
+
+=item gsort_data
+
+This method will sort the Data table by increasing genomic coordinates. It 
+requires the presence of chromosome and start (or position) columns, 
+identified by their column names. These are automatically identified. 
+Failure to find these columns mean a failure to sort the table. Chromosome 
+names are sorted first by their digits (e.g. chr2 before chr10), and then 
+alphanumerically. Base coordinates are sorted by increasing value. 
+Identical positions are kept in their original order.
+
 =item splice_data($current_part, $total_parts)
 
 This method will splice the Data table into $total_parts number of pieces, 
@@ -500,6 +538,7 @@ Two values are passed to the method. The first is the current part number,
 should be divided, corresponding to the number of concurrent processes. 
 For example, to fork the program into four concurrent processes.
 	
+	use FindBin qw($Bin);
 	my $Data = Bio::ToolBox::Data->new(file => $file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
@@ -512,13 +551,21 @@ For example, to fork the program into four concurrent processes.
 		$pm->finish;
 	}
 	$pm->wait_all_children;
+	
+	# join files together
+	my @files = glob "$file#*";
+	my @args = ("$Bin/join_data_file.pl", "--out", $outfile, @files);
+	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
 
 There is no convenient method for merging the modified contents of the 
 table from each child process back into the original Data table, as 
 each child is essentially isolated from the parent. The Parallel::ForkManager 
-documentation recommends going through a disk file intermediate. See the 
-accompanying BioToolBox script F<join_data_file.pl> for concatenating Data 
-table files together.
+documentation recommends going through a disk file intermediate. Therefore, 
+write each child Data object to file using a unique name. Then, once all 
+children have been reaped, join the child files. See the accompanying 
+BioToolBox script F<join_data_file.pl> for concatenating Data table files 
+together. As long as each child file has the same number of columns, the 
+files should be joined without issue.
 
 Remember that if you fork your script into child processes, any database 
 connections must be re-opened; they are typically not clone safe. If you 
@@ -714,147 +761,6 @@ Flag to use the midpoint instead of actual start and stop coordinates.
 
 =back
 
-=head1 Bio::ToolBox::Data::Feature METHODS
-
-A Bio::ToolBox::Data::Feature is an object representing a row in the 
-data table. Usually, this in turn represents an annotated feature or 
-segment in the genome. As such, this object provides shortcuts for 
-working with these features.
-
-Feature objects are generated using the next_row() method from a 
-Bio::ToolBox::Data::Iterator object (generated itself from the 
-$Data-E<gt>row_stream() function), or the $Data-E<gt>iterate() function.
-
-=head2 Methods to access row feature values
-
-=over 4
-
-=item seq_id
-
-=item start
-
-=item end
-
-=item strand
-
-=item name
-
-=item type
-
-=item id
-
-These methods return the corresponding appropriate value, if 
-present. These rely on the corresponding find_column methods.
-
-=item value($index)
-
-=item value($index, $new_value)
-
-Returns or sets the value at a specific column index in the 
-current data row.
-
-=item row_values
-
-Returns an array or array reference representing all the values 
-in the current data row. 
-
-=item row_index
-
-Returns the index position of the current data row within the 
-data table. Useful for knowing where you are at within the data 
-table.
-
-=back
-
-=head2 Convenience Methods to database functions
-
-The next three functions are convenience methods for using the 
-attributes in the current data row to interact with databases. 
-They are wrappers to methods in the Bio::ToolBox::db_helper 
-module.
-
-=over 4
-
-=item feature
-
-Returns a SeqFeature object from the database using the name and 
-type values in the current Data table row. The SeqFeature object 
-is requested from the database named in the general metadata. If 
-an alternate database is desired, you should change it first using  
-the $Data-E<gt>database() method. If the feature name or type is not 
-present in the table, then nothing is returned.
-
-=item segment
-
-Returns a database Segment object corresponding to the coordinates 
-defined in the Data table row. The database named in the general 
-metadata is used to establish the Segment object. If a different 
-database is desired, it should be changed first using the 
-general database() method. 
-
-=item get_score(%args)
-
-This is a convenience method for the 
-Bio::ToolBox::db_helper::get_chromo_region_score() method. It 
-will return a single score value for the region defined by the 
-coordinates or typed named feature in the current data row. If 
-the Data table has coordinates, then those will be automatically 
-used. If the Data table has typed named features, then the 
-coordinates will automatically be looked up for you by requesting 
-a SeqFeature object from the database.
-
-The name of the dataset from which to collect the data must be 
-provided. This may be a GFF type in a SeqFeature database, a 
-BigWig member in a BigWigSet database, or a path to a BigWig, 
-BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the Bio::ToolBox::db_helper::
-get_chromo_region_score() method for full details.
-
-Here is an example of collecting mean values from a BigWig 
-and adding the scores to the Data table.
-  
-  my $index = $Data->add_column('MyData');
-  my $stream = $Data->row_stream;
-  while (my $row = $stream->next_row) {
-     my $score = $row->get_score(
-        'method'    => 'mean',
-        'dataset'   => '/path/to/MyData.bw',
-     );
-     $row->value($index, $score);
-  }
-
-=item get_position_scores(%args)
-
-This is a convenience method for the Bio::ToolBox::db_helper::
-get_region_dataset_hash() method. It will return a hash of 
-positions =E<gt> scores over the region defined by the 
-coordinates or typed named feature in the current data row. 
-The coordinates for the interrogated region will be 
-automatically provided.
-
-Just like the get_score() method, the dataset from which to 
-collect the scores must be provided, along with any other 
-optional arguments. See the documentation for the 
-Bio::ToolBox::db_helper::get_region_dataset_hash() method 
-for more details.
-
-Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a BigWigSet directory.
-  
-  my $stream = $Data->row_stream;
-  while (my $row = $stream->next_row) {
-     my %position2score = $row->get_position_scores(
-        'ddb'       => '/path/to/BigWigSet/',
-        'dataset'   => 'MyData',
-        'position'  => 5,
-        'start'     => -500,
-        'stop'      => 500,
-     )
-     # do something with %position2score
-  }
-
-=back
-
 
 
 
@@ -864,12 +770,16 @@ the 5 prime end of a feature from a BigWigSet directory.
 use strict;
 use Carp qw(carp cluck croak confess);
 
+use Bio::ToolBox::utility;
+use Bio::ToolBox::Data::meta;
+
 use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	verify_data_structure
+	sort_data_structure
+	gsort_data_structure
 	splice_data_structure
 	index_data_table
-	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
@@ -898,8 +808,9 @@ sub new {
 	$args{features} ||= $args{feature} || undef;
 	
 	my $data;
-	if (exists $args{file} and -e $args{file}) {
+	if (exists $args{file}) {
 		# load from file
+		# extensions and file existence will be taken care of
 		$data = load_tim_data_file($args{file}) or 
 			croak "Cannot load file $args{file}!\n";
 	}
@@ -950,8 +861,7 @@ sub write_file {
 }
 
 sub save {
-	my $self = shift;
-	return $self->write_file(@_);
+	return shift->write_file(@_);
 }
 
 sub summary_file {
@@ -979,6 +889,18 @@ sub verify {
 	return verify_data_structure($self);
 }
 
+sub sort_data {
+	my $self = shift;
+	my $index = shift;
+	my $direction = shift || 'i';
+	return unless exists $self->{$index}{name};
+	return sort_data_structure($self, $index, $direction);
+}
+
+sub gsort_data {
+	my $self = shift;
+	return gsort_data_structure($self);
+}
 sub splice_data {
 	my $self = shift;
 	splice_data_structure($self, @_);
@@ -1000,107 +922,14 @@ sub convert_gff {
 
 
 
-### Metadata
+### Metadata manipulation
 
-sub feature {
-	my $self = shift;
-	if (@_) {
-		$self->{feature} = shift;
-	}
-	return $self->{feature};
-}
-
-sub program {
-	my $self = shift;
-	if (@_) {
-		$self->{program} = shift;
-	}
-	return $self->{program};
-}
-
-sub database {
-	my $self = shift;
-	if (@_) {
-		$self->{db} = shift;
-		if (exists $self->{db_connection}) {
-			my $db = open_db_connection($self->{db});
-			$self->{db_connection} = $db if $db;
-		}
-	}
-	return $self->{db};
-}
-
-sub open_database {
-	my $self = shift;
-	return unless $self->{db};
-	if (exists $self->{db_connection}) {
-		return $self->{db_connection};
-	}
-	else {
-		my $db = open_db_connection($self->{db});
-		return unless $db;
-		$self->{db_connection} = $db;
-		return $db;
-	}
-}
-
-sub gff {
-	my $self = shift;
-	return $self->{gff};
-}
-
-sub bed {
-	my $self = shift;
-	return $self->{bed};
-}
-
-sub number_columns {
-	my $self = shift;
-	return $self->{number_columns};
-}
-
-sub last_row {
-	my $self = shift;
-	return $self->{last_row};
-}
-
-sub filename {
-	my $self = shift;
-	if (@_) {
-		my $filename = shift;
-		my ($basename, $path, $extension) = parse_filename($filename);
-		$self->{filename}  = $filename;
-		$self->{basename}  = $basename;
-		$self->{path}      = $path;
-		$self->{extension} = $extension;
-	}
-	return $self->{filename};
-}
-
-sub basename {
-	my $self = shift;
-	return $self->{basename};
-}
-
-sub path {
-	my $self = shift;
-	return $self->{path};
-}
-
-sub extension {
-	my $self = shift;
-	return $self->{extension};
-}
-
-sub comments {
-	my $self = shift;
-	my @comments = @{ $self->{other} };
-	return @comments;
-}
+# see Bio::ToolBox::Data::meta for the imported methods of getting/setting metadata
 
 sub add_comment {
 	my $self = shift;
 	my $comment = shift or return;
+	# comment is not required to be prefixed with "# ", it will be added when saving
 	push @{ $self->{other} }, $comment;
 	return 1;
 }
@@ -1119,45 +948,9 @@ sub delete_comment {
 
 
 
-### Column Metadata
+### Column Metadata manipulation
 
-sub name {
-	my $self = shift;
-	my ($index, $new_name) = @_;
-	return unless defined $index;
-	return unless exists $self->{$index}{name};
-	if ($new_name) {
-		$self->{$index}{name} = $new_name;
-	}
-	return $self->{$index}{name};
-}
-
-sub metadata {
-	my $self = shift;
-	my ($index, $key, $value) = @_;
-	return unless defined $index;
-	return unless exists $self->{$index};
-	if ($key and $value) { 
-		# we are setting a new value
-		$self->{$index}{$key} = $value;
-		return $value;
-	}
-	elsif ($key and not defined $value) {
-		if (exists $self->{$index}{$key}) {
-			# retrieve a value
-			return $self->{$index}{$key};
-		}
-		else {
-			# set a new empty key
-			$self->{$index}{$key} = q();
-			return 1;
-		}
-	}
-	else {
-		my %hash = %{ $self->{$index} };
-		return wantarray ? %hash : \%hash;
-	}
-}
+# see Bio::ToolBox::Data::meta for the imported methods of getting/setting metadata
 
 sub delete_metadata {
 	my $self = shift;
@@ -1191,16 +984,9 @@ sub copy_metadata {
 }
 
 
-### Columns or Datasets
 
-sub list_columns {
-	my $self = shift;
-	my @list;
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		push @list, $self->{$i}{'name'};
-	}
-	return wantarray ? @list : \@list;
-}
+
+### Column manipulation
 
 sub column_values {
 	my ($self, $column) = @_;
@@ -1208,12 +994,6 @@ sub column_values {
 	return unless exists $self->{$column}{name};
 	my @values = map {$self->value($_, $column)} (0 .. $self->last_row);
 	return wantarray ? @values : \@values;
-}
-
-sub find_column {
-	my ($self, $name) = @_;
-	return unless $name;
-	return find_column_index($self, $name);
 }
 
 sub add_column {
@@ -1328,74 +1108,25 @@ sub copy_column {
 	return $new_index;
 }
 
-sub _find_column_indices {
-	my $self = shift;
-	my $name   = find_column_index($self, '^name');
-	my $type   = find_column_index($self, '^type|class');
-	my $id     = find_column_index($self, '^primary_id');
-	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
-	my $start  = find_column_index($self, '^start|position');
-	my $stop   = find_column_index($self, '^stop|end');
-	my $strand = find_column_index($self, '^strand');
-	$self->{column_indices} = {
-		'name'      => $name,
-		'type'      => $type,
-		'id'        => $id,
-		'seq_id'    => $chromo,
-		'chromo'    => $chromo,
-		'start'     => $start,
-		'stop'      => $stop,
-		'end'       => $stop,
-		'strand'    => $strand,
-	};
-	return 1;
-}
 
-sub chromo_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{chromo};
-}
-
-sub start_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{start};
-}
-
-sub stop_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{stop};
-}
-
-sub strand_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{strand};
-}
-
-sub name_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{name};
-}
-
-sub type_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{type};
-}
-
-sub id_column {
-	my $self = shift;
-	$self->_find_column_indices unless exists $self->{column_indices};
-	return $self->{column_indices}{id};
-}
 
 
 
 ### Other stuff
+
+sub open_database {
+	my $self = shift;
+	return unless $self->{db};
+	if (exists $self->{db_connection}) {
+		return $self->{db_connection};
+	}
+	else {
+		my $db = open_db_connection($self->{db});
+		return unless $db;
+		$self->{db_connection} = $db;
+		return $db;
+	}
+}
 
 sub verify_dataset {
 	my $self = shift;
@@ -1431,18 +1162,24 @@ sub verify_dataset {
 
 sub add_row {
 	my $self = shift;
-	my $row_data = shift;
-	if (scalar @$row_data > $self->{number_columns}) {
-		cluck "row added has more elements than columns in data strucure!\n"; 
-		splice @$row_data, 0, $self->{number_columns};
+	my @row_data;
+	if ($_[0] and ref $_[0] eq 'ARRAY') {
+		@row_data = @{ $_[0] };
 	}
-	until (scalar @$row_data == $self->{number_columns}) {
-		push @$row_data, undef;
+	else {
+		@row_data = map {'.'} (1 .. $self->{number_columns});
 	}
-	my $row = $self->{last_row} + 1;
-	$self->{data_table}->[$row] = $row_data;
+	if (scalar @row_data > $self->{number_columns}) {
+		cluck "row added has more elements than columns in data structure!\n"; 
+		splice @row_data, 0, $self->{number_columns};
+	}
+	until (scalar @row_data == $self->{number_columns}) {
+		push @row_data, '.';
+	}
+	my $row_index = $self->{last_row} + 1;
+	$self->{data_table}->[$row_index] = \@row_data;
 	$self->{last_row}++;
-	return 1;
+	return $row_index;
 }
 
 sub delete_row {
@@ -1494,38 +1231,25 @@ sub iterate {
 ####################################################
 
 package Bio::ToolBox::Data::Iterator;
+use Bio::ToolBox::Data::Feature;
 
 sub new {
 	my ($class, $data) = @_;
-	my $chromo = $data->chromo_column;
-	my $start  = $data->start_column;
-	my $type   = $data->type_column;
-	my $name   = $data->name_column;
-	my $feature_type;
-	if (defined $chromo and defined $start) {
-		$feature_type = 'coordinate';
-	}
-	elsif (defined $type and defined $name) {
-		$feature_type = 'named';
-	}
 	my %iterator = (
 		'index'     => 1,
 		'data'      => $data,
-		'last'      => $data->{last_row},
-		'feature'   => $feature_type,
 	);
 	return bless \%iterator, $class;
 }
 
 sub next_row {
 	my $self = shift;
-	return if $self->{'index'} > $self->{'last'}; # no more
+	return if $self->{'index'} > $self->{data}->{last_row}; # no more
 	my $i = $self->{'index'};
 	$self->{'index'}++;
 	return Bio::ToolBox::Data::Feature->new(
 		'data'      => $self->{data},
 		'index'     => $i,
-		'feature'   => $self->{feature},
 	);	
 }
 
@@ -1537,199 +1261,6 @@ sub row_index {
 
 
 ####################################################
-
-package Bio::ToolBox::Data::Feature;
-
-use Carp;
-use Bio::ToolBox::db_helper qw(
-	get_feature
-	get_chromo_region_score
-	get_region_dataset_hash
-);
-
-sub new {
-	my $class = shift;
-	my %self = @_;
-	return bless \%self, $class;
-}
-
-
-### Set and retrieve values
-
-sub row_index {
-	my $self = shift;
-	return $self->{'index'};
-}
-
-sub row_values {
-	my $self  = shift;
-	my $row = $self->{'index'};
-	my @data = @{ $self->{data}->{data_table}->[$row] };
-	return wantarray ? @data : \@data;
-}
-
-sub value {
-	my ($self, $column, $value) = @_;
-	return unless defined $column;
-	my $row = $self->{'index'};
-	
-	if (defined $value) {
-		# set a value
-		$self->{data}->{data_table}->[$row][$column] = $value;
-	}
-	return $self->{data}->{data_table}->[$row][$column];
-}
-
-sub seq_id {
-	my $self = shift;
-	my $i = $self->{data}->chromo_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-sub start {
-	my $self = shift;
-	my $i = $self->{data}->start_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-sub end {
-	my $self = shift;
-	my $i = $self->{data}->stop_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-sub stop {
-	return shift->end;
-}
-
-sub strand {
-	my $self = shift;
-	my $i = $self->{data}->strand_column;
-	return defined $i ? $self->value($i) : 0; # default is no strand
-}
-
-sub name {
-	my $self = shift;
-	my $i = $self->{data}->name_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-sub type {
-	my $self = shift;
-	my $i = $self->{data}->type_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-sub id {
-	my $self = shift;
-	my $i = $self->{data}->id_column;
-	return defined $i ? $self->value($i) : undef;
-}
-
-
-### Data collection convenience methods
-
-sub feature {
-	my $self = shift;
-	my $id   = $self->id;
-	my $name = $self->name;
-	my $type = $self->type;
-	return unless ($name and $type);
-	return unless $self->{data}->database;
-	return get_feature(
-		'db'    => $self->{data}->open_database,
-		'id'    => $self->id,
-		'name'  => $self->name,
-		'type'  => $self->type,
-	);
-}
-
-sub segment {
-	my $self   = shift;
-	my $chromo = $self->seq_id;
-	my $start  = $self->start;
-	my $stop   = $self->end;
-	return unless ($chromo and defined $start and defined $stop);
-	return unless $self->{data}->database;
-	my $db = $self->{data}->open_database;
-	return $db ? $db->segment($chromo, $start, $stop) : undef;
-}
-
-sub get_score {
-	my $self = shift;
-	my %args = @_;
-	
-	if ($self->{feature} eq 'named') {
-		# we must get the coordinates ourselves via lookup
-		my $f = $self->feature;
-		return unless $f;
-		$args{chromo} ||= $f->seq_id;
-		$args{start}  ||= $f->start;
-		$args{stop}   ||= $f->end;
-		$args{strand} ||= $f->strand;
-	}
-	elsif ($self->{feature} eq 'coordinate') {
-		$args{chromo} ||= $self->seq_id;
-		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
-		$args{strand} ||= $self->strand;
-	}
-	else {
-		# die otherwise we will have this error every time
-		croak "data table does not have coordinates or feature attributes for score collection\n";
-	}
-	
-	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
-	}
-	
-	$args{db} ||= $self->{data}->open_database;
-	
-	return get_chromo_region_score(%args);
-}
-
-sub get_position_scores {
-	my $self = shift;
-	my %args = @_;
-	
-	if ($self->{feature} eq 'named') {
-		# we must get the coordinates ourselves via lookup
-		$args{id}     ||= $self->id;
-		$args{name}   ||= $self->name;
-		$args{type}   ||= $self->type;
-	}
-	elsif ($self->{feature} eq 'coordinate') {
-		$args{chromo} ||= $self->seq_id;
-		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
-		$args{strand} ||= $self->strand;
-	}
-	else {
-		# die otherwise we will have this error every time
-		croak "data table does not have coordinates or feature attributes for score collection\n";
-	}
-	
-	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
-	}
-	
-	$args{db} ||= $self->{data}->open_database;
-	unless ($args{db} or $args{ddb}) {
-		# make sure we provide a database
-		if ($self->{feature} eq 'coordinate' and $args{dataset} =~ /^(?:file|http|ftp)/) {
-			$args{ddb} = $args{dataset};
-		}
-	}
-	
-	return get_region_dataset_hash(%args);
-}
-
 
 __END__
 
