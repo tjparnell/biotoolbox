@@ -40,6 +40,7 @@ sub get_base_options {
 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
+			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 			'Bio::Root::Version'      => '1.0069001',
