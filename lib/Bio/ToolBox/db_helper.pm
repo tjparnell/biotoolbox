@@ -3,8 +3,7 @@ package Bio::ToolBox::db_helper;
 use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
-use Bio::DB::Fasta;
-use Bio::DB::SeqFeature::Store;
+use Module::Load; # for dynamic loading during runtime
 use Statistics::Lite qw(
 	sum
 	mean
@@ -16,54 +15,23 @@ use Statistics::Lite qw(
 );
 use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure 
-	format_with_commas
-	parse_list
 );
 use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-# check for wiggle support
-our $WIGGLE_OK = 0;
-eval {
-	require Bio::ToolBox::db_helper::wiggle;
-	Bio::ToolBox::db_helper::wiggle->import;
-	$WIGGLE_OK = 1;
-};
+our $VERSION = '1.20';
 
-# check for BigWig support
-our $BIGWIG_OK = 0;
-eval { 
-	require Bio::ToolBox::db_helper::bigwig;
-	Bio::ToolBox::db_helper::bigwig->import;
-	$BIGWIG_OK = 1;
-};
 
-# check for BigBed support
-our $BIGBED_OK = 0;
-eval { 
-	require Bio::ToolBox::db_helper::bigbed;
-	Bio::ToolBox::db_helper::bigbed->import;
-	$BIGBED_OK = 1;
-};
-
-# check for Bam support
-our $BAM_OK = 0;
-eval { 
-	require Bio::ToolBox::db_helper::bam;
-	Bio::ToolBox::db_helper::bam->import;
-	$BAM_OK = 1;
-};
-
-# check for USeq support
-our $USEQ_OK = 0;
-eval { 
-	require Bio::ToolBox::db_helper::useq;
-	Bio::ToolBox::db_helper::useq->import;
-	$USEQ_OK = 1;
-};
-
-our $VERSION = '1.18';
-
+# check values for dynamically loaded helper modules
+# these are loaded only when needed during runtime to avoid wasting resources
+our $BAM_OK      = 0;
+our $BIGBED_OK   = 0;
+our $BIGWIG_OK   = 0;
+our $FASTA_OK    = 0;
+our $SEQSTORE_OK = 0;
+our $USEQ_OK     = 0;
+our $WIGGLE_OK   = 0;
 
 # define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
@@ -109,7 +77,7 @@ of interest. Collected scores may be summarized using a variety of statistical
 methods.
 
 When collecting scores or features, the data may hosted in a variety of 
-formats and locations. These include
+formats and locations. These include:
 
 =over 4
 
@@ -353,6 +321,7 @@ sub open_db_connection {
 		# a remote Bam database
 		if ($database =~ /\.bam$/i) {
 			# open using BigWig adaptor
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
 				unless ($db) {
@@ -369,6 +338,8 @@ sub open_db_connection {
 		# a remote BigBed database
 		elsif ($database =~ /\.bb$/i) {
 			# open using BigBed adaptor
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
+				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				$db = open_bigbed_db($database);
 				unless ($db) {
@@ -385,6 +356,8 @@ sub open_db_connection {
 		# a remote BigWig database
 		elsif ($database =~ /\.bw$/i) {
 			# open using BigWig adaptor
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
 				$db = open_bigwig_db($database);
 				unless ($db) {
@@ -407,6 +380,8 @@ sub open_db_connection {
 		# a presumed remote directory, presumably of bigwig files
 		else {
 			# open using BigWigSet adaptor
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
 				$db = open_bigwigset_db($database);
 				unless ($db) {
@@ -425,6 +400,8 @@ sub open_db_connection {
 	# a directory, presumably of bigwig files
 	elsif (-d $database) {
 		# try opening using the BigWigSet adaptor
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+			unless $BIGWIG_OK;
 		if ($BIGWIG_OK) {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
@@ -440,16 +417,23 @@ sub open_db_connection {
 		
 		# try opening with the Fasta adaptor
 		unless ($db) {
-			undef $@;
-			eval {
-				# to prevent annoying error messages
-				local $SIG{__WARN__} = sub {}; 
-				$db = Bio::DB::Fasta->new($database);
-			};
-			unless ($db) {
-				$error .= " ERROR: could not open fasta directory '$database'!\n";
-				$error .= "   Does directory contain fasta files? If it contains a" . 
-					" directory.index file,\n   try deleting it and try again.\n";
+			$FASTA_OK = _load_helper_module('Bio::DB::Fasta') unless $FASTA_OK;
+			if ($FASTA_OK) {
+				undef $@; # in case it was set by something else
+				eval {
+					# to prevent annoying error messages
+					local $SIG{__WARN__} = sub {}; 
+					$db = Bio::DB::Fasta->new($database);
+				};
+				unless ($db) {
+					$error .= " ERROR: could not open fasta directory '$database'!\n";
+					$error .= "   Does directory contain fasta files? If it contains a" . 
+						" directory.index file,\n   try deleting it and try again.\n";
+				}
+			}
+			else {
+				$error .= " Module Bio::DB::Fasta is required to open presumed fasta " . 
+					"directory\n";
 			}
 		}
 	}
@@ -462,37 +446,55 @@ sub open_db_connection {
 		
 			# a single gff3 file that we can load into memory
 			if ($database =~ /\.gff3?(?:\.gz)?$/i) {
-				print " Loading file into memory database...\n";
-				undef $@;
-				eval {
-					$db = Bio::DB::SeqFeature::Store->new(
-						-adaptor => 'memory',
-						-gff     => $database,
-					);
-				};
-				unless ($db) {
-					$error = " ERROR: could not load file '$database' into memory! $@\n";
+				$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
+					unless $SEQSTORE_OK;
+				if ($SEQSTORE_OK) {
+					print " Loading file into memory database...\n";
+					undef $@;
+					eval {
+						$db = Bio::DB::SeqFeature::Store->new(
+							-adaptor => 'memory',
+							-gff     => $database,
+						);
+					};
+					unless ($db) {
+						$error = " ERROR: could not load file '$database' into memory! $@\n";
+					}
+				}
+				else {
+					$error .= " Module Bio::DB::SeqFeature::Store is required to load " . 
+						"GFF3 files into memory\n";
 				}
 			}
 			
 			# a SQLite database
 			elsif ($database =~ /\.(?:sqlite|db)$/i) {
 				# open using SQLite adaptor
-				undef $@;
-				eval {
-					$db = Bio::DB::SeqFeature::Store->new(
-						-adaptor  => 'DBI::SQLite',
-						-dsn      => $database,
-					);
-				};
-				unless ($db) {
-					$error = " ERROR: could not open SQLite file '$database'! $@\n";
+				$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
+					unless $SEQSTORE_OK;
+				if ($SEQSTORE_OK) {
+					undef $@;
+					eval {
+						$db = Bio::DB::SeqFeature::Store->new(
+							-adaptor  => 'DBI::SQLite',
+							-dsn      => $database,
+						);
+					};
+					unless ($db) {
+						$error = " ERROR: could not open SQLite file '$database'! $@\n";
+					}
+				}
+				else {
+					$error .= " Module Bio::DB::SeqFeature::Store is required to access" . 
+						" database\n";
 				}
 			}
 			
 			# a Bam database
 			elsif ($database =~ /\.bam$/i) {
 				# open using BigWig adaptor
+				$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') 
+					unless $BAM_OK;
 				if ($BAM_OK) {
 					undef $@;
 					$db = open_bam_db($database);
@@ -510,6 +512,8 @@ sub open_db_connection {
 			# a BigBed database
 			elsif ($database =~ /\.bb$/i) {
 				# open using BigBed adaptor
+				$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
+					unless $BIGBED_OK;
 				if ($BIGBED_OK) {
 					undef $@;
 					$db = open_bigbed_db($database);
@@ -527,6 +531,8 @@ sub open_db_connection {
 			# a BigWig database
 			elsif ($database =~ /\.bw$/i) {
 				# open using BigWig adaptor
+				$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+					unless $BIGWIG_OK;
 				if ($BIGWIG_OK) {
 					undef $@;
 					$db = open_bigwig_db($database);
@@ -544,6 +550,8 @@ sub open_db_connection {
 			# a useq database
 			elsif ($database =~ /\.useq$/i) {
 				# open using USeq adaptor
+				$USEQ_OK = _load_helper_module('Bio::ToolBox::db_helper::useq') 
+					unless $USEQ_OK;
 				if ($USEQ_OK) {
 					$db = open_useq_db($database);
 					unless ($db) {
@@ -560,17 +568,24 @@ sub open_db_connection {
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
 				# open using the Fasta adaptor
-				undef $@;
-				eval {
-					# to prevent annoying error messages
-					local $SIG{__WARN__} = sub {}; 
-					$db = Bio::DB::Fasta->new($database);
-				};
-				unless ($db) {
-					$error = " ERROR: could not open fasta file '$database'!\n";
-					if (-e "$database\.index") {
-						$error .= "   Try deleting $database\.index and try again\n";
+				$FASTA_OK = _load_helper_module('Bio::DB::Fasta') unless $FASTA_OK;
+				if ($FASTA_OK) {
+					undef $@;
+					eval {
+						# to prevent annoying error messages
+						local $SIG{__WARN__} = sub {}; 
+						$db = Bio::DB::Fasta->new($database);
+					};
+					unless ($db) {
+						$error = " ERROR: could not open fasta file '$database'!\n";
+						if (-e "$database\.index") {
+							$error .= "   Try deleting $database\.index and try again\n";
+						}
 					}
+				}
+				else {
+					$error .= " Fasta file could not be loaded because Bio::DB::Fasta" . 
+						" is not installed\n";
 				}
 			}
 		}
@@ -594,7 +609,7 @@ sub open_db_connection {
 		$error = " File '$database' type is not recognized\n";
 	}
 	
-	# otherwise assume the name of a database in the configuration
+	# otherwise assume the name of a SeqFeature::Store database in the configuration
 	
 	# attempt to open using information from the configuration
 	# using default connection information as necessary
@@ -624,24 +639,32 @@ sub open_db_connection {
 		}
 		
 		# establish the database connection
-		eval {
-			# to prevent annoying error messages from B:DB:SF:S
-			local $SIG{__WARN__} = sub {}; 
+		$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
+			unless $SEQSTORE_OK;
+		if ($SEQSTORE_OK) {
+			eval {
+				# to prevent annoying error messages from B:DB:SF:S
+				local $SIG{__WARN__} = sub {}; 
 			
-			# attempt a connection
-			$db = Bio::DB::SeqFeature::Store->new(
-				-adaptor => $adaptor,
-				-dsn     => $dsn,
-				-user    => $user,
-				-pass    => $pass,
-			);
-		};
+				# attempt a connection
+				$db = Bio::DB::SeqFeature::Store->new(
+					-adaptor => $adaptor,
+					-dsn     => $dsn,
+					-user    => $user,
+					-pass    => $pass,
+				);
+			};
 		
-		unless ($db) {
-			$error .= " ERROR: unknown $adaptor database '$database'\n";
-			if ($dsn =~ /mysql|pg/i) {
-				$error .= "   using user '$user' and password\n";
+			unless ($db) {
+				$error .= " ERROR: unknown $adaptor database '$database'\n";
+				if ($dsn =~ /mysql|pg/i) {
+					$error .= "   using user '$user' and password\n";
+				}
 			}
+		}
+		else {
+			$error .= " Module Bio::DB::SeqFeature::Store is required to connect " . 
+				"to $adaptor databases\n";
 		}
 	}
 	
@@ -1881,7 +1904,7 @@ sub get_chromo_region_score {
 	}
 	
 	# Open a db connection 
-	$args{'db'} ||= undef;
+	$args{'db'} ||= $args{'ddb'} || undef;
 	unless ($args{'db'} or $args{'dataset'} =~ /^(?:file|http|ftp)/) {
 		# database is only really necessary if we are not using an indexed file dataset
 		confess "no database provided!";
@@ -1898,14 +1921,21 @@ sub get_chromo_region_score {
 	$args{'stop'}   ||= $args{'end'} || undef;
 	$args{'strand'} ||= 0;
 	if (defined $args{'start'} and $args{'start'} <= 0) {
-		warn " Invalid start coordinate for " . $args{'chromo'} . ':' . $args{'start'} .
-			'..' . $args{'stop'} . ". Resetting to 1.\n";
+# 		warn " Invalid start coordinate for " . $args{'chromo'} . ':' . $args{'start'} .
+# 			'..' . $args{'stop'} . ". Resetting to 1.\n";
 		$args{'start'} = 1;
 	}
-	unless ($args{chromo} and $args{start} and $args{stop}) {
-		cluck "one or more required genomic coordinates are missing for !";
+	unless (defined $args{chromo} and defined $args{start} and defined $args{stop}) {
+		cluck "one or more required genomic coordinates are missing for requested region!";
 		return;
 	};
+	if ($args{'stop'} < $args{'start'}) {
+		# coordinates are flipped, reverse strand
+		my $stop = $args{'start'};
+		$args{'start'} = $args{'stop'};
+		$args{'stop'}  = $stop;
+		$args{'strand'} = -1;
+	}
 	
 	# define default values as necessary
 	$args{'value'}    ||= 'score';
@@ -2075,10 +2105,19 @@ sub get_region_dataset_hash {
 	
 	### Initialize parameters
 	
+	# check the data source
+	$args{'dataset'} ||= undef;
+	unless ($args{'dataset'}) {
+		confess " no dataset requested!";
+	}
+	
 	# Open a db connection 
-	$args{'db'} ||= $args{'ddb'} || undef;
-	my $db = open_db_connection( $args{'db'} ) or 
-		confess "no database name or connection!!\n";
+	$args{'db'} ||= undef;
+	my $db;
+	if ($args{'db'}) {
+		$db = open_db_connection( $args{'db'} ) or 
+			confess "cannot open database!";
+	}
 	
 	# Open the data database if provided
 	$args{'ddb'} ||= undef;
@@ -2088,14 +2127,16 @@ sub get_region_dataset_hash {
 			confess "requested data database could not be opened!\n";
 	}
 	else {
-		# use the same database for both
-		$ddb = $db;
-	}
-	
-	# check the data source
-	$args{'dataset'} ||= undef;
-	unless ($args{'dataset'}) {
-		confess " no dataset requested!";
+		# reuse something else
+		if ($db) {
+			$ddb = $db;
+		}
+		elsif ($args{'dataset'} =~ /^(?:file|http|ftp)/) {
+			$ddb = $args{'dataset'};
+		}
+		else {
+			confess "no database or indexed dataset supplied!";
+		}
 	}
 	
 	# confirm options and check we have what we need 
@@ -2113,6 +2154,13 @@ sub get_region_dataset_hash {
 		cluck "the feature name and type or genomic coordinates are missing!";
 		return;
 	};
+	if ($args{'stop'} < $args{'start'}) {
+		# coordinates are flipped, reverse strand
+		my $stop = $args{'start'};
+		$args{'start'} = $args{'stop'};
+		$args{'stop'}  = $stop;
+		$args{'strand'} = -1;
+	}
 	
 	# assign other defaults
 	$args{'stranded'} ||= 'all';
@@ -2144,6 +2192,7 @@ sub get_region_dataset_hash {
 	) {
 		
 		# first define the feature to get endpoints
+		confess "database required to use named features" unless $db;
 		my $feature = get_feature(
 			'db'    => $db,
 			'id'    => $args{'id'},
@@ -2182,6 +2231,7 @@ sub get_region_dataset_hash {
 		$args{'start'} and $args{'stop'}
 	) {
 		# first define the feature to get endpoints
+		confess "database required to use named features" unless $db;
 		my $feature = get_feature(
 			'db'    => $db,
 			'id'    => $args{'id'},
@@ -2255,6 +2305,7 @@ sub get_region_dataset_hash {
 	elsif ( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) {
 		
 		# first define the feature to get endpoints
+		confess "database required to use named features" unless $db;
 		my $feature = get_feature(
 			'db'    => $db,
 			'id'    => $args{'id'},
@@ -2819,6 +2870,8 @@ sub _get_segment_score {
 			# this uses the Bio::DB::BigWig adaptor
 			
 			# check that we have bigwig support
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
 				# get the dataset scores using Bio::ToolBox::db_helper::bigwig
 				
@@ -2884,6 +2937,8 @@ sub _get_segment_score {
 			# this uses the Bio::DB::BigBed adaptor
 			
 			# check that we have bigbed support
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
+				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				# get the dataset scores using Bio::ToolBox::db_helper::bigbed
 				
@@ -2926,6 +2981,7 @@ sub _get_segment_score {
 			# this uses the Bio::DB::Sam adaptor
 			
 			# check that we have Bam support
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				# get the dataset scores using Bio::ToolBox::db_helper::bam
 				
@@ -2967,6 +3023,8 @@ sub _get_segment_score {
 			# this uses the Bio::DB::USeq adaptor
 			
 			# check that we have bigbed support
+			$USEQ_OK = _load_helper_module('Bio::ToolBox::db_helper::useq') 
+				unless $USEQ_OK;
 			if ($USEQ_OK) {
 				# get the dataset scores using Bio::ToolBox::db_helper::useq
 				
@@ -3150,6 +3208,8 @@ sub _get_segment_score {
 				}
 				
 				# check that we have wiggle support
+				$WIGGLE_OK = _load_helper_module('Bio::ToolBox::db_helper::wiggle') 
+					unless $WIGGLE_OK;
 				if ($WIGGLE_OK) {
 					# get the dataset scores using Bio::ToolBox::db_helper::wiggle
 					
@@ -3222,6 +3282,8 @@ sub _get_segment_score {
 				return _return_null($method) unless (@wigfiles);
 				
 				# check that we have bigwig support
+				$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+					unless $BIGWIG_OK;
 				if ($BIGWIG_OK) {
 					
 					# the data collection depends on the method
@@ -3541,6 +3603,17 @@ sub _return_null {
 	}
 }
 
+
+sub _load_helper_module {
+	my $class = shift;
+	my $success = 0;
+	eval {
+		load $class; # using Module::Load to dynamically load modules
+		$class->import; # must be done particularly for my modules
+		$success = 1;
+	};
+	return $success;
+}
 
 
 
