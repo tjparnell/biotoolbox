@@ -1,4 +1,5 @@
 package Bio::ToolBox::data_helper;
+our $VERSION = '1.20';
 
 ### modules
 require Exporter;
@@ -9,18 +10,15 @@ use Carp;
 ### Variables
 # Export
 our @ISA = qw(Exporter);
-our @EXPORT = qw(
-);
 our @EXPORT_OK = qw(
 	generate_tim_data_structure
 	verify_data_structure
+	sort_data_structure
+	gsort_data_structure
 	splice_data_structure
 	index_data_table
 	find_column_index
-	parse_list
-	format_with_commas
 );
-our $VERSION = '1.14';
 
 
 
@@ -395,6 +393,283 @@ sub verify_data_structure {
 
 
 
+### Sort a data structure
+sub sort_data_structure {
+	my ($data, $index, $direction) = @_;
+	my $data_table_ref = $data->{'data_table'};
+	
+	# confirm passed elements
+	unless ($data) {
+		confess "no data structure passed for sorting\n";
+	}
+	unless (defined $index and exists $data->{$index}{'name'}) {
+		confess "invalid data index $index provided to sort";
+	}
+	unless ($direction =~ /^[id]/i) {
+		warn "unrecognized sort order '$direction'! using default increasing order\n";
+		$direction = 'i';
+	}
+	
+	# Sample the dataset values
+	# this will be used to guess the sort method, below
+	my $example; # an example of the dataset
+	my $i = 1;
+	while ($example eq undef) {
+		# we want to avoid a non-value '.', so keep trying
+		if ($data_table_ref->[$i][$index] ne '.') {
+			# a non-null value, take it
+			$example = $data_table_ref->[$i][$index];
+		} 
+		else {
+			# a null value, proceed to next one
+			$i++;
+		}
+	}
+	
+	# Determine sort method, either numerical or alphabetical
+	my $sortmethod; 
+	if ($example =~ /[a-z]/i) { 
+		# there are detectable letters
+		$sortmethod = 'ascii';
+	} 
+	elsif ($example =~ /^\-?\d+\.?\d*$/) {
+		# there are only digits, allowing for minus sign and a decimal point
+		# I don't think this allows for exponents, though
+		$sortmethod = 'numeric';
+	} 
+	else { 
+		# unable to determine (probably alphanumeric), sort asciibetical
+		$sortmethod = 'ascii';
+	}
+	
+	# Remove the table header
+	# this keeps the header out of the sorting process
+	my $header = shift @{ $data_table_ref }; 
+	# calculate our own temporary last_row index, since the main data value
+	# is not valid because we moved the header out
+	my $last_row = scalar @{ $data_table_ref } - 1;
+	
+	# Re-order the datasets
+	# Directly sorting the @data array is proving difficult. It keeps giving me
+	# a segmentation fault. So I'm using a different approach by copying the 
+	# @data_table into a temporary hash.
+		# put data_table array into a temporary hash
+		# the hash key will the be dataset value, 
+		# the hash value will be the reference the row data
+	my %datahash;
+	
+	# reorder numerically
+	if ($sortmethod eq 'numeric') {
+		printf " Sorting %s numerically\n", $data->{$index}{'name'};
+		for my $row (0..$last_row) {
+			
+			# get the value to sort by
+			my $value = $data_table_ref->[$row][$index]; 
+			
+			# check to see whether this value exists or not
+			while (exists $datahash{$value}) {
+				# add a really small number to bump it up and make it unique
+				# this, of course, presumes that none of the dataset values
+				# are really this small - this may be an entirely bad 
+				# assumption!!!!! I suppose we could somehow calculate an 
+				# appropriate value.... nah.
+				# don't worry, we're only modifying the value used for sorting,
+				# not the actual value
+				$value += 0.00000001; 
+			}
+			
+			# store the row data reference
+			$datahash{$value} = $data_table_ref->[$row]; 
+		}
+		
+		# re-fill the array based on the sort direction
+		if ($direction =~ /^i/i) { 
+			# increasing sort
+			my $i = 0; # keep track of the row
+			foreach (sort {$a <=> $b} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$data_table_ref->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		} 
+		
+		else { 
+			# decreasing sort
+			my $i = 0; # keep track of the row
+			foreach (sort {$b <=> $a} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$data_table_ref->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		}
+		
+		# restore the table header
+		unshift @{ $data_table_ref }, $header;
+		
+		# summary prompt
+		printf " Data table sorted numerically by the contents of %s\n",
+			$data->{$index}{'name'};
+		
+	} 
+	
+	# reorder asciibetically
+	elsif ($sortmethod eq 'ascii') {
+		printf " Sorting %s asciibetically\n", $data->{$index}{'name'};
+		for my $row (0..$last_row) {
+			
+			# get the value to sort by
+			my $value = $data_table_ref->[$row][$index]; 
+			
+			# check to see if this is a unique value
+			if (exists $datahash{$value}) { 
+				# not unique
+				my $n = 1;
+				my $lookup = $value . sprintf("03%d", $n);
+				# we'll try to make a unique value by appending 
+				# a number to the original value
+				while (exists $datahash{$lookup}) {
+					# keep bumping up the number till it's unique
+					$n++;
+					$lookup = $value . sprintf("03%d", $n);
+				}
+				$datahash{$lookup} = $data_table_ref->[$row];
+			} 
+			else {
+				# unique
+				$datahash{$value} = $data_table_ref->[$row];
+			}
+		}
+		
+		# re-fill the array based on the sort direction
+		if ($direction =~ /^i/i) { 
+			# increasing
+			my $i = 0; # keep track of the row
+			foreach (sort {$a cmp $b} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$data_table_ref->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		} 
+		
+		elsif ($direction eq 'd' or $direction eq 'D') { 
+			# decreasing
+			my $i = 0; # keep track of the row
+			foreach (sort {$b cmp $a} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$data_table_ref->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		}
+		
+		# restore the table header
+		unshift @{ $data_table_ref }, $header;
+		
+		# summary prompt
+		printf " Data table sorted asciibetically by the contents of '%s'\n",
+			$data->{$index}{'name'};
+	}
+	
+	return 1;
+}
+
+
+
+### Sort a data structure by genomic coordinates
+sub gsort_data_structure {
+	
+	# data structure
+	my $main_data_ref = shift;
+	my $data_table_ref = $main_data_ref->{'data_table'};
+	unless ($main_data_ref) {
+		confess "no data structure passed for sorting\n";
+	}
+
+	# attempt to automatically identify the chromo and start indices
+	my $chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq');
+	my $start_i = find_column_index($main_data_ref, '^start|position');
+	
+	# if unable to auto-identify columns
+	unless (defined $chromo_i and defined $start_i) {
+		warn "unable to identify chromosome and start/position columns! table not sorted\n";
+		return;
+	}
+	
+	# Load the data into a temporary hash
+	# The datalines will be put into a hash of hashes: The first key will be 
+	# the chromosome name, the second hash will be the start value.
+	# 
+	# To deal with some chromosomes that don't have numbers (e.g. chrM), we'll
+	# use two separate hashes: one is for numbers, the other for strings
+	# when it comes time to sort, we'll put the numbers first, then strings
+	
+	my %num_datahash;
+	my %str_datahash;
+	for my $row (1 .. $main_data_ref->{'last_row'}) { 
+		
+		my $startvalue = $data_table_ref->[$row][$start_i];
+		
+		# check for alphabet characters
+		if ($startvalue =~ /[a-z]+/i) { 
+			warn "  Unable to numeric sort with alphabet characters in start data!\n";
+			return;
+		}
+		
+		# put the dataline into the appropriate temporary hash
+		if ($data_table_ref->[$row][$chromo_i] =~ /^(?:chr)?(\d+)$/) {
+			# dealing with a numeric chromosome name
+			# restricting to either chr2 or just 2 but not 2-micron
+			my $chromovalue = $1;
+			while (exists $num_datahash{$chromovalue}{$startvalue}) { 
+				# if another item already exists at this location
+				# add a really small number to bump it up and make it unique
+				$startvalue += 0.001; 
+			}
+			$num_datahash{$chromovalue}{$startvalue} = $data_table_ref->[$row];
+		} 
+		else {
+			# dealing with a non-numeric chromosome name
+			my $chromovalue = $data_table_ref->[$row][$chromo_i];
+			# use the entire chromosome name as key
+			while (exists $str_datahash{$chromovalue}{$startvalue}) { 
+				# if another item already exists at this location
+				# add a really small number to bump it up and make it unique
+				$startvalue += 0.001; 
+			}
+			$str_datahash{$chromovalue}{$startvalue} = $data_table_ref->[$row];
+		}
+	}
+	
+	
+	# Now re-load the data array with sorted data
+	# put the numeric chromosome data back first
+	my $i = 1; # keep track of the row
+	foreach my $chromovalue (sort {$a <=> $b} keys %num_datahash) {
+		# first, numeric sort on increasing chromosome number
+		foreach my $startvalue (
+			sort {$a <=> $b} keys %{ $num_datahash{$chromovalue} } 
+		) {
+			# second, numeric sort on increasing position value
+			$data_table_ref->[$i] = $num_datahash{$chromovalue}{$startvalue};
+			$i++; # increment for next row
+		}
+	}
+	# next put the string chromosome data back
+	foreach my $chromovalue (sort {$a cmp $b} keys %str_datahash) {
+		# first, ascii sort on increasing chromosome name
+		foreach my $startvalue (
+			sort {$a <=> $b} keys %{ $str_datahash{$chromovalue} } 
+		) {
+			# second, numeric sort on increasing position value
+			$data_table_ref->[$i] = $str_datahash{$chromovalue}{$startvalue};
+			$i++; # increment for next row
+		}
+	}
+	
+	return 1;
+}
+
+
+
 ### Split a data structure into an ordinal part for forking and parallel execution
 sub splice_data_structure {
 	my ($data, $part, $total_parts) = @_;
@@ -544,86 +819,6 @@ sub find_column_index {
 		}
 	}
 	return $index;
-}
-
-
-
-
-### Parse string into list
-sub parse_list {
-	# this subroutine will parse a string into an array
-	# it is designed for a string of numbers delimited by commas
-	# a range of numbers may be specified using a dash
-	# hence 1,2,5-7 would become an array of 1,2,5,6,7
-	
-	my $string = shift;
-	return unless defined $string;
-	if ($string =~ /[^\d,\-\s\&]/) {
-		carp " the string contains characters that can't be parsed\n";
-		return;
-	}
-	$string =~ s/\s+//g; 
-	my @list;
-	foreach (split /,/, $string) {
-		# check for a range
-		if (/\-/) { 
-			my ($start, $stop) = split /\-/;
-			# add each item in the range to the list
-			for (my $i = $start; $i <= $stop; $i++) {
-				push @list, $i;
-			}
-			next;
-		} 
-		else {
-			# either an ordinary number or an "&"ed list of numbers 
-			push @list, $_;
-		}
-	}
-	return @list;
-}
-
-
-
-### Format a number into readable comma-delimited by thousands number
-sub format_with_commas {
-	# for formatting a number with commas
-	my $number = shift;
-	if ($number =~ /[^\d,\-\.]/) {
-		carp " the string contains characters that can't be parsed\n";
-		return $number;
-	}
-	
-	# check for decimals
-	my ($integers, $decimals);
-	if ($number =~ /^\-?(\d+)\.(\d+)$/) {
-		$integers = $1;
-		$decimals = $2;
-	}
-	else {
-		$integers = $number;
-	}
-	
-	# format
-	my @digits = split //, $integers;
-	my @formatted;
-	while (@digits) {
-		if (@digits > 3) {
-			unshift @formatted, pop @digits;
-			unshift @formatted, pop @digits;
-			unshift @formatted, pop @digits;
-			unshift @formatted, ',';
-		}
-		else {
-			while (@digits) {
-				unshift @formatted, pop @digits;
-			}
-		}
-	}
-	
-	# finished
-	my $final = join("", @formatted);
-	$final .= $decimals if defined $decimals;
-	return $final;
 }
 
 
@@ -847,14 +1042,43 @@ some simple errors, and complain about others.
 Pass the data structure reference. It will return 1 if successfully 
 verified, or false if not.
 
+=item sort_data_structure()
+
+This subroutine will sort the data table by the values in given column. 
+It will automatically determine whether the contents of the column are 
+numbers or alphanumeric, and will sort accordingly, either numerically or 
+asciibetically. The first non-null value in the column is used to determine. 
+The sort may fail if the values are not consistent. The sort may be done 
+either increasing or decreasing.
+
+Pass the function three values:
+    
+    1. the data structure reference, as described here
+    2. the index of the column or dataset by which to sort
+    3. a scalar value indicating the direction of the sort, 
+       either 'increasing', 'i', 'decreasing', or 'd'.
+
+=item gsort_data_structure()
+
+This subroutine will sort the data table by increasing chromosomal coordinates.
+It will attempt to automatically identify the chromosome and start or position 
+columns by their column name. Failure to find these columns mean a failure to 
+sort the table. Chromosome names are sorted first by their digits (e.g. 
+chr2 before chr10), and then alphanumerically. Base coordinates are sorted by 
+increasing value. Identical positions are kept in their original order.
+
+Pass the function one parameter, the data structure.
+
 =item splice_data_structure()
 
 This function will splice an ordinal section out of a data structure in 
 preparation for forking and parallel execution. Pass the function 
 three parameters:
+    
     1. the data structure reference, as described here
     2. the 1-based ordinal index to keep
     3. the total number of parts to split the data structure
+
 Each spliced data structure will maintain the same metadata and 
 column headings (data table row 0), but the data table will have 
 only a fraction of the original data. 
@@ -961,39 +1185,6 @@ Example
 	my $main_data_ref = load_tim_data_file($filename);
 	my $chromo_index = find_column_index($main_data_ref, "^chr|seq");
 	
-=item parse_list()
-
-This subroutine parses a scalar value into a list of values. The scalar is 
-a text string of numbers (usually column or dataset indices) delimited by 
-commas and/or including a range. For example, a string "1,2,5-7" would become 
-an array of [1,2,5,6,7].
-
-Pass the module the scalar string.
-
-It will return the array of numbers.
-
-Example
-	
-	my $index_request = '1,2,5-7';
-	my @indices = parse_list($index_request); # returns [1,2,5,6,7]
-
-
-=item format_with_commas()
-
-This subroutine process a large number (e.g. 4327908475) into a human-friendly 
-version with commas delimiting the thousands (4,327,908,475).
-
-Pass the module a scalar string with a number value.
-
-It will return a scalar value containing the formatted number.
-
-Example
-	
-	my $count = '4327908475';
-	print " The final count was " . format_with_commas($count) . "\n";
-
-
-
 =back
 
 =head1 AUTHOR
