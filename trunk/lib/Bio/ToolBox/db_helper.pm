@@ -1703,16 +1703,16 @@ sub get_feature {
 	$args{'db'} ||= undef;
 	my $db = open_db_connection($args{'db'});
 	unless ($db) {
-		croak 'no database connected!';
+		croak 'no database connection for getting a feature!';
 	}
-	
+	my $db_ref = ref $db;
 	
 	# get the name of the feature
 	my $name = $args{'name'} || undef; 
 	$name = (split(/\s*;\s*/, $name))[0] if $name =~ /;/; # take the first name only
 	
 	# check for values and internal nulls
-	$args{'id'}   ||= undef;
+	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
 	$args{'type'} ||= undef;
 	undef $name         if $name eq '.';
 	undef $args{'id'}   if $args{'id'} eq '.';
@@ -1720,9 +1720,10 @@ sub get_feature {
 	
 	
 	# quick method for feature retrieval
-	if (defined $args{'id'}) {
+	if (defined $args{'id'} and $db_ref =~ /SeqFeature::Store/) {
 		# we have a unique primary_id to identify the feature
-		my $feature = $db->fetch($args{'id'}); 
+		# fetch method only works with Bio::DB::SeqFeature::Store databases
+		my $feature = $db->fetch($args{'id'}) || undef; 
 		
 		# check that the feature we pulled out is what we want
 		my $check = $feature ? 1 : 0;
@@ -1917,20 +1918,22 @@ sub get_chromo_region_score {
 	
 	# establish coordinates
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
-	$args{'start'}  ||= undef;
-	$args{'stop'}   ||= $args{'end'} || undef;
-	$args{'strand'} ||= 0;
-	if (defined $args{'start'} and $args{'start'} <= 0) {
-# 		warn " Invalid start coordinate for " . $args{'chromo'} . ':' . $args{'start'} .
-# 			'..' . $args{'stop'} . ". Resetting to 1.\n";
-		$args{'start'} = 1;
-	}
-	unless (defined $args{chromo} and defined $args{start} and defined $args{stop}) {
-		cluck "one or more required genomic coordinates are missing for requested region!";
+	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
+	$args{'start'}    = 1 if ($args{'start'} <= 0);
+	$args{'stop'}   ||= $args{'end'} || 1;
+	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
+	
+	unless ($args{chromo} and $args{start} and $args{stop}) {
+		my $s = sprintf "%s:%s..%s", $args{chromo}, $args{start}, $args{stop};
+		cluck "one or more provided genomic coordinates ($s) are invalid!\n";
 		return;
 	};
 	if ($args{'stop'} < $args{'start'}) {
 		# coordinates are flipped, reverse strand
+		if ($args{'stop'} <= 0) {
+			cluck "invalid stop coordinate $args{stop} provided\n";
+			return;
+		}
 		my $stop = $args{'start'};
 		$args{'start'} = $args{'stop'};
 		$args{'stop'}  = $stop;
@@ -2144,12 +2147,13 @@ sub get_region_dataset_hash {
 	$args{'type'}   ||= undef;
 	$args{'id'}     ||= undef;
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
-	$args{'start'}  ||= 0;
-	$args{'stop'}   ||= $args{'end'} || undef;
-	$args{'strand'} ||= 0;
+	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
+	$args{'start'}    = 1 if ($args{'start'} <= 0);
+	$args{'stop'}   ||= $args{'end'} || 1;
+	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
 	unless (
 		(defined $args{'name'} and defined $args{'type'}) or 
-		(defined $args{'chromo'} and defined $args{'start'} and defined $args{'stop'})
+		(defined $args{'chromo'} and $args{'start'} and $args{'stop'})
 	) {
 		cluck "the feature name and type or genomic coordinates are missing!";
 		return;
