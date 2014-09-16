@@ -342,10 +342,10 @@ sub strand {
 	my $i = $self->{data}->strand_column;
 	return $self->value($i) if defined $i;
 	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
+		my $f = $self->feature or return 0; # default is no strand if don't have feature
 		return $f->strand;
 	}
-	return;
+	return 0; # default is no strand
 }
 
 sub name {
@@ -398,16 +398,11 @@ sub feature {
 	my $name = $self->name;
 	my $type = $self->type;
 	return unless ($id or ($name and $type));
-	if ($name =~ /;/) {
-		# sometimes aliases get tacked onto the name, so split on semi-colon
-		my @names = split /;/, $name;
-		$name = $names[0];
-	}
 	my $f = get_feature(
 		'db'    => $self->{data}->open_database,
-		'id'    => $self->id,
-		'name'  => $self->name,
-		'type'  => $self->type,
+		'id'    => $id,
+		'name'  => $name, # we can handle "name; alias" lists later
+		'type'  => $type,
 	);
 	$self->{feature} = $f if $f;
 	return $f;
