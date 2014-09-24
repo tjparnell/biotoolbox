@@ -14,6 +14,7 @@ Bio::ToolBox::Data for more information.
 =cut
 
 use Bio::ToolBox::data_helper qw(find_column_index);
+use Bio::ToolBox::file_helper qw(parse_filename);
 use strict;
 require Exporter;
 our @ISA = qw(Exporter);
