@@ -770,9 +770,6 @@ Flag to use the midpoint instead of actual start and stop coordinates.
 use strict;
 use Carp qw(carp cluck croak confess);
 
-use Bio::ToolBox::utility;
-use Bio::ToolBox::Data::meta;
-
 use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	verify_data_structure
@@ -780,6 +777,12 @@ use Bio::ToolBox::data_helper qw(
 	gsort_data_structure
 	splice_data_structure
 	index_data_table
+);
+use Bio::ToolBox::db_helper qw(
+	get_new_feature_list 
+	get_new_genome_list 
+	open_db_connection
+	verify_or_request_feature_types
 );
 use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
@@ -789,12 +792,9 @@ use Bio::ToolBox::file_helper qw(
 	write_summary_data
 	parse_filename
 );
-use Bio::ToolBox::db_helper qw(
-	get_new_feature_list 
-	get_new_genome_list 
-	open_db_connection
-	verify_or_request_feature_types
-);
+use Bio::ToolBox::Data::meta;
+use Bio::ToolBox::utility;
+
 
 1;
 
@@ -1028,19 +1028,23 @@ sub add_column {
 				'index' => $column,    
 			};
 			for (my $i = 0; $i < scalar @$name; $i++) {
-				$self->value($column, $i, $name->[$i]);
+				$self->value($i, $column, $name->[$i]);
 			}
 			$self->{last_row} = scalar @$name - 1;
+			$self->{headers} = 1; # boolean to indicate the table now has headers
 		}
 	}
-	
-	else {
+	elsif (ref $name eq '') {
 		# just a name
 		$self->{$column} = {
 			'name'      => $name,
 			'index'     => $column,
 		};
 		$self->{data_table}->[0][$column] = $name;
+	}
+	else {
+		cluck "must pass a scalar value or array reference";
+		return;
 	}
 	
 	$self->{number_columns}++;
@@ -1133,7 +1137,6 @@ sub verify_dataset {
 	my $dataset = shift;
 	my $database = shift; # name or object?
 	return unless $dataset;
-	$database ||= $self->open_database;
 	if (exists $self->{verfied_dataset}{$dataset}) {
 		return $self->{verfied_dataset}{$dataset};
 	}
@@ -1143,6 +1146,7 @@ sub verify_dataset {
 			$self->{verfied_dataset}{$dataset} = $dataset;
 			return $dataset;
 		}
+		$database ||= $self->open_database;
 		my ($verified) = verify_or_request_feature_types(
 			# normally returns an array of verified features, we're only checking one
 			db      => $database,
