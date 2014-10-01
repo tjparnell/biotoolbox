@@ -8,7 +8,6 @@ use Pod::Usage;
 use Statistics::Lite qw(min max mean stddev);
 use Bio::ToolBox::data_helper qw(
 	find_column_index
-	format_with_commas
 );
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -19,7 +18,8 @@ use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.17';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
