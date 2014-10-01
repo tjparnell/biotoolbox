@@ -7,18 +7,15 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
 use Statistics::Lite qw(mean median);
-use Bio::ToolBox::data_helper qw(
-	parse_list
-	find_column_index
-);
-use Bio::ToolBox::file_helper qw(load_tim_data_file);
+use Bio::ToolBox::Data;
+use Bio::ToolBox::utility;
 my $gd_ok;
 eval {
 	require GD;
 	require GD::Graph::smoothlines; 
 	$gd_ok = 1;
 };
-my $VERSION = '1.15';
+my $VERSION = '1.20';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -37,13 +34,12 @@ unless (@ARGV) { # when no command line options are present
 my (
 	$infile, 
 	$all, 
-	$data, 
+	$index, 
 	$center, 
 	$min, 
 	$max, 
 	$x_index,
 	$dcolor,
-	$log,
 	$x_skip,
 	$x_offset,
 	$x_format,
@@ -55,14 +51,13 @@ my (
 );
 GetOptions( 
 	'in=s'        => \$infile, # the input file
-	'index=s'     => \$data, # a list of datasets to graph
+	'index=s'     => \$index, # a list of datasets to graph
 	'all'         => \$all, # flag to plot all data sets individually
 	'cen!'        => \$center, # flag to center normalize the datasets
 	'min=f'       => \$min, # mininum y axis coordinate
 	'max=f'       => \$max, # maximum y axis coordinate
 	'xindex=i'    => \$x_index, # index of the X-axis values
 	'color=s'     => \$dcolor, # data colors
-	'log!'        => \$log, # values are in log, respect log status
 	'skip=i'      => \$x_skip, # number of ticks to skip on x axis
 	'offset=i'    => \$x_offset, # skip number of x axis ticks before labeling
 	'xformat=i'   => \$x_format, # format decimal numbers of x axis
@@ -91,7 +86,11 @@ if ($print_version) {
 
 ##### Check required and default variables
 unless ($gd_ok) {
-	die "Module GD::Graph::smoothlines must be installed to run this script.\n";
+	die <<GD_WARNING
+Modules GD, GD::Graph, and GD::Graph::smoothlines failed to load, either because 
+they are not installed or they are missing an external dependency (libgd). 
+Please install these to run this script.
+GD_WARNING
 }
 
 unless ($infile) {
@@ -106,10 +105,6 @@ unless ($infile) {
 unless (defined $center) {
 	# default is no median center normalization
 	$center = 0;
-}
-unless (defined $log) {
-	# default is no log
-	$log = 0;
 }
 unless (defined $x_skip) {
 	$x_skip = 1;
@@ -129,24 +124,24 @@ unless (defined $y_ticks) {
 
 ### Load the file
 print " Loading data from file $infile....\n";
-my $main_data_ref = load_tim_data_file($infile);
-unless ($main_data_ref) {
+my $Data = Bio::ToolBox::Data->new(file => $infile) or
 	die " No data loaded!\n";
-}
-my $data_table_ref = $main_data_ref->{'data_table'};
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
-for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
+my $i = 0;
+foreach my $name ($Data->list_columns) {
 	# check column header names for gene or window attribute information
-	my $name = $main_data_ref->{$i}{'name'}; # name of the dataset
-	
-	# skip some common index names
-	next if $name =~ /^(?:window|midpoint|name|type|start|stop|end|chromosome)$/i;
+	# these won't be used for graph generation, so we'll skip them
+	next if $name =~ /^(?:name|id|class|type|alias|probe|chr|
+		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
+		midpoint|strand|primary_id|window|midpoint)$/xi;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
+	$i++;
 }	
+
 
 # find the x index
 unless (defined $x_index) {
@@ -155,9 +150,9 @@ unless (defined $x_index) {
 
 # Prepare output directory
 unless ($directory) {
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $Data->path . $Data->basename . '_graphs';
 }
-unless (-e "$directory") {
+unless (-e $directory) {
 	mkdir $directory or die "Can't create directory $directory\n";
 }
 
@@ -172,8 +167,8 @@ if (defined $dcolor) {
 ### Get the list of datasets to pairwise compare
 
 # A list of dataset pairs was provided upon execution
-if ($data) {
-	my @datasets = parse_list($data);
+if ($index) {
+	my @datasets = parse_list($index);
 	foreach my $dataset (@datasets) {
 		
 		# check for multiple datasets to be graphed together
@@ -181,7 +176,7 @@ if ($data) {
 			my @list = split /&/, $dataset;
 			my $check = -1; # assume all are correct initially
 			foreach (@list) {
-				unless (exists $dataset_by_id{$_} ) {
+				unless (exists $dataset_by_id{$_}) {
 					$check = $_; # remember the bad one
 					last; # one at a time, please
 				}
@@ -235,26 +230,27 @@ else {
 sub find_x_index {
 	
 	# automatically identify the X index if these columns are available
-	$x_index = find_column_index($main_data_ref, '^midpoint|start|position$');
-	$x_index = find_column_index($main_data_ref, '^window|name$') unless defined $x_index; 
+	$x_index = $Data->find_column('^midpoint|start|position$');
+	$x_index = $Data->find_column('^window|name$') unless defined $x_index; 
 		# we are searching independently because summary files have the window
 		# column come before the midpoint column, and we prefer the midpoint
 	if (defined $x_index) {
-		print " using ", $main_data_ref->{$x_index}{'name'}, " as the X index column\n";
+		printf " using %s as the X index column\n", $Data->name($x_index);
+		return;
 	}
 	
 	# request from the user
-	unless (defined $x_index) {
-		print " These are the indices of the data file:\n";
-		foreach my $i (0 .. $main_data_ref->{'number_columns'} -1 ) {
-			print "   $i\t$dataset_by_id{$i}\n";
-		}
-		print " Please enter the X index:  \n";
-		$x_index = <STDIN>;
-		chomp $x_index;
-		unless (exists $main_data_ref->{$x_index}) {
-			die " Invalid X index!\n";
-		}
+	print " These are the indices of the data file:\n";
+	my $i = 0;
+	foreach ($Data->column_names) {
+		print "   $i\t$_\n";
+		$i++;
+	}
+	print " Please enter the X index:  \n";
+	$x_index = <STDIN>;
+	chomp $x_index;
+	unless ($Data->name($x_index)) {
+		die " Invalid X index!\n";
 	}
 }
 
@@ -305,6 +301,7 @@ sub graph_datasets_interactively {
 		print "\n Enter the next set of datasets or push return to exit  ";
 		$answer = <STDIN>;
 		chomp $answer;
+		last if ($answer =~ /^q/i);
 	}
 }
 
@@ -333,72 +330,20 @@ sub graph_this {
 	
 	# first collect the x values, which may be either user defined, the 
 	# window midpoint, or the window name
-	push @graph_data, []; # first empty sub-array for the x values
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
-		# we'll walk through the data table
-		# and push the appropriate x values into the graph data first sub-array
-		push @{ $graph_data[0] }, $data_table_ref->[$row][$x_index];
-	}
+	my @xvalues = $Data->column_values($x_index);
+	shift @xvalues; # remove the column header
+	push @graph_data, \@xvalues; # push x values as first sub-array
 	
 	# next collect the dataset values
-	foreach my $dataset (@datasets) {
-		push @graph_data, []; # new empty sub-array for each y data
-		for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
-			# we'll walk through the data table
-			# and push the requested y values into the graph data last sub-array
-			my $value = $data_table_ref->[$row][$dataset];
-			if ($value ne '.') {
-				# a real value
-				push @{ $graph_data[-1] }, $value;
-			}
-			else {
-				# a null value
-				push @{ $graph_data[-1] }, undef;
-			}
-		}
+	foreach my $d (@datasets) {
+		my @values;
+		$Data->iterate( sub {
+			my $row = shift;
+			# take only valid values, not nulls
+			push @values, $row->value($d) eq '.' ? undef : $row->value($d);
+		} );
+		push @graph_data, \@values;
 	}
-	
-	
-	# Check log status
-	if ($log) {
-		# we need to work with log values
-		# we will obey any log2 flags present in the metadata first
-		# failing that, we will blindly assume the data needs to be transformed
-		
-		foreach my $ydata (1..$#datasets) {
-			# we'll walk through datasets array of requested indices
-			# using the index number in the datasets array rather than the 
-			# the index number of the main data table
-			# this way we can convert to the index number of the corresponding 
-			# dataset in the graph_data array
-			# skipping the x dataset, of course
-			
-			# first check the metadata for the x dataset
-			if (exists $main_data_ref->{ $datasets[$ydata] }{'log2'}) {
-				# x dataset has log2 flag
-				if ($main_data_ref->{ $datasets[$ydata] }{'log2'} == 1) {
-					# it is in log2 space, so de-log
-					
-					@{ $graph_data[ $ydata + 1 ] } = 
-						map { 2 ** $_ } @{ $graph_data[ $ydata + 1 ] };
-						# the corresponding @graph_data index is $ydata + 1, 
-						# since we're skipping the x dataset
-						# convert all values in that dataset from log2 space
-				}
-			} 
-			else {
-				# dataset has no log2 flag
-				# then we will blindly assume it needs to be transformed
-				
-				@{ $graph_data[ $ydata + 1 ] } = 
-					map { 2 ** $_ } @{ $graph_data[ $ydata + 1 ] };
-					# the corresponding @graph_data index is $ydata + 1, 
-					# since we're skipping the x dataset
-					# convert all values in that dataset from log2 space
-			}
-			
-		}
-	}	
 	
 	
 	# Median center the y dataset values if requested
@@ -419,15 +364,13 @@ sub graph_this {
 	}
 	
 	
-	
-	
 	####  Prepare the graph  ####
 	
 	# Initialize the graph
 	my $graph = GD::Graph::smoothlines->new(800,600);
 	$graph->set(
-		'title'             => 'Profile ' . $main_data_ref->{'feature'},
-		'x_label'           => $main_data_ref->{$x_index}{'name'},
+		'title'             => 'Profile ' . $Data->feature,
+		'x_label'           => $Data->name($x_index),
 		'x_label_position'  => 0.5,
 		'transparent'       => 0, # no transparency
 		'line_width'        => 2,
@@ -537,7 +480,6 @@ graph_profile.pl <filename>
   --index <index1,index2,...>
   --all
   --cen
-  --log
   --xindex <index>
   --skip <integer>
   --offset <integer>
@@ -588,11 +530,6 @@ Automatically graph all available datasets present in the file.
 Datasets should (not) be median centered prior to graphing. Useful when 
 graphing multiple datasets together when they have different medians. 
 Default is false.
-
-=item --log
-
-Dataset values are in log2 space, or status should be respected 
-if indicated in the file metadata.
 
 =item --xindex <index>
 
