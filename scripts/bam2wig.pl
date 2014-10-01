@@ -10,13 +10,10 @@ use Statistics::Lite qw(sum min max mean stddev);
 use Bio::ToolBox::file_helper qw(
 	open_to_read_fh 
 	open_to_write_fh 
-	write_tim_data_file
 );
-use Bio::ToolBox::data_helper qw(
-	format_with_commas
-	generate_tim_data_structure
-);
+use Bio::ToolBox::utility; 
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
+use Bio::ToolBox::Data;
 eval {
 	# check for bam support
 	require Bio::ToolBox::db_helper::bam;
@@ -971,78 +968,50 @@ sub write_model_file {
 	
 	
 	# Prepare the data structure
-	my $profile = generate_tim_data_structure(
-		'shift_model_profile',
-		'Start',
-		"$outbase\_F",
-		"$outbase\_R",
-		"$outbase\_shift"
+	my $profile = Bio::ToolBox::Data->new(
+		feature     => 'shift_model_profile',
+		datasets    => ['Start', "$outbase\_F", "$outbase\_R", "$outbase\_shift"],
 	);
-	$profile->{'db'} = $infile;
-	push @{ $profile->{'other'} }, "# Average profile of read start point sums\n";
-	push @{ $profile->{'other'} }, 
-		"# Only profiles of trimmed shift value samples included\n";
-	push @{ $profile->{'other'} }, "# Final shift value calculated as $value bp\n";
-	$profile->{2}{'minimum_r2'} = $correlation_min;
-	$profile->{2}{'number_of_chromosomes_sampled'} = $chr_number;
-	$profile->{2}{'regions_sampled'} = scalar(@$f_profile);
+	$profile->add_comment("Average profile of read start point sums");
+	$profile->add_comment("Only profiles of trimmed shift value samples included");
+	$profile->add_comment("Final shift value calculated as $value bp");
+	$profile->metadata(2, 'minimum_r2', $correlation_min);
+	$profile->metadata(2, 'number_of_chromosomes_sampled', $chr_number);
+	$profile->metadata(2, 'regions_sampled', scalar(@$f_profile));
 	
 	
 	# Load data table
 	# first we will put the mean value for all the regions
 	for my $i (0 .. 90) {
-		# generate the start position
-		$profile->{'data_table'}->[$i+1][0] = ($i - 45) * 10;
-		
-		# generate the mean value for each chromosome tested at each position
-		$profile->{'data_table'}->[$i+1][1] = mean( map { $centered_f_profile[$_][$i] } 
-			(0 .. $#centered_f_profile ) );
-		$profile->{'data_table'}->[$i+1][2] = mean( map { $centered_r_profile[$_][$i] } 
-			(0 .. $#centered_r_profile ) );
-		$profile->{'data_table'}->[$i+1][3] = 
-			mean( map { $centered_shifted_profile[$_][$i] } 
-			(0 .. $#centered_shifted_profile ) );
+		my $s = ($i - 45) * 10;
+		my $f = mean( map { $centered_f_profile[$_][$i] } (0 .. $#centered_f_profile ) );
+		my $r = mean( map { $centered_r_profile[$_][$i] } (0 .. $#centered_r_profile ) );
+		my $m = mean( map { $centered_shifted_profile[$_][$i] } 
+				(0 .. $#centered_shifted_profile ) );
+		$profile->add_row( [$s, $f, $r, $m] );
 	}
-	$profile->{'last_row'} = 91;
 	
 	
 	# Add the region specific profiles if verbose if requested
 	if ($verbose) {
 		for my $r (0 .. $#{$regions}) {
 		
-			# add column specific metadata
-			my $column = $profile->{'number_columns'};
-			$profile->{$column} = {
-				'name'  => $regions->[$r] . '_F',
-				'index' => $column,
-			};
-			$profile->{$column + 1} = {
-				'name'  => $regions->[$r] . '_R',
-				'index' => $column + 1,
-			};
-			$profile->{$column + 2} = {
-				'name'  => $regions->[$r] . '_Shift',
-				'index' => $column + 2,
-			};
-			$profile->{'data_table'}->[0][$column]   = $profile->{$column}{'name'};
-			$profile->{'data_table'}->[0][$column+1] = $profile->{$column+1}{'name'};
-			$profile->{'data_table'}->[0][$column+2] = $profile->{$column+2}{'name'};
+			# add columns
+			my $col1 = $profile->add_column($regions->[$r] . '_F');
+			my $col2 = $profile->add_column($regions->[$r] . '_R');
+			my $col3 = $profile->add_column($regions->[$r] . '_Shift');
 		
 			# fill in the columns
 			for my $i (0 .. 90) {
-				$profile->{'data_table'}->[$i+1][$column]   = $centered_f_profile[$r][$i];
-				$profile->{'data_table'}->[$i+1][$column+1] = $centered_r_profile[$r][$i];
-				$profile->{'data_table'}->[$i+1][$column+2] = 
-					$centered_shifted_profile[$r][$i];
+				$profile->value($i+1, $col1, $centered_f_profile[$r][$i]);
+				$profile->value($i+1, $col2, $centered_r_profile[$r][$i]);
+				$profile->value($i+1, $col3, $centered_shifted_profile[$r][$i]);
 			}
-		
-			$profile->{'number_columns'} += 3;
 		}
 	}
 	
 	# Write the model file
-	my $profile_file = write_tim_data_file( 
-		'data'     => $profile,
+	my $profile_file = $profile->write_file( 
 		'filename' => "$outfile\_model.txt",
 		'gz'       => 0,
 	);
@@ -1051,54 +1020,42 @@ sub write_model_file {
 	
 	### R squared data
 	# prepare the data structure
-	my $r2_data = generate_tim_data_structure(
-		'Shift_correlations',
-		'Shift',
-		"$outbase\_R2"
+	my $r2_data = Bio::ToolBox::Data->new(
+		feature   => 'Shift_correlations',
+		datasets  => ['Shift', "$outbase\_R2"],
 	);
-	$r2_data->{'db'} = $infile;
-	push @{ $r2_data->{'other'} }, "# Average R Squared values for each shift\n";
-	push @{ $r2_data->{'other'} }, "# Final shift value calculated as $value bp\n";
-	$r2_data->{1}{'minimum_r2'} = $correlation_min;
-	$r2_data->{1}{'number_of_chromosomes_sampled'} = $chr_number;
-	$r2_data->{1}{'regions_sampled'} = scalar(@$f_profile);
+	$r2_data->add_comment("Average R Squared values for each shift");
+	$r2_data->add_comment("Final shift value calculated as $value bp");
+	$r2_data->metadata(1, 'minimum_r2', $correlation_min);
+	$r2_data->metadata(1, 'number_of_chromosomes_sampled', $chr_number);
+	$r2_data->metadata(1, 'regions_sampled', scalar(@$f_profile));
 	
 	# load data table
 	# first we will put the mean value for all the r squared values
 	for my $i (0 .. 40) {
 		# generate the start position
-		$r2_data->{'data_table'}->[$i+1][0] = $i * 10;
-		
+		my $s = $i * 10;
 		# generate the mean value for each chromosome
-		$r2_data->{'data_table'}->[$i+1][1] = mean( map { $r2_values->[$_][$i] } 
-			(0 ..  $#{$regions}) );
+		my $m = mean( map { $r2_values->[$_][$i] } (0 ..  $#{$regions}) );
+		$r2_data->add_row( [$s, $m] );
 	}
-	$r2_data->{'last_row'} = 41;
 	
 	# add the chromosome specific profiles
 	if ($verbose) {
 		for my $r (0 .. $#{$regions}) {
 		
 			# add column specific metadata
-			my $column = $r2_data->{'number_columns'};
-			$r2_data->{$column} = {
-				'name'  => $regions->[$r] . '_R2',
-				'index' => $column,
-			};
-			$r2_data->{'data_table'}->[0][$column]   = $r2_data->{$column}{'name'};
+			my $column = $r2_data->add_column($regions->[$r] . '_R2');
 		
 			# fill in the columns
 			for my $i (0 .. 40) {
-				$r2_data->{'data_table'}->[$i+1][$column]   = $r2_values->[$r][$i];
+				$r2_data->value($i+1, $column, $r2_values->[$r][$i]);
 			}
-		
-			$r2_data->{'number_columns'}++;
 		}
 	}
 	
 	# write the r squared file
-	my $rSquared_file = write_tim_data_file( 
-		'data'     => $r2_data,
+	my $rSquared_file = $r2_data->write_file( 
 		'filename' => "$outfile\_correlations.txt",
 		'gz'       => 0,
 	);
@@ -2291,7 +2248,7 @@ bam2wig.pl [--options...] <filename.bam>
   --shift
   --shiftval <integer>
   --chrom <integer>                                 (2)
-  --sample <integer>                                (200)
+  --sample <integer>                                (300)
   --minr <float>                                    (0.25)
   --model
   
@@ -2327,8 +2284,8 @@ Specify the position of the alignment coordinate which should be
 recorded. Several positions are accepted: 
      
     start     the 5 prime position of the alignment
-    mid       the midpoint of the alignment
-    span      along the length of the alignment (coverage)
+    mid       the midpoint of the alignment (or pe fragment)
+    span      along the length of the alignment (read coverage)
     extend    along the length of the predicted fragment
               equal to 2 x the shift value (enables --shift) 
     coverage  another way to specify --coverage
@@ -2429,7 +2386,7 @@ on opposite strands flanking the true target site. This option is
 disabled with paired-end and spliced reads (where it is not needed). 
 
 The extend position option is a special mode where the entire predicted 
-ChIP fragment is recorded across the span. The length is 2 x the shift 
+ChIP fragment is recorded across its span. The length is 2 x the shift 
 value. 
 
 =item --shiftval <integer>

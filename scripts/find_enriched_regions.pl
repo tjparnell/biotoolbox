@@ -7,10 +7,7 @@ use Getopt::Long;
 use Statistics::Lite qw(mean median stddevp);
 use Pod::Usage;
 use File::Basename qw(fileparse);
-use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
-	format_with_commas
-);
+use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
@@ -19,11 +16,8 @@ use Bio::ToolBox::db_helper qw(
 	get_chromo_region_score
 	get_chromosome_list
 );
-use Bio::ToolBox::file_helper qw(
-	write_tim_data_file
-	convert_and_write_to_gff_file
-);
 use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::utility;
 my $parallel;
 eval {
 	# check for parallel support
@@ -31,7 +25,7 @@ eval {
 	$parallel = 1;
 };
 # use Data::Dumper;
-my $VERSION = '1.15';
+my $VERSION = '1.20';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -236,11 +230,11 @@ else {
 #### Main #####
 
 ## Preparing global variables
-	# This program predates my development of the tim data file and memory
-	# data structures described in Bio::ToolBox::file_helper. These structures
-	# were bolted on afterwards. As such, the program still uses lots of
+	# This program predates development of the Bio::ToolBox::Data object and
+	# related methods (it is quite old!). That library was bolted on long
+	# afterwards. As such, the program still uses lots of
 	# arrays described immediately below, and only at the end prior to 
-	# output is a tim data structure generated.
+	# output is a Bio::ToolBox::Data object generated.
 my @windows; # a temporary of the found enriched windows
 	# this is an array of arrays
 	# the first array is an array of the found windows, and consists of
@@ -384,23 +378,17 @@ if ($feat) {
 }
 
 
-## Generate the final primary data hash
-# this data hash is compatible with the tim data text format described in
-# Bio::ToolBox::data_helper and Bio::ToolBox::file_helper
-# converting to this structure makes it easier for writing files 
-# via Bio::ToolBox::file_helper
+## Generate the Bio::ToolBox::Data object with the windows information
+# this makes it compatible with writing data files
 # can you tell that this was bolted on long after writing the original script?
-my $main_data_ref = generate_main_data_hash();
-unless ($main_data_ref) {
-	die " unable to generate main data hash!\n";
-}
-
+# this is a very, very old script that has been updated over and over again 
+# to keep up to date with various sorted library modules and functionality
+my $Data = generate_main_data_hash();
 
 
 ## Print the output
 # write standard output data file
-my $write_success = write_tim_data_file(
-	'data'     => $main_data_ref,
+my $write_success = $Data->write_file(
 	'gz'       => $gz,
 	'filename' => $outfile,
 );
@@ -413,19 +401,11 @@ else {
 
 # write gff file
 if ($gff) { 
-	my $method;
-	if ($deplete) {
-		$method = 'depleted_region';
-	}
-	else {
-		$method = 'enriched_region';
-	}
-	my $gff_file = convert_and_write_to_gff_file(
-		'data'     => $main_data_ref,
+	my $gff_file = $Data->convert_gff(
 		'score'    => 6,
 		'name'     => 0,
-		'source'   => 'find_enriched_regions.pl',
-		'method'   => $method,
+		'source'   => 'find_enriched_regions',
+		'method'   => $deplete ? 'depleted_region' : 'enriched_region',
 		'version'  => 3,
 		'filename' => $outfile,
 		'gz'       => $gz,
@@ -572,12 +552,12 @@ sub parallel_execution {
 			
 			# re-open database objects to make them clone safe
 			# pass second true to avoid cached database objects
-			$fdb = open_db_connection($main_database, 1);
+			$fdb = open_db_connection($main_database, 1) if $main_database;
 			if ($data_database) {
 				$ddb = open_db_connection($data_database, 1);
 			}
 			else {
-				$ddb = $fdb;
+				$ddb = $fdb if $fdb;
 			}
 			
 			# process each chromosome in this child list
@@ -989,103 +969,55 @@ sub name_the_windows {
 
 
 
-### Generate the main data hash compatible with Bio::ToolBox::file_helper
+### Generate the main data hash compatible with Bio::ToolBox::Data
 # this is bolted on after writing the main script for compatibility with 
-# Bio::ToolBox::file_helper modules
+# Bio::ToolBox::Data
 sub generate_main_data_hash {
 	
-	# determine the data feature
-	my $feature;
-	if ($deplete) {
-		# depleted regions
-		$feature = 'depleted_regions';
-	}
-	else {
-		# enriched regions
-		$feature = 'enriched_regions';
-	}
-	
 	# generate a new data structure
-	my $data = generate_tim_data_structure(
-		$feature,
-		'WindowID',
-		'Chromosome',
-		'Start',
-		'Stop',
-		'Size',
-		'Strand',
-		'Score',
-	) or die " unable to generate tim data structure!\n";
+	my $Data = Bio::ToolBox::Data->new(
+		feature  => $deplete ? 'depleted_regions' : 'enriched_regions',
+		columns  => [qw(WindowID Chromosome Start Stop Size Strand Score)],
+	) or die " unable to generate Bio::ToolBox::Data object!\n";
 	
 	# Add metadata
-	$data->{'db'} = $main_database || $data_database;
+	$Data->database($main_database || $data_database);
 	
 	# window metadata
 		# traditionally with the genome feature datasets, extra pertinant
-		# information regarding the window generation goes under the start 
-		# metadata
-	$data->{2}{'win'} = $win;
-	$data->{2}{'step'} = $step;
-	if ($trim) {
-		$data->{4}{'trimmed'} = 1;
-	} else {
-		$data->{4}{'trimmed'} = 0;
-	}
-	$data->{4}{'min_size'} = $min_size;
+		# information regarding the window generation goes under the start  metadata
+	$Data->metadata(2, 'win', $win);
+	$Data->metadata(2, 'step', $step);
+	$Data->metadata(4, 'trimmed', $trim ? 1 : 0);
+	$Data->metadata(4, 'min_size', $min_size);
 	
 	# score metadata
-	$data->{6}{'log2'} = $log;
-	$data->{6}{'method'} = $method;
-	$data->{6}{'value'} = $value;
-	$data->{6}{'dataset'} = $dataset;
-	$data->{6}{'threshold'} = $threshold;
+	$Data->metadata(6, 'log', $log ? 2 : 0);
+	$Data->metadata(6, 'method', $method);
+	$Data->metadata(6, 'value', $value);
+	$Data->metadata(6, 'dataset', $dataset);
+	$Data->metadata(6, 'threshold', $threshold);
 	if ($sdlimit) {
-		$data->{6}{'standard_deviation_limit'} = $sdlimit;
+		$Data->metadata(6, 'standard_deviation_limit', $sdlimit);
 	}
 	if ($main_database and $data_database) {
-		$data->{6}{'data_database'} = $data_database;
+		$Data->metadata(6, 'data_database', $data_database);
 	}
 	
 	# add feature metadata if it was requested
 	if ($feat) {
-		# metadata keys
-		$data->{6} = {
-			# the orf list
-			'name'  => 'ORF_Features',
-			'index' => 6,
-		};
-		$data->{8} = {
-			# the orf list
-			'name'  => 'RNA_Features',
-			'index' => 7,
-		};
-		$data->{9} = {
-			# the orf list
-			'name'  => 'Non-gene_Features',
-			'index' => 8,
-		};
-		
-		# update the number of columns
-		$data->{'number_columns'} = 10;
-		
-	}
-	
-	# add the column headers
-	# the windows array never had column headers, so we'll add them here
-	unshift @windows, []; # put in space for the header
-	# add the names to the row 0 array
-	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-		$windows[0][$i] = $data->{$i}{'name'};
+		$Data->add_column('ORF_Features');
+		$Data->add_column('RNA_Features');
+		$Data->add_column('Non-gene_Features');
 	}
 	
 	# associate the @windows array with the data table in the structure
-	$data->{'data_table'} = \@windows;
+	foreach (@windows) {
+		$Data->add_row($_);
+	}
 	
-	# update last row
-	$data->{'last_row'} = scalar(@windows) - 1;
-	
-	# return the reference to the generated data hash
-	return $data;
+	# done
+	return $Data;
 }
 
 

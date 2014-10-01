@@ -5,19 +5,13 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(
-	find_column_index
-	parse_list
-);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_feature
 );
-use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
-);
-my $VERSION = '1.15';
+use Bio::ToolBox::Data;
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -91,25 +85,27 @@ unless (defined $gz) {$gz = 0}
 
 # load file
 print " Loading feature list from '$infile'....\n";
-my $main_data_ref = load_tim_data_file($infile);
-unless ($main_data_ref) {
+my $Data = Bio::ToolBox::Data->new(file => $infile);
+unless ($Data) {
 	die " No file data loaded!\n";
 }
-
-# identify indices
-my $name_index = find_column_index($main_data_ref, '^name');
-my $type_index = find_column_index($main_data_ref, '^type');
-my $id_index   = find_column_index($main_data_ref, '^primary_id');
+printf "  Loaded %s '%s' features.\n", 
+	format_with_commas( $Data->last_row ), $Data->feature;
 
 
 
 ### Establish database connection
-unless ($database) {
-	# define database if it wasn't on the command line
-	$database = $main_data_ref->{'db'} or 
-		die "No database defined! See help\n";
+if ($database) {
+	if ($Data->database and $Data->database ne $database) {
+		warn " provided database '$database' does not match file metadata!\n" . 
+			" overriding metadata and using '$database'\n";
+	}
+	$Data->database = $database;
 }
-my $db = open_db_connection($database);
+elsif (not $Data->database) {
+	die "No database defined! See help\n";
+}
+my $db = $Data->open_database;
 
 
 
@@ -136,9 +132,9 @@ unless ($outfile) {
 }
 
 # write the file
-my $file_success = write_tim_data_file(
-	'data'      => $main_data_ref,
+my $file_success = $Data->write_file(
 	'filename'  => $outfile,
+	'gz'        => $gz,
 );
 if ($file_success) {
 	# success
@@ -178,21 +174,15 @@ sub get_attribute_list_from_user {
 		# get the attributes for a sample of features
 		# store the tag keys in an example hash
 		my %tagexamples;
-		for (my $i = 1; $i < 50; $i++) {
-			last if $i == $main_data_ref->{'last_row'};
-			
-			my @examples = $db->features(
-				-name     => $main_data_ref->{'data_table'}->[$i][$name_index],
-				-type     => $main_data_ref->{'data_table'}->[$i][$type_index]
-			);
-			unless (@examples) {
-				next;
-			}
-			foreach my $example (@examples) {
-				my %taghash = $example->attributes();
-				foreach (keys %taghash) {
-					$tagexamples{$_} += 1;
-				}
+		my $stream = $Data->row_stream;
+		for (1 .. 50) {
+			my $row = $stream->next_row;
+			last unless $row;
+			my $f = $row->feature;
+			next unless $f;
+			my %taghash = $f->attributes();
+			foreach (keys %taghash) {
+				$tagexamples{$_} += 1;
 			}
 		}
 		
@@ -318,49 +308,34 @@ sub collect_attributes_for_list {
 		push @methods, get_attribute_method($_);
 	}
 	
+	# prepare columns
+	my @indices;
+	foreach (@list) {
+		my $i = $Data->add_column($_);
+		push @indices, $i;
+	}
+	
 	print " Retrieving ", join(", ", @list), "\n";
-	my $table = $main_data_ref->{'data_table'}; # shortcut reference
-	for my $row (1..$main_data_ref->{'last_row'}) {
+	my $stream = $Data->row_stream;
+	while (my $row = $stream->next_row) {
 		
-		# get the name of the feature
-		my $name = $table->[$row][$name_index];
-		$name = (split(';', $name))[0] if $name =~ /;/; # take the first name only
-		
-		# pull the feature(s) from the database
-		my $feature = get_feature(
-			'db'    => $db,
-			'name'  => defined $name_index ? 
-				$main_data_ref->{'data_table'}->[$row][$name_index] : undef,
-			'type'  => defined $type_index ? 
-				$main_data_ref->{'data_table'}->[$row][$type_index] : 
-				defined $use_type ? $use_type : undef,
-			'id'    => defined $id_index ? 
-				$main_data_ref->{'data_table'}->[$row][$id_index] : undef,
-		);
-		
-		# get the attribute(s)
+		my $feature = $row->feature;
 		if ($feature) {
+			# get the attribute(s)
 			for (my $i = 0; $i < scalar @list; $i++) {
 				# for each request in the list, we will collect the attribute
 				# we'll use the method sub defined in the methods
 				# pass both the feature and the name of the attribute
 				# only the tag value actually needs the name of the attribute
-				push @{ $table->[$row] }, 
-					&{ $methods[$i] }($feature, $list[$i]);
+				my $v = &{ $methods[$i] }($feature, $list[$i]);
+				$row->value($indices[$i], $v);
 			}
 		}
 		else {
 			# no feature found, cannot collect attributes
 			# record nulls
-			for (my $i = 0; $i < scalar @list; $i++) {
-				push @{ $table->[$row] }, '.';
-			}
+			foreach (@indices) { $row->value($_, '.') }
 		}
-	}
-	
-	# record the metadata
-	foreach (@list) {
-		record_metadata($_);
 	}
 }
 
@@ -561,36 +536,6 @@ sub get_tag_value {
 	else {
 		return '.';
 	}
-}
-
-
-# subroutine to record the metadata for each new attribute dataset
-sub record_metadata {
-	my $attrib = shift;
-	
-	# determine new index
-	my $new_index = $main_data_ref->{'number_columns'};
-	# remember that the index counting is 0-based, so the new index is 
-	# essentially number_columns - 1 + 1
-	$main_data_ref->{'number_columns'} += 1; # update
-	
-	# generate new metadata hash for this column
-	my %metadata = (
-		'name'     => $attrib,
-		'index'    => $new_index,
-	);
-	
-	# add database name if different
-	if ($database ne $main_data_ref->{'db'}) {
-		$metadata{'db'} = $database;
-	}
-	
-	# generate column name
-	$main_data_ref->{'data_table'}->[0][$new_index] = $attrib;
-	
-	# place metadata hash into main data structure
-	$main_data_ref->{$new_index} = \%metadata;
-	
 }
 
 
