@@ -166,6 +166,10 @@ unless (%evalues) {
 # check that all probes loaded have equal counts of values
 check_microarray_value_counts();
 
+print "next unique id for a probe would be $unique_id\n";
+printf " there are %s values for condition $k\n", scalar @(keys %evalues});
+printf " there are %s replicates for condition $k\n", scalar @{ $cvalues{1}};
+
 
 
 
