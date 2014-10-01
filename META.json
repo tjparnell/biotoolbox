@@ -36,6 +36,7 @@
             "Bio::DB::USeq" : "0.2",
             "Bio::Root::Version" : "1.0069001",
             "Config::Simple" : "4.58",
+            "Module::Load" : "0",
             "Statistics::Descriptive" : "3",
             "Statistics::Lite" : "3.2"
          }
@@ -44,17 +45,22 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.19"
+         "version" : "1.2"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
-         "version" : "1.18"
+         "version" : "1.2"
       },
       "Bio::ToolBox::Data::Feature" : {
-         "file" : "lib/Bio/ToolBox/Data.pm"
+         "file" : "lib/Bio/ToolBox/Data/Feature.pm",
+         "version" : "1.2"
       },
       "Bio::ToolBox::Data::Iterator" : {
          "file" : "lib/Bio/ToolBox/Data.pm"
+      },
+      "Bio::ToolBox::Data::meta" : {
+         "file" : "lib/Bio/ToolBox/Data/meta.pm",
+         "version" : "1.2"
       },
       "Bio::ToolBox::big_helper" : {
          "file" : "lib/Bio/ToolBox/big_helper.pm",
@@ -62,11 +68,11 @@
       },
       "Bio::ToolBox::data_helper" : {
          "file" : "lib/Bio/ToolBox/data_helper.pm",
-         "version" : "1.14"
+         "version" : "1.20"
       },
       "Bio::ToolBox::db_helper" : {
          "file" : "lib/Bio/ToolBox/db_helper.pm",
-         "version" : "1.18"
+         "version" : "1.20"
       },
       "Bio::ToolBox::db_helper::bam" : {
          "file" : "lib/Bio/ToolBox/db_helper/bam.pm",
@@ -98,7 +104,11 @@
       },
       "Bio::ToolBox::file_helper" : {
          "file" : "lib/Bio/ToolBox/file_helper.pm",
-         "version" : "1.15"
+         "version" : "1.20"
+      },
+      "Bio::ToolBox::utility" : {
+         "file" : "lib/Bio/ToolBox/utility.pm",
+         "version" : "1.20"
       }
    },
    "release_status" : "stable",
@@ -107,5 +117,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.19"
+   "version" : "1.2"
 }
