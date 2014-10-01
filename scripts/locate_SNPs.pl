@@ -17,7 +17,7 @@ use Bio::ToolBox::file_helper qw(
 	open_tim_data_file 
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+my $VERSION = '1.20';
 
 
 
@@ -414,7 +414,7 @@ sub find_overlapping_features {
 									push @codon_changes, determine_codon_change(
 										$snp_type,
 										$snp,
-										$subfeat,
+										$subfeat2,
 										$segment,
 									);
 									
