@@ -7,11 +7,11 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
 use Bio::SeqFeature::Lite;
-use Bio::ToolBox::data_helper qw(format_with_commas);
 use Bio::ToolBox::file_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
+use Bio::ToolBox::utility;
 my $VERSION = '1.20';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
@@ -646,7 +646,7 @@ sub process_line_data {
 		$data{exonCount}   = $linedata[8];
 		$data{exonStarts}  = $linedata[9];
 		$data{exonEnds}    = $linedata[10];
-		$data{name2}       = $linedata[12];
+		$data{name2}       = $linedata[12] || undef;
 		$data{note}        = $refseqsum->{ $linedata[1] }->[1] || undef;
 		$data{status}      = $refseqstat->{ $linedata[1] }->[0] || undef;
 		$data{completeness} = $refseqsum->{ $linedata[1] }->[0] || undef;
@@ -684,7 +684,7 @@ sub process_line_data {
 		$data{exonCount}   = $linedata[7];
 		$data{exonStarts}  = $linedata[8];
 		$data{exonEnds}    = $linedata[9];
-		$data{name2}       = $linedata[11];
+		$data{name2}       = $linedata[11] || undef;
 		$data{note}        = $refseqsum->{ $linedata[0] }->[1] || undef;
 		$data{status}      = $refseqstat->{ $linedata[0] }->[0] || undef;
 		$data{completeness} = $refseqsum->{ $linedata[0] }->[0] || undef;
