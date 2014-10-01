@@ -6,20 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
-use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
-	format_with_commas
-);
+use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
 use Bio::ToolBox::db_helper::gff3_parser;
-use Bio::ToolBox::file_helper qw(
-	open_to_read_fh
-	write_tim_data_file
-);
-my $VERSION = '1.19';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -140,15 +134,14 @@ if ($database) {
 elsif ($infile) {
 	$outdata = collect_from_file($method);
 }
-print "  collected ", format_with_commas($outdata->{'last_row'}), " regions\n";
+printf "  collected %s regions\n", format_with_commas($outdata->last_row);
 
 
 
 
 
 ### Finished
-my $success = write_tim_data_file(
-	'data'     => $outdata,
+my $success = $outdata->write_file(
 	'filename' => $outfile,
 	'gz'       => $gz,
 );
@@ -344,9 +337,8 @@ sub collect_from_database {
 	) or die "No valid gene feature type was provided! see help\n";
 	
 	# generate output data
-	my $output = generate_output_structure();
-	$output->{'db'} = $database;
-	$output->{0}{'feature'} = $feature; # parent column
+	my $Data = generate_output_structure();
+	$Data->database($database);
 	
 	# generate a seqfeature stream
 	my $iterator = $db->features(
@@ -359,8 +351,11 @@ sub collect_from_database {
 		# collect the regions based on the primary tag and the method re
 		if ($seqfeat->primary_tag eq 'gene') {
 			# gene
-			push @{ $output->{'data_table'} },
-				process_gene($seqfeat, $method);
+			my @genes = process_gene($seqfeat, $method);
+			foreach (@genes) {
+				# each element is an anon array of found feature info
+				$Data->add_row($_);
+			}
 		}
 		elsif ($seqfeat->primary_tag =~ /rna/i) {
 			# transcript
@@ -369,13 +364,15 @@ sub collect_from_database {
 			# add the parent name
 			map { unshift @$_, $seqfeat->display_name } @regions;
 			
-			push @{ $output->{'data_table'} }, @regions;
+			foreach (@regions) {
+				# each element is an anon array of found feature info
+				$Data->add_row($_);
+			}
 		}
 	}
-	$output->{'last_row'} = scalar( @{ $output->{'data_table'} }) - 1;
 	
 	# finished
-	return $output;
+	return $Data;
 }
 
 
@@ -398,13 +395,12 @@ sub collect_from_file {
 	# will be kept open until the end of the file is reached. 
 	
 	# generate output data
-	my $output = generate_output_structure();
-	push @{ $output->{'other'} }, "Source data file $infile\n";
+	my $Data = generate_output_structure();
+	$Data->add_comment("Source data file $infile");
 	
 	# open gff3 parser object
 	my $parser = Bio::ToolBox::db_helper::gff3_parser->new($infile) or
 		die " unable to open input file '$infile'!\n";
-	
 	
 	# process the features
 	while (my @top_features = $parser->top_features() ) {
@@ -416,8 +412,11 @@ sub collect_from_file {
 			# collect the regions based on the primary tag and the method re
 			if ($seqfeat->primary_tag =~ /^gene$/i) {
 				# gene
-				push @{ $output->{'data_table'} },
-					process_gene($seqfeat, $method);
+				my @genes = process_gene($seqfeat, $method);
+				foreach (@genes) {
+					# each element is an anon array of found feature info
+					$Data->add_row($_);
+				}
 			}
 			elsif ($seqfeat->primary_tag =~ /rna/i) {
 				# transcript
@@ -426,50 +425,41 @@ sub collect_from_file {
 				# add the parent name
 				map { unshift @$_, $seqfeat->display_name } @regions;
 				
-				push @{ $output->{'data_table'} }, @regions;
+				foreach (@regions) {
+					# each element is an anon array of found feature info
+					$Data->add_row($_);
+				}
 			}
 		}
 	}
-	$output->{'last_row'} = scalar( @{ $output->{'data_table'} }) - 1;
 	
 	# finished
-	return $output;
+	return $Data;
 }
 
 
 
 sub generate_output_structure {
-	
-	# generate
-	my $data = generate_tim_data_structure(
-		"region",
-		qw(
-			Parent
-			Transcript
-			Name
-			Chromosome
-			Start
-			Stop
-			Strand
-		)
+	my $Data = Bio::ToolBox::Data->new(
+		feature  => "region",
+		columns  => [ qw(Parent Transcript Name Chromosome Start Stop Strand) ],
 	);
-	
-	# add metadata
-	$data->{1}{'type'} = $request;
-	$data->{1}{'type'} =~ s/\s/_/; # replace spaces
-	$data->{2}{'type'} = $transcript_type;
+	my $r = $request;
+	$r =~ s/\s/_/g; # remove spaces
+	$Data->metadata(1,'type', $r);
+	$Data->metadata(2, 'type', $transcript_type);
 	if ($start_adj) {
-		$data->{4}{'start_adjusted'} = $start_adj;
+		$Data->metadata(4, 'start_adjusted', $start_adj);
 	}
 	if ($stop_adj) {
-		$data->{5}{'stop_adjusted'} = $stop_adj;
+		$Data->metadata(5, 'stop_adjusted', $stop_adj);
 	}
 	if ($unique) {
-		$data->{2}{'unique'} = 1; # Name
-		$data->{2}{'slop'} = $slop;
+		$Data->metadata(2, 'unique', 1);
+		$Data->metadata(2, 'slop', $slop);
 	}
 	
-	return $data;
+	return $Data;
 }
 
 

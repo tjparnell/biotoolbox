@@ -5,10 +5,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(
-	format_with_commas
-	generate_tim_data_structure
-);
+use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
@@ -16,10 +13,10 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
-	write_tim_data_file
 );
 use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.15';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -151,8 +148,7 @@ if (scalar @features == 1 and $features[0] =~ /,/) {
 
 
 ### Prepare data structure and/or output file
-my ($data, $out_fh);
-prepare_data_structure_or_output();
+my ($Data, $out_fh) = prepare_data_structure_or_output();
 
 
 
@@ -188,8 +184,7 @@ else {
 	unless ($outfile) {
 		$outfile = generate_file_name();
 	}
-	my $success = write_tim_data_file(
-		'data'     => $data,
+	my $success = $Data->write_file(
 		'filename' => $outfile,
 		'gz'       => $gz,
 	);
@@ -208,6 +203,7 @@ else {
 
 sub prepare_data_structure_or_output {
 	# how we prepare the structure is dependent on the output format
+	my ($Data, $fh);
 	
 	if ($convert_to_gff) {
 		# no need for a data structure
@@ -222,12 +218,12 @@ sub prepare_data_structure_or_output {
 		}
 		
 		# open file handle
-		$out_fh = open_to_write_fh($outfile, $gz) or 
+		$fh = open_to_write_fh($outfile, $gz) or 
 			die " unable to open output file for writing!\n";
 		
 		# print GFF headers
-		$out_fh->print("##gff-version 3\n");
-		$out_fh->print("# Features collected from database $database\n");
+		$fh->print("##gff-version 3\n");
+		$fh->print("# Features collected from database $database\n");
 	}
 	else {
 		# generate a tim data structure
@@ -235,55 +231,54 @@ sub prepare_data_structure_or_output {
 		# structure dependent on output format
 		if ($convert_to_bed) {
 			# bed structure
-			$data = generate_tim_data_structure(
-				'region', qw(Chromosome Start End Name Score Strand) );
-			$data->{'bed'} = 6; # set the bed parameter
-			
-			# add extra comments
-			# normally added to main data hash, but we want these 
-			# written to the bed file where they normally are not
-			push @{ $data->{'other'} }, 
-				"# Collected " . join(',', @features) . 
-				" features from database $database\n";
+			$Data = Bio::ToolBox::Data->new(
+				feature   => 'region', 
+				datasets  => [qw(Chromosome Start End Name Score Strand)],
+			);
+			$Data->bed = 6; # set the bed parameter
 			
 			# position adjustments
 			if ($start_adj) {
-				$data->{1}{'start_adjustment'} = $start_adj;
-				$data->{1}{'position'} = $position;
+				$Data->metadata(1, 'start_adjustment', $start_adj);
+				$Data->metadata(1, 'position', $position);
 			}
 			if ($stop_adj) {
-				$data->{2}{'stop_adjustment'} = $stop_adj;
-				$data->{2}{'position'} = $position;
+				$Data->metadata(2, 'start_adjustment', $start_adj);
+				$Data->metadata(2, 'position', $position);
 			}
 		}
 		
 		elsif ($include_coordinates) {
 			# generic tim data structure with coordinates
 			
-			$data = generate_tim_data_structure(
-				qw(region Name Type Chromosome Start End Strand)
+			$Data = Bio::ToolBox::Data->new(
+				feature   => 'region', 
+				datasets  => [qw(Name Type Chromosome Start End Strand)],
 			);
 		
 			# position adjustments
 			if ($start_adj) {
-				$data->{4}{'start_adjustment'} = $start_adj;
-				$data->{4}{'position'} = $position;
+				$Data->metadata(4, 'start_adjustment', $start_adj);
+				$Data->metadata(4, 'position', $position);
 			}
 			if ($stop_adj) {
-				$data->{5}{'stop_adjustment'} = $stop_adj;
-				$data->{5}{'position'} = $position;
+				$Data->metadata(5, 'start_adjustment', $start_adj);
+				$Data->metadata(5, 'position', $position);
 			}
 		}
 			
 		else {
 			# just name and type, thank you very much
-			$data = generate_tim_data_structure(
-				join(',', @features), qw(Primary_ID Name Type) );
+			$Data = Bio::ToolBox::Data->new(
+				feature   => join(',', @features), 
+				datasets  => [qw(Primary_ID Name Type)],
+			);
 		}
 		
 		# add database
-		$data->{'db'} = $database;
+		$Data->database($database);
 	}
+	return ($Data, $fh);
 }
 
 
@@ -350,15 +345,15 @@ sub record_bed_feature {
 	}
 	
 	# record the feature
-	push @{ $data->{'data_table'} }, [
+	my @fdata = (
 		$seqfeature->seq_id,
 		$seqfeature->start - 1,
 		$seqfeature->end,
 		$seqfeature->display_name || $seqfeature->primary_id || 'region',
 		$seqfeature->score || 0,
 		$seqfeature->strand, # this will be converted to + or - upon writing
-	];
-	$data->{'last_row'} += 1;
+	);
+	$Data->add_row(\@fdata);
 	
 	# record subfeatures if requested
 	if ($get_subfeatures) {
@@ -379,15 +374,15 @@ sub record_standard_coordinate_feature {
 	}
 		
 	# record the feature
-	push @{ $data->{'data_table'} }, [
+	my @fdata = (
 		$seqfeature->display_name,
 		$seqfeature->type,
 		$seqfeature->seq_id,
 		$seqfeature->start,
 		$seqfeature->end,
 		$seqfeature->strand,
-	];
-	$data->{'last_row'} += 1;
+	);
+	$Data->add_row(\@fdata);
 	
 	# record subfeatures if requested
 	if ($get_subfeatures) {
@@ -403,12 +398,12 @@ sub record_standard_feature {
 	my $seqfeature = shift;
 	
 	# record the feature
-	push @{ $data->{'data_table'} }, [
+	my @fdata = (
 		$seqfeature->primary_id,
-		join(';', $seqfeature->display_name, ($seqfeature->get_tag_values('Alias'))),
+		$seqfeature->display_name,
 		$seqfeature->type,
-	];
-	$data->{'last_row'} += 1;
+	);
+	$Data->add_row(\@fdata);
 	
 	# record subfeatures if requested
 	if ($get_subfeatures) {

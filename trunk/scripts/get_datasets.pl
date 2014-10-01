@@ -7,34 +7,14 @@ use Getopt::Long;
 use Pod::Usage;
 use FindBin qw($Bin);
 use File::Spec;
-use Statistics::Lite qw(
-	sum
-	mean
-	median
-	min
-	max
-	range
-	stddevp
-);
-use Bio::ToolBox::data_helper qw(
-	find_column_index
-	format_with_commas
-	splice_data_structure
-);
+use Statistics::Lite qw(sum mean median min max range stddevp);
+use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	check_dataset_for_rpm_support
-	get_new_feature_list 
-	get_new_genome_list 
-	get_feature
-	get_chromo_region_score
-	get_region_dataset_hash
 );
-use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
-);
+use Bio::ToolBox::utility;
 
 my $parallel;
 eval {
@@ -44,7 +24,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = '1.18';
+my $VERSION = '1.20';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -137,30 +117,10 @@ if ($print_version) {
 	exit;
 }
 
-
-
 # Assign default values
 set_defaults();
 my $start_time = time;
 
-# Assign database for new feature lists
-if ($new and not defined $main_database) {
-	# creating a new feature list requires a main database 
-	# otherwise we will postpone this till after loading the input file
-	
-	if (defined $data_database) {
-		# reuse the data database
-		$main_database = $data_database;
-	}
-	elsif (@datasets and $feature eq 'genome') {
-		# we could use a dataset file only if we're collecting genome windows
-		# take the first element
-		$main_database = $datasets[0];
-	}
-	else {
-		die " You must define a database or an appropriate dataset file! see help\n";
-	}
-}
 
 
 
@@ -168,40 +128,45 @@ if ($new and not defined $main_database) {
 
 ### Initialize main data, database, and datasets
 
-# Generate or open main feature list and identify columns
-my (
-	$main_data_ref, 
-	$name_i, 
-	$type_i, 
-	$id_i,
-	$chromo_i, 
-	$start_i, 
-	$stop_i, 
-	$strand_i
-) = get_main_data_ref();
-
-
-# Open main database connection
-unless ($main_database) {
-	# this could've been obtained either from the input file, 
-	# command line, or a source data file
-	# lacking that, we'll attempt to use the first dataset provided
-	# and hope for the best 
-	if ($data_database) {
-		# use data database if defined instead of main database
-		$main_database = $data_database;
-	}
-	elsif (@datasets) {
-		# we hope this some sort of indexed data file like bigWig or Bam
-		$main_database = $datasets[0];
-		print " no database defined, using $main_database\n";
+# Generate or open Data table
+my $Data;
+if ($infile) {
+	$Data = Bio::ToolBox::Data->new(file => $infile) or 
+		die " unable to load input file '$infile'\n";
+	printf "  Loaded %s '%s' features.\n", 
+		format_with_commas( $Data->last_row ), $Data->feature;
+	
+	# update main database as necessary
+	if ($main_database) {
+		if ($main_database ne $Data->database) {
+			# update with new database
+			printf " updating main database name from '%s' to '%s'\n", 
+				$Data->database, $main_database;
+			print "   Re-run without --db option if you do not want this to happen\n";
+			$Data->database($main_database);
+		}
 	}
 	else {
-		die " no database defined! see help\n";
+		$main_database = $Data->database;
 	}
 }
-my $mdb = open_db_connection($main_database) or 
-	die " unable to establish database connection to '$main_database'!\n";
+elsif ($new) {
+	# generate a new file
+	print " Generating a new feature list from database '$main_database'...\n";
+	$Data = Bio::ToolBox::Data->new(
+		db      => $main_database,
+		feature => $feature,
+		win     => $win,
+		step    => $step,
+	) or die " unable to generate new feature list\n";
+}
+
+# update program name
+unless ($Data->program eq $0) {
+	$Data->program($0);
+}
+
+
 
 # Open data database
 my $ddb;
@@ -210,15 +175,11 @@ if (defined $data_database) {
 	$ddb = open_db_connection($data_database) or 
 		die "unable to establish data database connection to $data_database!\n";
 }
-else {
-	# reuse the main database connection
-	$ddb = $mdb;
-}
 
 # Check the datasets
 unless ($datasets[0] eq 'none') {
 	@datasets = verify_or_request_feature_types(
-		'db'      => $ddb,
+		'db'      => $ddb || $Data->database,
 		'feature' => [ @datasets ],
 		'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
 					" to collect data. Comma delimited or range is acceptable\n",
@@ -256,8 +217,7 @@ if ($method eq 'rpm' or $method eq 'rpkm') {
 if ($datasets[0] eq 'none') {
 	print " Nothing to collect!\n";
 	if ($new) {
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
+		my $success = $Data->save(
 			'filename' => $outfile,
 			'gz'       => $gz,
 		);
@@ -274,7 +234,7 @@ if ($datasets[0] eq 'none') {
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $main_data_ref->{'last_row'}/$cpu < 100) {
+	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
 		# I figure we need at least 100 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
@@ -421,16 +381,6 @@ sub set_defaults {
 		$stranded = 'all'; 
 	}
 	
-	# check the limit when using fractional start and stop
-	if ($fstart and $fstop) {
-		# fractional start and stop requested
-		unless ($limit) {
-			# set a minimum size limit on sub fractionating a feature
-			# 1000 bp seems like a reasonable cut off, no?
-			$limit = 1000;
-		}
-	}
-	
 	# check the relative position
 	if (defined $position) {
 		# check the position value
@@ -444,183 +394,43 @@ sub set_defaults {
 		$position = 5;
 	}
 	
+	# check the limit when using fractional start and stop
+	if ($fstart and $fstop) {
+		# fractional start and stop requested
+		unless ($limit) {
+			# set a minimum size limit on sub fractionating a feature
+			# 1000 bp seems like a reasonable cut off, no?
+			$limit = 1000;
+		}
+		if ($position == 4) {
+			die " set position to 5 or 3 only when using fractional start and stop\n";
+		}
+	}
+	
 	# check the output file
 	unless ($outfile) {
 		# overwrite the input file
 		$outfile = $infile;
 	}
-}
-
-
-
-### Collect the feature list and populate the 
-sub get_main_data_ref {
 	
-	my ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
+	# Assign database for new feature lists
+	if ($new and not defined $main_database) {
+		# creating a new feature list requires a main database 
+		# otherwise we will postpone this till after loading the input file
 	
-	# Generate new input file from the database
-	if ($new) { 
-		print " Generating a new feature list from database '$main_database'...\n";
-		
-		# generate feature list based on type of feature
-		if ($feature eq 'genome') { 
-			# generate a list of genomic intervals
-			
-			# if window and step size were not set at execution from the 
-			# command line, then we'll be using the defaults hard encoded
-			# in the module subroutine, which should be window of 500 bp 
-			# and step size = window size
-			
-			# generate the list
-			$data_ref = get_new_genome_list(
-				'db'       => $main_database, 
-				'win'      => $win,
-				'step'     => $step,
-			);
-			
-			# assign the column indices
-			$chromo = 0;
-			$start  = 1;
-			$stop   = 2;
-		} 
-		
-		else { 
-			# everything else works off a feature list
-			
-			# generate the gene list
-			$data_ref = get_new_feature_list(
-				'db'        => $main_database,
-				'features'  => $feature,
-			);
-			
-			# assign the column indices
-			$id     = 0;
-			$name   = 1;
-			$type   = 2;
+		if (defined $data_database) {
+			# reuse the data database
+			$main_database = $data_database;
 		}
-		
-		# check
-		unless ($data_ref) {
-			die "no new feature list generated!";
+		elsif (@datasets and $feature eq 'genome') {
+			# we could use a dataset file only if we're collecting genome windows
+			# take the first element
+			$main_database = $datasets[0];
 		}
-		
-		# assign the current program
-		$data_ref->{'program'} = $0;
-	} 
-	
-	
-	# Open a file containing the data
-	else { 
-		print " Loading feature list from file '$infile'...\n";
-		$data_ref = load_tim_data_file($infile) or
-			die "no file data loaded!";
-		
-		# identify relevant feature data columns 
-		$name   = find_column_index($data_ref, '^name');
-		$type   = find_column_index($data_ref, '^type|class');
-		$id     = find_column_index($data_ref, '^primary_id');
-		$chromo = find_column_index($data_ref, '^chr|seq|ref|ref.?seq');
-		$start  = find_column_index($data_ref, '^start|position');
-		$stop   = find_column_index($data_ref, '^stop|end');
-		$strand = find_column_index($data_ref, '^strand');
-		
-		# now set missing arguments with values from loaded file
-		# database
-		unless ($main_database) {
-			$main_database = $data_ref->{'db'};
-		}
-		# feature
-		unless ($feature) {
-			if ( exists $data_ref->{'feature'} ) {
-				# load the feature defined in the file's metadata
-				$feature = $data_ref->{'feature'};
-			}
-		}
-		
-		# validate the feature
-		if ($feature =~ /genome|region|segment|interval/i) {
-			# genomic regions?
-			
-			# must have coordinates
-			unless (defined $chromo and defined $start) {
-				# no basic coordinates!!!!
-				
-				# does it at least have name and type?
-				if (defined $name and defined $type) {
-					# whew! reassign feature to named_feature
-					$feature = "Named feature";
-				}
-				else {
-					# nothing recognized!
-					die " File suggests genomic regions but coordinate" . 
-						" column headers can not be found!\n";
-				}
-			}
-			
-			# make sure we have stop index defined
-			unless (defined $stop) {
-				# we'll use the start index for the stop index in case 
-				# it isn't defined
-				# this will define a region of 1 bp
-				$stop = $start;
-			}
-		}
-		
-		elsif ($feature =~ /\w+/) {
-			# some named feature
-			
-			# must have name and type columns
-			unless (defined $id or (defined $name and defined $type)) {
-				# no name or type defined!?
-				
-				# do we at least have coordinates?
-				if (defined $chromo and defined $start and defined $stop) {
-					# whew! reassign to genome feature
-					$feature = 'region';
-				}
-				else {
-					# nothing recognized
-					die " File suggests '$feature' features but name and" . 
-						" type column headers cannot be found!\n";
-				}
-			}
-		}
-		
 		else {
-			# feature was not explicitly defined
-			
-			# determine empirically from column names
-			if (defined $id or (defined $name and defined $type)) {
-				# named features!
-				$feature = "Named feature";
-			}
-			elsif (defined $chromo and defined $start) {
-				# genomic coordinates
-				$feature = 'region';
-				
-				# make sure we have stop index defined
-				unless (defined $stop) {
-					# we'll use the start index for the stop index in case 
-					# it isn't defined
-					# this will define a region of 1 bp
-					$stop = $start;
-				}
-			}
-			else {
-				# no useable columns defined
-				die " File does not have recognizable name, type, and/or" .
-					" coordinate column headers!\n Unable to proceed\n";
-			}
+			die " You must define a database or an appropriate dataset file! see help\n";
 		}
-		
-		# print statement on feature
-		printf "  Loaded %s '%s' features.\n", 
-			format_with_commas( $data_ref->{'last_row'} ),
-			$feature;
 	}
-	
-	# done
-	return ($data_ref, $name, $type, $id, $chromo, $start, $stop, $strand);
 }
 
 
@@ -638,16 +448,12 @@ sub parallel_execution {
 		#### In child ####
 	
 		# splice the data structure
-		splice_data_structure($main_data_ref, $i, $cpu);
+		$Data->splice_data($i, $cpu);
 		
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
-		$mdb = open_db_connection($main_database, 1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
-		}
-		else {
-			$ddb = $mdb;
 		}
 		
 		# collect the dataset
@@ -658,8 +464,7 @@ sub parallel_execution {
 		}
 		
 		# write out result
-		my $success = write_tim_data_file(
-			'data'     => $main_data_ref,
+		my $success = $Data->save(
 			'filename' => "$child_base_name.$i",
 			'gz'       => 0, # faster to write without compression
 		);
@@ -693,9 +498,9 @@ sub parallel_execution {
 
 
 sub single_execution {
-	foreach my $dataset (@datasets) {
 	
-		# collect the dataset
+	# collect the datasets
+	foreach my $dataset (@datasets) {
 		unless ($dataset eq 'none') {
 			print " Collecting $method $value_type from dataset '$dataset'...\n";
 			collect_dataset($dataset);
@@ -706,8 +511,7 @@ sub single_execution {
 	# write the output file
 	# we will rewrite the file after each collection
 	# appropriate extensions and compression should be taken care of
-	my $success = write_tim_data_file(
-		'data'     => $main_data_ref,
+	my $success = $Data->save(
 		'filename' => $outfile,
 		'gz'       => $gz,
 	);
@@ -728,11 +532,11 @@ sub collect_dataset {
 	my $dataset = shift;
 	
 	# set the new metadata for this new dataset
-	my $index = record_metadata($dataset);
+	my $index = add_new_dataset($dataset);
 	
 	# check that we have strand data if necessary
 	if ($set_strand) {
-		unless (defined $strand_i) {
+		unless (defined $Data->strand_column) {
 			die " requested to set strand but a strand column was not found!\n";
 		}
 	}
@@ -742,7 +546,7 @@ sub collect_dataset {
 	# are we modifying or extending the coordinates of the region or feature?
 	
 	# Genomic regions
-	if ($feature =~ /genome|region|segment|interval/i) {
+	if ($Data->feature =~ /genome|region|segment|interval/i) {
 		
 		# collect the genome dataset based on whether we need to modify 
 		# the genomic coordinates or not
@@ -770,23 +574,11 @@ sub collect_dataset {
 	
 	# Named features
 	else {
-		
-		# check that we have the appropriate database opened
-		my $mdb_ref = ref $mdb;
-		unless ($mdb_ref =~ /^Bio::DB::SeqFeature::Store/) {
-			die "\n\n Collecting data for named features is currently only " .
-				"supported with\n Bio::DB::SeqFeature::Store databases! " .
-				"Please either open an appropriate\n" . 
-				" database or include coordinate information in your file\n";
-		}
-		
-		
 		# collect the named feature dataset based on whether we need to modify 
 		# the genomic coordinates or not
 		
 		if ($subfeature) {
 			# collect feature subfeatures
-			
 			get_subfeature_dataset($dataset, $index);
 		}
 		
@@ -816,192 +608,115 @@ sub collect_dataset {
 
 
 sub get_genome_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the genomic regions
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
-				'start'     => $main_data_ref->{'data_table'}->[$row][$start_i],
-				'stop'      => $main_data_ref->{'data_table'}->[$row][$stop_i],
-				'strand'    => defined $strand_i ?
-						$main_data_ref->{'data_table'}->[$row][$strand_i] : 0,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
+		my $score = $row->get_score(
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 sub get_extended_genome_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the genomic regions
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
-		
-		# get extended coordinates
-		my $start = $main_data_ref->{'data_table'}->[$row][$start_i] - $extend;
-		my $stop  = $main_data_ref->{'data_table'}->[$row][$stop_i]  + $extend;
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
-				'start'     => $start,
-				'stop'      => $stop,
-				'strand'    => defined $strand_i ?
-						$main_data_ref->{'data_table'}->[$row][$strand_i] : 0,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
+		my $score = $row->get_score(
+			# we need to extend the coordinates
+			'start'     => $row->start - $extend,
+			'stop'      => $row->end - $extend,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 sub get_adjusted_genome_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the genomic regions
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
-		# get strand of the region if defined
-		my $strand = defined $strand_i ? 
-			$main_data_ref->{'data_table'}->[$row][$strand_i] : 0;
-		
-		# calculate new relative start and stop positions
-		# this depends on both feature orientation and the 
-		# relative position requested
+		# adjust coordinates as requested
+		# depends on feature strand and relative position
 		my ($start, $stop);
-		
-		# adjust relative to the 5' position 
-		if ($position == 5) {
-		
-			if ($strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $main_data_ref->{'data_table'}->[$row][$start_i] +
-					$start_adj;
-				$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] + 
-					$stop_adj;
-			}
-			elsif ($strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $main_data_ref->{'data_table'}->[$row][$stop_i] -
-					$stop_adj;
-				$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
-					$start_adj;
-			}
+		if ($position == 5 and $row->strand >= 0) { 
+			# 5' end of forward strand
+			$start = $row->start + $start_adj;
+			$stop  = $row->start + $stop_adj;
 		}
-		
-		# adjust relative to the 3' position
-		elsif ($position == 3) {
-			
-			if ($strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $main_data_ref->{'data_table'}->[$row][$stop_i] +
-					$start_adj;
-				$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
-					$stop_adj;
-			}
-			elsif ($strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $main_data_ref->{'data_table'}->[$row][$start_i] -
-					$stop_adj;
-				$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] - 
-					$start_adj;
-			}
+		elsif ($position == 5 and $row->strand < 0) { 
+			# 5' end of reverse strand
+			$start = $row->end - $stop_adj;
+			$stop  = $row->end - $start_adj;
 		}
-		
-		# adjust relative to the midpoint position
+		elsif ($position == 3 and $row->strand >= 0) { 
+			# 3' end of forward strand
+			$start = $row->end + $start_adj;
+			$stop  = $row->end + $stop_adj;
+		}
+		elsif ($position == 3 and $row->strand < 0) {
+			# 3' end of reverse strand
+			$start = $row->start - $stop_adj;
+			$stop  = $row->start - $start_adj;
+		}
 		elsif ($position == 4) {
-			# determine the midpoint position
-			my $middle = int(
-				# calculate same way regardless of strand
-				(
-					$main_data_ref->{'data_table'}->[$row][$stop_i] +
-					$main_data_ref->{'data_table'}->[$row][$start_i] 
-				) / 2
-			);
-			if ($strand >= 0) {
-				# feature is on the forward, watson strand
+			# middle position
+			my $middle = int( ($row->end - $row->start) / 2);
+			if ($row->strand >= 0) {
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
 			}
-			elsif ($strand < 0) {
-				# feature is on the reverse, crick strand
+			else {
 				$start = $middle - $stop_adj;
 				$stop  = $middle - $start_adj;
 			}
 		}
 		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
-				'start'     => $start,
-				'stop'      => $stop,
-				'strand'    => $strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+		# now collect score
+		my $score = $row->get_score(
+			'start'     => $start,
+			'stop'      => $stop,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 sub get_fractionated_genome_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the genomic regions
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
-		# get strand of the region if defined
-		my $strand = defined $strand_i ? 
-			$main_data_ref->{'data_table'}->[$row][$strand_i] : 0;
-		
-		# get region length
-		my $length = 
-			$main_data_ref->{'data_table'}->[$row][$stop_i] -
-			$main_data_ref->{'data_table'}->[$row][$start_i] + 1;
-			
+		# calculate length
+		my $length = $row->end - $row->start + 1;
 		
 		# calculate new fractional start and stop positions
 		# the fraction depends on the length
@@ -1010,465 +725,247 @@ sub get_fractionated_genome_dataset {
 		my $relative_start = int( ($length * $fstart) + 0.5);
 		my $relative_stop  = int( ($length * $fstop) + 0.5);
 		my ($start, $stop);
-		
-		# check whether length exceeds the limit
 		if ($length >= $limit) {
 			# length exceeds our minimum limit
 			# we can take a fractional length
 			
-			# adjust relative to the 5' position 
-			if ($position == 5) {
-			
-				if ($strand >= 0) {
-					# feature is on the forward, watson strand
-					$start = $main_data_ref->{'data_table'}->[$row][$start_i] + 
-						$relative_start;
-					$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] + 
-						$relative_stop;
-				}
-				elsif ($strand < 0) {
-					# feature is on the reverse, crick strand
-					$start = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
-						$relative_stop;
-					$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] - 
-						$relative_start;
-				}
+			if ($position == 5 and $row->strand >= 0) { 
+				# 5' end of forward strand
+				$start = $row->start + $relative_start;
+				$stop  = $row->start + $relative_stop;
 			}
-			
-			# adjust relative to the 3' position
-			elsif ($position == 3) {
-				
-				if ($strand >= 0) {
-					# feature is on the forward, watson strand
-					$start = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
-						$relative_start;
-					$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i] + 
-						$relative_stop;
-				}
-				elsif ($strand < 0) {
-					# feature is on the reverse, crick strand
-					$start = $main_data_ref->{'data_table'}->[$row][$start_i] - 
-						$relative_stop;
-					$stop  = $main_data_ref->{'data_table'}->[$row][$start_i] - 
-						$relative_start;
-				}
+			elsif ($position == 5 and $row->strand < 0) { 
+				# 5' end of reverse strand
+				$start = $row->end - $relative_stop;
+				$stop  = $row->end - $relative_start;
 			}
-			
-			# adjust relative to the midpoint position
-			elsif ($position == 4) {
-				# determine the midpoint position
-				my $middle = int(
-					# calculate same way regardless of strand
-					(
-						$main_data_ref->{'data_table'}->[$row][$stop_i] +
-						$main_data_ref->{'data_table'}->[$row][$start_i] 
-					) / 2
-				);
-				if ($strand >= 0) {
-					# feature is on the forward, watson strand
-					$start = $middle + $relative_start;
-					$stop  = $middle + $relative_stop;
-				}
-				elsif ($strand < 0) {
-					# feature is on the reverse, crick strand
-					$start = $middle - $relative_stop;
-					$stop  = $middle - $relative_start;
-				}
+			elsif ($position == 3 and $row->strand >= 0) { 
+				# 3' end of forward strand
+				$start = $row->end + $relative_start;
+				$stop  = $row->end + $relative_stop;
 			}
+			elsif ($position == 3 and $row->strand < 0) {
+				# 3' end of reverse strand
+				$start = $row->start - $relative_stop;
+				$stop  = $row->start - $relative_start;
+			}
+			# midpoint is not accepted
 		}
-		
-		# length doesn't exceed minimum limit
 		else {
+			# length doesn't meet minimum limit
 			# simply take the whole fragment
-			$start = $main_data_ref->{'data_table'}->[$row][$start_i];
-			$stop  = $main_data_ref->{'data_table'}->[$row][$stop_i];
+			$start = $row->start;
+			$stop  = $row->end;
 		}
 		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $main_data_ref->{'data_table'}->[$row][$chromo_i],
-				'start'     => $start,
-				'stop'      => $stop,
-				'strand'    => $strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+		# now collect score
+		my $score = $row->get_score(
+			'start'     => $start,
+			'stop'      => $stop,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 sub get_feature_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the list of features
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
-		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
+		my $score = $row->get_score(
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
+			'strand'    => $set_strand ? $row->strand : undef,
 		);
-		unless ($feature) {
-			# record a null value and move on
-			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			next;
-		}
-		
-		# reassign strand value if requested
-		if ($set_strand) {
-			$feature->strand($main_data_ref->{'data_table'}->[$row][$strand_i]);
-		}
-		
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $feature->seq_id,
-				'start'     => $feature->start,
-				'stop'      => $feature->end,
-				'strand'    => $feature->strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
-		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 sub get_extended_feature_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the list of features
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
+		# collect score
+		my $score = $row->get_score(
+			'start'     => $row->start - $extend,
+			'stop'      => $row->end + $extend,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
+			'strand'    => $set_strand ? $row->strand : undef,
 		);
-		unless ($feature) {
-			# record a null value and move on
-			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			next;
-		}
-		
-		# reassign strand value if requested
-		if ($set_strand) {
-			$feature->strand($main_data_ref->{'data_table'}->[$row][$strand_i]);
-		}
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $feature->seq_id,
-				'start'     => $feature->start - $extend,
-				'stop'      => $feature->end + $extend,
-				'strand'    => $feature->strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
-		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 sub get_adjusted_feature_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the list of features
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
-		);
-		unless ($feature) {
-			# record a null value and move on
-			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			next;
-		}
+		# we need to collect the feature to adjust coordinates
+		my $feature = $row->feature;
 		
-		# reassign strand value if requested
-		if ($set_strand) {
-			$feature->strand($main_data_ref->{'data_table'}->[$row][$strand_i]);
-		}
-		
-		
-		
-		# calculate new relative start and stop positions
-		# this depends on both feature orientation and the 
-		# relative position requested
+		# adjust coordinates as requested
+		# depends on feature strand and relative position
 		my ($start, $stop);
-		
-		# adjust relative to the 5' position 
-		if ($position == 5) {
-		
-			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $feature->start + $start_adj;
-				$stop  = $feature->start + $stop_adj;
-			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $feature->end - $stop_adj;
-				$stop  = $feature->end - $start_adj;
-			}
+		if ($position == 5 and $feature->strand >= 0) { 
+			# 5' end of forward strand
+			$start = $feature->start + $start_adj;
+			$stop  = $feature->start + $stop_adj;
 		}
-		
-		# adjust relative to the 3' position
-		elsif ($position == 3) {
-			
-			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $feature->end + $start_adj;
-				$stop  = $feature->end + $stop_adj;
-			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $feature->start - $stop_adj;
-				$stop  = $feature->start - $start_adj;
-			}
+		elsif ($position == 5 and $feature->strand < 0) { 
+			# 5' end of reverse strand
+			$start = $feature->end - $stop_adj;
+			$stop  = $feature->end - $start_adj;
 		}
-		
-		# adjust relative to the midpoint position
+		elsif ($position == 3 and $feature->strand >= 0) { 
+			# 3' end of forward strand
+			$start = $feature->end + $start_adj;
+			$stop  = $feature->end + $stop_adj;
+		}
+		elsif ($position == 3 and $feature->strand < 0) {
+			# 3' end of reverse strand
+			$start = $feature->start - $stop_adj;
+			$stop  = $feature->start - $start_adj;
+		}
 		elsif ($position == 4) {
-			# determine the midpoint position
-			my $middle = ($feature->start + int( ($feature->length / 2) + 0.5));
+			# middle position
+			my $middle = int( ($feature->end - $feature->start) / 2);
 			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
 			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
+			else {
 				$start = $middle - $stop_adj;
 				$stop  = $middle - $start_adj;
 			}
 		}
 		
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $feature->seq_id,
-				'start'     => $start,
-				'stop'      => $stop,
-				'strand'    => $feature->strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+		# now collect score
+		my $score = $row->get_score(
+			'start'     => $start,
+			'stop'      => $stop,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
+			'strand'    => $set_strand ? $row->strand : undef,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 
 sub get_fractionated_feature_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the list of features
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
+		# we need to collect the feature to adjust coordinates
+		my $feature = $row->feature;
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
-		);
-		unless ($feature) {
-			# record a null value and move on
-			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			next;
-		}
-		
-		# reassign strand value if requested
-		if ($set_strand) {
-			$feature->strand($main_data_ref->{'data_table'}->[$row][$strand_i]);
-		}
-		
-		
+		# calculate length
+		my $length = $feature->length;
 		
 		# calculate new fractional start and stop positions
 		# the fraction depends on the length
 		# this depends on both feature orientation and the 
 		# relative position requested
-		my $relative_start = int( ($feature->length * $fstart) + 0.5);
-		my $relative_stop  = int( ($feature->length * $fstop) + 0.5);
+		my $relative_start = int( ($length * $fstart) + 0.5);
+		my $relative_stop  = int( ($length * $fstop) + 0.5);
 		my ($start, $stop);
-		
-		# use the entire feature length if it doesn't match the minimum limit
-		if ($feature->length < $limit) {
+		if ($length >= $limit) {
+			# length exceeds our minimum limit
+			# we can take a fractional length
+			
+			if ($position == 5 and $feature->strand >= 0) { 
+				# 5' end of forward strand
+				$start = $feature->start + $relative_start;
+				$stop  = $feature->start + $relative_stop;
+			}
+			elsif ($position == 5 and $feature->strand < 0) { 
+				# 5' end of reverse strand
+				$start = $feature->end - $relative_stop;
+				$stop  = $feature->end - $relative_start;
+			}
+			elsif ($position == 3 and $feature->strand >= 0) { 
+				# 3' end of forward strand
+				$start = $feature->end + $relative_start;
+				$stop  = $feature->end + $relative_stop;
+			}
+			elsif ($position == 3 and $feature->strand < 0) {
+				# 3' end of reverse strand
+				$start = $feature->start - $relative_stop;
+				$stop  = $feature->start - $relative_start;
+			}
+			# midpoint is not accepted
+		}
+		else {
+			# length doesn't meet minimum limit
+			# simply take the whole fragment
 			$start = $feature->start;
 			$stop  = $feature->end;
 		}
 		
-		# adjust relative to the 5' position 
-		elsif ($position == 5) {
-		
-			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $feature->start + $relative_start;
-				$stop  = $feature->start + $relative_stop;
-			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $feature->end - $relative_stop;
-				$stop  = $feature->end - $relative_start;
-			}
-		}
-		
-		# adjust relative to the 3' position
-		elsif ($position == 3) {
-			
-			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $feature->end + $relative_start;
-				$stop  = $feature->end + $relative_stop;
-			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $feature->start - $relative_stop;
-				$stop  = $feature->start - $relative_start;
-			}
-		}
-		
-		# adjust relative to the midpoint position
-		elsif ($position == 4) {
-			# determine the midpoint position
-			my $middle = ($feature->start + int( ($feature->length / 2) + 0.5));
-			if ($feature->strand >= 0) {
-				# feature is on the forward, watson strand
-				$start = $middle + $relative_start;
-				$stop  = $middle + $relative_stop;
-			}
-			elsif ($feature->strand < 0) {
-				# feature is on the reverse, crick strand
-				$start = $middle - $relative_stop;
-				$stop  = $middle - $relative_start;
-			}
-		}
-		
-		
-		# get region score
-		my $score = get_chromo_region_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $feature->seq_id,
-				'start'     => $start,
-				'stop'      => $stop,
-				'strand'    => $feature->strand,
-				'value'     => $value_type,
-				'method'    => $method,
-				'log'       => $main_data_ref->{$index}{'log2'},
-				'stranded'  => $stranded,
+		# now collect score
+		my $score = $row->get_score(
+			'start'     => $start,
+			'stop'      => $stop,
+			'db'        => $ddb,
+			'dataset'   => $dataset,
+			'value'     => $value_type,
+			'method'    => $method,
+			'log'       => $Data->metadata($index, 'log2'),
+			'stranded'  => $stranded,
+			'strand'    => $set_strand ? $row->strand : undef,
 		);
-		unless (defined $score) {
-			# this should return a value, otherwise we record an internal null
-			$score = '.';
-		}
-		$main_data_ref->{'data_table'}->[$row][$index] = $score;
-	}
+		$row->value($index, $score);
+	} );
 }
 
 
 
 sub get_subfeature_dataset {
-	
-	# get passed arguments
 	my ($dataset, $index) = @_;
 	
-	
-	# Loop through the list of features
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+	# collect the scores from the dataset for this index
+	$Data->iterate( sub {
+		my $row = shift;
 		
-		# get feature from the database
-		my $feature = get_feature(
-			'db'    => $mdb,
-			'id'    => defined $id_i ? 
-				$main_data_ref->{'data_table'}->[$row][$id_i] : undef,
-			'name'  => defined $name_i ? 
-				$main_data_ref->{'data_table'}->[$row][$name_i] : undef,
-			'type'  => defined $type_i ? 
-				$main_data_ref->{'data_table'}->[$row][$type_i] : undef,
-		);
-		unless ($feature) {
-			# record a null value and move on
-			$main_data_ref->{'data_table'}->[$row][$index] = '.';
-			next;
-		}
-		
-		# reassign strand value if requested
-		if ($set_strand) {
-			$feature->strand($main_data_ref->{'data_table'}->[$row][$strand_i]);
-		}
-		
+		# we need to collect the feature to adjust coordinates
+		my $feature = $row->feature;
 		
 		# Collect and identify the subfeatures
 		# we could use either exons or CDS subfeatures
@@ -1553,27 +1050,24 @@ sub get_subfeature_dataset {
 		my $gene_length = 0;
 		my @scores;
 		foreach my $subfeat (@subfeatures) {
-			# we don't want a single value for each subfeature
-			# rather we will collect the raw scores and then combine them
-			# ourselves later
-			
-			# we will use the indexed score function, which returns a 
-			# hash of postions and scores, but we'll just take the scores
-			# we will do this using genomic coordinates rather than 
-			# name and feature type, since we can't guarantee that the 
-			# subfeatures are indexed separately from the parent in the 
-			# database
-			my $score_ref = get_chromo_region_score(
+			# we will repeatedly call get_score on this $row feature but using
+			# the subfeature coordinates. as long as we provide everything, nothing 
+			# will be taken from the parent feature
+			my $score_ref = $row->get_score(
 				'db'        => $ddb,
 				'dataset'   => $dataset,
 				'chromo'    => $subfeat->seq_id,
 				'start'     => $subfeat->start,
 				'stop'      => $subfeat->end,
-				'strand'    => $subfeat->strand,
+				'strand'    => $set_strand ? $row->strand : $subfeat->strand,
+				'stranded'  => $stranded,
 				'value'     => $value_type,
 				'method'    => 'scores', # special method to return array ref of scores
-				'stranded'  => $stranded,
+				'log'       => $Data->metadata($index, 'log2'),
 			);
+			# we don't want a single value for each subfeature
+			# rather we will collect the raw scores and then combine them
+			# ourselves later
 			
 			# record the values
 			push @scores, @$score_ref;
@@ -1581,24 +1075,21 @@ sub get_subfeature_dataset {
 			# record the subfeature length
 			$gene_length += $subfeat->length;
 		}
-	
-		
-		
+
 		# Calculate the final score
-		
-		# no data collected!? record null or zero value
 		unless (@scores) {
+			# no data collected!? record null or zero value
 			if ($method =~ /sum|count|rpm|rpkm/) {
-				$main_data_ref->{'data_table'}->[$row][$index] = 0;
+				$row->value($index, 0);
 			}
 			else {
-				$main_data_ref->{'data_table'}->[$row][$index] = '.';
+				$row->value($index, '.');
 			}
 			next;
 		}
 		
 		# convert log2 values if necessary
-		if ($main_data_ref->{$index}{'log2'}) {
+		if ($Data->metadata($index, 'log2')) {
 			@scores = map {2 ** $_} @scores;
 		}
 		
@@ -1650,18 +1141,18 @@ sub get_subfeature_dataset {
 		}
 	
 		# convert back to log2 if necessary
-		if ($main_data_ref->{$index}{'log2'}) { 
+		if ($Data->metadata($index, 'log2')) { 
 			$parent_score = log($parent_score) / LOG2;
 		}
-			
-		# record the final score for the parent feature
-		$main_data_ref->{'data_table'}->[$row][$index] = $parent_score;
-	}
+		
+		# record
+		$row->value($index, $parent_score);
+	} );
 }
 
 
 # subroutine to record the metadata for a dataset
-sub record_metadata {
+sub add_new_dataset {
 	my $dataset = shift;
 	
 	# generate column name
@@ -1702,72 +1193,37 @@ sub record_metadata {
 		}
 	}
 	
+	# add new column
+	my $index = $Data->add_column($column_name);
 	
-	# determine new index
-	my $new_index = $main_data_ref->{'number_columns'};
-	# remember that the index counting is 0-based, so the new index is 
-	# essentially number_columns - 1 + 1
-	$main_data_ref->{'number_columns'} += 1; # update
-	
-	# generate new metadata hash for this column
-	my %metadata = (
-		'name'     => $column_name,
-		'dataset'  => $dataset,
-		'index'    => $new_index,
-		'log2'     => $logstatus,
-		'method'   => $method, # global argument for dataset combining
-		'strand'   => $stranded, # global argument for strand specificity
-		'value'    => $value_type, # global argument for value type
-	);
-	
-	# populate metadata hash as necessary from global arguments
-	if (defined $extend) {
-		$metadata{'extend'} = $extend;
-	}
-	if (defined $start_adj) {
-		$metadata{'start'} = $start_adj;
-	}
-	if (defined $stop_adj) {
-		$metadata{'stop'} = $stop_adj;
-	}
-	if (defined $fstart) {
-		$metadata{'fstart'} = $fstart;
-	}
-	if (defined $fstop) {
-		$metadata{'fstop'} = $fstop;
-	}
+	# update metadata 
+	$Data->metadata($index, 'dataset', $dataset);
+	$Data->metadata($index, 'method', $method);
+	$Data->metadata($index, 'value', $value_type);
+	$Data->metadata($index, 'log2', $logstatus);
+	$Data->metadata($index, 'strand', $stranded);
+	$Data->metadata($index, 'extend', $extend)   if defined $extend;
+	$Data->metadata($index, 'start', $start_adj) if defined $start_adj;	
+	$Data->metadata($index, 'stop', $stop_adj)   if defined $stop_adj;	
+	$Data->metadata($index, 'fstart', $fstart)   if defined $fstart;	
+	$Data->metadata($index, 'fstop', $fstop)     if defined $fstop;	
+	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
+	$Data->metadata($index, 'exons', 'yes')      if $subfeature;	
+	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
 	if ($position == 3) {
-		$metadata{'relative_position'} = "3'end";
+		$Data->metadata($index, 'relative_position', "3'end");	
 	}
-	elsif ($position == 1) {
-		$metadata{'relative_position'} = "middle";
+	elsif ($position == 4) {
+		$Data->metadata($index, 'relative_position', 'middle');
 	}
-	if ($limit) {
-		$metadata{'limit'} = $limit;
-	}
-	if ($subfeature) {
-		$metadata{'exons'} = 'yes';
-	}
-	if ($set_strand) {
-		$metadata{'forced_strand'} = 'yes';
-	}
-	
+
 	# add database name if different
 	if (defined $data_database) {
-		$metadata{'db'} = $data_database;
+		$Data->metadata($index, 'db', $data_database);
 	}
-	elsif ($main_database ne $main_data_ref->{'db'}) {
-		$metadata{'db'} = $main_database;
-	}
-	
-	# place metadata hash into main data structure
-	$main_data_ref->{$new_index} = \%metadata;
-	
-	# set column header name
-	$main_data_ref->{'data_table'}->[0][$new_index] = $column_name;
 	
 	# return the index number
-	return $new_index;
+	return $index;
 }
 
 
