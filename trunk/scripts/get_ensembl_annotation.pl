@@ -21,7 +21,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = '1.11';
+my $VERSION = '1.20';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -104,6 +104,7 @@ if ($help) {
 # Print version
 if ($print_version) {
 	print " Biotoolbox script get_ensembl_annotation.pl, version $VERSION\n\n";
+	printf " Bio::EnsEMBL API version %s\n", $bio_ensembl ? $bio_ensembl : 'not installed';
 	exit;
 }
 
@@ -418,6 +419,7 @@ sub process_genes {
 	# get chromosome name
 	my $chr = $slice->seq_region_name;
 	if ($slice->coord_system_name eq 'chromosome' and $ucsc) {
+		$chr =~ s/^MT$/M/; # rename mitochondrial chromosome
 		$chr = 'chr' . $chr;
 	}
 	
