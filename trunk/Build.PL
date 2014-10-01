@@ -36,7 +36,7 @@ sub get_base_options {
 		dist_author       => 'Timothy Parnell <parnell.tj@gmail.com>',
 		dist_abstract     => 'Tools for querying and analysis of genomic data',
 		configure_requires => {
-			'Module::Build'       => 0,
+			'Module::Build'           => 0,
 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
@@ -56,7 +56,6 @@ sub get_base_options {
 			'Parallel::ForkManager'   => 1.02,
 		},
 		script_files => [
-			'scripts/average_gene.pl',
 			'scripts/bam2gff_bed.pl',
 			'scripts/bam2wig.pl',
 			'scripts/bar2wig.pl',
@@ -79,6 +78,7 @@ sub get_base_options {
 			'scripts/find_enriched_regions.pl',
 			'scripts/get_actual_nuc_sizes.pl',
 			'scripts/get_bam_seq_stats.pl',
+			'scripts/get_binned_data.pl',
 			'scripts/get_datasets.pl',
 			'scripts/get_ensembl_annotation.pl',
 			'scripts/get_features.pl',
