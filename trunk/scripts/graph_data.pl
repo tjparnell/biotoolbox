@@ -7,11 +7,8 @@ use Pod::Usage;
 use Getopt::Long;
 use File::Spec;
 use Statistics::Descriptive;
-use Bio::ToolBox::data_helper qw(parse_list);
-use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	open_to_write_fh
-);
+use Bio::ToolBox::Data;
+use Bio::ToolBox::utility;
 my $gd_ok;
 eval {
 	require GD;
@@ -21,8 +18,8 @@ eval {
 };
 my $gd_smooth;
 eval {
-	$gd_smooth = 1;
 	require GD::Graph::smoothlines; 
+	$gd_smooth = 1;
 };
 my $parallel;
 eval {
@@ -30,8 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant LOG2 => log(2);
-my $VERSION = '1.18';
+my $VERSION = '1.20';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -69,7 +65,6 @@ my (
 	$y_format,
 	$format,
 	$places,
-	$log,
 	$directory,
 	$out,
 	$numbers,
@@ -98,7 +93,6 @@ GetOptions(
 	'format=i'  => \$format, # number of places to format tick labels
 	'xformat=i' => \$x_format, # number of places to format x axis tick labels
 	'yformat=i' => \$y_format, # number of places to format y axis tick labels
-	'log!'      => \$log, # values are in log, respect log status
 	'dir=s'     => \$directory, # optional name of the graph directory
 	'out=s'     => \$out, # output file name
 	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
@@ -125,7 +119,10 @@ if ($print_version) {
 
 ### check requirements
 unless ($gd_ok) {
-	die "Module GD::Graph must be installed to run this script.\n";
+	die <<GD_WARNING
+Modules GD and GD::Graph failed to load, either because they are not installed or they 
+are missing an external dependency (libgd). Please install these to run this script.
+GD_WARNING
 }
 
 unless ($infile) {
@@ -148,13 +145,13 @@ else {
 	$type = 'scatter';
 	print " Using default graph type of 'scatter'\n";
 }
+if ($type =~ /smooth/i) {
+	die "Perl module GD::Graph::smoothlines must be installed to graph smooth plots\n"
+		unless $gd_smooth;
+}
 unless (defined $norm) {
 	# default is no normalization (percent rank)
 	$norm = 0;
-}
-unless (defined $log) {
-	# default is no log
-	$log = 0;
 }
 if (defined $min) {
 	# assign general minimum value to specific axes
@@ -208,24 +205,23 @@ else {
 ### Prepare global variables and set up for execution
 
 print " Loading data from file $infile....\n";
-my $main_data_ref = load_tim_data_file($infile);
-unless ($main_data_ref) {
+my $Data = Bio::ToolBox::Data->new(file => $infile) or
 	die " No data loaded!\n";
-}
-my $data_table_ref = $main_data_ref->{'data_table'};
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
-for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
+my $i = 0;
+foreach my $name ($Data->list_columns) {
 	
 	# check column header names for gene or window attribute information
 	# these won't be used for graph generation, so we'll skip them
-	next if $main_data_ref->{$i}{'name'} =~ /^(?:name|id|class|type|alias|probe|chr|
+	next if $name =~ /^(?:name|id|class|type|alias|probe|chr|
 		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
 		midpoint|strand|primary_id)$/xi;
 	
 	# record the data set name
-	$dataset_by_id{$i} = $main_data_ref->{$i}{'name'};
+	$dataset_by_id{$i} = $name;
+	$i++;
 }	
 
 
@@ -233,15 +229,39 @@ for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
 unless ($directory) {
 	# directory may be specified from a command line argument, otherwise
 	# generate default directory from input file name
-	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
+	$directory = $Data->path . $Data->basename . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory '$directory'\n";
 }
 
 
-# Set up an output array of the correlation values
-my @correlation_output; 
+# Set up correlation values Data object
+my $statfile = File::Spec->catfile($directory, $Data->basename . "_stats.txt");
+my $stat_Data;
+if (-e $statfile) {
+	# if the file exists, append to it
+	$stat_Data = Bio::ToolBox::Data->new(file => $statfile) or 
+		die " unable to write '$statfile'!\n";
+} 
+else {
+	# open a new file
+	$stat_Data->Bio::ToolBox::Data->new(
+		feature => 'correlations',
+		columns => [qw(
+			SourceFile
+			GraphFile
+			GraphType
+			Normalized
+			X_Data
+			Y_Data
+			Intercept
+			Slope
+			Pearson_coefficient
+			R^2
+		)],
+	); 
+}
 
 
 
@@ -288,46 +308,16 @@ else {
 
 
 
-### Write out the linear regression statistics
-
-# open file
-my $statfile = $main_data_ref->{'basename'} . "_stats.txt";
-$statfile = File::Spec->catfile($directory, $statfile);
-my $stat_fh;
-if (-e $statfile) {
-	# if the file exists, append to it
-	$stat_fh = open_to_write_fh($statfile, 0, 1) or 
-		warn " unable to write '$statfile'!\n";
-} 
-else {
-	# open a new file
-	$stat_fh = open_to_write_fh($statfile) or 
-		warn " unable to write '$statfile'!\n";
-	$stat_fh->print( join("\t", qw(
-		SourceFile
-		GraphFile
-		GraphType
-		Normalized
-		X_Data
-		Y_Data
-		Intercept
-		Slope
-		Pearson_coefficient
-		R^2
-	) ) . "\n" ) if $stat_fh; 
-}
-
-# print to file
-if ($stat_fh) {
-	foreach (@correlation_output) {
-		$stat_fh->print("$_\n");
-	}
-	$stat_fh->close;
-}
+# Write out the linear regression statistics
+$stat_Data->write_file(
+	filename  => $statfile,
+	gz        => 0,
+	simple    => 1, # no metadata
+);
 
 
 ### The end of the main program	
-
+exit;
 
 
 
@@ -382,8 +372,7 @@ sub graph_provided_datasets {
 		my $pm = Parallel::ForkManager->new($cpu);
 		$pm->run_on_finish( sub {
 			my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result) = @_;
-			
-			push @correlation_output, $$result if $exit_code == 1;
+			$stat_Data->add_row($result) if $exit_code == 1;
 		});
 		
 		# run in parallel
@@ -411,7 +400,7 @@ sub graph_provided_datasets {
 		foreach (@to_do) {
 			my $result = graph_this($_->[0], $_->[1]); 
 			if ($result) {
-				push @correlation_output, $result;
+				$stat_Data->add_row($result);
 			}
 			else {
 				print " Failed to generate graph for ", $dataset_by_id{$_->[0]}, 
@@ -449,7 +438,7 @@ sub graph_datasets_interactively {
 			# generate the graph, and return the correlation stats as a string
 			my $result = graph_this($x, $y);
 			if ($result) {
-				push @correlation_output, $result;
+				$stat_Data->add_row($result);
 			}
 			else {
 				print " Failed to generate graph for ", $dataset_by_id{$x}, 
@@ -478,87 +467,33 @@ sub graph_this {
 	my $xname = $dataset_by_id{$xid}; 
 	my $yname = $dataset_by_id{$yid};
 	
-	# collect the values
+	# collect the values into separate x and y values
 	my (@xvalues, @yvalues);
-	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) { 
-		# walk through the data file
-		my $x = $data_table_ref->[$row][$xid];
-		my $y = $data_table_ref->[$row][$yid];
+	$Data->iterate( sub { 
+		my $row = shift;
+		my $x = $row->value($xid);
+		my $y = $row->value($yid);
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
 		if ( ($x ne '.') and ($y ne '.') ) {
-			push @xvalues, $x; # put into the values array
+			push @xvalues, $x; 
 			push @yvalues, $y;
 		}
-	}
-	
-	# check log status
-	my $changed_x_log_status = 0;
-	my $changed_y_log_status = 0;
-	if ($log) {
-		# we need to work with log values
-		# we will obey any log2 flags present in the metadata first
-		# failing that, we will blindly assume the data needs to be transformed
-		
-		# first check the metadata for the x dataset
-		if (exists $main_data_ref->{$xid}{'log2'}) {
-			# x dataset has log2 flag
-			if ($main_data_ref->{$xid}{'log2'} == 1) {
-				# it is in log2 space, so de-log
-				@xvalues = map { 2 ** $_ } @xvalues;
-				$changed_x_log_status = 1;
-			}
-		} else {
-			# x dataset has no log2 flag
-			# then we will blindly assume it needs to be transformed
-			@xvalues = map { 2 ** $_ } @xvalues;
-			$changed_x_log_status = 1;
-		}
-		# then check the metadata for the y dataset
-		if (exists $main_data_ref->{$yid}{'log2'}) {
-			# y dataset has log2 flag
-			if ($main_data_ref->{$yid}{'log2'} == 1) {
-				# it is in log2 space, so de-log
-				@yvalues = map { 2 ** $_ } @yvalues;
-				$changed_y_log_status = 1;
-			}
-		} else {
-			# y dataset has no log2 flag
-			# then we will blindly assume it needs to be transformed
-			@yvalues = map { 2 ** $_ } @yvalues;
-			$changed_y_log_status = 1;
-		}
-	}
-	
+	});
 	
 	# Sort the data points
 	sort_data(\@xvalues, \@yvalues);
 	
-	
 	# Smooth by moving average
 	if ($moving_average) {
-		# use subroutine
 		smooth_data(\@xvalues, \@yvalues);
 	}
 	
-	
-	# Either normalize or convert back to log
+	# Normalize values to a percent ranke (0..1) if requested
 	if ($norm) {
-		# Normalize values to a percent rank (0..1)
-		# they do not need to be re-logged
 		normalize_this(\@xvalues);
 		normalize_this(\@yvalues);
 	}
-	elsif ($changed_x_log_status or $changed_y_log_status) {
-		# Values were originally log2, change them back before plotting
-		if ($changed_x_log_status) {
-			@xvalues = map { log($_) / LOG2 } @xvalues;
-		}
-		if ($changed_y_log_status) {
-			@yvalues = map { log($_) / LOG2 } @yvalues;
-		}
-	}
-	
 	
 	# Determine graph type and plot accordingly
 	# the correlation statistics will be returned as a string
@@ -787,7 +722,7 @@ sub graph_scatterplot {
 	# return stats
 	print " Generated graph for $xname vs $yname\n" . 
 		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
+	return [ (
 		$infile,
 		$filename,
 		'scatter',
@@ -798,7 +733,7 @@ sub graph_scatterplot {
 		$m,
 		$r,
 		$rsquared
-	) );
+	) ];
 }
 
 
@@ -873,18 +808,18 @@ sub graph_line_plot {
 	# return stats
 	print " Generated graph for $xname vs $yname\n" . 
 		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
+	return [ (
 		$infile,
 		$filename,
-		'line',
+		'scatter',
 		$norm,
 		$xname,
-		$yname . ' (smoothed)',
+		$yname,
 		$q,
 		$m,
 		$r,
 		$rsquared
-	) );
+	) ];
 }
 
 
@@ -893,8 +828,6 @@ sub graph_smoothed_line_plot {
 	# the passed values
 	my ($xname, $yname, $xref, $yref) = @_;
 	
-	die "Perl module GD::Graph::smoothlines must be installed to graph smooth plots\n"
-		unless $gd_smooth;
 	
 	# calculate statistics
 	my ($q, $m, $r, $rsquared) = get_stats($xref, $yref);
@@ -960,18 +893,18 @@ sub graph_smoothed_line_plot {
 	# return stats
 	print " Generated graph for $xname vs $yname\n" . 
 		"  Pearson correlation is $r_formatted, R^2 is $rsquared_formatted\n";
-	return join("\t", (
+	return [ (
 		$infile,
 		$filename,
-		'line',
+		'scatter',
 		$norm,
 		$xname,
-		$yname . ' (smoothed)',
+		$yname,
 		$q,
 		$m,
 		$r,
 		$rsquared
-	) );
+	) ];
 }
 
 
@@ -1093,7 +1026,6 @@ graph_data.pl [--options] <filename>
   --all
   --ma <window>,<step>
   --norm
-  --log
   --min=<value>
   --xmin=<value>
   --ymin=<value>
@@ -1160,13 +1092,6 @@ Indicate that all available datasets in the input file should be
 plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y.
 If you wish to graph only a subset of datasets, provide a list 
 and/or range using the --index option.
-
-=item --log
-
-Indicate whether dataset values are in log2 space or not. If set 
-to true and the log2 status is indicated in the metadata, then 
-the metadata status is preserved. Default is false (and metadata 
-ignored).
 
 =item --norm
 
@@ -1278,14 +1203,12 @@ datasets from a list of available datasets in the data file.
 
 The data in the datasets may be manipulated in several ways prior to plotting.
 The data may be converted to a percentile rank, smoothed by a moving average, 
-converted from log2 values, constrained to minimum and maximum values, etc. 
-See options for details.
+constrained to minimum and maximum values, etc. 
 
 If the graph doesn't look like you expect, and you are not normalizing by 
 converting to a percent rank (--norm), try explicitly setting the --min and 
 --max values. The GD::Graph module tries its best at setting these 
-automatically, but sometimes does funny things, particularly with log2 data 
-that spans 0.
+automatically, but sometimes does funny things.
 
 =head1 AUTHOR
 
