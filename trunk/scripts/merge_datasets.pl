@@ -5,15 +5,8 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
-	find_column_index
-);
-use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
-);
-my $VERSION = '1.17';
+use Bio::ToolBox::Data;
+my $VERSION = '1.20';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -98,7 +91,7 @@ if ($automatic or $user_list) {
 my ($letter_of, $number_of) = get_number_letters(); # convert numbers into letters
 
 # Set up output
-my $output_data_ref; # the reference scalar for the output data structure
+my $output_data; # the reference scalar for the output data structure
 
 # name of lookup column to be used for all files
 my $lookup_name;
@@ -112,42 +105,34 @@ if ($use_coordinate) {
 
 # exactly two filenames are provided
 if (scalar @ARGV == 2) {
-	my $input_data1_ref = read_file(shift @ARGV);
-	my $input_data2_ref = read_file(shift @ARGV);
-	merge_two_datasets($input_data1_ref, $input_data2_ref);
+	my $input_data1 = read_file(shift @ARGV);
+	my $input_data2 = read_file(shift @ARGV);
+	merge_two_datasets($input_data1, $input_data2);
 }
 
 # more than two filenames
 else {
 	# merge the first two
-	my $input_data1_ref = read_file(shift @ARGV);
-	my $input_data2_ref = read_file(shift @ARGV);
-	merge_two_datasets($input_data1_ref, $input_data2_ref);
-	undef $input_data1_ref;
-	undef $input_data2_ref;
+	my $input_data1 = read_file(shift @ARGV);
+	my $input_data2 = read_file(shift @ARGV);
+	merge_two_datasets($input_data1, $input_data2);
+	
+	# undefine these data sources, hopefully to release memory
+	undef $input_data1;
+	undef $input_data2;
 	
 	# merge the subsequent files
-	foreach (@ARGV) {
-		my $input_data_ref = read_file($_);
-		add_datasets($input_data_ref);
+	while (@ARGV) {
+		my $input_data = read_file( shift @ARGV );
+		add_datasets($input_data);
 	}
 }
 
 # clean up coordinate column
-if (
-	$lookup_name =~ /^coordinate$/i and 
-	$output_data_ref->{0}{'name'} =~ /^coordinate$/i
-) {
-	# delete the coordinate metadata
-	for my $i (1 .. $output_data_ref->{'number_columns'}-1) {
-		$output_data_ref->{$i-1} = $output_data_ref->{$i};
-	}
-	$output_data_ref->{'number_columns'}--;
-	
-	# delete the table column
-	for my $row (0 .. $output_data_ref->{'last_row'}) {
-		shift @{ $output_data_ref->{'data_table'}->[$row] };
-	}
+if ($use_coordinate) {
+	# delete the coordinate metadata that we created
+	my $c = $output_data->find_column('Coordinate');
+	$output_data->delete_column($c);
 } 
 
 
@@ -171,18 +156,17 @@ unless ($automatic or $user_list) {
 # Request the output file name
 # default is to simply overwrite file1
 unless ($outfile) {
-	print " Enter the output file name [", $output_data_ref->{'filename'}, "] ";
+	printf " Enter the output file name [%s] ", $output_data->{'filename'};
 	$outfile = <STDIN>;
 	chomp $outfile;
 	if ($outfile eq '') {
 		# use file 1 as the default file name
-		$outfile = $output_data_ref->{'filename'};
+		$outfile = $output_data->filename;
 	} 
 }
 
 # write the file
-my $file_written = write_tim_data_file(
-	'data'      => $output_data_ref,
+my $file_written = $output_data->write_file(
 	'filename'  => $outfile,
 	'gz'        => $gz,
 );
@@ -205,83 +189,67 @@ sub read_file {
 	my $filename = shift;
 	
 	# load the file data
-	my $file_data_ref = load_tim_data_file($filename);
-	unless ($file_data_ref) {
+	my $Data = Bio::ToolBox::Data->new(file => $filename);
+	unless ($Data) {
 		die " file '$filename' not loaded!";
 	}
 	
 	# print the results
-	print "\n Loaded '$filename' with ", $file_data_ref->{'last_row'}, 
-		" data rows and ", $file_data_ref->{'number_columns'}, " columns\n";
+	printf "\n Loaded '$filename' with %s rows and %s columns\n", 
+		$Data->last_row, $Data->number_columns; 
 	
 	# delete any pre-existing original_file metadata
 	# we'll be writing new
-	for (my $i = 0; $i < $file_data_ref->{'number_columns'}; $i++) {
-		if (exists $file_data_ref->{$i}{'original_file'}) {
-			delete $file_data_ref->{$i}{'original_file'};
-		}
+	for (my $i = 0; $i < $Data->number_columns; $i++) {
+		$Data->delete_metadata($i, 'original_file');
 	}
 	
 	# add coordinates if necessary
-	if ($file_data_ref->{'bed'} or $file_data_ref->{'gff'} or $use_coordinate) {
+	if ($Data->bed or $Data->gff or $use_coordinate) {
 		
 		# refuse if user does not want to use coordinates
 		if (defined $use_coordinate and $use_coordinate == 0) {
-			return $file_data_ref;
+			return $Data;
 		}
 		
 		# identify coordinate columns
-		my $coord_i = $file_data_ref->{'number_columns'};
-		my $chr_i   = find_column_index($file_data_ref, '^chr|seq|ref|ref.?seq');
-		my $start_i = find_column_index($file_data_ref, '^start|position');
-		my $stop_i  = find_column_index($file_data_ref, '^stop|end');
-		unless (defined $chr_i and defined $start_i) {
-			# cannot add coordinate column, do without ?
+		unless (defined $Data->chromo_column and defined $Data->start_column) {
 			warn " cannot generate coordinates for file\n";
-			return $file_data_ref;
+			return $Data;
 		}
 		
-		# add new metadata
-		$file_data_ref->{$coord_i} = {
-			'name'      => 'Coordinate',
-			'index'     => $coord_i,
-		};
-		$file_data_ref->{'data_table'}->[0][$coord_i] = 'Coordinate';
-		$file_data_ref->{'number_columns'}++;
+		# add new column
+		my $coord_i = $Data->add_column('Coordinate');
 		
 		# generate coordinates
-		if (defined $stop_i) {
+		if (defined $Data->stop_column) {
 			# merge chromosome:start-stop
-			for my $row (1 .. $file_data_ref->{'last_row'}) {
-				$file_data_ref->{'data_table'}->[$row][$coord_i] = join("", 
-					$file_data_ref->{'data_table'}->[$row][$chr_i], ':', 
-					$file_data_ref->{'data_table'}->[$row][$start_i], '-',
-					$file_data_ref->{'data_table'}->[$row][$stop_i]
-				);
-			}
+			$Data->iterate( sub {
+				my $row = shift;
+				$row->value($coord_i, sprintf("%s:%s-%s", $row->seq_id, $row->start, 
+					$row->end));
+			} );
 		}
 		else {
 			# merge chromosome:start
-			for my $row (1 .. $file_data_ref->{'last_row'}) {
-				$file_data_ref->{'data_table'}->[$row][$coord_i] = join("", 
-					$file_data_ref->{'data_table'}->[$row][$chr_i], ':', 
-					$file_data_ref->{'data_table'}->[$row][$start_i]
-				);
-			}
+			$Data->iterate( sub {
+				my $row = shift;
+				$row->value($coord_i, sprintf("%s:%s", $row->seq_id, $row->start));
+			} );
 		}
 	}
 	
 	# return
-	return $file_data_ref;
+	return $Data;
 }
 
 
 ### Merge two datasets together
 sub merge_two_datasets {
-	my ($input_data1_ref, $input_data2_ref) = @_;
+	my ($input_data1, $input_data2) = @_;
 	
 	# Check the input data
-	my $check = check_data_tables($input_data1_ref, $input_data2_ref);
+	my $check = check_data_tables($input_data1, $input_data2);
 	if ($check and !$lookup) {
 		print " Files have non-equal numbers of data rows! Enabling lookup\n";
 	}
@@ -290,7 +258,7 @@ sub merge_two_datasets {
 	# Merge by lookup values
 	if ($lookup or $check) {
 		# we need to merge by lookup values
-		merge_two_datasets_by_lookup($input_data1_ref, $input_data2_ref);
+		merge_two_datasets_by_lookup($input_data1, $input_data2);
 		return;
 	}
 	
@@ -300,23 +268,18 @@ sub merge_two_datasets {
 	my @order;
 	if ($automatic) {
 		# automatic selection
-		@order = automatically_determine_order(
-			$input_data1_ref, $input_data2_ref);
-		
+		@order = automatically_determine_order($input_data1, $input_data2);
 	}
 	else {
 		# manual selection from user
-		@order = request_new_order($input_data1_ref, $input_data2_ref);
+		@order = request_new_order($input_data1, $input_data2);
 	}
 	
 	# Initialize the output data structure if necessary
-	$output_data_ref = initialize_output_data_structure($input_data1_ref); 
+	$output_data = initialize_output_data_structure($input_data1); 
 
 	# assign the datasets to the output data in requested order
 	foreach my $request (@order) {
-		
-		# determine the current column index we're working with
-		my $column = $output_data_ref->{'number_columns'};
 		
 		# add the dataset from the appropriate input file
 		if ($request =~ /^\d+$/) {
@@ -324,18 +287,15 @@ sub merge_two_datasets {
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
-				print "  Merging column " . 
-					$input_data1_ref->{$request}{'name'} . "\n";
+				printf "  Merging column %s\n", $input_data1->name($request);
 			}
 			
 			# copy the dataset
-			for my $row (0 .. $input_data1_ref->{'last_row'}) {
-				$output_data_ref->{'data_table'}->[$row][$column] = 
-					$input_data1_ref->{'data_table'}->[$row][$request];
-			}
+			my $values = $input_data1->column_values($request);
+			my $index = $output_data->add_column($values);
 			
 			# copy the metadata
-			copy_metadata($input_data1_ref, $request);
+			copy_metadata($input_data1, $request, $index);
 		} 
 		elsif ($request =~ /^[a-z]+$/i) {
 			# a letter indicates a dataset from file2
@@ -345,20 +305,18 @@ sub merge_two_datasets {
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
-				print "  Merging column " . 
-					$input_data2_ref->{$number}{'name'} . "\n";
+				printf "  Merging column %s\n", $input_data2->name($number); 
 			}
 			
 			# copy the dataset
-			for my $row (0 .. $input_data2_ref->{'last_row'}) {
-				$output_data_ref->{'data_table'}->[$row][$column] = 
-					$input_data2_ref->{'data_table'}->[$row][$number];
-			}
+			my $values = $input_data2->column_values($number);
+			my $index = $output_data->add_column($values);
 			
 			# copy the metadata
-			copy_metadata($input_data2_ref, $number);
+			copy_metadata($input_data2, $number, $index);
 		} 
 		else {
+			# we should never get here
 			die " unrecognized symbol '$request' in request! nothing done!\n";
 		}
 	}
@@ -368,23 +326,23 @@ sub merge_two_datasets {
 
 ### merge two datasets by lookup value
 sub merge_two_datasets_by_lookup {
-	my ($input_data1_ref, $input_data2_ref) = @_;
+	my ($input_data1, $input_data2) = @_;
 	
 	# determine lookup indices
 	my ($lookup_i1, $lookup_i2) = 
-		request_lookup_indices($input_data1_ref, $input_data2_ref);
+		request_lookup_indices($input_data1, $input_data2);
 		
 	# determine order
 	my @order;
 	if ($automatic) {
 		# automatic selection
 		@order = automatically_determine_order(
-			$input_data1_ref, $input_data2_ref);
+			$input_data1, $input_data2);
 		
 	}
 	else {
 		# manual selection from user
-		@order = request_new_order($input_data1_ref, $input_data2_ref);
+		@order = request_new_order($input_data1, $input_data2);
 	}
 	
 	# add coordinate column to output if necessary
@@ -405,8 +363,7 @@ sub merge_two_datasets_by_lookup {
 		# the dominant file is where we'll be taking all of the values
 		
 		# switch the references
-		($input_data1_ref, $input_data2_ref) = 
-			($input_data2_ref, $input_data1_ref);
+		($input_data1, $input_data2) = ($input_data2, $input_data1);
 		
 		# switch the lookup indices
 		($lookup_i1, $lookup_i2) = ($lookup_i2, $lookup_i1);
@@ -425,59 +382,37 @@ sub merge_two_datasets_by_lookup {
 	# Index the second dataset
 		# we'll be putting the lookup values into an index hash
 		# where the lookup value is the key and the row number is the value
-	$input_data2_ref->{'index'} = {};
-	my $index_warning = 0;
-	for (my $row = 1; $row <= $input_data2_ref->{'last_row'}; $row++) {
-		my $key = $input_data2_ref->{'data_table'}->[$row][$lookup_i2];
-		if (exists $input_data2_ref->{'index'}{$key}) {
-			# value is not unique
-			$index_warning++;
-		}
-		else {
-			# value is ok
-			$input_data2_ref->{'index'}{$key} = $row;
-		}
-	}
-	if ($index_warning) {
-		warn " Warning: $index_warning rows had two or more duplicate lookup values\n" . 
-			"  for column $lookup_i2 in file " . $input_data2_ref->{'filename'} . 
-			"\n  Only the first occurence was used\n";
-	}
+	my $index = index_dataset($input_data2, $lookup_i2);
 	
 	# Initialize the output data structure if necessary
-	$output_data_ref = initialize_output_data_structure($input_data1_ref); 
+	$output_data = initialize_output_data_structure($input_data1); 
 	
 	# assign the datasets to the output data in requested order
 	foreach my $request (@order) {
 		
-		# determine the current column index we're working with
-		my $column = $output_data_ref->{'number_columns'};
+		# add the dataset from the appropriate input file based on the type of request
+		my $column;
 		
-		# add the dataset from the appropriate input file
+		# a digit indicates a dataset from file1
 		if ($request =~ /\d+/) {
-			# a digit indicates a dataset from file1
 			# we're assuming that file1 is dominant, we copy all the 
 			# rows from file1 into output, no lookup required
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
-				print "  Merging column " . 
-					$input_data1_ref->{$request}{'name'} . "\n";
+				printf "  Merging column %s\n", $input_data1->name($request); 
 			}
 			
 			# copy the dataset including header
-			for my $row (0 .. $input_data1_ref->{'last_row'}) {
-				$output_data_ref->{'data_table'}->[$row][$column] = 
-					$input_data1_ref->{'data_table'}->[$row][$request];
-				
-			}
+			my $values = $input_data1->column_values($request);
+			$column = $output_data->add_column($values);
 			
 			# copy the metadata
-			copy_metadata($input_data1_ref, $request);
+			copy_metadata($input_data1, $request, $column);
 		} 
 		
+		# a letter indicates a dataset from file2
 		elsif ($request =~ /[a-z]+/i) {
-			# a letter indicates a dataset from file2
 			# we will have to perform the lookup here
 			
 			# first convert back to number
@@ -485,36 +420,36 @@ sub merge_two_datasets_by_lookup {
 			
 			# print dataset name in automatic mode
 			if ($automatic) {
-				print "  Merging column " . 
-					$input_data2_ref->{$request_number}{'name'} . "\n";
+				printf "  Merging column %s\n", $input_data2->name($request_number); 
 			}
 			
-			# copy the header
-			$output_data_ref->{'data_table'}->[0][$column] = 
-				$input_data2_ref->{'data_table'}->[0][$request_number];
+			# add new empty column
+			$column = $output_data->add_column( $input_data2->name($request_number) );
 			
-			# copy the dataset
-			for my $row (1 .. $input_data1_ref->{'last_row'}) {
+			# copy the dataset via lookup process
+			foreach my $r1 (1 .. $input_data1->last_row) {
 				# identify the appropriate row in file2 by lookup value
-				my $lookup = $input_data1_ref->{'data_table'}->[$row][$lookup_i1];
-				my $row2 = $input_data2_ref->{'index'}{$lookup} || undef;
+				my $lookup = $input_data1->value($r1, $lookup_i1);
+				my $r2 = $index->{$lookup} || undef;
 				
 				# copy the appropriate value
-				if (defined $row2) {
-					$output_data_ref->{'data_table'}->[$row][$column] = 
-						$input_data2_ref->{'data_table'}->[$row2][$request_number];
+				if (defined $r2) {
+					$output_data->value($r1, $column, 
+						$input_data2->value($r2, $request_number) ); 
 				}
 				else {
-					$output_data_ref->{'data_table'}->[$row][$column] = '.';
+					$output_data->value($r1, $column, '.'); # null value
 				}
 			}
 			
 			# copy the metadata
-			copy_metadata($input_data2_ref, $request_number);
+			copy_metadata($input_data2, $request_number, $column);
 		} 
 		
+		# something else
 		else {
-			die " unrecognized  symbol '$request' in request! nothing done!\n";
+			warn "unknown request '$request'. skipping this column\n";
+			next;
 		}
 		
 		# make sure we remember the lookup_column_index in the new output
@@ -524,60 +459,44 @@ sub merge_two_datasets_by_lookup {
 			# the output data structure is not yet defined
 			
 			# check if the current output index is it
-			if ($output_data_ref->{$column}{'name'} =~ /\A $lookup_name \Z/xi) {
+			if ($output_data->name($column) =~ /\A $lookup_name \Z/xi) {
 				# this current column matches the lookup name
 				# so we will use it
 				$output_lookup_i = $column;
 			}
 		}
 	}
-	
 }
 
 
 
 ### Add datasets from one data file to the output data structure
 sub add_datasets {
-	my $data_ref = shift;
+	my $data = shift;
 	
 	# Check the input data
-	my $check = check_data_tables($output_data_ref, $data_ref);
+	my $check = check_data_tables($output_data, $data);
 	
 	
 	# Determine if we need to do lookup
 	my $lookup_i;
+	my $index; # lookup hash for the current data table
 	if ($check or $lookup) {
 		# we need to merge by lookup values
 		
-		# check whether we have a lookup column defined
+		# check whether we need to do the lookup manually or automatically
 		if ($manual or not $lookup_name) {
-			# we have to do this by treating as two new datasets
-			merge_two_datasets_by_lookup($output_data_ref, $data_ref);
+			# we don't have an automatic lookup name defined or user wants to do it manually
+			# so we do this by treating as two new datasets
+			merge_two_datasets_by_lookup($output_data, $data);
 			return;
 		}
-		
-		# proceed with single lookup
-		$lookup_i = request_lookup_indices($data_ref);
 		
 		# index the new data reference
 			# we'll be putting the lookup values into an index hash
 			# where the lookup value is the key and the row number is the value
-		$data_ref->{'index'} = {};
-		for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
-			my $key = $data_ref->{'data_table'}->[$row][$lookup_i];
-			if (exists $data_ref->{'index'}{$key}) {
-				# value is not unique
-				warn " lookup value '$key' in file " . 
-					$data_ref->{'filename'} . 
-					", row $row is a duplicate!\n" . 
-					" Using the first occurence value\n";
-			}
-			else {
-				# value is ok
-				$data_ref->{'index'}{$key} = $row;
-			}
-		}
-		
+		$lookup_i = request_lookup_indices($data);
+		$index = index_dataset($data, $lookup_i);
 	}
 	
 	
@@ -586,77 +505,70 @@ sub add_datasets {
 	my @order;
 	if ($automatic) {
 		# automatic selection
-		@order = automatically_determine_order($data_ref);
+		@order = automatically_determine_order($data);
 		
 	}
 	else {
 		# manual selection from user
-		@order = request_new_order($data_ref);
+		@order = request_new_order($data);
 	}
 	
 	# assign the datasets to the output data in requested order
 	foreach my $request (@order) {
 		
-		# determine the current column index we're working with
-		my $column = $output_data_ref->{'number_columns'};
-		
-		# add the dataset from the appropriate input file
-		if ($request =~ /^\d+$/) {
-			
-			# print dataset name in automatic mode
-			if ($automatic) {
-				print "  Merging column " . 
-					$data_ref->{$request}{'name'} . "\n";
-			}
-			
-			# copy the dataset by lookup or blindly
-			if (defined $lookup_i) {
-				# merging by lookup
-				
-				# check that we have the output lookup index
-				unless (defined $output_lookup_i) {
-					die " The lookup index for column '$lookup_name' is " .
-						"not defined in the output!\n" . 
-						" Please ensure you include column '$lookup_name' in" .
-						" the output file.\n";
-				}
-				
-				# copy the header
-				$output_data_ref->{'data_table'}->[0][$column] = 
-					$data_ref->{'data_table'}->[0][$request];
-				
-				# copy the dataset
-				for my $row (1 .. $output_data_ref->{'last_row'}) {
-					# identify the appropriate row in file2 by lookup value
-					my $lookup = 
-						$output_data_ref->{'data_table'}->[$row][$output_lookup_i];
-					my $row2 = $data_ref->{'index'}{$lookup} || undef;
-					
-					# copy the appropriate value
-					if (defined $row2) {
-						$output_data_ref->{'data_table'}->[$row][$column] = 
-							$data_ref->{'data_table'}->[$row2][$request];
-					}
-					else {
-						$output_data_ref->{'data_table'}->[$row][$column] = '.';
-					}
-				}
-			}
-			else {
-				# merging blindly
-				
-				for my $row (0 .. $data_ref->{'last_row'}) {
-					$output_data_ref->{'data_table'}->[$row][$column] = 
-						$data_ref->{'data_table'}->[$row][$request];
-				}
-			}
-			
-			# copy the metadata
-			copy_metadata($data_ref, $request);
-		} 
-		else {
-			die " unrecognized  symbol '$request' in request! nothing done!\n";
+		# check the request
+		if ($request !~ /^\d+$/) {
+			warn "unknown request '$request'. skipping this column\n";
+			next;
 		}
+			
+		# print dataset name in automatic mode
+		if ($automatic) {
+			printf "  Merging column %s\n", $data->name($request); 
+		}
+		
+		# copy the dataset by lookup or blindly
+		my $column;
+		if (defined $lookup_i) {
+			# merging by lookup
+			
+			# check that we have the output lookup index
+			unless (defined $output_lookup_i) {
+				die " The lookup index for column '$lookup_name' is " .
+					"not defined in the output!\n" . 
+					" Please ensure you include column '$lookup_name' in" .
+					" the output file.\n";
+			}
+			
+			# add new empty column
+			$column = $output_data->add_column( $data->name($request) );
+			
+			# copy the dataset via lookup process
+			$output_data->iterate( sub {
+				my $row = shift;
+				
+				# identify the appropriate row in source data table by lookup value
+				my $r = $index->{ $row->value($output_lookup_i) } || undef;
+				
+				# copy the appropriate value
+				if ($r) {
+					$row->value($column, $data->value($r, $request) ); 
+				}
+				else {
+					$row->value($column, '.'); # null value
+				}
+			} );
+		}
+		
+		# merging blindly
+		else {
+			# copy the dataset including header
+			my $values = $data->column_values($request);
+			$column = $output_data->add_column($values);
+		}
+			
+		# copy the metadata
+		copy_metadata($data, $request, $column);
 	}
 }
 
@@ -701,6 +613,16 @@ sub request_new_order {
 	
 	# Parse response
 	my @order = parse_list($list); 
+	while (scalar @order == 0) {
+		# an empty order is returned if the list was unparseable
+		# allow user to try again
+		print " Unable to parse your list into valid indices. Please try again\n   ";
+		$list = <STDIN>;
+		chomp $list;
+		$list =~ s/\s+//g;
+		@order = parse_list($list);
+	}
+	
 	
 	# done
 	print " using order: ", join(", ", @order), "\n";
@@ -727,17 +649,15 @@ sub request_lookup_indices {
 			# we already have a lookup name
 			# just need to find same column for one dataset
 			
-			my $index1 = find_column_index($data1, "^$lookup_name\$");
+			my $index1 = $data1->find_column("^$lookup_name\$");
 			unless (defined $index1) {
 				die " Cannot find lookup column with name '$lookup_name'" . 
-					" in file " . $data1->{'filename'} . "\n";
+					" in file " . $data1->filename . "\n";
 			}
 			
 			# print the found column name
-			print "  using column $index1 (", 
-				$data1->{$index1}{'name'}, 
-				") as lookup index for file ", 
-				$data1->{'filename'}, "\n";
+			printf "  using column $index1 (%s) as lookup index for file %s\n", 
+				$data1->name($index1), $data1->filename;
 			return $index1;
 		}
 		
@@ -750,8 +670,8 @@ sub request_lookup_indices {
 		foreach my $name (@name_list) {
 			
 			# identify possibilities
-			my $possible_index1 = find_column_index($data1, "^$name\$");
-			my $possible_index2 = find_column_index($data2, "^$name\$");
+			my $possible_index1 = $data1->find_column("^$name\$");
+			my $possible_index2 = $data2->find_column("^$name\$");
 			
 			# check if something was found
 			if (defined $possible_index1 and defined $possible_index2) {
@@ -762,14 +682,10 @@ sub request_lookup_indices {
 				$lookup_name = $name; # for future lookups
 				
 				# report
-				print "  using column $index1 (", 
-					$data1->{$index1}{'name'}, 
-					") as lookup index for file ", 
-					$data1->{'filename'}, "\n";
-				print "  using column $index2 (", 
-					$data2->{$index2}{'name'}, 
-					") as lookup index for file ", 
-					$data2->{'filename'}, "\n";
+				printf "  using column $index1 (%s) as lookup index for file %s\n", 
+					$data1->name($index1), $data1->filename;
+				printf "  using column $index2 (%s) as lookup index for file %s\n", 
+					$data2->name($index1), $data2->filename;
 				
 				# don't go through remaining list
 				last;
@@ -796,27 +712,34 @@ sub request_lookup_indices {
 	
 		# Request first index responses from user
 		print " Enter the unique identifier index for lookup in the first file   ";
-		$index1 = <STDIN>;
-		chomp $index1;
-		unless ($index1 =~ /^\d+$/ and exists $data1->{$index1}) {
-			# check that it's valid
-			die " unknown index value!\n";
+		while (not defined $index1) {
+			$index1 = <STDIN>;
+			chomp $index1;
+			unless ($index1 =~ /^\d+$/ and exists $data1->{$index1}) {
+				# check that it's valid
+				print " unknown index value! Try again   ";
+				undef $index1;
+			}
 		}
 		
 		# Request second index responses from user
 		print " Enter the unique identifier index for lookup in the second file   ";
-		$index2 = <STDIN>;
-		chomp $index2;
-		unless ($index2 =~ /^[a-z]+$/i) { 
-			# check that it's valid
-			die " unknown index value!\n";
+		while (not defined $index2) {
+			$index2 = <STDIN>;
+			chomp $index2;
+			unless ($index2 =~ /^[a-z]+$/i) { 
+				# check that it's valid
+				print " index value must be a letter! Try again   ";
+				undef $index2;
+				next;
+			}
+			$index2 = $number_of->{$index2}; # convert to a number
+			unless (exists $data2->{$index2}) {
+				# check that it's valid
+				print " unknown index value! Try again   ";
+				undef $index2;
+			}
 		}
-		$index2 = $number_of->{$index2}; # convert to a number
-		unless (exists $data2->{$index2}) {
-			# check that it's valid
-			die " unknown index value!\n";
-		}
-		
 	}
 	
 	# done
@@ -834,7 +757,7 @@ sub automatically_determine_order {
 	my ($data1, $data2, $number);
 	if (scalar @_ == 1) {
 		# comparing new data with the output data we are building
-		$data1 = $output_data_ref;
+		$data1 = $output_data;
 		$data2 = shift @_;
 		$number = 1;
 	}
@@ -847,8 +770,8 @@ sub automatically_determine_order {
 	
 	# generate quick hash of names to exclude from data1
 	my %exclude;
-	for (my $i = 0; $i < $data1->{'number_columns'}; $i++) {
-		$exclude{ $data1->{$i}{'name'} } = 1;
+	for (my $i = 0; $i < $data1->number_columns; $i++) {
+		$exclude{ $data1->name($i) } = 1;
 	}
 	
 	# generate the order
@@ -857,15 +780,15 @@ sub automatically_determine_order {
 	# add the first dataset if provided
 	if ($number == 2) {
 		# we will automatically take all of the columns from the first data
-		for (my $i = 0; $i < $data1->{'number_columns'}; $i++) {
+		for (my $i = 0; $i < $data1->number_columns; $i++) {
 			push @order, $i;
 		}
 	}
 	
 	# automatically identify those columns in second data not present in
 	# the first one to take
-	for (my $i = 0; $i < $data2->{'number_columns'}; $i++) {
-		if ($data2->{$i}{'name'} eq 'Score') {
+	for (my $i = 0; $i < $data2->number_columns; $i++) {
+		if ($data2->name($i) eq 'Score') {
 			# name is score, take it
 			if ($number == 1) {
 				# one data file only, push number
@@ -877,7 +800,7 @@ sub automatically_determine_order {
 			}
 		}
 		
-		elsif (exists $exclude{ $data2->{$i}{'name'} } ) {
+		elsif (exists $exclude{ $data2->name($i) } ) {
 			# non-unique column, skip
 			next;
 		}
@@ -937,7 +860,7 @@ sub parse_list {
 			
 			else {
 				# unrecognizable
-				die " unrecognizable range order!\n";
+				return;
 			}
 		} 
 		
@@ -999,13 +922,13 @@ sub print_datasets {
 
 ### Check the data tables for similarity
 sub check_data_tables {
-	my ($input_data1_ref, $input_data2_ref) = @_;
+	my ($input_data1, $input_data2) = @_;
 	
 	# Check the feature types
 	if ( 
-		$input_data1_ref->{'feature'} and 
-		$input_data2_ref->{'feature'} and
-		$input_data1_ref->{'feature'} ne $input_data2_ref->{'feature'} 
+		$input_data1->feature and 
+		$input_data2->feature and
+		$input_data1->feature ne $input_data2->feature 
 	) {
 		# Each file has feature type defined, but they're not the same
 		# probably really don't want to combine these
@@ -1015,7 +938,7 @@ sub check_data_tables {
 	
 	# check line numbers
 	my $status = 0;
-	if ( $input_data1_ref->{'last_row'} != $input_data2_ref->{'last_row'} ) {
+	if ( $input_data1->last_row != $input_data2->last_row ) {
 		# the number of rows in each data table don't equal
 		# we will need to do this by lookup
 		$status = 1;
@@ -1025,29 +948,56 @@ sub check_data_tables {
 
 
 
+### Index the values in a data table
+sub index_dataset {
+	my ($data, $lookup_i) = @_;
+	
+	# load up the lookup index hash for the current data table
+	my %index;
+	my $index_warning = 0;
+	$data->iterate( sub {
+		my $row = shift;
+		my $key = $row->value($lookup_i);
+		if (exists $index{$key}) {
+			# value is not unique
+			$index_warning++;
+		}
+		else {
+			# value is ok
+			$index{$key} = $row->row_index;
+		}
+	} );
+	if ($index_warning) {
+		warn " Warning: $index_warning rows had two or more duplicate lookup values\n" . 
+			"  for column $lookup_i in file " . $data->filename . 
+			"\n  Only the first occurence was used\n";
+	}
+	return \%index;
+}
+
+
+
 ### Initialize the output data structure
 sub initialize_output_data_structure {
-	my $data_ref = shift;
+	my $Data1 = shift;
 	
 	# generate brand new output data structure
-	my $output_data = generate_tim_data_structure(
-		$data_ref->{'feature'}, # re-use the same feature as file1
+	my $output_data = Bio::ToolBox::Data->new(
+		feature => $Data1->feature, # re-use the same feature as file1
 	);
 	
 	# we'll re-use the values from file1 
-	$output_data->{'program'}   = $data_ref->{'program'};
-	$output_data->{'db'}        = $data_ref->{'db'};
-	$output_data->{'last_row'}  = $data_ref->{'last_row'}; # should be identical
-	$output_data->{'headers'}   = $data_ref->{'headers'};
+	$output_data->program( $Data1->program ); # force overwrite value
+	$output_data->database( $Data1->database );
 	
 	# assign the filename
 	if ($outfile) {
 		# use the new output file name
-		$output_data->{'filename'}  = $outfile;
+		$output_data->filename($outfile);
 	}
 	else {
 		# borrow the first file name
-		$output_data->{'filename'}  = $data_ref->{'filename'}; # borrow file name
+		$output_data->filename( $Data1->filename ); # borrow file name
 	}
 	
 	return $output_data;
@@ -1059,36 +1009,27 @@ sub initialize_output_data_structure {
 sub copy_metadata {
 	
 	# collect arguments
-	my ($data_ref, $dataset_index) = @_;
-	
-	# determine current dataset index to copy into
-	my $current_index = $output_data_ref->{'number_columns'};
+	my ($data, $request, $index) = @_;
 	
 	# copy the metadata
-	$output_data_ref->{$current_index} = { %{ $data_ref->{$dataset_index} } };
+	my %md = $data->metadata($request);
+	foreach my $k (keys %md) {
+		next if $k eq 'index';
+		next if $k eq 'name';
+		$output_data->metadata($index, $k, $md{$k});
+	}
 	
 	# check if should rename the dataset
-	if ($automatic and $data_ref->{$dataset_index}{'name'} eq 'Score') {
+	if ($automatic and $data->name($request) eq 'Score') {
 		# only in automatic mode and the dataset is a generic Score
 		# no opportunity to rename interactively
 		# use file basename appended with Score
-		$output_data_ref->{$current_index}{'name'} = 
-			$data_ref->{'basename'} . '_Score';
-		$output_data_ref->{'data_table'}->[0][$current_index] = 
-			$output_data_ref->{$current_index}{'name'};
+		$output_data->name($index, $data->basename . '_Score'); 
 	}
 	
 	# set the original file name
-	unless (exists $output_data_ref->{$current_index}{'original_file'}) {
-		$output_data_ref->{$current_index}{'original_file'} = 
-			$data_ref->{'filename'};
-	}
-	
-	# reset the index
-	$output_data_ref->{$current_index}{'index'} = $current_index;
-	
-	# increment the number of columns
-	$output_data_ref->{'number_columns'} += 1;
+	$output_data->metadata($index, 'original_file', $data->filename)
+		unless $data->metadata($request, 'AUTO');
 }
 	
 
@@ -1097,12 +1038,12 @@ sub copy_metadata {
 sub rename_dataset_names {
 	print " For each header, type a new name or push enter to accept the current name\n";
 	
-	for (my $i = 0; $i < $output_data_ref->{'number_columns'}; $i++) {
+	for (my $i = 0; $i < $output_data->number_columns; $i++) {
 		# walk through the list of columns
 		
 		# print the current name and it's originating file name
-		print '  ', $output_data_ref->{$i}{'original_file'}, ': ', 
-			$output_data_ref->{$i}{'name'}, ' ->  ';
+		printf "  %s: %s ->  ", $output_data->metadata($i, 'original_file'), 
+			$output_data->name($i);
 		
 		# request user input
 		my $new_name = <STDIN>;
@@ -1112,8 +1053,7 @@ sub rename_dataset_names {
 		if ($new_name) {
 			# user entered a new name
 			# assign new names in both metadata and column header
-			$output_data_ref->{$i}{'name'} = $new_name;
-			$output_data_ref->{'data_table'}->[0][$i] = $new_name;
+			$output_data->name($i, $new_name);
 		}
 	}
 }
