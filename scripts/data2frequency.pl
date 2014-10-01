@@ -8,13 +8,13 @@ use Statistics::Descriptive;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
-	parse_list
 );
 use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 );
-my $VERSION = '1.15';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 

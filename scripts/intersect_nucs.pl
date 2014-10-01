@@ -10,14 +10,14 @@ use Bio::ToolBox::data_helper qw(
 	generate_tim_data_structure
 	index_data_table
 	find_column_index
-	format_with_commas
 );
 use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = '1.15';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 

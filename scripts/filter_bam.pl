@@ -5,14 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(parse_list format_with_commas);
+use Bio::ToolBox::utility;
 my $bam_ok;
 eval {
 	# check for Bam support
 	require Bio::DB::Sam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.19';
+my $VERSION = '1.20';
 
 print "\n A script to filter a Bam file for specific criteria\n\n";
 
