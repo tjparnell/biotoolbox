@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
-use Bio::ToolBox::data_helper qw(format_with_commas);
 use Bio::ToolBox::file_helper qw(
 	load_tim_data_file
 	open_tim_data_file
 	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.15';
+use Bio::ToolBox::utility;
+my $VERSION = '1.20';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -96,18 +96,6 @@ unless ($outfile) {
 		$outfile = <STDIN>;
 		chomp $outfile;
 	}
-}
-
-# compare file extensions
-my (undef, undef, $outfile_extension) = fileparse($outfile, qr/\.[^.]*(?:\.gz)?$/);
-my $out_base_ext = $outfile_extension;
-my $in_base_ext = $first_data->{'extension'};
-$out_base_ext =~ s/\.gz$//; # strip any gz extension to make it a fair comparison
-$in_base_ext =~ s/\.gz$//;
-if ($out_base_ext and $out_base_ext ne $in_base_ext) {
-	print " changing output file extension $out_base_ext to match input" . 
-		" extension $in_base_ext\n";
-	$outfile =~ s/$out_base_ext/$in_base_ext/;
 }
 
 # check extension
