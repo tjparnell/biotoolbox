@@ -3,6 +3,8 @@ CHANGES
 lib/Bio/ToolBox.pm
 lib/Bio/ToolBox/big_helper.pm
 lib/Bio/ToolBox/Data.pm
+lib/Bio/ToolBox/Data/Feature.pm
+lib/Bio/ToolBox/Data/meta.pm
 lib/Bio/ToolBox/data_helper.pm
 lib/Bio/ToolBox/db_helper.pm
 lib/Bio/ToolBox/db_helper/bam.pm
@@ -13,11 +15,11 @@ lib/Bio/ToolBox/db_helper/gff3_parser.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
 lib/Bio/ToolBox/file_helper.pm
+lib/Bio/ToolBox/utility.pm
 MANIFEST			This list of files
 META.json
 META.yml
 README
-scripts/average_gene.pl
 scripts/bam2gff_bed.pl
 scripts/bam2wig.pl
 scripts/bar2wig.pl
@@ -40,6 +42,7 @@ scripts/filter_bam.pl
 scripts/find_enriched_regions.pl
 scripts/get_actual_nuc_sizes.pl
 scripts/get_bam_seq_stats.pl
+scripts/get_binned_data.pl
 scripts/get_datasets.pl
 scripts/get_ensembl_annotation.pl
 scripts/get_feature_info.pl
