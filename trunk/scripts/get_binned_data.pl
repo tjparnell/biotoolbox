@@ -123,31 +123,36 @@ my $start_time = time;
 
 
 ### Generate or load the dataset
-# Generate or open Data table
-my $Data = Bio::ToolBox::Data->new(file => $infile) or 
-	die " unable to load input file '$infile'\n";
-printf "  Loaded %s '%s' features.\n", format_with_commas( $Data->last_row ), 
-	$Data->feature;
-
-# update main database as necessary
-if ($main_database) {
-	if ($main_database ne $Data->database) {
-		# update with new database
-		printf " updating main database name from '%s' to '%s'\n", 
-			$Data->database, $main_database;
-		print "   Re-run without --db option if you do not want this to happen\n";
-		$Data->database($main_database);
+my $Data;
+if ($infile) {
+	$Data = Bio::ToolBox::Data->new(file => $infile) or 
+		die " unable to load input file '$infile'\n";
+	printf "  Loaded %s '%s' features.\n", 
+		format_with_commas( $Data->last_row ), $Data->feature;
+	
+	# update main database as necessary
+	if ($main_database) {
+		if ($main_database ne $Data->database) {
+			# update with new database
+			printf " updating main database name from '%s' to '%s'\n", 
+				$Data->database, $main_database;
+			print "   Re-run without --db option if you do not want this to happen\n";
+			$Data->database($main_database);
+		}
+	}
+	else {
+		$main_database = $Data->database;
 	}
 }
 else {
-	$main_database = $Data->database;
+	# generate a new file
+	print " Generating a new feature list from database '$main_database'...\n";
+	$Data = Bio::ToolBox::Data->new(
+		db      => $main_database,
+		feature => $feature,
+	) or die " unable to generate new feature list\n";
 }
 
-
-# update program name
-unless ($Data->program eq $0) {
-	$Data->program($0);
-}
 
 # the number of columns already in the data array
 my $startcolumn = $Data->number_columns; 
