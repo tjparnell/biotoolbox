@@ -901,13 +901,17 @@ sub gsort_data {
 	my $self = shift;
 	return gsort_data_structure($self);
 }
+
 sub splice_data {
 	my $self = shift;
 	splice_data_structure($self, @_);
-	if ($self->{db} and exists $self->{db_connection}) {
+	if ($self->{db}) {
 		# re-open a new un-cached database connection
-		my $db = open_db_connection($self->{db}, 1);
-		$self->{db_connection} = $db if $db;
+		# wrap in eval statement just in case db is not available
+		eval {
+			my $db = open_db_connection($self->{db}, 1);
+			$self->{db_connection} = $db if $db;
+		};
 	}
 	return 1;
 }
