@@ -819,7 +819,11 @@ sub record_individual_bin_values {
 				$start = $fstart - $Data->metadata($column, 'start');
 				$stop  = $fstart - $Data->metadata($column, 'stop');
 			}
-
+			else {
+				warn " unable to unable to identify region orientation: start " . 
+					$Data->metadata($column, 'start') . ", strand $strand\n";
+				return;
+			}
 		}
 		else {
 			# otherwise the bin size is based on feature length
