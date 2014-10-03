@@ -1,11 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
 v.1.20 (svn )
-	- Fix critical error where midpoints were not calculated 
-	correctly for features in script get_relative_data.pl, 
-	preventing data collection around a feature midpoint.
-	- Added support for converting refFlat and simple genePred 
-	file formats to GFF3 in script ucsc_table2gff3.pl.
 	- Refactored db_helper so that all database adaptors are loaded 
 	dynamically only as needed during runtime, rather than loading 
 	everything all at once regardless of need. This results in 
@@ -18,6 +13,28 @@ v.1.20 (svn )
 	necessary to collect attributes.
 	- Rewrote many, many scripts to use Bio::ToolBox::Data objects.
 	Simplify, unify, and improve all Data functions.
+	- Moved many specialized, outdated, or esoteric scripts to an 
+	optional extras folder that will no longer be distributed via 
+	CPAN but will be available through SVN.
+	- Added new functions to script manipulate_datasets.pl, including 
+	processing rows with specific values, split and concatenate columns, 
+	view table contents, and add additional manipulations prior to 
+	writing CDT files. Also, several old functions were removed.
+	- Added support for converting refFlat and simple genePred 
+	file formats to GFF3 in script ucsc_table2gff3.pl.
+	- Add better warnings for reading files with DOS or MAC line endings.
+	- Removed file extension manipulation in join_data_file script.
+	- Replaced fatal errors with warnings in merge_datasets script.
+	- Fix critical error where midpoints were not calculated correctly 
+	for features in script get_relative_data.pl, preventing data 
+	collection around a feature midpoint.
+	- Fix bug to properly collect extended bins at 3'end and avoid 
+	undefined start errors in average_gene.pl; plus write a summary 
+	file when executing with forks.
+	- Fix bugs with collecting features from a database.
+	- Fix bug with renaming M to UCSC-style chrMT in 
+	get_ensembl_annotation.
+	- Numerous other small fixes scattered about.
 	
 
 v.1.19 (svn 843)
