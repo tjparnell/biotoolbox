@@ -21,7 +21,7 @@ eval {
 	$parallel = 1;
 };
 use constant LOG2 => log(2);
-use constant DATASET_HASH_LIMIT => 3000;
+use constant DATASET_HASH_LIMIT => 5001;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
@@ -30,7 +30,7 @@ use constant DATASET_HASH_LIMIT => 3000;
 		# served by separate database queries for each window.
 my $VERSION = '1.20';
 
-print "\n This script will collect binned values across genes to create an average gene\n\n";
+print "\n This script will collect binned values across features\n\n";
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -1014,13 +1014,13 @@ __END__
 
 =head1 NAME
 
-average_gene.pl
+get_binned_data.pl
 
-A program to generate class average summaries for a list of features.
+A program to collect data in bins across a list of features.
 
 =head1 SYNOPSIS
  
- average_gene.pl [--options] <filename>
+ get_binned_data.pl [--options] <filename>
   
   Options for existing files:
   --in <filename>
@@ -1243,7 +1243,7 @@ extra bins may be extended on either side of the gene (default 0 on either
 side). The bin size is determined as a percentage of gene length.
 
 The program writes out a tim data formatted text file. It will also 
-optionally generate a "summed" or average profile for all of the features. 
+optionally generate a summary or average profile for all of the features. 
 
 =head1 EXAMPLES
 
@@ -1256,14 +1256,14 @@ These are some examples of some common scenarios for collecting data.
 You want to collect the mean score from a bigWig file in 10% intervals 
 across each feature in a Bed file.
 
-  average_gene.pl --data scores.bw --in input.bed
+  get_binned_data.pl --data scores.bw --in input.bed
 
 =item Collect scores in intervals plus extended regions
 
 You want to collect the maximum score in 5% intervals across each each 
 feature as well as five 100 bp intervals outside of each interval.
 
-  average_gene.pl --bins 20 --method max --ext 5 --extsize 100 --data \
+  get_binned_data.pl --bins 20 --method max --ext 5 --extsize 100 --data \
   scores.bw --in input.txt
 
 =item Collect scores in intervals for genes
@@ -1271,7 +1271,7 @@ feature as well as five 100 bp intervals outside of each interval.
 You want to collect stranded alignment counts from a Bam file for genes 
 in an annotation database, then generate a profile graph.
 
-  average_gene.pl --db annotation --feature gene --strand sense --value \
+  get_binned_data.pl --db annotation --feature gene --strand sense --value \
   count --method sum --data alignments.bam --out gene_profile --sum
   
   graph_profile.pl --in gene_profile_summed.txt --min 0 --max 100
