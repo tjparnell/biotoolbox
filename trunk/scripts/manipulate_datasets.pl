@@ -3704,6 +3704,8 @@ Additional manipulations on the columns may be performed prior to
 exporting. These may be chosen interactively or using the codes 
 listed below and specified using the --target option.
   
+  su - decreasing sort by sum of row values
+  sm - decreasing sort by mean of row values
   cg - median center features (rows)
   cd - median center datasets (columns)
   zd - convert columns to Z-scores
