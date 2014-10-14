@@ -126,6 +126,8 @@ The length of the feature or segment.
 
 =head2 Accessing and setting values in the row.
 
+=over 4
+
 =item value($index)
 
 =item value($index, $new_value)
