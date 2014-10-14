@@ -603,7 +603,7 @@ sub collect_binned_data_for_regions {
 		}
 		else {
 			# extension is dependent on feature length
-			my $extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
+			$extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
 		}
 		
 		# collect the data based on whether we want a hash or separate scores
@@ -627,7 +627,7 @@ sub collect_binned_data_for_regions {
 				'extend'   => $extra,
 				'stranded' => $stranded,
 			);
-		
+			
 			# record the scores for each bin
 			record_the_bin_values($row, $length, \%regionscores);
 		}
