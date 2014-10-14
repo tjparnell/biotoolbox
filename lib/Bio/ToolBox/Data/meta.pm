@@ -176,7 +176,7 @@ sub metadata {
 	if ($key and $key eq 'name') {
 		return $self->name($index, $value);
 	}
-	if ($key and $value) { 
+	if ($key and defined $value) { 
 		# we are setting a new value
 		$self->{$index}{$key} = $value;
 		return $value;
