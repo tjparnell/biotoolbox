@@ -116,7 +116,7 @@ __
 __--avoid
 
 __
-  Indicate whether features of the same type should be avoided when  calculating values in a window. Each window is checked for  overlapping features of the same type; if the window does overlap  another feature of the same type, no value is reported for the  window. The default is false (return all values regardless of  overlap).
+  Indicate whether features of the same type should be avoided when  calculating values in a window. Each window is checked for  overlapping features of the same type; if the window does overlap  another feature of the same type, no value is reported for the  window. This option requires using named database features and must  include a feature GFF type column. The default is false (return all  values regardless of overlap).
 __
   __
 __--long

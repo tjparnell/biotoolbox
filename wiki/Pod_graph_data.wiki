@@ -19,7 +19,6 @@ graph_data.pl `[`--options`]` <**filename>
   --all
   --ma <window>,<step>
   --norm
-  --log
   --min=<value>
   --xmin=<value>
   --ymin=<value>
@@ -69,12 +68,6 @@ __--all
 
 __
   Indicate that all available datasets in the input file should be plotted together. Redundant graphs are skipped, e.g. Y,X versus X,Y. If you wish to graph only a subset of datasets, provide a list  and/or range using the --index option.
-__
-  __
-__--log
-
-__
-  Indicate whether dataset values are in log2 space or not. If set  to true and the log2 status is indicated in the metadata, then  the metadata status is preserved. Default is false (and metadata  ignored).
 __
   __
 __--norm
@@ -180,9 +173,9 @@ A smooth plot is a line plot of pairwise values between two datasets and  smooth
 
 The datasets to be plotted may be specified either on the command line  using the --pair or --index arguments. If not specified, the program  defaults to an interactive mode and the user may repeatedly select the  datasets from a list of available datasets in the data file.
 
-The data in the datasets may be manipulated in several ways prior to plotting. The data may be converted to a percentile rank, smoothed by a moving average,  converted from log2 values, constrained to minimum and maximum values, etc.  See options for details.
+The data in the datasets may be manipulated in several ways prior to plotting. The data may be converted to a percentile rank, smoothed by a moving average,  constrained to minimum and maximum values, etc.
 
-If the graph doesn't look like you expect, and you are not normalizing by  converting to a percent rank (--norm), try explicitly setting the --min and  --max values. The GD::Graph module tries its best at setting these  automatically, but sometimes does funny things, particularly with log2 data  that spans 0.
+If the graph doesn't look like you expect, and you are not normalizing by  converting to a percent rank (--norm), try explicitly setting the --min and  --max values. The GD::Graph module tries its best at setting these  automatically, but sometimes does funny things.
 
 ==AUTHOR==
 {{{

@@ -16,7 +16,6 @@ graph_profile.pl <**filename>
   --index <index1,index2,...>
   --all
   --cen
-  --log
   --xindex <index>
   --skip <integer>
   --offset <integer>
@@ -58,12 +57,6 @@ __--cen
 
 __
   Datasets should (not) be median centered prior to graphing. Useful when  graphing multiple datasets together when they have different medians.  Default is false.
-__
-  __
-__--log
-
-__
-  Dataset values are in log2 space, or status should be respected  if indicated in the file metadata.
 __
   __
 __--xindex <**index>

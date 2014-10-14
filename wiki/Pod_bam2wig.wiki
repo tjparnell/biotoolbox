@@ -36,7 +36,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --shift
   --shiftval <integer>
   --chrom <integer>                                 (2)
-  --sample <integer>                                (200)
+  --sample <integer>                                (300)
   --minr <float>                                    (0.25)
   --model
   }}}
@@ -74,8 +74,8 @@ __
   __
 {{{
     start     the 5 prime position of the alignment
-    mid       the midpoint of the alignment
-    span      along the length of the alignment (coverage)
+    mid       the midpoint of the alignment (or pe fragment)
+    span      along the length of the alignment (read coverage)
     extend    along the length of the predicted fragment
               equal to 2 x the shift value (enables --shift) 
     coverage  another way to specify --coverage
@@ -149,7 +149,7 @@ __
   Specify that the positions of the alignment should be shifted towards  the 3' end. Useful for ChIP-Seq applications, where only the ends of  the fragments are counted and often seen as separated discrete peaks  on opposite strands flanking the true target site. This option is  disabled with paired-end and spliced reads (where it is not needed).
 __
   __
-  The extend position option is a special mode where the entire predicted  ChIP fragment is recorded across the span. The length is 2 x the shift  value.
+  The extend position option is a special mode where the entire predicted  ChIP fragment is recorded across its span. The length is 2 x the shift  value.
 __
   __
 __--shiftval <**integer>

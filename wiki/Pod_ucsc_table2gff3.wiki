@@ -62,7 +62,7 @@ __
 __--table <**filename>
 
 __
-  Provide the name of a UCSC gene or gene prediction table. Tables known  to work include the ___refGene___, ___ensGene___, ___xenoRefGene___, and UCSC  ___knownGene___ tables. The file may be gzipped. When converting multiple  tables, use this option repeatedly for each table. The `--ftp` option is  recommended over using this one.
+  Provide the name of a UCSC gene or gene prediction table. Tables known  to work include the ___refGene___, ___ensGene___, ___xenoRefGene___, and UCSC  ___knownGene___ tables. Both simple and extended gene prediction tables, as  well as refFlat tables are supported. The file may be gzipped. When  converting multiple tables, use this option repeatedly for each table.  The `--ftp` option is recommended over using this one.
 __
   __
 __--status <**filename>
@@ -171,6 +171,8 @@ __
 This program will convert a UCSC gene or gene prediction table file into a GFF3 format file. It will build canonical gene->transcript->`[`exon,  CDS, UTR`]` heirarchical structures. It will attempt to identify non-coding genes as to type using the gene name as inference. Various additional informational attributes may also be included with the gene and transcript features, which are derived from supporting table files.
 
 Four table files are supported. Gene prediction tables, including ___refGene___,  ___xenoRefGene___, and ___ensGene___, are supported. The UCSC ___knownGene___ gene  table, if available, is also supported. Supporting tables include ___refSeqStatus___,  ___refSeqSummary___, ___ensemblToGeneName___, ___ensemblSource___, and ___kgXref___.
+
+Tables obtained from UCSC are typically in the extended !GenePrediction**  format, although simple genePrediction and refFlat formats are also  supported. See <[http://genome.ucsc.edu/FAQ/FAQformat.html#format9]> regarding UCSC gene prediction table formats.
 
 The latest table files may be automatically downloaded using FTP from  UCSC or other host. Since these files are periodically updated, this may  be the best option. Alternatively, individual files may be specified  through command line options. Files may be obtained manually through FTP,  HTTP, or the UCSC Table Browser. However, it is _*_highly recommended_*_ to  let the program obtain the necessary files using the `--ftp` option, as  using the wrong file format or manipulating the tables may prevent the  program from working properly.
 

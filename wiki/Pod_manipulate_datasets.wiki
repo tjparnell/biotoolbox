@@ -13,12 +13,12 @@ manipulate_datasets.pl `[`--options ...`]` <**input_filename>
 {{{
   Options:
   --in <input_filename>
-  --func [ stat | reorder | delete | rename | number | coordinate | sort |
-          gsort | null | duplicate | above | below | cnull | absolute | 
-          minimum | maximum | add | subtract | multiply | divide | scale | 
-          pr | zscore | log2 | delog2 | format | combine | subsample | 
-          ratio | diff | normdiff | strandsign | mergestrand | center | 
-          new | summary | export | rewrite | treeview ]
+  --func [ reorder | delete | rename | new | number | concatenate | split | 
+           sort | gsort | null | duplicate | above | below | specific | keep
+           coordinate | cnull | absolute | minimum | maximum | log | delog | 
+           format | pr | add | subtract | multiply | divide | combine | scale | 
+           zscore | ratio | diff | normdiff | center | rewrite | export | 
+           treeview | summary | stat ]
   --index <integers>
   --exp | --num <integer>
   --con | --den <integer>
@@ -55,47 +55,9 @@ __
   The program is designed to be run interactively. However, single manipulations  may be performed on single datasets by specifying a function name and any  other required options. These functions include the following.
 __
   __
-{{{
-  stat
-  reorder
-  delete
-  rename
-  number
-  coordinate
-  sort
-  gsort
-  null
-  duplicate
-  above
-  below
-  cnull
-  absolute
-  minimum
-  maximum
-  add
-  subtract
-  multiply
-  divide
-  scale
-  pr
-  zscore
-  log2
-  delog2
-  format
-  combine
-  subsample
-  ratio
-  diff
-  normdiff
-  strandsign
-  mergestrand
-  center
-  new
-  summary
-  export
-  rewrite
-  treeview
-}}}
+  _*_reorder_*_ _*_delete_*_ _*_rename_*_ _*_new_*_ _*_number_*_ _*_concatenate_*_ _*_split_*_ _*_coordinate_*_ _*_sort_*_ _*_gsort_*_ _*_null_*_ _*_duplicate_*_ _*_above_*_ _*_below_*_ _*_specific_*_ _*_keep_*_ _*_cnull_*_ _*_absolute_*_ _*_minimum_*_ _*_maximum_*_ _*_log_*_ _*_delog_*_ _*_format_*_ _*_pr_*_ _*_add_*_ _*_subtract_*_ _*_multiply_*_ _*_divide_*_ _*_combine_*_ _*_scale_*_ _*_zscore_*_ _*_ratio_*_ _*_diff_*_ _*_normdiff_*_ _*_center_*_ _*_rewrite_*_ _*_export_*_ _*_treeview_*_ _*_summary_*_ _*_stat_*_
+__
+  __
   Refer to the FUNCTIONS section for details.
 __
   __
@@ -204,235 +166,243 @@ The program keeps track of the number of manipulations performed, and if  any ar
 ==FUNCTIONS==
 This is a list of the functions available for manipulating columns. These may  be selected interactively from the main menu (note the case sensitivity!),  or specified on the command line using the --func option.
 
-_*_stat_*_ (menu option 't')
+_*_stat_*_ (menu option _*_t_*_)
 
 __
   Print some basic statistics for a column, including mean,  median, standard deviation, min, and max. If 0 values are present, indicate whether to include them (y or n)
 __
   __
-_*_reorder_*_ (menu option 'R')
+_*_reorder_*_ (menu option _*_R_*_)
 
 __
   The column may be rewritten in a different order. The new order  is requested as a string of index numbers in the desired order.  Also, a column may be deleted by skipping its number or duplicated by including it twice.
 __
   __
-_*_delete_*_ (menu option 'D')
+_*_delete_*_ (menu option _*_D_*_)
 
 __
   One or more column may be selected for deletion.
 __
   __
-_*_rename_*_ (menu option 'n')
+_*_rename_*_ (menu option _*_n_*_)
 
 __
   Assign a new name to a column. For automatic execution, use the --name  option to specify the new name. Also, for any automatically executed  function (using the --func option) that generates a new column, the  column's new name may be explicitly defined with this option.
 __
   __
-_*_number_*_ (menu option 'b')
+_*_number_*_ (menu option _*_b_*_)
 
 __
   Assign a number to each datapoint (or line), incrementing from 1  to the end. The numbered column will be inserted after the requested  column index.
 __
   __
-_*_coordinate_*_ (menu option 'C')
+_*_concatenate_*_ (menu option _*_C_*_)
+
+__
+  Concatenate the values from two or more columns into a single new  column. The character used to join the values may be specified  interactively or by the command line option --target (default is '`_`'  in automatic execution mode). The new column is appended at the end.
+__
+  __
+_*_split_*_ (menu option _*_T_*_)
+
+__
+  Split a column into two or more new columns using a specified character  as the delimiter. The character may be specified interactively or  with the --target command line option (default is '`_`' in automatic  execution mode). The new columns are appended at the end. If the  number of split items are not equal amongst the rows, absent values  are appended with null values.
+__
+  __
+_*_coordinate_*_ (menu option _*_O_*_)
 
 __
   Generate a coordinate string from the chromosome, start, and, if  present, stop coordinate values as a new column. The string will  have the format "chr:start-stop" or "chr:start". This is useful  in making unique identifiers or working with genome browsers.
 __
   __
-_*_sort_*_ (menu option 'o')
+_*_sort_*_ (menu option _*_o_*_)
 
 __
   The entire data table is sorted by a specific column. The first datapoint is checked for the presence of letters, and the data  table is then sorted either asciibetically or numerically. If the  sort method cannot be automatically determined, it will ask. The  direction of sort, (i)ncreasing or (d)ecreasing, is requested.
 __
   __
-_*_gsort_*_ (menu option 'g')
+_*_gsort_*_ (menu option _*_g_*_)
 
 __
   The entire data table is sorted by increasing genomic position,  first by chromosome then by start position. These columns must exist  and have recognizable names (e.g. 'chromo', 'chromosome', 'start').
 __
   __
-_*_null_*_ (menu option 'N')
+_*_null_*_ (menu option _*_N_*_)
 
 __
-  Toss datapoints (rows) that contain a null value in one or more  columns. Some of the other functions may not work properly if a non-value is present. If 0 values are present, indicate whether to toss them (y or n). This may also be specified as a command line  option using the --except flag.
+  Delete rows that contain a null value in one or more  columns. Some of the other functions may not work properly if a non-value is present. If 0 values are present, indicate whether to toss them (y or n). This may also be specified as a command line  option using the --except flag.
 __
   __
-_*_duplicate_*_ (menu option 'P')
+_*_duplicate_*_ (menu option _*_P_*_)
 
 __
-  Toss datapoints with duplicate values. One or more columns may be  selected to search for duplicate values. Values are simply concatenated  when multiple columns are selected. Rows with duplicated values are  deleted, always leaving the first row.
+  Delete rows with duplicate values. One or more columns may be  selected to search for duplicate values. Values are simply concatenated  when multiple columns are selected. Rows with duplicated values are  deleted, always leaving the first row.
 __
   __
-_*_above_*_ (menu option 'A')
+_*_above_*_ (menu option _*_A_*_)
 
 __
-  Toss datapoints with values that are above a certain threshold value.  One or more columns may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
+  Delete rows with values that are above a certain threshold value.  One or more columns may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
 __
   __
-_*_below_*_ (menu option 'B')
+_*_below_*_ (menu option _*_B_*_)
 
 __
-  Toss datapoints with values that are below a certain threshold value.  One or more columns may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
+  Delete rows with values that are below a certain threshold value.  One or more columns may be selected to test values for the  threshold. The threshold value may be requested interactively or  specified with the --target option.
 __
   __
-_*_cnull_*_ (menu option 'U')
+_*_specific_*_ (menu option _*_S_*_)
+
+__
+  Delete rows with values that contain a specific value, either text  or number. One or more columns may be selected to check for values.  The specific values may be selected interactively from a list or  specified with the --target option.
+__
+  __
+_*_keep_*_ (menu option _*_K_*_)
+
+__
+  Keep only those rows with values that contain a specific value,  either text or number. One or more columns may be selected to check  for values. The specific values may be selected interactively from a  list or specified with the --target option.
+__
+  __
+_*_cnull_*_ (menu option _*_U_*_)
 
 __
   Convert null values to a specific value. One or more columns may  be selected to convert null values. The new value may be requested  interactively or defined with the --target option.
 __
   __
-_*_absolute_*_ (menu option 'L')
+_*_absolute_*_ (menu option _*_G_*_)
 
 __
   Convert signed values to their absolute value equivalents. One or  more columns may be selected to convert.
 __
   __
-_*_minimum_*_ (menu option 'I')
+_*_minimum_*_ (menu option _*_I_*_)
 
 __
   Reset datapoints whose values are less than a specified minimum  value to the minimum value. One or more columns may be selected  to reset values to the minimum. The minimum value may be requested  interactively or specified with the --target option.
 __
   __
-_*_maximum_*_ (menu option 'X')
+_*_maximum_*_ (menu option _*_X_*_)
 
 __
   Reset datapoints whose values are greater than a specified maximum  value to the maximum value. One or more columns may be selected  to reset values to the maximum. The maximum value may be requested  interactively or specified with the --target option.
 __
   __
-_*_add_*_ (menu option 'a')
+_*_add_*_ (menu option _*_a_*_)
 
 __
   Add a value to a column. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the column. The column may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
 __
   __
-_*_subtract_*_ (menu option 'u')
+_*_subtract_*_ (menu option _*_u_*_)
 
 __
   Subtract a value from a column. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the column. The column may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
 __
   __
-_*_multiply_*_ (menu option 'y')
+_*_multiply_*_ (menu option _*_y_*_)
 
 __
   Multiply a column by a value. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the column. The column may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
 __
   __
-_*_divide_*_ (menu option 'v')
+_*_divide_*_ (menu option _*_v_*_)
 
 __
   Divide a column by a value. A real number may be supplied, or the words 'mean', 'median', or 'sum' may be entered as a proxy for those statistical values of the column. The column may either be replaced or added as a new one. For automatic execution, specify the number using the --target option.
 __
   __
-_*_scale_*_ (menu option 's')
+_*_scale_*_ (menu option _*_s_*_)
 
 __
   A column may be a median scaled as a means of normalization  with other columns. The current median of the column requested is presented, and a new median target is requested. The column may  either be replaced with the median scaled values or added as a new  column. For automatic execution, specify the new median target  with the --target option.
 __
   __
-_*_pr_*_ (menu option 'p')
+_*_pr_*_ (menu option _*_p_*_)
 
 __
   A column may be converted to a percentile rank, whereby the data values are sorted in ascending order and assigned a new value  from 0..1 based on its rank in the sorted order. The column may  either be replaced with the percentile rank or added as a new column. The original order of the column is maintained.
 __
   __
-_*_zscore_*_ (menu option 'Z')
+_*_zscore_*_ (menu option _*_Z_*_)
 
 __
   Generate a Z-score or standard score for each value in a column. The Z-score is the number of standard deviations the value is away from the column's mean, such that the new mean is 0 and the standard  deviation is 1. Provides a simple method of normalizing columns with disparate dynamic ranges.
 __
   __
-_*_log2_*_ (menu option 'l')
+_*_log_*_ (menu option _*_l_*_)
 
 __
-  A column may be converted to log base 2 values. The column may either be replaced with the log2 values ar added as a new  column.
+  A column may be converted to log values. The column may either  be replaced with the log values or added as a new column. Use  the --target option to specify the base (usually 2 or 10).
 __
   __
-_*_delog2_*_ (menu option '2')
+_*_delog_*_ (menu option _*_L_*_)
 
 __
-  A column that is currently in log2 space may be converted back to normal base10 numbers. The column may either be replaced with the  new values or added as a new column.
+  A column that is currently in log space may be converted back to normal numbers. The column may either be replaced with the  new values or added as a new column. Use the --target option to  specify the base (usually 2 or 10). The base may be obtained from the  metadata.
 __
   __
-_*_format_*_ (menu option 'f')
+_*_format_*_ (menu option _*_f_*_)
 
 __
   Format the numbers of a column to a given number of decimal places.  An integer must be provided. The column may either be replaced or  added as a new column. For automatic execution, use the --target  option to specify the number decimal places.
 __
   __
-_*_combine_*_ (menu option 'c')
+_*_combine_*_ (menu option _*_c_*_)
 
 __
   Mathematically combine the data values in two or more columns. The  methods for combining the values include mean, median, min, max,  stdev, or sum. The method may be specified on the command line  using the --target option. The combined data values are added as a  new column.
 __
   __
-_*_subsample_*_ (menu option 'su')
-
-__
-  Subsample an enumerated dataset. Datapoints within a column are chosen  randomly and the values reduced by one until the target sum is reached.  This assumes an enumerated dataset, e.g. tag counts from Next-gen sequencing, where the sum of tags from two or more columns must be normalized to each other. This function assumes that the data are positive integers; log2 columns will not be used. Provide a target sum to reach using the --target option. If this number is less than or equal to the number of columns in the file, then it is assumed to be an index number and the sum of that column will be used as the target. The subsampled dataset is always added as new column.
-__
-  __
-_*_ratio_*_ (menu option 'r')
+_*_ratio_*_ (menu option _*_r_*_)
 
 __
   A ratio may be generated between two columns. The experiment and  control columns are requested and the ratio is added as a new column. For log2 numbers, the control is subtracted from the experiment. The log2 status is checked in the metadata for the  specified columns, or may be specified as a command line option, or asked of the user.
 __
   __
-_*_diff_*_ (menu option 'd')
+_*_diff_*_ (menu option _*_d_*_)
 
 __
   A simple difference is generated between two existing columns. The  values in the 'control' column are simply subtracted from the  values in the 'experimental' column and recorded as a new column. For enumerated columns (e.g. tag counts from Next Generation  Sequencing), the columns should be subsampled to equalize the sums  of the two columns. The indices for the experimental and control columns  may either requested from the user or supplied by the --exp and  --con command line options.
 __
   __
-_*_normdiff_*_ (menu option 'z')
+_*_normdiff_*_ (menu option _*_z_*_)
 
 __
   A normalized difference is generated between two existing columns.  The difference between 'control' and 'experimental' column values  is divided by the square root of the sum (an approximation of the  standard deviation). This is supposed to yield fewer false positives than a simple difference (see Nix et al, BMC Bioinformatics, 2008). For enumerated datasets (e.g. tag counts from Next Generation  Sequencing), the datasets should be subsampled to equalize the sums  of the two datasets. The indices for the experimental and control columns  may either requested from the user or supplied by the --exp and  --con command line options.
 __
   __
-_*_strandsign_*_ (menu option 'si')
-
-__
-  Convert a column's values to signed data according to strand. Forward  strand data is positive, and reverse strand is negative. This function  may not be appropriate with logarithmic or other datasets that include  negative values. Provide the index of a single column to convert. A  second column should provide the strand information and be labeled  with a name that includes either 'strand' or 'direction'. Strand  information may include 1, -1, +, -, f, r, w, c, ., or 0. The stranded  data may overwrite the data or written to a new column.
-__
-  __
-_*_mergestrand_*_ (menu option 'st')
-
-__
-  Merge two stranded columns into a single new column, with the forward  dataset represented as a positive value, and the reverse dataset as a  negative value. Datapoints which contain values on both strands are  recorded as a simple difference (forward - reverse). This function may  not be appropriate with logarithmic or other datasets that include  negative values. Provide the indices of the two columns as forward,  reverse. Metadata is not checked for validity.
-__
-  __
-_*_center_*_ (menu option 'e')
+_*_center_*_ (menu option _*_e_*_)
 
 __
   Center normalize the datapoints in a row by subtracting the mean or median of the datapoints. The range of columns is requested or  provided by the --index option. Old values are replaced by new  values. This is useful for visualizing data as a heat map, for example.
 __
   __
-_*_new_*_ (menu option 'w')
+_*_new_*_ (menu option _*_w_*_)
 
 __
   Generate a new column which contains an identical value for  each datapoint (row). The value may be either requested interactively or  supplied using the --target option. This function may be useful for  assigning a common value to all of the data points before joining the  data file with another.
 __
   __
-_*_summary_*_ (menu option 'y')
+_*_summary_*_ (menu option _*_y_*_)
 
 __
   Write out a summary of collected windowed data file, in which the mean  for each of the data columns is calculated, transposed (columns become  rows), and written to a new data file. This is essentially identical to  the summary function from the biotoolbox analysis scripts  [Pod_map_relative_data_pl map_relative_data.pl] and [Pod_pull_features_pl pull_features.pl]. It assumes that each  column has start and stop metadata. The program will automatically  identify available columns to summarize based on their name. In  interactive mode, it will request the contiguous range of start and  ending columns to summarize. The contiguous columns may also be  indicated using the --index option. By default, a new file using the  input file base name appended with '`_`summary' is written, or a  filename may be specified using the --out option.
 __
   __
-_*_export_*_ (menu option 'x')
+_*_export_*_ (menu option _*_x_*_)
 
 __
   Export the data into a simple tab-delimited text file that contains no  metadata or header information. Non-values '.' are converted to   true nulls. If an output file name is specified using the --outfile  option, it will be used. Otherwise, a possible filename will be  suggested based on the input file name. If any modifications are  made to the data structure, a normal data file will still be written.  Note that this could overwrite the exported file if the output file name was specified on the command line, as both file write subroutines will  use the same name!
 __
   __
-_*_treeview_*_ (menu option 'T')
+_*_treeview_*_ (menu option _*_i_*_)
 
 __
   Export the data to the CDT format compatible with both Treeview and  Cluster programs for visualizing and/or generating clusters. Specify the  columns containing a unique name and the columns to be analyzed (e.g.  --index <**name>,<**start-stop>). Extraneous columns are removed.  Additional manipulations on the columns may be performed prior to  exporting. These may be chosen interactively or using the codes  listed below and specified using the --target option.
 __
   __
 {{{
+  su - decreasing sort by sum of row values
+  sm - decreasing sort by mean of row values
   cg - median center features (rows)
   cd - median center datasets (columns)
   zd - convert columns to Z-scores
@@ -443,7 +413,7 @@ __
   A simple Cluster data text file is written (default file name  "<**basename>.cdt"), but without the GWEIGHT column or EWEIGHT row. The  original file will not be rewritten.
 __
   __
-_*_rewrite_*_ (menu option 'W')
+_*_rewrite_*_ (menu option _*_W_*_)
 
 __
   Force the data file contents to be re-written. Useful if you want to  write an intermediate file during numerous interactive manipulations.  Consider this as a 'Save as...'.

@@ -15,6 +15,7 @@ A script to calculate observed vs expected CpG dinucleotides
 {{{
   Options:
   --db <name|file|directory>
+  --fasta <file|directory>
   --in <filename>
   --win <integer>
   --out <filename> 
@@ -27,6 +28,9 @@ A script to calculate observed vs expected CpG dinucleotides
 The command line flags and descriptions:
 
 __--db <**name|file|directory>
+
+__
+__--fasta <**file|directory>
 
 __
   Provide the name of a Bio::DB::!SeqFeature**::Store database from which to  collect the genomic sequence. Alternatively, provide the name  of an uncompressed Fasta file (multi-fasta is ok) or directory containing  multiple fasta files representing the genomic sequence. The directory  must be writeable for a small index file to be written. For more information  about using databases, see  <[https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases]>.  The database may be provided in the metadata of an input file.
