@@ -10,7 +10,7 @@ use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.19';
+my $VERSION = '1.21';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -104,7 +104,7 @@ $outfh->print( join("\t", qw(#geneName name chrom strand txStart txEnd cdsStart
 
 ### Process the GFF3 table
 # initialize global variables
-my $count = 0; # a count of written features
+my %counts; # a hash of known written features
 my %unknowns; # a hash of unrecognized feature types to report at the end
 process_gff_file_to_table();
 
@@ -117,15 +117,23 @@ process_gff_file_to_table();
 
 # Close output file
 $outfh->close;
+my $count = 0;
+my $string;
+foreach (sort {$a cmp $b} keys %counts) {
+	$count += $counts{$_};
+	$string .= "  Wrote $counts{$_} $_ features\n";
+}
+print " Finished! Wrote $count features to file '$outfile'\n$string";
+
 
 # print warnings about unknown feature types
 if (%unknowns) {
+	print " Unrecognized features that were not included\n";
 	foreach (sort {$a cmp $b} keys %unknowns) {
-		print " Found $unknowns{$_} unrecognized features of '$_'!\n";
+		print "  Skipped $unknowns{$_} '$_' features\n";
 	}
 }
 
-print " Finished! Wrote $count features to file '$outfile'\n";
 
 
 
@@ -192,20 +200,28 @@ sub process_gff_file_to_table {
 				# a coding transcript
 				
 				# first need to initialize the ucsc table object
-				my $ucsc_transcript = initialize_transcript($feature);
+				my $ucsc = initialize_transcript($feature);
 				
+				# collect the names for the transcript
+				collect_names($ucsc, $feature);
+			
 				# process the gene object
-				process_transcript($ucsc_transcript, $feature);
+				process_transcript($ucsc, $feature);
+				$counts{$feature->primary_tag} += 1;
 			}
 			
 			elsif ($type =~ /rna|noncoding/) {
 				# a non-coding RNA transcript
 				
 				# first need to initialize the ucsc table object
-				my $ucsc_transcript = initialize_transcript($feature);
+				my $ucsc = initialize_transcript($feature);
 				
+				# collect the names for the transcript
+				collect_names($ucsc, $feature);
+			
 				# process the gene object
-				process_nc_transcript($ucsc_transcript, $feature);
+				process_nc_transcript($ucsc, $feature);
+				$counts{$feature->primary_tag} += 1;
 			}
 			
 			elsif ($type =~ /transcript/) {
@@ -213,23 +229,23 @@ sub process_gff_file_to_table {
 				# hopefully noncoding transcripts will be caught earlier
 				
 				# first need to initialize the ucsc table object
-				my $ucsc_transcript = initialize_transcript($feature);
+				my $ucsc = initialize_transcript($feature);
 				
+				# collect the names for the transcript
+				collect_names($ucsc, $feature);
+			
 				# process the gene object
-				process_transcript($ucsc_transcript, $feature);
+				process_transcript($ucsc, $feature);
+				$counts{$feature->primary_tag} += 1;
 			}
 			
 			else {
 				# catchall for unrecognized feature types
 				# record and warn at end
-				$unknowns{$type} += 1;
+				$unknowns{$feature->primary_tag} += 1;
 				next;
 			}
-			
 		}
-		
-		# print running total
-		print "  wrote $count features so far\n" if $verbose;
 	}
 }
 
@@ -290,9 +306,10 @@ sub process_gene {
 			# collect the names for the transcript and/or gene
 			collect_names($ucsc, $gene, $subfeat);
 			
-			# process the transcript
+			# process and print the transcript
 			process_transcript($ucsc, $subfeat);
 			
+			$counts{$subfeat->primary_tag} += 1;
 			$transcript_success++;
 		}
 		
@@ -307,9 +324,10 @@ sub process_gene {
 			# collect the names for the transcript and/or gene
 			collect_names($ucsc, $gene, $subfeat);
 			
-			# process the transcript
+			# process and print the transcript
 			process_nc_transcript($ucsc, $subfeat);
 			
+			$counts{$subfeat->primary_tag} += 1;
 			$transcript_success++;
 		}
 		
@@ -333,7 +351,7 @@ sub process_gene {
 			# collect the names for the transcript and/or gene
 			collect_names($ucsc, $gene, $subfeat);
 			
-			# process the transcript
+			# process and print the transcript
 			if ($cds_check) {
 				process_transcript($ucsc, $subfeat);
 			}
@@ -341,6 +359,7 @@ sub process_gene {
 				process_nc_transcript($ucsc, $subfeat);
 			}
 			
+			$counts{$subfeat->primary_tag} += 1;
 			$transcript_success++;
 		}
 		
@@ -379,8 +398,9 @@ sub process_gene {
 		# collect the names for the transcript and/or gene
 		collect_names($ucsc, $gene, $gene);
 		
-		# assume the gene is a transcript and process as such
+		# assume the gene is a transcript and process and print as such
 		process_transcript($ucsc, $gene);
+		$counts{$gene->primary_tag} += 1;
 	}
 }
 
@@ -393,7 +413,21 @@ sub collect_names {
 	# these names may or may not be same
 	# we assume we will always have a primary_id
 	$ucsc->{'name'}  = $gene->display_name || $gene->primary_id;
-	$ucsc->{'name2'} = $transcript->display_name || $transcript->primary_id;
+	if ($transcript) {
+		# transcript may have a separate name
+		$ucsc->{'name2'} = $transcript->display_name || $transcript->primary_id;
+	}
+	else {
+		# no transcript provided
+		if ($gene->display_name) {
+			# we have a name, so use the id instead
+			$ucsc->{'name2'} = $gene->primary_id;
+		}
+		else {
+			# reuse the name
+			$ucsc->{'name2'} = $ucsc->{'name'};
+		}
+	}
 	
 	# append additional names if requested and if possible
 	if ($use_alias) {
@@ -411,9 +445,9 @@ sub collect_names {
 	
 	# clean up name
 	$ucsc->{'name'} =~ s/ ?\(\d+ of \d+\)//; # remove (1 of 2)
-	$ucsc->{'name'} =~ s/ /_/;
+	$ucsc->{'name'} =~ s/ /_/g;
 	$ucsc->{'name2'} =~ s/ ?\(\d+ of \d+\)//; # remove (1 of 2)
-	$ucsc->{'name2'} =~ s/ /_/;
+	$ucsc->{'name2'} =~ s/ /_/g;
 }
 
 
@@ -734,7 +768,6 @@ sub print_table_item {
 	);
 	
 	$outfh->print(join("\t", @components) . "\n");
-	$count++; # increment global counter
 }
 
 
