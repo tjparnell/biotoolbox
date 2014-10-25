@@ -22,7 +22,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION = '1.18';
+my $VERSION = '1.21';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -140,22 +140,25 @@ unless (defined $strand_i) {
 }
 
 
-
 ### Determine mode ###
 if (defined $id_i and defined $seq_i and $concatenate) {
 	# sequence is already in the source file
+	print " writing a single concatenated fasta with the provided sequence\n";
 	write_direct_single_fasta();
 }
-if (defined $id_i and defined $seq_i) {
+elsif (defined $id_i and defined $seq_i) {
 	# sequence is already in the source file
+	print " writing a multi-fasta with the provided sequence\n";
 	write_direct_multi_fasta();
 }
 elsif (defined $chr_i and $start_i and $stop_i and $concatenate) {
 	# collect sequences and concatenate into single
+	print " fetching sequence from $database and writing a concatenated fasta\n";
 	fetch_seq_and_write_single_fasta();
 }
 elsif (defined $chr_i and $start_i and $stop_i) {
 	# need to collect sequence
+	print " fetching sequence from $database and writing a multi-fasta\n";
 	fetch_seq_and_write_multi_fasta();
 }
 else {
@@ -352,6 +355,9 @@ sub open_output_fasta {
 	# get filename
 	unless ($outfile) {
 		$outfile = $metadata_ref->{'basename'} . '.fa';
+	}
+	unless ($outfile =~ /\.fa(?:sta)?(?:\.gz)?/i) {
+		$outfile .= '.fasta';
 	}
 	if ($gz and $outfile !~ /\.gz$/i) {
 		$outfile .= '.gz';
