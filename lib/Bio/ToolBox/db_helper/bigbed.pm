@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = '1.15';
+our $VERSION = 1.21;
 
 
 # Exported names
@@ -64,7 +64,7 @@ sub collect_bigbed_scores {
 			$bb = $OPENED_BB{$bedfile};
 		}
 		else {
-			# open and cache the bigWig object
+			# open and cache the bigBed object
 			$bb = open_bigbed_db($bedfile) or 
 				croak " Unable to open bigBed file '$bedfile'! $!\n";
 			$OPENED_BB{$bedfile} = $bb;
@@ -150,8 +150,8 @@ sub collect_bigbed_position_scores {
 			$bb = $OPENED_BB{$bedfile};
 		}
 		else {
-			# open and cache the bigWig object
-			$bb = open_bigwig_db($bedfile) or 
+			# open and cache the bigBed object
+			$bb = open_bigbed_db($bedfile) or 
 				croak " Unable to open bigBed file '$bedfile'! $!\n";
 			$OPENED_BB{$bedfile} = $bb;
 			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
