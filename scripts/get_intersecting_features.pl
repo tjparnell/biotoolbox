@@ -16,7 +16,7 @@ use Bio::ToolBox::db_helper qw(
 	get_feature
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = '1.21';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -96,9 +96,9 @@ if (scalar @search_features == 1 and $search_features[0] =~ /,/) {
 
 
 ### Load the input file
-my $Data = load_tim_data_file($infile) or 
+my $Data = Bio::ToolBox::Data->new(file => $infile) or 
 	die "  Unable to load data file!\n";
-print " loaded file '$infile' with %s features\n", format_with_commas($Data->last_row);
+printf " loaded file '$infile' with %s features\n", format_with_commas($Data->last_row);
 
 
 
@@ -109,7 +109,7 @@ if ($database) {
 		warn " provided database '$database' does not match file metadata!\n" . 
 			" overriding metadata and using '$database'\n";
 	}
-	$Data->database = $database;
+	$Data->database($database);
 }
 elsif (not $Data->database) {
 	die "No database defined! See help\n";
