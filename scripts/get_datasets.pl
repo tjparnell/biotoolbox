@@ -24,7 +24,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = '1.20';
+my $VERSION = 1.21;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -185,7 +185,9 @@ unless ($datasets[0] eq 'none') {
 					" to collect data. Comma delimited or range is acceptable\n",
 	);
 }
-
+unless (@datasets) {
+	die " No verifiable datasets provided. Check your file path, database, or dataset.\n";
+}
 
 # Working with RPM and RPKM value datasets
 # global values
