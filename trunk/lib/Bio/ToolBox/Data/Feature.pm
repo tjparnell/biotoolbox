@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.20;
+our $VERSION = 1.21;
 
 =head1 NAME
 
@@ -468,9 +468,7 @@ sub get_position_scores {
 		$args{id}     ||= $self->id;
 		$args{name}   ||= $self->name;
 		$args{type}   ||= $self->type;
-		unless (exists $args{strand} and defined $args{strand}) {
-			$args{strand} = $self->strand;
-		}
+		# do NOT assign strand here, it will be assigned in db_helper
 	}
 	elsif ($self->feature_type eq 'coordinate') {
 		$args{chromo} ||= $self->seq_id;

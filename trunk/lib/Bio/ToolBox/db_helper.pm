@@ -20,7 +20,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-our $VERSION = '1.20';
+our $VERSION = 1.21;
 
 
 # check values for dynamically loaded helper modules
@@ -2148,9 +2148,8 @@ sub get_region_dataset_hash {
 	$args{'id'}     ||= undef;
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
 	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'start'}    = 1 if ($args{'start'} <= 0);
 	$args{'stop'}   ||= $args{'end'} || 1;
-	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
+	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : undef;
 	unless (
 		(defined $args{'name'} and defined $args{'type'}) or 
 		(defined $args{'chromo'} and $args{'start'} and $args{'stop'})
@@ -2204,17 +2203,20 @@ sub get_region_dataset_hash {
 			'type'  => $args{'type'},
 		) or return; 
 		
+		# determine the strand
+		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
+		
 		# record the feature reference position and strand
-		if ($args{'position'} == 5 and $feature->strand >= 0) {
+		if ($args{'position'} == 5 and $fstrand >= 0) {
 			$fref_pos = $feature->start;
 		}
-		elsif ($args{'position'} == 3 and $feature->strand >= 0) {
+		elsif ($args{'position'} == 3 and $fstrand >= 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($args{'position'} == 5 and $feature->strand < 0) {
+		elsif ($args{'position'} == 5 and $fstrand < 0) {
 			$fref_pos = $feature->end;
 		}
-		elsif ($args{'position'} == 3 and $feature->strand < 0) {
+		elsif ($args{'position'} == 3 and $fstrand < 0) {
 			$fref_pos = $feature->start;
 		}
 		elsif ($args{'position'} == 4) {
@@ -2226,7 +2228,6 @@ sub get_region_dataset_hash {
 		$fchromo = $feature->seq_id;
 		$fstart  = $feature->start - $args{'extend'};
 		$fstop   = $feature->end + $args{'extend'};
-		$fstrand = $args{'strand'} ? $args{'strand'} : $feature->strand;
 	} 
 		
 	# Specific start and stop coordinates of a named database feature
@@ -2243,8 +2244,11 @@ sub get_region_dataset_hash {
 			'type'  => $args{'type'},
 		) or return; 
 		
+		# determine the strand
+		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
+		
 		# determine the cooridnates based on the identified feature
-		if ($args{'position'} == 5 and $feature->strand >= 0) {
+		if ($args{'position'} == 5 and $fstrand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 5' end
 			
@@ -2253,10 +2257,9 @@ sub get_region_dataset_hash {
 			$fchromo   = $feature->seq_id;
 			$fstart    = $feature->start + $args{'start'};
 			$fstop     = $feature->start + $args{'stop'};
-			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($args{'position'} == 5 and $feature->strand < 0) {
+		elsif ($args{'position'} == 5 and $fstrand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 5' end
 			
@@ -2265,10 +2268,9 @@ sub get_region_dataset_hash {
 			$fchromo   = $feature->seq_id;
 			$fstart    = $feature->end - $args{'stop'};
 			$fstop     = $feature->end - $args{'start'};
-			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($args{'position'} == 3 and $feature->strand >= 0) {
+		elsif ($args{'position'} == 3 and $fstrand >= 0) {
 			# feature is on forward, top, watson strand
 			# set segment relative to the 3' end
 			
@@ -2277,10 +2279,9 @@ sub get_region_dataset_hash {
 			$fchromo   = $feature->seq_id;
 			$fstart    = $feature->end + $args{'start'};
 			$fstop     = $feature->end + $args{'stop'};
-			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
-		elsif ($args{'position'} == 3 and $feature->strand < 0) {
+		elsif ($args{'position'} == 3 and $fstrand < 0) {
 			# feature is on reverse, bottom, crick strand
 			# set segment relative to the 3' end
 			
@@ -2289,7 +2290,6 @@ sub get_region_dataset_hash {
 			$fchromo   = $feature->seq_id;
 			$fstart    = $feature->start - $args{'stop'};
 			$fstop     = $feature->start - $args{'start'};
-			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 		
 		elsif ($args{'position'} == 4) {
@@ -2301,7 +2301,6 @@ sub get_region_dataset_hash {
 			$fchromo   = $feature->seq_id;
 			$fstart    = $fref_pos + $args{'start'};
 			$fstop     = $fref_pos + $args{'stop'};
-			$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
 		}
 	}
 	
@@ -2318,7 +2317,7 @@ sub get_region_dataset_hash {
 		) or return; 
 		
 		# determine the strand
-		$fstrand   = $args{'strand'} ? $args{'strand'} : $feature->strand;
+		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
 		
 		# record the feature reference position and strand
 		if ($args{'position'} == 5 and $fstrand >= 0) {
@@ -2361,7 +2360,7 @@ sub get_region_dataset_hash {
 		$fstart = 1 if $fstart <= 0;
 		
 		# determine the strand
-		$fstrand   = $args{'strand'} ? $args{'strand'} : 0; # default is no strand
+		$fstrand   = defined $args{'strand'} ? $args{'strand'} : 0; # default is no strand
 		
 		# record the feature reference position and strand
 		if ($args{'position'} == 5 and $fstrand >= 0) {
@@ -2389,6 +2388,8 @@ sub get_region_dataset_hash {
 			" identify database feature!\n";
 	}
 	
+	# sanity check for $fstart
+	$fstart = 1 if $fstart < 1;
 	
 	### Data collection
 	my %datahash = _get_segment_score(
