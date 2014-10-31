@@ -28,7 +28,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.20';
+my $VERSION = 1.21;
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -187,6 +187,9 @@ $dataset = verify_or_request_feature_types(
 	'prompt'  => " Enter the number of the feature or dataset from which to" . 
 					" collect data   ",
 );
+unless ($dataset) {
+	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
+} 
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
@@ -859,7 +862,7 @@ sub record_scores {
 		else {
 			# no scores
 			# assign a "null" value
-			$winscore = '.';
+			$winscore = $method eq 'sum' ? 0 : '.';
 		}
 		
 		# put the value into the data table

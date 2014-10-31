@@ -28,7 +28,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.20';
+my $VERSION = 1.21;
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -175,6 +175,9 @@ $dataset = verify_or_request_feature_types(
 					" collect data   ",
 	'single'  => 1,
 );
+unless ($dataset) {
+	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
+} 
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
