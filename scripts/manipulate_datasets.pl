@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = 1.21;
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1225,11 +1225,8 @@ sub do_specific_values_function {
 		print " These are the values (occurrences) in the indicated columns\n";
 		my %lookup;
 		my $i = 1;
-		foreach (
-			# sort by decreasing occurrence
-			map { $_->[0] } sort { $b->[1] <=> $a->[1] } 
-			map { [$_, $possibilities{$_}] } keys %possibilities
-		) {
+		foreach (sort { $a cmp $b } keys %possibilities) {
+			# sort asciibetically by name
 			printf "   $i\t$_ (%s)\n", $possibilities{$_};
 			$lookup{$i} = $_;
 			$i++;
