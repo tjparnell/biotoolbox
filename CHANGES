@@ -1,6 +1,22 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.20 (svn )
+v.1.21 (svn 896)
+	- Fixed critical bug that prevented upstream windows from 
+	collecting data in script get_relative_data.
+	- Fixed critical bug that prevented some bigBed files from 
+	being opened.
+	- Fixed critical bugs that prevented scripts data2fasta and 
+	get_intersecting_features from working properly.
+	- Fixed bugs where strand may be inappropriately assigned or 
+	sometimes ignored when collecting a regional positioned scores.
+	- Fix minor bugs in output of scripts ucsc_table2gff3 and 
+	get_ensembl_data
+	- Include checks in data collection scripts to exit gracefully if 
+	datasets can't be verified.
+	- Interactive list of values to keep or toss is now sorted 
+	alphanumerically in script manipulate_datasets.
+
+v.1.20 (svn 884)
 	- Refactored db_helper so that all database adaptors are loaded 
 	dynamically only as needed during runtime, rather than loading 
 	everything all at once regardless of need. This results in 
