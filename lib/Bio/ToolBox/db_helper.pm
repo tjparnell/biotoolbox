@@ -20,7 +20,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-our $VERSION = 1.21;
+our $VERSION = 1.22;
 
 
 # check values for dynamically loaded helper modules
@@ -1709,7 +1709,9 @@ sub get_feature {
 	
 	# get the name of the feature
 	my $name = $args{'name'} || undef; 
-	$name = (split(/\s*;\s*/, $name))[0] if $name =~ /;/; # take the first name only
+	$name = (split(/\s*[;,\|]\s*/, $name))[0] if $name =~ /[;,\|]/;
+		 # multiple names present using common delimiters ;,|
+		 # take the first name only, assume others are aliases that we don't need
 	
 	# check for values and internal nulls
 	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
@@ -1717,7 +1719,6 @@ sub get_feature {
 	undef $name         if $name eq '.';
 	undef $args{'id'}   if $args{'id'} eq '.';
 	undef $args{'type'} if $args{'type'} eq '.';
-	
 	
 	# quick method for feature retrieval
 	if (defined $args{'id'} and $db_ref =~ /SeqFeature::Store/) {
@@ -1794,12 +1795,11 @@ sub get_feature {
 		}
 		
 		# warn the user, this should be fixed
-		warn " Found " . scalar(@features) . " " . $args{'type'} . " features" .
-			" named '$name' in the database!\n Using the first feature only!\n";
+		printf "  Found %s %s features named '$name' in the database! Using first one.\n", 
+			scalar(@features), $args{'type'};
 	}
 	elsif (!@features) {
-		warn " Found no " . $args{'type'} . " features" .
-			" named '$name' in the database!\n";
+		printf "  Found no %s features named '$name' in the database!\n", $args{'type'};
 		return;
 	}
 	
