@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = 1.21;
+our $VERSION = 1.22;
 
 1;
 
