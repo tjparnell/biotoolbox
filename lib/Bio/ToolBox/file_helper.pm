@@ -12,7 +12,7 @@ use Bio::ToolBox::data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = '1.20';
+our $VERSION = 1.22;
 
 
 ### Variables
@@ -1221,8 +1221,11 @@ sub write_tim_data_file {
 	my $strand_i = find_column_index($data, '^strand$');
 	if (
 		defined $strand_i and
-		exists $data->{$strand_i}{'strand_style'} and 
-		$data->{$strand_i}{'strand_style'} eq 'plusminus'
+		(
+			($data->{'bed'} > 0 or $data->{'gff'} > 0) or 
+			(exists $data->{$strand_i}{'strand_style'} and 
+			$data->{$strand_i}{'strand_style'} eq 'plusminus')
+		)
 	) {
 		# strand information was originally BED and GFF style +,.,-
 		# then convert back to that format before writing
@@ -1237,6 +1240,8 @@ sub write_tim_data_file {
 				$data->{'data_table'}->[$row][$strand_i] = '.';
 			}
 		}
+		delete $data->{$strand_i}{'strand_style'} if 
+			exists $data->{$strand_i}{'strand_style'};
 	}
 	
 	
