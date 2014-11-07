@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.21;
+our $VERSION = 1.22;
 
 =head1 NAME
 
@@ -12,12 +12,6 @@ data table. Usually, this in turn represents an annotated feature or
 segment in the genome. As such, this object provides convenient 
 methods for accessing and manipulating the values in a row, as well as 
 methods for working with the represented genomic feature.
-
-In many cases, the row may represent a database feature. In this case, 
-many of the methods will automatically retrieve the feature from the 
-database for you to perform request, be it attribute lookup or score 
-collection. the Database features typically presume working with a 
-Bio::DB::SeqFeature::Store database. 
 
 This class should not be used directly by the user. Rather, Feature 
 objects are generated from a Bio::ToolBox::Data::Iterator object 
@@ -82,9 +76,14 @@ named database features. The return values include:
 =head2 Methods to access row feature attributes
 
 These methods return the corresponding value, if present in the 
-data table, based on the column header name. For rows representing 
-database features, the feature will be automatically retrieved from 
-the database, and the attribute returned. 
+data table, based on the column header name. If the row represents 
+a named database object, try calling the feature() method first. 
+This will retrieve the database SeqFeature object, and the attributes 
+can then be retrieved using the methods below or on the actual 
+database SeqFeature object.
+
+These methods do not set attribute values. If you need to change the 
+values in a table, use the value() method below.
 
 =over 4
 
@@ -98,20 +97,26 @@ The name of the chromosome the feature is on.
 
 =item stop
 
-The coordinates of the feature or segment. All coordinates are 1-based.
+The coordinates of the feature or segment. All coordinates are returned 
+as 1-based.
 
 =item strand
 
-The strand of the feature or segment. Returns -1, 0, or 1. Default is 0.
+The strand of the feature or segment. Returns -1, 0, or 1. Default is 0, 
+or unstranded.
 
 =item name
 
-The display_name of the feature.
+=item display_name
+
+The name of the feature.
 
 =item type
 
 The type of feature. Typically either primary_tag or primary_tag:source_tag. 
-In a GFF3 file, this represents columns 3 and 2, respectively.
+In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
+databases such as Bio::DB::SeqFeature::Store, the type is used to restrict 
+to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
 
@@ -306,10 +311,7 @@ sub seq_id {
 	my $self = shift;
 	my $i = $self->{data}->chromo_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->seq_id;
-	}
+	return $self->{feature}->seq_id if exists $self->{feature};
 	return;
 }
 
@@ -317,10 +319,7 @@ sub start {
 	my $self = shift;
 	my $i = $self->{data}->start_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->start;
-	}
+	return $self->{feature}->start if exists $self->{feature};
 	return;
 }
 
@@ -328,10 +327,7 @@ sub end {
 	my $self = shift;
 	my $i = $self->{data}->stop_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->end;
-	}
+	return $self->{feature}->end if exists $self->{feature};
 	return;
 }
 
@@ -343,32 +339,27 @@ sub strand {
 	my $self = shift;
 	my $i = $self->{data}->strand_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return 0; # default is no strand if don't have feature
-		return $f->strand;
-	}
-	return 0; # default is no strand
+	return $self->{feature}->strand if exists $self->{feature};
+	return 0;
 }
 
 sub name {
 	my $self = shift;
 	my $i = $self->{data}->name_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->display_name;
-	}
+	return $self->{feature}->display_name if exists $self->{feature};
 	return;
+}
+
+sub display_name {
+	return shift->name;
 }
 
 sub type {
 	my $self = shift;
 	my $i = $self->{data}->type_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->type;
-	}
+	return $self->{feature}->primary_tag if exists $self->{feature};
 	return;
 }
 
@@ -376,10 +367,7 @@ sub id {
 	my $self = shift;
 	my $i = $self->{data}->id_column;
 	return $self->value($i) if defined $i;
-	if ($self->feature_type eq 'named') {
-		my $f = $self->feature or return;
-		return $f->primary_id;
-	}
+	return $self->{feature}->primary_id if exists $self->{feature};
 	return;
 }
 
@@ -398,7 +386,7 @@ sub feature {
 	# retrieve the feature from the database
 	my $id   = $self->id;
 	my $name = $self->name;
-	my $type = $self->type;
+	my $type = $self->type || $self->{data}->feature;
 	return unless ($id or ($name and $type));
 	my $f = get_feature(
 		'db'    => $self->{data}->open_database,
@@ -433,22 +421,36 @@ sub get_score {
 	my $self = shift;
 	my %args = @_;
 	
-	# verify coordinates
-	$args{chromo} ||= $self->seq_id;
-	$args{start}  ||= $self->start;
-	$args{stop}   ||= $self->end;
+	# verify coordinates based on type of feature
+	if ($self->feature_type eq 'coordinate') {
+		# coordinates are already in the table, use those
+		$args{chromo} ||= $self->seq_id;
+		$args{start}  ||= $self->start;
+		$args{stop}   ||= $self->end;
+	}
+	elsif ($self->feature_type eq 'named') {
+		# must retrieve feature from the database first
+		my $f = $self->feature;
+		return unless $f;
+		$args{chromo} ||= $f->seq_id;
+		$args{start}  ||= $f->start;
+		$args{stop}   ||= $f->end;
+	}
+	else {
+		croak "data table does not have coordinates or feature attributes for score collection.";
+	}
 	unless (exists $args{strand} and defined $args{strand}) {
 		$args{strand} = $self->strand; 
 	}
 	unless ($args{chromo} and $args{start}) {
-		croak "data table does not have coordinates or feature attributes for score collection\n";
+		croak "data table does not have coordinates or feature attributes for score collection.";
 	}
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
 	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+		croak "provided dataset was unrecognized format or otherwise could not be verified!";
 	}
 	
 	$args{db} ||= $self->{data}->open_database;
