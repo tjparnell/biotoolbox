@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::meta;
-our $VERSION = 1.20;
+our $VERSION = 1.22;
 
 =head1 NAME
 
@@ -210,8 +210,8 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = find_column_index($self, '^name');
-	my $type   = find_column_index($self, '^type|class');
+	my $name   = find_column_index($self, '^name|geneName|transcriptName|alias');
+	my $type   = find_column_index($self, '^type|class|primary_tag');
 	my $id     = find_column_index($self, '^primary_id');
 	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
 	my $start  = find_column_index($self, '^start|position');
