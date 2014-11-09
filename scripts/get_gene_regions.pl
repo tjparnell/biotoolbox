@@ -13,7 +13,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::gff3_parser;
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = 1.22;
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -228,6 +228,18 @@ sub determine_method {
 		$request = 'last intron';
 		$method = \&collect_last_intron;
 	}
+	elsif ($request =~ /^alt.*exons?/i) {
+		$request = 'alternate exon';
+		$method = \&collect_common_alt_exons;
+	}
+	elsif ($request =~ /^common ?exons?/i) {
+		$request = 'common exon';
+		$method = \&collect_common_alt_exons;
+	}
+	elsif ($request =~ /^exons?/i) {
+		$request = 'exon';
+		$method = \&collect_exons;
+	}
 	else {
 		die " unknown region request!\n";
 	}
@@ -240,14 +252,17 @@ sub determine_method {
 sub collect_method_from_user {
 	
 	my %list = (
-		1	=> 'first exon',
-		2	=> 'last exon',
-		3	=> 'transcription start site',
-		4	=> 'transcription stop site',
-		5	=> 'splice sites',
-		6	=> 'introns',
-		7   => 'first intron',
-		8   => 'last intron',
+		1	=> 'transcription start site',
+		2	=> 'transcription stop site',
+		3   => 'exons',
+		4	=> 'first exon',
+		5	=> 'last exon',
+		6   => 'alternate exons',
+		7   => 'common exons',
+		8	=> 'introns',
+		9   => 'first intron',
+		10  => 'last intron',
+		11	=> 'splice sites',
 	);
 	
 	# request feature from the user
@@ -469,6 +484,14 @@ sub process_gene {
 	# passed objects
 	my ($gene, $method) = @_;
 	
+	# alternate or common exons require working with gene level
+	if ($request =~ /^alt.*exons?/i) {
+		return collect_common_alt_exons($gene, 1);
+	}
+	elsif ($request =~ /^common ?exons?/i) {
+		return collect_common_alt_exons($gene, 0);
+	}
+	
 	# look for transcripts for this gene
 	my @regions;
 	foreach my $subfeat ($gene->get_SeqFeatures) {
@@ -504,6 +527,11 @@ sub process_transcript {
 	# passed objects
 	my ($transcript, $method) = @_;
 	
+	# can not process alternate exons with a single transcript
+	return if ($request =~ /^alt.*exons?/i);
+	return if ($request =~ /^common ?exons?/i);
+	
+	# call appropriate method
 	if (
 		($transcript->primary_tag =~ /mrna/i and $do_mrna) or
 		($transcript->primary_tag =~ /mirna/i and $do_mirna) or
@@ -872,6 +900,105 @@ sub collect_last_intron {
 }
 
 
+sub collect_exons {
+	
+	my $transcript = shift;
+	
+	# find the exons and/or CDSs
+	my $list = _collect_exons($transcript);
+	return unless $list;
+	
+	# process and adjust the exons
+	my @exons;
+	my $i = 0;
+	foreach my $e (@$list) {
+		my $name = $e->display_name || $transcript->display_name . "_exon$i";
+		push @exons, _adjust_positions( [ 
+			$transcript->display_name,
+			$name, 
+			$e->seq_id, 
+			$e->start, 
+			$e->end,
+			$e->strand,
+		] );
+		$i++;
+	}
+	
+	return @exons;
+}
+
+
+sub collect_common_alt_exons {
+	
+	my $gene = shift;
+	my $alternate = shift;
+	
+	# get list of transcripts, must have more than one
+	my @transcripts = $gene->get_SeqFeatures;
+	return unless (scalar @transcripts > 1);
+	
+	# collect the exons based on transcript type
+	my %pos2exons;
+	my $trx_number = 0;
+	foreach my $t (@transcripts) {
+		next unless (
+			($t->primary_tag =~ /mrna/i and $do_mrna) or
+			($t->primary_tag =~ /mirna/i and $do_mirna) or
+			($t->primary_tag =~ /ncrna/i and $do_ncrna) or
+			($t->primary_tag =~ /snrna/i and $do_snrna) or
+			($t->primary_tag =~ /snorna/i and $do_snorna) or
+			($t->primary_tag =~ /trna/i and $do_rrna) or
+			($t->primary_tag =~ /rrna/i and $do_rrna)
+		);
+		my $exons = _collect_exons($t);
+		foreach my $e (@$exons) {
+			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
+		}
+		$trx_number++;
+	}
+	return unless $trx_number > 1;
+	
+	# identify alternate or common exons based on the number of them
+	my @exons;
+	foreach my $s (sort {$a <=> $b} keys %pos2exons) {               # sort on start
+		foreach my $e (sort {$a <=> $b} keys %{ $pos2exons{$s} }) {  # sort on stop
+			
+			# skip if this exon is present in all transcripts and looking for alternates
+			next if (scalar( @{ $pos2exons{$s}{$e} } ) == $trx_number and $alternate);
+			
+			# skip if this exon is not present in all transcripts and looking for common
+			next if (scalar( @{ $pos2exons{$s}{$e} } ) != $trx_number and !$alternate);
+			
+			# record these exons
+			foreach (@{ $pos2exons{$s}{$e} }) {
+				my $tname = $_->[0];
+				my $exon = $_->[1];
+				push @exons, _adjust_positions( [ 
+					$tname,
+					$exon->display_name || $tname . ".$s", 
+					$exon->seq_id, 
+					$exon->start, 
+					$exon->end,
+					$exon->strand,
+				] );
+			}
+		}
+	}
+	
+	# remove duplicates if requested
+	if ($unique) {
+		remove_duplicates(\@exons);
+	}
+	
+	# add the parent name
+	for my $i (0 .. $#exons) {
+		unshift @{ $exons[$i] }, $gene->display_name;
+	}
+	
+	# return the exons
+	return @exons;
+}
+
 sub _collect_exons {
 	
 	# initialize
@@ -1019,7 +1146,8 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
-  --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
+  --region [tss|tts|exon|altExon|commonExon|firstExon|lastExon|
+            intron|firstIntron|lastIntron|splice]
   --start=<integer>
   --stop=<integer>
   --unique
@@ -1070,20 +1198,23 @@ Specify the transcript feature or gene subfeature type from which to
 collect the regions. Multiple types may be specified as a comma-delimited 
 list, or 'all' may be specified. The default value is mRNA.
 
-=item --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
+=item --region <region>
 
 Specify the type of region to retrieve. If not specified on the command 
-line, the list is presented interactively to the user for selection. Six 
+line, the list is presented interactively to the user for selection. Ten 
 possibilities are possible.
      
      tss         The first base of transcription
      tts         The last base of transcription
+     exon        The exons of each transcript
      firstExon   The first exon of each transcript
      lastExon    The last exon of each transcript
-     splice      The first and last base of each intron
+     altExon     All alternate exons from multiple transcripts for each gene
+     commonExon  All common exons between multiple transcripts for each gene
      intron      Each intron (usually not defined in the GFF3)
      firstIntron The first intron of each transcript
      lastIntron  The last intron of each transcript
+     splice      The first and last base of each intron
 
 =item --start=<integer>
 
@@ -1136,10 +1267,11 @@ This program will collect specific regions from annotated genes and/or
 transcripts. Often these regions are not explicitly defined in the 
 source GFF3 annotation, necessitating a script to pull them out. These 
 regions include the start and stop sites of transcription, introns, 
-the splice sites (both 5' and 3'), and the first and last exons. 
-Importantly, unique regions may only be reported, especially important 
-when a single gene may have multiple alternative transcripts. A 
-slop factor is included for imprecise annotation.
+the splice sites (both 5' and 3'), exons, the first (5') or last (3') 
+exons, or all alternate or common exons of genes with multiple 
+transcripts. Importantly, unique regions may only be reported, 
+especially important when a single gene may have multiple alternative 
+transcripts. A slop factor is included for imprecise annotation.
 
 The program will report the chromosome, start and stop coordinates, 
 strand, name, and parent and transcript names for each region 
