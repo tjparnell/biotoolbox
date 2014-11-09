@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.21;
+my $VERSION = 1.22;
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -97,7 +97,7 @@ unless ($infile) {
 my $Data = Bio::ToolBox::Data->new(file => $infile) 
 	or die "no data loaded from file '$infile'!";
 printf "    Loaded '$infile' with %s data rows and %s columns\n\n", 
-	$Data->last_row, $Data->number_columns;
+	format_with_commas($Data->last_row), $Data->number_columns;
 
 
 
@@ -361,12 +361,9 @@ sub print_statistics_function {
 		return;
 	}
 	
-	# determine what to do with zero values
-	my $zero = $opt_zero; 
-	
 	# get statistics and print
 	foreach my $index (@indices) {
-		my %statdata = _get_statistics_hash($index, $zero);
+		my %statdata = _get_statistics_hash($index);
 		unless (%statdata) { 
 			warn " unable to get statistics for column index $index!\n"; 
 			return;
@@ -737,7 +734,7 @@ sub median_scale_function {
 		my $correction_value = $target / $statdata{median};
 	
 		# Replace values
-		$index = _prepare_destination($index, '_scaled') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_scaled') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index) eq '.'; # null value, nothing to do
@@ -802,7 +799,7 @@ sub percentile_rank_function {
 		}
 		
 		# Replace the contents with the calculated percent rank
-		$index = _prepare_destination($index, '_pr') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_pr') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index eq '.');
@@ -860,7 +857,7 @@ sub zscore_function {
 		}
 		
 		# Replace the current values
-		$index = _prepare_destination($index, '_Zscore') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_Zscore') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index) eq '.';
@@ -1351,7 +1348,7 @@ sub convert_nulls_function {
 		my $count  = 0; 
 		
 		# reset values
-		$index = _prepare_destination($index, '_convert_nulls') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_convert_nulls') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1441,7 +1438,7 @@ sub convert_absolute_function {
 		my $failed = 0;
 		
 		# reset minimum values
-		$index = _prepare_destination($index, '_absolute') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_absolute') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1521,7 +1518,7 @@ sub minimum_function {
 		my $count  = 0; 
 		
 		# reset minimum values
-		$index = _prepare_destination($index, '_minimum_reset') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_minimum_reset') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1589,7 +1586,7 @@ sub maximum_function {
 		my $count  = 0; 
 		
 		# reset minimum values
-		$index = _prepare_destination($index, '_maximum_reset') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_maximum_reset') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1680,7 +1677,7 @@ sub log_function {
 		my $failed = 0;
 		
 		# perform log conversions
-		$index = _prepare_destination($index, "_log$base") if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, "_log$base") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1780,7 +1777,7 @@ sub delog_function {
 		# Placement dictates method
 		my $count = 0; # conversion count
 		my $failed = 0;
-		$index = _prepare_destination($index, "_delog$base") if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, "_delog$base") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1867,7 +1864,7 @@ sub format_function {
 	# format each index request
 	my @datasets_modified; # a list of which datasets were modified
 	foreach my $index (@indices) {
-		$index = _prepare_destination($index, '_formatted') if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, '_formatted') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -2366,7 +2363,7 @@ sub math_function {
 		
 		# generate subtraction product
 		my $failed_count = 0; # failed count  
-		$index = _prepare_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
+		$index = _prepare_new_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			if ($row->value($index) eq '.') {
@@ -3167,7 +3164,7 @@ sub _get_statistics_hash {
 	my @invalues = $Data->column_values($index);
 	shift @invalues; # remove header
 	my @goodvalues;
-	while (my $v = shift @invalues) {
+	foreach my $v (@invalues) {
 		next if $v eq '.';
 		if ($v == 0) {
 			# we need to determine whether we can accept 0 values
