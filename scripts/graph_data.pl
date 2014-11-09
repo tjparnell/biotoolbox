@@ -27,7 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.20';
+my $VERSION = 1.22;
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -215,9 +215,13 @@ foreach my $name ($Data->list_columns) {
 	
 	# check column header names for gene or window attribute information
 	# these won't be used for graph generation, so we'll skip them
-	next if $name =~ /^(?:name|id|class|type|alias|probe|chr|
+	if ($name =~ /^(?:name|id|class|type|alias|probe|chr|
 		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand|primary_id)$/xi;
+		midpoint|strand|primary_id)$/xi
+	) {
+		$i++;
+		next;
+	}
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
@@ -246,7 +250,7 @@ if (-e $statfile) {
 } 
 else {
 	# open a new file
-	$stat_Data->Bio::ToolBox::Data->new(
+	$stat_Data = Bio::ToolBox::Data->new(
 		feature => 'correlations',
 		columns => [qw(
 			SourceFile
