@@ -84,18 +84,15 @@ unless (defined $gz) {$gz = 0}
 ### Load the feature list
 
 # load file
-print " Loading feature list from '$infile'....\n";
-my $Data = Bio::ToolBox::Data->new(file => $infile);
-unless ($Data) {
-	die " No file data loaded!\n";
-}
+my $Data = Bio::ToolBox::Data->new(file => $infile) or
+	die " Unable to load data file!\n";
+printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+
 if (not defined $Data->feature and $use_type) {
 	# set the general feature type, which will be used as a proxy for individual 
 	# feature types in the Data method that looks for the database features.
 	$Data->feature($use_type);
 }
-printf "  Loaded %s%s features.\n", 
-	format_with_commas( $Data->last_row ), $Data->feature ? ' ' . $Data->feature  : '';
 
 
 

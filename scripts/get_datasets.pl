@@ -24,7 +24,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.21;
+my $VERSION = 1.22;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -133,8 +133,7 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(file => $infile) or 
 		die " unable to load input file '$infile'\n";
-	printf "  Loaded %s '%s' features.\n", 
-		format_with_commas( $Data->last_row ), $Data->feature;
+	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# update main database as necessary
 	if ($main_database) {

@@ -20,7 +20,7 @@ eval {
 	require Bio::DB::Sam;
 	$BAM_OK = 0;
 };
-my $VERSION = '1.20';
+my $VERSION = 1.22;
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -120,6 +120,7 @@ if ($infile) {
 	# an input file of regions is provided
 	$Data = Bio::ToolBox::Data->new(file => $infile) or 
 		die " unable to open input file '$infile'!\n";
+	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# check database
 	unless ($database) {
