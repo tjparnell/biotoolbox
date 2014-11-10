@@ -8,8 +8,6 @@ Bio::!ToolBox**::Data::Feature - Objects representing rows in a data table
 ==DESCRIPTION==
 A Bio::!ToolBox**::Data::Feature is an object representing a row in the  data table. Usually, this in turn represents an annotated feature or  segment in the genome. As such, this object provides convenient  methods for accessing and manipulating the values in a row, as well as  methods for working with the represented genomic feature.
 
-In many cases, the row may represent a database feature. In this case,  many of the methods will automatically retrieve the feature from the  database for you to perform request, be it attribute lookup or score  collection. the Database features typically presume working with a  Bio::DB::!SeqFeature**::Store database.
-
 This class should not be used directly by the user. Rather, Feature  objects are generated from a Bio::!ToolBox**::Data::Iterator object  (generated itself from the row_stream() function in Bio::!ToolBox**::Data),  or the iterate() function in Bio::!ToolBox**::Data. Please see the  documentation for Bio::!ToolBox**::Data for more information.
 
 Example of working with a stream object.
@@ -62,7 +60,9 @@ __
 __
   __
 ===Methods to access row feature attributes===
-These methods return the corresponding value, if present in the  data table, based on the column header name. For rows representing  database features, the feature will be automatically retrieved from  the database, and the attribute returned.
+These methods return the corresponding value, if present in the  data table, based on the column header name. If the row represents  a named database object, try calling the feature() method first.  This will retrieve the database !SeqFeature** object, and the attributes  can then be retrieved using the methods below or on the actual  database !SeqFeature** object.
+
+These methods do not set attribute values. If you need to change the  values in a table, use the value() method below.
 
 seq_id
 
@@ -79,25 +79,28 @@ __
 stop
 
 __
-  The coordinates of the feature or segment. All coordinates are 1-based.
+  The coordinates of the feature or segment. All coordinates are returned  as 1-based.
 __
   __
 strand
 
 __
-  The strand of the feature or segment. Returns -1, 0, or 1. Default is 0.
+  The strand of the feature or segment. Returns -1, 0, or 1. Default is 0,  or unstranded.
 __
   __
 name
 
 __
-  The display_name of the feature.
+display_name
+
+__
+  The name of the feature.
 __
   __
 type
 
 __
-  The type of feature. Typically either primary_tag or primary_tag:source_tag.  In a GFF3 file, this represents columns 3 and 2, respectively.
+  The type of feature. Typically either primary_tag or primary_tag:source_tag.  In a GFF3 file, this represents columns 3 and 2, respectively. In annotation  databases such as Bio::DB::!SeqFeature**::Store, the type is used to restrict  to one of many different types of features, e.g. gene, mRNA, or exon.
 __
   __
 id
