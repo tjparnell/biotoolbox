@@ -1,5 +1,21 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.22 (svn 906)
+	- Added new export options of alternate, common, or all exons 
+	to script get_gene_regions.
+	- Changed behavior of Bio::ToolBox::Data::Feature such that 
+	database features must now be explicitly retrieved rather 
+	than automatically retrieved, which could lead to runaway 
+	execution if it could not be found.
+	- Improved how name columns are recognized and used when 
+	retrieving database features.
+	- Improved writing of strand information in proper format 
+	for Bed and GFF files.
+	- Fixed numerous bugs that prevented proper execution in 
+	several scripts, including manipulate_datasets, get_feature_info, 
+	graphing scripts. Thanks to Mengyao and Yixuan for reporting.
+	- Standardize data file loading message among several scripts.
+
 v.1.21 (svn 896)
 	- Fixed critical bug that prevented upstream windows from 
 	collecting data in script get_relative_data.
