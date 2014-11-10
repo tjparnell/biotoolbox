@@ -204,9 +204,9 @@ else {
 
 ### Prepare global variables and set up for execution
 
-print " Loading data from file $infile....\n";
 my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " No data loaded!\n";
+	die " Unable to load data file!\n";
+printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id

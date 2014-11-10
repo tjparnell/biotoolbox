@@ -28,7 +28,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.21;
+my $VERSION = 1.22;
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -127,8 +127,7 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(file => $infile) or 
 		die " unable to load input file '$infile'\n";
-	printf "  Loaded %s '%s' features.\n", 
-		format_with_commas( $Data->last_row ), $Data->feature;
+	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# update main database as necessary
 	if ($main_database) {
