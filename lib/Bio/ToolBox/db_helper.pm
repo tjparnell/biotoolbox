@@ -20,7 +20,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-our $VERSION = 1.22;
+our $VERSION = 1.23;
 
 
 # check values for dynamically loaded helper modules
@@ -804,7 +804,7 @@ If no list was provided, then a list of available feature types in the
 provided database will be presented to the user, and the user prompted 
 to make a selection. One or more types may be selected, and a single 
 item may be enforced if requested. The response is filtered through 
-the parse_list() method from C<Bio::ToolBox::db_helper>, so a mix of single 
+the parse_list() method from L<Bio::ToolBox::utility>, so a mix of single 
 numbers or a range of numbers may be accepted. The responses are then 
 validated.
 
@@ -840,6 +840,12 @@ and values. Not every key is required.
               presented list. If true, only one dataset choice is 
               accepted. If false, one or more dataset choices are 
               allowed. Default is false.
+  limit    => Optionally provide a word or regular expression that matches
+              the feature type (primary_tag only; source_tag, if present, 
+              is ignored). For example, provide "gene|mrna" to only 
+              present gene and mRNA features to the user. This is only 
+              applicable when a user must select from a database list. 
+              The default is to list all available feature types.
 
 The subroutine will return a list of the accepted datasets. It will print 
 bad dataset names to standard out.
@@ -894,6 +900,11 @@ sub verify_or_request_feature_types {
 		push @datasets, $args{'feature'};
 	}
 	# else it is null and @datasets remains empty, prompting user input
+	
+	# feature limits
+	# this is a regex to limit the feature types presented to the user
+	# otherwise everything in the database is presented to the user
+	my $limit = $args{'limit'} ||= undef;
 	
 	
 	# Open database object and collect features
@@ -1029,6 +1040,11 @@ sub verify_or_request_feature_types {
 			# collect the database features as needed
 			my $i = 1;
 			foreach my $type ( get_dataset_list($db) ) {
+				if ($limit) {
+					my ($p, $s) = split /:/, $type; # split into primary_tag and source
+					# only keep those types that match our limiter
+					next unless $p =~ /$limit/i;
+				}
 				$db_features{$i} = $type;
 				$i++;
 			}
@@ -1919,10 +1935,14 @@ sub get_chromo_region_score {
 	# establish coordinates
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
 	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'start'}    = 1 if ($args{'start'} <= 0);
 	$args{'stop'}   ||= $args{'end'} || 1;
 	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
-	
+	if ($args{'start'} < 0 and $args{'stop'} < 0) {
+		cluck sprintf "both start and stop coordinates are negative! %s and %s",  
+			$args{'start'}, $args{'stop'};
+		return;
+	}
+	$args{'start'}    = 1 if ($args{'start'} <= 0);
 	unless ($args{chromo} and $args{start} and $args{stop}) {
 		my $s = sprintf "%s:%s..%s", $args{chromo}, $args{start}, $args{stop};
 		cluck "one or more provided genomic coordinates ($s) are invalid!\n";
