@@ -1,5 +1,16 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.23 (svn 912)
+	- Improved script get_gene_regions to recognize non_coding exons; 
+	prompt for region, feature, and RNA type; specify for more than 
+	one feature type at a time; and avoid mixing RNA sub types from 
+	the same gene. Thanks to Mengyao for troubleshooting.
+	- Fixed bugs pertaining to collecting relative windows that may 
+	extend beyond the beginning of the chromosome. Thanks to Nate 
+	for reporting.
+	- Fixed bugs sorting by genomic coordinate, especially when 
+	only Position is provided and not Start.
+
 v.1.22 (svn 906)
 	- Added new export options of alternate, common, or all exons 
 	to script get_gene_regions.
