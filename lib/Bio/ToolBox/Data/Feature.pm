@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.22;
+our $VERSION = 1.23;
 
 =head1 NAME
 
@@ -437,13 +437,15 @@ sub get_score {
 		$args{stop}   ||= $f->end;
 	}
 	else {
-		croak "data table does not have coordinates or feature attributes for score collection.";
+		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
 	}
 	unless (exists $args{strand} and defined $args{strand}) {
 		$args{strand} = $self->strand; 
 	}
-	unless ($args{chromo} and $args{start}) {
-		croak "data table does not have coordinates or feature attributes for score collection.";
+	unless ($args{chromo} and defined $args{start}) {
+		printf " Feature at data table row %s has chromosome '%s', start '%s', skipping without defined coordinates", 
+			$self->row_index, $args{chromo}, $args{start};
+		return;
 	}
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
