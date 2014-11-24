@@ -28,7 +28,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.22;
+my $VERSION = 1.23;
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -843,6 +843,13 @@ sub record_individual_bin_values {
 				$stop  = int( $fstop - 
 					($Data->metadata($column, 'stop') * 0.01 * $length) + 1 + 0.5);
 			}
+		}
+		
+		# check for negative coordinates
+		if ($start < 0 and $stop < 0) {
+			# bin is off the beginning of the chromosome, record null
+			$row->value($column, '.');
+			next;
 		}
 		
 		# collect the data for this bin

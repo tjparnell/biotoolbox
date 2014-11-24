@@ -28,7 +28,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.22;
+my $VERSION = 1.23;
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -920,16 +920,24 @@ sub collect_long_data_window_scores {
 	) {
 		# we must modify the start and stop position with the adjustments
 		# recorded in the current column metadata
+		my $start = $fstrand >= 0 ? $reference + $Data->metadata($column, 'start') :
+			$reference - $Data->metadata($column, 'start');
+		my $stop = $fstrand >= 0 ? $reference + $Data->metadata($column, 'stop') : 
+			$reference - $Data->metadata($column, 'stop');
+		if ($start < 0 and $stop < 0) {
+			# we are off the beginning of the chromosome
+			# cannot collect score of negative coordinates
+			# record null
+			$row->value($column, '.');
+			next;
+		}
+			
 		my $score = $row->get_score(
 			'db'          => $ddb,
 			'dataset'     => $dataset,
 			'chromo'      => $fchromo,
-			'start'       => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'start') :
-								$reference - $Data->metadata($column, 'start'),
-			'stop'        => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'stop') : 
-								$reference - $Data->metdata($column, 'stop'),
+			'start'       => $start,
+			'stop'        => $stop,
 			'strand'      => $fstrand,
 			'method'      => $method,
 			'value'       => $value_type,
@@ -938,6 +946,7 @@ sub collect_long_data_window_scores {
 		);
 		$row->value($column, $score);
 	}
+	
 }
 
 
