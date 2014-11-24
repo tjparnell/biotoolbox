@@ -1,5 +1,5 @@
 package Bio::ToolBox::data_helper;
-our $VERSION = '1.20';
+our $VERSION = 1.23;
 
 ### modules
 require Exporter;
@@ -579,14 +579,18 @@ sub gsort_data_structure {
 	
 	# data structure
 	my $main_data_ref = shift;
-	my $data_table_ref = $main_data_ref->{'data_table'};
 	unless ($main_data_ref) {
 		confess "no data structure passed for sorting\n";
 	}
+	my $data_table_ref = $main_data_ref->{'data_table'};
 
 	# attempt to automatically identify the chromo and start indices
-	my $chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq');
-	my $start_i = find_column_index($main_data_ref, '^start|position');
+	# the indices should be passed from Bio:ToolBox::Data, but if not, look for them
+	my ($chromo_i, $start_i) = @_;
+	$chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq') unless
+		defined $chromo_i;
+	$start_i = find_column_index($main_data_ref, '^start|position|pos$') unless
+		defined $start_i;
 	
 	# if unable to auto-identify columns
 	unless (defined $chromo_i and defined $start_i) {

@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::meta;
-our $VERSION = 1.22;
+our $VERSION = 1.23;
 
 =head1 NAME
 
@@ -214,7 +214,7 @@ sub _find_column_indices {
 	my $type   = find_column_index($self, '^type|class|primary_tag');
 	my $id     = find_column_index($self, '^primary_id');
 	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
-	my $start  = find_column_index($self, '^start|position');
+	my $start  = find_column_index($self, '^start|position|pos$');
 	my $stop   = find_column_index($self, '^stop|end');
 	my $strand = find_column_index($self, '^strand');
 	$self->{column_indices} = {
