@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.22;
+my $VERSION = 1.23;
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -944,7 +944,11 @@ sub sort_function {
 sub genomic_sort_function {
 	# This will sort the entire data table by chromosome and start position
 	
-	$Data->gsort_data;
+	my $result = $Data->gsort_data;
+	unless ($result) {
+		print " Data table not sorted\n";
+		return;
+	}
 	
 	# remove any pre-existing sorted metadata since no longer valid
 	for (my $i = 0; $i < $Data->number_columns; $i++) {

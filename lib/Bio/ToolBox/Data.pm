@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.20;
+our $VERSION = 1.23;
 
 =head1 NAME
 
@@ -899,7 +899,7 @@ sub sort_data {
 
 sub gsort_data {
 	my $self = shift;
-	return gsort_data_structure($self);
+	return gsort_data_structure($self, $self->chromo_column, $self->start_column);
 }
 
 sub splice_data {
