@@ -1934,26 +1934,14 @@ sub get_chromo_region_score {
 	
 	# establish coordinates
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
+	return '.' unless $args{'chromo'}; # null value
 	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'stop'}   ||= $args{'end'} || 1;
-	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
-	if ($args{'start'} < 0 and $args{'stop'} < 0) {
-		cluck sprintf "both start and stop coordinates are negative! %s and %s",  
-			$args{'start'}, $args{'stop'};
-		return;
-	}
 	$args{'start'}    = 1 if ($args{'start'} <= 0);
-	unless ($args{chromo} and $args{start} and $args{stop}) {
-		my $s = sprintf "%s:%s..%s", $args{chromo}, $args{start}, $args{stop};
-		cluck "one or more provided genomic coordinates ($s) are invalid!\n";
-		return;
-	};
+	$args{'stop'}   ||= $args{'end'};
+	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
 	if ($args{'stop'} < $args{'start'}) {
 		# coordinates are flipped, reverse strand
-		if ($args{'stop'} <= 0) {
-			cluck "invalid stop coordinate $args{stop} provided\n";
-			return;
-		}
+		return '.' if ($args{'stop'} <= 0);
 		my $stop = $args{'start'};
 		$args{'start'} = $args{'stop'};
 		$args{'stop'}  = $stop;
@@ -2168,17 +2156,18 @@ sub get_region_dataset_hash {
 	$args{'id'}     ||= undef;
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
 	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'stop'}   ||= $args{'end'} || 1;
+	$args{'start'}    = 1 if ($args{'start'} <= 0);
+	$args{'stop'}   ||= $args{'end'};
 	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : undef;
 	unless (
 		(defined $args{'name'} and defined $args{'type'}) or 
 		(defined $args{'chromo'} and $args{'start'} and $args{'stop'})
 	) {
-		cluck "the feature name and type or genomic coordinates are missing!";
 		return;
 	};
 	if ($args{'stop'} < $args{'start'}) {
 		# coordinates are flipped, reverse strand
+		return '.' if $args{'stop'} < 0;
 		my $stop = $args{'start'};
 		$args{'start'} = $args{'stop'};
 		$args{'stop'}  = $stop;

@@ -97,8 +97,12 @@ The name of the chromosome the feature is on.
 
 =item stop
 
-The coordinates of the feature or segment. All coordinates are returned 
-as 1-based.
+The coordinates of the feature or segment. Coordinates from known 
+0-based file formats, e.g. BED, are returned as 1-based. Coordinates 
+must be integers to be returned. Zero or negative start coordinates 
+are assumed to be accidents or poor programming and transformed to 1. 
+Zero or negative stop coordinates are just ignored. Use the value() 
+method if you don't want this to happen.
 
 =item strand
 
@@ -310,25 +314,30 @@ sub value {
 sub seq_id {
 	my $self = shift;
 	my $i = $self->{data}->chromo_column;
-	return $self->value($i) if defined $i;
+	if (defined $i) {
+		my $v = $self->value($i);
+		return (defined $v and $v ne '.') ? $v : undef;
+	}
 	return $self->{feature}->seq_id if exists $self->{feature};
-	return;
+	return undef;
 }
 
 sub start {
 	my $self = shift;
 	my $i = $self->{data}->start_column;
-	return $self->value($i) if defined $i;
-	return $self->{feature}->start if exists $self->{feature};
-	return;
+	my $v = $self->value($i) if defined $i;
+	$v = $self->{feature}->start if (not defined $v and exists $self->{feature});
+	return undef unless ($v =~ /^\-?\d+$/);
+	return $v < 1 ? 1 : $v;
 }
 
 sub end {
 	my $self = shift;
 	my $i = $self->{data}->stop_column;
-	return $self->value($i) if defined $i;
-	return $self->{feature}->end if exists $self->{feature};
-	return;
+	my $v = $self->value($i) if defined $i;
+	$v = $self->{feature}->end if (not defined $v and exists $self->{feature});
+	return undef unless ($v =~ /^\-?\d+$/);
+	return $v < 1 ? undef : $v;
 }
 
 sub stop {
@@ -348,7 +357,7 @@ sub name {
 	my $i = $self->{data}->name_column;
 	return $self->value($i) if defined $i;
 	return $self->{feature}->display_name if exists $self->{feature};
-	return;
+	return undef;
 }
 
 sub display_name {
@@ -360,7 +369,7 @@ sub type {
 	my $i = $self->{data}->type_column;
 	return $self->value($i) if defined $i;
 	return $self->{feature}->primary_tag if exists $self->{feature};
-	return;
+	return undef;
 }
 
 sub id {
@@ -368,12 +377,19 @@ sub id {
 	my $i = $self->{data}->id_column;
 	return $self->value($i) if defined $i;
 	return $self->{feature}->primary_id if exists $self->{feature};
-	return;
+	return undef;
 }
 
 sub length {
 	my $self = shift;
-	return $self->end - $self->start + 1;
+	my $s = $self->start;
+	my $e = $self->end;
+	if (defined $s and defined $e) {
+		return $e - $s + 1;
+	}
+	else {
+		return undef;
+	}
 }
 
 ### Data collection convenience methods
@@ -381,13 +397,13 @@ sub length {
 sub feature {
 	my $self = shift;
 	return $self->{feature} if exists $self->{feature};
-	return unless $self->{data}->database;
+	return undef unless $self->{data}->database;
 	
 	# retrieve the feature from the database
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
-	return unless ($id or ($name and $type));
+	return undef unless ($id or ($name and $type));
 	my $f = get_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
@@ -442,11 +458,9 @@ sub get_score {
 	unless (exists $args{strand} and defined $args{strand}) {
 		$args{strand} = $self->strand; 
 	}
-	unless ($args{chromo} and defined $args{start}) {
-		printf " Feature at data table row %s has chromosome '%s', start '%s', skipping without defined coordinates", 
-			$self->row_index, $args{chromo}, $args{start};
-		return;
-	}
+# 	unless ($args{chromo} and defined $args{start}) {
+# 		return;
+# 	}
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
