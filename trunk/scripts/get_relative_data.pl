@@ -394,10 +394,6 @@ sub parallel_execution {
 			print " Interpolating missing values....\n";
 			go_interpolate_values();
 		}
-		# convert null values to zero if necessary
-		if ($method eq 'sum' or $method eq 'rpm') {
-			null_to_zeros();
-		}
 		
 		# write out result
 		my $success = $Data->save(
@@ -466,10 +462,6 @@ sub single_execution {
 	if ($smooth) {
 		print " Interpolating missing values....\n";
 		go_interpolate_values();
-	}
-	# convert null values to zero if necessary
-	if ($method eq 'sum' or $method eq 'rpm') {
-		null_to_zeros();
 	}
 
 
@@ -808,6 +800,13 @@ sub record_scores {
 		$column < $Data->number_columns; 
 		$column++
 	) {
+		
+		# record nulls if no data returned
+		unless (scalar keys %$regionscores) {
+			$row->value($column, '.');
+			next;
+		}
+		
 		# get start and stop
 		my $start = $Data->metadata($column, 'start');
 		my $stop = $Data->metadata($column, 'stop');
@@ -882,7 +881,7 @@ sub collect_long_data_window_scores {
 		$fstop,
 		$fstrand
 	) = @_;
-
+	
 	# Translate the actual reference start position based on requested 
 	# reference position and region strand
 	my $reference;
@@ -920,24 +919,16 @@ sub collect_long_data_window_scores {
 	) {
 		# we must modify the start and stop position with the adjustments
 		# recorded in the current column metadata
-		my $start = $fstrand >= 0 ? $reference + $Data->metadata($column, 'start') :
-			$reference - $Data->metadata($column, 'start');
-		my $stop = $fstrand >= 0 ? $reference + $Data->metadata($column, 'stop') : 
-			$reference - $Data->metadata($column, 'stop');
-		if ($start < 0 and $stop < 0) {
-			# we are off the beginning of the chromosome
-			# cannot collect score of negative coordinates
-			# record null
-			$row->value($column, '.');
-			next;
-		}
-			
 		my $score = $row->get_score(
 			'db'          => $ddb,
 			'dataset'     => $dataset,
 			'chromo'      => $fchromo,
-			'start'       => $start,
-			'stop'        => $stop,
+			'start'       => $fstrand >= 0 ? 
+								$reference + $Data->metadata($column, 'start') :
+								$reference - $Data->metadata($column, 'start'),
+			'stop'        => $fstrand >= 0 ? 
+								$reference + $Data->metadata($column, 'stop') : 
+								$reference - $Data->metdata($column, 'stop'),
 			'strand'      => $fstrand,
 			'method'      => $method,
 			'value'       => $value_type,
@@ -946,7 +937,6 @@ sub collect_long_data_window_scores {
 		);
 		$row->value($column, $score);
 	}
-	
 }
 
 
@@ -997,27 +987,6 @@ sub go_interpolate_values {
 			$col++;
 		}
 	}
-}
-
-
-
-## Convert null values to proper zero values
-sub null_to_zeros {
-	# for those methods where we expect a true zero, sum and rpm
-	# convert '.' null scores to zero
-	
-	# this wasn't done before because the null value makes the 
-	# interpolation a lot easier without having to worry about zero
-	
-	# walk through each data line and then each window
-	$Data->iterate( sub {
-		my $row = shift;
-		for (my $c = $startcolumn; $c < $Data->number_columns; $c++) {
-			if ($row->value($c) eq '.') {
-				$row->value($c, 0);
-			}
-		}
-	} );
 }
 
 

@@ -651,6 +651,12 @@ sub record_the_bin_values {
 		# any scores within this window will be collected and the mean 
 		# value reported
 		
+		# record nulls if no data returned
+		unless (scalar keys %$regionscores) {
+			$row->value($column, '.');
+			next;
+		}
+		
 		# convert the window start and stop coordinates (as percentages) to
 		# actual bp
 		# this depends on whether the binsize is explicitly defined in bp or
@@ -843,13 +849,6 @@ sub record_individual_bin_values {
 				$stop  = int( $fstop - 
 					($Data->metadata($column, 'stop') * 0.01 * $length) + 1 + 0.5);
 			}
-		}
-		
-		# check for negative coordinates
-		if ($start < 0 and $stop < 0) {
-			# bin is off the beginning of the chromosome, record null
-			$row->value($column, '.');
-			next;
 		}
 		
 		# collect the data for this bin
