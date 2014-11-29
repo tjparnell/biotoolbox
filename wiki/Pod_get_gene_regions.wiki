@@ -18,13 +18,14 @@ get_gene_regions.pl `[`--options...`]` --in <**filename> --out <**filename>
   --in <filename>
   --out <filename> 
   --feature <type | type:source>
-  --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
+  --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
   --region [tss|tts|exon|altExon|commonExon|firstExon|lastExon|
             intron|firstIntron|lastIntron|splice]
   --start=<integer>
   --stop=<integer>
   --unique
   --slop <integer>
+  --mix
   --bed
   --gz
   --version
@@ -54,13 +55,13 @@ __
 __--feature <**type | type:source>
 
 __
-  Specify the parental gene feature type (primary_tag) or type:source when using a database. If not specified, a list of available types will be presented interactively to the user for selection. This is not relevant for GFF3 source files (all gene or transcript features are considered). Helpful when gene annotation from multiple sources are listed in the same database, e.g. refSeq and ensembl sources.
+  Specify the parental gene feature type (primary_tag) or type:source when using a database. If not specified, a list of available types will be presented interactively to the user for selection. This is not relevant for GFF3 source files (all gene or transcript features are considered). This is  helpful when gene annotation from multiple sources are present in the same  database, e.g. refSeq and ensembl sources. More than one feature may be  included, either as a comma-delimited list or multiple options.
 __
   __
-__--transcript `[`all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA`]`
+__--transcript `[`all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA`]`
 
 __
-  Specify the transcript feature or gene subfeature type from which to   collect the regions. Multiple types may be specified as a comma-delimited  list, or 'all' may be specified. The default value is mRNA.
+  Specify the transcript type (usually a gene subfeature) from which to   collect the regions. Multiple types may be specified as a comma-delimited  list, or 'all' may be specified. If not specified, an interactive list  will be presented from which the user may select.
 __
   __
 __--region <**region>
@@ -101,6 +102,12 @@ __--slop <**integer>
 
 __
   When identifying unique regions, specify the number of bp to  add and subtract to the start position (the slop or fudge factor)  of the regions when considering duplicates. Any other region  within this window will be considered a duplicate. Useful, for  example, when start sites of transcription are not precisely mapped,  but not useful with defined introns and exons. This does not take  into consideration transcripts from other genes, only the current  gene. The default is 0 (no sloppiness).
+__
+  __
+__--mix
+
+__
+  Allow two or more different transcript types from genes to be used. Some genes may generate more than one transcript type, for example  mRNA and certain non-coding RNAs. By default, only one type of RNA  transcript type is accepted. This is usually mRNA, if requested.
 __
   __
 __--bed

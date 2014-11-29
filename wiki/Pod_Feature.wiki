@@ -79,7 +79,7 @@ __
 stop
 
 __
-  The coordinates of the feature or segment. All coordinates are returned  as 1-based.
+  The coordinates of the feature or segment. Coordinates from known  0-based file formats, e.g. BED, are returned as 1-based. Coordinates  must be integers to be returned. Zero or negative start coordinates  are assumed to be accidents or poor programming and transformed to 1.  Zero or negative stop coordinates are just ignored. Use the value()  method if you don't want this to happen.
 __
   __
 strand
