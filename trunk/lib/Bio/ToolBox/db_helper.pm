@@ -20,7 +20,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-our $VERSION = 1.23;
+our $VERSION = 1.24;
 
 
 # check values for dynamically loaded helper modules
@@ -1763,6 +1763,7 @@ sub get_feature {
 	}
 	
 	# otherwise use name and type 
+	return unless $name; # otherwise db will return all features! Not what we want!
 	my @features = $db->features( 
 		-name       => $name, # we assume this name will be unique
 		-aliases    => 0, 
@@ -2580,8 +2581,24 @@ sub get_chromosome_list {
 	# I used to have one generic approach, but idiosyncrasies and potential 
 	# bugs make me use different approaches for better consistency
 	
+	# SeqFeature::Store
+	if (ref $db eq 'Bio::DB::SeqFeature::Store') {
+		for my $chr ($db->seq_ids) {
+			
+			# check for excluded chromosomes
+			next if (exists $excluded_chr_lookup{$chr} );
+			
+			# get chromosome size
+			my ($seqf) = $db->get_features_by_name($chr);
+			my $length = $seqf ? $seqf->length : 0;
+			
+			# store
+			push @chrom_lengths, [ $chr, $length ];
+		}
+	}
+	
 	# Bigfile
-	if (ref $db eq 'Bio::DB::BigWig' or ref $db eq 'Bio::DB::BigBed') {
+	elsif (ref $db eq 'Bio::DB::BigWig' or ref $db eq 'Bio::DB::BigBed') {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
@@ -2610,9 +2627,7 @@ sub get_chromosome_list {
 			my $length = $db->target_len($tid);
 			
 			# check for excluded chromosomes
-			if (exists $excluded_chr_lookup{$chr} ) {
-				next;
-			}
+			next if (exists $excluded_chr_lookup{$chr} );
 			
 			# store
 			push @chrom_lengths, [ $chr, $length ];
@@ -2624,9 +2639,7 @@ sub get_chromosome_list {
 		for my $chr ($db->get_all_ids) {
 			
 			# check for excluded chromosomes
-			if (exists $excluded_chr_lookup{$chr} ) {
-				next;
-			}
+			next if (exists $excluded_chr_lookup{$chr} );
 			
 			# get chromosome size
 			my $seq = $db->get_Seq_by_id($chr);
@@ -2637,14 +2650,12 @@ sub get_chromosome_list {
 		}
 	}
 	
-	# SeqFeature::Store or other Bioperl
+	# other Bioperl
 	else {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			if (exists $excluded_chr_lookup{$chr} ) {
-				next;
-			}
+			next if (exists $excluded_chr_lookup{$chr} );
 			
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
