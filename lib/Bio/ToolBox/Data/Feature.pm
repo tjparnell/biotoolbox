@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.23;
+our $VERSION = 1.24;
 
 =head1 NAME
 
@@ -314,9 +314,9 @@ sub value {
 sub seq_id {
 	my $self = shift;
 	my $i = $self->{data}->chromo_column;
-	if (defined $i) {
-		my $v = $self->value($i);
-		return (defined $v and $v ne '.') ? $v : undef;
+	my $v = $self->value($i) if defined $i;
+	if (defined $v and $v ne '.') {
+		return $v;
 	}
 	return $self->{feature}->seq_id if exists $self->{feature};
 	return undef;
@@ -355,7 +355,10 @@ sub strand {
 sub name {
 	my $self = shift;
 	my $i = $self->{data}->name_column;
-	return $self->value($i) if defined $i;
+	my $v = $self->value($i) if defined $i;
+	if (defined $v and $v ne '.') {
+		return $v;
+	}
 	return $self->{feature}->display_name if exists $self->{feature};
 	return undef;
 }
@@ -367,15 +370,22 @@ sub display_name {
 sub type {
 	my $self = shift;
 	my $i = $self->{data}->type_column;
-	return $self->value($i) if defined $i;
+	my $v = $self->value($i) if defined $i;
+	if (defined $v and $v ne '.') {
+		return $v;
+	}
 	return $self->{feature}->primary_tag if exists $self->{feature};
+	return $self->{data}->feature if $self->{data}->feature; # general metadata feature type
 	return undef;
 }
 
 sub id {
 	my $self = shift;
 	my $i = $self->{data}->id_column;
-	return $self->value($i) if defined $i;
+	my $v = $self->value($i) if defined $i;
+	if (defined $v and $v ne '.') {
+		return $v;
+	}
 	return $self->{feature}->primary_id if exists $self->{feature};
 	return undef;
 }
