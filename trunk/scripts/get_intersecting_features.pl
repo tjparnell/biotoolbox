@@ -16,7 +16,7 @@ use Bio::ToolBox::db_helper qw(
 	get_feature
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.22;
+my $VERSION = 1.24;
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -334,7 +334,7 @@ sub intersect_genome_features {
 			# limit to actual start
 			$new_start = 1;
 		}
-		if ($new_stop > $chrom2length{ $row->seq_id }) {
+		if ($chrom2length{ $row->seq_id } and $new_stop > $chrom2length{ $row->seq_id }) {
 			# limit to actual length
 			$new_stop = $chrom2length{ $row->seq_id };
 		}
@@ -359,8 +359,8 @@ sub intersect_genome_features {
 		}
 		else {
 			# no region defined
-			warn " unable to establish region for %s:%s..%s\n", 
-				$row->seq_id, $row->start, $row->end;
+			warn sprintf(" unable to establish region for %s:%s..%s\n", 
+				$row->seq_id, $row->start, $row->end);
 			# fill in table anyway
 			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
 				$distance_i, $overlap_i);
