@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
 use File::Spec;
 use Statistics::Lite qw(sum mean median min max range stddevp);
 use Bio::ToolBox::Data;
@@ -24,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.22;
+my $VERSION = 1.24;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -235,8 +234,8 @@ if ($datasets[0] eq 'none') {
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
+	while ($cpu > 1 and $Data->last_row / $cpu < 1000) {
+		# We need at least 1000 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
 		$cpu--;
@@ -258,6 +257,20 @@ else {
 
 
 ### Finished
+# write the output file
+# we will rewrite the file after each collection
+# appropriate extensions and compression should be taken care of
+my $success = $Data->save(
+	'filename' => $outfile,
+	'gz'       => $gz,
+);
+if ($success) {
+	printf " wrote file $success\n";
+}
+else {
+	# failure! the subroutine will have printed error messages
+	print " unable to write file!\n";
+}
 printf " Finished in %.1f minutes\n", (time - $start_time)/60;
 
 
@@ -343,10 +356,10 @@ sub set_defaults {
 			$value_type = 'count';
 		}
 		elsif ($method eq 'rpkm') {
-			$value_type = 'count';
+			$value_type = 'pcount';
 		}
 		elsif ($method eq 'rpm') {
-			$value_type = 'count';
+			$value_type = 'pcount';
 		}
 	}
 	else {
@@ -359,7 +372,7 @@ sub set_defaults {
 	# check the type of value to collect
 	if (defined $value_type) {
 		# validate the requested value type
-		unless ($value_type =~ m/^(?:score|count|length)$/) {
+		unless ($value_type =~ m/^(?:score|pcount|count|length)$/) {
 			die " unknown value type '$value_type'!\n";
 		}
 	}
@@ -438,6 +451,9 @@ sub set_defaults {
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
+	$pm->run_on_start( sub { sleep 1; }); 
+		# give a chance for child to start up and open databases, files, etc 
+		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -466,16 +482,11 @@ sub parallel_execution {
 		
 		# write out result
 		my $success = $Data->save(
-			'filename' => "$child_base_name.$i",
+			'filename' => sprintf("$child_base_name.%03s",$i),
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
 		}
 		
 		# Finished
@@ -488,18 +499,16 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	# done
+	unless (scalar @files == $cpu) {
+		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
+	}
+	my $count = $Data->reload_children(@files);
+	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
 
 
 sub single_execution {
-	
 	# collect the datasets
 	foreach my $dataset (@datasets) {
 		unless ($dataset eq 'none') {
@@ -507,21 +516,6 @@ sub single_execution {
 			collect_dataset($dataset);
 		}
 		last if $dataset eq 'none';
-	}
-	
-	# write the output file
-	# we will rewrite the file after each collection
-	# appropriate extensions and compression should be taken care of
-	my $success = $Data->save(
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($success) {
-		printf " wrote file $success\n";
-	}
-	else {
-		# failure! the subroutine will have printed error messages
-		print " unable to write file!\n";
 	}
 }
 
@@ -1257,7 +1251,7 @@ get_datasets.pl [--options...] [<filename>]
   --ddb <name | filename>
   --data <none | file | type>, ...
   --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]  (mean)
-  --value [score|count|length]                              (score)
+  --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --exons
@@ -1374,31 +1368,66 @@ without collecting data, provide the dataset name of "none".
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
-  
-  - mean        (default)
-  - median
-  - sum
-  - stddev      Standard deviation of the population (within the region)
-  - min
-  - max
-  - range       Returns difference of max and min
-  - rpm         Reads Per Million mapped, Bam/BigBed only
-  - rpkm        Reads Per Kilobase per Million Mapped, Bam/BigBed only
+
+=over 4
+
+=item * mean (default)
+
+=item * median
+
+=item * sum
+
+=item * stddev  Standard deviation of the population (within the region)
+
+=item * min
+
+=item * max
+
+=item * range   Returns difference of max and min
+
+=item * rpm     Reads Per Million mapped, Bam/BigBed only
+
+=item * rpkm    Reads Per Kilobase per Million Mapped, Bam/BigBed only
+
+=back
 
 When collecting data using rpkm, the normalized sum of the reads is 
 divided by the length of the feature requested (the Kilobase part in rpkm). 
 Note that for mRNA or gene features, this will be the sum of the exon 
-lengths, not the gene or mRNA.
+lengths, not the gene or transcript.
   
-=item --value [score|count|length]
+=item --value [score|count|pcount|length]
 
 Optionally specify the type of data value to collect from the dataset or 
-data file. Three values are accepted: score, count, or length. The default 
-value type is score. Note that some data sources only support certain 
-types of data values. Wig and BigWig files only support score and count; 
-BigBed and database features support count and length and optionally 
-score; Bam files support basepair coverage (score), count (number of 
-alignments), and length.
+data file. Four values are accepted: score, count, pcount, or length. 
+The default value type is score. Note that some data sources only support certain 
+types of data values. The types are detailed below.
+
+=over 4
+
+=item * score
+
+The default value. Supported by wig, bigWig, USeq, bigBed (if the features 
+include the score column), GFF features, and Bam (returns non-transformed 
+base pair coverage).
+
+=item * count
+
+Counts the number of features that overlap the search region. For long 
+features (> 1 bp), these may include features that overlap or span beyond 
+the search region. Supported by all databases.
+
+=item * pcount (precise count)
+
+Counts only those features that are contained within the search region, 
+not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+
+=item * length
+
+Returns the length of long features. Supported by Bam, bigBed, USeq, and 
+GFF features.
+
+=back
 
 =item --strand [all | sense | antisense]
 

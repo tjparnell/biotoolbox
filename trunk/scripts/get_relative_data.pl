@@ -5,7 +5,6 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use FindBin qw($Bin);
 use Statistics::Lite qw(mean median sum stddevp min max);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
@@ -28,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.23;
+my $VERSION = 1.24;
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -227,7 +226,39 @@ else {
 	single_execution();
 }
 
-## Conclusion
+
+## Generate summed data 
+# an average across all features at each position suitable for plotting
+if ($sum) {
+	print " Generating final summed data....\n";
+	my $sumfile = $Data->summary_file(
+		'filename'    => $outfile,
+		'startcolumn' => $startcolumn,
+		'dataset'     => $dataset,
+		'log'         => $log,
+	);
+	if ($sumfile) {
+		print " Wrote summary file '$sumfile'\n";
+	}
+	else {
+		print " Unable to write summary file!\n";
+	}
+}
+
+
+## Output the data
+my $written_file = $Data->save(
+	'filename' => $outfile,
+	'gz'       => $gz,
+);
+if ($written_file) {
+	# success!
+	print " wrote file $written_file\n";
+}
+else {
+	# failure! the subroutine will have printed error messages
+	print " unable to write output file!\n";
+}
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 
@@ -366,6 +397,9 @@ sub check_defaults {
 ## Run in parallel
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
+	$pm->run_on_start( sub { sleep 1; }); 
+		# give a chance for child to start up and open databases, files, etc 
+		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -373,7 +407,7 @@ sub parallel_execution {
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i (1 .. $cpu) {
 		$pm->start and next;
-	
+		
 		#### In child ####
 	
 		# splice the data structure
@@ -397,7 +431,7 @@ sub parallel_execution {
 		
 		# write out result
 		my $success = $Data->save(
-			'filename' => "$child_base_name.$i",
+			'filename' => sprintf("$child_base_name.%03s",$i),
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
@@ -419,35 +453,11 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	
-	# generate summary file
-	if ($sum) {
-		# reopen the combined file
-		my $Data2 = Bio::ToolBox::Data->new(file => $outfile);
-		unless ($Data2) {
-			warn " cannot re-open $outfile to generate summary file!\n";
-			return;
-		}
-		print " Generating final summed data....\n";
-		my $sumfile = $Data2->summary_file(
-			# it will automatically define a new output name
-			'startcolumn' => $startcolumn,
-			'dataset'     => $dataset,
-			'log'         => $log,
-		);
-		if ($sumfile) {
-			print " Wrote summary file '$sumfile'\n";
-		}
-		else {
-			print " Unable to write summary file!\n";
-		}
+	unless (scalar @files == $cpu) {
+		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
 	}
-	# done
+	my $count = $Data->reload_children(@files);
+	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
 
@@ -463,41 +473,6 @@ sub single_execution {
 		print " Interpolating missing values....\n";
 		go_interpolate_values();
 	}
-
-
-	# Generate summed data - 
-	# an average across all features at each position suitable for plotting
-	if ($sum) {
-		print " Generating final summed data....\n";
-		my $sumfile = $Data->summary_file(
-			'filename'    => $outfile,
-			'startcolumn' => $startcolumn,
-			'dataset'     => $dataset,
-			'log'         => $log,
-		);
-		if ($sumfile) {
-			print " Wrote summary file '$sumfile'\n";
-		}
-		else {
-			print " Unable to write summary file!\n";
-		}
-	}
-
-
-	## Output the data
-	my $written_file = $Data->save(
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($written_file) {
-		# success!
-		print " wrote file $written_file\n";
-	}
-	else {
-		# failure! the subroutine will have printed error messages
-		print " unable to write output file!\n";
-	}
-	# done
 }
 
 
@@ -1014,7 +989,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --ddb <name|file>
   --data <dataset_name | filename>
   --method [mean|median|min|max|stddev|sum|rpm]             (mean)
-  --value [score|count|length]                              (score)
+  --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --avoid
@@ -1093,22 +1068,63 @@ Alternatively, the name of a data file may be provided. Supported
 file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
 (.bam). The file may be local or remote.
 
-=item --method [mean|median|min|max|stddev|sum|rpm]
+=item --method [mean|median|stddev|min|max|range|sum|rpm]
 
-Specify the method of combining multiple values within each window. The mean, 
-median, minimum, maximum, standard deviation, or sum of the values may be 
-reported. The default value is mean for score and length values, or sum for 
-count values.
+Specify the method for combining all of the dataset values within the 
+genomic region of the feature. Accepted values include:
 
-=item --value [score|count|length]
+=over 4
+
+=item * mean (default)
+
+=item * median
+
+=item * sum
+
+=item * stddev  Standard deviation of the population (within the region)
+
+=item * min
+
+=item * max
+
+=item * range   Returns difference of max and min
+
+=item * rpm     Reads Per Million mapped, Bam/BigBed only
+
+=back
+
+=item --value [score|count|pcount|length]
 
 Optionally specify the type of data value to collect from the dataset or 
-data file. Three values are accepted: score, count, or length. Note that 
-some data sources only support certain types of data values. Wig and 
-BigWig files only support score and count; BigBed database features 
-support count and length and optionally score; Bam files support basepair 
-coverage (score), count (number of alignments), and length. The default 
-value type is score. 
+data file. Four values are accepted: score, count, pcount, or length. 
+The default value type is score. Note that some data sources only support certain 
+types of data values. The types are detailed below.
+
+=over 4
+
+=item * score
+
+The default value. Supported by wig, bigWig, USeq, bigBed (if the features 
+include the score column), GFF features, and Bam (returns non-transformed 
+base pair coverage).
+
+=item * count
+
+Counts the number of features that overlap the search region. For long 
+features (> 1 bp), these may include features that overlap or span beyond 
+the search region. Supported by all databases.
+
+=item * pcount (precise count)
+
+Counts only those features that are contained within the search region, 
+not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+
+=item * length
+
+Returns the length of long features. Supported by Bam, bigBed, USeq, and 
+GFF features.
+
+=back
 
 =item --strand [sense|antisense|all]
 
