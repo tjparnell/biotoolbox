@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use FindBin qw($Bin);
 use Statistics::Lite qw(sum min max mean median stddevp);
 use Statistics::Descriptive;
 use Bio::ToolBox::Data; 
@@ -34,7 +33,7 @@ my $PARAMETRIC    = 1;
 my $ORDINAL       = 0;
 	
 use constant LOG10 => log(10);
-my $VERSION = '1.20';
+my $VERSION = 1.24;
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -118,6 +117,7 @@ check_defaults();
 ### Open input file
 my $Data = Bio::ToolBox::Data(file => $infile) or 
 	die " unable to open input file '$infile'!\n";
+printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 
 
 
@@ -153,8 +153,8 @@ validate_or_request_dataset();
 my $start_time = time;
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
-		# I figure we need at least 100 lines in each fork split to make 
+	while ($cpu > 1 and $Data->last_row / $cpu < 1000) {
+		# We need at least 1000 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
 		$cpu--;
@@ -173,7 +173,17 @@ else {
 
 
 
-# The End
+### Write output file
+my $success = $Data->write_file(
+	'filename' => $outfile,
+	'gz'       => $gz,
+);
+if ($success) {
+	print " wrote output file $success\n";
+}
+else {
+	print " unable to write output file!\n";
+}
 printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 
 
@@ -276,6 +286,9 @@ sub validate_or_request_dataset {
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
+	$pm->run_on_start( sub { sleep 1; }); 
+		# give a chance for child to start up and open databases, files, etc 
+		# without creating race conditions
 	
 	# Prepare new columns
 	my ($r_i, $p_i, $shift_i, $shiftr_i) = add_new_columns();
@@ -320,7 +333,7 @@ sub parallel_execution {
 
 		# write output file
 		my $success = $Data->write_file(
-			'filename' => "$child_base_name.$i",
+			'filename' => sprintf("$child_base_name.%03s",$i),
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
@@ -346,12 +359,11 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
-	push @args, '--gz' if $gz;
-	push @args, @files;
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
-	unlink @files;
-	# done
+	unless (scalar @files == $cpu) {
+		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
+	}
+	my $count = $Data->reload_children(@files);
+	printf " reloaded %s features from children\n", format_with_commas($count);
 }
 
 
@@ -368,18 +380,6 @@ sub single_execution {
 	
 	# summarize
 	summarize_results(@results);
-	
-	# write output file
-	my $success = $Data->write_file(
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($success) {
-		print " wrote output file $success\n";
-	}
-	else {
-		print " unable to write output file!\n";
-	}
 }
 
 
