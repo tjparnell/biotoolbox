@@ -15,9 +15,10 @@ methods for working with the represented genomic feature.
 
 This class should not be used directly by the user. Rather, Feature 
 objects are generated from a Bio::ToolBox::Data::Iterator object 
-(generated itself from the row_stream() function in Bio::ToolBox::Data), 
-or the iterate() function in Bio::ToolBox::Data. Please see the 
-documentation for Bio::ToolBox::Data for more information.
+(generated itself from the L<row_stream|Bio::ToolBox::Data/row_stream> 
+function in Bio::ToolBox::Data), or the L<iterate|Bio::ToolBox::Data/iterate> 
+function in Bio::ToolBox::Data. Please see the respective documentation 
+for more information.
 
 Example of working with a stream object.
 	
@@ -119,7 +120,7 @@ The name of the feature.
 
 The type of feature. Typically either primary_tag or primary_tag:source_tag. 
 In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
-databases such as Bio::DB::SeqFeature::Store, the type is used to restrict 
+databases such as L<Bio::DB::SeqFeature::Store>, the type is used to restrict 
 to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
@@ -155,7 +156,7 @@ in the current data row.
 
 The next three functions are convenience methods for using the 
 attributes in the current data row to interact with databases. 
-They are wrappers to methods in the Bio::ToolBox::db_helper 
+They are wrappers to methods in the <Bio::ToolBox::db_helper> 
 module.
 
 =over 4
@@ -169,7 +170,7 @@ an alternate database is desired, you should change it first using
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See Bio::DB::SeqFeature and Bio::SeqFeatureI for more information 
+See <Bio::DB::SeqFeature> and L<Bio::SeqFeatureI> for more information 
 about working with these objects.
 
 =item segment
@@ -182,14 +183,14 @@ database named in the general metadata is used to establish the
 Segment object. If a different database is desired, it should be 
 changed first using the general database() method. 
 
-See Bio::DB::SeqFeature::Segment and Bio::RangeI for more information 
+See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
 about working with Segment objects.
 
 =item get_score(%args)
 
 This is a convenience method for the 
-Bio::ToolBox::db_helper::get_chromo_region_score() method. It 
-will return a single score value for the region defined by the 
+L<get_chromo_region_score|Bio::ToolBox::db_helper/get_chromo_region_score> 
+method. It will return a single score value for the region defined by the 
 coordinates or typed named feature in the current data row. If 
 the Data table has coordinates, then those will be automatically 
 used. If the Data table has typed named features, then the 
@@ -200,8 +201,8 @@ The name of the dataset from which to collect the data must be
 provided. This may be a GFF type in a SeqFeature database, a 
 BigWig member in a BigWigSet database, or a path to a BigWig, 
 BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the Bio::ToolBox::db_helper::
-get_chromo_region_score() method for full details.
+specified; please see the L<Bio::ToolBox::db_helper> 
+for full details.
 
 If you wish to override coordinates that are present in the 
 Data table, for example to extend or shift the given coordinates 
@@ -223,18 +224,17 @@ and adding the scores to the Data table.
 
 =item get_position_scores(%args)
 
-This is a convenience method for the Bio::ToolBox::db_helper::
-get_region_dataset_hash() method. It will return a hash of 
+This is a convenience method for the 
+L<get_region_dataset_hash|Bio::ToolBox::db_helper/get_region_dataset_hash> 
+method. It will return a hash of 
 positions =E<gt> scores over the region defined by the 
 coordinates or typed named feature in the current data row. 
 The coordinates for the interrogated region will be 
 automatically provided.
 
-Just like the get_score() method, the dataset from which to 
+Just like the L<get_score> method, the dataset from which to 
 collect the scores must be provided, along with any other 
-optional arguments. See the documentation for the 
-Bio::ToolBox::db_helper::get_region_dataset_hash() method 
-for more details.
+optional arguments. 
 
 If you wish to override coordinates that are present in the 
 Data table, for example to extend or shift the given coordinates 
@@ -242,7 +242,8 @@ by some amount, then simply pass the new start and end
 coordinates as options to this method.
 
 Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a BigWigSet directory.
+the 5 prime end of a feature from a L<BigWigSet|Bio::DB::BigWigSet> 
+directory.
   
   my $stream = $Data->row_stream;
   while (my $row = $stream->next_row) {
@@ -327,6 +328,7 @@ sub start {
 	my $i = $self->{data}->start_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->start if (not defined $v and exists $self->{feature});
+	return undef unless defined $v;
 	return undef unless ($v =~ /^\-?\d+$/);
 	return $v < 1 ? 1 : $v;
 }
@@ -336,6 +338,7 @@ sub end {
 	my $i = $self->{data}->stop_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->end if (not defined $v and exists $self->{feature});
+	return undef unless defined $v;
 	return undef unless ($v =~ /^\-?\d+$/);
 	return $v < 1 ? undef : $v;
 }
@@ -479,7 +482,9 @@ sub get_score {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
 	}
 	
-	$args{db} ||= $self->{data}->open_database;
+	# make sure database is defined in arguments
+	# user could specify ddb but we need only one db
+	$args{db} ||= $args{ddb} || $self->{data}->open_database;
 	
 	return get_chromo_region_score(%args);
 }
