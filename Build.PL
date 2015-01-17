@@ -147,7 +147,7 @@ sub check_extra {
 	# these are extra scripts that may be available when obtained from SVN 
 	# instead of CPAN
 	
-	if (-e "$Bin/extra") {
+	if (-e "$Bin/extras") {
 		push @{ $options->{script_files} }, (
 			'extras/bam2gff_bed.pl',
 			'extras/bar2wig.pl',
