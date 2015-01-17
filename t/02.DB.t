@@ -5,92 +5,137 @@
 # using in memory database for simplicity here....
 
 use strict;
-use Test;
+use Test::More;
 use FindBin '$Bin';
+use Data::Dumper;
 
 BEGIN {
-	plan tests => 15;
+	plan tests => 33;
 	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
 }
 
 use lib "$Bin/../lib";
-use Bio::ToolBox::Data;
+require_ok 'Bio::ToolBox::Data' or 
+	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
-### Open a test file
+
+### Collect features from a database
 my $Data = Bio::ToolBox::Data->new(
 	'db'      => "$Bin/Data/chrI.gff3.gz",
 	'feature' => 'gene:SGD',
 );
-ok($Data);
+isa_ok($Data, 'Bio::ToolBox::Data', 'db collected gene table');
 
-# test number_columns
-my $col_number = $Data->number_columns;
-ok($col_number, 3);
+# check metadata
+is($Data->feature, 'gene:SGD', 'feature');
+is($Data->feature_type, 'named', 'feature type');
+like($Data->program, qr/02\.DB\.t/, 'program');
+is($Data->gff, 0, 'gff format');
+is($Data->bed, 0, 'bed format');
+is($Data->filename, undef, 'filename');
 
-# test last_row
-my $last_row = $Data->last_row;
-ok($last_row, 92);
+# check data table
+is($Data->number_columns, 3, 'number of columns');
+is($Data->last_row, 26, 'last row');
 
-# test column_name
-ok($Data->name_column, 1);
-
-# test column_type
-ok($Data->type_column, 2);
+# columns
+is($Data->id_column, 0, 'primary ID column');
+is($Data->name_column, 1, 'identify name column');
+is($Data->type_column, 2, 'identify type column');
 
 # test database
-ok($Data->database, "$Bin/Data/chrI.gff3.gz");
+is($Data->database, "$Bin/Data/chrI.gff3.gz", 'database name');
 my $db = $Data->open_database;
-ok($db);
+isa_ok($db, 'Bio::DB::SeqFeature::Store', 'opened database');
 
-# test add_column
-my $cds_index = $Data->add_column('CDS_count');
-ok($cds_index, 3);
+# since we are dealing with a memory database, the features returned 
+# are not in a predictable order suitable for testing
+# so we will sort the data table by increasing name
+$Data->sort_data(1, 'i');
 
 # test row_stream
 my $stream = $Data->row_stream;
-ok($stream);
+isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator');
 
-# first row feature
+# look at first row
 my $row = $stream->next_row;
-ok($row);
-
-# test row feature
-ok($row->type, 'gene:SGD');
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'row Feature');
+ok($row->row_index, 'row index'); # could be anything
+is($row->type, 'gene:SGD', 'Feature type');
+is($row->name, 'YAL043C', 'Feature name');
+cmp_ok($row->id, '>=', 1, 'primary id'); # in memory db, could be anything?
+is($row->start, undef, 'Feature start, undefined'); # not in table, returns nothing
+is($row->stop, undef, 'Feature stop, undefined'); # not in table, returns nothing
 
 # test SeqFeature
 my $feature = $row->feature;
-ok($feature);
-# ok($feature->start, 87286);
-# ok($feature->display_name, 'YAL030W');
+isa_ok($feature, 'Bio::DB::SeqFeature', 'db SeqFeature from row Feature');
+is($row->start, 58695, 'Feature start, defined'); # uses db feature for start
+is($row->stop, 61052, 'Feature stop, defined'); # uses db feature for stop
+my $segment = $row->segment;
+isa_ok($segment, 'Bio::DB::SeqFeature::Segment', 'db segment from row Feature');
 
-# test get_score CDS count
+# verify data from a data database
+my $ddb = "$Bin/Data/sample2.gff3";
+my $verified = $Data->verify_dataset('data:sample2', $ddb);
+is($verified, 'data:sample2', 'dataset in data database verified');
+
+# collect mean score
 my $score = $row->get_score(
-	'db'      => $db,
-	'dataset' => 'cds',
-	'method'  => 'sum',
-	'value'   => 'count',
+	ddb     => $ddb,
+	dataset => 'data',
+	'method'  => 'mean',
 );
-ok($score >= 1);
-$row->value($cds_index, $score);
+# print "mean score with data and ddb is $score\n";
+is(sprintf("%.2f", $score), 0.18, 'mean score across feature');
+ 
+# collect mean score
+$score = $row->get_score(
+	db      => $ddb,
+	dataset => 'data',
+	'method'  => 'mean',
+);
+# print "mean score is $score\n";
+is(sprintf("%.2f", $score), 0.18, 'mean score across feature');
+ 
+# collect max score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method'  => 'max',
+);
+# print "max score is $score\n";
+is(sprintf("%.2f", $score), 0.46, 'max score across feature');
 
-# add remaining values
-while ($row = $stream->next_row) {
-	my $score = $row->get_score(
-		'db'      => $db,
-		'dataset' => 'cds',
-		'method'  => 'sum',
-		'value'   => 'count',
-	);
-	$row->value($cds_index, $score);
-}
+# collect median score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method'  => 'median',
+);
+# print "median score is $score\n";
+is(sprintf("%.2f", $score), 0.19, 'median score across feature');
 
-# test save file
-my $file = $Data->save(filename => "$Bin/Data/DB_results");
-ok($file, "$Bin/Data/DB_results.txt");
-ok(-e "$Bin/Data/DB_results.txt");
+# collect 5' mean score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method'  => 'mean',
+	start   => $row->stop - 1000,
+	stop    => $row->stop,
+);
+# print "5 prime mean score is $score\n";
+is(sprintf("%.2f", $score), '0.30', 'mean score across 5 prime feature');
+
+# collect position scores
+my %score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+);
+# print "position_score is ", Dumper(\%score1), "\n";
 
 
 
 END {
-	unlink "$Bin/Data/DB_results.txt";
+# 	unlink "$Bin/Data/DB_results.txt";
 }

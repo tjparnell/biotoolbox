@@ -23,7 +23,7 @@ require_ok 'Bio::ToolBox::Data' or
 
 
 ### Prepare the GFF database
-my $database = "$Bin/Data/sample2.gff3";
+my $database = "$Bin/Data/sample2_wib.gff3";
 unless (-e $database) {
 	open(my $fh, ">" ,$database);
 	print $fh <<GFF
