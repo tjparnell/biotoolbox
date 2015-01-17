@@ -3,8 +3,9 @@ CHANGES
 lib/Bio/ToolBox.pm
 lib/Bio/ToolBox/big_helper.pm
 lib/Bio/ToolBox/Data.pm
+lib/Bio/ToolBox/Data/common.pm
 lib/Bio/ToolBox/Data/Feature.pm
-lib/Bio/ToolBox/Data/meta.pm
+lib/Bio/ToolBox/Data/Stream.pm
 lib/Bio/ToolBox/data_helper.pm
 lib/Bio/ToolBox/db_helper.pm
 lib/Bio/ToolBox/db_helper/bam.pm
@@ -69,6 +70,7 @@ t/Data/sample1.bam
 t/Data/sample1.bam.bai
 t/Data/sample1.bb
 t/Data/sample2.bw
+t/Data/sample2.gff3
 t/Data/sample2.wib
 t/Data/sample3/metadata.txt
 t/Data/sample3/sample3_f.bw
