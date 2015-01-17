@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
-use Bio::ToolBox::file_helper qw(open_tim_data_file);
+use Bio::ToolBox::file_helper qw(open_data_file);
 my $cluster_ok;
 eval {
 	require Algorithm::Cluster::Record;
 	$cluster_ok = 1;
 };
 
-my $VERSION = '1.17';
+my $VERSION =  1.24;
 
 print "\n A script to run the k-means cluster analysis\n\n";
 
@@ -108,7 +108,7 @@ unless ($distribution) {
 # open to read metadata
 # we're not actually loading the file
 # we just want to verify it looks ok
-my ($in_fh, $metadata) = open_tim_data_file($infile);
+my ($in_fh, $metadata) = open_data_file($infile);
 my $check = 1; # assume ok to begin with
 my $error;
 
@@ -232,7 +232,7 @@ The command line flags and descriptions:
 Specify the input file. The file should be a simple tab-delimited text 
 file, genes (features) as rows, experimental data (microarray or sequencing 
 data) should be columns. The first column contains unique gene identifiers. 
-A column header row is expected. Standard tim data text files with 
+A column header row is expected. Standard biotoolbox data text files with 
 metadata lines should be exported to a compatible format using the treeview 
 function in the B<manipulate_datasets.pl> script. A .cdt file generated 
 from this may also be used.

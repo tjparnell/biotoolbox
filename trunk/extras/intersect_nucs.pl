@@ -7,17 +7,17 @@ use Getopt::Long;
 use Statistics::Lite qw(min max mean stddevp);
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
+	generate_data_structure
 	index_data_table
 	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
+	load_data_file
+	write_data_file
 	convert_and_write_to_gff_file
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = 1.24;
 
 print "\n This script will intersect two lists of nucleosomes\n\n";
 
@@ -94,11 +94,11 @@ unless (defined $gz) {$gz = 0}
 
 
 ### Load input files
-my $data1 = load_tim_data_file($infile1) 
+my $data1 = load_data_file($infile1) 
 	or die " no data loaded from file '$infile1'!\n";
 print " Loaded $data1->{last_row} features from file '$infile1'\n"; 
 
-my $data2 = load_tim_data_file($infile2) 
+my $data2 = load_data_file($infile2) 
 	or die " no data loaded from file '$infile2'!\n";
 print " Loaded $data2->{last_row} features from file '$infile2'\n\n"; 
 
@@ -146,7 +146,7 @@ unless ($outfile) {
 	$outfile = 'intersection_' . $data1->{'basename'} . '_' . 
 		$data2->{'basename'};
 }
-my $success = write_tim_data_file(
+my $success = write_data_file(
 	'data'     => $output,
 	'filename' => $outfile,
 );
@@ -205,7 +205,7 @@ sub intersect_nucs {
 	my ($target_data, $reference_data) = @_;
 	
 	# initialize the output data structure
-	my $out_data = generate_tim_data_structure(
+	my $out_data = generate_data_structure(
 		'nucleosome',
 		qw(
 			Chromosome
@@ -217,7 +217,7 @@ sub intersect_nucs {
 			Target_ID
 			Reference_ID
 		)
-	) or die " unable to generate tim data structure!\n";
+	) or die " unable to generate data structure!\n";
 	
 	# add metadata to output data structure
 	$out_data->{6}{'file'} = $target_data->{'filename'}; 
@@ -736,7 +736,7 @@ and the file with the most number is designated as the reference list. The
 reference file, at least, must be sorted in genomic order; otherwise, 
 intersection will yield undesirable results.
 
-The program will output a tim data text file of the intersections, which
+The program will output a data text file of the intersections, which
 include the start and stop points that indicate the positions and extent of
 the midpoint shift, the direction of shift, and the name of the
 intersecting nucleosomes. Optionally a GFF file may also be written as well.

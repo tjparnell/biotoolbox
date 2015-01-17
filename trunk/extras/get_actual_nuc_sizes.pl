@@ -8,8 +8,8 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean stddevp median min max);
 use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
+	load_data_file
+	write_data_file
 	convert_and_write_to_gff_file
 );
 eval {
@@ -17,7 +17,7 @@ eval {
 	require Bio::ToolBox::db_helper::bam;
 	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.15';
+my $VERSION =  1.24;
 
 
 print "\n A script to get exact nucleosome fragment sizes from a Bam file\n\n";
@@ -91,7 +91,7 @@ unless ($infile and $bamfile) {
 
 # Input data file
 print " opening files....\n";
-my $main_data_ref = load_tim_data_file($infile) or 
+my $main_data_ref = load_data_file($infile) or 
 	die "  Unable to load data file!\n";
 unless (
 	$main_data_ref->{'feature'} eq 'nucleosome' and
@@ -133,7 +133,7 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = write_tim_data_file(
+my $success = write_data_file(
 	'data'      => $main_data_ref,
 	'filename'  => $outfile,
 );
