@@ -32,7 +32,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.20';
+my $VERSION = '1.24';
 	
 	
 
@@ -411,10 +411,10 @@ sub check_defaults {
 		# the default 1 bp resolution 
 		
 		# cannot use bin with spanned features
-		if ($use_span) {
+		if ($use_span or $use_coverage) {
 			$bin_size = 1;
 			undef $bin;
-			warn " disabling bin when recording span or extended positions\n". 
+			warn " disabling bin when recording span or extended positions or coverage\n". 
 				"   a bedGraph file will automatically be written\n";
 		}
 		else {
@@ -1193,21 +1193,9 @@ sub process_bam_coverage_on_chromosome {
 		);
 		
 		# now dump the coverage out to file
-		if ($bin) {
-			for (my $i = 0; $i < scalar(@{ $coverage }); $i += $bin_size) {
-			
-				# sum the reads within our bin
-				my $sum = sum( map {$coverage->[$_]} ($i .. $i + $bin_size - 1));
-			
-				# print the wig line
-				$fh->print("$sum\n");
-			}
-		}
-		else {
-			for my $i (0 .. scalar(@$coverage)-1) {
-				# print the wig line
-				$fh->print("$coverage->[$i]\n");
-			}
+		for my $i (0 .. scalar(@$coverage)-1) {
+			# print the wig line
+			$fh->print("$coverage->[$i]\n");
 		}
 	}
 	printf " Converted reads on $seq_id in %.3f minutes\n", (time - $start_time)/60;
