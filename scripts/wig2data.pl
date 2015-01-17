@@ -5,14 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+use Bio::ToolBox::data_helper qw(generate_data_structure);
 use Bio::ToolBox::file_helper qw(
-	write_tim_data_file
+	write_data_file
 	open_to_read_fh
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
-my $VERSION = '1.15';
+my $VERSION = 1.24;
 
 print "\n This program will convert wiggle files to a tabbed text file\n\n";
 
@@ -285,7 +285,7 @@ print " wrote file '$outfile'\n";
 
 
 sub initialize_data_structure {
-	my $data = generate_tim_data_structure(
+	my $data = generate_data_structure(
 		'wig_data',
 		qw(
 			Chromo
@@ -293,7 +293,7 @@ sub initialize_data_structure {
 			Stop
 			Score
 		)
-	) or die " unable to generate tim data structure!\n";
+	) or die " unable to generate data structure!\n";
 	
 	# add metadata
 	$data->{3}{'original_file'} = $infile;
@@ -350,8 +350,8 @@ sub write_progressive_data {
 		# opened yet
 		
 		# rather than generating new code for writing the gff file,
-		# we will simply use the write_tim_data_file sub
-		my $new_outfile = write_tim_data_file(
+		# we will simply use the write_data_file sub
+		my $new_outfile = write_data_file(
 			'data'      => $out_data_ref,
 			'filename'  => $outfile,
 			'gz'        => $gz,
@@ -417,7 +417,7 @@ basename.
 =item --gff
 
 Indicate whether the output file should be in GFF format. If false, a 
-standard tim data tab delimited text file will be written with four 
+standard tab delimited text file will be written with four 
 columns: chromosome, start, stop, and score. The default value is false.
 
 =item --type <text>

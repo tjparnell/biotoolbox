@@ -7,14 +7,14 @@ use Getopt::Long;
 use Statistics::Descriptive;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
+	generate_data_structure
 );
 use Bio::ToolBox::file_helper qw(
-	load_tim_data_file
-	write_tim_data_file
+	load_data_file
+	write_data_file
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = 1.24;
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -112,7 +112,7 @@ unless (defined $max) {
 
 ### Load the file
 print " Loading data from file $infile....\n";
-my $in_data_ref = load_tim_data_file($infile);
+my $in_data_ref = load_data_file($infile);
 unless ($in_data_ref) {
 	die " No data loaded!\n";
 }
@@ -162,7 +162,7 @@ unless ($outfile) {
 	$outfile = $infile; # use input name
 	$outfile = $in_data_ref->{'basename'} . '_frequency';
 }
-my $write_results = write_tim_data_file(
+my $write_results = write_data_file(
 	'data'      => $out_data_ref,
 	'filename'  => $outfile,
 );
@@ -240,16 +240,16 @@ sub ask_for_index {
 }
 
 
-### Prepare the output tim data structure
+### Prepare the output data structure
 sub prepare_output_data_structure {
 	print " Defining $binnumber bins of size $binsize from $start to $max\n";
 	
 	# generate a new data structure
-	my $data = generate_tim_data_structure(
+	my $data = generate_data_structure(
 		'distribution_frequency',
 		'Bin',
 		'Range',
-	) or die " unable to generate tim data structure!\n";
+	) or die " unable to generate data structure!\n";
 	
 	# add metadata
 	$data->{0}{'mininum'}    = $start;
@@ -413,7 +413,7 @@ a list of possible datasets to convert.
 =item --out <filename>
 
 Specify the output file name. The default is to take the input file base name
-and append '_frequency' to it. The file format is a tim data file.
+and append '_frequency' to it. 
 
 =item --version
 

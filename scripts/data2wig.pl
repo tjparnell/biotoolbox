@@ -11,10 +11,10 @@ use Bio::ToolBox::data_helper qw(
 );
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 use Bio::ToolBox::file_helper qw(
-	open_tim_data_file
+	open_data_file
 	open_to_write_fh
 );
-my $VERSION = '1.15';
+my $VERSION =  1.24;
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -121,7 +121,7 @@ unless (defined $use_track) {
 
 
 ### Load input file
-my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
+my ($in_fh, $metadata_ref) = open_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
@@ -250,7 +250,7 @@ sub identify_indices {
 		$score_index = 2 unless defined $score_index;
 	}
 	
-	# non-standard text file or tim data format text file
+	# non-standard text file or data format text file
 	else {
 		# we will automatically look for the coordinate columns
 		

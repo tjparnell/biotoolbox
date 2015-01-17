@@ -7,11 +7,11 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
 use Bio::ToolBox::file_helper qw(
-	open_tim_data_file 
-	write_tim_data_file 
+	open_data_file 
+	write_data_file 
 );
-use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
-my $VERSION = '1.15';
+use Bio::ToolBox::data_helper qw(generate_data_structure);
+my $VERSION = 1.24;
 
 print "\n A script to intersect and pull unique SNPs from multiple lists\n\n";
 
@@ -120,7 +120,7 @@ foreach my $name (sort {$a cmp $b} keys %samples) {
 		" unique SNPs for '$name'\n";
 	
 	# print
-	my $success = write_tim_data_file(
+	my $success = write_data_file(
 		'data'     => $samples{$name},
 		'filename' => $name . '_unique.vcf',
 		'gz'       => $gz,
@@ -139,7 +139,7 @@ foreach my $name (sort {$a cmp $b} keys %samples) {
 	print " There were ", $common->{'last_row'}, " common SNPs\n";
 	
 	# print
-	my $success = write_tim_data_file(
+	my $success = write_data_file(
 		'data'     => $common,
 		'filename' => join('_', keys %samples) . '_common.vcf',
 		'gz'       => $gz,
@@ -163,7 +163,7 @@ sub load_snp_files {
 		print " Loading '$file'... ";
 		
 		# open file
-		my ($fh, $metadata) = open_tim_data_file($file) or 
+		my ($fh, $metadata) = open_data_file($file) or 
 			die " could not open file '$file'!\n";
 		
 		# check for VCF header
@@ -215,7 +215,7 @@ sub prepare_common_data {
 	my $name = (keys %samples)[0];
 	
 	# generate clean structure
-	my $common = generate_tim_data_structure( undef, qw(
+	my $common = generate_data_structure( undef, qw(
 		#CHROM
 		POS
 		ID

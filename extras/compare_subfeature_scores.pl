@@ -7,14 +7,14 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(min max range);
 use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure
+	generate_data_structure
 	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
-	open_tim_data_file 
-	write_tim_data_file 
+	open_data_file 
+	write_data_file 
 );
-my $VERSION = '1.15';
+my $VERSION = 1.24;
 
 print "\n This program will compare scores from multiple subfeatures\n\n";
 
@@ -86,7 +86,7 @@ unless (defined $gz) {
 
 
 ### Open input file
-my ($in_fh, $in_md) = open_tim_data_file($infile) or 
+my ($in_fh, $in_md) = open_data_file($infile) or 
 	die " unable to open input file!\n";
 
 # Check for columns
@@ -104,7 +104,7 @@ my $outdata = process_gene_tree($tree);
 
 
 ### Finished
-my $success = write_tim_data_file(
+my $success = write_data_file(
 	'data'     => $outdata,
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -207,7 +207,7 @@ sub process_gene_tree {
 	my $tree = shift;
 	
 	# generate output data structure
-	my $output = generate_tim_data_structure( 
+	my $output = generate_data_structure( 
 		'Gene_transcripts',
 		qw(
 			Parent

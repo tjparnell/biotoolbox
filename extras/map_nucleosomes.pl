@@ -6,7 +6,7 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(count min max range sum mean stddevp);
-use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
+use Bio::ToolBox::data_helper qw(generate_data_structure);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
@@ -15,11 +15,11 @@ use Bio::ToolBox::db_helper qw(
 	get_chromo_region_score
 );
 use Bio::ToolBox::file_helper qw(
-	write_tim_data_file
+	write_data_file
 	convert_and_write_to_gff_file
 );
 #use Data::Dumper;
-my $VERSION = '1.17';
+my $VERSION = 1.24;
 
 print "\n This script will map nucleosomes\n\n";
 
@@ -159,12 +159,11 @@ if ($debug) {
 
 
 ### Output
-# a tim data file
 exit unless $found_nucs;
 unless ($outfile) {
 	$outfile = $dataset . '_nucleosome';
 }
-my $success = write_tim_data_file(
+my $success = write_data_file(
 	'data'     => $nucleosomes_ref,
 	'filename' => $outfile,
 );
@@ -224,7 +223,7 @@ if ($gff) {
 sub initialize_nucleosome_data {
 	
 	# generate the data structure based on what datasets were provided
-	my $data = generate_tim_data_structure(
+	my $data = generate_data_structure(
 			'nucleosome',
 			qw(
 				Chromosome
@@ -235,7 +234,7 @@ sub initialize_nucleosome_data {
 				Occupancy
 				Fuzziness
 			)
-	) or die " unable to generate tim data structure!\n";
+	) or die " unable to generate data structure!\n";
 	
 	# add additional metadata
 	$data->{'db'}               = $database;
