@@ -14,7 +14,7 @@ use Statistics::Lite qw(
 	stddevp
 );
 use Bio::ToolBox::data_helper qw(
-	generate_tim_data_structure 
+	generate_data_structure 
 );
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
@@ -1212,6 +1212,7 @@ sub check_dataset_for_rpm_support {
 	elsif ($dataset =~ /\.bam$/) {
 		# a bam file dataset
 		
+		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 		if ($BAM_OK) {
 			# Bio::ToolBox::db_helper::bam was loaded ok
 			# sum the number of reads in the dataset
@@ -1227,6 +1228,8 @@ sub check_dataset_for_rpm_support {
 	elsif ($dataset =~ /\.bb$/) {
 		# a bigbed file dataset
 		
+		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') unless 
+			$BIGBED_OK; 
 		if ($BIGBED_OK) {
 			# Bio::ToolBox::db_helper::bigbed was loaded ok
 			# sum the number of features in the dataset
@@ -1284,6 +1287,7 @@ sub check_dataset_for_rpm_support {
 			# specifying a bam file
 			my ($bamfile) = $features[0]->get_tag_values('bamfile');
 			
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				# Bio::ToolBox::db_helper::bam was loaded ok
 				# sum the number of reads in the dataset
@@ -1300,6 +1304,8 @@ sub check_dataset_for_rpm_support {
 			# specifying a bigbed file
 			my ($bedfile) = $features[0]->get_tag_values('bigbedfile');
 			
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
+				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				# Bio::ToolBox::db_helper::bigbed was loaded ok
 				# sum the number of features in the dataset
@@ -1411,23 +1417,23 @@ sub get_new_feature_list {
 	}
 	
 	# Generate data structures
-	my $new_data = generate_tim_data_structure(
+	my $data = generate_data_structure(
 		$args{'features'},
 		'Primary_ID',
 		'Name',
 		'Type'
 	);
-	unless ($new_data) {
-		cluck " cannot generate tim data structure!\n";
+	unless ($data) {
+		cluck " cannot generate data structure!\n";
 		return;
 	}
 	
 	# name of the database
-	$new_data->{'db'} = $db_name; 
+	$data->{'db'} = $db_name; 
 	
 	# List of types
 	if (scalar @classes > 1) {
-		$new_data->{1}->{'include'} = join(",", @classes);
+		$data->{1}->{'include'} = join(",", @classes);
 	}
 	
 	# Get the names of chromosomes to avoid
@@ -1465,20 +1471,20 @@ sub get_new_feature_list {
 		# Record the feature information
 		# in the B::DB::SF::S database, the primary_ID is a number unique to the 
 		# the specific database, and is not portable between databases
-		push @{ $new_data->{'data_table'} }, [
+		push @{ $data->{'data_table'} }, [
 			$feature->primary_id, 
 			$feature->display_name,  
 			$feature->type,
 		];
-		$new_data->{'last_row'} += 1;
+		$data->{'last_row'} += 1;
 	}
 	
 	# print result of search
 	printf "   Found %s features in the database\n", format_with_commas($total_count);
-	printf "   Kept %s features.\n", format_with_commas($new_data->{'last_row'});
+	printf "   Kept %s features.\n", format_with_commas($data->{'last_row'});
 	
 	# return the new data structure
-	return $new_data;
+	return $data;
 }
 
 
@@ -1553,22 +1559,22 @@ sub get_new_genome_list {
 		
 	
 	# Generate data structures
-	my $new_data = generate_tim_data_structure(
+	my $data = generate_data_structure(
 		'genome',
 		'Chromosome',
 		'Start',
 		'Stop'
 	);
-	unless ($new_data) {
-		cluck " cannot generate tim data structure!\n";
+	unless ($data) {
+		cluck " cannot generate data structure!\n";
 		return;
 	}
-	my $feature_table = $new_data->{'data_table'}; 
+	my $feature_table = $data->{'data_table'}; 
 	
 	# Begin loading basic metadata information
-	$new_data->{'db'}      = $db_name; # the db name
-	$new_data->{1}{'win'}  = $args{'win'}; # under the Start metadata
-	$new_data->{1}{'step'} = $args{'step'};
+	$data->{'db'}      = $db_name; # the db name
+	$data->{1}{'win'}  = $args{'win'}; # under the Start metadata
+	$data->{1}{'step'} = $args{'step'};
 	
 	
 	
@@ -1600,13 +1606,13 @@ sub get_new_genome_list {
 			
 			# add to the output list
 			push @{$feature_table}, [ $chr, $start, $end,];
-			$new_data->{'last_row'}++;
+			$data->{'last_row'}++;
 		}
 	}
-	print "   Kept " . $new_data->{'last_row'} . " windows.\n";
+	print "   Kept " . $data->{'last_row'} . " windows.\n";
 	
 	# Return the data structure
-	return $new_data;
+	return $data;
 }
 
 
@@ -2157,7 +2163,6 @@ sub get_region_dataset_hash {
 	$args{'id'}     ||= undef;
 	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
 	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'start'}    = 1 if ($args{'start'} <= 0);
 	$args{'stop'}   ||= $args{'end'};
 	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : undef;
 	unless (
@@ -2166,7 +2171,10 @@ sub get_region_dataset_hash {
 	) {
 		return;
 	};
-	if ($args{'stop'} < $args{'start'}) {
+	if (
+		(defined $args{'stop'} and defined $args{'start'}) and 
+		($args{'stop'} < $args{'start'})
+	) {
 		# coordinates are flipped, reverse strand
 		return '.' if $args{'stop'} < 0;
 		my $stop = $args{'start'};
@@ -2190,13 +2198,13 @@ sub get_region_dataset_hash {
 	my $fstart;
 	my $fstop;
 	my $fstrand;
+	my $primary; # database ID to be used when matching overlapping features
 	
 	
 	
 	### Define the chromosomal region segment
 	# we will use the primary database to establish the intitial feature
 	# and determine the chromosome, start and stop
-	
 	
 	# Extend a named database feature
 	if (
@@ -2212,6 +2220,7 @@ sub get_region_dataset_hash {
 			'name'  => $args{'name'},
 			'type'  => $args{'type'},
 		) or return; 
+		$primary = $feature->primary_id;
 		
 		# determine the strand
 		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
@@ -2253,6 +2262,7 @@ sub get_region_dataset_hash {
 			'name'  => $args{'name'},
 			'type'  => $args{'type'},
 		) or return; 
+		$primary = $feature->primary_id;
 		
 		# determine the strand
 		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
@@ -2325,6 +2335,7 @@ sub get_region_dataset_hash {
 			'name'  => $args{'name'},
 			'type'  => $args{'type'},
 		) or return; 
+		$primary = $feature->primary_id;
 		
 		# determine the strand
 		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
@@ -2436,10 +2447,8 @@ sub get_region_dataset_hash {
 			# the others are not what we want and therefore need to be 
 			# avoided
 			foreach my $feat (@overlap_features) {
-				
 				# skip the one we want
-				next if ($feat->display_name eq $args{'name'});
-				
+				next if ($feat->primary_id == $primary);
 				# now eliminate those scores which overlap this feature
 				foreach my $position (keys %datahash) {
 					
@@ -3425,6 +3434,10 @@ sub _get_segment_score {
 						elsif ($value_type eq 'count') {
 							$pos2data{$position} += 1;
 						}
+						elsif ($value_type eq 'pcount') {
+							$pos2data{$position} += 1 if 
+								($feature->start >= $start and $feature->end <= $stop);
+						}
 						elsif ($value_type eq 'length') {
 							push @{ $pos2data{$position} }, $feature->length;
 						}
@@ -3438,7 +3451,11 @@ sub _get_segment_score {
 							push @scores, $feature->score;
 						}
 						elsif ($value_type eq 'count') {
-							push @scores, 1;
+							$scores[0] += 1;
+						}
+						elsif ($value_type eq 'pcount') {
+							$scores[0] += 1 if 
+								($feature->start >= $start and $feature->end <= $stop);
 						}
 						elsif ($value_type eq 'length') {
 							push @scores, $feature->length;

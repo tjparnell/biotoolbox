@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = 1.21;
+our $VERSION = 1.24;
 
 
 # Exported names
@@ -109,7 +109,11 @@ sub collect_bigbed_scores {
 					push @scores, $bed->score;
 				}
 				elsif ($method eq 'count') {
-					push @scores, 1;
+					$scores[0] += 1;
+				}
+				elsif ($method eq 'pcount') {
+					$scores[0] += 1 if 
+						($bed->start >= $start and $bed->end <= $stop);
 				}
 				elsif ($method eq 'length') {
 					push @scores, $bed->length;
@@ -218,6 +222,10 @@ sub collect_bigbed_position_scores {
 				}
 				elsif ($method eq 'count') {
 					$bed_data{$position} += 1;
+				}
+				elsif ($method eq 'pcount') {
+					$bed_data{$position} += 1 if 
+						($bed->start <= $start and $bed->end <= $stop);
 				}
 				elsif ($method eq 'length') {
 					# I hope that length is supported, but not sure
@@ -339,20 +347,49 @@ scores is not retained, and the values are best further processed through
 some statistical method (mean, median, etc.).
 
 The subroutine is passed seven or more arguments in the following order:
-    
-    1) The chromosome or seq_id
-    2) The start position of the segment to collect 
-    3) The stop or end position of the segment to collect 
-    4) The strand of the original feature (or region), -1, 0, or 1.
-    5) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       or "all". Only those scores which match the indicated 
-       strandedness are collected.
-    6) The method or type of data collected. 
-       Acceptable values include 'score' (returns the bed feature 
-       score), 'count' (returns the number of bed features found), or 
-       'length' (returns the length of the bed features found).  
-    7) The paths, either local or remote, to one or more BigBed files.
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 2. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the feature or segment.
+
+The BioPerl strand values must be used, i.e. -1, 0, or 1.
+
+=item 5. The strandedness of the bed elements to collect.
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The value type of the data to collect.
+ 
+Acceptable values include score, count, pcount, and length.
+
+   score returns the score of each bed element within the 
+   region. Make sure the BigBed elements contain a score 
+   column.
+   
+   count returns the number of elements that overlap the 
+   search region. 
+   
+   pcount, or precise count, returns the count of elements 
+   that only fall within the region and do not extend beyond
+   the search region.
+   
+   length returns the lengths of all overlapping elements. 
+
+=item 7. The paths to one or more BigBed files
+
+Always provide the BigBed path. Opened BigBed file objects are 
+cached. Both local and remote files are supported.
+
+=back
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 

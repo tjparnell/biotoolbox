@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
-our $VERSION = '1.15';
+our $VERSION = '1.24';
 
 
 # Exported names
@@ -101,7 +101,23 @@ sub collect_useq_scores {
 			
 			# collect the lengths of each feature
 			while (my $f = $iterator->next_seq) {
-				push @scores, 1;
+				$scores[0] += 1;
+			}
+		}
+		elsif ($method eq 'pcount') {
+			# need to collect features across the region
+			my $iterator = $useq->get_seq_stream(
+				-seq_id     => $chromo,
+				-start      => $start,
+				-end        => $stop,
+				-strand     => $strand,
+			);
+			return unless $iterator;
+			
+			# collect the lengths of each feature
+			while (my $f = $iterator->next_seq) {
+				$scores[0] += 1 if 
+					($f->start >= $start and $f->end <= $stop);
 			}
 		}
 		elsif ($method eq 'length') {
@@ -212,6 +228,10 @@ sub collect_useq_position_scores {
 			elsif ($method eq 'count') {
 				$pos2score{$position} += 1;
 			}
+			elsif ($method eq 'pcount') {
+				$pos2score{$position} += 1 if 
+					($f->start >= $start and $f->end <= $stop);
+			}
 			elsif ($method eq 'length') {
 				push @{ $pos2score{$position} }, $f->length;
 			}
@@ -296,21 +316,43 @@ scores is not retained, and the values are best further processed through
 some statistical method (mean, median, etc.).
 
 The subroutine is passed seven or more arguments in the following order:
-    
-    1) The chromosome or seq_id
-    2) The start position of the segment to collect 
-    3) The stop or end position of the segment to collect 
-    4) The strand of the original feature (or region), -1, 0, or 1.
-    5) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       or "all". Only those scores which match the indicated 
-       strandedness are collected.
-    6) The method or type of data collected. 
-       Acceptable values include 'score', 'count' (returns the number 
-       of features found), or 'length' (returns the lengths of the 
-       features found).  
-    7) The paths to one or more USeq files. It's unlikely to collect 
-       from more than one, but, hey, if you want to....
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 2. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Strand values should be in BioPerl standard values, i.e. -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The value type of data to collect
+
+Acceptable values include score, count, pcount, and length.
+
+   score returns the feature scores
+   
+   count returns the number of features that overlap the 
+   search region. 
+   
+   pcount, or precise count, returns the count of features 
+   that only fall within the region. 
+   
+   length returns the lengths of all overlapping features 
+
+=item 7. Paths to one or more USeq files
+
+=back
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
