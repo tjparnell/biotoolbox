@@ -1,5 +1,47 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.24 (svn )
+	- Added new module Bio::ToolBox::Data::Stream for working with 
+	data files line by line instead of loading them into memory. 
+	Moved lots of shared methods into Bio::ToolBox::Data::common.
+	- Added explicit file support for UCSC-style refSeq and genePred
+	file formats, as well as Encode narrowPeak and broadPeak files.
+	- Added new value type, pcount, in data collection scripts and 
+	library score methods. Features, such as Bam alignments, must 
+	be entirely contained within the search region, and not just 
+	overlapping as with the count value.
+	- Added improved method for reloading forked children files 
+	back into Data objects without having to call external 
+	join_data_file script.
+	- Improved forking in data collection scripts, including a 1 
+	second delay in parent after forking to prevent race conditions 
+	on fast servers with high fork numbers.
+	- Removed all vanity names to data_helper and file_helper 
+	subroutines. All scripts updated to reflect changes.
+	- Improved identification of overlapping features when avoiding 
+	neighboring features when collecting relative data.
+	- Optimized Bam score data collection methods.
+	- Disabling bins when writing coverage in bam2wig.
+	- Fix bugs with writing CDT files in manipulate_datasets.
+	- Improved ToolBox::Data::Feature methods to handle internal nulls.
+	- Improved retrieval of sequence list, particularly for 
+	SeqFeature::Store databases.
+	- Updated and improved library testing for Data and Stream objects 
+	and database interaction.
+	- Fixed bug where negative coordinates would not be accepted 
+	when collecting relative coordinates.
+	- Fixed bug where Bam and BigBed databases may not be opened 
+	properly in some instances, such as precounting features for RPM 
+	scores.
+	- Fix bug where in some cases all database features could be 
+	returned with the method get_feature().
+	- Fix bug were type options is now properly implemented in script 
+	get_feature_info.
+	- Fix bug limiting to chromosome length in script 
+	get_intesecting_features.
+	
+	
+
 v.1.23 (svn 915)
 	- Improved script get_gene_regions to recognize non_coding exons; 
 	prompt for region, feature, and RNA type; specify for more than 
