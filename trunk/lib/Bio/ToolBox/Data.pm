@@ -707,7 +707,6 @@ use Bio::ToolBox::file_helper qw(
 	write_summary_data
 );
 use Bio::ToolBox::Data::common;
-use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
 
 
@@ -724,7 +723,14 @@ sub new {
 	
 	# check for stream
 	if (exists $args{stream} and $args{stream}) {
-		return Bio::ToolBox::Data::Stream->new(@_);
+		my $ok;
+		eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
+		if ($ok) {
+			return Bio::ToolBox::Data::Stream->new(@_);
+		}
+		else {
+			croak "Cannot load Bio::ToolBox::Data::Stream!";
+		}
 	}
 	
 	my $data;
@@ -802,6 +808,14 @@ sub reload_children {
 	my $self = shift;
 	my @files = @_;
 	return unless @files;
+	
+	# prepare Stream
+	my $ok;
+	eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
+	unless ($ok) {
+		carp "unable to load Bio::ToolBox::Data::Stream! $@";
+		return;
+	}
 	
 	# open first stream
 	my $first = shift @files;
