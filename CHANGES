@@ -1,6 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.24 (svn )
+v.1.24 (svn 936)
 	- Added new module Bio::ToolBox::Data::Stream for working with 
 	data files line by line instead of loading them into memory. 
 	Moved lots of shared methods into Bio::ToolBox::Data::common.
@@ -13,8 +13,8 @@ v.1.24 (svn )
 	- Added improved method for reloading forked children files 
 	back into Data objects without having to call external 
 	join_data_file script.
-	- Improved forking in data collection scripts, including a 1 
-	second delay in parent after forking to prevent race conditions 
+	- Improved forking in data collection scripts, including a 
+	delay in the parent after forking to prevent race conditions 
 	on fast servers with high fork numbers.
 	- Removed all vanity names to data_helper and file_helper 
 	subroutines. All scripts updated to reflect changes.
@@ -39,8 +39,6 @@ v.1.24 (svn )
 	get_feature_info.
 	- Fix bug limiting to chromosome length in script 
 	get_intesecting_features.
-	
-	
 
 v.1.23 (svn 915)
 	- Improved script get_gene_regions to recognize non_coding exons; 
