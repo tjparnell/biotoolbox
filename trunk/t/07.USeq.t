@@ -5,6 +5,7 @@
 
 use strict;
 use Test::More;
+use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
@@ -14,18 +15,19 @@ BEGIN {
 	else {
 		plan skip_all => 'Optional module Bio::DB::USeq not available';
 	}
-	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
-use lib "$Bin/../lib";
+use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
 
-my $dataset = "$Bin/Data/sample3.useq";
+my $dataset = File::Spec->catfile($Bin, "Data", "sample3.useq");
 
 ### Open a test file
-my $Data = Bio::ToolBox::Data->new(file => "$Bin/Data/sample.bed");
+my $infile = File::Spec->catfile($Bin, "Data", "sample.bed");
+my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
