@@ -64,7 +64,7 @@ t/06.BigWigSet.t
 t/07.USeq.t
 t/08.Wiggle.t
 t/Data/biotoolbox.cfg
-t/Data/chrI.gff3.gz
+t/Data/chrI.gff3
 t/Data/sample.bed
 t/Data/sample1.bam
 t/Data/sample1.bam.bai
