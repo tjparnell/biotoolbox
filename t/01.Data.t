@@ -4,22 +4,24 @@
 
 use strict;
 use Test::More;
+use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
 	plan tests => 104;
-	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
-use lib "$Bin/../lib";
+use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 require_ok 'Bio::ToolBox::Data::Stream' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data::Stream";
 
 ### Open a test file
+my $infile = File::Spec->catfile($Bin, "Data", "chrI.gff3");
 my $Data = Bio::ToolBox::Data->new(
-	file => "$Bin/Data/chrI.gff3.gz",
+	file => $infile,
 );
 isa_ok($Data, 'Bio::ToolBox::Data', 'GFF3 Data');
 
@@ -30,10 +32,10 @@ is($Data->program, '', 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
 is($Data->database, '', 'database');
-is($Data->filename, "$Bin/Data/chrI.gff3.gz", 'filename');
+is($Data->filename, $infile, 'filename');
 is($Data->basename, 'chrI', 'basename');
-is($Data->extension, '.gff3.gz', 'extension');
-is($Data->path, "$Bin/Data/", 'path');
+is($Data->extension, '.gff3', 'extension');
+is($Data->path, File::Spec->catfile($Bin, "Data", ''), 'path');
 
 # test comments
 my @comments = $Data->comments;
@@ -183,9 +185,10 @@ is($Data->last_row, 39, 'last row index after splicing');
 is($Data->value(39,3), 'Feature77', 'data table value after splicing');
 
 # test save file
-my $file = $Data->save(filename => "$Bin/Data/chrI.bed");
-is($file, "$Bin/Data/chrI.bed", 'output file name success');
-ok(-e "$Bin/Data/chrI.bed", 'output file exists');
+my $outfile = File::Spec->catdir($Bin, "Data", "chrI.bed");
+my $file = $Data->save(filename => $outfile);
+is($file, $outfile, 'output file name success');
+ok(-e $outfile, 'output file exists');
 
 
 

@@ -6,22 +6,24 @@
 
 use strict;
 use Test::More;
+use File::Spec;
 use FindBin '$Bin';
-use Data::Dumper;
+use Statistics::Lite qw(min max);
 
 BEGIN {
-	plan tests => 33;
-	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
+	plan tests => 58;
+	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
-use lib "$Bin/../lib";
+use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
 
 ### Collect features from a database
+my $infile = File::Spec->catfile($Bin, "Data", "chrI.gff3");
 my $Data = Bio::ToolBox::Data->new(
-	'db'      => "$Bin/Data/chrI.gff3.gz",
+	'db'      => $infile,
 	'feature' => 'gene:SGD',
 );
 isa_ok($Data, 'Bio::ToolBox::Data', 'db collected gene table');
@@ -44,7 +46,7 @@ is($Data->name_column, 1, 'identify name column');
 is($Data->type_column, 2, 'identify type column');
 
 # test database
-is($Data->database, "$Bin/Data/chrI.gff3.gz", 'database name');
+is($Data->database, $infile, 'database name');
 my $db = $Data->open_database;
 isa_ok($db, 'Bio::DB::SeqFeature::Store', 'opened database');
 
@@ -76,7 +78,7 @@ my $segment = $row->segment;
 isa_ok($segment, 'Bio::DB::SeqFeature::Segment', 'db segment from row Feature');
 
 # verify data from a data database
-my $ddb = "$Bin/Data/sample2.gff3";
+my $ddb = File::Spec->catfile($Bin, "Data", "sample2.gff3");
 my $verified = $Data->verify_dataset('data:sample2', $ddb);
 is($verified, 'data:sample2', 'dataset in data database verified');
 
@@ -127,15 +129,129 @@ $score = $row->get_score(
 # print "5 prime mean score is $score\n";
 is(sprintf("%.2f", $score), '0.30', 'mean score across 5 prime feature');
 
+# collect sum count score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method'  => 'sum',
+	value   => 'count',
+);
+# print "median score is $score\n";
+is($score, 60, 'sum count across feature');
+
+# collect mean length score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method'  => 'mean',
+	value   => 'length',
+);
+# print "median score is $score\n";
+is($score, 1, 'mean length of scores across feature');
+
 # collect position scores
 my %score1 = $row->get_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 );
-# print "position_score is ", Dumper(\%score1), "\n";
+# print "position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), 58, 'min position in positioned score hash');
+is(max(keys %score1), 2342, 'max position in positioned score hash');
+is($score1{686}, 0.26, 'score at position 686 in positioned score hash');
 
 
 
-END {
-# 	unlink "$Bin/Data/DB_results.txt";
+# move to next gene to get better relative scores
+$row = $stream->next_row;
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'row Feature');
+is($row->name, 'YAL044C', 'Feature name');
+
+# collect 5' relative position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	start   => -500,
+	stop    => 500,
+	position => 5,
+);
+# print "5' position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), -467, 'min 5prime relative position in positioned score hash');
+is(max(keys %score1), 467, 'max 5prime relative position in positioned score hash');
+is($score1{218}, 0.62, 'score at position 218 in 5prime relative positioned score hash');
+
+# collect 3' relative position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	start   => -500,
+	stop    => 500,
+	position => 3,
+);
+# print "3' position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), -430, 'min 3prime relative position in positioned score hash');
+is(max(keys %score1), 481, 'max 3prime relative position in positioned score hash');
+is($score1{187}, 0.75, 'score at position 187 in 3prime relative positioned score hash');
+
+# collect absolute position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	start   => -500,
+	stop    => 500,
+	position => 5,
+	absolute => 1,
+);
+# print "position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), 57995, 'absolute min position in positioned score hash');
+is(max(keys %score1), 58929, 'absolute max position in positioned score hash');
+is($score1{58212}, 0.52, 'score at absolute position 58212 in positioned score hash');
+
+# collect extended relative position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	extend  => 500,
+	absolute => 1,
+);
+# print "extended position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), 57469, 'min extended relative position in positioned score hash');
+is(max(keys %score1), 58929, 'max extended relative position in positioned score hash');
+is($score1{58532}, 0.34, 'score at position 58532 in extended relative positioned score hash');
+is(scalar(keys %score1), 39, 'number of keys extended relative positioned score hash');
+
+# collect extended relative position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	extend  => 1000,
+	absolute => 1,
+	avoid   => 1,
+);
+# print "avoided extended position_score is \n" . print_hash(\%score1);
+is(min(keys %score1), 56969, 'min avoided extended relative position in positioned score hash');
+is(max(keys %score1), 58683, 'max avoided extended relative position in positioned score hash');
+is($score1{58532}, 0.34, 'score at position 58532 in avoided extended relative positioned score hash');
+is(scalar(keys %score1), 26, 'number of keys avoided extended relative positioned score hash');
+
+# collect absolute position scores
+%score1 = $row->get_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	start   => -500,
+	stop    => 500,
+	position => 4,
+	value   => 'count',
+);
+# print "position_score is \n" . print_hash(\%score1);
+is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
+
+
+
+
+
+sub print_hash {
+	my $hash = shift;
+	foreach (sort {$a <=> $b} keys %$hash) {
+		print "    $_\t=> " . $hash->{$_} . "\n";
+	}
 }
