@@ -42,7 +42,7 @@ __
 __--gff
 
 __
-  Indicate whether the output file should be in GFF format. If false, a  standard tim data tab delimited text file will be written with four  columns: chromosome, start, stop, and score. The default value is false.
+  Indicate whether the output file should be in GFF format. If false, a  standard tab delimited text file will be written with four  columns: chromosome, start, stop, and score. The default value is false.
 __
   __
 __--type <**text>

@@ -442,7 +442,7 @@ __
 ===Data Table Functions===
 These methods alter the Data table en masse.
 
-verify
+verify()
 
 __
   This method will verify the Data structure, including the metadata and the  Data table. It ensures that the table has the correct number of rows and  columns as described in the metadata, and that each column has the basic  metadata.
@@ -472,108 +472,52 @@ __
   This method will splice the Data table into $total_parts number of pieces,  retaining the $current_part piece. The other parts are discarded. This  method is intended to be used when a program is forked into separate  processes, allowing each child process to work on a subset of the original  Data table.
 __
   __
-  Two values are passed to the method. The first is the current part number,  1-based. The second value is the total number of parts that the table  should be divided, corresponding to the number of concurrent processes.  For example, to fork the program into four concurrent processes.
+  Two values are passed to the method. The first is the current part number,  1-based. The second value is the total number of parts that the table  should be divided, corresponding to the number of concurrent processes.  One easy approach to forking is to use [Pod_Parallel_ForkManager Parallel::ForkManager]. The  example below shows how to fork into four concurrent processes.
 __
   __
 {{{
-	use FindBin qw($Bin);
 	my $Data = Bio::ToolBox::Data->new(file => $file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
 		$pm->start and next;
-		### in child
+		### in child ###
 		$Data->splice_data($i, 4);
-		$db = $Data->open_database; # a clone-safe new db object
 		# do something with this portion
-		$Data->save('filename' => "file#$i");
+		# then save to a temporary unique file
+		$Data->save("$file_$i");
 		$pm->finish;
 	}
 	$pm->wait_all_children;
-	}}}
-{{{
-	# join files together
-	my @files = glob "$file#*";
-	my @args = ("$Bin/join_data_file.pl", "--out", $outfile, @files);
-	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
+	# reload children files
+	$Data->reload_children(glob "$file_*");
 }}}
-  There is no convenient method for merging the modified contents of the  table from each child process back into the original Data table, as  each child is essentially isolated from the parent. The Parallel::!ForkManager**  documentation recommends going through a disk file intermediate. Therefore,  write each child Data object to file using a unique name. Then, once all  children have been reaped, join the child files. See the accompanying  !BioToolBox** script `join_data_file.pl` for concatenating Data table files  together. As long as each child file has the same number of columns, the  files should be joined without issue.
+  Since each forked child process is separate from their parent process,  their contents must be reloaded into the current Data object. The  [Pod_Parallel_ForkManager Parallel::ForkManager] documentation recommends going through a disk  file intermediate. Therefore, write each child Data object to file using  a unique name. Once all children have been reaped, they can be reloaded  into the current Data object using the reload_children() method.
 __
   __
   Remember that if you fork your script into child processes, any database  connections must be re-opened; they are typically not clone safe. If you  have an existing database connection by using the open_database() method,  it should be automatically re-opened for you when you use the splice_data()  method, but you will need to call open_database() again in the child  process to obtain the new database object.
 __
   __
-convert_gff(%options)
+reload_children(@children_files)
 
 __
-  This method will irreversibly convert the Data table into a GFF format. Table columns will be added, deleted, reordered, and renamed as necessary  to generate the GFF structure. An array of options should be passed to  control the conversion step.
+  Discards the current data table in memory and reloads two or more files  written from forked children processes. Provide the name of the child  files in the order you want them loaded. The files will be automatically  deleted if successfully loaded. Returns the number of lines reloaded on  success.
 __
   __
-  version => <**2|3>
-__
-  __
-    Provide the GFF version. The default is version 3.
-  __
-    __
-  chromo => $index
-__
-  __
-  start => $index
-__
-  __
-  stop => $index
-__
-  __
-  strand => $index
-__
-  __
-    Provide the column indices for the appropriate columns. These should   be automatically identified from the column header names. Indices  are 0-based.
-  __
-    __
-  score => $index
-__
-  __
-    Provide the index column name for whatever score column. This is  not automatically determined.
-  __
-    __
-  source => $index|$text
-__
-  __
-  type => $index|$text
-__
-  __
-  name => $index|$text
-__
-  __
-    Provide either a column index (0-based) or a text name to be used  for all the features. Integers between 0 and the rightmost column  index are presumed to be an index; everything else is taken as text.
-  __
-    __
-  tag => \@indices
-__
-  __
-    Provide an array reference of column indices to be used for GFF tags.
-  __
-    __
-  id => $index
-__
-  __
-    Provide a column index of unique values to be used for GFF3 ID tag.
-  __
-    __
-  midpoint => <**boolean>
-__
-  __
-    Flag to use the midpoint instead of actual start and stop coordinates.
-  __
-    __
 ===File Functions===
 When you are finished modifying the Data table, it may then be written out  as a tabbed-delimited text file. If the format corresponds to a valide BED or  GFF file, then it may be written in that format.
 
 Several functions are available for writing the Data table, exporting to a  compatible GFF file format, or writing a summary of the Data table.
 
+save()
+
+__
 write_file()
 
 __
-save()
+write_file($filename)
+
+__
+write_file(%options)
 
 __
   These methods will write the Data structure out to file. It will  be first verified as to proper structure. Opened BED and GFF files  are checked to see if their structure is maintained. If so, they  are written in the same format; if not, they are written as regular  tab-delimited text files. You may pass additional options.
@@ -592,10 +536,10 @@ __
   __
     __
   If the file save is successful, it will return the full path and  name of the saved file, complete with any changes to the file extension.
-summary_file()
+summary_file(%options)
 
 __
-  Write a separate file summarizing columns of data (mean values).  The mean value of each column becomes a row value, and each column  header becomes a row identifier (i.e. the table is transposed). The  best use of this is to summarize the mean profile of windowed data  collected across a feature. See the Bio::!ToolBox** scripts  `get_relative_data.pl` and `average_gene.pl` as an example.  You may pass options.
+  Write a separate file summarizing columns of data (mean values).  The mean value of each column becomes a row value, and each column  header becomes a row identifier (i.e. the table is transposed). The  best use of this is to summarize the mean profile of windowed data  collected across a feature. See the Bio::!ToolBox** scripts  [Pod_get_relative_data_pl get_relative_data.pl] and [Pod_average_gene_pl average_gene.pl] as examples.  You may pass these options.
 __
   __
   filename => $filename
@@ -614,83 +558,21 @@ __
   __
     __
   If successful, it will return the name of the file saved.
-write_gff()
+===Verifying Datasets===
+When working with row Features and collecting scores, the dataset  from which you are collecting must be verified prior to collection.  This ensures that the proper database adaptor is available and loaded,  and that the dataset is correctly specified (otherwise nothing would be  collected). This verification is normally performed transparently when  you call [Pod_Bio_ToolBox_Data_Feature get_score]() or  [Pod_Bio_ToolBox_Data_Feature get_position_scores](). However, datasets may be explicitly verified prior to calling the score  methods.
+
+verify_dataset($dataset)
 
 __
-  This will write out the existing data in GFF format. A number of  options may be passed to control the conversion.
+verify_dataset($dataset, $database)
+
+__
+  Pass the name of the dataset (GFF type or type:source) for a GFF3-based  database, e.g. <**Bio::DB::!SeqFeature**::Store>, or path and file name for a  data file, e.g. Bam, !BigWig**, !BigBed**, or USeq file. If a separate database  is being used, pass the name or opened database object as a second  parameter. For more advance options, see  [Pod_Bio_ToolBox_db_helper "verify_or_request_feature_types" in Bio::ToolBox::db_helper].
 __
   __
-  filename => $filename
+  The name of the verified dataset, with a prefix if necessary, is returned.
 __
   __
-    Optionally pass the filename to save. A suitable default will be  generated if not provided.
-  __
-    __
-  version => <**2|3>
-__
-  __
-    Provide the GFF version. The default is version 3.
-  __
-    __
-  chromo => $index
-__
-  __
-  start => $index
-__
-  __
-  stop => $index
-__
-  __
-  strand => $index
-__
-  __
-    Provide the column indices for the appropriate columns. These should   be automatically identified from the column header names. Indices  are 0-based.
-  __
-    __
-  score => $index
-__
-  __
-    Provide the index column name for whatever score column. This is  not automatically determined.
-  __
-    __
-  source => $index|$text
-__
-  __
-  type => $index|$text
-__
-  __
-  name => $index|$text
-__
-  __
-    Provide either a column index (0-based) or a text name to be used  for all the features. Integers between 0 and the rightmost column  index are presumed to be an index; everything else is taken as text.
-  __
-    __
-  tag => \@indices
-__
-  __
-    Provide an array reference of column indices to be used for GFF tags.
-  __
-    __
-  id => $index
-__
-  __
-    Provide a column index of unique values to be used for GFF3 ID tag.
-  __
-    __
-  midpoint => <**boolean>
-__
-  __
-    Flag to use the midpoint instead of actual start and stop coordinates.
-  __
-    __
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
-{{{
-}}}
 ==AUTHOR==
 {{{
  Timothy J. Parnell, PhD

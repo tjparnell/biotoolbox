@@ -8,7 +8,7 @@ Bio::!ToolBox**::Data::Feature - Objects representing rows in a data table
 ==DESCRIPTION==
 A Bio::!ToolBox**::Data::Feature is an object representing a row in the  data table. Usually, this in turn represents an annotated feature or  segment in the genome. As such, this object provides convenient  methods for accessing and manipulating the values in a row, as well as  methods for working with the represented genomic feature.
 
-This class should not be used directly by the user. Rather, Feature  objects are generated from a Bio::!ToolBox**::Data::Iterator object  (generated itself from the row_stream() function in Bio::!ToolBox**::Data),  or the iterate() function in Bio::!ToolBox**::Data. Please see the  documentation for Bio::!ToolBox**::Data for more information.
+This class should not be used directly by the user. Rather, Feature  objects are generated from a Bio::!ToolBox**::Data::Iterator object  (generated itself from the [Pod_Bio_ToolBox_Data row_stream]  function in Bio::!ToolBox**::Data), or the [Pod_Bio_ToolBox_Data iterate]  function in Bio::!ToolBox**::Data. Please see the respective documentation  for more information.
 
 Example of working with a stream object.
 
@@ -100,7 +100,7 @@ __
 type
 
 __
-  The type of feature. Typically either primary_tag or primary_tag:source_tag.  In a GFF3 file, this represents columns 3 and 2, respectively. In annotation  databases such as Bio::DB::!SeqFeature**::Store, the type is used to restrict  to one of many different types of features, e.g. gene, mRNA, or exon.
+  The type of feature. Typically either primary_tag or primary_tag:source_tag.  In a GFF3 file, this represents columns 3 and 2, respectively. In annotation  databases such as [Pod_Bio_DB_SeqFeature_Store Bio::DB::SeqFeature::Store], the type is used to restrict  to one of many different types of features, e.g. gene, mRNA, or exon.
 __
   __
 id
@@ -132,7 +132,7 @@ __
 __
   __
 ===Convenience Methods to database functions===
-The next three functions are convenience methods for using the  attributes in the current data row to interact with databases.  They are wrappers to methods in the Bio::!ToolBox**::db_helper  module.
+The next three functions are convenience methods for using the  attributes in the current data row to interact with databases.  They are wrappers to methods in the <**Bio::!ToolBox**::db_helper>  module.
 
 feature
 
@@ -140,7 +140,7 @@ __
   Returns a !SeqFeature** object from the database using the name and  type values in the current Data table row. The !SeqFeature** object  is requested from the database named in the general metadata. If  an alternate database is desired, you should change it first using   the $Data->database() method. If the feature name or type is not  present in the table, then nothing is returned.
 __
   __
-  See Bio::DB::!SeqFeature** and Bio::SeqFeatureI for more information  about working with these objects.
+  See <**Bio::DB::!SeqFeature**> and [Pod_Bio_SeqFeatureI Bio::SeqFeatureI] for more information  about working with these objects.
 __
   __
 segment
@@ -149,16 +149,16 @@ __
   Returns a database Segment object corresponding to the coordinates  defined in the Data table row. If a named feature and type are  present instead of coordinates, then the feature is first automatically  retrieved and a Segment returned based on its coordinates. The  database named in the general metadata is used to establish the  Segment object. If a different database is desired, it should be  changed first using the general database() method.
 __
   __
-  See Bio::DB::!SeqFeature**::Segment and Bio::RangeI for more information  about working with Segment objects.
+  See [Pod_Bio_DB_SeqFeature_Segment Bio::DB::SeqFeature::Segment] and [Pod_Bio_RangeI Bio::RangeI] for more information  about working with Segment objects.
 __
   __
 get_score(%args)
 
 __
-  This is a convenience method for the  Bio::!ToolBox**::db_helper::get_chromo_region_score() method. It  will return a single score value for the region defined by the  coordinates or typed named feature in the current data row. If  the Data table has coordinates, then those will be automatically  used. If the Data table has typed named features, then the  coordinates will automatically be looked up for you by requesting  a !SeqFeature** object from the database.
+  This is a convenience method for the  [Pod_Bio_ToolBox_db_helper get_chromo_region_score]  method. It will return a single score value for the region defined by the  coordinates or typed named feature in the current data row. If  the Data table has coordinates, then those will be automatically  used. If the Data table has typed named features, then the  coordinates will automatically be looked up for you by requesting  a !SeqFeature** object from the database.
 __
   __
-  The name of the dataset from which to collect the data must be  provided. This may be a GFF type in a !SeqFeature** database, a  !BigWig** member in a !BigWigSet** database, or a path to a !BigWig**,  !BigBed**, Bam, or USeq file. Additional parameters may also be  specified; please see the Bio::!ToolBox**::db_helper:: get_chromo_region_score() method for full details.
+  The name of the dataset from which to collect the data must be  provided. This may be a GFF type in a !SeqFeature** database, a  !BigWig** member in a !BigWigSet** database, or a path to a !BigWig**,  !BigBed**, Bam, or USeq file. Additional parameters may also be  specified; please see the [Pod_Bio_ToolBox_db_helper Bio::ToolBox::db_helper]  for full details.
 __
   __
   If you wish to override coordinates that are present in the  Data table, for example to extend or shift the given coordinates  by some amount, then simply pass the new start and end  coordinates as options to this method.
@@ -181,16 +181,16 @@ __
 get_position_scores(%args)
 
 __
-  This is a convenience method for the Bio::!ToolBox**::db_helper:: get_region_dataset_hash() method. It will return a hash of  positions => scores over the region defined by the  coordinates or typed named feature in the current data row.  The coordinates for the interrogated region will be  automatically provided.
+  This is a convenience method for the  [Pod_Bio_ToolBox_db_helper get_region_dataset_hash]  method. It will return a hash of  positions => scores over the region defined by the  coordinates or typed named feature in the current data row.  The coordinates for the interrogated region will be  automatically provided.
 __
   __
-  Just like the get_score() method, the dataset from which to  collect the scores must be provided, along with any other  optional arguments. See the documentation for the  Bio::!ToolBox**::db_helper::get_region_dataset_hash() method  for more details.
+  Just like the [Pod_get_score get_score] method, the dataset from which to  collect the scores must be provided, along with any other  optional arguments.
 __
   __
   If you wish to override coordinates that are present in the  Data table, for example to extend or shift the given coordinates  by some amount, then simply pass the new start and end  coordinates as options to this method.
 __
   __
-  Here is an example for collecting positioned scores around  the 5 prime end of a feature from a !BigWigSet** directory.
+  Here is an example for collecting positioned scores around  the 5 prime end of a feature from a [Pod_Bio_DB_BigWigSet BigWigSet]  directory.
 __
   __
 {{{

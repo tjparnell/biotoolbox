@@ -27,7 +27,7 @@ The command line flags and descriptions:
 __--in <**filename>
 
 __
-  Specify the input file. The file should be a simple tab-delimited text  file, genes (features) as rows, experimental data (microarray or sequencing  data) should be columns. The first column contains unique gene identifiers.  A column header row is expected. Standard tim data text files with  metadata lines should be exported to a compatible format using the treeview  function in the _*_manipulate_datasets.pl_*_ script. A .cdt file generated  from this may also be used.
+  Specify the input file. The file should be a simple tab-delimited text  file, genes (features) as rows, experimental data (microarray or sequencing  data) should be columns. The first column contains unique gene identifiers.  A column header row is expected. Standard biotoolbox data text files with  metadata lines should be exported to a compatible format using the treeview  function in the _*_manipulate_datasets.pl_*_ script. A .cdt file generated  from this may also be used.
 __
   __
 __--out <**jobname>

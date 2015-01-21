@@ -129,7 +129,7 @@ __
 __
   __
 ==DESCRIPTION==
-This program will take a tab-delimited text file (tim data formated file,  for example) and generate either a multi-sequence fasta file containing the  sequences of each feature defined in the input file, or optionally a single  concatenated fasta file. If concatenating, the individual sequences may be  padded with the given number of 'N' bases.
+This program will take a tab-delimited text file (BED file,  for example) and generate either a multi-sequence fasta file containing the  sequences of each feature defined in the input file, or optionally a single  concatenated fasta file. If concatenating, the individual sequences may be  padded with the given number of 'N' bases.
 
 This program has two modes. If the name and sequence is already present in  the file, it will generate the fasta file directly from the file content.
 

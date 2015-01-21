@@ -26,7 +26,7 @@ get_datasets.pl `[`--options...`]` `[`<**filename>`]`
   --ddb <name | filename>
   --data <none | file | type>, ...
   --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]  (mean)
-  --value [score|count|length]                              (score)
+  --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --exons
@@ -128,26 +128,64 @@ __
   Specify the method for combining all of the dataset values within the  genomic region of the feature. Accepted values include:
 __
   __
-{{{
-  - mean        (default)
-  - median
-  - sum
-  - stddev      Standard deviation of the population (within the region)
-  - min
-  - max
-  - range       Returns difference of max and min
-  - rpm         Reads Per Million mapped, Bam/BigBed only
-  - rpkm        Reads Per Kilobase per Million Mapped, Bam/BigBed only
-}}}
-  When collecting data using rpkm, the normalized sum of the reads is  divided by the length of the feature requested (the Kilobase part in rpkm).  Note that for mRNA or gene features, this will be the sum of the exon  lengths, not the gene or mRNA.
+  `*` mean (default)
 __
   __
-__--value `[`score|count|length`]`
+  `*` median
+__
+  __
+  `*` sum
+__
+  __
+  `*` stddev  Standard deviation of the population (within the region)
+__
+  __
+  `*` min
+__
+  __
+  `*` max
+__
+  __
+  `*` range   Returns difference of max and min
+__
+  __
+  `*` rpm     Reads Per Million mapped, Bam/!BigBed** only
+__
+  __
+  `*` rpkm    Reads Per Kilobase per Million Mapped, Bam/!BigBed** only
+__
+  __
+  When collecting data using rpkm, the normalized sum of the reads is  divided by the length of the feature requested (the Kilobase part in rpkm).  Note that for mRNA or gene features, this will be the sum of the exon  lengths, not the gene or transcript.
+__--value `[`score|count|pcount|length`]`
 
 __
-  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
+  Optionally specify the type of data value to collect from the dataset or  data file. Four values are accepted: score, count, pcount, or length.  The default value type is score. Note that some data sources only support certain  types of data values. The types are detailed below.
 __
   __
+  `*` score
+__
+  __
+    The default value. Supported by wig, bigWig, USeq, bigBed (if the features  include the score column), GFF features, and Bam (returns non-transformed  base pair coverage).
+  __
+    __
+  `*` count
+__
+  __
+    Counts the number of features that overlap the search region. For long  features (> 1 bp), these may include features that overlap or span beyond  the search region. Supported by all databases.
+  __
+    __
+  `*` pcount (precise count)
+__
+  __
+    Counts only those features that are contained within the search region,  not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+  __
+    __
+  `*` length
+__
+  __
+    Returns the length of long features. Supported by Bam, bigBed, USeq, and  GFF features.
+  __
+    __
 __--strand `[`all | sense | antisense`]`
 
 __

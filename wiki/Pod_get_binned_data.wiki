@@ -24,8 +24,8 @@ A program to collect data in bins across a list of features.
   Options for data collection:
   --ddb <name | filename>
   --data <dataset_name | filename>
-  --method [mean|median|stddev|min|max|sum|rpm|rpkm]        (mean)
-  --value [score|count|length]                              (score)
+  --method [mean|median|stddev|min|max|sum|rpm]             (mean)
+  --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --long
@@ -90,28 +90,66 @@ __
   Alternatively, the dataset may be a database file, including bigWig (.bw),  bigBed (.bb), or Bam alignment (.bam) files. The files may be local or  remote (specified with a http: or ftp: prefix).
 __
   __
-__--method `[`mean|median|stddev|min|max|range|sum|rpm|rpkm`]`
+__--method `[`mean|median|stddev|min|max|range|sum|rpm`]`
 
 __
   Specify the method for combining all of the dataset values within the  genomic region of the feature. Accepted values include:
 __
   __
-{{{
-  - mean        (default)
-  - median
-  - sum
-  - stddev      Standard deviation of the population (within the region)
-  - min
-  - max
-  - rpm         Reads Per Million mapped, for Bam and BigBed only
-  - rpkm        Same as rpm but normalized for gene length in kb
-}}}
-__--value `[`score|count|length`]`
-
-__
-  Optionally specify the type of data value to collect from the dataset or  data file. Three values are accepted: score, count, or length. The default  value type is score. Note that some data sources only support certain  types of data values. Wig and !BigWig** files only support score and count;  !BigBed** and database features support count and length and optionally  score; Bam files support basepair coverage (score), count (number of  alignments), and length.
+  `*` mean (default)
 __
   __
+  `*` median
+__
+  __
+  `*` sum
+__
+  __
+  `*` stddev  Standard deviation of the population (within the region)
+__
+  __
+  `*` min
+__
+  __
+  `*` max
+__
+  __
+  `*` range   Returns difference of max and min
+__
+  __
+  `*` rpm     Reads Per Million mapped, Bam/!BigBed** only
+__
+  __
+__--value `[`score|count|pcount|length`]`
+
+__
+  Optionally specify the type of data value to collect from the dataset or  data file. Four values are accepted: score, count, pcount, or length.  The default value type is score. Note that some data sources only support certain  types of data values. The types are detailed below.
+__
+  __
+  `*` score
+__
+  __
+    The default value. Supported by wig, bigWig, USeq, bigBed (if the features  include the score column), GFF features, and Bam (returns non-transformed  base pair coverage).
+  __
+    __
+  `*` count
+__
+  __
+    Counts the number of features that overlap the search region. For long  features (> 1 bp), these may include features that overlap or span beyond  the search region. Supported by all databases.
+  __
+    __
+  `*` pcount (precise count)
+__
+  __
+    Counts only those features that are contained within the search region,  not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+  __
+    __
+  `*` length
+__
+  __
+    Returns the length of long features. Supported by Bam, bigBed, USeq, and  GFF features.
+  __
+    __
 __--strand `[`all|sense|antisense`]`
 
 __
