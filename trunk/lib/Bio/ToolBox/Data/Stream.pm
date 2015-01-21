@@ -110,7 +110,7 @@ checked for existence. Existing files are assumed to be read, and non-existent
 files are assumed to be written, unless otherwise specified by the mode 
 option. This option is required.
 
-=item overwrite =E<GT> boolean
+=item overwrite =E<gt> boolean
 
 If a file exists and you wish to overwrite, pass this option with a true value.
 
@@ -138,7 +138,7 @@ The following methods may be used to access or set these
 metadata properties. Note that metadata is only written at the beginning 
 of the file, and so must be set prior to iterating through the file.
 
-=over
+=over 4
 
 =item feature()
 
@@ -179,7 +179,7 @@ features were derived.
 
 The following methods may be used to access metadata only.
 
-=over
+=over 4
 
 =item gff
 
@@ -316,7 +316,7 @@ write_row() method is called. This enables one, for example, to
 duplicate a read-only Stream object to create a write-only Stream, 
 add or delete columns, and then begin the row iteration.
 
-=over
+=over 4
 
 =item add_column($name)
 
@@ -347,6 +347,8 @@ Reorders columns into the specified order. Provide the
 new desired order of indices. Columns could be duplicated 
 or deleted using this method. The columns will adopt their 
 new index numbers.
+
+=back
 
 =head2 Row Data Access
 
