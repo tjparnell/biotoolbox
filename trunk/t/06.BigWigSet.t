@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigWigSet; 1}) {
-		plan tests => 18;
+		plan tests => 22;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigWigSet not available';
@@ -21,6 +21,7 @@ BEGIN {
 use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
+use_ok( 'Bio::ToolBox::db_helper', 'get_chromosome_list' );
 
 
 my $dataset = File::Spec->catfile($Bin, "Data", "sample3");
@@ -35,6 +36,12 @@ $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
 isa_ok($db, 'Bio::DB::BigWigSet', 'connected database');
+
+# check chromosomes
+my @chromos = get_chromosome_list($db);
+is(scalar @chromos, 1, 'number of chromosomes');
+is($chromos[0][0], 'chrI', 'name of first chromosome');
+is($chromos[0][1], 230208, 'length of first chromosome');
 
 
 
@@ -59,7 +66,8 @@ my $score = $row->get_score(
 	'method'   => 'sum',
 );
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 433, 'row sum of count');
+is($score, 435, 'row sum of count') or 
+	diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 # score mean coverage
 $score = $row->get_score(
@@ -69,7 +77,8 @@ $score = $row->get_score(
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 1.19, 'row mean score');
+is(sprintf("%.2f", $score), 1.19, 'row mean score') or 
+	diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 
 
@@ -85,7 +94,8 @@ $score = $row->get_score(
 	'stranded' => 'all',
 );
 # print "both strands score median for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 1.69, 'row median score');
+is(sprintf("%.2f", $score), 1.69, 'row median score') or 
+	diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 # try stranded data collection
 $score = $row->get_score(
@@ -95,7 +105,8 @@ $score = $row->get_score(
 	'stranded' => 'sense',
 );
 # print "sense score median for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 2.74, 'row sense median score');
+is(sprintf("%.2f", $score), 2.74, 'row sense median score') or 
+	diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 $score = $row->get_score(
 	'dataset'  => 'sample3',
@@ -104,7 +115,8 @@ $score = $row->get_score(
 	'stranded' => 'antisense',
 );
 # print "antisense score median for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 0.38, 'row antisense median score');
+is(sprintf("%.2f", $score), 0.38, 'row antisense median score') or 
+	diag("if this test fails, try updating your UCSC kent source library and rebuild");
 
 
 

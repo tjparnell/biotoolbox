@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::USeq; 1}) {
-		plan tests => 18;
+		plan tests => 22;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::USeq not available';
@@ -21,6 +21,7 @@ BEGIN {
 use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
+use_ok( 'Bio::ToolBox::db_helper', 'get_chromosome_list' );
 
 
 my $dataset = File::Spec->catfile($Bin, "Data", "sample3.useq");
@@ -35,6 +36,12 @@ $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
 isa_ok($db, 'Bio::DB::USeq', 'connected database');
+
+# check chromosomes
+my @chromos = get_chromosome_list($db);
+is(scalar @chromos, 1, 'number of chromosomes');
+is($chromos[0][0], 'chrI', 'name of first chromosome');
+is($chromos[0][1], 60997, 'length of first chromosome');
 
 
 
