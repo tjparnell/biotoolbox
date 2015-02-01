@@ -223,7 +223,7 @@ To work with next generation sequencing data, you'll need to install [http://sam
 
 Download the source code for the latest version from the samtools [http://sourceforge.net/projects/samtools/files/samtools/ SourceForge] project, and unpack it in your directory.
 
-*Note* For samtools `<` v0.1.19 only. If you'll be working with 64-bit executables (likely), edit the `Makefile` to un-comment out the `-m64` on the line containing `CLFAGS`. This ensures the program will compile as a 64-bit executable.
+*Note* The Bio-SamTools Perl module *only* works with the 0.19 version, even though there is a newer HTSlib 1.0 version available. Most of the functionality we need is present in the older version, however.
 
 Next, compile the program.
 <pre>
@@ -232,60 +232,44 @@ Next, compile the program.
 
 The samtools `make` does not include test or install methods. For a system-wide installation, I will copy the `samtools-0.1.x` folder to `\usr\local\`, and generate symlinks to the executables `samtools` and `razip` into `\usr\local\bin\`, as well as symlink the man page `samtools.1` into the appropriate Man page directory. For a local home directory, just place the directory someplace easily accessible where you won't lose it. I'll also create symlinks to the executables in my home `~\bin` directory for quick access. 
 
-To install the Bio-SamTools Perl module, you'll need access to the header and library folders in the samtools directory (this is why you need to keep it handy). Do a search for Bio-SamTools from within the CPAN Shell, and install the latest version you find. During the installation, the Installer will ask for the location of the samtools headers and libraries. Enter the full path to where you've placed it, and it should compile and install fine.
+To install the Bio-SamTools Perl module, you'll need access to the header and library folders in the samtools directory (this is why you need to keep it handy). Install Bio-SamTools using your favorite CPAN install utility; see [BioToolBoxSetUp#Installing_Perl_Modules Installing Perl Modules] above for details. During the installation, the Installer will ask for the location of the samtools headers and libraries. Enter the full path to where you've placed it, and it should compile and install fine.
 
 One error you may or may not encounter is regarding shared libraries, and errors mentioning recompiling with "`-fPIC`". Some combinations of Perl and GCC don't mix well. In this case, go back to the samtools `Makefile`, edit the CFLAGS line and add "`-fPIC`" to the line (make sure there isn't a `#` comment character before it!). Then recompile.
 <pre>
 	make clean
 	make
 </pre>
-Repeat the Bio-Samtools installation (you may need to issue the clean command from within CPAN Shell). It should work now.
+Repeat the Bio-Samtools installation (you may need to issue the "clean" command from within CPAN Shell). It should work now.
 
 ==Installing bigWig and bigBed support==
-The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats for easy sharing and viewing of dense genomic data, such as from next generation sequencing technologies. These are self-contained, compressed, indexed, binary file formats, similar to a Bam file, that can be accessed locally or remotely. While they are tremendously helpful in viewing data, I have found they are also quite useful in genome analysis with the BioToolBox scripts. Their use, while not required, are highly recommended if you're using large datasets. 
+The UCSC Genome site developed the [http://genome.ucsc.edu/goldenPath/help/bigWig.html bigWig] and [http://genome.ucsc.edu/goldenPath/help/bigBed.html bigBed] file formats for easy sharing and viewing of dense genomic data, such as from next generation sequencing technologies. These are self-contained, compressed, indexed, binary file formats, similar to a Bam file, that can be accessed locally or remotely. Their use, while not required, are highly recommended if you're using large datasets. 
 
-You'll first need to compile the libraries used with big files. You can follow the instructions for the installation in the [http://search.cpan.org/dist/Bio-BigFile/ Bio-BigFile] Perl module README, or the instructions below. 
+You'll first need to compile the libraries used with big files. UCSC has recently changed their distribution method of source code. Earlier instructions (including those in the Bio-BigFile perl module) involve downloading the entire source code package, including browser, and having various other packages installed. Now they have made just the libraries and command-line utilities available, simplifying the installation process. 
 
-First, make sure you have prerequisites, including the source headers (developer package) for the GD2 libraries, including `libpng`. If these are installed in an odd place, e.g via [SetupForMacOSX#Installing_GD_Libraries Fink on Mac OS X], you may need to specify their location. For example, 
+First, you will need to download the [http://hgdownload.soe.ucsc.edu/admin/exe/userApps.src.tgz userApps source] file. In the download [http://hgdownload.soe.ucsc.edu/admin/exe/ directory] there are several versions available; I have tested version 310. Next, follow the steps below
 <pre>
-	export PNGLIB=/sw/lib/libpng.a 
-	export PNGINCL='-I/sw/include'
-</pre>
-
-Next, download Jim Kent's [http://hgdownload.cse.ucsc.edu/admin/jksrc.zip source] code. Then follow these instructions.
-<pre>
-	unzip jksrc.zip
-	cd kent/src/
-	export MACHTYPE=x86_64     # or replace with i386 or ppc as appropriate
+	export MACHTYPE=x86_64
+	
+	tar xf userApps.src.tgz
+	cd userApps/kent/src/
 	export KENT_SRC=```pwd```
 	
 	cd lib/
 	make
 	cd ..
 </pre>
-You should get a `x86_64/jkweb.a` file.
+If the compile works successfully, You should have a `lib/x86_64/jkweb.a` file. Note the two export commands above. The first sets a generic machine type, and the second records the path to the source directory. Both will greatly ease the installation of the Perl module.
 
-Next, install Bio-BigFile using the CPAN Shell. During installation, it will need to know the location of the kent/src/ directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
+Next, install Bio-BigFile using your favorite CPAN utility; see [BioToolBoxSetUp#Installing_Perl_Modules Installing Perl Modules] above for more information. During installation, it will need to know the location of the `kent/src/` directory. It should automatically find it from the environment variables you exported above (both are essential). Note that if you run CPAN Shell under `sudo`, your environment variables may not carry over if you performed the above not as root. 
 
 You may encounter the same error as with samtools above regarding "`-fPIC`". In that case, go back and edit the file `kent/src/inc/common.mk`. Find the line beginning with CFLAGS and add "`-fPIC`" to the line. Save, "`make clean`", and "`make`" again. 
 
 
 ===Big file utilities===
-There are a number of utilities available for working with bigWig and bigBed files. The easiest way to obtain these is to download pre-compiled binaries for your platform from the [http://hgdownload.cse.ucsc.edu/admin/exe/ UCSC downloads] site.
+There are a number of utilities available for working with bigWig and bigBed files. Some of these are required for converting to the big format. The easiest way to obtain these is to download pre-compiled binaries for your platform from the [http://hgdownload.cse.ucsc.edu/admin/exe/ UCSC downloads] site.
 
-Alternatively, you can compile utilities yourself. Note that in recent versions, you will need additional prerequisites, notably MySQL headers, just to build these utilities. If they are located in standard locations, e.g. in some linux distributions, you should be safe. If not, e.g. MySQL is installed through [SetupForMacOSX#Installing_MySQL_on_a_client_system Fink on Mac OS X], export the necessary paths.
-<pre>
-	export MYSQLINC=/sw/include/mysql
-	export MYSQLLIBS="/sw/lib/mysql/libmysqlclient.a -lz"
-</pre>
-
-Next, you will need to make the destination `bin` directory. 
-<pre>
-	mkdir ~/bin
-	mkdir ~/bin/x86_64     # this should be whatever you set your MACHTYPE
-</pre>
-
-Next, enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. Enter each one separately, and execute "`make`". It will compile the executable, and place it in your bin directory. Here is a short list I would recommend.
+Alternatively, you can compile the utilities yourself, since you have already downloaded the source code above. 
+Enter the `kent/src/util` directory, where you'll find numerous subdirectories for a number of utility programs. To compile all 200-something utilities, simply enter "`make`" on the command line. Alternatively, enter each one separately, and execute "`make`" in each subdirectory. It will compile the executable. The executable will be copied into "`~/bin/x86_64`". Here is a short list I would recommend.
 	* `wigToBigWig`
 	* `bedGraphToBigWig`
 	* `bedToBigBed`
