@@ -11,7 +11,12 @@ use FindBin '$Bin';
 use Statistics::Lite qw(min max);
 
 BEGIN {
-	plan tests => 58;
+	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
+		plan tests => 58;
+	}
+	else {
+		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
+	}
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
