@@ -1,5 +1,11 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.24001 (svn 940)
+	- Updated tests to catch possible sources of error, including 
+	recent UCSC BigFile libraries that power Bio::DB::BigWig 
+	adaptors, DB_File required for GFF3 loading into memory database,
+	and path verification in Data metadata.
+	
 v.1.24 (svn 936)
 	- Added new module Bio::ToolBox::Data::Stream for working with 
 	data files line by line instead of loading them into memory. 
