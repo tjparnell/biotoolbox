@@ -27,7 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = 1.22;
+my $VERSION = 1.25;
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -387,7 +387,7 @@ sub graph_provided_datasets {
 			my $result = graph_this($_->[0], $_->[1]);
 			if ($result) {
 				# return exit code of 1 means success
-				$pm->finish(1, \$result); 
+				$pm->finish(1, $result); 
 			}
 			else {
 				# exit code of 0 means failure, no correlation to report
