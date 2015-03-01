@@ -20,7 +20,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
 
-our $VERSION = 1.24;
+our $VERSION = 1.25;
 
 
 # check values for dynamically loaded helper modules
@@ -28,10 +28,8 @@ our $VERSION = 1.24;
 our $BAM_OK      = 0;
 our $BIGBED_OK   = 0;
 our $BIGWIG_OK   = 0;
-our $FASTA_OK    = 0;
-our $SEQSTORE_OK = 0;
+our $SEQFASTA_OK = 0;
 our $USEQ_OK     = 0;
-our $WIGGLE_OK   = 0;
 
 # define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
@@ -302,8 +300,8 @@ sub open_db_connection {
 	# check to see if we have already opened it
 	if (exists $OPENED_DB{$database} and not $no_cache) {
 		# return the cached database connection
-		# but only if user explicitly requested no cached databases
-		# DO NOT reuse databases if you have forked!!!
+		# but NOT if user explicitly requested no cached databases
+		# DO NOT reuse database objects if you have forked!!! Bad things happen
 		return wantarray ? ($OPENED_DB{$database}, $database) : $OPENED_DB{$database};
 	}
 	
@@ -336,7 +334,7 @@ sub open_db_connection {
 		}
 		
 		# a remote BigBed database
-		elsif ($database =~ /\.bb$/i) {
+		elsif ($database =~ /\.(?:bb|bigbed)$/i) {
 			# open using BigBed adaptor
 			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
 				unless $BIGBED_OK;
@@ -354,7 +352,7 @@ sub open_db_connection {
 		}
 		
 		# a remote BigWig database
-		elsif ($database =~ /\.bw$/i) {
+		elsif ($database =~ /\.(?:bw|bigwig)$/i) {
 			# open using BigWig adaptor
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
 				unless $BIGWIG_OK;
@@ -417,14 +415,10 @@ sub open_db_connection {
 		
 		# try opening with the Fasta adaptor
 		unless ($db) {
-			$FASTA_OK = _load_helper_module('Bio::DB::Fasta') unless $FASTA_OK;
-			if ($FASTA_OK) {
-				undef $@; # in case it was set by something else
-				eval {
-					# to prevent annoying error messages
-					local $SIG{__WARN__} = sub {}; 
-					$db = Bio::DB::Fasta->new($database);
-				};
+			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+				unless $SEQFASTA_OK;
+			if ($SEQFASTA_OK) {
+				$db = open_fasta_db($database);
 				unless ($db) {
 					$error .= " ERROR: could not open fasta directory '$database'!\n";
 					$error .= "   Does directory contain fasta files? If it contains a" . 
@@ -439,59 +433,13 @@ sub open_db_connection {
 	}
 	
 	# check for a known file type
-	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta/i) {
+	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig/i) {
 		
 		# first check that it exists
 		if (-e $database and -r _) {
 		
-			# a single gff3 file that we can load into memory
-			if ($database =~ /\.gff3?(?:\.gz)?$/i) {
-				$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
-					unless $SEQSTORE_OK;
-				if ($SEQSTORE_OK) {
-					print " Loading file into memory database...\n";
-					undef $@;
-					eval {
-						$db = Bio::DB::SeqFeature::Store->new(
-							-adaptor => 'memory',
-							-gff     => $database,
-						);
-					};
-					unless ($db) {
-						$error = " ERROR: could not load file '$database' into memory! $@\n";
-					}
-				}
-				else {
-					$error .= " Module Bio::DB::SeqFeature::Store is required to load " . 
-						"GFF3 files into memory\n";
-				}
-			}
-			
-			# a SQLite database
-			elsif ($database =~ /\.(?:sqlite|db)$/i) {
-				# open using SQLite adaptor
-				$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
-					unless $SEQSTORE_OK;
-				if ($SEQSTORE_OK) {
-					undef $@;
-					eval {
-						$db = Bio::DB::SeqFeature::Store->new(
-							-adaptor  => 'DBI::SQLite',
-							-dsn      => $database,
-						);
-					};
-					unless ($db) {
-						$error = " ERROR: could not open SQLite file '$database'! $@\n";
-					}
-				}
-				else {
-					$error .= " Module Bio::DB::SeqFeature::Store is required to access" . 
-						" database\n";
-				}
-			}
-			
 			# a Bam database
-			elsif ($database =~ /\.bam$/i) {
+			if ($database =~ /\.bam$/i) {
 				# open using BigWig adaptor
 				$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') 
 					unless $BAM_OK;
@@ -510,7 +458,7 @@ sub open_db_connection {
 			}
 			
 			# a BigBed database
-			elsif ($database =~ /\.bb$/i) {
+			elsif ($database =~ /\.(?:bb|bigbed)$/i) {
 				# open using BigBed adaptor
 				$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
 					unless $BIGBED_OK;
@@ -529,7 +477,7 @@ sub open_db_connection {
 			}
 			
 			# a BigWig database
-			elsif ($database =~ /\.bw$/i) {
+			elsif ($database =~ /\.(?:bw|bigwig)$/i) {
 				# open using BigWig adaptor
 				$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
 					unless $BIGWIG_OK;
@@ -568,16 +516,12 @@ sub open_db_connection {
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
 				# open using the Fasta adaptor
-				$FASTA_OK = _load_helper_module('Bio::DB::Fasta') unless $FASTA_OK;
-				if ($FASTA_OK) {
-					undef $@;
-					eval {
-						# to prevent annoying error messages
-						local $SIG{__WARN__} = sub {}; 
-						$db = Bio::DB::Fasta->new($database);
-					};
+				$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+					unless $SEQFASTA_OK;
+				if ($SEQFASTA_OK) {
+					$db = open_fasta_db($database);
 					unless ($db) {
-						$error = " ERROR: could not open fasta file '$database'!\n";
+						$error .= " ERROR: could not open fasta file '$database'!\n";
 						if (-e "$database\.index") {
 							$error .= "   Try deleting $database\.index and try again\n";
 						}
@@ -587,6 +531,26 @@ sub open_db_connection {
 					$error .= " Fasta file could not be loaded because Bio::DB::Fasta" . 
 						" is not installed\n";
 				}
+			}
+			
+			# a gff3 or sqlite database 
+			elsif ($database =~ /\.(?:gff3?|gff3?\.gz|db|sqlite)$/) {
+				$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+					unless $SEQFASTA_OK;
+				if ($SEQFASTA_OK) {
+					$db = open_store_db($database);
+					unless ($db) {
+						$error = " ERROR: could not load SeqFeature database file '$database'!\n";
+					}
+				}
+				else {
+					$error .= " Module Bio::DB::SeqFeature::Store is required to load " . 
+						"GFF and database files\n";
+				}
+			}
+			
+			else {
+				$error .= " Programmer error! Cannot interpret database type for $database!\n";
 			}
 		}
 		
@@ -606,7 +570,7 @@ sub open_db_connection {
 	# unrecognized real file
 	elsif (-e $database) {
 		# file exists, I just don't recognize the extension
-		$error = " File '$database' type is not recognized\n";
+		$error = " File '$database' type and/or extension is not recognized\n";
 	}
 	
 	# otherwise assume the name of a SeqFeature::Store database in the configuration
@@ -614,57 +578,17 @@ sub open_db_connection {
 	# attempt to open using information from the configuration
 	# using default connection information as necessary
 	unless ($db) {
-		# open the connection using parameters from the configuration file
-		# we'll try to use database specific parameters first, else use 
-		# the db_default parameters
-		my $adaptor = $BTB_CONFIG->param($database . '.adaptor') || 
-			$BTB_CONFIG->param('default_db.adaptor');
-		my $user = $BTB_CONFIG->param($database . '.user') || 
-			$BTB_CONFIG->param('default_db.user');
-		my $pass = $BTB_CONFIG->param($database . '.pass') ||
-			$BTB_CONFIG->param('default_db.pass') || undef;
-		
-		# check for empty passwords
-		# config::simple passes an empty array when nothing was defined
-		if (ref $pass eq 'ARRAY' and scalar @$pass == 0) {$pass = undef}
-		
-		# set up the dsn
-		# it can be specifically defined
-		my $dsn = $BTB_CONFIG->param($database . '.dsn') || undef;
-		unless (defined $dsn) {
-			# or dsn can be generated with the dsn_prefix
-			$dsn = $BTB_CONFIG->param($database . '.dsn_prefix') || 
-				$BTB_CONFIG->param('default_db.dsn_prefix');
-			$dsn .= $database;
-		}
-		
-		# establish the database connection
-		$SEQSTORE_OK = _load_helper_module('Bio::DB::SeqFeature::Store') 
-			unless $SEQSTORE_OK;
-		if ($SEQSTORE_OK) {
-			eval {
-				# to prevent annoying error messages from B:DB:SF:S
-				local $SIG{__WARN__} = sub {}; 
-			
-				# attempt a connection
-				$db = Bio::DB::SeqFeature::Store->new(
-					-adaptor => $adaptor,
-					-dsn     => $dsn,
-					-user    => $user,
-					-pass    => $pass,
-				);
-			};
-		
+		$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+			unless $SEQFASTA_OK;
+		if ($SEQFASTA_OK) {
+			$db = open_store_db($database);
 			unless ($db) {
-				$error .= " ERROR: unknown $adaptor database '$database'\n";
-				if ($dsn =~ /mysql|pg/i) {
-					$error .= "   using user '$user' and password\n";
-				}
+				$error .= " unable to open relational database named '$database'\n";
 			}
 		}
 		else {
 			$error .= " Module Bio::DB::SeqFeature::Store is required to connect " . 
-				"to $adaptor databases\n";
+				"to databases\n";
 		}
 	}
 	
@@ -729,7 +653,7 @@ sub get_dataset_list {
 	my @types;
 	
 	# a SeqFeature database
-	if ($db_ref =~ m/Bio::DB::SeqFeature::Store/) {
+	if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
 		
 		# collect the database types, 
 		# sort first by source, then by method
@@ -1483,6 +1407,9 @@ sub get_new_feature_list {
 	printf "   Found %s features in the database\n", format_with_commas($total_count);
 	printf "   Kept %s features.\n", format_with_commas($data->{'last_row'});
 	
+	# associate the opened database object with the data
+	$data->{db_connection} = $db;
+	
 	# return the new data structure
 	return $data;
 }
@@ -1610,6 +1537,9 @@ sub get_new_genome_list {
 		}
 	}
 	print "   Kept " . $data->{'last_row'} . " windows.\n";
+	
+	# associate the opened database object with the data
+	$data->{db_connection} = $db;
 	
 	# Return the data structure
 	return $data;
@@ -2591,7 +2521,7 @@ sub get_chromosome_list {
 	# bugs make me use different approaches for better consistency
 	
 	# SeqFeature::Store
-	if (ref $db eq 'Bio::DB::SeqFeature::Store') {
+	if (ref $db =~ /^Bio::DB::SeqFeature::Store/) {
 		for my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
@@ -2875,7 +2805,6 @@ sub _get_segment_score {
 	
 	# define
 	my @scores; # array of collected scores
-	my %pos2data; # hash of position to scores
 	my $dataset_type; # remember what type of database the data is from
 	my $iterator; # seqfeature stream object for reiterating db features
 	my $db_type = $db ? ref $db : undef; # source of the originating db 
@@ -3107,6 +3036,12 @@ sub _get_segment_score {
 	elsif ($db_type =~ m/^Bio::DB::BigWigSet/) {
 		# calling features from a BigWigSet database object
 		
+		# check that we have bigwig support
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+			unless $BIGWIG_OK;
+		confess " BigWigSet support is not enabled! Is Bio::DB::BigFile installed?" 
+			unless $BIGWIG_OK;
+		
 		# we may be able to take advantage of a special low-level 
 		# super-speedy interface based on the BigWigSet summary feature
 		
@@ -3172,453 +3107,184 @@ sub _get_segment_score {
 		}
 	}
 		
-	
+
 	### SeqFeature database
-	elsif ($db_type =~ m/^Bio::DB::SeqFeature/) {
-		# a SeqFeature database
-		# normal collection
-		$iterator = $db->get_seq_stream(
-			-seq_id      => $chromo,
-			-start       => $start,
-			-end         => $stop,
-			-primary_tag => [@datasetlist],
-		);
+	elsif ($db_type =~ m/^Bio::DB/) {
+		# a BioPerl-style database
+		# presumably this is a Bio::DB::SeqFeature::Store database
+		# if not, most Bio::DB databases support generic get_seq_stream() methods
+		# that return seqfeature objects, which we can use in a generic sense
+		# at best, this will return simple scores
+		# at worst, these generic methods are not supported and it will fail
+		
+		# check that we have support
+		$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+			unless $SEQFASTA_OK;
+		if ($SEQFASTA_OK) {
+			# get the dataset scores using Bio::ToolBox::db_helper::seqfasta
+			
+			if ($method eq 'indexed') {
+				# warn " using collect_useq_position_scores() with file\n";
+				return collect_store_position_scores(
+					$db,
+					$chromo,
+					$start,
+					$stop,
+					$strand, 
+					$strandedness, 
+					$value_type,
+					@datasetlist
+				);
+			}
+			
+			else {
+				# warn " using collect_useq_scores() with file\n";
+				@scores = collect_store_scores(
+					$db,
+					$chromo,
+					$start,
+					$stop,
+					$strand, 
+					$strandedness, 
+					$value_type, 
+					@datasetlist
+				);
+				$dataset_type = 'seqfeature';
+			}
+		}
+		else {
+			croak " SeqFeature Store support is not enabled! " . 
+				"Is Bio::DB::SeqFeature::Store properly installed?\n";
+		}
 	}
 	
 	
 	### Some other database?
 	else {
-		# some other Bio::DB database????
-		# until I code in every single possibility
-		# let's just try a basic features method using whatever the 
-		# default type is and hope for the best
-		# warn "using other database $db_type!\n";
 		confess "no database passed!" unless $db;
-		$iterator = $db->get_seq_stream(
-			-seq_id      => $chromo,
-			-start       => $start,
-			-end         => $stop,
-		);
+		confess "unrecognized database type $db_type!";
 	}
 		
-	
-	
-	### Process database SeqFeature objects
-	if ($iterator) {
-		# We have a seqfeature object stream
-		# First check whether we're dealing with a datafile pointed to by
-		# an attribute tag 
-		# Failing that, assume it's the seqfeature objects themselves we want
-		
-		# collect the first feature
-		my $feature = $iterator->next_seq;
-		return _return_null($method) unless $feature;
-		
-		# deal with features that might not be from the chromosome we want
-		# sometimes chromosome matching is sloppy and we get something else
-		while ($feature->seq_id ne $chromo) {
-			$feature = $iterator->next_seq || undef;
-		}
-		return _return_null($method) unless $feature;
-		
-		## Wig Data
-		if ( $feature->has_tag('wigfile') ) {
-			# data is in wig format, or at least the first datapoint is
-			
-			# determine the type of wigfile
-			my ($wigfile) = $feature->get_tag_values('wigfile');
-			
-			## Bio::Graphics wib file
-			if ($wigfile =~ /\.wib$/) {
-				# data is in old-style binary wiggle format
-				# based on the Bio::Graphics::Wiggle adaptor
-				
-				# get the full list of features to pass off to the 
-				# helper subroutine
-				my @features;
-				push @features, $feature;
-				while (my $f = $iterator->next_seq) {
-					push @features, $f;
-				}
-				
-				# check that we have wiggle support
-				$WIGGLE_OK = _load_helper_module('Bio::ToolBox::db_helper::wiggle') 
-					unless $WIGGLE_OK;
-				if ($WIGGLE_OK) {
-					# get the dataset scores using Bio::ToolBox::db_helper::wiggle
-					
-					if ($method eq 'indexed') {
-						# warn " using collect_wig_position_scores() from tag\n";
-						return collect_wig_position_scores(
-							$start,
-							$stop,
-							$strand, 
-							$strandedness, 
-							$value_type,
-							@features
-						);
-					}
-					else {
-						# warn " using collect_wig_scores() from tag\n";
-						@scores = collect_wig_scores(
-							$start,
-							$stop,
-							$strand, 
-							$strandedness, 
-							$value_type,
-							@features
-						);
-						$dataset_type = 'wig';
-					}
-				}
-				else {
-					croak " Wiggle support is not enabled! " . 
-						"Is Bio::Graphics::Wiggle installed?\n";
-				}
-			}
-			
-			## BigWig file
-			elsif ($wigfile =~ /\.bw$/) {
-				# data is in bigwig format
-				# this uses the Bio::DB::BigWig adaptor
-				
-				# collect the wigfile paths
-				# also check strand while we're at it
-				my @wigfiles;
-				while ($feature) {
-					
-					# check if we can take this feature
-					if (
-						$strandedness eq 'all' # stranded data not requested
-						or $feature->strand == 0 # unstranded data
-						or ( 
-							# sense data
-							$strand == $feature->strand 
-							and $strandedness eq 'sense'
-						) 
-						or (
-							# antisense data
-							$strand != $feature->strand  
-							and $strandedness eq 'antisense'
-						)
-					) {
-						# we can take this file, it passes the strand test
-						my ($file) = $feature->get_tag_values('wigfile');
-						push @wigfiles, "file:$file";
-					}
-					
-					# prepare for next
-					$feature = $iterator->next_seq || undef;
-				}
-				
-				# if no wigfiles are found, return empty handed
-				# should only happen if the strands don't match
-				return _return_null($method) unless (@wigfiles);
-				
-				# check that we have bigwig support
-				$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-					unless $BIGWIG_OK;
-				if ($BIGWIG_OK) {
-					
-					# the data collection depends on the method
-					if ($value_type eq 'score' and 
-						$method =~ /min|max|mean|sum|count/
-					) {
-						# we can use the low-level, super-speedy, summary method 
-						# warn " using collect_bigwig_score() from tag\n";
-						return collect_bigwig_score(
-							$chromo,
-							$start,
-							$stop,
-							$method,
-							@wigfiles
-						);
-					}
-					
-					elsif ($value_type eq 'count' and $method eq 'sum') {
-						# we can use the low-level, super-speedy, summary method 
-						# warn " using collect_bigwig_score() from tag\n";
-						return collect_bigwig_score(
-							$chromo,
-							$start,
-							$stop,
-							'count', # special method
-							@wigfiles
-						);
-					}
-					
-					elsif ($method eq 'indexed') {
-						# warn " using collect_bigwig_position_scores() from tag\n";
-						return collect_bigwig_position_scores(
-							$chromo,
-							$start,
-							$stop,
-							@wigfiles
-						);
-					}
-					
-					else {
-						# use the longer region collection method
-						# warn " using collect_bigwig_scores() from tag\n";
-						@scores = collect_bigwig_scores(
-							$chromo,
-							$start,
-							$stop,
-							@wigfiles
-						);
-						$dataset_type = 'bw';
-					}
-				}
-				else {
-					croak " BigWig support is not enabled! " . 
-						"Is Bio::DB::BigWig installed?\n";
-				}
-			}
-			else {
-				croak " Unrecognized wigfile attribute '$wigfile'!" . 
-					" Unable to continue!\n";
-			}
-		}
-		
-		
-		## Database Data
-		else {
-			# Working with data stored directly in the database
-			# this is more straight forward in collection
-			
-			# Walk through the datapoints
-			# warn " using database\n";
-			while ($feature) {
-			
-				# Check which data to take based on strand
-				if (
-					$strandedness eq 'all' # all data is requested
-					or $strand == 0 # region is unstranded
-					or $feature->strand == 0 # unstranded data
-					or ( 
-						# sense data
-						$strand == $feature->strand 
-						and $strandedness eq 'sense'
-					) 
-					or (
-						# antisense data
-						$strand != $feature->strand  
-						and $strandedness eq 'antisense'
-					)
-				) {
-					# we have acceptable data to collect
-				
-					# data is in the database
-					# much easier to collect
-					
-					# store data in either indexed hash or score array
-					if ($method eq 'indexed') {
-					
-						# determine position to record
-						my $position;
-						if ($feature->start == $feature->end) {
-							# just one position recorded
-							$position = $feature->start;
-						}
-						else {
-							# calculate the midpoint
-							$position = int( 
-								($feature->start + $feature->end) / 2
-							);
-						}
-						
-						# store the appropriate value
-						if ($value_type eq 'score') {
-							push @{ $pos2data{$position} }, $feature->score;
-						}
-						elsif ($value_type eq 'count') {
-							$pos2data{$position} += 1;
-						}
-						elsif ($value_type eq 'pcount') {
-							$pos2data{$position} += 1 if 
-								($feature->start >= $start and $feature->end <= $stop);
-						}
-						elsif ($value_type eq 'length') {
-							push @{ $pos2data{$position} }, $feature->length;
-						}
-					}
-					
-					else {
-						# just store the score in the array
-						
-						# store the appropriate value
-						if ($value_type eq 'score') {
-							push @scores, $feature->score;
-						}
-						elsif ($value_type eq 'count') {
-							$scores[0] += 1;
-						}
-						elsif ($value_type eq 'pcount') {
-							$scores[0] += 1 if 
-								($feature->start >= $start and $feature->end <= $stop);
-						}
-						elsif ($value_type eq 'length') {
-							push @scores, $feature->length;
-						}
-					}
-				}
-				
-				# prepare for next
-				$feature = $iterator->next_seq || undef;
-			}
-			
-			# post-process the collected position->score values 
-			# combine multiple values recorded at the same position
-			if (
-				$method eq 'indexed' and 
-				($value_type eq 'score' or $value_type eq 'length')
-			) {
-				# each 'value' is an array of one or more scores or lengths 
-				# from the datapoints collected above
-				# the mean value is the best we can do right now for 
-				# combining the data
-				# really would prefer something else
-				# we don't have a true method to utilize
-				foreach my $position (keys %pos2data) {
-					$pos2data{$position} = mean( @{$pos2data{$position}} );
-				}
-			}
-			
-			$dataset_type = 'db';
-		} 
-	
-	} # end database collection
-	
-	
 	
 	### Determine region score from collected scores
-	# We have collected the positioned scores
-	# Now return the appropriate values
 	
-	# indexed scores
-	if ($method eq 'indexed') {
-		# requested indexed position scores
-		# we will simply return the data hash
-		# regardless whether there are scores or not
-		return %pos2data;
-	}
-	
-	# scores
-	elsif ($method eq 'scores') {
+	# all scores
+	if ($method eq 'scores') {
 		# just the scores are requested
 		# return an array reference
 		return \@scores;
 	}
 	
-	# single region score
-	else {
-		# check that we have scores
-		return _return_null($method) unless (@scores);
+	# check that we have scores
+	return _return_null($method) unless (@scores);
+	
+	# requested a single score for this region
+	# we need to combine the data
+	my $region_score;
+	
+	# first deal with log2 values if necessary
+	if ($log) {
+		@scores = map {2 ** $_} @scores;
+	}
+	
+	# determine the region score according to method
+	# we are using subroutines from Statistics::Lite
+	if ($method eq 'median') {
+		# take the median value
+		$region_score = median(@scores);
+	}
+	elsif ($method eq 'mean') {
+		# or take the mean value
+		$region_score = mean(@scores);
+	} 
+	elsif ($method eq 'range') {
+		# or take the range value
+		# this is 'min-max'
+		$region_score = range(@scores);
+	}
+	elsif ($method eq 'stddev') {
+		# or take the standard deviation value
+		# we are using the standard deviation of the population, 
+		# since these are the only scores we are considering
+		$region_score = stddevp(@scores);
+	}
+	elsif ($method eq 'min') {
+		# or take the minimum value
+		$region_score = min(@scores);
+	}
+	elsif ($method eq 'max') {
+		# or take the maximum value
+		$region_score = max(@scores);
+	}
+	elsif ($method eq 'count') {
+		# count the number of values
+		$region_score = scalar(@scores);
+	}
+	elsif ($method eq 'sum') {
+		# sum the number of values
+		$region_score = sum(@scores);
+	}
+	elsif ($method =~ /rpk?m/) {
+		# convert to reads per million mapped
+		# this is only supported by bam and bigbed db, checked above
 		
-		# requested a single score for this region
-		# we need to combine the data
-		my $region_score;
-		
-		# first deal with log2 values if necessary
-		if ($log) {
-			@scores = map {2 ** $_} @scores;
-		}
-		
-		# determine the region score according to method
-		# we are using subroutines from Statistics::Lite
-		if ($method eq 'median') {
-			# take the median value
-			$region_score = median(@scores);
-		}
-		elsif ($method eq 'mean') {
-			# or take the mean value
-			$region_score = mean(@scores);
-		} 
-		elsif ($method eq 'range') {
-			# or take the range value
-			# this is 'min-max'
-			$region_score = range(@scores);
-		}
-		elsif ($method eq 'stddev') {
-			# or take the standard deviation value
-			# we are using the standard deviation of the population, 
-			# since these are the only scores we are considering
-			$region_score = stddevp(@scores);
-		}
-		elsif ($method eq 'min') {
-			# or take the minimum value
-			$region_score = min(@scores);
-		}
-		elsif ($method eq 'max') {
-			# or take the maximum value
-			$region_score = max(@scores);
-		}
-		elsif ($method eq 'count') {
-			# count the number of values
-			$region_score = scalar(@scores);
-		}
-		elsif ($method eq 'sum') {
-			# sum the number of values
-			$region_score = sum(@scores);
-		}
-		elsif ($method =~ /rpk?m/) {
-			# convert to reads per million mapped
-			# this is only supported by bam and bigbed db, checked above
+		# total the number of reads if necessary
+		unless (exists $total_read_number{$dataset} ) {
 			
-			# total the number of reads if necessary
-			unless (exists $total_read_number{$dataset} ) {
+			# check the type of database
+			if ($dataset_type eq 'bam') {
+				# a bam database
 				
-				# check the type of database
-				if ($dataset_type eq 'bam') {
-					# a bam database
-					
-					$total_read_number{$dataset} = 
-						sum_total_bam_alignments($dataset);
-					print "\n [total alignments: ", 
-						format_with_commas( $total_read_number{$dataset} ), 
-						"]\n";
-				}
-				
-				elsif ($dataset_type eq 'bb') {
-					# bigBed database
-					
-					$total_read_number{$dataset} = 
-						sum_total_bigbed_features($dataset);
-					print "\n [total features: ", 
-						format_with_commas( $total_read_number{$dataset} ), 
-						"]\n";
-				}
-			}	
-			
-			# calculate the region score according to the method
-			if ($method eq 'rpkm') {
-				$region_score = 
-					( sum(@scores) * 1000000000 ) / 
-					( ($stop - $start + 1) * $total_read_number{$dataset} );
+				$total_read_number{$dataset} = 
+					sum_total_bam_alignments($dataset);
+				print "\n [total alignments: ", 
+					format_with_commas( $total_read_number{$dataset} ), 
+					"]\n";
 			}
-			elsif ($method eq 'rpm') {
-				$region_score = 
-					( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
+			elsif ($dataset_type eq 'bb') {
+				# bigBed database
+				
+				$total_read_number{$dataset} = 
+					sum_total_bigbed_features($dataset);
+				print "\n [total features: ", 
+					format_with_commas( $total_read_number{$dataset} ), 
+					"]\n";
 			}
 			else {
-				# this dataset doesn't support rpm methods
-				# use the sum method instead
-				$region_score = sum(@scores);
+				# database is not supported
+				# reset the method
+				$method = 'sum';
 			}
+		}	
+		
+		# calculate the region score according to the method
+		if ($method eq 'rpkm') {
+			$region_score = 
+				( sum(@scores) * 1000000000 ) / 
+				( ($stop - $start + 1) * $total_read_number{$dataset} );
+		}
+		elsif ($method eq 'rpm') {
+			$region_score = 
+				( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
 		}
 		else {
-			# somehow bad method snuck past our checks
-			confess " unrecognized method '$method'!";
+			# this dataset doesn't support rpm methods
+			# use the sum method instead
+			$region_score = sum(@scores);
 		}
-	
-		# convert back to log2 if necessary
-		if ($log) { 
-			$region_score = log($region_score) / LOG2;
-		}
-		
-		# finished
-		return $region_score;
 	}
+	else {
+		# somehow bad method snuck past our checks
+		confess " unrecognized method '$method'!";
+	}
+
+	# convert back to log2 if necessary
+	if ($log) { 
+		$region_score = log($region_score) / LOG2;
+	}
+	
+	# finished
+	return $region_score;
 }
 
 
