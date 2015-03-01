@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::common;
-our $VERSION = 1.24;
+our $VERSION = 1.25;
 
 =head1 NAME
 
@@ -342,8 +342,10 @@ sub delete_metadata {
 	my $self = shift;
 	my ($index, $key) = @_;
 	return unless defined $index;
-	if (defined $key and exists $self->{$index}{$key}) {
-		return delete $self->{$index}{$key};
+	if (defined $key) {
+		if (exists $self->{$index}{$key}) {
+			return delete $self->{$index}{$key};
+		}
 	}
 	else {
 		# user wants to delete the metadata
@@ -385,7 +387,7 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = find_column_index($self, '^name|geneName|transcriptName|alias');
+	my $name   = find_column_index($self, '^name|geneName|transcriptName|geneid|id|alias');
 	my $type   = find_column_index($self, '^type|class|primary_tag');
 	my $id     = find_column_index($self, '^primary_id');
 	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
