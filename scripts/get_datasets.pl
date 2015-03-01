@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.24;
+my $VERSION = 1.25;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -146,6 +146,11 @@ if ($infile) {
 	}
 	else {
 		$main_database = $Data->database;
+	}
+	
+	# update feature type as necessary
+	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
+		$Data->feature($feature);
 	}
 }
 elsif ($new) {

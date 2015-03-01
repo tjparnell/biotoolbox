@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.24;
+my $VERSION = 1.25;
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -145,6 +145,11 @@ if ($infile) {
 	}
 	else {
 		$main_database = $Data->database;
+	}
+	
+	# update feature type as necessary
+	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
+		$Data->feature($feature);
 	}
 }
 else {
