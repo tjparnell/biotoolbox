@@ -220,14 +220,6 @@ sub process_gene_tree {
 			Sum_score
 			Stdev_score
 	) );
-# old columns
-# 			Parent
-# 			Number_subfeatures
-# 			Min_name
-# 			Min_score
-# 			Max_name
-# 			Max_score
-# 			Range
 	push @{ $output->{'other'} }, " # original_input_file $infile\n";
 	
 	# walk through each gene
