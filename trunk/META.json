@@ -4,7 +4,7 @@
       "Timothy Parnell <parnell.tj@gmail.com>"
    ],
    "dynamic_config" : 1,
-   "generated_by" : "Module::Build version 0.4205",
+   "generated_by" : "Module::Build version 0.4211",
    "license" : [
       "perl_5"
    ],
@@ -45,7 +45,7 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.24"
+         "version" : "1.25"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
@@ -64,7 +64,7 @@
       },
       "Bio::ToolBox::Data::common" : {
          "file" : "lib/Bio/ToolBox/Data/common.pm",
-         "version" : "1.24"
+         "version" : "1.25"
       },
       "Bio::ToolBox::big_helper" : {
          "file" : "lib/Bio/ToolBox/big_helper.pm",
@@ -72,11 +72,11 @@
       },
       "Bio::ToolBox::data_helper" : {
          "file" : "lib/Bio/ToolBox/data_helper.pm",
-         "version" : "1.24"
+         "version" : "1.25"
       },
       "Bio::ToolBox::db_helper" : {
          "file" : "lib/Bio/ToolBox/db_helper.pm",
-         "version" : "1.24"
+         "version" : "1.25"
       },
       "Bio::ToolBox::db_helper::bam" : {
          "file" : "lib/Bio/ToolBox/db_helper/bam.pm",
@@ -98,6 +98,10 @@
          "file" : "lib/Bio/ToolBox/db_helper/gff3_parser.pm",
          "version" : "1.19"
       },
+      "Bio::ToolBox::db_helper::seqfasta" : {
+         "file" : "lib/Bio/ToolBox/db_helper/seqfasta.pm",
+         "version" : "1.25"
+      },
       "Bio::ToolBox::db_helper::useq" : {
          "file" : "lib/Bio/ToolBox/db_helper/useq.pm",
          "version" : "1.24"
@@ -108,7 +112,7 @@
       },
       "Bio::ToolBox::file_helper" : {
          "file" : "lib/Bio/ToolBox/file_helper.pm",
-         "version" : "1.24"
+         "version" : "1.25"
       },
       "Bio::ToolBox::utility" : {
          "file" : "lib/Bio/ToolBox/utility.pm",
@@ -121,5 +125,5 @@
          "http://dev.perl.org/licenses/"
       ]
    },
-   "version" : "1.24"
+   "version" : "1.25"
 }
