@@ -160,7 +160,8 @@ sub feature_type {
 		$feature_type = 'coordinate';
 	}
 	elsif (defined $self->id_column or 
-		( defined $self->type_column and defined $self->name_column )
+		( defined $self->type_column and defined $self->name_column ) or 
+		( defined $self->feature and defined $self->name_column )
 	) {
 		$feature_type = 'named';
 	}
