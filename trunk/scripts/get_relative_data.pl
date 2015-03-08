@@ -135,11 +135,11 @@ if ($infile) {
 	
 	# update main database as necessary
 	if ($main_database) {
-		if ($main_database ne $Data->database) {
+		if (defined $Data->database and $Data->database ne $main_database) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-			print "   Re-run without --db option if you do not want this to happen\n";
+# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
@@ -166,7 +166,7 @@ my $startcolumn = $Data->number_columns;
 
 # make sure data table supports avoid option
 if ($avoid) {
-	unless ($Data->feature_type eq 'named' and defined $Data->type_column) {
+	unless ($Data->feature_type eq 'named') {
 		warn " avoid option not supported with current Data table. Disabling\n";
 		$avoid = 0;
 	}
@@ -420,6 +420,7 @@ sub parallel_execution {
 		
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
+		my $db = $Data->open_database(1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}
@@ -908,7 +909,7 @@ sub collect_long_data_window_scores {
 								$reference - $Data->metadata($column, 'start'),
 			'stop'        => $fstrand >= 0 ? 
 								$reference + $Data->metadata($column, 'stop') : 
-								$reference - $Data->metdata($column, 'stop'),
+								$reference - $Data->metadata($column, 'stop'),
 			'strand'      => $fstrand,
 			'method'      => $method,
 			'value'       => $value_type,
