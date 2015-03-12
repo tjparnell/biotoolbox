@@ -32,7 +32,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.24';
+my $VERSION = 1.25;
 	
 	
 
@@ -60,6 +60,7 @@ my (
 	$paired,
 	$shift,
 	$shift_value,
+	$ext_value,
 	$sample_number,
 	$chr_number,
 	$correlation_min,
@@ -93,6 +94,7 @@ GetOptions(
 	'pe!'       => \$paired, # paired-end alignments
 	'shift!'    => \$shift, # shift coordinates 3'
 	'shiftval=i' => \$shift_value, # value to shift coordinates
+	'ext=i'     => \$ext_value, # value to extend reads
 	'sample=i'  => \$sample_number, # number of samples to test for shift
 	'chrom=i'   => \$chr_number, # number of chromosomes to sample
 	'minr=f'    => \$correlation_min, # R^2 minimum value for shift
@@ -173,21 +175,22 @@ if ($rpm) {
 
 ### Calculate shift value
 if ($shift) {
-	if (not $shift_value) {
+	unless ($shift_value or ($position eq 'extend' and $ext_value)) {
 		print " Calculating 3' shift value...\n";
 		$shift_value = determine_shift_value();
 	}
 	
 	# precalculate double shift when recording extended position
 	if ($position eq 'extend') {
-		$shift_value = $shift_value * 2;
-		print " Reads will be extended by $shift_value bp\n";
+		unless ($ext_value) {
+			$ext_value = $shift_value * 2;
+		}
+		print " Alignments will be extended by $ext_value bp\n";
 	}
 	else {
-		print " Read counts will be shifted by $shift_value bp\n";
+		print " Alignments will be shifted by $shift_value bp\n";
 	}
 }
-
 
 
 ### Process bam file
@@ -230,7 +233,6 @@ else {
 
 
 ### Finish
-
 printf " Finished in %.1f min\n", (time - $start_time)/60;
 
 
@@ -272,7 +274,7 @@ sub check_defaults {
 	
 	# check mapping quality
 	if (defined $min_mapq) {
-		die " quality score must be < 255!\n" if $min_mapq > 255;
+		die " quality score must be 0-255!\n" if $min_mapq > 255;
 	}
 	else {
 		$min_mapq = 0;
@@ -309,13 +311,10 @@ sub check_defaults {
 		}
 		elsif ($position eq 'span') {
 			$use_span = 1;
-			if ($shift) {
-				# essentially the same thing as extend
-				$position eq 'extend';
-			}
 		}
 		elsif ($position eq 'extend') {
 			if ($paired) {
+				# why would this be set??? oh well
 				$use_span = 1;
 			}
 			else {
@@ -336,17 +335,15 @@ sub check_defaults {
 		if ($paired) {
 			$use_mid = 1;
 		}
+		elsif (!$shift and !$strand and !$log and !$rpm and !$splice) {
+			$use_coverage = 1;
+		}
 		else {
-			if (!$shift and !$strand and !$log and !$rpm and !$splice) {
-				$use_coverage = 1;
-			}
-			else {
-				$use_start = 1;
-			}
+			$use_start = 1;
 		}
 	}
 	if ($paired and $use_start) {
-		warn " using midpoint with paired-end reads\n";
+		warn " using start with paired-end reads is not recommended, recording midpoint\n";
 		undef $use_start;
 		$use_mid   = 1;
 	}
@@ -363,12 +360,20 @@ sub check_defaults {
 		undef $splice;
 	}
 	
-	# check to shift position or not
-	if ($shift and ($paired or $splice) ) {
-		warn " disabling shift with paired reads\n" if $paired;
-		warn " disabling shift with splices enabled\n" if $splice;
+	# incompatible options
+	if ($splice and $ext_value) {
+		warn " disabling splices when custom extend value is defined\n";
+		$splice = 0;
+	}
+	if ($shift and $splice) {
+		die " enabling both shift and splices is not allowed. Pick one.\n";
+	}
+	if ($shift and $paired) {
+		warn " disabling shift with paired reads\n";
 		undef $shift;
 	}
+	
+	# check to shift position or not
 	if ($shift_value and !$shift) {
 		$shift = 1;
 	}
@@ -438,11 +443,6 @@ sub check_defaults {
 		# overide to false if bigwig is true
 		undef $gz if $bigwig;
 	} 
-	else {
-		# default is to use compression unless a bigwig file is requested
-		# then the file is only temporary anyway
-		$gz = $bigwig ? 0 : 1;
-	}
 	(undef, undef, $outbase) = File::Spec->splitpath($outfile);
 	$outfile =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # strip extension if present
 	$outbase =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # splitpath doesn't do extensions
@@ -455,6 +455,8 @@ sub check_defaults {
 		# no callbacks necessary, special mode
 		print " recording coverage spanning alignments\n";
 	}
+	
+	# impossibilities
 	elsif ($strand and $shift) {
 		# this should not happen, strand is disabled with shift
 		die " programming error!\n";
@@ -467,6 +469,8 @@ sub check_defaults {
 		# this should not happen, shift is disabled with paired
 		die " programming error!\n";
 	}
+	
+	# start positions
 	elsif ($use_start and !$strand and !$shift and !$paired) {
 		$callback  = \&record_start;
 		$split_callback = \&record_split_start;
@@ -484,6 +488,8 @@ sub check_defaults {
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording shifted-start positions\n";
 	}
+	
+	# mid positions
 	elsif ($use_mid and $strand and !$shift and $paired) {
 		$callback = \&record_stranded_paired_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
@@ -511,16 +517,35 @@ sub check_defaults {
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
 		print " recording mid position\n";
 	}
+	
+	# spanning
+		# record_span					-> length
+		# record_split_span				-> length
+		# record_split_stranded_span	-> length
+		# record_paired_span			-> isize
+		# record_stranded_paired_span	-> isize
+		
+		# record_shifted_span			-> length, shift_value
+		# record_extended				-> ext_value
+	
+	
 	elsif ($use_span and $strand and !$shift and $paired) {
 		$callback  = \&record_stranded_paired_span;
 		$write_wig = \&write_bedgraph;
 		print " recording stranded positions spanning paired alignments\n";
 	}
 	elsif ($use_span and $strand and !$shift and !$paired) {
-		$callback  = \&record_stranded_span;
-		$split_callback = \&record_split_stranded_span;
-		$write_wig = \&write_bedgraph;
-		print " recording stranded positions spanning alignments\n";
+		if ($ext_value) {
+			$callback = \&record_stranded_extend;
+			$write_wig = \&write_bedgraph;
+			print " recording stranded extended alignments\n";
+		}
+		else {
+			$callback  = \&record_stranded_span;
+			$split_callback = \&record_split_stranded_span;
+			$write_wig = \&write_bedgraph;
+			print " recording stranded positions spanning alignments\n";
+		}
 	}
 	elsif ($use_span and !$strand and !$shift and $paired) {
 		$callback  = \&record_paired_span;
@@ -528,12 +553,17 @@ sub check_defaults {
 		print " recording positions spanning paired alignments\n";
 	}
 	elsif ($use_span and !$strand and !$shift and !$paired) {
-		if (!$rpm and !$log and !$splice) {
-			# this is actually coverage
-			undef $use_span;
-			undef $bedgraph; # no bedgraph file, coverage uses fixedStep
-			$use_coverage = 1;
-			print " recording coverage spanning alignments\n";
+# 		if (!$rpm and !$log and !$splice) {
+# 			# this is actually coverage
+# 			undef $use_span;
+# 			undef $bedgraph; # no bedgraph file, coverage uses fixedStep
+# 			$use_coverage = 1;
+# 			print " recording coverage spanning alignments\n";
+# 		}
+		if ($ext_value) {
+			$callback  = \&record_extended;
+			$write_wig = \&write_bedgraph;
+			print " recording custom extended alignments\n";
 		}
 		else {
 			$callback  = \&record_span;
@@ -543,9 +573,21 @@ sub check_defaults {
 		}
 	}
 	elsif ($use_span and !$strand and $shift and !$paired) {
-		$callback  = \&record_extended;
-		$write_wig = \&write_bedgraph;
-		print " recording extended alignments\n";
+		if ($position eq 'extend') {
+			$callback  = \&record_extended;
+			$write_wig = \&write_bedgraph;
+			print " recording extended alignments\n";
+		}
+		elsif ($ext_value) {
+			$callback  = \&record_shifted_extended;
+			$write_wig = \&write_bedgraph;
+			print " recording shifted extended alignments\n";
+		}
+		else {
+			$callback  = \&record_shifted_span;
+			$write_wig = \&write_bedgraph;
+			print " recording shifted positions spanning alignments\n";
+		}
 	}
 	else {
 		# what else is left!?
@@ -841,6 +883,7 @@ sub calculate_strand_correlation {
 			'f'       => {},
 			'r'       => {},
 			'count'   => 0,
+			'tcount'  => 0,
 			'print'   => 0, # we will not print this data to file
 		};
 		$sam->bam_index->fetch(
@@ -1060,6 +1103,34 @@ sub write_model_file {
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $rSquared_file\n" if $rSquared_file;
+}
+
+
+
+### Pre-check alignment lengths for extend value
+sub check_alignment_lengths {
+	
+	# start check alignments from the beginning, do not care about chromosome
+	my $bam = $sam->bam;
+	my @lengths;
+	my $count = 0;
+	while (my $a = $bam->read1) {
+		last if $count == 2000; # go through first 2000, seems reasonable
+		next if $a->unmapped;
+		push @lengths, $a->calend - $a->pos;
+		$count++;
+	}
+	
+	# check if the lengths are all equal
+	if (all_equal(\@lengths)) {
+		return $lengths[0];
+	}
+	else {
+		printf "  %s alignments, mean %.2f +/- %.2f, min %s, max %s\n", 
+			scalar @lengths, mean(@lengths), stddev(@lengths), 
+			min(@lengths), max(@lengths);
+		return 0;
+	}
 }
 
 
@@ -1398,6 +1469,7 @@ sub process_alignments_on_chromosome {
 		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
 		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
 		'count'   => 0,
+		'tcount'  => 0,
 		'seq_id'  => $seq_id,
 		'seq_length' => $seq_length,
 		'print'   => 1,
@@ -1407,7 +1479,7 @@ sub process_alignments_on_chromosome {
 	# finish up this chromosome
 	&$write_wig(\%data, 1); # final write
 	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-		format_with_commas( $data{'count'}), (time - $start_time)/60;
+		format_with_commas( $data{'tcount'}), (time - $start_time)/60;
 }
 
 
@@ -1458,6 +1530,7 @@ sub process_split_alignments_on_chromosome {
 		'offsetf' => $bedgraph ? 0 : 1, # bedgraph used 0-base indexing
 		'offsetr' => $bedgraph ? 0 : 1, # wig used 1-base indexing
 		'count'   => 0,
+		'tcount'  => 0,
 		'seq_id'  => $seq_id,
 		'seq_length' => $seq_length,
 		'print'   => 1,
@@ -1470,7 +1543,7 @@ sub process_split_alignments_on_chromosome {
 	# finish up this chromosome
 	&$write_wig(\%data, 1); # final write
 	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-		format_with_commas( $data{'count'}), (time - $start_time)/60;
+		format_with_commas( $data{'tcount'}), (time - $start_time)/60;
 }
 
 
@@ -1790,13 +1863,35 @@ sub record_stranded_span {
 	return if $a->qual < $min_mapq;
 	
 	# record length at the start position based on strand
+	my $length = $a->calend - $a->pos;
 	if ($a->reversed) {
 		# reverse strand
-		$data->{r}{ $a->pos } .= $a->calend - $a->pos . ',';
+		$data->{r}{ $a->pos } .= "$length,";
 	}
 	else {
 		# forward strand
-		$data->{f}{ $a->pos } .= $a->calend - $a->pos . ',';
+		$data->{f}{ $a->pos } .= "$length,";
+	}
+	check_data($data);
+}
+
+
+### Record stranded across alignment
+sub record_stranded_extend {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# record length at the start position based on strand
+	if ($a->reversed) {
+		# reverse strand
+		# go back the length of extension so that end will be same as original read
+		$data->{r}{ $a->calend - $ext_value } .= "$ext_value,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos } .= "$ext_value,";
 	}
 	check_data($data);
 }
@@ -1844,7 +1939,7 @@ sub record_span {
 	return if $a->qual < $min_mapq;
 	
 	# record the length
-	$data->{f}{ $a->pos } .= $a->calend - $a->pos . ',';
+	$data->{f}{ $a->pos } .=  $a->calend - $a->pos . ',';
 	check_data($data);
 }
 
@@ -1870,11 +1965,53 @@ sub record_extended {
 	if ($a->reversed) {
 		# reverse strand
 		# must calculate the start position of the 3 prime extended fragment
-		$data->{f}{ $a->calend - $shift_value } .= "$shift_value,";
+		$data->{f}{ $a->calend - $ext_value } .= "$ext_value,";
 	}
 	else {
 		# forward strand
-		$data->{f}{ $a->pos } .= "$shift_value,";
+		$data->{f}{ $a->pos } .= "$ext_value,";
+	}
+	check_data($data);
+}
+
+
+### Record shifted span alignment
+sub record_shifted_span {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# start based on strand, record on forward
+	my $length = $a->calend - $a->pos;
+	if ($a->reversed) {
+		# reverse strand
+		# start position of the 3 prime extended fragment
+		$data->{f}{ $a->pos - $shift_value } .= "$length,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + $shift_value} .= "$length,";
+	}
+	check_data($data);
+}
+
+
+sub record_shifted_extended {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# start based on strand, record on forward
+	if ($a->reversed) {
+		# reverse strand
+		# start position of the 3 prime extended fragment
+		$data->{f}{ $a->pos - $shift_value } .= "$ext_value,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + $shift_value} .= "$ext_value,";
 	}
 	check_data($data);
 }
@@ -1884,11 +2021,13 @@ sub record_extended {
 sub check_data {
 	my $data = $_[0];
 	$data->{'count'}++;
+	$data->{'tcount'}++;
 	
 	# write when we reach buffer maximum number of alignments read
-	if ($data->{'print'} and $data->{'count'} % $alignment_count == 0) {
+	if ($data->{'print'} and $data->{'count'} == $alignment_count) {
 		&$write_wig($data, 0);
 	}
+	$data->{'count'} = 0; # reset for next round of writing
 }
 
 
@@ -2060,10 +2199,12 @@ sub write_bedgraph {
 			}
 			
 			# we will take a shortcut if all lengths are the same
-			if ( $shift_value or all_equal(\@lengths) ) {
-				# all the lengths are equal
+			my $recording_length = $ext_value ? $ext_value : all_equal(\@lengths) ? 
+				$lengths[0] : 0;
+			if ($recording_length) {
+				# we have one length to record
 				# each position will get the same pileup number
-				for (0 .. $lengths[0] - 1) {
+				for (0 .. $recording_length - 1) {
 					# generate coverage
 					# we're relying on autovivification of the buffer array here
 					# this is what makes Perl both great and terrible at the same time
@@ -2172,7 +2313,7 @@ sub write_bedgraph {
 ### A simple test to confirm if all elements in an array ref are equal
 sub all_equal {
 	my $array = shift;
-	my $value = $array->[0];
+	my $value = $array->[0] or return;
 	foreach (@$array) {
 		return 0 if $_ != $value;
 	}
@@ -2226,6 +2367,7 @@ bam2wig.pl [--options...] <filename.bam>
   --rpm
   --log [2|10]
   --max <integer>
+  --ext <integer>
   
   Alignment options:
   --pe
@@ -2253,7 +2395,7 @@ bam2wig.pl [--options...] <filename.bam>
   --count <integer>
   --verbose
   --version
-  --help
+  --help                              detailed documentation
 
 =head1 OPTIONS
 
@@ -2339,6 +2481,13 @@ to avoid PCR bias. Note that setting this value in conjunction with the --rpm
 option may result in lower coverage than anticipated, since the pre-count 
 does not account for duplicity. The default is undefined (no limit). 
 
+=item --ext <integer>
+
+Manually set the length for reads to be extended when position is set to 
+either span or extend. By default, the alignment length is used for single-end
+span, the insertion size for paired-end span, and 2 X the shift value for 
+extend.
+
 =item --pe
 
 The Bam file consists of paired-end alignments, and only properly 
@@ -2373,16 +2522,12 @@ the fragments are counted and often seen as separated discrete peaks
 on opposite strands flanking the true target site. This option is 
 disabled with paired-end and spliced reads (where it is not needed). 
 
-The extend position option is a special mode where the entire predicted 
-ChIP fragment is recorded across its span. The length is 2 x the shift 
-value. 
-
 =item --shiftval <integer>
 
 Provide the value in bp that the recorded position should be shifted. 
-The value should be 1/2 the average length of the insert library 
-that was sequenced. The default is to empirically determine the 
-appropriate shift value. See below for the approach.
+The value should be 1/2 the average length of the library insert size.
+The default is to automatically and empirically determine the 
+appropriate shift value using cross-strand correlation (recommended). 
 
 =item --chrom <integer>
 
@@ -2504,11 +2649,13 @@ in the 3 prime direction. This effectively merges the separate peaks
 (representing the ends of the enriched fragments) on each strand 
 into a single peak centered over the target locus. Alternatively, 
 the entire predicted fragment may be recorded across its span. 
-This extended method of recording is analogous to the approach 
-used by the MACS program. The shift value may be empirically 
-determined from the sequencing data (see below). If requested, the 
-shift model profile may be written to file. Use the BioToolBox 
-script C<graph_profile.pl> to graph the data.
+This extended method of recording infers the mean size of the 
+library fragments, thereby emulating the coverage of paired-end 
+sequencing using single-end sequence data. The shift value is 
+empirically determined from the sequencing data (see below) or 
+provided by the user. If requested, the shift model profile may be 
+written to file. Use the BioToolBox script L<graph_profile.pl> to 
+graph the data.
 
 The output wig file may be either a variableStep, fixedStep, or 
 bedGraph format. The file format is dictated by where the alignment 
@@ -2520,11 +2667,6 @@ Span and extended positions are written as a bedGraph file.
 The wig file may be further converted into a compressed, indexed, binary 
 bigWig format, dependent on the availability of the appropriate 
 conversion utilities. 
-
-More information about wiggle files can be found at 
-http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at 
-http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at 
-http://genome.ucsc.edu/goldenPath/help/bigWig.html.
 
 =head1 RECOMMENDED SETTINGS
 
@@ -2623,6 +2765,69 @@ bam2wig.pl will use this to set the strand.
 
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  
+=back
+
+=head1 TEXT REPRESENTATION OF RECORDING ALIGNMENTS
+
+To help users visualize how this program records alignments in a wig 
+file, drawn below are 10 alignments, five forward and five reverse. 
+They may be interpreted as either single-end or paired-end. Drawn 
+below are the numbers that would be recorded in a wig file for various 
+parameter settings. Note that alignments are not drawn to scale and 
+are drawn for visualization purposes only. Values of X represent 10.
+
+=over 4
+
+=item Alignments
+
+  ....>>>>>>.....................................<<<<<<.............
+  .....>>>>>>..................................<<<<<<...............
+  ........>>>>>>.......................................<<<<<<.......
+  ........>>>>>>.........................................<<<<<<.....
+  ..........>>>>>>............................................<<<<<<
+
+=item Starts
+
+  ....11..2.1.......................................1.1.....1.1....1
+
+=item Midpoints
+
+  ......11..2.1..................................1.1.....1.1....1...
+
+=item Stranded Starts
+
+  F...11..2.1.......................................................
+  R.................................................1.1.....1.1....1
+
+=item Span (Coverage)
+
+  ....122244433311.............................112222111122221211111
+
+=item Stranded Span
+
+  F...122244433311..................................................
+  R............................................112222111122221211111
+
+=item Shifted Starts (shift value 26)
+
+  .........................1.1.11..3.11...1.........................
+
+=item Shifted Span (shift value 26)
+
+  .........................23447776552311111........................
+
+=item Extend (extend value 52)
+
+  12223445789999XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX999887665321111
+
+=item Paired-End Midpoints
+
+  ............................1...111..1............................
+
+=item Paired-End Span
+
+  ....12224455555555555555555555555555555555555555555443333332211111
+
 =back
 
 =head1 TROUBLESHOOTING
