@@ -257,6 +257,122 @@ directory.
 
 =back
 
+=head2 Feature Export
+
+These methods allow the feature to be exported in industry standard 
+formats, including the BED format and the GFF format. Both methods 
+return a formatted tab-delimited text string suitable for printing to 
+file. The string does not include a line ending character.
+
+These methods rely on coordinates being present in the source table. 
+If the row feature represents a database item, the feature() method 
+should be called prior to these methods, allowing the feature to be 
+retrieved from the database and coordinates obtained.
+
+=over 4
+
+=item bed_string(%args)
+
+Returns a BED formatted string. By default, a 6-element string is 
+generated, unless otherwise specified. Pass an array of key values 
+to control how the string is generated. The following arguments 
+are supported.
+
+=over 4
+
+=item bed => <integer>
+
+Specify the number of BED elements to include. The number of elements 
+correspond to the number of columns in the BED file specification. A 
+minimum of 3 (chromosome, start, stop) is required, and maximum of 6 
+is allowed (chromosome, start, stop, name, score, strand). 
+
+=item chromo => <text>
+
+=item seq_id => <text>
+
+=item start  => <integer>
+
+=item stop   => <integer>
+
+=item end    => <integer>
+
+=item strand => $strand
+
+Provide alternate values from those defined or missing in the current 
+row Feature. Note that start values are automatically converted to 0-base 
+by subtracting 1.
+
+=item name => <text>
+
+Provide alternate or missing name value to be used as text in the 4th 
+column. If no name is provided or available, a default name is generated.
+
+=item score => <number>
+
+Provide a numerical value to be included as the score. BED files typically 
+use integer values ranging from 1..1000. 
+
+=back
+
+=item gff_string(%args)
+
+Returns a GFF3 formatted string. Pass an array of key values 
+to control how the string is generated. The following arguments 
+are supported.
+
+=over 4
+
+=item chromo => <text>
+
+=item seq_id => <text>
+
+=item start  => <integer>
+
+=item stop   => <integer>
+
+=item end    => <integer>
+
+=item strand => $strand
+
+Provide alternate values from those defined or missing in the current 
+row Feature. 
+
+=item source => <text>
+
+Provide a text string to be used as the source_tag value in the 2nd 
+column. The default value is null ".".
+
+=item primary_tag => <text>
+
+Provide a text string to be used as the primary_tag value in the 3rd 
+column. The default value is null ".".
+
+=item type => <text>
+
+Provide a text string. This can be either a "primary_tag:source_tag" value 
+as used by GFF based BioPerl databases, or "primary_tag" alone.
+
+=item score => <number>
+
+Provide a numerical value to be included as the score. The default 
+value is null ".". 
+
+=item name => <text>
+
+Provide alternate or missing name value to be used as the display_name. 
+If no name is provided or available, a default name is generated.
+
+=item attributes => [index],
+
+Provide an anonymous array reference of one or more row Feature indices 
+to be used as GFF attributes. The name of the column is used as the GFF 
+attribute key. 
+
+=back
+
+=back
+
 =cut
 
 use strict;
@@ -532,6 +648,97 @@ sub get_position_scores {
 	}
 	
 	return get_region_dataset_hash(%args);
+}
+
+
+### String export
+
+sub bed_string {
+	my $self = shift;
+	my %args = @_;
+	$args{bed} ||= 6; # number of bed columns
+	croak "bed count must be an integer!" unless $args{bed} =~ /^\d+$/;
+	croak "bed count must be at least 3!" unless $args{bed} >= 3;
+	
+	# coordinate information
+	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
+	my $start = $args{start} || $self->start;
+	my $stop  = $args{stop} || $args{end} || $self->stop;
+	unless ($chr and defined $start and $stop) {
+		carp "Not enough information to generate bed string. Need identifiable" . 
+			"chr, start, stop columns";
+		return;
+	}
+	$start -= 1; # 0-based coordinates
+	my $string = "$chr\t$start\t$stop";
+	
+	# additional information
+	if ($args{bed} >= 4) {
+		my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
+		$string .= "\t$name";
+	}
+	if ($args{bed} >= 5) {
+		my $score = exists $args{score} ? $args{score} : 1;
+		$string .= "\t$score";
+	}
+	if ($args{bed} >= 6) {
+		my $strand = $args{strand} || $self->strand;
+		$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
+		$string .= "\t$strand";
+	}
+	# we could go on with other columns, but there's no guarantee that additional 
+	# information is available, and we would have to implement user provided data 
+	
+	# done
+	return $string;
+}
+
+sub gff_string {
+	my $self = shift;
+	my %args = @_;
+	
+	# coordinate information
+	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
+	my $start = $args{start} || $self->start;
+	my $stop  = $args{stop} || $args{end} || $self->stop;
+	unless ($chr and defined $start and $stop) {
+		carp "Not enough information to generate GFF string. Need identifiable" . 
+			"chr, start, stop columns";
+		return;
+	}
+	my $strand = $args{strand} || $self->strand;
+	$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
+	
+	# type information
+	my $type = $args{type} || $self->type || undef;
+	my ($source, $primary_tag);
+	if (defined $type and $type =~ /:/) {
+		($primary_tag, $source) = split /:/, $type;
+	}
+	unless ($source) {
+		$source = $args{source} || '.';
+	}
+	unless ($primary_tag) {
+		$primary_tag = $args{primary_tag} || defined $type ? $type : '.';
+	}
+	
+	# score
+	my $score = exists $args{score} ? $args{score} : '.';
+	my $phase = '.'; # do not even bother!!!!
+	
+	# attributes
+	my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
+	my $attributes = "Name = $name";
+	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
+		foreach my $i (@{$args{attributes}}) {
+			$attributes .= '; ' . $self->{data}->name($i) . ' = ' . $self->value($i);
+		}
+	}
+	
+	# done
+	my $string = join("\t", $chr, $source, $primary_tag, $start, $stop, $strand, 
+		$score, $phase, $attributes);
+	return $string;
 }
 
 
