@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.25;
+my $VERSION = 1.22;
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -88,13 +88,9 @@ my $Data = Bio::ToolBox::Data->new(file => $infile) or
 	die " Unable to load data file!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 
-if ($use_type) {
+if (not defined $Data->feature and $use_type) {
 	# set the general feature type, which will be used as a proxy for individual 
 	# feature types in the Data method that looks for the database features.
-	my $f = $Data->feature;
-	if (defined $f) {
-		print " Resetting feature type '$f' to requested '$use_type'\n";
-	}
 	$Data->feature($use_type);
 }
 

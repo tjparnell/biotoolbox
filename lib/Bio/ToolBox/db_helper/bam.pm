@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.24';
+our $VERSION = '1.19';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -36,9 +36,6 @@ our %BAM_CHROMOS;
 # Opened Bam db objects
 our %OPENED_BAM;
 	# a cache for opened Bam files, primarily for collecting scores
-
-# Lookup hash for caching callback methods
-our %CALLBACKS;
 
 # The true statement
 1; 
@@ -177,7 +174,7 @@ sub _collect_bam_data {
 		$value_type, 
 		@bam_features
 	) = @_;
-		# value_type can be score, count, or length
+		# method can be score, count, or length
 	
 	# initialize score structures
 	# which one is used depends on the $do_index boolean variable
@@ -429,59 +426,34 @@ sub _assign_callback {
 	
 	my ($stranded, $strand, $value_type, $do_index) = @_;
 	
-	# check the current list of calculated callbacks
-		# this process is pretty lengthy, especially to do it for every single 
-		# data collection, so we cache the calculate callback method to speed up 
-		# subsequent data collections
-		# it's likely only one method is ever employed in an execution, but just in case
-		# we will cache all that we calculate
-	if (exists $CALLBACKS{"$stranded$strand$value_type$do_index"}) {
-		return $CALLBACKS{"$stranded$strand$value_type$do_index"};
-	}
-	
-	# determine the callback method based on requested criteria
-	my $callback;
+	# all alignments
 	if (
 		$stranded eq 'all' and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
-		$callback = \&_all_count_indexed;
-	}
-	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'pcount' and 
-		$do_index
-	) {
-		$callback = \&_all_precise_count_indexed;
+		return \&_all_count_indexed;
 	}
 	elsif (
 		$stranded eq 'all' and 
 		$value_type eq 'count' and 
 		!$do_index
 	) {
-		$callback = \&_all_count_array;
-	}
-	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'pcount' and 
-		!$do_index
-	) {
-		$callback = \&_all_precise_count_array;
+		return \&_all_count_array;
 	}
 	elsif (
 		$stranded eq 'all' and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
-		$callback = \&_all_length_indexed;
+		return \&_all_length_indexed;
 	}
 	elsif (
 		$stranded eq 'all' and 
 		$value_type eq 'length' and 
 		!$do_index
 	) {
-		$callback = \&_all_length_array;
+		return \&_all_length_array;
 	}
 	
 	
@@ -492,15 +464,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		$do_index
 	) {
-		$callback = \&_forward_count_indexed;
-	}
-	elsif (
-		$stranded eq 'sense' and 
-		$strand == 1 and 
-		$value_type eq 'pcount' and 
-		$do_index
-	) {
-		$callback = \&_forward_precise_count_indexed;
+		return \&_sense_forward_count_indexed;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -508,15 +472,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		!$do_index
 	) {
-		$callback = \&_forward_count_array;
-	}
-	elsif (
-		$stranded eq 'sense' and 
-		$strand == 1 and 
-		$value_type eq 'pcount' and 
-		!$do_index
-	) {
-		$callback = \&_forward_precise_count_array;
+		return \&_sense_forward_count_array;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -524,7 +480,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		$do_index
 	) {
-		$callback = \&_forward_length_indexed;
+		return \&_sense_forward_length_indexed;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -532,7 +488,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		!$do_index
 	) {
-		$callback = \&_forward_length_array;
+		return \&_sense_forward_length_array;
 	}
 	
 	
@@ -543,15 +499,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		$do_index
 	) {
-		$callback = \&_reverse_count_indexed;
-	}
-	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
-		$do_index
-	) {
-		$callback = \&_reverse_precise_count_indexed;
+		return \&_sense_reverse_count_indexed;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -559,15 +507,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		!$do_index
 	) {
-		$callback = \&_reverse_count_array;
-	}
-	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
-		!$do_index
-	) {
-		$callback = \&_reverse_precise_count_array;
+		return \&_sense_reverse_count_array;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -575,7 +515,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		$do_index
 	) {
-		$callback = \&_reverse_length_indexed;
+		return \&_sense_reverse_length_indexed;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -583,26 +523,18 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		!$do_index
 	) {
-		$callback = \&_reverse_length_array;
+		return \&_sense_reverse_length_array;
 	}
 	
 	
 	# anti-sense, forward strand 
-	elsif (
+	if (
 		$stranded eq 'antisense' and 
 		$strand == 1 and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
-		$callback = \&_reverse_count_indexed;
-	}
-	elsif (
-		$stranded eq 'antisense' and 
-		$strand == 1 and 
-		$value_type eq 'pcount' and 
-		$do_index
-	) {
-		$callback = \&_reverse_precise_count_indexed;
+		return \&_antisense_forward_count_indexed;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -610,15 +542,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		!$do_index
 	) {
-		$callback = \&_reverse_count_array;
-	}
-	elsif (
-		$stranded eq 'antisense' and 
-		$strand == 1 and 
-		$value_type eq 'pcount' and 
-		!$do_index
-	) {
-		$callback = \&_reverse_precise_count_array;
+		return \&_antisense_forward_count_array;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -626,7 +550,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		$do_index
 	) {
-		$callback = \&_reverse_length_indexed;
+		return \&_antisense_forward_length_indexed;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -634,7 +558,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		!$do_index
 	) {
-		$callback = \&_reverse_length_array;
+		return \&_antisense_forward_length_array;
 	}
 	
 	
@@ -645,15 +569,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		$do_index
 	) {
-		$callback = \&_forward_count_indexed;
-	}
-	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
-		$do_index
-	) {
-		$callback = \&_forward_precise_count_indexed;
+		return \&_antisense_reverse_count_indexed;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -661,15 +577,7 @@ sub _assign_callback {
 		$value_type eq 'count' and 
 		!$do_index
 	) {
-		$callback = \&_forward_count_array;
-	}
-	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
-		!$do_index
-	) {
-		$callback = \&_forward_precise_count_array;
+		return \&_antisense_reverse_count_array;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -677,7 +585,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		$do_index
 	) {
-		$callback = \&_forward_length_indexed;
+		return \&_antisense_reverse_length_indexed;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -685,7 +593,7 @@ sub _assign_callback {
 		$value_type eq 'length' and 
 		!$do_index
 	) {
-		$callback = \&_forward_length_array ;
+		return \&_antisense_reverse_length_array ;
 	}
 	
 	
@@ -694,11 +602,6 @@ sub _assign_callback {
 		confess("Programmer error: stranded $stranded, strand $strand, value_type ". 
 				"$value_type, index $do_index\n");
 	}
-	
-	# remember next time 
-	$CALLBACKS{"$stranded$strand$value_type$do_index"} = $callback;
-	
-	return $callback;
 }
 
 
@@ -712,22 +615,9 @@ sub _all_count_indexed {
 		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
 }
 
-sub _all_precise_count_indexed {
-	my ($a, $data) = @_;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
-}
-
 sub _all_count_array {
 	my ($a, $data) = @_;
-	$data->{'scores'}->[0] += 1;
-}
-
-sub _all_precise_count_array {
-	my ($a, $data) = @_;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
+	push @{ $data->{'scores'} }, 1;
 }
 
 sub _all_length_indexed {
@@ -743,7 +633,7 @@ sub _all_length_array {
 	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
-sub _forward_count_indexed {
+sub _sense_forward_count_indexed {
 	my ($a, $data) = @_;
 	return if $a->reversed;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
@@ -751,28 +641,13 @@ sub _forward_count_indexed {
 		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
 }
 
-sub _forward_precise_count_indexed {
+sub _sense_forward_count_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
+	push @{ $data->{'scores'} }, 1;
 }
 
-sub _forward_count_array {
-	my ($a, $data) = @_;
-	return if $a->reversed;
-	$data->{'scores'}->[0] += 1;
-}
-
-sub _forward_precise_count_array {
-	my ($a, $data) = @_;
-	return if $a->reversed;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
-}
-
-sub _forward_length_indexed {
+sub _sense_forward_length_indexed {
 	my ($a, $data) = @_;
 	return if $a->reversed;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
@@ -781,13 +656,13 @@ sub _forward_length_indexed {
 	}
 }
 
-sub _forward_length_array {
+sub _sense_forward_length_array {
 	my ($a, $data) = @_;
 	return if $a->reversed;
 	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
-sub _reverse_count_indexed {
+sub _sense_reverse_count_indexed {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
@@ -795,28 +670,13 @@ sub _reverse_count_indexed {
 		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
 }
 
-sub _reverse_precise_count_indexed {
+sub _sense_reverse_count_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
+	push @{ $data->{'scores'} }, 1;
 }
 
-sub _reverse_count_array {
-	my ($a, $data) = @_;
-	return unless $a->reversed;
-	$data->{'scores'}->[0] += 1;
-}
-
-sub _reverse_precise_count_array {
-	my ($a, $data) = @_;
-	return unless $a->reversed;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
-}
-
-sub _reverse_length_indexed {
+sub _sense_reverse_length_indexed {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
@@ -825,12 +685,69 @@ sub _reverse_length_indexed {
 	}
 }
 
-sub _reverse_length_array {
+sub _sense_reverse_length_array {
 	my ($a, $data) = @_;
 	return unless $a->reversed;
 	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
+sub _antisense_forward_count_indexed {
+	my ($a, $data) = @_;
+	return unless $a->reversed;
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	$data->{'index'}{$pos}++ if 
+		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+}
+
+sub _antisense_forward_count_array {
+	my ($a, $data) = @_;
+	return unless $a->reversed;
+	push @{ $data->{'scores'} }, 1;
+}
+
+sub _antisense_forward_length_indexed {
+	my ($a, $data) = @_;
+	return unless $a->reversed;
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
+		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
+	}
+}
+
+sub _antisense_forward_length_array {
+	my ($a, $data) = @_;
+	return unless $a->reversed;
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
+}
+
+sub _antisense_reverse_count_indexed {
+	my ($a, $data) = @_;
+	return if $a->reversed;
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	$data->{'index'}{$pos}++ if 
+		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+}
+
+sub _antisense_reverse_count_array {
+	my ($a, $data) = @_;
+	return if $a->reversed;
+	push @{ $data->{'scores'} }, 1;
+}
+
+sub _antisense_reverse_length_indexed {
+	my ($a, $data) = @_;
+	return if $a->reversed;
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
+		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
+	}
+}
+
+sub _antisense_reverse_length_array {
+	my ($a, $data) = @_;
+	return if $a->reversed;
+	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
+}
 
 
 
@@ -909,44 +826,23 @@ scores is not retained, and the values are best further processed through
 some statistical method (mean, median, etc.).
 
 The subroutine is passed seven or more arguments in the following order:
-
-=over 4
-
-=item 1. The chromosome or seq_id
-
-=item 2. The start position of the segment to collect 
-
-=item 3. The stop or end position of the segment to collect 
-
-=item 4. The strand of the segment to collect
-
-Strand values should be in BioPerl standard values, i.e. -1, 0, or 1.
-
-=item 5. The strandedness of the data to collect
-
-A scalar value representing the desired strandedness of the data 
-to be collected. Acceptable values include "sense", "antisense", 
-or "all". Only those scores which match the indicated 
-strandedness are collected.
-
-=item 6. The value type of data to collect
-
-Acceptable values include score, count, pcount, and length.
-
-   score returns the basepair coverage of alignments over the 
-   region of interest
-   
-   count returns the number of alignments that overlap the 
-   search region. 
-   
-   pcount, or precise count, returns the count of alignments 
-   that only fall within the region. Best for RNASeq alignments.
-   
-   length returns the lengths of all overlapping alignments 
-
-=item 7. Paths to one or more Bam files
-
-=back
+    
+    1) The chromosome or seq_id
+    2) The start position of the segment to collect 
+    3) The stop or end position of the segment to collect 
+    4) The strand of the original feature (or region), -1, 0, or 1.
+    5) A scalar value representing the desired strandedness of the data 
+       to be collected. Acceptable values include "sense", "antisense", 
+       or "all". Only those scores which match the indicated 
+       strandedness are collected.
+    6) The type of data collected. 
+       Acceptable values include 'score' (returns the basepair coverage
+       of alignments over the region of interest), 'count' (returns the 
+       number of alignments found at each base position in the region, 
+       recorded at the alignment's midpoint), or 'length' (returns the 
+       mean lengths of the alignments found at each base position in 
+       the region, recorded at the alignment's midpoint). 
+    7) The paths, either local or remote, to one or more Bam files.
 
 The subroutine returns an array of the defined dataset values found within 
 the region of interest. 
@@ -967,38 +863,21 @@ position, a simple mean (for length data methods) or sum
 =item sum_total_bam_alignments()
 
 This subroutine will sum the total number of properly mapped alignments 
-in a bam file. Pass the subroutine one to four arguments in the following 
-order. 
-
-=over 4
-
-=item 1. Bam file path or object 
-
-The name of the Bam file which should be counted. Alternatively, an 
-opened Bio::DB::Sam object may also be given. Required.
-
-=item 2. Minimum mapping quality (integer)
-
-Optionally pass the minimum mapping quality of the reads to be 
-counted. The default is 0, where all alignments are counted.
-Maximum is 255. See the SAM specification for details.
-
-=item 3. Paired-end (boolean)
-
-Optionally pass a boolean value (1 or 0) indicating whether 
-the Bam file represents paired-end alignments. Only proper 
-alignment pairs are counted. The default is to treat all 
-alignments as single-end.
-
-=item 4. Number of forks (integer)
-
-Optionally pass the number of parallel processes to execute 
-when counting alignments. Walking through a Bam file is 
-time consuming but can be easily parallelized. The module 
-Parallel::ForkManager is required, and the default is a 
-conservative two processes when it is installed.
-
-=back
+in a bam file. Pass the subroutine one to four arguments. 
+    
+    1) The name of the Bam file which should be counted. Alternatively,  
+       an opened Bio::DB::Sam object may also be given. Required.
+    2) Optionally pass the minimum mapping quality of the reads to be 
+       counted. The default is 0, where all alignments are counted.
+    3) Optionally pass a boolean value (1 or 0) indicating whether 
+       the Bam file represents paired-end alignments. Only proper 
+       alignment pairs are counted. The default is to treat all 
+       alignments as single-end.
+    4) Optionally pass the number of parallel processes to execute 
+       when counting alignments. Walking through a Bam file is 
+       time consuming but can be easily parallelized. The module 
+       Parallel::ForkManager is required, and the default is a 
+       conservative two processes when it is installed.
        
 The subroutine will return the number of alignments.
 

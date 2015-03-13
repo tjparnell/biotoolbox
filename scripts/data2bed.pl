@@ -8,10 +8,10 @@ use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 use Bio::ToolBox::file_helper qw(
-	open_data_file
+	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION =  1.24;
+my $VERSION = '1.20';
 
 print "\n This program will write a BED file\n";
 
@@ -123,7 +123,7 @@ if (defined $name) {
 
 ### Load file
 print " Opening data file '$infile'...\n";
-my ($in_fh, $metadata_ref) = open_data_file($infile);
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
