@@ -7,17 +7,17 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::Tools::CodonTable;
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	find_column_index
 );
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file 
-	write_data_file
+	open_tim_data_file 
+	write_tim_data_file
 );
-my $VERSION = 1.24;
+my $VERSION = '1.15';
 
 
 
@@ -122,7 +122,7 @@ foreach my $infile (@infiles) {
 	
 	## Open and process the SNP file
 	print " processing SNP file '$infile'....\n";
-	my ($fh, $metadata) = open_data_file($infile) 
+	my ($fh, $metadata) = open_tim_data_file($infile) 
 		or die "unable to open file!\n";
 	
 	# check input file
@@ -144,7 +144,7 @@ foreach my $infile (@infiles) {
 	
 	
 	## Initialize data structure
-	my $output = generate_data_structure(
+	my $output = generate_tim_data_structure(
 		'SNPs',
 		qw(
 			Variation_Type
@@ -161,7 +161,7 @@ foreach my $infile (@infiles) {
 			Genotype
 			Feature_description
 		)
-	) or die " unable to generate data structure!\n";
+	) or die " unable to generate tim data structure!\n";
 	$output->{'db'} = $database;
 	my $table = $output->{'data_table'};
 	
@@ -287,7 +287,7 @@ foreach my $infile (@infiles) {
 	my $outfile = $infile;
 	$outfile = $metadata->{'basename'};
 	$outfile .= '_summary.txt';
-	my $written_file = write_data_file(
+	my $written_file = write_tim_data_file(
 		'data'     => $output,
 		'filename' => $outfile,
 		'format'   => 'simple',
@@ -414,7 +414,7 @@ sub find_overlapping_features {
 									push @codon_changes, determine_codon_change(
 										$snp_type,
 										$snp,
-										$subfeat2,
+										$subfeat,
 										$segment,
 									);
 									

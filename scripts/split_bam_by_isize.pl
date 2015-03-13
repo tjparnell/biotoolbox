@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::utility;
+use Bio::ToolBox::data_helper qw(format_with_commas);
 my $bam_ok;
 eval {
 	# check for Bam support
@@ -13,7 +13,7 @@ eval {
 	use Bio::ToolBox::db_helper::bam;
 	$bam_ok = 1;
 };
-my $VERSION = '1.20';
+my $VERSION = '1.15';
 
 # constant for memory usage while sorting
 # this increases default from 500MB to 1GB
@@ -510,8 +510,8 @@ split_bam_by_isize.pl [--options] <file.bam>
   
   Options:
   --in <file.bam>
-  --min <integer>       (100)
-  --max <integer>       (200)
+  --min <integer>
+  --max <integer>
   --size <min-max>
   --out <filename>
   --at

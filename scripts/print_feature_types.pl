@@ -9,14 +9,21 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	get_dataset_list
 );
-use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.19';
+my $VERSION = '1.15';
 
 print "\n A script to print all available feature types in a database\n\n";
 
 
 ### Quick help
-# 
+unless (@ARGV) { 
+	# when no command line options are present
+	# print SYNOPSIS
+	pod2usage( {
+		'-verbose' => 0, 
+		'-exitval' => 1,
+	} );
+}
+
 
 
 ### Get command line options and initialize values
@@ -44,7 +51,7 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script db_types.pl, version $VERSION\n\n";
+	print " Biotoolbox script print_feature_types.pl, version $VERSION\n\n";
 	exit;
 }
 
@@ -54,22 +61,9 @@ if ($print_version) {
 
 # Check for database
 unless ($dbname) {
-	if (@ARGV) {
-		$dbname = shift @ARGV;
-	}
-	else {
-		$dbname = request_db_from_user();
-	}
+	$dbname = shift @ARGV or 
+		die " Must provide a database name!\n";
 }
-unless ($dbname) { 
-	# when no databases are available, print SYNOPSIS
-	pod2usage( {
-		'-verbose' => 0, 
-		'-exitval' => 1,
-	} );
-	exit;
-}
-
 
 
 
@@ -122,41 +116,17 @@ print "That's all\n";
 
 
 
-sub request_db_from_user {
-	my %num2db;
-	my $n = 1;
-	foreach my $key ($BTB_CONFIG->param()) {
-		if ($key =~ /^(.+)\.dsn$/) {
-			next if $1 =~ /example/;
-			$num2db{$n} = $1;
-			$n++;
-		}
-	}
-	return unless $n > 1;
-	
-	print " These are the known databases:\n";
-	foreach (sort {$a <=> $b} keys %num2db) {
-		print "   $_\t$num2db{$_}\n";
-	}
-	print " Enter the number of the database to examine   ";
-	my $number = <STDIN>;
-	chomp $number;
-	return unless exists $num2db{$number};
-	return $num2db{$number};
-}
-
-
 __END__
 
 =head1 NAME
 
-db_types.pl
+print_feature_types.pl
 
 A script to print out the available feature types in a database.
 
 =head1 SYNOPSIS
 
-db_types.pl <database>
+print_feature_types.pl <database>
   
   Options:
   --db <database>
@@ -172,11 +142,8 @@ The command line flags and descriptions:
 =item --db <database>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. If not specified, 
-then a list of known databases in the BioToolBox configuration file 
-F<.biotoolbox.cfg> will be presented as a list to the user.
-
-For more information about using annotation databases, 
+from which gene or feature annotation may be derived. For more information 
+about using annotation databases, 
 see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --version

@@ -7,33 +7,21 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(sum min max mean median stddevp);
 use Statistics::Descriptive;
-use Bio::ToolBox::Data; 
+use Bio::ToolBox::data_helper qw(
+	find_column_index
+	format_with_commas
+);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
+	get_feature
+	get_region_dataset_hash
 );
-use Bio::ToolBox::utility;
-
-my $parallel;
-eval {
-	# check for parallel support
-	require Parallel::ForkManager;
-	$parallel = 1;
-};
-
-# ANOVA Parameters for P-value Statistics
-my $anova;
-eval {
-	# check for ANOVA support
-	require Statistics::ANOVA;
-	$anova = 1;
-};
-my $INDEPENDENCE  = 0;
-my $PARAMETRIC    = 1;
-my $ORDINAL       = 0;
-	
-use constant LOG10 => log(10);
-my $VERSION = 1.24;
+use Bio::ToolBox::file_helper qw(
+	load_tim_data_file 
+	write_tim_data_file 
+);
+my $VERSION = '1.15';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -57,7 +45,6 @@ my (
 	$data_database,
 	$refDataSet,
 	$testDataSet,
-	$find_pvalue,
 	$find_shift,
 	$radius,
 	$position,
@@ -65,7 +52,6 @@ my (
 	$norm_method,
 	$interpolate,
 	$gz,
-	$cpu,
 	$help,
 	$print_version,
 );
@@ -78,7 +64,6 @@ GetOptions(
 	'ddb=s'       => \$data_database, # database containing datasets
 	'ref=s'       => \$refDataSet, # reference dataset
 	'test=s'      => \$testDataSet, # test dataset
-	'pval!'       => \$find_pvalue, # calculate student t-test
 	'shift!'      => \$find_shift, # calculate optimum shift
 	'radius=i'    => \$radius, # for collecting data when shifting
 	'pos=s'       => \$position, # set the relative feature position
@@ -87,7 +72,6 @@ GetOptions(
 	'norm=s'      => \$norm_method, # method of normalization
 	'interpolate!' => \$interpolate, # interpolate the position data
 	'gz!'         => \$gz, # compress output
-	'cpu=i'      => \$cpu, # number of execution threads
 	'help'        => \$help, # request help
 	'version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -110,36 +94,72 @@ if ($print_version) {
 
 
 ### Check for requirements
-check_defaults();
+unless ($infile) {
+	$infile = shift @ARGV or
+		die " no input file! use --help for more information\n";
+}
+unless (defined $gz) {
+	$gz = 0;
+}
+
+if (defined $position) {
+	# check the position value
+	unless (
+		$position == 5 or
+		$position == 3 or
+		$position == 4 or
+		$position eq 'm'
+	) {
+		die " Unknown relative position '$position'!\n";
+	}
+	if ($position eq 'm') {$position = 4} # change to match internal usage
+}
+else {
+	# default position to use the midpoint
+	$position = 4;
+}
+
+unless (defined $interpolate) {
+	$interpolate = 1;
+}
+
+if ($norm_method) {
+	unless ($norm_method =~ /^rank|sum$/i) {
+		die " Unrecognized normalization method! see help\n";
+	}
+}
+
+if ($find_shift) {
+	unless ($radius) {
+		die " Must define a radius and reference point to calculate optimum shift\n";
+	}
+}
+
 
 
 
 ### Open input file
-my $Data = Bio::ToolBox::Data(file => $infile) or 
+my $mainData = load_tim_data_file($infile) or 
 	die " unable to open input file '$infile'!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 
 
 
 ### Open database connection
-if ($database) {
-	# update or add database as required
-	if ($Data->database and $database ne $Data->database) {
-		# update with new database
-		printf " updating main database name from '%s' to '%s'\n", 
-			$Data->database, $database;
-		print "   Re-run without --db option if you do not want this to happen\n";
-		$Data->database($database);
-	}
-	elsif (not $Data->database) {
-		$Data->database($database);
-	}
+unless ($database) {
+	$database = $mainData->{'db'} or 
+		die " no database provided! use --help for more information\n";
 }
+my $db = open_db_connection($database) or 
+	die " unable to open database '$database' connection!\n";
 my $ddb;
-if (defined $data_database) {
-	# specifically defined a data database
+if ($data_database) {
+	# separate database for the refDataSet and testDataSet
 	$ddb = open_db_connection($data_database) or 
-		die "unable to establish data database connection to $data_database!\n";
+		die " unable to open data database '$data_database' connection!\n";
+}
+else {
+	# use the same database
+	$ddb = $db;
 }
 
 
@@ -148,33 +168,26 @@ if (defined $data_database) {
 validate_or_request_dataset();
 
 
+### Identify column indices
+my %index = identify_indices();
+# Prepare new columns
+add_new_columns();
 
-### Collect the data correlations
+
+### Collect correlations
 my $start_time = time;
-# check whether it is worth doing parallel execution
-if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 1000) {
-		# We need at least 1000 lines in each fork split to make 
-		# it worthwhile to do the split, otherwise, reduce the number of 
-		# splits to something more worthwhile
-		$cpu--;
-	}
+
+print " Collecting correlations....\n";
+collect_correlations();
+
+
+
+### Output file
+unless ($outfile) {
+	$outfile = $infile;
 }
-
-if ($cpu > 1) {
-	# parallel execution
-	parallel_execution();
-}
-else {
-	# single process execution
-	single_execution();
-}
-
-
-
-
-### Write output file
-my $success = $Data->write_file(
+my $success = write_tim_data_file(
+	'data'     => $mainData,
 	'filename' => $outfile,
 	'gz'       => $gz,
 );
@@ -184,6 +197,8 @@ if ($success) {
 else {
 	print " unable to write output file!\n";
 }
+
+# The End
 printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 
 
@@ -191,77 +206,11 @@ printf " Finished in %.2f minutes\n", (time - $start_time) / 60;
 
 ########################   Subroutines   ###################################
 
-sub check_defaults {
-	
-	unless ($infile) {
-		$infile = shift @ARGV or
-			die " no input file! use --help for more information\n";
-	}
-	unless (defined $gz) {
-		$gz = 0;
-	}
-
-	if (defined $position) {
-		# check the position value
-		unless (
-			$position == 5 or
-			$position == 3 or
-			$position == 4 or
-			$position eq 'm'
-		) {
-			die " Unknown relative position '$position'!\n";
-		}
-		if ($position eq 'm') {$position = 4} # change to match internal usage
-	}
-	else {
-		# default position to use the midpoint
-		$position = 4;
-	}
-
-	unless (defined $interpolate) {
-		$interpolate = 1;
-	}
-
-	if ($norm_method) {
-		unless ($norm_method =~ /^rank|sum$/i) {
-			die " Unrecognized normalization method! see help\n";
-		}
-	}
-
-	if ($find_pvalue) {
-		unless ($anova) {
-			die " Cannot calculate requested P-value! Pleast install Statistics::ANOVA\n";
-		}
-	}
-
-	if ($find_shift) {
-		unless ($radius) {
-			die " Must define a radius and reference point to calculate optimum shift\n";
-		}
-	}
-
-	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
-	}
-	else {
-			# disable cores
-			print " disabling parallel CPU execution, no support present\n" if $cpu;
-			$cpu = 0;
-	}
-
-	unless ($outfile) {
-		$outfile = $infile;
-	}
-
-}
-
-
 sub validate_or_request_dataset {
 	
 	# Process the reference dataset
 	$refDataSet = verify_or_request_feature_types(
-		'db'      => $ddb || $Data->database,
+		'db'      => $ddb,
 		'feature' => $refDataSet,
 		'prompt'  => "Enter the reference data set  ",
 		'single'  => 1,
@@ -273,7 +222,7 @@ sub validate_or_request_dataset {
 	
 	# Process the test dataset
 	$testDataSet = verify_or_request_feature_types(
-		'db'      => $ddb || $Data->database,
+		'db'      => $ddb,
 		'feature' => $testDataSet,
 		'prompt'  => "Enter the test data set  ",
 		'single'  => 1,
@@ -284,108 +233,32 @@ sub validate_or_request_dataset {
 }
 
 
-sub parallel_execution {
-	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
+sub identify_indices {
+	# Identify columns in the input file
 	
-	# Prepare new columns
-	my ($r_i, $p_i, $shift_i, $shiftr_i) = add_new_columns();
-
-	# generate base name for child processes
-	my $child_base_name = $outfile . ".$$"; 
-	
-	# variables for reporting the summary of results
-	my @correlations;
-	my @optimal_shifts;
-	my @optimal_correlations;
-	my $count = 0;
-	my $not_enough_data = 0;
-	my $no_variance = 0;
-	$pm->run_on_finish( sub {
-		my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $result) = @_;
-		push @correlations, @{ $result->[0] };
-		push @optimal_shifts, @{ $result->[1] };
-		push @optimal_correlations, @{ $result->[2] };
-		$count += $result->[3];
-		$not_enough_data += $result->[4];
-		$no_variance += $result->[5];
-	} );
-
-	# Split the input data into parts and execute in parallel in separate forks
-	print " Forking into $cpu children for parallel correlation collections\n";
-	for my $i (1 .. $cpu) {
-		$pm->start and next;
-	
-		#### In child ####
-	
-		# splice the data structure
-		$Data->splice_data($i, $cpu);
-		
-		# re-open database objects to make them clone safe
-		if ($data_database) {
-			$ddb = open_db_connection($data_database, 1);
-		}
-		
-		# collect
-		my @results = collect_correlations($r_i, $p_i, $shift_i, $shiftr_i);
-
-		# write output file
-		my $success = $Data->write_file(
-			'filename' => sprintf("$child_base_name.%03s",$i),
-			'gz'       => 0, # faster to write without compression
-		);
-		if ($success) {
-			print " wrote output file $success\n";
-		}
-		else {
-			# failure! the subroutine will have printed error messages
-			die " unable to write file!\n";
-			# no need to continue
-		}
-		
-		# Finished
-		$pm->finish(0, \@results); 
+	my %index;
+	$index{name}   = find_column_index($mainData, "^name");
+	$index{type}   = find_column_index($mainData, "^type");
+	$index{id}     = find_column_index($mainData, "^primary_id");
+	$index{chrom}  = find_column_index($mainData, "^chr|seq");
+	$index{start}  = find_column_index($mainData, "^start");
+	$index{stop}   = find_column_index($mainData, "^stop|end");
+	$index{strand} = find_column_index($mainData, "strand");
+	unless (defined $index{id} or defined $index{name} or defined $index{chrom}) {
+		die " unable to identify at least name or chromosome column index!\n";
 	}
-	$pm->wait_all_children;
-	
-	# summarize the results
-	summarize_results(\@correlations, \@optimal_shifts, \@optimal_correlations,
-		$count, $not_enough_data, $no_variance);
-	
-	# reassemble children files into output file
-	my @files = glob "$child_base_name.*";
-	unless (@files) {
-		die "unable to find children files!\n";
+	if ($set_strand and not defined $index{strand}) {
+		warn " unable to identify strand column to enforce strand!\n";
+		$set_strand = 0;
 	}
-	unless (scalar @files == $cpu) {
-		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
-	}
-	my $count = $Data->reload_children(@files);
-	printf " reloaded %s features from children\n", format_with_commas($count);
+	
+	return %index;
 }
 
-
-
-sub single_execution {
-	# run in a single thread
-	
-	# Prepare new columns
-	my ($r_i, $p_i, $shift_i, $shiftr_i) = add_new_columns();
-	
-	# collect
-	print " Collecting correlations....\n";
-	my @results = collect_correlations($r_i, $p_i, $shift_i, $shiftr_i);
-	
-	# summarize
-	summarize_results(@results);
-}
 
 
 
 sub collect_correlations {
-	my ($r_i, $p_i, $shift_i, $shiftr_i) = @_; 
 	
 	# Set variables for summary analysis
 	my @correlations;
@@ -395,28 +268,57 @@ sub collect_correlations {
 	my $not_enough_data = 0;
 	my $no_variance = 0;
 	
-	# check that we can collect information
-	unless ($Data->feature_type eq 'named' or $Data->feature_type eq 'coordinate') {
-		die " Unable to identify the type of features in the input file." . 
-			" File must be a recognizable format and/or have column header names\n" . 
-			" for chromosome, start, stop; or named database features\n";
+	
+	# set coordinate collection method
+	my $collect_coordinates;
+	if (defined $index{id} or (defined $index{name} and defined $index{type}) ) {
+		# using named features
+		# retrieve the coordinates from the database
+		$collect_coordinates = \&collect_coordinates_from_db;
+		print "  coordinates will be collected from database $database\n";
+	}
+	elsif (
+		defined $index{chrom} and 
+		defined $index{start} and 
+		defined $index{stop}
+	) {
+		# coordinates are defined in the input file
+		$collect_coordinates = \&collect_coordinates_from_file;
+		print "  coordinates will be collected from file\n";
+	}
+	else {
+		# don't have enough info to continue
+		die " do not have enough information in the file to identify regions\n";
 	}
 	
+	
 	# Walk through features
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	for my $row (1 .. $mainData->{'last_row'}) {
+		
+		# Determine coordinates
+		my ($chromo, $start, $stop, $strand) = &{$collect_coordinates}($row);
+		unless ($chromo and $start and $stop) {
+			# verify coordinates
+			$mainData->{'data_table'}->[$row][$index{r}]       = '.';
+			if ($find_shift) {
+				$mainData->{'data_table'}->[$row][$index{shiftval}] = '.';
+				$mainData->{'data_table'}->[$row][$index{shiftr}]  = '.';
+			}
+			$not_enough_data++;
+			next;
+		}
 		
 		
 		# determine reference point
 		my $ref_point;
 		if ($position == 5) {
-			$ref_point = $$row->strand >= 0 ? $row->start : $row->end;
+			$ref_point = $strand >= 0 ? $start : $stop;
 		}
 		elsif ($position == 4) {
-			$ref_point = int( ( ( $row->start + $row->end ) / 2 ) + 0.5);
+			$ref_point = int( ( ( $start + $stop ) / 2 ) + 0.5);
 		}
 		elsif ($position == 3) {
-			$ref_point = $row->strand >= 0 ? $row->end : $row->start;
+			$ref_point = $strand >= 0 ? $stop : $start;
 		}
 		
 		
@@ -427,36 +329,48 @@ sub collect_correlations {
 			# collecting data in a radius around a reference point
 			
 			# collect data
-			%ref_pos2data = $row->get_position_scores(
+			%ref_pos2data = get_region_dataset_hash(
+				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
+				'chromo'    => $chromo,
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
-				'position'  => $position, 
 				'value'     => 'score',
 			);
-			%test_pos2data = $row->get_position_scores(
+			%test_pos2data = get_region_dataset_hash(
+				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
+				'chromo'    => $chromo,
 				'start'     => $ref_point - (2 * $radius),
 				'stop'      => $ref_point + (2 * $radius),
-				'position'  => $position, 
 				'value'     => 'score',
 			);
 		}
 		else {
 			# just collect data over the region
 			# collect data
-			%ref_pos2data = $row->get_position_scores(
+			%ref_pos2data = get_region_dataset_hash(
+				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $refDataSet,
-				'position'  => $position, 
+				'chromo'    => $chromo,
+				'start'     => $start,
+				'stop'      => $stop,
+				'strand'    => $strand,
+				'position'  => 5, 
 				'value'     => 'score',
 			);
-			%test_pos2data = $row->get_position_scores(
+			%test_pos2data = get_region_dataset_hash(
+				'db'        => $db,
 				'ddb'       => $ddb,
 				'dataset'   => $testDataSet,
-				'position'  => $position, 
+				'chromo'    => $chromo,
+				'start'     => $start,
+				'stop'      => $stop,
+				'strand'    => $strand,
+				'position'  => 5, 
 				'value'     => 'score',
 			);
 		}
@@ -476,22 +390,15 @@ sub collect_correlations {
 			)
 		) {
 			# not enough data points to work with
-			$row->value($r_i, '.');
-			$row->value($p_i, '.') if ($find_pvalue);
+			$mainData->{'data_table'}->[$row][$index{r}]       = '.';
 			if ($find_shift) {
-				$row->value($shift_i, '.');
-				$row->value($shiftr_i, '.');
+				$mainData->{'data_table'}->[$row][$index{shiftval}] = '.';
+				$mainData->{'data_table'}->[$row][$index{shiftr}]  = '.';
 			}
 			$not_enough_data++;
 			next;
 		}
 			
-		
-		# Calculate Paired T-Test P value
-		# going to try this before normalizing
-		if ($find_pvalue) {
-			$row->value($p_i, calculate_ttest(\%ref_pos2data, \%test_pos2data) );
-		}
 		
 		
 		# Interpolate data points
@@ -499,8 +406,8 @@ sub collect_correlations {
 		# especially when data is sparse
 		if ($interpolate) {
 			# pass the data reference and the region length
-			interpolate_values(\%ref_pos2data, $row->length);
-			interpolate_values(\%test_pos2data, $row->length);
+			interpolate_values(\%ref_pos2data, ($stop - $start + 1));
+			interpolate_values(\%test_pos2data, ($stop - $start + 1));
 		}
 		
 		
@@ -538,7 +445,7 @@ sub collect_correlations {
 			}
 		}
 		else {
-			for (my $i = 1; $i < $row->length; $i++) {
+			for (my $i = 1; $i < ($stop - $start + 1); $i++) {
 				# get values for each position, default 0
 				push @ref_data, $ref_pos2data{$i} || 0;
 				push @test_data, $test_pos2data{$i} || 0;
@@ -548,12 +455,13 @@ sub collect_correlations {
 		# verify the reference data
 		if ( min(@ref_data) == max(@ref_data) ) {
 			# no variance in the data! cannot calculate Pearson
-			$row->value($r_i, '.');
-			$row->value($p_i, '.') if ($find_pvalue);
+			$mainData->{'data_table'}->[$row][$index{r}]       = '.';
 			if ($find_shift) {
-				$row->value($shift_i, '.');
-				$row->value($shiftr_i, '.');
+				$mainData->{'data_table'}->[$row][$index{shiftval}] = '.';
+				$mainData->{'data_table'}->[$row][$index{shiftr}]  = '.';
 			}
+			
+			# if the reference is no good, cannot continue, must bail
 			$no_variance++;
 			next;
 		}
@@ -574,7 +482,9 @@ sub collect_correlations {
 			# test has variance, calculate Pearson
 			$r = calculate_pearson(\@ref_data, \@test_data) || 0;
 		}
-		$row->value($r_i, $r);
+		
+		# record
+		$mainData->{'data_table'}->[$row][$index{r}] = $r;
 		push @correlations, $r if $r;
 		
 		
@@ -591,15 +501,16 @@ sub collect_correlations {
 			# change strand
 			if ($set_strand) {
 				# user is imposing a strand
-				if ($$row->strand < 0) {
+				if ($strand < 0) {
 					# only change shift direction if reverse strand
 					$best_shift *= -1;
 				}
 			}
 			
 			# record in data table
-			$row->value($shift_i, $best_shift);
-			$row->value($shiftr_i, $best_r > $r ? $best_r : '.');
+			$mainData->{'data_table'}->[$row][$index{shiftval}] = $best_shift;
+			$mainData->{'data_table'}->[$row][$index{shiftr}] = 
+				$best_r > $r ? $best_r : '.';
 			
 			# record for summary analyses
 			push @optimal_shifts, $best_shift if ($best_r > $r);
@@ -611,9 +522,28 @@ sub collect_correlations {
 		$count++;
 	}
 	
-	# Return correlation results for summary
-	return (\@correlations, \@optimal_shifts, \@optimal_correlations,
-		$count, $not_enough_data, $no_variance);
+	
+	
+	# Summary analyses
+	printf " Correlated %s features\n", format_with_commas($count);
+	printf " Mean Pearson correlation was %.3f  +/- %.3f\n", 
+		mean(@correlations), stddevp(@correlations);
+	
+	if ($find_shift) {
+		printf " Mean absolute optimal shift was %.0f +/- %.0f bp\n", 
+			mean( map {abs $_} @optimal_shifts), 
+			stddevp( map {abs $_} @optimal_shifts);
+		printf " Mean optimal Pearson correlation was %.3f  +/- %.3f\n", 
+			mean(@optimal_correlations), stddevp(@optimal_correlations);
+	}
+	if ($not_enough_data) {
+		printf " %s features did not have enough data points\n", 
+			format_with_commas($not_enough_data);
+	}
+	if ($no_variance) {
+		printf " %s features had no variance in the reference data points\n", 
+			format_with_commas($no_variance);
+	}
 }
 
 
@@ -621,54 +551,120 @@ sub add_new_columns {
 	
 	# Required columns
 	# the Pearson column
-	my $r_i = $Data->add_column('Pearson_correlation');
-	$Data->metadata($r_i, 'reference', $refDataSet);
-	$Data->metadata($r_i, 'test', $testDataSet);
+	my $r_i = $mainData->{'number_columns'};
+	$mainData->{$r_i} = {
+		'index'     => $r_i,
+		'name'      => 'Pearson_correlation',
+		'reference' => $refDataSet,
+		'test'      => $testDataSet,
+	};
+	$mainData->{'data_table'}->[0][$r_i] = 'Pearson_correlation';
+	$mainData->{'number_columns'} += 1;
 	# extra information
-	$Data->metadata($r_i, 'data_database', $data_database) if $data_database;
-	$Data->metadata($r_i, 'normalization', $norm_method) if $norm_method;
-	$Data->metadata($r_i, 'interpolate', 1) if $interpolate;
+	$mainData->{$r_i}{'data_database'} = $data_database if ($data_database);
+	$mainData->{$r_i}{'normalization'} = $norm_method if ($norm_method);
 	if ($radius) {
-		$Data->metadata($r_i, 'radius', $radius);
-		$Data->metadata($r_i, 'reference_point', $position == 5 ? 
-			'5_prime' : $position == 4 ? 'midpoint' : '3_prime');
+		$mainData->{$r_i}{'radius'} = $radius;
+		$mainData->{$r_i}{'reference_point'} = $position == 5 ? 
+			'5_prime' : $position == 4 ? 'midpoint' : '3_prime';
 	}
+	
 	
 	# Optional columns if we're calculating an optimal shift
 	my ($shift_i, $shiftr_i);
 	if ($find_shift) {
 		
 		# optimal test-reference shift value
-		$shift_i = $Data->add_column('optimal_shift');
-		$Data->metadata($shift_i, 'reference', $refDataSet);
-		$Data->metadata($shift_i, 'test', $testDataSet);
-		$Data->metadata($shift_i, 'radius', $radius);
-		$Data->metadata($shift_i, 'data_database', $data_database) if $data_database;
-		$Data->metadata($shift_i, 'reference_point', $position == 5 ? 
-			'5_prime' : $position == 4 ? 'midpoint' : '3_prime');
+		$shift_i = $mainData->{'number_columns'};
+		$mainData->{$shift_i} = {
+			'index'     => $shift_i,
+			'name'      => 'optimal_shift',
+			'reference' => $refDataSet,
+			'test'      => $testDataSet,
+			'radius'    => $radius,
+		};
+		$mainData->{'data_table'}->[0][$shift_i] = 'optimal_shift';
+		$mainData->{'number_columns'} += 1;
+		$mainData->{$shift_i}{'data_database'} = $data_database 
+			if ($data_database);
+		$mainData->{$shift_i}{'reference_point'} = $position == 5 ? 
+			'5_prime' : $position == 4 ? 'midpoint' : '3_prime';
 		
 		# optimal test-reference shift value
-		$shiftr_i = $Data->add_column('shift_correlation');
-		$Data->metadata($shiftr_i, 'reference', $refDataSet);
-		$Data->metadata($shiftr_i, 'test', $testDataSet);
-		$Data->metadata($shiftr_i, 'radius', $radius);
-		$Data->metadata($shiftr_i, 'data_database', $data_database) if $data_database;
-		$Data->metadata($shiftr_i, 'reference_point', $position == 5 ? 
-			'5_prime' : $position == 4 ? 'midpoint' : '3_prime');
-		$Data->metadata($shiftr_i, 'normalization', $norm_method) if $norm_method;
-	}
-	
-	# Paired Student T-Test P-value
-	my $p_i;
-	if ($find_pvalue) {
-		$p_i = $Data->add_column('ANOVA_Pval');
-		$Data->metadata($p_i, 'reference', $refDataSet);
-		$Data->metadata($p_i, 'test', $testDataSet);
-		$Data->metadata($p_i, 'transform', '-Log10');
+		$shiftr_i = $mainData->{'number_columns'};
+		$mainData->{$shiftr_i} = {
+			'index'     => $shiftr_i,
+			'name'      => 'shift_correlation',
+			'reference' => $refDataSet,
+			'test'      => $testDataSet,
+			'radius'    => $radius,
+		};
+		$mainData->{'data_table'}->[0][$shiftr_i] = 'shift_correlation';
+		$mainData->{'number_columns'} += 1;
+		$mainData->{$shiftr_i}{'data_database'} = $data_database 
+			if ($data_database);
+		$mainData->{$shiftr_i}{'reference_point'} = $position == 5 ? 
+			'5_prime' : $position == 4 ? 'midpoint' : '3_prime';
+		$mainData->{$shiftr_i}{'normalization'} = $norm_method if ($norm_method);
 	}
 	
 	# record the indices
-	return ($r_i, $p_i, $shift_i, $shiftr_i);
+	$index{r} = $r_i;
+	$index{shiftval} = $shift_i;
+	$index{shiftr} = $shiftr_i;
+}
+
+
+sub collect_coordinates_from_db {
+	my $row = shift;
+	
+	# retrieve the coordinates from named features in the database
+	my $feature = get_feature(
+		'db'    => $db,
+		'id'    => defined $index{id} ? 
+			$mainData->{'data_table'}->[$row][$index{id}] : undef,
+		'name'  => defined $index{name} ? 
+			$mainData->{'data_table'}->[$row][$index{name}] : undef,
+		'type'  => defined $index{type} ? 
+			$mainData->{'data_table'}->[$row][$index{type}] : undef,
+	);
+	return unless ($feature);
+	
+	# calculate strand
+	my $strand;
+	if ($set_strand) {
+		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
+			-1 : 1;
+	}
+	else {
+		$strand = $feature->strand;
+	}
+	
+	# return coordinates
+	return ($feature->seq_id, $feature->start, $feature->end, $strand);
+}
+
+
+sub collect_coordinates_from_file {
+	my $row = shift;
+	
+	# calculate strand
+	my $strand;
+	if (defined $index{strand}) {
+		$strand = $mainData->{'data_table'}->[$row][$index{strand}] =~ /-/ ?
+			-1 : 1;
+	}
+	else {
+		$strand = 0;
+	}
+	
+	# return coordinates defined in the table
+	return (
+		$mainData->{'data_table'}->[$row][$index{chrom}], 
+		$mainData->{'data_table'}->[$row][$index{start}], 
+		$mainData->{'data_table'}->[$row][$index{stop}], 
+		$strand
+	);
 }
 
 
@@ -790,7 +786,7 @@ sub calculate_optimum_shift {
 		
 		# calculate Pearson correlation
 		my $pearson = calculate_pearson($ref_data, \@test_data); 
-		if (defined $pearson and $pearson > 0.6) {
+		if (defined $pearson) {
 			$shift2pearson{$shift} = $pearson;
 		}
 	}
@@ -898,69 +894,7 @@ sub calculate_pearson {
 }
 
 
-sub calculate_ttest {
-	
-	# generate the data arrays
-	my ($ref, $test) = @_;
-	my @ref_data;
-	my @test_data;
-	
-	# load the data arrays
-	my $min_value = min( min(keys %{$ref}), min(keys %{$test}) );
-	my $max_value = max( max(keys %{$ref}), max(keys %{$test}) );
-	for my $i ($min_value .. $max_value) {
-		push @ref_data, $ref->{$i} || 0;
-		push @test_data, $test->{$i} || 0;
-	}
-	
-	# calculate ANOVA
-	my $p_value;
-	my $aov = Statistics::ANOVA->new();
-	eval {
-		$aov->load( {
-			'test' => \@test_data,
-			'ref'  => \@ref_data,
-		} );
-		$aov->anova(
-			'independent'   => $INDEPENDENCE, 
-			'parametric'    => $PARAMETRIC,
-			'ordinal'       => $ORDINAL,
-		);
-		$p_value = $aov->{_stat}{p_value};
-	};
-	
-	$p_value = -1 * (log($p_value) / LOG10) if $p_value;
-	return $p_value || '.';
-}
 
-
-sub summarize_results {
-	
-	# the results from the correlation analysis
-	my ($correlations, $optimal_shifts, $optimal_correlations, 
-		$count, $not_enough_data, $no_variance) = @_;
-	
-	# Summary analyses
-	printf " Correlated %s features\n", format_with_commas($count);
-	printf " Mean Pearson correlation was %.3f  +/- %.3f\n", 
-		mean(@$correlations), stddevp(@$correlations);
-	
-	if ($find_shift) {
-		printf " Mean absolute optimal shift was %.0f +/- %.0f bp\n", 
-			mean( map {abs $_} @$optimal_shifts), 
-			stddevp( map {abs $_} @$optimal_shifts);
-		printf " Mean optimal Pearson correlation was %.3f  +/- %.3f\n", 
-			mean(@$optimal_correlations), stddevp(@$optimal_correlations);
-	}
-	if ($not_enough_data) {
-		printf " %s features did not have enough data points\n", 
-			format_with_commas($not_enough_data);
-	}
-	if ($no_variance) {
-		printf " %s features had no variance in the reference data points\n", 
-			format_with_commas($no_variance);
-	}
-}
 
 
 
@@ -983,11 +917,10 @@ correlate_position_data.pl [--options] <filename>
   --ddb <name | filename>
   --ref <type | filename>
   --test <type | filename>
-  --pval
   --shift
   --radius <integer>
-  --pos [5|m|3]                 (m)
-  --norm [rank|sum ]
+  --pos [5 | m | 3]
+  --norm [rank | sum ]
   --force_strand
   --(no)interpolate
   --gz
@@ -1038,16 +971,6 @@ correlate. These may be GFF type or name in a database or BigWigSet, or
 they may be a BigWig or even Bam file. Both options are required. If 
 not provided, they may be interactively chosen from the database.
 
-=item --pval
-
-Perform an ANOVA analysis between the test and reference data sets and 
-report a P-value. By default, this performs a dependent, parametric 
-ANOVA. This requires the C<Statistic::ANOVA> module to be installed. 
-Please refer to the module documentation for details. If your needs 
-require a change to the test, you may edit the parameters at the top 
-of this script. For convenience, the P-values are reported as -Log10(P) 
-transformed values. The default is false.
-
 =item --shift
 
 Optionally specify whether an optimal shift should be calculated that 
@@ -1062,7 +985,7 @@ when calculating an optimal shift (--shift option). The default is to
 take the length of the feature as the window for calculating the 
 correlation.  
 
-=item --pos [5|m|3]
+=item --pos [5 | m | 3]
 
 Indicate the relative position of the feature to be used as the 
 reference point around which the window (determined by the radius 
@@ -1071,7 +994,7 @@ accepted: "5" indicates the 5' prime end is used, "3" indicates the
 3' end is used, and "m" indicates the middle of the feature is used. 
 The default is to use the midpoint. 
 
-=item --norm [rank|sum]
+=item --norm [rank | sum]
 
 Optionally define a method of normalizing the scores between the 
 reference and test data sets prior to calculating the correlation. 
@@ -1112,18 +1035,13 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-This program will calculate statistics between the positioned scores of
-two different datasets over a window from an annotated feature or
-chromosomal segment. These statistics will help determine whether the
-positions or distribution of scores across the window vary or underwent
-a positional shift between a test and a reference dataset. For example,
-if the enrichment of nucleosome signal from a ChIP experiment shifts in
-genomic position, indicating a change in nucleosome position. 
-
-Two statistics may be calculated. First, it will calculate a a Pearson
-linear correlation coefficient (r value) between the datasets (default). 
-Additionally, an ANOVA analysis may be performed between the datasets and 
-generate a P-value.  
+This program will calculate a Pearson linear correlation coefficient (r value) 
+between the positioned scores (occupancy) of two datasets over a window 
+from an annotated feature or chromosomal segment. This will determine 
+whether the positions or distribution of scores across the window vary 
+between two different data sets: a test dataset and a reference dataset. 
+The original implementation of this program is to compare nucleosome 
+occupancy differences between two datasets and identify shifts in position. 
 
 By default, the correlation is determined between the data points 
 collected over the entire length of the feature. Alternatively, a 
@@ -1132,10 +1050,9 @@ that sets the window for collecting scores and calculating a correlation.
 
 To ensure a more reliable Pearson value, missing values or values of 
 zero are interpolated from neighboring values, when possible. Also, 
-values may be normalized using one of two methods. The values may be 
+values may be normalized using one of three methods. The values may be 
 converted to rank positions (compare to Kendall's tau), or scaled such 
-that the absolute sum values are equal (for example, when working with 
-sequence tag read counts).
+that the absolute sum or median values are equal.
 
 In addition to calculating a correlation coefficient, an optimal shift 
 may also be calculated. This essentially shifts the data, 1 bp at a time, 
