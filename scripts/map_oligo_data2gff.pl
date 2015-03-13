@@ -7,11 +7,11 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	open_data_file
-	write_data_file
+	load_tim_data_file
+	open_tim_data_file
+	write_tim_data_file
 );
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 
 print "\n This script will map oligo data to the genome and generate a GFF file\n";
@@ -135,7 +135,7 @@ unless (defined $midpoint) {
 
 
 ### Load the oligo GFF data
-my $oligo_feature_ref = load_data_file($oligo_file) or 
+my $oligo_feature_ref = load_tim_data_file($oligo_file) or 
 	die " unable to load oligo feature file!\n";
 
 unless ($oligo_feature_ref->{gff}) {
@@ -267,7 +267,7 @@ $oligo_feature_ref->{'basename'} = undef;
 $oligo_feature_ref->{'filename'} = undef;
 $oligo_feature_ref->{'extension'} = undef;
 
-my $success = write_data_file(
+my $success = write_tim_data_file(
 	'data'       => $oligo_feature_ref,
 	'filename'   => $outfile,
 	'gz'         => $gz
@@ -286,7 +286,7 @@ else {
 sub load_microarray_data {
 	
 	# open the data file
-	my ($data_fh, $data_ref) = open_data_file($data_file) or 
+	my ($data_fh, $data_ref) = open_tim_data_file($data_file) or 
 		die " Unable to open oligo data file '$data_file'!\n";
 	
 	# Determine the column of microarray data
@@ -387,9 +387,10 @@ field.
 
 =item --data <oligo_data.tx>
 
-Specify the file name of a data file. It must be a tab-delimited text file.
-The file may be compressed with gzip. The first column MUST be the oligo or 
-probe unique name or ID.
+Specify the file name of a data file. It must be a tab-delimited text file,
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
+although any format should work. The file may be compressed with gzip. The 
+first column MUST be the oligo or probe unique name or ID.
 
 =item --index <column_index>
 

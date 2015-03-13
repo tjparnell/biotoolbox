@@ -7,15 +7,15 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
 use Statistics::Descriptive;
-use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
+use Bio::ToolBox::data_helper qw(parse_list);
+use Bio::ToolBox::file_helper qw(load_tim_data_file);
 my $gd_ok;
 eval {
 	require GD::Graph::lines; 
 	require GD::Graph::bars; 
 	$gd_ok = 1;
 };
-my $VERSION = 1.22;
+my $VERSION = '1.15';
 
 print "\n This script will plot histograms of value frequencies\n\n";
 
@@ -86,10 +86,7 @@ if ($print_version) {
 
 ### Check required and default values
 unless ($gd_ok) {
-	die <<GD_WARNING
-Modules GD and GD::Graph failed to load, either because they are not installed or they 
-are missing an external dependency (libgd). Please install these to run this script.
-GD_WARNING
+	die "Module GD::Graph must be installed to run this script.\n";
 }
 
 unless ($infile) {
@@ -150,28 +147,29 @@ unless (defined $y_ticks) {
 ####### Main ###########
 
 ### Load the file
-my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+print " Loading data from file $infile....\n";
+my $main_data_ref = load_tim_data_file($infile);
+unless ($main_data_ref) {
+	die " No data loaded!\n";
+}
+my $data_table_ref = $main_data_ref->{'data_table'};
 
 # load the dataset names into hashes
 my (%dataset_by_name, %dataset_by_id); # hashes for name and id
-my $i = 0;
-foreach my $name ($Data->list_columns) {
-	# check column header names for gene or window attribute information
-	# these won't be used for graph generation, so we'll skip them
-	if ($name =~ /^(?:name|id|class|type|alias|probe|chr|
-		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand|primary_id)$/xi
-	) {
-		$i++;
-		next;
+for (my $i = 0; $i < $main_data_ref->{'number_columns'}; $i++) {
+	my $name = $main_data_ref->{$i}{'name'};
+	if (
+		# check column header names for gene or window attribute information
+		$name =~ /^(?:name|id|alias|chromosome|start|stop|end|strand|type|class)$/i
+	) { 
+		# skip on to the next header
+		next; 
+	} 
+	else { 
+		# record the data set name
+		$dataset_by_id{$i} = $name;
+		$dataset_by_name{$name} = $i;
 	}
-	
-	# record the data set name
-	$dataset_by_id{$i} = $name;
-	$dataset_by_name{$name} = $i;
-	$i++;
 }	
 
 # determine the bins for the frequency distribution
@@ -183,9 +181,7 @@ for my $i (1 .. $binnumber) {
 
 # Prepare output directory
 unless ($directory) {
-	# directory may be specified from a command line argument, otherwise
-	# generate default directory from input file name
-	$directory = $Data->path . $Data->basename . '_graphs';
+	$directory = $main_data_ref->{'path'} . $main_data_ref->{'basename'} . '_graphs';
 }
 unless (-e "$directory") {
 	mkdir $directory or die "Can't create directory $directory\n";
@@ -236,8 +232,8 @@ sub graph_all_datasets {
 sub graph_designated_datasets {
 	my @columns = @_;
 	foreach (@columns) {
+		# we're plotting two datasets
 		if (/&/) { 
-			# we're plotting two datasets
 			my ($one, $two) = split /&/;
 			if ( 
 				(exists $dataset_by_id{$one}) and 
@@ -318,9 +314,8 @@ sub graph_one {
 	print " Preparing graph for $name....\n";
 	my $index = $dataset_by_name{$name};
 	my @values;
-	$Data->iterate( sub { 
-		my $row = shift;
-		my $y = $row->value($index);
+	for my $i (1..$main_data_ref->{'last_row'}) { # walk through the data file
+		my $y = $data_table_ref->[$i][$index];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
 		unless (
@@ -330,7 +325,7 @@ sub graph_one {
 		) {
 			push @values, $y; # put into the values array
 		}
-	} );
+	}
 	#print "  found " . scalar @values . " useable values\n";
 	
 	# Determine the data frequency
@@ -344,14 +339,15 @@ sub graph_one {
 	}
 	my $string = '%.' . $x_format . 'f';
 	my @xlabels = map { sprintf $string, $_ } @bins;
+	my @data = ( [@xlabels], [@yvalue] );
 	
 	# Now (finally) prepare the graph
-	my $title = "$out $name";
+	my $title = "Distribution of $out $name";
 	if ($lines) {
-		graph_this_as_lines($name, undef, $title, [ \@xlabels, \@yvalue ]);
+		graph_this_as_lines($name, undef, $title, \@data);
 	} 
 	else {
-		graph_this_as_bars($name, undef, $title, [ \@xlabels, \@yvalue ]);
+		graph_this_as_bars($name, undef, $title, \@data);
 	}
 }	
 
@@ -367,27 +363,27 @@ sub graph_two {
 	my $index1 = $dataset_by_name{$name1};
 	my $index2 = $dataset_by_name{$name2};
 	my (@values1, @values2);
-	$Data->iterate( sub { 
-		my $row = shift;
-		my $v1 = $row->value($index1);
-		my $v2 = $row->value($index2);
+	for my $i (1..$main_data_ref->{'last_row'}) { 
+		# walk through the data file
+		my $value1 = $data_table_ref->[$i][$index1];
+		my $value2 = $data_table_ref->[$i][$index2];
 		# only take numerical data
 		# must have a numeric value from both datasets, otherwise skip
 		unless (
-			$v1 eq '.' or
-			$v1 < $start or
-			$v1 > $max
+			$value1 eq '.' or
+			$value1 < $start or
+			$value1 > $max
 		) {
-			push @values1, $v1;
+			push @values1, $value1; # put into the values array
 		}
 		unless (
-			$v2 eq '.' or
-			$v2 < $start or
-			$v2 > $max
+			$value2 eq '.' or
+			$value2 < $start or
+			$value2 > $max
 		) {
-			push @values2, $v2;
+			push @values2, $value2; # put into the values array
 		}
-	} );
+	}
 	
 	# Determine the data frequency
 	# we have to first determine which dataset has the biggest max value
@@ -410,14 +406,15 @@ sub graph_two {
 	
 	my $string = '%.' . $x_format . 'f';
 	my @xlabels = map { sprintf $string, $_ } @bins;
+	my @data = ( \@xlabels, \@yvalue1, \@yvalue2 );
 	
 	# Now (finally) prepare the graph
-	my $title = "$out $name1 & $name2";
+	my $title = "Distributions of $out $name1 & $name2";
 	if ($lines) {
-		graph_this_as_lines($name1, $name2, $title, [ \@xlabels, \@yvalue1, \@yvalue2 ]);
+		graph_this_as_lines($name1, $name2, $title, \@data);
 	} 
 	else {
-		graph_this_as_bars($name1, $name2, $title, [ \@xlabels, \@yvalue1, \@yvalue2 ]);
+		graph_this_as_bars($name1, $name2, $title, \@data);
 	}
 }
 

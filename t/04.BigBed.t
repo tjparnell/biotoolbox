@@ -5,30 +5,27 @@
 
 use strict;
 use Test::More;
-use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigBed; 1}) {
-		plan tests => 33;
+		plan tests => 24;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigBed not available';
 	}
-	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
+	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
 }
 
-use lib File::Spec->catfile($Bin, "..", "lib");
+use lib "$Bin/../lib";
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
-use_ok( 'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support', 'get_chromosome_list' );
 
 
-my $dataset = File::Spec->catfile($Bin, "Data", "sample1.bb");
+my $dataset = "$Bin/Data/sample1.bb";
 
 ### Open a test file
-my $infile = File::Spec->catfile($Bin, "Data", "sample.bed");
-my $Data = Bio::ToolBox::Data->new(file => $infile);
+my $Data = Bio::ToolBox::Data->new(file => "$Bin/Data/sample.bed");
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
@@ -36,16 +33,6 @@ $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
 isa_ok($db, 'Bio::DB::BigBed', 'connected database');
-
-# check chromosomes
-my @chromos = get_chromosome_list($db);
-is(scalar @chromos, 1, 'number of chromosomes');
-is($chromos[0][0], 'chrI', 'name of first chromosome');
-is($chromos[0][1], 230208, 'length of first chromosome');
-
-# check total mapped alignments
-my $total = check_dataset_for_rpm_support($dataset);
-is($total, 1414, "number of features in BigBed");
 
 
 
@@ -81,49 +68,6 @@ $score = $row->get_score(
 );
 # print "mean coverage for ", $row->name, " is $score\n";
 is(sprintf("%.2f", $score), 143.81, 'row mean score');
-
-# read precise count sum
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'pcount',
-	'method'   => 'sum',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is($score, 414, 'row sum of read precise count score');
-
-# read length mean
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'length',
-	'method'   => 'median',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is($score, 73, 'median of read length');
-
-# read count rpm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 320367, 'read count as rpm');
-
-# read count rpkm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpkm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 171411, 'read count as rpkm');
-
-
-
 
 
 

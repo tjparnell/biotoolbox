@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file
+	open_tim_data_file
 	open_to_write_fh
 );
 my $BAM_OK;
@@ -22,7 +22,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION =  1.24;
+my $VERSION = '1.18';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -108,7 +108,7 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my ($in_fh, $metadata_ref) = open_data_file($infile) or 
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile) or 
 	die "unable to open input file!\n";
 unless ($database) {
 	$database = $metadata_ref->{'db'};
@@ -140,25 +140,22 @@ unless (defined $strand_i) {
 }
 
 
+
 ### Determine mode ###
 if (defined $id_i and defined $seq_i and $concatenate) {
 	# sequence is already in the source file
-	print " writing a single concatenated fasta with the provided sequence\n";
 	write_direct_single_fasta();
 }
-elsif (defined $id_i and defined $seq_i) {
+if (defined $id_i and defined $seq_i) {
 	# sequence is already in the source file
-	print " writing a multi-fasta with the provided sequence\n";
 	write_direct_multi_fasta();
 }
 elsif (defined $chr_i and $start_i and $stop_i and $concatenate) {
 	# collect sequences and concatenate into single
-	print " fetching sequence from $database and writing a concatenated fasta\n";
 	fetch_seq_and_write_single_fasta();
 }
 elsif (defined $chr_i and $start_i and $stop_i) {
 	# need to collect sequence
-	print " fetching sequence from $database and writing a multi-fasta\n";
 	fetch_seq_and_write_multi_fasta();
 }
 else {
@@ -356,9 +353,6 @@ sub open_output_fasta {
 	unless ($outfile) {
 		$outfile = $metadata_ref->{'basename'} . '.fa';
 	}
-	unless ($outfile =~ /\.fa(?:sta)?(?:\.gz)?/i) {
-		$outfile .= '.fasta';
-	}
 	if ($gz and $outfile !~ /\.gz$/i) {
 		$outfile .= '.gz';
 	}
@@ -518,7 +512,7 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-This program will take a tab-delimited text file (BED file, 
+This program will take a tab-delimited text file (tim data formated file, 
 for example) and generate either a multi-sequence fasta file containing the 
 sequences of each feature defined in the input file, or optionally a single 
 concatenated fasta file. If concatenating, the individual sequences may be 

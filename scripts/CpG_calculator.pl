@@ -5,9 +5,20 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::Data;
-use Bio::ToolBox::db_helper qw(open_db_connection);
-use Bio::ToolBox::utility;
+use FindBin qw($Bin);
+use Bio::ToolBox::data_helper qw(
+	generate_tim_data_structure
+	find_column_index
+	splice_data_structure
+);
+use Bio::ToolBox::db_helper qw(
+	open_db_connection
+	get_new_genome_list 
+);
+use Bio::ToolBox::file_helper qw(
+	load_tim_data_file 
+	write_tim_data_file 
+);
 my $parallel;
 eval {
 	# check for parallel support
@@ -20,7 +31,7 @@ eval {
 	require Bio::DB::Sam;
 	$BAM_OK = 0;
 };
-my $VERSION = 1.24;
+my $VERSION = '1.18';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -115,26 +126,33 @@ my $start_time = time;
 
 ### Prepare the database and main data structure
 my $db;
-my $Data;
+my $data;
 if ($infile) {
 	# an input file of regions is provided
-	$Data = Bio::ToolBox::Data->new(file => $infile) or 
+	$data = load_tim_data_file($infile) or 
 		die " unable to open input file '$infile'!\n";
-	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# check database
 	unless ($database) {
-		$database = $Data->database or 
+		$database = $data->{'db'} or 
 			die " no database or fasta file given! use --help for more information\n";
 	}
+	
+	# open database
+	$db = open_sequence_db() or 
+		die " unable to open database connection!\n";
 }
 else {
 	# make a new genome list based on the type of database we're using
 	if ($database) {
-		$Data = Bio::ToolBox::Data->new(
-			'feature' => 'genome',
-			'db'      => $database,
-			'win'     => $window,
+		# first open the database
+		$db = open_db_connection($database) or 
+			die " unable to open database connection!\n";
+		
+		# get the list from the database
+		$data = get_new_genome_list(
+			'db'   => $db,
+			'win'  => $window,
 		) or die " unable to generate genome window list!\n";
 	}
 	else {
@@ -143,10 +161,16 @@ else {
 	}
 }
 
+# check the database
+my $db_ref = ref $db;
+unless ($db_ref =~ /SeqFeature|Fasta|Fai/) {
+	die " unsupported database type $db_ref!\n";
+}
+
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and ($Data->last_row / $cpu) < 1000) {
-		# We need at least 1000 lines in each fork split to make 
+	while ($cpu > 1 and $data->{'last_row'}/$cpu < 100) {
+		# I figure we need at least 100 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
 		$cpu--;
@@ -171,17 +195,6 @@ else {
 
 
 ### Finished
-# write the data file
-my $written_file = $Data->write_file(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
-if ($written_file) {
-	print " Wrote data file '$written_file' ";
-}
-else {
-	print " unable to write data file! ";
-}
 printf " in %.2f minutes\n", (time - $start_time) / 60;
 
 
@@ -192,9 +205,6 @@ printf " in %.2f minutes\n", (time - $start_time) / 60;
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -206,7 +216,7 @@ sub parallel_execution {
 		#### In child ####
 	
 		# splice the data structure
-		$Data->splice_data($i, $cpu);
+		splice_data_structure($data, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
 		# pass true to avoid cached database objects
@@ -216,12 +226,18 @@ sub parallel_execution {
 		process_regions();
 		
 		# write out result
-		my $success = $Data->write_file(
-			'filename' => sprintf("$child_base_name.%03s",$i),
+		my $success = write_tim_data_file(
+			'data'     => $data,
+			'filename' => "$child_base_name.$i",
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
+		}
+		else {
+			# failure! the subroutine will have printed error messages
+			die " unable to write file!\n";
+			# no need to continue
 		}
 		
 		# Finished
@@ -234,64 +250,141 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
-		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
-	}
-	my $count = $Data->reload_children(@files);
-	printf " reloaded %s features from children\n", format_with_commas($count);
+	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
+	push @args, '--gz' if $gz;
+	push @args, @files;
+	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
+	unlink @files;
 }
 
 
 sub single_execution {
+	
 	# execute
-	$db = open_sequence_db();
 	process_regions();
+	
+	# write the data file
+	my $written_file = write_tim_data_file(
+		# we will write a tim data file
+		# appropriate extensions and compression should be taken care of
+		'data'     => $data,
+		'filename' => $outfile,
+	);
+	if ($written_file) {
+		print " Wrote data file '$written_file' ";
+	}
+	else {
+		print " unable to write data file! ";
+	}
+}
+
+
+sub identify_indices {
+	
+	# the indices to identify
+	my ($chrom, $start, $stop);
+	
+	# check obvious indices
+	if ($data->{'gff'}) {
+		$chrom = 0;
+		$start = 3;
+		$stop  = 4;
+	}
+	elsif ($data->{'bed'}) {
+		$chrom = 0;
+		$start = 1;
+		$stop  = 2;
+	}
+	elsif ($data->{'program'} eq $0) {
+		# genome data generated by this program
+		$chrom = 0;
+		$start = 1;
+		$stop  = 2;
+	}
+	else {
+		# custom tim data file
+		$chrom = find_column_index($data, '^chr|seq|ref|id');
+		$start = find_column_index($data, '^start');
+		$stop  = find_column_index($data, '^stop|end');
+	
+		# check
+		unless (defined $chrom and defined $start and defined $stop) {
+			die " unable to identify one or more coordinate column indices!\n";
+		}
+	}
+	
+	return ($chrom, $start, $stop);
 }
 
 
 sub process_regions {
 	
+	# Identify the indices
+	my ($chr_i, $start_i, $stop_i) = identify_indices();
+	
 	# Add new columns
 	# Fraction gc
-	my $fgc_i = $Data->add_column('Fraction_GC');
+	my $fgc_i = $data->{'number_columns'};
+	$data->{$fgc_i} = {
+		'name'   => 'Fraction_GC',
+		'index'  => $fgc_i,
+	};
+	$data->{'number_columns'} += 1;
 	
 	# number of CpG
-	my $cg_i = $Data->add_column('Number_CpG');
+	my $cg_i = $data->{'number_columns'};
+	$data->{$cg_i} = {
+		'name'   => 'Number_CpG',
+		'index'  => $cg_i,
+	};
+	$data->{'number_columns'} += 1;
 	
 	# expected number of CpG
-	my $exp_i = $Data->add_column('Expected_CpG');
+	my $exp_i = $data->{'number_columns'};
+	$data->{$exp_i} = {
+		'name'   => 'Expected_CpG',
+		'index'  => $exp_i,
+	};
+	$data->{'number_columns'} += 1;
 	
 	# observed/expected ratio
-	my $oe_i = $Data->add_column('Obs_Exp_Ratio');
+	my $oe_i = $data->{'number_columns'};
+	$data->{$oe_i} = {
+		'name'   => 'Obs_Exp_Ratio',
+		'index'  => $oe_i,
+	};
+	$data->{'number_columns'} += 1;
+	
+	# add column header names
+	foreach ($fgc_i, $cg_i, $exp_i, $oe_i) { 
+		$data->{'data_table'}->[0][$_] = $data->{$_}{'name'};
+	}
 	
 	
 	# Process the regions
-	$Data->iterate( sub {
+	for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
 		
-		my $row = shift;
 		# get the region subsequence
-		# we are using our own database and not $Data's internal database connection
-		# since we might be using the faster Bio::DB::Sam::Fai module
 		my $seq = $db->seq(
-			$row->seq_id,
-			$row->start,
-			$row->end + 1,
+			$data->{'data_table'}->[$row][$chr_i],
+			$data->{'data_table'}->[$row][$start_i],
+			$data->{'data_table'}->[$row][$stop_i] + 1,
 			# we add 1 bp so that we can count CpG that cross a window border
-		) || undef;
+		);
 		unless ($seq) {
 			# this may happen if 0 or >1 chromosomes match the name
 			# or possibly coordinates are off the end, although I thought this was 
 			# checked by the db adaptor
-			my $w = sprintf 
-				"No sequence available for segment %s:%s..%s at row %s, skipping\n", 
-				$row->seq_id, $row->start, $row->end, $row->row_index;
-			warn $w;
+			warn "No sequence for segment " . 
+				$data->{'data_table'}->[$row][$chr_i] . ":" .
+				$data->{'data_table'}->[$row][$start_i] . ".." .
+				$data->{'data_table'}->[$row][$stop_i] . " at row $row, skipping.\n";
 			
 			# fill out null data
-			$row->value($fgc_i, '.');
-			$row->value($cg_i, '.');
-			$row->value($exp_i, '.');
-			$row->value($oe_i, '.');
+			$data->{'data_table'}->[$row][$fgc_i] = '.';
+			$data->{'data_table'}->[$row][$cg_i]  = '.';
+			$data->{'data_table'}->[$row][$exp_i] = '.';
+			$data->{'data_table'}->[$row][$oe_i]  = '.';
 			next;
 		}
 		
@@ -314,26 +407,27 @@ sub process_regions {
 		# we subtract 1 from the length because we added 1 when we generated the seq
 		if (length($seq) > 1) {
 			# must have reasonable length to avoid div by 0 errors
-			$row->value($fgc_i, 
-				sprintf "%.3f", ($numC + $numG) / (length($seq) - 1) );
+			$data->{'data_table'}->[$row][$fgc_i] = 
+				sprintf "%.3f", ($numC + $numG) / (length($seq) - 1); # fraction GC
 		
-			$row->value($cg_i, $numCG);
+			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
 		
-			$row->value($exp_i,  
-				sprintf "%.0f", ($numC * $numG) / (length($seq) - 1) );
+			$data->{'data_table'}->[$row][$exp_i] = 
+				sprintf "%.0f", ($numC * $numG) / (length($seq) - 1); # expected CpG
 		
-			$row->value($oe_i, 
-				$row->value($exp_i) ? # avoid div by 0
-				sprintf("%.3f", $numCG / $row->value($exp_i) ) : 0);
+			$data->{'data_table'}->[$row][$oe_i]  = 
+				$data->{'data_table'}->[$row][$exp_i] ? # avoid div by 0
+				sprintf("%.3f", $numCG / $data->{'data_table'}->[$row][$exp_i]) : 
+				0; # obs/exp ratio
 		}
 		else {
 			# a sequence of 1 bp? odd, just record default values
-			$row->value($fgc_i, 0);
-			$row->value($cg_i, $numCG); 
-			$row->value($exp_i, 0);
-			$row->value($oe_i, 0);
+			$data->{'data_table'}->[$row][$fgc_i] = 0;
+			$data->{'data_table'}->[$row][$cg_i]  = $numCG; # number CpG
+			$data->{'data_table'}->[$row][$exp_i] = 0;
+			$data->{'data_table'}->[$row][$oe_i]  = 0;
 		}
-	} );
+	}
 	
 }
 
@@ -373,7 +467,6 @@ CpG_calculator.pl --db <text> [--options...]
   
   Options:
   --db <name|file|directory>
-  --fasta <file|directory>
   --in <filename>
   --win <integer>
   --out <filename> 
@@ -389,8 +482,6 @@ The command line flags and descriptions:
 =over 4
 
 =item --db <name|file|directory>
-
-=item --fasta <file|directory>
 
 Provide the name of a Bio::DB::SeqFeature::Store database from which to 
 collect the genomic sequence. Alternatively, provide the name 

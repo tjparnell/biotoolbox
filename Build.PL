@@ -2,7 +2,6 @@
 
 use strict;
 use warnings;
-use FindBin qw($Bin);
 use Module::Build;
 
 
@@ -16,7 +15,7 @@ my $options = get_base_options();
 check_useq();
 check_sam();
 check_big();
-check_extra();
+
 
 
 ### Build the script
@@ -37,11 +36,10 @@ sub get_base_options {
 		dist_author       => 'Timothy Parnell <parnell.tj@gmail.com>',
 		dist_abstract     => 'Tools for querying and analysis of genomic data',
 		configure_requires => {
-			'Module::Build'           => 0,
+			'Module::Build'       => 0,
 		},
 		requires          => {
 			'Config::Simple'          => 4.58,
-			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 			'Bio::Root::Version'      => '1.0069001',
@@ -58,8 +56,15 @@ sub get_base_options {
 		},
 		script_files => [
 			'scripts/average_gene.pl',
+			'scripts/bam2gff_bed.pl',
 			'scripts/bam2wig.pl',
+			'scripts/bar2wig.pl',
+			'scripts/big_file2gff3.pl',
+			'scripts/bin_genomic_data.pl',
+			'scripts/change_chr_prefix.pl',
 			'scripts/change_cluster_order.pl',
+			'scripts/compare_subfeature_scores.pl',
+			'scripts/convert_yeast_genome_version.pl',
 			'scripts/correlate_position_data.pl',
 			'scripts/CpG_calculator.pl',
 			'scripts/data2bed.pl',
@@ -71,7 +76,8 @@ sub get_base_options {
 			'scripts/db_types.pl',
 			'scripts/filter_bam.pl',
 			'scripts/find_enriched_regions.pl',
-			'scripts/get_binned_data.pl',
+			'scripts/get_actual_nuc_sizes.pl',
+			'scripts/get_bam_seq_stats.pl',
 			'scripts/get_datasets.pl',
 			'scripts/get_ensembl_annotation.pl',
 			'scripts/get_features.pl',
@@ -83,13 +89,24 @@ sub get_base_options {
 			'scripts/graph_data.pl',
 			'scripts/graph_histogram.pl',
 			'scripts/graph_profile.pl',
+			'scripts/intersect_nucs.pl',
+			'scripts/intersect_SNPs.pl',
 			'scripts/join_data_file.pl',
+			'scripts/locate_SNPs.pl',
 			'scripts/manipulate_datasets.pl',
+			'scripts/map_nucleosomes.pl',
+			'scripts/map_oligo_data2gff.pl',
+			'scripts/map_transcripts.pl',
 			'scripts/merge_datasets.pl',
+			'scripts/novo_wrapper.pl',
+			'scripts/process_microarray.pl',
 			'scripts/pull_features.pl',
 			'scripts/run_cluster.pl',
+			'scripts/split_bam_by_isize.pl',
 			'scripts/split_data_file.pl',
+			'scripts/ucsc_cytoband2gff3.pl',
 			'scripts/ucsc_table2gff3.pl',
+			'scripts/verify_nucleosome_mapping.pl',
 			'scripts/wig2data.pl',
 		],
 	);
@@ -141,35 +158,4 @@ sub check_big {
 }
 
 
-sub check_extra {
-	
-	# check to see if extra folder is present
-	# these are extra scripts that may be available when obtained from SVN 
-	# instead of CPAN
-	
-	if (-e "$Bin/extras") {
-		push @{ $options->{script_files} }, (
-			'extras/bam2gff_bed.pl',
-			'extras/bar2wig.pl',
-			'extras/big_file2gff3.pl',
-			'extras/bin_genomic_data.pl',
-			'extras/change_chr_prefix.pl',
-			'extras/compare_subfeature_scores.pl',
-			'extras/convert_yeast_genome_version.pl',
-			'extras/get_actual_nuc_sizes.pl',
-			'extras/get_bam_seq_stats.pl',
-			'extras/intersect_nucs.pl',
-			'extras/intersect_SNPs.pl',
-			'extras/locate_SNPs.pl',
-			'extras/map_nucleosomes.pl',
-			'extras/map_oligo_data2gff.pl',
-			'extras/map_transcripts.pl',
-			'extras/novo_wrapper.pl',
-			'extras/process_microarray.pl',
-			'extras/split_bam_by_isize.pl',
-			'extras/ucsc_cytoband2gff3.pl',
-			'extras/verify_nucleosome_mapping.pl',
-		);
-	}
-}
 

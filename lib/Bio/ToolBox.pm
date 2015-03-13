@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = 1.25;
+our $VERSION = 1.19;
 
 1;
 
@@ -100,19 +100,10 @@ This module uses an object-oriented interface. Many of the methods
 will be familiar to users of BioPerl, from which this module draws 
 heavily.
 
-=item Bio::ToolBox::Data::Feature
-
-This is the object class for working with individual rows in a table 
-of data. It provides a number of conventions for working with the rows 
-in a standard fashion, for example returning the start column value  
-regardless of which column it is or whether the table is bed or gff or 
-an arbitrary text file. A number of convenience methods are present for 
-collecting data from data files. This module is not used directly by the 
-user, but its objects are returned when using Bio::ToolBox::Data.
-
 =item Bio::ToolBox::data_helper
 
-This is a helper library for working with the Bio::ToolBox Data structure. 
+This is a helper library for working with the Bio::ToolBox Data 
+structure (previously referred colloquially as a tim data structure). 
 This is essentially a complex hash of metadata and an array of arrays 
 representing the data table.
 

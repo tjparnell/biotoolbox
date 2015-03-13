@@ -72,7 +72,8 @@
 # Avoid archives of this distribution
 \bBio-ToolBox-[\d\.\_]+
 
-# Avoid extra scripts when building distribution
-\bextras/
+# Avoid retired and standalone scripts
+\bretired/
+\bstand_alone_scripts/
 
 
