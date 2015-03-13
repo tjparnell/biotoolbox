@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.25;
+my $VERSION = '1.20';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -84,19 +84,13 @@ unless (defined $gz) {$gz = 0}
 ### Load the feature list
 
 # load file
-my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
-
-if ($use_type) {
-	# set the general feature type, which will be used as a proxy for individual 
-	# feature types in the Data method that looks for the database features.
-	my $f = $Data->feature;
-	if (defined $f) {
-		print " Resetting feature type '$f' to requested '$use_type'\n";
-	}
-	$Data->feature($use_type);
+print " Loading feature list from '$infile'....\n";
+my $Data = Bio::ToolBox::Data->new(file => $infile);
+unless ($Data) {
+	die " No file data loaded!\n";
 }
+printf "  Loaded %s '%s' features.\n", 
+	format_with_commas( $Data->last_row ), $Data->feature;
 
 
 
@@ -106,7 +100,7 @@ if ($database) {
 		warn " provided database '$database' does not match file metadata!\n" . 
 			" overriding metadata and using '$database'\n";
 	}
-	$Data->database($database);
+	$Data->database = $database;
 }
 elsif (not $Data->database) {
 	die "No database defined! See help\n";
@@ -176,7 +170,6 @@ sub get_attribute_list_from_user {
 	else {
 		
 		# get the list of features to check for examples
-		print " Collecting sample features to generate list of attributes....\n";
 		
 		# get the attributes for a sample of features
 		# store the tag keys in an example hash

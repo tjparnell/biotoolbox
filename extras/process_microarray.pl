@@ -8,7 +8,7 @@ use Pod::Usage;
 use Statistics::Lite qw(mean median);
 use Statistics::Descriptive;
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
@@ -18,7 +18,7 @@ use Bio::ToolBox::file_helper qw(
 	write_tim_data_file
 );
 use constant LOG2 => log(2);
-my $VERSION = 1.24;
+my $VERSION = '1.18';
 
 print "\n A script to process microarray files\n\n";
 
@@ -1323,7 +1323,7 @@ sub perform_probe_normalization_median_scaling {
 sub output_combined_records {
 	
 	# prepare output data structure
-	my $data = generate_data_structure( qw(
+	my $data = generate_tim_data_structure( qw(
 		microarray_probes
 		ProbeID
 		Experiment
@@ -1431,7 +1431,7 @@ sub output_combined_records {
 sub output_single_records {
 	
 	# prepare output data structure
-	my $data = generate_data_structure( qw(
+	my $data = generate_tim_data_structure( qw(
 		microarray_probes
 		ProbeID
 		Experiment

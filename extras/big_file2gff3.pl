@@ -9,9 +9,9 @@ use File::Copy;
 use File::Spec;
 use File::Path 'make_path';
 use File::Basename qw(fileparse);
-use Bio::ToolBox::data_helper qw(generate_data_structure);
+use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
 use Bio::ToolBox::file_helper qw(
-	write_data_file
+	write_tim_data_file
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
@@ -29,7 +29,7 @@ eval {
 	require Bio::ToolBox::db_helper::bam;
 	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = 1.24;
+my $VERSION = '1.15';
 
 print "\n This script will generate a GFF3 file for BigBed, BigWig or Bam files\n";
 
@@ -283,14 +283,14 @@ while (@infiles) {
 	
 	### Generate the GFF data structure
 	# Initialize the data structure
-	my $main_data_ref = generate_data_structure(
+	my $main_data_ref = generate_tim_data_structure(
 		'bigwig_features',
 		'Chromosome',
 		'Start',
 		'Stop',
 		'Strand',
 		'File'
-	) or die " unable to generate data structure!\n";
+	) or die " unable to generate tim data structure!\n";
 	
 	# Determine the target file name
 	my $target_basename;
@@ -399,7 +399,7 @@ while (@infiles) {
 			$main_data_ref->{'last_row'} += scalar(@chromodata);
 		}
 		
-		my $success = write_data_file(
+		my $success = write_tim_data_file(
 			'data'       => $main_data_ref,
 			'filename'   => $gff_file,
 		);

@@ -13,7 +13,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::db_helper::gff3_parser;
 use Bio::ToolBox::utility;
-my $VERSION = 1.23;
+my $VERSION = '1.20';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -41,27 +41,24 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
-	$do_mixed,
 	$bed,
 	$gz,
 	$help,
 	$print_version,
 );
-my @features;
 
 # Command line options
 GetOptions( 
 	'in=s'      => \$infile, # the input data file
 	'out=s'     => \$outfile, # name of output file 
 	'db=s'      => \$database, # source annotation database
-	'feature=s' => \@features, # the gene feature from the database
+	'feature=s' => \$feature, # the gene feature from the database
 	'region=s'  => \$request, # the region requested
 	'transcript=s' => \$transcript_type, # which transcripts to take
 	'start=i'   => \$start_adj, # start coordinate adjustment
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
-	'mix!'      => \$do_mixed, # mix RNA transcript types from same gene
 	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -101,6 +98,10 @@ unless ($outfile) {
 	die " must define an output file name! use --help for more information\n";
 }
 
+unless ($transcript_type) {
+	$transcript_type = 'mRNA';
+}
+
 unless (defined $slop) {
 	$slop = 0;
 }
@@ -109,21 +110,15 @@ unless (defined $gz) {
 	$gz = 0;
 }
 
-# one or more feature types may have been provided
-# check if it is a comma delimited list
-if (scalar @features == 1 and $features[0] =~ /,/) {
-	@features = split /,/, shift @features;
-}
-
-
-# boolean values for different transcript types to take
-my ($do_mrna, $do_mirna, $do_ncrna, $do_snrna, $do_snorna, $do_trna, 
-	$do_rrna, $do_miscrna, $do_lincrna, $do_all_rna);
 
 
 ### Determine methods and transcript types
 # Determine request_method
 my $method = determine_method();
+
+# detemine transcript type to take
+my ($do_mrna, $do_mirna, $do_ncrna, $do_snrna, $do_snorna, $do_trna, $do_rrna);
+determine_transcript_types();
 
 
 ### Collect feature regions
@@ -200,9 +195,9 @@ sub determine_method {
 		$request = 'first exon';
 		$method = \&collect_first_exon;
 	}
-	elsif ($request =~ /^last ?exon$/i) {
+	elsif ($request =~ /^second ?exon$/i) {
 		$request = 'last exon';
-		$method = \&collect_last_exon;
+		$method = \&collect_second_exon;
 	}
 	elsif ($request =~ /tss/i) {
 		$request = 'transcription start site';
@@ -233,18 +228,6 @@ sub determine_method {
 		$request = 'last intron';
 		$method = \&collect_last_intron;
 	}
-	elsif ($request =~ /^alt.*exons?/i) {
-		$request = 'alternate exon';
-		$method = \&collect_common_alt_exons;
-	}
-	elsif ($request =~ /^common ?exons?/i) {
-		$request = 'common exon';
-		$method = \&collect_common_alt_exons;
-	}
-	elsif ($request =~ /^exons?/i) {
-		$request = 'exon';
-		$method = \&collect_exons;
-	}
 	else {
 		die " unknown region request!\n";
 	}
@@ -257,17 +240,14 @@ sub determine_method {
 sub collect_method_from_user {
 	
 	my %list = (
-		1	=> 'transcription start site',
-		2	=> 'transcription stop site',
-		3   => 'exons',
-		4	=> 'first exon',
-		5	=> 'last exon',
-		6   => 'alternate exons',
-		7   => 'common exons',
-		8	=> 'introns',
-		9   => 'first intron',
-		10  => 'last intron',
-		11	=> 'splice sites',
+		1	=> 'first exon',
+		2	=> 'last exon',
+		3	=> 'transcription start site',
+		4	=> 'transcription stop site',
+		5	=> 'splice sites',
+		6	=> 'introns',
+		7   => 'first intron',
+		8   => 'last intron',
 	);
 	
 	# request feature from the user
@@ -292,90 +272,46 @@ sub collect_method_from_user {
 
 sub determine_transcript_types {
 	
-	# if we are collecting from a database, the user may have already selected 
-	# an RNA feature type, which makes this selection redundant.
-	my @features = @_;
-	
-	# collect all the transcript types requested
-	my @types;
-	if ($transcript_type) {
-		# provided by the user from the command line
-		if ($transcript_type =~ /,/) {
-			@types = split ",", $transcript_type;
-		}
-		else {
-			push @types, $transcript_type;
-		}
-	}
-	elsif (@features) {
-		# user selected types from a database
-		foreach (@features) {
-			my ($p, $s) = split /:/, $feature; # take only the primary tag if both present
-			push @types, $p if $p =~ /rna/i;
-		}
-	}
-	
-	unless (@types) {
-		# request from the user
-		print " Genes may generate different types of RNA transcripts.\n";
-		my $i = 1;
-		my %i2tag;
-		foreach (qw(all mRNA ncRNA snRNA snoRNA tRNA rRNA miRNA lincRNA misc_RNA)) {
-			print "   $i\t$_\n";
-			$i2tag{$i} = $_;
-			$i++;
-		}
-		print " Select one or more RNA types to include   ";
-		my $response = <STDIN>;
-		chomp $response;
-		@types = map {$i2tag{$_} || undef} parse_list($response);
-	}
-	
 	# string for visual output
 	my $string = " Collecting transcript types:";
 	
+	# collect all the transcript types requested
+	my @types;
+	if ($transcript_type =~ /,/) {
+		@types = split ",", $transcript_type;
+	}
+	else {
+		push @types, $transcript_type;
+	}
 	
 	foreach (@types) {
-		if (m/^all$/i) {
-			$do_all_rna = 1;
-			$string .= ' all RNAs';
-			last;
-		}
-		if (m/^mRNA$/i) {
+		if (m/^mRNA|all$/i) {
 			$do_mrna   = 1;
 			$string .= ' mRNA';
 		}
-		if (m/^miRNA$/i) {
+		if (m/^miRNA|all$/i) {
 			$do_mirna  = 1;
 			$string .= ' miRNA';
 		}
-		if (m/^ncRNA$/i) {
+		if (m/^ncRNA|all$/i) {
 			$do_ncrna  = 1;
 			$string .= ' ncRNA';
 		}
-		if (m/^snRNA$/i) {
+		if (m/^snRNA|all$/i) {
 			$do_snrna  = 1;
 			$string .= ' snRNA';
 		}
-		if (m/^snoRNA$/i) {
+		if (m/^snoRNA|all$/i) {
 			$do_snorna = 1;
 			$string .= ' snoRNA';
 		}
-		if (m/^tRNA$/i) {
+		if (m/^tRNA|all$/i) {
 			$do_trna   = 1;
 			$string .= ' tRNA';
 		}
-		if (m/^rRNA$/i) {
+		if (m/^rRNA|all$/i) {
 			$do_rrna   = 1;
 			$string .= ' rRNA';
-		}
-		if (m/^misc_RNA$/i) {
-			$do_miscrna = 1;
-			$string .= ' misc_RNA';
-		}
-		if (m/^lincRNA$/i) {
-			$do_lincrna = 1;
-			$string .= ' lincRNA';
 		}
 	}
 	print "$string\n";
@@ -393,21 +329,12 @@ sub collect_from_database {
 		die " unable to open database connection!\n";
 	
 	# get feature type if necessary
-	my $prompt = <<PROMPT;
- Select one or more database feature from which to collect regions. This 
- is typically a top-level feature, such as "gene". If transcripts are 
- not organized into genes, select an RNA feature.
-PROMPT
-	@features = verify_or_request_feature_types(
+	$feature = verify_or_request_feature_types(
 		'db'      => $db,
 		'feature' => $feature,
-		'prompt'  => $prompt,
-		'single'  => 0,
-		'limit'   => 'gene|rna',
+		'prompt'  => 'Enter the gene feature from which to collect regions   ',
+		'single'  => 1,
 	) or die "No valid gene feature type was provided! see help\n";
-	
-	# get transcript_type
-	determine_transcript_types(@features);
 	
 	# generate output data
 	my $Data = generate_output_structure();
@@ -415,7 +342,7 @@ PROMPT
 	
 	# generate a seqfeature stream
 	my $iterator = $db->features(
-		-type     => \@features,
+		-type     => $feature,
 		-iterator => 1,
 	);
 	
@@ -454,9 +381,6 @@ sub collect_from_file {
 
 	# collection method
 	my $method = shift;
-	
-	# get transcript_type
-	determine_transcript_types();
 	
 	# Collect the top features for each sequence group.
 	# Rather than going feature by feature through the gff,
@@ -545,76 +469,19 @@ sub process_gene {
 	# passed objects
 	my ($gene, $method) = @_;
 	
-	# alternate or common exons require working with gene level
-	if ($request =~ /^alt.*exons?/i) {
-		return collect_common_alt_exons($gene, 1);
-	}
-	elsif ($request =~ /^common ?exons?/i) {
-		return collect_common_alt_exons($gene, 0);
-	}
-	
 	# look for transcripts for this gene
-	my @mRNAs;
-	my @ncRNAs;
-	foreach my $subfeat ($gene->get_SeqFeatures) {
-		if ($subfeat->primary_tag =~ /^mrna$/i) {
-			push @mRNAs, $subfeat;
-		}
-		elsif ($subfeat->primary_tag =~ /rna$/i) {
-			push @ncRNAs, $subfeat;
-		}
-	}
-	
-	# collect the desired regions based on transcript type
-	# must handle cases where 2 or more transcript types from the same gene
 	my @regions;
-	if (@mRNAs and @ncRNAs) {
-		# there are both mRNAs and ncRNAs from the same gene!!!????
-		if ($do_mixed) {
-			# both mixed mRNAs and ncRNAs are perfectly acceptable
-			push @mRNAs, @ncRNAs;
-			foreach (@mRNAs) {
-				my @r = process_transcript($_, $method);
-				if ($r[0]) {
-					push @regions, @r;
-				}
-			}
-		}
-		else {
-			# don't you dare mix your mRNAs with your ncRNAs!!!!
-			if ($do_mrna) {
-				# preferentially take mRNAs if requested
-				foreach (@mRNAs) {
-					my @r = process_transcript($_, $method);
-					if ($r[0]) {
-						push @regions, @r;
-					}
-				}
-			}
-			else {
-				# take everything else
-				foreach (@ncRNAs) {
-					my @r = process_transcript($_, $method);
-					if ($r[0]) {
-						push @regions, @r;
-					}
-				}
-			}
-		}
-	}
-	else {
-		# only one type of transcript present
-		# mix together and process
-		push @mRNAs, @ncRNAs;
-		foreach (@mRNAs) {
-			my @r = process_transcript($_, $method);
+	foreach my $subfeat ($gene->get_SeqFeatures) {
+		if ($subfeat->primary_tag =~ /rna/i) {
+			my @r = process_transcript($subfeat, $method);
 			if ($r[0]) {
 				push @regions, @r;
 			}
 		}
 	}
-	
 	return unless @regions;
+# 	warn "  found " . scalar(@regions) . " regions for " . $gene->display_name . "\n";
+# 	print Dumper(\@regions);
 	
 	# remove duplicates if requested
 	if ($unique) {
@@ -637,22 +504,14 @@ sub process_transcript {
 	# passed objects
 	my ($transcript, $method) = @_;
 	
-	# can not process alternate exons with a single transcript
-	return if ($request =~ /^alt.*exons?/i);
-	return if ($request =~ /^common ?exons?/i);
-	
-	# call appropriate method
 	if (
-		($transcript->primary_tag =~ /rna/i and $do_all_rna) or
 		($transcript->primary_tag =~ /mrna/i and $do_mrna) or
 		($transcript->primary_tag =~ /mirna/i and $do_mirna) or
 		($transcript->primary_tag =~ /ncrna/i and $do_ncrna) or
 		($transcript->primary_tag =~ /snrna/i and $do_snrna) or
 		($transcript->primary_tag =~ /snorna/i and $do_snorna) or
 		($transcript->primary_tag =~ /trna/i and $do_rrna) or
-		($transcript->primary_tag =~ /rrna/i and $do_rrna) or
-		($transcript->primary_tag =~ /misc_rna/i and $do_miscrna) or
-		($transcript->primary_tag =~ /lincrna/i and $do_lincrna)
+		($transcript->primary_tag =~ /rrna/i and $do_rrna)
 	) {
 		return &{$method}($transcript);
 	}
@@ -1013,134 +872,6 @@ sub collect_last_intron {
 }
 
 
-sub collect_exons {
-	
-	my $transcript = shift;
-	
-	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
-	return unless $list;
-	
-	# process and adjust the exons
-	my @exons;
-	my $i = 0;
-	foreach my $e (@$list) {
-		my $name = $e->display_name || $transcript->display_name . "_exon$i";
-		push @exons, _adjust_positions( [ 
-			$transcript->display_name,
-			$name, 
-			$e->seq_id, 
-			$e->start, 
-			$e->end,
-			$e->strand,
-		] );
-		$i++;
-	}
-	
-	return @exons;
-}
-
-
-sub collect_common_alt_exons {
-	
-	my $gene = shift;
-	my $alternate = shift;
-	
-	# identify types of transcripts to avoid mixed types
-	my @mRNAs;
-	my @ncRNAs;
-	foreach ($gene->get_SeqFeaturess) {
-		push @mRNAs,  $_ if $_->primary_tag =~ /^mRNA$/i;
-		push @ncRNAs, $_ if $_->primary_tag =~ /rna/i;
-	}
-	
-	# get list of transcripts, must have more than one
-	my @transcripts;
-	if (@mRNAs and @ncRNAs) {
-		# both RNA types are present
-		# only take those that are requested
-		if ($do_mixed) {
-			# it's ok to mix multiple types
-			push @transcripts, @mRNAs;
-			push @transcripts, @ncRNAs;
-		}
-		elsif ($do_mrna) {
-			push @transcripts, @mRNAs;
-		}
-		else {
-			# all other RNA types
-			push @transcripts, @ncRNAs;
-		}
-	}
-	else {
-		# only one type was present
-		push @transcripts, @mRNAs;
-		push @transcripts, @ncRNAs;
-	}
-	return unless (scalar @transcripts > 1);
-	
-	# collect the exons based on transcript type
-	my %pos2exons;
-	my $trx_number = 0;
-	foreach my $t (@transcripts) {
-		next unless (
-			($t->primary_tag =~ /mrna/i and $do_mrna) or
-			($t->primary_tag =~ /mirna/i and $do_mirna) or
-			($t->primary_tag =~ /ncrna/i and $do_ncrna) or
-			($t->primary_tag =~ /snrna/i and $do_snrna) or
-			($t->primary_tag =~ /snorna/i and $do_snorna) or
-			($t->primary_tag =~ /trna/i and $do_rrna) or
-			($t->primary_tag =~ /rrna/i and $do_rrna)
-		);
-		my $exons = _collect_exons($t);
-		foreach my $e (@$exons) {
-			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
-		}
-		$trx_number++;
-	}
-	return unless $trx_number > 1;
-	
-	# identify alternate or common exons based on the number of them
-	my @exons;
-	foreach my $s (sort {$a <=> $b} keys %pos2exons) {               # sort on start
-		foreach my $e (sort {$a <=> $b} keys %{ $pos2exons{$s} }) {  # sort on stop
-			
-			# skip if this exon is present in all transcripts and looking for alternates
-			next if (scalar( @{ $pos2exons{$s}{$e} } ) == $trx_number and $alternate);
-			
-			# skip if this exon is not present in all transcripts and looking for common
-			next if (scalar( @{ $pos2exons{$s}{$e} } ) != $trx_number and !$alternate);
-			
-			# record these exons
-			foreach (@{ $pos2exons{$s}{$e} }) {
-				my $tname = $_->[0];
-				my $exon = $_->[1];
-				push @exons, _adjust_positions( [ 
-					$tname,
-					$exon->display_name || $tname . ".$s", 
-					$exon->seq_id, 
-					$exon->start, 
-					$exon->end,
-					$exon->strand,
-				] );
-			}
-		}
-	}
-	
-	# remove duplicates if requested
-	if ($unique) {
-		remove_duplicates(\@exons);
-	}
-	
-	# add the parent name
-	for my $i (0 .. $#exons) {
-		unshift @{ $exons[$i] }, $gene->display_name;
-	}
-	
-	# return the exons
-	return @exons;
-}
-
 sub _collect_exons {
 	
 	# initialize
@@ -1150,7 +881,7 @@ sub _collect_exons {
 	
 	# go through the subfeatures
 	foreach my $subfeat ($transcript->get_SeqFeatures) {
-		if ($subfeat->primary_tag =~ /exon/) {
+		if ($subfeat->primary_tag eq 'exon') {
 			push @exons, $subfeat;
 		}
 		elsif ($subfeat->primary_tag =~ /cds|utr|untranslated/i) {
@@ -1287,14 +1018,12 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --in <filename>
   --out <filename> 
   --feature <type | type:source>
-  --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
-  --region [tss|tts|exon|altExon|commonExon|firstExon|lastExon|
-            intron|firstIntron|lastIntron|splice]
+  --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
+  --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
   --start=<integer>
   --stop=<integer>
   --unique
   --slop <integer>
-  --mix
   --bed
   --gz
   --version
@@ -1331,35 +1060,30 @@ Specify the output filename.
 Specify the parental gene feature type (primary_tag) or type:source when
 using a database. If not specified, a list of available types will be
 presented interactively to the user for selection. This is not relevant for
-GFF3 source files (all gene or transcript features are considered). This is 
-helpful when gene annotation from multiple sources are present in the same 
-database, e.g. refSeq and ensembl sources. More than one feature may be 
-included, either as a comma-delimited list or multiple options.
+GFF3 source files (all gene or transcript features are considered). Helpful
+when gene annotation from multiple sources are listed in the same database,
+e.g. refSeq and ensembl sources.
 
-=item --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
+=item --transcript [all|mRNA|miRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA]
 
-Specify the transcript type (usually a gene subfeature) from which to  
+Specify the transcript feature or gene subfeature type from which to  
 collect the regions. Multiple types may be specified as a comma-delimited 
-list, or 'all' may be specified. If not specified, an interactive list 
-will be presented from which the user may select.
+list, or 'all' may be specified. The default value is mRNA.
 
-=item --region <region>
+=item --region [tss|tts|firstExon|lastExon|splice|intron|firstIntron|lastIntron]
 
 Specify the type of region to retrieve. If not specified on the command 
-line, the list is presented interactively to the user for selection. Ten 
+line, the list is presented interactively to the user for selection. Six 
 possibilities are possible.
      
      tss         The first base of transcription
      tts         The last base of transcription
-     exon        The exons of each transcript
      firstExon   The first exon of each transcript
      lastExon    The last exon of each transcript
-     altExon     All alternate exons from multiple transcripts for each gene
-     commonExon  All common exons between multiple transcripts for each gene
+     splice      The first and last base of each intron
      intron      Each intron (usually not defined in the GFF3)
      firstIntron The first intron of each transcript
      lastIntron  The last intron of each transcript
-     splice      The first and last base of each intron
 
 =item --start=<integer>
 
@@ -1388,13 +1112,6 @@ but not useful with defined introns and exons. This does not take
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
 
-=item --mix
-
-Allow two or more different transcript types from genes to be used.
-Some genes may generate more than one transcript type, for example 
-mRNA and certain non-coding RNAs. By default, only one type of RNA 
-transcript type is accepted. This is usually mRNA, if requested.
-
 =item --bed
 
 Automatically convert the output file to a BED file.
@@ -1419,11 +1136,10 @@ This program will collect specific regions from annotated genes and/or
 transcripts. Often these regions are not explicitly defined in the 
 source GFF3 annotation, necessitating a script to pull them out. These 
 regions include the start and stop sites of transcription, introns, 
-the splice sites (both 5' and 3'), exons, the first (5') or last (3') 
-exons, or all alternate or common exons of genes with multiple 
-transcripts. Importantly, unique regions may only be reported, 
-especially important when a single gene may have multiple alternative 
-transcripts. A slop factor is included for imprecise annotation.
+the splice sites (both 5' and 3'), and the first and last exons. 
+Importantly, unique regions may only be reported, especially important 
+when a single gene may have multiple alternative transcripts. A 
+slop factor is included for imprecise annotation.
 
 The program will report the chromosome, start and stop coordinates, 
 strand, name, and parent and transcript names for each region 

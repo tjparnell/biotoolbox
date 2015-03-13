@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+my $VERSION = '1.20';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -97,7 +97,7 @@ unless ($infile) {
 my $Data = Bio::ToolBox::Data->new(file => $infile) 
 	or die "no data loaded from file '$infile'!";
 printf "    Loaded '$infile' with %s data rows and %s columns\n\n", 
-	format_with_commas($Data->last_row), $Data->number_columns;
+	$Data->last_row, $Data->number_columns;
 
 
 
@@ -361,9 +361,12 @@ sub print_statistics_function {
 		return;
 	}
 	
+	# determine what to do with zero values
+	my $zero = $opt_zero; 
+	
 	# get statistics and print
 	foreach my $index (@indices) {
-		my %statdata = _get_statistics_hash($index);
+		my %statdata = _get_statistics_hash($index, $zero);
 		unless (%statdata) { 
 			warn " unable to get statistics for column index $index!\n"; 
 			return;
@@ -734,7 +737,7 @@ sub median_scale_function {
 		my $correction_value = $target / $statdata{median};
 	
 		# Replace values
-		$index = _prepare_new_destination($index, '_scaled') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_scaled') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index) eq '.'; # null value, nothing to do
@@ -799,7 +802,7 @@ sub percentile_rank_function {
 		}
 		
 		# Replace the contents with the calculated percent rank
-		$index = _prepare_new_destination($index, '_pr') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_pr') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index eq '.');
@@ -857,7 +860,7 @@ sub zscore_function {
 		}
 		
 		# Replace the current values
-		$index = _prepare_new_destination($index, '_Zscore') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_Zscore') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			next if $row->value($index) eq '.';
@@ -944,11 +947,7 @@ sub sort_function {
 sub genomic_sort_function {
 	# This will sort the entire data table by chromosome and start position
 	
-	my $result = $Data->gsort_data;
-	unless ($result) {
-		print " Data table not sorted\n";
-		return;
-	}
+	$Data->gsort_data;
 	
 	# remove any pre-existing sorted metadata since no longer valid
 	for (my $i = 0; $i < $Data->number_columns; $i++) {
@@ -1226,8 +1225,11 @@ sub do_specific_values_function {
 		print " These are the values (occurrences) in the indicated columns\n";
 		my %lookup;
 		my $i = 1;
-		foreach (sort { $a cmp $b } keys %possibilities) {
-			# sort asciibetically by name
+		foreach (
+			# sort by decreasing occurrence
+			map { $_->[0] } sort { $b->[1] <=> $a->[1] } 
+			map { [$_, $possibilities{$_}] } keys %possibilities
+		) {
 			printf "   $i\t$_ (%s)\n", $possibilities{$_};
 			$lookup{$i} = $_;
 			$i++;
@@ -1352,7 +1354,7 @@ sub convert_nulls_function {
 		my $count  = 0; 
 		
 		# reset values
-		$index = _prepare_new_destination($index, '_convert_nulls') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_convert_nulls') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1442,7 +1444,7 @@ sub convert_absolute_function {
 		my $failed = 0;
 		
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_absolute') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_absolute') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1522,7 +1524,7 @@ sub minimum_function {
 		my $count  = 0; 
 		
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_minimum_reset') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_minimum_reset') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1590,7 +1592,7 @@ sub maximum_function {
 		my $count  = 0; 
 		
 		# reset minimum values
-		$index = _prepare_new_destination($index, '_maximum_reset') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_maximum_reset') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1681,7 +1683,7 @@ sub log_function {
 		my $failed = 0;
 		
 		# perform log conversions
-		$index = _prepare_new_destination($index, "_log$base") if $placement =~ /^n/i;
+		$index = _prepare_destination($index, "_log$base") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1781,7 +1783,7 @@ sub delog_function {
 		# Placement dictates method
 		my $count = 0; # conversion count
 		my $failed = 0;
-		$index = _prepare_new_destination($index, "_delog$base") if $placement =~ /^n/i;
+		$index = _prepare_destination($index, "_delog$base") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -1868,7 +1870,7 @@ sub format_function {
 	# format each index request
 	my @datasets_modified; # a list of which datasets were modified
 	foreach my $index (@indices) {
-		$index = _prepare_new_destination($index, '_formatted') if $placement =~ /^n/i;
+		$index = _prepare_destination($index, '_formatted') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
@@ -2367,7 +2369,7 @@ sub math_function {
 		
 		# generate subtraction product
 		my $failed_count = 0; # failed count  
-		$index = _prepare_new_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
+		$index = _prepare_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
 			if ($row->value($index) eq '.') {
@@ -2589,15 +2591,15 @@ sub export_treeview_function {
 	else {
 		# ask the user
 		print <<LIST;
-Available dataset manipulations
+Available dataset manipulations\n";
   su - decreasing sort by sum of row values
   sm - decreasing sort by mean of row values
-  cg - median center features (genes)
-  cd - median center datasets
-  zd - convert dataset to Z-scores
-  pd - convert dataset to percentile rank
-  L2 - convert dataset to log2
-  n0 - convert null values to 0
+  cg - median center features (genes)\n";
+  cd - median center datasets\n";
+  zd - convert dataset to Z-scores\n";
+  pd - convert dataset to percentile rank\n";
+  L2 - convert dataset to log2\n";
+  n0 - convert null values to 0\n";
 Enter the manipulation(s) in order of desired execution  
 LIST
 		my $answer = <STDIN>;
@@ -2635,7 +2637,7 @@ LIST
 			sort_function($i);
 			$Data->delete_column($i);
 		}
-		elsif (/^sm$/i) {
+		if (/^sm$/i) {
 			# decreasing sort by sum of row values
 			$opt_target = 'mean';
 			combine_function(@datasets);
@@ -2679,7 +2681,7 @@ LIST
 			convert_nulls_function(@datasets);
 		}
 		else {
-			warn " unknown manipulation '$_'!\n";
+			warn " unkown manipulation '$_'!\n";
 		}
 	}
 	
@@ -3168,7 +3170,7 @@ sub _get_statistics_hash {
 	my @invalues = $Data->column_values($index);
 	shift @invalues; # remove header
 	my @goodvalues;
-	foreach my $v (@invalues) {
+	while (my $v = shift @invalues) {
 		next if $v eq '.';
 		if ($v == 0) {
 			# we need to determine whether we can accept 0 values
