@@ -6,11 +6,11 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
+	open_tim_data_file
+	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -33,7 +33,6 @@ my (
 	$index,
 	$max,
 	$gz,
-	$prefix,
 	$help,
 	$print_version,
 );
@@ -43,7 +42,6 @@ GetOptions(
 	'in=s'        => \$infile, # specify the input data file
 	'index|col=i' => \$index, # index for the column to use for splitting
 	'max=i'       => \$max, # maximum number of lines per file
-	'prefix=s'    => \$prefix, # output file prefix
 	'gz!'         => \$gz, # compress output files
 	'help'        => \$help, # request help
 	'version'     => \$print_version, # print the version
@@ -84,8 +82,9 @@ unless (defined $gz) {
 }
 
 
+
 ### Load file
-my ($in_fh, $metadata_ref) = open_data_file($infile);
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
@@ -273,7 +272,7 @@ sub write_current_data_to_file_part {
 		
 		# write the file
 		# this should be within the maximum line limit, so we should be safe
-		my $success = write_data_file(
+		my $success = write_tim_data_file(
 			'data'     => $metadata_ref,
 			'filename' => $written_files{$value}{'file'},
 			'gz'       => $gz,
@@ -315,20 +314,9 @@ sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
 	my $value = shift;
 	my $filename_value = $value;
-	$filename_value =~ s/[\:\|\\\/\+\*\?\#\(\)\[\]\{\} ]+/_/g; 
-		# replace unsafe characters
-	
-	my $file;
-	if ($prefix and $prefix eq 'none') {
-		$file = $metadata_ref->{'path'} . $filename_value;
-	}
-	elsif ($prefix) {
-		$file = $prefix . '#' . $filename_value;
-	}
-	else {
-		$file = $metadata_ref->{'path'} . $metadata_ref->{'basename'} . 
+	$filename_value =~ s/[\:\|\\\/\+\*\?\# ]+/_/g; # replace unsafe characters
+	my $file = $metadata_ref->{'path'} . $metadata_ref->{'basename'} . 
 		'#' . $filename_value;
-	}
 	
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
@@ -379,7 +367,6 @@ split_data_file.pl [--options] <filename>
   --in <filename>
   --index <column_index>
   --max <integer>
-  --prefix <text>
   --gz
   --version
   --help
@@ -392,8 +379,9 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the file name of a data file. It must be a tab-delimited text file. 
-The file may be compressed with gzip.
+Specify the file name of a data file. It must be a tab-delimited text file,
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
+although any format should work. The file may be compressed with gzip.
 
 =item --index <column_index>
 
@@ -409,12 +397,6 @@ Optionally specify the maximum number of data lines to write to each
 file. Each group of specific value data is written to one or more files. 
 Enter as an integer; underscores may be used as thousands separator, e.g. 
 100_000. 
-
-=item --prefix <text>
-
-Optionally provide a filename prefix for the output files. The default 
-prefix is the input filename base name. If no prefix is desired, using 
-just the values as filenames, then set the prefix to 'none'.
 
 =item --gz
 

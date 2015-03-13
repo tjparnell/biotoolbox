@@ -7,12 +7,12 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	load_data_file
-	write_data_file
+	open_tim_data_file
+	load_tim_data_file
+	write_tim_data_file
 	write_summary_data
 );
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -109,10 +109,10 @@ else {
 
 ### Open files
 # file handles and metadata
-my $list_data = load_data_file($listfile) or
+my $list_data = load_tim_data_file($listfile) or
 	die " unable to open list file!\n";
 
-my ($data_fh, $data_md) = open_data_file($datafile) or
+my ($data_fh, $data_md) = open_tim_data_file($datafile) or
 	die " unable to open data file!\n";
 
 
@@ -493,7 +493,7 @@ sub write_files {
 		$data->{'last_row'} = scalar @{ $data->{'data_table'} } - 1;
 		
 		# write the file
-		my $write_results = write_data_file(
+		my $write_results = write_tim_data_file(
 			'data'      => $data,
 			# no file name, using the filename recorded in the out data
 		);

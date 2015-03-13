@@ -8,8 +8,8 @@ use Pod::Usage;
 use File::Temp qw( tempfile );
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	write_data_file
+	load_tim_data_file
+	write_tim_data_file
 	open_to_read_fh
 	open_to_write_fh
 );
@@ -22,7 +22,7 @@ eval {
 	$bam_support = 1;
 };
 
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 
 print "\n This program will adjust chromosome names of a data file\n";
@@ -540,7 +540,7 @@ sub process_text_file {
 	my ($infile, $outfile) = @_;
 	
 	# open files
-	my $in_data = load_data_file($infile) or 
+	my $in_data = load_tim_data_file($infile) or 
 		die " can't open input file!\n";
 	
 	# find the chromosome column
@@ -566,7 +566,7 @@ sub process_text_file {
 	}
 	
 	# write out the file
-	my $success = write_data_file(
+	my $success = write_tim_data_file(
 		'data'      => $in_data,
 		'gz'        => $gz,
 		'filename'  => $outfile,

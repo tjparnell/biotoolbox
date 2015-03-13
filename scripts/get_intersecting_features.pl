@@ -7,7 +7,10 @@ use warnings;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::Range;
-use Bio::ToolBox::Data;
+use Bio::ToolBox::data_helper qw(
+	parse_list
+	find_column_index
+);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types 
@@ -15,8 +18,11 @@ use Bio::ToolBox::db_helper qw(
 	validate_included_feature
 	get_feature
 );
-use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+use Bio::ToolBox::file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+);
+my $VERSION = '1.15';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -96,25 +102,34 @@ if (scalar @search_features == 1 and $search_features[0] =~ /,/) {
 
 
 ### Load the input file
-my $Data = Bio::ToolBox::Data->new(file => $infile) or 
+my $main_data_ref = load_tim_data_file($infile) || 
 	die "  Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+print " loaded file '$main_data_ref->{filename}' with $main_data_ref->{last_row}" . 
+	" features\n";
 
 
 
 
 ### Open database connection
-if ($database) {
-	if ($Data->database and $Data->database ne $database) {
-		warn " provided database '$database' does not match file metadata!\n" . 
-			" overriding metadata and using '$database'\n";
+
+# check database
+unless ($database) {
+	
+	# check for database referenced in the input file metadata
+	if (exists $main_data_ref->{'db'}) {
+		$database = $main_data_ref->{'db'};
+		print " using database '$database'\n";
 	}
-	$Data->database($database);
+	else {
+		# no database defined!
+		die " no database defined!\n";
+	}
 }
-elsif (not $Data->database) {
-	die "No database defined! See help\n";
-}
-my $db = $Data->open_database;
+
+# open connection
+my $db = open_db_connection($database) || 
+	die " unable to establish database connection!\n";
+
 
 
 
@@ -147,9 +162,9 @@ unless ($outfile) {
 	# overwrite the input file
 	$outfile = $infile;
 }
-my $success = $Data->write_file(
+my $success = write_tim_data_file(
+	'data'      => $main_data_ref,
 	'filename'  => $outfile,
-	'gz'        => $gz,
 );
 if ($success) {
 	print " Wrote data file '$success'\n";
@@ -170,13 +185,35 @@ else {
 ### Main starting point to find overlapping features
 sub find_overlapping_features {
 	
-	if ($Data->feature_type eq 'coordinate') {
+	# identify the required indices of columns 
+	# either genome coordinates or named features
+	my $chrom_i  = find_column_index($main_data_ref, '^chr|seq');
+	my $start_i  = find_column_index($main_data_ref, '^start');
+	my $stop_i   = find_column_index($main_data_ref, '^stop|end');
+	my $strand_i = find_column_index($main_data_ref, '^strand');
+	my $name_i   = find_column_index($main_data_ref, '^name');
+	my $type_i   = find_column_index($main_data_ref, '^type');
+	my $id_i     = find_column_index($main_data_ref, '^primary_id');
+	
+	# genomic coordinates
+	if (
+		defined $chrom_i and 
+		defined $start_i and 
+		defined $stop_i
+	) {
 		# we're working with genomic coordinates here
-		intersect_genome_features();
+		print " Input file '$infile' has genomic interval features\n";
+		intersect_genome_features($chrom_i, $start_i, $stop_i, $strand_i);
 	}
-	elsif ($Data->feature_type eq 'named') {
+	
+	# named database features
+	elsif (
+		defined $id_i or 
+		(defined $name_i and defined $type_i)
+	) {
 		# we're working with named features
-		intersect_named_features();
+		print " Input file '$infile' has named features\n";
+		intersect_named_features($id_i, $name_i, $type_i);
 	}
 	else {
 		# unable to identify
@@ -191,19 +228,37 @@ sub find_overlapping_features {
 sub intersect_named_features {
 	# Named features 
 	
+	# search feature indices
+	my ($search_id_i, $search_name_i, $search_type_i) = @_;
+	
+	# shortcut reference
+	my $table = $main_data_ref->{'data_table'};
+
 	# prepare new metadata columns 
 	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
 		generate_new_metadata();
 	
-	# iterate through table
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	
+	# loop
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
 		
 		# identify feature first
-		my $feature = $row->feature;
+		my $feature = get_feature(
+			'db'    => $db,
+			'id'    => defined $search_id_i   ? $table->[$row][$search_id_i]   : undef,
+			'name'  => defined $search_name_i ? $table->[$row][$search_name_i] : undef,
+			'type'  => defined $search_type_i ? $table->[$row][$search_type_i] : undef,
+		);
 		unless ($feature) {
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature(
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i,
+				$overlap_i,
+			);
 			next;
 		}
 		
@@ -275,13 +330,19 @@ sub intersect_named_features {
 		}
 		else {
 			# no region defined
-			my $w = sprintf " unable to establish region for %s %s\n", 
-				$row->type, $row->name;
-			warn $w;
+			warn " unable to establish region for $table->[$row][$search_type_i] " . 
+				"$table->[$row][$search_name_i]\n";
 			
 			# fill in table anyway
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature(
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i,
+				$overlap_i,
+			);
 		}
 	
 	}
@@ -295,6 +356,12 @@ sub intersect_named_features {
 ### Working with genomic features 
 sub intersect_genome_features {
 	
+	# search feature indices
+	my ($search_chrom_i, $search_start_i, $search_stop_i, $search_strand_i) = @_;
+	
+	# shortcut
+	my $table = $main_data_ref->{'data_table'};
+
 	# prepare new metadata columns 
 	my ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i) = 
 		generate_new_metadata();
@@ -307,47 +374,78 @@ sub intersect_genome_features {
 		$chrom2length{ $_->[0] } = $_->[1];
 	}
 	
-	# iterate through table
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	# loop
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		my $region;
 		
-		# adjust positions as necessary
-		my ($new_start, $new_stop);
+		# extend the region
 		if ($extend) {
 			# we're adding an extension on either side of the region
-			$new_start = $row->start - $extend;
-			$new_stop = $row->end + $extend;
+			
+			# new start
+			my $new_start = $table->[$row][$search_start_i] - $extend;
+			if ($new_start < 1) {
+				# limit to actual start
+				$new_start = 1;
+			}
+			
+			# new stop
+			my $new_stop = $table->[$row][$search_stop_i] + $extend;
+			if ($new_stop > $chrom2length{ $table->[$row][$search_chrom_i] }) {
+				# limit to actual length
+				$new_stop = $chrom2length{ $table->[$row][$search_chrom_i] };
+			}
+			
+			# establish region
+			$region = $db->segment(
+				$table->[$row][$search_chrom_i], # chromosome
+				$new_start,        # start
+				$new_stop          # stop
+			);
 		}
-		elsif (defined $start and defined $stop) {
+		
+		# specific relative start, stop
+		if (defined $start and defined $stop) {
 			# we'll adjust the coordinates specifically
 			# this is relative to the start position
-			$new_start = $row->start + $start;
-			$new_stop = $row->start + $stop;
+			
+			# new start
+			my $new_start = $table->[$row][$search_start_i] + $start;
+			if ($new_start < 1) {
+				# limit to actual start
+				$new_start = 1;
+			}
+			
+			# new stop
+			my $new_stop = $table->[$row][$search_start_i] + $stop;
+			
+			# establish region
+			$region = $db->segment(
+				$table->[$row][$search_chrom_i], # chromosome
+				$new_start,        # start
+				$new_stop          # stop
+			);
 		}
+		
+		# default is entire region
 		else {
-			$new_start = $row->start;
-			$new_stop = $row->end;
+			
+			# establish region as is
+			$region = $db->segment(
+				$table->[$row][$search_chrom_i], # chromosome
+				$table->[$row][$search_start_i], # start
+				$table->[$row][$search_stop_i]   # stop
+			);
 		}
-		
-		# check new positions
-		if ($new_start < 1) {
-			# limit to actual start
-			$new_start = 1;
-		}
-		if ($chrom2length{ $row->seq_id } and $new_stop > $chrom2length{ $row->seq_id }) {
-			# limit to actual length
-			$new_stop = $chrom2length{ $row->seq_id };
-		}
-		
-		# establish region
-		my $region = $db->segment($row->seq_id, $new_start, $new_stop);
 		
 		# check region
 		if ($region) {
 			# succesfully established a region, find features
 			process_region(
 				$region,
-				$row->strand, # default is 0 if not defined
+				defined $search_strand_i ? $table->[$row][$search_strand_i] : 0, 
+					# use strand if available in source data file, otherwise
+					# it is non-stranded region
 				$row, 
 				$number_i, 
 				$name_i, 
@@ -359,12 +457,23 @@ sub intersect_genome_features {
 		}
 		else {
 			# no region defined
-			warn sprintf(" unable to establish region for %s:%s..%s\n", 
-				$row->seq_id, $row->start, $row->end);
+			warn " unable to establish region for " . 
+				$table->[$row][$search_chrom_i] . ":" . 
+				$table->[$row][$search_start_i] . ".." . 
+				$table->[$row][$search_stop_i]. "\n";
+			
 			# fill in table anyway
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature(
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i, 
+				$overlap_i
+			);
 		}
+			
 	}
 	
 	# summarize the findings
@@ -380,31 +489,74 @@ sub intersect_genome_features {
 sub generate_new_metadata {
 	
 	# count of features column
-	my $number_i = $Data->add_column('Number_features');
+	my $number_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$number_i} = {
+		'index'        => $number_i,
+		'name'         => 'Number_features',
+		'intersection' => $main_data_ref->{'feature'},
+	};
+	$main_data_ref->{'data_table'}->[0][$number_i] = 'Number_features';
+	$main_data_ref->{'number_columns'} += 1;
 	
 	# Name column
-	my $name_i = $Data->add_column('Target_Name');
+	my $name_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$name_i} = {
+		'index'        => $name_i,
+		'name'         => 'Name',
+		'intersection' => $main_data_ref->{'feature'},
+	};
+	$main_data_ref->{'data_table'}->[0][$name_i] = 'Name';
+	$main_data_ref->{'number_columns'} += 1;
 	if (defined $start and defined $stop) {
-		$Data->metadata($name_i, 'Start', $start);
-		$Data->metadata($name_i, 'Stop', $stop);
+		$main_data_ref->{$name_i}{'Start'} = $start;
+		$main_data_ref->{$name_i}{'Stop'} = $stop;
 	}
 	if (defined $extend) {
-		$Data->metadata($name_i, 'Extend', $extend);
+		$main_data_ref->{$name_i}{'Extend'} = $extend;
 	}
 	
 	# Type column
-	my $type_i = $Data->add_column('Target_Type');
+	my $type_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$type_i} = {
+		'index'        => $type_i,
+		'name'         => 'Type',
+		'intersection' => $main_data_ref->{'feature'},
+	};
+	$main_data_ref->{'data_table'}->[0][$type_i] = 'Type';
+	$main_data_ref->{'number_columns'} += 1;
 	
 	# Strand column
-	my $strand_i = $Data->add_column('Target_Strand');
+	my $strand_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$strand_i} = {
+		'index'        => $strand_i,
+		'name'         => 'Strand',
+		'intersection' => $main_data_ref->{'feature'},
+	};
+	$main_data_ref->{'data_table'}->[0][$strand_i] = 'Strand';
+	$main_data_ref->{'number_columns'} += 1;
 	
 	# Distance column
-	my $distance_i = $Data->add_column('Target_Distance');
-	$Data->metadata($distance_i, 'reference', $reference_position);
+	my $distance_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$distance_i} = {
+		'index'        => $distance_i,
+		'name'         => 'Distance',
+		'intersection' => $main_data_ref->{'feature'},
+		'reference'    => $reference_position,
+	};
+	$main_data_ref->{'data_table'}->[0][$distance_i] = 'Distance';
+	$main_data_ref->{'number_columns'} += 1;
 			
+	
 	# Overlap column
-	my $overlap_i = $Data->add_column('Target_Overlap');
-	$Data->metadata($overlap_i, 'reference', $reference_position);
+	my $overlap_i = $main_data_ref->{'number_columns'};
+	$main_data_ref->{$overlap_i} = {
+		'index'        => $overlap_i,
+		'name'         => 'Overlap',
+		'intersection' => $main_data_ref->{'feature'},
+		'reference'    => $reference_position,
+	};
+	$main_data_ref->{'data_table'}->[0][$overlap_i] = 'Overlap';
+	$main_data_ref->{'number_columns'} += 1;
 	
 	
 	return ($number_i, $name_i, $type_i, $strand_i, $distance_i, $overlap_i);
@@ -429,8 +581,15 @@ sub process_region {
 		# no features found
 		
 		# put in null data
-		process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-			$distance_i, $overlap_i);
+		process_no_feature(
+			$row, 
+			$number_i, 
+			$name_i, 
+			$type_i, 
+			$strand_i, 
+			$distance_i,
+			$overlap_i,
+		);
 	}
 	
 	elsif (scalar @features == 1) {
@@ -440,17 +599,26 @@ sub process_region {
 		# record information
 		if ( validate_included_feature($f) ) {
 			# the feature is ok to use (doesn't have tag to exclude it)
-			$row->value($number_i, 1);
-			$row->value($name_i, $f->display_name);
-			$row->value($type_i, $f->type);
-			$row->value($strand_i, $f->strand);
-			$row->value($distance_i, determine_distance($region, $region_strand, $f));
-			$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
+			$main_data_ref->{'data_table'}->[$row][$number_i]   = 1;
+			$main_data_ref->{'data_table'}->[$row][$name_i]     = $f->display_name;
+			$main_data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
+			$main_data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
+			$main_data_ref->{'data_table'}->[$row][$distance_i] = 
+				determine_distance($region, $region_strand, $f);
+			$main_data_ref->{'data_table'}->[$row][$overlap_i] = 
+				determine_overlap($region, $region_strand, $f);
 		}
 		else {
 			# the feature should be excluded
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
+			process_no_feature(
+				$row, 
+				$number_i, 
+				$name_i, 
+				$type_i, 
+				$strand_i, 
+				$distance_i,
+				$overlap_i,
+			);
 		}
 	}
 	
@@ -492,12 +660,15 @@ sub process_region {
 		}
 		
 		# record the information
-		$row->value($number_i, scalar(@features));
-		$row->value($name_i, $f->display_name);
-		$row->value($type_i, $f->type);
-		$row->value($strand_i, $f->strand);
-		$row->value($distance_i, determine_distance($region, $region_strand, $f));
-		$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
+		$main_data_ref->{'data_table'}->[$row][$number_i]   = scalar(@features);
+		$main_data_ref->{'data_table'}->[$row][$name_i]     = $f->display_name;
+		$main_data_ref->{'data_table'}->[$row][$type_i]     = $f->type;
+		$main_data_ref->{'data_table'}->[$row][$strand_i]   = $f->strand;
+		$main_data_ref->{'data_table'}->[$row][$distance_i] = 
+			determine_distance($region, $region_strand, $f);
+		$main_data_ref->{'data_table'}->[$row][$overlap_i] = 
+			determine_overlap($region, $region_strand, $f);
+		
 	}
 	
 	return;
@@ -510,15 +681,17 @@ sub process_region {
 
 ### Fill in data table with null data
 sub process_no_feature {
+	
 	my ($row, $number_i, $name_i, $type_i, $strand_i, 
 		$distance_i, $overlap_i) = @_;
 
-	$row->value($number_i, 0);
-	$row->value($name_i, '.');
-	$row->value($type_i, '.');
-	$row->value($strand_i, 0);
-	$row->value($distance_i, '.');
-	$row->value($overlap_i, '.');
+	$main_data_ref->{'data_table'}->[$row][$number_i]   = 0;
+	$main_data_ref->{'data_table'}->[$row][$name_i]     = '.';
+	$main_data_ref->{'data_table'}->[$row][$type_i]     = '.';
+	$main_data_ref->{'data_table'}->[$row][$strand_i]   = 0;
+	$main_data_ref->{'data_table'}->[$row][$distance_i] = '.';
+	$main_data_ref->{'data_table'}->[$row][$overlap_i]  = '.';
+
 }
 
 
@@ -602,26 +775,25 @@ sub summarize_found_features {
 	my $multiple = 0;
 	
 	# count up
-	$Data->iterate( sub {
-		my $row = shift;
-		if ($row->value($number_i) == 0) {
+	for (my $row = 1; $row <= $main_data_ref->{'last_row'}; $row++) {
+		if ($main_data_ref->{'data_table'}->[$row][$number_i] == 0) {
 			$none++;
 		}
-		elsif ($row->value($number_i) == 1) {
+		elsif ($main_data_ref->{'data_table'}->[$row][$number_i] == 1) {
 			$one++;
 		}
-		elsif ($row->value($number_i) > 1) {
+		elsif ($main_data_ref->{'data_table'}->[$row][$number_i] > 1) {
 			$multiple++;
 		}
-	} );
+	}
 	
 	# print summary
 	printf " $one (%.1f%%) reference features intersected with unique target features\n",
-		(($one / $Data->{'last_row'}) * 100) if $one;
+		(($one / $main_data_ref->{'last_row'}) * 100) if $one;
 	printf " $none (%.1f%%) reference features intersected with zero target features\n",
-		(($none / $Data->{'last_row'}) * 100) if $none;
+		(($none / $main_data_ref->{'last_row'}) * 100) if $none;
 	printf " $multiple (%.1f%%) reference features intersected with multiple target features\n",
-		(($multiple / $Data->{'last_row'}) * 100) if $multiple;
+		(($multiple / $main_data_ref->{'last_row'}) * 100) if $multiple;
 }
 
 

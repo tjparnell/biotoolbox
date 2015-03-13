@@ -8,10 +8,10 @@ use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 use Bio::ToolBox::file_helper qw(
-	open_data_file
+	open_tim_data_file
 	open_to_write_fh
 );
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This program will write a BED file\n";
 
@@ -123,7 +123,7 @@ if (defined $name) {
 
 ### Load file
 print " Opening data file '$infile'...\n";
-my ($in_fh, $metadata_ref) = open_data_file($infile);
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
@@ -305,7 +305,7 @@ print "  - '", $metadata_ref->{$strand_index}{name}, "' for strand\n"
 
 # open output file handle
 unless ($outfile) {
-	$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
+	$outfile = $metadata_ref->{'basename'};
 }
 unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
 	# check for .bed extension and add if necessary
@@ -319,9 +319,9 @@ my $out_fh = open_to_write_fh($outfile, $gz) or
 	die " unable to open output file for writing!\n";
 
 # write very simple metadata
-# unless ($bigbed) {
-# 	$out_fh->print("# Converted from file " . $metadata_ref->{'filename'} . "\n");
-# }
+unless ($bigbed) {
+	$out_fh->print("# Converted from file " . $metadata_ref->{'filename'} . "\n");
+}
 
 # parse through the data lines in the input data file
 my $count = 0; # the number of lines processed
@@ -349,11 +349,7 @@ while (my $line = $in_fh->getline) {
 	# Convert the name 
 		# the name index could either be a simple one-word element
 		# or it could be embeded in the group column of a GFF file
-	if (defined $name_base) {
-		# auto-generate the names
-		push @bed, $name_base . '_' . $count;
-	}
-	elsif (defined $name_index and $name_index == 8 and $metadata_ref->{'gff'}) {
+	if (defined $name_index and $name_index == 8 and $metadata_ref->{'gff'}) {
 		# name is embedded in the group column of a gff file
 		# need to extract
 		
@@ -390,6 +386,10 @@ while (my $line = $in_fh->getline) {
 	elsif (defined $name_index) {
 		# a simple one-word element
 		push @bed, $data[$name_index];
+	}
+	elsif (defined $name_base) {
+		# auto-generate the names
+		push @bed, $name_base . '_' . $count;
 	}
 	elsif (defined $score_index or defined $strand_index) {
 		# user is requesting subsequent columns

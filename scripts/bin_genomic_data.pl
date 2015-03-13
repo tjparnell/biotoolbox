@@ -12,8 +12,8 @@ use Bio::ToolBox::db_helper qw(
 	get_new_genome_list
 );
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	write_data_file
+	load_tim_data_file
+	write_tim_data_file
 	open_to_read_fh
 	convert_and_write_to_gff_file
 );
@@ -22,7 +22,7 @@ eval {
 	require Bio::ToolBox::db_helper::bam;
 	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 
 print "\n This script will generate genomic binned data\n\n";
@@ -222,7 +222,7 @@ if ($gffout) {
 	);
 }
 else {
-	$write_success = write_data_file(
+	$write_success = write_tim_data_file(
 		'data'      => $main_data,
 		'filename'  => $outfile,
 		'gz'        => $gz,
@@ -267,7 +267,7 @@ sub prepare_data_structure {
 	# otherwise load a pre-existing file
 	else {
 		print " Loading data file $infile....\n";
-		$main_data = load_data_file($infile);
+		$main_data = load_tim_data_file($infile);
 		unless ($main_data) {
 			die "Unable to load data file!\n";
 		}
@@ -1223,7 +1223,7 @@ accordingly and report as log2 data.
 
 =item --gff
 
-Write a new gff output file instead of a normal data file.
+Write a new gff output file instead of a normal tim data file.
 
 =item --gz
 

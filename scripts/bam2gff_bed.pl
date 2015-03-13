@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-use Bio::ToolBox::utility;
+use Bio::ToolBox::data_helper qw(format_with_commas);
 use Bio::ToolBox::file_helper qw(open_to_write_fh);
 eval {
 	# check for bam support
 	require Bio::ToolBox::db_helper::bam;
 	Bio::ToolBox::db_helper::bam->import;
 };
-my $VERSION = '1.20';
+my $VERSION = '1.15';
 
 
 print "\n A script to convert Bam alignments to GFF or BED files\n\n";

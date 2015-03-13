@@ -12,17 +12,11 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file
+	open_tim_data_file
 	open_to_write_fh
 );
-my $BAM_OK;
-eval { 
-	# we want access to Bio::DB::Sam::Fai
-	require Bio::DB::Sam;
-	$BAM_OK = 1;
-};
 
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -50,9 +44,6 @@ my (
 	$start_i,
 	$stop_i,
 	$strand_i,
-	$extend,
-	$concatenate,
-	$pad,
 	$gz,
 	$help,
 	$print_version,
@@ -70,9 +61,6 @@ GetOptions(
 	'start=i'   => \$start_i, # start index
 	'stop|end=i' => \$stop_i, # stop index
 	'strand=i'  => \$strand_i, # strand index
-	'extend=i'  => \$extend, # extend sequence by given bp
-	'cat!'      => \$concatenate, # concatenate sequences into one
-	'pad=i'     => \$pad, # pad concatenate sequences with given N bp
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -108,7 +96,7 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my ($in_fh, $metadata_ref) = open_data_file($infile) or 
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile) or 
 	die "unable to open input file!\n";
 unless ($database) {
 	$database = $metadata_ref->{'db'};
@@ -140,26 +128,15 @@ unless (defined $strand_i) {
 }
 
 
+
 ### Determine mode ###
-if (defined $id_i and defined $seq_i and $concatenate) {
+if (defined $id_i and defined $seq_i) {
 	# sequence is already in the source file
-	print " writing a single concatenated fasta with the provided sequence\n";
-	write_direct_single_fasta();
-}
-elsif (defined $id_i and defined $seq_i) {
-	# sequence is already in the source file
-	print " writing a multi-fasta with the provided sequence\n";
-	write_direct_multi_fasta();
-}
-elsif (defined $chr_i and $start_i and $stop_i and $concatenate) {
-	# collect sequences and concatenate into single
-	print " fetching sequence from $database and writing a concatenated fasta\n";
-	fetch_seq_and_write_single_fasta();
+	write_direct_fasta();
 }
 elsif (defined $chr_i and $start_i and $stop_i) {
 	# need to collect sequence
-	print " fetching sequence from $database and writing a multi-fasta\n";
-	fetch_seq_and_write_multi_fasta();
+	fetch_seq_and_write_fasta();
 }
 else {
 	die " unable to identify appropriate columns! see help\n";
@@ -174,37 +151,7 @@ print " wrote file '$outfile'\n";
 
 ########################   Subroutines   ###################################
 
-sub write_direct_single_fasta {
-	
-	# concatenated sequence
-	my $concat_seq;
-	
-	# concatenate each of the provided sequences
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# add to the concatenated sequence
-		$concat_seq .= $data[$seq_i];
-		$concat_seq .= 'N' x $pad if $pad;
-	}
-	
-	# create final sequence object
-	my $seq = Bio::Seq->new(
-		-id     => $metadata_ref->{'basename'},
-		-desc   => "Concatenated sequences",
-		-seq    => $concat_seq,
-	);
-	
-	# open output file
-	my $seq_io = open_output_fasta();
-	
-	# write out
-	$seq_io->write_seq($seq);
-}
-
-
-sub write_direct_multi_fasta {
+sub write_direct_fasta {
 	
 	# open output file
 	my $seq_io = open_output_fasta();
@@ -229,75 +176,15 @@ sub write_direct_multi_fasta {
 }
 
 
-sub fetch_seq_and_write_single_fasta {
+
+sub fetch_seq_and_write_fasta {
 	
 	# Open fasta database
 	unless ($database) {
 		die " Must provide a database or genomic fasta file(s)!\n";
 	}
-	my $db = open_sequence_db() or 
-		die " Unable to open database '$database'!\n";
-	
-	# concatenated sequence
-	my $concat_seq;
-	
-	# collect sequences and write
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# coordinates
-		my $seq_id = $data[$chr_i];
-		my $start  = $data[$start_i];
-		my $stop   = $data[$stop_i];
-		if ($extend) {
-			$start -= $extend;
-			$start = 1 if $start < 0;
-			$stop += $extend;
-		}
-		
-		# collect sequence
-		my $sequence = $db->seq($seq_id, $start, $stop);
-	
-		# reverse if necessary
-		if (defined $strand_i and $data[$strand_i] =~ /^[\-r]/) {
-			# we will create a quick Bio::Seq object to do the reverse complementation
-			my $seq = Bio::Seq->new(
-				-id     => 'temp',
-				-seq    => $sequence,
-			);
-			my $rev = $seq->revcom;
-			$sequence = $rev->seq;
-		}
-		
-		# concatenate the sequence
-		$concat_seq .= $sequence;
-		$concat_seq .= 'N' x $pad if $pad;
-	}
-	
-	# create final sequence object
-	my $seq = Bio::Seq->new(
-		-id     => $metadata_ref->{'basename'},
-		-desc   => "Concatenated sequences",
-		-seq    => $concat_seq,
-	);
-	
-	# open output file
-	my $seq_io = open_output_fasta();
-	
-	# write out
-	$seq_io->write_seq($seq);
-}
-
-
-
-sub fetch_seq_and_write_multi_fasta {
-	
-	# Open fasta database
-	unless ($database) {
-		die " Must provide a database or genomic fasta file(s)!\n";
-	}
-	my $db = open_sequence_db() or 
+	print " Indexing Fasta database for sequence collection....\n";
+	my $db = open_db_connection($database) or 
 		die " Unable to open database '$database'!\n";
 	
 	# open output file
@@ -312,11 +199,6 @@ sub fetch_seq_and_write_multi_fasta {
 		my $seq_id = $data[$chr_i];
 		my $start  = $data[$start_i];
 		my $stop   = $data[$stop_i];
-		if ($extend) {
-			$start -= $extend;
-			$start = 1 if $start < 0;
-			$stop += $extend;
-		}
 		
 		# name
 		my $name;
@@ -356,9 +238,6 @@ sub open_output_fasta {
 	unless ($outfile) {
 		$outfile = $metadata_ref->{'basename'} . '.fa';
 	}
-	unless ($outfile =~ /\.fa(?:sta)?(?:\.gz)?/i) {
-		$outfile .= '.fasta';
-	}
 	if ($gz and $outfile !~ /\.gz$/i) {
 		$outfile .= '.gz';
 	}
@@ -376,18 +255,6 @@ sub open_output_fasta {
 	return $seq_io;
 }
 
-
-sub open_sequence_db {
-	my $db;
-	if ($database =~ /\.fa(?:sta)?$/i and $BAM_OK) {
-		# this is a limited but very fast sequence accessor
-		$db = Bio::DB::Sam::Fai->open($database);
-	}
-	else {
-		$db = open_db_connection($database);
-	}
-	return $db;
-}
 
 __END__
 
@@ -411,9 +278,6 @@ data2fasta.pl [--options...] <filename>
   --start <index>
   --stop <index>
   --strand <index>
-  --extend <integer>
-  --cat
-  --pad <integer>
   --out <filename> 
   --gz
   --version
@@ -441,8 +305,7 @@ written. Alternatively, the name of a Bio::DB::SeqFeature::Store
 annotation database that contains genomic sequence may be provided. 
 For more information about using databases, see 
 L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>.  
-The database name may be obtained from the input file metadata. 
-Required only if collecting sequence from genomic coordinates.
+The database name may be obtained from the input file metadata. Required.
 
 =item --id <index>
 
@@ -479,25 +342,6 @@ automatically determined from the column header.
 Optionally specify the index for the strand column. It may be 
 automatically determined from the column header.
 
-=item --extend <integer>
-
-Optionally provide the number of extra base pairs to extend the start 
-and stop positions. This will then include the given number of base 
-pairs of flanking sequence from the database. This only applies when 
-sequence is obtained from the database.
-
-=item --cat
-
-Optionally indicate that all of the sequences should be concatenated 
-into a single Fasta sequence. The default is to write a multi-fasta 
-file with separate sequences.
-
-=item --pad <integer>
-
-When concatenating sequences into a single Fasta sequence, optionally 
-indicate the number of 'N' bases to insert between the individual 
-sequences. The default is zero.
-
 =item --out <filename>
 
 Specify the output filename. By default it uses the input file basename.
@@ -518,18 +362,17 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-This program will take a tab-delimited text file (BED file, 
-for example) and generate either a multi-sequence fasta file containing the 
-sequences of each feature defined in the input file, or optionally a single 
-concatenated fasta file. If concatenating, the individual sequences may be 
-padded with the given number of 'N' bases. 
+This program will take a tab-delimited text file (tim data formated file, 
+for example) and generate a multi-sequence fasta file containing the 
+sequences of each feature defined in the input file. This program has 
+two modes.
 
-This program has two modes. If the name and sequence is already present in 
-the file, it will generate the fasta file directly from the file content.
+If the name and sequence is already present in the file, it will generate 
+the fasta file directly from the file content.
 
-Alternatively, if only genomic position information (chromosome, start, 
-stop, and optionally strand) is present in the file, then the sequence will 
-be retrieved from a database, either a Bio::DB::SeqFeature::Store database, 
+If only genomic position information (chromosome, start, stop, and 
+optionally strand) is present in the file, then the sequence will be 
+retrieved from a database, either a Bio::DB::SeqFeature::Store database, 
 a genomic sequence multi-fasta, or a directory of multiple fasta files. 
 If strand information is provided, then the sequence reverse complement 
 is returned for reverse strand coordinates.

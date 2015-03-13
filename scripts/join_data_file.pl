@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
+use Bio::ToolBox::data_helper qw(format_with_commas);
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	open_data_file
-	write_data_file
+	load_tim_data_file
+	open_tim_data_file
+	write_tim_data_file
 	open_to_write_fh
 );
-use Bio::ToolBox::utility;
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -74,7 +74,7 @@ unless (scalar @ARGV > 1) {
 
 ### Load first file
 my $first_file = shift @ARGV;
-my $first_data = load_data_file($first_file) or
+my $first_data = load_tim_data_file($first_file) or
 	die "Unable to open first file '$first_file'!\n";
 
 
@@ -98,6 +98,18 @@ unless ($outfile) {
 	}
 }
 
+# compare file extensions
+my (undef, undef, $outfile_extension) = fileparse($outfile, qr/\.[^.]*(?:\.gz)?$/);
+my $out_base_ext = $outfile_extension;
+my $in_base_ext = $first_data->{'extension'};
+$out_base_ext =~ s/\.gz$//; # strip any gz extension to make it a fair comparison
+$in_base_ext =~ s/\.gz$//;
+if ($out_base_ext and $out_base_ext ne $in_base_ext) {
+	print " changing output file extension $out_base_ext to match input" . 
+		" extension $in_base_ext\n";
+	$outfile =~ s/$out_base_ext/$in_base_ext/;
+}
+
 # check extension
 unless (defined $gz) {
 	if ($outfile =~ /\.gz$/) {
@@ -116,7 +128,7 @@ unless (defined $gz) {
 ### Begin writing file
 # Rewrite the first file using the new file output name
 my $line_count = $first_data->{'last_row'};
-my $new_outfile = write_data_file(
+my $new_outfile = write_tim_data_file(
 	'data'     => $first_data,
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -144,7 +156,7 @@ foreach my $file (@ARGV) {
 	print " Joining file '$file'...";
 	
 	# open the file
-	my ($file_fh, $file_data_ref) = open_data_file($file);
+	my ($file_fh, $file_data_ref) = open_tim_data_file($file);
 	unless ($file_fh) {
 		die "\n Unable to open file '$file'! Unable to proceed!\n";
 	}

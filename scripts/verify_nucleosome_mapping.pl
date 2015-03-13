@@ -8,6 +8,7 @@ use Pod::Usage;
 use Statistics::Lite qw(min max mean stddev);
 use Bio::ToolBox::data_helper qw(
 	find_column_index
+	format_with_commas
 );
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -15,11 +16,10 @@ use Bio::ToolBox::db_helper qw(
 	get_region_dataset_hash
 );
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	write_data_file
+	load_tim_data_file
+	write_tim_data_file
 );
-use Bio::ToolBox::utility;
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This program will verify the mapping of nucleosomes\n\n";
 
@@ -94,7 +94,7 @@ if ($filter and !$outfile) {
 }
 
 ### Load the nucleosome file
-my $data_ref = load_data_file($infile) or die 
+my $data_ref = load_tim_data_file($infile) or die 
 	" can't load file '$infile'!\n";
 unless ($data_ref->{feature} eq 'nucleosome') {
 	warn " file feature is not 'nucleosome'! proceeding anyway\n";
@@ -561,7 +561,7 @@ unless ($outfile) {
 }
 my $success;
 if (
-	$success = write_data_file(
+	$success = write_tim_data_file(
 		'data'     => $data_ref,
 		'filename' => $outfile,
 		'gz'       => $gz,
@@ -593,7 +593,7 @@ verify_nucleosome_mapping.pl [--options...] <filename>
   --db <text>
   --data <text | filename>
   --filter
-  --max <integer>           (30)
+  --max <integer>
   --recenter
   --out <filename> 
   --gz
