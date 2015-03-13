@@ -12,7 +12,7 @@ use Bio::ToolBox::data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = 1.25;
+our $VERSION = 1.24;
 
 
 ### Variables
@@ -138,9 +138,9 @@ sub load_data_file {
 	if ($plusminus_count) {
 		# we have converted strand information
 		$data->{$strand_i}{'strand_style'} = 'plusminus';
-		if (exists $data->{$strand_i}{'AUTO'}) {
+		if (exists $data->{1}{'AUTO'}) {
 			# update automatically generated metadata
-			$data->{$strand_i}{'AUTO'}++;
+			$data->{1}{'AUTO'}++;
 		}
 	}
 	foreach my $s (@starts) {
@@ -1234,9 +1234,6 @@ sub write_data_file {
 				$data->{'data_table'}->[$row][1] -= 1;
 			}
 			delete $data->{1}{'base'};
-			if (exists $data->{1}{'AUTO'}) {
-				$data->{1}{'AUTO'} -= 1;
-			}
 		}
 	}
 	if ($data->{'ucsc'} > 0) {
@@ -1254,14 +1251,8 @@ sub write_data_file {
 			$data->{'data_table'}->[$row][$t] -= 1 if $do_t;
 			$data->{'data_table'}->[$row][$c] -= 1 if $do_c;
 		}
-		if ($do_t) {
-			delete $data->{$t}{'base'};
-			$data->{$t}{'AUTO'} -= 1 if exists $data->{$t}{'AUTO'};
-		}
-		if ($do_c) {
-			delete $data->{$c}{'base'};
-			$data->{$c}{'AUTO'} -= 1 if exists $data->{$c}{'AUTO'};
-		}
+		delete $data->{$t}{'base'} if $do_t;
+		delete $data->{$c}{'base'} if $do_c;
 	}
 	
 	

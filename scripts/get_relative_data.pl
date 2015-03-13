@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.25;
+my $VERSION = 1.24;
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -135,21 +135,16 @@ if ($infile) {
 	
 	# update main database as necessary
 	if ($main_database) {
-		if (defined $Data->database and $Data->database ne $main_database) {
+		if ($main_database ne $Data->database) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-# 			print "   Re-run without --db option if you do not want this to happen\n";
+			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
 	else {
 		$main_database = $Data->database;
-	}
-	
-	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
-		$Data->feature($feature);
 	}
 }
 else {
@@ -166,7 +161,7 @@ my $startcolumn = $Data->number_columns;
 
 # make sure data table supports avoid option
 if ($avoid) {
-	unless ($Data->feature_type eq 'named') {
+	unless ($Data->feature_type eq 'named' and defined $Data->type_column) {
 		warn " avoid option not supported with current Data table. Disabling\n";
 		$avoid = 0;
 	}
@@ -420,7 +415,6 @@ sub parallel_execution {
 		
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
-		my $db = $Data->open_database(1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}
@@ -909,7 +903,7 @@ sub collect_long_data_window_scores {
 								$reference - $Data->metadata($column, 'start'),
 			'stop'        => $fstrand >= 0 ? 
 								$reference + $Data->metadata($column, 'stop') : 
-								$reference - $Data->metadata($column, 'stop'),
+								$reference - $Data->metdata($column, 'stop'),
 			'strand'      => $fstrand,
 			'method'      => $method,
 			'value'       => $value_type,

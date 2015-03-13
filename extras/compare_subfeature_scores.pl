@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Statistics::Lite qw(statshash);
+use Statistics::Lite qw(min max range);
 use Bio::ToolBox::data_helper qw(
 	generate_data_structure
 	find_column_index
@@ -14,7 +14,7 @@ use Bio::ToolBox::file_helper qw(
 	open_data_file 
 	write_data_file 
 );
-my $VERSION = 1.25;
+my $VERSION = 1.24;
 
 print "\n This program will compare scores from multiple subfeatures\n\n";
 
@@ -213,12 +213,10 @@ sub process_gene_tree {
 			Parent
 			Number_subfeatures
 			Min_name
-			Max_name
 			Min_score
+			Max_name
 			Max_score
-			Mean_score
-			Sum_score
-			Stdev_score
+			Range
 	) );
 	push @{ $output->{'other'} }, " # original_input_file $infile\n";
 	
@@ -240,10 +238,8 @@ sub process_gene_tree {
 					$gene,
 					$number,
 					$transcript,
+					$tree->{$gene}{$transcript},
 					$transcript,
-					$tree->{$gene}{$transcript},
-					$tree->{$gene}{$transcript},
-					$tree->{$gene}{$transcript},
 					$tree->{$gene}{$transcript},
 					0
 				];
@@ -254,17 +250,18 @@ sub process_gene_tree {
 		else {
 			# we need to identify which is the minimum and maximum
 			
-			# determine statistics on the scores
-			my %stats = statshash(values %{ $tree->{$gene} });
+			# determine the scores
+			my $min = min(values %{ $tree->{$gene} });
+			my $max = max(values %{ $tree->{$gene} });
 			
 			# identify the min max ids
 			my ($min_id, $max_id);
 			foreach my $id (sort {$a cmp $b} keys %{ $tree->{$gene} } ) {
 				unless ($min_id) {
-					$min_id = $id if $tree->{$gene}{$id} == $stats{min};
+					$min_id = $id if $tree->{$gene}{$id} == $min;
 				}
 				unless ($max_id) {
-					$max_id = $id if $tree->{$gene}{$id} == $stats{max};
+					$max_id = $id if $tree->{$gene}{$id} == $max;
 				}
 			}
 			
@@ -274,12 +271,10 @@ sub process_gene_tree {
 					$gene,
 					$number,
 					$min_id,
+					$min,
 					$max_id,
-					$stats{min},
-					$stats{max},
-					$stats{mean},
-					$stats{sum},
-					$stats{stddev},
+					$max,
+					range(values %{ $tree->{$gene} }), # the range of the scores
 				 ];
 			$output->{'last_row'} += 1;
 		}
@@ -377,9 +372,8 @@ biotoolbox script L<get_gene_regions.pl> followed by L<get_datasets.pl>.
 
 The program will output a new file. Each line will represent one 
 parent feature. The columns include the parent feature name, number of 
-subfeatures, the names of the minimum and maximum subfeatures, and some 
-simple statistics of the subfeature scores, including minimum, maximum, 
-mean, sum, and standard deviation.
+subfeatures, the minimum and maximum subfeature names and scores, and 
+the range of scores.
 
 =head1 AUTHOR
 

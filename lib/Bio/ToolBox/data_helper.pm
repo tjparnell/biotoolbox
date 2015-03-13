@@ -1,5 +1,5 @@
 package Bio::ToolBox::data_helper;
-our $VERSION = 1.25;
+our $VERSION = 1.24;
 
 ### modules
 require Exporter;
@@ -41,7 +41,7 @@ sub generate_data_structure {
 	# Initialize the hash structure
 	my $ToolBoxVersion = Bio::ToolBox->VERSION;
 	my %data = (
-		'program'        => "$0, lib v$ToolBoxVersion",
+		'program'        => "$0 v$ToolBoxVersion",
 		'feature'        => $feature,
 		'db'             => q(),
 		'gff'            => 0,

@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.25;
+my $VERSION = 1.24;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -146,11 +146,6 @@ if ($infile) {
 	}
 	else {
 		$main_database = $Data->database;
-	}
-	
-	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
-		$Data->feature($feature);
 	}
 }
 elsif ($new) {
@@ -474,7 +469,6 @@ sub parallel_execution {
 		
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
-		my $db = $Data->open_database(1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}

@@ -1,31 +1,5 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.25 (svn 955)
-	- Added a new option to manually specify the extension length 
-	and allow new ways to record read coverage in the script bam2wig.pl.
-	A text graphic is included in the documentation to illustrate 
-	different methods.
-	- Broke out database and fasta functionality from 
-	Bio::ToolBox::db_helper into a separate sub module, which should 
-	limit the number of modules loaded at compile time.
-	- Allow main Data feature_type to be specified by command line 
-	option, useful when your input file has names of database features 
-	but not a type column, for scripts get_feature_info.pl, 
-	get_datasets.pl, get_binned_data.pl, and get_relative_data.pl. 
-	- Added BED and GFF string export to Bio::ToolBox::Data::Feature 
-	objects.
-	- Changed library version reporting for default new Data files.
-	- Fix bugs with setting and removing AUTO metadata properly 
-	when opening and writing Data files.
-	- Fix bugs regarding deleting metadata, which had a side effect 
-	of adding unwanted metadata to files written by manipulate_datasets.
-	- Added more name possibilities when looking for possible name 
-	columns.
-	- Fix bug where a database may sometimes not be opened properly 
-	after forking into children in data collection scripts.
-	- Fix bug that prevented statistics from being recovered from 
-	child processes in script graph_data.pl.
-
 v.1.24001 (svn 940)
 	- Updated tests to catch possible sources of error, including 
 	recent UCSC BigFile libraries that power Bio::DB::BigWig 
