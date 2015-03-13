@@ -1,0 +1,9 @@
+[sample3_f.bw]
+type = sample3
+name = sample3_f
+strand = 1
+
+[sample3_r.bw]
+type = sample3
+name = sample3_r
+strand = -1
