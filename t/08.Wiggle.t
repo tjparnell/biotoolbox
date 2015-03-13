@@ -5,7 +5,6 @@
 
 use strict;
 use Test::More;
-use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
@@ -15,23 +14,22 @@ BEGIN {
 	else {
 		plan skip_all => 'Optional module Bio::Graphics not available';
 	}
-	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
+	$ENV{'BIOTOOLBOX'} = "$Bin/Data/biotoolbox.cfg";
 }
 
-use lib File::Spec->catfile($Bin, "..", "lib");
+use lib "$Bin/../lib";
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
 
 ### Prepare the GFF database
-my $database = File::Spec->catfile($Bin, "Data", "sample2_wib.gff3");
-my $wigfile  = File::Spec->catfile($Bin, "Data", "sample2.wib");
+my $database = "$Bin/Data/sample2.gff3";
 unless (-e $database) {
 	open(my $fh, ">" ,$database);
 	print $fh <<GFF
 ##gff-version 3
 chrI	SGD	chromosome	1	230218	.	.	.	ID=chrI;dbxref=NCBI:NC_001133;Name=chrI
-chrI	tim	sample2	1	230218	.	.	.	Name=sample2;wigfile=$wigfile
+chrI	tim	sample2	1	230218	.	.	.	Name=sample2;wigfile=$Bin/Data/sample2.wib
 GFF
 ;
 	close $fh;
@@ -39,8 +37,7 @@ GFF
 
 
 ### Open a test file
-my $infile = File::Spec->catfile($Bin, "Data", "sample.bed");
-my $Data = Bio::ToolBox::Data->new(file => $infile);
+my $Data = Bio::ToolBox::Data->new(file => "$Bin/Data/sample.bed");
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database

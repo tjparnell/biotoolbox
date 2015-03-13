@@ -10,7 +10,7 @@ use FindBin qw($Bin);
 use Statistics::Lite qw(:all);
 use File::Basename qw(fileparse);
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	find_column_index
 );
 use Bio::ToolBox::db_helper qw(
@@ -19,11 +19,11 @@ use Bio::ToolBox::db_helper qw(
 	get_chromo_region_score
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
+	open_tim_data_file
+	write_tim_data_file
 	convert_and_write_to_gff_file
 );
-my $VERSION = 1.24;
+my $VERSION = '1.15';
 
 print "\n This script will map transcription-enriched windows to gene transcripts\n\n";
 
@@ -216,7 +216,7 @@ calculate_utr_and_extent();
 
 ### Prepare for output
 # generate data structure
-my $main_data_ref = convert_transcripts_to_data_structure();
+my $main_data_ref = convert_transcripts_to_tim_data_structure();
 if (defined $main_data_ref) {
 	# we no longer need the transcripts hash
 	undef %transcripts;
@@ -224,7 +224,7 @@ if (defined $main_data_ref) {
 
 # write main data file
 {
-	my $written_file = write_data_file(
+	my $written_file = write_tim_data_file(
 		'data'     => $main_data_ref,
 		'filename' => $outfile,
 	);
@@ -420,7 +420,7 @@ sub load_regions {
 	
 	# First open the enriched windows file
 	my $count = 0;
-	my ($fh, $metadata_ref) = open_data_file($filename) or 
+	my ($fh, $metadata_ref) = open_tim_data_file($filename) or 
 		die " unable to open regions file '$filename!'\n";
 	
 	# check the feature of the loaded file
@@ -1093,11 +1093,11 @@ sub calculate_utr_and_extent {
 
 
 
-# Convert the transcripts hash into a final data structure
-sub convert_transcripts_to_data_structure {
+# Convert the transcripts hash into a final tim data structure
+sub convert_transcripts_to_tim_data_structure {
 	
 	# generate the data hash
-	my $data = generate_data_structure(
+	my $data = generate_tim_data_structure(
 		'mapped_transcripts',
 		qw(
 			Chromosome
@@ -1118,7 +1118,7 @@ sub convert_transcripts_to_data_structure {
 			3prime_UTR_Length
 			Transcription_Fragment
 		)
-	) or die " unable to generate data structure!\n";
+	) or die " unable to generate tim data structure!\n";
 	
 	# set metadata
 	$data->{'db'} = $database;

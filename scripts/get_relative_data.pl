@@ -5,14 +5,27 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
+use FindBin qw($Bin);
 use Statistics::Lite qw(mean median sum stddevp min max);
-use Bio::ToolBox::Data;
+use Bio::ToolBox::data_helper qw(
+	find_column_index
+	format_with_commas
+	splice_data_structure
+);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
+	get_new_feature_list
+	get_feature
+	get_region_dataset_hash
+	get_chromo_region_score
 	check_dataset_for_rpm_support
 );
-use Bio::ToolBox::utility;
+use Bio::ToolBox::file_helper qw(
+	load_tim_data_file
+	write_tim_data_file
+	write_summary_data
+);
 my $parallel;
 eval {
 	# check for parallel support
@@ -20,14 +33,14 @@ eval {
 	$parallel = 1;
 };
 use constant LOG2 => log(2);
-use constant DATASET_HASH_LIMIT => 5001;
+use constant DATASET_HASH_LIMIT => 3000;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.25;
+my $VERSION = '1.18';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -127,53 +140,63 @@ my $start_time = time;
 
 
 ## Generate or load the input dataset
-my $Data;
+my $main_data_ref; # a reference to the main data structure
 if ($infile) {
-	$Data = Bio::ToolBox::Data->new(file => $infile) or 
-		die " unable to load input file '$infile'\n";
-	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
-	
-	# update main database as necessary
-	if ($main_database) {
-		if (defined $Data->database and $Data->database ne $main_database) {
-			# update with new database
-			printf " updating main database name from '%s' to '%s'\n", 
-				$Data->database, $main_database;
-# 			print "   Re-run without --db option if you do not want this to happen\n";
-			$Data->database($main_database);
-		}
-	}
-	else {
-		$main_database = $Data->database;
-	}
-	
-	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
-		$Data->feature($feature);
-	}
-}
+	# load the gene dataset from existing file
+	print " Loading feature set from file $infile....\n";
+	$main_data_ref = load_tim_data_file($infile);
+} 
 else {
-	# generate a new file
-	print " Generating a new feature list from database '$main_database'...\n";
-	$Data = Bio::ToolBox::Data->new(
-		db      => $main_database,
-		feature => $feature,
-	) or die " unable to generate new feature list\n";
+	# we will start a new file with a new dataset
+	$main_data_ref = get_new_feature_list(
+			'db'       => $main_database,
+			'features' => $feature,
+	);
 }
+unless ($main_data_ref) {
+	# check for data
+	die " No data loaded! Nothing to do!\n";
+}
+
+# update program name
+unless ($main_data_ref->{'program'} eq $0) {
+	$main_data_ref->{'program'} = $0;
+}
+
+# simple reference to the data table
+my $data_table_ref = $main_data_ref->{'data_table'};
 
 # the number of columns already in the data array
-my $startcolumn = $Data->number_columns; 
+my $startcolumn = $main_data_ref->{'number_columns'}; 
 
-# make sure data table supports avoid option
-if ($avoid) {
-	unless ($Data->feature_type eq 'named') {
-		warn " avoid option not supported with current Data table. Disabling\n";
-		$avoid = 0;
-	}
-}
+
+
 
 
 ## Prepare to collect data
+
+# Open main database connection
+unless ($main_database) {
+	# define the database 
+	if ( $main_data_ref->{'db'} ) {
+		# from the input file if possible
+		$main_database = $main_data_ref->{'db'};
+	}
+	elsif ($dataset) {
+		# or use the dataset if possible
+		$main_database = $dataset;
+	}
+	else {
+		die " You must define a database or dataset!\n" . 
+			" Use --help for more information\n";
+	}
+}
+my $mdb = open_db_connection($main_database);
+unless ($mdb) {
+	die " You must define a database or dataset!\n" . 
+		" Use --help for more information\n";
+}
+
 # Open data database
 my $ddb;
 if (defined $data_database) {
@@ -181,18 +204,19 @@ if (defined $data_database) {
 	$ddb = open_db_connection($data_database) or 
 		die "unable to establish data database connection to $data_database!\n";
 }
+else {
+	# reuse the main database connection
+	$ddb = $mdb;
+}
 
 # Check the dataset
 $dataset = verify_or_request_feature_types(
-	'db'      => $ddb || $Data->database,
+	'db'      => $ddb,
 	'feature' => $dataset,
 	'single'  => 1,
 	'prompt'  => " Enter the number of the feature or dataset from which to" . 
 					" collect data   ",
 );
-unless ($dataset) {
-	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
-} 
 
 # Check the RPM method if necessary
 my $rpm_read_sum;
@@ -213,7 +237,7 @@ if ($method eq 'rpm') {
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
+	while ($cpu > 1 and $main_data_ref->{'last_row'}/$cpu < 100) {
 		# I figure we need at least 100 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
@@ -231,39 +255,7 @@ else {
 	single_execution();
 }
 
-
-## Generate summed data 
-# an average across all features at each position suitable for plotting
-if ($sum) {
-	print " Generating final summed data....\n";
-	my $sumfile = $Data->summary_file(
-		'filename'    => $outfile,
-		'startcolumn' => $startcolumn,
-		'dataset'     => $dataset,
-		'log'         => $log,
-	);
-	if ($sumfile) {
-		print " Wrote summary file '$sumfile'\n";
-	}
-	else {
-		print " Unable to write summary file!\n";
-	}
-}
-
-
-## Output the data
-my $written_file = $Data->save(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
-if ($written_file) {
-	# success!
-	print " wrote file $written_file\n";
-}
-else {
-	# failure! the subroutine will have printed error messages
-	print " unable to write output file!\n";
-}
+## Conclusion
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 
@@ -286,6 +278,7 @@ sub check_defaults {
 			die " You must define an output filename !\n Use --help for more information\n";
 		}
 	}
+	$outfile =~ s/\.txt$//; # strip extension, we'll add it later
 
 	unless ($feature or $infile) {
 		die " You must define a feature or use an input file!\n Use --help for more information\n";
@@ -394,7 +387,7 @@ sub check_defaults {
 	else {
 		# disable cores
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 1;
+		$cpu = 0;
 	}
 }
 
@@ -402,9 +395,6 @@ sub check_defaults {
 ## Run in parallel
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -412,17 +402,20 @@ sub parallel_execution {
 	# Split the input data into parts and execute in parallel in separate forks
 	for my $i (1 .. $cpu) {
 		$pm->start and next;
-		
+	
 		#### In child ####
 	
 		# splice the data structure
-		$Data->splice_data($i, $cpu);
+		splice_data_structure($main_data_ref, $i, $cpu);
 		
 		# re-open database objects to make them clone safe
 		# pass second true to avoid cached database objects
-		my $db = $Data->open_database(1);
+		$mdb = open_db_connection($main_database, 1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
+		}
+		else {
+			$ddb = $mdb;
 		}
 		
 		# Collect the data
@@ -434,10 +427,15 @@ sub parallel_execution {
 			print " Interpolating missing values....\n";
 			go_interpolate_values();
 		}
+		# convert null values to zero if necessary
+		if ($method eq 'sum' or $method eq 'rpm') {
+			null_to_zeros();
+		}
 		
 		# write out result
-		my $success = $Data->save(
-			'filename' => sprintf("$child_base_name.%03s",$i),
+		my $success = write_tim_data_file(
+			'data'     => $main_data_ref,
+			'filename' => "$child_base_name.$i",
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
@@ -459,11 +457,36 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
-		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
+	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
+	push @args, '--gz' if $gz;
+	push @args, @files;
+	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
+	unlink @files;
+	
+	# generate summary file
+	if ($sum) {
+		# reopen the combined file
+		my $data = load_tim_data_file($outfile);
+		unless ($data) {
+			warn " cannot re-open $outfile to generate summary file!\n";
+			return;
+		}
+		print " Generating final summed data....\n";
+		my $sumfile = write_summary_data(
+			'data'        => $data,
+			# it will automatically define a new output name
+			'startcolumn' => $startcolumn,
+			'dataset'     => $dataset,
+			'log'         => $log,
+		);
+		if ($sumfile) {
+			print " Wrote summary file '$sumfile'\n";
+		}
+		else {
+			print " Unable to write summary file!\n";
+		}
 	}
-	my $count = $Data->reload_children(@files);
-	printf " reloaded %s features from children\n", format_with_commas($count);
+	# done
 }
 
 
@@ -479,6 +502,47 @@ sub single_execution {
 		print " Interpolating missing values....\n";
 		go_interpolate_values();
 	}
+	# convert null values to zero if necessary
+	if ($method eq 'sum' or $method eq 'rpm') {
+		null_to_zeros();
+	}
+
+
+	# Generate summed data - 
+	# an average across all features at each position suitable for plotting
+	if ($sum) {
+		print " Generating final summed data....\n";
+		my $sumfile = write_summary_data(
+			'data'        => $main_data_ref,
+			'filename'    => $outfile,
+			'startcolumn' => $startcolumn,
+			'dataset'     => $dataset,
+			'log'         => $log,
+		);
+		if ($sumfile) {
+			print " Wrote summary file '$sumfile'\n";
+		}
+		else {
+			print " Unable to write summary file!\n";
+		}
+	}
+
+
+	## Output the data
+	my $written_file = write_tim_data_file(
+		'data'     => $main_data_ref,
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+	if ($written_file) {
+		# success!
+		print " wrote file $written_file\n";
+	}
+	else {
+		# failure! the subroutine will have printed error messages
+		print " unable to write output file!\n";
+	}
+	# done
 }
 
 
@@ -538,41 +602,49 @@ sub prepare_window_datasets {
 			}
 		}
 		
+		# set the new index value, which is equivalent to the number of columns
+		my $new_index = $main_data_ref->{'number_columns'};
+		
 		# the new name
 		my $new_name = $start . '..' . $stop;
 		
-		# add new column
-		my $new_index = $Data->add_column($new_name);
-		
 		# set the metadata
-		$Data->metadata($new_index, 'start' , $start);
-		$Data->metadata($new_index, 'stop' , $stop);
-		$Data->metadata($new_index, 'window' , $win);
-		$Data->metadata($new_index, 'log2' , $log);
-		$Data->metadata($new_index, 'dataset' , $dataset);
-		$Data->metadata($new_index, 'method' , $method);
-		$Data->metadata($new_index, 'value' , $value_type);
+		my %metadata = (
+			'name'        => $new_name,
+			'index'       => $new_index,
+			'start'       => $start,
+			'stop'        => $stop,
+			'window'      => $win,
+			'log2'        => $log,
+			'dataset'     => $dataset,
+			'method'      => $method,
+			'value'       => $value_type,
+		);
 		if ($position == 5) {
-			$Data->metadata($new_index, 'relative_position', '5prime_end');
+			$metadata{'relative_position'} = '5prime_end';
 		}
 		elsif ($position == 3) {
-			$Data->metadata($new_index, 'relative_position', '3prime_end');
+			$metadata{'relative_position'} = '3prime_end';
 		}
 		else { # midpoint
-			$Data->metadata($new_index, 'relative_position', 'center');
+			$metadata{'relative_position'} = 'center';
 		}
 		if ($set_strand) {
-			$Data->metadata($new_index, 'strand_implied', 1);
+			$metadata{'strand_implied'} = 1;
 		}
 		if ($strand_sense =~ /sense/) {
-			$Data->metadata($new_index, 'strand',  $strand_sense);
+			$metadata{'strand'} = $strand_sense;
 		}
 		if ($data_database) {
-			$Data->metadata($new_index, 'db', $data_database);
+			$metadata{'db'} = $data_database;
 		}
-		if ($avoid) {
-			$Data->metadata($new_index, 'avoid', 1);
-		}
+		$main_data_ref->{$new_index} = \%metadata;
+		
+		# set the column header
+		$data_table_ref->[0][$new_index] = $new_name;
+		
+		# update number of columns
+		$main_data_ref->{'number_columns'} += 1;
 	}
 	
 	return ($startingpoint, $endingpoint);
@@ -588,6 +660,23 @@ sub map_relative_data {
 	my ($starting_point, $ending_point) = prepare_window_datasets();
 	
 	
+	
+	# Identify columns for feature identification
+	my $name   = find_column_index($main_data_ref, '^name');
+	
+	my $type   = find_column_index($main_data_ref, '^type|class');
+	
+	my $id     = find_column_index($main_data_ref, '^primary_id');
+	
+	my $chromo = find_column_index($main_data_ref, '^chr|seq|ref|ref.?seq');
+	
+	my $start  = find_column_index($main_data_ref, '^start|position');
+	
+	my $stop   = find_column_index($main_data_ref, '^stop|end');
+	
+	my $strand = find_column_index($main_data_ref, '^strand');
+	
+	
 	# determine long data collection for very large regions
 	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
 		# This could potentially create performance issues where returned hashes   
@@ -596,46 +685,94 @@ sub map_relative_data {
 		$long_data = 1;
 	}
 	
+	
+	
 	# Select the appropriate method for data collection
-	if ($Data->feature_type eq 'coordinate' and not $long_data) {
+	if (
+		defined $start and
+		defined $stop  and
+		defined $chromo and
+		not $long_data
+	) {
 		# mapping point data features using genome segments
-		map_relative_data_for_regions($starting_point, $ending_point);
+		map_relative_data_for_regions(
+			$starting_point, $ending_point, $chromo, $start, $stop, $strand);
 	}
-	elsif ($Data->feature_type eq 'coordinate' and $long_data) {
+	
+	elsif (
+		defined $start and
+		defined $stop  and
+		defined $chromo and
+		$long_data
+	) {
 		# mapping long data features using genome segments
-		map_relative_long_data_for_regions();
+		map_relative_long_data_for_regions($chromo, $start, $stop, $strand);
 	}
-	elsif ($Data->feature_type eq 'named' and not $long_data) {
+	
+	elsif (
+		(defined $id or 
+			( defined $name and defined $type ) 
+		) and 
+		not $long_data
+	) {
 		# mapping point data features using named features
-		map_relative_data_for_features($starting_point, $ending_point);
+		map_relative_data_for_features(
+			$starting_point, $ending_point, $name, $type, $id, $strand);
 	}
-	elsif ($Data->feature_type eq 'named' and $long_data) {
+	
+	elsif (
+		(defined $id or 
+			( defined $name and defined $type ) 
+		) and 
+		$long_data
+	) {
 		# mapping long data features using named features
-		map_relative_long_data_for_features();
+		map_relative_long_data_for_features($name, $type, $id, $strand);
 	}
+	
 	else {
 		die " Unable to identify columns with feature identifiers!\n" .
 			" File must have Primary_ID or Name and Type, or Chromo, Start, Stop columns\n";
 	}
+	
 }
 
 
 sub map_relative_data_for_features {
-	my ($starting_point, $ending_point) = @_;
 	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		my %regionscores = $row->get_position_scores(
-			'ddb'         => $ddb,
-			'dataset'     => $dataset,
-			'start'       => $starting_point,
-			'stop'        => $ending_point,
-			'position'    => $position,
-			'value'       => $value_type,
-			'stranded'    => $strand_sense,
-			'strand'      => $set_strand ? $row->strand : undef, 
-			'avoid'       => $avoid,
+	# Get the feature indices
+	my (
+		$starting_point, 
+		$ending_point, 
+		$name_index, 
+		$type_index, 
+		$id_index,
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		# collect the region scores
+		my %regionscores = get_region_dataset_hash(
+				'db'          => $mdb,
+				'ddb'         => $ddb,
+				'dataset'     => $dataset,
+				'name'        => defined $name_index ? 
+									$data_table_ref->[$row][$name_index] : undef,
+				'type'        => defined $type_index ? 
+									$data_table_ref->[$row][$type_index] : undef,
+				'id'          => defined $id_index ?
+									$data_table_ref->[$row][$id_index] : undef,
+				'start'       => $starting_point,
+				'stop'        => $ending_point,
+				'position'    => $position,
+				'value'       => $value_type,
+				'stranded'    => $strand_sense,
+				'strand'      => $set_strand ? 
+								$data_table_ref->[$row][$strand_index] : undef, 
+				'avoid'       => $avoid,
 		);
 		
 		# record the scores
@@ -647,19 +784,45 @@ sub map_relative_data_for_features {
 
 sub map_relative_long_data_for_features {
 	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	# Get the feature indices
+	my (
+		$name_index, 
+		$type_index, 
+		$id_index,
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
 		
 		# get feature from the database
-		my $feature = $row->feature;
+		my $feature = get_feature(
+			'db'    => $mdb,
+			'id'    => defined $id_index ? 
+				$data_table_ref->[$row][$id_index] : undef,
+			'name'  => defined $name_index ? 
+				$data_table_ref->[$row][$name_index] : undef,
+			'type'  => defined $type_index ? 
+				$data_table_ref->[$row][$type_index] : undef,
+		);
+		
+		# check that we have a feature
 		unless ($feature) {
+			
 			# record a null values
-			for (my $c = $startcolumn; $c < $Data->number_columns; $c++) {
-				$row->value($c, '.');
+			for (
+				my $column = $startcolumn; 
+				$column < $main_data_ref->{'number_columns'}; 
+				$column++
+			) {
+				$data_table_ref->[$row][$column] = '.';
 			}
+			
+			# move on
 			next;
 		}
+		
 		
 		# Collect the scores for each window
 		collect_long_data_window_scores(
@@ -667,22 +830,74 @@ sub map_relative_long_data_for_features {
 			$feature->seq_id,
 			$feature->start,
 			$feature->end,
-			$set_strand ? $row->strand : $feature->strand,
+			$set_strand ? 
+				$data_table_ref->[$row][$strand_index] : $feature->strand
 		);
-		
-		if ($avoid) {
-			warn " avoid option is currently not supported with long data collection! Disabling!\n";
-			$avoid = 0;
-		}
 	}
 }
 
 sub map_relative_data_for_regions {
-	my ($starting_point, $ending_point) = @_;
 	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	# Get the feature indices
+	my (
+		$starting_point, 
+		$ending_point, 
+		$chr_index, 
+		$start_index, 
+		$stop_index, 
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		# collect the given coordinates from the data table
+		my ($fstart, $fstop, $strand);
+		if (
+			$data_table_ref->[$row][$start_index] <= 
+			$data_table_ref->[$row][$stop_index]
+		) {
+			# proper orientation
+			$fstart = $data_table_ref->[$row][$start_index];
+			$fstop  = $data_table_ref->[$row][$stop_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$strand = 1;
+			}
+		}
+		else {
+			# not a proper orientation of values
+			# assume the user really meant this
+			$fstart = $data_table_ref->[$row][$stop_index];
+			$fstop  = $data_table_ref->[$row][$start_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$strand = -1;
+			}
+		}
+			
+		# determine strand
+		if (defined $strand_index) {
+			# the strand in the data table could be any one of several 
+			# characters denoting strand
+			if ($data_table_ref->[$row][$strand_index] =~ m/^[1|f|w|\+]/i) {
+				$strand = 1;
+			}
+			elsif ($data_table_ref->[$row][$strand_index] =~ m/^[r|c|\-]/i) {
+				$strand = -1;
+			}
+			else {
+				$strand = 0;
+			}
+		}
+		else {
+			$strand = 0 unless defined $strand;
+		}
+		
+		
 		
 		# calculate new coordinates based on relative adjustments
 			# this is a little tricky, because we're working with absolute 
@@ -690,37 +905,37 @@ sub map_relative_data_for_regions {
 			# the appropriate conversions
 		my ($start, $stop, $region_start);
 		
-		if ($row->strand >= 0 and $position == 5) {
+		if ($strand >= 0 and $position == 5) {
 			# 5' end of forward strand
-			$region_start = $row->start;
-			$start = $row->start + $starting_point;
-			$stop  = $row->start + $ending_point;
+			$region_start = $fstart;
+			$start = $fstart + $starting_point;
+			$stop  = $fstart + $ending_point;
 		}
 		
-		elsif ($row->strand == -1 and $position == 5) {
+		elsif ($strand == -1 and $position == 5) {
 			# 5' end of reverse strand
-			$region_start = $row->stop;
-			$start = $row->stop - $ending_point;
-			$stop  = $row->stop - $starting_point;
+			$region_start = $fstop;
+			$start = $fstop - $ending_point;
+			$stop  = $fstop - $starting_point;
 		}
 		
-		elsif ($row->strand >= 0 and $position == 3) {
+		elsif ($strand >= 0 and $position == 3) {
 			# 3' end of forward strand
-			$region_start = $row->stop;
-			$start = $row->stop + $starting_point;
-			$stop  = $row->stop + $ending_point;
+			$region_start = $fstop;
+			$start = $fstop + $starting_point;
+			$stop  = $fstop + $ending_point;
 		}
 		
-		elsif ($row->strand == -1 and $position == 3) {
+		elsif ($strand == -1 and $position == 3) {
 			# 3' end of reverse strand
-			$region_start = $row->start;
-			$start = $row->start - $ending_point;
-			$stop  = $row->start - $starting_point;
+			$region_start = $fstart;
+			$start = $fstart - $ending_point;
+			$stop  = $fstart - $starting_point;
 		}
 		
 		elsif ($position == 4) {
 			# midpoint regardless of strand
-			$region_start = int( ( ($row->stop + $row->start) / 2) + 0.5);
+			$region_start = int( ( ($fstop - $fstart) / 2) + 0.5);
 			$start = $region_start + $starting_point;
 			$stop  = $region_start + $ending_point;
 		}
@@ -728,15 +943,17 @@ sub map_relative_data_for_regions {
 		else {
 			# something happened
 			die " programming error!? feature " . 
-				" at data row $row->row_index\n";
+				" at data row $row\n";
 		}
 		
 		# collect the region scores
-		my %regionscores = $row->get_position_scores(
+		my %regionscores = get_region_dataset_hash(
 				'db'          => $ddb,
 				'dataset'     => $dataset,
+				'chromo'      => $data_table_ref->[$row][$chr_index],
 				'start'       => $start,
 				'stop'        => $stop,
+				'strand'      => $strand,
 				'value'       => $value_type,
 				'stranded'    => $strand_sense,
 		);
@@ -750,6 +967,7 @@ sub map_relative_data_for_regions {
 		
 		# record the scores
 		record_scores($row, \%relative_scores);
+		
 	}
 }
 
@@ -757,40 +975,95 @@ sub map_relative_data_for_regions {
 
 sub map_relative_long_data_for_regions {
 	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	# Get the feature indices
+	my (
+		$chr_index, 
+		$start_index, 
+		$stop_index, 
+		$strand_index
+	) = @_;
+	
+	
+	### Collect the data
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		# collect the given coordinates from the data table
+		my ($fstart, $fstop, $fstrand);
+		if (
+			$data_table_ref->[$row][$start_index] <= 
+			$data_table_ref->[$row][$stop_index]
+		) {
+			# proper orientation
+			$fstart = $data_table_ref->[$row][$start_index];
+			$fstop  = $data_table_ref->[$row][$stop_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$fstrand = 1;
+			}
+		}
+		else {
+			# not a proper orientation of values
+			# assume the user really meant this
+			$fstart = $data_table_ref->[$row][$stop_index];
+			$fstop  = $data_table_ref->[$row][$start_index];
+			
+			# set the strand if not defined
+			unless (defined $strand_index) {
+				$fstrand = -1;
+			}
+		}
+			
+		# determine strand
+		if (defined $strand_index) {
+			# the strand in the data table could be any one of several 
+			# characters denoting strand
+			if ($data_table_ref->[$row][$strand_index] =~ m/^[1|f|w|\+]/i) {
+				$fstrand = 1;
+			}
+			elsif ($data_table_ref->[$row][$strand_index] =~ m/^[r|c|\-]/i) {
+				$fstrand = -1;
+			}
+			else {
+				$fstrand = 0;
+			}
+		}
+		else {
+			$fstrand = 0 unless defined $fstrand;
+		}
+		
+		
 		# Collect the scores for each window
 		collect_long_data_window_scores(
-			$row, $row->seq_id, $row->start, $row->end, $row->strand);
+			$row,
+			$data_table_ref->[$row][$chr_index],
+			$fstart,
+			$fstop,
+			$fstrand,
+		);
 	}
+	
 }
 
 
 
 sub record_scores {
 	
-	# row object and raw scores
+	# get the collected raw scores
 	my ($row, $regionscores) = @_;
+	
 	
 	# assign the scores to the windows in the region
 	for (
 		# we will process each window one at a time
 		# proceed by the column index for each window
 		my $column = $startcolumn; 
-		$column < $Data->number_columns; 
+		$column < $main_data_ref->{'number_columns'}; 
 		$column++
 	) {
-		
-		# record nulls if no data returned
-		unless (scalar keys %$regionscores) {
-			$row->value($column, '.');
-			next;
-		}
-		
 		# get start and stop
-		my $start = $Data->metadata($column, 'start');
-		my $stop = $Data->metadata($column, 'stop');
+		my $start = $main_data_ref->{$column}{'start'};
+		my $stop = $main_data_ref->{$column}{'stop'};
 		
 		# collect a score at each position in the window
 		my @scores;
@@ -841,12 +1114,16 @@ sub record_scores {
 		else {
 			# no scores
 			# assign a "null" value
-			$winscore = $method eq 'sum' ? 0 : '.';
+			$winscore = '.';
 		}
 		
 		# put the value into the data table
-		$row->value($column, $winscore);
+		# we're using a push function instead of explicitly assigning 
+		# a position, since the loop is based on relative genomic 
+		# position rather than 
+		$data_table_ref->[$row][$column] = $winscore;
 	}
+
 }
 
 
@@ -854,7 +1131,7 @@ sub record_scores {
 ## Collecting long data in windows
 sub collect_long_data_window_scores {
 	
-	# passed row object and coordinates
+	# passed row index and coordinates
 	my (
 		$row,
 		$fchromo,
@@ -862,7 +1139,7 @@ sub collect_long_data_window_scores {
 		$fstop,
 		$fstrand
 	) = @_;
-	
+
 	# Translate the actual reference start position based on requested 
 	# reference position and region strand
 	my $reference;
@@ -870,55 +1147,62 @@ sub collect_long_data_window_scores {
 		# 5' end of forward strand
 		$reference = $fstart;
 	}
+	
 	elsif ($fstrand == -1 and $position == 5) {
 		# 5' end of reverse strand
 		$reference = $fstop;
 	}
+	
 	elsif ($fstrand >= 0 and $position == 3) {
 		# 3' end of forward strand
 		$reference = $fstop;
 	}
+	
 	elsif ($fstrand == -1 and $position == 3) {
 		# 3' end of reverse strand
 		$reference = $fstart;
 	}
+	
 	elsif ($position == 4) {
 		# midpoint regardless of strand
-		$reference = int( ( ($fstop + $fstart) / 2) + 0.5);
+		$reference = int( ( ($fstop - $fstart) / 2) + 0.5);
 	}
+	
 	else {
 		# something happened
 		die " programming error!? feature " . 
 			" at data row $row\n";
 	}
 	
-	# collect the data for every window 
+	# collect the data
+	# we will be using the get_chromo_region_score() to collect data
+	# for every window 
 	for (
 		my $column = $startcolumn; 
-		$column < $Data->number_columns; 
+		$column < $main_data_ref->{'number_columns'}; 
 		$column++
 	) {
-		# we must modify the start and stop position with the adjustments
-		# recorded in the current column metadata
-		my $score = $row->get_score(
+		$data_table_ref->[$row][$column] = get_chromo_region_score(
 			'db'          => $ddb,
 			'dataset'     => $dataset,
 			'chromo'      => $fchromo,
 			'start'       => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'start') :
-								$reference - $Data->metadata($column, 'start'),
+								$reference + $main_data_ref->{$column}{'start'} :
+								$reference - $main_data_ref->{$column}{'start'},
 			'stop'        => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'stop') : 
-								$reference - $Data->metadata($column, 'stop'),
+								$reference + $main_data_ref->{$column}{'stop'} : 
+								$reference - $main_data_ref->{$column}{'stop'},
 			'strand'      => $fstrand,
 			'method'      => $method,
 			'value'       => $value_type,
 			'stranded'    => $strand_sense,
 			'log'         => $log,
 		);
-		$row->value($column, $score);
 	}
 }
+
+
+
 
 
 
@@ -926,26 +1210,28 @@ sub collect_long_data_window_scores {
 sub go_interpolate_values {
 	
 	# determine counts
-	my $lastwindow = $Data->number_columns - 1; 
+	my $lastwindow = $main_data_ref->{'number_columns'} - 1; 
 		# lastwindow is the index of the last column
 	
 	# walk through each data line and then each window
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+	for my $row (1..$main_data_ref->{'last_row'}) {
 		my $col = $startcolumn + 1;
 		while ($col < $lastwindow) {
 			# walk through the windows of a data row
 			# skipping the very first and last windows (columns)
 			# we will look for null values
 			# if one is found, interpolate from neighbors
-			if ($row->value($col) eq '.' and $row->value($col - 1) ne '.') {
+			if (
+				$data_table_ref->[$row][$col] eq '.' and 
+				$data_table_ref->[$row][$col - 1] ne '.'
+			) {
 				# we will interpolate the value from the neighbors
 				# first, need to check that the neighbors have values
 				
 				# find the next real value
 				my $next_i;
 				for (my $i = $col + 1; $col <= $lastwindow; $i++) {
-					if ($row->value($i) ne '.') {
+					if ($data_table_ref->[$row][$i] ne '.') {
 						$next_i = $i;
 						last;
 					}
@@ -953,19 +1239,44 @@ sub go_interpolate_values {
 				next unless defined $next_i;
 				
 				# determine fractional value
-				my $initial = $row->value($col - 1);
-				my $fraction = ($row->value($next_i) - $initial) / 
+				my $initial = $data_table_ref->[$row][$col - 1];
+				my $fraction = ($data_table_ref->[$row][$next_i] - $initial) / 
 					($next_i - $col + 1);
 				
 				# apply fractional values
 				for (my $n = $col; $n < $next_i; $n++) {
-					$row->value($n, $initial + ($fraction * ($n - $col + 1)) );
+					$data_table_ref->[$row][$n] = $initial + ($fraction * ($n - $col + 1));
 				}
 				
 				# jump ahead
 				$col = $next_i;
 			}
 			$col++;
+		}
+	}
+}
+
+
+
+## Convert null values to proper zero values
+sub null_to_zeros {
+	# for those methods where we expect a true zero, sum and rpm
+	# convert '.' null scores to zero
+	
+	# this wasn't done before because the null value makes the 
+	# interpolation a lot easier without having to worry about zero
+	
+	# walk through each data line and then each window
+	for my $row (1..$main_data_ref->{'last_row'}) {
+		
+		for (
+			my $col = $startcolumn; 
+			$col < $main_data_ref->{'number_columns'};
+			$col++
+		) {
+			if ($data_table_ref->[$row][$col] eq '.') {
+				$data_table_ref->[$row][$col] = 0;
+			}
 		}
 	}
 }
@@ -995,7 +1306,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --ddb <name|file>
   --data <dataset_name | filename>
   --method [mean|median|min|max|stddev|sum|rpm]             (mean)
-  --value [score|count|pcount|length]                       (score)
+  --value [score|count|length]                              (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --avoid
@@ -1074,63 +1385,22 @@ Alternatively, the name of a data file may be provided. Supported
 file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
 (.bam). The file may be local or remote.
 
-=item --method [mean|median|stddev|min|max|range|sum|rpm]
+=item --method [mean|median|min|max|stddev|sum|rpm]
 
-Specify the method for combining all of the dataset values within the 
-genomic region of the feature. Accepted values include:
+Specify the method of combining multiple values within each window. The mean, 
+median, minimum, maximum, standard deviation, or sum of the values may be 
+reported. The default value is mean for score and length values, or sum for 
+count values.
 
-=over 4
-
-=item * mean (default)
-
-=item * median
-
-=item * sum
-
-=item * stddev  Standard deviation of the population (within the region)
-
-=item * min
-
-=item * max
-
-=item * range   Returns difference of max and min
-
-=item * rpm     Reads Per Million mapped, Bam/BigBed only
-
-=back
-
-=item --value [score|count|pcount|length]
+=item --value [score|count|length]
 
 Optionally specify the type of data value to collect from the dataset or 
-data file. Four values are accepted: score, count, pcount, or length. 
-The default value type is score. Note that some data sources only support certain 
-types of data values. The types are detailed below.
-
-=over 4
-
-=item * score
-
-The default value. Supported by wig, bigWig, USeq, bigBed (if the features 
-include the score column), GFF features, and Bam (returns non-transformed 
-base pair coverage).
-
-=item * count
-
-Counts the number of features that overlap the search region. For long 
-features (> 1 bp), these may include features that overlap or span beyond 
-the search region. Supported by all databases.
-
-=item * pcount (precise count)
-
-Counts only those features that are contained within the search region, 
-not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
-
-=item * length
-
-Returns the length of long features. Supported by Bam, bigBed, USeq, and 
-GFF features.
-
-=back
+data file. Three values are accepted: score, count, or length. Note that 
+some data sources only support certain types of data values. Wig and 
+BigWig files only support score and count; BigBed database features 
+support count and length and optionally score; Bam files support basepair 
+coverage (score), count (number of alignments), and length. The default 
+value type is score. 
 
 =item --strand [sense|antisense|all]
 
@@ -1155,9 +1425,8 @@ Indicate whether features of the same type should be avoided when
 calculating values in a window. Each window is checked for 
 overlapping features of the same type; if the window does overlap 
 another feature of the same type, no value is reported for the 
-window. This option requires using named database features and must 
-include a feature GFF type column. The default is false (return all 
-values regardless of overlap).
+window. The default is false (return all values regardless of 
+overlap).
 
 =item --long
 

@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/bin/env perl
 
 # documentation at end of file
 
@@ -7,12 +7,11 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
 use Bio::SeqFeature::Lite;
-use Bio::ToolBox::data_helper qw(format_with_commas);
-use Bio::ToolBox::file_helper qw(
-	open_to_read_fh
-	open_to_write_fh
-);
-my $VERSION = '1.18';
+use IO::File;
+use IO::Zlib;
+
+
+my $VERSION = '1.11';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -95,8 +94,8 @@ if ($print_version) {
 
 
 ### Check requirements and defaults
-unless (@genetables or $ftp_file or $chromof) {
-	die " Specify either an input table file, chromosome file, or a FTP table!\n";
+unless (@genetables or $ftp_file) {
+	die " Specify either an input table file or a FTP table!\n";
 }
 if ($ftp_file) {
 	unless ($ftp_file =~ m/^refgene|ensgene|xenorefgene|known|all$/i) {
@@ -559,8 +558,8 @@ sub load_extra_ensembl_data {
 		$fh->close;
 	}
 	
-	# done, return reference if we loaded data
-	return %data ? \%data : undef; 
+	# done
+	return \%data;
 }
 
 
@@ -878,23 +877,16 @@ sub generate_new_gene {
 	# Set the gene name
 	# in most cases this will be the name2 item from the gene table
 	# except for some ncRNA and ensGene transcripts
-	my ($name, $id, $alias);
-	if ($ensembldata and exists $ensembldata->{ $linedata->{name} } ) {
-		# we will automatically check ensembl data for a matching name 
-		# this should not interfere with refGene names
-		# not all ensGene names may use an ENS prefix, e.g. fly transcripts
-		
-		# we may not actually have a name though....
+	my ($name, $id);
+	if ($linedata->{name} =~ /^ENS/i) {
+		# an ensGene transcript, look up the common name if possible
 		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
 			
 			# use the common name as the gene name
 			$name  = $ensembldata->{ $linedata->{name} }->[0];
 			
 			# use the name2 identifier as the ID
-			$id = $linedata->{name2}; 
-			
-			# set the original identifier as an alias
-			$alias = $linedata->{name2};
+			$id = $linedata->{name2};   
 		}
 		else {
 			# use the name2 value
@@ -948,8 +940,8 @@ sub generate_new_gene {
 	
 	# add the original ENS* identifier as an Alias in addition to ID
 	# for ensGene transcripts
-	if ($alias) {
-		$gene->add_tag_value('Alias', $alias);
+	if ($linedata->{name} =~ /^ENS/i) {
+		$gene->add_tag_value('Alias', $linedata->{name2});
 	}
 	
 	# update extra attributes as necessary
@@ -999,13 +991,10 @@ sub generate_new_transcript {
 		
 		# check if we have a ensGene transcript, we may have the type
 		if (
-			$ensembldata and 
-			exists $ensembldata->{ $linedata->{name} } and
+			$linedata->{name} =~ /^ENS/i and 
 			defined $ensembldata->{ $linedata->{name} }->[1]
 		) {
-			# this looks like an ensGene transcript
-			# we just go ahead and check the ensembl data for a match
-			# since not all ensGene names use the ENS prefix and are easily identified
+			# this is a ensGene transcript
 			
 			# these should be fairly typical standards
 			# snRNA, rRNA, pseudogene, etc
@@ -1043,16 +1032,14 @@ sub generate_new_transcript {
 	
 	
 	# add the Ensembl Gene name if it is an ensGene transcript
-	if (
-		$ensembldata and 
-		exists $ensembldata->{ $linedata->{name} } and
-		defined $ensembldata->{ $linedata->{name} }->[0]
-	) {
+	if ($linedata->{name} =~ /^ENS/i) {
 		# if we have loaded the EnsemblGeneName data hash
 		# we should be able to find the real gene name
-		# we will put the common gene name as an alias
-		$transcript->add_tag_value('Alias', 
-			$ensembldata->{ $linedata->{name} }->[0] );
+		if (defined $ensembldata->{ $linedata->{name} }->[0] ) {
+			# we will put the common gene name as an alias
+			$transcript->add_tag_value('Alias', 
+				$ensembldata->{ $linedata->{name} }->[0] );
+		}
 	}
 	
 	# add gene name as an alias
@@ -1726,6 +1713,173 @@ sub print_chromosomes {
 
 
 
+######################## Imported ##############################################
+
+# The open_to_read_fh() and open_to_write_fh() subroutines are copied from 
+# biotoolbox/lib/tim_file_helper.pm to make a streamlined single executable
+
+# The format_with_commas() subroutine was copied from 
+# biotoolbox/lib/tim_data_helper.pm
+
+
+
+
+#### Open a file for reading
+sub open_to_read_fh {
+	# a simple subroutine to open a filehandle for reading a file
+	
+	# check filename
+	my $filename = shift;
+	unless (-e $filename) {
+		warn " file '$filename' does not exist!\n";
+		return;
+	}
+	
+	# Open filehandle object as appropriate
+	my $fh; # filehandle
+	if ($filename =~ /\.gz$/i) {
+		# the file is compressed with gzip
+		$fh = IO::Zlib->new;
+	} 
+	else {
+		# the file is uncompressed and space hogging
+		$fh = IO::File->new;
+	}
+	
+	# Open file and return
+	if ($fh->open($filename, "r") ) {
+		return $fh;
+	}
+	else {
+		warn "unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
+}
+
+
+#### Open a file for writing
+sub open_to_write_fh {
+	# A simple subroutine to open a filehandle for writing a file
+	
+	my ($filename, $gz, $append) = @_;
+	
+	# check filename
+	unless ($filename) {
+		warn " no filename to write!";
+		return;
+	}
+	
+	# check zip status if necessary
+	unless (defined $gz) {
+		# look at filename extension as a clue
+		# in case we're overwriting the input file, keep the zip status
+		if ($filename =~ m/\.gz$/i) {
+			$gz = 1;
+		}
+		else {
+			$gz = 0; # default
+		}
+	}
+	
+	# check file append mode
+	unless (defined $append) {
+		# default is not to append
+		$append = 0;
+	}
+	
+	# determine write mode
+	my $mode;
+	if ($gz and $append) {
+		# append a gzip file
+		$mode = 'ab';
+	}
+	elsif (!$gz and $append) {
+		# append a normal file
+		$mode = 'a';
+	}
+	elsif ($gz and !$append) {
+		# write a new gzip file
+		$mode = 'wb';
+	}
+	else {
+		# write a new normal file
+		$mode = 'w';
+	}
+	
+	
+	# Generate appropriate filehandle object and name
+	my $fh;
+	if ($gz) {
+		# write a space-saving compressed file
+		
+		# add gz extension if necessary
+		unless ($filename =~ m/\.gz$/i) {
+			$filename .= '.gz';
+		}
+		$fh = new IO::Zlib;
+	}
+	else {
+		# write a normal space-hogging file
+		
+		# strip gz extension if present
+		$filename =~ s/\.gz$//i; 
+		
+		$fh = new IO::File;
+	}
+	
+	# Open file for writing and return
+	if ($fh->open($filename, $mode) ) {
+		return $fh;
+	}
+	else {
+		warn " unable to open file '$filename': " . $fh->error . "\n";
+		return;
+	}
+}
+
+
+### Format a number into readable comma-delimited by thousands number
+sub format_with_commas {
+	# for formatting a number with commas
+	my $number = shift;
+	if ($number =~ /[^\d,\-\.]/) {
+		warn " the string contains characters that can't be parsed\n";
+		return $number;
+	}
+	
+	# check for decimals
+	my ($integers, $decimals);
+	if ($number =~ /^\-?(\d+)\.(\d+)$/) {
+		$integers = $1;
+		$decimals = $2;
+	}
+	else {
+		$integers = $number;
+	}
+	
+	# format
+	my @digits = split //, $integers;
+	my @formatted;
+	while (@digits) {
+		if (@digits > 3) {
+			unshift @formatted, pop @digits;
+			unshift @formatted, pop @digits;
+			unshift @formatted, pop @digits;
+			unshift @formatted, ',';
+		}
+		else {
+			while (@digits) {
+				unshift @formatted, pop @digits;
+			}
+		}
+	}
+	
+	# finished
+	return join("", @formatted) . $decimals;
+}
+
+
+
 
 __END__
 
@@ -1772,9 +1926,9 @@ The command line flags and descriptions:
 
 Request that the current indicated tables and supporting files be 
 downloaded from UCSC via FTP. Four different tables may be downloaded, 
-including I<refGene>, I<ensGene>, I<xenoRefGene> mRNA gene prediction 
-tables, and the UCSC I<knownGene> table (if available). Specify all to 
-download all four tables. A comma delimited list may also be provided.
+including refGene, ensGene, xenoRefGene mRNA gene prediction tables, and 
+the UCSC known gene table (if available). Specify all to download all 
+four tables. A comma delimited list may also be provided.
 
 =item --db <text>
 
@@ -1791,43 +1945,41 @@ gene table files. The default is 'hgdownload.cse.ucsc.edu'.
 =item --table <filename>
 
 Provide the name of a UCSC gene or gene prediction table. Tables known 
-to work include the I<refGene>, I<ensGene>, I<xenoRefGene>, and UCSC 
-I<knownGene> tables. The file may be gzipped. When converting multiple 
-tables, use this option repeatedly for each table. The C<--ftp> option is 
-recommended over using this one.
+to work include the refGene, ensGene, xenoRefGene, and UCSC knownGene 
+tables. The file may be gzipped. When converting multiple tables, use 
+this option repeatedly for each table.
 
 =item --status <filename>
 
-Optionally provide the name of the I<refSeqStatus> table file. This file 
-provides additional information for the I<refSeq>-based gene prediction 
-tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. 
-The file may be gzipped. The C<--ftp> option is recommended over using this.
+Optionally provide the name of the refSeqStatus table file. This file 
+provides additional information for the refSeq-based gene prediction 
+tables, including refGene, xenoRefGene, and knownGene tables. The 
+file may be gzipped.
 
 =item --sum <filename>
 
-Optionally provide the name of the I<refSeqSummary> file. This file 
-provides additional information for the I<refSeq>-based gene prediction 
-tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. The 
-file may be gzipped. The C<--ftp> option is recommended over using this.
+Optionally provide the name of the refSeqSummary file. This file 
+provides additional information for the refSeq-based gene prediction 
+tables, including refGene, xenoRefGene, and knownGene tables. The 
+file may be gzipped.
 
 =item --ensname <filename>
 
-Optionally provide the name of the I<ensemblToGeneName> file. This file 
+Optionally provide the name of the ensemblToGeneName file. This file 
 provides a key to translate the Ensembl unique gene identifier to the 
-common gene name. The file may be gzipped. The C<--ftp> option is 
-recommended over using this.
+common gene name. The file may be gzipped.
 
 =item --enssrc <filename>
 
-Optionally provide the name of the I<ensemblSource> file. This file 
+Optionally provide the name of the ensemblSource file. This file 
 provides a key to translate the Ensembl unique gene identifier to the 
 type of transcript, provided by Ensembl as the source. The file may be 
-gzipped. The C<--ftp> option is recommended over using this.
+gzipped.
 
 =item --kgxref <filename>
 
-Optionally provide the name of the I<kgXref> file. This file 
-provides additional information for the UCSC I<knownGene> gene table.
+Optionally provide the name of the kgXref file. This file 
+provides additional information for the UCSC knownGene gene table.
 The file may be gzipped.
 
 =item --chromo <filename>
@@ -1845,17 +1997,17 @@ automatically derived from the source table file name, if recognized, or
 
 =item --(no)chr
 
-When downloading the current gene tables from UCSC using the C<--ftp> 
-option, indicate whether (or not) to include the I<chromInfo> table. 
-The default is true. The C<--ftp> option is recommended over using this.
+When downloading the current gene tables from UCSC using the --ftp 
+option, indicate whether (or not) to include the chromInfo table. 
+The default is true. 
 
 =item --(no)gene
 
 Specify whether (or not) to assemble mRNA transcripts into genes. This 
-will create the canonical gene-E<gt>mRNA-E<gt>(exon,CDS) heirarchical 
-structure. Otherwise, mRNA transcripts are kept independent. The gene name, 
-when available, are always associated with transcripts through the Alias 
-tag. The default is true.
+will create the canonical gene->mRNA->(exon,CDS) heirarchical structure. 
+Otherwise, mRNA transcripts are kept independent. The gene name, when 
+available, are always associated with transcripts through the Alias tag. 
+The default is true.
 
 =item --(no)cds
 
@@ -1890,34 +2042,32 @@ Display the POD documentation
 =head1 DESCRIPTION
 
 This program will convert a UCSC gene or gene prediction table file into a
-GFF3 format file. It will build canonical gene-E<gt>transcript-E<gt>[exon, 
-CDS, UTR] heirarchical structures. It will attempt to identify non-coding genes
+GFF3 format file. It will build canonical gene->transcript->[exon, CDS,
+UTR] heirarchical structures. It will attempt to identify non-coding genes
 as to type using the gene name as inference. Various additional
 informational attributes may also be included with the gene and transcript
 features, which are derived from supporting table files.
 
-Four table files are supported. Gene prediction tables, including I<refGene>, 
-I<xenoRefGene>, and I<ensGene>, are supported. The UCSC I<knownGene> gene 
-table, if available, is also supported. Supporting tables include I<refSeqStatus>, 
-I<refSeqSummary>, I<ensemblToGeneName>, I<ensemblSource>, and I<kgXref>. 
+Four table files are supported. Gene prediction tables, including refGene, 
+xenoRefGene, and ensGene, are supported. The UCSC knownGene gene table, if 
+available, is also supported. Supporting tables include refSeqStatus, 
+refSeqSummary, ensemblToGeneName, ensemblSource, and kgXref. 
 
 The latest table files may be automatically downloaded using FTP from 
 UCSC or other host. Since these files are periodically updated, this may 
 be the best option. Alternatively, individual files may be specified 
 through command line options. Files may be obtained manually through FTP, 
-HTTP, or the UCSC Table Browser. However, it is B<highly recommended> to 
-let the program obtain the necessary files using the C<--ftp> option, as 
-using the wrong file format or manipulating the tables may prevent the 
-program from working properly.
+HTTP, or the UCSC Table Browser.
 
 If provided, chromosome and/or scaffold features may also be written to a 
 GFF file. If only one table is being converted, then the chromosome features 
 are prepended to the GFF file; otherwise, a separate chromosome GFF file is 
 written.
 
-If you need to set up a database using UCSC annotation, you should first 
-take a look at the BioToolBox script B<db_setup.pl>, which provides a 
-convenient automated database setup based on UCSC annotation.
+=head1 PROJECT
+
+This script is part of the BioToolBox collection of scripts. This and other 
+scripts may be found at L<http://code.google.com/p/biotoolbox/>.
 
 =head1 AUTHOR
 
@@ -1926,6 +2076,10 @@ convenient automated database setup based on UCSC annotation.
  Huntsman Cancer Institute
  University of Utah
  Salt Lake City, UT, 84112
+ parnell.tj@gmail.com
+ timothy.parnell@hci.utah.edu
+
+=head1 LICENSE
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the GPL (either version 1, or at your option,
