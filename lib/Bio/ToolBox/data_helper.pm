@@ -1,17 +1,17 @@
 package Bio::ToolBox::data_helper;
-our $VERSION = 1.25;
+our $VERSION = 1.23;
 
 ### modules
 require Exporter;
 use strict;
 use Carp;
-use Bio::ToolBox;
+
 
 ### Variables
 # Export
 our @ISA = qw(Exporter);
 our @EXPORT_OK = qw(
-	generate_data_structure
+	generate_tim_data_structure
 	verify_data_structure
 	sort_data_structure
 	gsort_data_structure
@@ -29,8 +29,8 @@ our @EXPORT_OK = qw(
 
 #################   The Subroutines   ###################
 
-### Generate a new empty data structure
-sub generate_data_structure {
+### Generate a new empty tim data structure
+sub generate_tim_data_structure {
 	
 	# Collect the feature
 	my $feature = shift;
@@ -39,14 +39,12 @@ sub generate_data_structure {
 	my @datasets = @_;
 	
 	# Initialize the hash structure
-	my $ToolBoxVersion = Bio::ToolBox->VERSION;
-	my %data = (
-		'program'        => "$0, lib v$ToolBoxVersion",
+	my %tim_data = (
+		'program'        => $0,
 		'feature'        => $feature,
 		'db'             => q(),
 		'gff'            => 0,
 		'bed'            => 0,
-		'ucsc'           => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
 		'headers'        => @datasets ? 1 : 0,
@@ -59,22 +57,22 @@ sub generate_data_structure {
 	foreach my $dataset (@datasets) {
 		
 		# the metadata structure
-		$data{$index} = {
+		$tim_data{$index} = {
 			'name'        => $dataset,
 			'index'       => $index,
 		};
 		
 		# the table header
-		$data{'data_table'}->[0][$index] = $dataset;
+		$tim_data{'data_table'}->[0][$index] = $dataset;
 		
 		# increment number columns
-		$data{'number_columns'} += 1;
+		$tim_data{'number_columns'} += 1;
 		
 		$index++;
 	}
 	
 	# Finished
-	return \%data;
+	return \%tim_data;
 }
 
 
@@ -83,48 +81,48 @@ sub generate_data_structure {
 
 ### Subroutine to check for missing required values in the data hash
 sub verify_data_structure {
-	my $data = shift;
+	my $datahash_ref = shift;
 	
 	# check for data table
 	unless (
-		defined $data->{'data_table'} and 
-		ref $data->{'data_table'} eq 'ARRAY'
+		defined $datahash_ref->{'data_table'} and 
+		ref $datahash_ref->{'data_table'} eq 'ARRAY'
 	) {
 		carp " No data table in passed data structure!";
 		return;
 	}
 	
 	# check for last row index
-	if (defined $data->{'last_row'}) {
-		my $number = scalar( @{ $data->{'data_table'} } ) - 1;
-		if ($data->{'last_row'} != $number) {
+	if (defined $datahash_ref->{'last_row'}) {
+		my $number = scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
+		if ($datahash_ref->{'last_row'} != $number) {
 			warn " data table last_row index [$number] doesn't match " . 
-				"metadata value [" . $data->{'last_row'} . "]!\n";
+				"metadata value [" . $datahash_ref->{'last_row'} . "]!\n";
 			# fix it for them
-			$data->{'last_row'} = $number;
+			$datahash_ref->{'last_row'} = $number;
 		}
 	}
 	else {
 		# define it for them
-		$data->{'last_row'} = 
-			scalar( @{ $data->{'data_table'} } ) - 1;
+		$datahash_ref->{'last_row'} = 
+			scalar( @{ $datahash_ref->{'data_table'} } ) - 1;
 	}
 	
 	# check for consistent number of columns
-	if (defined $data->{'number_columns'}) {
-		my $number = $data->{'number_columns'};
+	if (defined $datahash_ref->{'number_columns'}) {
+		my $number = $datahash_ref->{'number_columns'};
 		my @problems;
 		my $too_low = 0;
 		my $too_high = 0;
-		for (my $row = 0; $row <= $data->{'last_row'}; $row++) {
-			my $count = scalar @{ $data->{'data_table'}->[$row] };
+		for (my $row = 0; $row <= $datahash_ref->{'last_row'}; $row++) {
+			my $count = scalar @{ $datahash_ref->{'data_table'}->[$row] };
 			if ($count != $number) {
 				push @problems, $row;
 				$too_low++ if $count < $number;
 				$too_high++ if $count > $number;
 				while ($count < $number) {
 					# we can sort-of-fix this problem
-					$data->{'data_table'}->[$row][$count] = '.';
+					$datahash_ref->{'data_table'}->[$row][$count] = '.';
 					$count++;
 				}
 			}
@@ -140,88 +138,88 @@ sub verify_data_structure {
 		}
 	}
 	else {
-		$data->{'number_columns'} = 
-			scalar @{ $data->{'data_table'}->[0] };
+		$datahash_ref->{'number_columns'} = 
+			scalar @{ $datahash_ref->{'data_table'}->[0] };
 	}
 	
 	# check metadata
-	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+	for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
 		unless (
-			$data->{$i}{'name'} eq 
-			$data->{'data_table'}->[0][$i]
+			$datahash_ref->{$i}{'name'} eq 
+			$datahash_ref->{'data_table'}->[0][$i]
 		) {
 			carp " incorrect or missing metadata!\n  Column header names don't" 
 				. " match metadata name values for index $i\n" . 
-				"  compare '" . $data->{$i}{'name'} . "' with '" .
-				$data->{'data_table'}->[0][$i] . "'\n";
+				"  compare '" . $datahash_ref->{$i}{'name'} . "' with '" .
+				$datahash_ref->{'data_table'}->[0][$i] . "'\n";
 			return;
 		}
 	}
 	
 	# check for proper gff structure
-	if ($data->{'gff'}) {
+	if ($datahash_ref->{'gff'}) {
 		# if any of these checks fail, we will reset the gff version to 
 		# the default of 0, or no gff
 		my $gff_check = 1; # start with assumption it is true
 		
 		# check number of columns
-		if ($data->{'number_columns'} != 9) {
+		if ($datahash_ref->{'number_columns'} != 9) {
 			$gff_check = 0;
 		}
 		
 		# check column indices
 		if (
-			exists $data->{0} and
-			$data->{0}{'name'} !~ 
+			exists $datahash_ref->{0} and
+			$datahash_ref->{0}{'name'} !~ 
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{1} and
-			$data->{1}{'name'} !~ m/^source/i
+			exists $datahash_ref->{1} and
+			$datahash_ref->{1}{'name'} !~ m/^source/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{2} and
-			$data->{2}{'name'} !~ m/^type|method/i
+			exists $datahash_ref->{2} and
+			$datahash_ref->{2}{'name'} !~ m/^type|method/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{3} and
-			$data->{3}{'name'} !~ m/^start/i
+			exists $datahash_ref->{3} and
+			$datahash_ref->{3}{'name'} !~ m/^start/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{4} and
-			$data->{4}{'name'} !~ m/^stop|end/i
+			exists $datahash_ref->{4} and
+			$datahash_ref->{4}{'name'} !~ m/^stop|end/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{5} and
-			$data->{5}{'name'} !~ m/^score|value/i
+			exists $datahash_ref->{5} and
+			$datahash_ref->{5}{'name'} !~ m/^score|value/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{6} and
-			$data->{6}{'name'} !~ m/^strand/i
+			exists $datahash_ref->{6} and
+			$datahash_ref->{6}{'name'} !~ m/^strand/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{7} and
-			$data->{7}{'name'} !~ m/^phase/i
+			exists $datahash_ref->{7} and
+			$datahash_ref->{7}{'name'} !~ m/^phase/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $data->{8} and
-			$data->{8}{'name'} !~ m/^group|attribute/i
+			exists $datahash_ref->{8} and
+			$datahash_ref->{8}{'name'} !~ m/^group|attribute/i
 		) {
 			$gff_check = 0;
 		}
@@ -229,49 +227,49 @@ sub verify_data_structure {
 		# update gff value as necessary
 		if ($gff_check == 0) {
 			# reset metadata
-			$data->{'gff'} = 0;
-			$data->{'headers'} = 1;
+			$datahash_ref->{'gff'} = 0;
+			$datahash_ref->{'headers'} = 1;
 			
 			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-				if (exists $data->{$i}{'AUTO'}) {
-					delete $data->{$i}{'AUTO'};
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
 				}
 			}
 		}
 	}
 	
 	# check for proper BED structure
-	if ($data->{'bed'}) {
+	if ($datahash_ref->{'bed'}) {
 		# if any of these checks fail, we will reset the bed flag to 0
 		# to make it not a bed file format
 		my $bed_check = 1; # start with assumption it is correct
 		
 		# check number of columns
 		if (
-			$data->{'number_columns'} < 3 and 
-			$data->{'number_columns'} > 12 
+			$datahash_ref->{'number_columns'} < 3 and 
+			$datahash_ref->{'number_columns'} > 12 
 		) {
 			$bed_check = 0;
 		}
 		
 		# check column index names
 		if (
-			exists $data->{0} and
-			$data->{0}{'name'} !~ 
+			exists $datahash_ref->{0} and
+			$datahash_ref->{0}{'name'} !~ 
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$bed_check = 0;
 		}
 		if (
-			exists $data->{1} and
-			$data->{1}{'name'} !~ m/^start/i
+			exists $datahash_ref->{1} and
+			$datahash_ref->{1}{'name'} !~ m/^start/i
 		) {
 			$bed_check = 0;
 		}
 		if (
-			exists $data->{2} and
-			$data->{2}{'name'} !~ m/^stop|end/i
+			exists $datahash_ref->{2} and
+			$datahash_ref->{2}{'name'} !~ m/^stop|end/i
 		) {
 			$bed_check = 0;
 		}
@@ -280,114 +278,62 @@ sub verify_data_structure {
 		# named as I expect, especially if it was generated de novo
 		# so only check these if the original file extension was bed
 		if (
-			exists $data->{'extension'} and 
-			$data->{'extension'} =~ /bed|bdg/i
+			exists $datahash_ref->{'extension'} and 
+			$datahash_ref->{'extension'} =~ /bed|bdg/i
 		) {
 			if (
-				exists $data->{3} and
-				$data->{3}{'name'} !~ m/^name|id|score/i
+				exists $datahash_ref->{3} and
+				$datahash_ref->{3}{'name'} !~ m/^name|id|score/i
 				# for bed this should be name or ID
 				# for bedgraph this should be score
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{4} and
-				$data->{4}{'name'} !~ m/^score|value/i
+				exists $datahash_ref->{4} and
+				$datahash_ref->{4}{'name'} !~ m/^score|value/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{5} and
-				$data->{5}{'name'} !~ m/^strand/i
+				exists $datahash_ref->{5} and
+				$datahash_ref->{5}{'name'} !~ m/^strand/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{6} and
-				$data->{6}{'name'} !~ m/^thickstart/i
+				exists $datahash_ref->{6} and
+				$datahash_ref->{6}{'name'} !~ m/^thickstart/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{7} and
-				$data->{7}{'name'} !~ m/^thickend/i
+				exists $datahash_ref->{7} and
+				$datahash_ref->{7}{'name'} !~ m/^thickend/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{8} and
-				$data->{8}{'name'} !~ m/^itemrgb/i
+				exists $datahash_ref->{8} and
+				$datahash_ref->{8}{'name'} !~ m/^itemrgb/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{9} and
-				$data->{9}{'name'} !~ m/^blockcount/i
+				exists $datahash_ref->{9} and
+				$datahash_ref->{9}{'name'} !~ m/^blockcount/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{10} and
-				$data->{10}{'name'} !~ m/^blocksizes/i
+				exists $datahash_ref->{10} and
+				$datahash_ref->{10}{'name'} !~ m/^blocksizes/i
 			) {
 				$bed_check = 0;
 			}
 			if (
-				exists $data->{11} and
-				$data->{11}{'name'} !~ m/^blockstarts/i
-			) {
-				$bed_check = 0;
-			}
-		} 
-		elsif (
-			exists $data->{'extension'} and 
-			$data->{'extension'} =~ /peak/i
-		) {
-			# some sort of peak file
-			# narrowpeak: signalValue pValue qValue peak
-			# broadpeak: signalValue pValue qValue
-			if (
-				exists $data->{3} and
-				$data->{3}{'name'} !~ m/^name|id|score/i
-				# for bed this should be name or ID
-				# for bedgraph this should be score
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{4} and
-				$data->{4}{'name'} !~ m/^score|value/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{5} and
-				$data->{5}{'name'} !~ m/^strand/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{6} and
-				$data->{6}{'name'} !~ m/^signalvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{7} and
-				$data->{7}{'name'} !~ m/^pvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{8} and
-				$data->{8}{'name'} !~ m/^qvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $data->{9} and
-				$data->{9}{'name'} !~ m/^peak/i
+				exists $datahash_ref->{11} and
+				$datahash_ref->{11}{'name'} !~ m/^blockstarts/i
 			) {
 				$bed_check = 0;
 			}
@@ -395,119 +341,48 @@ sub verify_data_structure {
 		
 		# reset the BED tag value as appropriate
 		if ($bed_check) {
-			$data->{'bed'} = $data->{'number_columns'};
+			$datahash_ref->{'bed'} = $datahash_ref->{'number_columns'};
 		}
 		else {
 			# reset metadata
-			$data->{'bed'} = 0;
-			$data->{'headers'} = 1;
+			$datahash_ref->{'bed'} = 0;
+			$datahash_ref->{'headers'} = 1;
 			
 			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-				if (exists $data->{$i}{'AUTO'}) {
-					delete $data->{$i}{'AUTO'};
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
 				}
 			}
 		}
-	}
-	
-	# check refFlat or genePred gene structure
-	if ($data->{'ucsc'}) {
-		# if any of these checks fail, we will reset the extension
-		my $ucsc_check = 1; # start with assumption it is correct
-		
-		if ($data->{'number_columns'} == 16) {
-			my @names = qw(bin name chrom strand txStart txEnd cdsStart cdsEnd 
-				exonCount exonStarts exonEnds score name2 cdsStartSt 
-				cdsEndStat exonFrames);
-			for my $i (0 .. 15) {
-				unless ($data->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}		
-		elsif ($data->{'number_columns'} == 15) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-				exonCount exonStarts exonEnds score name2 cdsStartSt 
-				cdsEndStat exonFrames);
-			for my $i (0 .. 14) {
-				unless ($data->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}		
-		elsif ($data->{'number_columns'} == 12) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds proteinID alignID);
-			for my $i (0 .. 11) {
-				unless ($data->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}		
-		elsif ($data->{'number_columns'} == 11) {
-			my @names = qw(geneName transcriptName chrom strand txStart txEnd 
-						cdsStart cdsEnd exonCount exonStarts exonEnds);
-			for my $i (0 .. 10) {
-				unless ($data->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}		
-		elsif ($data->{'number_columns'} == 10) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds);
-			for my $i (0 .. 9) {
-				unless ($data->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}
-		
-		if ($ucsc_check == 0) {
-			# failed the check
-			my $ext = $data->{'extension'};
-			$data->{'filename'} =~ s/$ext/.txt/;
-			$data->{'extension'} = '.txt';
-			$data->{'ucsc'} = 0;
-			
-			# remove the AUTO key
-			for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-				if (exists $data->{$i}{'AUTO'}) {
-					delete $data->{$i}{'AUTO'};
-				}
-			}
-		}	
 	}
 	
 	# check proper SGR file structure
-	if (defined $data->{'extension'} and 
-		$data->{'extension'} =~ /sgr/i
+	if (
+		( defined $datahash_ref->{'extension'} and 
+		$datahash_ref->{'extension'} =~ /sgr/i ) or
+		( defined $datahash_ref->{'filename'} and 
+		$datahash_ref->{'filename'} =~ /sgr/i )
 	) {
 		# there is no sgr field in the data structure
 		# so we're just checking for the extension
 		# we will change the extension as necessary if it doesn't conform
 		if (
-			$data->{'number_columns'} != 3 or
-			$data->{0}{'name'} !~ /^chr|seq|ref/i or
-			$data->{1}{'name'} !~ /^start|position/i
+			$datahash_ref->{'number_columns'} != 3 or
+			$datahash_ref->{0}{'name'} !~ /^chr|seq|ref/i or
+			$datahash_ref->{1}{'name'} !~ /^start|position/i
 		) {
 			# doesn't smell like a SGR file
 			# change the extension so the write subroutine won't think it is
 			# make it a text file
-			$data->{'extension'} =~ s/sgr/txt/i;
-			$data->{'filename'}  =~ s/sgr/txt/i;
-			$data->{'headers'} = 1;
+			$datahash_ref->{'extension'} =~ s/sgr/txt/i;
+			$datahash_ref->{'filename'}  =~ s/sgr/txt/i;
+			$datahash_ref->{'headers'} = 1;
 			
 			# remove the AUTO key from the metadata
-			for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-				if (exists $data->{$i}{'AUTO'}) {
-					delete $data->{$i}{'AUTO'};
+			for (my $i = 0; $i < $datahash_ref->{'number_columns'}; $i++) {
+				if (exists $datahash_ref->{$i}{'AUTO'}) {
+					delete $datahash_ref->{$i}{'AUTO'};
 				}
 			}
 		}
@@ -521,7 +396,7 @@ sub verify_data_structure {
 ### Sort a data structure
 sub sort_data_structure {
 	my ($data, $index, $direction) = @_;
-	my $table = $data->{'data_table'};
+	my $data_table_ref = $data->{'data_table'};
 	
 	# confirm passed elements
 	unless ($data) {
@@ -539,11 +414,11 @@ sub sort_data_structure {
 	# this will be used to guess the sort method, below
 	my $example; # an example of the dataset
 	my $i = 1;
-	while (!$example) {
+	while ($example eq undef) {
 		# we want to avoid a non-value '.', so keep trying
-		if ($table->[$i][$index] ne '.') {
+		if ($data_table_ref->[$i][$index] ne '.') {
 			# a non-null value, take it
-			$example = $table->[$i][$index];
+			$example = $data_table_ref->[$i][$index];
 		} 
 		else {
 			# a null value, proceed to next one
@@ -569,10 +444,10 @@ sub sort_data_structure {
 	
 	# Remove the table header
 	# this keeps the header out of the sorting process
-	my $header = shift @{ $table }; 
+	my $header = shift @{ $data_table_ref }; 
 	# calculate our own temporary last_row index, since the main data value
 	# is not valid because we moved the header out
-	my $last_row = scalar @{ $table } - 1;
+	my $last_row = scalar @{ $data_table_ref } - 1;
 	
 	# Re-order the datasets
 	# Directly sorting the @data array is proving difficult. It keeps giving me
@@ -589,7 +464,7 @@ sub sort_data_structure {
 		for my $row (0..$last_row) {
 			
 			# get the value to sort by
-			my $value = $table->[$row][$index]; 
+			my $value = $data_table_ref->[$row][$index]; 
 			
 			# check to see whether this value exists or not
 			while (exists $datahash{$value}) {
@@ -604,7 +479,7 @@ sub sort_data_structure {
 			}
 			
 			# store the row data reference
-			$datahash{$value} = $table->[$row]; 
+			$datahash{$value} = $data_table_ref->[$row]; 
 		}
 		
 		# re-fill the array based on the sort direction
@@ -613,7 +488,7 @@ sub sort_data_structure {
 			my $i = 0; # keep track of the row
 			foreach (sort {$a <=> $b} keys %datahash) {
 				# put back the reference to the anonymous array of row data
-				$table->[$i] = $datahash{$_};
+				$data_table_ref->[$i] = $datahash{$_};
 				$i++; # increment for next row
 			}
 		} 
@@ -623,13 +498,13 @@ sub sort_data_structure {
 			my $i = 0; # keep track of the row
 			foreach (sort {$b <=> $a} keys %datahash) {
 				# put back the reference to the anonymous array of row data
-				$table->[$i] = $datahash{$_};
+				$data_table_ref->[$i] = $datahash{$_};
 				$i++; # increment for next row
 			}
 		}
 		
 		# restore the table header
-		unshift @{ $table }, $header;
+		unshift @{ $data_table_ref }, $header;
 		
 		# summary prompt
 		printf " Data table sorted numerically by the contents of %s\n",
@@ -643,7 +518,7 @@ sub sort_data_structure {
 		for my $row (0..$last_row) {
 			
 			# get the value to sort by
-			my $value = $table->[$row][$index]; 
+			my $value = $data_table_ref->[$row][$index]; 
 			
 			# check to see if this is a unique value
 			if (exists $datahash{$value}) { 
@@ -657,11 +532,11 @@ sub sort_data_structure {
 					$n++;
 					$lookup = $value . sprintf("03%d", $n);
 				}
-				$datahash{$lookup} = $table->[$row];
+				$datahash{$lookup} = $data_table_ref->[$row];
 			} 
 			else {
 				# unique
-				$datahash{$value} = $table->[$row];
+				$datahash{$value} = $data_table_ref->[$row];
 			}
 		}
 		
@@ -671,7 +546,7 @@ sub sort_data_structure {
 			my $i = 0; # keep track of the row
 			foreach (sort {$a cmp $b} keys %datahash) {
 				# put back the reference to the anonymous array of row data
-				$table->[$i] = $datahash{$_};
+				$data_table_ref->[$i] = $datahash{$_};
 				$i++; # increment for next row
 			}
 		} 
@@ -681,13 +556,13 @@ sub sort_data_structure {
 			my $i = 0; # keep track of the row
 			foreach (sort {$b cmp $a} keys %datahash) {
 				# put back the reference to the anonymous array of row data
-				$table->[$i] = $datahash{$_};
+				$data_table_ref->[$i] = $datahash{$_};
 				$i++; # increment for next row
 			}
 		}
 		
 		# restore the table header
-		unshift @{ $table }, $header;
+		unshift @{ $data_table_ref }, $header;
 		
 		# summary prompt
 		printf " Data table sorted asciibetically by the contents of '%s'\n",
@@ -703,18 +578,18 @@ sub sort_data_structure {
 sub gsort_data_structure {
 	
 	# data structure
-	my $data = shift;
-	my $table = $data->{'data_table'};
-	unless ($data) {
+	my $main_data_ref = shift;
+	unless ($main_data_ref) {
 		confess "no data structure passed for sorting\n";
 	}
+	my $data_table_ref = $main_data_ref->{'data_table'};
 
 	# attempt to automatically identify the chromo and start indices
 	# the indices should be passed from Bio:ToolBox::Data, but if not, look for them
 	my ($chromo_i, $start_i) = @_;
-	$chromo_i = find_column_index($data, '^chr|seq|refseq') unless
+	$chromo_i = find_column_index($main_data_ref, '^chr|seq|refseq') unless
 		defined $chromo_i;
-	$start_i = find_column_index($data, '^start|position|pos$') unless
+	$start_i = find_column_index($main_data_ref, '^start|position|pos$') unless
 		defined $start_i;
 	
 	# if unable to auto-identify columns
@@ -733,9 +608,9 @@ sub gsort_data_structure {
 	
 	my %num_datahash;
 	my %str_datahash;
-	for my $row (1 .. $data->{'last_row'}) { 
+	for my $row (1 .. $main_data_ref->{'last_row'}) { 
 		
-		my $startvalue = $table->[$row][$start_i];
+		my $startvalue = $data_table_ref->[$row][$start_i];
 		
 		# check for alphabet characters
 		if ($startvalue =~ /[a-z]+/i) { 
@@ -744,7 +619,7 @@ sub gsort_data_structure {
 		}
 		
 		# put the dataline into the appropriate temporary hash
-		if ($table->[$row][$chromo_i] =~ /^(?:chr)?(\d+)$/) {
+		if ($data_table_ref->[$row][$chromo_i] =~ /^(?:chr)?(\d+)$/) {
 			# dealing with a numeric chromosome name
 			# restricting to either chr2 or just 2 but not 2-micron
 			my $chromovalue = $1;
@@ -753,18 +628,18 @@ sub gsort_data_structure {
 				# add a really small number to bump it up and make it unique
 				$startvalue += 0.001; 
 			}
-			$num_datahash{$chromovalue}{$startvalue} = $table->[$row];
+			$num_datahash{$chromovalue}{$startvalue} = $data_table_ref->[$row];
 		} 
 		else {
 			# dealing with a non-numeric chromosome name
-			my $chromovalue = $table->[$row][$chromo_i];
+			my $chromovalue = $data_table_ref->[$row][$chromo_i];
 			# use the entire chromosome name as key
 			while (exists $str_datahash{$chromovalue}{$startvalue}) { 
 				# if another item already exists at this location
 				# add a really small number to bump it up and make it unique
 				$startvalue += 0.001; 
 			}
-			$str_datahash{$chromovalue}{$startvalue} = $table->[$row];
+			$str_datahash{$chromovalue}{$startvalue} = $data_table_ref->[$row];
 		}
 	}
 	
@@ -778,7 +653,7 @@ sub gsort_data_structure {
 			sort {$a <=> $b} keys %{ $num_datahash{$chromovalue} } 
 		) {
 			# second, numeric sort on increasing position value
-			$table->[$i] = $num_datahash{$chromovalue}{$startvalue};
+			$data_table_ref->[$i] = $num_datahash{$chromovalue}{$startvalue};
 			$i++; # increment for next row
 		}
 	}
@@ -789,7 +664,7 @@ sub gsort_data_structure {
 			sort {$a <=> $b} keys %{ $str_datahash{$chromovalue} } 
 		) {
 			# second, numeric sort on increasing position value
-			$table->[$i] = $str_datahash{$chromovalue}{$startvalue};
+			$data_table_ref->[$i] = $str_datahash{$chromovalue}{$startvalue};
 			$i++; # increment for next row
 		}
 	}
@@ -854,24 +729,24 @@ sub splice_data_structure {
 sub index_data_table {
 	
 	# get the arguements
-	my ($data, $increment) = @_;
+	my ($data_ref, $increment) = @_;
 	
 	# check data structure
-	unless (defined $data) {
+	unless (defined $data_ref) {
 		carp " No data structure passed!";
 		return;
 	}
-	unless ( verify_data_structure($data) ) {
+	unless ( verify_data_structure($data_ref) ) {
 		return;
 	}
-	if (exists $data->{'index'}) {
+	if (exists $data_ref->{'index'}) {
 		warn " data structure is already indexed!\n";
 		return 1;
 	}
 	
 	# check column indices
-	my $chr_index = find_column_index($data, '^chr|seq|refseq');
-	my $start_index = find_column_index($data, '^start');
+	my $chr_index = find_column_index($data_ref, '^chr|seq|refseq');
+	my $start_index = find_column_index($data_ref, '^start');
 	unless (defined $chr_index and $start_index) {
 		carp " unable to find chromosome and start dataset indices!\n";
 		return;
@@ -880,12 +755,12 @@ sub index_data_table {
 	# define increment value
 	unless (defined $increment) {
 		# calculate default value
-		if (exists $data->{$start_index}{'win'}) {
+		if (exists $data_ref->{$start_index}{'win'}) {
 			# in genome datasets, window size metadata is stored with the 
 			# start position
 			# increment is window size x 20
 			# seems like a reasonable compromise between index size and efficiency
-			$increment = $data->{$start_index}{'win'} * 20;
+			$increment = $data_ref->{$start_index}{'win'} * 20;
 		}
 		else {
 			# use some random made-up default value that could be totally 
@@ -893,12 +768,12 @@ sub index_data_table {
 			$increment = 100;
 		}
 	}
-	$data->{'index_increment'} = $increment;
+	$data_ref->{'index_increment'} = $increment;
 	
 	# generate index
-	my $table_ref = $data->{'data_table'};
+	my $table_ref = $data_ref->{'data_table'};
 	my %index;
-	for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
+	for (my $row = 1; $row <= $data_ref->{'last_row'}; $row++) {
 		
 		# the index will consist of a complex hash structure
 		# the first key will be the chromosome name
@@ -917,7 +792,7 @@ sub index_data_table {
 	}
 	
 	# associate the index hash
-	$data->{'index'} = \%index;
+	$data_ref->{'index'} = \%index;
 	
 	# success
 	return 1;
@@ -929,7 +804,7 @@ sub index_data_table {
 
 ### Subroutine to find a column
 sub find_column_index {
-	my ($data, $name) = @_;
+	my ($data_ref, $name) = @_;
 	
 	# the $name variable will be used as a regex in identifying the name
 	# fix it so that it will possible accept a # character at the beginning
@@ -940,9 +815,9 @@ sub find_column_index {
 	
 	# walk through each column index
 	my $index;
-	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+	for (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
 		# check the names of each column
-		if ($data->{$i}{'name'} =~ /$name/i) {
+		if ($data_ref->{$i}{'name'} =~ /$name/i) {
 			$index = $i;
 			last;
 		}
@@ -961,23 +836,26 @@ Bio::ToolBox::data_helper
 
 =head1 DESCRIPTION
 
-These are subroutines for working with a raw L<Bio::ToolBox::Data> data 
-structure. In other words, they are not object methods, but rather 
-exportable subroutines for working directly on the complex data 
-structure underlying the L<Bio::ToolBox::Data> object. These subroutines 
-and data structures predate the L<Bio::ToolBox::Data> object model and 
-exist for backwards compatibility. End-users are strongly encouraged to 
-use the L<Bio::ToolBox::Data> API. 
+These are general subroutines for working with data, and specifically what 
+was known colloquially as the "tim data structure", before it became 
+Bio::ToolBox. These subroutines provides a catchall location for common 
+subroutines that don't fit in either Bio::ToolBox::file_helper or 
+Bio::ToolBox::db_helper.
 
-=head1 DATA STRUCTURE
+=head1 TIM DATA STRUCTURE
 
-The data structure is a complex data structure that is commonly used 
+The tim data structure is a complex data structure that is commonly used 
 throughout the biotoolbox scripts, thus simplifying data input/output and 
 manipulation. The primary structure is a hash with numerous keys. The actual 
 data table is represented as an array of arrays.  Metadata for the columns 
 (datasets) are stored as hashes. 
 
-The description of the primary keys in the data structure are described 
+This whole data structure is intended to eventually become the structure for 
+a blessed object and the basis for a class of object-oriented methods that 
+work on the structure. One of these days I'll find time to implement that and 
+rewrite all of the biotoolbox scripts.... Maybe for that mythical 2.0 release.
+
+The description of the primary keys in the tim data structure are described 
 here.
 
 =over 4
@@ -1065,7 +943,7 @@ regenerated by concatenating the path, basename, and extension.
 A boolean flag (1 or 0) to indicate whether headers are present or not. 
 Some file formats, e.g. BED, GFF, etc., do not explicitly have column 
 headers; the headers flag should be set to false in this case. Standard 
-data formatted text files should be set to true.
+tim data formatted text files should be set to true.
 
 =item <column_index_number>
 
@@ -1106,14 +984,14 @@ position within the data_table, but you will still need to step
 through the features (rows) starting at the indexed position 
 until you find the row you want. That should save you a little bit 
 of time, at least. The index is not stored upon writing to a 
-standard data text file.
+standard tim data text file.
 
 =item index_increment
 
 This is a single number representing the increment value to calculate 
 the index value for the index. It is generated along with the index 
 by the index_data_table() function. The index_increment value is not 
-stored upon writing to a standard data text file.
+stored upon writing to a standard tim data text file.
 
 =back
 
@@ -1122,7 +1000,7 @@ stored upon writing to a standard data text file.
 Call the module at the beginning of your perl script. Include the name(s) 
 of the subroutines to import.
   
-  use Bio::ToolBox::data_helper qw(generate_data_structure);
+  use Bio::ToolBox::data_helper qw(generate_tim_data_structure);
   
 
 The specific usage for each subroutine is detailed below.
@@ -1130,7 +1008,7 @@ The specific usage for each subroutine is detailed below.
 
 =over
 
-=item generate_data_structure()
+=item generate_tim_data_structure()
 
 As the name implies, this generates a new empty data structure as described 
 above. Populating the data table and metadata is the responsibility of the 
@@ -1143,11 +1021,11 @@ metadata hash for each dataset is generated (consisting only of name and
 index). The name is also entered into the first row of the data table (row 0, 
 the header row).
 
-It will return the reference to the data structure.
+It will return the reference to the tim_data_structure.
 
 Example
 	
-	my $main_data = generate_data_structure(qw(
+	my $main_data_ref = generate_tim_data_structure(qw(
 		genomic_intevals
 		Chromo
 		Start
@@ -1213,14 +1091,14 @@ For example, to split a data table into four segments for parallel
 execution in four children processes, call this function once in 
 each child, increasing the index (second parameter) each time.
 	
-	my $data = load_data_file($file);
+	my $data = load_tim_data_file($file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
 		$pm->start and next;
 		### in child
 		splice_data_structure($data, $i, 4);
 		# do something with this fraction
-		write_data_file('data' => $data, 'filename' => "file#$i");
+		write_tim_data_file('data' => $data, 'filename' => "file#$i");
 		$pm->finish;
 	}
 	$pm->wait_all_children;
@@ -1241,9 +1119,9 @@ feature (or data row), an index may be generated to speed up the
 search, such that only a tiny portion of the data_table needs to be 
 stepped through to identify the correct feature.
 
-This function generates two additional keys in the data structure 
+This function generates two additional keys in the tim data structure 
 described above, L</index> and L</index_increment>. Please refer to 
-those items in L<DATA STRUCTURE> for their description and 
+those items in L<TIM DATA STRUCTURE> for their description and 
 usage.
 
 Pass this subroutine one or two arguments. The first is the reference 
@@ -1259,35 +1137,35 @@ If successful, the subroutine returns a true value.
 
 Example
 
-	my $main_data = load_data_file($filename);
-	index_data_table($main_data) or 
+	my $main_data_ref = load_tim_data_file($filename);
+	index_data_table($main_data_ref) or 
 		die " unable to index data table!\n";
 	...
 	my $chr = 'chr9';
 	my $start = 123456;
 	my $index_value = 
-		int( $start / $main_data->{index_increment} ); 
-	my $starting_row = $main_data->{index}{$chr}{$index_value};
+		int( $start / $main_data_ref->{index_increment} ); 
+	my $starting_row = $main_data_ref->{index}{$chr}{$index_value};
 	for (
 		my $row = $starting_row;
-		$row <= $main_data->{last_row};
+		$row <= $main_data_ref->{last_row};
 		$row++
 	) {
 		if (
-			$main_data->{data_table}->[$row][0] eq $chr and
-			$main_data->{data_table}->[$row][1] <= $start and
-			$main_data->{data_table}->[$row][2] >= $start
+			$main_data_ref->{data_table}->[$row][0] eq $chr and
+			$main_data_ref->{data_table}->[$row][1] <= $start and
+			$main_data_ref->{data_table}->[$row][2] >= $start
 		) {
 			# do something
 			# you could stop here, but what if you had overlapping
 			# genomic bins for some odd reason?
 		} elsif (
-			$main_data->{data_table}->[$row][0] ne $chr
+			$main_data_ref->{data_table}->[$row][0] ne $chr
 		) {
 			# no longer on same chromosome, stop the loop
 			last;
 		} elsif (
-			$main_data->{data_table}->[$row][1] > $start
+			$main_data_ref->{data_table}->[$row][1] > $start
 		) {
 			# moved beyond the window, stop the loop
 			last;
@@ -1298,7 +1176,7 @@ Example
 
 This subroutine helps to find the index number of a dataset or column given 
 only the name. This is useful if the file contents are not in a standard 
-order, for example a typical data text file instead of a GFF or BED file.
+order, for example a typical tim data text file instead of a GFF or BED file.
 
 Pass the subroutine two arguments: 1) The reference to the data structure, and 
 2) a scalar text string that represents the name. The string will be used in 
@@ -1308,8 +1186,8 @@ match is returned.
 
 Example
 
-	my $main_data = load_data_file($filename);
-	my $chromo_index = find_column_index($main_data, "^chr|seq");
+	my $main_data_ref = load_tim_data_file($filename);
+	my $chromo_index = find_column_index($main_data_ref, "^chr|seq");
 	
 =back
 

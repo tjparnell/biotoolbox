@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.24;
+our $VERSION = 1.23;
 
 =head1 NAME
 
@@ -490,7 +490,7 @@ These methods alter the Data table en masse.
 
 =over 4
 
-=item verify()
+=item verify
 
 This method will verify the Data structure, including the metadata and the 
 Data table. It ensures that the table has the correct number of rows and 
@@ -536,30 +536,36 @@ Data table.
 Two values are passed to the method. The first is the current part number, 
 1-based. The second value is the total number of parts that the table 
 should be divided, corresponding to the number of concurrent processes. 
-One easy approach to forking is to use L<Parallel::ForkManager>. The 
-example below shows how to fork into four concurrent processes.
+For example, to fork the program into four concurrent processes.
 	
+	use FindBin qw($Bin);
 	my $Data = Bio::ToolBox::Data->new(file => $file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
 		$pm->start and next;
-		### in child ###
+		### in child
 		$Data->splice_data($i, 4);
+		$db = $Data->open_database; # a clone-safe new db object
 		# do something with this portion
-		# then save to a temporary unique file
-		$Data->save("$file_$i");
+		$Data->save('filename' => "file#$i");
 		$pm->finish;
 	}
 	$pm->wait_all_children;
-	# reload children files
-	$Data->reload_children(glob "$file_*");
+	
+	# join files together
+	my @files = glob "$file#*";
+	my @args = ("$Bin/join_data_file.pl", "--out", $outfile, @files);
+	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
 
-Since each forked child process is separate from their parent process, 
-their contents must be reloaded into the current Data object. The 
-L<Parallel::ForkManager> documentation recommends going through a disk 
-file intermediate. Therefore, write each child Data object to file using 
-a unique name. Once all children have been reaped, they can be reloaded 
-into the current Data object using the reload_children() method.
+There is no convenient method for merging the modified contents of the 
+table from each child process back into the original Data table, as 
+each child is essentially isolated from the parent. The Parallel::ForkManager 
+documentation recommends going through a disk file intermediate. Therefore, 
+write each child Data object to file using a unique name. Then, once all 
+children have been reaped, join the child files. See the accompanying 
+BioToolBox script F<join_data_file.pl> for concatenating Data table files 
+together. As long as each child file has the same number of columns, the 
+files should be joined without issue.
 
 Remember that if you fork your script into child processes, any database 
 connections must be re-opened; they are typically not clone safe. If you 
@@ -568,13 +574,59 @@ it should be automatically re-opened for you when you use the splice_data()
 method, but you will need to call open_database() again in the child 
 process to obtain the new database object.
 
-=item reload_children(@children_files)
+=item convert_gff(%options)
 
-Discards the current data table in memory and reloads two or more files 
-written from forked children processes. Provide the name of the child 
-files in the order you want them loaded. The files will be automatically 
-deleted if successfully loaded. Returns the number of lines reloaded on 
-success.
+This method will irreversibly convert the Data table into a GFF format.
+Table columns will be added, deleted, reordered, and renamed as necessary 
+to generate the GFF structure. An array of options should be passed to 
+control the conversion step. 
+
+=over 4
+
+=item version =E<gt> <2|3>
+
+Provide the GFF version. The default is version 3.
+
+=item chromo =E<gt> $index
+
+=item start =E<gt> $index
+
+=item stop =E<gt> $index
+
+=item strand =E<gt> $index
+
+Provide the column indices for the appropriate columns. These should  
+be automatically identified from the column header names. Indices 
+are 0-based.
+
+=item score =E<gt> $index
+
+Provide the index column name for whatever score column. This is 
+not automatically determined. 
+
+=item source =E<gt> $index|$text
+
+=item type =E<gt> $index|$text
+
+=item name =E<gt> $index|$text
+
+Provide either a column index (0-based) or a text name to be used 
+for all the features. Integers between 0 and the rightmost column 
+index are presumed to be an index; everything else is taken as text.
+
+=item tag =E<gt> \@indices
+
+Provide an array reference of column indices to be used for GFF tags.
+
+=item id =E<gt> $index
+
+Provide a column index of unique values to be used for GFF3 ID tag.
+
+=item midpoint =E<gt> <boolean>
+
+Flag to use the midpoint instead of actual start and stop coordinates.
+
+=back
 
 =back
 
@@ -589,13 +641,9 @@ compatible GFF file format, or writing a summary of the Data table.
 
 =over 4
 
-=item save()
-
 =item write_file()
 
-=item write_file($filename)
-
-=item write_file(%options)
+=item save()
 
 These methods will write the Data structure out to file. It will 
 be first verified as to proper structure. Opened BED and GFF files 
@@ -624,15 +672,15 @@ maintain the status of the original opened file.
 If the file save is successful, it will return the full path and 
 name of the saved file, complete with any changes to the file extension.
 
-=item summary_file(%options)
+=item summary_file()
 
 Write a separate file summarizing columns of data (mean values). 
 The mean value of each column becomes a row value, and each column 
 header becomes a row identifier (i.e. the table is transposed). The 
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
-L<get_relative_data.pl> and L<average_gene.pl> as examples. 
-You may pass these options. 
+C<get_relative_data.pl> and C<average_gene.pl> as an example. 
+You may pass options. 
 
 =over 4
 
@@ -654,36 +702,68 @@ The default ending column is the last rightmost column. Indexes are
 
 If successful, it will return the name of the file saved.
 
-=back
+=item write_gff()
 
-=head2 Verifying Datasets
-
-When working with row Features and collecting scores, the dataset 
-from which you are collecting must be verified prior to collection. 
-This ensures that the proper database adaptor is available and loaded, 
-and that the dataset is correctly specified (otherwise nothing would be 
-collected). This verification is normally performed transparently when 
-you call L<get_score|Bio::ToolBox::Data::Feature/get_score>() or 
-L<get_position_scores|Bio::ToolBox::Data::Feature/get_position_scores>().
-However, datasets may be explicitly verified prior to calling the score 
-methods. 
+This will write out the existing data in GFF format. A number of 
+options may be passed to control the conversion.
 
 =over 4
 
-=item verify_dataset($dataset)
+=item filename =E<gt> $filename
 
-=item verify_dataset($dataset, $database)
+Optionally pass the filename to save. A suitable default will be 
+generated if not provided.
 
-Pass the name of the dataset (GFF type or type:source) for a GFF3-based 
-database, e.g. <Bio::DB::SeqFeature::Store>, or path and file name for a 
-data file, e.g. Bam, BigWig, BigBed, or USeq file. If a separate database 
-is being used, pass the name or opened database object as a second 
-parameter. For more advance options, see 
-L<Bio::ToolBox::db_helper/verify_or_request_feature_types>. 
+=item version =E<gt> <2|3>
 
-The name of the verified dataset, with a prefix if necessary, is returned.
+Provide the GFF version. The default is version 3.
+
+=item chromo =E<gt> $index
+
+=item start =E<gt> $index
+
+=item stop =E<gt> $index
+
+=item strand =E<gt> $index
+
+Provide the column indices for the appropriate columns. These should  
+be automatically identified from the column header names. Indices 
+are 0-based.
+
+=item score =E<gt> $index
+
+Provide the index column name for whatever score column. This is 
+not automatically determined. 
+
+=item source =E<gt> $index|$text
+
+=item type =E<gt> $index|$text
+
+=item name =E<gt> $index|$text
+
+Provide either a column index (0-based) or a text name to be used 
+for all the features. Integers between 0 and the rightmost column 
+index are presumed to be an index; everything else is taken as text.
+
+=item tag =E<gt> \@indices
+
+Provide an array reference of column indices to be used for GFF tags.
+
+=item id =E<gt> $index
+
+Provide a column index of unique values to be used for GFF3 ID tag.
+
+=item midpoint =E<gt> <boolean>
+
+Flag to use the midpoint instead of actual start and stop coordinates.
 
 =back
+
+=back
+
+
+
+
 
 =cut
 
@@ -691,22 +771,28 @@ use strict;
 use Carp qw(carp cluck croak confess);
 
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	verify_data_structure
 	sort_data_structure
 	gsort_data_structure
 	splice_data_structure
+	index_data_table
 );
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list 
 	get_new_genome_list 
+	open_db_connection
+	verify_or_request_feature_types
 );
 use Bio::ToolBox::file_helper qw(
-	load_data_file
-	write_data_file
+	load_tim_data_file
+	write_tim_data_file
+	convert_genome_data_2_gff_data 
+	convert_and_write_to_gff_file
 	write_summary_data
+	parse_filename
 );
-use Bio::ToolBox::Data::common;
+use Bio::ToolBox::Data::meta;
 use Bio::ToolBox::utility;
 
 
@@ -721,23 +807,11 @@ sub new {
 	my %args  = @_;
 	$args{features} ||= $args{feature} || undef;
 	
-	# check for stream
-	if (exists $args{stream} and $args{stream}) {
-		my $ok;
-		eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
-		if ($ok) {
-			return Bio::ToolBox::Data::Stream->new(@_);
-		}
-		else {
-			croak "Cannot load Bio::ToolBox::Data::Stream!";
-		}
-	}
-	
 	my $data;
 	if (exists $args{file}) {
 		# load from file
 		# extensions and file existence will be taken care of
-		$data = load_data_file($args{file}) or 
+		$data = load_tim_data_file($args{file}) or 
 			croak "Cannot load file $args{file}!\n";
 	}
 	elsif (exists $args{db} and exists $args{features} ) {
@@ -761,7 +835,7 @@ sub new {
 			@datasets = @{ $args{columns} };
 		}
 		my $feature = $args{features} || 'feature';
-		$data = generate_data_structure($feature, @datasets);
+		$data = generate_tim_data_structure($feature, @datasets);
 	}
 	
 	return bless $data, $class;
@@ -783,7 +857,7 @@ sub write_file {
 		%args = @_;
 	}
 	$args{data} = $self;
-	return write_data_file(%args);
+	return write_tim_data_file(%args);
 }
 
 sub save {
@@ -804,74 +878,6 @@ sub write_gff {
 	return convert_and_write_to_gff_file(%args);
 }
 
-sub reload_children {
-	my $self = shift;
-	my @files = @_;
-	return unless @files;
-	
-	# prepare Stream
-	my $ok;
-	eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
-	unless ($ok) {
-		carp "unable to load Bio::ToolBox::Data::Stream! $@";
-		return;
-	}
-	
-	# open first stream
-	my $first = shift @files;
-	my $Stream = Bio::ToolBox::Data::Stream->new(file => $first);
-	unless ($Stream) {
-		carp "unable to load first child file $first";
-		return;
-	}
-	
-	# destroy current data table and metadata
-	$self->{data_table} = [];
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		delete $self->{$i};
-	}
-	
-	# copy the metadata
-	foreach (qw(program feature db bed gff ucsc headers number_columns last_row)) {
-		# various keys
-		$self->{$_} = $Stream->{$_};
-	}
-	for (my $i = 0; $i < $Stream->number_columns; $i++) {
-		# column metadata
-		my %md = $Stream->metadata($i);
-		$self->{$i} = \%md;
-	}
-	my @comments = $Stream->comments;
-	push @{$self->{other}}, @comments;
-	
-	# first row column headers
-	$self->{data_table}->[0] = [ @{ $Stream->{data_table}->[0] } ];
-	
-	# load the data
-	while (my $row = $Stream->next_row) {
-		my $a = $row->row_values;
-		$self->add_row($a);
-	}
-	$Stream->close_fh;
-	
-	# load remaining files
-	foreach my $file (@files) {
-		my $Stream = Bio::ToolBox::Data::Stream->new(file => $file);
-		if ($Stream->number_columns != $self->number_columns) {
-			confess "fatal error: child file $file has a different number of columns!";
-		}
-		while (my $row = $Stream->next_row) {
-			my $a = $row->row_values;
-			$self->add_row($a);
-		}
-		$Stream->close_fh;
-	}
-	$self->verify;
-	
-	# clean up
-	unlink($first, @files);
-	return $self->last_row;
-}
 
 
 
@@ -899,9 +905,13 @@ sub gsort_data {
 sub splice_data {
 	my $self = shift;
 	splice_data_structure($self, @_);
-	if (exists $self->{db_connection}) {
+	if ($self->{db}) {
 		# re-open a new un-cached database connection
-		$self->open_database(1);
+		# wrap in eval statement just in case db is not available
+		eval {
+			my $db = open_db_connection($self->{db}, 1);
+			$self->{db_connection} = $db if $db;
+		};
 	}
 	return 1;
 }
@@ -912,6 +922,71 @@ sub convert_gff {
 	$args{data} = $self;
 	return convert_genome_data_2_gff_data(%args);
 }
+
+
+
+
+### Metadata manipulation
+
+# see Bio::ToolBox::Data::meta for the imported methods of getting/setting metadata
+
+sub add_comment {
+	my $self = shift;
+	my $comment = shift or return;
+	# comment is not required to be prefixed with "# ", it will be added when saving
+	push @{ $self->{other} }, $comment;
+	return 1;
+}
+
+sub delete_comment {
+	my $self = shift;
+	my $index = shift;
+	if (defined $index) {
+		eval {splice @{$self->{other}}, $index, 1};
+	}
+	else {
+		$self->{other} = [];
+	}
+}
+
+
+
+
+### Column Metadata manipulation
+
+# see Bio::ToolBox::Data::meta for the imported methods of getting/setting metadata
+
+sub delete_metadata {
+	my $self = shift;
+	my ($index, $key) = @_;
+	return unless defined $index;
+	if (defined $key and exists $self->{$index}{$key}) {
+		return delete $self->{$index}{$key};
+	}
+	else {
+		# user wants to delete the metadata
+		# but we need to keep the basics name and index
+		foreach my $key (keys %{ $self->{$index} }) {
+			next if $key eq 'name';
+			next if $key eq 'index';
+			delete $self->{$index}{$key};
+		}
+	}
+}
+
+sub copy_metadata {
+	my ($self, $source, $target) = @_;
+	return unless (exists $self->{$source}{name} and exists $self->{$target}{name});
+	my $md = $self->metadata($source);
+	delete $md->{name};
+	delete $md->{'index'};
+	delete $md->{'AUTO'} if exists $md->{'AUTO'}; # presume this is no longer auto index
+	foreach (keys %$md) {
+		$self->{$target}{$_} = $md->{$_};
+	}
+	return 1;
+}
+
 
 
 
@@ -981,6 +1056,56 @@ sub add_column {
 	return $column;
 }
 
+sub delete_column {
+	my $self = shift;
+	
+	my @deletion_list = sort {$a <=> $b} @_;
+	my @retain_list; 
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		# compare each current index with the first one in the list of 
+		# deleted indices. if it matches, delete. if not, keep
+		if ( $i == $deletion_list[0] ) {
+			# this particular index should be deleted
+			shift @deletion_list;
+		}
+		else {
+			# this particular index should be kept
+			push @retain_list, $i;
+		}
+	}
+	return $self->reorder_column(@retain_list);
+}
+
+sub reorder_column {
+	my $self = shift;
+	my @order = @_;
+	
+	# reorder data table
+	for (my $row = 0; $row <= $self->last_row; $row++) {
+		my @old = $self->row_values($row);
+		my @new = map { $old[$_] } @order;
+		splice( @{ $self->{data_table} }, $row, 1, \@new);
+	}
+	
+	# reorder metadata
+	my %old_metadata;
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		# copy the metadata info hash into a temporary hash
+		$old_metadata{$i} = $self->{$i};
+		delete $self->{$i}; # delete original
+	}
+	for (my $i = 0; $i < scalar(@order); $i++) {
+		# now copy back from the old_metadata into the main data hash
+		# using the new index number in the @order array
+		$self->{$i} = { %{ $old_metadata{ $order[$i] } } };
+		# assign new index number
+		$self->{$i}{'index'} = $i;
+	}
+	$self->{'number_columns'} = scalar @order;
+	delete $self->{column_indices} if exists $self->{column_indices};
+	return 1;
+}
+
 sub copy_column {
 	my $self = shift;
 	my $index = shift;
@@ -989,6 +1114,54 @@ sub copy_column {
 	my $new_index = $self->add_column($data);
 	$self->copy_metadata($index, $new_index);
 	return $new_index;
+}
+
+
+
+
+
+### Other stuff
+
+sub open_database {
+	my $self = shift;
+	return unless $self->{db};
+	if (exists $self->{db_connection}) {
+		return $self->{db_connection};
+	}
+	else {
+		my $db = open_db_connection($self->{db});
+		return unless $db;
+		$self->{db_connection} = $db;
+		return $db;
+	}
+}
+
+sub verify_dataset {
+	my $self = shift;
+	my $dataset = shift;
+	my $database = shift; # name or object?
+	return unless $dataset;
+	if (exists $self->{verfied_dataset}{$dataset}) {
+		return $self->{verfied_dataset}{$dataset};
+	}
+	else {
+		if ($dataset =~ /^(?:file|http|ftp)/) {
+			# local or remote file already verified?
+			$self->{verfied_dataset}{$dataset} = $dataset;
+			return $dataset;
+		}
+		$database ||= $self->open_database;
+		my ($verified) = verify_or_request_feature_types(
+			# normally returns an array of verified features, we're only checking one
+			db      => $database,
+			feature => $dataset,
+		);
+		if ($verified) {
+			$self->{verfied_dataset}{$dataset} = $verified;
+			return $verified;
+		}
+	}
+	return;
 }
 
 

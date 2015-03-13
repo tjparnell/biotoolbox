@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+my $VERSION = 1.23;
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -2589,15 +2589,15 @@ sub export_treeview_function {
 	else {
 		# ask the user
 		print <<LIST;
-Available dataset manipulations
+Available dataset manipulations\n";
   su - decreasing sort by sum of row values
   sm - decreasing sort by mean of row values
-  cg - median center features (genes)
-  cd - median center datasets
-  zd - convert dataset to Z-scores
-  pd - convert dataset to percentile rank
-  L2 - convert dataset to log2
-  n0 - convert null values to 0
+  cg - median center features (genes)\n";
+  cd - median center datasets\n";
+  zd - convert dataset to Z-scores\n";
+  pd - convert dataset to percentile rank\n";
+  L2 - convert dataset to log2\n";
+  n0 - convert null values to 0\n";
 Enter the manipulation(s) in order of desired execution  
 LIST
 		my $answer = <STDIN>;
@@ -2635,7 +2635,7 @@ LIST
 			sort_function($i);
 			$Data->delete_column($i);
 		}
-		elsif (/^sm$/i) {
+		if (/^sm$/i) {
 			# decreasing sort by sum of row values
 			$opt_target = 'mean';
 			combine_function(@datasets);
@@ -2679,7 +2679,7 @@ LIST
 			convert_nulls_function(@datasets);
 		}
 		else {
-			warn " unknown manipulation '$_'!\n";
+			warn " unkown manipulation '$_'!\n";
 		}
 	}
 	

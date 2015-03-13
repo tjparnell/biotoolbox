@@ -1,142 +1,28 @@
-package Bio::ToolBox::Data::common;
-our $VERSION = 1.25;
+package Bio::ToolBox::Data::meta;
+our $VERSION = 1.23;
 
 =head1 NAME
 
-Bio::ToolBox::Data::common - common methods for Data objects
+Bio::ToolBox::Data::meta - metadata for Data tables
 
 =head1 DESCRIPTION
 
-Common methods for metadata and manipulation in a L<Bio::ToolBox::Data> 
-data table and L<Bio::ToolBox::Data::Stream> file stream. This module 
-should not be used directly. See the respective modules for more information.
+General methods for describing the metadata in a Bio::ToolBox::Data 
+data table. This module should not be used directly. See 
+Bio::ToolBox::Data for more information.
 
 =cut
 
-use strict;
-require Exporter;
-use Carp qw(carp cluck croak confess);
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::file_helper qw(parse_filename);
-use Bio::ToolBox::db_helper qw(
-	open_db_connection
-	verify_or_request_feature_types
-);
+use strict;
+require Exporter;
 our @ISA = qw(Exporter);
-our @EXPORT = qw(open_database verify_dataset delete_column reorder_column
-	feature feature_type program database gff bed number_columns 
-	last_row filename basename path extension comments add_comment delete_comment
-	list_columns name metadata copy_metadata delete_metadata 
-	find_column _find_column_indices chromo_column start_column stop_column 
-	strand_column name_column type_column id_column);
+our @EXPORT = qw(feature feature_type program database gff bed number_columns 
+	last_row filename basename path extension comments 
+	list_columns name metadata find_column _find_column_indices chromo_column  
+	start_column stop_column strand_column name_column type_column id_column);
 
-
-#### Database methods #####
-
-sub open_database {
-	my $self = shift;
-	my $force = shift || 0;
-	return unless $self->{db};
-	if (exists $self->{db_connection}) {
-		return $self->{db_connection} unless $force;
-	}
-	my $db = open_db_connection($self->{db}, $force);
-	return unless $db;
-	$self->{db_connection} = $db;
-	return $db;
-}
-
-sub verify_dataset {
-	my $self = shift;
-	my $dataset = shift;
-	my $database = shift; # name or object?
-	return unless $dataset;
-	if (exists $self->{verfied_dataset}{$dataset}) {
-		return $self->{verfied_dataset}{$dataset};
-	}
-	else {
-		if ($dataset =~ /^(?:file|http|ftp)/) {
-			# local or remote file already verified?
-			$self->{verfied_dataset}{$dataset} = $dataset;
-			return $dataset;
-		}
-		$database ||= $self->open_database;
-		my ($verified) = verify_or_request_feature_types(
-			# normally returns an array of verified features, we're only checking one
-			db      => $database,
-			feature => $dataset,
-		);
-		if ($verified) {
-			$self->{verfied_dataset}{$dataset} = $verified;
-			return $verified;
-		}
-	}
-	return;
-}
-
-
-
-#### Column Manipulation ####
-
-sub delete_column {
-	my $self = shift;
-	if (defined $self->{fh}) {
-		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
-	}
-	
-	my @deletion_list = sort {$a <=> $b} @_;
-	my @retain_list; 
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		# compare each current index with the first one in the list of 
-		# deleted indices. if it matches, delete. if not, keep
-		if ( $i == $deletion_list[0] ) {
-			# this particular index should be deleted
-			shift @deletion_list;
-		}
-		else {
-			# this particular index should be kept
-			push @retain_list, $i;
-		}
-	}
-	return $self->reorder_column(@retain_list);
-}
-
-sub reorder_column {
-	my $self = shift;
-	if (defined $self->{fh}) {
-		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
-	}
-	
-	# reorder data table
-	my @order = @_;
-	for (my $row = 0; $row <= $self->last_row; $row++) {
-		my @old = $self->row_values($row);
-		my @new = map { $old[$_] } @order;
-		splice( @{ $self->{data_table} }, $row, 1, \@new);
-	}
-	
-	# reorder metadata
-	my %old_metadata;
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		# copy the metadata info hash into a temporary hash
-		$old_metadata{$i} = $self->{$i};
-		delete $self->{$i}; # delete original
-	}
-	for (my $i = 0; $i < scalar(@order); $i++) {
-		# now copy back from the old_metadata into the main data hash
-		# using the new index number in the @order array
-		$self->{$i} = { %{ $old_metadata{ $order[$i] } } };
-		# assign new index number
-		$self->{$i}{'index'} = $i;
-	}
-	$self->{'number_columns'} = scalar @order;
-	delete $self->{column_indices} if exists $self->{column_indices};
-	return 1;
-}
 
 
 
@@ -160,8 +46,7 @@ sub feature_type {
 		$feature_type = 'coordinate';
 	}
 	elsif (defined $self->id_column or 
-		( defined $self->type_column and defined $self->name_column ) or 
-		( defined $self->feature and defined $self->name_column )
+		( defined $self->type_column and defined $self->name_column )
 	) {
 		$feature_type = 'named';
 	}
@@ -247,39 +132,13 @@ sub extension {
 	return $self->{extension};
 }
 
-
-
-#### General Comments ####
-
 sub comments {
 	my $self = shift;
-	my @comments = @{ $self->{other} };
-	foreach (@comments) {s/[\r\n]+//g}
+	my @comments = map {s/[\r\n]+//g} @{ $self->{other} };
 	# comments are not chomped when loading
 	# side effect of dealing with rare commented header lines with null values at end
 	return @comments;
 }
-
-sub add_comment {
-	my $self = shift;
-	my $comment = shift or return;
-	# comment is not required to be prefixed with "# ", it will be added when saving
-	push @{ $self->{other} }, $comment;
-	return 1;
-}
-
-sub delete_comment {
-	my $self = shift;
-	my $index = shift;
-	if (defined $index) {
-		eval {splice @{$self->{other}}, $index, 1};
-	}
-	else {
-		$self->{other} = [];
-	}
-}
-
-
 
 #### Column Metadata ####
 
@@ -339,43 +198,6 @@ sub metadata {
 	}
 }
 
-sub delete_metadata {
-	my $self = shift;
-	my ($index, $key) = @_;
-	return unless defined $index;
-	if (defined $key) {
-		if (exists $self->{$index}{$key}) {
-			return delete $self->{$index}{$key};
-		}
-	}
-	else {
-		# user wants to delete the metadata
-		# but we need to keep the basics name and index
-		foreach my $key (keys %{ $self->{$index} }) {
-			next if $key eq 'name';
-			next if $key eq 'index';
-			delete $self->{$index}{$key};
-		}
-	}
-}
-
-sub copy_metadata {
-	my ($self, $source, $target) = @_;
-	return unless (exists $self->{$source}{name} and exists $self->{$target}{name});
-	my $md = $self->metadata($source);
-	delete $md->{name};
-	delete $md->{'index'};
-	delete $md->{'AUTO'} if exists $md->{'AUTO'}; # presume this is no longer auto index
-	foreach (keys %$md) {
-		$self->{$target}{$_} = $md->{$_};
-	}
-	return 1;
-}
-
-
-
-#### Column Indices ####
-
 sub find_column {
 	my ($self, $name) = @_;
 	return unless $name;
@@ -388,12 +210,12 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = find_column_index($self, '^name|geneName|transcriptName|geneid|id|alias');
+	my $name   = find_column_index($self, '^name|geneName|transcriptName|alias');
 	my $type   = find_column_index($self, '^type|class|primary_tag');
 	my $id     = find_column_index($self, '^primary_id');
 	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
-	my $start  = find_column_index($self, '^start|position|pos|txStart$');
-	my $stop   = find_column_index($self, '^stop|end|txEnd');
+	my $start  = find_column_index($self, '^start|position|pos$');
+	my $stop   = find_column_index($self, '^stop|end');
 	my $strand = find_column_index($self, '^strand');
 	$self->{column_indices} = {
 		'name'      => $name,
@@ -427,10 +249,6 @@ sub stop_column {
 	return $self->{column_indices}{stop};
 }
 
-sub end_column {
-	return shift->stop_column;
-}
-
 sub strand_column {
 	my $self = shift;
 	$self->_find_column_indices unless exists $self->{column_indices};
@@ -454,6 +272,7 @@ sub id_column {
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{id};
 }
+
 
 
 

@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.24;
+our $VERSION = 1.23;
 
 =head1 NAME
 
@@ -15,10 +15,9 @@ methods for working with the represented genomic feature.
 
 This class should not be used directly by the user. Rather, Feature 
 objects are generated from a Bio::ToolBox::Data::Iterator object 
-(generated itself from the L<row_stream|Bio::ToolBox::Data/row_stream> 
-function in Bio::ToolBox::Data), or the L<iterate|Bio::ToolBox::Data/iterate> 
-function in Bio::ToolBox::Data. Please see the respective documentation 
-for more information.
+(generated itself from the row_stream() function in Bio::ToolBox::Data), 
+or the iterate() function in Bio::ToolBox::Data. Please see the 
+documentation for Bio::ToolBox::Data for more information.
 
 Example of working with a stream object.
 	
@@ -120,7 +119,7 @@ The name of the feature.
 
 The type of feature. Typically either primary_tag or primary_tag:source_tag. 
 In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
-databases such as L<Bio::DB::SeqFeature::Store>, the type is used to restrict 
+databases such as Bio::DB::SeqFeature::Store, the type is used to restrict 
 to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
@@ -156,7 +155,7 @@ in the current data row.
 
 The next three functions are convenience methods for using the 
 attributes in the current data row to interact with databases. 
-They are wrappers to methods in the <Bio::ToolBox::db_helper> 
+They are wrappers to methods in the Bio::ToolBox::db_helper 
 module.
 
 =over 4
@@ -170,7 +169,7 @@ an alternate database is desired, you should change it first using
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See <Bio::DB::SeqFeature> and L<Bio::SeqFeatureI> for more information 
+See Bio::DB::SeqFeature and Bio::SeqFeatureI for more information 
 about working with these objects.
 
 =item segment
@@ -183,14 +182,14 @@ database named in the general metadata is used to establish the
 Segment object. If a different database is desired, it should be 
 changed first using the general database() method. 
 
-See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
+See Bio::DB::SeqFeature::Segment and Bio::RangeI for more information 
 about working with Segment objects.
 
 =item get_score(%args)
 
 This is a convenience method for the 
-L<get_chromo_region_score|Bio::ToolBox::db_helper/get_chromo_region_score> 
-method. It will return a single score value for the region defined by the 
+Bio::ToolBox::db_helper::get_chromo_region_score() method. It 
+will return a single score value for the region defined by the 
 coordinates or typed named feature in the current data row. If 
 the Data table has coordinates, then those will be automatically 
 used. If the Data table has typed named features, then the 
@@ -201,8 +200,8 @@ The name of the dataset from which to collect the data must be
 provided. This may be a GFF type in a SeqFeature database, a 
 BigWig member in a BigWigSet database, or a path to a BigWig, 
 BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the L<Bio::ToolBox::db_helper> 
-for full details.
+specified; please see the Bio::ToolBox::db_helper::
+get_chromo_region_score() method for full details.
 
 If you wish to override coordinates that are present in the 
 Data table, for example to extend or shift the given coordinates 
@@ -224,17 +223,18 @@ and adding the scores to the Data table.
 
 =item get_position_scores(%args)
 
-This is a convenience method for the 
-L<get_region_dataset_hash|Bio::ToolBox::db_helper/get_region_dataset_hash> 
-method. It will return a hash of 
+This is a convenience method for the Bio::ToolBox::db_helper::
+get_region_dataset_hash() method. It will return a hash of 
 positions =E<gt> scores over the region defined by the 
 coordinates or typed named feature in the current data row. 
 The coordinates for the interrogated region will be 
 automatically provided.
 
-Just like the L<get_score> method, the dataset from which to 
+Just like the get_score() method, the dataset from which to 
 collect the scores must be provided, along with any other 
-optional arguments. 
+optional arguments. See the documentation for the 
+Bio::ToolBox::db_helper::get_region_dataset_hash() method 
+for more details.
 
 If you wish to override coordinates that are present in the 
 Data table, for example to extend or shift the given coordinates 
@@ -242,8 +242,7 @@ by some amount, then simply pass the new start and end
 coordinates as options to this method.
 
 Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a L<BigWigSet|Bio::DB::BigWigSet> 
-directory.
+the 5 prime end of a feature from a BigWigSet directory.
   
   my $stream = $Data->row_stream;
   while (my $row = $stream->next_row) {
@@ -254,122 +253,6 @@ directory.
      )
      # do something with %position2score
   }
-
-=back
-
-=head2 Feature Export
-
-These methods allow the feature to be exported in industry standard 
-formats, including the BED format and the GFF format. Both methods 
-return a formatted tab-delimited text string suitable for printing to 
-file. The string does not include a line ending character.
-
-These methods rely on coordinates being present in the source table. 
-If the row feature represents a database item, the feature() method 
-should be called prior to these methods, allowing the feature to be 
-retrieved from the database and coordinates obtained.
-
-=over 4
-
-=item bed_string(%args)
-
-Returns a BED formatted string. By default, a 6-element string is 
-generated, unless otherwise specified. Pass an array of key values 
-to control how the string is generated. The following arguments 
-are supported.
-
-=over 4
-
-=item bed => <integer>
-
-Specify the number of BED elements to include. The number of elements 
-correspond to the number of columns in the BED file specification. A 
-minimum of 3 (chromosome, start, stop) is required, and maximum of 6 
-is allowed (chromosome, start, stop, name, score, strand). 
-
-=item chromo => <text>
-
-=item seq_id => <text>
-
-=item start  => <integer>
-
-=item stop   => <integer>
-
-=item end    => <integer>
-
-=item strand => $strand
-
-Provide alternate values from those defined or missing in the current 
-row Feature. Note that start values are automatically converted to 0-base 
-by subtracting 1.
-
-=item name => <text>
-
-Provide alternate or missing name value to be used as text in the 4th 
-column. If no name is provided or available, a default name is generated.
-
-=item score => <number>
-
-Provide a numerical value to be included as the score. BED files typically 
-use integer values ranging from 1..1000. 
-
-=back
-
-=item gff_string(%args)
-
-Returns a GFF3 formatted string. Pass an array of key values 
-to control how the string is generated. The following arguments 
-are supported.
-
-=over 4
-
-=item chromo => <text>
-
-=item seq_id => <text>
-
-=item start  => <integer>
-
-=item stop   => <integer>
-
-=item end    => <integer>
-
-=item strand => $strand
-
-Provide alternate values from those defined or missing in the current 
-row Feature. 
-
-=item source => <text>
-
-Provide a text string to be used as the source_tag value in the 2nd 
-column. The default value is null ".".
-
-=item primary_tag => <text>
-
-Provide a text string to be used as the primary_tag value in the 3rd 
-column. The default value is null ".".
-
-=item type => <text>
-
-Provide a text string. This can be either a "primary_tag:source_tag" value 
-as used by GFF based BioPerl databases, or "primary_tag" alone.
-
-=item score => <number>
-
-Provide a numerical value to be included as the score. The default 
-value is null ".". 
-
-=item name => <text>
-
-Provide alternate or missing name value to be used as the display_name. 
-If no name is provided or available, a default name is generated.
-
-=item attributes => [index],
-
-Provide an anonymous array reference of one or more row Feature indices 
-to be used as GFF attributes. The name of the column is used as the GFF 
-attribute key. 
-
-=back
 
 =back
 
@@ -431,9 +314,9 @@ sub value {
 sub seq_id {
 	my $self = shift;
 	my $i = $self->{data}->chromo_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if (defined $i) {
+		my $v = $self->value($i);
+		return (defined $v and $v ne '.') ? $v : undef;
 	}
 	return $self->{feature}->seq_id if exists $self->{feature};
 	return undef;
@@ -444,7 +327,6 @@ sub start {
 	my $i = $self->{data}->start_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->start if (not defined $v and exists $self->{feature});
-	return undef unless defined $v;
 	return undef unless ($v =~ /^\-?\d+$/);
 	return $v < 1 ? 1 : $v;
 }
@@ -454,7 +336,6 @@ sub end {
 	my $i = $self->{data}->stop_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->end if (not defined $v and exists $self->{feature});
-	return undef unless defined $v;
 	return undef unless ($v =~ /^\-?\d+$/);
 	return $v < 1 ? undef : $v;
 }
@@ -474,10 +355,7 @@ sub strand {
 sub name {
 	my $self = shift;
 	my $i = $self->{data}->name_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
-	}
+	return $self->value($i) if defined $i;
 	return $self->{feature}->display_name if exists $self->{feature};
 	return undef;
 }
@@ -489,22 +367,15 @@ sub display_name {
 sub type {
 	my $self = shift;
 	my $i = $self->{data}->type_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
-	}
+	return $self->value($i) if defined $i;
 	return $self->{feature}->primary_tag if exists $self->{feature};
-	return $self->{data}->feature if $self->{data}->feature; # general metadata feature type
 	return undef;
 }
 
 sub id {
 	my $self = shift;
 	my $i = $self->{data}->id_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
-	}
+	return $self->value($i) if defined $i;
 	return $self->{feature}->primary_id if exists $self->{feature};
 	return undef;
 }
@@ -598,9 +469,7 @@ sub get_score {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
 	}
 	
-	# make sure database is defined in arguments
-	# user could specify ddb but we need only one db
-	$args{db} ||= $args{ddb} || $self->{data}->open_database;
+	$args{db} ||= $self->{data}->open_database;
 	
 	return get_chromo_region_score(%args);
 }
@@ -648,97 +517,6 @@ sub get_position_scores {
 	}
 	
 	return get_region_dataset_hash(%args);
-}
-
-
-### String export
-
-sub bed_string {
-	my $self = shift;
-	my %args = @_;
-	$args{bed} ||= 6; # number of bed columns
-	croak "bed count must be an integer!" unless $args{bed} =~ /^\d+$/;
-	croak "bed count must be at least 3!" unless $args{bed} >= 3;
-	
-	# coordinate information
-	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
-	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
-		carp "Not enough information to generate bed string. Need identifiable" . 
-			"chr, start, stop columns";
-		return;
-	}
-	$start -= 1; # 0-based coordinates
-	my $string = "$chr\t$start\t$stop";
-	
-	# additional information
-	if ($args{bed} >= 4) {
-		my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
-		$string .= "\t$name";
-	}
-	if ($args{bed} >= 5) {
-		my $score = exists $args{score} ? $args{score} : 1;
-		$string .= "\t$score";
-	}
-	if ($args{bed} >= 6) {
-		my $strand = $args{strand} || $self->strand;
-		$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
-		$string .= "\t$strand";
-	}
-	# we could go on with other columns, but there's no guarantee that additional 
-	# information is available, and we would have to implement user provided data 
-	
-	# done
-	return $string;
-}
-
-sub gff_string {
-	my $self = shift;
-	my %args = @_;
-	
-	# coordinate information
-	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
-	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
-		carp "Not enough information to generate GFF string. Need identifiable" . 
-			"chr, start, stop columns";
-		return;
-	}
-	my $strand = $args{strand} || $self->strand;
-	$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
-	
-	# type information
-	my $type = $args{type} || $self->type || undef;
-	my ($source, $primary_tag);
-	if (defined $type and $type =~ /:/) {
-		($primary_tag, $source) = split /:/, $type;
-	}
-	unless ($source) {
-		$source = $args{source} || '.';
-	}
-	unless ($primary_tag) {
-		$primary_tag = $args{primary_tag} || defined $type ? $type : '.';
-	}
-	
-	# score
-	my $score = exists $args{score} ? $args{score} : '.';
-	my $phase = '.'; # do not even bother!!!!
-	
-	# attributes
-	my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
-	my $attributes = "Name = $name";
-	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
-		foreach my $i (@{$args{attributes}}) {
-			$attributes .= '; ' . $self->{data}->name($i) . ' = ' . $self->value($i);
-		}
-	}
-	
-	# done
-	my $string = join("\t", $chr, $source, $primary_tag, $start, $stop, $strand, 
-		$score, $phase, $attributes);
-	return $string;
 }
 
 

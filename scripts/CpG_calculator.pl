@@ -5,9 +5,9 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
+use FindBin qw($Bin);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(open_db_connection);
-use Bio::ToolBox::utility;
 my $parallel;
 eval {
 	# check for parallel support
@@ -20,7 +20,7 @@ eval {
 	require Bio::DB::Sam;
 	$BAM_OK = 0;
 };
-my $VERSION = 1.24;
+my $VERSION = 1.22;
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -145,8 +145,8 @@ else {
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and ($Data->last_row / $cpu) < 1000) {
-		# We need at least 1000 lines in each fork split to make 
+	while ($cpu > 1 and ($Data->last_row / $cpu) < 200) {
+		# I figure we need at least 200 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
 		$cpu--;
@@ -171,17 +171,6 @@ else {
 
 
 ### Finished
-# write the data file
-my $written_file = $Data->write_file(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
-if ($written_file) {
-	print " Wrote data file '$written_file' ";
-}
-else {
-	print " unable to write data file! ";
-}
 printf " in %.2f minutes\n", (time - $start_time) / 60;
 
 
@@ -192,9 +181,6 @@ printf " in %.2f minutes\n", (time - $start_time) / 60;
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -217,11 +203,16 @@ sub parallel_execution {
 		
 		# write out result
 		my $success = $Data->write_file(
-			'filename' => sprintf("$child_base_name.%03s",$i),
+			'filename' => "$child_base_name.$i",
 			'gz'       => 0, # faster to write without compression
 		);
 		if ($success) {
 			printf " wrote child file $success\n";
+		}
+		else {
+			# failure! the subroutine will have printed error messages
+			die " unable to write file!\n";
+			# no need to continue
 		}
 		
 		# Finished
@@ -234,18 +225,31 @@ sub parallel_execution {
 	unless (@files) {
 		die "unable to find children files!\n";
 	}
-	unless (scalar @files == $cpu) {
-		die "only found " . scalar(@files) . " child files when there should be $cpu!\n";
-	}
-	my $count = $Data->reload_children(@files);
-	printf " reloaded %s features from children\n", format_with_commas($count);
+	my @args = ("$Bin/join_data_file.pl", "--out", $outfile);
+	push @args, '--gz' if $gz;
+	push @args, @files;
+	system(@args) == 0 or die " unable to execute join_data_file.pl! $?\n";
+	unlink @files;
 }
 
 
 sub single_execution {
+	
 	# execute
 	$db = open_sequence_db();
 	process_regions();
+	
+	# write the data file
+	my $written_file = $Data->write_file(
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+	if ($written_file) {
+		print " Wrote data file '$written_file' ";
+	}
+	else {
+		print " unable to write data file! ";
+	}
 }
 
 

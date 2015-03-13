@@ -9,13 +9,13 @@ use Bio::ToolBox::data_helper qw(
 	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
+	open_tim_data_file
+	write_tim_data_file
 	open_to_write_fh
 	convert_genome_data_2_gff_data
 );
 use Bio::ToolBox::utility;
-my $VERSION =  1.24;
+my $VERSION = '1.20';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -116,7 +116,7 @@ unless (defined $gz) {
 
 ### Load file
 print " Opening data file '$infile'...\n";
-my ($in_fh, $metadata_ref) = open_data_file($infile);
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
@@ -596,8 +596,8 @@ sub write_gff_data {
 		# opened yet
 		
 		# rather than generating new code for writing the gff file,
-		# we will simply use the write_data_file sub
-		$outfile = write_data_file(
+		# we will simply use the write_tim_data_file sub
+		$outfile = write_tim_data_file(
 			'data'      => \%output_data,
 			'filename'  => $outfile,
 			'gz'        => $gz,
