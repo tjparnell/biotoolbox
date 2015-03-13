@@ -1,0 +1,113 @@
+{
+   "abstract" : "Tools for querying and analysis of genomic data",
+   "author" : [
+      "Timothy Parnell <parnell.tj@gmail.com>"
+   ],
+   "dynamic_config" : 1,
+   "generated_by" : "Module::Build version 0.4003, CPAN::Meta::Converter version 2.112621",
+   "license" : [
+      "perl_5"
+   ],
+   "meta-spec" : {
+      "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
+      "version" : "2"
+   },
+   "name" : "Bio-ToolBox",
+   "prereqs" : {
+      "configure" : {
+         "requires" : {
+            "Module::Build" : 0
+         }
+      },
+      "runtime" : {
+         "recommends" : {
+            "Algorithm::Cluster" : 0,
+            "Bio::DB::BigFile" : "1.07",
+            "Bio::DB::Sam" : "1.36",
+            "Bio::DB::USeq" : "0.2",
+            "DBD::SQLite" : 0,
+            "File::Which" : 0,
+            "GD::Graph" : "1.44",
+            "GD::Graph::smoothlines" : "1.6",
+            "Net::FTP" : 0,
+            "Parallel::ForkManager" : "1.02",
+            "Statistics::LineFit" : "0.06"
+         },
+         "requires" : {
+            "Bio::Root::Version" : "1.0069001",
+            "Config::Simple" : "4.58",
+            "Statistics::Descriptive" : "3",
+            "Statistics::Lite" : "3.2"
+         }
+      }
+   },
+   "provides" : {
+      "Bio::ToolBox" : {
+         "file" : "lib/Bio/ToolBox.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::Data" : {
+         "file" : "lib/Bio/ToolBox/Data.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::Data::Feature" : {
+         "file" : "lib/Bio/ToolBox/Data.pm",
+         "version" : 0
+      },
+      "Bio::ToolBox::Data::Iterator" : {
+         "file" : "lib/Bio/ToolBox/Data.pm",
+         "version" : 0
+      },
+      "Bio::ToolBox::big_helper" : {
+         "file" : "lib/Bio/ToolBox/big_helper.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::data_helper" : {
+         "file" : "lib/Bio/ToolBox/data_helper.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper" : {
+         "file" : "lib/Bio/ToolBox/db_helper.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::bam" : {
+         "file" : "lib/Bio/ToolBox/db_helper/bam.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::bigbed" : {
+         "file" : "lib/Bio/ToolBox/db_helper/bigbed.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::bigwig" : {
+         "file" : "lib/Bio/ToolBox/db_helper/bigwig.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::config" : {
+         "file" : "lib/Bio/ToolBox/db_helper/config.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::gff3_parser" : {
+         "file" : "lib/Bio/ToolBox/db_helper/gff3_parser.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::useq" : {
+         "file" : "lib/Bio/ToolBox/db_helper/useq.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::wiggle" : {
+         "file" : "lib/Bio/ToolBox/db_helper/wiggle.pm",
+         "version" : "1.14"
+      },
+      "Bio::ToolBox::file_helper" : {
+         "file" : "lib/Bio/ToolBox/file_helper.pm",
+         "version" : "1.14"
+      }
+   },
+   "release_status" : "stable",
+   "resources" : {
+      "license" : [
+         "http://dev.perl.org/licenses/"
+      ]
+   },
+   "version" : "1.14"
+}
