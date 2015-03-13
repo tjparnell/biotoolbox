@@ -11,7 +11,7 @@ eval {
 	$GZIP_OK = 1;
 };
 
-my $VERSION = '1.19';
+my $VERSION = '1.14';
 
 sub new {
 	my $class = shift;
@@ -118,7 +118,7 @@ sub top_features {
 	
 	# initialize
 	my @top_features;
-	my %orphans;
+	my @orphan_features;
 	my %loaded; # hash of loaded features
 	
 	# Collect the top features
@@ -196,24 +196,16 @@ sub top_features {
 		# look for parents and children
 		if ($feature->has_tag('Parent')) {
 			# must be a child
-			# there may be more than one parent, per the GFF3 specification
-			foreach my $parent ( $feature->get_tag_values('Parent') ) {
-				if (exists $loaded{$parent}) {
-					# we've seen this id
-					# associate the child with the parent
-					$loaded{$parent}->add_SeqFeature($feature);
-				}
-				else {
-					# can't find the parent, maybe not loaded yet?
-					# put 'em in the orphanage
-					# using a hash with parent as key
-					if (exists $orphans{$parent}) {
-						push @{ $orphans{$parent} }, $feature;
-					}
-					else {
-						$orphans{$parent} = [ $feature ];
-					}
-				}
+			my ($parent) = $feature->get_tag_values('Parent');
+			if (exists $loaded{$parent}) {
+				# we've seen this id
+				# associate the child with the parent
+				$loaded{$parent}->add_SeqFeature($feature);
+			}
+			else {
+				# can't find the parent, maybe not loaded yet?
+				# put 'em in the orphanage
+				push @orphan_features, $feature;
 			}
 		}
 		else {
@@ -224,23 +216,22 @@ sub top_features {
 	# Finished loading the GFF lines (so far....)
 	
 	# check for orphans
-	if (%orphans) {
+	if (@orphan_features) {
 		
 		my $lost_count = 0;
-		foreach my $parent (keys %orphans) {
+		while (my $feature = shift @orphan_features) {
 			
 			# find the parent
+			my ($parent) = $feature->get_tag_values('Parent');
 			if (exists $loaded{$parent}) {
-				# we have loaded the parent
-				# associate each orphan feature with the parent
-				foreach ( @{ $orphans{$parent} } ) {
-					$loaded{$parent}->add_SeqFeature($_);
-				}
+				# we've seen this id
+				# associate the child with the parent
+				$loaded{$parent}->add_SeqFeature($feature);
 			}
 			else {
 				# can't find the parent
 				# forget about them, just another statistic
-				$lost_count += scalar @{ $orphans{$parent} };
+				$lost_count++;
 			}
 		}
 		
@@ -368,8 +359,7 @@ are associated with parents as sub SeqFeature objects, assuming the Parent
 tag is included and correctly identifies the unique ID tag of the parent. 
 Any feature without a Parent tag is assumed to be a parent. Children 
 features referencing a parent feature that has not been loaded may be 
-lost. Multiple parentage, for example exons shared between different 
-transcripts of the same gene, are now supported.
+lost. 
 
 Embedded Fasta sequences are ignored, as are most comment and pragma lines.
 
@@ -436,24 +426,11 @@ automatically skipped.
 This method will return an array of the top (parent) features defined in 
 the GFF3 file. The file will be progressively parsed from the beginning 
 until either a close features pragma (###) or the end of the file is 
-reached. Child features (those containing a Parent attribute) are 
-associated with the parent feature. A warning will be issued about lost 
-children (orphans). Shared subfeatures, for example exons common to 
-multiple transcripts, are associated properly with each parent. 
-
-Note that subfeatures may not necessarily be in ascending genomic order 
-when associated with the feature, depending on their order in the GFF3 
-file and whether shared subfeatures are present or not. When calling 
-subfeatures in your program, you should sort the subfeatures. For 
-example
-  
-  my @subfeatures = map { $_->[0] }
-                    sort { $a->[1] <=> $b->[1] }
-                    map { [$_, $_->start] }
-                    $parent->get_SeqFeatures;
+reached. Features containing a Parent attribute are associated with the 
+corresponding feature, if it was loaded. 
 
 When close pragmas are present in the file, call this method repeatedly 
-to finish parsing the remainder of the file. 
+to finish parsing the remainder of the file.
 
 =item from_gff3_string($string)
 

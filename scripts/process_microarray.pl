@@ -8,7 +8,7 @@ use Pod::Usage;
 use Statistics::Lite qw(mean median);
 use Statistics::Descriptive;
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	find_column_index
 );
 use Bio::ToolBox::file_helper qw(
@@ -17,8 +17,7 @@ use Bio::ToolBox::file_helper qw(
 	open_tim_data_file
 	write_tim_data_file
 );
-use constant LOG2 => log(2);
-my $VERSION = 1.24;
+my $VERSION = '1.15';
 
 print "\n A script to process microarray files\n\n";
 
@@ -165,10 +164,6 @@ unless (%evalues) {
 
 # check that all probes loaded have equal counts of values
 check_microarray_value_counts();
-
-print "next unique id for a probe would be $unique_id\n";
-printf " there are %s values for condition $k\n", scalar @(keys %evalues});
-printf " there are %s replicates for condition $k\n", scalar @{ $cvalues{1}};
 
 
 
@@ -1323,7 +1318,7 @@ sub perform_probe_normalization_median_scaling {
 sub output_combined_records {
 	
 	# prepare output data structure
-	my $data = generate_data_structure( qw(
+	my $data = generate_tim_data_structure( qw(
 		microarray_probes
 		ProbeID
 		Experiment
@@ -1406,10 +1401,10 @@ sub output_combined_records {
 		
 		# calculate log2 ratios if requested
 		if ($log) { 
-			$experiment = ( log($experiment) / LOG2 );
-			$control    = ( log($control) / LOG2 );
+			$experiment = ( log($experiment) / log(2) );
+			$control    = ( log($control) / log(2) );
 			unless ($ratio eq '.') {
-				$ratio  = ( log($ratio) / LOG2 );
+				$ratio  = ( log($ratio) / log(2) );
 			}
 		}
 		
@@ -1431,7 +1426,7 @@ sub output_combined_records {
 sub output_single_records {
 	
 	# prepare output data structure
-	my $data = generate_data_structure( qw(
+	my $data = generate_tim_data_structure( qw(
 		microarray_probes
 		ProbeID
 		Experiment
@@ -1483,7 +1478,7 @@ sub output_single_records {
 		
 		# calculate log2 ratios if requested
 		if ($log) { 
-			$experiment = ( log($experiment) / LOG2 );
+			$experiment = ( log($experiment) / log(2) );
 		}
 		
 		# store the data
