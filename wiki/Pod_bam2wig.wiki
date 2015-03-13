@@ -24,6 +24,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --rpm
   --log [2|10]
   --max <integer>
+  --ext <integer>
   }}}
 {{{
   Alignment options:
@@ -55,7 +56,7 @@ bam2wig.pl `[`--options...`]` <**filename.bam>
   --count <integer>
   --verbose
   --version
-  --help
+  --help                              detailed documentation
 }}}
 ==OPTIONS==
 The command line flags and descriptions:
@@ -125,6 +126,12 @@ __
   Set a maximum number of duplicate alignments tolerated at a single position.  This uses the alignment start (or midpoint if recording midpoint) position  to determine duplicity. Note that this has no effect in coverage mode.  You may want to set a limit when working with random fragments (sonication)  to avoid PCR bias. Note that setting this value in conjunction with the --rpm  option may result in lower coverage than anticipated, since the pre-count  does not account for duplicity. The default is undefined (no limit).
 __
   __
+__--ext <**integer>
+
+__
+  Manually set the length for reads to be extended when position is set to  either span or extend. By default, the alignment length is used for single-end span, the insertion size for paired-end span, and 2 X the shift value for  extend.
+__
+  __
 __--pe
 
 __
@@ -149,13 +156,10 @@ __
   Specify that the positions of the alignment should be shifted towards  the 3' end. Useful for ChIP-Seq applications, where only the ends of  the fragments are counted and often seen as separated discrete peaks  on opposite strands flanking the true target site. This option is  disabled with paired-end and spliced reads (where it is not needed).
 __
   __
-  The extend position option is a special mode where the entire predicted  ChIP fragment is recorded across its span. The length is 2 x the shift  value.
-__
-  __
 __--shiftval <**integer>
 
 __
-  Provide the value in bp that the recorded position should be shifted.  The value should be 1/2 the average length of the insert library  that was sequenced. The default is to empirically determine the  appropriate shift value. See below for the approach.
+  Provide the value in bp that the recorded position should be shifted.  The value should be 1/2 the average length of the library insert size. The default is to automatically and empirically determine the  appropriate shift value using cross-strand correlation (recommended).
 __
   __
 __--chrom <**integer>
@@ -253,13 +257,11 @@ This program will enumerate aligned sequence tags and generate a wig,  or option
 
 Both paired-end and single-end alignments may be counted. Alignments  with splices (e.g. RNA-Seq) may be counted singly or separately.  Alignment counts may be separated by strand, facilitating analysis of  RNA-Seq experiments.
 
-For ChIP-Seq experiments, the alignment position may be shifted  in the 3 prime direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording is analogous to the approach  used by the MACS program. The shift value may be empirically  determined from the sequencing data (see below). If requested, the  shift model profile may be written to file. Use the !BioToolBox**  script `graph_profile.pl` to graph the data.
+For ChIP-Seq experiments, the alignment position may be shifted  in the 3 prime direction. This effectively merges the separate peaks  (representing the ends of the enriched fragments) on each strand  into a single peak centered over the target locus. Alternatively,  the entire predicted fragment may be recorded across its span.  This extended method of recording infers the mean size of the  library fragments, thereby emulating the coverage of paired-end  sequencing using single-end sequence data. The shift value is  empirically determined from the sequencing data (see below) or  provided by the user. If requested, the shift model profile may be  written to file. Use the !BioToolBox** script [Pod_graph_profile_pl graph_profile.pl] to  graph the data.
 
 The output wig file may be either a variableStep, fixedStep, or  bedGraph format. The file format is dictated by where the alignment  position is recorded. Recording start and midpoint at single  base-pair resolution writes a variableStep wig file. Binned start  or midpoint counts and coverage are written as a fixedStep wig file.  Span and extended positions are written as a bedGraph file.
 
 The wig file may be further converted into a compressed, indexed, binary  bigWig format, dependent on the availability of the appropriate  conversion utilities.
-
-More information about wiggle files can be found at  http://genome.ucsc.edu/goldenPath/help/wiggle.html, bedGraph at  http://genome.ucsc.edu/goldenPath/help/bedgraph.html, and bigWig at  http://genome.ucsc.edu/goldenPath/help/bigWig.html.
 
 ==RECOMMENDED SETTINGS==
 The type of wig file to generate for your Bam sequencing file can vary  depending on your particular experimental application. Here are a few  common sequencing applications and my recommended settings for generating  the wig or bigWig file.
@@ -345,6 +347,81 @@ __
 {{{
  bam2wig --pe --pos mid --strand --rpm --in <bamfile>
  }}}
+==TEXT REPRESENTATION OF RECORDING ALIGNMENTS==
+To help users visualize how this program records alignments in a wig  file, drawn below are 10 alignments, five forward and five reverse.  They may be interpreted as either single-end or paired-end. Drawn  below are the numbers that would be recorded in a wig file for various  parameter settings. Note that alignments are not drawn to scale and  are drawn for visualization purposes only. Values of X represent 10.
+
+Alignments
+
+__
+{{{
+  ....>>>>>>.....................................<<<<<<.............
+  .....>>>>>>..................................<<<<<<...............
+  ........>>>>>>.......................................<<<<<<.......
+  ........>>>>>>.........................................<<<<<<.....
+  ..........>>>>>>............................................<<<<<<
+}}}
+Starts
+
+__
+{{{
+  ....11..2.1.......................................1.1.....1.1....1
+}}}
+Midpoints
+
+__
+{{{
+  ......11..2.1..................................1.1.....1.1....1...
+}}}
+Stranded Starts
+
+__
+{{{
+  F...11..2.1.......................................................
+  R.................................................1.1.....1.1....1
+}}}
+Span (Coverage)
+
+__
+{{{
+  ....122244433311.............................112222111122221211111
+}}}
+Stranded Span
+
+__
+{{{
+  F...122244433311..................................................
+  R............................................112222111122221211111
+}}}
+Shifted Starts (shift value 26)
+
+__
+{{{
+  .........................1.1.11..3.11...1.........................
+}}}
+Shifted Span (shift value 26)
+
+__
+{{{
+  .........................23447776552311111........................
+}}}
+Extend (extend value 52)
+
+__
+{{{
+  12223445789999XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX999887665321111
+}}}
+Paired-End Midpoints
+
+__
+{{{
+  ............................1...111..1............................
+}}}
+Paired-End Span
+
+__
+{{{
+  ....12224455555555555555555555555555555555555555555443333332211111
+}}}
 ==TROUBLESHOOTING==
 If you have spliced reads spanning introns from RNA-Seq data, you may  get warnings about duplicate positions in your wig or bedGraph file.  This is especially the case when converting to bigWig files. In this  case, increase the --buffer value to accomodate these large introns.
 
