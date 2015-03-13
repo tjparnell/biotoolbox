@@ -27,7 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = 1.25;
+my $VERSION = '1.20';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -204,9 +204,9 @@ else {
 
 ### Prepare global variables and set up for execution
 
+print " Loading data from file $infile....\n";
 my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	die " No data loaded!\n";
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
@@ -215,13 +215,9 @@ foreach my $name ($Data->list_columns) {
 	
 	# check column header names for gene or window attribute information
 	# these won't be used for graph generation, so we'll skip them
-	if ($name =~ /^(?:name|id|class|type|alias|probe|chr|
+	next if $name =~ /^(?:name|id|class|type|alias|probe|chr|
 		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand|primary_id)$/xi
-	) {
-		$i++;
-		next;
-	}
+		midpoint|strand|primary_id)$/xi;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
@@ -250,7 +246,7 @@ if (-e $statfile) {
 } 
 else {
 	# open a new file
-	$stat_Data = Bio::ToolBox::Data->new(
+	$stat_Data->Bio::ToolBox::Data->new(
 		feature => 'correlations',
 		columns => [qw(
 			SourceFile
@@ -387,7 +383,7 @@ sub graph_provided_datasets {
 			my $result = graph_this($_->[0], $_->[1]);
 			if ($result) {
 				# return exit code of 1 means success
-				$pm->finish(1, $result); 
+				$pm->finish(1, \$result); 
 			}
 			else {
 				# exit code of 0 means failure, no correlation to report

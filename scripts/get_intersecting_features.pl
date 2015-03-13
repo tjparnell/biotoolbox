@@ -16,7 +16,7 @@ use Bio::ToolBox::db_helper qw(
 	get_feature
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+my $VERSION = '1.21';
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -98,7 +98,7 @@ if (scalar @search_features == 1 and $search_features[0] =~ /,/) {
 ### Load the input file
 my $Data = Bio::ToolBox::Data->new(file => $infile) or 
 	die "  Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+printf " loaded file '$infile' with %s features\n", format_with_commas($Data->last_row);
 
 
 
@@ -334,7 +334,7 @@ sub intersect_genome_features {
 			# limit to actual start
 			$new_start = 1;
 		}
-		if ($chrom2length{ $row->seq_id } and $new_stop > $chrom2length{ $row->seq_id }) {
+		if ($new_stop > $chrom2length{ $row->seq_id }) {
 			# limit to actual length
 			$new_stop = $chrom2length{ $row->seq_id };
 		}
@@ -359,8 +359,8 @@ sub intersect_genome_features {
 		}
 		else {
 			# no region defined
-			warn sprintf(" unable to establish region for %s:%s..%s\n", 
-				$row->seq_id, $row->start, $row->end);
+			warn " unable to establish region for %s:%s..%s\n", 
+				$row->seq_id, $row->start, $row->end;
 			# fill in table anyway
 			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
 				$distance_i, $overlap_i);

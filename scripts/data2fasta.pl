@@ -12,7 +12,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
 use Bio::ToolBox::file_helper qw(
-	open_data_file
+	open_tim_data_file
 	open_to_write_fh
 );
 my $BAM_OK;
@@ -22,7 +22,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION =  1.24;
+my $VERSION = '1.21';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -108,7 +108,7 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my ($in_fh, $metadata_ref) = open_data_file($infile) or 
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile) or 
 	die "unable to open input file!\n";
 unless ($database) {
 	$database = $metadata_ref->{'db'};
@@ -518,7 +518,7 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-This program will take a tab-delimited text file (BED file, 
+This program will take a tab-delimited text file (tim data formated file, 
 for example) and generate either a multi-sequence fasta file containing the 
 sequences of each feature defined in the input file, or optionally a single 
 concatenated fasta file. If concatenating, the individual sequences may be 

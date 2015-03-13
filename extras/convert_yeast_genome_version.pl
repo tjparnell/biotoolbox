@@ -7,14 +7,14 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
+	open_tim_data_file
+	write_tim_data_file
 	open_to_write_fh
 );
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
-my $VERSION =  1.24;
+my $VERSION = '1.15';
 
 print "\n This script will convert yeast genomic coordinates\n";
 
@@ -298,7 +298,7 @@ sub process_file {
 	
 	
 	# Open the input file
-	my ($fh, $metadata_ref) = open_data_file($filename);
+	my ($fh, $metadata_ref) = open_tim_data_file($filename);
 	
 	# Identify the columns
 	my $chromo_index;
@@ -361,7 +361,7 @@ sub process_file {
 	push @{ $metadata_ref->{data_table} }, $metadata_ref->{'column_names'};
 	my $new_filename = $metadata_ref->{path} . $metadata_ref->{basename} . '.' . 
 		$new_version_number . $metadata_ref->{extension};
-	unless ( write_data_file(
+	unless ( write_tim_data_file(
 			'data'       => $metadata_ref,
 			'filename'   => $new_filename,
 			'gz'         => $gz,

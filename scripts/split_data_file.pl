@@ -6,11 +6,11 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
+	open_tim_data_file
+	write_tim_data_file
 	open_to_write_fh
 );
-my $VERSION =  1.24;
+my $VERSION = '1.18';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -85,7 +85,7 @@ unless (defined $gz) {
 
 
 ### Load file
-my ($in_fh, $metadata_ref) = open_data_file($infile);
+my ($in_fh, $metadata_ref) = open_tim_data_file($infile);
 unless ($in_fh) {
 	die "Unable to open data table!\n";
 }
@@ -273,7 +273,7 @@ sub write_current_data_to_file_part {
 		
 		# write the file
 		# this should be within the maximum line limit, so we should be safe
-		my $success = write_data_file(
+		my $success = write_tim_data_file(
 			'data'     => $metadata_ref,
 			'filename' => $written_files{$value}{'file'},
 			'gz'       => $gz,
@@ -392,8 +392,9 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the file name of a data file. It must be a tab-delimited text file. 
-The file may be compressed with gzip.
+Specify the file name of a data file. It must be a tab-delimited text file,
+preferably in the tim data format as described in Bio::ToolBox::file_helper, 
+although any format should work. The file may be compressed with gzip.
 
 =item --index <column_index>
 

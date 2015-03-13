@@ -8,11 +8,11 @@ use File::Basename qw(fileparse);
 use IO::File;
 use Statistics::Lite qw(mean min);
 use Bio::ToolBox::data_helper qw(
-	generate_data_structure
+	generate_tim_data_structure
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = 1.25;
+our $VERSION = '1.20';
 
 
 ### Variables
@@ -21,40 +21,43 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 );
 our @EXPORT_OK = qw(
-	open_data_file 
-	load_data_file
-	process_data_line 
+	load_tim_data_file 
 	parse_filename
-	write_data_file 
+	open_tim_data_file 
+	write_tim_data_file 
 	open_to_read_fh
 	open_to_write_fh
 	convert_genome_data_2_gff_data 
 	convert_and_write_to_gff_file
 	write_summary_data
-	check_file
 );
 
 # List of acceptable filename extensions
 	# include gzipped versions, but list uncompressed versions first
 	# need to escape the periods so that they match periods and not 
-	# any character - fileparse() uses a regex
+	# any character - apparently fileparse() uses a regex
 our @SUFFIX_LIST = qw(
-	\.txt \.txt\.gz \.txt\.bz2
-	\.gff \.gff\.gz
-	\.gtf \.gtf\.gz
-	\.gff3 \.gff3\.gz
-	\.bed \.bed\.gz
-	\.bdg \.bdg\.gz
-	\.bedgraph \.bedgraph.gz
-	\.sgr \.sgr\.gz
-	\.kgg \.cdt
-	\.vcf \.vcf\.gz
-	\.narrowpeak \.narrowpeak\.gz
-	\.broadpeak \.broadpeak\.gz
-	\.reflat \.reflat\.gz
-	\.refflat \.refflat\.gz
-	\.genepred \.genepred\.gz
-	\.ucsc \.ucsc\.gz 
+	\.txt
+	\.txt\.gz
+	\.txt\.bz2
+	\.gff
+	\.gff\.gz
+	\.gtf
+	\.gtf\.gz
+	\.gff3
+	\.gff3\.gz
+	\.bed
+	\.bed\.gz
+	\.bdg
+	\.bdg\.gz
+	\.bedgraph
+	\.bedgraph.gz
+	\.sgr
+	\.sgr\.gz
+	\.kgg
+	\.cdt
+	\.vcf
+	\.vcf\.gz
 ); 
 
 
@@ -65,12 +68,12 @@ our @SUFFIX_LIST = qw(
 
 ### Load new version data table from file
 
-sub load_data_file {
-	# this subroutine will load a data file entirely into memory
+sub load_tim_data_file {
+	# this subroutine will load a tim data file entirely into memory
 	
 	# retrieve file name as passed argument and check it
 	my $filename = shift; 
-	$filename = check_file($filename);
+	$filename = _check_file($filename);
 	unless ($filename) {
 		carp " file '$filename' does not exist!\n";
 		return;
@@ -78,7 +81,7 @@ sub load_data_file {
 	
 	# open the file and parse the metadata
 	# this will return the metadata hash and an open filehandle
-	my ($fh, $data) = open_data_file($filename);
+	my ($fh, $inputdata) = open_tim_data_file($filename);
 	unless ($fh) {
 		return;
 	}
@@ -87,28 +90,15 @@ sub load_data_file {
 	my @datatable;
 	
 	# put the column names into the data table
-	push @datatable, $data->{'column_names'};
-	delete $data->{'column_names'}; # we no longer need this
+	push @datatable, $inputdata->{'column_names'};
+	delete $inputdata->{'column_names'}; # we no longer need this
 	
-	# gather information required for processing data lines
-	my $strand_i = find_column_index($data, '^strand$');
-	my @starts;
-	if ($data->{'ucsc'} or $data->{'bed'}) {
-		# same thing for ucsc files
-		# adjust both transcription and coding start
-		#### We should be doing thickStart and blockStarts too ####
-		# but I'm not sure how useful this really would be, plus adds complexity 
-		# that will slow file loading down - it's already pretty complicated
-		foreach my $name (qw(start txStart cdsStart peak)) {
-			my $c = find_column_index($data, $name);
-			next unless defined $c;
-			next if (exists $data->{$c}{'base'} and $data->{$c}{'base'} == 1);
-			push @starts, $c;
-		}
-	}
+	# determine strand column 
+		# should be true for BED and GFF files or any other file with strand
+	my $strand_i = find_column_index($inputdata, '^strand$');
 	my $plusminus_count = 0;
 	
-	### Load the data table
+	# load the data table
 	while (my $line = $fh->getline) {		
 		
 		# the current file position should be at the beginning of the
@@ -116,56 +106,120 @@ sub load_data_file {
 		
 		# skip comment lines
 		if ($line =~ /^#/) {
-			push @{ $data->{'other'} }, $line;
+			push @{ $inputdata->{'other'} }, $line;
 			next;
 		}
-	
+		
 		# no real line, just empty space
 		if ($line !~ m/\w+/) {
 			next;
 		}
 		
-		# process the line
-		my ($linedata, $plusminus) = process_data_line($line, $data->{'number_columns'}, 
-			$strand_i, @starts);
-		$plusminus_count += $plusminus;
+		# simply read each line in the file, explode the line into an 
+		# anonymous array and push it to the data_table array
+		my @linedata = split /\t/, $line;
+		
+		# check the number of elements
+		if (scalar @linedata != $inputdata->{'number_columns'} ) {
+			if ($line =~ /\r/ and $line !~ /\n/) {
+				croak "File '$filename' does not appear to have unix line endings!\n" . 
+					" Please convert to unix-style line endings and try again\n";
+			}
+			else {
+				carp "File '$filename' is inconsistent! line $. has ", scalar(@linedata),
+					" columns instead of expected ", $inputdata->{'number_columns'}, "\n";
+				return;
+			}
+		}
+		
+		# chomp the last element
+		# we do this here to ensure the tab split above gets all of the values
+		# otherwise trailing null values aren't included in @linedata
+		# be sure to handle both newlines and carriage returns
+		$linedata[-1] =~ s/[\r\n]+$//;
+		
+		# convert null values to internal '.'
+		for (my $i = 0; $i < $inputdata->{'number_columns'}; $i++ ) {
+			if (!defined $linedata[$i]) {
+				# not defined position in the array?
+				$linedata[$i] = '.';
+			}
+			elsif ($linedata[$i] eq '') {
+				# a null value
+				$linedata[$i] = '.';
+			}
+			elsif ($linedata[$i] =~ /^n\/?a$/i) {
+				# value matches na or n/a, a null value
+				$linedata[$i] = '.';
+			}
+		}
+		
+		# convert 0-based starts to 1-base for BED source files
+		if ($inputdata->{'bed'}) {
+			# add 1 to each start position
+			$linedata[1] += 1;
+		}
+		
+		# convert strand information to integers
+		if (defined $strand_i) {
+			# convert any interpretable value to signed value
+			if ($linedata[$strand_i] eq '+') {
+				# just a simple plus
+				$linedata[$strand_i] = 1;
+				$plusminus_count++;
+			}
+			elsif ($linedata[$strand_i] eq '-') {
+				# simple minus
+				$linedata[$strand_i] = -1;
+				$plusminus_count++;
+			}
+			elsif ($linedata[$strand_i] eq '.') {
+				# unstranded GFF format, not BED
+				$linedata[$strand_i] = 0;
+				$plusminus_count++;
+			}
+			# otherwise assume bioperl convention -1, 0, 1
+			# if it is not, then hope for the best
+			# I am dropping support for the ancient forward, watson, reverse, crick
+			# who uses those anyway?????
+			# some old bioperl scripts may still support it
+		}
 		
 		# store the array
-		push @datatable, $linedata;
+		push @datatable, [ @linedata ];
 	}
 	
-	# update metadata as necessary
-	if ($plusminus_count) {
-		# we have converted strand information
-		$data->{$strand_i}{'strand_style'} = 'plusminus';
-		if (exists $data->{$strand_i}{'AUTO'}) {
-			# update automatically generated metadata
-			$data->{$strand_i}{'AUTO'}++;
-		}
+	# record metadata for base number and strand style
+	if ($inputdata->{'bed'}) {
+		$inputdata->{1}{'base'} = 1;
 	}
-	foreach my $s (@starts) {
-		# each column of 0-based start that has been updated
-		$data->{$s}{'base'} = 1;
-		if (exists $data->{$s}{'AUTO'}) {
-			# update automatically generated metadata
-			$data->{$s}{'AUTO'}++;
+	if (defined $strand_i) {
+		# add an internal use only metadata value to indicate we've changed strand values
+		if ($plusminus_count == (scalar @datatable - 1)) {
+			# all the loaded lines are plusminus style
+			$inputdata->{$strand_i}{'strand_style'} = 'plusminus';
+			if (exists $inputdata->{$strand_i}{'AUTO'}) {
+				# update automatically generated metadata
+				$inputdata->{$strand_i}{'AUTO'}++;
+			}
 		}
 	}
 	
+		
 	# associate the data table with the data hash
-	$data->{'data_table'} = \@datatable;
+	$inputdata->{'data_table'} = \@datatable;
 	
 	# record the index number of the last data row
-	$data->{'last_row'} = scalar @datatable - 1;
+	$inputdata->{'last_row'} = scalar @datatable - 1;
 	
 	# completed loading the file
 	$fh->close;
 	
 	# verify the structure
-	return unless verify_data_structure($data);
+	verify_data_structure($inputdata);
 	
 	# finished
-	return $data;
+	return $inputdata;
 }
 
 
@@ -174,10 +228,10 @@ sub load_data_file {
 
 
 
-#### Open a data file, process the metadata, and return the open filehandle
+#### Open a tim data file, process the metadata, and return the open filehandle
 
-sub open_data_file {
-	# This subroutine will open a data text file, process the headers and
+sub open_tim_data_file {
+	# This subroutine will open a tim data text file, process the headers and
 	# extract the metadata, load the metadata into a data hash, then return
 	# the metadata and the open filehandle for further processing.
 	
@@ -187,8 +241,7 @@ sub open_data_file {
 	
 	# get filename
 	my $file = shift;
-	my $noheader = shift || 0; # boolean to indicate no headers are present
-	my $filename = check_file($file);
+	my $filename = _check_file($file);
 	unless ($filename) {
 		carp " file '$file' does not exist!\n";
 		return;
@@ -205,18 +258,18 @@ sub open_data_file {
 	
 	
 	# generate the data hash to store the file metadata into
-	my $data = generate_data_structure(undef);
-	unless ($data) {
-		cluck " cannot generate data structure!\n";
+	my $inputdata = generate_tim_data_structure(undef);
+	unless ($inputdata) {
+		cluck " cannot generate tim data structure!\n";
 		return;
 	}
-	$data->{'filename'} = $filename; # the original filename
-	$data->{'basename'} = $basename; # filename basename
-	$data->{'extension'} = $extension; # the filename extension
-	$data->{'path'} = $path; # the original path
-	$data->{'column_names'} = []; # array for the column names
-	$data->{'headers'} = q(); # boolean to indicate column headers present
-	$data->{'program'} = q(); # clear program, this will be read from file
+	$inputdata->{'filename'} = $filename; # the original filename
+	$inputdata->{'basename'} = $basename; # filename basename
+	$inputdata->{'extension'} = $extension; # the filename extension
+	$inputdata->{'path'} = $path; # the original path
+	$inputdata->{'column_names'} = []; # array for the column names
+	$inputdata->{'headers'} = q(); # boolean to indicate column headers present
+	$inputdata->{'program'} = q(); # clear program, this will be read from file
 	
 	# read and parse the file
 	# we will ONLY parse the header lines prefixed with a #, as well as the 
@@ -232,7 +285,7 @@ sub open_data_file {
 		
 		# check for Mac-style return line endings
 		if ($line =~ /\r/ and $line !~ /\n/) {
-			die "File '$filename' does not appear to have unix line endings!\n" . 
+			croak "File '$filename' does not appear to have unix line endings!\n" . 
 				" Please convert to unix-style line endings and try again\n";
 		}
 		
@@ -246,22 +299,22 @@ sub open_data_file {
 		
 		# the generating program
 		elsif ($line =~ m/^# Program (.+)$/) {
-			$data->{'program'} = $1;
-			$data->{'program'} =~ s/[\r\n]+$//;
+			$inputdata->{'program'} = $1;
+			$inputdata->{'program'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
 		# the source database
 		elsif ($line =~ m/^# Database (.+)$/) {
-			$data->{'db'} = $1;
-			$data->{'db'} =~ s/[\r\n]+$//;
+			$inputdata->{'db'} = $1;
+			$inputdata->{'db'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
 		# the type of feature in this datafile
 		elsif ($line =~ m/^# Feature (.+)$/) {
-			$data->{'feature'} = $1;
-			$data->{'feature'} =~ s/[\r\n]+$//;
+			$inputdata->{'feature'} = $1;
+			$inputdata->{'feature'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
@@ -311,17 +364,17 @@ sub open_data_file {
 				# check for pre-existing main metadata hash for this column
 				# for example, gff files will have standard hashes created above
 				# or possibly a badly formatted previous metadata line
-				if (exists $data->{$index}) {
+				if (exists $inputdata->{$index}) {
 					# we will simply overwrite the previous metadata hash
 					# harsh, I know, but what to do?
 					# if it was canned metadata for a gff file, that's ok
-					$data->{$index} = \%temphash;
+					$inputdata->{$index} = \%temphash;
 				}
 				else {
 					# metadata hash doesn't exist, so we will add it
-					$data->{$index} = \%temphash;
+					$inputdata->{$index} = \%temphash;
 					# also update the number of columns
-					$data->{'number_columns'} += 1;
+					$inputdata->{'number_columns'} += 1;
 				}
 			} 
 			else {
@@ -335,18 +388,18 @@ sub open_data_file {
 					# the file's metadata line
 					
 					# assign a new index number
-					my $new_index = $data->{'number_columns'};
+					my $new_index = $inputdata->{'number_columns'};
 					$temphash{'index'} = $new_index;
 					
 					# check for pre-existing main metadata hash
-					if (exists $data->{$new_index}) {
+					if (exists $inputdata->{$new_index}) {
 						# we will simply overwrite the previous metadata hash
-						$data->{$new_index} = \%temphash;
+						$inputdata->{$new_index} = \%temphash;
 					}
 					else {
 						# metadata hash doesn't exist, so add it
-						$data->{$new_index} = \%temphash;
-						$data->{'number_columns'} += 1;
+						$inputdata->{$new_index} = \%temphash;
+						$inputdata->{'number_columns'} += 1;
 					}
 				}
 			}
@@ -358,25 +411,25 @@ sub open_data_file {
 			# store the gff version in the hash
 			# this may or may not be present in the gff file, but want to keep
 			# it if it is
-			$data->{'gff'} = $1;
-			$data->{'gff'} =~ s/[\r\n]+$//;
+			$inputdata->{'gff'} = $1;
+			$inputdata->{'gff'} =~ s/[\r\n]+$//;
 			$header_line_count++;
 		}
 		
 		# any other nonstandard header
 		elsif ($line =~ /^#/) {
 			# store in an anonymous array in the inputdata hash
-			push @{ $data->{'other'} }, $line;
+			push @{ $inputdata->{'other'} }, $line;
 			$header_line_count++;
 		}
 		
-		# a track or browser line 
-		elsif ($line =~ /^(?:track|browser)\s+/i) {
+		# a track line 
+		elsif ($line =~ /^track\s+/i) {
 			# common with wig, bed, or bedgraph files for use with
 			# the UCSC genome browser
 			# treat as a comment line, there's not that much useful info
 			# in here, possibly the name, that's it
-			push @{ $data->{'other'} }, $line;
+			push @{ $inputdata->{'other'} }, $line;
 			$header_line_count++;
 		}
 		
@@ -389,14 +442,12 @@ sub open_data_file {
 			# these file formats do NOT have column headers
 			# we will first check for those file formats and process accordingly
 			
-			
-			### Data tables with a commented header line 
-			if ( _commented_header_line($data, $line) ) {
+			# Data tables with a commented header line
 				# including data table files from UCSC Table Browser
 				# also VCF files as well
 				# these will have one comment line marked with #
 				# that really contains the column headers
-				
+			if ( _commented_header_line($inputdata, $line) ) {
 				# lots of requirements, but this checks that (column 
 				# metadata has not already been loaded), there is at least one 
 				# unknown comment line, and that the last comment line is 
@@ -404,61 +455,60 @@ sub open_data_file {
 				# data line
 				
 				# process the real header line
-				my $header_line = pop @{ $data->{'other'} };
+				my $header_line = pop @{ $inputdata->{'other'} };
 				$header_line =~ s/[\r\n]+$//;
 				
 				# generate the metadata
 				my $i = 0;
 				foreach (split /\t/, $header_line) {
-					$data->{$i} = { 
+					$inputdata->{$i} = { 
 						'name'   => $_,
 						'index'  => $i,
 						'AUTO'   => 3,
-					} unless exists $data->{$i};
+					} unless exists $inputdata->{$i};
 					
-					push @{ $data->{'column_names'} }, $_;
+					push @{ $inputdata->{'column_names'} }, $_;
 					$i++;
 				}
-				$data->{'number_columns'} = $i;
+				$inputdata->{'number_columns'} = $i;
 				
 				# we do not count the current line as a header
 				
 				# set headers flag to true
-				$data->{'headers'} = 1;
+				$inputdata->{'headers'} = 1;
 				
 				# check for special formatted files
 					# these include GFF and BED, which don't normally have 
 					# header lines, even commented ones, but you never know 
 					# what crazy users like Sue will feed these programs
 					# we set the gff or bed flag
-				if ($extension =~ /gtf|gff3?/i) {
+				if ($extension =~ /gtf|gff3?/) {
 					# set the gff version based on the extension
-					unless ($data->{'gff'}) {
-						$data->{'gff'} = 
+					unless ($inputdata->{'gff'}) {
+						$inputdata->{'gff'} = 
 							$extension =~ /gtf/  ? 2.5 :
 							$extension =~ /gff3/ ? 3   :
 							2;
 					}
 					
 					# set the feature type
-					unless (defined $data->{'feature'}) {
-						$data->{'feature'} = 'region';
+					unless (defined $inputdata->{'feature'}) {
+						$inputdata->{'feature'} = 'region';
 					}
 				}
-				elsif ($extension =~ /bed|bdg|bedgraph|peak/i) {
-					$data->{'bed'} = $data->{'number_columns'};
+				elsif ($extension =~ /bed|bdg|bedgraph/) {
+					$inputdata->{'bed'} = $inputdata->{'number_columns'};
 					
 					# set the feature type
-					unless (defined $data->{'feature'}) {
-						$data->{'feature'} = 'region';
+					unless (defined $inputdata->{'feature'}) {
+						$inputdata->{'feature'} = 'region';
 					}
 				}
 				
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
-			### a GFF file
+			# a GFF file
 			elsif ($extension =~ /g[tf]f/i) {
 				# gff files have nine defined columns
 				# there are different specifications and variants:
@@ -468,19 +518,28 @@ sub open_data_file {
 				# http://gmod.org/wiki/GFF3
 				
 				# set column number
-				$data->{'number_columns'} = 9; # supposed to be 9 columns
+				$inputdata->{'number_columns'} = 9; # supposed to be 9 columns
 				
 				# set the gff version based on the extension
-				unless ($data->{'gff'}) {
-					$data->{'gff'} = 
+				unless ($inputdata->{'gff'}) {
+					$inputdata->{'gff'} = 
 						$extension =~ /gtf/  ? 2.5 :
 						$extension =~ /gff3/ ? 3   :
 						2;
 				}
 				
 				# a list of gff column names
-				my @gff_names = qw(Chromosome Source Type Start Stop 
-					Score Strand Phase Group );
+				my @gff_names = qw(
+					Chromosome
+					Source
+					Type
+					Start
+					Stop
+					Score
+					Strand
+					Phase
+					Group
+				);
 				
 				# set the metadata for the each column
 					# some of these may already be defined if there was a 
@@ -488,30 +547,29 @@ sub open_data_file {
 				for (my $i = 0; $i < 9; $i++) {
 					# loop for each column
 					# set metadata unless it's already loaded
-					unless (exists $data->{$i}) {
-						$data->{$i}{'name'}  = $gff_names[$i];
-						$data->{$i}{'index'} = $i;
-						$data->{$i}{'AUTO'}  = 3;
+					unless (exists $inputdata->{$i}) {
+						$inputdata->{$i}{'name'}  = $gff_names[$i];
+						$inputdata->{$i}{'index'} = $i;
+						$inputdata->{$i}{'AUTO'}  = 3;
 					}
 					# assign the name to the column header
-					$data->{'column_names'}->[$i] = 
-						$data->{$i}{'name'};
+					$inputdata->{'column_names'}->[$i] = 
+						$inputdata->{$i}{'name'};
 				}
 				
 				# set headers flag to false
-				$data->{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# set the feature type
-				unless (defined $data->{'feature'}) {
-					$data->{'feature'} = 'region';
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'region';
 				}
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
-			### a Bed or BedGraph file
+			# a Bed or BedGraph file
 			elsif ($extension =~ /bdg|bed/i) {
 				# bed files have a loose format
 				# they require a minimum of 3 columns, and have a max of 12
@@ -532,229 +590,248 @@ sub open_data_file {
 				my @elements = split /\s+/, $line;
 					# normally tab-delimited, but the specs are not explicit
 				my $column_count = scalar @elements;
-				$data->{'number_columns'} = $column_count; 
-				$data->{'bed'} = $column_count;
+				$inputdata->{'number_columns'} = $column_count; 
+				$inputdata->{'bed'} = $column_count;
 				
-				# malformed bed file
-				if ($column_count < 3) {
-					warn " file $filename appears to be malformed! Extension suggests " . 
-						" BED file but only has $column_count columns!\n";
-				}
 				
-				# set column names
-				my @bed_names = qw(Chromosome Start End Name Score Strand  
-					thickStart thickEnd itemRGB blockCount blockSizes blockStarts);
 				
-				# bedGraph files
-				if ($column_count == 4 and $extension =~ /bdg|graph/i) {
-					# fourth column is Score
-					$bed_names[3] = 'Score';
-				}
-				
-				# set the metadata for each column
-					# some of these may already be defined if there was a 
-					# column metadata specific column in the file
-				for (my $i = 0; $i < $column_count; $i++) {
-					# loop for each column
-					# set name unless it already has one from metadata
- 					unless (exists $data->{$i}) {
-						$data->{$i}{'name'}  = $bed_names[$i] || 'extraColumn';
-						$data->{$i}{'index'} = $i;
-						$data->{$i}{'AUTO'}  = 3;
-					}
-					# assign the name to the column header
-					$data->{'column_names'}->[$i] = 
-						$data->{$i}{'name'};
-				}
-				
-				# set the feature type
-				unless (defined $data->{'feature'}) {
-					$data->{'feature'} = 'region';
-				}
-				
-				# set headers flag to false
-				$data->{'headers'} = 0;
-				
-				# end this loop
-				last PARSE_HEADER_LOOP;
-			}
-			
-			
-			### a peak file
-			elsif ($extension =~ /peak/i) {
-				# three different types of peak files are available
-				# see http://genome.ucsc.edu/FAQ/FAQformat.html
-				
-				my @elements = split /\s+/, $line;
-					# normally tab-delimited, but the specs are not explicit
-				my $column_count = scalar @elements;
-				$data->{'number_columns'} = $column_count; 
-				$data->{'bed'} = $column_count;
-					# technically this is called bed6+4 or bed6+3, but for our 
-					# purposes here, we will stick to column count to avoid breaking
-				
-				# determine type of peak file based on extension
-				# narrowPeak
-				if ($extension =~ /narrowpeak/i) {
+				# Define the columns and metadata
+				if ($column_count >= 3) {
+					# the first three columns are required: chrom start end
+					
 					# set column names
-					my @names = qw(Chromosome Start End Name Score Strand signalValue 
-						pValue qValue peak);
+					my @bed_names = qw(
+						Chromosome
+						Start
+						End
+					);
+					
 					# set the metadata for each column
 						# some of these may already be defined if there was a 
 						# column metadata specific column in the file
-					for (my $i = 0; $i < $column_count; $i++) {
+					for (my $i = 0; $i < 3; $i++) {
 						# loop for each column
 						# set name unless it already has one from metadata
-						unless (exists $data->{$i}) {
-							$data->{$i}{'name'}  = $names[$i] || 'extraColumn';
-							$data->{$i}{'index'} = $i;
-							$data->{$i}{'AUTO'}  = 3;
+						unless (exists $inputdata->{$i}) {
+							$inputdata->{$i}{'name'}  = $bed_names[$i];
+							$inputdata->{$i}{'index'} = $i;
+							$inputdata->{$i}{'AUTO'}  = 3;
 						}
 						# assign the name to the column header
-						$data->{'column_names'}->[$i] = 
-							$data->{$i}{'name'};
+						$inputdata->{'column_names'}->[$i] = 
+							$inputdata->{$i}{'name'};
+					}
+					
+					# add additional columns if necessary
+					if ($column_count >= 4) {
+						# this is a special column
+						# it may be either a name or a score
+						# determine this by the file extension, not an 
+						# exact science
+						
+						if ($extension =~ /bdg|graph/i) {
+							# a bedgraph file
+							# this is the score column
+							
+							# column metadata
+							unless (exists $inputdata->{3}) {
+								$inputdata->{3}{'name'}  = 'Score';
+								$inputdata->{3}{'index'} = 3;
+								$inputdata->{3}{'AUTO'}  = 3;
+							}
+							
+							# column header name
+							$inputdata->{'column_names'}->[3] = 
+								$inputdata->{3}{'name'};
+						}
+						
+						else {
+							# a plain old bed file
+							# this is the name column
+							
+							# column metadata
+							unless (exists $inputdata->{3}) {
+								$inputdata->{3}{'name'}  = 'Name';
+								$inputdata->{3}{'index'} = 3;
+								$inputdata->{3}{'AUTO'}  = 3;
+							}
+							
+							# column header name
+							$inputdata->{'column_names'}->[3] = 
+								$inputdata->{3}{'name'};
+						}
+					}	
+					
+					if ($column_count >= 5) {
+						# score of the bed line feature
+						
+						# column metadata
+						unless (exists $inputdata->{4}) {
+							$inputdata->{4}{'name'}  = 'Score';
+							$inputdata->{4}{'index'} = 4;
+							$inputdata->{4}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[4] = 
+							$inputdata->{4}{'name'};
+					}	
+					
+					if ($column_count >= 6) {
+						# strand of the bed line feature
+						
+						# column metadata
+						unless (exists $inputdata->{5}) {
+							$inputdata->{5}{'name'}  = 'Strand';
+							$inputdata->{5}{'index'} = 5;
+							$inputdata->{5}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[5] = 
+							$inputdata->{5}{'name'};
+					}	
+					
+					if ($column_count >= 7) {
+						# start position for block (exon)
+						
+						# column metadata
+						unless (exists $inputdata->{6}) {
+							$inputdata->{6}{'name'}  = 'thickStart';
+							$inputdata->{6}{'index'} = 6;
+							$inputdata->{6}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[6] = 
+							$inputdata->{6}{'name'};
+					}	
+					
+					if ($column_count >= 8) {
+						# end position for block (exon)
+						
+						# column metadata
+						unless (exists $inputdata->{7}) {
+							$inputdata->{7}{'name'}  = 'thickEnd';
+							$inputdata->{7}{'index'} = 7;
+							$inputdata->{7}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[7] = 
+							$inputdata->{7}{'name'};
+					}	
+					
+					if ($column_count >= 9) {
+						# RGB value of bed feature
+						
+						# column metadata
+						unless (exists $inputdata->{8}) {
+							$inputdata->{8}{'name'}  = 'itemRGB';
+							$inputdata->{8}{'index'} = 8;
+							$inputdata->{8}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[8] = 
+							$inputdata->{8}{'name'};
+					}	
+					
+					if ($column_count >= 10) {
+						# The number of blocks (exons)
+						
+						# column metadata
+						unless (exists $inputdata->{9}) {
+							$inputdata->{9}{'name'}  = 'blockCount';
+							$inputdata->{9}{'index'} = 9;
+							$inputdata->{9}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[9] = 
+							$inputdata->{9}{'name'};
+					}	
+					
+					if ($column_count >= 11) {
+						# The size of the blocks (exons)
+						
+						# column metadata
+						unless (exists $inputdata->{10}) {
+							$inputdata->{10}{'name'}  = 'blockSizes';
+							$inputdata->{10}{'index'} = 10;
+							$inputdata->{10}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[10] = 
+							$inputdata->{10}{'name'};
+					}	
+					
+					if ($column_count >= 12) {
+						# The start positions of the blocks (exons)
+						
+						# column metadata
+						unless (exists $inputdata->{11}) {
+							$inputdata->{11}{'name'}  = 'blockStarts';
+							$inputdata->{11}{'index'} = 11;
+							$inputdata->{11}{'AUTO'}  = 3;
+						}
+						
+						# column header name
+						$inputdata->{'column_names'}->[11] = 
+							$inputdata->{11}{'name'};
+					}	
+					
+					if ($column_count > 12) {
+						# why would there be extra columns in here!!??
+						
+						carp " BED file '$filename' has too many columns! Bad formatting?\n";
+						
+						# process anyway
+						for (my $i = 11; $i < $column_count; $i++) {
+							# column metadata
+							unless (exists $inputdata->{$i}) {
+								$inputdata->{$i}{'name'}  = "Column_$i";
+								$inputdata->{$i}{'index'} = $i;
+								$inputdata->{$i}{'AUTO'}  = 3;
+							}
+							
+							# column header name
+							$inputdata->{'column_names'}->[$i] = 
+								$inputdata->{$i}{'name'};
+						}
 					}
 				}
 				
-				# broadPeak
-				elsif ($extension =~ /broadpeak/i) {
-					# set column names
-					my @names = qw(Chromosome Start End Name Score Strand signalValue 
-						pValue qValue);
-					# set the metadata for each column
-						# some of these may already be defined if there was a 
-						# column metadata specific column in the file
-					for (my $i = 0; $i < $column_count; $i++) {
-						# loop for each column
-						# set name unless it already has one from metadata
-						unless (exists $data->{$i}) {
-							$data->{$i}{'name'}  = $names[$i] || 'extraColumn';
-							$data->{$i}{'index'} = $i;
-							$data->{$i}{'AUTO'}  = 3;
-						}
-						# assign the name to the column header
-						$data->{'column_names'}->[$i] = 
-							$data->{$i}{'name'};
-					}
-				}
-				
-				# some other type of peak
+				# less than 3 columns!???
 				else {
-					# set column names
-					my @names = qw(Chromosome Start End Name Score Strand);
-					# set the metadata for each column
-						# some of these may already be defined if there was a 
-						# column metadata specific column in the file
-					for (my $i = 0; $i < $column_count; $i++) {
-						# loop for each column
-						# set name unless it already has one from metadata
-						unless (exists $data->{$i}) {
-							$data->{$i}{'name'}  = $names[$i] || 'extraColumn';
-							$data->{$i}{'index'} = $i;
-							$data->{$i}{'AUTO'}  = 3;
-						}
-						# assign the name to the column header
-						$data->{'column_names'}->[$i] = 
-							$data->{$i}{'name'};
-					}
+					carp " BED file '$filename' doesn't have at least 3 columns!\n";
+					return;
 				}
 				
 				# set the feature type
-				unless (defined $data->{'feature'}) {
-					$data->{'feature'} = 'region';
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'region';
 				}
 				
 				# set headers flag to false
-				$data->{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
-			### a UCSC gene table
-			elsif ($extension =~ /ref+lat|genepred|ucsc/i) {
-				# these are tricky, as we will try to determine contents by counting
-				# the columns, which may not be accurate
-				# not only that, but this presumes the extension even makes it recognizable
-				# see http://genome.ucsc.edu/FAQ/FAQformat.html#format9 for details
-				# also biotoolbox script ucsc_table2gff3.pl
-				
-				my @elements = split /\s+/, $line;
-					# normally tab-delimited, but the specs are not explicit
-				my $column_count = scalar @elements;
-				$data->{'number_columns'} = $column_count; 
-				
-				
-				my @names;
-				if ($column_count == 16) {
-					# an extended gene prediction table, e.g. refGene, ensGene
-					# as downloaded from the UCSC Table Browser or FTP site
-					@names = qw(bin name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds score name2 cdsStartSt 
-						cdsEndStat exonFrames);
-				}
-				elsif ($column_count == 15) {
-					# an extended gene prediction table, e.g. refGene, ensGene
-					# without the bin value
-					@names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds score name2 cdsStartSt 
-						cdsEndStat exonFrames);
-				}
-				elsif ($column_count == 12) {
-					# a known gene prediction table
-					@names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds proteinID alignID);
-				}
-				elsif ($column_count == 11) {
-					# a refFlat gene prediction table
-					@names = qw(geneName transcriptName chrom strand txStart txEnd 
-						cdsStart cdsEnd exonCount exonStarts exonEnds);
-				}
-				elsif ($column_count == 10) {
-					# a refFlat gene prediction table
-					@names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds);
-				}
-				
-				# assign the column names and metadata
-				for (my $i = 0; $i < $column_count; $i++) {
-					# loop for each column
-					# set name unless it already has one from metadata
-					unless (exists $data->{$i}) {
-						$data->{$i}{'name'}  = $names[$i] || 'extraColumn';
-						$data->{$i}{'index'} = $i;
-						$data->{$i}{'AUTO'}  = 3;
-					}
-					# assign the name to the column header
-					$data->{'column_names'}->[$i] = 
-						$data->{$i}{'name'};
-				}
-				
-				# set the feature type
-				unless (defined $data->{'feature'}) {
-					$data->{'feature'} = 'gene';
-				}
-				
-				# set headers flag to false
-				$data->{'headers'} = 0;
-				
-				# end this loop
-				last PARSE_HEADER_LOOP;
-			}
-			
-			
-			### a SGR file
+			# a SGR file
 			elsif ($extension =~ /sgr/i) {
 				# a sgr file contains three columns: chromo, position, score
 				# this is a very simple file format, useful in exporting and
 				# importing to binary BAR files used in T2, USeq, and IGB
 				
 				# set values
-				$data->{'number_columns'} = 3; # supposed to be 3 columns
+				$inputdata->{'number_columns'} = 3; # supposed to be 3 columns
 				
 				# set column names
-				push @{ $data->{'column_names'} }, qw(
+				push @{ $inputdata->{'column_names'} }, qw(
 					Chromo
 					Start
 					Score
@@ -763,36 +840,35 @@ sub open_data_file {
 				# set the metadata for the each column
 					# some of these may already be defined if there was a 
 					# column metadata specific column in the file
-				$data->{0} = {
+				$inputdata->{0} = {
 					'name'  => 'Chromo',
 					'index' => 0,
 					'AUTO'  => 3,
-				} unless exists $data->{0};
-				$data->{1} = {
+				} unless exists $inputdata->{0};
+				$inputdata->{1} = {
 					'name'  => 'Start',
 					'index' => 1,
 					'AUTO'  => 3,
-				} unless exists $data->{1};
-				$data->{2} = {
+				} unless exists $inputdata->{1};
+				$inputdata->{2} = {
 					'name'  => 'Score',
 					'index' => 2,
 					'AUTO'  => 3,
-				} unless exists $data->{2};
+				} unless exists $inputdata->{2};
 				
 				# set headers flag to false
-				$data->{'headers'} = 0;
+				$inputdata->{'headers'} = 0;
 				
 				# set the feature type
-				unless (defined $data->{'feature'}) {
-					$data->{'feature'} = 'region';
+				unless (defined $inputdata->{'feature'}) {
+					$inputdata->{'feature'} = 'region';
 				}
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
-			### standard text file with headers, i.e. everything else
+			# all other file formats, including tim data files
 			else {
 				# we have not yet parsed the row of data column names
 				# we will do so now
@@ -803,17 +879,17 @@ sub open_data_file {
 				# we will define the columns based on
 				for my $i (0..$#namelist) {
 					# confirm that a file metadata exists for this column
-					if (exists $data->{$i}) {
-						unless ($namelist[$i] eq $data->{$i}->{'name'}) {
+					if (exists $inputdata->{$i}) {
+						unless ($namelist[$i] eq $inputdata->{$i}->{'name'}) {
 							cluck "metadata and header names for column $i do not match!";
 							# set the name to match the actual column name
-							$data->{$i}->{'name'} = $namelist[$i];
+							$inputdata->{$i}->{'name'} = $namelist[$i];
 						}
 					} 
 					
 					# otherwise be nice and generate it here
 					else {
-						$data->{$i} = {
+						$inputdata->{$i} = {
 							'name'  => $namelist[$i],
 							'index' => $i,
 							'AUTO'  => 3,
@@ -822,45 +898,25 @@ sub open_data_file {
 				}
 				
 				# check the number of columns
-				if (scalar @namelist != $data->{'number_columns'} ) {
+				if (scalar @namelist != $inputdata->{'number_columns'} ) {
 					# adjust to match actual content
-					$data->{'number_columns'} = scalar @namelist;
+					$inputdata->{'number_columns'} = scalar @namelist;
 				}
 				
 				# put the column names in the metadata
-				push @{ $data->{'column_names'} }, @namelist;
+				push @{ $inputdata->{'column_names'} }, @namelist;
 				
 				# count as a header line
 				$header_line_count++;
 				
 				# set headers flag to true
-				$data->{'headers'} = 1;
+				$inputdata->{'headers'} = 1;
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
 			}
 		}
 		
-	}
-	
-	# No header was requested
-	if ($noheader) {
-		# user indicated that no header was present
-		# which means that what we used as a header is actually the first data row
-		
-		# fix the column names
-		for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
-			my $name = $data->{$i}{'name'};
-			$data->{$i}{'name'} = "Column$i ($name)";
-			$data->{'column_names'}->[$i] = $data->{$i}{'name'};
-			$data->{$i}{'AUTO'} = 3;
-		}
-		
-		# move the counter back one line
-		$header_line_count -= 1;
-		
-		# set headers flag to false
-		$data->{'headers'} = 0; 
 	}
 	
 	
@@ -878,86 +934,9 @@ sub open_data_file {
 	}
 	
 	# now return the advanced filehandle and the parsed metadata
-	return ($fh, $data);
+	return ($fh, $inputdata);
 	
 }
-
-
-
-### Parse a line to be included in a data table
-sub process_data_line {
-	my ($line, $number, $strand_i, @starts) = @_;
-	
-	# simply read each line in the file, explode the line into an 
-	# anonymous array and push it to the data_table array
-	my @linedata = split /\t/, $line;
-	
-	# check the number of elements
-	if (scalar @linedata != $number ) {
-		if ($line =~ /\r/ and $line !~ /\n/) {
-			die "File does not appear to have unix line endings!\n" . 
-				" Please convert to unix-style line endings and try again\n";
-		}
-		warn "Number of columns in line is inconsistent\n";
-		# we will verify the table after loading all the lines to verify 
-	}
-	
-	# chomp the last element
-	# we do this here to ensure the tab split above gets all of the values
-	# otherwise trailing null values aren't included in @linedata
-	# be sure to handle both newlines and carriage returns
-	$linedata[-1] =~ s/[\r\n]+$//;
-	
-	# convert null values to internal '.'
-	for (my $i = 0; $i < $number; $i++ ) {
-		if (!defined $linedata[$i]) {
-			# not defined position in the array?
-			$linedata[$i] = '.';
-		}
-		elsif ($linedata[$i] eq '') {
-			# a null value
-			$linedata[$i] = '.';
-		}
-		elsif ($linedata[$i] =~ /^n\/?a$/i) {
-			# value matches na or n/a, a null value
-			$linedata[$i] = '.';
-		}
-	}
-	
-	# convert strand as necessary
-	my $strand_convert = 0;
-	if (defined $strand_i) {
-		# convert any interpretable value to signed value
-		if ($linedata[$strand_i] eq '+') {
-			# just a simple plus
-			$linedata[$strand_i] = 1;
-			$strand_convert = 1;
-		}
-		elsif ($linedata[$strand_i] eq '-') {
-			# simple minus
-			$linedata[$strand_i] = -1;
-			$strand_convert = 1;
-		}
-		elsif ($linedata[$strand_i] eq '.') {
-			# unstranded GFF format, not BED
-			$linedata[$strand_i] = 0;
-			$strand_convert = 1;
-		}
-		# otherwise assume bioperl convention -1, 0, 1
-		# if it is not, then hope for the best
-		# I am dropping support for the ancient forward, watson, reverse, crick
-		# who uses those anyway?????
-		# some old bioperl scripts may still support it
-	}
-	
-	# adjust start positions
-	foreach my $s (@starts) {
-		$linedata[$s] += 1;
-	}
-	
-	return (\@linedata, $strand_convert);
-}
-
 
 
 
@@ -977,7 +956,7 @@ sub parse_filename {
 ### Write out a data file from the data hash
 
 
-sub write_data_file {
+sub write_tim_data_file {
 	
 	# collect passed arguments
 	my %args = @_; 
@@ -1045,7 +1024,7 @@ sub write_data_file {
 		}
 		
 		# BED file
-		elsif ($extension =~ /bed|bdg|peak/i) {
+		elsif ($extension =~ /bed|bdg/i) {
 			unless ($data->{'bed'}) {
 				# it's not set as a bed data
 				# let's set it to true and see if it passes verification
@@ -1142,7 +1121,7 @@ sub write_data_file {
 			}
 			
 			# structure is bed
-			elsif ($data->{'extension'} =~ /bed|bdg|peak/i) {
+			elsif ($data->{'extension'} =~ /bed|bdg/i) {
 				# check to see that we still have a valid bed structure
 				if ($data->{'bed'}) {
 					$extension = $data->{'extension'};
@@ -1221,7 +1200,7 @@ sub write_data_file {
 	
 	
 	# Convert base to interbase coordinates if necessary
-	if ($extension =~ /\.bed|bdg|peak/i and $data->{'bed'} > 0) {
+	if ($extension =~ /\.bed|bdg/i and $data->{'bed'} > 0) {
 		# we are writing a confirmed bed file 
 		if (
 			exists $data->{1}{'base'} and 
@@ -1234,33 +1213,6 @@ sub write_data_file {
 				$data->{'data_table'}->[$row][1] -= 1;
 			}
 			delete $data->{1}{'base'};
-			if (exists $data->{1}{'AUTO'}) {
-				$data->{1}{'AUTO'} -= 1;
-			}
-		}
-	}
-	if ($data->{'ucsc'} > 0) {
-		my $t = find_column_index($data, 'txStart');
-		my $c = find_column_index($data, 'cdsStart');
-		
-		# check if we need to convert these, probably do, but just in case
-		my ($do_t, $do_c);
-		$do_t = 1 if (exists $data->{$t}{'base'} and $data->{$t}{'base'} == 1);
-		$do_t = 1 if (exists $data->{$c}{'base'} and $data->{$c}{'base'} == 1);
-		
-		# convert back to interbase
-		for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
-			# subtract 1 to each start position
-			$data->{'data_table'}->[$row][$t] -= 1 if $do_t;
-			$data->{'data_table'}->[$row][$c] -= 1 if $do_c;
-		}
-		if ($do_t) {
-			delete $data->{$t}{'base'};
-			$data->{$t}{'AUTO'} -= 1 if exists $data->{$t}{'AUTO'};
-		}
-		if ($do_c) {
-			delete $data->{$c}{'base'};
-			$data->{$c}{'AUTO'} -= 1 if exists $data->{$c}{'AUTO'};
 		}
 	}
 	
@@ -1307,7 +1259,7 @@ sub write_data_file {
 		}
 		
 		# Write the primary headers
-		unless ($extension =~ m/gff|bed|bdg|sgr|kgg|cdt|peak/i) {
+		unless ($extension =~ m/gff|bed|bdg|sgr|kgg|cdt/i) {
 			# we only write these for text files, not gff or bed files
 			
 			if ($data->{'program'}) {
@@ -1369,7 +1321,7 @@ sub write_data_file {
 				next;
 			}
 			elsif (
-				$extension =~ m/gff|bed|bdg|peak/i and
+				$extension =~ m/gff|bed|bdg/i and
 				scalar( keys %{ $data->{$i} } ) == 2
 			) {
 				# only two metadata keys exist, name and index
@@ -1467,7 +1419,7 @@ sub open_to_read_fh {
 	
 	# check filename
 	my $file = shift;
-	my $filename = check_file($file);
+	my $filename = _check_file($file);
 	unless ($filename) {
 		carp " file '$file' does not exist!\n";
 		return;
@@ -1569,7 +1521,7 @@ sub open_to_write_fh {
 
 
 
-#### Convert a data table into GFF format
+#### Convert a tim data table into GFF format
 
 sub convert_genome_data_2_gff_data {
 	# a subroutine to convert the data table format from genomic bins or
@@ -2032,7 +1984,7 @@ sub convert_genome_data_2_gff_data {
 }
 
 
-#### Export a data table to GFF file
+#### Export a tim data table to GFF file
 
 sub convert_and_write_to_gff_file {
 	# a subroutine to export the data table format from genomic bins or
@@ -2635,7 +2587,7 @@ sub write_summary_data {
 	my ($data_name, undef, undef) = fileparse($outfile, @SUFFIX_LIST);
 	
 	# Prepare array to store the summed data
-	my $summed_data = generate_data_structure(
+	my $summed_data = generate_tim_data_structure(
 		'averaged_windows', 
 		'Window',
 		'Midpoint',
@@ -2695,7 +2647,7 @@ sub write_summary_data {
 	
 	# Write summed data
 	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
-	my $written_file = write_data_file(
+	my $written_file = write_tim_data_file(
 		'data'      => $summed_data,
 		'filename'  => $outfile . '_summed',
 		'gz'        => 0,
@@ -2714,8 +2666,8 @@ sub write_summary_data {
 
 
 
-### Subroutine to check for file existance
-sub check_file {
+### Internal subroutine to check for file existance
+sub _check_file {
 	my $filename = shift;
 	
 	# check for file existance
@@ -2792,20 +2744,43 @@ __END__
 
 Bio::ToolBox::file_helper
 
+=head1 SYNOPSIS
+
+  use Bio::ToolBox::file_helper qw(
+    load_tim_data_file
+    write_tim_data_file
+    open_to_read_fh
+    open_to_write_fh
+  );
+  
+  my $input_data = load_tim_data_file($file) or die "can't open file!";
+  
+  my ($fh, $metadata) = open_tim_data_file($file) or die;
+  
+  while (my $line = $fh->getline) {
+    ...
+  }
+  
+  my $input_fh = open_to_read_fh($file);
+  
+  my $output_fh = open_to_write_fh($file);
+  
+  my $output_fh = open_to_write_fh($file, $gz, $append);
+  
+  my $success = write_tim_data_file(
+    'data'       => $data,
+    'filename'   => $file,
+    'gz'         => $gz,
+  );
+
 =head1 DESCRIPTION
 
-These are subroutines for providing file IO for the L<Bio::ToolBox::Data> 
-data structure. In other words, they are not object methods, but rather 
-exportable subroutines for reading and writing data into the complex data 
-structure underlying the L<Bio::ToolBox::Data> object. These subroutines 
-and data structures predate the L<Bio::ToolBox::Data> object model and 
-exist for backwards compatibility. End-users are strongly encouraged to 
-use the L<Bio::ToolBox::Data> API. 
-
-These file IO methods work with any generic tab-delimited text file 
-of rows and columns. It also properly handles comment, metadata, and 
-column-specific metadata custom to Bio::ToolBox programs.
-Special file formats used in bioinformatics, including for example
+These are general file helper subroutines to work with data text files, 
+primarily opening, loading, and writing. Specifically, it is designed 
+to work with I<tim data text files>, which is a generic tab delimited
+text file of rows and columns along with special metadata column headers.
+While it best uses this I<tim data format>, it will really read any tab 
+delimited text file. Special file formats used in bioinformatics, including 
 GFF and BED files, are automatically recognized by their file extension and 
 appropriate metadata added. 
 
@@ -2818,12 +2793,12 @@ it was collected, and how it was processed.
 Additional subroutines are also present for general processing and output of
 this data structure.
 
-The data file format is described below, and following that a 
+The I<tim data file format> is described below, and following that a 
 description of the data structure.
 
-=head1 FORMAT OF BIOTOOLBOX DATA TEXT FILE
+=head1 FORMAT OF TIM DATA TEXT FILE
 
-The BioToolBox data file format is not indicated by a special file extension. 
+The tim data file format is not indicated by a special file extension. 
 Rather, a generic '.txt' extension is used to preserve functionality with
 other text processing programs. The file is essentially a simple tab 
 delimited text file representing rows (lines) and columns (demarcated by the
@@ -2939,24 +2914,24 @@ generated for conveniance.
 Call the module at the beginning of your perl script and pass a list of the 
 desired modules to import. None are imported by default.
   
-  use Bio::ToolBox::db_helper qw(load_data_file write_data_file);
+  use Bio::ToolBox::db_helper qw(load_tim_data_file write_tim_data_file);
   
 The specific usage for each subroutine is detailed below.
 
 =over
 
-=item load_data_file()
+=item load_tim_data_file()
 
-This is a newer, updated file loader and parser for BioToolBox data files. It will
+This is a newer, updated file loader and parser for tim's data files. It will
 completely parse and load the file contents into the described data structure 
-in memory. Files with metadata lines (described in BioToolBox data format) will 
+in memory. Files with metadata lines (described in tim data format) will 
 have the metadata lines loaded. Files without metadata lines will have basic 
 metadata (column name and index) automatically generated. The first 
 non-header line should contain the column (dataset) name. Recognized file 
 formats without headers, including GFF, BED, and SGR, will have the columns 
 automatically named.
 
-This subroutine uses the open_data_file() subroutine and completes the 
+This subroutine uses the open_tim_data_file() subroutine and completes the 
 loading of the file into memory.
 
 BED and BedGraph style files, recognized by .bed or .bdg file extensions, 
@@ -2979,11 +2954,11 @@ Failure to read or parse the file will return an empty value.
 Example:
 	
 	my $filename = 'my_data.txt.gz';
-	my $data_ref = load_data_file($filename);
+	my $data_ref = load_tim_data_file($filename);
 	
-=item open_data_file()
+=item open_tim_data_file()
 
-This is a file opener and metadata parser for data files, including BioToolBox 
+This is a file opener and metadata parser for data files, including tim's 
 data formatted files and other recognized data formats (gff, bed, sgr). It 
 will open the file, parse the metadata, and return an open file handle 
 ready for reading. It will NOT load the entire file contents into memory. 
@@ -3005,13 +2980,13 @@ by the .gz extension.
 
 The subroutine will return two items: a scalar reference to the file handle,
 and a scalar reference to the data hash, described as above. The file handle
-is an L<IO::Handle> object and may be manipulated as such.
+is an IO::Handle object and may be manipulated as such.
 Failure to read or parse the file will return an empty value.
 
 Example:
 	
 	my $filename = 'my_data.txt.gz';
-	my ($fh, $metadata_ref) = open_data_file($filename);
+	my ($fh, $metadata_ref) = open_tim_data_file($filename);
 	while (my $line = $fh->getline) {
 		...
 	}
@@ -3019,10 +2994,10 @@ Example:
 
 
 
-=item write_data_file()
+=item write_tim_data_file()
 
-This subroutine will write out a data file formatted for BioToolBox data files. 
-Please refer to L<FORMAT OF BIOTOOLBOX DATA TEXT FILE> for more 
+This subroutine will write out a data file formatted for tim's data files. 
+Please refer to L<FORMAT OF TIM DATA TEXT FILE> for more 
 information regarding the file format. If the 'gff' key is true in the data 
 hash, then a gff file will be written.
 
@@ -3030,8 +3005,8 @@ The subroutine is passed a reference to an anonymous hash containing the
 arguments. The keys include
 
   Required:
-  data     => A scalar reference to the data structure ad described
-              in L<Bio::ToolBox::data_helper>. 
+  data     => A scalar reference to the tim data structure ad described
+              in C<Bio::ToolBox::data_helper>. 
   Optional: 
   filename => A scalar value containing the name of the file to 
               write. This value is required for new data files and 
@@ -3067,9 +3042,9 @@ The arguments always take precendence over the filename extensions, however.
 Example
 
 	my $filename = 'my_data.txt.gz';
-	my $data_ref = load_data_file($filename);
+	my $data_ref = load_tim_data_file($filename);
 	...
-	my $success_write = write_data_file(
+	my $success_write = write_tim_data_file(
 		'data'     => $data_ref,
 		'filename' => $filename,
 		'format'   => 'simple',
@@ -3134,7 +3109,7 @@ Example
 This subroutine will convert an existing data hash structure as described above
 and convert it to a defined gff data structure, i.e. one that has the nine 
 defined columns. Once converted, a gff data file may then be written using the
-write_data_file() subroutine. To convert and write the gff file in one 
+write_tim_data_file() subroutine. To convert and write the gff file in one 
 step, see the following subroutine, convert_and_write_gff_file();
 
 NOTE: This method is DESTRUCTIVE!!!!
@@ -3213,7 +3188,7 @@ will return nothing.
 
 Example
 
-	my $data_ref = load_data_file($filename);
+	my $data_ref = load_tim_data_file($filename);
 	...
 	my $success = convert_genome_data_2_gff_data(
 		'data'     => $data_ref,
@@ -3222,7 +3197,7 @@ Example
 	);
 	if ($success) {
 		# write a gff file
-		my $success_write = write_data_file(
+		my $success_write = write_tim_data_file(
 			'data'     => $data_ref,
 			'filename' => $filename,
 		);
@@ -3234,7 +3209,7 @@ Example
 
 =item convert_and_write_to_gff_file()
 
-This subroutine will convert a BioToolBox data structure as described above into 
+This subroutine will convert a tim data structure as described above into 
 GFF format and write the file. It will preserve the current data structure 
 and convert the data on the fly as the file is written, unlike the 
 destructive subroutine convert_genome_data_2_gff_data(). 
@@ -3316,7 +3291,7 @@ arguments. The keys include
 
 Example
 
-	my $data_ref = load_data_file($filename);
+	my $data_ref = load_tim_data_file($filename);
 	...
 	my $success = convert_and_write_to_gff_file(
 		'data'     => $data_ref,
@@ -3338,7 +3313,7 @@ the summarized data. This is useful for data collected in windows across a
 feature, for example, microarray data values across the body of genes, and 
 then generating a composite or average gene occupancy.
 
-The output file is a BioToolBox data tab-delimited file as described above with three
+The output file is a tim data tab-delimited file as described above with three
 columns: The Name of the window, the Midpoint of the window (calculated as the
 mean of the start and stop points for the window), and the mean value. The 
 table is essentially rotated 90º from the original table; the averages of each
@@ -3371,7 +3346,7 @@ Pass the subroutine an anonymous hash of arguments. These include:
 
 Example
 
-	my $main_data_ref = load_data_file($filename);
+	my $main_data_ref = load_tim_data_file($filename);
 	...
 	my $summary_success = write_summary_data(
 		'data'         => $main_data_ref,
@@ -3380,7 +3355,15 @@ Example
 	);
 
 
-=item check_file
+=back
+
+=head1 INTERNAL SUBROUTINES
+
+These are internally used subroutines and are not exported for general usage.
+
+=over
+
+=item _check_file
 
 This subroutine confirms the existance of a passed filename. If not 
 immediately found, it will attempt to append common file extensions 

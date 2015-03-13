@@ -15,7 +15,7 @@ eval {
 	require GD::Graph::smoothlines; 
 	$gd_ok = 1;
 };
-my $VERSION = 1.22;
+my $VERSION = '1.20';
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -123,9 +123,9 @@ unless (defined $y_ticks) {
 ####### Main ###########
 
 ### Load the file
+print " Loading data from file $infile....\n";
 my $Data = Bio::ToolBox::Data->new(file => $infile) or
-	die " Unable to load data file!\n";
-printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	die " No data loaded!\n";
 
 # load the dataset names into hashes
 my %dataset_by_id; # hashes for name and id
@@ -133,13 +133,9 @@ my $i = 0;
 foreach my $name ($Data->list_columns) {
 	# check column header names for gene or window attribute information
 	# these won't be used for graph generation, so we'll skip them
-	if ($name =~ /^(?:name|id|class|type|alias|probe|chr|
+	next if $name =~ /^(?:name|id|class|type|alias|probe|chr|
 		chromo|chromosome|seq|sequence|refseq|contig|scaffold|start|stop|end|mid|
-		midpoint|strand|primary_id|window|midpoint)$/xi
-	) {
-		$i++;
-		next;
-	}
+		midpoint|strand|primary_id|window|midpoint)$/xi;
 	
 	# record the data set name
 	$dataset_by_id{$i} = $name;
@@ -295,7 +291,6 @@ sub graph_datasets_interactively {
 		# graph the datasets
 		if ($check == -1) {
 			# all dataset indexes are valid
-			
 			graph_this(@datasets);
 		}
 		else {
