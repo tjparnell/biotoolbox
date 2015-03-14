@@ -277,8 +277,6 @@ wrote bar graph distribution_Pokholok_H3k36me3_ChIP_44k.png in directory gene_li
 
 Here, we specified the number of bins (30), the bin size (0.2), the starting or minimum bin value (-3), and the dataset index. The script will also allow for datasets to be selected from a list interactively if it's not provided as a command line argument. The output graphic file is written in a subdirectory named after the input file. 
 
-http://biotoolbox.googlecode.com/svn/wiki/distribution_Pokholok_H3k36me3_ChIP_44k.png
-
 Finally, we want to show the correlation between the two datasets. For this we use another script, [Pod_graph_data graph_data.pl], which plots a pairwise XY plot between two datasets. 
 <pre>
 Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gene_list.txt 
@@ -291,8 +289,6 @@ Elessar:~ tim$ graph_data.pl --type scatter --pair 5,6 --min=-3 --max=3 --in gen
 </pre>
 
 Here, we specify a scatter plot between datasets 5 and 6, with a mininum and a maximum value of -3 and 3, respectively. Simple correlation stats are printed as output in the terminal (r = 0.59, moderately correlated), in the graphic title, and in a text file in the output graph subdirectory.
-
-http://biotoolbox.googlecode.com/svn/wiki/Pokholok_H3k4me3_ChIP_44k_and_Pokholok_H3k36me3_ChIP_44k.png
 
 While these graphs are not exactly publication quality, they are certainly good enough for lab meeting presentations and interpreting data.
 
