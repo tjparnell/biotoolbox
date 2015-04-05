@@ -18,6 +18,7 @@ lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
 lib/Bio/ToolBox/file_helper.pm
 lib/Bio/ToolBox/utility.pm
+LICENSE
 MANIFEST			This list of files
 META.json
 META.yml
