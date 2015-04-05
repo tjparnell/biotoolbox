@@ -16,7 +16,6 @@ my $options = get_base_options();
 check_useq();
 check_sam();
 check_big();
-check_extra();
 
 
 ### Build the script
@@ -137,39 +136,6 @@ sub check_big {
 	}
 	else {
 		$options->{'recommends'}{'Bio::DB::BigFile'} = 1.07;
-	}
-}
-
-
-sub check_extra {
-	
-	# check to see if extra folder is present
-	# these are extra scripts that may be available when obtained from SVN 
-	# instead of CPAN
-	
-	if (-e "$Bin/extras") {
-		push @{ $options->{script_files} }, (
-			'extras/bam2gff_bed.pl',
-			'extras/bar2wig.pl',
-			'extras/big_file2gff3.pl',
-			'extras/bin_genomic_data.pl',
-			'extras/change_chr_prefix.pl',
-			'extras/compare_subfeature_scores.pl',
-			'extras/convert_yeast_genome_version.pl',
-			'extras/get_actual_nuc_sizes.pl',
-			'extras/get_bam_seq_stats.pl',
-			'extras/intersect_nucs.pl',
-			'extras/intersect_SNPs.pl',
-			'extras/locate_SNPs.pl',
-			'extras/map_nucleosomes.pl',
-			'extras/map_oligo_data2gff.pl',
-			'extras/map_transcripts.pl',
-			'extras/novo_wrapper.pl',
-			'extras/process_microarray.pl',
-			'extras/split_bam_by_isize.pl',
-			'extras/ucsc_cytoband2gff3.pl',
-			'extras/verify_nucleosome_mapping.pl',
-		);
 	}
 }
 
