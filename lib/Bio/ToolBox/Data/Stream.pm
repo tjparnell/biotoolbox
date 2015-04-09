@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = 1.24;
+our $VERSION = 1.26;
 
 =head1 NAME
 
@@ -539,8 +539,8 @@ sub new {
 		$data = generate_data_structure($feature, @datasets);
 		
 		# add file name information
-		my ($basename, $path, $extension) = parse_filename($filename);
-		$data->{filename}  = $filename;
+		my ($basename, $path, $extension) = parse_filename($args{filename});
+		$data->{filename}  = $args{filename};
 		$data->{basename}  = $basename;
 		$data->{path}      = $path;
 		$data->{extension} = $extension;
