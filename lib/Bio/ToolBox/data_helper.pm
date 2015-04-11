@@ -1,5 +1,5 @@
 package Bio::ToolBox::data_helper;
-our $VERSION = 1.25;
+our $VERSION = 1.26;
 
 ### modules
 require Exporter;
@@ -16,7 +16,6 @@ our @EXPORT_OK = qw(
 	sort_data_structure
 	gsort_data_structure
 	splice_data_structure
-	index_data_table
 	find_column_index
 );
 
@@ -850,82 +849,6 @@ sub splice_data_structure {
 
 
 
-#### Index a data table
-sub index_data_table {
-	
-	# get the arguements
-	my ($data, $increment) = @_;
-	
-	# check data structure
-	unless (defined $data) {
-		carp " No data structure passed!";
-		return;
-	}
-	unless ( verify_data_structure($data) ) {
-		return;
-	}
-	if (exists $data->{'index'}) {
-		warn " data structure is already indexed!\n";
-		return 1;
-	}
-	
-	# check column indices
-	my $chr_index = find_column_index($data, '^chr|seq|refseq');
-	my $start_index = find_column_index($data, '^start');
-	unless (defined $chr_index and $start_index) {
-		carp " unable to find chromosome and start dataset indices!\n";
-		return;
-	}
-	
-	# define increment value
-	unless (defined $increment) {
-		# calculate default value
-		if (exists $data->{$start_index}{'win'}) {
-			# in genome datasets, window size metadata is stored with the 
-			# start position
-			# increment is window size x 20
-			# seems like a reasonable compromise between index size and efficiency
-			$increment = $data->{$start_index}{'win'} * 20;
-		}
-		else {
-			# use some random made-up default value that could be totally 
-			# inappropriate, maybe we should carp a warning instead
-			$increment = 100;
-		}
-	}
-	$data->{'index_increment'} = $increment;
-	
-	# generate index
-	my $table_ref = $data->{'data_table'};
-	my %index;
-	for (my $row = 1; $row <= $data->{'last_row'}; $row++) {
-		
-		# the index will consist of a complex hash structure
-		# the first key will be the chromosome name
-		# the first value will be the second key, and is the integer of 
-		# the start position divided by the increment
-		# the second value will be the row index number 
-		
-		# calculate the index value
-		my $index_value = int( $table_ref->[$row][$start_index] / $increment );
-		
-		# check and insert the index value
-		unless (exists $index{ $table_ref->[$row][$chr_index] }{ $index_value} ) {
-			# insert the current row, which should be the first occurence
-			$index{ $table_ref->[$row][$chr_index] }{ $index_value } = $row;
-		}
-	}
-	
-	# associate the index hash
-	$data->{'index'} = \%index;
-	
-	# success
-	return 1;
-}
-
-
-
-
 
 ### Subroutine to find a column
 sub find_column_index {
@@ -1087,34 +1010,6 @@ $data_structure_ref->{'data_table'}->[$row][$column]. The first row
 should always contain the column (dataset) names, regardless whether 
 the original data file had dataset names (e.g. GFF or BED files).
 
-=item index
-
-This is an optional index hash to provide faster lookup to specific 
-data table rows for genomic bin features. The index is generated 
-using the index_data_table() function. The index is comprised of 
-another hash data structure, where the first key represents the 
-chromosome name, and the second key represents an index value. 
-The index value is the integer (or whole number rounding down) of 
-the start value divided by the index_increment value. For example, 
-with a genomic bin feature at chr1:10691..10700 and an index_increment
-value of 100, the index value would be {chr1}{106}. The value of 
-that key would be the index number of that row, or more specifically, 
-the row index for the first occurence of that index_value (which 
-would've been genomic bin feature chr1:10601..10610). Hence, the 
-index will get you relatively close to your desired genomic 
-position within the data_table, but you will still need to step 
-through the features (rows) starting at the indexed position 
-until you find the row you want. That should save you a little bit 
-of time, at least. The index is not stored upon writing to a 
-standard data text file.
-
-=item index_increment
-
-This is a single number representing the increment value to calculate 
-the index value for the index. It is generated along with the index 
-by the index_data_table() function. The index_increment value is not 
-stored upon writing to a standard data text file.
-
 =back
 
 =head1 USAGE
@@ -1232,68 +1127,6 @@ the file segments back into a single file. The Parallel::ForkManager
 also has a method of merging the data structure into the parent 
 process using a disk file intermediate.
 
-=item index_data_table()
-
-This function creates an index hash for genomic bin features in the 
-data table. Rather than stepping through an entire data table of 
-genomic coordinates looking for a specific chromosome and start 
-feature (or data row), an index may be generated to speed up the 
-search, such that only a tiny portion of the data_table needs to be 
-stepped through to identify the correct feature.
-
-This function generates two additional keys in the data structure 
-described above, L</index> and L</index_increment>. Please refer to 
-those items in L<DATA STRUCTURE> for their description and 
-usage.
-
-Pass this subroutine one or two arguments. The first is the reference 
-to the data structure. The optional second argument is an integer 
-value to be used as the index_increment value. This value determines 
-the size and efficiency of the index; small values generate a larger 
-but more efficient index, while large values do the opposite. A 
-balance should be struck between memory consumption and speed. The 
-default value is 20 x the feature window size (determined from the 
-metadata). Therefore, finding the specific genomic coordinate 
-feature should take no more than 20 steps from the indexed position. 
-If successful, the subroutine returns a true value.
-
-Example
-
-	my $main_data = load_data_file($filename);
-	index_data_table($main_data) or 
-		die " unable to index data table!\n";
-	...
-	my $chr = 'chr9';
-	my $start = 123456;
-	my $index_value = 
-		int( $start / $main_data->{index_increment} ); 
-	my $starting_row = $main_data->{index}{$chr}{$index_value};
-	for (
-		my $row = $starting_row;
-		$row <= $main_data->{last_row};
-		$row++
-	) {
-		if (
-			$main_data->{data_table}->[$row][0] eq $chr and
-			$main_data->{data_table}->[$row][1] <= $start and
-			$main_data->{data_table}->[$row][2] >= $start
-		) {
-			# do something
-			# you could stop here, but what if you had overlapping
-			# genomic bins for some odd reason?
-		} elsif (
-			$main_data->{data_table}->[$row][0] ne $chr
-		) {
-			# no longer on same chromosome, stop the loop
-			last;
-		} elsif (
-			$main_data->{data_table}->[$row][1] > $start
-		) {
-			# moved beyond the window, stop the loop
-			last;
-		}
-	}
-		
 =item find_column_index()
 
 This subroutine helps to find the index number of a dataset or column given 
