@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.25;
+my $VERSION = 1.26;
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -547,7 +547,7 @@ sub collect_dataset {
 	# are we modifying or extending the coordinates of the region or feature?
 	
 	# Genomic regions
-	if ($Data->feature =~ /genome|region|segment|interval/i) {
+	if ($Data->feature_type eq 'coordinate') {
 		
 		# collect the genome dataset based on whether we need to modify 
 		# the genomic coordinates or not
@@ -574,7 +574,7 @@ sub collect_dataset {
 	}
 	
 	# Named features
-	else {
+	elsif ($Data->feature_type eq 'named') {
 		# collect the named feature dataset based on whether we need to modify 
 		# the genomic coordinates or not
 		
@@ -604,6 +604,10 @@ sub collect_dataset {
 		}
 	}
 	
+	else {
+		die " Unable to identify columns with feature identifiers!\n" .
+			" File must have Name and Type, or Chromo, Start, Stop columns\n";
+	}
 }
 
 
