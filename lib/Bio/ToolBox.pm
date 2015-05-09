@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = 1.25;
+our $VERSION = 1.26;
 
 1;
 
@@ -200,10 +200,11 @@ version of this data collection script, see the BioToolBox script B<get_datasets
 =head1 REPOSITORY
 
 Source code for the Bio::ToolBox package is maintained at 
-L<http://code.google.com/p/biotoolbox/>. Extensive documentation, including How To 
-documents, installation guides, and script documentation, can be found there as well.
+L<https://github.com/tjparnell/biotoolbox/>. Extensive documentation, including How To 
+documents, installation guides, and script documentation, can be found at 
+L<https://code.google.com/p/biotoolbox/>.
 
-Bugs and issues should be submitted at L<https://code.google.com/p/biotoolbox/issues/list>.
+Bugs and issues should be submitted at L<https://github.com/tjparnell/biotoolbox/issues>.
 
 =head1 AUTHOR
 
@@ -214,5 +215,4 @@ Bugs and issues should be submitted at L<https://code.google.com/p/biotoolbox/is
  Salt Lake City, UT, 84112
 
 This package is free software; you can redistribute it and/or modify
-it under the terms of the GPL (either version 1, or at your option,
-any later version) or the Artistic License 2.0. 
+it under the terms of the Artistic License 2.0. 
