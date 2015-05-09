@@ -1,5 +1,17 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.26 (git 21c800b)
+	- Removed Extras folder and outdated library functions. These 
+	are available as a separate GitHub project, biotoolbox-extra.
+	- Improved GFF3 parser to handle orphans more gracefully, and 
+	simplify parsing by adding a next_top_feature function. It is 
+	moved out of the db_helper hierarchy, where it never really belonged.
+	- Changed license to exclusively Artistic License 2.0.
+	- Fixed bug when using input files with coordinate information in 
+	script get_datasets. Thanks to Mengyao for reporting.
+	- Fixed bug when opening a new Data::Stream not based on a file or 
+	data list.
+
 v.1.25 (svn 955)
 	- Added a new option to manually specify the extension length 
 	and allow new ways to record read coverage in the script bam2wig.pl.
