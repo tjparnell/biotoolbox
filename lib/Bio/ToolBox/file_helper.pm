@@ -119,10 +119,26 @@ sub load_data_file {
 	# update metadata as necessary
 	if ($plusminus_count) {
 		# we have converted strand information
-		$data->{$strand_i}{'strand_style'} = 'plusminus';
-		if (exists $data->{$strand_i}{'AUTO'}) {
-			# update automatically generated metadata
-			$data->{$strand_i}{'AUTO'}++;
+		if (exists $data->{$strand_i}{'strand_style'}) {
+			# just in case, reset it to plusminus
+			$data->{$strand_i}{'strand_style'} = 'plusminus';
+		}
+		else {
+			$data->{$strand_i}{'strand_style'} = 'plusminus';
+			if (exists $data->{$strand_i}{'AUTO'}) {
+				# update automatically generated metadata
+				$data->{$strand_i}{'AUTO'}++;
+			}
+		}
+	}
+	else {
+		# no plusminus count, make sure metadata was not set automatically
+		# but this is technically a problem
+		if (exists $data->{$strand_i}{'strand_style'}) {
+			carp "File format is suspicious! format suggests plus/minus strand format" . 
+				" but none was found!?\n";
+			delete $data->{$strand_i}{'strand_style'};
+			$data->{$strand_i}{'AUTO'}--;
 		}
 	}
 	foreach my $s (@starts) {
@@ -1501,6 +1517,10 @@ sub _gff_metadata {
 			$data->{$i}{'name'};
 	}
 	
+	# set strand style
+	$data->{6}{'strand_style'} = 'plusminus';
+	$data->{6}{'AUTO'}++;
+	
 	# set headers flag to false
 	$data->{'headers'} = 0;
 	
@@ -1551,6 +1571,12 @@ sub _bed_metadata {
 		# assign the name to the column header
 		$data->{'column_names'}->[$i] = 
 			$data->{$i}{'name'};
+	}
+	
+	# set strand style
+	if ($column_count >= 6) {
+		$data->{5}{'strand_style'} = 'plusminus';
+		$data->{5}{'AUTO'}++;
 	}
 	
 	# set the feature type
@@ -1633,6 +1659,12 @@ sub _peak_metadata {
 		}
 	}
 	
+	# set strand style
+	if ($column_count >= 6) {
+		$data->{5}{'strand_style'} = 'plusminus';
+		$data->{5}{'AUTO'}++;
+	}
+	
 	# set the feature type
 	unless (defined $data->{'feature'}) {
 		$data->{'feature'} = 'region';
@@ -1691,6 +1723,11 @@ sub _ucsc_metadata {
 		$data->{'column_names'}->[$i] = 
 			$data->{$i}{'name'};
 	}
+	
+	# set strand style
+	my $strand_i = find_column_index($data, 'strand');
+	$data->{$strand_i}{'strand_style'} = 'plusminus';
+	$data->{$strand_i}{'AUTO'}++;
 	
 	# set the feature type
 	unless (defined $data->{'feature'}) {
