@@ -149,8 +149,8 @@ sub verify_data_structure {
 			$data->{$i}{'name'} eq 
 			$data->{'data_table'}->[0][$i]
 		) {
-			carp " incorrect or missing metadata!\n  Column header names don't" 
-				. " match metadata name values for index $i\n" . 
+			carp " incorrect or missing metadata!\n  Column header names don't" .
+				" match metadata name values for index $i\n" . 
 				"  compare '" . $data->{$i}{'name'} . "' with '" .
 				$data->{'data_table'}->[0][$i] . "'\n";
 			return;
