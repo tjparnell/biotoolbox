@@ -201,7 +201,7 @@ ok(-e $outfile, 'output file exists');
 
 # open the bed file we just wrote
 my $Stream = Bio::ToolBox::Data::Stream->new(
-	file    => $file,
+	in    => $file,
 );
 isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream object');
 is($Stream->bed, 4, 'bed value');
@@ -238,7 +238,7 @@ undef $Stream;
 # open again differently
 $Stream = Bio::ToolBox::Data->new(
 	stream      => 1,
-	file        => $file,
+	in          => $file,
 );
 isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream object');
 
@@ -253,6 +253,7 @@ is($outStream->basename, 'chrI_2', 'out Stream basename');
 # duplicate file
 while (my $row = $Stream->next_row) {
 	# just write the same thing, no need to modify
+	# write as Feature objects
 	$outStream->write_row($row);
 }
 $Stream->close_fh;
@@ -260,17 +261,19 @@ $outStream->close_fh;
 is(-s $file, -s $file1, "duplicate file sizes");
 
 # duplicate file again
+# specify out stream as a new empty bed file
 my $file2 = $file1;
 $file2 =~ s/_2\.bed/_3.bed/;
-$Stream = Bio::ToolBox::Data::Stream->new(file => $file);
-$outStream = $Stream->duplicate($file2);
+$Stream = Bio::ToolBox::Data::Stream->new(in => $file);
+$outStream = Bio::ToolBox::Data::Stream->new(out => $file2, bed => 4);
 while (my $row = $Stream->next_row) {
+	# write as arrays
 	my @a = $row->row_values;
 	$outStream->write_row(\@a);
 }
 $Stream->close_fh;
 $outStream->close_fh;
-is(-s $file, -s $file2, "duplicate file sizes again");
+cmp_ok(-s $file2, '<', -s $file, "smaller file size due to lack of comments");
 
 # reload the duplicate files
 my $reloaded = $Data->reload_children($file, $file1, $file2);

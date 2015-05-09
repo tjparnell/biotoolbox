@@ -819,7 +819,7 @@ sub reload_children {
 	
 	# open first stream
 	my $first = shift @files;
-	my $Stream = Bio::ToolBox::Data::Stream->new(file => $first);
+	my $Stream = Bio::ToolBox::Data::Stream->new(in => $first);
 	unless ($Stream) {
 		carp "unable to load first child file $first";
 		return;
@@ -856,7 +856,7 @@ sub reload_children {
 	
 	# load remaining files
 	foreach my $file (@files) {
-		my $Stream = Bio::ToolBox::Data::Stream->new(file => $file);
+		my $Stream = Bio::ToolBox::Data::Stream->new(in => $file);
 		if ($Stream->number_columns != $self->number_columns) {
 			confess "fatal error: child file $file has a different number of columns!";
 		}
