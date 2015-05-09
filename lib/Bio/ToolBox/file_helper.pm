@@ -12,7 +12,7 @@ use Bio::ToolBox::data_helper qw(
 	verify_data_structure
 	find_column_index
 );
-our $VERSION = 1.26;
+our $VERSION = 1.27;
 
 
 ### Variables
