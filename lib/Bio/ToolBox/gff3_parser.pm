@@ -1,4 +1,4 @@
-package Bio::ToolBox::db_helper::gff3_parser;
+package Bio::ToolBox::gff3_parser;
 
 use strict;
 use Carp qw(carp cluck croak confess);
@@ -11,23 +11,28 @@ eval {
 	$GZIP_OK = 1;
 };
 
-my $VERSION = '1.19';
+my $VERSION = '1.26';
 
 sub new {
 	my $class = shift;
-	my $self = {'fh' => undef};
+	my $self = {
+		'fh'            => undef,
+		'top_features'  => [],
+		'orphans'       => [],
+		'duplicate_ids' => {},
+	};
 	bless $self, $class;
 	
 	# check for a file name
 	if (@_) {
-		$self->parse_file(shift);
+		$self->open_file(shift);
 	}
 	
 	# done
 	return $self;
 }
 
-sub parse_file {
+sub open_file {
 	my $self = shift;
 	
 	# check file
@@ -108,6 +113,31 @@ sub next_feature {
 	return;
 }
 
+sub next_top_feature {
+	my $self = shift;
+	
+	# check that we have an open filehandle
+	unless ($self->fh) {
+		croak("no GFF3 file loaded to parse!");
+	}
+	
+	# get the top features
+	unless (scalar @{ $self->{top_features} }) {
+		# fill 'er up with features
+		@{ $self->{top_features} } = $self->top_features;
+	}
+	
+	# return the next top feature
+	if (scalar @{ $self->{top_features} }) {
+		# we have top features to give
+		return shift @{ $self->{top_features} };
+	}
+	else {
+		return;
+	}
+}
+
+
 sub top_features {
 	my $self = shift;
 	
@@ -118,8 +148,7 @@ sub top_features {
 	
 	# initialize
 	my @top_features;
-	my %orphans;
-	my %loaded; # hash of loaded features
+	my %loaded;
 	
 	# Collect the top features
 	# we will continue to read the file until we either reach the file end
@@ -132,6 +161,7 @@ sub top_features {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
+	TOP_FEATURE_LOOP:
 	while (my $line = $self->fh->getline) {
 		chomp $line;
 		
@@ -181,10 +211,20 @@ sub top_features {
 		my $id = $feature->primary_id;
 		if ($id) {
 			# this ID should be unique in the GFF file
+			# and all parents must have IDs
 			# complain if it isn't
 			if (exists $loaded{$id}) {
-				carp " Feature ID '$id' occurs more than once in file! skipping\n";
-				next;
+				# record how many times we've seen this
+				$self->{duplicate_ids}{$id}++;
+				
+				# check to see if this is child feature
+				unless ($feature->has_tag('Parent')) {
+					# without a parent, this must be an orphan, or a malformed GFF3 file
+					# anyway, keep this as an orphan
+					# use the memory address as a unique ID 
+					$self->_add_orphan($feature);
+					next TOP_FEATURE_LOOP;
+				}
 			} 
 			else {
 				$loaded{$id} = $feature;
@@ -206,13 +246,7 @@ sub top_features {
 				else {
 					# can't find the parent, maybe not loaded yet?
 					# put 'em in the orphanage
-					# using a hash with parent as key
-					if (exists $orphans{$parent}) {
-						push @{ $orphans{$parent} }, $feature;
-					}
-					else {
-						$orphans{$parent} = [ $feature ];
-					}
+					$self->_add_orphan($feature);
 				}
 			}
 		}
@@ -224,30 +258,38 @@ sub top_features {
 	# Finished loading the GFF lines (so far....)
 	
 	# check for orphans
-	if (%orphans) {
+	if (scalar @{ $self->{orphans} }) {
 		
-		my $lost_count = 0;
-		foreach my $parent (keys %orphans) {
+		my @reunited; # list of indices to delete after reuniting orphan with parent
+		
+		# go through the list of orphans
+		for (my $i = 0; $i < scalar @{ $self->{orphans} }; $i++) {
+			my $orphan = $self->{orphans}->[$i];
+			my $success = 0;
 			
 			# find the parent
-			if (exists $loaded{$parent}) {
-				# we have loaded the parent
-				# associate each orphan feature with the parent
-				foreach ( @{ $orphans{$parent} } ) {
-					$loaded{$parent}->add_SeqFeature($_);
+			foreach my $parent ($orphan->get_tag_values('Parent') ) {
+				if (exists $loaded{$parent}) {
+					# we have loaded the parent
+					# associate each orphan feature with the parent
+					$loaded{$parent}->add_SeqFeature($orphan);
+					$success++;
 				}
 			}
-			else {
-				# can't find the parent
-				# forget about them, just another statistic
-				$lost_count += scalar @{ $orphans{$parent} };
-			}
+			# delete the orphan from the array if it found it's long lost parent
+			push @reunited, $i if $success;
+		}
+		
+		# clean up the orphanage
+		while (@reunited) {
+			my $i = pop @reunited;
+			splice(@{ $self->{orphans} }, $i, 1);
 		}
 		
 		# report
-		if ($lost_count) {
-			carp " $lost_count features could not be associated with" . 
-				" reported parents!\n";
+		if (scalar @{ $self->{orphans} }) {
+			carp " " . scalar @{ $self->{orphans} } . " features could not be " . 
+				"associated with reported parents!\n";
 		}
 	}
 	
@@ -354,12 +396,29 @@ sub unescape {
 }
 
 
+sub _add_orphan {
+	my ($self, $feature) = @_;
+	push @{ $self->{orphans} }, $feature;
+	return 1;
+}
+
+
+sub orphans {
+	my $self = shift;
+	my @orphans;
+	foreach (@{ $self->{orphans} }) {
+		push @orphans, $_;
+	}
+	return @orphans;
+}
+
+
 
 __END__
 
 =head1 NAME
 
-Bio::ToolBox::db_helper::gff3_parser
+Bio::ToolBox::gff3_parser
 
 =head1 DESCRIPTION
 
@@ -374,26 +433,25 @@ transcripts of the same gene, are now supported.
 Embedded Fasta sequences are ignored, as are most comment and pragma lines.
 
 Close directives (###) in the GFF3 file are highly encouraged to limit 
-parsing, otherwise the entire file will be slurped into memory. Refer to 
-the GFF3 definition at http://www.sequenceontology.org for more details.
+parsing, otherwise the entire file will be slurped into memory. This happens 
+regardless of whether you retrieve top features one at a time or all at once. 
+Refer to the GFF3 definition at L<http://www.sequenceontology.org> for details 
+on the close directive.
 
 The SeqFeature objects that are returned are Bio::SeqFeature::Lite objects. 
 Refer to that documentation for more information.
 
 =head1 SYNOPSIS
 
-  use Bio::ToolBox::db_helper::gff3_parser;
+  use Bio::ToolBox::gff3_parser;
   my $filename = 'file.gff3';
   
-  my $parser = Bio::ToolBox::db_helper::gff3_parser->new($filename) or 
+  my $parser = Bio::ToolBox::gff3_parser->new($filename) or 
   	die "unable to open gff file!\n";
   
-  while (my @top_features = $parser->top_features() ) {
-  	while (@top_features) {
-  		my $feature = shift @top_features;
-  		# each $feature is a Bio::SeqFeature::Lite object
-  		my @children = $feature->get_SeqFeatures();
-  	}
+  while (my $feature = $parser->next_top_feature() ) {
+	# each $feature is a Bio::SeqFeature::Lite object
+	my @children = $feature->get_SeqFeatures();
   }
 
 =head1 METHODS
@@ -407,9 +465,10 @@ Refer to that documentation for more information.
 Initialize a new gff3_parser object.
 
 Optionally pass the name of the GFF3 file, and it will be automatically 
-opened by calling parse_file().
+opened by calling open_file(). There's not much to do unless you open a 
+file.
 
-=item parse_file($file)
+=item open_file($file)
 
 Pass the name of a GFF3 file to be parsed. The file must have a .gff or 
 .gff3 extension, and may optionally be gzipped (.gz extension). 
@@ -431,20 +490,27 @@ present. This may be used in a while loop until the end of the file
 is reached. Pragmas are ignored and comment lines and sequence are 
 automatically skipped. 
 
-=item top_features()
+=item next_top_feature()
 
-This method will return an array of the top (parent) features defined in 
-the GFF3 file. The file will be progressively parsed from the beginning 
-until either a close features pragma (###) or the end of the file is 
-reached. Child features (those containing a Parent attribute) are 
-associated with the parent feature. A warning will be issued about lost 
+This method will return a top level parent Bio::SeqFeature::Lite object 
+assembled with child features as sub-features. For example, a gene 
+object with mRNA subfeatures, which in turn may have exon and/or CDS 
+subfeatures. Child features are assembled based on the existence of 
+proper Parent attributes in child features. If no Parent attributes are 
+included in the GFF file, then this will behave as next_feature().
+
+Unless close features pragmas (###) are included in the file, this will 
+require loading all features in the file into memory to find proper 
+parent-child relationships. Child features (those containing a Parent attribute) 
+are associated with the parent feature. A warning will be issued about lost 
 children (orphans). Shared subfeatures, for example exons common to 
-multiple transcripts, are associated properly with each parent. 
+multiple transcripts, are associated properly with each parent. An opportunity 
+to rescue orphans is available using the orphans() method.
 
 Note that subfeatures may not necessarily be in ascending genomic order 
 when associated with the feature, depending on their order in the GFF3 
 file and whether shared subfeatures are present or not. When calling 
-subfeatures in your program, you should sort the subfeatures. For 
+subfeatures in your program, you may want to sort the subfeatures. For 
 example
   
   my @subfeatures = map { $_->[0] }
@@ -454,6 +520,23 @@ example
 
 When close pragmas are present in the file, call this method repeatedly 
 to finish parsing the remainder of the file. 
+
+=item top_features()
+
+This method will return an array of the top (parent) features defined in 
+the GFF3 file. This is similar to the next_top_feature() method except that 
+all features are returned at once. 
+
+Note that unless close pragmas are present in the file, requesting all top 
+features at once or one at a time will not save on memory; the entire file 
+will still be parsed into memory.
+
+=item orphans()
+
+This method will return an array of orphan SeqFeature objects that indicated 
+they had a parent but said parent could not be found. Typically, this is an 
+indication of an incomplete or malformed GFF3 file. Nevertheless, it might 
+be a good idea to check this after retrieving all top features.
 
 =item from_gff3_string($string)
 
