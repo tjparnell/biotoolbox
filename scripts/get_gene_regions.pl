@@ -11,9 +11,9 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
-use Bio::ToolBox::db_helper::gff3_parser;
+use Bio::ToolBox::gff3_parser;
 use Bio::ToolBox::utility;
-my $VERSION = 1.23;
+my $VERSION = 1.26;
 
 print "\n This program will get specific regions from features\n\n";
 

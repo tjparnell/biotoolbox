@@ -1,4 +1,4 @@
-package Bio::ToolBox::db_helper::gff3_parser;
+package Bio::ToolBox::gff3_parser;
 
 use strict;
 use Carp qw(carp cluck croak confess);
@@ -418,7 +418,7 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::db_helper::gff3_parser
+Bio::ToolBox::gff3_parser
 
 =head1 DESCRIPTION
 
@@ -443,10 +443,10 @@ Refer to that documentation for more information.
 
 =head1 SYNOPSIS
 
-  use Bio::ToolBox::db_helper::gff3_parser;
+  use Bio::ToolBox::gff3_parser;
   my $filename = 'file.gff3';
   
-  my $parser = Bio::ToolBox::db_helper::gff3_parser->new($filename) or 
+  my $parser = Bio::ToolBox::gff3_parser->new($filename) or 
   	die "unable to open gff file!\n";
   
   while (my $feature = $parser->next_top_feature() ) {
