@@ -33,6 +33,10 @@ our @EXPORT_OK = qw(
 	open_to_write_fh
 	write_summary_data
 	check_file
+	add_gff_metadata
+	add_bed_metadata
+	add_ucsc_metadata
+	add_peak_metadata
 	$std_col_names
 );
 
@@ -342,7 +346,7 @@ sub open_data_file {
 				# http://gmod.org/wiki/GFF3
 				
 				# generate metadata for gff files
-				_gff_metadata($data);
+				add_gff_metadata($data);
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -364,7 +368,7 @@ sub open_data_file {
 				# the fourth column is score, not name
 				
 				# generate metadata
-				_bed_metadata($data, $line);
+				add_bed_metadata($data, $line);
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -377,7 +381,7 @@ sub open_data_file {
 				# see http://genome.ucsc.edu/FAQ/FAQformat.html
 				
 				# generate metadata
-				_peak_metadata($data, $line);
+				add_peak_metadata($data, $line);
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -393,7 +397,7 @@ sub open_data_file {
 				# also biotoolbox script ucsc_table2gff3.pl
 				
 				# generate metadata
-				_ucsc_metadata($data, $line);
+				add_ucsc_metadata($data, $line);
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -407,7 +411,7 @@ sub open_data_file {
 				# importing to binary BAR files used in T2, USeq, and IGB
 				
 				# generate metadata
-				_sgr_metadata($data, $line);
+				add_sgr_metadata($data, $line);
 				
 				# end this loop
 				last PARSE_HEADER_LOOP;
@@ -420,7 +424,7 @@ sub open_data_file {
 				# we will do so now
 				
 				# generate metadata
-				_standard_metadata($data, $line);
+				add_standard_metadata($data, $line);
 				
 				# count as a header line
 				$header_line_count++;
@@ -1486,8 +1490,8 @@ sub _commented_header_line_metadata {
 }
 
 
-### Internal subroutine to generate metadata for gff files
-sub _gff_metadata {
+### Subroutine to generate metadata for gff files
+sub add_gff_metadata {
 	my $data = shift;
 	
 	# set column number
@@ -1531,8 +1535,8 @@ sub _gff_metadata {
 }
 
 
-### Internal subroutine to generate metadata for BED files
-sub _bed_metadata {
+### Subroutine to generate metadata for BED files
+sub add_bed_metadata {
 	my ($data, $line) = @_;
 
 	# first determine the number of columns we're working
@@ -1589,8 +1593,8 @@ sub _bed_metadata {
 }
 
 
-### Internal subroutine to generate metadata for broadpeak and narrowpeak files
-sub _peak_metadata {
+### Subroutine to generate metadata for broadpeak and narrowpeak files
+sub add_peak_metadata {
 	my ($data, $line) = @_;
 
 	my @elements = split /\s+/, $line;
@@ -1675,8 +1679,8 @@ sub _peak_metadata {
 }
 
 
-### Internal subroutine to generate metadata for various UCSC gene files
-sub _ucsc_metadata {
+### Subroutine to generate metadata for various UCSC gene files
+sub add_ucsc_metadata {
 	my ($data, $line) = @_;
 	
 	my @elements = split /\s+/, $line;
@@ -1739,8 +1743,8 @@ sub _ucsc_metadata {
 }
 
 
-### Internal subroutine to generate metadata for SGR files
-sub _sgr_metadata {
+### Subroutine to generate metadata for SGR files
+sub add_sgr_metadata {
 	my ($data, $line) = @_;
 	
 	# set column metadata
@@ -1770,7 +1774,7 @@ sub _sgr_metadata {
 
 
 ### Internal subroutine to generate metadata for standard files
-sub _standard_metadata {
+sub add_standard_metadata {
 	my ($data, $line) = @_;
 	
 	my @namelist = split /\t/, $line;
