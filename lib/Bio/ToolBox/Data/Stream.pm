@@ -11,13 +11,19 @@ Bio::ToolBox::Data::Stream - Read, Write, and Manipulate Data File Line by Line
   
   ### Open a pre-existing file
   my $Stream = Bio::ToolBox::Data->new(
-        file    => 'regions.bed',
+        in      => 'regions.bed',
         stream  => 1,
   );
   
   # or directly
   my $Stream = Bio::ToolBox::Data::Stream->new(
-        file    => 'regions.bed',
+        in      => 'regions.bed',
+  );
+  
+  ### Open a new file for writing
+  my $Stream = Bio::ToolBox::Data::Stream->new(
+        out     => 'output.txt',
+        columns => [qw(chromosome start stop name)],
   );
   
   
@@ -93,7 +99,7 @@ may also be opened using the L<Bio::ToolBox::Data> new function.
 	
 	my $Stream = Bio::ToolBox::Data->new(
 	   stream       => 1,
-	   file         => $filename,
+	   in           => $filename,
 	);
 
 Options to the new function are listed below. Streams are inherently either 
@@ -101,23 +107,51 @@ read or write mode, determined by the mode given through the options.
 
 =over 4
 
-=item file =E<gt> $filename
+=item in =E<gt> $filename
 
-Provide the path and name of the file to open. File types are recognized by 
-the extension, and compressed files (.gz) are supported. File types supported 
-include all those listed in L<Bio::ToolBox::file_helper>. Files are 
-checked for existence. Existing files are assumed to be read, and non-existent 
-files are assumed to be written, unless otherwise specified by the mode 
-option. This option is required.
+Provide the path and name of the file to open for reading. File types are 
+recognized by the extension, and compressed files (.gz) are supported. File 
+types supported include all those listed in L<Bio::ToolBox::file_helper>. 
 
-=item overwrite =E<gt> boolean
+=item out =E<gt> $filename
 
-If a file exists and you wish to overwrite, pass this option with a true value.
+Provide the path and name of the file to open for writing. No check is made 
+for pre-existing files; if it exists it will be overwritten! A new data 
+object is prepared, therefore column names must be provided. 
 
 =item columns =E<gt> [qw(Column1 Column2 ...)]
 
 When a new file is written, provide the names of the columns as an 
-anonymous array. 
+anonymous array. If no columns are provided, then a completely empty 
+data structure is made. Columns must be added with the add_column() 
+method below.
+
+=item gff =E<gt> $gff_version
+
+When writing a GFF file, provide a GFF version. When this is given, the 
+nine standard column names and metadata are automatically provided based 
+on the file format specification. Note that the column names are not 
+actually written in the file, but are maintained for internal use. 
+Acceptable versions include 1, 2, 2.5 (GTF), and 3 (GFF3).
+
+=item bed =E<gt> $number_of_bed_columns
+
+When writing a BED file, provide the number of bed columns that the file 
+will have. When this is given, the standard column names and metadata 
+will be automatically provided based on the standard file format 
+specification. Note that column names are not actually written to the file, 
+but are maintained for internal use. Acceptable values are integers from 
+3 to 12. 
+
+=item ucsc =E<gt> $number_of_columns
+
+When writing a UCSC-style file format, provide the number of bed columns 
+that the file will have. When this is given, the standard column names and 
+metadata will be automatically provided based on the file format specification. 
+Note that column names are not actually written to the file, but are maintained 
+for internal use. Acceptable values include 10 (refFlat without gene names), 
+11 (refFlat with gene names), 12 (knownGene gene prediction table), and 15 
+(an extended gene prediction or genePredExt table).
 
 =back
 
@@ -458,7 +492,10 @@ use Bio::ToolBox::file_helper qw(
 	open_to_write_fh
 	parse_filename
 	process_data_line
-	check_file
+	add_gff_metadata
+	add_bed_metadata
+	add_ucsc_metadata
+	$std_col_names
 );
 use Bio::ToolBox::Data::common;
 use Bio::ToolBox::Data::Feature;
@@ -473,28 +510,24 @@ sub new {
 	my $class = shift;
 	my %args  = @_;
 	
-	$args{features} ||= $args{feature} || 'feature';
-	$args{filename} ||= $args{file} || undef;
-	$args{overwrite} ||= 0;
-	
-	unless (defined $args{filename}) {
-		carp "a filename must be provided!";
+	# file arguments
+	$args{in}  ||= undef;
+	$args{out} ||= undef;
+	if (defined $args{in} and defined $args{out}) {
+		cluck "cannot define both 'in' and 'out' arguments!\n";
 		return;
-	}
+	} 
 	
 	# prepare
 	my $data;
 	my $fh;
 	my $mode;
 	
-	# check if the file exists
-	my $filename = check_file($args{filename});
-	
-	# default behavior is to open an existing file for reading
-	if ($filename and not $args{overwrite}) {
-		($fh, $data) = open_data_file($filename);
+	# open an existing file for reading
+	if ($args{in}) {
+		($fh, $data) = open_data_file($args{in});
 		unless ($data) {
-			croak "unable to read file $filename!";
+			croak "unable to read file $args{in}!";
 		}
 		$mode = 0; # read mode
 		
@@ -521,37 +554,97 @@ sub new {
 		}
 	}
 	
-	# alternate behavior if file does not exist is to create an empty stream
-	# and prepare it for writing
-	else {
-		my @datasets;
-		if (exists $args{datasets}) {
-			@datasets = @{ $args{datasets} };
+	# prepare to write to a new stream
+	elsif ($args{out}) {
+		
+		# first get list of dataset or column names
+		my @columns;
+		if (exists $args{columns}) {
+			@columns = @{ $args{columns} };
 		}
-		elsif (exists $args{columns}) {
-			@datasets = @{ $args{columns} };
+		elsif (exists $args{datasets}) {
+			@columns = @{ $args{datasets} };
 		}
-		unless (@datasets) {
-			carp "no column names provided!";
-			return;
-		}
-		my $feature = $args{features} || 'feature';
-		$data = generate_data_structure($feature, @datasets);
+		
+		# generate data structure
+		my $feature = $args{features} || $args{feature} || '';
+		$data = generate_data_structure($feature, @columns);
 		
 		# add file name information
-		my ($basename, $path, $extension) = parse_filename($args{filename});
-		$data->{filename}  = $args{filename};
+		my ($basename, $path, $extension) = parse_filename($args{out});
+		$data->{filename}  = $args{out};
 		$data->{basename}  = $basename;
 		$data->{path}      = $path;
 		$data->{extension} = $extension;
 		
-		# add extra information for checking strand and start information
-		$data->{strand_check} = undef;
-		$data->{column_starts} = [];
+		# add columns and/or metadata for special pre-defined formats
+		if (exists $args{gff}) {
+			# use standard names for the number of columns indicated
+			# we trust that the user knows the subtle difference between gff versions
+			$data->{gff} = $args{gff};
+			add_gff_metadata($data);
+			push @{ $data->{'data_table'} }, $data->{'column_names'};
+		}
+		elsif (exists $args{bed}) {
+			# use standard names for the number of columns indicated
+			unless ($args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3) {
+				carp "bed parameter must be an integer 3-12!";
+				return;
+			}	
+			$data->{bed} = $args{bed};
+			add_bed_metadata($data, join("\t", (1 .. $args{bed}) ));
+			push @{ $data->{'data_table'} }, $data->{'column_names'};
+		}
+		elsif (exists $args{ucsc}) {
+			# a ucsc format such as refFlat, genePred, or genePredExt
+			my $type = 'ucsc' . $args{ucsc};
+			if (exists $std_col_names->{$type}) {
+				$data->{ucsc} = $args{ucsc};
+				add_ucsc_metadata($data, join("\t", (1 .. $args{ucsc}) ));
+				push @{ $data->{'data_table'} }, $data->{'column_names'};
+			}
+			else {
+				carp "unrecognized ucsc value!";
+				return;
+			}
+		}
+		
+		# add extra information for checking strand information
+		if ($data->{gff} or $data->{bed} >= 6 or $data->{ucsc}) {
+			$data->{strand_check} = 1;
+		}
+		else {
+			# worry about this later....
+			$data->{strand_check} = undef;
+		}
+		
+		# add extra information for checking start information
+		if ($data->{'ucsc'} or $data->{'bed'}) {
+			my @starts;
+			foreach my $name (qw(start txStart cdsStart peak)) {
+				my $c = find_column_index($data, $name);
+				next unless defined $c;
+				next if (exists $data->{$c}{'base'} and $data->{$c}{'base'} == 1);
+				push @starts, $c;
+			}
+			$data->{column_starts} = \@starts;
+		}
+		else {
+			$data->{column_starts} = [];
+		}
 		
 		# we will not open the file handle quite yet in case the user 
 		# wants to modify metadata
 		$mode = 1; # write mode
+	}
+	
+	# no file name was specified
+	else {
+		if (exists $args{filename} or exists $args{file}) {
+			warn "You are using an outdated API! Please update your code!\n";
+		}
+		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
+		return;
 	}
 	
 	$data->{fh} = $fh;
