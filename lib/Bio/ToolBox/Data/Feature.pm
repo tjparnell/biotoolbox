@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.24;
+our $VERSION = 1.27;
 
 =head1 NAME
 
@@ -376,7 +376,7 @@ attribute key.
 =cut
 
 use strict;
-use Carp;
+use Carp qw(carp cluck croak confess);
 use Bio::ToolBox::db_helper qw(
 	get_feature
 	get_chromo_region_score
@@ -388,11 +388,16 @@ use Bio::ToolBox::db_helper qw(
 
 ### Initialization
 
-# this should only be called from Bio::ToolBox::Data::Iterator
 sub new {
+	# this should only be called from Bio::ToolBox::Data* iterators
 	my $class = shift;
 	my %self = @_;
-	return unless exists $self{data}; # this must be a Bio::ToolBox::Data object
+	unless (exists $self{data}) {
+		confess "new() must be called with a data element!";
+	}
+	unless (exists $self{'index'}) {
+		confess "new() must be called with an index integer!";
+	}
 	return bless \%self, $class;
 }
 
