@@ -478,30 +478,12 @@ the file handle. Use with caution.
 
 =cut
 
-
 use strict;
 use Carp qw(carp cluck croak confess);
-
-use Bio::ToolBox::data_helper qw(
-	generate_data_structure
-	find_column_index
-);
-use Bio::ToolBox::file_helper qw(
-	open_data_file
-	write_data_file
-	open_to_write_fh
-	parse_filename
-	process_data_line
-	add_gff_metadata
-	add_bed_metadata
-	add_ucsc_metadata
-	$std_col_names
-);
-use Bio::ToolBox::Data::common;
+use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::Data::Feature;
 
 1;
-
 
 
 #### Initialize ####
@@ -513,51 +495,59 @@ sub new {
 	# file arguments
 	$args{in}  ||= undef;
 	$args{out} ||= undef;
+	unless ($args{in} or $args{out}) {
+		if (exists $args{filename} or exists $args{file}) {
+			warn "You are using an outdated API! Please update your code!\n";
+		}
+		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
+		return;
+	}
 	if (defined $args{in} and defined $args{out}) {
 		cluck "cannot define both 'in' and 'out' arguments!\n";
 		return;
 	} 
 	
-	# prepare
-	my $data;
-	my $fh;
-	my $mode;
+	# prepare object
+	my $self = $class->SUPER::new();
 	
 	# open an existing file for reading
 	if ($args{in}) {
-		($fh, $data) = open_data_file($args{in});
-		unless ($data) {
-			croak "unable to read file $args{in}!";
-		}
-		$mode = 0; # read mode
 		
-		# add the column headers
-		push @{ $data->{data_table} }, $data->{'column_names'};
-		delete $data->{'column_names'}; # we no longer need this
+		my $filename = $self->check_file($args{in});
+		$self->add_file_metadata($filename);
+		my $fh = $self->open_to_read_fh or return;
+		$self->{fh} = $fh;
+		$self->{mode} = 0; # read mode
+		
+		# parse column headers
+		$self->parse_headers;
+		$self->{data_table}->[0] = $self->{'column_names'}; 
 		
 		# look for potential start columns to convert from 0-based
-		my @starts;
-		if ($data->{'ucsc'} or $data->{'bed'}) {
+		$self->{'0based_starts'} = [];
+		if ($self->bed or $self->{'ucsc'}) {
 			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = find_column_index($data, $name);
+				my $c = $self->find_column($name);
 				next unless defined $c;
-				next if (exists $data->{$c}{'base'} and $data->{$c}{'base'} == 1);
-				push @starts, $c;
+				push @{ $self->{'0based_starts'} }, $c;
 			}
 		}
-		$data->{column_starts} = \@starts;
 		
 		# potential strand column that may need to be converted
-		my $strand_i = find_column_index($data, '^strand$');
-		if (defined $strand_i) {
-			$data->{strand_check} = $strand_i;
-		}
+		$self->{plusminus_count} = 0;
 	}
 	
 	# prepare to write to a new stream
 	elsif ($args{out}) {
 		
-		# first get list of dataset or column names
+		# add file name information
+		$self->add_file_metadata($args{out});
+		
+		# we will not open the file handle quite yet in case the user 
+		# wants to modify metadata
+		$self->{mode} = 1; # set to write mode
+		
+		# get names of columns user may have passed
 		my @columns;
 		if (exists $args{columns}) {
 			@columns = @{ $args{columns} };
@@ -566,96 +556,61 @@ sub new {
 			@columns = @{ $args{datasets} };
 		}
 		
-		# generate data structure
-		my $feature = $args{features} || $args{feature} || '';
-		$data = generate_data_structure($feature, @columns);
-		
-		# add file name information
-		my ($basename, $path, $extension) = parse_filename($args{out});
-		$data->{filename}  = $args{out};
-		$data->{basename}  = $basename;
-		$data->{path}      = $path;
-		$data->{extension} = $extension;
-		
-		# add columns and/or metadata for special pre-defined formats
-		if (exists $args{gff}) {
+		# add the column names
+		if (@columns) {
+			foreach my $c (@columns) {
+				$self->add_column($c);
+			}
+		}
+		elsif (exists $args{gff} and $args{gff}) {
 			# use standard names for the number of columns indicated
 			# we trust that the user knows the subtle difference between gff versions
-			$data->{gff} = $args{gff};
-			add_gff_metadata($data);
-			push @{ $data->{'data_table'} }, $data->{'column_names'};
+			$self->add_gff_metadata($args{gff});
+			$self->{'data_table'}->[0] = $self->{'column_names'};
 		}
-		elsif (exists $args{bed}) {
+		elsif (exists $args{bed} and $args{bed}) {
 			# use standard names for the number of columns indicated
 			unless ($args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3) {
 				carp "bed parameter must be an integer 3-12!";
 				return;
 			}	
-			$data->{bed} = $args{bed};
-			add_bed_metadata($data, join("\t", (1 .. $args{bed}) ));
-			push @{ $data->{'data_table'} }, $data->{'column_names'};
+			$self->add_bed_metadata($args{bed});
+			$self->{'data_table'}->[0] = $self->{'column_names'};
 		}
-		elsif (exists $args{ucsc}) {
+		elsif (exists $args{ucsc} and $args{ucsc}) {
 			# a ucsc format such as refFlat, genePred, or genePredExt
-			my $type = 'ucsc' . $args{ucsc};
-			if (exists $std_col_names->{$type}) {
-				$data->{ucsc} = $args{ucsc};
-				add_ucsc_metadata($data, join("\t", (1 .. $args{ucsc}) ));
-				push @{ $data->{'data_table'} }, $data->{'column_names'};
-			}
-			else {
-				carp "unrecognized ucsc value!";
+			my $u = $self->add_ucsc_metadata($args{ucsc});
+			unless ($u) {
+				carp "unrecognized number of columns for ucsc format!";
 				return;
-			}
+			};
+			$self->{'data_table'}->[0] = $self->{'column_names'};
 		}
+		# else it will be an empty object with no columns
 		
-		# add extra information for checking strand information
-		if ($data->{gff} or $data->{bed} >= 6 or $data->{ucsc}) {
-			$data->{strand_check} = 1;
-		}
-		else {
-			# worry about this later....
-			$data->{strand_check} = undef;
-		}
+		# add feature
+		$args{feature} ||= $args{features} || undef;
+		$self->feature($args{feature}) unless $self->feature;
 		
-		# add extra information for checking start information
-		if ($data->{'ucsc'} or $data->{'bed'}) {
+		# look for potential start columns to convert from 0-based
+		$self->{'0based_starts'} = [];
+		if ($self->{'ucsc'} or $self->{'bed'}) {
 			my @starts;
 			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = find_column_index($data, $name);
+				my $c = $self->find_column($name);
 				next unless defined $c;
-				next if (exists $data->{$c}{'base'} and $data->{$c}{'base'} == 1);
-				push @starts, $c;
+				next if $self->metadata($c, 'base');
+				push @{ $self->{'0based_starts'} }, $c;
 			}
-			$data->{column_starts} = \@starts;
 		}
-		else {
-			$data->{column_starts} = [];
-		}
-		
-		# we will not open the file handle quite yet in case the user 
-		# wants to modify metadata
-		$mode = 1; # write mode
 	}
 	
-	# no file name was specified
-	else {
-		if (exists $args{filename} or exists $args{file}) {
-			warn "You are using an outdated API! Please update your code!\n";
-		}
-		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
-		return;
-	}
-	
-	$data->{fh} = $fh;
-	$data->{mode} = $mode;
-	return bless $data, $class;
+	return $self;
 }
 
 
 sub duplicate {
-	my $self = shift;
-	my $filename = shift;
+	my ($self, $filename) = @_;
 	unless ($filename) {
 		carp "a new filename must be provided!";
 		return;
@@ -666,50 +621,47 @@ sub duplicate {
 	}
 	
 	# duplicate the data structure
-	my $data = generate_data_structure( $self->feature, $self->list_columns );
+	my $columns = $self->list_columns;
+	my $Dup = Bio::ToolBox::Data::Stream->new(
+		'out' => $filename, 
+		'columns' => $columns,
+	) or return;
 	
 	# copy the metadata
 	for (my $i = 0; $i < $self->number_columns; $i++) {
 		# column metadata
 		my %md = $self->metadata($i);
-		$data->{$i} = \%md;
+		$Dup->{$i} = \%md;
 	}
-	foreach (qw(program db bed gff ucsc headers)) {
+	foreach (qw(feature program db bed gff ucsc headers)) {
 		# various keys
-		$data->{$_} = $self->{$_};
+		$Dup->{$_} = $self->{$_};
 	}
-	$data->{column_starts} = [ @{ $self->{column_starts} } ];
+	$Dup->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
 	my @comments = $self->comments;
-	push @{$data->{other}}, @comments;
+	push @{$Dup->{comments}}, @comments;
 	
-	# add file name information
-	undef $data->{fh};
-	$data->{mode} = 1;
-	my ($basename, $path, $extension) = parse_filename($filename);
-	$data->{filename}  = $filename;
-	$data->{basename}  = $basename;
-	$data->{path}      = $path;
-	$data->{extension} = $extension;
-	
-	return bless $data, 'Bio::ToolBox::Data::Stream';
+	return $Dup;
 }
 
 
 
 ### Column manipulation
 
-# see also Bio::ToolBox::Data::common for imported methods
-
 sub add_column {
 	my ($self, $name) = @_;
 	return unless $name;
+	unless ($self->mode) {
+		cluck "We have a read-only Stream object, cannot add columns";
+		return;
+	}
 	if (defined $self->{fh}) {
 		# Stream file handle is opened
 		cluck "Cannot modify columns when a Stream file handle is opened!";
 		return;
 	}
 	
-	my $column = $self->{number_columns};
+	my $column = $self->number_columns;
 	$self->{$column} = {
 		'name'      => $name,
 		'index'     => $column,
@@ -722,6 +674,10 @@ sub add_column {
 
 sub copy_column {
 	my $self = shift;
+	unless ($self->mode) {
+		cluck "We have a read-only Stream object, cannot add columns";
+		return;
+	}
 	if (defined $self->{fh}) {
 		# Stream file handle is opened
 		cluck "Cannot modify columns when a Stream file handle is opened!";
@@ -746,25 +702,21 @@ sub next_row {
 		return;
 	}
 	
-	# process the data line, converting strand and 0-based coordinates as necessary
+	# read and add the next line in the file
 	my $line = $self->{fh}->getline;
 	return unless $line;
-	my ($linedata, $plusminus) = process_data_line($line, $self->number_columns, 
-		$self->strand_column, @{ $self->{column_starts} });
+	if ($line =~ /^#/) {
+		$self->add_comment($line);
+		return $self->next_row;
+	}
+	return $self->next_row if $line !~ m/\w+/;
 	
-	# update the data table
-	# it will always be row 1
-	$self->{data_table}->[1] = $linedata;
-	
-	# update metadata as necessary
-	if (defined $self->{strand_check} and $plusminus) {
-		$self->metadata($self->strand_column, 'strand_style', 'plusminus');
-		my $auto = $self->metadata($self->strand_column, 'AUTO');
-		if ($auto) {
-			# update automatically generated metadata
-			$self->metadata($self->strand_column, 'AUTO', $auto++);
-		}
-		undef $self->{strand_check}; # we no longer need to check this
+	# add the current line to the data table as row 1
+	splice( @{ $self->{data_table} }, 1, 1); # remove the old line
+	my $added = $self->add_data_line($line);
+	unless ($added) {
+		cluck "could not process line '$line'!";
+		return $self->next_row;
 	}
 	
 	# return the feature
@@ -791,20 +743,19 @@ sub write_row {
 	# open the file handle if it hasn't been opened yet
 	unless (defined $self->{fh}) {
 		# we first write a standard empty data file with metadata and headers
-		my $filename = write_data_file(
-			data     => $self,
-			filename => $self->filename,
-		);
-		unless ($filename) {
+		my $newfile = $self->write_file($self->filename);
+		unless ($newfile) {
 			die "unable to write file!";
 		}
 		
 		# just in case the filename is changed when writing the file
-		$self->filename($filename);
+		if ($newfile ne $self->filename) {
+			$self->add_file_metadata($newfile);
+		}
 		
 		# then we re-open the file for appending
-		my $fh = open_to_write_fh($filename, undef, 1) or 
-			die "unable to append to file $filename!";
+		my $fh = $self->open_to_write_fh($newfile, undef, 1) or 
+			die "unable to append to file $newfile!";
 		$self->{fh} = $fh;
 	}
 	
@@ -813,80 +764,30 @@ sub write_row {
 	my @values;
 	if ($data_ref eq 'Bio::ToolBox::Data::Feature') {
 		# user passed a Feature object
-		
-		# get the values
 		@values = $data->row_values;
-		
-		# check strand information
-		unless (defined $self->{strand_check}) {
-			# we do this check only once, presuming that if it's true for the first 
-			# one, it's probably true for all
-			# too expensive to do every time we perform a write, right?
-			# must dig back into the original Stream object, which may or may not be self
-			if ($data->{data}->strand_column) {
-				if ($data->{data}->metadata( $data->{data}->strand_column, 'strand_style') 
-					eq 'plusminus'
-				) {
-					# we do need to convert strand back
-					$self->{strand_check} = 1;
-				}
-				else {
-					# we should not convert strand back
-					$self->{strand_check} = 0;
-				}
-			}
-			
-			# also check start coordinates while we're at it
-			if (scalar @{ $data->{data}->{column_starts} } > 0) {
-				$self->{column_starts} = [ @{ $data->{data}->{column_starts} } ];
-			}
-			else {
-				$self->{column_starts} = [];
-			}
-		}
 	}
 	elsif ($data_ref eq 'ARRAY') {
 		# user passed an array of values
 		@values = @$data;
-		
-		# check strand information
-		unless (defined $self->{strand_check}) {
-			# we do this check only once, presuming that if it's true for the first 
-			# one, it's probably true for all
-			# too expensive to do every time we perform a write, right?
-			# use the metadata from the current Stream object which may not be accurate
-			if ($self->strand_column) {
-				if (
-					$self->metadata($self->strand_column, 'strand_style') eq 'plusminus'
-				) {
-					# we need to convert strand back
-					$self->{strand_check} = 1;
-				}
-				else {
-					# we do not need to convert strand back
-					$self->{strand_check} = 0;
-				}
-			}
-		}
 	}
 	
 	# write the values as necessary
 	if (@values) {
 		# we have an array of values to write
 		# make adjustments as necessary
-		if ($self->{strand_check}) {
+		my $strand_i = $self->strand_column;
+		if (defined $strand_i and $values[$strand_i] =~ /\d/) {
 			# strand adjustment
-			my $i = $data->{data}->strand_column;
-			if ($values[$i] >= 0) {
-				$values[$i] = '+';
+			if ($values[$strand_i] >= 0) {
+				$values[$strand_i] = '+';
 			}
 			else {
-				$values[$i] = '-';
+				$values[$strand_i] = '-';
 			}
 		}
-		if ( @{$self->{column_starts}} ) {
+		if ( @{$self->{'0based_starts'}} ) {
 			# 0-based start coordinate adjustment
-			foreach my $c ( @{$self->{column_starts}} ) {
+			foreach my $c ( @{$self->{'0based_starts'}} ) {
 				$values[$c] -= 1;
 			}
 		}
