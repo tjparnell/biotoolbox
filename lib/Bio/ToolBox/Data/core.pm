@@ -15,7 +15,6 @@ should not be used directly. See the respective modules for more information.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use Module::Load;
 use Bio::ToolBox;
 use base 'Bio::ToolBox::Data::file';
 use Bio::ToolBox::db_helper qw(
@@ -42,7 +41,7 @@ sub new {
 		'ucsc'           => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
-		'headers'        => 0,
+		'headers'        => 1,
 		'column_names'   => [],
 		'filename'       => undef,
 		'basename'       => undef,
@@ -693,7 +692,7 @@ sub last_row {
 sub filename {
 	my $self = shift;
 	if (@_) {
-		carp "filename() is a read only method. Use parse_filename().";
+		carp "filename() is a read only method. Use add_file_metadata().";
 	}
 	return $self->{filename};
 }
@@ -701,7 +700,7 @@ sub filename {
 sub basename {
 	my $self = shift;
 	if (@_) {
-		carp "basename() is a read only method. Use parse_filename().";
+		carp "basename() is a read only method. Use add_file_metadata().";
 	}
 	return $self->{basename};
 }
@@ -709,7 +708,7 @@ sub basename {
 sub path {
 	my $self = shift;
 	if (@_) {
-		carp "path() is a read only method. Use parse_filename().";
+		carp "path() is a read only method. Use add_file_metadata().";
 	}
 	return $self->{path};
 }
@@ -717,7 +716,7 @@ sub path {
 sub extension {
 	my $self = shift;
 	if (@_) {
-		carp "extension() is a read only method. Use parse_filename().";
+		carp "extension() is a read only method. Use add_file_metadata().";
 	}
 	return $self->{extension};
 }
@@ -864,9 +863,9 @@ sub find_column {
 	
 	# walk through each column index
 	my $index;
-	for (my $i = 0; $i < $data->{'number_columns'}; $i++) {
+	for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
 		# check the names of each column
-		if ($data->{$i}{'name'} =~ /$name/i) {
+		if ($self->{$i}{'name'} =~ /$name/i) {
 			$index = $i;
 			last;
 		}
@@ -880,13 +879,13 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = find_column_index($self, '^name|geneName|transcriptName|geneid|id|alias');
-	my $type   = find_column_index($self, '^type|class|primary_tag');
-	my $id     = find_column_index($self, '^primary_id');
-	my $chromo = find_column_index($self, '^chr|seq|ref|ref.?seq');
-	my $start  = find_column_index($self, '^start|position|pos|txStart$');
-	my $stop   = find_column_index($self, '^stop|end|txEnd');
-	my $strand = find_column_index($self, '^strand');
+	my $name   = $self->find_column('^name|geneName|transcriptName|geneid|id|alias');
+	my $type   = $self->find_column('^type|class|primary_tag');
+	my $id     = $self->find_column('^primary_id');
+	my $chromo = $self->find_column('^chr|seq|ref|ref.?seq');
+	my $start  = $self->find_column('^start|position|pos|txStart$');
+	my $stop   = $self->find_column('^stop|end|txEnd');
+	my $strand = $self->find_column('^strand');
 	$self->{column_indices} = {
 		'name'      => $name,
 		'type'      => $type,

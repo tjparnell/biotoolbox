@@ -50,7 +50,7 @@ sub load_file {
 	return unless $fh;
 	$self->{fh} = $fh;
 	$self->parse_headers;
-	$self->{data_table}->[0] eq $self->{'column_names'}; 
+	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
 	# set metadata for converting 0-based starts to 1-based
 	$self->{'0based_starts'} = [];
@@ -72,7 +72,7 @@ sub load_file {
 	$self->{plusminus_count} = 0;
 	
 	# Load the data table
-	while (my $line = $fh->getline) {		
+	while (my $line = $self->{fh}->getline) {		
 		# the current file position should be at the beginning of the
 		# data table information
 		
@@ -128,7 +128,7 @@ sub load_file {
 	$self->{'last_row'} = scalar @{ $self->{'data_table'} } - 1;
 	
 	# completed loading the file
-	$fh->close;
+	$self->{fh}->close;
 	delete $self->{fh};
 	
 	# verify the structure
@@ -148,14 +148,14 @@ sub parse_headers {
 	my $self = shift;
 	my $fh = shift || $self->{fh};
 	my $noheader = shift || 0; # boolean to indicate no headers are present
-	unless (ref $fh =~ /^IO/) {
+	unless (ref($fh) =~ /^IO/) {
 		confess " must pass an open IO::Handle compatible object!\n";
 	}
 	
 	# read and parse the file
 	# we will ONLY parse the header lines prefixed with a #, as well as the 
-	# first data row which contains the column names, except for gff files
-	# which don't have column names
+	# first data row which contains the column names
+	$self->program(undef); # reset this to blank, it will be filled by file metadata
 	my $header_line_count = 0;
 	PARSE_HEADER_LOOP:
 	while (my $line = $fh->getline) {		
@@ -246,7 +246,7 @@ sub parse_headers {
 			# we will first check for those file formats and process accordingly
 			
 			### Data tables with a commented header line 
-			if ( $self->have_commented_header_line($line) ) {
+			if ( $self->_commented_header_line($line) ) {
 				# these will have one comment line marked with #
 				# that really contains the column headers
 				
@@ -405,8 +405,10 @@ sub add_data_line {
 	}
 	
 	# adjust start positions
-	foreach my $s (@{ $self->{'0based_starts'} }) {
-		$linedata[$s] += 1;
+	if (exists $self->{'0based_starts'}) {
+		foreach my $s (@{ $self->{'0based_starts'} }) {
+			$linedata[$s] += 1;
+		}
 	}
 	
 	# add the line of data
@@ -432,24 +434,21 @@ sub add_file_metadata {
 
 
 
-### Write out a data file from the data hash
+### Write out a data file
 sub write_file {
 	my $self = shift;
 	
 	# collect passed arguments
 	my %args;
 	if (scalar(@_) == 1) {
-		$args{'filename'};
+		$args{'filename'} = $_[0];
 	}
-	elsif (scalar(@_) % 2 == 0) {
+	else {
 		%args = @_;
 	}
-	 
-	$args{'filename'} ||= undef;
+	$args{'filename'} ||= $args{'file'} || undef;
 	$args{'format'}   ||= undef;
 	unless (exists $args{'gz'}) {$args{'gz'} = undef} 
-		# this is a boolean value, need to be cognizant of 0
-		# this will be checked below
 	
 	# check the data
 	unless ($self->verify) {
@@ -474,54 +473,45 @@ sub write_file {
 	my ($name, $path, $extension) = fileparse($args{'filename'}, $SUFFIX);
 	
 	# Adjust filename extension if necessary
-	if ($extension) {
-		
-		# GFF file
-		if ($extension =~ /g[tf]f/i) {
-			unless ($self->gff) {
-				# it's not set as a gff data
-				# let's set it to true and see if it passes verification
-				$self->{'gff'} = 3; # default
-				unless ($self->verify and $self->gff) {
-					warn " re-setting extension from $extension to .txt\n";
-					$extension =~ s/g[tf]f3?/txt/i;
-				}
-			}
-		}
-		
-		# BED file
-		elsif ($extension =~ /bed|bdg|peak/i) {
-			unless ($self->bed) {
-				# it's not set as a bed data
-				# let's set it to true and see if it passes verification
-				$self->{'bed'} = 1; # a fake true
-				unless ($self->verify and$self->{'bed'}) {
-					warn " re-setting extension from $extension to .txt\n";
-					$extension =~ s/bed|bdg/txt/i;
-				}
-			}
-		}
-		
-		# SGR file
-		elsif ($extension =~ /sgr/i) {
-			if ($self->{'extension'} =~ /sgr/i) {
-				# the original file extension was sgr then it 
-				# likely passed verification above so we will keep it
-			}
-			else {
-				# original file was not SGR
-				# let's pretend it was and see if still passes 
-				# the sgr verification relies on the recorded extension
-				$self->{'extension'} = '.sgr';
-				$self->verify;
-				if ($self->extension =~ /txt/) {
-					warn " re-setting extension from $extension to .txt\n";
-				}
-				$extension = $self->{'extension'};
+	if ($extension =~ /g[tf]f/i) {
+		unless ($self->gff) {
+			# it's not set as a gff data
+			# let's set it to true and see if it passes verification
+			$self->{'gff'} = 3; # default
+			unless ($self->verify and $self->gff) {
+				warn " re-setting extension from $extension to .txt\n";
+				$extension =~ s/g[tf]f3?/txt/i;
 			}
 		}
 	}
-	
+	elsif ($extension =~ /bed|bdg|peak/i) {
+		unless ($self->bed) {
+			# it's not set as a bed data
+			# let's set it to true and see if it passes verification
+			$self->{'bed'} = 1; # a fake true
+			unless ($self->verify and $self->{'bed'}) {
+				warn " re-setting extension from $extension to .txt\n";
+				$extension =~ s/bed|bdg/txt/i;
+			}
+		}
+	}
+	elsif ($extension =~ /sgr/i) {
+		if ($self->{'extension'} =~ /sgr/i) {
+			# the original file extension was sgr then it 
+			# likely passed verification above so we will keep it
+		}
+		else {
+			# original file was not SGR
+			# let's pretend it was and see if still passes 
+			# the sgr verification relies on the recorded extension
+			$self->{'extension'} = '.sgr';
+			$self->verify;
+			if ($self->extension =~ /txt/) {
+				warn " re-setting extension from $extension to .txt\n";
+			}
+			$extension = $self->{'extension'};
+		}
+	}
 	else {
 		# no extension was available
 		# try and determine one from metadata
@@ -624,10 +614,7 @@ sub write_file {
 		foreach my $name (qw(start txStart cdsStart peak)) {
 			my $c = $self->find_column($name);
 			next unless defined $c;
-			if (
-				exists $self->{$c}{'base'} and 
-				$self->{$c}{'base'} == 1
-			) {
+			if (exists $self->{$c}{'base'} and $self->{$c}{'base'}) {
 				push @starts, $c;
 			}
 		}
@@ -650,8 +637,10 @@ sub write_file {
 	# Convert strand information
 	my $strand_i = $self->strand_column;
 	if (
-		defined $strand_i and
-		$self->metadata($strand_i, 'strand_style') eq 'plusminus'
+		defined $strand_i and (
+			$self->metadata($strand_i, 'strand_style') eq 'plusminus' or 
+			($self->gff or $self->bed or $self->{ucsc})
+		)
 	) {
 		# strand information was originally BED and GFF style +,.,-
 		# then convert back to that format before writing
@@ -825,6 +814,9 @@ sub write_file {
 	return $newname;
 }
 
+sub save {
+	return shift->write_file(@_);
+}
 
 
 
@@ -842,7 +834,7 @@ sub open_to_read_fh {
 	return unless $file;
 	
 	# Open filehandle object as appropriate
-	my $fh; # filehandle
+	my $fh; 
 	if ($file =~ /\.gz$/i) {
 		# the file is compressed with gzip
 		$fh = IO::File->new("gzip -dc $file |") or 
@@ -858,7 +850,7 @@ sub open_to_read_fh {
 		$fh = IO::File->new($file, 'r') or 
 			carp "unable to read '$file' $!\n";
 	}
-	return $fh if defined $fh;	
+	return $fh;	
 }
 
 
@@ -932,153 +924,6 @@ sub open_to_write_fh {
 
 
 
-
-
-### Generate a summary data file
-
-sub summary_file {
-	my $self = shift;
-	unless ($self->last_row > 1) {
-		cluck "must have a data table with more than 1 row! Data::Streams don't count";
-		return;
-	}
-	
-	# Collect passed arguments
-	my %args = @_; 
-	unless (%args) {
-		cluck "no arguments passed!";
-		return;
-	}
-	
-	# parameters
-	my $outfile =        $args{'filename'}    || undef;
-	my $dataset =        $args{'dataset'}     || undef;
-	my $startcolumn =    $args{'startcolumn'} || undef;
-	my $endcolumn =      $args{'endcolumn'}   || $args{'stopcolumn'}  || undef;
-	my $log =            $args{'log'}         || undef;
-	
-	# Check required values
-	unless ($self->verify) {
-		cluck "bad data structure!";
-		return;
-	}
-	unless (defined $outfile) {
-		if ($self->basename) {
-			# use the opened file's filename if it exists
-			# prepend the path if it exists
-			# the extension will be added later
-			$outfile = $self->path . $self->basename;
-		}
-		else {
-			cluck "no filename passed to write_summary_data!\n";
-			return;
-		}
-	}
-	
-	# Auto calculate missing arguments
-	unless (defined $startcolumn) {
-		# we will attempt to determine where to start the summing process
-		# we will skip those columns with common feature-description names
-		
-		my @acceptable_indices; # array of acceptable indices
-		my %skip = map {$_ => 1} qw (systematicname name id alias aliases type class 
-				geneclass chromosome chromo seq_id seqid start stop end gene strand 
-				length primary_id);
-		
-		# walk through the dataset names
-		for (my $i = 0; $i < $self->number_columns; $i++) {
-			unless (exists $skip{ lc $self->{$i}{'name'} } ) {
-				push @acceptable_indices, $i;
-			}
-		}
-		
-		# The start column should be the lowest index number in the list of
-		# acceptable_indices array.
-		# Assuming, of course, that feature descriptor datasets (columns) are
-		# leftmost only.
-		$startcolumn = min(@acceptable_indices);
-	}
-	unless (defined $endcolumn) {
-		# take the last or rightmost column
-		$endcolumn = $self->number_columns - 1;
-	}
-	unless ($dataset) {
-		# the original dataset name (i.e. the name of the dataset in the 
-		# database from which the column's data was derived) 
-		$dataset = $self->metadata($startcolumn, 'dataset') || 'data_scores';
-	}
-	unless (defined $log) {
-		# the log flag should be set in the column metadata and should be the
-		# same in all
-		$log = $self->metadata($startcolumn, 'log2') || 0;
-	}
-	
-	# Prepare score column name
-		# we will use the basename of the output file name to make it 
-		# easier in downstream applications
-	my ($data_name, undef, undef) = fileparse($outfile, $SUFFIX);
-	
-	# Prepare array to store the summed data
-	my $summed_data = $self->new(
-		feature => 'averaged_windows', 
-		columns => ['Window','Midpoint', $data_name],
-	);
-	$summed_data->database = $self->database;
-	$summed_data->metadata(0, 'number_features', $self->last_row);
-	$summed_data->metadata(2, 'log2', $log);
-	$summed_data->metadata(2, 'dataset', $dataset);
-	
-	
-	# Collect summarized data
-	for (
-		my $column = $startcolumn;
-		$column <= $endcolumn;
-		$column++
-	) { 
-		
-		# determine the midpoint position of the window
-		my $midpoint = int mean(
-			# this assumes the column metadata has start and stop
-			$self->metadata($column, 'start'),	
-			$self->metadata($column, 'stop'),	
-		) or undef; 
-		
-		
-		# collect the values in the column
-		my @values;
-		for my $row (1..$self->last_row) {
-			my $v = $self->value($row, $column);
-			push @values, $v if $v ne '.';
-		}
-		
-		# adjust if log value
-		if ($log) {
-			@values = map { 2 ** $_ } @values;
-		}
-		
-		# determine mean value
-		my $window_mean = mean(@values);
-		if ($log) { 
-			$window_mean = log($window_mean) / log(2);
-		}
-		
-		# push to summed output
-		$summed_data->add_row( [ $self->{$column}{'name'}, $midpoint, $window_mean ] );
-	}
-	
-	# Write summed data
-	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
-	my $written_file = $summed_data->write_file(
-		'filename'  => $outfile . '_summed',
-		'gz'        => 0,
-	);
-	return $written_file;
-}
-
-
-
-
-
 ### Subroutine to check for file existance
 sub check_file {
 	my ($self, $filename) = @_;
@@ -1109,9 +954,9 @@ sub _commented_header_line {
 	
 	# prepare arrays from the other lines and current line
 	my @commentdata;
-	if ( scalar @{ $data->{'other'} } >= 1 ) {
+	if ( scalar @{ $data->{'comments'} } >= 1 ) {
 		# take the last line in the other array
-		@commentdata = split /\t/, $data->{'other'}->[-1];
+		@commentdata = split /\t/, $data->{'comments'}->[-1];
 	}
 	my @linedata = split /\t/, $line;
 	
@@ -1169,6 +1014,7 @@ sub add_column_metadata {
 		# also update the number of columns
 		$data->{'number_columns'} += 1;
 	}
+	return 1;
 }
 
 ### Subroutine to generate metadata for gff files
@@ -1220,6 +1066,7 @@ sub add_gff_metadata {
 	unless (defined $self->{'feature'}) {
 		$self->{'feature'} = 'region';
 	}
+	return 1;
 }
 
 
@@ -1275,6 +1122,7 @@ sub add_bed_metadata {
 	
 	# set headers flag to false
 	$self->{'headers'} = 0;
+	return 1;
 }
 
 
@@ -1320,6 +1168,7 @@ sub add_peak_metadata {
 	
 	# set headers flag to false
 	$self->{'headers'} = 0;
+	return 1;
 }
 
 
@@ -1364,6 +1213,7 @@ sub add_ucsc_metadata {
 	
 	# set headers flag to false
 	$self->{'headers'} = 0;
+	return 1;
 }
 
 
@@ -1398,6 +1248,7 @@ sub add_sgr_metadata {
 	unless (defined $self->{'feature'}) {
 		$self->{'feature'} = 'region';
 	}
+	return 1;
 }
 
 
@@ -1440,6 +1291,7 @@ sub add_standard_metadata {
 	
 	# set headers flag to true
 	$self->{'headers'} = 1;
+	return 1;
 }
 
 
