@@ -28,10 +28,10 @@ isa_ok($Data, 'Bio::ToolBox::Data', 'GFF3 Data');
 # test general metadata
 is($Data->gff, 3, 'gff version');
 is($Data->bed, 0, 'bed version');
-is($Data->program, '', 'program name');
+is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
-is($Data->database, '', 'database');
+is($Data->database, undef, 'database');
 is($Data->filename, $infile, 'filename');
 is($Data->basename, 'chrI', 'basename');
 is($Data->extension, '.gff3', 'extension');
