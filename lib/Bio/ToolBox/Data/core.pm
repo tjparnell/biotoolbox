@@ -258,6 +258,7 @@ sub verify {
 		# so only check these if the original file extension was bed
 		if (
 			exists $self->{'extension'} and 
+			defined $self->{'extension'} and
 			$self->{'extension'} =~ /bed|bdg/i
 		) {
 			if (
@@ -319,6 +320,7 @@ sub verify {
 		} 
 		elsif (
 			exists $self->{'extension'} and 
+			defined $self->{'extension'} and
 			$self->{'extension'} =~ /peak/i
 		) {
 			# some sort of peak file
@@ -463,7 +465,8 @@ sub verify {
 	}
 	
 	# check proper SGR file structure
-	if (defined $self->{'extension'} and 
+	if (exists $self->{'extension'} and 
+		defined $self->{'extension'} and
 		$self->{'extension'} =~ /sgr/i
 	) {
 		# there is no sgr field in the data structure
