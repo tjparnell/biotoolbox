@@ -529,6 +529,7 @@ sub new {
 			foreach my $name (qw(start txStart cdsStart peak)) {
 				my $c = $self->find_column($name);
 				next unless defined $c;
+				next if $self->metadata($c, 'base');
 				push @{ $self->{'0based_starts'} }, $c;
 			}
 		}
