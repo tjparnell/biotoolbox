@@ -691,6 +691,10 @@ use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Module::Load;
+use Bio::ToolBox::db_helper qw(
+	get_new_feature_list 
+	get_new_genome_list 
+);
 
 1;
 
@@ -732,19 +736,19 @@ sub new {
 	}
 	elsif (exists $args{db} and exists $args{features}) {
 		# generate new list
+		$self->feature($args{features});
+		$self->database($args{db});
+		$args{data} = $self;
+		my $result;
 		if ($args{features} eq 'genome') {
-			my $g = $self->genome_list(%args);
-			unless ($g) {
-				carp "Cannot generate new genome list!\n";
-				return;
-			}
+			$result = get_new_genome_list(%args);
 		}
 		else {
-			my $f = $self->feature_list(%args);
-			unless ($f) {
-				carp "Cannot generate new feature list!\n";
-				return;
-			}
+			$result = get_new_feature_list(%args);
+		}
+		unless ($result) {
+			carp "Cannot generate new $args{features} list!\n";
+			return;
 		}
 	}
 	else {
