@@ -43,6 +43,12 @@ our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|
 sub load_file {
 	my ($self, $file) = @_;
 	
+	# check that we have an empty table
+	if ($self->last_row != 0 or $self->number_columns != 0 or $self->filename) {
+		carp "Cannot load file onto an existing data table!";
+		return;
+	}
+	
 	# open the file and load metadata
 	my $filename = $self->check_file($file);
 	$self->add_file_metadata($filename);
@@ -63,7 +69,7 @@ sub load_file {
 		foreach my $name (qw(start txStart cdsStart peak)) {
 			my $c = $self->find_column($name);
 			next unless defined $c;
-			next if $self->metadata($c, 'base');
+			next if $self->metadata($c, 'base'); 
 			push @{ $self->{'0based_starts'} }, $c;
 		}
 	}
@@ -139,11 +145,6 @@ sub load_file {
 }
 
 
-
-
-
-
-
 sub parse_headers {
 	my $self = shift;
 	my $fh = shift || $self->{fh};
@@ -151,6 +152,12 @@ sub parse_headers {
 	unless (ref($fh) =~ /^IO/) {
 		confess " must pass an open IO::Handle compatible object!\n";
 	}
+	
+	# check that we have an empty table
+	if ($self->last_row != 0 or $self->number_columns != 0) {
+		carp "Cannot parse file headers onto an existing data table!";
+		return;
+	}	
 	
 	# read and parse the file
 	# we will ONLY parse the header lines prefixed with a #, as well as the 
@@ -417,8 +424,6 @@ sub add_data_line {
 }
 
 
-
-
 ### Parse the filename using the list suffix list
 sub add_file_metadata {
 	my ($self, $filename) = @_;
@@ -428,10 +433,6 @@ sub add_file_metadata {
 	$self->{path}      = $path;
 	$self->{extension} = $extension;
 }
-
-
-
-
 
 
 ### Write out a data file
@@ -819,11 +820,7 @@ sub save {
 }
 
 
-
-
-
 #### Open a file for reading
-
 sub open_to_read_fh {
 	my ($self, $file) = @_;
 	
@@ -854,12 +851,7 @@ sub open_to_read_fh {
 }
 
 
-
-
-
-
 #### Open a file for writing
-
 sub open_to_write_fh {
 	my ($self, $filename, $gz, $append) = @_;
 	
@@ -921,7 +913,6 @@ sub open_to_write_fh {
 	}
 	return $fh if defined $fh;
 }
-
 
 
 ### Subroutine to check for file existance
@@ -1293,7 +1284,6 @@ sub add_standard_metadata {
 	$self->{'headers'} = 1;
 	return 1;
 }
-
 
 
 ### Internal subroutine to generate hash of standard file format column names
