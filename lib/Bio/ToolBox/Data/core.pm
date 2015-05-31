@@ -29,6 +29,11 @@ use Bio::ToolBox::db_helper qw(
 sub new {
 	my $class = shift;
 	
+	# in case someone calls this from an established object
+	if (ref($class) =~ /Bio::ToolBox/) {
+		$class = ref($class);
+	}
+	
 	# Initialize the hash structure
 	my $ToolBoxVersion = Bio::ToolBox->VERSION;
 	my %data = (

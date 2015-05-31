@@ -623,7 +623,7 @@ sub duplicate {
 	
 	# duplicate the data structure
 	my $columns = $self->list_columns;
-	my $Dup = Bio::ToolBox::Data::Stream->new(
+	my $Dup = $self->new(
 		'out' => $filename, 
 		'columns' => $columns,
 	) or return;
