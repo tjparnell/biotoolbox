@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 103;
+	plan tests => 128;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -193,7 +193,42 @@ my $file = $Data->save(filename => $outfile);
 is($file, $outfile, 'output file name success');
 ok(-e $outfile, 'output file exists');
 
+# clean up
+undef $row;
+undef $stream;
+undef $Data;
 
+
+### reopen saved Bed file
+# many of the same types of tests as above, just with bed file
+$Data = Bio::ToolBox::Data->new(file => $file);
+isa_ok($Data, 'Bio::ToolBox::Data', 'Bed Data');
+is($Data->gff, 0, 'gff version');
+is($Data->bed, 4, 'bed version');
+is($Data->program, undef, 'program name');
+is($Data->feature, 'region', 'general feature');
+is($Data->feature_type, 'coordinate', 'feature type');
+is($Data->database, undef, 'database');
+is($Data->filename, $file, 'filename');
+is($Data->basename, 'chrI', 'basename');
+is($Data->extension, '.bed', 'extension');
+is($Data->number_columns, 4, 'number of columns');
+is($Data->last_row, 39, 'last row index');
+is($Data->chromo_column, 0, 'chromosome column');
+is($Data->start_column, 1, 'start column');
+is($Data->stop_column, 2, 'stop column');
+is($Data->strand_column, undef, 'strand column');
+is($Data->type_column, undef, 'type column');
+$stream = $Data->row_stream;
+$row = $stream->next_row;
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
+is($row->value(0), 'chrI', 'row object value of chromo index');
+is($row->start, 35155, 'row object start value');
+is($row->end, 36303, 'row object end value');
+is($row->name, 'Feature41', 'row object feature name');
+undef $row;
+undef $stream;
+undef $Data;
 
 
 
@@ -203,7 +238,7 @@ ok(-e $outfile, 'output file exists');
 my $Stream = Bio::ToolBox::Data::Stream->new(
 	in    => $file,
 );
-isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream object');
+isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream Bed object');
 is($Stream->bed, 4, 'bed value');
 is($Stream->gff, 0, 'gff value');
 is($Stream->feature, 'region', 'feature');
@@ -276,6 +311,11 @@ $outStream->close_fh;
 cmp_ok(-s $file2, '<', -s $file, "smaller file size due to lack of comments");
 
 # reload the duplicate files
+$Data = Bio::ToolBox::Data->new();
+isa_ok($Data, 'Bio::ToolBox::Data', 'new empty Data object');
+is($Data->number_columns, 0, 'number of columns');
+is($Data->last_row, 0, 'last row index');
+
 my $reloaded = $Data->reload_children($file, $file1, $file2);
 is($reloaded, 117, 'reloaded children files');
 ok($Data->verify, 'verify data structure');
