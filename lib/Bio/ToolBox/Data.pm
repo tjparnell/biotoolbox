@@ -1293,7 +1293,7 @@ sub summary_file {
 	# load modules
 	eval {
 		my $class = 'Statistics::Lite';
-		load($class, 'min mean');
+		load($class, qw(min mean));
 	};
 	if ($@) {
 		carp "missing required modules! $@";
@@ -1371,7 +1371,7 @@ sub summary_file {
 		feature => 'averaged_windows', 
 		columns => ['Window','Midpoint', $data_name],
 	);
-	$summed_data->database = $self->database;
+	$summed_data->database($self->database);
 	$summed_data->metadata(0, 'number_features', $self->last_row);
 	$summed_data->metadata(2, 'log2', $log);
 	$summed_data->metadata(2, 'dataset', $dataset);
