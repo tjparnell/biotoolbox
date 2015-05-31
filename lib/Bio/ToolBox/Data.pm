@@ -857,7 +857,7 @@ sub add_row {
 		@row_data = map {'.'} (1 .. $self->{number_columns});
 	}
 	if (scalar @row_data > $self->{number_columns}) {
-		cluck "row added has more elements than columns in data structure!\n"; 
+		cluck "row added has more elements than table columns! truncating row elements\n"; 
 		splice @row_data, 0, $self->{number_columns};
 	}
 	until (scalar @row_data == $self->{number_columns}) {
@@ -1210,7 +1210,11 @@ sub reload_children {
 	
 	# prepare Stream
 	my $class = "Bio::ToolBox::Data::Stream";
-	load $class;
+	eval {load $class};
+	if ($@) {
+		carp "unable to load $class! can't reload children!";
+		return;
+	}
 	
 	# open first stream
 	my $first = shift @files;
@@ -1284,7 +1288,8 @@ sub summary_file {
 	
 	# load modules
 	eval {
-		load 'Statistics::Lite', 'min mean';
+		my $class = 'Statistics::Lite';
+		load($class, 'min mean');
 	};
 	if ($@) {
 		carp "missing required modules! $@";
