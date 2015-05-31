@@ -805,9 +805,8 @@ sub metadata {
 			return $self->{$index}{$key};
 		}
 		else {
-			# set a new empty key
-			$self->{$index}{$key} = q();
-			return 1;
+			# key does not exist
+			return;
 		}
 	}
 	else {
