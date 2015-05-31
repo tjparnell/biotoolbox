@@ -95,28 +95,30 @@ sub load_file {
 	
 	# update metadata as necessary
 	my $strand_i = $self->strand_column;
-	if ($self->{plusminus_count}) {
-		# we have converted strand information
-		if (exists $self->{$strand_i}{'strand_style'}) {
-			# just in case, reset it to plusminus
-			$self->{$strand_i}{'strand_style'} = 'plusminus';
-		}
-		else {
-			$self->{$strand_i}{'strand_style'} = 'plusminus';
-			if (exists $self->{$strand_i}{'AUTO'}) {
-				# update automatically generated metadata
-				$self->{$strand_i}{'AUTO'}++;
+	if (defined $strand_i) {
+		if ($self->{plusminus_count}) {
+			# we have converted strand information
+			if (exists $self->{$strand_i}{'strand_style'}) {
+				# just in case, reset it to plusminus
+				$self->{$strand_i}{'strand_style'} = 'plusminus';
+			}
+			else {
+				$self->{$strand_i}{'strand_style'} = 'plusminus';
+				if (exists $self->{$strand_i}{'AUTO'}) {
+					# update automatically generated metadata
+					$self->{$strand_i}{'AUTO'}++;
+				}
 			}
 		}
-	}
-	else {
-		# no plusminus count, make sure metadata was not set automatically
-		# but this is technically a problem
-		if (exists $self->{$strand_i}{'strand_style'}) {
-			carp "File format is suspicious! format suggests plus/minus strand format" . 
-				" but none was found!?\n";
-			delete $self->{$strand_i}{'strand_style'};
-			$self->{$strand_i}{'AUTO'}--;
+		else {
+			# no plusminus count, make sure metadata was not set automatically
+			# but this is technically a problem
+			if (exists $self->{$strand_i}{'strand_style'}) {
+				carp "File format is suspicious! format suggests plus/minus strand format" . 
+					" but none was found!?\n";
+				delete $self->{$strand_i}{'strand_style'};
+				$self->{$strand_i}{'AUTO'}--;
+			}
 		}
 	}
 	foreach my $s (@{ $self->{'0based_starts'} }) {
