@@ -429,6 +429,7 @@ sub add_data_line {
 ### Parse the filename using the list suffix list
 sub add_file_metadata {
 	my ($self, $filename) = @_;
+	confess "no valid filename!" unless defined $filename;
 	my ($basename, $path, $extension) = fileparse($filename, $SUFFIX);
 	$self->{filename}  = $filename;
 	$self->{basename}  = $basename;
@@ -678,9 +679,9 @@ sub write_file {
 		# Write the primary headers
 		unless (
 			$self->gff or $self->bed or $self->{'ucsc'} or
-			$extension =~ m/sgr|kgg|cdt|peak/i
+			$extension =~ m/sgr|kgg|cdt|peak|vcf/i
 		) {
-			# we only write these for text files, not defined format files
+			# we only write these for normal text files, not defined format files
 			
 			if ($self->program) {
 				$fh->print('# Program ' . $self->program . "\n");
@@ -766,9 +767,9 @@ sub write_file {
 	
 	# Write the table column headers
 	if (
-		$self->{'headers'} and          # table headers existed before
-		not $self->gff == 0 and         # not a gff or bed or ucsc or sgr file
-		not $self->bed == 0 and
+		$self->{'headers'} and      # table headers existed before
+		$self->gff == 0 and         # not a gff or bed or ucsc or sgr file
+		$self->bed == 0 and
 		not $self->{ucsc} and 
 		$extension !~ /sgr/i
 	) {

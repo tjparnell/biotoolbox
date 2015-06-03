@@ -513,7 +513,12 @@ sub new {
 	# open an existing file for reading
 	if ($args{in}) {
 		
+		# check and open file
 		my $filename = $self->check_file($args{in});
+		unless ($filename) {
+			carp sprintf "file '%s' does not exist!", $args{in};
+			return;
+		}
 		$self->add_file_metadata($filename);
 		my $fh = $self->open_to_read_fh or return;
 		$self->{fh} = $fh;
