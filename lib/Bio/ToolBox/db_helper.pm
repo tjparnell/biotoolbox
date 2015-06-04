@@ -1,4 +1,5 @@
 package Bio::ToolBox::db_helper;
+our $VERSION = '1.30';
 
 use strict;
 require Exporter;
@@ -16,8 +17,6 @@ use Statistics::Lite qw(
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
-
-our $VERSION = 1.27;
 
 
 # check values for dynamically loaded helper modules
