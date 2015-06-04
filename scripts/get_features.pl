@@ -11,12 +11,12 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types
 	validate_included_feature
 );
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_write_fh
 );
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
-my $VERSION = 1.22;
+my $VERSION = '1.30';
 
 print "\n This program will collect features from a database\n\n";
 

@@ -5,15 +5,17 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(find_column_index);
-use Bio::ToolBox::file_helper qw(open_data_file);
+use Bio::ToolBox::legacy_helper qw(
+	open_data_file
+	find_column_index
+);
 my $cluster_ok;
 eval {
 	require Algorithm::Cluster::Record;
 	$cluster_ok = 1;
 };
 
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 

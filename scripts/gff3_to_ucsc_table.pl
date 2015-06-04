@@ -6,11 +6,11 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::gff3_parser;
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = 1.26;
+my $VERSION = '1.30';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";

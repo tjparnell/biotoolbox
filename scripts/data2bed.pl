@@ -5,13 +5,13 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_data_file
 	open_to_write_fh
+	find_column_index
 );
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n This program will write a BED file\n";
 

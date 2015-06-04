@@ -6,15 +6,13 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
-use Bio::ToolBox::data_helper qw(
-	find_column_index
-);
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_data_file
 	open_to_write_fh
+	find_column_index
 );
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n This script will export a data file to a wig file\n\n";
 

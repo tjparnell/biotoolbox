@@ -7,12 +7,12 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
 use Bio::SeqFeature::Lite;
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.20';
+my $VERSION = '1.30';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 

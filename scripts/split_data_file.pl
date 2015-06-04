@@ -5,12 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_data_file
 	write_data_file
 	open_to_write_fh
 );
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n This script will split a data file by features\n\n";
 

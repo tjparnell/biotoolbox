@@ -5,14 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::data_helper qw(find_column_index);
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_data_file
 	load_data_file
 	write_data_file
 	write_summary_data
+	find_column_index
 );
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n A script to pull out specific features from a data file\n";
 

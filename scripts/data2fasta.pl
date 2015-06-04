@@ -7,13 +7,13 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::ToolBox::data_helper qw(find_column_index);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_data_file
 	open_to_write_fh
+	find_column_index
 );
 my $BAM_OK;
 eval { 
@@ -22,7 +22,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n This program will convert a data file to fasta\n\n";
 
