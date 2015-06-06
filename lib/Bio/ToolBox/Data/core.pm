@@ -553,10 +553,18 @@ sub verify_dataset {
 
 sub delete_column {
 	my $self = shift;
-	if (defined $self->{fh}) {
-		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
+	
+	# check for Stream
+	if (ref $self eq 'Bio::ToolBox::Data::Stream') {
+		unless ($self->mode) {
+			cluck "We have a read-only Stream object, cannot add columns";
+			return;
+		}
+		if (defined $self->{fh}) {
+			# Stream file handle is opened
+			cluck "Cannot modify columns when a Stream file handle is opened!";
+			return;
+		}
 	}
 	
 	my @deletion_list = sort {$a <=> $b} @_;
@@ -578,10 +586,18 @@ sub delete_column {
 
 sub reorder_column {
 	my $self = shift;
-	if (defined $self->{fh}) {
-		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
+	
+	# check for Stream
+	if (ref $self eq 'Bio::ToolBox::Data::Stream') {
+		unless ($self->mode) {
+			cluck "We have a read-only Stream object, cannot add columns";
+			return;
+		}
+		if (defined $self->{fh}) {
+			# Stream file handle is opened
+			cluck "Cannot modify columns when a Stream file handle is opened!";
+			return;
+		}
 	}
 	
 	# reorder data table

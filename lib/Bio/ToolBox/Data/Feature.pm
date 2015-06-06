@@ -414,6 +414,19 @@ sub row_index {
 	return $self->{'index'};
 }
 
+sub line_number {
+	my $self = shift;
+	if (exists $self->{data}->{line_count}) {
+		return $self->{data}->{line_count};
+	}
+	elsif (exists $self->{data}->{header_line_count}) {
+		return $self->{data}->{header_line_count} + $self->row_index;
+	}
+	else {
+		return;
+	}
+}
+
 sub row_values {
 	my $self  = shift;
 	my $row = $self->{'index'};

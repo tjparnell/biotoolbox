@@ -525,8 +525,10 @@ sub new {
 		$self->{mode} = 0; # read mode
 		
 		# parse column headers
+		$self->{header_line_count} = 0;
 		$self->parse_headers;
 		$self->{data_table}->[0] = $self->{'column_names'}; 
+		$self->{line_count} = $self->{header_line_count};
 		
 		# look for potential start columns to convert from 0-based
 		$self->{'0based_starts'} = [];
@@ -711,6 +713,7 @@ sub next_row {
 	# read and add the next line in the file
 	my $line = $self->{fh}->getline;
 	return unless $line;
+	$self->{line_count}++;
 	if ($line =~ /^#/) {
 		$self->add_comment($line);
 		return $self->next_row;
