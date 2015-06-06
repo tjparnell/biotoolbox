@@ -55,6 +55,7 @@ sub load_file {
 	my $fh = $self->open_to_read_fh;
 	return unless $fh;
 	$self->{fh} = $fh;
+	$self->{header_line_count} = 0;
 	$self->parse_headers;
 	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
@@ -344,6 +345,7 @@ sub parse_headers {
 	for (1 .. $header_line_count) {
 		my $line = $fh->getline;
 	}
+	$self->{header_line_count} = $header_line_count;
 	$self->{fh} = $fh;
 	return 1;
 }
@@ -381,10 +383,10 @@ sub add_data_line {
 			# a null value
 			$linedata[$i] = '.';
 		}
-		elsif ($linedata[$i] =~ /^n\/?a$/i) {
-			# value matches na or n/a, a null value
-			$linedata[$i] = '.';
-		}
+# 		elsif ($linedata[$i] =~ /^n\/?a$/i) {
+# 			# value matches na or n/a, a null value
+# 			$linedata[$i] = '.';
+# 		}
 	}
 	
 	# convert strand as necessary
