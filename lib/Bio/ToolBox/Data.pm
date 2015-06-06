@@ -726,9 +726,10 @@ sub new {
 	
 	# initialize
 	my $self = $class->SUPER::new();
-	if (exists $args{file}) {
+	if (exists $args{file} or exists $args{in}) {
 		# load from file
-		my $l = $self->load_file($args{file});
+		my $f = $args{file} || $args{in} || q();
+		my $l = $self->load_file($f);
 		unless ($l) {
 			carp "Cannot load file!\n";
 			return;
