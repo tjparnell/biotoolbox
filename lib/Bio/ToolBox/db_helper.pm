@@ -2950,6 +2950,15 @@ sub _get_segment_score {
 						@datasetlist
 					);
 					$dataset_type = 'bam';
+					
+					# Convert names into unique counts
+					# unless the user requested raw scores
+					if ($value_type eq 'ncount' and $method ne 'scores') {
+						my %name2count;
+						foreach (@scores) { $name2count{$_} += 1 }
+						@scores = (); # empty the array
+						push @scores, scalar(keys %name2count);
+					}
 				}
 			}
 			else {
@@ -3148,7 +3157,7 @@ sub _get_segment_score {
 	
 	# all scores
 	if ($method eq 'scores') {
-		# just the scores are requested
+		# just the raw scores are requested
 		# return an array reference
 		return \@scores;
 	}
@@ -3194,13 +3203,13 @@ sub _get_segment_score {
 		# or take the maximum value
 		$region_score = max(@scores);
 	}
-	elsif ($method eq 'count') {
-		# count the number of values
-		$region_score = scalar(@scores);
-	}
 	elsif ($method eq 'sum') {
 		# sum the number of values
 		$region_score = sum(@scores);
+	}
+	elsif ($method =~ /count/) {
+		# count the number of values
+		$region_score = scalar(@scores);
 	}
 	elsif ($method =~ /rpk?m/) {
 		# convert to reads per million mapped
@@ -3280,7 +3289,7 @@ sub _return_null {
 	if ($method eq 'sum') { 
 		return 0;
 	}
-	elsif ($method eq 'count') { 
+	elsif ($method =~ /count/) { 
 		return 0;
 	}
 	else {
