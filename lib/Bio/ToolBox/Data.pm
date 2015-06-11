@@ -1000,7 +1000,7 @@ sub sort_data {
 		# re-fill the array based on the sort direction
 		if ($direction =~ /^i/i) { 
 			# increasing sort
-			my $i = 1; # keep track of the row
+			my $i = 1; # keep track of the row, skip the header
 			foreach (sort {$a <=> $b} keys %datahash) {
 				# put back the reference to the anonymous array of row data
 				$self->{data_table}->[$i] = $datahash{$_};
@@ -1009,7 +1009,7 @@ sub sort_data {
 		} 
 		else { 
 			# decreasing sort
-			my $i = 0; # keep track of the row
+			my $i = 1; # keep track of the row, skip the header
 			foreach (sort {$b <=> $a} keys %datahash) {
 				# put back the reference to the anonymous array of row data
 				$self->{data_table}->[$i] = $datahash{$_};
