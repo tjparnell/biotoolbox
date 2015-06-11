@@ -248,9 +248,10 @@ if ($cpu > 1) {
 }
 
 # execute data collection in 1 or more processes
-print " Collecting $method $value_type from datasets @datasets...\n";
 if ($cpu > 1) {
 	# parallel execution
+	# print statements here before we fork, less we have duplicate statements!
+	print " Collecting $method $value_type from datasets @datasets...\n";
 	print " Forking into $cpu children for parallel data collection\n";
 	parallel_execution();
 }
@@ -368,6 +369,7 @@ sub set_defaults {
 		if ($count_check) {
 			if ($subfeature and not defined $value_type and $datasets[0] =~ /\.bam$/i) {
 				$value_type = 'ncount'; # special mode to count unique names
+				print " setting value type to 'ncount' when using subfeatures with bam datasets\n";
 			}
 			else {
 				$value_type ||= 'count';
@@ -1233,6 +1235,8 @@ sub add_new_dataset {
 	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
 	$Data->metadata($index, 'exons', 'yes')      if $subfeature;	
 	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
+	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
+		exists $dataset2sum{$dataset};
 	if ($position == 3) {
 		$Data->metadata($index, 'relative_position', "3'end");	
 	}
