@@ -1103,8 +1103,8 @@ genomic region of the feature. Accepted values include:
 
 Optionally specify the type of data value to collect from the dataset or 
 data file. Four values are accepted: score, count, pcount, or length. 
-The default value type is score. Note that some data sources only support certain 
-types of data values. The types are detailed below.
+The default value type is score. Note that some data sources only support 
+certain types of data values. The types are detailed below.
 
 =over 4
 
@@ -1151,13 +1151,14 @@ regions (e.g. BED files). Default is false.
 
 =item --avoid
 
-Indicate whether features of the same type should be avoided when 
-calculating values in a window. Each window is checked for 
+Indicate whether search features of the same type should be avoided 
+when calculating values in a window. Each window is checked for 
 overlapping features of the same type; if the window does overlap 
 another feature of the same type, no value is reported for the 
 window. This option requires using named database features and must 
-include a feature GFF type column. The default is false (return all 
-values regardless of overlap).
+include a feature GFF type column. This is useful to avoid scoring 
+windows that overlap a neighboring gene, for example. The default is 
+false (return all values regardless of overlap).
 
 =item --long
 
@@ -1167,8 +1168,10 @@ data (microarray data or sequence coverage). Normally long features are
 only recorded at their midpoint, leading to inaccurate representation at 
 some windows. This option forces the program to collect data separately 
 at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. Execution times may be 
-longer than otherwise. Default is false.
+subsequently assigning scores to windows. This may result in counting 
+features more than once if it overlaps more than one window, a result 
+that may or may not be desired. Execution time will likely increase. 
+Default is false.
 
 =item --log
 
