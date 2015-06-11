@@ -121,7 +121,7 @@ sub open_to_read_fh {
 sub open_to_write_fh {
 	my ($filename, $gz, $append) = @_;
 	return unless defined $filename;
-	return $CLASS->open_to_read_fh($filename, $gz, $append);
+	return $CLASS->open_to_write_fh($filename, $gz, $append);
 }
 
 sub write_summary_data {
