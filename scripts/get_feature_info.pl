@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.25;
+my $VERSION = '1.30';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -200,8 +200,8 @@ sub get_attribute_list_from_user {
 		# standard attributes for any user
 		foreach ( 
 			qw(Chromosome Start Stop Strand Score Name Alias Note Type Primary_tag Source 
-				Length Midpoint Phase RNA_count Exon_count Transcript_length Parent 
-				Primary_ID 
+				Length Midpoint Phase RNA_count Exon_count Gene_length Transcript_length 
+				Parent Primary_ID 
 			) 
 		) {
 			print "   $i\t$_\n";
@@ -259,6 +259,9 @@ sub get_attribute_method {
 	} 
 	elsif ($attrib =~ /^length$/i) {
 		$method = \&get_length;
+	} 
+	elsif ($attrib =~ /^gene_length$/i) {
+		$method = \&get_gene_length;
 	} 
 	elsif ($attrib =~ /^transcript_length$/i) {
 		$method = \&get_transcript_length;
@@ -375,6 +378,97 @@ sub get_length {
 	my $feature = shift;
 	return 0 unless $feature;
 	return $feature->length || 0;
+}
+
+
+sub get_gene_length {
+	my $feature = shift;
+	return 0 unless $feature;
+	
+	# collect all exons or CDSs for every transcript
+	my @exons;
+	my @cdss;
+	foreach my $subfeat ( $feature->get_SeqFeatures() ) {
+		# feature may consist of multiple transcripts
+		if ($subfeat->primary_tag =~ /exon/i) {
+			push @exons, $subfeat;
+		}
+		elsif ($subfeat->primary_tag =~ /utr|untranslated/i) {
+			push @cdss, $subfeat;
+		}
+		elsif ($subfeat->primary_tag =~ /cds/i) {
+			push @cdss, $subfeat;
+		}
+		elsif ($subfeat->primary_tag =~ /rna/i) {
+			# an RNA subfeature, keep going down another level
+			foreach my $f ($subfeat->get_SeqFeatures) {
+				if ($f->primary_tag =~ /exon/i) {
+					push @exons, $f;
+				}
+				elsif ($f->primary_tag =~ /utr|untranslated/i) {
+					push @cdss, $f;
+				}
+				elsif ($f->primary_tag =~ /cds/i) {
+					push @cdss, $f;
+				}
+			}
+		}
+	}
+	
+	# Determine which subfeatures to collect
+	# we prefer to use exons because they are easier
+	# if exons are not defined then we'll infer them from CDSs and UTRs
+	my @features_to_check;
+	if (@exons) {
+		@features_to_check = @exons;
+	}
+	elsif (@cdss) {
+		@features_to_check = @cdss;
+	}
+	else {
+		# found neither exons, CDSs, or UTRs
+		# possibly because there were no subfeatures
+		# in this case we just take the whole thing
+		push @features_to_check, $feature;
+	}
+	
+	
+	# Order and collapse the subfeatures
+	# we don't want overlapping features
+	my @sorted_features =   map {$_->[1]} 
+							sort {$a->[0] <=> $b->[0]} 
+							map { [$_->start, $_] } 
+							@features_to_check;
+	my @merged;
+	my $current = shift @sorted_features;
+	while ($current) {
+		if (@sorted_features) {
+			my $next = shift @sorted_features;
+			if ($current->overlaps($next) ) {
+				# overlapping features, so reassign the end point to that of the next
+				$current->end($next->end);
+			}
+			else {
+				# no overlap, keep current, next becomes current
+				push @merged, $current;
+				$current = $next;
+			}
+		}
+		else {
+			# no more features
+			push @merged, $current;
+			undef $current;
+		}
+	}
+	
+	# calculate the length
+	my $gene_length = 0;
+	foreach my $f (@merged) {
+		$gene_length += $f->length;
+	}
+	
+	# return most appropriate number
+	return $gene_length;
 }
 
 
@@ -588,6 +682,7 @@ get_feature_info.pl <filename>
    Phase
    RNA_count
    Exon_count
+   Gene_length (sum of merged alternative transcript exon lengths)
    Transcript_length (sum of exon lengths)
    Parent (name)
    Primary_ID
@@ -639,7 +734,8 @@ attributes include the following
    - Phase
    - RNA_count (number of RNA subfeatures)
    - Exon_count (number of exons, or CDS, subfeatures)
-   - Transcript_length
+   - Gene_length (sum of merged alternative transcript exon lengths)
+   - Transcript_length (sum of exon lengths)
    - Parent (name)
    - Primary_ID
    - <tag>
