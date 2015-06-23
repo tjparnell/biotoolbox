@@ -158,6 +158,14 @@ may also optionally provide a general feature name, if desired.
 
 If successful, the method will return a Bio::ToolBox::Data object.
 
+=item duplicate()
+
+This will create a new Data object containing the same column 
+headers and metadata, but lacking the table content, i.e. no 
+rows of data. File name metadata, if present in the original, is 
+not preserved. The purpose here, for example, is to allow one 
+to selectively copy rows from one row to another.
+
 =back
 
 =head2 General Metadata
@@ -339,10 +347,15 @@ new index numbers.
 
 =item add_row(\@values)
 
+=item add_row($row)
+
 Add a new row of data values to the end of the Data table. 
-Optionally provide a reference to an array of values to 
-put in the row. The array is filled up with C<undef> for 
-missing values, and excess values are dropped.
+Optionally provide either a reference to an array of values 
+to put in the row, or pass a <Bio::ToolBox::Data::Feature> 
+row object, such as one obtained from another Data object. 
+If the number of columns do not match, the array is filled 
+up with null values for missing columns, or excess values 
+are dropped.
 
 =item delete_row($row1, $row2, ...)
 
@@ -770,6 +783,34 @@ sub new {
 	return $self;
 }
 
+sub duplicate {
+	my $self = shift;
+	
+	# duplicate the data structure
+	my $columns = $self->list_columns;
+	my $Dup = $self->new(
+		'columns' => $columns,
+	) or return;
+	
+	# copy the metadata
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		# column metadata
+		my %md = $self->metadata($i);
+		$Dup->{$i} = \%md;
+	}
+	foreach (qw(feature program db bed gff ucsc headers)) {
+		# various keys
+		$Dup->{$_} = $self->{$_};
+	}
+	$Dup->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
+	my @comments = $self->comments;
+	push @{$Dup->{comments}}, @comments;
+	
+	return $Dup;
+}
+
+
+
 
 
 ### Column manipulation
@@ -857,6 +898,9 @@ sub add_row {
 	my @row_data;
 	if ($_[0] and ref $_[0] eq 'ARRAY') {
 		@row_data = @{ $_[0] };
+	}
+	elsif ($_[0] and ref $_[0] eq 'Bio::ToolBox::Data::Feature') {
+		@row_data = $_[0]->row_values;
 	}
 	else {
 		@row_data = map {'.'} (1 .. $self->{number_columns});
