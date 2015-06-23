@@ -13,7 +13,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::gff3_parser;
 use Bio::ToolBox::utility;
-my $VERSION = 1.26;
+my $VERSION = '1.30';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -475,36 +475,31 @@ sub collect_from_file {
 	$Data->add_comment("Source data file $infile");
 	
 	# open gff3 parser object
-	my $parser = Bio::ToolBox::db_helper::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::gff3_parser->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
 	# process the features
-	while (my @top_features = $parser->top_features() ) {
+	while (my $seqfeat = $parser->next_top_feature) {
 		
-		# Process the top features
-		while (@top_features) {
-			my $seqfeat = shift @top_features;
-		
-			# collect the regions based on the primary tag and the method re
-			if ($seqfeat->primary_tag =~ /^gene$/i) {
-				# gene
-				my @genes = process_gene($seqfeat, $method);
-				foreach (@genes) {
-					# each element is an anon array of found feature info
-					$Data->add_row($_);
-				}
+		# collect the regions based on the primary tag and the method re
+		if ($seqfeat->primary_tag =~ /^gene$/i) {
+			# gene
+			my @genes = process_gene($seqfeat, $method);
+			foreach (@genes) {
+				# each element is an anon array of found feature info
+				$Data->add_row($_);
 			}
-			elsif ($seqfeat->primary_tag =~ /rna/i) {
-				# transcript
-				my @regions = process_transcript($seqfeat, $method);
-				
-				# add the parent name
-				map { unshift @$_, $seqfeat->display_name } @regions;
-				
-				foreach (@regions) {
-					# each element is an anon array of found feature info
-					$Data->add_row($_);
-				}
+		}
+		elsif ($seqfeat->primary_tag =~ /rna/i) {
+			# transcript
+			my @regions = process_transcript($seqfeat, $method);
+			
+			# add the parent name
+			map { unshift @$_, $seqfeat->display_name } @regions;
+			
+			foreach (@regions) {
+				# each element is an anon array of found feature info
+				$Data->add_row($_);
 			}
 		}
 	}
