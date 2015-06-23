@@ -618,7 +618,7 @@ sub reorder_column {
 	for (my $i = 0; $i < scalar(@order); $i++) {
 		# now copy back from the old_metadata into the main data hash
 		# using the new index number in the @order array
-		$self->{$i} = { %{ $old_metadata{ $order[$i] } } };
+		$self->{$i} = $old_metadata{ $order[$i] };
 		# assign new index number
 		$self->{$i}{'index'} = $i;
 	}
