@@ -518,10 +518,25 @@ sub write_file {
 			$extension = $self->{'extension'};
 		}
 	}
-	else {
+	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
+		unless ($self->{ucsc}) {
+			# it's not set as a ucsc data
+			# let's set it to true and see if it passes verification
+			$self->{ucsc} = $self->number_columns; 
+# HERE BE DRAGONS
+# 			unless ($self->verify and $self->{ucsc}) {
+# 				warn " re-setting extension from $extension to .txt\n";
+# 				$extension = '.txt';
+# 			}
+		}
+		if ($self->{ucsc} != $self->number_columns) {
+			$self->{ucsc} = $self->number_columns;
+		}
+	}
+	elsif (not $extension) {
 		# no extension was available
 		# try and determine one from metadata
-				
+			
 		if ($self->gff) {
 			$extension = $self->gff == 3 ? '.gff3' : $self->gff == 2.5 ? '.gtf' : '.gff';
 		} 
@@ -556,6 +571,7 @@ sub write_file {
 			$extension = '.txt';
 		}
 	}
+	# otherwise the extension must be good, hope for the best
 	
 	# determine format 
 	unless ($args{'format'}) {
@@ -1198,7 +1214,7 @@ sub add_ucsc_metadata {
 	}
 	
 	# set strand style
-	my $strand_i = find_column_index($self, 'strand');
+	my $strand_i = $self->find_column('strand');
 	$self->{$strand_i}{'strand_style'} = 'plusminus';
 	$self->{$strand_i}{'AUTO'}++;
 	
