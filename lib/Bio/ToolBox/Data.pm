@@ -788,7 +788,7 @@ sub duplicate {
 	
 	# duplicate the data structure
 	my $columns = $self->list_columns;
-	my $Dup = $self->new(
+	my $Dupe = $self->new(
 		'columns' => $columns,
 	) or return;
 	
@@ -796,17 +796,19 @@ sub duplicate {
 	for (my $i = 0; $i < $self->number_columns; $i++) {
 		# column metadata
 		my %md = $self->metadata($i);
-		$Dup->{$i} = \%md;
+		$Dupe->{$i} = \%md;
 	}
 	foreach (qw(feature program db bed gff ucsc headers)) {
 		# various keys
-		$Dup->{$_} = $self->{$_};
+		$Dupe->{$_} = $self->{$_};
 	}
-	$Dup->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
+	if (exists $self->{'0based_starts'}) {
+		$Dupe->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
+	}
 	my @comments = $self->comments;
-	push @{$Dup->{comments}}, @comments;
+	push @{$Dupe->{comments}}, @comments;
 	
-	return $Dup;
+	return $Dupe;
 }
 
 
@@ -1297,8 +1299,7 @@ sub reload_children {
 	
 	# load the data
 	while (my $row = $Stream->next_row) {
-		my $a = $row->row_values;
-		$self->add_row($a);
+		$self->add_row($row);
 	}
 	$Stream->close_fh;
 	

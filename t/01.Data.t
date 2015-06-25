@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 128;
+	plan tests => 141;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -89,6 +89,18 @@ ok($cv, 'column values');
 is(scalar @$cv, 80, 'number of column values');
 is($cv->[1], 1, 'check specific column value');
 
+# test duplicate
+my $Dupe = $Data->duplicate;
+isa_ok($Dupe, 'Bio::ToolBox::Data', 'Duplicated object');
+is($Dupe->gff, 3, 'Dupe gff version');
+is($Dupe->program, undef, 'Dupe program name');
+is($Dupe->feature, 'region', 'Dupe general feature');
+is($Dupe->feature_type, 'coordinate', 'Dupe feature type');
+is($Dupe->database, undef, 'Dupe database');
+is($Dupe->filename, undef, 'Dupe filename');
+is($Dupe->number_columns, 9, 'Dupe number of columns');
+is($Dupe->last_row, 0, 'Dupe last row index');
+
 # test row_stream
 my $stream = $Data->row_stream;
 isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'Iterator object');
@@ -99,6 +111,13 @@ isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
 is($row->value(0), 'chrI', 'row object value of chromo index');
 is($row->start, 1, 'row object start value');
 is($row->end, 230218, 'row object end value');
+
+# add row feature
+my $added_row_i = $Dupe->add_row($row);
+is($added_row_i, 1, 'Dupe add_row Feature object');
+is($Dupe->last_row, 1, 'Dupe added last row index');
+is($Dupe->value(1,3), 1, 'Dupe row start value');
+is($Dupe->value(1,4), 230218, 'Dupe row end value');
 
 # second row feature
 $row = $stream->next_row;
@@ -192,6 +211,7 @@ my $outfile = File::Spec->catdir($Bin, "Data", "chrI.bed");
 my $file = $Data->save(filename => $outfile);
 is($file, $outfile, 'output file name success');
 ok(-e $outfile, 'output file exists');
+
 
 # clean up
 undef $row;
