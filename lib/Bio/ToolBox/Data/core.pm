@@ -153,6 +153,7 @@ sub verify {
 		
 		# check column indices
 		if (
+			# column 0 should look like chromosome
 			exists $self->{0} and
 			$self->{0}{'name'} !~ 
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
@@ -160,53 +161,29 @@ sub verify {
 			$gff_check = 0;
 		}
 		if (
-			exists $self->{1} and
-			$self->{1}{'name'} !~ m/^source/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $self->{2} and
-			$self->{2}{'name'} !~ m/^type|method/i
-		) {
-			$gff_check = 0;
-		}
-		if (
+			# column 3 should look like start
 			exists $self->{3} and
-			$self->{3}{'name'} !~ m/^start/i
+			$self->{3}{'name'} !~ m/start|position/i
 		) {
 			$gff_check = 0;
 		}
 		if (
+			# column 4 should look like end
 			exists $self->{4} and
-			$self->{4}{'name'} !~ m/^stop|end/i
+			$self->{4}{'name'} !~ m/stop|end|position/i
 		) {
 			$gff_check = 0;
 		}
 		if (
-			exists $self->{5} and
-			$self->{5}{'name'} !~ m/^score|value/i
-		) {
-			$gff_check = 0;
-		}
-		if (
+			# column 6 should look like strand
 			exists $self->{6} and
-			$self->{6}{'name'} !~ m/^strand/i
+			$self->{6}{'name'} !~ m/strand/i
 		) {
 			$gff_check = 0;
 		}
-		if (
-			exists $self->{7} and
-			$self->{7}{'name'} !~ m/^phase/i
-		) {
-			$gff_check = 0;
-		}
-		if (
-			exists $self->{8} and
-			$self->{8}{'name'} !~ m/^group|attribute/i
-		) {
-			$gff_check = 0;
-		}
+		
+		# check integers
+		$gff_check = 0 unless $self->_column_is_integers(3,4);
 		
 		# update gff value as necessary
 		if ($gff_check == 0) {
@@ -247,135 +224,19 @@ sub verify {
 		}
 		if (
 			exists $self->{1} and
-			$self->{1}{'name'} !~ m/^start/i
+			$self->{1}{'name'} !~ m/start|position/i
 		) {
 			$bed_check = 0;
 		}
 		if (
 			exists $self->{2} and
-			$self->{2}{'name'} !~ m/^stop|end/i
+			$self->{2}{'name'} !~ m/stop|end|position/i
 		) {
 			$bed_check = 0;
 		}
 		
-		# the remaining columns are tricky, as they may or may not be 
-		# named as I expect, especially if it was generated de novo
-		# so only check these if the original file extension was bed
-		if (
-			exists $self->{'extension'} and 
-			defined $self->{'extension'} and
-			$self->{'extension'} =~ /bed|bdg/i
-		) {
-			if (
-				exists $self->{3} and
-				$self->{3}{'name'} !~ m/^name|id|score/i
-				# for bed this should be name or ID
-				# for bedgraph this should be score
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{4} and
-				$self->{4}{'name'} !~ m/^score|value/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{5} and
-				$self->{5}{'name'} !~ m/^strand/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{6} and
-				$self->{6}{'name'} !~ m/^thickstart/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{7} and
-				$self->{7}{'name'} !~ m/^thickend/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{8} and
-				$self->{8}{'name'} !~ m/^itemrgb/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{9} and
-				$self->{9}{'name'} !~ m/^blockcount/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{10} and
-				$self->{10}{'name'} !~ m/^blocksizes/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{11} and
-				$self->{11}{'name'} !~ m/^blockstarts/i
-			) {
-				$bed_check = 0;
-			}
-		} 
-		elsif (
-			exists $self->{'extension'} and 
-			defined $self->{'extension'} and
-			$self->{'extension'} =~ /peak/i
-		) {
-			# some sort of peak file
-			# narrowpeak: signalValue pValue qValue peak
-			# broadpeak: signalValue pValue qValue
-			if (
-				exists $self->{3} and
-				$self->{3}{'name'} !~ m/^name|id|score/i
-				# for bed this should be name or ID
-				# for bedgraph this should be score
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{4} and
-				$self->{4}{'name'} !~ m/^score|value/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{5} and
-				$self->{5}{'name'} !~ m/^strand/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{6} and
-				$self->{6}{'name'} !~ m/^signalvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{7} and
-				$self->{7}{'name'} !~ m/^pvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{8} and
-				$self->{8}{'name'} !~ m/^qvalue/i
-			) {
-				$bed_check = 0;
-			}
-			if (
-				exists $self->{9} and
-				$self->{9}{'name'} !~ m/^peak/i
-			) {
-				$bed_check = 0;
-			}
-		}
+		# coordinates are integers
+		$bed_check = 0 unless $self->_column_is_integers(1,2);
 		
 		# reset the BED tag value as appropriate
 		if ($bed_check) {
@@ -400,59 +261,61 @@ sub verify {
 		# if any of these checks fail, we will reset the extension
 		my $ucsc_check = 1; # start with assumption it is correct
 		
-		if ($self->{'number_columns'} == 16) {
-			my @names = qw(bin name chrom strand txStart txEnd cdsStart cdsEnd 
-				exonCount exonStarts exonEnds score name2 cdsStartSt 
-				cdsEndStat exonFrames);
-			for my $i (0 .. 15) {
-				unless ($self->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
+		# check number of columns
+		my $colnumber = $self->{number_columns};
+		if ($colnumber == 16) {
+			# bin name chrom strand txStart txEnd cdsStart cdsEnd 
+			# exonCount exonStarts exonEnds score name2 cdsStartSt 
+			# cdsEndStat exonFrames
+			$ucsc_check = 0 unless $self->{2}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
+			$ucsc_check = 0 unless $self->{4}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{5}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
 		}		
-		elsif ($self->{'number_columns'} == 15) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-				exonCount exonStarts exonEnds score name2 cdsStartSt 
-				cdsEndStat exonFrames);
-			for my $i (0 .. 14) {
-				unless ($self->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
+		elsif ($colnumber == 15 or $colnumber == 12) {
+			# name chrom strand txStart txEnd cdsStart cdsEnd 
+			# exonCount exonStarts exonEnds score name2 cdsStartSt 
+			# cdsEndStat exonFrames
+			# or 
+			# name chrom strand txStart txEnd cdsStart cdsEnd 
+			# exonCount exonStarts exonEnds proteinID alignID
+			$ucsc_check = 0 unless $self->{1}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
+			$ucsc_check = 0 unless $self->{3}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{4}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
 		}		
-		elsif ($self->{'number_columns'} == 12) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds proteinID alignID);
-			for my $i (0 .. 11) {
-				unless ($self->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
+		elsif ($colnumber == 11) {
+			# geneName transcriptName chrom strand txStart txEnd 
+			# cdsStart cdsEnd exonCount exonStarts exonEnds
+			$ucsc_check = 0 unless $self->{2}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
+			$ucsc_check = 0 unless $self->{4}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{5}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
 		}		
-		elsif ($self->{'number_columns'} == 11) {
-			my @names = qw(geneName transcriptName chrom strand txStart txEnd 
-						cdsStart cdsEnd exonCount exonStarts exonEnds);
-			for my $i (0 .. 10) {
-				unless ($self->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
-		}		
-		elsif ($self->{'number_columns'} == 10) {
-			my @names = qw(name chrom strand txStart txEnd cdsStart cdsEnd 
-						exonCount exonStarts exonEnds);
-			for my $i (0 .. 9) {
-				unless ($self->{$i}{'name'} =~ /$names[$i]/i) {
-					$ucsc_check = 0;
-					last;
-				}
-			}
+		elsif ($colnumber == 10) {
+			# name chrom strand txStart txEnd cdsStart cdsEnd 
+			# exonCount exonStarts exonEnds
+			$ucsc_check = 0 unless $self->{1}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
+			$ucsc_check = 0 unless $self->{3}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{4}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
+			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
+			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
 		}
-		
+		else {
+			$ucsc_check = 0;
+		}
+
 		if ($ucsc_check == 0) {
 			# failed the check
 			my $ext = $self->{'extension'};
@@ -480,7 +343,8 @@ sub verify {
 		if (
 			$self->{'number_columns'} != 3 or
 			$self->{0}{'name'} !~ /^chr|seq|ref/i or
-			$self->{1}{'name'} !~ /^start|position/i
+			$self->{1}{'name'} !~ /^start|position/i or 
+			not $self->_column_is_integers(1)
 		) {
 			# doesn't smell like a SGR file
 			# change the extension so the write subroutine won't think it is
@@ -501,6 +365,20 @@ sub verify {
 	# if we haven't made it here yet, then there was a problem
 	return 1;
 }
+
+# internal method to check if a column is nothing but integers, i.e. start, stop
+sub _column_is_integers {
+	my $self = shift;
+	my @index = @_;
+	for my $row (1 .. $self->{last_row}) {
+		for my $i (@index) {
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^\d+$/);
+		}
+	}
+	return 1;
+}
+
+
 
 
 
