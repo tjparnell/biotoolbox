@@ -519,18 +519,13 @@ sub write_file {
 		}
 	}
 	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
-		unless ($self->{ucsc}) {
+		unless ($self->ucsc) {
 			# it's not set as a ucsc data
 			# let's set it to true and see if it passes verification
-			$self->{ucsc} = $self->number_columns; 
-# HERE BE DRAGONS
-# 			unless ($self->verify and $self->{ucsc}) {
-# 				warn " re-setting extension from $extension to .txt\n";
-# 				$extension = '.txt';
-# 			}
+			$self->ucsc = $self->number_columns; 
 		}
-		if ($self->{ucsc} != $self->number_columns) {
-			$self->{ucsc} = $self->number_columns;
+		if ($self->ucsc != $self->number_columns) {
+			$self->ucsc = $self->number_columns;
 		}
 	}
 	elsif (not $extension) {
@@ -661,7 +656,7 @@ sub write_file {
 	if (
 		defined $strand_i and (
 			$self->metadata($strand_i, 'strand_style') eq 'plusminus' or 
-			($self->gff or $self->bed or $self->{ucsc})
+			($self->gff or $self->bed or $self->ucsc)
 		)
 	) {
 		# strand information was originally BED and GFF style +,.,-
@@ -755,7 +750,7 @@ sub write_file {
 				# these are so simple it's not worth writing them
 				next;
 			}
-			elsif ($extension =~ /sgr|kgg|cdt/i or $self->{ucsc}) {
+			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc) {
 				# these do not need metadata
 				next;
 			}
@@ -788,7 +783,7 @@ sub write_file {
 		$self->{'headers'} and      # table headers existed before
 		$self->gff == 0 and         # not a gff or bed or ucsc or sgr file
 		$self->bed == 0 and
-		not $self->{ucsc} and 
+		not $self->ucsc and 
 		$extension !~ /sgr/i
 	) {
 		# therefore headers should be written

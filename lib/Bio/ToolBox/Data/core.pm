@@ -575,6 +575,14 @@ sub bed {
 	return $self->{bed};
 }
 
+sub ucsc {
+	my $self = shift;
+	if ($_[0] and $_[0] =~ /^\d+$/) {
+		$self->{ucsc} = $_[0];
+	}
+	return $self->{ucsc};
+}
+
 sub number_columns {
 	my $self = shift;
 	if (@_) {
