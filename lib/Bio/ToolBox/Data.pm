@@ -904,6 +904,9 @@ sub add_row {
 	elsif ($_[0] and ref $_[0] eq 'Bio::ToolBox::Data::Feature') {
 		@row_data = $_[0]->row_values;
 	}
+	elsif ($_[0] and $_[0] =~ /\t/) {
+		@row_data = split /\t/, $_[0];
+	}
 	else {
 		@row_data = map {'.'} (1 .. $self->{number_columns});
 	}
