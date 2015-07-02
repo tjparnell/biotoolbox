@@ -1639,9 +1639,6 @@ sub get_feature {
 	
 	# get the name of the feature
 	my $name = $args{'name'} || undef; 
-	$name = (split(/\s*[;,\|]\s*/, $name))[0] if $name =~ /[;,\|]/;
-		 # multiple names present using common delimiters ;,|
-		 # take the first name only, assume others are aliases that we don't need
 	
 	# check for values and internal nulls
 	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
@@ -1692,6 +1689,18 @@ sub get_feature {
 			-aliases    => 1, 
 			-type       => $args{'type'},
 		);
+	}
+	unless (@features and $name =~ /[;,\|]/) {
+		# I used to append aliases to the end of the name in old versions of biotoolbox
+		# crazy, I know, but just in case this happened, let's try breaking them apart
+		my $name2 = (split(/\s*[;,\|]\s*/, $name))[0];
+			 # multiple names present using common delimiters ;,|
+			 # take the first name only, assume others are aliases that we don't need
+			@features = $db->features( 
+				-name       => $name2,
+				-aliases    => 1, 
+				-type       => $args{'type'},
+			);
 	}
 	
 	# check the number of features returned
