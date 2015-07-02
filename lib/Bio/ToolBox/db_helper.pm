@@ -310,11 +310,11 @@ sub open_db_connection {
 	my $error;
 	
 	# check if it is a remote file
-	if ($database =~ /^http|ftp/i) {
+	if ($database =~ /^(?:https?|ftp)/i) {
 		
 		# a remote Bam database
 		if ($database =~ /\.bam$/i) {
-			# open using BigWig adaptor
+			# open using Bam adaptor
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
