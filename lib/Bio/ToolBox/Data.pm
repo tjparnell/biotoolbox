@@ -1480,6 +1480,7 @@ sub summary_file {
 
 package Bio::ToolBox::Data::Iterator;
 use Bio::ToolBox::Data::Feature;
+use Carp;
 
 sub new {
 	my ($class, $data) = @_;
@@ -1503,6 +1504,7 @@ sub next_row {
 
 sub row_index {
 	my $self = shift;
+	carp "row_index is a read only method" if @_;
 	return $self->{'index'};
 }
 

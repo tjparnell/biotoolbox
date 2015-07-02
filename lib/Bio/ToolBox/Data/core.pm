@@ -66,13 +66,14 @@ sub verify {
 	# this is a low level integrity checker
 	# this is very old code from before the days of an OO API of Bio::ToolBox
 	my $self = shift;
+	carp "verify is a read only method" if @_;
 	
 	# check for data table
 	unless (
 		defined $self->{'data_table'} and 
 		ref $self->{'data_table'} eq 'ARRAY'
 	) {
-		cluck " No data table in passed data structure!";
+		carp " No data table in passed data structure!";
 		return;
 	}
 	
@@ -80,7 +81,7 @@ sub verify {
 	if (defined $self->{'last_row'}) {
 		my $number = scalar( @{ $self->{'data_table'} } ) - 1;
 		if ($self->{'last_row'} != $number) {
-			cluck " data table last_row index [$number] doesn't match " . 
+			carp " data table last_row index [$number] doesn't match " . 
 				"metadata value [" . $self->{'last_row'} . "]!\n";
 			# fix it for them
 			$self->{'last_row'} = $number;
@@ -112,11 +113,11 @@ sub verify {
 			}
 		}
 		if ($too_low) {
-			cluck " $too_low rows in data table had fewer than expected columns!\n" . 
+			carp " $too_low rows in data table had fewer than expected columns!\n" . 
 				 "  padded rows " . join(',', @problems) . " with null values\n";
 		}
 		if ($too_high) {
-			cluck " $too_high rows in data table had more columns than expected!\n" . 
+			carp " $too_high rows in data table had more columns than expected!\n" . 
 				" rows " . join(',', @problems) . "\n";
 			return;
 		}
@@ -132,7 +133,7 @@ sub verify {
 			$self->{$i}{'name'} eq 
 			$self->{'data_table'}->[0][$i]
 		) {
-			cluck " incorrect or missing metadata!  Column header names don't" .
+			carp " incorrect or missing metadata!  Column header names don't" .
 				" match metadata name values for index $i!" . 
 				" compare '" . $self->{$i}{'name'} . "' with '" .
 				$self->{'data_table'}->[0][$i] . "'\n";
@@ -444,6 +445,10 @@ sub delete_column {
 			return;
 		}
 	}
+	unless (@_) {
+		cluck "must provide a list";
+		return;
+	}
 	
 	my @deletion_list = sort {$a <=> $b} @_;
 	my @retain_list; 
@@ -479,6 +484,10 @@ sub reorder_column {
 	}
 	
 	# reorder data table
+	unless (@_) {
+		carp "must provide a list";
+		return;
+	}
 	my @order = @_;
 	for (my $row = 0; $row <= $self->last_row; $row++) {
 		my @old = $self->row_values($row);
@@ -519,6 +528,7 @@ sub feature {
 
 sub feature_type {
 	my $self = shift;
+	carp "feature_type is a read only method" if @_;
 	if (defined $self->{feature_type}) {
 		return $self->{feature_type};
 	}
@@ -585,49 +595,37 @@ sub ucsc {
 
 sub number_columns {
 	my $self = shift;
-	if (@_) {
-		carp "number_columns() is a read only method";
-	}
+	carp "number_columns is a read only method" if @_;
 	return $self->{number_columns};
 }
 
 sub last_row {
 	my $self = shift;
-	if (@_) {
-		carp "last_row() is a read only method";
-	}
+	carp "last_row is a read only method" if @_;
 	return $self->{last_row};
 }
 
 sub filename {
 	my $self = shift;
-	if (@_) {
-		carp "filename() is a read only method. Use add_file_metadata().";
-	}
+	carp "filename is a read only method. Use add_file_metadata()." if @_;
 	return $self->{filename};
 }
 
 sub basename {
 	my $self = shift;
-	if (@_) {
-		carp "basename() is a read only method. Use add_file_metadata().";
-	}
+	carp "basename is a read only method. Use add_file_metadata()." if @_;
 	return $self->{basename};
 }
 
 sub path {
 	my $self = shift;
-	if (@_) {
-		carp "path() is a read only method. Use add_file_metadata().";
-	}
+	carp "path is a read only method. Use add_file_metadata()." if @_;
 	return $self->{path};
 }
 
 sub extension {
 	my $self = shift;
-	if (@_) {
-		carp "extension() is a read only method. Use add_file_metadata().";
-	}
+	carp "extension() is a read only method. Use add_file_metadata()." if @_;
 	return $self->{extension};
 }
 
@@ -669,6 +667,7 @@ sub delete_comment {
 
 sub list_columns {
 	my $self = shift;
+	carp "list_columns is a read only method" if @_;
 	my @list;
 	for (my $i = 0; $i < $self->number_columns; $i++) {
 		push @list, $self->{$i}{'name'};
@@ -811,18 +810,21 @@ sub _find_column_indices {
 
 sub chromo_column {
 	my $self = shift;
+	carp "chromo_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{chromo};
 }
 
 sub start_column {
 	my $self = shift;
+	carp "start_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{start};
 }
 
 sub stop_column {
 	my $self = shift;
+	carp "stop_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{stop};
 }
@@ -833,24 +835,28 @@ sub end_column {
 
 sub strand_column {
 	my $self = shift;
+	carp "strand_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{strand};
 }
 
 sub name_column {
 	my $self = shift;
+	carp "name_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{name};
 }
 
 sub type_column {
 	my $self = shift;
+	carp "type_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{type};
 }
 
 sub id_column {
 	my $self = shift;
+	carp "id_column is a read only method" if @_;
 	$self->_find_column_indices unless exists $self->{column_indices};
 	return $self->{column_indices}{id};
 }
