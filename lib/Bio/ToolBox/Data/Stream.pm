@@ -737,7 +737,7 @@ sub next_row {
 
 
 sub add_row {
-	shift->write_row(@_);
+	return shift->write_row(@_);
 }
 
 
@@ -815,6 +815,7 @@ sub write_row {
 		}
 		$self->{fh}->print($data);
 	}
+	return 1;
 }
 
 
