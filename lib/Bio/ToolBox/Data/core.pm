@@ -505,7 +505,12 @@ sub reorder_column {
 	for (my $i = 0; $i < scalar(@order); $i++) {
 		# now copy back from the old_metadata into the main data hash
 		# using the new index number in the @order array
-		$self->{$i} = $old_metadata{ $order[$i] };
+		# must regenerate the hash, not just link to the old anonymous hash, in 
+		# case we're duplicating columns
+		$self->{$i} = {};
+		foreach my $k (keys %{ $old_metadata{$order[$i]} }) {
+			$self->{$i}{$k} = $old_metadata{$order[$i]}{$k};
+		}
 		# assign new index number
 		$self->{$i}{'index'} = $i;
 	}
