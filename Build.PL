@@ -2,7 +2,6 @@
 
 use strict;
 use warnings;
-use FindBin qw($Bin);
 use Module::Build;
 
 
@@ -38,12 +37,17 @@ sub get_base_options {
 		configure_requires => {
 			'Module::Build'           => 0,
 		},
+		meta_merge        => {
+			resources     => {
+				repository     => 'https://github.com/tjparnell/biotoolbox'
+			}
+		},
 		requires          => {
 			'Config::Simple'          => 4.58,
 			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
-			'Bio::Root::Version'      => '1.0069001',
+			'Bio::Root::Version'      => '1.0069022',
 		},
 		recommends        => {
 			'Algorithm::Cluster'      => 0,
@@ -56,7 +60,6 @@ sub get_base_options {
 			'Parallel::ForkManager'   => 1.02,
 		},
 		script_files => [
-			'scripts/average_gene.pl',
 			'scripts/bam2wig.pl',
 			'scripts/change_cluster_order.pl',
 			'scripts/correlate_position_data.pl',

@@ -23,7 +23,6 @@ MANIFEST			This list of files
 META.json
 META.yml
 README
-scripts/average_gene.pl
 scripts/bam2wig.pl
 scripts/change_cluster_order.pl
 scripts/correlate_position_data.pl
