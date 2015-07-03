@@ -115,7 +115,7 @@ my $check = 1; # assume ok to begin with
 my $error;
 
 # check comment lines
-if (scalar @{ $metadata->{'other'}} != 0) {
+if (scalar @{ $metadata->{'comments'}} != 0) {
 	$check = 0;
 	$error .= "  file has extraneous comment lines\n";
 }

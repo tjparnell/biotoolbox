@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.20';
+my $VERSION = '1.30';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -993,11 +993,11 @@ sub initialize_output_data_structure {
 	# assign the filename
 	if ($outfile) {
 		# use the new output file name
-		$output_data->filename($outfile);
+		$output_data->add_file_metadata($outfile);
 	}
 	else {
 		# borrow the first file name
-		$output_data->filename( $Data1->filename ); # borrow file name
+		$output_data->add_file_metadata( $Data1->filename ); # borrow file name
 	}
 	
 	return $output_data;
