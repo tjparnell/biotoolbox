@@ -383,10 +383,6 @@ sub add_data_line {
 			# a null value
 			$linedata[$i] = '.';
 		}
-# 		elsif ($linedata[$i] =~ /^n\/?a$/i) {
-# 			# value matches na or n/a, a null value
-# 			$linedata[$i] = '.';
-# 		}
 	}
 	
 	# convert strand as necessary

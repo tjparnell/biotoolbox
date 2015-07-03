@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+my $VERSION = '1.30';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -737,7 +737,7 @@ sub median_scale_function {
 		$index = _prepare_new_destination($index, '_scaled') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
-			next if $row->value($index) eq '.'; # null value, nothing to do
+			next if _is_null( $row->value($index) ); 
 			my $v = $correction_value * $row->value($index);
 			$row->value($index, $v);
 		} );
@@ -802,7 +802,7 @@ sub percentile_rank_function {
 		$index = _prepare_new_destination($index, '_pr') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
-			next if $row->value($index eq '.');
+			next if _is_null($row->value($index));
 			$row->value($index, $percentrank{ $row->value($index) });
 		} );
 		
@@ -860,7 +860,7 @@ sub zscore_function {
 		$index = _prepare_new_destination($index, '_Zscore') if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
-			next if $row->value($index) eq '.';
+			next if _is_null($row->value($index));
 			my $v = ($row->value($index) - $statdata{'mean'}) / $statdata{'stddevp'};
 			$row->value($index, $v);
 		} );
@@ -990,10 +990,7 @@ sub toss_nulls_function {
 		my $check = 0; 
 		foreach my $i (@order) {
 			my $v = $row->value($i);
-			if ($v eq '.') {
-				$check++;
-			} 
-			elsif (not defined $v) {
+			if (_is_null($v)) {
 				$check++;
 			} 
 			elsif ($v == 0) {
@@ -1144,8 +1141,7 @@ sub toss_threshold_function {
 			my $check = 0; 
 			foreach my $i (@order) {
 				my $v = $row->value($i);
-				next unless defined $v;
-				next if $v eq '.';
+				next if _is_null($v);
 				$check++ if $v > $threshold;
 			}
 			# mark for deletion if the row fails the check
@@ -1158,8 +1154,7 @@ sub toss_threshold_function {
 			my $check = 0; 
 			foreach my $i (@order) {
 				my $v = $row->value($i);
-				next unless defined $v;
-				next if $v eq '.';
+				next if _is_null($v);
 				$check++ if $v < $threshold;
 			}
 			# mark for deletion if the row fails the check
@@ -1356,11 +1351,7 @@ sub convert_nulls_function {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
-			if (not defined $v) {
-				$row->value($index, $new_value);
-				$count++;
-			}
-			elsif ($v eq '.') {
+			if (_is_null($v)) {
 				$row->value($index, $new_value);
 				$count++;
 			}
@@ -1446,7 +1437,7 @@ sub convert_absolute_function {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
-			next if $v eq '.';
+			next if _is_null($v);
 			my $new_value;
 			eval { $new_value = abs($v) };
 			if (defined $new_value) {
@@ -1526,7 +1517,7 @@ sub minimum_function {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
-			next if $v eq '.';
+			next if _is_null($v);
 			if ($v < $value) {
 				$row->value($index, $value);
 				$count++;
@@ -1594,7 +1585,7 @@ sub maximum_function {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
-			next if $v eq '.';
+			next if _is_null($v);
 			if ($v < $value) {
 				$row->value($index, $value);
 				$count++;
@@ -1686,13 +1677,13 @@ sub log_function {
 			my $row = shift;
 			my $v = $row->value($index);
 			# check the value contents and process appropriately
-			if ($v == 0) { 
-				# cannot take log of 0, change to null
-				$row->value($index, '.'); 
+			if (_is_null($v)) {
+				# a null value, do nothing
 				$failed++;
 			} 
-			elsif ($v eq '.') {
-				# a null value, do nothing
+			elsif ($v == 0) { 
+				# cannot take log of 0, change to null
+				$row->value($index, '.'); 
 				$failed++;
 			} 
 			else {
@@ -1786,7 +1777,7 @@ sub delog_function {
 			my $row = shift;
 			my $v = $row->value($index);
 			# check the value contents and process appropriately
-			if ($v eq '.') {
+			if (_is_null($v)) {
 				# a null value, do nothing
 				$failed++;
 			} 
@@ -2069,7 +2060,7 @@ sub ratio_function {
 		my $d = $row->value($denominator);
 		
 		# add new value
-		if ($n eq '.' or $d eq '.') {
+		if (_is_null($n) or _is_null($d)) {
 			# either value is null
 			$row->value($new_position, '.');
 			$failure_count++;
@@ -2169,8 +2160,8 @@ sub difference_function {
 		my $row = shift;
 		
 		# calculate difference
-		if ($row->value($experiment_index) eq '.' or 
-			$row->value($control_index) eq '.'
+		if (_is_null( $row->value($experiment_index) ) or 
+			_is_null( $row->value($control_index) )
 		) {
 			# can't do anything with nulls, new value will be null
 			$row->value($new_position, '.');
@@ -2370,7 +2361,7 @@ sub math_function {
 		$index = _prepare_new_destination($index, "_$mathed\_$value") if $placement =~ /^n/i;
 		$Data->iterate( sub {
 			my $row = shift;
-			if ($row->value($index) eq '.') {
+			if (_is_null( $row->value($index) )) {
 				$failed_count++;
 			}
 			else {
@@ -2749,7 +2740,7 @@ sub center_function {
 		
 		# adjust the datapoints
 		foreach my $d (@datasets) {
-			next if $row->value($d) eq '.';
+			next if _is_null($row->value($d));
 			$row->value($d, ($row->value($d) - $median_value) );
 		}
 	} );
@@ -2843,10 +2834,10 @@ sub rewrite_function {
 	
 	# report write results
 	if ($write_results) {
-		print " $modification manipulations performed\n Wrote datafile $write_results\n";
+		print " Wrote datafile $write_results\n";
 	}
 	else {
-		print " unable to re-write to file '$rewrite_filename'!\n";
+		print " Unable to re-write to file '$rewrite_filename'!\n";
 	}
 	
 	return;
@@ -3169,7 +3160,7 @@ sub _get_statistics_hash {
 	shift @invalues; # remove header
 	my @goodvalues;
 	foreach my $v (@invalues) {
-		next if $v eq '.';
+		next if _is_null($v);
 		if ($v == 0) {
 			# we need to determine whether we can accept 0 values
 			unless (defined $zero) {
@@ -3201,6 +3192,13 @@ sub _get_statistics_hash {
 	return statshash(@goodvalues);
 }
 
+
+sub _is_null {
+	my $v = shift;
+	return 1 if not defined $v;
+	return 1 if ($v eq '.' or $v =~ /^n\/?a$/i or $v eq 'NaN');
+	return 0;
+}
 
 
 
