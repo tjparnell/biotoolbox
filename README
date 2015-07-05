@@ -3,39 +3,29 @@ Bio::ToolBox - Tools for querying and analysis of genomic data
 DESCRIPTION
 
 This is a collection of libraries and high-quality end-user 
-scripts for bioinformatic analysis, particularly of genomic data 
-obtained from microarray and next-generation sequencing.
+scripts for bioinformatic analysis, including working with gene 
+annotation, collecting data scores from a variety of modern file 
+formats, and conversion between file formats. 
 
-The Bio::ToolBox libraries provide an abstraction layer over a variety
-of different specialized BioPerl-style modules. For example, there is
-a special emphasis on the collection data values for defined genomic
-coordinate regions, regardless of whether the values come from a GFF
-database, Bam file, BigWig file, etc. See the documentation with the
-Bio::ToolBox::Data module for more information on working with tables
-of information, for example BED files of genomic coordinates, and
-using that information to collect data from databases.
+The Bio::ToolBox libraries provide a unified, abstracted interface 
+to multiple common gene annotation formats and the collection of data 
+from multiple data files. They rely on BioPerl SeqFeature libraries 
+and related adaptors to access binary file formats including Bam, 
+BigWig, BigBed, and USeq. 
 
-The Bio::ToolBox package also includes a large number of high 
-quality scripts for setting up databases of annotation, collecting 
-annotated features, collecting genomic data relative to features, 
-manipulating and analyzing data, and data format conversion. 
-These scripts are installed in your local scripts bin directory. 
+The Bio::ToolBox package includes scripts for setting up databases 
+of annotation, collecting annotated features, collecting genomic data 
+relative to features, manipulating and analyzing data, and data format 
+conversion. 
 
 
 
 REQUIREMENTS
 
-These are Perl modules and scripts. They require Perl and a unix-like 
+These are Perl modules and scripts. They require Perl and a 
 command-line environment. They have been developed and tested on Mac 
-OS X and linux; Microsoft Windows compatability is not tested nor 
-guaranteed.
-
-Most recent versions of Perl will work; older versions will require 
-additional updating for compatibility.
-
-Several different Perl modules are required for specific programs to work, 
-most notably BioPerl, among a few others. Most of these dependencies can 
-be taken care of by the installer.
+OS X and linux; Microsoft Windows compatability is not tested but 
+should mostly work.
 
 
 
@@ -48,8 +38,13 @@ Installation is simple with the standard Perl incantation.
     ./Build test
     ./Build install
 
-Installation may also be managed through a package manager, either the 
-CPAN shell or a utility such as cpanminus.
+Released version may be obtained though the CPAN repository using 
+your favorite package manager. For a quick installation, 
+the following command will get you started using the system perl and 
+your personal PERL5 library.
+
+	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::ToolBox
+
 
 
 
@@ -87,45 +82,14 @@ bins, etc. and the columns represent descriptive information and data. The
 first line in the table are the column headings. Metadata about each 
 column are recorded in header lines at the beginning of the file and 
 prefixed by a # symbol. The files may be compressed with gzip. More 
-information may be found Bio::ToolBox::file_helper.
+information may be found Bio::ToolBox::Data.
 
 
 
 PROJECT WEBSITE
 
 The BioToolBox project repository may be found at
-http://code.google.com/p/biotoolbox/. 
+https://github.com/tjparnell/biotoolbox. 
 
-Please contact the author for bugs. Feature requests are also accepted, 
-within time constraints. Contact information is at the project website.
-
-
-
-
-ONLINE DOCUMENTATION
-
-Setting up a computer for BioToolBox
-http://code.google.com/p/biotoolbox/wiki/BioToolBoxSetUp
-
-Setting up Mac OS X for bioinformatics
-http://code.google.com/p/biotoolbox/wiki/SetupForMacOSX
-
-Up to data list of BioToolBox programs
-http://code.google.com/p/biotoolbox/wiki/ProgramList
-
-Working with annotation in databases
-http://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases
-
-Working with data files and datasets
-http://code.google.com/p/biotoolbox/wiki/WorkingWithDatasets
-
-Description of supported data file formats
-http://code.google.com/p/biotoolbox/wiki/DataFileFormats
-
-Mapping SNPs 
-http://code.google.com/p/biotoolbox/wiki/MappingSNPs
-
-Description of the text data report format
-http://code.google.com/p/biotoolbox/wiki/TimDataFormat
 
 
