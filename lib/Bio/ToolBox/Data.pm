@@ -104,6 +104,12 @@ assumed to be column header names. Commented lines (beginning
 with #) are parsed as metadata. The files may be compressed 
 (gzip or bzip2).
 
+=item stream =E<gt> 1
+
+Indicate that the file should be opened as a file stream.  
+A Bio::ToolBox::Data::Stream object will be returned. This is a 
+convenience method. 
+
 =item feature =E<gt> $type
 
 =item feature =E<gt> "$type:$source"
@@ -233,12 +239,7 @@ such. A value of 0 means they are not formatted as such.
 
 =over 4
 
-=item filename($text)
-
-Returns or sets the filename for the Data structure. If you set 
-a new filename, the path, basename, and extension are 
-automatically derived for you. If a path was not provided, 
-the current working directory is assumed. 
+=item filename
 
 =item path
 
@@ -246,15 +247,20 @@ the current working directory is assumed.
 
 =item extension
 
-Returns the full path, basename, and extension of the filename. 
-Concatenating these three values will reconstitute the 
-original filename.
+Returns the filename, full path, basename, and extension of 
+the filename. Concatenating the last three values will reconstitute 
+the first original filename.
+
+=item add_file_metadata($filename)
+
+Add filename metadata. This will automatically parse the path, 
+basename, and recognized extension from the passed filename.
 
 =back
 
 =head2 Comments
 
-Comments are the other commented lines from a text file (lines 
+Comments are any other commented lines from a text file (lines 
 beginning with a #) that were not parsed as metadata.
 
 =over 4
@@ -392,8 +398,10 @@ the beginning of the file.
 
 =item name($index)
 
+=item name($index, $new_name)
+
 Convenient method to return the name of the column given the 
-index number.
+index number. A column may also be renamed by passing a new name.
 
 =item metadata($index, $key)
 
@@ -644,7 +652,7 @@ The mean value of each column becomes a row value, and each column
 header becomes a row identifier (i.e. the table is transposed). The 
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
-L<get_relative_data.pl> and L<average_gene.pl> as examples. 
+L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
 You may pass these options. 
 
 =over 4

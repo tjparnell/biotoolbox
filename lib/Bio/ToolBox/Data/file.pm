@@ -1356,17 +1356,10 @@ __END__
 
 =head1 DESCRIPTION
 
-These are subroutines for providing file IO for the L<Bio::ToolBox::Data> 
-data structure. In other words, they are not object methods, but rather 
-exportable subroutines for reading and writing data into the complex data 
-structure underlying the L<Bio::ToolBox::Data> object. These subroutines 
-and data structures predate the L<Bio::ToolBox::Data> object model and 
-exist for backwards compatibility. End-users are strongly encouraged to 
-use the L<Bio::ToolBox::Data> API. 
-
-These file IO methods work with any generic tab-delimited text file 
-of rows and columns. It also properly handles comment, metadata, and 
-column-specific metadata custom to Bio::ToolBox programs.
+These are methods for providing file IO for the L<Bio::ToolBox::Data> 
+data structure. These file IO methods work with any generic tab-delimited 
+text file of rows and columns. It also properly handles comment, metadata, 
+and column-specific metadata custom to Bio::ToolBox programs.
 Special file formats used in bioinformatics, including for example
 GFF and BED files, are automatically recognized by their file extension and 
 appropriate metadata added. 
@@ -1383,23 +1376,69 @@ this data structure.
 The data file format is described below, and following that a 
 description of the data structure.
 
-=head1 FORMAT OF BIOTOOLBOX DATA TEXT FILE
+=head1 RECOGNIZED  FILE FORMATS
 
-The BioToolBox data file format is not indicated by a special file extension. 
-Rather, a generic '.txt' extension is used to preserve functionality with
-other text processing programs. The file is essentially a simple tab 
-delimited text file representing rows (lines) and columns (demarcated by the
-tabs). 
+Bio::ToolBox will recognize a number of standard bioinformatic file 
+formats, almost all of which are recognized by their extension. Recognition 
+is NOT guaranteed if an alternate file extension is used!!!!
 
-What makes it unique are the metadata header lines, each prefixed by a '# '.
-These metadata lines describe the data within the table with regards to its
-type, source, methodology, history, and processing. The metadata is designed
-to be read by both human and computer. Opening files without this metadata 
-will result in basic default metadata assigned to each column. Special files
-recognized by their extension (e.g. GFF or BED) will have appropriate 
-metadata assigned.
+These formats include
 
-The specific metadata lines that are specifically recognized are listed below.
+=over 4
+
+=item BED .bed .bedgraph .bdg
+
+Bed files must have 3-12 columns. BedGraph files must have 4 columns.
+
+=item GFF .gff .gff3 .gtf
+
+These may also be recognized by the gff-version pragma. These must have 
+9 columns.
+
+=item UCSC tables .refFlat .genePred 
+
+These are typically recognized by the number of columns, and can include 
+simple refFlat, gene prediction, extended gene prediction, and known Gene 
+tables. 
+
+=item Peak files .narrowPeak .broadPeak 
+
+These are special "BED6+4" file formats. 
+
+=item CDT .cdt
+
+Cluster data files used with Cluster 3.0 and Treeview.
+
+=item SGR
+
+Rare file format of chromosome, position, score.
+
+=item TEXT .txt
+
+Almost any tab-delimited text file can be loaded.
+
+=item Compression .gz .bz2
+
+Compressed files are usually read through an external decompression 
+program. All of the above formats can be loaded as compressed files.
+
+=back
+
+=head1 DEFAULT BIO::TOOLBOX DATA TEXT FILE FORMAT
+
+When not writing to a defined format, e.g. BED or GFF, a Bio::ToolBox 
+Data structure is written as a simple tab-delimited text file, with the 
+first line being the column header names. Such files are easily parsed 
+by other programs. 
+
+If additional metadata is included in the Data object, then these are 
+written as comment lines, prefixed by a "# ", before the table. Metadata 
+can describe the data within the table with regards to its type, source, 
+methodology, history, and processing. The metadata is designed to be read 
+by both human and computer. Opening files without this metadata 
+will result in basic default metadata assigned to each column. 
+
+Some common metadata lines that are specifically recognized are listed below.
 
 =over 4
 
@@ -1428,16 +1467,11 @@ Following this is a series of 'key=value' pairs separated by ';'.
 Spaces are generally not allowed. Obviously '=' or ';' are not 
 allowed or they will interfere with the parsing. The metadata 
 describes how and where the data was collected. Additionally, any 
-modifications performed on the data are also recorded here. The only 
-key that is required is 'name'. 
-If the file being read does not contain metadata, then it will be auto 
-generated with basic metadata.
+modifications performed on the data are also recorded here. 
 
-=back
+A list of common column metadata keys is shown. 
 
-A list of standard column header keys is below, but is not exhaustive. 
-
-=over
+=over 4
 
 =item name
 
@@ -1473,7 +1507,7 @@ The extension of the region in collecting values
 
 =item strand
 
-The strandedness of the data collecte. Values include 'sense',
+The strandedness of the data collected. Values include 'sense',
 'antisense', or 'none'
 
 =item method
@@ -1486,115 +1520,43 @@ boolean indicating the values are in log2 space or not
 
 =back
 
-Finally, the data table follows the metadata. The table consists of 
-tab-delimited data. The same number of fields should be present in each 
-row. Each row represents a genomic feature or landmark, and each column 
-contains either identifying information or a collected dataset. 
-The first row will always contain the column names, except in special
-cases such as the GFF format where the columns are strictly defined.
-The column name should be the same as defined in the column's metadata.
-When loading GFF files, the header names and metadata are automatically
-generated for conveniance. 
+=back
 
-=head1 USAGE
+=head1 USER METHODS REFERENCE
 
-Call the module at the beginning of your perl script and pass a list of the 
-desired modules to import. None are imported by default.
-  
-  use Bio::ToolBox::db_helper qw(load_data_file write_data_file);
-  
-The specific usage for each subroutine is detailed below.
+These methods are generally available to Bio::ToolBox::Data objects 
+and can be used by the user.
 
 =over
 
-=item load_data_file()
+=item load_file($filename)
 
-This is a newer, updated file loader and parser for BioToolBox data files. It will
-completely parse and load the file contents into the described data structure 
-in memory. Files with metadata lines (described in BioToolBox data format) will 
-have the metadata lines loaded. Files without metadata lines will have basic 
-metadata (column name and index) automatically generated. The first 
-non-header line should contain the column (dataset) name. Recognized file 
-formats without headers, including GFF, BED, and SGR, will have the columns 
-automatically named.
+Loads a file into memory. Any metadata lines will be automatically 
+parsed and the table loaded into the Data object. Some basic consistency 
+checks are performed. Structured file formats, such as BED, GFF, etc are 
 
-This subroutine uses the open_data_file() subroutine and completes the 
-loading of the file into memory.
+=item add_file_metadata($filename)
 
-BED and BedGraph style files, recognized by .bed or .bdg file extensions, 
-have their start coordinate adjusted by +1 to convert from 0-based interbase 
-numbering system to 1-based numbering format, the convention used by BioPerl. 
-A metadata attribute is applied informing the user of the change. When writing 
-a valid Bed or BedGraph file, converted start positions are changed back to 
-interbase format.
+Add or update the file metadata to a Data object. This will automatically 
+parse the path, basename, and recognized file extension.
 
-Strand information is parsed from recognizable symbols, including "+, -, 1, 
--1, f, r, w, c, 0, .",  to the BioPerl convention of 1, 0, and -1. Valid 
-BED and GFF files are changed back when writing these files. 
+=item write_file()
 
-Pass the module the filename. The file may be compressed with gzip, recognized
-by the .gz extension.
+=item save()
 
-The subroutine will return a scalar reference to the hash, described above. 
-Failure to read or parse the file will return an empty value.
+This method will write out a Bio::ToolBox Data structure to file. 
+Zero or more values may be passed to the method.
 
-Example:
-	
-	my $filename = 'my_data.txt.gz';
-	my $data_ref = load_data_file($filename);
-	
-=item open_data_file()
+Pass no values, and the filename stored in the metadata will be used in 
+writing the file, effectively overwriting itself. No filename will generate 
+an error. 
 
-This is a file opener and metadata parser for data files, including BioToolBox 
-data formatted files and other recognized data formats (gff, bed, sgr). It 
-will open the file, parse the metadata, and return an open file handle 
-ready for reading. It will NOT load the entire file contents into memory. 
-This is to allow for processing those gigantic data files that will break 
-Perl with malloc errors. 
+Pass a single value representing the filename to write. The current 
+working directory is assumed if no path is provided in the filename.
 
-The subroutine will open the file, parse the header lines (marked with
-a # prefix) into a metadata hash as described above, parse the data column 
-names (the first row in the table), set the file pointer to the first row of
-data in the table, and return the open file handle along with a scalar 
-reference to the metadata hash. The calling program may then process the file 
-through the filehandle line by line as appropriate.
+Pass an array of key =E<gt> values for fine control of the write process. 
+Keys include the following: 
 
-The data column names may be found in an array in the data hash under the 
-key 'column_names';
-
-Pass the module the filename. The file may be compressed with gzip, recognized
-by the .gz extension.
-
-The subroutine will return two items: a scalar reference to the file handle,
-and a scalar reference to the data hash, described as above. The file handle
-is an L<IO::Handle> object and may be manipulated as such.
-Failure to read or parse the file will return an empty value.
-
-Example:
-	
-	my $filename = 'my_data.txt.gz';
-	my ($fh, $metadata_ref) = open_data_file($filename);
-	while (my $line = $fh->getline) {
-		...
-	}
-	$fh->close;
-
-
-
-=item write_data_file()
-
-This subroutine will write out a data file formatted for BioToolBox data files. 
-Please refer to L<FORMAT OF BIOTOOLBOX DATA TEXT FILE> for more 
-information regarding the file format. If the 'gff' key is true in the data 
-hash, then a gff file will be written.
-
-The subroutine is passed a reference to an anonymous hash containing the 
-arguments. The keys include
-
-  Required:
-  data     => A scalar reference to the data structure ad described
-              in L<Bio::ToolBox::data_helper>. 
-  Optional: 
   filename => A scalar value containing the name of the file to 
               write. This value is required for new data files and 
               optional for overwriting existing files (the filename 
@@ -1618,28 +1580,9 @@ arguments. The keys include
               tab-delimited text data file should be written. This is 
               an old alias for setting 'format' to 'simple'.
 
-The subroutine will return true if the write was successful, otherwise it will
-return undef. The true value is the name of the file written, including any 
-changes to the extension if necessary. 
-
-Note that by explicitly providing the filename extension, some of these 
-options may be set without providing the arguments to the subroutine. 
-The arguments always take precendence over the filename extensions, however.
-
-Example
-
-	my $filename = 'my_data.txt.gz';
-	my $data_ref = load_data_file($filename);
-	...
-	my $success_write = write_data_file(
-		'data'     => $data_ref,
-		'filename' => $filename,
-		'format'   => 'simple',
-	);
-	if ($success_write) {
-		print "wrote $success_write!";
-	}
-
+The method will return the real name of the file written if the write was 
+successful. The filename may be modified slightly as necessary, for example 
+append or change the file extension to match the specified file format.
 
 =item open_to_read_fh()
 
@@ -1654,7 +1597,7 @@ as such.
 Example
 	
 	my $filename = 'my_data.txt.gz';
-	my $fh = open_to_read_fh($filename);
+	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
 	while (my $line = $fh->getline) {
 		# do something
 	}
@@ -1685,69 +1628,73 @@ Example
 	
 	my $filename = 'my_data.txt.gz';
 	my $gz = 1; # compress output file with gzip
-	my $fh = open_to_write_fh($filename, $gz);
+	my $fh = Bio::ToolBox::Data::file->open_to_write_fh($filename, $gz);
 	# write to new compressed file
 	$fh->print("something interesting\n");
 	$fh->close;
 	
+=back
 
-=item write_summary_data()
+=head1 OTHER METHODS
 
-This subroutine will summarize the data in a data file, generating mean values
-for all the values in each dataset (column), and writing an output file with
-the summarized data. This is useful for data collected in windows across a 
-feature, for example, microarray data values across the body of genes, and 
-then generating a composite or average gene occupancy.
+These methods are used internally by Bio::ToolBox::Core and other objects 
+are not recommended for use by general users. 
 
-The output file is a BioToolBox data tab-delimited file as described above with three
-columns: The Name of the window, the Midpoint of the window (calculated as the
-mean of the start and stop points for the window), and the mean value. The 
-table is essentially rotated 90º from the original table; the averages of each
-column dataset becomes rows of data.
+=item parse_headers
 
-Pass the subroutine an anonymous hash of arguments. These include:
+This will determine the file format, parse any metadata lines that may 
+be present, add metadata and inferred column names for known file formats, 
+and determine the table column header names. This is automatically called 
+by load_file(), and generally need not be called.
 
-  Required:
-  data        => A scalar reference to the data hash. The data hash 
-                 should be as described in this module.
-  filename    => The base filename for the file. This will be 
-                 appended with '_summed' to differentiate from the 
-                 original data file. This may be automatically  
-                 obtained from the metadata of an opened file if 
-                 not specified, otherwise it will not work.
-  Optional: 
-  startcolumn => The index of the beginning dataset containing the 
-                 data to summarized. This may be automatically 
-                 calculated by taking the leftmost column without
-                 a known feature-description name (using examples 
-                 from Bio::ToolBox::db_helper).
-  stopcolumn  => The index of the last dataset containing the 
-                 data to summarized. This may be automatically 
-                 calculated by taking the rightmost column. 
-  dataset     => The name of the original dataset used in 
-                 collecting the data. It may be obtained from the 
-                 metadata for the startcolumn.
-  log         => The data is in log2 space. It may be obtained 
-                 from the metadata for the startcolumn.
+=item add_data_line($line)
 
-Example
+Parses a text line from the file into a Data table row.
 
-	my $main_data_ref = load_data_file($filename);
-	...
-	my $summary_success = write_summary_data(
-		'data'         => $main_data_ref,
-		'filename'     => $outfile,
-		'startcolumn'  => 4,
-	);
+=item 
 
-
-=item check_file
+=item check_file($filename)
 
 This subroutine confirms the existance of a passed filename. If not 
 immediately found, it will attempt to append common file extensions 
 and verifiy its existence. This allows the user to pass only the base 
 file name and not worry about missing the extension. This may be useful 
 in shell scripts.
+
+=item add_column_metadata()
+
+Parse a column metadata line from a file into a Data structure.
+
+=item add_gff_metadata()
+
+Add default column metadata for a GFF file.
+
+=item add_bed_metadata()
+
+Add default column metadata for a BED file.
+
+=item add_peak_metadata()
+
+Add default column metadata for a narrowPeak or broadPeak file.
+
+=item add_ucsc_metadata()
+
+Add default column metadata for a UCSC refFlat or genePred file.
+
+=item add_sgr_metadata()
+
+Add default column metadata for a SGR file.
+
+=item add_standard_metadata()
+
+Add default column metadata for a generic file.
+
+=item standard_column_names()
+
+Returns an anonymous array of standard file format column header names. 
+Pass a value representing the file format. Values include gff, bed12, 
+bed6, bdg, narrowpeak, broadpeak, sgr, ucsc16, ucsc15, genepredext, 
+ucsc12, knowngene, ucsc11, genepred, ucsc10, refflat.
 
 =back
 

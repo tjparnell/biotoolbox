@@ -229,12 +229,7 @@ such. A value of 0 means they are not formatted as such.
 
 =over 4
 
-=item filename($text)
-
-Returns or sets the filename for the Data structure. If you set 
-a new filename, the path, basename, and extension are 
-automatically derived for you. If a path was not provided, 
-the current working directory is assumed. 
+=item filename
 
 =item path
 
@@ -242,9 +237,14 @@ the current working directory is assumed.
 
 =item extension
 
-Returns the full path, basename, and extension of the filename. 
-Concatenating these three values will reconstitute the 
-original filename.
+Returns the filename, full path, basename, and extension of 
+the filename. Concatenating the last three values will reconstitute 
+the first original filename.
+
+=item add_file_metadata($filename)
+
+Add filename metadata. This will automatically parse the path, 
+basename, and recognized extension from the passed filename.
 
 =back
 

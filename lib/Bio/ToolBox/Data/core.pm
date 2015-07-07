@@ -866,9 +866,176 @@ sub id_column {
 	return $self->{column_indices}{id};
 }
 
-
-
 __END__
+
+=head1 METHODS REFERENCE
+
+For reference only. Please use L<Bio::ToolBox::Data>
+
+=over 4
+
+=item new
+
+Generate new object. 
+
+=item verify
+
+Verify the integrity of the Data object. Checks multiple things, 
+including metadata, table integrity (consistent number of rows and 
+columns), and special file format structure.
+
+=item open_database
+
+Open the database that is listed in the metadata. Returns the 
+database connection. Pass a true value to force a new database 
+connection to be opened, rather than returning a cached connection 
+object (useful when forking).
+
+=item verify_dataset($dataset)
+
+Verifies the existence of a dataset or data file before collecting 
+data from it. Multiple datasets may be verified. This is a convenience 
+method to Bio::ToolBox::db_helper::verify_or_request_feature_types().
+
+=item delete_column(@indices)
+
+Delete one or more columns in a data table.
+
+=item reorder_column(@indices)
+
+Reorder the columns in a data table. Allows for skipping (deleting) and 
+duplicating columns.
+
+=item feature
+
+Returns or sets the string of the feature name listed in the metadata. 
+
+=item feature_type
+
+Returns "named", "coordinate", or "unknown" based on what kind of feature 
+is present in the data table.
+
+=item program
+
+Returns or sets the program string in the metadata.
+
+=item database
+
+Returns or sets the name of the database in the metadata.
+
+=item gff
+
+Returns or sets the GFF version value in the metadata.
+
+=item bed
+
+Returns or sets the number of BED columns in the metadata. 
+
+=item ucsc
+
+Returns or sets the number of columns in a UCSC-type file 
+format, including genePred and refFlat.
+
+=item number_columns
+
+Returns the number of columns in the data table.
+
+=item last_row
+
+Returns the array index of the last row in the data table.
+
+=item filename
+
+Returns the complete filename listed in the metadata.
+
+=item basename
+
+Returns the base name of the filename listed in the metadata.
+
+=item path
+
+Returns the path portion of the filename listed in the metadata.
+
+=item extension
+
+Returns the recognized extension of the filename listed in the metadata.
+
+=item comments
+
+Returns an array of comment lines present in the metadata.
+
+=item add_comment($string)
+
+Adds a string to the list of comments to be included in the metadata.
+
+=item delete_comment($index)
+
+Deletes the indicated array index from the metadata comments array.
+
+=item list_columns
+
+Returns an array of the column names
+
+=item name($index)
+
+=item name($index, $newname)
+
+Returns or sets the name of the column.
+
+=item metadata($index, $key)
+
+=item metadata($index, $key, $value)
+
+Returns or sets the metadata key/value pair for a specific column.
+
+=item delete_metadata($index, $key)
+
+Deletes the metadata key for a column.
+ 
+=item copy_metadata($source, $target)
+
+Copies the metadata values from one column to another column.
+
+=item find_column("string")
+
+Returns the column index for the column with the specified name. Name 
+searches are case insensitive and can tolerate a # prefix character. 
+The first match is returned.
+
+=item chromo_column
+
+Returns the index of the column that best represents the chromosome column.
+
+=item start_column
+
+Returns the index of the column that best represents the start, position, 
+or transcription start column.
+
+=item stop_column
+
+=item end_column
+
+Returns the index of the column that best represents the stop or end 
+column. 
+
+=item strand_column
+
+Returns the index of the column that best represents the strand.
+
+=item name_column
+
+Returns the index of the column that best represents the name.
+
+=item type_column
+
+Returns the index of the column that best represents the type.
+
+=item id_column
+
+Returns the index of the column that represents the Primary_ID 
+column used in databases.
+
+=back
 
 =head1 AUTHOR
 
