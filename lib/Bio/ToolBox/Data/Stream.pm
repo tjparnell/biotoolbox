@@ -837,6 +837,11 @@ sub close_fh {
 	$self->{fh}->close;
 }
 
+sub DESTROY {
+	my $self = shift;
+	$self->close_fh;
+}
+
 
 ####################################################
 
