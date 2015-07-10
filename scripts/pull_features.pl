@@ -5,13 +5,8 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	load_data_file
-	write_data_file
-	write_summary_data
-	find_column_index
-);
+use Bio::ToolBox::Data;
+use Bio::ToolBox::utility;
 my $VERSION =  '1.30';
 
 print "\n A script to pull out specific features from a data file\n";
@@ -109,10 +104,10 @@ else {
 
 ### Open files
 # file handles and metadata
-my $list_data = load_data_file($listfile) or
+my $List = Bio::ToolBox::Data->new(file => $listfile) or
 	die " unable to open list file!\n";
 
-my ($data_fh, $data_md) = open_data_file($datafile) or
+my $Data = Bio::ToolBox::Data->new(file => $datafile) or
 	die " unable to open data file!\n";
 
 
@@ -161,7 +156,7 @@ else {
 sub identify_indices {
 	
 	# first check whether we have a simple list file
-	if ($list_data->{'number_columns'} == 1) {
+	if ($List->number_columns == 1) {
 		# simple one-column file
 		# the answer is obvious
 		print "  list file only has 1 column, using it\n";
@@ -182,17 +177,17 @@ sub identify_indices {
 		# we have the data index but need the list index
 		
 		# get the column header name
-		my $lookup = $data_md->{$data_index}{'name'};
+		my $lookup = $Data->name($data_index);
 		
 		# find it in the list
-		my $possible = find_column_index($list_data, "^$lookup\$");
+		my $possible = $List->find_column("^$lookup\$");
 		
 		# check
 		if (defined $possible) {
 			# found something
 			$list_index = $possible;
-			print "  found column '", $list_data->{$list_index}{'name'}, 
-				"', using list index $list_index\n";
+			printf "  found column '%s', using list index $list_index\n", 
+				$List->name($list_index);
 			return;
 		}
 	}
@@ -202,31 +197,33 @@ sub identify_indices {
 		# we have the list index but need the data index
 		
 		# get the column header name
-		my $lookup = $list_data->{$list_index}{'name'};
+		my $lookup = $List->name($list_index);
 		
 		# find it in the list
-		my $possible = find_column_index($data_md, "^$lookup\$");
+		my $possible = $Data->find_column("^$lookup\$");
 		
 		# check
 		if (defined $possible) {
 			# found something
 			$data_index = $possible;
-			print "  found column '", $data_md->{$data_index}{'name'}, 
-				"', using data index $data_index\n";
+			printf "  found column '%s', using data index $data_index\n", 
+				$Data->name($data_index);
 			return;
 		}
 		else {
 			# did not find something
 			# is it possible it is a simple list of names?
-			if ($list_data->{'number_columns'} == 1) {
+			if ($List->number_columns == 1) {
 				# we likely only have a simple list of features
 				# adjust the data table accordingly by adding a name
 				# this will avoid not finding the first element in the output file
 				# if this is not true, then the user will just get an error that 
 				# one feature cannot be found.....
-				unshift @{ $list_data->{'data_table'} }, 'Name';
-				$list_data->{0}{'name'} = 'Name';
-				$list_data->{'last_row'}++;
+				#### WE ARE MESSING WITH THE INTERNALS OF THE OBJECT HERE
+				#### DONT DO THIS!!!!!!!
+				unshift @{ $List->{'data_table'} }, 'Name';
+				$List->{0}{'name'} = 'Name';
+				$List->{'last_row'}++;
 			}
 		}
 	}
@@ -234,67 +231,37 @@ sub identify_indices {
 	# neither was specified
 	elsif (!defined $data_index and !defined $list_index) {
 		
-		# try some known column identifiers
-		foreach my $name (qw(name id transcript gene)) {
-			
-			# identify possibilities
-			my $possible_data_i = find_column_index($data_md, "^$name\$");
-			my $possible_list_i = find_column_index($list_data, "^$name\$");
-			
-			# check if something was found
-			if (defined $possible_data_i and defined $possible_list_i) {
-				
-				# assign
-				$data_index = $possible_data_i;
-				$list_index = $possible_list_i;
-				
-				# report
-				print " found identical columns\n";
-				print "  using list column '", $list_data->{$list_index}{'name'}, 
-					"', index $list_index\n";
-				print "  using data column '", $data_md->{$data_index}{'name'}, 
-					"', index $data_index\n";
-				return;
-			}
+		# just try the built-in name column index
+		# this uses a few common names
+		$data_index = $Data->name_column;
+		$list_index = $List->name_column;
+		
+		if (defined $data_index and defined $list_index) {
+			# report
+			printf "  using list column '%s', index $list_index\n", 
+				$List->name($list_index);
+			printf "  using data column '%s', index $data_index\n", 
+				$Data->name($data_index);
+			return;
+		}
+		else {
+			# nope, do not have a match, forget our guesses
+			undef $data_index;
+			undef $list_index;
 		}
 	}
 	
 	# End automatic guessing of index numbers, ask the user
-	foreach ( ['list', $list_data], ['data', $data_md] ) {
-		# a complicated foreach loop to look for either one
-		
-		# the type and metadata structure
-		my ($type, $metadata) = @$_;
-		
-		# skip the ones we already know
-		next if ($type eq 'list' and defined $list_index);
-		next if ($type eq 'data' and defined $data_index);
-		
-		# print the headers
-		print "\n These are the columns in the $type file.\n";
-		for (my $i = 0; $i < $metadata->{'number_columns'}; $i++) {
-			print "   $i\t$metadata->{$i}{name}\n";
-		}
-	
-		# process the answer
-		print " Enter the unique identifier lookup column index from the $type file    ";
-		my $answer = <STDIN>;
-		chomp $answer;
-		
-		# check answer
-		if (exists $metadata->{$answer}) {
-			# answer appears to be a column index
-			if ($type eq 'list') {
-				$list_index = $answer;
-			}
-			else {
-				$data_index = $answer;
-			}
-		}
-		else {
-			die " Invalid response!\n";
-		}
+	unless (defined $list_index) {
+		$list_index = ask_user_for_index($List, 
+			" Enter the unique identifier lookup column index from the list file    ");
 	}
+	unless (defined $data_index) {
+		$data_index = ask_user_for_index($Data, 
+			" Enter the unique identifier lookup column index from the data file    ");
+	}
+	printf " We are using list lookup index $list_index, %s, and data lookup index $data_index, %s\n",
+		$List->name($list_index), $Data->name($data_index);
 }
 
 
@@ -308,17 +275,17 @@ sub collect_request_list {
 		# separate files, we need to know how many and which ones
 		# can't trust whether all groups are in the KGG file or just a few
 	my %pulled;
-	# pulled_data{ group# } -> { unique_id } = [ line_data ]
-	# still need a list of the order:
-	# pulled_data{ group# } -> { 'feature_order' } = [unique_id,...]
+		# hash pulled{ group# } -> { unique_id } = [ line_data ]
+		# still need a list of the order:
+		# hash pulled{ group# } -> { 'feature_order' } = [unique_id,...]
 	
 	
 	# Check whether we're working with a Cluster .kgg file
 	if ($listfile =~ /\.kgg$/i) {
-		for my $row (1 .. $list_data->{'last_row'}) {
-			
-			my $id    = $list_data->{'data_table'}->[$row][0];
-			my $group = $list_data->{'data_table'}->[$row][1];
+		$List->iterate( sub {
+			my $row = shift;
+			my $id    = $row->value(0);
+			my $group = $row->value(1);
 			
 			# store the identifier in the requests hash
 			# the gene identifier is the key, the cluster group number is the value
@@ -334,7 +301,7 @@ sub collect_request_list {
 			else {
 				$pulled{$group}{'list_order'} = [ ($id) ];
 			}
-		}
+		} );
 	}
 	
 	# otherwise a simple text file
@@ -344,13 +311,14 @@ sub collect_request_list {
 		$pulled{0}{'feature_order'} = [];
 		
 		# collect the identifiers
-		for my $row (1 .. $list_data->{'last_row'}) {
-			my $id = $list_data->{'data_table'}->[$row][$list_index];
+		$List->iterate( sub {
+			my $row = shift;
+			my $id = $row->value($list_index);
 			
 			$requests{$id} = 0;
 			$pulled{0}{$id} = [];
 			push @{ $pulled{0}{'list_order'} }, $id;
-		}
+		} );
 	}
 	
 	# prepare the dump array for keeping the features in data file order 
@@ -360,6 +328,44 @@ sub collect_request_list {
 	}
 	
 	return (\%requests, \%pulled);
+}
+
+
+
+### Subroutine to pull the requested features
+sub pull_requested_features {
+	
+	# we will now walk through the data file and pull out those lines 
+	# which match the feature identifier
+	my $found = 0;
+	my $notfound = 0;
+	$Data->iterate( sub {
+		my $row = shift;
+		
+		# check if the identifier exists in our requests hash
+		if (exists $requests->{ $row->value($data_index) } ) {
+			# found
+			my $id = $row->value($data_index);
+			my $group = $requests->{$id};
+						
+			# record the line data
+			if ($list_order) {
+				# store by ID so that it can be sorted later
+				push @{ $pulled->{$group}{$id} }, $row;
+			}
+			else {
+				# just dump it in the same order as the data file
+				push @{ $pulled->{$group}{'data_dump'} }, $row;
+			}
+			$found++;
+		}
+		else {
+			# not found
+			$notfound++;
+		}
+	} );
+	
+	return ($found, $notfound);
 }
 
 
@@ -378,91 +384,36 @@ sub generate_output_data_structures {
 	# only one output data structure
 	if (scalar keys %{$pulled} == 1) {
 		
-		# copy
-		my %new_md = %{ $data_md };
-		
-		# update the file name data
+		# generate new file name data
 		my $newfile = $outfile;
-		my $ext = $data_md->{'extension'};
+		my $ext = $Data->extension;
 		unless ($newfile =~ m/$ext\Z/) {
 			# add the current extension if necessary
 			$newfile .= $ext;
 		}
-		$new_md{'filename'} = $newfile;
-		$new_md{'basename'} = undef;
-		$new_md{'path'} = undef;
 		
-		# add the data table
-		$new_md{'data_table'} = [];
-		# add the column headers
-		push @{ $new_md{'data_table'} }, [ @{ $data_md->{'column_names'} } ];
-		
-		# store the structure
-		$pulled->{0}{'output_data'} = \%new_md;
+		# duplicate and store away
+		my $New = $Data->duplicate;
+		$New->add_file_metadata($newfile);
+		$pulled->{0}{'output_data'} = $New;
 	}
 	
 	# multiple data structures
 	else {
 		foreach my $group (keys %$pulled) {
-			# copy
-			my %new_md = %{ $data_md };
 			
-			# update the file name data
+			# generate new file name
 			my $newfile = $outfile;
-			my $ext = $data_md->{'extension'};
+			my $ext = $Data->extension;
 			$newfile =~ s/$ext\Z//; # remove the extension if present
-			$new_md{'filename'} = $newfile . '_g' . $group . $ext;
-			$new_md{'basename'} = undef;
-			$new_md{'path'} = undef;
+			$newfile .= '_g' . $group . $ext;
 			
-			# add the data table
-			$new_md{'data_table'} = [];
-			# add the column headers
-			push @{ $new_md{'data_table'} }, [ @{ $data_md->{'column_names'} } ];
-			
-			# store the structure
-		$pulled->{$group}{'output_data'} = \%new_md;
+			# duplicate and store away
+			my $New = $Data->duplicate;
+			$New->add_file_metadata($newfile);
+			$pulled->{$group}{'output_data'} = $New;
 		}
 	}
-}
-
-
-
-### Subroutine to pull the requested features
-sub pull_requested_features {
-	
-	# we will now walk through the data file and pull out those lines 
-	# which match the feature identifier
-	my $found = 0;
-	my $notfound = 0;
-	while (my $line = $data_fh->getline) {
-		$line =~ s/[\r\n]+$//; # chomp
-		my @d = split /\t/, $line;
-		
-		# check if the identifier exists in our requests hash
-		if (exists $requests->{ $d[$data_index] } ) {
-			# found
-			my $id = $d[$data_index];
-			my $group = $requests->{ $d[$data_index] };
-						
-			# record the line data
-			if ($list_order) {
-				# store by ID so that it can be sorted later
-				push @{ $pulled->{$group}{$id} }, \@d;
-			}
-			else {
-				# just dump it in the same order as the data file
-				push @{ $pulled->{$group}{'data_dump'} }, \@d;
-			}
-			$found++;
-		}
-		else {
-			# not found
-			$notfound++;
-		}
-	}
-	
-	return ($found, $notfound);
 }
 
 
@@ -474,7 +425,7 @@ sub write_files {
 	foreach my $group (keys %$pulled) {
 		
 		# de-reference the output data for ease
-		my $data = $pulled->{$group}{'output_data'};
+		my $group_Data = $pulled->{$group}{'output_data'};
 		
 		# copy the pulled data lines into the output data structure
 		if ($list_order) {
@@ -482,21 +433,22 @@ sub write_files {
 			foreach my $id (@{ $pulled->{$group}{'list_order'} }) {
 				# this is a list of the feature ids in the same order as the input 
 				# list file 
-				push @{ $data->{'data_table'} }, @{ $pulled->{$group}{$id} };
+				foreach ( @{ $pulled->{$group}{$id} } ) {
+					$group_Data->add_row($_);
+				}
 			}
 		}
 		else {
 			# we will use the data file order in the output file
 			# just copy the contents over
-			push @{ $data->{'data_table'} }, @{ $pulled->{$group}{'data_dump'} };
+			foreach ( @{ $pulled->{$group}{'data_dump'} } ) {
+				$group_Data->add_row($_);
+			}
 		}
-		$data->{'last_row'} = scalar @{ $data->{'data_table'} } - 1;
 		
 		# write the file
-		my $write_results = write_data_file(
-			'data'      => $data,
+		my $write_results = $group_Data->save;
 			# no file name, using the filename recorded in the out data
-		);
 		if ($write_results) {
 			print "  Wrote new datafile '$write_results'\n";
 		}
@@ -507,9 +459,7 @@ sub write_files {
 		# Summarize the pulled data
 		if ($sum) {
 			print " Generating final summed data...\n";
-			my $sumfile = write_summary_data(
-				'data'         => $data,
-				'filename'     => $data->{'filename'}, # must provide
+			my $sumfile = $group_Data->summary_file(
 				'startcolumn'  => $startcolumn,
 				'endcolumn'    => $stopcolumn,
 				'log'          => $log,
