@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.20';
+our $VERSION = '1.30';
 
 =head1 NAME
 
