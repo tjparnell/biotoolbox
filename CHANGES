@@ -1,5 +1,18 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.30 (git 9ab9ff4)
+	- Major upgrade of the Bio::ToolBox::Data library internals. 
+	Old data_helper and file_helper modules are gone, and a 
+	legacy_helper module added for those programs that still haven't 
+	been upgraded yet. Numerous improvements and bug fixes to Data and 
+	Stream objects, structure verification, standard file format metadata, 
+	file writing, and more. Several new methods have been added too.
+	- Added support for ncount, or name count, of bam files. By 
+	counting unique alignment names, we can avoid double-counting 
+	of reads in adjacent search areas. Also works for counting 
+	paired-end reads. Supported by get_datasets script.
+	- Updated pull_features script to use new Data objects.
+
 v.1.26 (git 21c800b)
 	- Removed Extras folder and outdated library functions. These 
 	are available as a separate GitHub project, biotoolbox-extra.
