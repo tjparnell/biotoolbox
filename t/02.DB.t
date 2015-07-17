@@ -36,7 +36,7 @@ isa_ok($Data, 'Bio::ToolBox::Data', 'db collected gene table');
 # check metadata
 is($Data->feature, 'gene:SGD', 'feature');
 is($Data->feature_type, 'named', 'feature type');
-like($Data->program, qr/02\.DB\.t/, 'program');
+is($Data->program, undef, 'program');
 is($Data->gff, 0, 'gff format');
 is($Data->bed, 0, 'bed format');
 is($Data->filename, undef, 'filename');
