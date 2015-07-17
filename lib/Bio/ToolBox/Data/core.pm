@@ -162,14 +162,14 @@ sub verify {
 		if (
 			# column 3 should look like start
 			exists $self->{3} and
-			$self->{3}{'name'} !~ m/start|position/i
+			$self->{3}{'name'} !~ m/start|pos|position/i
 		) {
 			$gff_check = 0;
 		}
 		if (
 			# column 4 should look like end
 			exists $self->{4} and
-			$self->{4}{'name'} !~ m/stop|end|position/i
+			$self->{4}{'name'} !~ m/stop|end|pos|position/i
 		) {
 			$gff_check = 0;
 		}
@@ -223,13 +223,19 @@ sub verify {
 		}
 		if (
 			exists $self->{1} and
-			$self->{1}{'name'} !~ m/start|position/i
+			$self->{1}{'name'} !~ m/start|pos|position/i
 		) {
 			$bed_check = 0;
 		}
 		if (
 			exists $self->{2} and
-			$self->{2}{'name'} !~ m/stop|end|position/i
+			$self->{2}{'name'} !~ m/stop|end|pos|position/i
+		) {
+			$bed_check = 0;
+		}
+		if (
+			exists $self->{5} and
+			$self->{5}{'name'} !~ m/strand/i
 		) {
 			$bed_check = 0;
 		}
