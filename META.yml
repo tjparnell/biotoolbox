@@ -68,7 +68,7 @@ provides:
     version: '1.30'
   Bio::ToolBox::utility:
     file: lib/Bio/ToolBox/utility.pm
-    version: '1.20'
+    version: '1.30'
 recommends:
   Algorithm::Cluster: '0'
   DBD::SQLite: '0'
