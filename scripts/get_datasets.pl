@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = 1.26;
+my $VERSION = '1.30';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -165,9 +165,7 @@ elsif ($new) {
 }
 
 # update program name
-unless ($Data->program eq $0) {
-	$Data->program($0);
-}
+$Data->program("$0, v $VERSION");
 
 
 
@@ -250,11 +248,11 @@ if ($cpu > 1) {
 # execute data collection in 1 or more processes
 if ($cpu > 1) {
 	# parallel execution
+	# print statements here before we fork, less we have duplicate statements!
 	print " Collecting $method $value_type from datasets @datasets...\n";
 	print " Forking into $cpu children for parallel data collection\n";
 	parallel_execution();
 }
-
 else {
 	# single threaded execution
 	single_execution();
@@ -350,21 +348,33 @@ sub set_defaults {
 		}
 		
 		# set appropriate options for specific methods
+		my $count_check;
 		if ($method eq 'count') {
 			# convenience method
 			$method = 'sum';
-			$value_type = 'count';
+			$count_check = 1;
 		}
 		elsif ($method eq 'enumerate') {
 			# convenience method
 			$method = 'sum';
-			$value_type = 'count';
+			$count_check = 1;
 		}
-		elsif ($method eq 'rpkm') {
-			$value_type = 'pcount';
+		elsif ($method eq 'rpkm' or $method eq 'rpm') {
+			$count_check = 1;
 		}
-		elsif ($method eq 'rpm') {
-			$value_type = 'pcount';
+		
+		# make sure we have an appropriate count value_type
+		if ($count_check) {
+			if ($subfeature and not defined $value_type and $datasets[0] =~ /\.bam$/i) {
+				$value_type = 'ncount'; # special mode to count unique names
+				print " setting value type to 'ncount' when using subfeatures with bam datasets\n";
+			}
+			else {
+				$value_type ||= 'count';
+			}
+			unless ($value_type =~ /count/) {
+				die " value type must be count, pcount, or ncount with method $method!";
+			}
 		}
 	}
 	else {
@@ -377,7 +387,7 @@ sub set_defaults {
 	# check the type of value to collect
 	if (defined $value_type) {
 		# validate the requested value type
-		unless ($value_type =~ m/^(?:score|pcount|count|length)$/) {
+		unless ($value_type =~ m/^(?:score|pcount|ncount|count|length)$/) {
 			die " unknown value type '$value_type'!\n";
 		}
 	}
@@ -1093,6 +1103,14 @@ sub get_subfeature_dataset {
 			next;
 		}
 		
+		# take unique bam alignments only and recalculate sum
+		if ($value_type eq 'ncount') {
+			my %name2count;
+			foreach (@scores) { $name2count{$_} += 1 }
+			@scores = (); # empty the array
+			push @scores, scalar(keys %name2count);
+		}
+		
 		# convert log2 values if necessary
 		if ($Data->metadata($index, 'log2')) {
 			@scores = map {2 ** $_} @scores;
@@ -1215,6 +1233,8 @@ sub add_new_dataset {
 	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
 	$Data->metadata($index, 'exons', 'yes')      if $subfeature;	
 	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
+	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
+		exists $dataset2sum{$dataset};
 	if ($position == 3) {
 		$Data->metadata($index, 'relative_position', "3'end");	
 	}
@@ -1261,7 +1281,7 @@ get_datasets.pl [--options...] [<filename>]
   --ddb <name | filename>
   --data <none | file | type>, ...
   --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]  (mean)
-  --value [score|count|pcount|length]                       (score)
+  --value [score|count|pcount|ncount|length]                (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --exons
@@ -1406,7 +1426,7 @@ divided by the length of the feature requested (the Kilobase part in rpkm).
 Note that for mRNA or gene features, this will be the sum of the exon 
 lengths, not the gene or transcript.
   
-=item --value [score|count|pcount|length]
+=item --value [score|count|pcount|ncount|length]
 
 Optionally specify the type of data value to collect from the dataset or 
 data file. Four values are accepted: score, count, pcount, or length. 
@@ -1431,6 +1451,12 @@ the search region. Supported by all databases.
 
 Counts only those features that are contained within the search region, 
 not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+
+=item * ncount (name count)
+
+Counts unique names. Useful when counting paired alignments to avoid 
+double-counting paired reads from the same fragment. Any overlap is 
+counted. Currently supported by Bam datasets only. 
 
 =item * length
 

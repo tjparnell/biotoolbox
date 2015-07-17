@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 103;
+	plan tests => 141;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -28,10 +28,10 @@ isa_ok($Data, 'Bio::ToolBox::Data', 'GFF3 Data');
 # test general metadata
 is($Data->gff, 3, 'gff version');
 is($Data->bed, 0, 'bed version');
-is($Data->program, '', 'program name');
+is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
-is($Data->database, '', 'database');
+is($Data->database, undef, 'database');
 is($Data->filename, $infile, 'filename');
 is($Data->basename, 'chrI', 'basename');
 is($Data->extension, '.gff3', 'extension');
@@ -89,6 +89,18 @@ ok($cv, 'column values');
 is(scalar @$cv, 80, 'number of column values');
 is($cv->[1], 1, 'check specific column value');
 
+# test duplicate
+my $Dupe = $Data->duplicate;
+isa_ok($Dupe, 'Bio::ToolBox::Data', 'Duplicated object');
+is($Dupe->gff, 3, 'Dupe gff version');
+is($Dupe->program, undef, 'Dupe program name');
+is($Dupe->feature, 'region', 'Dupe general feature');
+is($Dupe->feature_type, 'coordinate', 'Dupe feature type');
+is($Dupe->database, undef, 'Dupe database');
+is($Dupe->filename, undef, 'Dupe filename');
+is($Dupe->number_columns, 9, 'Dupe number of columns');
+is($Dupe->last_row, 0, 'Dupe last row index');
+
 # test row_stream
 my $stream = $Data->row_stream;
 isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'Iterator object');
@@ -99,6 +111,13 @@ isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
 is($row->value(0), 'chrI', 'row object value of chromo index');
 is($row->start, 1, 'row object start value');
 is($row->end, 230218, 'row object end value');
+
+# add row feature
+my $added_row_i = $Dupe->add_row($row);
+is($added_row_i, 1, 'Dupe add_row Feature object');
+is($Dupe->last_row, 1, 'Dupe added last row index');
+is($Dupe->value(1,3), 1, 'Dupe row start value');
+is($Dupe->value(1,4), 230218, 'Dupe row end value');
 
 # second row feature
 $row = $stream->next_row;
@@ -194,6 +213,42 @@ is($file, $outfile, 'output file name success');
 ok(-e $outfile, 'output file exists');
 
 
+# clean up
+undef $row;
+undef $stream;
+undef $Data;
+
+
+### reopen saved Bed file
+# many of the same types of tests as above, just with bed file
+$Data = Bio::ToolBox::Data->new(file => $file);
+isa_ok($Data, 'Bio::ToolBox::Data', 'Bed Data');
+is($Data->gff, 0, 'gff version');
+is($Data->bed, 4, 'bed version');
+is($Data->program, undef, 'program name');
+is($Data->feature, 'region', 'general feature');
+is($Data->feature_type, 'coordinate', 'feature type');
+is($Data->database, undef, 'database');
+is($Data->filename, $file, 'filename');
+is($Data->basename, 'chrI', 'basename');
+is($Data->extension, '.bed', 'extension');
+is($Data->number_columns, 4, 'number of columns');
+is($Data->last_row, 39, 'last row index');
+is($Data->chromo_column, 0, 'chromosome column');
+is($Data->start_column, 1, 'start column');
+is($Data->stop_column, 2, 'stop column');
+is($Data->strand_column, undef, 'strand column');
+is($Data->type_column, undef, 'type column');
+$stream = $Data->row_stream;
+$row = $stream->next_row;
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
+is($row->value(0), 'chrI', 'row object value of chromo index');
+is($row->start, 35155, 'row object start value');
+is($row->end, 36303, 'row object end value');
+is($row->name, 'Feature41', 'row object feature name');
+undef $row;
+undef $stream;
+undef $Data;
 
 
 
@@ -201,9 +256,9 @@ ok(-e $outfile, 'output file exists');
 
 # open the bed file we just wrote
 my $Stream = Bio::ToolBox::Data::Stream->new(
-	file    => $file,
+	in    => $file,
 );
-isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream object');
+isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream Bed object');
 is($Stream->bed, 4, 'bed value');
 is($Stream->gff, 0, 'gff value');
 is($Stream->feature, 'region', 'feature');
@@ -238,7 +293,7 @@ undef $Stream;
 # open again differently
 $Stream = Bio::ToolBox::Data->new(
 	stream      => 1,
-	file        => $file,
+	in          => $file,
 );
 isa_ok($Stream, 'Bio::ToolBox::Data::Stream', 'Stream object');
 
@@ -253,6 +308,7 @@ is($outStream->basename, 'chrI_2', 'out Stream basename');
 # duplicate file
 while (my $row = $Stream->next_row) {
 	# just write the same thing, no need to modify
+	# write as Feature objects
 	$outStream->write_row($row);
 }
 $Stream->close_fh;
@@ -260,19 +316,26 @@ $outStream->close_fh;
 is(-s $file, -s $file1, "duplicate file sizes");
 
 # duplicate file again
+# specify out stream as a new empty bed file
 my $file2 = $file1;
 $file2 =~ s/_2\.bed/_3.bed/;
-$Stream = Bio::ToolBox::Data::Stream->new(file => $file);
-$outStream = $Stream->duplicate($file2);
+$Stream = Bio::ToolBox::Data::Stream->new(in => $file);
+$outStream = Bio::ToolBox::Data::Stream->new(out => $file2, bed => 4);
 while (my $row = $Stream->next_row) {
+	# write as arrays
 	my @a = $row->row_values;
 	$outStream->write_row(\@a);
 }
 $Stream->close_fh;
 $outStream->close_fh;
-is(-s $file, -s $file2, "duplicate file sizes again");
+cmp_ok(-s $file2, '<', -s $file, "smaller file size due to lack of comments");
 
 # reload the duplicate files
+$Data = Bio::ToolBox::Data->new();
+isa_ok($Data, 'Bio::ToolBox::Data', 'new empty Data object');
+is($Data->number_columns, 0, 'number of columns');
+is($Data->last_row, 0, 'last row index');
+
 my $reloaded = $Data->reload_children($file, $file1, $file2);
 is($reloaded, 117, 'reloaded children files');
 ok($Data->verify, 'verify data structure');

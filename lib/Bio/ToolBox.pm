@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = 1.26;
+our $VERSION = '1.30';
 
 1;
 
@@ -73,7 +73,7 @@ quality scripts ready for a wide variety of analyses.
 The libraries and modules are available to extend existing 
 scripts or to write your own. 
 
-There is one primary module, which provides a convenient 
+The primary module, which provides a convenient 
 object-oriented interface for working with data files and 
 collecting data. It is the one most users will want to work with.
 
@@ -110,12 +110,6 @@ an arbitrary text file. A number of convenience methods are present for
 collecting data from data files. This module is not used directly by the 
 user, but its objects are returned when using Bio::ToolBox::Data.
 
-=item Bio::ToolBox::data_helper
-
-This is a helper library for working with the Bio::ToolBox Data structure. 
-This is essentially a complex hash of metadata and an array of arrays 
-representing the data table.
-
 =item Bio::ToolBox::db_helper
 
 This helper library interacts with databases, including a variety of 
@@ -125,14 +119,6 @@ stated otherwise, most database functions assume the use of
 Bio::DB::SeqFeature::Store databases, particularly with regards to 
 genomic annotation. The functions are fairly well abstracted, and the 
 library will take care of handling the database specifics appropriately.
-
-=item Bio::ToolBox::file_helper
-
-This helper library takes care of file input and output, especially for the 
-native Bio::ToolBox Data format, which is just a tab-delimited text table 
-with commented metadata lines at the beginning. It transparently handles 
-common standard bioinformatic file formats, including BED and GFF, and 
-gzip compression.
 
 =item Bio::ToolBox::big_helper
 

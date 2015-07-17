@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = 1.24;
+our $VERSION = '1.30';
 
 =head1 NAME
 
@@ -104,6 +104,12 @@ assumed to be column header names. Commented lines (beginning
 with #) are parsed as metadata. The files may be compressed 
 (gzip or bzip2).
 
+=item stream =E<gt> 1
+
+Indicate that the file should be opened as a file stream.  
+A Bio::ToolBox::Data::Stream object will be returned. This is a 
+convenience method. 
+
 =item feature =E<gt> $type
 
 =item feature =E<gt> "$type:$source"
@@ -157,6 +163,14 @@ may also optionally provide a general feature name, if desired.
 =back
 
 If successful, the method will return a Bio::ToolBox::Data object.
+
+=item duplicate()
+
+This will create a new Data object containing the same column 
+headers and metadata, but lacking the table content, i.e. no 
+rows of data. File name metadata, if present in the original, is 
+not preserved. The purpose here, for example, is to allow one 
+to selectively copy rows from one row to another.
 
 =back
 
@@ -225,12 +239,7 @@ such. A value of 0 means they are not formatted as such.
 
 =over 4
 
-=item filename($text)
-
-Returns or sets the filename for the Data structure. If you set 
-a new filename, the path, basename, and extension are 
-automatically derived for you. If a path was not provided, 
-the current working directory is assumed. 
+=item filename
 
 =item path
 
@@ -238,15 +247,20 @@ the current working directory is assumed.
 
 =item extension
 
-Returns the full path, basename, and extension of the filename. 
-Concatenating these three values will reconstitute the 
-original filename.
+Returns the filename, full path, basename, and extension of 
+the filename. Concatenating the last three values will reconstitute 
+the first original filename.
+
+=item add_file_metadata($filename)
+
+Add filename metadata. This will automatically parse the path, 
+basename, and recognized extension from the passed filename.
 
 =back
 
 =head2 Comments
 
-Comments are the other commented lines from a text file (lines 
+Comments are any other commented lines from a text file (lines 
 beginning with a #) that were not parsed as metadata.
 
 =over 4
@@ -339,10 +353,15 @@ new index numbers.
 
 =item add_row(\@values)
 
+=item add_row($row)
+
 Add a new row of data values to the end of the Data table. 
-Optionally provide a reference to an array of values to 
-put in the row. The array is filled up with C<undef> for 
-missing values, and excess values are dropped.
+Optionally provide either a reference to an array of values 
+to put in the row, or pass a <Bio::ToolBox::Data::Feature> 
+row object, such as one obtained from another Data object. 
+If the number of columns do not match, the array is filled 
+up with null values for missing columns, or excess values 
+are dropped.
 
 =item delete_row($row1, $row2, ...)
 
@@ -379,8 +398,10 @@ the beginning of the file.
 
 =item name($index)
 
+=item name($index, $new_name)
+
 Convenient method to return the name of the column given the 
-index number.
+index number. A column may also be renamed by passing a new name.
 
 =item metadata($index, $key)
 
@@ -631,7 +652,7 @@ The mean value of each column becomes a row value, and each column
 header becomes a row identifier (i.e. the table is transposed). The 
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
-L<get_relative_data.pl> and L<average_gene.pl> as examples. 
+L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
 You may pass these options. 
 
 =over 4
@@ -689,29 +710,14 @@ The name of the verified dataset, with a prefix if necessary, is returned.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-
-use Bio::ToolBox::data_helper qw(
-	generate_data_structure
-	verify_data_structure
-	sort_data_structure
-	gsort_data_structure
-	splice_data_structure
-);
+use base 'Bio::ToolBox::Data::core';
+use Module::Load;
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list 
 	get_new_genome_list 
 );
-use Bio::ToolBox::file_helper qw(
-	load_data_file
-	write_data_file
-	write_summary_data
-);
-use Bio::ToolBox::Data::common;
-use Bio::ToolBox::utility;
-
 
 1;
-
 
 
 ### Initialize
@@ -722,33 +728,49 @@ sub new {
 	$args{features} ||= $args{feature} || undef;
 	
 	# check for stream
-	if (exists $args{stream} and $args{stream}) {
-		my $ok;
-		eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
-		if ($ok) {
-			return Bio::ToolBox::Data::Stream->new(@_);
+	$args{stream} ||= $args{Stream} || 0;
+	if ($args{stream}) {
+		my $obj;
+		eval {
+			$class = "Bio::ToolBox::Data::Stream";
+			load $class;
+			$obj = $class->new(@_);
+		};
+		if ($obj) {
+			return $obj;
 		}
 		else {
-			croak "Cannot load Bio::ToolBox::Data::Stream!";
+			carp "cannot load Stream object $@";
+			return;
 		}
 	}
 	
-	my $data;
-	if (exists $args{file}) {
+	# initialize
+	my $self = $class->SUPER::new();
+	if (exists $args{file} or exists $args{in}) {
 		# load from file
-		# extensions and file existence will be taken care of
-		$data = load_data_file($args{file}) or 
-			croak "Cannot load file $args{file}!\n";
+		my $f = $args{file} || $args{in} || q();
+		my $l = $self->load_file($f);
+		unless ($l) {
+			carp "Cannot load file!\n";
+			return;
+		}
 	}
-	elsif (exists $args{db} and exists $args{features} ) {
+	elsif (exists $args{db} and exists $args{features}) {
 		# generate new list
+		$self->feature($args{features});
+		$self->database($args{db});
+		$args{data} = $self;
+		my $result;
 		if ($args{features} eq 'genome') {
-			$data = get_new_genome_list(%args) or 
-				croak "Cannot generate new genome list!\n";
+			$result = get_new_genome_list(%args);
 		}
 		else {
-			$data = get_new_feature_list(%args) or 
-				croak "Cannot generate new feature list!\n";
+			$result = get_new_feature_list(%args);
+		}
+		unless ($result) {
+			carp "Cannot generate new $args{features} list!\n";
+			return;
 		}
 	}
 	else {
@@ -761,157 +783,43 @@ sub new {
 			@datasets = @{ $args{columns} };
 		}
 		my $feature = $args{features} || 'feature';
-		$data = generate_data_structure($feature, @datasets);
+		foreach my $d (@datasets) {
+			$self->add_column($d);
+		}
 	}
 	
-	return bless $data, $class;
+	return $self;
 }
 
-
-
-### File functions
-
-# we don't have file read or open, see the new method instead
-
-sub write_file {
+sub duplicate {
 	my $self = shift;
-	my %args;
-	if (scalar @_ == 1) {
-		$args{filename} = $_[0];
-	}
-	else {
-		%args = @_;
-	}
-	$args{data} = $self;
-	return write_data_file(%args);
-}
-
-sub save {
-	return shift->write_file(@_);
-}
-
-sub summary_file {
-	my $self = shift;
-	my %args = @_;
-	$args{data} = $self;
-	return write_summary_data(%args);
-}
-
-sub write_gff {
-	my $self = shift;
-	my %args = @_;
-	$args{data} = $self;
-	return convert_and_write_to_gff_file(%args);
-}
-
-sub reload_children {
-	my $self = shift;
-	my @files = @_;
-	return unless @files;
 	
-	# prepare Stream
-	my $ok;
-	eval {require Bio::ToolBox::Data::Stream; $ok = 1;};
-	unless ($ok) {
-		carp "unable to load Bio::ToolBox::Data::Stream! $@";
-		return;
-	}
-	
-	# open first stream
-	my $first = shift @files;
-	my $Stream = Bio::ToolBox::Data::Stream->new(file => $first);
-	unless ($Stream) {
-		carp "unable to load first child file $first";
-		return;
-	}
-	
-	# destroy current data table and metadata
-	$self->{data_table} = [];
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		delete $self->{$i};
-	}
+	# duplicate the data structure
+	my $columns = $self->list_columns;
+	my $Dupe = $self->new(
+		'columns' => $columns,
+	) or return;
 	
 	# copy the metadata
-	foreach (qw(program feature db bed gff ucsc headers number_columns last_row)) {
-		# various keys
-		$self->{$_} = $Stream->{$_};
-	}
-	for (my $i = 0; $i < $Stream->number_columns; $i++) {
+	for (my $i = 0; $i < $self->number_columns; $i++) {
 		# column metadata
-		my %md = $Stream->metadata($i);
-		$self->{$i} = \%md;
+		my %md = $self->metadata($i);
+		$Dupe->{$i} = \%md;
 	}
-	my @comments = $Stream->comments;
-	push @{$self->{other}}, @comments;
-	
-	# first row column headers
-	$self->{data_table}->[0] = [ @{ $Stream->{data_table}->[0] } ];
-	
-	# load the data
-	while (my $row = $Stream->next_row) {
-		my $a = $row->row_values;
-		$self->add_row($a);
+	foreach (qw(feature program db bed gff ucsc headers)) {
+		# various keys
+		$Dupe->{$_} = $self->{$_};
 	}
-	$Stream->close_fh;
-	
-	# load remaining files
-	foreach my $file (@files) {
-		my $Stream = Bio::ToolBox::Data::Stream->new(file => $file);
-		if ($Stream->number_columns != $self->number_columns) {
-			confess "fatal error: child file $file has a different number of columns!";
-		}
-		while (my $row = $Stream->next_row) {
-			my $a = $row->row_values;
-			$self->add_row($a);
-		}
-		$Stream->close_fh;
+	if (exists $self->{'0based_starts'}) {
+		$Dupe->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
 	}
-	$self->verify;
+	my @comments = $self->comments;
+	push @{$Dupe->{comments}}, @comments;
 	
-	# clean up
-	unlink($first, @files);
-	return $self->last_row;
+	return $Dupe;
 }
 
 
-
-
-### Data structure manipulation
-
-sub verify {
-	my $self = shift;
-	return verify_data_structure($self);
-}
-
-sub sort_data {
-	my $self = shift;
-	my $index = shift;
-	my $direction = shift || 'i';
-	return unless exists $self->{$index}{name};
-	return sort_data_structure($self, $index, $direction);
-}
-
-sub gsort_data {
-	my $self = shift;
-	return gsort_data_structure($self, $self->chromo_column, $self->start_column);
-}
-
-sub splice_data {
-	my $self = shift;
-	splice_data_structure($self, @_);
-	if (exists $self->{db_connection}) {
-		# re-open a new un-cached database connection
-		$self->open_database(1);
-	}
-	return 1;
-}
-
-sub convert_gff {
-	my $self = shift;
-	my %args = @_;
-	$args{data} = $self;
-	return convert_genome_data_2_gff_data(%args);
-}
 
 
 
@@ -1001,11 +909,17 @@ sub add_row {
 	if ($_[0] and ref $_[0] eq 'ARRAY') {
 		@row_data = @{ $_[0] };
 	}
+	elsif ($_[0] and ref $_[0] eq 'Bio::ToolBox::Data::Feature') {
+		@row_data = $_[0]->row_values;
+	}
+	elsif ($_[0] and $_[0] =~ /\t/) {
+		@row_data = split /\t/, $_[0];
+	}
 	else {
 		@row_data = map {'.'} (1 .. $self->{number_columns});
 	}
 	if (scalar @row_data > $self->{number_columns}) {
-		cluck "row added has more elements than columns in data structure!\n"; 
+		cluck "row added has more elements than table columns! truncating row elements\n"; 
 		splice @row_data, 0, $self->{number_columns};
 	}
 	until (scalar @row_data == $self->{number_columns}) {
@@ -1063,10 +977,518 @@ sub iterate {
 }
 
 
+
+
+### Data structure manipulation
+
+sub sort_data {
+	my $self = shift;
+	my $index = shift;
+	my $direction = shift || 'i';
+	
+	# confirm options
+	return unless exists $self->{$index}{name};
+	unless ($direction =~ /^[id]/i) {
+		carp "unrecognized sort order '$direction'! Must be i or d";
+		return;
+	}
+	
+	# Sample the dataset values
+	# this will be used to guess the sort method, below
+	my $example; # an example of the dataset
+	my $i = 1;
+	while (!$example) {
+		# we want to avoid a non-value '.', so keep trying
+		if ($self->value($i, $index) ne '.') {
+			# a non-null value, take it
+			$example = $self->value($i, $index);
+		} 
+		else {
+			# a null value, proceed to next one
+			$i++;
+		}
+	}
+	
+	# Determine sort method, either numerical or alphabetical
+	my $sortmethod; 
+	if ($example =~ /[a-z]/i) { 
+		# there are detectable letters
+		$sortmethod = 'ascii';
+	} 
+	elsif ($example =~ /^\-?\d+\.?\d*$/) {
+		# there are only digits, allowing for minus sign and a decimal point
+		# I don't think this allows for exponents, though
+		$sortmethod = 'numeric';
+	} 
+	else { 
+		# unable to determine (probably alphanumeric), sort asciibetical
+		$sortmethod = 'ascii';
+	}
+	
+	# Re-order the datasets
+	# Directly sorting the @data array is proving difficult. It keeps giving me
+	# a segmentation fault. So I'm using a different approach by copying the 
+	# @data_table into a temporary hash.
+		# put data_table array into a temporary hash
+		# the hash key will the be dataset value, 
+		# the hash value will be the reference the row data
+	my %datahash;
+	
+	# reorder numerically
+	if ($sortmethod eq 'numeric') {
+		for my $row (1..$self->last_row) {
+			my $value = $self->value($row, $index); 
+			
+			# check to see whether this value exists or not
+			while (exists $datahash{$value}) {
+				# add a really small number to bump it up and make it unique
+				# this, of course, presumes that none of the dataset values
+				# are really this small - this may be an entirely bad 
+				# assumption!!!!! I suppose we could somehow calculate an 
+				# appropriate value.... nah.
+				# don't worry, we're only modifying the value used for sorting,
+				# not the actual value
+				$value += 0.00000001; 
+			}
+			# store the row data reference
+			$datahash{$value} = $self->{data_table}->[$row]; 
+		}
+		
+		# re-fill the array based on the sort direction
+		if ($direction =~ /^i/i) { 
+			# increasing sort
+			my $i = 1; # keep track of the row, skip the header
+			foreach (sort {$a <=> $b} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$self->{data_table}->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		} 
+		else { 
+			# decreasing sort
+			my $i = 1; # keep track of the row, skip the header
+			foreach (sort {$b <=> $a} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$self->{data_table}->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		}
+		
+		# summary prompt
+		printf " Data table sorted numerically by the contents of %s\n",
+			$self->name($index);
+	} 
+	
+	# reorder asciibetically
+	elsif ($sortmethod eq 'ascii') {
+		for my $row (1..$self->last_row) {
+			# get the value to sort by
+			my $value = $self->value($row, $index); 
+			if (exists $datahash{$value}) { 
+				# not unique
+				my $n = 1;
+				my $lookup = $value . sprintf("03%d", $n);
+				# we'll try to make a unique value by appending 
+				# a number to the original value
+				while (exists $datahash{$lookup}) {
+					# keep bumping up the number till it's unique
+					$n++;
+					$lookup = $value . sprintf("03%d", $n);
+				}
+				$datahash{$lookup} = $self->{data_table}->[$row];
+			} 
+			else {
+				# unique
+				$datahash{$value} = $self->{data_table}->[$row];
+			}
+		}
+		
+		# re-fill the array based on the sort direction
+		if ($direction eq 'i' or $direction eq 'I') { 
+			# increasing
+			my $i = 1; # keep track of the row
+			foreach (sort {$a cmp $b} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$self->{data_table}->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		} 
+		elsif ($direction eq 'd' or $direction eq 'D') { 
+			# decreasing
+			my $i = 1; # keep track of the row
+			foreach (sort {$b cmp $a} keys %datahash) {
+				# put back the reference to the anonymous array of row data
+				$self->{data_table}->[$i] = $datahash{$_};
+				$i++; # increment for next row
+			}
+		}
+		
+		# summary prompt
+		printf " Data table sorted asciibetically by the contents of '%s'\n",
+			$self->name($index);
+	}
+	
+	return 1;
+}
+
+sub gsort_data {
+	my $self = shift;
+	
+	# identify indices
+	my $chromo_i = $self->chromo_column;
+	my $start_i  = $self->start_column;
+	unless (defined $chromo_i and defined $start_i) {
+		carp "unable to identify chromosome and start/position columns! table not sorted\n";
+		return;
+	}
+	
+	# Load the data into a temporary hash
+	# The datalines will be put into a hash of hashes: The first key will be 
+	# the chromosome name, the second hash will be the start value.
+	# 
+	# To deal with some chromosomes that don't have numbers (e.g. chrM), we'll
+	# use two separate hashes: one is for numbers, the other for strings
+	# when it comes time to sort, we'll put the numbers first, then strings
+	
+	my %num_datahash;
+	my %str_datahash;
+	for my $row (1 .. $self->last_row) { 
+		
+		my $startvalue = $self->value($row, $start_i);
+		
+		# put the dataline into the appropriate temporary hash
+		if ($self->value($row, $chromo_i) =~ /^(?:chr)?(\d+)$/) {
+			# dealing with a numeric chromosome name
+			# restricting to either chr2 or just 2 but not 2-micron
+			my $chromovalue = $1;
+			while (exists $num_datahash{$chromovalue}{$startvalue}) { 
+				# if another item already exists at this location
+				# add a really small number to bump it up and make it unique
+				$startvalue += 0.001; 
+			}
+			$num_datahash{$chromovalue}{$startvalue} = $self->{data_table}->[$row];
+		} 
+		else {
+			# dealing with a non-numeric chromosome name
+			my $chromovalue = $self->value($row, $chromo_i);
+			# use the entire chromosome name as key
+			while (exists $str_datahash{$chromovalue}{$startvalue}) { 
+				# if another item already exists at this location
+				# add a really small number to bump it up and make it unique
+				$startvalue += 0.001; 
+			}
+			$str_datahash{$chromovalue}{$startvalue} = $self->{data_table}->[$row];
+		}
+	}
+	
+	
+	# Now re-load the data array with sorted data
+	# put the numeric chromosome data back first
+	my $i = 1; # keep track of the row
+	foreach my $chromovalue (sort {$a <=> $b} keys %num_datahash) {
+		# first, numeric sort on increasing chromosome number
+		foreach my $startvalue (
+			sort {$a <=> $b} keys %{ $num_datahash{$chromovalue} } 
+		) {
+			# second, numeric sort on increasing position value
+			$self->{data_table}->[$i] = $num_datahash{$chromovalue}{$startvalue};
+			$i++; # increment for next row
+		}
+	}
+	# next put the string chromosome data back
+	foreach my $chromovalue (sort {$a cmp $b} keys %str_datahash) {
+		# first, ascii sort on increasing chromosome name
+		foreach my $startvalue (
+			sort {$a <=> $b} keys %{ $str_datahash{$chromovalue} } 
+		) {
+			# second, numeric sort on increasing position value
+			$self->{data_table}->[$i] = $str_datahash{$chromovalue}{$startvalue};
+			$i++; # increment for next row
+		}
+	}
+	
+	return 1;
+}
+
+sub splice_data {
+	my ($self, $part, $total_parts) = @_;
+	
+	unless ($part and $total_parts) {
+		confess "ordinal part and total number of parts not passed\n";
+	}
+	my $part_length = int($self->last_row / $total_parts);
+	
+	# splicing based on which part we do 
+	if ($part == 1) {
+		# remove all but the first part
+		splice( 
+			@{$self->{'data_table'}}, 
+			$part_length + 1 
+		);
+	}
+	elsif ($part == $total_parts) {
+		# remove all but the last part
+		splice( 
+			@{$self->{'data_table'}}, 
+			1,
+			$part_length * ($total_parts - 1) 
+		);
+	}
+	else {
+		# splicing in the middle requires two rounds
+		
+		# remove the last parts
+		splice( 
+			@{$self->{'data_table'}}, 
+			($part * $part_length) + 1
+		);
+		
+		# remove the first parts
+		splice( 
+			@{$self->{'data_table'}}, 
+			1,
+			$part_length * ($part - 1) 
+		);
+	}
+	
+	# update last row metadata
+	$self->{'last_row'} = scalar(@{$self->{'data_table'}}) - 1;
+	
+	# re-open a new un-cached database connection
+	if (exists $self->{db_connection}) {
+		$self->open_database(1);
+	}
+	return 1;
+}
+
+
+
+### File functions
+
+sub reload_children {
+	my $self = shift;
+	my @files = @_;
+	return unless @files;
+	
+	# prepare Stream
+	my $class = "Bio::ToolBox::Data::Stream";
+	eval {load $class};
+	if ($@) {
+		carp "unable to load $class! can't reload children!";
+		return;
+	}
+	
+	# open first stream
+	my $first = shift @files;
+	my $Stream = $class->new(in => $first);
+	unless ($Stream) {
+		carp "unable to load first child file $first";
+		return;
+	}
+	
+	# destroy current data table and metadata
+	$self->{data_table} = [];
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		delete $self->{$i};
+	}
+	
+	# copy the metadata
+	foreach (qw(program feature db bed gff ucsc headers number_columns last_row)) {
+		# various keys
+		$self->{$_} = $Stream->{$_};
+	}
+	for (my $i = 0; $i < $Stream->number_columns; $i++) {
+		# column metadata
+		my %md = $Stream->metadata($i);
+		$self->{$i} = \%md;
+	}
+	my @comments = $Stream->comments;
+	push @{$self->{other}}, @comments;
+	
+	# first row column headers
+	$self->{data_table}->[0] = [ @{ $Stream->{data_table}->[0] } ];
+	
+	# load the data
+	while (my $row = $Stream->next_row) {
+		$self->add_row($row);
+	}
+	$Stream->close_fh;
+	
+	# load remaining files
+	foreach my $file (@files) {
+		my $Stream = $class->new(in => $file);
+		if ($Stream->number_columns != $self->number_columns) {
+			confess "fatal error: child file $file has a different number of columns!";
+		}
+		while (my $row = $Stream->next_row) {
+			my $a = $row->row_values;
+			$self->add_row($a);
+		}
+		$Stream->close_fh;
+	}
+	$self->verify;
+	
+	# clean up
+	unlink($first, @files);
+	return $self->last_row;
+}
+
+
+
+
+### Export summary data file
+sub summary_file {
+	my $self = shift;
+	
+	# Collect passed arguments
+	my %args = @_; 
+	unless (%args) {
+		cluck "no arguments passed!";
+		return;
+	}
+	
+	# load modules
+	eval {
+		my $class = 'Statistics::Lite';
+		load($class, qw(min mean));
+	};
+	if ($@) {
+		carp "missing required modules! $@";
+		return;
+	}
+	
+	# parameters
+	my $outfile =        $args{'filename'}    || undef;
+	my $dataset =        $args{'dataset'}     || undef;
+	my $startcolumn =    $args{'startcolumn'} || undef;
+	my $endcolumn =      $args{'endcolumn'}   || $args{'stopcolumn'}  || undef;
+	my $log =            $args{'log'}         || undef;
+	
+	# Check required values
+	unless ($self->verify) {
+		cluck "bad data structure!";
+		return;
+	}
+	unless (defined $outfile) {
+		if ($self->basename) {
+			# use the opened file's filename if it exists
+			# prepend the path if it exists
+			# the extension will be added later
+			$outfile = $self->path . $self->basename;
+		}
+		else {
+			cluck "no filename passed to write_summary_data!\n";
+			return;
+		}
+	}
+	
+	# Auto calculate missing arguments
+	unless (defined $startcolumn) {
+		# we will attempt to determine where to start the summing process
+		# we will skip those columns with common feature-description names
+		
+		my @acceptable_indices; # array of acceptable indices
+		my %skip = map {$_ => 1} qw (systematicname name id alias aliases type class 
+				geneclass chromosome chromo seq_id seqid start stop end gene strand 
+				length primary_id);
+		
+		# walk through the dataset names
+		for (my $i = 0; $i < $self->number_columns; $i++) {
+			unless (exists $skip{ lc $self->{$i}{'name'} } ) {
+				push @acceptable_indices, $i;
+			}
+		}
+		
+		# The start column should be the lowest index number in the list of
+		# acceptable_indices array.
+		# Assuming, of course, that feature descriptor datasets (columns) are
+		# leftmost only.
+		$startcolumn = min(@acceptable_indices);
+	}
+	unless (defined $endcolumn) {
+		# take the last or rightmost column
+		$endcolumn = $self->number_columns - 1;
+	}
+	unless ($dataset) {
+		# the original dataset name (i.e. the name of the dataset in the 
+		# database from which the column's data was derived) 
+		$dataset = $self->metadata($startcolumn, 'dataset') || 'data_scores';
+	}
+	unless (defined $log) {
+		# the log flag should be set in the column metadata and should be the
+		# same in all
+		$log = $self->metadata($startcolumn, 'log2') || 0;
+	}
+	
+	# Prepare score column name
+	my $data_name = $self->basename || $dataset || 'dataset';
+	
+	# Prepare array to store the summed data
+	my $summed_data = $self->new(
+		feature => 'averaged_windows', 
+		columns => ['Window','Midpoint', $data_name],
+	);
+	$summed_data->database($self->database);
+	$summed_data->metadata(0, 'number_features', $self->last_row);
+	$summed_data->metadata(2, 'log2', $log);
+	$summed_data->metadata(2, 'dataset', $dataset);
+	
+	
+	# Collect summarized data
+	for (
+		my $column = $startcolumn;
+		$column <= $endcolumn;
+		$column++
+	) { 
+		
+		# determine the midpoint position of the window
+		my $midpoint = int mean(
+			# this assumes the column metadata has start and stop
+			$self->metadata($column, 'start'),	
+			$self->metadata($column, 'stop'),	
+		) or undef; 
+		
+		
+		# collect the values in the column
+		my @values;
+		for my $row (1..$self->last_row) {
+			my $v = $self->value($row, $column);
+			push @values, $v if $v ne '.';
+		}
+		
+		# adjust if log value
+		if ($log) {
+			@values = map { 2 ** $_ } @values;
+		}
+		
+		# determine mean value
+		my $window_mean = mean(@values);
+		if ($log) { 
+			$window_mean = log($window_mean) / log(2);
+		}
+		
+		# push to summed output
+		$summed_data->add_row( [ $self->{$column}{'name'}, $midpoint, $window_mean ] );
+	}
+	
+	# Write summed data
+	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
+	my $written_file = $summed_data->write_file(
+		'filename'  => $outfile . '_summed',
+		'gz'        => 0,
+	);
+	return $written_file;
+}
+
+
+
+
+
 ####################################################
 
 package Bio::ToolBox::Data::Iterator;
 use Bio::ToolBox::Data::Feature;
+use Carp;
 
 sub new {
 	my ($class, $data) = @_;
@@ -1090,6 +1512,7 @@ sub next_row {
 
 sub row_index {
 	my $self = shift;
+	carp "row_index is a read only method" if @_;
 	return $self->{'index'};
 }
 

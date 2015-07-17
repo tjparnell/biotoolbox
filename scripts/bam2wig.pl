@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
 use Statistics::Lite qw(sum min max mean stddev);
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_read_fh 
 	open_to_write_fh 
 );
@@ -32,7 +32,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = 1.25;
+my $VERSION = '1.30';
 	
 	
 

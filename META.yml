@@ -15,33 +15,33 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.26'
+    version: '1.30'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.24'
+    version: '1.30'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
-    version: '1.24'
+    version: '1.30'
   Bio::ToolBox::Data::Iterator:
     file: lib/Bio/ToolBox/Data.pm
   Bio::ToolBox::Data::Stream:
     file: lib/Bio/ToolBox/Data/Stream.pm
-    version: '1.26'
-  Bio::ToolBox::Data::common:
-    file: lib/Bio/ToolBox/Data/common.pm
-    version: '1.25'
+    version: '1.30'
+  Bio::ToolBox::Data::core:
+    file: lib/Bio/ToolBox/Data/core.pm
+    version: '1.30'
+  Bio::ToolBox::Data::file:
+    file: lib/Bio/ToolBox/Data/file.pm
+    version: '1.30'
   Bio::ToolBox::big_helper:
     file: lib/Bio/ToolBox/big_helper.pm
     version: '1.14'
-  Bio::ToolBox::data_helper:
-    file: lib/Bio/ToolBox/data_helper.pm
-    version: '1.26'
   Bio::ToolBox::db_helper:
     file: lib/Bio/ToolBox/db_helper.pm
-    version: '1.25'
+    version: '1.30'
   Bio::ToolBox::db_helper::bam:
     file: lib/Bio/ToolBox/db_helper/bam.pm
-    version: '1.24'
+    version: '1.30'
   Bio::ToolBox::db_helper::bigbed:
     file: lib/Bio/ToolBox/db_helper/bigbed.pm
     version: '1.24'
@@ -60,12 +60,12 @@ provides:
   Bio::ToolBox::db_helper::wiggle:
     file: lib/Bio/ToolBox/db_helper/wiggle.pm
     version: '1.14'
-  Bio::ToolBox::file_helper:
-    file: lib/Bio/ToolBox/file_helper.pm
-    version: '1.26'
   Bio::ToolBox::gff3_parser:
     file: lib/Bio/ToolBox/gff3_parser.pm
     version: '1.26'
+  Bio::ToolBox::legacy_helper:
+    file: lib/Bio/ToolBox/legacy_helper.pm
+    version: '1.30'
   Bio::ToolBox::utility:
     file: lib/Bio/ToolBox/utility.pm
     version: '1.20'
@@ -82,11 +82,12 @@ requires:
   Bio::DB::BigFile: '1.07'
   Bio::DB::Sam: '1.36'
   Bio::DB::USeq: '0.2'
-  Bio::Root::Version: '1.0069001'
+  Bio::Root::Version: '1.0069022'
   Config::Simple: '4.58'
   Module::Load: '0'
   Statistics::Descriptive: '3'
   Statistics::Lite: '3.2'
 resources:
   license: http://dev.perl.org/licenses/
-version: '1.26'
+  repository: https://github.com/tjparnell/biotoolbox
+version: '1.30'

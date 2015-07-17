@@ -6,11 +6,11 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::gff3_parser;
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = 1.26;
+my $VERSION = '1.30';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -77,14 +77,14 @@ unless ($infile =~ /\.gff 3? (?: \.gz )? $/xi) {
 
 if ($outfile) {
 	# be nice and add an extension for them if it's missing
-	unless ($outfile =~ /\.txt$/) {
-		$outfile .= '.txt';
+	unless ($outfile =~ /\.reff?lat(?:\.gz)?$/) {
+		$outfile .= '.refFlat';
 	}
 }
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff 3? (?: \.gz )? $/.refFlat.txt/xi;
+	$outfile =~ s/\.gff 3? (?: \.gz )? $/.refFlat/xi;
 }
 unless (defined $gz) {
 	# mimic the input file as far as compression is concerned
@@ -158,7 +158,7 @@ sub process_gff_file_to_table {
 	# will be kept open until the end of the file is reached. 
 	
 	# open gff3 parser object
-	my $parser = Bio::ToolBox::db_helper::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::gff3_parser->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
 	

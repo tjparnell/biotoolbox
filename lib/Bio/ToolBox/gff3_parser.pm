@@ -115,7 +115,6 @@ sub next_feature {
 
 sub next_top_feature {
 	my $self = shift;
-	
 	# check that we have an open filehandle
 	unless ($self->fh) {
 		croak("no GFF3 file loaded to parse!");
@@ -124,7 +123,8 @@ sub next_top_feature {
 	# get the top features
 	unless (scalar @{ $self->{top_features} }) {
 		# fill 'er up with features
-		@{ $self->{top_features} } = $self->top_features;
+		my @a = $self->top_features;
+		push @{ $self->{top_features} }, @a;
 	}
 	
 	# return the next top feature
@@ -140,7 +140,6 @@ sub next_top_feature {
 
 sub top_features {
 	my $self = shift;
-	
 	# check that we have an open filehandle
 	unless ($self->fh) {
 		croak("no GFF3 file loaded to parse!");
@@ -171,34 +170,41 @@ sub top_features {
 			if ($1 != 3) {
 				croak " Input GFF version is $1 not 3!\n" ;
 			}
-			next;
+			next TOP_FEATURE_LOOP;
 		}
 		elsif ($line =~ /^###/) {
 			# close features directive line, 
 			# all subfeatures have been loaded for this chromosome/scaffold
-			last;
+			# just make sure we've collected something, stop if we have, otherwise
+			# go on if we haven't
+			if (@top_features) {
+				last TOP_FEATURE_LOOP;
+			}
+			else {
+				next TOP_FEATURE_LOOP;
+			}
 		}
 		elsif ($line =~ /^##FASTA$/) {
 			# FASTA pragma
 			# go no further
-			last;
+			last TOP_FEATURE_LOOP;
 		}
 		elsif ($line =~ /^#/) {
 			# some other unrecognized pragma or a comment line
 			# skip
-			next;
+			next TOP_FEATURE_LOOP;
 		}
 		elsif ($line =~ /^$/) {
 			# an empty line
-			next;
+			next TOP_FEATURE_LOOP;
 		}
 		elsif ($line =~ /^>/) {
 			# fasta header line, skip
-			next;
+			next TOP_FEATURE_LOOP;
 		}
 		elsif ($line =~ /^[agctn]+$/i) {
 			# fasta sequence, skip
-			next;
+			next TOP_FEATURE_LOOP;
 		}
 		
 		

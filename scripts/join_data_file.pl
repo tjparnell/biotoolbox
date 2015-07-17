@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Basename qw(fileparse);
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	load_data_file
 	open_data_file
 	write_data_file
 	open_to_write_fh
 );
 use Bio::ToolBox::utility;
-my $VERSION =  1.24;
+my $VERSION =  '1.30';
 
 print "\n This script will concatenate two or more data files\n\n";
 

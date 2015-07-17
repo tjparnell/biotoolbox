@@ -5,12 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.20;
+my $VERSION = '1.30';
 
 print "\n A tool for switching the order of cluster files\n";
 

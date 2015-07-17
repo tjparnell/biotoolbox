@@ -11,12 +11,12 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types
 	validate_included_feature
 );
-use Bio::ToolBox::file_helper qw(
+use Bio::ToolBox::legacy_helper qw(
 	open_to_write_fh
 );
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
-my $VERSION = 1.22;
+my $VERSION = '1.30';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -225,9 +225,7 @@ sub prepare_data_structure_or_output {
 		$fh->print("##gff-version 3\n");
 		$fh->print("# Features collected from database $database\n");
 	}
-	else {
-		# generate a tim data structure
-		
+	else {		
 		# structure dependent on output format
 		if ($convert_to_bed) {
 			# bed structure
@@ -279,6 +277,7 @@ sub prepare_data_structure_or_output {
 		
 		# add database
 		$Data->database($database);
+		$Data->program("$0, v $VERSION");
 	}
 	return ($Data, $fh);
 }

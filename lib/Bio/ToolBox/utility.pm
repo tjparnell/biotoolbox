@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.20';
+our $VERSION = '1.30';
 
 =head1 NAME
 
@@ -47,6 +47,19 @@ Example
 	my $count = '4327908475';
 	print " The final count was " . format_with_commas($count) . "\n";
 
+=item ask_user_for_index($Data, $prompt)
+
+This subroutine will present the list of column names from a Bio::ToolBox::Data 
+structure along with their numeric indexes to the user and prompt for one 
+or more to be selected and entered. A text prompt should be provided, or a 
+generic one is used. The list of indices are validated, and a warning printed for 
+invalid responses. The responses are then returned as a single value or array, 
+depending on context.
+
+Example
+	
+	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
+
 =back
 
 =cut
@@ -62,6 +75,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	parse_list
 	format_with_commas
+	ask_user_for_index
 );
 
 
@@ -149,6 +163,40 @@ sub format_with_commas {
 	return $final;
 }
 
+
+sub ask_user_for_index {
+	my $Data = shift;
+	my $line = shift || ' Enter the desired column index   ';
+	unless (ref($Data) =~ /Bio::ToolBox::Data/) {
+		carp "Must pass a Bio::ToolBox::Data object!\n";
+		return;
+	}
+	
+	print " These are the datasets in the file\n";
+	my $i = 0;
+	foreach ($Data->list_columns) {
+		print "  $i\t$_\n";
+		$i++;
+	}
+	print $line;
+	
+	# get response
+	my $response = <STDIN>;
+	chomp $response;
+	my @indices = parse_list($response); 
+	
+	# verify
+	my @good;
+	foreach (@indices) {
+		if ($Data->name($_)) {
+			push @good, $_;
+		}
+		else {
+			print " $_ is not a valid index!\n";
+		}
+	}
+	return wantarray ? @good : $good[0];
+}
 
 
 

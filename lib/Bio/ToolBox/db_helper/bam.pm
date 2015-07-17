@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.24';
+our $VERSION = '1.30';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -91,19 +91,19 @@ sub check_bam_index {
 	# check for existing index
 	if (-e $bam_index) {
 		if ( (stat($bam_index))[9] < $bam_mtime) {
-			# index is older than bam file !? re-index
-			Bio::DB::Bam->reindex($bamfile);
+			# index is older than bam file
+			print " index $bam_index is old. Attempting to update time stamp.\n";
+			my $now = time;
+			utime($now, $now, $bam_index) || Bio::DB::Bam->reindex($bamfile);
 		}
 	}
 	elsif (-e $alt_index) {
 		if ( (stat($alt_index))[9] < $bam_mtime) {
-			# index is older than bam file !? re-index
-			Bio::DB::Bam->reindex($bamfile);
+			# index is older than bam file
+			print " index $alt_index is old.\n";
 		}
-		else {
-			# reuse this index
-			copy($alt_index, $bam_index)
-		}
+		# reuse this index
+		copy($alt_index, $bam_index);
 	}
 	else {
 		# make a new index
@@ -125,7 +125,6 @@ sub write_new_bam_file {
 
 ### Collect Bam scores only
 sub collect_bam_scores {
-	
 	# set the do_index boolean to false
 	# return the scores
 	return _collect_bam_data(0, @_);
@@ -267,7 +266,6 @@ sub _collect_bam_data {
 			
 		}
 	}
-
 	
 	## Return collected data
 	if ($do_index) {
@@ -441,6 +439,8 @@ sub _assign_callback {
 	
 	# determine the callback method based on requested criteria
 	my $callback;
+	
+	# all reads, either strand
 	if (
 		$stranded eq 'all' and 
 		$value_type eq 'count' and 
@@ -468,6 +468,13 @@ sub _assign_callback {
 		!$do_index
 	) {
 		$callback = \&_all_precise_count_array;
+	}
+	elsif (
+		$stranded eq 'all' and 
+		$value_type eq 'ncount' and 
+		!$do_index
+	) {
+		$callback = \&_all_name_array;
 	}
 	elsif (
 		$stranded eq 'all' and 
@@ -517,6 +524,14 @@ sub _assign_callback {
 		!$do_index
 	) {
 		$callback = \&_forward_precise_count_array;
+	}
+	elsif (
+		$stranded eq 'sense' and 
+		$strand == 1 and 
+		$value_type eq 'ncount' and 
+		!$do_index
+	) {
+		$callback = \&_forward_name_array;
 	}
 	elsif (
 		$stranded eq 'sense' and 
@@ -572,6 +587,14 @@ sub _assign_callback {
 	elsif (
 		$stranded eq 'sense' and 
 		$strand == -1 and 
+		$value_type eq 'ncount' and 
+		!$do_index
+	) {
+		$callback = \&_reverse_name_array;
+	}
+	elsif (
+		$stranded eq 'sense' and 
+		$strand == -1 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -619,6 +642,14 @@ sub _assign_callback {
 		!$do_index
 	) {
 		$callback = \&_reverse_precise_count_array;
+	}
+	elsif (
+		$stranded eq 'antisense' and 
+		$strand == 1 and 
+		$value_type eq 'ncount' and 
+		!$do_index
+	) {
+		$callback = \&_reverse_name_array;
 	}
 	elsif (
 		$stranded eq 'antisense' and 
@@ -674,6 +705,14 @@ sub _assign_callback {
 	elsif (
 		$stranded eq 'antisense' and 
 		$strand == -1 and 
+		$value_type eq 'ncount' and 
+		!$do_index
+	) {
+		$callback = \&_forward_name_array;
+	}
+	elsif (
+		$stranded eq 'antisense' and 
+		$strand == -1 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -688,6 +727,15 @@ sub _assign_callback {
 		$callback = \&_forward_length_array ;
 	}
 	
+	# unacceptable combination
+	elsif (
+		$value_type eq 'ncount' and 
+		$do_index
+	) {
+		# I don't see any reason to collect names in an indexed fashion
+		# If there is a reason, let me know and I will figure out how to code it
+		confess "invalid combination: value_type=ncount and do_index=true!";
+	}
 	
 	# I goofed
 	else {
@@ -730,6 +778,11 @@ sub _all_precise_count_array {
 	$data->{'scores'}->[0] += 1;
 }
 
+sub _all_name_array {
+	my ($a, $data) = @_;
+	push @{ $data->{'scores'} }, $a->qname; # query or read name
+}
+
 sub _all_length_indexed {
 	my ($a, $data) = @_;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
@@ -745,7 +798,14 @@ sub _all_length_array {
 
 sub _forward_count_indexed {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++ if 
 		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
@@ -753,7 +813,14 @@ sub _forward_count_indexed {
 
 sub _forward_precise_count_indexed {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++;
@@ -761,20 +828,54 @@ sub _forward_precise_count_indexed {
 
 sub _forward_count_array {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	$data->{'scores'}->[0] += 1;
 }
 
 sub _forward_precise_count_array {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
 	$data->{'scores'}->[0] += 1;
 }
 
+sub _forward_name_array {
+	my ($a, $data) = @_;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
+	push @{ $data->{'scores'} }, $a->qname;
+}
+
 sub _forward_length_indexed {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
 		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
@@ -783,13 +884,27 @@ sub _forward_length_indexed {
 
 sub _forward_length_array {
 	my ($a, $data) = @_;
-	return if $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
 	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
 sub _reverse_count_indexed {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++ if 
 		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
@@ -797,7 +912,14 @@ sub _reverse_count_indexed {
 
 sub _reverse_precise_count_indexed {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++;
@@ -805,20 +927,54 @@ sub _reverse_precise_count_indexed {
 
 sub _reverse_count_array {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	$data->{'scores'}->[0] += 1;
 }
 
 sub _reverse_precise_count_array {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
 	$data->{'scores'}->[0] += 1;
 }
 
+sub _reverse_name_array {
+	my ($a, $data) = @_;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
+	push @{ $data->{'scores'} }, $a->qname;
+}
+
 sub _reverse_length_indexed {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
 		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
@@ -827,7 +983,14 @@ sub _reverse_length_indexed {
 
 sub _reverse_length_array {
 	my ($a, $data) = @_;
-	return unless $a->reversed;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
 	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
 }
 
@@ -855,11 +1018,12 @@ alignments (count method) and collecting alignment lengths do support
 stranded data collection. Alignments are checked to see whether their midpoint 
 is within the search interval before counting or length collected. 
 
-Currently, paired-end bam files are treated as single-end files. There are 
-some limitations regarding working with paired-end alignments that don't 
-work well (search, strand, length, etc). If paired-end alignments are to 
-be analyzed, they should be processed into another format (BigWig or BigBed). 
-See the biotoolbox scripts 'bam2gff_bed.pl' or 'bam2wig.pl' for solutions.
+As of version 1.30, paired-end bam files are properly handled with regards 
+to strand; Strand is determined by the orientation of the first mate. However, 
+pairs are still counted as two alignments, not one. To avoid this, use the 
+value_type of 'ncount' and count the number of unique alignment names. 
+(Previous versions treated all paired-end alignments as single-end alignments, 
+severely limiting usefulness.)
 
 =head1 USAGE
 
@@ -931,16 +1095,21 @@ strandedness are collected.
 
 =item 6. The value type of data to collect
 
-Acceptable values include score, count, pcount, and length.
+Acceptable values include score, count, pcount, ncount, and length.
 
-   score returns the basepair coverage of alignments over the 
+   * score returns the basepair coverage of alignments over the 
    region of interest
    
-   count returns the number of alignments that overlap the 
+   * count returns the number of alignments that overlap the 
    search region. 
    
-   pcount, or precise count, returns the count of alignments 
-   that only fall within the region. Best for RNASeq alignments.
+   * pcount, or precise count, returns the count of alignments 
+   whose start and end fall within the region. 
+   
+   * ncount, or named count, returns an array of alignment read  
+   names. Use this to avoid double-counting paired-end reads by 
+   counting only unique names. Reads are taken if they overlap 
+   the search region.
    
    length returns the lengths of all overlapping alignments 
 
@@ -962,7 +1131,8 @@ The subroutine returns a hash of the defined dataset values found within
 the region of interest keyed by position. The feature midpoint is used 
 as the key position. When multiple features are found at the same 
 position, a simple mean (for length data methods) or sum 
-(for count methods) is returned.
+(for count methods) is returned. The ncount value type is not supported 
+with positioned scores.
 
 =item sum_total_bam_alignments()
 

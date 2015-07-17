@@ -1,4 +1,5 @@
 package Bio::ToolBox::db_helper;
+our $VERSION = '1.30';
 
 use strict;
 require Exporter;
@@ -13,14 +14,9 @@ use Statistics::Lite qw(
 	range
 	stddevp
 );
-use Bio::ToolBox::data_helper qw(
-	generate_data_structure 
-);
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant LOG2 => log(2);
-
-our $VERSION = 1.25;
 
 
 # check values for dynamically loaded helper modules
@@ -314,11 +310,11 @@ sub open_db_connection {
 	my $error;
 	
 	# check if it is a remote file
-	if ($database =~ /^http|ftp/i) {
+	if ($database =~ /^(?:https?|ftp)/i) {
 		
 		# a remote Bam database
 		if ($database =~ /\.bam$/i) {
-			# open using BigWig adaptor
+			# open using Bam adaptor
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
@@ -1317,6 +1313,17 @@ sub get_new_feature_list {
 	# Retrieve passed values
 	my %args = @_; # the passed argument values
 	
+	# check data object
+	my $data = $args{data} || undef;
+	unless ($data) {
+		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
+		return;
+	}
+	unless (ref($data) eq 'Bio::ToolBox::Data') {
+		confess 'must pass a Bio::ToolBox::Data object!';
+		return;
+	}
+	
 	# Open a db connection 
 	$args{'db'} ||= undef;
 	my ($db, $db_name) = open_db_connection($args{'db'});
@@ -1332,7 +1339,6 @@ sub get_new_feature_list {
 		return;
 	}
 	
-	
 	# Translate the features into a list of classes
 	my @classes = _features_to_classes($args{'features'});
 	unless (@classes) {
@@ -1340,24 +1346,14 @@ sub get_new_feature_list {
 		return;
 	}
 	
-	# Generate data structures
-	my $data = generate_data_structure(
-		$args{'features'},
-		'Primary_ID',
-		'Name',
-		'Type'
-	);
-	unless ($data) {
-		cluck " cannot generate data structure!\n";
-		return;
-	}
-	
-	# name of the database
-	$data->{'db'} = $db_name; 
+	# Add table columns
+	my $pid_i  = $data->add_column('Primary_ID');
+	my $name_i = $data->add_column('Name');
+	my $type_i = $data->add_column('Type');
 	
 	# List of types
 	if (scalar @classes > 1) {
-		$data->{1}->{'include'} = join(",", @classes);
+		$data->metadata($name_i, 'include', join(",", @classes));
 	}
 	
 	# Get the names of chromosomes to avoid
@@ -1380,7 +1376,6 @@ sub get_new_feature_list {
 		return;
 	}
 	
-	
 	# Walk through the collected features
 	my $total_count = 0; # total found features
 	while (my $feature = $iterator->next_seq) {
@@ -1395,23 +1390,19 @@ sub get_new_feature_list {
 		# Record the feature information
 		# in the B::DB::SF::S database, the primary_ID is a number unique to the 
 		# the specific database, and is not portable between databases
-		push @{ $data->{'data_table'} }, [
+		$data->add_row( [
 			$feature->primary_id, 
 			$feature->display_name,  
 			$feature->type,
-		];
-		$data->{'last_row'} += 1;
+		] );
 	}
 	
 	# print result of search
 	printf "   Found %s features in the database\n", format_with_commas($total_count);
-	printf "   Kept %s features.\n", format_with_commas($data->{'last_row'});
-	
-	# associate the opened database object with the data
-	$data->{db_connection} = $db;
+	printf "   Kept %s features.\n", format_with_commas($data->last_row);
 	
 	# return the new data structure
-	return $data;
+	return 1;
 }
 
 
@@ -1464,7 +1455,17 @@ sub get_new_genome_list {
 	# Collect the passed arguments
 	my %args = @_; 
 	
-	
+	# check data object
+	my $data = $args{data} || undef;
+	unless ($data) {
+		confess "must pass a 'data' key and Bio::ToolBox::Data object!";
+		return;
+	}
+	unless (ref($data) eq 'Bio::ToolBox::Data') {
+		confess 'must pass a Bio::ToolBox::Data object!';
+		return;
+	}
+		
 	# Open a db connection 
 	$args{'db'} ||= undef;
 	my ($db, $db_name) = open_db_connection($args{'db'});
@@ -1472,7 +1473,6 @@ sub get_new_genome_list {
 		carp 'no database connected!';
 		return;
 	}
-	
 	
 	# Determine win and step sizes
 	$args{'win'} ||= undef;
@@ -1485,25 +1485,12 @@ sub get_new_genome_list {
 	$args{'step'} ||= $args{'win'};
 		
 	
-	# Generate data structures
-	my $data = generate_data_structure(
-		'genome',
-		'Chromosome',
-		'Start',
-		'Stop'
-	);
-	unless ($data) {
-		cluck " cannot generate data structure!\n";
-		return;
-	}
-	my $feature_table = $data->{'data_table'}; 
-	
-	# Begin loading basic metadata information
-	$data->{'db'}      = $db_name; # the db name
-	$data->{1}{'win'}  = $args{'win'}; # under the Start metadata
-	$data->{1}{'step'} = $args{'step'};
-	
-	
+	# Prepare data structures
+	my $chr_i   = $data->add_column('Chromosome');
+	my $start_i = $data->add_column('Start');
+	my $stop_i  = $data->add_column('Stop');
+	$data->metadata($start_i, 'win', $args{'win'}); 
+	$data->metadata($start_i, 'step', $args{'step'});
 	
 	# Collect the chromosomes
 	# include option to exclude those listed in biotoolbox.cfg that
@@ -1514,7 +1501,6 @@ sub get_new_genome_list {
 		return;
 	}
 	
-	
 	# Collect the genomic windows
 	print "   Generating $args{win} bp windows in $args{step} bp increments\n";
 	foreach (@chromosomes) {
@@ -1523,26 +1509,18 @@ sub get_new_genome_list {
 		my ($chr, $length) = @{$_};
 		
 		for (my $start = 1; $start <= $length; $start += $args{step}) {
-			# set the end point
 			my $end = $start + $args{win} - 1; 
-			
 			if ($end > $length) {
 				# fix end to the length of the chromosome
 				$end = $length;
 			} 
-			
-			# add to the output list
-			push @{$feature_table}, [ $chr, $start, $end,];
-			$data->{'last_row'}++;
+			$data->add_row( [ $chr, $start, $end] );
 		}
 	}
 	print "   Kept " . $data->{'last_row'} . " windows.\n";
 	
-	# associate the opened database object with the data
-	$data->{db_connection} = $db;
-	
 	# Return the data structure
-	return $data;
+	return 1;
 }
 
 
@@ -1661,9 +1639,6 @@ sub get_feature {
 	
 	# get the name of the feature
 	my $name = $args{'name'} || undef; 
-	$name = (split(/\s*[;,\|]\s*/, $name))[0] if $name =~ /[;,\|]/;
-		 # multiple names present using common delimiters ;,|
-		 # take the first name only, assume others are aliases that we don't need
 	
 	# check for values and internal nulls
 	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
@@ -1714,6 +1689,18 @@ sub get_feature {
 			-aliases    => 1, 
 			-type       => $args{'type'},
 		);
+	}
+	unless (@features and $name =~ /[;,\|]/) {
+		# I used to append aliases to the end of the name in old versions of biotoolbox
+		# crazy, I know, but just in case this happened, let's try breaking them apart
+		my $name2 = (split(/\s*[;,\|]\s*/, $name))[0];
+			 # multiple names present using common delimiters ;,|
+			 # take the first name only, assume others are aliases that we don't need
+			@features = $db->features( 
+				-name       => $name2,
+				-aliases    => 1, 
+				-type       => $args{'type'},
+			);
 	}
 	
 	# check the number of features returned
@@ -2972,6 +2959,15 @@ sub _get_segment_score {
 						@datasetlist
 					);
 					$dataset_type = 'bam';
+					
+					# Convert names into unique counts
+					# unless the user requested raw scores
+					if ($value_type eq 'ncount' and $method ne 'scores') {
+						my %name2count;
+						foreach (@scores) { $name2count{$_} += 1 }
+						@scores = (); # empty the array
+						push @scores, scalar(keys %name2count);
+					}
 				}
 			}
 			else {
@@ -3170,7 +3166,7 @@ sub _get_segment_score {
 	
 	# all scores
 	if ($method eq 'scores') {
-		# just the scores are requested
+		# just the raw scores are requested
 		# return an array reference
 		return \@scores;
 	}
@@ -3216,13 +3212,13 @@ sub _get_segment_score {
 		# or take the maximum value
 		$region_score = max(@scores);
 	}
-	elsif ($method eq 'count') {
-		# count the number of values
-		$region_score = scalar(@scores);
-	}
 	elsif ($method eq 'sum') {
 		# sum the number of values
 		$region_score = sum(@scores);
+	}
+	elsif ($method =~ /count/) {
+		# count the number of values
+		$region_score = scalar(@scores);
 	}
 	elsif ($method =~ /rpk?m/) {
 		# convert to reads per million mapped
@@ -3302,7 +3298,7 @@ sub _return_null {
 	if ($method eq 'sum') { 
 		return 0;
 	}
-	elsif ($method eq 'count') { 
+	elsif ($method =~ /count/) { 
 		return 0;
 	}
 	else {

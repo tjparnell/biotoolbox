@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = 1.24;
+our $VERSION = '1.30';
 
 =head1 NAME
 
@@ -376,7 +376,7 @@ attribute key.
 =cut
 
 use strict;
-use Carp;
+use Carp qw(carp cluck croak confess);
 use Bio::ToolBox::db_helper qw(
 	get_feature
 	get_chromo_region_score
@@ -388,11 +388,16 @@ use Bio::ToolBox::db_helper qw(
 
 ### Initialization
 
-# this should only be called from Bio::ToolBox::Data::Iterator
 sub new {
+	# this should only be called from Bio::ToolBox::Data* iterators
 	my $class = shift;
 	my %self = @_;
-	return unless exists $self{data}; # this must be a Bio::ToolBox::Data object
+	unless (exists $self{data}) {
+		confess "new() must be called with a data element!";
+	}
+	unless (exists $self{'index'}) {
+		confess "new() must be called with an index integer!";
+	}
 	return bless \%self, $class;
 }
 
@@ -401,16 +406,33 @@ sub new {
 
 sub feature_type {
 	my $self = shift;
+	carp "feature_type is a read only method" if @_;
 	return $self->{data}->feature_type;
 }
 
 sub row_index {
 	my $self = shift;
+	carp "row_index is a read only method" if @_;
 	return $self->{'index'};
+}
+
+sub line_number {
+	my $self = shift;
+	carp "line_number is a read only method" if @_;
+	if (exists $self->{data}->{line_count}) {
+		return $self->{data}->{line_count};
+	}
+	elsif (exists $self->{data}->{header_line_count}) {
+		return $self->{data}->{header_line_count} + $self->row_index;
+	}
+	else {
+		return;
+	}
 }
 
 sub row_values {
 	my $self  = shift;
+	carp "row_values is a read only method" if @_;
 	my $row = $self->{'index'};
 	my @data = @{ $self->{data}->{data_table}->[$row] };
 	return wantarray ? @data : \@data;
@@ -430,6 +452,7 @@ sub value {
 
 sub seq_id {
 	my $self = shift;
+	carp "seq_id is a read only method" if @_;
 	my $i = $self->{data}->chromo_column;
 	my $v = $self->value($i) if defined $i;
 	if (defined $v and $v ne '.') {
@@ -441,6 +464,7 @@ sub seq_id {
 
 sub start {
 	my $self = shift;
+	carp "start is a read only method" if @_;
 	my $i = $self->{data}->start_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->start if (not defined $v and exists $self->{feature});
@@ -451,6 +475,7 @@ sub start {
 
 sub end {
 	my $self = shift;
+	carp "end is a read only method" if @_;
 	my $i = $self->{data}->stop_column;
 	my $v = $self->value($i) if defined $i;
 	$v = $self->{feature}->end if (not defined $v and exists $self->{feature});
@@ -465,6 +490,7 @@ sub stop {
 
 sub strand {
 	my $self = shift;
+	carp "strand is a read only method" if @_;
 	my $i = $self->{data}->strand_column;
 	return $self->value($i) if defined $i;
 	return $self->{feature}->strand if exists $self->{feature};
@@ -473,6 +499,7 @@ sub strand {
 
 sub name {
 	my $self = shift;
+	carp "name is a read only method" if @_;
 	my $i = $self->{data}->name_column;
 	my $v = $self->value($i) if defined $i;
 	if (defined $v and $v ne '.') {
@@ -488,6 +515,7 @@ sub display_name {
 
 sub type {
 	my $self = shift;
+	carp "type is a read only method" if @_;
 	my $i = $self->{data}->type_column;
 	my $v = $self->value($i) if defined $i;
 	if (defined $v and $v ne '.') {
@@ -500,6 +528,7 @@ sub type {
 
 sub id {
 	my $self = shift;
+	carp "id is a read only method" if @_;
 	my $i = $self->{data}->id_column;
 	my $v = $self->value($i) if defined $i;
 	if (defined $v and $v ne '.') {
@@ -511,6 +540,7 @@ sub id {
 
 sub length {
 	my $self = shift;
+	carp "length is a read only method" if @_;
 	my $s = $self->start;
 	my $e = $self->end;
 	if (defined $s and defined $e) {
@@ -525,6 +555,7 @@ sub length {
 
 sub feature {
 	my $self = shift;
+	carp "feature is a read only method" if @_;
 	return $self->{feature} if exists $self->{feature};
 	return undef unless $self->{data}->database;
 	
@@ -545,6 +576,7 @@ sub feature {
 
 sub segment {
 	my $self   = shift;
+	carp "segment is a read only method" if @_;
 	return unless $self->{data}->database;
 	if ($self->feature_type eq 'coordinate') {
 		my $chromo = $self->seq_id;

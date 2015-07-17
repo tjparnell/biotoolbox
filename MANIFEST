@@ -3,10 +3,10 @@ CHANGES
 lib/Bio/ToolBox.pm
 lib/Bio/ToolBox/big_helper.pm
 lib/Bio/ToolBox/Data.pm
-lib/Bio/ToolBox/Data/common.pm
+lib/Bio/ToolBox/Data/core.pm
+lib/Bio/ToolBox/Data/file.pm
 lib/Bio/ToolBox/Data/Feature.pm
 lib/Bio/ToolBox/Data/Stream.pm
-lib/Bio/ToolBox/data_helper.pm
 lib/Bio/ToolBox/db_helper.pm
 lib/Bio/ToolBox/db_helper/bam.pm
 lib/Bio/ToolBox/db_helper/bigbed.pm
@@ -15,15 +15,14 @@ lib/Bio/ToolBox/db_helper/config.pm
 lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
-lib/Bio/ToolBox/file_helper.pm
 lib/Bio/ToolBox/gff3_parser.pm
+lib/Bio/ToolBox/legacy_helper.pm
 lib/Bio/ToolBox/utility.pm
 LICENSE
 MANIFEST			This list of files
 META.json
 META.yml
 README
-scripts/average_gene.pl
 scripts/bam2wig.pl
 scripts/change_cluster_order.pl
 scripts/correlate_position_data.pl
