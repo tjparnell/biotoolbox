@@ -27,7 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = 1.25;
+my $VERSION = '1.30';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -265,6 +265,7 @@ else {
 			R^2
 		)],
 	); 
+	$Data->program("$0, v $VERSION");
 }
 
 

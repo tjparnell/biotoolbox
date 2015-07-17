@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = 1.25;
+my $VERSION = '1.30';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -155,6 +155,8 @@ else {
 		feature => $feature,
 	) or die " unable to generate new feature list\n";
 }
+$Data->program("$0, v $VERSION");
+
 
 
 # the number of columns already in the data array

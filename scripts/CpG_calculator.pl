@@ -20,7 +20,7 @@ eval {
 	require Bio::DB::Sam;
 	$BAM_OK = 0;
 };
-my $VERSION = 1.24;
+my $VERSION = '1.30';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -141,6 +141,7 @@ else {
 		# no database, cannot continue
 		die " no database or fasta file given! use --help for more information\n";
 	}
+	$Data->program("$0, v $VERSION");
 }
 
 # check whether it is worth doing parallel execution

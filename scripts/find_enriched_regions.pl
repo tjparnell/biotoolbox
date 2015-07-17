@@ -25,7 +25,7 @@ eval {
 	$parallel = 1;
 };
 # use Data::Dumper;
-my $VERSION = '1.20';
+my $VERSION = '1.30';
 
 print "\n This script will find enriched regions for a specific data set\n\n";
 
@@ -981,6 +981,7 @@ sub generate_main_data_hash {
 	) or die " unable to generate Bio::ToolBox::Data object!\n";
 	
 	# Add metadata
+	$Data->program("$0, v $VERSION");
 	$Data->database($main_database || $data_database);
 	
 	# window metadata

@@ -515,6 +515,7 @@ sub generate_output_structure {
 		feature  => "region",
 		columns  => [ qw(Parent Transcript Name Chromosome Start Stop Strand) ],
 	);
+	$Data->program("$0, v $VERSION");
 	my $r = $request;
 	$r =~ s/\s/_/g; # remove spaces
 	$Data->metadata(1,'type', $r);

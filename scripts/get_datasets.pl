@@ -165,9 +165,7 @@ elsif ($new) {
 }
 
 # update program name
-unless ($Data->program eq $0) {
-	$Data->program($0);
-}
+$Data->program("$0, v $VERSION");
 
 
 

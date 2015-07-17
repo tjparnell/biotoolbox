@@ -33,7 +33,7 @@ my $PARAMETRIC    = 1;
 my $ORDINAL       = 0;
 	
 use constant LOG10 => log(10);
-my $VERSION = 1.24;
+my $VERSION = '1.30';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -118,7 +118,7 @@ check_defaults();
 my $Data = Bio::ToolBox::Data(file => $infile) or 
 	die " unable to open input file '$infile'!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
-
+$Data->program("$0, v $VERSION");
 
 
 ### Open database connection

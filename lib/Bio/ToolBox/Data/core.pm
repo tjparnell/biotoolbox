@@ -15,7 +15,6 @@ should not be used directly. See the respective modules for more information.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use Bio::ToolBox;
 use base 'Bio::ToolBox::Data::file';
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -35,9 +34,8 @@ sub new {
 	}
 	
 	# Initialize the hash structure
-	my $ToolBoxVersion = Bio::ToolBox->VERSION;
 	my %data = (
-		'program'        => "$0, lib v$ToolBoxVersion",
+		'program'        => undef,
 		'feature'        => undef,
 		'feature_type'   => undef,
 		'db'             => undef,
