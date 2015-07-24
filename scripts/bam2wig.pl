@@ -32,7 +32,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 	
 	
 
@@ -2167,10 +2167,10 @@ sub write_bedgraph {
 	
 	# do each strand one at a time
 	foreach my $s (qw(f r)) {
-		next unless keys( %{ $data->{$s} } );
 		my $buffer = "buffer$s";
 		my $offset = "offset$s";
 		my $fh     = "fh$s";
+		next unless defined $data->{$fh};
 		
 		# reset final to true as necessary
 		$final = 1 if ( max(keys %{$data->{$s}}) >= $data->{'seq_length'} );
@@ -2306,6 +2306,21 @@ sub write_bedgraph {
 		
 		# remember the current position for next writing
 		$data->{$offset} = $current_pos + $current_offset + 1;
+		# set the next position for next round of writing
+		$data->{$offset} = $start_pos + $current_offset + 1 
+			if ($current_pos + $current_offset) != 0;
+			# ugly hack to make sure we have written something before pushing 
+			# to next position, i.e. 0 + 1 is not the beginning of the chromosome
+		
+		# make sure we write to the end of the chromosome
+		if ($final and $data->{$offset} < $data->{'seq_length'}) {
+			$data->{$fh}->print( join("\t", 
+					$data->{'seq_id'}, 
+					$data->{$offset},
+					$data->{'seq_length'},
+					&$convertor(0) # convert RPM or log before writing
+			) . "\n");
+		}
 	}
 }
 
