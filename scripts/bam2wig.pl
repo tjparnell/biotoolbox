@@ -2305,9 +2305,7 @@ sub write_bedgraph {
 		}
 		
 		# remember the current position for next writing
-		$data->{$offset} = $current_pos + $current_offset + 1;
-		# set the next position for next round of writing
-		$data->{$offset} = $start_pos + $current_offset + 1 
+		$data->{$offset} = $current_pos + $current_offset + 1
 			if ($current_pos + $current_offset) != 0;
 			# ugly hack to make sure we have written something before pushing 
 			# to next position, i.e. 0 + 1 is not the beginning of the chromosome
