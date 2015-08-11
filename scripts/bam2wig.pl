@@ -71,14 +71,16 @@ my (
 	$min_mapq,
 	$max_dup,
 	$max_count,
+	$max_isize,
 	$rpm,
 	$log,
 	$bigwig,
 	$bwapp,
 	$gz,
 	$cpu,
-	$buffer_min,
+	$min_buffer,
 	$alignment_count,
+	$reduce_memory,
 	$verbose,
 	$help,
 	$print_version,
@@ -105,14 +107,16 @@ GetOptions(
 	'qual=i'    => \$min_mapq, # minimum mapping quality
 	'max=i'     => \$max_dup, # maximum duplicate positions
 	'max_cnt=i' => \$max_count, # maximum pileup count in coverage mode only
+	'max_isize=i' => \$max_isize, # maximum paired insert size to accept
 	'rpm!'      => \$rpm, # calculate reads per million
 	'log=i'     => \$log, # transform count to log scale
 	'bw!'       => \$bigwig, # generate bigwig file
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
 	'gz!'       => \$gz, # compress text output
 	'cpu=i'     => \$cpu, # number of cpu cores to use
-	'buffer=i'  => \$buffer_min, # minimum buffer length
+	'buffer=i'  => \$min_buffer, # minimum buffer length
 	'count=i'   => \$alignment_count, # number of alignments before writing to disk
+	'mem!'      => \$reduce_memory, # reduce buffer memory
 	'verbose!'  => \$verbose, # print sample correlations
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -288,13 +292,23 @@ sub check_defaults {
 	}
 	
 	# check minimum buffer
-	unless (defined $buffer_min) {
-		$buffer_min = 5000;
+	unless (defined $min_buffer) {
+		$min_buffer = 5000;
+	}
+	
+	# check minimum paired-end insert size
+	unless (defined $max_isize) {
+		$max_isize = $min_buffer;
 	}
 	
 	# check alignment count
 	unless (defined $alignment_count) {
 		$alignment_count = 200000;
+	}
+	
+	# check reduce memory flag
+	unless (defined $reduce_memory) {
+		$reduce_memory = 1;
 	}
 	
 	# check position
@@ -1745,6 +1759,7 @@ sub record_paired_mid {
 	return unless $a->mreversed;
 	return unless $a->tid == $a->mtid; # on the same chromosome
 	return if $a->qual < $min_mapq;
+	return if $a->isize > $max_isize;
 	
 	# calculate mid position of the pair
 	my $position = $a->pos + 1 + int( $a->isize / 2 );
@@ -1765,6 +1780,7 @@ sub record_stranded_paired_mid {
 	return unless $a->mreversed;
 	return unless $a->tid == $a->mtid; # on the same chromosome
 	return if $a->qual < $min_mapq;
+	return if $a->isize > $max_isize;
 	
 	# calculate mid position of the pair
 	my $position = $a->pos + 1 + int( $a->isize / 2 );
@@ -1829,6 +1845,7 @@ sub record_stranded_paired_span {
 	return unless $a->mreversed;
 	return unless $a->tid == $a->mtid; # on the same chromosome
 	return if $a->qual < $min_mapq;
+	return if $a->isize > $max_isize;
 	
 	# determine strand
 	# normally proper paired-end alignments are inherently not stranded
@@ -1924,6 +1941,7 @@ sub record_paired_span {
 	return unless $a->mreversed;
 	return unless $a->tid == $a->mtid; # on the same chromosome
 	return if $a->qual < $min_mapq;
+	return if $a->isize > $max_isize;
 	
 	# record isize at start
 	$data->{'f'}{ $a->pos } .= $a->isize . ",";
@@ -2043,7 +2061,7 @@ sub write_varstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
+			max(keys %{$data->{$s}}) - $min_buffer; 
 		
 		# deal with negative positions
 		if (min( keys %{ $data->{$s} }) <= 0) {
@@ -2101,7 +2119,7 @@ sub write_fixstep {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
+			max(keys %{$data->{$s}}) - $min_buffer; 
 		
 		# deal with negative positions
 		if (min( keys %{ $data->{$s} }) <= 0) {
@@ -2178,7 +2196,7 @@ sub write_bedgraph {
 		# check the maximum position that we cannot go beyond
 		# defined either by the minimum buffer value or the end of the chromosome
 		my $maximum = $final ?  $data->{'seq_length'} : 
-			max(keys %{$data->{$s}}) - $buffer_min; 
+			max(keys %{$data->{$s}}) - $min_buffer; 
 		
 		# print warning about negative positions
 		if ($verbose and min( keys %{ $data->{$s} }) < 0) {
@@ -2187,7 +2205,9 @@ sub write_bedgraph {
 		}
 		
 		# convert read lengths to coverage in the buffer array
-		foreach my $pos (sort {$a <=> $b} keys %{ $data->{$s} }) {
+		my @position_keys = sort {$a <=> $b} keys %{ $data->{$s} };
+		while (@position_keys) {
+			my $pos = shift @position_keys;
 			
 			# first check the position and bail when we've gone far enough
 			last if ($pos > $maximum);
@@ -2226,89 +2246,21 @@ sub write_bedgraph {
 				}
 			}
 			delete $data->{$s}{$pos};
+			
+			# check to see if we need to write existing array
+			if (
+				$reduce_memory and 
+				@position_keys and 
+				($position_keys[0] - $pos) > $min_buffer
+			) {
+				# too big of jump to the next position
+				# let's dump what we got in the array
+				_write_array_to_bedgraph($data, $final, $position_keys[0], $buffer, $offset, $fh, 1);
+			}
 		}
 		
 		# write the array into bedgraph
-		my $current_pos = $data->{$offset};
-		my $current_value = shift @{ $data->{$buffer} } || 0;
-		my $current_offset = 0;
-		while (
-			scalar( @{ $data->{$buffer} } ) > $buffer_min or 
-				# keep at least minimum length in the buffer
-			( $final and scalar @{ $data->{$buffer} } )
-				# or we're at the end of the chromosome and need to write everything
-		) {
-			my $value = shift @{ $data->{$buffer} } || 0;
-			if ($value == $current_value) {
-				# same value, extend the interval
-				$current_offset++;
-			}
-			else {
-				# write out bedgraph line for the current interval of identical values
-				
-				# generate the end point
-				# remember we're working with 0-base positions here
-				my $end = $current_pos + $current_offset + 1;
-				if ($final and $end >= $maximum) {
-					# we've reached the end of the chromosome
-					$end = $data->{'seq_length'};
-					
-					# dump anything left in the array to finish up
-					print "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
-						" from the end of chromosome " . $data->{'seq_id'} . "\n" 
-						if $verbose;
-					$data->{$buffer} = [];
-				}
-				
-				# write line
-				$data->{$fh}->print( join("\t", 
-					$data->{'seq_id'}, 
-					$current_pos,
-					$end,
-					&$convertor($current_value) # convert RPM or log before writing
-				) . "\n");
-				
-				# reset for the next interval
-				$current_pos += $current_offset + 1;
-				$current_value = $value;
-				$current_offset = 0;
-			}
-		}
-		
-		# make sure we don't leave a value hanging
-		if ($current_offset) {
-			my $end = $current_pos + $current_offset + 1;
-			if ($final) {
-				# interval must not go off the chromosome end
-				if ($current_pos < $data->{'seq_length'}) {
-					
-					# reset end if necessary
-					$end = $end > $data->{'seq_length'} ? $data->{'seq_length'} : $end;
-					
-					# print the hanging value
-					$data->{$fh}->print( join("\t", 
-							$data->{'seq_id'}, 
-							$current_pos,
-							$end,
-							&$convertor($current_value) # convert RPM or log before writing
-					) . "\n");
-				}
-			}
-			else {
-				$data->{$fh}->print( join("\t", 
-						$data->{'seq_id'}, 
-						$current_pos,
-						$end,
-						&$convertor($current_value) # convert RPM or log before writing
-				) . "\n");
-			}
-		}
-		
-		# remember the current position for next writing
-		$data->{$offset} = $current_pos + $current_offset + 1
-			if ($current_pos + $current_offset) != 0;
-			# ugly hack to make sure we have written something before pushing 
-			# to next position, i.e. 0 + 1 is not the beginning of the chromosome
+		_write_array_to_bedgraph($data, $final, $maximum, $buffer, $offset, $fh, 0);
 		
 		# make sure we write to the end of the chromosome
 		if ($final and $data->{$offset} < $data->{'seq_length'}) {
@@ -2356,6 +2308,91 @@ sub convert_to_bigwig {
 }
 
 
+sub _write_array_to_bedgraph {
+	my ($data, $final, $max_pos, $buffer, $offset, $fh, $special) = @_;
+	
+	my $current_pos = $data->{$offset};
+	my $current_value = shift @{ $data->{$buffer} } || 0;
+	my $current_offset = 0;
+	while ($current_pos <= $max_pos and (scalar @{$data->{$buffer}}) ) {
+		my $value = shift @{ $data->{$buffer} } || 0;
+		if ($value == $current_value) {
+			# same value, extend the interval
+			$current_offset++;
+		}
+		else {
+			# write out bedgraph line for the current interval of identical values
+			
+			# generate the end point
+			# remember we're working with 0-base positions here
+			my $end = $current_pos + $current_offset + 1;
+			if ($final and $end >= $data->{'seq_length'}) {
+				# we've reached the end of the chromosome
+				$end = $data->{'seq_length'};
+				
+				# dump anything left in the array to finish up
+				print "  Warning: " . scalar(@{ $data->{$buffer} }) . " bp trimmed" .
+					" from the end of chromosome " . $data->{'seq_id'} . "\n" 
+					if $verbose;
+				$data->{$buffer} = [];
+			}
+			
+			# write line
+			$data->{$fh}->print( join("\t", 
+				$data->{'seq_id'}, 
+				$current_pos,
+				$end,
+				&$convertor($current_value) # convert RPM or log before writing
+			) . "\n");
+			
+			# reset for the next interval
+			$current_pos += $current_offset + 1;
+			$current_value = $value;
+			$current_offset = 0;
+		}
+	}
+	
+	# make sure we don't leave a value hanging
+	if ($current_offset) {
+		my $end = $current_pos + $current_offset + 1;
+		if ($final) {
+			# interval must not go off the chromosome end
+			if ($current_pos < $data->{'seq_length'}) {
+				
+				# reset end if necessary
+				$end = $end > $data->{'seq_length'} ? $data->{'seq_length'} : $end;
+				
+				# print the hanging value
+				$data->{$fh}->print( join("\t", 
+						$data->{'seq_id'}, 
+						$current_pos,
+						$end,
+						&$convertor($current_value) # convert RPM or log before writing
+				) . "\n");
+			}
+		}
+		else {
+			$data->{$fh}->print( join("\t", 
+					$data->{'seq_id'}, 
+					$current_pos,
+					$end,
+					&$convertor($current_value) # convert RPM or log before writing
+			) . "\n");
+		}
+	}
+	else {
+		$current_offset = -1;
+	}
+	
+	# set the next position for next round of writing
+	$data->{$offset} = $current_pos + $current_offset + 1 
+		if ($current_pos + $current_offset) != 0;
+		# ugly hack to make sure we have written something before pushing 
+		# to next position, i.e. 0 + 1 is not the beginning of the chromosome
+	
+	return;
+}
+
 __END__
 
 =head1 NAME
@@ -2372,7 +2409,7 @@ bam2wig.pl [--options...] <filename.bam>
   --in <filename.bam>
   
   Reporting options:
-  --position [start|mid|span|extend]                (start)
+  --position [start|mid|span|extend]            (start)
   --coverage
   --bin <integer>
   --strand
@@ -2385,14 +2422,15 @@ bam2wig.pl [--options...] <filename.bam>
   Alignment options:
   --pe
   --splice
-  --qual <integer>
+  --qual <integer>                              (1)
+  --max_isize <integer>                         (buffer size)
   
   Shift options:
   --shift
-  --shiftval <integer>
-  --chrom <integer>                                 (2)
-  --sample <integer>                                (300)
-  --minr <float>                                    (0.25)
+  --shiftval <integer>                          (calculated)
+  --chrom <integer>                             (2)
+  --sample <integer>                            (300)
+  --minr <float>                                (0.25)
   --model
   
   Output options:
@@ -2402,13 +2440,14 @@ bam2wig.pl [--options...] <filename.bam>
   --gz
   
   General options:
-  --cpu <integer>                                   (2)
-  --max_cnt <integer>
-  --buffer <integer>
-  --count <integer>
+  --cpu <integer>                               (2)
+  --max_cnt <integer>                           (8000)
+  --buffer <integer>                            (5000)
+  --count <integer>                             (200000)
+  --nomem
   --verbose
   --version
-  --help                              detailed documentation
+  --help                             show full documentation
 
 =head1 OPTIONS
 
@@ -2527,6 +2566,14 @@ integer (range 0..255). Higher numbers are more stringent. For performance
 reasons, when counting paired-end reads, only the left alignment is
 checked. The default value is 0 (accept everything).
 
+=item --max_isize <integer>
+
+Set a maximum insertion size when recording paired-end alignments. 
+Extremely large insertions sizes are often due to large scale insertions, 
+large introns, or poor mapping quality. Recording their span will balloon 
+memory usage. The default is to use the size for the bedGraph memory 
+buffer below.
+
 =item --shift
 
 Specify that the positions of the alignment should be shifted towards 
@@ -2623,6 +2670,13 @@ Specify the number of alignments processed before writing to file.
 Increasing this count will reduce the number of disk writes and increase 
 performance at the cost of increased memory usage. Lowering will 
 decrease memory usage. The default is 200,000 alignments.
+
+=item --nomem
+
+Do not turn on memory optimization, which attempts to flush the 
+bedGraph memory buffer when encountering large empty regions greater 
+than the buffer itself. Without this flush, memory usage could go very 
+high when recording bam files with large gaps in coverage, e.g. RNASeq.
 
 =item --verbose
 
