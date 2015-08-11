@@ -32,7 +32,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 	
 	
 
@@ -553,13 +553,6 @@ sub check_defaults {
 		print " recording positions spanning paired alignments\n";
 	}
 	elsif ($use_span and !$strand and !$shift and !$paired) {
-# 		if (!$rpm and !$log and !$splice) {
-# 			# this is actually coverage
-# 			undef $use_span;
-# 			undef $bedgraph; # no bedgraph file, coverage uses fixedStep
-# 			$use_coverage = 1;
-# 			print " recording coverage spanning alignments\n";
-# 		}
 		if ($ext_value) {
 			$callback  = \&record_extended;
 			$write_wig = \&write_bedgraph;
@@ -1252,7 +1245,7 @@ sub process_bam_coverage_on_chromosome {
 	for (my $start = 0; $start < $seq_length; $start += $dump) {
 		
 		# the low level interface works with 0-base indexing
-		my $end = $start + $dump -1;
+		my $end = $start + $dump;
 		$end = $seq_length if $end > $seq_length;
 		
 		# using the low level interface for a little more performance
