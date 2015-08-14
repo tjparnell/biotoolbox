@@ -1,19 +1,19 @@
-package Bio::ToolBox::ucsc_parser;
+package Bio::ToolBox::parser::ucsc;
 our $VERSION = '1.31';
 
 =head1 NAME
 
-Bio::ToolBox::ucsc_parser - Parser for UCSC genePred, refFlat, etc formats
+Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
 
 =head1 SYNOPSIS
 
-  use Bio::ToolBox::ucsc_parser;
+  use Bio::ToolBox::parser::ucsc;
   
   ### A simple transcript parser
-  my $ucsc = Bio::ToolBox::ucsc_parser->new('file.genePred');
+  my $ucsc = Bio::ToolBox::parser::ucsc->new('file.genePred');
   
   ### A full fledged gene parser
-  my $ucsc = Bio::ToolBox::ucsc_parser->new(
+  my $ucsc = Bio::ToolBox::parser::ucsc->new(
         file      => 'ensGene.genePred',
         do_gene   => 1,
         do_cds    => 1,
@@ -283,7 +283,7 @@ SeqFeature objects.
 
 =over 4
 
-=item load_table
+=item parse_table
 
 Parses the table into memory. If a table wasn't provided using the 
 new() or open_file() methods, then a filename can be passed to this 
@@ -311,7 +311,7 @@ parse the line into gene objects.
 
 =back
 
-=head2 Bio::ToolBox::ucsc_parser::builder
+=head2 Bio::ToolBox::parser::ucsc::builder
 
 This is a private module that is responsible for building SeqFeature 
 objects from UCSC table lines. It is not intended for general public use.
@@ -319,7 +319,7 @@ objects from UCSC table lines. It is not intended for general public use.
 =cut
 
 use strict;
-use Carp qw(carp cluck croak confess);
+use Carp qw(carp cluck croak);
 use Bio::ToolBox::Data::file; # only used to get an open filehandle
 
 1;
@@ -691,7 +691,7 @@ sub next_feature {
 			$self->{line_count}++;
 			next;
 		}
-		my $builder = Bio::ToolBox::ucsc_parser::builder->new($line, $self);
+		my $builder = Bio::ToolBox::parser::ucsc::builder->new($line, $self);
 		$self->{line_count}++;
 		unless ($builder) {
 			# builder will print its own error message if fails
@@ -720,7 +720,7 @@ sub next_feature {
 sub next_top_feature {
 	my $self = shift;
 	unless ($self->{'eof'}) {
-		$self->load_table;
+		$self->parse_table;
 	}
 	return shift @{ $self->{top_features} };
 }
@@ -728,13 +728,15 @@ sub next_top_feature {
 sub top_features {
 	my $self = shift;
 	unless ($self->{'eof'}) {
-		$self->load_table;
+		$self->parse_table;
 	}
 	my @features = @{ $self->{top_features} };
 	return wantarray ? @features : \@features;
 }
 
-sub load_table {
+*parse_file = \&parse_table;
+
+sub parse_table {
 	my $self = shift;
 	if (@_) {
 		$self->open_file(shift) or return;
@@ -749,7 +751,7 @@ sub load_table {
 	while (my $feature = $self->next_feature) {
 		
 		# add to gene2seqf hash
-		my $gene = $self->find_gene($feature); # >>>>>>>>>>>>>> I CANT USE THIS HERE !
+		my $gene = $self->find_gene($feature); 
 		unless ($gene) {
 			# the current feature is not in the hash, so add it
 			$self->{gene2seqf}->{ lc $feature->display_name } = [ $feature ];
@@ -768,13 +770,9 @@ sub load_table {
 	return 1;
 }
 
-# I don't think I can use this for finding current genes when building new 
-# gene/transcript models during parsing as well as make it general function
-# for finding existing genes. I think I need to put another find_gene under 
-# the builder module for finding genes to assemble....
 sub find_gene {
 	my ($self, $thing) = @_;
-	# thing could be a gene name string, or builder object, or SeqFeature object
+	# thing could be a gene name string, SeqFeature object, or Data::Feature object
 	
 	# go no further unless genes are requested
 	return unless $self->do_gene;
@@ -856,7 +854,7 @@ sub counts {
 sub from_ucsc_string {
 	my ($self, $string) = @_;
 	return unless $string;
-	my $builder = Bio::ToolBox::ucsc_parser::builder->new($string, $self);
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new($string, $self);
 	return unless $builder;
 	return $builder->build_gene;
 }
@@ -864,9 +862,9 @@ sub from_ucsc_string {
 
 
 
-package Bio::ToolBox::ucsc_parser::builder;
+package Bio::ToolBox::parser::ucsc::builder;
 use strict;
-use Carp qw(carp cluck croak confess);
+use Carp qw(carp cluck croak);
 use Bio::SeqFeature::Lite;
 
 sub new {
