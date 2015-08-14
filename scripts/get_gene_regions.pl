@@ -11,9 +11,9 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
-use Bio::ToolBox::gff3_parser;
+use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -475,7 +475,7 @@ sub collect_from_file {
 	$Data->add_comment("Source data file $infile");
 	
 	# open gff3 parser object
-	my $parser = Bio::ToolBox::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::parser::gff->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
 	# process the features

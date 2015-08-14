@@ -11,7 +11,7 @@ use Bio::ToolBox::legacy_helper qw(
 	open_to_read_fh
 	open_to_write_fh
 );
-use Bio::ToolBox::ucsc_parser;
+use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
 my $VERSION = '1.31';
 
@@ -176,7 +176,7 @@ if ($ftp_file) {
 
 
 ### Initiate the parser
-my $ucsc = Bio::ToolBox::ucsc_parser->new(
+my $ucsc = Bio::ToolBox::parser::ucsc->new(
 	do_gene     => $do_gene,
 	do_cds      => $do_cds,
 	do_utr      => $do_utr,
