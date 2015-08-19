@@ -331,7 +331,7 @@ sub next_feature {
 		chomp $line;
 		
 		# skip any comment and pragma lines that we might encounter
-		if ($line =~ /^##gff-version\s([\d\.]+$)/) {
+		if ($line =~ /^##gff\-version\s(\d\.?\d?)$/) {
 			unless (defined $self->version) {
 				$self->version($1);
 			}
@@ -554,7 +554,7 @@ sub find_gene {
 		$strand = $thing->strand || undef;
 		$id     = $thing->id || $thing->primary_id || undef;
 	}
-	elsif (not defined $thingref) {
+	elsif ($thingref eq q()) {
 		# it's just a name
 		$name = $thing;
 	}

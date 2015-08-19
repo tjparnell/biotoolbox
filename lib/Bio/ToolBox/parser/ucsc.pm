@@ -22,7 +22,7 @@ Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
         enssrc    => 'ensemblSource.txt',
   );
   
-  ### Retrieve one transcript at a time
+  ### Retrieve one transcript line at a time
   my $transcript = $ucsc->next_feature;
   
   ### Retrieve one assembled gene at a time
@@ -306,8 +306,8 @@ have been parsed.
 =item from_ucsc_string
 
 A bare bones method that will convert a tab-delimited text line from a UCSC 
-formatted gene table into a SeqFeature object for you. Don't expect this to 
-parse the line into gene objects. 
+formatted gene table into a SeqFeature object for you. Don't expect alternate 
+transcripts to be assembled into genes. 
 
 =back
 
@@ -545,18 +545,16 @@ sub open_file {
 		$self->{'duplicate_ids'} = {};
 		$self->{'gene2seqf'}     = {};
 		$self->{'id2count'}      = {};
-		$self->{'counts'}        => {
-			'gene'       => 0,
-			'mrna'       => 0,
-			'pseudogene' => 0,
-			'ncrna'      => 0,
-			'mirna'      => 0,
-			'snrna'      => 0,
-			'snorna'     => 0,
-			'trna'       => 0,
-			'rrna'       => 0,
-			'other'      => 0,
-		};
+		$self->{'counts'}{'gene'}       = 0;
+		$self->{'counts'}{'mrna'}       = 0;
+		$self->{'counts'}{'pseudogene'} = 0;
+		$self->{'counts'}{'ncrna'}      = 0;
+		$self->{'counts'}{'mirna'}      = 0;
+		$self->{'counts'}{'snrna'}      = 0;
+		$self->{'counts'}{'snorna'}     = 0;
+		$self->{'counts'}{'trna'}       = 0;
+		$self->{'counts'}{'rrna'}       = 0;
+		$self->{'counts'}{'other'}      = 0;
 		$self->{'eof'}           = 0;
 		$self->{'line_count'}    = 0;
 	}
@@ -789,7 +787,7 @@ sub find_gene {
 		$strand = $thing->strand || undef;
 		$id     = $thing->id || $thing->primary_id || undef;
 	}
-	elsif (not defined $thingref) {
+	elsif (not $thingref) {
 		# it's just a name
 		$name = $thing;
 	}
@@ -1236,11 +1234,9 @@ sub build_gene {
 	my $ensembldata = $ucsc->{ensembldata};
 	
 	# find a pre-existing gene to update or build a new one
-# 	my $gene = $ucsc->find_gene($self);
 	my $gene = $self->find_gene;
 	if ($gene) {
 		# update as necessary
-		printf " found existing gene for %s\n", $self->gene_name;
 		if ( ($self->txStart) < $gene->start) {
 			# update the transcription start position
 			$gene->start( $self->txStart );
@@ -1252,7 +1248,6 @@ sub build_gene {
 	}
 	else {
 		# build a new gene
-		printf " building new gene for %s\n", $self->gene_name;
 		$gene = Bio::SeqFeature::Lite->new(
 			-seq_id        => $self->chrom,
 			-source        => $ucsc->source,
@@ -1959,7 +1954,7 @@ sub find_existing_subfeature {
 	my ($self, $gene, $type, $start, $stop) = @_;
 	
 	# we will try to find a pre-existing subfeature at identical coordinates
-	SUBF_LOOP: foreach my $transcript ($gene->get_SeqFeatures()) {
+	foreach my $transcript ($gene->get_SeqFeatures()) {
 		# walk through transcripts
 		foreach my $subfeature ($transcript->get_SeqFeatures()) {
 			# walk through subfeatures of transcripts
@@ -1973,6 +1968,7 @@ sub find_existing_subfeature {
 			}
 		}
 	}
+	return;
 }
 
 
