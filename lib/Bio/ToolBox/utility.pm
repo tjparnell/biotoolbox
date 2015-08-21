@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.30';
+our $VERSION = '1.31';
 
 =head1 NAME
 
@@ -99,9 +99,8 @@ sub parse_list {
 		carp " the string contains characters that can't be parsed\n";
 		return;
 	}
-	$string =~ s/\s+//g; 
 	my @list;
-	foreach (split /,/, $string) {
+	foreach (split /[,\s+]/, $string) {
 		# check for a range
 		if (/\-/) { 
 			my ($start, $stop) = split /\-/;
