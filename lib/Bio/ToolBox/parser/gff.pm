@@ -189,12 +189,17 @@ entire file is loaded into memory. Genes with a matching name are
 confirmed by a matching ID or overlapping coordinates, if available. 
 Otherwise the first match is returned.
 
-=item orphans()
+=item orphans
 
 This method will return an array of orphan SeqFeature objects that indicated 
 they had a parent but said parent could not be found. Typically, this is an 
 indication of an incomplete or malformed GFF3 file. Nevertheless, it might 
 be a good idea to check this after retrieving all top features.
+
+=item comments
+
+This method will return an array of the comment or pragma lines that may have 
+been in the parsed file. These may or may not be useful.
 
 =item from_gff_string($string)
 
@@ -229,6 +234,7 @@ sub new {
 		'gene2seqf'     => {},
 		'eof'           => 0,
 		'version'       => undef,
+		'comments'      => [],
 	};
 	bless $self, $class;
 	
@@ -337,8 +343,13 @@ sub next_feature {
 			}
 			next;
 		}
+		elsif ($line =~ /^###$/) {
+			# GFF3 subfeature close directive, we no longer pay attention to these 
+			next;
+		}
 		elsif ($line =~ /^#/) {
-			# either a pragma or a comment line
+			# either a pragma or a comment line, may be useful
+			push @{$self->{comments}}, $line;
 			next;
 		}
 		elsif ($line =~ /^$/) {
@@ -692,9 +703,22 @@ sub _gtf_to_seqf {
 	my $feature = $self->_gff_to_seqf(@_);
 	
 	# process groups
-	foreach my $g (split(/\s*;\s*/, $group)) {
-		my ($tag, $value) = split /\s+/, $g;
+	foreach my $g (split(/;\s+/, $group)) { # supposed to be "; " as delimiter
+		my ($tag, $value, @bits) = split /\s+/, $g;
+		if (@bits) {
+			# value had spaces in it!
+			foreach (@bits) {$value .= " $_"}
+		}
+		$value =~ s/"//g; # remove the flanking double quotes, assume no internal quotes
 		$feature->add_tag_value($tag, $value);
+	}
+	
+	# change some Ensembl tags
+	# Ensembl GTFs use the source tag as the biotype, instead of a the real source
+	my $original_source = $feature->source; # keep this for later
+	if ($feature->has_tag('gene_source')) {
+		my ($s) = $feature->get_tag_values('gene_source');
+		$feature->source($s);
 	}
 	
 	# convert some tags into GFF3-like conventions
@@ -732,6 +756,22 @@ sub _gtf_to_seqf {
 		if ($feature->has_tag('gene_name')) {
 			my ($alias) = $feature->get_tag_values('gene_name');
 			$feature->add_tag_value('Alias', $alias);
+		}
+		
+		# update primary_tag to follow BioPerl/BioToolBox/GFF3/traditional conventions
+		# primarily to handle specifically Ensembl GTF file formats
+		if ($feature->primary_tag =~ /^transcript$/i) {
+			if ($feature->has_tag('gene_biotype')) {
+				my ($t) = $feature->get_tag_values('gene_biotype');
+				$t = 'mRNA' if $t =~ /protein_coding/i;
+				$feature->primary_tag($t);
+			}
+			elsif ($original_source =~ /protein_coding/i) {
+				$feature->primary_tag('mRNA');
+			}
+			elsif ($original_source =~ /rna|antisense|transcript|nonsense_mediated/i) {
+				$feature->primary_tag($original_source);
+			}
 		}
 	}
 	else {
@@ -812,9 +852,18 @@ sub orphans {
 	foreach (@{ $self->{orphans} }) {
 		push @orphans, $_;
 	}
-	return @orphans;
+	return wantarray ? @orphans : \@orphans;
 }
 
+
+sub comments {
+	my $self = shift;
+	my @comments;
+	foreach (@{ $self->{comments} }) {
+		push @comments, $_;
+	}
+	return wantarray ? @comments : \@comments;
+}
 
 
 __END__
