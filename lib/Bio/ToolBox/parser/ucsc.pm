@@ -668,6 +668,7 @@ sub load_extra_data {
 	
 			# store data into hash
 			$self->{$type}{$id} = [@line_data];
+			$count++;
 		}
 	}
 	
