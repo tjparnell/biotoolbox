@@ -1254,7 +1254,7 @@ sub splice_data {
 	
 	# re-open a new un-cached database connection
 	if (exists $self->{db_connection}) {
-		$self->open_database(1);
+		delete $self->{db_connection};
 	}
 	return 1;
 }
