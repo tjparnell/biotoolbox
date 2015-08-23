@@ -15,10 +15,10 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.30'
+    version: '1.31'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.30'
+    version: '1.31'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
     version: '1.30'
@@ -60,15 +60,20 @@ provides:
   Bio::ToolBox::db_helper::wiggle:
     file: lib/Bio/ToolBox/db_helper/wiggle.pm
     version: '1.14'
-  Bio::ToolBox::gff3_parser:
-    file: lib/Bio/ToolBox/gff3_parser.pm
-    version: '1.26'
   Bio::ToolBox::legacy_helper:
     file: lib/Bio/ToolBox/legacy_helper.pm
     version: '1.30'
+  Bio::ToolBox::parser::gff:
+    file: lib/Bio/ToolBox/parser/gff.pm
+    version: '1.31'
+  Bio::ToolBox::parser::ucsc:
+    file: lib/Bio/ToolBox/parser/ucsc.pm
+    version: '1.31'
+  Bio::ToolBox::parser::ucsc::builder:
+    file: lib/Bio/ToolBox/parser/ucsc.pm
   Bio::ToolBox::utility:
     file: lib/Bio/ToolBox/utility.pm
-    version: '1.30'
+    version: '1.31'
 recommends:
   Algorithm::Cluster: '0'
   DBD::SQLite: '0'
@@ -90,4 +95,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.30'
+version: '1.31'
