@@ -291,8 +291,8 @@ method and it will automatically be opened for you.
 
 =item find_gene
 
-Pass a gene name, or optionally a Bio object with a name, display_name, 
-ID, primary_ID, and/or coordinate information, that can be used 
+Pass a gene name, or an array of key = values (name, display_name, 
+ID, primary_ID, and/or coordinate information), that can be used 
 to find a gene already loaded into memory. Only really successful if the 
 entire table is loaded into memory. Genes with a matching name are 
 confirmed by a matching ID or overlapping coordinates, if available. 
@@ -771,30 +771,31 @@ sub parse_table {
 }
 
 sub find_gene {
-	my ($self, $thing) = @_;
-	# thing could be a gene name string, SeqFeature object, or Data::Feature object
+	my $self = shift;
 	
 	# go no further unless genes are requested
 	return unless $self->do_gene;
 	
-	# get the name and coordinates from the thing, which could be object or string
+	# get the name and coordinates from arguments
 	my ($name, $id, $chrom, $start, $end, $strand);
-	my $thingref = ref $thing;
-	if ($thingref =~ /^Bio::/)  {
-		# a standard Bio object, maybe SeqFeature, maybe Data::Feature
-		$name   = $thing->display_name || undef;
-		$chrom  = $thing->seq_id || undef;
-		$start  = $thing->start || undef;
-		$end    = $thing->end || undef;
-		$strand = $thing->strand || undef;
-		$id     = $thing->id || $thing->primary_id || undef;
+	if (scalar @_ == 0) {
+		carp "must provide information to find_gene method!";
+		return;
 	}
-	elsif (not $thingref) {
-		# it's just a name
-		$name = $thing;
+	elsif (scalar @_ == 1) {
+		$name = $_[0];
 	}
 	else {
-		# don't know what it is
+		my %opt = @_;
+		$name  = $opt{name} || $opt{display_name} || undef;
+		$id    = $opt{id} || $opt{primary_id} || undef;
+		$chrom = $opt{chrom} || $opt{seq_id} || undef;
+		$start = $opt{start} || undef;
+		$end   = $opt{stop} || $opt{end} || undef;
+		$strand = $opt{strand} || 0;
+	}
+	unless ($name) {
+		carp "name is required for find_gene!";
 		return;
 	}
 	
