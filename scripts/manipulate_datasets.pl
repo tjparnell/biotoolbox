@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1863,7 +1863,7 @@ sub format_function {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $v = $row->value($index);
-			if ($v ne '.') {
+			if (not _is_null($v)) {
 				$row->value($index, sprintf($format_string, $v));
 			}
 		});
@@ -1947,7 +1947,13 @@ sub combine_function {
 		my $row = shift;
 		
 		# collect data, throwing out null values
-		my @data = grep {!/^\.$/} map {$row->value($_)} @indices;
+		# my @data = grep {!/^\.$/} map {$row->value($_)} @indices;
+		my @data;
+		foreach (@indices) {
+			my $v = $row->value($_);
+			next if _is_null($v);
+			push @data, $v;
+		} 
 		
 		# combine the data
 		my $v;
@@ -1955,7 +1961,7 @@ sub combine_function {
 			$v = &{$combine_method}(@data);
 		}
 		else {
-			$v = '.';
+			$v = $method eq 'sum' ? 0 : '.';
 			$failure_count++;
 		}
 		$row->value($new_position, $v);
@@ -2731,7 +2737,7 @@ sub center_function {
 		# collect the datapoint values in each dataset for the feature  
 		my @values;
 		foreach my $d (@datasets) {
-			push @values, $row->value($d) if $row->value($d) ne '.';
+			push @values, $row->value($d) if not _is_null($row->value($d));
 		}
 		next unless (@values);
 		
@@ -3196,7 +3202,7 @@ sub _get_statistics_hash {
 sub _is_null {
 	my $v = shift;
 	return 1 if not defined $v;
-	return 1 if ($v eq '.' or $v =~ /^n\/?a$/i or $v eq 'NaN');
+	return 1 if ($v eq '.' or $v =~ /^(?:n\/?a|nan|\-?inf)$/i);
 	return 0;
 }
 

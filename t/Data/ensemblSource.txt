@@ -1,0 +1,17 @@
+ENST00000411647	protein_coding
+ENST00000465226	processed_transcript
+ENST00000382214	nonsense_mediated_decay
+ENST00000415942	nonsense_mediated_decay
+ENST00000356286	protein_coding
+ENST00000475269	protein_coding
+ENST00000441733	protein_coding
+ENST00000353660	protein_coding
+ENST00000400245	processed_transcript
+ENST00000382181	protein_coding
+ENST00000400247	protein_coding
+ENST00000414880	protein_coding
+ENST00000468272	retained_intron
+ENST00000384070	misc_RNA
+ENST00000492704	processed_pseudogene
+ENST00000580848	miRNA
+ENST00000516294	snRNA

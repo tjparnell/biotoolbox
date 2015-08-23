@@ -11,9 +11,10 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
-use Bio::ToolBox::gff3_parser;
+use Bio::ToolBox::parser::gff;
+use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -89,10 +90,9 @@ if ($print_version) {
 unless ($infile or $database) {
 	die " must define a database or input GFF3 file! use --help for more information\n";
 }
-if ($database =~ /\.gff3?(?:\.gz)?$/) {
-	# a gff3 was specified as the database
+if ($database =~ /\.(?:gtf|gff3?|txt|refflat|genepred|ucsc)(?:\.gz)?$/i) {
+	# looks like a gene table file was specified as the database
 	# intercept and assign to input file name
-	# faster than trying to load the gff3 file into a memory db
 	$infile = $database;
 	$database = undef;
 }
@@ -140,16 +140,33 @@ elsif ($infile) {
 	$outdata = collect_from_file($method);
 }
 printf "  collected %s regions\n", format_with_commas($outdata->last_row);
+print " Sorting...\n";
+$outdata->gsort_data;
 
 
 
 
-
-### Finished
-my $success = $outdata->write_file(
-	'filename' => $outfile,
-	'gz'       => $gz,
-);
+### Write the file
+my $success;
+if ($bed) {
+	my $Stream = Bio::ToolBox::Data->new(
+		stream  => 1,
+		out     => $outfile,
+		bed     => 6,
+	) or die "unable to write output file '$outfile'!";
+	$outdata->iterate( sub {
+		my $row = shift;
+		my $bedstring = $row->bed_string(bed => 6);
+		$Stream->write_row($bedstring);
+	} );
+	$success = $Stream->filename;
+}
+else {
+	$success = $outdata->write_file(
+		'filename' => $outfile,
+		'gz'       => $gz,
+	);
+}
 if ($success) {
 	print " wrote file '$success'\n";
 }
@@ -157,31 +174,6 @@ else {
 	# failure! the subroutine will have printed error messages
 	print " unable to write file!\n";
 }
-
-
-### Convert to bed format if requested
-# rather than taking the time to modify the data structures and all the 
-# the data collection subroutines to a BED format, we'll just simply 
-# take advantage of the data2bed.pl program as a convenient cop-out
-if ($bed and $success) {
-	system(
-		"$Bin/data2bed.pl",
-		"--chr",
-		3,
-		"--start",
-		4,
-		"--stop",
-		5,
-		"--strand",
-		6,
-		"--name",
-		2,
-		"--in",
-		$success,
-		$gz ? "--gz" : "",
-	) == 0 or warn " unable to execute data2bed.pl for converting to bed!\n";
-}
-
 
 
 ########################   Subroutines   ###################################
@@ -310,8 +302,8 @@ sub determine_transcript_types {
 	elsif (@features) {
 		# user selected types from a database
 		foreach (@features) {
-			my ($p, $s) = split /:/, $feature; # take only the primary tag if both present
-			push @types, $p if $p =~ /rna/i;
+			my ($p, $s) = split /:/, $_; # take only the primary tag if both present
+			push @types, $p if $p =~ /rna|transcript/i;
 		}
 	}
 	
@@ -394,9 +386,7 @@ sub collect_from_database {
 	
 	# get feature type if necessary
 	my $prompt = <<PROMPT;
- Select one or more database feature from which to collect regions. This 
- is typically a top-level feature, such as "gene". If transcripts are 
- not organized into genes, select an RNA feature.
+ Select one or more database features (typically genes) from which to collect regions. 
 PROMPT
 	@features = verify_or_request_feature_types(
 		'db'      => $db,
@@ -474,9 +464,23 @@ sub collect_from_file {
 	my $Data = generate_output_structure();
 	$Data->add_comment("Source data file $infile");
 	
-	# open gff3 parser object
-	my $parser = Bio::ToolBox::gff3_parser->new($infile) or
-		die " unable to open input file '$infile'!\n";
+	# open appropriate parser object
+	my $parser;
+	if ($infile =~ /\.(?:gtf|gff3?)(?:\.gz)?$/) {
+		$parser = Bio::ToolBox::parser::gff->new(file => $infile) or
+			die " unable to open input file '$infile'!\n";
+	}
+	else {
+		# assuming some sort of ucsc format
+		# it will either work or it won't
+		$parser = Bio::ToolBox::parser::ucsc->new(
+			file    => $infile,
+			do_gene => 1,
+			do_utr  => 1,
+			do_cds  => 1,
+		) or die " unable to open input file '$infile'!\n";
+	}
+	$parser->parse_table or die "unable to parse file '$infile'!\n";
 	
 	# process the features
 	while (my $seqfeat = $parser->next_top_feature) {
@@ -556,7 +560,7 @@ sub process_gene {
 		if ($subfeat->primary_tag =~ /^mrna$/i) {
 			push @mRNAs, $subfeat;
 		}
-		elsif ($subfeat->primary_tag =~ /rna$/i) {
+		elsif (_acceptable_transcript($subfeat)) {
 			push @ncRNAs, $subfeat;
 		}
 	}
@@ -638,18 +642,7 @@ sub process_transcript {
 	return if ($request =~ /^common ?exons?/i);
 	
 	# call appropriate method
-	if (
-		($transcript->primary_tag =~ /rna/i and $do_all_rna) or
-		($transcript->primary_tag =~ /mrna/i and $do_mrna) or
-		($transcript->primary_tag =~ /mirna/i and $do_mirna) or
-		($transcript->primary_tag =~ /ncrna/i and $do_ncrna) or
-		($transcript->primary_tag =~ /snrna/i and $do_snrna) or
-		($transcript->primary_tag =~ /snorna/i and $do_snorna) or
-		($transcript->primary_tag =~ /trna/i and $do_rrna) or
-		($transcript->primary_tag =~ /rrna/i and $do_rrna) or
-		($transcript->primary_tag =~ /misc_rna/i and $do_miscrna) or
-		($transcript->primary_tag =~ /lincrna/i and $do_lincrna)
-	) {
+	if (_acceptable_transcript($transcript)) {
 		return &{$method}($transcript);
 	}
 }
@@ -1046,8 +1039,8 @@ sub collect_common_alt_exons {
 	my @mRNAs;
 	my @ncRNAs;
 	foreach ($gene->get_SeqFeaturess) {
-		push @mRNAs,  $_ if $_->primary_tag =~ /^mRNA$/i;
-		push @ncRNAs, $_ if $_->primary_tag =~ /rna/i;
+		push @mRNAs,  $_ if $_->primary_tag =~ /^mrna$/i;
+		push @ncRNAs, $_ if _acceptable_transcript($_);
 	}
 	
 	# get list of transcripts, must have more than one
@@ -1079,15 +1072,7 @@ sub collect_common_alt_exons {
 	my %pos2exons;
 	my $trx_number = 0;
 	foreach my $t (@transcripts) {
-		next unless (
-			($t->primary_tag =~ /mrna/i and $do_mrna) or
-			($t->primary_tag =~ /mirna/i and $do_mirna) or
-			($t->primary_tag =~ /ncrna/i and $do_ncrna) or
-			($t->primary_tag =~ /snrna/i and $do_snrna) or
-			($t->primary_tag =~ /snorna/i and $do_snorna) or
-			($t->primary_tag =~ /trna/i and $do_rrna) or
-			($t->primary_tag =~ /rrna/i and $do_rrna)
-		);
+		next unless _acceptable_transcript($t);
 		my $exons = _collect_exons($t);
 		foreach my $e (@$exons) {
 			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
@@ -1191,6 +1176,24 @@ sub _collect_exons {
 }
 
 
+sub _acceptable_transcript {
+	my $t = shift;
+	return 1 if ($t->primary_tag =~ 
+		/rna|transcript|retained_intron|antisense|nonsense/i and $do_all_rna);
+	return 1 if ($t->primary_tag =~ /mrna/i and $do_mrna);
+	return 1 if ($t->primary_tag =~ /mirna/i and $do_mirna);
+	return 1 if ($t->primary_tag =~ /ncrna/i and $do_ncrna);
+	return 1 if ($t->primary_tag =~ /snrna/i and $do_snrna);
+	return 1 if ($t->primary_tag =~ /snorna/i and $do_snorna);
+	return 1 if ($t->primary_tag =~ /trna/i and $do_rrna);
+	return 1 if ($t->primary_tag =~ /rrna/i and $do_rrna);
+	return 1 if ($t->primary_tag =~ 
+		/misc_rna|transcript|retained_intron|antisense|nonsense/i and 
+		$do_miscrna);
+	return 1 if ($t->primary_tag =~ /lincrna/i and $do_lincrna);
+	return 0;
+}
+
 
 sub _adjust_positions {
 	
@@ -1280,7 +1283,7 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   
   Options:
   --db <text>
-  --in <filename>
+  --in <filename>  (gff,gtf,gff3,refFlat,genePred,knownGene)
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
@@ -1313,10 +1316,9 @@ Also see C<--in> as an alternative.
 
 =item --in <filename>
 
-Alternative to a database, a GFF3 annotation file may be provided. 
-For best results, the database or file should include hierarchical 
-parent-child annotation in the form of gene -> mRNA -> [exon or CDS]. 
-The GFF3 file may be gzipped.
+Alternative to a database, a gene table or annotation file may be provided. 
+A GTF, GFF, GFF3, or UCSC gene table, including refFlat, genePred (gene 
+prediction), or known gene table may be provided. Files may be gzipped.
 
 =item --out <filename>
 

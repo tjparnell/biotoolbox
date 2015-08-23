@@ -5,12 +5,12 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::gff3_parser;
+use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::legacy_helper qw(
 	open_to_write_fh
 );
 
-my $VERSION = '1.30';
+my $VERSION = '1.31';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -158,93 +158,77 @@ sub process_gff_file_to_table {
 	# will be kept open until the end of the file is reached. 
 	
 	# open gff3 parser object
-	my $parser = Bio::ToolBox::gff3_parser->new($infile) or
+	my $parser = Bio::ToolBox::parser::gff->new($infile) or
 		die " unable to open input file '$infile'!\n";
 	
-	
-	# process the features
-	while (my @top_features = $parser->top_features() ) {
+	# Process the top features
+	my @top_features = $parser->top_features();
+	while (@top_features) {
+		my $feature = shift @top_features;
+		my $type = lc $feature->primary_tag;
 		
-		# processing statement
-		if ($verbose) {
-			print " Collected ", scalar(@top_features), " features from ";
-			if ( $top_features[0]->seq_id eq $top_features[-1]->seq_id ) {
-				# check whether all the features came from the same top sequence
-				print "sequence ID '", $top_features[0]->seq_id, "'\n";
-			}
-			else {
-				print "multiple sequences\n";
-			}
+		# check for chromosome
+		if ($type =~ /chromosome|contig|scaffold|sequence|region/) {
+			next;
 		}
 		
-		# Process the top features
-		while (@top_features) {
-			my $feature = shift @top_features;
-			my $type = lc $feature->primary_tag;
+		# process the features
+		if ($type eq 'gene' or $type eq 'pseudogene') {
+			# a gene object, we will need to process it's transcript subfeatures
 			
-			# check for chromosome
-			if ($type =~ /chromosome|contig|scaffold|sequence|region/) {
-				next;
-			}
+			# process the gene object
+			process_gene($feature);
 			
-			# process the features
-			if ($type eq 'gene' or $type eq 'pseudogene') {
-				# a gene object, we will need to process it's transcript subfeatures
-				
-				# process the gene object
-				process_gene($feature);
-				
-			}
+		}
+		
+		elsif ($type eq 'mrna') {
+			# a coding transcript
 			
-			elsif ($type eq 'mrna') {
-				# a coding transcript
-				
-				# first need to initialize the ucsc table object
-				my $ucsc = initialize_transcript($feature);
-				
-				# collect the names for the transcript
-				collect_names($ucsc, $feature);
+			# first need to initialize the ucsc table object
+			my $ucsc = initialize_transcript($feature);
 			
-				# process the gene object
-				process_transcript($ucsc, $feature);
-				$counts{$feature->primary_tag} += 1;
-			}
+			# collect the names for the transcript
+			collect_names($ucsc, $feature);
+		
+			# process the gene object
+			process_transcript($ucsc, $feature);
+			$counts{$feature->primary_tag} += 1;
+		}
+		
+		elsif ($type =~ /rna|noncoding/) {
+			# a non-coding RNA transcript
 			
-			elsif ($type =~ /rna|noncoding/) {
-				# a non-coding RNA transcript
-				
-				# first need to initialize the ucsc table object
-				my $ucsc = initialize_transcript($feature);
-				
-				# collect the names for the transcript
-				collect_names($ucsc, $feature);
+			# first need to initialize the ucsc table object
+			my $ucsc = initialize_transcript($feature);
 			
-				# process the gene object
-				process_nc_transcript($ucsc, $feature);
-				$counts{$feature->primary_tag} += 1;
-			}
+			# collect the names for the transcript
+			collect_names($ucsc, $feature);
+		
+			# process the gene object
+			process_nc_transcript($ucsc, $feature);
+			$counts{$feature->primary_tag} += 1;
+		}
+		
+		elsif ($type =~ /transcript/) {
+			# we'll assume this is a protein_coding transcript?
+			# hopefully noncoding transcripts will be caught earlier
 			
-			elsif ($type =~ /transcript/) {
-				# we'll assume this is a protein_coding transcript?
-				# hopefully noncoding transcripts will be caught earlier
-				
-				# first need to initialize the ucsc table object
-				my $ucsc = initialize_transcript($feature);
-				
-				# collect the names for the transcript
-				collect_names($ucsc, $feature);
+			# first need to initialize the ucsc table object
+			my $ucsc = initialize_transcript($feature);
 			
-				# process the gene object
-				process_transcript($ucsc, $feature);
-				$counts{$feature->primary_tag} += 1;
-			}
-			
-			else {
-				# catchall for unrecognized feature types
-				# record and warn at end
-				$unknowns{$feature->primary_tag} += 1;
-				next;
-			}
+			# collect the names for the transcript
+			collect_names($ucsc, $feature);
+		
+			# process the gene object
+			process_transcript($ucsc, $feature);
+			$counts{$feature->primary_tag} += 1;
+		}
+		
+		else {
+			# catchall for unrecognized feature types
+			# record and warn at end
+			$unknowns{$feature->primary_tag} += 1;
+			next;
 		}
 	}
 }

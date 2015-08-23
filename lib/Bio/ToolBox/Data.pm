@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.30';
+our $VERSION = '1.31';
 
 =head1 NAME
 
@@ -996,17 +996,15 @@ sub sort_data {
 	# Sample the dataset values
 	# this will be used to guess the sort method, below
 	my $example; # an example of the dataset
-	my $i = 1;
-	while (!$example) {
-		# we want to avoid a non-value '.', so keep trying
-		if ($self->value($i, $index) ne '.') {
+	foreach (my $i = 1; $i <= $self->last_row; $i++) {
+		# we want to avoid null values, so keep trying
+		# null being . or any variation of N/A, NaN, inf
+		my $v = $self->value($i, $index);
+		if (defined $v and $v !~ /^(?:\.|n\/?a|nan|\-?inf)$/i) {
 			# a non-null value, take it
-			$example = $self->value($i, $index);
+			$example = $v;
+			last;
 		} 
-		else {
-			# a null value, proceed to next one
-			$i++;
-		}
 	}
 	
 	# Determine sort method, either numerical or alphabetical
@@ -1256,7 +1254,7 @@ sub splice_data {
 	
 	# re-open a new un-cached database connection
 	if (exists $self->{db_connection}) {
-		$self->open_database(1);
+		delete $self->{db_connection};
 	}
 	return 1;
 }
