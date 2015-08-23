@@ -747,6 +747,7 @@ sub parse_table {
 	return if ($self->{'eof'});
 	
 	#### Main Loop
+	print "  Parsing UCSC gene table....\n";
 	while (my $feature = $self->next_feature) {
 		
 		# add to gene2seqf hash

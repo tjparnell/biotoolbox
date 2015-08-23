@@ -417,6 +417,7 @@ sub parse_file {
 	
 	my %loaded;
 	
+	print "  Parsing GFF file....\n";
 	TOP_FEATURE_LOOP:
 	while (my $feature = $self->next_feature) {
 		
