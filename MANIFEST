@@ -65,6 +65,7 @@ t/05.BigWig.t
 t/06.BigWigSet.t
 t/07.USeq.t
 t/08.Wiggle.t
+t/09.parser.t
 t/Data/biotoolbox.cfg
 t/Data/chrI.gff3
 t/Data/ensemblSource.txt
