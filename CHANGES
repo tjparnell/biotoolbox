@@ -1,6 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
-v.1.31 (git 42090dc)
+v.1.31 (git 9a4e122)
 	- Major addition of parsers for GFF and UCSC gene table formats.
 	This replaces the old gff3_parser and now supports GFF, GTF, and GFF3.
 	Also moved UCSC gene table parsing out of ucsc_table2gff3 and into 
@@ -11,6 +11,8 @@ v.1.31 (git 42090dc)
 	memory usage. Also ensure that bedGraph is written over entire chromosome.
 	- Fix bugs when sorting and performing math with null, NA, and inf 
 	values, especially with script manipulate_datasets.
+	- Fix bug where coverage shifts by 1 bp after each write to fixedStep wig 
+	in script bam2wig. Thanks to Magda for reporting.
 
 v.1.30 (git 9ab9ff4)
 	- Major upgrade of the Bio::ToolBox::Data library internals. 
