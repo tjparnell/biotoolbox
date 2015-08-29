@@ -895,6 +895,9 @@ sub add_column {
 	
 	$self->{number_columns}++;
 	delete $self->{column_indices} if exists $self->{column_indices};
+	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
+	$self->gff(0) if $self->gff; 
+	$self->ucsc(0) if $self->ucsc;
 	return $column;
 }
 

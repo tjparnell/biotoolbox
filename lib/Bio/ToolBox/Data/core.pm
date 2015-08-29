@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.30';
+our $VERSION = '1.32';
 
 =head1 NAME
 
@@ -520,6 +520,9 @@ sub reorder_column {
 	}
 	$self->{'number_columns'} = scalar @order;
 	delete $self->{column_indices} if exists $self->{column_indices};
+	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
+	$self->gff(0) if $self->gff; 
+	$self->ucsc(0) if $self->ucsc;
 	return 1;
 }
 
@@ -580,7 +583,7 @@ sub database {
 
 sub gff {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^[123]/) {
+	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.5|3)$/) {
 		$self->{gff} = $_[0];
 	}
 	return $self->{gff};
@@ -588,7 +591,7 @@ sub gff {
 
 sub bed {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^\d+/) {
+	if (defined $_[0] and $_[0] =~ /^\d+$/) {
 		$self->{bed} = $_[0];
 	}
 	return $self->{bed};
@@ -596,7 +599,7 @@ sub bed {
 
 sub ucsc {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^\d+$/) {
+	if (defined $_[0] and $_[0] =~ /^\d+$/) {
 		$self->{ucsc} = $_[0];
 	}
 	return $self->{ucsc};
