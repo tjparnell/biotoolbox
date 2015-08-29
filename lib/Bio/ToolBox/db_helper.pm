@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.30';
+our $VERSION = '1.32';
 
 use strict;
 require Exporter;
@@ -864,7 +864,7 @@ sub verify_or_request_feature_types {
 			}
 			
 			# a local file
-			elsif ($dataset =~ /\.(?:bw|bb|bam|useq)$/i) {
+			elsif ($dataset =~ /\.(?:bam|bw|bigwig|bb|bigbed|useq)$/i) {
 				# presume we have a local indexed data file
 				
 				# user may have requested two or more files to be merged
