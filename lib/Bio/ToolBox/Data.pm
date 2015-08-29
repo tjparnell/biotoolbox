@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.31';
+our $VERSION = '1.32';
 
 =head1 NAME
 
@@ -839,7 +839,8 @@ sub add_column {
 	my $column = $self->{number_columns};
 	
 	# check for array of column data
-	if (ref $name eq 'ARRAY') {
+	my $name_ref = ref $name;
+	if ($name_ref eq 'ARRAY') {
 		if ($self->last_row > 1) {
 			# table has existing data beyond column headers
 			if ($self->last_row == (scalar @$name - 1)) {
@@ -871,7 +872,15 @@ sub add_column {
 			$self->{headers} = 1; # boolean to indicate the table now has headers
 		}
 	}
-	elsif (ref $name eq '') {
+	elsif ($name_ref eq 'Bio::DB::GFF::Typename') {
+		# a Typename object that was selected from a SeqFeature::Store database
+		$self->{$column} = {
+			'name'      => $name->asString,
+			'index'     => $column,
+		};
+		$self->{data_table}->[0][$column] = $name->asString;
+	}
+	elsif ($name_ref eq '') {
 		# just a name
 		$self->{$column} = {
 			'name'      => $name,
@@ -880,7 +889,7 @@ sub add_column {
 		$self->{data_table}->[0][$column] = $name;
 	}
 	else {
-		cluck "must pass a scalar value or array reference";
+		cluck "unrecognized reference '$name_ref'! pass a scalar value or array reference";
 		return;
 	}
 	
