@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.30';
+our $VERSION = '1.32';
 
 =head1 NAME
 
@@ -181,8 +181,9 @@ sub verify {
 			$gff_check = 0;
 		}
 		
-		# check integers
+		# check column data
 		$gff_check = 0 unless $self->_column_is_integers(3,4);
+		$gff_check = 0 unless $self->_column_is_stranded(6);
 		
 		# update gff value as necessary
 		if ($gff_check == 0) {
@@ -240,12 +241,16 @@ sub verify {
 			$bed_check = 0;
 		}
 		
-		# coordinates are integers
+		# check column data
 		$bed_check = 0 unless $self->_column_is_integers(1,2);
+		if ($self->{'number_columns'} >= 5) {
+			# only check if it is actually present, since could be optional
+			$bed_check = 0 unless $self->_column_is_stranded(5);
+		}
 		
 		# reset the BED tag value as appropriate
 		if ($bed_check) {
-			$self->{'bed'} = $self->{'number_columns'};
+			$self->{'bed'} = $self->{'number_columns'}; # in case we had a fake true
 		}
 		else {
 			# reset metadata
@@ -279,6 +284,7 @@ sub verify {
 			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
 			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
 			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
+			$ucsc_check = 0 unless $self->_column_is_stranded(3);
 		}		
 		elsif ($colnumber == 15 or $colnumber == 12) {
 			# name chrom strand txStart txEnd cdsStart cdsEnd 
@@ -294,6 +300,7 @@ sub verify {
 			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
 			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
 			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
+			$ucsc_check = 0 unless $self->_column_is_stranded(2);
 		}		
 		elsif ($colnumber == 11) {
 			# geneName transcriptName chrom strand txStart txEnd 
@@ -305,6 +312,7 @@ sub verify {
 			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
 			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
 			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
+			$ucsc_check = 0 unless $self->_column_is_stranded(3);
 		}		
 		elsif ($colnumber == 10) {
 			# name chrom strand txStart txEnd cdsStart cdsEnd 
@@ -316,6 +324,7 @@ sub verify {
 			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
 			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
 			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
+			$ucsc_check = 0 unless $self->_column_is_stranded(2);
 		}
 		else {
 			$ucsc_check = 0;
@@ -367,7 +376,21 @@ sub verify {
 		}
 	}
 	
-	# if we haven't made it here yet, then there was a problem
+	# check file headers value because this may have changed
+	if (
+		$self->{'bed'} == 0 and 
+		$self->{'gff'} == 0 and 
+		$self->{'ucsc'} == 0 and
+		$self->{'extension'} !~ /sgr/i
+	) {
+		$self->{'headers'} = 1;
+	}
+	else {
+		$self->{'headers'} = 0;
+	}
+	
+	# if we haven't made it here yet, then there was a major structural problem
+	# minor issues should have been fixed
 	return 1;
 }
 
@@ -375,10 +398,23 @@ sub verify {
 sub _column_is_integers {
 	my $self = shift;
 	my @index = @_;
+	foreach (@index) {
+		return 0 unless exists $self->{$_};
+	}
 	for my $row (1 .. $self->{last_row}) {
 		for my $i (@index) {
 			return 0 unless ($self->{data_table}->[$row][$i] =~ /^\d+$/);
 		}
+	}
+	return 1;
+}
+
+# internal method to check if a column looks like a strand column
+sub _column_is_stranded {
+	my ($self, $index) = @_;
+	return unless exists $self->{$index};
+	for my $row (1 .. $self->{last_row}) {
+		return 0 if ($self->{data_table}->[$row][$index] !~ /^(?:\-1|0|1|\+|\-|\.)$/);
 	}
 	return 1;
 }
@@ -520,6 +556,9 @@ sub reorder_column {
 	}
 	$self->{'number_columns'} = scalar @order;
 	delete $self->{column_indices} if exists $self->{column_indices};
+	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
+	$self->gff(0) if $self->gff; 
+	$self->ucsc(0) if $self->ucsc;
 	return 1;
 }
 
@@ -580,7 +619,7 @@ sub database {
 
 sub gff {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^[123]/) {
+	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.5|3)$/) {
 		$self->{gff} = $_[0];
 	}
 	return $self->{gff};
@@ -588,7 +627,7 @@ sub gff {
 
 sub bed {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^\d+/) {
+	if (defined $_[0] and $_[0] =~ /^\d+$/) {
 		$self->{bed} = $_[0];
 	}
 	return $self->{bed};
@@ -596,7 +635,7 @@ sub bed {
 
 sub ucsc {
 	my $self = shift;
-	if ($_[0] and $_[0] =~ /^\d+$/) {
+	if (defined $_[0] and $_[0] =~ /^\d+$/) {
 		$self->{ucsc} = $_[0];
 	}
 	return $self->{ucsc};

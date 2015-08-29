@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.30';
+our $VERSION = '1.32';
 
 =head1 NAME
 
@@ -458,43 +458,47 @@ sub write_file {
 		return;
 	}
 	
-	# determine filename
-	unless ($args{'filename'}) {
-		if ($self->filename) {
-			# re-use the original file name 
-			$args{'filename'} = $self->filename;
-		}
-		else {
-			# complain about no file name
-			cluck "no filename given!\n";
-			return;
-		}
+	# check filename
+	unless ($args{'filename'} or $self->filename) {
+		cluck "no filename given!\n";
+		return;
 	}
 	
 	# split filename into its base components
-	my ($name, $path, $extension) = fileparse($args{'filename'}, $SUFFIX);
+	my ($name, $path, $extension) = 
+		fileparse($args{'filename'} || $self->filename, $SUFFIX);
 	
 	# Adjust filename extension if necessary
-	if ($extension =~ /g[tf]f/i) {
-		unless ($self->gff) {
-			# it's not set as a gff data
+	if ($extension =~ /(g[tf]f)/i) {
+		if (not $self->gff and $self->extension ne $extension) {
+			# gff flag is not true and extension came from user and not self
 			# let's set it to true and see if it passes verification
-			$self->{'gff'} = 3; # default
+			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3; # default
 			unless ($self->verify and $self->gff) {
 				warn " re-setting extension from $extension to .txt\n";
 				$extension =~ s/g[tf]f3?/txt/i;
 			}
 		}
+		elsif (not $self->gff) {
+			# flag not set, reset extension
+			warn " re-setting extension from $extension to .txt\n";
+			$extension =~ s/g[tf]f3?/txt/i;
+		}
 	}
-	elsif ($extension =~ /bed|bdg|peak/i) {
-		unless ($self->bed) {
-			# it's not set as a bed data
+	elsif ($extension =~ /bedgraph|bed|bdg|narrowpeak|broadpeak/i) {
+		if ($self->bed == 0 and $self->extension ne $extension) {
+			# bed flag is not true and extension came from user and not self
 			# let's set it to true and see if it passes verification
 			$self->{'bed'} = 1; # a fake true
-			unless ($self->verify and $self->{'bed'}) {
+			unless ($self->verify and $self->bed) {
 				warn " re-setting extension from $extension to .txt\n";
-				$extension =~ s/bed|bdg/txt/i;
+				$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
 			}
+		}
+		elsif (not $self->bed) {
+			# flag not set, reset extension
+			warn " re-setting extension from $extension to .txt\n";
+			$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
 		}
 	}
 	elsif ($extension =~ /sgr/i) {
@@ -747,7 +751,7 @@ sub write_file {
 				next;
 			}
 			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc) {
-				# these do not need metadata
+				# these do not support metadata lines
 				next;
 			}
 			
@@ -775,16 +779,8 @@ sub write_file {
 	
 	
 	# Write the table column headers
-	if (
-		$self->{'headers'} and      # table headers existed before
-		$self->gff == 0 and         # not a gff or bed or ucsc or sgr file
-		$self->bed == 0 and
-		not $self->ucsc and 
-		$extension !~ /sgr/i
-	) {
-		# therefore headers should be written
-		$fh->print( 
-			join("\t", @{ $self->{'data_table'}[0] }), "\n");
+	if ($self->{'headers'}) {
+		$fh->print(join("\t", @{ $self->{'data_table'}[0] }), "\n");
 	}
 		
 	

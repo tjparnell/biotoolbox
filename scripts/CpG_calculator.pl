@@ -18,9 +18,9 @@ my $BAM_OK;
 eval { 
 	# we want access to Bio::DB::Sam::Fai
 	require Bio::DB::Sam;
-	$BAM_OK = 0;
+	$BAM_OK = 1;
 };
-my $VERSION = '1.30';
+my $VERSION = '1.32';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -114,7 +114,6 @@ my $start_time = time;
 
 
 ### Prepare the database and main data structure
-my $db;
 my $Data;
 if ($infile) {
 	# an input file of regions is provided
@@ -143,6 +142,12 @@ else {
 	}
 	$Data->program("$0, v $VERSION");
 }
+
+# open database in case we need to do something, like index a fasta
+my $db = open_sequence_db(0) or 
+	die " unable to open database connection to '$database'!\n";
+
+
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
@@ -245,7 +250,6 @@ sub parallel_execution {
 
 sub single_execution {
 	# execute
-	$db = open_sequence_db();
 	process_regions();
 }
 
@@ -344,13 +348,16 @@ sub process_regions {
 sub open_sequence_db {
 	my $nocache = shift || 0;
 	my $db;
+	print "Bam status is $BAM_OK\n";
 	if ($database =~ /\.fa(?:sta)?$/i and $BAM_OK) {
 		# this is a limited but very fast sequence accessor
 		# based on samtools fasta index
+		print "opening Fai db\n";
 		$db = Bio::DB::Sam::Fai->open($database);
 	}
 	else {
 		# otherwise we use a standard database connection
+		print "opening ordinary db\n";
 		$db = open_db_connection($database, $nocache);
 	}
 	return $db;
