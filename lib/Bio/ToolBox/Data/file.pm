@@ -1031,7 +1031,7 @@ sub add_gff_metadata {
 	
 	# set the gff version based on the extension if it isn't already
 	unless ($self->gff) {
-		$self->gff = defined $version ? $version :
+		$self->{gff} = defined $version ? $version :
 			$self->extension =~ /gtf/  ? 2.5 :
 			$self->extension =~ /gff3/ ? 3   :
 			2;
