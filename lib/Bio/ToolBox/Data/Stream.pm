@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.30';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -152,6 +152,11 @@ Note that column names are not actually written to the file, but are maintained
 for internal use. Acceptable values include 10 (refFlat without gene names), 
 11 (refFlat with gene names), 12 (knownGene gene prediction table), and 15 
 (an extended gene prediction or genePredExt table).
+
+=item gz =E<gt> $gz
+
+Optional boolean value that indicates whether the output file should be 
+written with compression. This can also be inferred from the file name.
 
 =back
 
@@ -493,12 +498,9 @@ sub new {
 	my %args  = @_;
 	
 	# file arguments
-	$args{in}  ||= undef;
+	$args{in}  ||= $args{file} || undef;
 	$args{out} ||= undef;
 	unless ($args{in} or $args{out}) {
-		if (exists $args{filename} or exists $args{file}) {
-			warn "You are using an outdated API! Please update your code!\n";
-		}
 		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
 		return;
 	}
@@ -575,6 +577,10 @@ sub new {
 			# we trust that the user knows the subtle difference between gff versions
 			$self->add_gff_metadata($args{gff});
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /g[tf]f/) {
+				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
+					$args{gff} == 3 ? '.gff3' : '.gff';
+			}
 		}
 		elsif (exists $args{bed} and $args{bed}) {
 			# use standard names for the number of columns indicated
@@ -584,6 +590,9 @@ sub new {
 			}	
 			$self->add_bed_metadata($args{bed});
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /bed|peak/) {
+				$self->{extension} = '.bed';
+			}
 		}
 		elsif (exists $args{ucsc} and $args{ucsc}) {
 			# a ucsc format such as refFlat, genePred, or genePredExt
@@ -593,8 +602,16 @@ sub new {
 				return;
 			};
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
+				$self->{extension} = '.ucsc';
+			}
 		}
 		# else it will be an empty object with no columns
+		
+		# append gz if necessary
+		if (exists $args{gz} and $args{gz} and $self->extension !~ /gz$/) {
+			$self->{extension} .= '.gz';
+		}
 		
 		# add feature
 		$args{feature} ||= $args{features} || undef;
