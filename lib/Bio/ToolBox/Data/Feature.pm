@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.30';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -506,6 +506,9 @@ sub name {
 		return $v;
 	}
 	return $self->{feature}->display_name if exists $self->{feature};
+	if (my $att = $self->gff_attributes) {
+		return $att->{Name} || $att->{ID} || $att->{transcript_name};
+	}
 	return undef;
 }
 
@@ -535,6 +538,9 @@ sub id {
 		return $v;
 	}
 	return $self->{feature}->primary_id if exists $self->{feature};
+	if (my $att = $self->gff_attributes) {
+		return $att->{ID} || $att->{Name} || $att->{transcript_id};
+	}
 	return undef;
 }
 
@@ -549,6 +555,19 @@ sub length {
 	else {
 		return undef;
 	}
+}
+
+sub gff_attributes {
+	my $self = shift;
+	return unless ($self->{data}->gff);
+	return $self->{attributes} if (exists $self->{attributes});
+	$self->{attributes} = {};
+	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
+		my ($tag, $value) = split /\s+/, $g;
+		next unless ($tag and $value);
+		$self->{attributes}->{$tag} = $value;
+	}
+	return $self->{attributes};
 }
 
 ### Data collection convenience methods
@@ -761,6 +780,8 @@ sub gff_string {
 	# attributes
 	my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
 	my $attributes = "Name = $name";
+	my $id = $args{id} || sprintf("%08d", $self->row_index);
+	$attributes .= "ID = $id";
 	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
 		foreach my $i (@{$args{attributes}}) {
 			$attributes .= '; ' . $self->{data}->name($i) . ' = ' . $self->value($i);
