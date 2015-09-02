@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.31';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -51,9 +51,11 @@ Example
 
 This subroutine will present the list of column names from a Bio::ToolBox::Data 
 structure along with their numeric indexes to the user and prompt for one 
-or more to be selected and entered. A text prompt should be provided, or a 
-generic one is used. The list of indices are validated, and a warning printed for 
-invalid responses. The responses are then returned as a single value or array, 
+or more to be selected and entered. The function is smart enough to only print 
+the list once (if it hasn't changed) so as not to annoy the user with repeated 
+lists of header names when used more than once. A text prompt should be provided, 
+or a generic one is used. The list of indices are validated, and a warning printed 
+for invalid responses. The responses are then returned as a single value or array, 
 depending on context.
 
 Example
@@ -77,7 +79,8 @@ our @EXPORT = qw(
 	format_with_commas
 	ask_user_for_index
 );
-
+our $DATA_COLNUMBER = 0;
+our $DATA_FILENAME  = undef;
 
 ### The True Statement
 1; 
@@ -171,11 +174,21 @@ sub ask_user_for_index {
 		return;
 	}
 	
-	print " These are the datasets in the file\n";
-	my $i = 0;
-	foreach ($Data->list_columns) {
-		print "  $i\t$_\n";
-		$i++;
+	# print column header names only if we have not done so before
+	unless (
+		# we use filename and column number as indicators 
+		$Data->filename eq $DATA_FILENAME and 
+		$Data->number_columns == $DATA_COLNUMBER
+	) {
+		print " These are the columns in the file\n";
+		my $i = 0;
+		foreach ($Data->list_columns) {
+			print "  $i\t$_\n";
+			$i++;
+		}
+		# remember for next time
+		$DATA_FILENAME = $Data->filename;
+		$DATA_COLNUMBER = $Data->number_columns;
 	}
 	print $line;
 	
@@ -191,7 +204,7 @@ sub ask_user_for_index {
 			push @good, $_;
 		}
 		else {
-			print " $_ is not a valid index!\n";
+			print "  $_ is not a valid index!\n";
 		}
 	}
 	return wantarray ? @good : $good[0];
