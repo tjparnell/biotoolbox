@@ -1,5 +1,20 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.32 (git 67749a7)
+	- Fix bug with adding a new column to Data object, particularly 
+	when selected from a database. 
+	- Fix bugs related to adding, deleting, or modifying columns for 
+	a specific file format, such as BED or GFF
+	- Introduce additional Data structure verification tests, including 
+	proper strand information, to verify correct file formatting, such 
+	as BED and GFF
+	- Fix bugs when writing data files that incorrectly maintained 
+	file extensions for a given format even when the structure was no 
+	longer valid.
+	- Add support for .bigwig and .bigbed file extensions.
+	- Fix bug with opening fai fasta index and forked databases in script 
+	CpG_calculator.
+
 v.1.31 (git 9a4e122)
 	- Major addition of parsers for GFF and UCSC gene table formats.
 	This replaces the old gff3_parser and now supports GFF, GTF, and GFF3.
