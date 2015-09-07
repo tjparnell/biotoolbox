@@ -7,8 +7,8 @@ use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
-my $VERSION = '1.31';
+use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
+my $VERSION = '1.33';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -3009,54 +3009,30 @@ sub _get_function_to_subroutine_hash {
 }
 
 
-sub _print_headers {
-	# this subroutine will print the names of the datasets from the column 
-	# headers. It will also generate a hash of the dataset names with their 
-	# index numbers as keys
-	print " These are the datasets in the file\n";
-	my $i = 0;
-	foreach ($Data->list_columns) {
-		print "\t$i\t$_\n";
-		$i++;
-	}
-}
-
-
-
 sub _request_index {
 	# this subroutine will determine which dataset index to use
-	
 	# if index is specified on the command line, that will be used
 	# alternatively, it will ask the user which dataset to process.	
 	# it will return the index number
-	
 	my $line = shift; # the custom request line to give the user
-	my $index;
-	
 	if (@opt_indices) {
 		# index array is specified on the command line
 		# use the first element in the global index array
-		$index = $opt_indices[0];
+		my $index = $opt_indices[0];
 		unless ( _validate_index_list($index) )  {
-			# return an error value
-			$index = -1;
+			return -1; # error value
 		}
+		return $index;
 	}
-	
 	else {
 		# request interactively from the user
-		
-		_print_headers();
-		print $line; # print the user prompt
-		$index = <STDIN>;
-		chomp $index;
-		unless ( _validate_index_list($index) )  {
+		my $index = ask_user_for_index($Data, $line);
+		unless (defined $index) {
 			# return an error value
-			$index = -1;
+			return -1;
 		}
+		return $index;
 	}
-	
-	return $index;
 }
 
 
@@ -3064,30 +3040,21 @@ sub _request_indices {
 	# this subroutine will determine which datasets are to be used
 	# if the indices are specified on the command line, those will be used
 	# alternatively, it will ask the user for the indices interactively
-	
 	my $line = shift; # the custom request line to give the user
-	my @indices;
 	
 	# get list of indices
 	if (@opt_indices) {
 		# index array is specified on the command line
-		@indices = @opt_indices;
+		my @indices = @opt_indices;
+		unless ( _validate_index_list(@indices) ) {
+			return;
+		}
+		return @indices;
 	}
 	else {
 		# request interactively from the user
-		_print_headers();
-		print $line; # print the user prompt
-		my $response = <STDIN>;
-		chomp $response;
-		@indices = parse_list($response); 
+		return ask_user_for_index($Data, $line);
 	}
-	
-	# check the list of indices
-	unless ( _validate_index_list(@indices) ) {
-		return;
-	}
-	
-	return @indices;
 }
 
 
