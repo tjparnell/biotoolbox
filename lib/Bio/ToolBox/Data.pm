@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.32';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -1145,12 +1145,12 @@ sub gsort_data {
 	my $self = shift;
 	
 	# identify indices
-	my $chromo_i = $self->chromo_column;
-	my $start_i  = $self->start_column;
-	unless (defined $chromo_i and defined $start_i) {
-		carp "unable to identify chromosome and start/position columns! table not sorted\n";
+	unless ($self->feature_type eq 'coordinate') {
+		carp "no chromosome and start/position columns to sort!\n";
 		return;
 	}
+	my $chromo_i = $self->chromo_column;
+	my $start_i  = $self->start_column;
 	
 	# Load the data into a temporary hash
 	# The datalines will be put into a hash of hashes: The first key will be 
