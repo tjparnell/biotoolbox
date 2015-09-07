@@ -6,8 +6,8 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility;
-my $VERSION =  '1.30';
+use Bio::ToolBox::utility qw(ask_user_for_index);
+my $VERSION =  '1.33';
 
 print "\n A script to pull out specific features from a data file\n";
 

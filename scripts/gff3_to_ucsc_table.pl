@@ -6,11 +6,9 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::parser::gff;
-use Bio::ToolBox::legacy_helper qw(
-	open_to_write_fh
-);
+use Bio::ToolBox::utility qw(open_to_write_fh format_with_commas);
 
-my $VERSION = '1.31';
+my $VERSION = '1.33';
 
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
@@ -121,9 +119,10 @@ my $count = 0;
 my $string;
 foreach (sort {$a cmp $b} keys %counts) {
 	$count += $counts{$_};
-	$string .= "  Wrote $counts{$_} $_ features\n";
+	$string .= sprintf("  Wrote %s %s features\n", format_with_commas($counts{$_}), $_);
 }
-print " Finished! Wrote $count features to file '$outfile'\n$string";
+printf " Finished! Wrote %s features to file '$outfile'\n$string", 
+	format_with_commas($count);
 
 
 # print warnings about unknown feature types
