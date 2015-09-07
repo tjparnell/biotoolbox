@@ -734,7 +734,7 @@ sub bed_string {
 	}
 	if ($args{bed} >= 6) {
 		my $strand = $args{strand} || $self->strand;
-		$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
+		$strand = $strand == 0 ? '+' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
 		$string .= "\t$strand";
 	}
 	# we could go on with other columns, but there's no guarantee that additional 
