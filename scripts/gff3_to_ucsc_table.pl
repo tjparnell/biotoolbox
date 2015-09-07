@@ -69,8 +69,8 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($infile =~ /\.gff 3? (?: \.gz )? $/xi) {
-	die " input file doesn't have a gff extension! Is this a GFF3 file?\n";
+unless ($infile =~ /\.g[tf]f 3? (?: \.gz )? $/xi) {
+	die " input file doesn't have a gff extension! Is this a GFF file?\n";
 }
 
 if ($outfile) {
@@ -82,7 +82,7 @@ if ($outfile) {
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff 3? (?: \.gz )? $/.refFlat/xi;
+	$outfile =~ s/\.g[tf]f 3? (?: \.gz )? $/.refFlat/xi;
 }
 unless (defined $gz) {
 	# mimic the input file as far as compression is concerned
@@ -768,7 +768,7 @@ A script to convert a GFF3 file to a UCSC style refFlat table
 gff3_to_ucsc_table.pl [--options...] <filename>
   
   Options:
-  --in <filename>
+  --in <filename>   [gff3 gtf]
   --out <filename> 
   --alias
   --gz
@@ -784,7 +784,7 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the input GFF3 file. The file may be compressed with gzip.
+Specify the input GFF3 or GTF file. The file may be compressed with gzip.
 
 =item --out <filename>
 
