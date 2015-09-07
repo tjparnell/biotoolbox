@@ -3,14 +3,13 @@ our $VERSION = '1.33';
 
 =head1 NAME
 
-Bio::ToolBox::utility - 
+Bio::ToolBox::utility - common utility functions for Bio::ToolBox
 
 =head1 DESCRIPTION
 
-These are general subroutines that don't fit in either Bio::ToolBox::file_helper 
-or Bio::ToolBox::db_helper.
+These are general subroutines that don't fit in with the other modules.
 
-=head1 SUBROUTINES
+=head1 REGULAR SUBROUTINES
 
 The following subroutines are automatically exported when you use this module.
 
@@ -47,6 +46,17 @@ Example
 	my $count = '4327908475';
 	print " The final count was " . format_with_commas($count) . "\n";
 
+=back
+
+=head1 ADDITIONAL SUBROUTINES
+
+These are additional functions that can be optionally exported. Some provide 
+accessibility to the Bio::ToolBox::Data::file functions for opening file 
+handles. If you import these, be sure to import the ones above if you need those 
+too.
+
+=over 4
+
 =item ask_user_for_index($Data, $prompt)
 
 This subroutine will present the list of column names from a Bio::ToolBox::Data 
@@ -62,13 +72,32 @@ Example
 	
 	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
 
+=item open_to_read_fh($file)
+
+Opens a file as an IO::Handle read only object. Transparently handles gzip and bzip2 
+compression. 
+
+=item open_to_write_fh($file, $gz, $append)
+
+Opens a file as an IO::Handle write only object. Pass the file name as the option.
+Optionally provide a boolean value if you want the file to be written as a compressed 
+gzip file. Pass another boolean value if you want to append to an existing file; 
+otherwise an existing file with the same name will be overwritten!
+
+=item check_file($file)
+
+Checks to see if a file exists. If not, some common missing extensions are appended 
+and then existence is re-checked. If a file is found, the name is returned so that 
+it could be opened. Useful, for example, if you forget the .txt or .gz extensions.
+
 =back
 
 =cut
 
-require Exporter;
 use strict;
 use Carp;
+require Exporter;
+use Bio::ToolBox::Data::file;
 
 
 ### Variables
@@ -77,7 +106,12 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	parse_list
 	format_with_commas
+);
+our @EXPORT_OK = qw(
 	ask_user_for_index
+	open_to_read_fh
+	open_to_write_fh
+	check_file
 );
 our $DATA_COLNUMBER = 0;
 our $DATA_FILENAME  = undef;
@@ -210,6 +244,19 @@ sub ask_user_for_index {
 	return wantarray ? @good : $good[0];
 }
 
+
+sub open_to_read_fh {
+	return Bio::ToolBox::Data::file->open_to_read_fh(@_);
+}
+
+
+sub open_to_write_fh {
+	return Bio::ToolBox::Data::file->open_to_write_fh(@_);
+}
+
+sub check_file {
+	return Bio::ToolBox::Data::file->check_file(@_);
+}
 
 
 __END__

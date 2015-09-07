@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.32';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -18,16 +18,6 @@ use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use IO::File;
 use Statistics::Lite qw(mean min);
-
-# Export for legacy functions
-require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
-our @EXPORT_OK = qw(
-	open_to_read_fh
-	open_to_write_fh
-	check_file
-);
 
 # List of acceptable filename extensions
 our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc)(?:\.gz)?/i;
