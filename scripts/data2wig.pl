@@ -7,12 +7,8 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	open_to_write_fh
-	find_column_index
-);
-my $VERSION =  '1.30';
+use Bio::ToolBox::Data;
+my $VERSION =  '1.33';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -47,7 +43,6 @@ my (
 	$interbase,
 	$format,
 	$method,
-	$log2,
 	$bigwig,
 	$bw_app_path,
 	$database,
@@ -77,7 +72,6 @@ GetOptions(
 	'zero|inter!' => \$interbase, # shift from interbase
 	'format=i'  => \$format, # format output to indicated number of places
 	'method=s'  => \$method, # method for combining duplicate values
-	'log!'      => \$log2, # data is in log2 format
 	'bigwig|bw' => \$bigwig, # generate a binary bigwig file
 	'db=s'      => \$database, # database for bigwig file generation
 	'chromof=s' => \$chromo_file, # name of a chromosome file
@@ -112,23 +106,20 @@ unless ($infile) {
 }
 unless (defined $use_track) {
 	# default is to write a track
-	# this will be changed later if we're writing a bigwig
-	$use_track = 1;
+	$use_track = $bigwig ? 0 : 1;
 }
 
 
 
 ### Load input file
-my ($in_fh, $metadata_ref) = open_data_file($infile);
-unless ($in_fh) {
-	die "Unable to open data table!\n";
-}
+my $Input = Bio::ToolBox::Data->new(file => $infile) or
+	die "Unable to open file '$infile'!\n";
 
 
 
 ### Check and/or ask for specific options
 
-identify_indices();
+check_indices();
 
 check_track_name();
 
@@ -136,7 +127,7 @@ check_step();
 
 check_log2();
 
-set_bigwig_options();
+set_bigwig_options() if $bigwig;
 
 my $method_sub = set_method_sub();
 
@@ -151,7 +142,7 @@ unless ($outfile =~ /\.(?:wig|bdg|bedgraph)(?:\.gz)?$/i) {
 	# add extension
 	$outfile .= $bedgraph ? '.bdg' : '.wig';
 }
-my $out_fh = open_to_write_fh($outfile, $gz) or 
+my $out_fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
 	die " unable to open output file '$outfile' for writing!\n";
 
 # write track line
@@ -162,7 +153,9 @@ if ($use_track) {
 
 
 ### Start the conversion 
-print " converting '" . $metadata_ref->{$score_index}{'name'} . "'....\n";
+printf " converting '%s'....\n", $Input->name($score_index);
+# sort by genomic coordinates just in case
+$Input->gsort_data if $Input->feature_type eq 'coordinate';
 if ($bedgraph) {
 	convert_to_bedgraph();
 }
@@ -176,7 +169,6 @@ elsif ($step eq 'variable') {
 
 
 # close files
-$in_fh->close;
 $out_fh->close;
 
 
@@ -198,146 +190,43 @@ else {
 
 ############ Subroutines ###############
 
-sub identify_indices {
+sub check_indices {
 	
-	# automatically identify the indices based on file type if possible
-	
-	# gff
-	if ( $metadata_ref->{'gff'} ) {
-		# these indices are assumptions based on proper GFF format
-		$chr_index   = 0 unless defined $chr_index;
-		$start_index = 3 unless defined $start_index;
-		$stop_index  = 4 unless defined $stop_index;
-		$score_index = 5 unless defined $score_index;
-	}
-	
-	# bedgraph
-	elsif ( 
-		$metadata_ref->{'bed'} == 4 and
-		$metadata_ref->{'extension'} =~ /graph|bdg/
-	) {
-		# a bedgraph format
-		$chr_index   = 0 unless defined $chr_index;
-		$start_index = 1 unless defined $start_index;
-		$stop_index  = 2 unless defined $stop_index;
-		$score_index = 3 unless defined $score_index;
-		
-		# automatically set interbase
-		$interbase = 1;
-	}
-	
-	# traditional bed
-	elsif ( 
-		$metadata_ref->{'bed'} >=5
-	) {
-		# a bed format, using the score column
-		$chr_index   = 0 unless defined $chr_index;
-		$start_index = 1 unless defined $start_index;
-		$stop_index  = 2 unless defined $stop_index;
-		$score_index = 4 unless defined $score_index;
-		
-		# automatically set interbase
-		$interbase = 1;
-	}
-	
-	# sgr
-	elsif ( $metadata_ref->{'extension'} =~ /sgr/ ) {
-		# SGR format only has start and score
-		$chr_index   = 0 unless defined $chr_index;
-		$start_index = 1 unless defined $start_index;
-		$score_index = 2 unless defined $score_index;
-	}
-	
-	# non-standard text file or data format text file
-	else {
-		# we will automatically look for the coordinate columns
-		
-		# chromosome
+	# check coordinates
+	unless (defined $chr_index or defined $Input->chromo_column) {
+		$chr_index = ask_user_for_index($Input, 
+			" Enter the index for the chromosome column  ");
 		unless (defined $chr_index) {
-			$chr_index = find_column_index($metadata_ref, '^chr|seq|ref');
-			
-			# this is a required index
-			unless (defined $chr_index) {
-				die " No chromosome or sequence ID column" . 
-						" found in the file!!!\n  Please specify with" . 
-						" the --chr option\n";
-			}
-		}
-		
-		# start
-		unless (defined $start_index) {
-			$start_index = find_column_index($metadata_ref, '^start|pos');
-			
-			# this is a required index
-			unless (defined $start_index) {
-				# still no start? how about a midpoint? position?
-				# keep trying
-				$start_index = find_column_index($metadata_ref, 
-					'midpoint|mid|position|index');
-				
-				# fail
-				unless (defined $start_index) {
-					# still nothing found, fail
-					die " No start, midpoint, or position coordinate column" . 
-						" found in the file!!!\n  Please specify with" . 
-						" the --start option\n";
-				}
-			}
-		}
-		
-		# stop
-		unless (defined $stop_index) {
-			# this is not absolutely required
-			$stop_index = find_column_index($metadata_ref, '^stop|end');
-			
-			if ($midpoint and not defined $stop_index) {
-				die " Stop index is required to calculate midpoint!\n";
-			}
-		}
-		
-		# score
-		unless (defined $score_index) {
-			# first look for a generic score index
-			$score_index = find_column_index($metadata_ref, '^score$');
-			
-			unless (defined $score_index) {
-				# ask the user for help if we can't find it
-				# print the column names
-				print " These are the column names in the datafile\n";
-				for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-					print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
-				}
-			
-				# ask for the score index
-				print " Enter the index for the feature score column  ";
-				$score_index = <STDIN>;
-				chomp $score_index;
-			}
+			die " No identifiable chromosome column index!\n";
 		}
 	}
+	unless (defined $start_index or defined $Input->start_column) {
+		$start_index = ask_user_for_index($Input, 
+			" Enter the index for the start or position column  ");
+		unless (defined $start_index) {
+			die " No identifiable start column index!\n";
+		}
+	}
+	# stop column is optional	
 	
-	# finished with indices
+	# score
+	unless (defined $score_index) {
+		# first look for a generic score index
+		$score_index = ask_user_for_index($Input, 
+			" Enter the index for the score column  ");
+		unless (defined $start_index) {
+			die " No identifiable score column index!\n";
+		}
+	}
 }
 
 
 sub check_track_name {
 	# determine what the track name will be
-	
-	unless (defined $track_name) {
-		if ( 
-			$metadata_ref->{'gff'} or
-			$metadata_ref->{'bed'} or
-			$metadata_ref->{'extension'} =~ /sgr/
-		) {
-			# if it is a gff/sgr/bed file, use the base file name
-			# I have a practice of using the GFF type as the file name
-			# this is easier than attempting to read the type column from the gff file
-			$track_name = $metadata_ref->{'basename'};
-		}
-		else {
-			# use the name of the score column
-			$track_name = $metadata_ref->{$score_index}{'name'};
-		}
+	$track_name = $Input->name($score_index);
+	if ($track_name =~/^score$/i) {
+		# some sort of bed or gff file standard score column
+		$track_name = $Input->basename;
 	}
 }
 
@@ -369,23 +258,18 @@ sub check_step {
 	elsif ($step eq 'fixed') {
 		# double check that the data file supports this
 		# assign the step size as necessary
-		if (exists $metadata_ref->{$start_index}{'step'} ) {
-			
+		if (defined $Input->metadata($start_index, 'step') ) {
 			if (defined $step_size) {
-				if ($step_size != $metadata_ref->{$start_index}{'step'}) {
-					warn " Requested step size $step_size does not match" .
-						" metadata step size " . 
-						$metadata_ref->{$start_index}{'step'} . "!\n" .
-						"  Accurate wig file is not guaranteed!!!\n";
+				if ($step_size != $Input->metadata($start_index, 'step')) {
+					die " Requested step size $step_size does not match" .
+						" metadata step size!!!\n";
 				}
 			}
-			
 			else {
 				# define it from the metadata
-				$step_size = $metadata_ref->{$start_index}{'step'};
+				$step_size = $Input->metadata($start_index, 'step');
 			}
 		}
-		
 		elsif (!defined $step_size) {
 			warn " Fixed step size not defined by user or metadata! Using 'variableStep'\n";
 			$step = 'variable';
@@ -393,11 +277,10 @@ sub check_step {
 	}
 	else {
 		# attempt to determine automatically
-		if ( exists $metadata_ref->{$start_index}{'step'} ) {
-			
+		if (defined $Input->metadata($start_index, 'step') ) {
 			# set step size
 			$step = 'fixed';
-			$step_size = $metadata_ref->{$start_index}{'step'};
+			$step_size = $Input->metadata($start_index, 'step');
 			print " Automatically generating 'fixedStep' wig with " . 
 				"step of $step_size bp\n";
 		}
@@ -410,25 +293,18 @@ sub check_step {
 	# check span
 	if ($span) {
 		# user set it, confirm with metadata if possible
-		if (
-			exists $metadata_ref->{$start_index}{'win'} and
-			$metadata_ref->{$start_index}{'win'} != $span
+		if (defined $Input->metadata($start_index, 'win') and
+			$Input->metadata($start_index, 'win') != $span
 		) {
 			# the requested span and metadata window size do not match
-			print " Requested span size $span does not match" .
-						" metadata window size " . 
-						$metadata_ref->{$start_index}{'win'} . "!\n" .
-						"  Accurate wig file is not guaranteed!!!\n";
+			die " Requested span size $span does not match metadata window size!!!\n";
 		}
 	}
 	else {
 		# attempt to determine automatically 
-		if (
-			exists $metadata_ref->{$start_index}{'win'} and
-			not $midpoint
-		) {
+		if (defined $Input->metadata($start_index, 'win') and not $midpoint) {
 			# set the span equal to the window size
-			$span = $metadata_ref->{$start_index}{'win'};
+			$span = $Input->metadata($start_index, 'win');
 			print " Automatically setting span to $span bp\n";
 		}
 		else {
@@ -455,43 +331,22 @@ sub check_step {
 }
 
 
-sub check_log2 {
-	unless (defined $log2) {
-		# check the metadata for the score dataset
-		if (exists $metadata_ref->{$score_index}{'log2'}) {
-			$log2 = $metadata_ref->{$score_index}{'log2'};
-		}
-		else {
-			# otherwise default is false
-			$log2 = 0;
-		}
-	}
-}
-
-
 sub set_bigwig_options {
-	if ($bigwig) {
-		# if we're generating bigwig file, no track is needed
-		$use_track = 0;
-		
-		# force no compression
-		$gz = 0;
-		
-		# check that we have a source for chromosome info
-		unless ($database or $chromo_file) {
-			if (exists $metadata_ref->{db}) {
-				$database = $metadata_ref->{db};
-			}
-			else {
-				die " No database name or chromosome file provided for generating bigwig file!\n";
-			}
-		}
+	# if we're generating bigwig file, no track is needed
+	$use_track = 0;
+	
+	# force no compression
+	$gz = 0;
+	
+	# check that we have a source for chromosome info
+	unless ($database or $chromo_file) {
+		$database = $Input->database or
+		die " No database name or chromosome file provided for generating bigwig file!\n";
 	}
 }
 
 
 sub set_method_sub {
-	
 	# for combining values from duplicate positions we need a method
 	if ($method eq 'mean') {
 		return \&mean;
@@ -505,6 +360,10 @@ sub set_method_sub {
 	elsif ($method eq 'max') {
 		return \&max;
 	}
+	else {
+		# default is mean
+		return \&mean;
+	}
 }
 
 
@@ -514,61 +373,30 @@ sub convert_to_fixedStep {
 	my $current_chr; # current chromosome
 	
 	# walk through the data file
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# adjust for interbase 0-base coordinates
-		if ($interbase) {
-			$data[$start_index] += 1;
-		}
-		
-		# skip negative or zero coordinates
-		next if $data[$start_index] <= 0;
+	my $iterator = $Input->row_stream;
+	while (my $row = $iterator->next_row) {
+		# coordinates
+		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
+		my $start = calculate_position($row);
+		next if $start <= 0; # skip negative or zero coordinates
 		
 		# write definition line if necessary
-		if ($data[$chr_index] ne $current_chr) {
+		if ($chromosome ne $current_chr) {
 			# new chromosome, new definition line
-			
-			# need to determine start position first
-			my $start = calculate_position(@data);
-			
-			# print definition line
-			my $definition = 'fixedStep chrom=' . $data[$chr_index] .
-				 " start=$start step=$step_size span=$span";
-			$out_fh->print("$definition\n");
-				
+			my $def = sprintf "fixedStep chrom=%s start=%d step=%d span=%d\n",
+				 $chromosome, $start, $step_size, $span;
+			$out_fh->print($def);
 			
 			# reset the current chromosome
-			$current_chr = $data[$chr_index];
+			$current_chr = $chromosome;
 		}
-		
 		
 		# adjust score formatting as requested
-		my $score;
-		if ($data[$score_index] eq '.') {
-			# an internal null value
-			# treat as 0 if fixedStep
-			$score = 0;
-		}
-		else {
-			$score = $data[$score_index];
-		}
+		my $score = $row->value($score_index);
+		$score = 0 if $score eq '.';
 		if (defined $format) {
 			# format if requested
 			$score = format_score($score);
-		}
-		
-		# check we haven't gone over the chromosome end
-		# we assume the last interval would accurately record the chromosome end
-		if ( defined $stop_index ) {
-			if ( ($data[$start_index] + $step_size - 1) > $data[$stop_index]) {
-				# size is too big
-				# we will not write this last data point
-				# we may have some data loss at the end of the chromosome
-				#warn " $current_chr clipped at $data[$stop_index]\n";
-				next;
-			}
 		}
 		
 		# write fixed data line
@@ -579,15 +407,17 @@ sub convert_to_fixedStep {
 
 sub convert_to_variableStep {
 	my $current_chr; # current chromosome
-	my $previous_pos; # previous position to avoid duplicates in wig file
+	my $previous_pos = 0; # previous position to avoid duplicates in wig file
 	my @scores; # reusable array for putting multiple data points in
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
+	my $iterator = $Input->row_stream;
+	while (my $row = $iterator->next_row) {
+		# coordinates
+		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
+		my $start = calculate_position($row);
+		next if $start <= 0; # skip negative or zero coordinates
 		
 		# write definition line if necessary
-		if ($data[$chr_index] ne $current_chr) {
-			
+		if ($chromosome ne $current_chr) {
 			# first check and write orphan scores
 			# this might happen if there was only one score on the entire chr
 			if (@scores) {
@@ -596,91 +426,33 @@ sub convert_to_variableStep {
 					$out_fh->print("$previous_pos $scores[0]\n");
 				}
 				else {
-					# more than one score
-					
-					# combine the scores if possible
-					if ($method_sub) {
-						my $new_score;
-						if ($log2) {
-							# convert to log2 first
-							@scores = map {2 ** $_} @scores;
-							# combine and convert back to log2
-							$new_score = log( &{$method_sub}(@scores) ) / log(2);
-						}
-						else {
-							$new_score = &{$method_sub}(@scores);
-						}
-						
-						# print the combined score
-						$out_fh->print("$previous_pos $new_score\n");
-					}
-					else {
-						die " there are " . scalar(@scores) . " scores for " . 
-							"position $current_chr $previous_pos!!!!\n" .
-							" Please define a combination method!!! see help\n";
-					}
+					# more than one score, combine them
+					my $score = &{$method_sub}(@scores);
+					$out_fh->print("$previous_pos $score\n");
 				}
+				@scores = ();
 			}
 			
-			# new chromosome, new definition line
-			my $definition = 'variableStep chrom=' . $data[$chr_index] . 
-				" span=$span";
-			$out_fh->print("$definition\n");
-			
-			# reset the current chromosome
-			$current_chr = $data[$chr_index];
-			$previous_pos = undef;
-			@scores = ();
-		}
-		
-		
-		# adjust for interbase 0-base coordinates
-		if ($interbase) {
-			$data[$start_index] += 1;
+			# print new definition line and reset for next
+			$out_fh->print("variableStep chrom=$chromosome span=$span\n");
+			$current_chr = $chromosome;
+			$previous_pos = $start;
 		}
 		
 		# collect the score
-		my $score;
-		if ($data[$score_index] eq '.') {
-			# internal null value, skip these
-			next;
-		}
+		my $score = $row->value($score_index);
+		next if $score eq '.'; # skip null values
 		if (defined $format) {
 			# format if requested
-			$score = format_score( $data[$score_index] );
+			$score = format_score($score);
 		}
-		else {
-			# no formatting, take as is
-			$score = $data[$score_index];
-		}
-		
-		
-		# calculate the position that we will use
-		my $position = calculate_position(@data);
-			
-		# skip negative or zero coordinates
-		next if $position <= 0;
 		
 		# check for duplicate positions and write appropriately
-		if (!defined $previous_pos) {
-			# new chromosome
-			$previous_pos = $position;
-			push @scores, $score;
-		}
-		
-		elsif ($position == $previous_pos) {
+		if ($start == $previous_pos) {
 			# same position, add to the score list
 			push @scores, $score;
 		}
-		
-		elsif ($position < $previous_pos) {
-			# error!!! unsorted file!!!!
-			die " file is not sorted by increasing position!\n   " . 
-				"chromosome $current_chr, compare current position " . 
-				"$position\n    versus previous position $previous_pos\n";
-		}
-		
-		else {
+		elsif ($start > $previous_pos) {
 			# we have moved on to the next position
 			# now print the previous scores
 			if (scalar @scores == 1) {
@@ -689,132 +461,86 @@ sub convert_to_variableStep {
 			}
 			else {
 				# more than one score
-				
-				# combine the scores if possible
-				if ($method_sub) {
-					my $new_score;
-					if ($log2) {
-						# convert to log2 first
-						@scores = map {2 ** $_} @scores;
-						# combine and convert back to log2
-						$new_score = log( &{$method_sub}(@scores) ) / log(2);
-					}
-					else {
-						$new_score = &{$method_sub}(@scores);
-					}
-					
-					# print the combined score
-					$out_fh->print("$previous_pos $new_score\n");
-				}
-				else {
-					die " there are " . scalar(@scores) . " scores for " . 
-						"position $current_chr $previous_pos!!!!\n" .
-						" Please define a combination method!!! see help\n";
-				}
+				my $score = &{$method_sub}(@scores);
+				$out_fh->print("$previous_pos $score\n");
 			}
 			
 			# reset for next
-			$previous_pos = $position;
+			$previous_pos = $start;
 			@scores = ($score);
 		}
+		else {
+			die "file not sorted! chromosome $chromosome, previous position $previous_pos, current position $start\n"; 
+		}
 	}
-
 }
 
 
 sub convert_to_bedgraph {
 	
-	# check for indices
-	unless (defined $chr_index and defined $start_index and defined $stop_index) {
-		die " One or more indices for chromosome, start, or stop is not defined" . 
-			" or found!\n Unable to write a bedgraph file!\n";
-	}
-	
 	# variables to check for overlap
 	my $current_chr; # current chromosome
 	my $previous_pos; # previous position to avoid overlap
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# adjust start position
-		unless ($interbase) {
-			$data[$start_index]--;
-		}
+	my $iterator = $Input->row_stream;
+	while (my $row = $iterator->next_row) {
+		# coordinates
+		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
+		my $start = defined $start_index ? $row->value($start_index) : $row->start;
+		my $stop  = defined $stop_index ? $row->value($stop_index) : $row->stop;
 		
 		# check coordinates
-		if (defined $previous_pos and defined $current_chr) {
-			
-			# check if on the same chromosome
-			if ($current_chr eq $data[$chr_index]) {
-				# check for overlap
-				if ($data[$start_index] < $previous_pos) {
-					die " There are overlapping intervals or the file is not sorted by" .
-						" coordinates!\n Compare $data[$chr_index]:$data[$start_index]" . 
-						" with previous stop position $previous_pos\n";
-				}
-				# otherwise it is ok
-				$previous_pos = $data[$stop_index];
+		$current_chr ||= $chromosome;
+		$previous_pos ||= $stop;
+		# check if on the same chromosome
+		if ($current_chr eq $chromosome) {
+			# check for overlap
+			if ($start < $previous_pos) {
+				die " There are overlapping intervals or the file is not sorted by" .
+					" coordinates!\n Compare $chromosome:$start" . 
+					" with previous stop position $previous_pos\n";
 			}
-			else {
-				# new chromosome
-				$current_chr = $data[$chr_index];
-				$previous_pos = $data[$stop_index];
-			}
+			# otherwise it is ok
+			$previous_pos = $stop;
 		}
 		else {
-			# define the current 
-			$current_chr = $data[$chr_index];
-			$previous_pos = $data[$stop_index];
+			# new chromosome
+			$current_chr = $chromosome;
+			$previous_pos = $stop;
 		}
 		
 		# collect the score
-		my $score;
-		if ($data[$score_index] eq '.') {
-			# internal null value, skip these
-			next;
-		}
+		my $score = $row->value($score_index);
+		next if $score eq '.'; # skip null values
 		if (defined $format) {
 			# format if requested
-			$score = format_score( $data[$score_index] );
-		}
-		else {
-			# no formatting, take as is
-			$score = $data[$score_index];
+			$score = format_score($score);
 		}
 		
 		# write the feature line
-		$out_fh->print(join("\t", $data[$chr_index], $data[$start_index], 
-			$data[$stop_index], $score), "\n");
+		$out_fh->print(join("\t", $chromosome, $start, $stop, $score), "\n");
 	}
 }
 
 
 sub calculate_position {
-	my @data = @_;
-	my $position;
-	
-	if ($midpoint) {
-		# user requested to use the midpoint
-		if ( 
-			defined $stop_index and 
-			$data[$start_index] != $data[$stop_index] 
-		) {
-			# not same position, so calculate midpoint
-			$position = int(  
-				( ( $data[$start_index] + $data[$stop_index] ) / 2 ) + 0.5 );
-		}
-		else {
-			# same position
-			$position = $data[$start_index];
-		}
+	my $row = shift;
+	my $start;
+	if (defined $start_index) {
+		$start = $row->value($start_index);
+		$start += 1 if $interbase;
 	}
 	else {
-		# otherwise use the start position
-		$position = $data[$start_index];
+		$start = $row->start; # this should handle interbase automatically
 	}
-	
-	return $position;
+	if ($midpoint) {
+		# calculate midpoint and return
+		my $end = defined $stop_index ? $row->value($stop_index) : $row->end;
+		$end ||= $start; # in case no end was defined
+		return $start == $end ? $start : int( ( ($start + $end) / 2) + 0.5) ;
+	}
+	else {
+		return $start;
+	}
 }
 
 
@@ -895,7 +621,6 @@ data2wig.pl [--options...] <filename>
   --inter | --zero
   --format [0 | 1 | 2 | 3]
   --method [mean | median | sum | max]
-  --log
   --bigwig | --bw
   --chromof <filename>
   --db <database>
@@ -1023,8 +748,8 @@ should be used. The default is to use only the 'start' position.
 
 Source data is in interbase coordinate (0-base) system. Shift the 
 start position to base coordinate (1-base) system. Wig files are by 
-definition 1-based. This is automatically enabled when converting 
-from Bed or BedGraph files. Default is false.
+definition 1-based. This is automatically handled for most input  
+files. Default is false.
 
 =item --format [0 | 1 | 2 | 3]
 
@@ -1035,13 +760,8 @@ The default is to not format the score value.
 =item --method [mean | median | sum | max]
 
 Define the method used to combine multiple data values at a single 
-position. Wig files do not tolerate multiple identical positions.
-
-=item --log
-
-If multiple data values need to be combined at a single identical 
-position, indicate whether the data is in log2 space or not. This 
-affects the mathematics behind the combination method.
+position. Wig files do not tolerate multiple identical positions. 
+Default is mean.
 
 =item --bigwig
 

@@ -5,15 +5,9 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	write_data_file
-	open_to_write_fh
-	find_column_index
-);
-use Bio::ToolBox::Extra qw(convert_genome_data_2_gff_data);
-use Bio::ToolBox::utility;
-my $VERSION =  '1.30';
+use Bio::ToolBox::Data::Stream;
+use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas parse_list);
+my $VERSION =  '1.33';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -45,9 +39,6 @@ my (
 	$source,
 	$type,
 	$tag,
-	$midpoint,
-	$format,
-	$zero_based,
 	$unique,
 	$ask,
 	$version,
@@ -71,10 +62,6 @@ GetOptions(
 	'source=s'  => \$source, # text to put in the source column
 	'type=s'    => \$type, # test to put in the type column
 	'tag|tags=s'=> \$tag, # comma list of tag column indices
-	'midpoint!' => \$midpoint, # boolean to use the midpoint
-	'format=i'  => \$format, # format output to indicated number of places
-	'zero!'     => \$zero_based, # source is 0-based numbering, convert
-	'unique!'   => \$unique, # make the names unique
 	'ask'       => \$ask, # request help in assigning indices
 	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # boolean to compress output file
@@ -111,539 +98,251 @@ unless (defined $gz) {
 	$gz = 0;
 }
 
+# define name base or index
+my ($name_index, $name_base);
+if (defined $name) {
+	if ($name =~ /^(\d+)$/) {
+		# looks like an index was provided
+		$name_index = $1;
+	}
+	elsif ($name =~ /(\w+)/i) {
+		# text that will be used as the name base when autogenerating
+		$name_base = $1;
+	}
+}
 
-### Load file
-print " Opening data file '$infile'...\n";
-my ($in_fh, $metadata_ref) = open_data_file($infile);
-unless ($in_fh) {
-	die "Unable to open data table!\n";
+# define type base or index
+my ($type_index, $type_base);
+if (defined $type) {
+	if ($type =~ /^(\d+)$/) {
+		# looks like an index was provided
+		$type_index = $1;
+	}
+	elsif ($type =~ /(\w+)/i) {
+		# text that will be used as the type base when autogenerating
+		$type_base = $1;
+	}
+}
+
+# define source base or index
+my ($source_index, $source_base);
+if (defined $source) {
+	if ($source =~ /^(\d+)$/) {
+		# looks like an index was provided
+		$source_index = $1;
+	}
+	elsif ($source =~ /(\w+)/i) {
+		# text that will be used as the source base when autogenerating
+		$source_base = $1;
+	}
+}
+
+# gff attribute tag indices
+my @tag_indices;
+if ($tag) {
+	@tag_indices = parse_list($tag);
 }
 
 
-### Determine indices
 
-# Ask user interactively
+
+### Load file
+my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
+	die "Unable to open file '$infile'!\n";
+
+
+### Determine indices
 if ($ask) {
 	# the user has specified that we should ask for specific indices
-	
-	# print the column names
-	print " These are the column names in the datafile\n";
-	for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-		print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
-	}
-	print " Note that not all options are not required\n";
+	print " Press Return to accept the suggested index\n";
 	
 	# request chromosome index
 	unless (defined $chr_index) {
-		my $suggestion = find_column_index($metadata_ref, '^chr|seq|refseq');
-		print " Enter the index for the chromosome column (Required) [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$chr_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$chr_index = $suggestion;
-		}
-		else {
+		my $suggestion = $Input->chromo_column;
+		$chr_index = ask_user_for_index($Input, 
+			" Enter the index for the chromosome column [$suggestion]  ");
+		$chr_index = defined $chr_index ? $chr_index : $suggestion;
+		unless (defined $chr_index) {
 			die " No identifiable chromosome column index!\n";
 		}
 	}
 	
 	# request start index
 	unless (defined $start_index) {
-		my $suggestion = find_column_index($metadata_ref, 'start');
-		print " Enter the index for the start column (Required) [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$start_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$start_index = $suggestion;
-		}
-		else {
+		my $suggestion = $Input->start_column;
+		$start_index = ask_user_for_index($Input, 
+			" Enter the index for the start column [$suggestion]  ");
+		$start_index = defined $start_index ? $start_index : $suggestion;
+		unless (defined $start_index) {
 			die " No identifiable start position column index!\n";
 		}
 	}
 	
 	# request stop index
 	unless (defined $stop_index) {
-		my $suggestion = find_column_index($metadata_ref, 'stop|end');
-		print " Enter the index for the stop or end column (Required) [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$stop_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$stop_index = $suggestion;
-		}
-		else {
+		my $suggestion = $Input->stop_column;
+		$stop_index = ask_user_for_index($Input, 
+			" Enter the index for the stop or end column [$suggestion]  ");
+		$stop_index = defined $stop_index ? $stop_index : $suggestion;
+		unless (defined $stop_index) {
 			die " No identifiable stop position column index!\n";
 		}
 	}
 	
 	# request source text
 	unless (defined $source) {
+		# this is a special input, can't use the ask_user_for_index sub
+		# accepts either index or text string
 		print " Enter the text string or column index for the GFF source (Suggested)  ";
-		$source = <STDIN>;
-		chomp $source;
+		my $in = <STDIN>;
+		if ($in =~ /^(\d+)$/) {
+			$source_index = $1;
+		}
+		elsif ($in =~ /(\w+)/) {
+			$source_base = $1;
+		}
 	}
 	
 	# request type text
 	unless (defined $type) {
+		# this is a special input, can't use the ask_user_for_index sub
+		# accepts either index or text string
 		print " Enter the text string or column index for the GFF type (Suggested)  ";
-		$type = <STDIN>;
-		chomp $type;
+		my $in = <STDIN>;
+		if ($in =~ /^(\d+)$/) {
+			$type_index = $1;
+		}
+		elsif ($in =~ /(\w+)/) {
+			$type_base = $1;
+		}
 	}
 	
 	# request score index
 	unless (defined $score_index) {
-		my $suggestion = find_column_index($metadata_ref, '^score$');
-		print " Enter the index for the feature score column [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$score_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$score_index = $suggestion;
-		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
-		}
+		my $suggestion = $Input->find_column('^score$');
+		$score_index = ask_user_for_index($Input, 
+			" Enter the index for the feature score column [$suggestion]  ");
+		$score_index = defined $score_index ? $score_index : $suggestion;
 	}
 	
 	# request strand index
 	unless (defined $strand_index) {
-		my $suggestion = find_column_index($metadata_ref, 'strand');
-		print " Enter the index for the feature strand column [$suggestion]  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{exists}) {
-			$strand_index = $in;
-		}
-		elsif (not $in and defined $suggestion) {
-			$strand_index = $suggestion;
-		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
-		}
+		my $suggestion = $Input->strand_column;
+		$strand_index = ask_user_for_index($Input, 
+			" Enter the index for the feature strand column [$suggestion]  ");
+		$strand_index = defined $strand_index ? $strand_index : $suggestion;
 	}
 	
 	# request name index or text
 	unless (defined $name) {
-		my $suggestion = find_column_index($metadata_ref, '^name|id');
-		print " Enter the index for the feature name column or the text (Suggested) [$suggestion]  ";
-		$name = <STDIN>;
-		chomp $name;
-		if (not $name and defined $suggestion) {
-			$name = $suggestion;
+		# this is a special input, can't use the ask_user_for_index sub
+		# accepts either index or text string
+		my $suggestion = $Input->name_column;
+		print " Enter the index for the feature name column or\n" . 
+			"   the base text for auto-generated names [$suggestion]  ";
+		my $in = <STDIN>;
+		if ($in =~ /^(\d+)$/) {
+			$name_index = $1;
+		}
+		elsif ($in =~ /(\w+)/) {
+			$name_base = $1;
+		}
+		elsif (defined $suggestion) {
+			$name_index = $suggestion;
 		}
 	}
 	
 	# request ID index
 	unless (defined $id_index) {
-		print " Enter the index for the feature unique ID column  ";
-		my $in = <STDIN>;
-		chomp $in;
-		if ($in =~ /^\d+$/ and exists $metadata_ref->{$in}) {
-			$id_index = $in;
-		}
-		elsif ($in) {
-			print " unrecognized index, skipping\n";
-		}
+		my $suggestion = $Input->id_column;
+		$id_index = ask_user_for_index($Input, 
+			" Enter the index for the feature unique ID column [$suggestion]  ");
+		$id_index = defined $id_index ? $id_index : $suggestion;
 	}
 	
 	# request tags
 	unless (defined $tag) {
-		print " Enter a comma-delimited list of column indices for GFF group tags  ";
-		$tag = <STDIN>;
-		chomp $tag;
-		$tag =~ s/\s+//g; # remove whitespace
+		@tag_indices = ask_user_for_index($Input, 
+			" Enter zero or more column indices for GFF group tags  ");
 	}
 }
 
-# otherwise attempt to identify indices automatically
-else {
-	unless (defined $chr_index) {
-		$chr_index = find_column_index($metadata_ref, '^chr|seq|refseq');
-	}
-	unless (defined $start_index) {
-		$start_index = find_column_index($metadata_ref, '^start');
-	}
-	unless (defined $stop_index) {
-		$stop_index = find_column_index($metadata_ref, '^stop|end');
-	}
-	unless (defined $strand_index) {
-		$strand_index = find_column_index($metadata_ref, '^strand');
-	}
-	unless (defined $name or defined $name_index) {
-		$name_index = find_column_index($metadata_ref, '^name|ID');
-		unless (defined $name_index) {
-			$name_index = find_column_index($metadata_ref, 'name|ID$');
-		}
-	}
-	unless (defined $score_index) {
-		$score_index = find_column_index($metadata_ref, '^score$');
-	}
-	unless (defined $type) {
-		$type = $metadata_ref->{'feature'} || 'region';
-	}
-	unless (defined $source) {
-		$source = $metadata_ref->{'basename'};
-	}
-}
-
-if ($metadata_ref->{'bed'}) {
-	# bedfiles are 0-based
-	$zero_based = 1;
-}
 
 
-# Convert tag text to list of indices
-my @tag_indices;
-if ($tag) {
-	foreach (split /,\s*/, $tag) {
-		if (/(\d+)/) {
-			push @tag_indices, $1;
-		}
-	}
-}
-
-# Determine the name index or text
-if (
-	defined $name and 
-	$name =~/^\d+$/ and 
-	exists $metadata_ref->{$name}
-) {
-	# looks like a number, so assume it is the index
-	$name_index = $name;
-}
-if ($unique and (not defined $name and not defined $name_index)) {
-	die " unable to assign unique feature names without a name index or text!\n";
-}
-if ($unique and not defined $name_index) {
-	# a uniqe name is requested but we don't have an index, yet
-	# so make one
-	$name_index = $metadata_ref->{'number_columns'};
-	$metadata_ref->{$name_index} = {
-		'name'   => 'Name',
-		'index'  => $name_index,
-	};
-	push @{ $metadata_ref->{'column_names'} }, 'Name';
-	$metadata_ref->{'number_columns'} += 1;
-}
-
-# Generate the output file name
+### Open output stream
 unless ($outfile) {
-	# re-use the input file name
-	$outfile = $metadata_ref->{'path'} . $metadata_ref->{'basename'};
+	$outfile = $Input->path . $Input->basename;
 }
+my $Output = Bio::ToolBox::Data::Stream->new(
+	out     => $outfile,
+	gff     => $version,
+	gz      => $gz
+) or die " unable to create output file $outfile!";
 
 
 
-### Print the user or auto-generated options
-print " converting to GFF using\n";
-print "  - '", $metadata_ref->{$chr_index}{name}, "' column for chromosome\n" 
-	if defined $chr_index;
-print "  - '", $metadata_ref->{$start_index}{name}, "' column for start\n" 
-	if defined $start_index;
-print "  - '", $metadata_ref->{$stop_index}{name}, "' column for stop\n" 
-	if defined $stop_index;
-print "  - '", $metadata_ref->{$strand_index}{name}, "' column for strand\n" 
-	if defined $strand_index;
-print "  - '", $metadata_ref->{$score_index}{name}, "' column for score\n" 
-	if defined $score_index;
-if (defined $name_index) {
-	print "  - '", $metadata_ref->{$name_index}{name}, "' column for name\n" 
-}
-elsif (defined $name) {
-	print "  - '$name' for name\n" 
-}
-print "  - '", $metadata_ref->{$id_index}{name}, "' column for ID\n" 
-	if defined $id_index;
-if ($type =~ /^\d+$/ and exists $metadata_ref->{$type}) {
-	# type looks like a column index
-	print "  - '", $metadata_ref->{$type}{name}, "' column for GFF type\n";
-}
-else {
-	# type must be a text string
-	print "  - '$type' for type\n" if defined $type;
-}
-if ($source =~ /^\d+$/ and exists $metadata_ref->{$source}) {
-	# type looks like a column index
-	print "  - '", $metadata_ref->{$source}{name}, "' column for GFF source\n";
-}
-else {
-	# type must be a text string
-	print "  - '$source' for GFF source\n" if defined $source;
-}
-print "  - '", join(", ", map { $metadata_ref->{$_}{name} } @tag_indices ), 
-	"' columns for group tags\n" if $tag;
-
-
-
-
-### Generate a temporary gff data structure based on the input metadata
-# doing this manually rather than calling Bio::ToolBox::data_helper to make a new 
-# structure, because we're basing this off the input file metadata, 
-# and we populate, empty, and regenerate numerous times as we walk 
-# through the file. Ugh, it's complicated, and very old un-optimized, crazy code
-my %output_data;
-if (exists $metadata_ref->{'program'}) {
-	# use originating data file program
-	$output_data{'program'} = $metadata_ref->{'program'};
-}
-else {
-	# use current program name
-	$output_data{'program'} = $0;
-}
-if (exists $metadata_ref->{'feature'}) {
-	$output_data{'feature'} = $metadata_ref->{'feature'};
-}
-if (exists $metadata_ref->{'db'}) {
-	$output_data{'db'} = $metadata_ref->{'db'};
-}
-$output_data{'other'} = [ @{ $metadata_ref->{'other'} } ];
-$output_data{'data_table'} = [];
-regenerate_output_data_hash();
-
-
-
-### Global variables
-# set output control variables
-my $out_fh; # the output file handle
-my $count = 0; # the number of lines processed before writing output
-my $total_count = 0;
-
-# set unique name counter
-my %unique_name_counter;
-
-
-
-
-### Parse input file into GFF
-# To avoid exorbitant memory requirements for ginormous files, 
-# we will only convert 20000 lines at time. 
-while (my $line = $in_fh->getline) {
+### Convert the input stream
+my $count = 0; # the number of lines processed
+my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
+while (my $row = $Input->next_row) {
 	
-	# add line to the data table
-	chomp $line;
-	push @{ $output_data{'data_table'} }, [ split /\t/, $line ];
-	$output_data{'last_row'} += 1;
+	# get the feature from the db if necessary
+	my $f = $row->feature if $do_feature;
 	
-	# increment counter
-	$count++;
-	
-	# temporarily write output
-	if ($count == 20000) {
-				
-		# generate unique names if requested
-		if ($unique) {
-			generate_unique_names();
-		}
-		
-		# progressively write out the converted gff data
-		write_gff_data();
-		
-		# regenerate the output data hash
-		regenerate_output_data_hash();
-		
-		# reset count
-		$total_count += $count;
-		$count = 0;
+	# build the arguments
+	# retrieve information from row object if indices were provided
+	my @args;
+	if (defined $chr_index) {
+		push @args, 'chromo', $row->value($chr_index);
 	}
+	if (defined $start_index) {
+		push @args, 'start', $row->value($start_index);
+	}
+	if (defined $stop_index) {
+		push @args, 'stop', $row->value($stop_index);
+	}
+	if (defined $strand_index) {
+		push @args, 'strand', $row->value($strand_index);
+	}
+	if (defined $score_index) {
+		push @args, 'score', $row->value($score_index);
+	}
+	if (defined $name_index) {
+		push @args, 'name', $row->value($name_index);
+	} elsif (defined $name_base) {
+		push @args, 'name', sprintf("%s_%07d", $name_base, $count);
+	}
+	if (defined $id_index) {
+		push @args, 'id', $row->value($id_index);
+	}
+	if (defined $type_index) {
+		push @args, 'type', $row->value($type_index);
+	} elsif (defined $type_base) {
+		push @args, 'type', $type_base;
+	}
+	if (defined $source_index) {
+		push @args, 'source', $row->value($source_index);
+	} elsif (defined $source_base) {
+		push @args, 'source', $source_base;
+	}
+	if (@tag_indices) {
+		push @args, 'attributes', \@tag_indices;
+	}
+			
+	# write
+	$Output->add_row( $row->gff_string(@args) );
+	$count++;
 }
 
-
-
-
-
-### Write final output
-if ($unique) {
-	generate_unique_names();
-}
-write_gff_data();
-$total_count += $count;
 
 
 
 ### Finish
-$in_fh->close;
-$out_fh->close;
-printf " Converted %s lines of input data to GFF file '$outfile'\n", 
-	format_with_commas($total_count);
-if ($unique) {
-	printf " There were %s original unique names\n", 
-		format_with_commas(scalar keys %unique_name_counter);
-}
-# That's it!
+$Input->fh_close;
+$Output->fh_close;
+printf " Converted %s lines of input data to GFF file '%s'\n", 
+	format_with_commas($count), $Output->filename;
 
-
-
-
-sub regenerate_output_data_hash {
-	# a subroutine to prepare a temporary output data hash for gff conversion
-	
-	# reset data table specifics
-	$output_data{'number_columns'} = $metadata_ref->{'number_columns'};
-	$output_data{'gff'} = 0;
-	$output_data{'last_row'} = 0;
-	
-	# delete the column metadata hashes
-	for (my $i = 0; $i < 9; $i++) {
-		delete $output_data{$i};
-	}
-	
-	# restore the original column metadata
-	for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-		$output_data{$i} = { %{ $metadata_ref->{$i} } };
-	}
-	
-	# empty the table
-	$output_data{'data_table'} = [ q() ]; # clear the array
-	
-	# add the original column names
-	$output_data{'data_table'}->[0] = [ 
-		@{ $metadata_ref->{'column_names'} } 
-	];
-}
-
-
-sub write_gff_data {
-	# a subroutine to progressively write out the converted gff data
-	
-	# convert to gff
-	my @arguments = (
-		'data'     => \%output_data,
-		'chromo'   => $chr_index,
-		'start'    => $start_index,
-		'stop'     => $stop_index,
-		'score'    => $score_index,
-		'strand'   => $strand_index,
-		'source'   => $source, # will interpret as either text or index
-		'type'     => $type, # will interpret as either text or index
-		'midpoint' => $midpoint,
-		'version'  => $version,
-		'tags'     => [ @tag_indices ],
-		'id'       => $id_index,
-		'zero'     => $zero_based,
-	);
-	if ($unique) {
-		# we've generated a new name index
-		push @arguments, 'name' => $name_index;
-	}
-	elsif (defined $name_index) {
-		# supplied name index
-		push @arguments, 'name' => $name_index;
-	}
-	else {
-		# text name
-		push @arguments, 'name' => $name;
-	}
-	convert_genome_data_2_gff_data( @arguments ) or 
-		die " Unable to convert to GFF format!\n";
-	
-	# format the numbers
-	if (defined $format) {
-		for (my $row = 1; $row <= $output_data{'last_row'}; $row++) {
-			# walk through each row in the data table
-			# format the score value to the indicated number of spaces
-			if ($format == 0) {
-				# no decimal places
-				$output_data{'data_table'}->[$row][5] = 
-					sprintf( "%.0f", $output_data{'data_table'}->[$row][5] );
-			}
-			elsif ($format == 1) {
-				# 1 decimal place
-				$output_data{'data_table'}->[$row][5] = 
-					sprintf( "%.1f", $output_data{'data_table'}->[$row][5] );
-			}
-			elsif ($format == 2) {
-				# 2 decimal places
-				$output_data{'data_table'}->[$row][5] = 
-					sprintf( "%.2f", $output_data{'data_table'}->[$row][5] );
-			}
-			elsif ($format == 3) {
-				# 3 decimal places
-				$output_data{'data_table'}->[$row][5] = 
-					sprintf( "%.3f", $output_data{'data_table'}->[$row][5] );
-			}
-		}
-		# update metadata
-		$output_data{5}{'formatted'} = $format;
-	}
-	
-	# check for file handle
-	if ($out_fh) {
-		# the output file has been opened and partially written
-		# we now only need to write the data table portion and not the 
-		# metadata
-		
-		for my $row (1..$output_data{'last_row'}) {
-			print {$out_fh} join(
-					"\t", @{ $output_data{'data_table'}->[$row] }
-				), "\n";
-				 
-		}
-	}
-	else {
-		# we will need to open the output file to write if it's not 
-		# opened yet
-		
-		# rather than generating new code for writing the gff file,
-		# we will simply use the write_data_file sub
-		$outfile = write_data_file(
-			'data'      => \%output_data,
-			'filename'  => $outfile,
-			'gz'        => $gz,
-		);
-		
-		# but now we will have to reopen the file for appended writing
-		$out_fh = open_to_write_fh($outfile, $gz, 1);
-	}
-
-}
-
-
-sub generate_unique_names {
-	
-	for (my $row = 1; $row <= $output_data{'last_row'}; $row++) {
-		
-		# name scalars
-		my $new_name;
-		my $current; # current name
-		
-		# determine current name
-		if (defined $output_data{'data_table'}->[$row][$name_index]) {
-			$current = $output_data{'data_table'}->[$row][$name_index];
-		}
-		else {
-			$current = $name;
-		}
-			
-		# check uniqueness
-		if (exists $unique_name_counter{$current} ) {
-			# we've encountered this name before
-			# generate a unique name by appending the count number
-			$unique_name_counter{ $current } += 1;
-			$new_name = $current . '.' . 
-				$unique_name_counter{ $current };
-		}
-		else {
-			# first time for this name
-			# record in the hash
-			$new_name = $current;
-			$unique_name_counter{$current} = 0;
-		}
-		
-		# assign the new name
-		$output_data{'data_table'}->[$row][$name_index] = $new_name;
-	}
-
-}
 
 __END__
 
@@ -670,10 +369,6 @@ data2gff.pl [--options...] <filename>
   --tags <column_index,column_index,...>
   --source <text>
   --type <text | column_index>
-  --zero
-  --format [0,1,2,3]
-  --midpoint
-  --unique
   --out <filename> 
   --version [2,3]
   --gz
@@ -689,11 +384,9 @@ The command line flags and descriptions:
 =item --in <filename>
 
 Specify an input file containing either a list of database features or 
-genomic coordinates for which to collect data. The file should be a 
+genomic coordinates for which to convert to GFF format. The file should be a 
 tab-delimited text file, one row per feature, with columns representing 
-feature identifiers, attributes, coordinates, and/or data values. Genome 
-coordinates are required. The first row should be column headers. Text 
-files generated by other B<BioToolBox> scripts are acceptable. Files may 
+feature identifiers, attributes, coordinates, and/or data values. Files may 
 be gzipped compressed.
 
 =item --ask
@@ -735,7 +428,7 @@ information will be used in the 'group' column.
 
 The index of the dataset in the data table to be used
 as the unique ID of each gff feature. This information
-will be used in the 'group' column of GFF v.3 files 
+will be used in the 'group' column of GFF v3 files 
 only. The default is to automatically generate a 
 unique identifier.
 
@@ -743,8 +436,7 @@ unique identifier.
 
 The index of the dataset in the data table to be used
 for strand information. Accepted values might include
-any of the following "f(orward), r(everse), w(atson),
-c(rick), +, -, 1, -1, 0, .".
+any of the following "+, -, 1, -1, 0, .".
 
 =item --tags <column_indices>
 
@@ -766,39 +458,10 @@ not defined, it will use the column name for either
 the 'score' or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
 
-=item --zero
-
-Indicate whether the source data is in interbase or 0-based 
-coordinates, as is used with UCSC source data or USeq data 
-packages. The coordinates will then be converted to 1-based 
-coordinates, consistent with the rest of bioperl conventions.
-The default is false (will not convert).
-
-=item --format [0,1,2,3]
-
-Indicate the number of decimal places the score value should
-be formatted. Acceptable values include 0, 1, 2, or 3 places.
-Anything else is ignored.
-
-=item --midpoint
-
-A boolean (1 or 0) value to indicate whether the 
-midpoint between the actual 'start' and 'stop' values
-should be used instead of the actual values. Default 
-is false.
-
-=item --unique
-
-Indicate whether the feature names should be made unique. A count 
-number is appended to the name of subsequent features to make them 
-unique. This should only be applied to genomic features, and not to 
-genomic data values (microarray data, sequencing data, etc). The 
-default behavior is false (not unique).
-
 =item --out <filename>
 
 Optionally specify the name of of the output file. The default is to use 
-the assigned type value. The '.gff' extension is automatically
+the input file base name. The '.gff' extension is automatically
 added if required.
 
 =item --version [2,3]
@@ -825,11 +488,6 @@ This program will convert a data file into a GFF formatted text file.
 Only simple conversions are performed, where each data line is converted 
 to a single feature. Complex features with parent-child relationships (such 
 as genes) should be converted with something more advanced.
-
-The input file should have chromosomal coordinates, i.e. chromosome, 
-start, and (optionally) stop or end coordinates. They may be specified 
-upon execution or identified automatically. If they are not found, the 
-GFF conversion will fail. 
 
 =head1 AUTHOR
 

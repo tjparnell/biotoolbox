@@ -6,13 +6,9 @@ use strict;
 use Getopt::Long;
 use Statistics::Descriptive;
 use Pod::Usage;
-use Bio::ToolBox::legacy_helper qw(
-	generate_data_structure
-	load_data_file
-	write_data_file
-);
-use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+use Bio::ToolBox::Data;
+use Bio::ToolBox::utility qw(ask_user_for_index parse_list);
+my $VERSION = '1.33';
 
 print "\n This script will convert a datafile into histogram values\n\n";
 
@@ -109,16 +105,8 @@ unless (defined $max) {
 ####### Main ###########
 
 ### Load the file
-print " Loading data from file $infile....\n";
-my $in_data_ref = load_data_file($infile);
-unless ($in_data_ref) {
+my $Input = Bio::ToolBox::Data->(file => $infile) or
 	die " No data loaded!\n";
-}
-my $in_table_ref = $in_data_ref->{'data_table'};
-
-
-
-
 
 ### Determine the request order
 my @indices; # an array of the indices to convert
@@ -128,7 +116,8 @@ if (defined $index) {
 }
 else {
 	# interactively ask the user
-	@indices = ask_for_index();
+	@indices = ask_user_for_index($Input, 
+		' Enter one or more indices to convert to bins  ');
 }
 unless (@indices) {
 	die " no indices defined! nothing to do!\n";
@@ -139,14 +128,13 @@ unless (@indices) {
 ### Convert to distribution frequency
 # Generate a new output data structure
 my @bins; 
-my $out_data_ref = prepare_output_data_structure();
-my $out_table_ref = $out_data_ref->{'data_table'}; # quick ref
+my $Output = prepare_output_data_structure();
 
 # Process each requested index
 print " Converting datasets to a distribution frequency....\n";
 foreach (@indices) {
 	# convert this dataset to the distribution frequency
-	print "   " . $in_data_ref->{$_}{'name'} . "...\n";
+	print "   " . $Input->name($_). "...\n";
 	my $success = convert_dataset($_);
 	unless ($success) {
 		die " unable to convert dataset index $_!\n";
@@ -157,13 +145,9 @@ foreach (@indices) {
 
 ### Write the new file
 unless ($outfile) {
-	$outfile = $infile; # use input name
-	$outfile = $in_data_ref->{'basename'} . '_frequency';
+	$outfile = $Input->path . $Input->basename . '_frequency';
 }
-my $write_results = write_data_file(
-	'data'      => $out_data_ref,
-	'filename'  => $outfile,
-);
+my $write_results = $Output->write_file($outfile);
 # report write results
 if ($write_results) {
 	print "  Wrote new datafile '$write_results'\n";
@@ -179,81 +163,21 @@ else {
 
 
 
-### Ask user for the index
-sub ask_for_index {
-	
-	# load the dataset names into hashes
-	my (%dataset_by_name, %dataset_by_id); # hashes for name and id
-	for (my $i = 0; $i < $in_data_ref->{'number_columns'}; $i++) {
-		my $name = $in_data_ref->{$i}{'name'};
-		if (
-			# check column header names for gene or window attribute information
-			$name =~ /^name|ID|alias/i or 
-			$name =~ /^class|type/i or
-			$name =~ /^chr|ref/i or
-			$name =~ /^start/i or
-			$name =~ /^stop|end/i
-		) { 
-			# skip on to the next header
-			next; 
-		} 
-		else { 
-			# record the data set name
-			$dataset_by_id{$i} = $name;
-			$dataset_by_name{$name} = $i;
-		}
-	}	
-	
-	# present the dataset name list
-	print " These are the data sets in the file '$infile'\n";
-	foreach (sort {$a <=> $b} keys %dataset_by_id) {
-		print "   $_\t$dataset_by_id{$_}\n";
-	}
-	
-	# collect user answer
-	print " Enter the dataset indices, separated by comma (x,y) or as range (x-y)\n  ";
-	my $answer = <STDIN>; # get user answer
-	chomp $answer;
-	
-	# process the answer
-	my @list = parse_list($answer);
-	
-	# check the answer
-	my $check = 1; # assume all are ok
-	foreach (@list) {
-		unless (exists $dataset_by_id{$_}) {
-			# it's not present
-			$check = 0;
-			last;
-		}
-	}
-	
-	# return
-	if ($check) {
-		return @list;
-	}
-	else {
-		die " At least one index is not valid! Nothing done\n";
-	}
-}
-
-
 ### Prepare the output data structure
 sub prepare_output_data_structure {
 	print " Defining $binnumber bins of size $binsize from $start to $max\n";
 	
 	# generate a new data structure
-	my $data = generate_data_structure(
-		'distribution_frequency',
-		'Bin',
-		'Range',
+	my $Data = Bio::ToolBox::Data->new(
+		feature     => 'distribution_frequency',
+		columns     => ['Bin', 'Range'],
 	) or die " unable to generate data structure!\n";
 	
 	# add metadata
-	$data->{0}{'mininum'}    = $start;
-	$data->{0}{'maximum'}    = $max;
-	$data->{0}{'bin_number'} = $binnumber;
-	$data->{0}{'bin_size'}   = $binsize;
+	$Data->metadate(0,'mininum', $start);
+	$Data->metadata(0,'maximum', $max);
+	$Data->metadata(0, 'bin_number', $binnumber);
+	$Data->metadata(0, 'bin_size', $binsize);
 	
 	# determine formatting 
 	my $format = 0;
@@ -267,36 +191,31 @@ sub prepare_output_data_structure {
 			$start + ( ($i - 1) * $binsize);
 		my $bin_end   = sprintf "%.$format" . "f", $start + ($i * $binsize);
 		push @bins, $bin_end;
-		push @{ $data->{'data_table'} }, [
+		$Data->add_row( [
 			$bin_end,
 			$bin_start . '..' . $bin_end, 
-		];
-		$data->{'last_row'} += 1;
+		] );
 	}
 	
 	# Return
-	return $data;
+	return $Data;
 }
 
 
 ### Convert the dataset
 sub convert_dataset {
-	my $data_index = shift;
+	my $index = shift;
 	
 	# collect the original values
 	my @values;
-	for my $i (1..$in_data_ref->{'last_row'}) {
-		# walk through the data file
-		
+	$Input->iterate( sub {
+		my $row = shift;
 		# collect numerical data within range
-		unless (
-			$in_table_ref->[$i][$data_index] eq '.' or
-			$in_table_ref->[$i][$data_index] < $start or
-			$in_table_ref->[$i][$data_index] > $max
-		) {
-			push @values, $in_table_ref->[$i][$data_index]; 
+		my $v = $row->value($index);
+		if ($v =~ /\d/ and ($v >= $start or $v <= $max)) {
+			push @values, $v; 
 		}
-	}
+	} );
 	
 	# calculate the distribution frequency
 	my $stat = Statistics::Descriptive::Full->new() or
@@ -308,29 +227,22 @@ sub convert_dataset {
 		# are the values in @bins and the value is the number of 
 		# datapoints 
 		
-	# determine the new index
-	my $new_index = $out_data_ref->{'number_columns'};
-	
-	# record the header name
-	$out_table_ref->[0][$new_index] = $in_data_ref->{$data_index}{'name'};
-	
 	# record the distribution in the output data structure
-	for my $row (1..$out_data_ref->{'last_row'}) {
+	my $new_index = $Output->add_column( $Input->name($index) );
+	$Output->iterate( sub {
 		# use this bin value in the lookup of the calculated distribution
 		# frequency hash
-		$out_table_ref->[$row][$new_index] = 
-			$freq_ref->{ $out_table_ref->[$row][0] }; 
-	}
+		my $row = shift;
+		$row->value($new_index, $freq_ref->{ $row->value(0) }); 
+	} );
 	
 	# update metada, copy from old data structure
-	$out_data_ref->{$new_index} = { %{ $in_data_ref->{$data_index} } };
-	if (exists $out_data_ref->{$new_index}{'log2'}) {
-		# no longer log2
-		delete $out_data_ref->{$new_index}{'log2'};
+	my %in_md = $Input->metadata($index);
+	foreach (keys %in_md) {
+		next if (m/^(?:name|index|log2)$/i);
+		$Output->metadata($new_index, $_, $in_md{$_});
 	}
-	$out_data_ref->{$new_index}{'index'} = $new_index; # update index
-	$out_data_ref->{'number_columns'} += 1;
-	
+	return 1;
 }
 
 
