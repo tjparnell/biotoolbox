@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.31';
+my $VERSION = '1.33';
 
 =head1 NAME
 
@@ -274,8 +274,9 @@ sub skip {
 
 sub version {
 	my $self = shift;
-	if (@_ and $_[0] =~ /^(?:1|2|2\.5|3)$/) {
-		$self->{version} = $_[0];
+	my $v = shift;
+	if (defined $v and $v =~ /^(?:1|2|2\.5|3)$/) {
+		$self->{version} = $v;
 	}
 	return $self->{version};
 }
@@ -337,10 +338,10 @@ sub next_feature {
 		chomp $line;
 		
 		# skip any comment and pragma lines that we might encounter
-		if ($line =~ /^##gff\-version\s(\d\.?\d?)$/) {
-			unless (defined $self->version) {
-				$self->version($1);
-			}
+		if ($line =~ /^##gff\-version\s(\d\.?\d?)\s*$/i) {
+			# override any version that may have been inferred from the extension
+			# based on the assumption that this pragma is correct
+			$self->version($1);
 			next;
 		}
 		elsif ($line =~ /^###$/) {
@@ -404,7 +405,7 @@ sub parse_file {
 	my $self = shift;
 	# check that we have an open filehandle
 	unless ($self->fh) {
-		croak("no GFF3 file loaded to parse!");
+		croak("no file loaded to parse!");
 	}
 	return if $self->{'eof'};
 	
@@ -415,9 +416,12 @@ sub parse_file {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
+	# a loaded hash to check for unique feature IDs and to find parents
 	my %loaded;
 	
-	print "  Parsing GFF file....\n";
+	printf "  Parsing %s format file....\n", 
+		$self->version eq '3' ? 'GFF3' : 
+		$self->version eq '2.5' ? 'GTF' : 'GFF';
 	TOP_FEATURE_LOOP:
 	while (my $feature = $self->next_feature) {
 		
@@ -468,23 +472,27 @@ sub parse_file {
 				}
 				elsif ($self->version == 2.5) {
 					# gene parents likely not specified in the file, so must infer
-					my $parentSeqF = Bio::SeqFeature::Lite->new(
-						-seq_id         => $feature->seq_id,
-						-start          => $feature->start,
-						-end            => $feature->end,
-						-strand         => $feature->strand,
-						-source         => $feature->source,
-						-primary_tag    => 'gene',
-						-primary_id     => $parent,
-					);
-					if ($feature->has_tag('gene_name')) {
-						$parentSeqF->display_name(($feature->get_tag_values('gene_name')));
+					
+					if ($feature->primary_tag =~ /gene/i) {
+						# I assume we're good here
+					}
+					elsif ($feature->primary_tag =~ /rna|transcript/i) {
+						# we need to make the gene parent
+						my $gene = $self->_make_gene_parent($feature);
+						$loaded{ $gene->primary_id } = $gene;
+						$gene->add_SeqFeature($feature);
+						push @{ $self->{top_features} }, $gene;
 					}
 					else {
-						$parentSeqF->display_name($parent);
+						# we need to make both the gene and transcript parents
+						my $gene = $self->_make_gene_parent($feature);
+						$loaded{ $gene->primary_id } = $gene;
+						push @{ $self->{top_features} }, $gene;
+						my $transcript = $self->_make_rna_parent($feature);
+						$loaded{ $transcript->primary_id } = $transcript;
+						$transcript->add_SeqFeature($feature);
+						$gene->add_SeqFeature($transcript);
 					}
-					$parentSeqF->add_SeqFeature($feature);
-					$loaded{$parent} = $parentSeqF;
 				}
 				else {
 					# can't find the parent, maybe not loaded yet?
@@ -549,6 +557,76 @@ sub parse_file {
 	
 	return 1;
 }
+
+
+sub _make_gene_parent {
+	# for generating GTF gene parent features
+	my ($self, $feature) = @_;
+	my $gene = Bio::SeqFeature::Lite->new(
+		-seq_id         => $feature->seq_id,
+		-start          => $feature->start,
+		-end            => $feature->end,
+		-strand         => $feature->strand,
+		-source         => $feature->source,
+		-primary_tag    => 'gene',
+	);
+	
+	if ($feature->has_tag('gene_id')) {
+		$gene->primary_id(($feature->get_tag_values('gene_id')));
+	}
+	elsif ($feature->has_tag('gene_name')) {
+		$gene->primary_id(($feature->get_tag_values('gene_name')));
+	}
+	else {
+		$gene->display_id(($feature->get_tag_values('Parent')));
+	}
+	
+	if ($feature->has_tag('gene_name')) {
+		$gene->display_name(($feature->get_tag_values('gene_name')));
+	}
+	elsif ($feature->has_tag('gene_id')) {
+		$gene->display_name(($feature->get_tag_values('gene_id')));
+	}
+	else {
+		$gene->display_name(($feature->get_tag_values('Parent')));
+	}
+	return $gene;
+}
+
+
+sub _make_rna_parent {
+	# for generating GTF transcript parent features
+	my ($self, $feature) = @_;
+	my $rna = Bio::SeqFeature::Lite->new(
+		-seq_id         => $feature->seq_id,
+		-start          => $feature->start,
+		-end            => $feature->end,
+		-strand         => $feature->strand,
+		-source         => $feature->source,
+		-primary_tag    => 'transcript', # probably mRNA, but since we don't know
+	);
+	if ($feature->has_tag('transcript_id')) {
+		$rna->primary_id(($feature->get_tag_values('transcript_id')));
+	}
+	elsif ($feature->has_tag('transcript_name')) {
+		$rna->primary_id(($feature->get_tag_values('transcript_name')));
+	}
+	else {
+		$rna->display_id(($feature->get_tag_values('Parent')));
+	}
+	
+	if ($feature->has_tag('transcript_name')) {
+		$rna->display_name(($feature->get_tag_values('transcript_name')));
+	}
+	elsif ($feature->has_tag('transcript_id')) {
+		$rna->display_name(($feature->get_tag_values('transcript_id')));
+	}
+	else {
+		$rna->display_name(($feature->get_tag_values('Parent')));
+	}
+	return $rna;
+}
+
 
 sub find_gene {
 	my $self = shift;
@@ -711,7 +789,7 @@ sub _gtf_to_seqf {
 			# value had spaces in it!
 			foreach (@bits) {$value .= " $_"}
 		}
-		$value =~ s/"//g; # remove the flanking double quotes, assume no internal quotes
+		$value =~ s/[";]//g; # remove the flanking double quotes, assume no internal quotes
 		$feature->add_tag_value($tag, $value);
 	}
 	
@@ -778,6 +856,7 @@ sub _gtf_to_seqf {
 	}
 	else {
 		# other features are assumed to be transcript children
+		# not required to set a primary_id
 		if ($feature->has_tag('transcript_id')) {
 			my ($parent) = $feature->get_tag_values('transcript_id');
 			$feature->add_tag_value('Parent', $parent);
