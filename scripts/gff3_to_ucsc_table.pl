@@ -278,7 +278,7 @@ sub process_gene {
 	foreach my $subfeat ($gene->get_SeqFeatures) {
 		
 		# check the type, and process accordingly
-		my $type = lc($subfeat->primary_tag);
+		my $type = lc $subfeat->primary_tag;
 		
 		if ($type eq 'mrna') {
 			# a protein coding transcript
@@ -532,6 +532,12 @@ sub process_nc_transcript {
 				push @{ $ucsc->{'exonStarts'} }, $subf->start - 1;
 				push @{ $ucsc->{'exonEnds'} }, $subf->end;
 				$ucsc->{'exonCount'} += 1;
+			}
+			elsif ($subf->primary_tag =~ /cds|codon/i) {
+				# this looks like an improperly annotated coding transcript
+				# some coding transcripts do not have mRNA primary_tag, esp from GTF
+				# go back to the transcript function
+				return process_transcript($ucsc, $transcript);
 			}
 			else {
 				# catchall for unrecognized feature types
