@@ -482,13 +482,13 @@ sub write_file {
 			$self->{'bed'} = 1; # a fake true
 			unless ($self->verify and $self->bed) {
 				warn " re-setting extension from $extension to .txt\n";
-				$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
+				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
 		}
 		elsif (not $self->bed) {
 			# flag not set, reset extension
 			warn " re-setting extension from $extension to .txt\n";
-			$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
+			$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 		}
 	}
 	elsif ($extension =~ /sgr/i) {
@@ -509,13 +509,14 @@ sub write_file {
 		}
 	}
 	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
-		unless ($self->ucsc) {
+		if ($self->ucsc != $self->number_columns) {
 			# it's not set as a ucsc data
 			# let's set it to true and see if it passes verification
-			$self->ucsc = $self->number_columns; 
-		}
-		if ($self->ucsc != $self->number_columns) {
-			$self->ucsc = $self->number_columns;
+			$self->ucsc($self->number_columns);
+			unless ($self->verify and $self->ucsc) {
+				warn " re-setting extension from $extension to .txt\n";
+				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
+			}
 		}
 	}
 	elsif (not $extension) {
