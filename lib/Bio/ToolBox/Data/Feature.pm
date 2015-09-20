@@ -725,7 +725,7 @@ sub bed_string {
 	
 	# additional information
 	if ($args{bed} >= 4) {
-		my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
+		my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
 		$string .= "\t$name";
 	}
 	if ($args{bed} >= 5) {
@@ -778,13 +778,17 @@ sub gff_string {
 	my $phase = '.'; # do not even bother!!!!
 	
 	# attributes
-	my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
-	my $attributes = "Name = $name";
-	my $id = $args{id} || sprintf("%08d", $self->row_index);
-	$attributes .= "ID = $id";
+	my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
+	my $attributes = "Name=$name";
+	my $id = $args{id} || sprintf("%08d", $self->line_number);
+	$attributes .= "; ID=$id";
 	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
 		foreach my $i (@{$args{attributes}}) {
-			$attributes .= '; ' . $self->{data}->name($i) . ' = ' . $self->value($i);
+			my $k = $self->{data}->name($i);
+			$k =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			my $v = $self->value($i);
+			$v =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			$attributes .= "; $k=$v";
 		}
 	}
 	
