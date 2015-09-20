@@ -201,7 +201,17 @@ if ($ask) {
 		$strand_index = defined $strand_index ? $strand_index : $suggestion;
 	}
 }
-
+else {
+	# or else the indices need to be automatically identified
+	unless (
+		$Input->feature_type eq 'coordinate' or 
+		(defined $chr_index and defined $start_index and defined $stop_index) or 
+		($Input->feature_type eq 'named' and ($database or $Input->database)) 
+	) {
+		die "Not enough information has been provided to convert to bed file.\n" . 
+			"Coordinate column names must be recognizable or specified. Use --help\n";
+	}
+}
 
 
 # Open output stream

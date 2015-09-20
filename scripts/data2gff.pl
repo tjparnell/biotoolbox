@@ -39,9 +39,7 @@ my (
 	$source,
 	$type,
 	$tag,
-	$unique,
 	$ask,
-	$version,
 	$gz,
 	$help,
 	$print_version,
@@ -63,10 +61,8 @@ GetOptions(
 	'type=s'    => \$type, # test to put in the type column
 	'tag|tags=s'=> \$tag, # comma list of tag column indices
 	'ask'       => \$ask, # request help in assigning indices
-	'version=i' => \$version, # the gff version
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -90,9 +86,6 @@ if ($print_version) {
 unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use $0 --help\n";
-}
-unless ($version) {
-	$version = 3;
 }
 unless (defined $gz) {
 	$gz = 0;
@@ -266,6 +259,17 @@ if ($ask) {
 			" Enter zero or more column indices for GFF group tags  ");
 	}
 }
+else {
+	# or else the indices need to be automatically identified
+	unless (
+		$Input->feature_type eq 'coordinate' or 
+		(defined $chr_index and defined $start_index and defined $stop_index) or 
+		($Input->feature_type eq 'named' and $Input->database) 
+	) {
+		die "Not enough information has been provided to convert to GFF file.\n" . 
+			"Coordinate column names must be recognizable or specified. Use --help\n";
+	}
+}
 
 
 
@@ -275,7 +279,7 @@ unless ($outfile) {
 }
 my $Output = Bio::ToolBox::Data::Stream->new(
 	out     => $outfile,
-	gff     => $version,
+	gff     => 3,        # default, only one
 	gz      => $gz
 ) or die " unable to create output file $outfile!";
 
@@ -338,8 +342,8 @@ while (my $row = $Input->next_row) {
 
 
 ### Finish
-$Input->fh_close;
-$Output->fh_close;
+$Input->close_fh;
+$Output->close_fh;
 printf " Converted %s lines of input data to GFF file '%s'\n", 
 	format_with_commas($count), $Output->filename;
 
@@ -367,10 +371,9 @@ data2gff.pl [--options...] <filename>
   --name <text | column_index>
   --id <column_index>
   --tags <column_index,column_index,...>
-  --source <text>
+  --source <text | column_index>
   --type <text | column_index>
   --out <filename> 
-  --version [2,3]
   --gz
   --version
   --help
@@ -464,10 +467,6 @@ Optionally specify the name of of the output file. The default is to use
 the input file base name. The '.gff' extension is automatically
 added if required.
 
-=item --version [2,3]
-
-Specify the GFF version. The default is version 3.
-
 =item --gz
 
 Indicate whether the output file should (not) be compressed with gzip.
@@ -484,7 +483,7 @@ Display the POD documentation
 
 =head1 DESCRIPTION
 
-This program will convert a data file into a GFF formatted text file. 
+This program will convert a data file into a GFF version 3 formatted text file. 
 Only simple conversions are performed, where each data line is converted 
 to a single feature. Complex features with parent-child relationships (such 
 as genes) should be converted with something more advanced.
