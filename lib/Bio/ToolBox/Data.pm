@@ -1431,7 +1431,7 @@ sub summary_file {
 	}
 	
 	# Prepare score column name
-	my $data_name = $self->basename || $dataset || 'dataset';
+	my $data_name = $dataset || $self->basename || 'dataset';
 	
 	# Prepare array to store the summed data
 	my $summed_data = $self->new(
