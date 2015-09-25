@@ -6,8 +6,9 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
-use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 use Bio::ToolBox::Data;
+use Bio::ToolBox::utility qw(ask_user_for_index);
+use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 my $VERSION =  '1.33';
 
 print "\n This script will export a data file to a wig file\n\n";
@@ -125,8 +126,6 @@ check_track_name();
 
 check_step();
 
-check_log2();
-
 set_bigwig_options() if $bigwig;
 
 my $method_sub = set_method_sub();
@@ -214,7 +213,7 @@ sub check_indices {
 		# first look for a generic score index
 		$score_index = ask_user_for_index($Input, 
 			" Enter the index for the score column  ");
-		unless (defined $start_index) {
+		unless (defined $score_index) {
 			die " No identifiable score column index!\n";
 		}
 	}
@@ -441,7 +440,7 @@ sub convert_to_variableStep {
 		
 		# collect the score
 		my $score = $row->value($score_index);
-		next if $score eq '.'; # skip null values
+		next if ($score eq '' or $score eq '.'); # skip null values
 		if (defined $format) {
 			# format if requested
 			$score = format_score($score);
@@ -452,25 +451,27 @@ sub convert_to_variableStep {
 			# same position, add to the score list
 			push @scores, $score;
 		}
-		elsif ($start > $previous_pos) {
+		else {
 			# we have moved on to the next position
 			# now print the previous scores
 			if (scalar @scores == 1) {
 				# print the one score
 				$out_fh->print("$previous_pos $scores[0]\n");
 			}
-			else {
+			elsif (scalar @scores > 1) {
 				# more than one score
 				my $score = &{$method_sub}(@scores);
 				$out_fh->print("$previous_pos $score\n");
 			}
 			
+			if ($start < $previous_pos) {
+				# print warning that output wig will not be sorted
+				warn " warning! output wig will not be sorted correctly! chromosome $chromosome: $start > $previous_pos\n"; 
+			}
+			
 			# reset for next
 			$previous_pos = $start;
 			@scores = ($score);
-		}
-		else {
-			die "file not sorted! chromosome $chromosome, previous position $previous_pos, current position $start\n"; 
 		}
 	}
 }
@@ -488,22 +489,31 @@ sub convert_to_bedgraph {
 		my $start = defined $start_index ? $row->value($start_index) : $row->start;
 		my $stop  = defined $stop_index ? $row->value($stop_index) : $row->stop;
 		
+		# adjust start position
+		unless ($interbase) {
+			$start--;
+		}
+		
 		# check coordinates
-		$current_chr ||= $chromosome;
-		$previous_pos ||= $stop;
-		# check if on the same chromosome
-		if ($current_chr eq $chromosome) {
-			# check for overlap
-			if ($start < $previous_pos) {
-				die " There are overlapping intervals or the file is not sorted by" .
-					" coordinates!\n Compare $chromosome:$start" . 
-					" with previous stop position $previous_pos\n";
+		if (defined $previous_pos and defined $current_chr) {
+			# check if on the same chromosome
+			if ($current_chr eq $chromosome) {
+				# check for overlap
+				if ($start < $previous_pos) {
+					die " There are overlapping intervals or the file is not sorted by" .
+						" coordinates!\n Compare $chromosome:$start" . 
+						" with previous stop position $previous_pos\n";
+				}
+				# otherwise it is ok
+				$previous_pos = $stop;
 			}
-			# otherwise it is ok
-			$previous_pos = $stop;
+			else {
+				# new chromosome
+				$current_chr = $chromosome;
+				$previous_pos = $stop;
+			}
 		}
 		else {
-			# new chromosome
 			$current_chr = $chromosome;
 			$previous_pos = $stop;
 		}
