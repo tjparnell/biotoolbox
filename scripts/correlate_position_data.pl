@@ -33,7 +33,7 @@ my $PARAMETRIC    = 1;
 my $ORDINAL       = 0;
 	
 use constant LOG10 => log(10);
-my $VERSION = '1.30';
+my $VERSION = '1.33';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -87,7 +87,7 @@ GetOptions(
 	'norm=s'      => \$norm_method, # method of normalization
 	'interpolate!' => \$interpolate, # interpolate the position data
 	'gz!'         => \$gz, # compress output
-	'cpu=i'      => \$cpu, # number of execution threads
+	'cpu=i'       => \$cpu, # number of execution threads
 	'help'        => \$help, # request help
 	'version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -115,7 +115,7 @@ check_defaults();
 
 
 ### Open input file
-my $Data = Bio::ToolBox::Data(file => $infile) or 
+my $Data = Bio::ToolBox::Data->new(file => $infile) or 
 	die " unable to open input file '$infile'!\n";
 printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 $Data->program("$0, v $VERSION");
@@ -324,6 +324,7 @@ sub parallel_execution {
 		$Data->splice_data($i, $cpu);
 		
 		# re-open database objects to make them clone safe
+		my $db = $Data->open_database(1);
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}
@@ -350,10 +351,6 @@ sub parallel_execution {
 	}
 	$pm->wait_all_children;
 	
-	# summarize the results
-	summarize_results(\@correlations, \@optimal_shifts, \@optimal_correlations,
-		$count, $not_enough_data, $no_variance);
-	
 	# reassemble children files into output file
 	my @files = glob "$child_base_name.*";
 	unless (@files) {
@@ -364,6 +361,10 @@ sub parallel_execution {
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
+	
+	# summarize the results
+	summarize_results(\@correlations, \@optimal_shifts, \@optimal_correlations,
+		$count, $not_enough_data, $no_variance);
 }
 
 
@@ -410,7 +411,7 @@ sub collect_correlations {
 		# determine reference point
 		my $ref_point;
 		if ($position == 5) {
-			$ref_point = $$row->strand >= 0 ? $row->start : $row->end;
+			$ref_point = $row->strand >= 0 ? $row->start : $row->end;
 		}
 		elsif ($position == 4) {
 			$ref_point = int( ( ( $row->start + $row->end ) / 2 ) + 0.5);
@@ -987,9 +988,10 @@ correlate_position_data.pl [--options] <filename>
   --shift
   --radius <integer>
   --pos [5|m|3]                 (m)
-  --norm [rank|sum ]
+  --norm [rank|sum]
   --force_strand
   --(no)interpolate
+  --cpu                         (2)
   --gz
   --version
   --help
