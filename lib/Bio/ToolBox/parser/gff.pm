@@ -276,6 +276,10 @@ sub version {
 	my $self = shift;
 	my $v = shift;
 	if (defined $v and $v =~ /^(?:1|2|2\.5|3)$/) {
+		if (defined $self->{version} and $self->{version} ne $v) {
+			warn sprintf(" GFF version information (extension, pragma, etc) mismatch! compare %s with %s! using %s\n", 
+				$self->{version}, $v, $v);
+		}
 		$self->{version} = $v;
 	}
 	return $self->{version};
@@ -311,6 +315,19 @@ sub open_file {
 	# Open filehandle object 
 	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
+	
+	# check gff version pragma
+	my $first = $fh->getline;
+	if ($first =~ /^##gff\-version\s+(\d\.?\d?)\s*$/i) {
+		# override any version that may have been inferred from the extension
+		# based on the assumption that this pragma is correct
+		$self->version($1);
+	}
+	else {
+		# no pragma, reopen the file
+		$fh->close;
+		$fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
+	}
 	$self->fh($fh);
 	return 1;
 }
@@ -338,7 +355,7 @@ sub next_feature {
 		chomp $line;
 		
 		# skip any comment and pragma lines that we might encounter
-		if ($line =~ /^##gff\-version\s(\d\.?\d?)\s*$/i) {
+		if ($line =~ /^##gff\-version\s+(\d\.?\d?)\s*$/i) {
 			# override any version that may have been inferred from the extension
 			# based on the assumption that this pragma is correct
 			$self->version($1);
