@@ -42,6 +42,7 @@ sub new {
 		'gff'            => 0,
 		'bed'            => 0,
 		'ucsc'           => 0,
+		'vcf'            => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
 		'headers'        => 1,
@@ -641,6 +642,14 @@ sub ucsc {
 	return $self->{ucsc};
 }
 
+sub vcf {
+	my $self = shift;
+	if (defined $_[0] and $_[0] =~ /^[\d\.]+$/) {
+		$self->{vcf} = $_[0];
+	}
+	return $self->{vcf};
+}
+
 sub number_columns {
 	my $self = shift;
 	carp "number_columns is a read only method" if @_;
@@ -978,6 +987,10 @@ Returns or sets the number of BED columns in the metadata.
 
 Returns or sets the number of columns in a UCSC-type file 
 format, including genePred and refFlat.
+
+=item vcf
+
+Returns or sets the VCF version value in the metadata.
 
 =item number_columns
 

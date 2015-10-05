@@ -152,6 +152,39 @@ in the current data row.
 
 =back
 
+=head2 Special feature attributes
+
+GFF and VCF files have special attributes in the form of key = value pairs. 
+These are stored as specially formatted, character-delimited lists in 
+certain columns. These methods will parse this information and return as 
+a convenient hash reference. 
+
+=over 4
+
+=item gff_attributes
+
+Parses the 9th column of GFF files. URL-escaped characters are converted 
+back to text. Returns a hash reference of key =E<gt> value pairs.
+
+=item vcf_attributes
+
+Parses the INFO (8th column) and all sample columns (10th and higher 
+columns) in a version 4 VCF file. The Sample columns use the FORMAT 
+column (9th column) as keys. The returned hash reference has two levels:
+The first level keys are both the column names and index (0-based). The 
+second level keys are the individual attribute keys to each value. 
+For example:
+
+   my $attr = $row->vcf_attributes;
+   # access by column name
+   my $genotype = $attr->{sample1}{GT};
+   my $depth = $attr->{INFO}{ADP};
+   # access by 0-based column index 
+   my $genotype = $attr->{9}{GT};
+   my $depth = $attr->{7}{ADP}
+
+=back
+
 =head2 Convenience Methods to database functions
 
 The next three functions are convenience methods for using the 
@@ -565,10 +598,45 @@ sub gff_attributes {
 	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
 		my ($tag, $value) = split /\s+/, $g;
 		next unless ($tag and $value);
+		# unescape URL encoded values, borrowed from Bio::DB::GFF
+		$value =~ tr/+/ /;
+		$value =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
 		$self->{attributes}->{$tag} = $value;
 	}
 	return $self->{attributes};
 }
+
+sub vcf_attributes {
+	my $self = shift;
+	return unless ($self->{data}->vcf);
+	return $self->{attributes} if (exists $self->{attributes});
+	$self->{attributes} = {};
+	
+	# INFO attributes
+	unless ($self->{data}->name(7) eq 'INFO') {
+		croak "VCF column INFO is missing or improperly formatted!";
+	}
+	my %info = 	map {$_[0] => defined $_[1] ? $_[1] : 1} 
+				map { [ split /=/ ] } 
+				( split /;/, $self->value(7) );
+	$self->{attributes}->{INFO} = \%info;
+	$self->{attributes}->{7}    = \%info;
+	
+	# Sample attributes
+	unless ($self->{data}->name(8) eq 'FORMAT') {
+		croak "VCF column FORMAT is missing or file is improperly formatted!";
+	}
+	my @formatKeys = split /:/, $self->value(8);
+	foreach my $i (9 .. $self->{data}->number_columns - 1) {
+		my $name = $self->{data}->name($i);
+		my @sampleVals = split /:/, $self->value($i);
+		my %sample = map { $formatKeys[$_] => $sampleVals[$_] } (0 .. $#formatKeys);
+		$self->{attributes}->{$name} = \%sample;
+		$self->{attributes}->{$i}    = \%sample;
+	}
+	return $self->{attributes};
+}
+
 
 ### Data collection convenience methods
 

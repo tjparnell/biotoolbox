@@ -222,6 +222,18 @@ sub parse_headers {
 			$header_line_count++;
 		}
 		
+		# VCF version header
+		elsif ($line =~ /^##fileformat=VCFv([\d\.]+)$/) {
+			# store the VCF version in the hash
+			# this may or may not be present in the gff file, but want to keep
+			# it if it is
+			my $v = $1;
+			$v =~ s/[\r\n]+$//;
+			$self->vcf($v);
+			$self->add_comment($line); # so that it is written properly
+			$header_line_count++;
+		}
+		
 		# any other nonstandard header
 		elsif ($line =~ /^#/) {
 			$self->add_comment($line);
