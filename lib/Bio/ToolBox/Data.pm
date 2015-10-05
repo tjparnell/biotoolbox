@@ -69,7 +69,7 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
 This module works with the primary Bio::ToolBox Data structure. Simply, it 
 is a complex data structure representing a tabbed-delimited table (array 
 of arrays), with plenty of options for metadata. Many common bioinformatic 
-file formats are simply tabbed-delimited text files (think BED and GFF). 
+file formats are simply tabbed-delimited text files (think BED, GFF, VCF). 
 Each row is a feature or genomic interval, and each column is a piece of 
 information about that feature, such as name, type, and/or coordinates. 
 We can append to that file additional columns of information, perhaps 
@@ -219,19 +219,27 @@ Returns or sets the name of the program generating the list.
 Returns or sets the name or path of the database from which the 
 features were derived.
 
-=back
-
-The following methods may be used to access metadata only.
-
-=over
-
 =item gff
+
+Returns or sets the version of loaded GFF files. Supported versions 
+included 1, 2, 2.5 (GTF), and 3.
 
 =item bed
 
-Returns the GFF version number or the number of BED columns 
-indicating that the Data structure is properly formatted as 
-such. A value of 0 means they are not formatted as such.
+Returns or sets the BED file version. Here, the BED version is simply 
+the number of columns.
+
+=item ucsc
+
+Returns or sets the UCSC file format version. Here, the version is 
+simply the number of columns. Supported versions include 10 (gene 
+prediction), 11 (refFlat, or gene prediction with gene name), 12 
+(knownGene table), 15 (extended gene prediction), or 16 (extended 
+gene prediction with bin).
+
+=item vcf
+
+Returns or sets the VCF file version number. VCF support is limited.
 
 =back
 
