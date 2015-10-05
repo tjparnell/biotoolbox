@@ -472,44 +472,58 @@ sub delete_function {
 sub rename_function {
 	# this subroutine will re-name a dataset name
 	
-	# determine or request dataset index and newname
-	my ($index, $newname);
+	# determine or request dataset indices and newname
+	my @indices;
+	my @newnames;
 	if (scalar @_ == 2) {
 		# passed from internal subroutine
-		$index   = $_[0];
-		$newname = $_[1];
+		$indices[0]  = $_[0];
+		$newnames[0] = $_[1];
 	}
 	else {
-		# request from user
-		
-		# index
-		$index = _request_index(
-			" Enter the index number of the column to rename  "
+		# request index from user
+		@indices = _request_indices(
+			" Enter the index numbers of the columns to rename  "
 		);
-		if ($index == -1) {
-			warn " unknown index number. nothing done\n";
-			return;
+	}
+	
+	# check if user supplied name
+	if ($function and $opt_name) {
+		# new name is specified from the command line during automatic execution
+		# use this global value
+		# it might be a comma delimited name, so split it
+		my @provided = split /,/, $opt_name;
+		if (scalar @provided == scalar @indices) {
+			# this is great - same number
+			@newnames = @provided;
 		}
-		
-		# name
-		if ($function and $opt_name) {
-			# new name is specified from the command line during automatic execution
-			# use this global value
-			$newname = $opt_name;
+		elsif (scalar @provided == 1 and scalar @indices > 1) {
+			# use the same one for each of them!?
+			@newnames = map { $opt_name } @indices;
 		}
 		else {
-			# request a new name from the user
-			print " Enter a new name...  ";
-			$newname = <STDIN>;
-			chomp $newname;
+			warn "unequal number of provided names and indices!? nothing done\n";
+			return;
 		}
 	}
 	
-	# assign new name
-	my $oldname = $Data->name($index);
-	$Data->name($index, $newname);
-	print " $oldname re-named to $newname\n";
-	return 1;
+	# rename each of the requested indices
+	my $count = 0;
+	foreach my $i (@indices) {
+		my $name = shift @newnames || undef;
+		my $oldname = $Data->name($i);
+		unless ($name) {
+			# request a new name from the user
+			print " ($oldname) Enter a new name: ";
+			$name = <STDIN>;
+			chomp $name;
+		}
+		# assign new name
+		$Data->name($i, $name);
+		print "  $oldname re-named to $name\n";
+		$count++;
+	}
+	return $count;
 }
 
 
