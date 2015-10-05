@@ -38,6 +38,7 @@ my (
 	$start_index,
 	$stop_index,
 	$score_index,
+	$attribute_name,
 	$track_name,
 	$use_track,
 	$midpoint,
@@ -67,6 +68,7 @@ GetOptions(
 	'start|pos=i' => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
 	'index|score=i' => \$score_index, # index for the score column
+	'attrib=s'  => \$attribute_name, # gff or vcf attribute name to use 
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
 	'mid!'      => \$midpoint, # boolean to use the midpoint
@@ -130,6 +132,10 @@ set_bigwig_options() if $bigwig;
 
 my $method_sub = set_method_sub();
 
+# generate the format string
+if ($format) {
+	$format = "%." . $format . "f";
+}
 
 
 ### Open output file
@@ -390,15 +396,10 @@ sub convert_to_fixedStep {
 			$current_chr = $chromosome;
 		}
 		
-		# adjust score formatting as requested
-		my $score = $row->value($score_index);
-		$score = 0 if $score eq '.';
-		if (defined $format) {
-			# format if requested
-			$score = format_score($score);
-		}
+		# get the score
+		my $score = get_score($row);
+		next unless defined $score;
 		
-		# write fixed data line
 		$out_fh->print("$score\n");
 	}
 }
@@ -439,12 +440,8 @@ sub convert_to_variableStep {
 		}
 		
 		# collect the score
-		my $score = $row->value($score_index);
-		next if ($score eq '' or $score eq '.'); # skip null values
-		if (defined $format) {
-			# format if requested
-			$score = format_score($score);
-		}
+		my $score = get_score($row);
+		next unless defined $score;
 		
 		# check for duplicate positions and write appropriately
 		if ($start == $previous_pos) {
@@ -487,7 +484,8 @@ sub convert_to_bedgraph {
 		# coordinates
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = defined $start_index ? $row->value($start_index) : $row->start;
-		my $stop  = defined $stop_index ? $row->value($stop_index) : $row->stop;
+		my $stop  = defined $stop_index ? $row->value($stop_index) : 
+			$row->stop || $row->start;
 		
 		# adjust start position
 		unless ($interbase) {
@@ -519,12 +517,8 @@ sub convert_to_bedgraph {
 		}
 		
 		# collect the score
-		my $score = $row->value($score_index);
-		next if $score eq '.'; # skip null values
-		if (defined $format) {
-			# format if requested
-			$score = format_score($score);
-		}
+		my $score = get_score($row);
+		next unless defined $score;
 		
 		# write the feature line
 		$out_fh->print(join("\t", $chromosome, $start, $stop, $score), "\n");
@@ -554,26 +548,34 @@ sub calculate_position {
 }
 
 
-sub format_score {
-	my $score = shift;
+sub get_score {
+	my $row = shift;
+	my $score;
 	
-	# format the score value to the indicated number of spaces
-	if ($format == 0) {
-		# no decimal places
-		return sprintf( "%.0f", $score);
+	# get score depending on what was requested
+	if ($attribute_name) {
+		# a GFF attribute
+		if ($Input->gff) {
+			my $attribs = $row->gff_attributes;
+			$score = $attribs->{$attribute_name} || 0;
+		}
+		# a VCF attribute
+		elsif ($Input->vcf) {
+			my $attribs = $row->vcf_attributes;
+			$score = $attribs->{$score_index}{$attribute_name} || 0;
+		}
 	}
-	elsif ($format == 1) {
-		# 1 decimal place
-		return sprintf( "%.1f", $score);
+	elsif ($score_index) {
+		$score = $row->value($score_index) || 0;
 	}
-	elsif ($format == 2) {
-		# 2 decimal places
-		return sprintf( "%.2f", $score);
+	return if $score eq '.';
+	
+	# format as necessary
+	$score =~ s/\%$//; # remove stupid percents if present
+	if ($format) {
+		return sprintf $format, $score;
 	}
-	elsif ($format == 3) {
-		# 3 decimal places
-		return sprintf( "%.3f", $score);
-	}
+	return $score;
 }
 
 
@@ -625,6 +627,7 @@ data2wig.pl [--options...] <filename>
   --chr <column_index>
   --start | --pos <column_index>
   --stop | --end <column_index>
+  --attrib <attribute_name>
   --name <text>
   --(no)track
   --mid
@@ -731,6 +734,15 @@ identified automatically from the column header names.
 
 Optionally specify the column index (0-based) of the stop or end 
 position. It may be identified automatically from the column header names.
+
+=item --attrib <attribute_name>
+
+Optionally provide the name of the attribute key which represents the score 
+value to put into the wig file. Both GFF and VCF attributes are supported. 
+GFF attributes are automatically taken from the attribute column (index 8).
+For VCF columns, provide the (0-based) index number of the sample column 
+from which to take the value (usually 9 or higher) using the --index option. 
+INFO field attributes can also be taken, if desired (use --index 7).
 
 =item --name <text>
 
