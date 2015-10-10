@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = 1.24;
+our $VERSION = 1.33;
 
 
 # Exported names
@@ -24,18 +24,18 @@ our %BIGBED_CHROMOS;
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
 	# $BIGBED_CHROMOS{bigfile}{chromos}
+	# we also record the chromosome name variant with or without chr prefix
+	# to accommodate different naming conventions
 
 # Opened bigBed db objects
 our %OPENED_BB;
 	# a cache for opened BigBed databases, primarily for collecting scores
+	# caching here is only for local purposes of collecting scores
+	# db_helper also provides caching of db objects but with option to force open in
+	# the case of forking processes - we don't have that here
 
 # The true statement
 1; 
-
-
-
-### Modules ###
-
 
 
 ### Collect BigBed scores only
@@ -58,23 +58,10 @@ sub collect_bigbed_scores {
 	foreach my $bedfile (@bed_features) {
 	
 		# open the bedfile
-		my $bb;
-		if (exists $OPENED_BB{$bedfile}) {
-			# use a cached object
-			$bb = $OPENED_BB{$bedfile};
-		}
-		else {
-			# open and cache the bigBed object
-			$bb = open_bigbed_db($bedfile) or 
-				croak " Unable to open bigBed file '$bedfile'! $!\n";
-			$OPENED_BB{$bedfile} = $bb;
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
+		my $bb = _get_bb($bedfile);
 			
 		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
-			next;
-		}
+		$chromo = $BIGBED_CHROMOS{$bedfile}{$chromo} or next;
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
@@ -143,28 +130,14 @@ sub collect_bigbed_position_scores {
 	my %bed_data;
 	
 	# look at each bedfile
-	# usually there is only one, but for stranded data there may be 
-	# two bedfiles (+ and -), so we'll check each bed file for strand info
+	# usually there is only one, but there may be more
 	foreach my $bedfile (@bed_features) {
 	
 		# open the bedfile
-		my $bb;
-		if (exists $OPENED_BB{$bedfile}) {
-			# use a cached object
-			$bb = $OPENED_BB{$bedfile};
-		}
-		else {
-			# open and cache the bigBed object
-			$bb = open_bigbed_db($bedfile) or 
-				croak " Unable to open bigBed file '$bedfile'! $!\n";
-			$OPENED_BB{$bedfile} = $bb;
-			%{ $BIGBED_CHROMOS{$bedfile} } = map { $_ => 1 } $bb->seq_ids;
-		}
+		my $bb = _get_bb($bedfile);
 			
 		# first check that the chromosome is present
-		unless (exists $BIGBED_CHROMOS{$bedfile}{$chromo}) {
-			next;
-		}
+		$chromo = $BIGBED_CHROMOS{$bedfile}{$chromo} or next;
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
@@ -304,6 +277,31 @@ sub sum_total_bigbed_features {
 		# the number of covered bases, not entirely useful here
 }
 
+
+### Internal subroutine for getting the cached bigbed object
+sub _get_bb {
+	my $bbfile = shift;
+	
+	return $OPENED_BB{$bbfile} if exists $OPENED_BB{$bbfile};
+	
+	# open and cache the bigWig object
+	my $bb = open_bigbed_db($bbfile) or 
+		croak " Unable to open bigBed file '$bbfile'! $!\n";
+	$OPENED_BB{$bbfile} = $bb;
+	
+	# record the chromosomes and possible variants
+	$BIGBED_CHROMOS{$bbfile} = {};
+	foreach my $s ($bb->seq_ids) {
+		$BIGBED_CHROMOS{$bbfile}{$s} = $s;
+		if ($s =~ /^chr(.+)$/) {
+			$BIGBED_CHROMOS{$bbfile}{$1} = $s;
+		}
+		else {
+			$BIGBED_CHROMOS{$bbfile}{"chr$s"} = $s;
+		}
+	}
+	return $bb;
+}
 
 
 __END__

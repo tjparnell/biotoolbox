@@ -7,7 +7,7 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-our $VERSION = '1.15';
+our $VERSION = '1.33';
 
 
 # Exported names
@@ -30,10 +30,15 @@ our %BIGWIG_CHROMOS;
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
 	# $BIGWIG_CHROMOS{bigfile}{chromos}
+	# we also record the chromosome name variant with or without chr prefix
+	# to accommodate different naming conventions
 
 # Opened bigWig db objects
 our %OPENED_BW;
 	# a cache for opened BigWig databases, primarily for collecting scores
+	# caching here is only for local purposes of collecting scores
+	# db_helper also provides caching of db objects but with option to force open in
+	# the case of forking processes - we don't have that here
 
 # The true statement
 1; 
@@ -62,47 +67,25 @@ sub collect_bigwig_score {
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $wig (@wig_files) {
-		
-		# open a new db object
-		my $bw;
-		if (exists $OPENED_BW{$wig}) {
-			# use a cached object
-			$bw = $OPENED_BW{$wig};
-		}
-		else {
-			# open and cache the bigWig object
-			$bw = open_bigwig_db($wig) or 
-				croak " Unable to open bigWig file '$wig'! $!\n";
-			$OPENED_BW{$wig} = $bw;
-			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
-		}
+	foreach my $bwfile (@wig_files) {
+		my $bw = _get_bw($bwfile);
 		
 		# first check that the chromosome is present
-		if (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
-			my (@features) = $bw->features(
-				-seq_id    => $chromo,
-				-start     => $start,
-				-end       => $stop,
-				-type      => 'summary',
-			);
-			
-			# check
-			confess(' BigWig database returned ' . scalar(@features) . 
-				'summary features! Expected only 1!\n') 
-				if scalar(@features) > 1;
-			
-			# keep the summary
-			push @summaries, $features[0]->score;
-		}
+		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
+		
+		# collect summary score
+		my @features = $bw->features(
+			-seq_id    => $chromo,
+			-start     => $start,
+			-end       => $stop,
+			-type      => 'summary',
+		);
+		push @summaries, $features[0]->score;
 	}
 	
 	# now process the summary features
 	return _process_summaries($method, @summaries);
 }
-
-
-
 
 
 ### Collect multiple BigWig scores
@@ -119,26 +102,13 @@ sub collect_bigwig_scores {
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $wig (@wig_files) {
+	foreach my $bwfile (@wig_files) {
 	
-		# Open the BigWig file
-		my $bw;
-		if (exists $OPENED_BW{$wig}) {
-			# use a cached object
-			$bw = $OPENED_BW{$wig};
-		}
-		else {
-			# open and cache the bigWig object
-			$bw = open_bigwig_db($wig) or 
-				croak " Unable to open bigWig file '$wig'! $!\n";
-			$OPENED_BW{$wig} = $bw;
-			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
-		}
+		# open db object
+		my $bw = _get_bw($bwfile);
 		
 		# first check that the chromosome is present
-		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
-			next;
-		}
+		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
 		
 		# initialize a feature stream for this segment
 		my $iterator = $bw->features(
@@ -160,8 +130,6 @@ sub collect_bigwig_scores {
 }
 
 
-
-
 ### Collect positioned BigWig scores
 sub collect_bigwig_position_scores {
 	
@@ -177,26 +145,13 @@ sub collect_bigwig_position_scores {
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $wig (@wig_files) {
+	foreach my $bwfile (@wig_files) {
 	
 		# Open the BigWig file
-		my $bw;
-		if (exists $OPENED_BW{$wig}) {
-			# use a cached object
-			$bw = $OPENED_BW{$wig};
-		}
-		else {
-			# open and cache the bigWig object
-			$bw = open_bigwig_db($wig) or 
-				croak " Unable to open bigWig file '$wig'! $!\n";
-			$OPENED_BW{$wig} = $bw;
-			%{ $BIGWIG_CHROMOS{$wig} } = map { $_ => 1 } $bw->seq_ids;
-		}
+		my $bw = _get_bw($bwfile);
 		
 		# first check that the chromosome is present
-		unless (exists $BIGWIG_CHROMOS{$wig}{$chromo}) {
-			next;
-		}
+		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
 		
 		# initialize a feature stream for this segment
 		my $iterator = $bw->features(
@@ -239,8 +194,8 @@ sub collect_bigwigset_score {
 	}
 	
 	# Confirm the chromosome
-	my $first_path = ($db->bigwigs)[0];
-	unless ( exists $BIGWIG_CHROMOS{$first_path}{$chromo} ) {
+	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	unless (defined $chromo) {
 		# chromosome is not present, at least in the first bigwig in the set
 		# return null
 		return $method =~ /sum|count/ ? 0 : '.';
@@ -351,12 +306,10 @@ sub collect_bigwigset_scores {
 	my ($db, $chromo, $start, $stop, $strand, $stranded, @types) = @_;
 	
 	# Confirm the chromosome
-	my $first_path = ($db->bigwigs)[0];
-	unless ( exists $BIGWIG_CHROMOS{$first_path}{$chromo} ) {
+	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
 		# return nothing
-		return;
-	}
 	
 	# Reset which feature_type to collect from the database
 	# this is normally set to region when we opened the bigwigset db
@@ -468,12 +421,10 @@ sub collect_bigwigset_position_scores {
 	my ($db, $chromo, $start, $stop, $strand, $stranded, @types) = @_;
 	
 	# Confirm the chromosome
-	my $first_path = ($db->bigwigs)[0];
-	unless ( exists $BIGWIG_CHROMOS{$first_path}{$chromo} ) {
+	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
 		# return nothing
-		return;
-	}
 	
 	# Reset which feature_type to collect from the database
 	# this is normally set to region when we opened the bigwigset db
@@ -635,43 +586,64 @@ sub open_bigwigset_db {
 	
 	# check that we haven't just opened a new empty bigwigset object
 	my @paths = $bws->bigwigs;
+	return unless @paths; # no valid bigWig files, not valid
 	
-	if (@paths) {
-		# we have bigwig files, must be a valid bigwigset directory
-		
-		# collect the chromosomes from the first bigwig
-		# we will assume all of the bigwigs have the same chromosomes!
-		my $bw = $bws->get_bigwig($paths[0]);
-		
-		# collect the chromosomes for this bigwig
-		%{ $BIGWIG_CHROMOS{$paths[0]} } = map { $_ => 1 } $bw->seq_ids;
-		
-		# check for potential implied strandedness
-		my $md = $bws->metadata;
-		foreach my $i (keys %$md) {
-			my $f = $md->{$i}{'dbid'}; # the file path
-			if ($f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i) {
-				# implied forward strand 
-				unless (exists $md->{$i}{'strand'}) {
-					$bws->set_bigwig_attributes($f, {'strand' => 1});
-				}
-			}
-			elsif ($f =~ /(?:r|rev|reverse|bottom|minus|\-)\.bw$/i) {
-				# implied reverse strand 
-				unless (exists $md->{$i}{'strand'}) {
-					$bws->set_bigwig_attributes($f, {'strand' => -1});
-				}
+	# we have bigwig files, must be a valid bigwigset directory
+	
+	# collect the chromosomes from the first bigwig
+	# we will assume all of the bigwigs have the same chromosomes!
+	_record_seqids($paths[0], $bws->get_bigwig($paths[0]) );
+	
+	# check for potential implied strandedness
+	my $md = $bws->metadata;
+	foreach my $i (keys %$md) {
+		my $f = $md->{$i}{'dbid'}; # the file path
+		if ($f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i) {
+			# implied forward strand 
+			unless (exists $md->{$i}{'strand'}) {
+				$bws->set_bigwig_attributes($f, {'strand' => 1});
 			}
 		}
-		
-		return $bws;
+		elsif ($f =~ /(?:r|rev|reverse|bottom|minus|\-)\.bw$/i) {
+			# implied reverse strand 
+			unless (exists $md->{$i}{'strand'}) {
+				$bws->set_bigwig_attributes($f, {'strand' => -1});
+			}
+		}
 	}
-	else {
-		# no valid bigWig files, not valid
-		return;
-	}
+	
+	return $bws;
 }
 
+
+### Internal subroutine for getting the cached bigwig object
+sub _get_bw {
+	my $bwfile = shift;
+	
+	return $OPENED_BW{$bwfile} if exists $OPENED_BW{$bwfile};
+	
+	# open and cache the bigWig object
+	my $bw = open_bigwig_db($bwfile) or 
+		croak " Unable to open bigWig file '$bwfile'! $!\n";
+	$OPENED_BW{$bwfile} = $bw;
+	_record_seqids($bwfile, $bw);
+	return $bw;
+}
+
+	# record the chromosomes and possible variants
+sub _record_seqids {
+	my ($bwfile, $bw) = @_;
+	$BIGWIG_CHROMOS{$bwfile} = {};
+	foreach my $s ($bw->seq_ids) {
+		$BIGWIG_CHROMOS{$bwfile}{$s} = $s;
+		if ($s =~ /^chr(.+)$/) {
+			$BIGWIG_CHROMOS{$bwfile}{$1} = $s;
+		}
+		else {
+			$BIGWIG_CHROMOS{$bwfile}{"chr$s"} = $s;
+		}
+	}
+}
 
 
 

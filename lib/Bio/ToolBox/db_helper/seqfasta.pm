@@ -9,7 +9,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
-our $VERSION = '1.25';
+our $VERSION = '1.33';
 our $WIGGLE_OK = 0;
 
 # Exported names
@@ -154,6 +154,24 @@ sub _collect_store_data {
 		-end         => $stop,
 		-primary_tag => [@types],
 	);
+	unless ($iterator) {
+		# do we have the wrong chromosome name? try another naming convention
+		if ($chromo =~ /^chr(.+)$/) {
+			# strip chr prefix
+			$chromo = $1;
+		}
+		else {
+			# add chr prefix
+			$chromo = "chr$chromo";
+		}
+		# try again
+		$iterator = $db->get_seq_stream(
+			-seq_id      => $chromo,
+			-start       => $start,
+			-end         => $stop,
+			-primary_tag => [@types],
+		);
+	}
 	return unless $iterator;
 	
 	# collect the first feature
