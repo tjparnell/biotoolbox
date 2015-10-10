@@ -502,7 +502,7 @@ sub _assign_callback {
 	# sense, forward strand 
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
@@ -510,7 +510,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		$do_index
 	) {
@@ -518,7 +518,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		!$do_index
 	) {
@@ -526,7 +526,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		!$do_index
 	) {
@@ -534,7 +534,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'ncount' and 
 		!$do_index
 	) {
@@ -542,7 +542,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -550,7 +550,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		!$do_index
 	) {
@@ -620,7 +620,7 @@ sub _assign_callback {
 	# anti-sense, forward strand 
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
@@ -628,7 +628,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		$do_index
 	) {
@@ -636,7 +636,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		!$do_index
 	) {
@@ -644,7 +644,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		!$do_index
 	) {
@@ -652,7 +652,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'ncount' and 
 		!$do_index
 	) {
@@ -660,7 +660,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -668,7 +668,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		!$do_index
 	) {
