@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.31';
+my $VERSION = '1.33';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -128,9 +128,7 @@ my $method = determine_method();
 
 ### Collect feature regions
 # collection
-print " Collecting ";
-print $unique ? "unique " : "";
-print "$request regions...\n";
+printf " Collecting %s$request regions...\n", $unique ? "unique " : "";
 
 my $outdata;
 if ($database) {
@@ -139,7 +137,7 @@ if ($database) {
 elsif ($infile) {
 	$outdata = collect_from_file($method);
 }
-printf "  collected %s regions\n", format_with_commas($outdata->last_row);
+printf " Collected %s regions\n", format_with_commas($outdata->last_row);
 print " Sorting...\n";
 $outdata->gsort_data;
 
@@ -446,6 +444,10 @@ sub collect_from_file {
 	my $method = shift;
 	
 	# get transcript_type
+	unless (defined $transcript_type) {
+		# user providing a file, so we'll just take everything in here
+		$transcript_type = 'all';
+	}
 	determine_transcript_types();
 	
 	# Collect the top features for each sequence group.
@@ -453,12 +455,6 @@ sub collect_from_file {
 	# we'll load the top features, which will collect all the features 
 	# and assemble appropriate feature -> subfeatures according to the 
 	# parent - child attributes.
-	# This may (will?) be memory intensive. This can be limited by 
-	# including '###' directives in the GFF3 file after each chromosome.
-	# This directive tells the parser that all previously opened feature 
-	# objects are finished and may be closed.
-	# Without the directives, all feature objects loaded from the GFF3 file 
-	# will be kept open until the end of the file is reached. 
 	
 	# generate output data
 	my $Data = generate_output_structure();
@@ -483,32 +479,45 @@ sub collect_from_file {
 	$parser->parse_table or die "unable to parse file '$infile'!\n";
 	
 	# process the features
+	my @bad_features;
 	while (my $seqfeat = $parser->next_top_feature) {
 		
-		# collect the regions based on the primary tag and the method re
-		if ($seqfeat->primary_tag =~ /^gene$/i) {
-			# gene
-			my @genes = process_gene($seqfeat, $method);
-			foreach (@genes) {
+		# collect the regions based on the primary tag
+		if ($seqfeat->primary_tag =~ /gene$/i) {
+			# gene, including things like gene, miRNA_gene, etc
+			my @regions = process_gene($seqfeat, $method);
+			foreach (@regions) {
 				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
-		elsif ($seqfeat->primary_tag =~ /rna/i) {
+		elsif ($seqfeat->primary_tag =~ /rna|transcript/i) {
 			# transcript
 			my @regions = process_transcript($seqfeat, $method);
 			
 			# add the parent name
-			map { unshift @$_, $seqfeat->display_name } @regions;
+			map { unshift @{$_}, $seqfeat->display_name } @regions;
 			
 			foreach (@regions) {
 				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
+		else {
+			push @bad_features, $seqfeat unless 
+				$seqfeat->primary_tag =~ /chromosome|contig|scaffold|sequence/i;
+		}
 	}
 	
 	# finished
+	if (@bad_features) {
+		my %bad_types;
+		foreach (@bad_features) {
+			$bad_types{ $_->primary_tag } += 1;
+		}
+		printf " skipped %s unrecognized top feature types:\n%s\n", scalar(@bad_features), 
+			join("\n", map {"  $bad_types{$_} $_"} sort {$a cmp $b} keys %bad_types);
+	}
 	return $Data;
 }
 
@@ -560,7 +569,7 @@ sub process_gene {
 		if ($subfeat->primary_tag =~ /^mrna$/i) {
 			push @mRNAs, $subfeat;
 		}
-		elsif (_acceptable_transcript($subfeat)) {
+		elsif (acceptable_transcript($subfeat)) {
 			push @ncRNAs, $subfeat;
 		}
 	}
@@ -642,9 +651,10 @@ sub process_transcript {
 	return if ($request =~ /^common ?exons?/i);
 	
 	# call appropriate method
-	if (_acceptable_transcript($transcript)) {
+	if (acceptable_transcript($transcript)) {
 		return &{$method}($transcript);
 	}
+	return;
 }
 
 
@@ -1040,7 +1050,7 @@ sub collect_common_alt_exons {
 	my @ncRNAs;
 	foreach ($gene->get_SeqFeaturess) {
 		push @mRNAs,  $_ if $_->primary_tag =~ /^mrna$/i;
-		push @ncRNAs, $_ if _acceptable_transcript($_);
+		push @ncRNAs, $_ if acceptable_transcript($_);
 	}
 	
 	# get list of transcripts, must have more than one
@@ -1072,7 +1082,7 @@ sub collect_common_alt_exons {
 	my %pos2exons;
 	my $trx_number = 0;
 	foreach my $t (@transcripts) {
-		next unless _acceptable_transcript($t);
+		next unless acceptable_transcript($t);
 		my $exons = _collect_exons($t);
 		foreach my $e (@$exons) {
 			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
@@ -1176,11 +1186,11 @@ sub _collect_exons {
 }
 
 
-sub _acceptable_transcript {
+sub acceptable_transcript {
 	my $t = shift;
 	return 1 if ($t->primary_tag =~ 
 		/rna|transcript|retained_intron|antisense|nonsense/i and $do_all_rna);
-	return 1 if ($t->primary_tag =~ /mrna/i and $do_mrna);
+	return 1 if (is_coding($t) and $do_mrna);
 	return 1 if ($t->primary_tag =~ /mirna/i and $do_mirna);
 	return 1 if ($t->primary_tag =~ /ncrna/i and $do_ncrna);
 	return 1 if ($t->primary_tag =~ /snrna/i and $do_snrna);
@@ -1193,6 +1203,24 @@ sub _acceptable_transcript {
 	return 1 if ($t->primary_tag =~ /lincrna/i and $do_lincrna);
 	return 0;
 }
+
+sub is_coding {
+	my $transcript = shift;
+	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
+	return 1 if $transcript->source =~ /protein.?coding/i;
+	if ($transcript->has_tag('biotype')) {
+		# ensembl type GFFs
+		my ($biotype) = $transcript->get_tag_values('biotype');
+		return 1 if $biotype =~ /protein.?coding/i;
+	}
+	foreach ($transcript->get_SeqFeatures) {
+		# old fashioned way
+		return 1 if $_->primary_tag eq 'CDS';
+	}
+	return 0;
+}
+
+
 
 
 sub _adjust_positions {
