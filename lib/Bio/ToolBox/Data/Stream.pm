@@ -666,7 +666,7 @@ sub duplicate {
 		my %md = $self->metadata($i);
 		$Dup->{$i} = \%md;
 	}
-	foreach (qw(feature program db bed gff ucsc headers)) {
+	foreach (qw(feature program db bed gff vcf ucsc headers)) {
 		# various keys
 		$Dup->{$_} = $self->{$_};
 	}

@@ -694,8 +694,8 @@ sub write_file {
 		
 		# Write the primary headers
 		unless (
-			$self->gff or $self->bed or $self->{'ucsc'} or
-			$extension =~ m/sgr|kgg|cdt|peak|vcf/i
+			$self->gff or $self->bed or $self->ucsc or $self->vcf or
+			$extension =~ m/sgr|kgg|cdt|peak/i
 		) {
 			# we only write these for normal text files, not defined format files
 			
@@ -753,7 +753,7 @@ sub write_file {
 				# these are so simple it's not worth writing them
 				next;
 			}
-			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc) {
+			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc or $self->vcf) {
 				# these do not support metadata lines
 				next;
 			}
