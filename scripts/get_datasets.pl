@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = '1.30';
+my $VERSION = '1.33';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -237,10 +237,12 @@ if ($datasets[0] eq 'none') {
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 1000) {
-		# We need at least 1000 lines in each fork split to make 
+	while ($cpu > 1 and $Data->last_row / $cpu < 500) {
+		# We need at least 500 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
+		# dang it! it all depends on what we're collecting from
+		# bw mean goes super fast, but bam rpkms are really slow
 		$cpu--;
 	}
 }

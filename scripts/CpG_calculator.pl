@@ -151,7 +151,7 @@ my $db = open_sequence_db(0) or
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and ($Data->last_row / $cpu) < 1000) {
+	while ($cpu > 1 and ($Data->last_row / $cpu) < 500) {
 		# We need at least 1000 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
