@@ -484,8 +484,8 @@ sub write_file {
 			}
 		}
 		elsif (not $self->gff) {
-			# flag not set, reset extension
-			warn " re-setting extension from $extension to .txt\n";
+			# flag not set from verification above, extension matches, reset extension
+			warn " GFF structure changed. re-setting extension from $extension to .txt\n";
 			$extension =~ s/g[tf]f3?/txt/i;
 		}
 	}
@@ -495,13 +495,13 @@ sub write_file {
 			# let's set it to true and see if it passes verification
 			$self->{'bed'} = 1; # a fake true
 			unless ($self->verify and $self->bed) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " Re-setting extension from $extension to .txt\n";
 				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
 		}
 		elsif (not $self->bed) {
-			# flag not set, reset extension
-			warn " re-setting extension from $extension to .txt\n";
+			# flag not set from verification above, but extension matches, reset extension
+			warn " BED structure changed. Re-setting extension from $extension to .txt\n";
 			$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 		}
 	}
@@ -517,20 +517,25 @@ sub write_file {
 			$self->{'extension'} = '.sgr';
 			$self->verify;
 			if ($self->extension =~ /txt/) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " SGR structure changed. Re-setting extension from $extension to .txt\n";
 			}
 			$extension = $self->{'extension'};
 		}
 	}
 	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
-		if ($self->ucsc != $self->number_columns) {
+		if ($self->ucsc != $self->number_columns and $self->extension ne $extension) {
 			# it's not set as a ucsc data
 			# let's set it to true and see if it passes verification
 			$self->ucsc($self->number_columns);
 			unless ($self->verify and $self->ucsc) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " Re-setting extension from $extension to .txt\n";
 				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
+		}
+		elsif (not $self->ucsc) {
+			# flag not set from verification above, but extension matches, reset extension
+			warn " BED structure changed. Re-setting extension from $extension to .txt\n";
+			$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 		}
 	}
 	elsif (not $extension) {
@@ -551,9 +556,14 @@ sub write_file {
 				$extension = '.bed'; # a regular bed file
 			}
 		}
-		
-		# original file had an extension, re-use it if appropriate
+		elsif ($self->ucsc) {
+			# use a generic ucsc format, don't bother to customize it
+			$extension = '.ucsc';
+		}
 		elsif ($self->extension) {
+			# original file had an extension, re-use it if appropriate
+			# why wouldn't this get picked up above???? probably old cruft, 
+			# leave it in for the time being, shouldn't hurt anything
 			if ($self->extension =~ /g[tf]f/i) {
 				$extension = $self->gff ? $self->extension : '.txt';
 			}
@@ -565,15 +575,17 @@ sub write_file {
 				$extension = $self->extension;
 			}
 		}
-		
-		# normal data text file
 		else {
+			# normal data text file
 			$extension = '.txt';
 		}
 	}
 	# otherwise the extension must be good, hope for the best
 	
 	# determine format 
+	# this is an arcane specification of whether we want a "simple" no metadata 
+	# format, or an ordinary text format that may or may not have metadata
+	# it's currently not hurting much, so leave it in for now?
 	unless ($args{'format'}) {
 		if (defined $args{'simple'}) {
 			# an old method of specifying simple
