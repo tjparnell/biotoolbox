@@ -580,10 +580,17 @@ sub id {
 sub length {
 	my $self = shift;
 	carp "length is a read only method" if @_;
+	if ($self->{data}->vcf) {
+		# special case for vcf files, measure the length of the ALT allele
+		return CORE::length($self->value(4)); 
+	}
 	my $s = $self->start;
 	my $e = $self->end;
 	if (defined $s and defined $e) {
 		return $e - $s + 1;
+	}
+	elsif (defined $s) {
+		return 1;
 	}
 	else {
 		return undef;
@@ -782,10 +789,11 @@ sub bed_string {
 	# coordinate information
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
+	my $stop  = $args{stop} || $args{end} || $self->stop || 
+		$start + $self->length - 1 || $start;
+	unless ($chr and defined $start) {
 		carp "Not enough information to generate bed string. Need identifiable" . 
-			"chr, start, stop columns";
+			"chromosome and start columns";
 		return;
 	}
 	$start -= 1; # 0-based coordinates
@@ -819,10 +827,11 @@ sub gff_string {
 	# coordinate information
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
+	my $stop  = $args{stop} || $args{end} || $self->stop || 
+		$start + $self->length - 1 || $start;
+	unless ($chr and defined $start) {
 		carp "Not enough information to generate GFF string. Need identifiable" . 
-			"chr, start, stop columns";
+			"chromosome and start columns";
 		return;
 	}
 	my $strand = $args{strand} || $self->strand;
