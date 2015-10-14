@@ -89,7 +89,7 @@ my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
 unless (defined $index) {
 	$index = ask_user_for_index($Input, 
 		"  Enter the column index number containing the values to split by   ");
-	unless ($index) {
+	unless (defined $index) {
 		die " Must provide a valid index!\n";
 	}
 }
