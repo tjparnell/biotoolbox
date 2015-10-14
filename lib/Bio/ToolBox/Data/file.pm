@@ -148,7 +148,7 @@ sub parse_headers {
 	
 	# check that we have an empty table
 	if ($self->last_row != 0 or $self->number_columns != 0) {
-		carp "Cannot parse file headers onto an existing data table!";
+		cluck "Cannot parse file headers onto an existing data table!";
 		return;
 	}	
 	
@@ -264,11 +264,12 @@ sub parse_headers {
 				
 				# process the real header line
 				$self->add_standard_metadata( pop @{ $self->{'comments'} } );
-				last PARSE_HEADER_LOOP;
 			}
+			# we will continue here in case the commented header line was part of a 
+			# formatted file type, which will be checked by extension below
 			
 			### a GFF file
-			elsif ($self->extension =~ /g[tf]f/i) {
+			if ($self->extension =~ /g[tf]f/i) {
 				$self->add_gff_metadata;
 				last PARSE_HEADER_LOOP;
 			}
@@ -302,9 +303,8 @@ sub parse_headers {
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
 			### standard text file with headers, i.e. everything else
-			else {
+			unless ($self->number_columns) {
 				# we have not yet parsed the row of data column names
 				# we will do so now
 				
@@ -364,6 +364,8 @@ sub add_data_line {
 		if ($line =~ /\r/ and $line !~ /\n/) {
 			die "File does not appear to have unix line endings!\n" . 
 				" Please convert to unix-style line endings and try again\n";
+			# the line ending is set by a global variable for low-level file reading
+			# at this point it's easier to just die than reset it and start over
 		}
 		warn "Number of columns in line is inconsistent\n";
 		# we will verify the table after loading all the lines to verify 
@@ -1013,8 +1015,6 @@ sub add_column_metadata {
 	else {
 		# metadata hash doesn't exist, so we will add it
 		$data->{$index} = \%temphash;
-		# also update the number of columns
-		$data->{'number_columns'} += 1;
 	}
 	return 1;
 }
@@ -1053,8 +1053,8 @@ sub add_gff_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1062,7 +1062,7 @@ sub add_gff_metadata {
 	$self->{6}{'AUTO'}++;
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1107,8 +1107,8 @@ sub add_bed_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1123,7 +1123,7 @@ sub add_bed_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1153,8 +1153,8 @@ sub add_peak_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1169,7 +1169,7 @@ sub add_peak_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1199,8 +1199,8 @@ sub add_ucsc_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1214,7 +1214,7 @@ sub add_ucsc_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1237,14 +1237,14 @@ sub add_sgr_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	$self->{'number_columns'} = 3; 
 
 
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1266,7 +1266,7 @@ sub add_standard_metadata {
 		# confirm that a file metadata exists for this column
 		if (exists $self->{$i}) {
 			unless ($namelist[$i] eq $self->{$i}->{'name'}) {
-				cluck "metadata and header names for column $i do not match!";
+				warn "metadata and header names for column $i do not match!";
 				# set the name to match the actual column name
 				$self->{$i}->{'name'} = $namelist[$i];
 			}
