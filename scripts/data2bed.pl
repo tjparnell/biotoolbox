@@ -228,14 +228,14 @@ my $Output = Bio::ToolBox::Data->new(
 
 
 # Convert the input stream
-printf " Converting using \n  - chromosome index %d\n  - start index %d\n" . 
-	"  - stop index %d\n  - name index %d\n  - score index %d\n  - strand index %d\n",
-	$chr_index || $Input->chromo_column,
-	$start_index || $Input->start_column,
-	$stop_index || $Input->stop_column,
-	$name_index || $name_base || $Input->name_column,
-	$score_index,
-	$strand_index || $Input->strand_column;
+printf " Converting using \n  - chromosome index %s\n  - start index %s\n" . 
+	"  - stop index %s\n  - name index %s\n  - score index %s\n  - strand index %s\n",
+	defined $chr_index ? $chr_index : defined $Input->chromo_column ? $Input->chromo_column : '-',
+	defined $start_index ? $start_index : defined $Input->start_column ? $Input->start_column : '-',
+	defined $stop_index ? $stop_index : defined $Input->stop_column ? $Input->stop_column : '-',
+	defined $name_index ? $name_index : defined $name_base ? $name_base : defined $Input->name_column ? $Input->name_column : '-',
+	defined $score_index ? $score_index : '-',
+	defined $strand_index ? $strand_index : defined $Input->strand_column ? $Input->strand_column : '-';
 
 my $count = 0; # the number of lines processed
 my $notsorted = 0; # flag to set 

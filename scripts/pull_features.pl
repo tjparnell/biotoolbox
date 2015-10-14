@@ -113,12 +113,12 @@ my $Data = Bio::ToolBox::Data->new(file => $datafile) or
 
 
 ### Determine indices
-identify_indices();
 
 
 
 ### Load the list of specified values
 print " Collecting lookup values from file '$listfile'...\n";
+identify_indices();
 my ($requests, $pulled) = collect_request_list();
 	# these are global references to two data hashes
 	# the first is for a lookup for the feature requests and identify the group number
@@ -450,25 +450,24 @@ sub write_files {
 		my $write_results = $group_Data->save;
 			# no file name, using the filename recorded in the out data
 		if ($write_results) {
-			print "  Wrote new datafile '$write_results'\n";
+			print " Wrote new datafile '$write_results'\n";
 		}
 		else {
-			print "  Unable to write datafile '$write_results'!!!\n";
+			print " Unable to write datafile '$write_results'!!!\n";
 		}
 		
 		# Summarize the pulled data
 		if ($sum) {
-			print " Generating final summed data...\n";
 			my $sumfile = $group_Data->summary_file(
 				'startcolumn'  => $startcolumn,
 				'endcolumn'    => $stopcolumn,
 				'log'          => $log,
 			);
 			if ($sumfile) {
-				print "  Wrote summary file '$sumfile'\n";
+				print " Wrote summary file '$sumfile'\n";
 			}
 			else {
-				print "  Unable to write summary file!\n";
+				print " Unable to write summary file!\n";
 			}
 		}
 	}
