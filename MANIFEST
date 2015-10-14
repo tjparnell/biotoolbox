@@ -15,7 +15,6 @@ lib/Bio/ToolBox/db_helper/config.pm
 lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
-lib/Bio/ToolBox/legacy_helper.pm
 lib/Bio/ToolBox/parser/gff.pm
 lib/Bio/ToolBox/parser/ucsc.pm
 lib/Bio/ToolBox/utility.pm
