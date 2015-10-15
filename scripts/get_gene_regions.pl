@@ -1043,14 +1043,18 @@ sub collect_exons {
 sub collect_common_alt_exons {
 	
 	my $gene = shift;
-	my $alternate = shift;
+	my $alternate = shift || 0;
 	
 	# identify types of transcripts to avoid mixed types
 	my @mRNAs;
 	my @ncRNAs;
 	foreach ($gene->get_SeqFeaturess) {
-		push @mRNAs,  $_ if $_->primary_tag =~ /^mrna$/i;
-		push @ncRNAs, $_ if acceptable_transcript($_);
+		if (is_coding($_)) {
+			push @mRNAs, $_;
+		}
+		else {
+			push @ncRNAs, $_ if acceptable_transcript($_);
+		}
 	}
 	
 	# get list of transcripts, must have more than one
@@ -1141,7 +1145,7 @@ sub _collect_exons {
 	
 	# go through the subfeatures
 	foreach my $subfeat ($transcript->get_SeqFeatures) {
-		if ($subfeat->primary_tag =~ /exon/) {
+		if ($subfeat->primary_tag =~ /exon/i) {
 			push @exons, $subfeat;
 		}
 		elsif ($subfeat->primary_tag =~ /cds|utr|untranslated/i) {
