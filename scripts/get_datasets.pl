@@ -999,7 +999,7 @@ sub get_subfeature_dataset {
 			elsif ($subfeat->primary_tag =~ /cds/i) {
 				push @cdss, $subfeat;
 			}
-			elsif ($subfeat->primary_tag =~ /rna/i) {
+			elsif ($subfeat->primary_tag =~ /rna|transcript/i) {
 				# an RNA subfeature, keep going down another level
 				foreach my $f ($subfeat->get_SeqFeatures) {
 					if ($f->primary_tag =~ /exon/i) {

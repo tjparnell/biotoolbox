@@ -11,7 +11,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+my $VERSION = '1.33';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -260,10 +260,10 @@ sub get_attribute_method {
 	elsif ($attrib =~ /^length$/i) {
 		$method = \&get_length;
 	} 
-	elsif ($attrib =~ /^gene_length$/i) {
+	elsif ($attrib =~ /^gene.?length$/i) {
 		$method = \&get_gene_length;
 	} 
-	elsif ($attrib =~ /^transcript_length$/i) {
+	elsif ($attrib =~ /^transcript.?length$/i) {
 		$method = \&get_transcript_length;
 	} 
 	elsif ($attrib =~ /^strand$/i) {
@@ -275,16 +275,16 @@ sub get_attribute_method {
 	elsif ($attrib =~ /^score$/i) {
 		$method = \&get_score;
 	} 
-	elsif ($attrib =~ /^rna_count$/i) {
+	elsif ($attrib =~ /^rna.?count$/i) {
 		$method = \&get_rna_number;
 	} 
-	elsif ($attrib =~ /^exon_count$/i) {
+	elsif ($attrib =~ /^exon.?count$/i) {
 		$method = \&get_exon_number;
 	} 
 	elsif ($attrib =~ /^parent$/i) {
 		$method = \&get_parent;
 	} 
-	elsif ($attrib =~ /^primary_id$/i) {
+	elsif ($attrib =~ /^primary.?id$/i) {
 		$method = \&get_primary_id;
 	} 
 	elsif ($attrib =~ /^name$/i) {
@@ -296,7 +296,7 @@ sub get_attribute_method {
 	elsif ($attrib =~ /^type$/i) {
 		$method = \&get_type;
 	} 
-	elsif ($attrib =~ /^primary_tag$/i) {
+	elsif ($attrib =~ /^primary.?tag$/i) {
 		$method = \&get_primary_tag;
 	} 
 	else {
@@ -399,7 +399,7 @@ sub get_gene_length {
 		elsif ($subfeat->primary_tag =~ /cds/i) {
 			push @cdss, $subfeat;
 		}
-		elsif ($subfeat->primary_tag =~ /rna/i) {
+		elsif ($subfeat->primary_tag =~ /rna|transcript/i) {
 			# an RNA subfeature, keep going down another level
 			foreach my $f ($subfeat->get_SeqFeatures) {
 				if ($f->primary_tag =~ /exon/i) {
@@ -530,7 +530,7 @@ sub get_rna_number {
 	return 0 unless $feature;
 	my $rna_count = 0;
 	foreach my $f ($feature->get_SeqFeatures) {
-		if ($f->primary_tag =~ /rna/i) {
+		if ($f->primary_tag =~ /rna|transcript/i) {
 			# an RNA transcript
 			$rna_count++;
 		}
@@ -552,7 +552,7 @@ sub get_exon_number {
 		elsif ($f->primary_tag =~ /cds/i) {
 			$cds_count++;
 		}
-		elsif ($f->primary_tag =~ /rna/i) {
+		elsif ($f->primary_tag =~ /rna|transcript/i) {
 			# an RNA transcript, go one more level
 			foreach my $sf ($f->get_SeqFeatures) {
 				if ($sf->primary_tag =~ /exon/i) {
@@ -680,9 +680,9 @@ get_feature_info.pl <filename>
    Length
    Midpoint
    Phase
-   RNA_count
-   Exon_count
-   Gene_length (sum of merged alternative transcript exon lengths)
+   RNA_count (number of transcript subfeatures)
+   Exon_count (number of exon subfeatures)
+   Gene_length (sum of all merged, collapsed, transcript exon lengths)
    Transcript_length (sum of exon lengths)
    Parent (name)
    Primary_ID
@@ -732,9 +732,9 @@ attributes include the following
    - Length
    - Midpoint
    - Phase
-   - RNA_count (number of RNA subfeatures)
-   - Exon_count (number of exons, or CDS, subfeatures)
-   - Gene_length (sum of merged alternative transcript exon lengths)
+   - RNA_count (number of transcript subfeatures)
+   - Exon_count (number of exon subfeatures)
+   - Gene_length (sum of all merged, collapsed, transcript exon lengths)
    - Transcript_length (sum of exon lengths)
    - Parent (name)
    - Primary_ID
