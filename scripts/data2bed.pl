@@ -300,7 +300,7 @@ if ($bigbed) {
 	
 	# perform the conversion
 	my $bb_file = bed_to_bigbed_conversion(
-			'bed'       => $outfile,
+			'bed'       => $Output->filename,
 			'db'        => $database,
 			'chromo'    => $chromo_file,
 			'bbapppath' => $bb_app_path,
