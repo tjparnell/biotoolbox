@@ -21,7 +21,7 @@ eval {
 	require Bio::EnsEMBL::Registry;
 	Bio::EnsEMBL::Registry->import;
 };
-my $VERSION = 1.21;
+my $VERSION = '1.33';
 	
 print "\n A script to fetch genomic annotation from public Ensembl databases\n\n";
 
@@ -287,8 +287,7 @@ foreach my $slice (@{ $slices_ref }) {
 		);
 		
 		# write the object
-		$chromo_sf->version(3);
-		$gff_fh->print( $chromo_sf->gff_string . "\n");
+		$gff_fh->print( $chromo_sf->gff3_string . "\n");
 		$chr_feature_count++;
 	}
 	
@@ -550,8 +549,7 @@ sub process_coding_gene {
 	
 	
 	# print the gene feature and its subfeatures
-	$gene_sf->version(3);
-	$gff_fh->print( $gene_sf->gff_string(1), "\n###\n");
+	$gff_fh->print( $gene_sf->gff3_string(1), "\n###\n");
 		# the gff_string method is undocumented in the POD, but is a 
 		# valid method. Passing 1 should force a recursive action to 
 		# print parent and children.
@@ -1030,8 +1028,7 @@ sub process_rna_gene {
 	}
 	
 	# print the gene feature and its subfeatures
-	$gene_sf->version(3);
-	$gff_fh->print( $gene_sf->gff_string(1), "\n###\n");
+	$gff_fh->print( $gene_sf->gff3_string(1), "\n###\n");
 		# the gff_string method is undocumented in the POD, but is a 
 		# valid method. Passing 1 should force a recursive action to 
 		# print parent and children.

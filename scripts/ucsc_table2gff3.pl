@@ -490,8 +490,7 @@ sub print_current_gene_list {
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'numeric_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'numeric_chr'}{$chr} }) {
 			# print the seqfeature recursively
-			$pos2seqf{'numeric_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1));
 			
 			# print directive to close out all previous features
 			$gff_fh->print("\n###\n"); 
@@ -499,22 +498,19 @@ sub print_current_gene_list {
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_chr'}{$chr} }) {
-			$pos2seqf{'other_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'other_numeric'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_numeric'}{$chr} }) {
-			$pos2seqf{'other_numeric'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other'}{$chr} }) {
-			$pos2seqf{'other'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}
