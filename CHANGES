@@ -1,5 +1,19 @@
 ######## Bio::ToolBox revision history #############
 
+v.1.33 (git ba1a70e)
+	- Removed legacy_helper module. All scripts now properly updated to  
+	use Bio::ToolBox::Data and related objects. This was the last step of 
+	a long process to modernize all of the scripts to use the new libraries.
+	- All data collection modules are now chromosome naming-scheme agnostic, 
+	meaning that "chr1" and "1" for chromosome can be used equally, regardless 
+	of what the annotation or big data file uses.
+	- Minimal VCF file support is added, including the ability to parse INFO 
+	and SAMPLE attributes, and verify some file format integrity. 
+	- Significantly improve GTF file parsing. 
+	- Improve file format verification, including printing error messages. 
+	This should alleviate cryptic reasons for automatic file extension changes.
+	- Tons of bug fixes. See GitHub for a full change log. 
+
 v.1.32 (git 67749a7)
 	- Fix bug with adding a new column to Data object, particularly 
 	when selected from a database. 
