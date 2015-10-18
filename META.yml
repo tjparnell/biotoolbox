@@ -15,24 +15,24 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.32'
+    version: '1.33'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.32'
+    version: '1.33'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
-    version: '1.30'
+    version: '1.33'
   Bio::ToolBox::Data::Iterator:
     file: lib/Bio/ToolBox/Data.pm
   Bio::ToolBox::Data::Stream:
     file: lib/Bio/ToolBox/Data/Stream.pm
-    version: '1.30'
+    version: '1.33'
   Bio::ToolBox::Data::core:
     file: lib/Bio/ToolBox/Data/core.pm
     version: '1.32'
   Bio::ToolBox::Data::file:
     file: lib/Bio/ToolBox/Data/file.pm
-    version: '1.32'
+    version: '1.33'
   Bio::ToolBox::big_helper:
     file: lib/Bio/ToolBox/big_helper.pm
     version: '1.14'
@@ -41,31 +41,28 @@ provides:
     version: '1.32'
   Bio::ToolBox::db_helper::bam:
     file: lib/Bio/ToolBox/db_helper/bam.pm
-    version: '1.30'
+    version: '1.33'
   Bio::ToolBox::db_helper::bigbed:
     file: lib/Bio/ToolBox/db_helper/bigbed.pm
-    version: '1.24'
+    version: '1.33'
   Bio::ToolBox::db_helper::bigwig:
     file: lib/Bio/ToolBox/db_helper/bigwig.pm
-    version: '1.15'
+    version: '1.33'
   Bio::ToolBox::db_helper::config:
     file: lib/Bio/ToolBox/db_helper/config.pm
     version: '1.14'
   Bio::ToolBox::db_helper::seqfasta:
     file: lib/Bio/ToolBox/db_helper/seqfasta.pm
-    version: '1.25'
+    version: '1.33'
   Bio::ToolBox::db_helper::useq:
     file: lib/Bio/ToolBox/db_helper/useq.pm
-    version: '1.24'
+    version: '1.33'
   Bio::ToolBox::db_helper::wiggle:
     file: lib/Bio/ToolBox/db_helper/wiggle.pm
     version: '1.14'
-  Bio::ToolBox::legacy_helper:
-    file: lib/Bio/ToolBox/legacy_helper.pm
-    version: '1.30'
   Bio::ToolBox::parser::gff:
     file: lib/Bio/ToolBox/parser/gff.pm
-    version: '1.31'
+    version: '1.33'
   Bio::ToolBox::parser::ucsc:
     file: lib/Bio/ToolBox/parser/ucsc.pm
     version: '1.31'
@@ -73,7 +70,7 @@ provides:
     file: lib/Bio/ToolBox/parser/ucsc.pm
   Bio::ToolBox::utility:
     file: lib/Bio/ToolBox/utility.pm
-    version: '1.31'
+    version: '1.33'
 recommends:
   Algorithm::Cluster: '0'
   DBD::SQLite: '0'
@@ -95,4 +92,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.32'
+version: '1.33'
