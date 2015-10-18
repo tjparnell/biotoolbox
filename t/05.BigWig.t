@@ -18,7 +18,6 @@ BEGIN {
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
-use lib File::Spec->catfile($Bin, "..", "lib");
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 use_ok( 'Bio::ToolBox::db_helper', 'get_chromosome_list' );
