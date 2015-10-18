@@ -286,6 +286,22 @@ sub verify {
 			}
 		}
 		
+		# peak file format
+		if ($self->{'extension'} and 
+			$self->{'extension'} =~ /narrowpeak/i and 
+			$self->{'number_columns'} != 10
+		) {
+			$bed_check = 0;
+			$error .= " NarrowPeak has 10 columns only.";
+		}
+		if ($self->{'extension'} and 
+			$self->{'extension'} =~ /broadpeak/i and 
+			$self->{'number_columns'} != 9
+		) {
+			$bed_check = 0;
+			$error .= " BroadPeak has 9 columns only.";
+		}
+		
 		# reset the BED tag value as appropriate
 		if ($bed_check) {
 			$self->{'bed'} = $self->{'number_columns'}; # in case we had a fake true
