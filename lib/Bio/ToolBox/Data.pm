@@ -903,9 +903,10 @@ sub add_column {
 	
 	$self->{number_columns}++;
 	delete $self->{column_indices} if exists $self->{column_indices};
-	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
-	$self->gff(0) if $self->gff; 
-	$self->ucsc(0) if $self->ucsc;
+	if ($self->gff or $self->bed or $self->ucsc or $self->vcf) {
+		# check if we maintain integrity, at least insofar what we test
+		$self->verify(1); # silence so user doesn't get these messages
+	}
 	return $column;
 }
 
