@@ -474,68 +474,47 @@ sub write_file {
 	
 	# Adjust filename extension if necessary
 	if ($extension =~ /(g[tf]f)/i) {
-		if (not $self->gff and $self->extension ne $extension) {
-			# gff flag is not true and extension came from user and not self
+		if (not $self->gff) {
 			# let's set it to true and see if it passes verification
 			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3; # default
 			unless ($self->verify and $self->gff) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " GFF structure changed, re-setting extension from $extension to .txt\n";
 				$extension =~ s/g[tf]f3?/txt/i;
 			}
 		}
-		elsif (not $self->gff) {
-			# flag not set from verification above, extension matches, reset extension
-			warn " GFF structure changed. re-setting extension from $extension to .txt\n";
-			$extension =~ s/g[tf]f3?/txt/i;
-		}
 	}
 	elsif ($extension =~ /bedgraph|bed|bdg|narrowpeak|broadpeak/i) {
-		if ($self->bed == 0 and $self->extension ne $extension) {
-			# bed flag is not true and extension came from user and not self
+		if (not $self->bed) {
 			# let's set it to true and see if it passes verification
 			$self->{'bed'} = 1; # a fake true
 			unless ($self->verify and $self->bed) {
-				warn " Re-setting extension from $extension to .txt\n";
+				warn " BED structure changed, re-setting extension from $extension to .txt\n";
 				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
 		}
-		elsif (not $self->bed) {
-			# flag not set from verification above, but extension matches, reset extension
-			warn " BED structure changed. Re-setting extension from $extension to .txt\n";
-			$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
-		}
 	}
 	elsif ($extension =~ /sgr/i) {
-		if ($self->{'extension'} =~ /sgr/i) {
-			# the original file extension was sgr then it 
-			# likely passed verification above so we will keep it
-		}
-		else {
+		unless ($self->{'extension'} =~ /sgr/i) {
 			# original file was not SGR
 			# let's pretend it was and see if still passes 
 			# the sgr verification relies on the recorded extension
 			$self->{'extension'} = '.sgr';
 			$self->verify;
 			if ($self->extension =~ /txt/) {
-				warn " SGR structure changed. Re-setting extension from $extension to .txt\n";
+				warn " SGR structure changed, re-setting extension from $extension to .txt\n";
 			}
 			$extension = $self->{'extension'};
 		}
 	}
 	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
-		if ($self->ucsc != $self->number_columns and $self->extension ne $extension) {
+		if ($self->ucsc != $self->number_columns) {
 			# it's not set as a ucsc data
 			# let's set it to true and see if it passes verification
 			$self->ucsc($self->number_columns);
 			unless ($self->verify and $self->ucsc) {
-				warn " Re-setting extension from $extension to .txt\n";
+				warn " UCSC structure changed, re-setting extension from $extension to .txt\n";
 				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
-		}
-		elsif (not $self->ucsc) {
-			# flag not set from verification above, but extension matches, reset extension
-			warn " BED structure changed. Re-setting extension from $extension to .txt\n";
-			$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 		}
 	}
 	elsif (not $extension) {
