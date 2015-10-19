@@ -20,7 +20,7 @@ eval {
 	require Bio::DB::Sam;
 	$BAM_OK = 1;
 };
-my $VERSION = '1.32';
+my $VERSION = '1.33';
 
 print "\n This program will calculate observed & expected CpGs\n\n";
 
@@ -151,7 +151,7 @@ my $db = open_sequence_db(0) or
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and ($Data->last_row / $cpu) < 1000) {
+	while ($cpu > 1 and ($Data->last_row / $cpu) < 500) {
 		# We need at least 1000 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
@@ -283,6 +283,23 @@ sub process_regions {
 			$row->end + 1,
 			# we add 1 bp so that we can count CpG that cross a window border
 		) || undef;
+		unless ($seq) {
+			# no sequence, possibly because of difference in chromosome name convention?
+			my $chrom = $row->seq_id;
+			if ($chrom =~ /^chr(.+)$/i) {
+				$chrom = $1;
+			}
+			else {
+				$chrom = "chr$chrom";
+			}
+			# try again with different chromosome name
+			$seq = $db->seq(
+				$chrom,
+				$row->start,
+				$row->end + 1,
+				# we add 1 bp so that we can count CpG that cross a window border
+			) || undef;
+		}
 		unless ($seq) {
 			# this may happen if 0 or >1 chromosomes match the name
 			# or possibly coordinates are off the end, although I thought this was 

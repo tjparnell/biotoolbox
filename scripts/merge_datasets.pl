@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.30';
+my $VERSION = '1.33';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -97,7 +97,7 @@ my $output_data; # the reference scalar for the output data structure
 my $lookup_name;
 my $output_lookup_i;
 if ($use_coordinate) {
-	$lookup_name = 'Coordinate';
+	$lookup_name = 'MergeDatasetCoordinate';
 }
 
 
@@ -131,7 +131,7 @@ else {
 # clean up coordinate column
 if ($use_coordinate) {
 	# delete the coordinate metadata that we created
-	my $c = $output_data->find_column('Coordinate');
+	my $c = $output_data->find_column('MergeDatasetCoordinate');
 	$output_data->delete_column($c);
 } 
 
@@ -148,11 +148,18 @@ unless ($automatic or $user_list) {
 		rename_dataset_names();
 	}
 }
+# clean up metadata we added but shouldn't keep
+# this was put in here for remembering original file names for renaming purposes
+for (my $c = 0; $c < $output_data->number_columns; $c++) {
+	if ($output_data->metadata($c, 'AUTO')) {
+		$output_data->delete_metadata('original_file');
+	}
+}
+
 
 
 
 ### Print the output
-
 # Request the output file name
 # default is to simply overwrite file1
 unless ($outfile) {
@@ -219,7 +226,7 @@ sub read_file {
 		}
 		
 		# add new column
-		my $coord_i = $Data->add_column('Coordinate');
+		my $coord_i = $Data->add_column('MergeDatasetCoordinate');
 		
 		# generate coordinates
 		if (defined $Data->stop_column) {
@@ -338,7 +345,6 @@ sub merge_two_datasets_by_lookup {
 		# automatic selection
 		@order = automatically_determine_order(
 			$input_data1, $input_data2);
-		
 	}
 	else {
 		# manual selection from user
@@ -346,7 +352,7 @@ sub merge_two_datasets_by_lookup {
 	}
 	
 	# add coordinate column to output if necessary
-	if ($lookup_name =~ /^coordinate$/i) {
+	if ($lookup_name eq 'MergeDatasetCoordinate' and not $automatic) {
 		
 		# check if we taking from file 1 or 2
 		if ($order[0] =~ /[a-z]+/i) {
@@ -663,7 +669,7 @@ sub request_lookup_indices {
 		
 		# First try some known column identifiers we could use automatically
 		# don't forget to add the user-requested lookup name
-		my @name_list = qw(coordinate name id transcript gene);
+		my @name_list = qw(MergeDatasetCoordinate coordinate name id transcript gene);
 		if ($user_lookup_name) {
 			unshift @name_list, $user_lookup_name;
 		}
@@ -881,36 +887,38 @@ sub parse_list {
 sub print_datasets {
 	
 	# pass the data structure reference and the index type ('number' or 'letter')
-	my ($data_ref, $index_type, $include_coordinate) = @_;
+	my ($data, $index_type, $include_coordinate) = @_;
 	
 	# array to be used in the default order
 	my @order;
 	
 	# print the dataset names for this datafile
-	print " These are the headers in file '" . $data_ref->{'filename'} . "'\n";
+	printf " These are the headers in file '%s'\n", . $data->filename;
 	
 	# print Numbers
 	if ($index_type eq 'number') {
-		foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
+		foreach (my $i = 0; $i < $data->number_columns; $i++) {
 			# skip the coordinate
-			next if ($data_ref->{$i}{'name'} eq 'Coordinate' and not $include_coordinate);
+			next if ($data->name($i) eq 'MergeDatasetCoordinate' and 
+				not $include_coordinate);
 			
 			# print the dataset name and it's index
 			# and record the index in the order array for the default order
-			print '  ', $i, "\t", $data_ref->{$i}{'name'}, "\n";
+			printf "  %s\t%s\n", $i, $data->name($i);
 			push @order, $i;
 		}
 	}
 	
 	# print letters
 	else {
-		foreach (my $i = 0; $i < $data_ref->{'number_columns'}; $i++) {
+		foreach (my $i = 0; $i < $data->number_columns; $i++) {
 			# skip the coordinate
-			next if ($data_ref->{$i}{'name'} eq 'Coordinate' and not $include_coordinate);
+			next if ($data->name($i) eq 'MergeDatasetCoordinate' and 
+				not $include_coordinate);
 			
 			# use letters instead of numbers as the index key
 			my $letter = $letter_of->{$i};
-			print '  ', $letter, "\t", $data_ref->{$i}{'name'}, "\n";
+			printf "  %s\t%s\n", $letter, $data->name($i);
 			push @order, $letter;
 		}
 	}
@@ -1028,8 +1036,9 @@ sub copy_metadata {
 	}
 	
 	# set the original file name
-	$output_data->metadata($index, 'original_file', $data->filename)
-		unless $data->metadata($request, 'AUTO');
+	# we are ignoring the AUTO metadata here, which we should respect
+	# we will delete this metadata later
+	$output_data->metadata($index, 'original_file', $data->filename);
 }
 	
 

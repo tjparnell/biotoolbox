@@ -7,14 +7,8 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::ToolBox::db_helper qw(
-	open_db_connection
-);
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	open_to_write_fh
-	find_column_index
-);
+use Bio::ToolBox::db_helper qw(open_db_connection);
+use Bio::ToolBox::Data::Stream;
 my $BAM_OK;
 eval { 
 	# we want access to Bio::DB::Sam::Fai
@@ -22,7 +16,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION =  '1.30';
+my $VERSION =  '1.33';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -108,35 +102,35 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my ($in_fh, $metadata_ref) = open_data_file($infile) or 
+my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or 
 	die "unable to open input file!\n";
 unless ($database) {
-	$database = $metadata_ref->{'db'};
+	$database = $Input->database;
 }
 
 
 
 ### Identify columns ####
 unless (defined $id_i) {
-	$id_i = find_column_index($metadata_ref, 'ID|Name');
+	$id_i = $Input->name_column;
 }
 unless (defined $seq_i) {
-	$seq_i = find_column_index($metadata_ref, 'sequence');
+	$seq_i = $Input->find_column('sequence');
 }
 unless (defined $desc_i) {
-	$desc_i = find_column_index($metadata_ref, 'description|note');
+	$desc_i = $Input->find_column('description|note');
 }
 unless (defined $chr_i) {
-	$chr_i = find_column_index($metadata_ref, '^chr|seq|ref');
+	$chr_i = $Input->chromo_column;
 }
 unless (defined $start_i) {
-	$start_i = find_column_index($metadata_ref, '^start');
+	$start_i = $Input->start_column;
 }
 unless (defined $stop_i) {
-	$stop_i = find_column_index($metadata_ref, '^stop|end');
+	$stop_i = $Input->stop_column;
 }
 unless (defined $strand_i) {
-	$strand_i = find_column_index($metadata_ref, '^strand');
+	$strand_i = $Input->strand_column;
 }
 
 
@@ -168,68 +162,51 @@ else {
 
 
 ### Finished
-$in_fh->close;
 print " wrote file '$outfile'\n";
 
 
 ########################   Subroutines   ###################################
 
 sub write_direct_single_fasta {
-	
-	# concatenated sequence
-	my $concat_seq;
-	
 	# concatenate each of the provided sequences
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# add to the concatenated sequence
-		$concat_seq .= $data[$seq_i];
+	my $concat_seq;
+	while (my $row = $Input->next_row) {
+		$concat_seq .= $row->value($seq_i);
 		$concat_seq .= 'N' x $pad if $pad;
 	}
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
-		-id     => $metadata_ref->{'basename'},
+		-id     => $Input->basename,
 		-desc   => "Concatenated sequences",
 		-seq    => $concat_seq,
 	);
 	
-	# open output file
-	my $seq_io = open_output_fasta();
-	
 	# write out
+	my $seq_io = open_output_fasta();
 	$seq_io->write_seq($seq);
 }
 
 
 sub write_direct_multi_fasta {
-	
-	# open output file
+	# write multi-fasta with the provided sequences
 	my $seq_io = open_output_fasta();
-	
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
+	while (my $row = $Input->next_row) {
 		# create seq object
 		my $seq = Bio::Seq->new(
-			-id     => $data[$id_i],
-			-seq    => $data[$seq_i],
+			-id     => $row->value($id_i),
+			-seq    => $row->value($seq_i),
 		);
-		
 		if (defined $desc_i) {
-			$seq->desc( $data[$desc_i] );
+			$seq->desc( $row->value($desc_i) );
 		}
-		
-		# print sequence
 		$seq_io->write_seq($seq);
 	}
 }
 
 
 sub fetch_seq_and_write_single_fasta {
+	# fetch sequence from database and write concatenated fasta file
 	
 	# Open fasta database
 	unless ($database) {
@@ -238,18 +215,13 @@ sub fetch_seq_and_write_single_fasta {
 	my $db = open_sequence_db() or 
 		die " Unable to open database '$database'!\n";
 	
-	# concatenated sequence
+	# collect concatenated sequences and write
 	my $concat_seq;
-	
-	# collect sequences and write
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
-		# coordinates
-		my $seq_id = $data[$chr_i];
-		my $start  = $data[$start_i];
-		my $stop   = $data[$stop_i];
+	while (my $row = $Input->next_row) {
+		# get coordinates
+		my $seq_id = $row->seq_id;
+		my $start  = $row->start;
+		my $stop   = $row->stop;
 		if ($extend) {
 			$start -= $extend;
 			$start = 1 if $start < 0;
@@ -258,9 +230,13 @@ sub fetch_seq_and_write_single_fasta {
 		
 		# collect sequence
 		my $sequence = $db->seq($seq_id, $start, $stop);
+		unless ($sequence) {
+			print "no sequence for $seq_id:$start..$stop! skipping\n";
+			next;
+		}
 	
 		# reverse if necessary
-		if (defined $strand_i and $data[$strand_i] =~ /^[\-r]/) {
+		if ($row->strand < 0) {
 			# we will create a quick Bio::Seq object to do the reverse complementation
 			my $seq = Bio::Seq->new(
 				-id     => 'temp',
@@ -277,21 +253,20 @@ sub fetch_seq_and_write_single_fasta {
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
-		-id     => $metadata_ref->{'basename'},
+		-id     => $Input->basename,
 		-desc   => "Concatenated sequences",
 		-seq    => $concat_seq,
 	);
 	
-	# open output file
-	my $seq_io = open_output_fasta();
-	
 	# write out
+	my $seq_io = open_output_fasta();
 	$seq_io->write_seq($seq);
 }
 
 
 
 sub fetch_seq_and_write_multi_fasta {
+	# fetch sequence from database and write multi-fasta file
 	
 	# Open fasta database
 	unless ($database) {
@@ -304,42 +279,35 @@ sub fetch_seq_and_write_multi_fasta {
 	my $seq_io = open_output_fasta();
 	
 	# collect sequences and write
-	while (my $line = $in_fh->getline) {
-		chomp $line;
-		my @data = split /\t/, $line;
-		
+	while (my $row = $Input->next_row) {
 		# coordinates
-		my $seq_id = $data[$chr_i];
-		my $start  = $data[$start_i];
-		my $stop   = $data[$stop_i];
+		my $seq_id = $row->seq_id;
+		my $start  = $row->start;
+		my $stop   = $row->stop;
 		if ($extend) {
 			$start -= $extend;
 			$start = 1 if $start < 0;
 			$stop += $extend;
 		}
 		
-		# name
-		my $name;
-		if (defined $id_i) {
-			$name = $data[$id_i];
+		# collect sequence
+		my $sequence = $db->seq($seq_id, $start, $stop);
+		unless ($sequence) {
+			print "no sequence for $seq_id:$start..$stop! skipping\n";
+			next;
 		}
-		else {
-			$name = "$seq_id:$start..$stop";
-		}
-		
+	
 		# create seq object
 		my $seq = Bio::Seq->new(
-			-id     => $name,
-			-seq    => $db->seq($seq_id, $start, $stop),
+			-id     => $row->name || "$seq_id:$start..$stop",
+			-seq    => $sequence,
 		);
-		
-		# description
 		if (defined $desc_i) {
-			$seq->desc( $data[$desc_i] );
+			$seq->desc( $row->value($desc_i) );
 		}
 		
 		# reverse if necessary
-		if (defined $strand_i and $data[$strand_i] =~ /^[\-r]/) {
+		if ($row->strand < 0) {
 			$seq = $seq->revcom();
 		}
 		
@@ -354,7 +322,7 @@ sub open_output_fasta {
 	
 	# get filename
 	unless ($outfile) {
-		$outfile = $metadata_ref->{'basename'} . '.fa';
+		$outfile = $Input->path . $Input->basename . '.fa';
 	}
 	unless ($outfile =~ /\.fa(?:sta)?(?:\.gz)?/i) {
 		$outfile .= '.fasta';
@@ -364,7 +332,7 @@ sub open_output_fasta {
 	}
 	
 	# open for writing
-	my $out_fh = open_to_write_fh($outfile, $gz) or 
+	my $out_fh = Bio::ToolBox::Data::Stream->open_to_write_fh($outfile, $gz) or 
 		die "unable to open '$outfile' for writing!\n";
 	
 	# open SeqIO object
@@ -372,7 +340,6 @@ sub open_output_fasta {
 		-fh     => $out_fh,
 		-format => 'fasta',
 	);
-	
 	return $seq_io;
 }
 
@@ -437,10 +404,10 @@ compressed with gzip.
 Provide the name of an uncompressed Fasta file (multi-fasta is ok) or 
 directory containing multiple fasta files representing the genomic 
 sequence. The directory must be writeable for a small index file to be 
-written. Alternatively, the name of a Bio::DB::SeqFeature::Store 
+written. If Bam support is available, the fasta file can be 
+indexed with samtools, allowing for a faster fasta experience. 
+Alternatively, the name of a Bio::DB::SeqFeature::Store 
 annotation database that contains genomic sequence may be provided. 
-For more information about using databases, see 
-L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>.  
 The database name may be obtained from the input file metadata. 
 Required only if collecting sequence from genomic coordinates.
 

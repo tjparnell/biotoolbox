@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.30';
+our $VERSION = '1.33';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -26,27 +26,27 @@ our @EXPORT = qw(
 	sum_total_bam_alignments
 );
 
-# Hash of Bigfile chromosomes
+# Hash of Bam chromosomes
 our %BAM_CHROMOS;
 	# sometimes user may request a chromosome that's not in the bigfile
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
-	# $BAM_CHROMOS{bigfile}{chromos}
+	# $BAM_CHROMOS{bamfile}{chromos}
+	# we also record the chromosome name variant with or without chr prefix
+	# to accommodate different naming conventions
 
 # Opened Bam db objects
 our %OPENED_BAM;
-	# a cache for opened Bam files, primarily for collecting scores
+	# a cache for opened Bam files 
+	# caching here is only for local purposes of collecting scores
+	# db_helper also provides caching of db objects but with option to force open in
+	# the case of forking processes - we don't have that here
 
 # Lookup hash for caching callback methods
 our %CALLBACKS;
 
 # The true statement
 1; 
-
-
-
-### Modules ###
-
 
 
 ### Open a bam database connection
@@ -66,8 +66,8 @@ sub open_bam_db {
 		$sam = Bio::DB::Sam->new(-bam => $path);
 	};
 	return unless $sam;
+	# we specifically do not cache the bam object or chromosome names here
 	
-	# done
 	return $sam;
 }
 
@@ -110,6 +110,7 @@ sub check_bam_index {
 		Bio::DB::Bam->reindex($bamfile);
 	}
 }
+
 
 
 ### Write a new bam file
@@ -188,22 +189,28 @@ sub _collect_bam_data {
 	foreach my $bamfile (@bam_features) {
 	
 		## Open the Bam File
-		my $bam;
-		if (exists $OPENED_BAM{$bamfile}) {
-			# re-use the cached bam object
-			$bam = $OPENED_BAM{$bamfile};
-		}
-		else {
+		my $bam = $OPENED_BAM{$bamfile} || undef;
+		unless ($bam) {
 			# open and cache the bam file
-			$bam = open_bam_db($bamfile);
+			$bam = open_bam_db($bamfile) or 
+				croak " Unable to open bam file '$bamfile'! $!\n";
 			$OPENED_BAM{$bamfile} = $bam;
-			%{ $BAM_CHROMOS{$bamfile} } = map { $_ => 1 } $bam->seq_ids;
+	
+			# record the chromosomes and possible variants
+			$BAM_CHROMOS{$bamfile} = {};
+			foreach my $s ($bam->seq_ids) {
+				$BAM_CHROMOS{$bamfile}{$s} = $s;
+				if ($s =~ /^chr(.+)$/) {
+					$BAM_CHROMOS{$bamfile}{$1} = $s;
+				}
+				else {
+					$BAM_CHROMOS{$bamfile}{"chr$s"} = $s;
+				}
+			}
 		}
 			
 		# first check that the chromosome is present
-		unless (exists $BAM_CHROMOS{$bamfile}{$chromo}) {
-			next;
-		}
+		$chromo = $BAM_CHROMOS{$bamfile}{$chromo} or next;
 		
 		# convert coordinates into low level coordinates
 		# consumed by the low level Bam API
@@ -495,7 +502,7 @@ sub _assign_callback {
 	# sense, forward strand 
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
@@ -503,7 +510,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		$do_index
 	) {
@@ -511,7 +518,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		!$do_index
 	) {
@@ -519,7 +526,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		!$do_index
 	) {
@@ -527,7 +534,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'ncount' and 
 		!$do_index
 	) {
@@ -535,7 +542,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -543,7 +550,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'sense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		!$do_index
 	) {
@@ -613,7 +620,7 @@ sub _assign_callback {
 	# anti-sense, forward strand 
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		$do_index
 	) {
@@ -621,7 +628,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		$do_index
 	) {
@@ -629,7 +636,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'count' and 
 		!$do_index
 	) {
@@ -637,7 +644,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'pcount' and 
 		!$do_index
 	) {
@@ -645,7 +652,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'ncount' and 
 		!$do_index
 	) {
@@ -653,7 +660,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		$do_index
 	) {
@@ -661,7 +668,7 @@ sub _assign_callback {
 	}
 	elsif (
 		$stranded eq 'antisense' and 
-		$strand == 1 and 
+		$strand >= 0 and 
 		$value_type eq 'length' and 
 		!$do_index
 	) {

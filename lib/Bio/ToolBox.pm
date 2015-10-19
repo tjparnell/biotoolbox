@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = '1.32';
+our $VERSION = '1.33';
 
 1;
 
@@ -22,17 +22,17 @@ a set of common tools for working with them.
 
 =item * Opening and saving common tab-delimited text formats
 
-=item * Support for BED and GFF files
+=item * Support for BED, GFF, VCF, narrowPeak files
 
 =item * Scoring intervals with datasets from microarray and sequencing
 
-=item * ChIPSeq, RNASeq, microarray expression, SNP detection
+=item * ChIPSeq, RNASeq, microarray expression
 
 =item * Support for Bam, BigWig, BigBed, wig, and USeq data formats
 
 =item * Intersection with other known annotation
 
-=item * Works with any genomic annotation in GFF3 format
+=item * Works with any genomic annotation in GTF, GFF3, and UCSC formats
 
 =back
 

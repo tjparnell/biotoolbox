@@ -5,12 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Bio::ToolBox::legacy_helper qw(
+use Bio::ToolBox::utility qw(
+	parse_list
 	open_to_read_fh
 	open_to_write_fh
 );
-use Bio::ToolBox::utility;
-my $VERSION = '1.30';
+my $VERSION = '1.33';
 
 print "\n A tool for switching the order of cluster files\n";
 
@@ -193,7 +193,11 @@ sub get_new_order {
 		@order = parse_list($given_order);
 	}
 	else {
-		print " The current group order: ", join(" ", @{$kgg_data->{'original'}} ), "\n";
+		printf " The current group order:\n%s\n", 
+			join("\n", 
+				map { "   $_\t(" . scalar(@{ $kgg_data->{$_}}) . " rows)" }
+				@{$kgg_data->{'original'}} 
+			);
 		print " Please enter a new order as comma-delimited or range\n  ";
 		my $response = <STDIN>;
 		chomp $response;

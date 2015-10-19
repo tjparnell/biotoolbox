@@ -5,17 +5,14 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	find_column_index
-);
+use Bio::ToolBox::Data;
 my $cluster_ok;
 eval {
 	require Algorithm::Cluster::Record;
 	$cluster_ok = 1;
 };
 
-my $VERSION =  '1.30';
+my $VERSION =  '1.33';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 
@@ -108,27 +105,27 @@ unless ($distribution) {
 
 ### Check the input file format
 # open to read metadata
-# we're not actually loading the file
-# we just want to verify it looks ok
-my ($in_fh, $metadata) = open_data_file($infile);
+# we just need to verify it looks ok, but won't actually use the object
+my $Data = Bio::ToolBox::Data->new(file => $infile) or 
+	die "unable to open input file!\n";
 my $check = 1; # assume ok to begin with
 my $error;
 
 # check comment lines
-if (scalar @{ $metadata->{'comments'}} != 0) {
+if (scalar @{ $Data->comments } != 0) {
 	$check = 0;
 	$error .= "  file has extraneous comment lines\n";
 }
 
 # check first column
-if ($metadata->{0}{'name'} !~ /name|id|gene|transcript/i) {
+if ($Data->name(0) !~ /name|id|gene|transcript/i) {
 	# may not be lethal
 	$error .= "  first column name is unusual\n";
 }
 
 # check for column data
-for (my $i = 0; $i < $metadata->{'number_columns'}; $i++) {
-	if (not exists $metadata->{$i}{'AUTO'}) {
+for (my $i = 0; $i < $Data->number_columns; $i++) {
+	unless ($Data->metadata($i, 'AUTO')) {
 		# no automatically generated column metadata 
 		# suggests there was column metadata in the file
 		$check = 0;
@@ -138,7 +135,7 @@ for (my $i = 0; $i < $metadata->{'number_columns'}; $i++) {
 
 # check for extraneous data columns
 foreach (qw(chr seq start stop end strand type class source phase)) {
-	my $i = find_column_index($metadata, "^$_");
+	my $i = $Data->find_column("^$_");
 	if (defined $i) {
 		$check = 0;
 		$error .= "  file has extraneous column '$_' at position $i\n";
@@ -159,7 +156,13 @@ elsif ($check == 1 and $error) {
 else {
 	print " input file appears to be valid\n";
 }
-$in_fh->close;
+
+
+# generate outfile
+unless ($outfile) {
+	$outfile = $Data->path . $Data->basename;
+}
+undef $Data; # we no longer need this
 
 
 
@@ -167,7 +170,7 @@ $in_fh->close;
 ### Load the file
 my $start_time = time;
 my $record = Algorithm::Cluster::Record->new() or 
-	die " unable to intialize Cluster::Record object!\n";
+	die " unable to intialize Cluster::Record object! $!\n";
 
 open INPUT, $infile;
 $record->read(*INPUT);
@@ -183,15 +186,12 @@ my ($clusterid, $error, $nfound) = $record->kcluster(
 	'method'        => $method,
 	'dist'          => $distribution,
 );
-printf " An optimal solution was identified %s times in %.1f minutes\n",
+printf " An optimal solution was identified for $infile %d times in %.1f minutes\n",
 	$nfound, (time - $start_time)/60;
 
 
 
 ### Output results
-unless ($outfile) {
-	$outfile = $metadata->{'path'} . $metadata->{'basename'};
-}
 $record->save(
 	'jobname'       => $outfile,
 	'geneclusters'  => $clusterid,

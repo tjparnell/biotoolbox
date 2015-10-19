@@ -7,13 +7,12 @@ use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
 use Statistics::Lite qw(sum min max mean stddev);
-use Bio::ToolBox::legacy_helper qw(
+use Bio::ToolBox::utility qw(
+	format_with_commas
 	open_to_read_fh 
 	open_to_write_fh 
-);
-use Bio::ToolBox::utility; 
+); 
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-use Bio::ToolBox::Data;
 eval {
 	# check for bam support
 	require Bio::ToolBox::db_helper::bam;
@@ -32,7 +31,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.31';
+my $VERSION = '1.33';
 	
 	
 
@@ -981,6 +980,14 @@ sub calculate_strand_correlation {
 sub write_model_file {
 	my ($value, $f_profile, $r_profile, $shifted_profile, $r2_values, $regions) = @_;
 	
+	# check Data
+	my $data_good;
+	eval {use Bio::ToolBox::Data; $data_good = 1;};
+	unless ($data_good) {
+		warn "unable to write model files! Cannot load Data library!\n";
+		return;
+	}
+	
 	### Profile model
 	# Prepare the centered profiles from the raw profiles
 	# these will be -450 to +450, with 0 being the shifted profile peak
@@ -1022,6 +1029,7 @@ sub write_model_file {
 		feature     => 'shift_model_profile',
 		datasets    => ['Start', "$outbase\_F", "$outbase\_R", "$outbase\_shift"],
 	);
+	return unless $profile;
 	$profile->add_comment("Average profile of read start point sums");
 	$profile->add_comment("Only profiles of trimmed shift value samples included");
 	$profile->add_comment("Final shift value calculated as $value bp");

@@ -5,12 +5,9 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Bio::ToolBox::legacy_helper qw(
-	open_data_file
-	write_data_file
-	open_to_write_fh
-);
-my $VERSION =  '1.30';
+use Bio::ToolBox::Data::Stream;
+use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
+my $VERSION =  '1.33';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -71,7 +68,7 @@ if ($print_version) {
 ### Check for required values
 unless ($infile) {
 	$infile = shift @ARGV or
-		die "  OOPS! No source data file specified! \n use $0 --help\n";
+		die "  No input file specified! \n use $0 --help\n";
 }
 unless (defined $gz) {
 	if ($infile =~ /\.gz$/) {
@@ -84,44 +81,23 @@ unless (defined $gz) {
 }
 
 
-### Load file
-my ($in_fh, $metadata_ref) = open_data_file($infile);
-unless ($in_fh) {
-	die "Unable to open data table!\n";
-}
+### Load Input file
+my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
+	die "Unable to open input file!\n";
 
-# add column headers
-push @{ $metadata_ref->{'data_table'} }, $metadata_ref->{'column_names'};
-$metadata_ref->{'last_row'} = 0;
-
-
-
-### Identify the column
-# Request the index from the user if necessary
+# Identify the column
 unless (defined $index) {
-	
-	# present a list to the user
-	print "\n  This is the list of columns in the data file\n";
-	for (my $i = 0; $i < $metadata_ref->{'number_columns'}; $i++) {
-		print "   $i\t", $metadata_ref->{$i}{'name'}, "\n";
+	$index = ask_user_for_index($Input, 
+		"  Enter the column index number containing the values to split by   ");
+	unless (defined $index) {
+		die " Must provide a valid index!\n";
 	}
-	
-	# get user response
-	print "  Enter the column index number containing the values to split by   ";
-	$index = <STDIN>;
-	chomp $index;
 }
-
-# check index
-unless ($index =~ /^\d+$/ and exists $metadata_ref->{$index}) {
-	die " unknown column index!\n";
-}
-
 
 
 ### Split the file
-print " Splitting file by elements in column '$metadata_ref->{$index}{name}'...\n";
-my %written_files; # a hash of the file names written
+printf " Splitting file by elements in column %s...\n", $Input->name($index);
+my %out_files; # a hash of the file names written
 	# we can't assume that all the data elements we're splitting on are 
 	# contiguous in the file
 	# if they're not, then we would be simply re-writing over the 
@@ -129,187 +105,47 @@ my %written_files; # a hash of the file names written
 	# also, we're enforcing a maximum number of lines per file
 	# so we'll remember the files we've written, and re-open that file 
 	# to write the next block of data
-my $previous_value;
 my $split_count = 0;
-while (my $line = $in_fh->getline) {
+while (my $row = $Input->next_row) {
 	
-	# Collect line data and the check value
-	chomp $line;
-	my @data = split /\t/, $line;
-	my $check_value = $data[$index];
-	
-	# For the first line only
-	unless (defined $previous_value) {
-		$previous_value = $check_value;
+	# Get the check value
+	my $check = $row->value($index);
+	unless (exists $out_files{$check}{'stream'}) {
+		request_new_file_name($check);
 	}
 	
-	# Determine whether to write or proceed to next line
-	if ($check_value eq $previous_value ) {
-		# the same value, so keep in same array
-		
-		push @{ $metadata_ref->{'data_table'} }, [ @data ];
-		$metadata_ref->{'last_row'} += 1;
-	}
-	else {
-		# different value, new data section
-		
-		# write the current data out to file(s)
-		write_current_data_to_file_part($previous_value);
-			# this should automatically clear the previous table data
-		
-		# now add the current row of data
-		push @{ $metadata_ref->{'data_table'} }, [ @data ];
-		$metadata_ref->{'last_row'} += 1;
-		
-		# reset
-		$previous_value = $check_value;
-	}
+	# write the row
+	$out_files{$check}{'stream'}->add_row($row);
+	$out_files{$check}{'number'} += 1;
+	$out_files{$check}{'total'} += 1;
 	
-	# Check the number of lines collected, write if necessary
-	if (defined $max and $metadata_ref->{'last_row'} == $max) {
-		# we've reached the maximum number of data lines for this current 
-		# data block
-		
-		# need to force a data write
-		write_current_data_to_file_part($previous_value);
+	# Check the number of lines collected, close if necessary
+	if (defined $max and $out_files{$check}{'number'} == $max) {
+		# we've reached the maximum number of data lines for this current data
+		$out_files{$check}{'stream'}->close_fh;
+		delete $out_files{$check}{'stream'};
 	}
 }
 
 
 
 ### Finish
-
-# Final write 
-write_current_data_to_file_part($previous_value);
-
 # Properly close out all file handles
-$in_fh->close;
-foreach my $value (keys %written_files) {
-	$written_files{$value}{'fh'}->close;
+$Input->close_fh;
+foreach my $value (keys %out_files) {
+	$out_files{$value}{'stream'}->close_fh if exists $out_files{$value}{'stream'};
 }
-
 
 # report
 print " Split '$infile' into $split_count files\n";
-foreach my $value (sort {$a cmp $b} keys %written_files) {
-	print "  wrote $written_files{$value}{total} lines in " . 
-		"$written_files{$value}{parts} files for '$value'\n";
+foreach my $value (sort {$a cmp $b} keys %out_files) {
+	printf "  wrote %s lines in %d file%s for '$value'\n", 
+		format_with_commas( $out_files{$value}{total} ), $out_files{$value}{parts}, 
+		$out_files{$value}{parts} > 1 ? 's' : '';
 }
 
 
 
-
-sub write_current_data_to_file_part {
-
-	# get the current value we're working with
-	my $value = shift;
-	my $last_row = $metadata_ref->{'last_row'};
-	
-	# open the file and write
-		# check for a pre-existing file to be added, or start a new one
-	if (defined $written_files{$value}{'file'}) {
-		# we have a current file that is partially written
-		my $file = $written_files{$value}{'file'};
-		my $out_fh = $written_files{$value}{'fh'};
-		
-		# begin writing the data
-		# determine how many lines we can still write to this file
-		
-		# maximum is defined but we'll have to do two writes
-		if (
-			defined $max and
-			($max - $written_files{$value}{'number'}) < $last_row
-		) {
-			# we'll have to do two writes
-			# finish up current, then write the remainder
-			my $limit = $max - $written_files{$value}{'number'};
-			
-			# write the lines up to the current limit
-			for (my $row = 1; $row <= $limit; $row++) {
-				$out_fh->print(
-					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
-				"\n");
-			}
-			$written_files{$value}{'total'} += $limit;
-			
-			# clear the table contents of the written lines
-			splice( @{ $metadata_ref->{'data_table'} }, 1, $limit );
-			$metadata_ref->{'last_row'} = 
-				scalar @{ $metadata_ref->{'data_table'} } - 1;
-			
-			# we're finished with this file
-			$written_files{$value}{'file'}   = undef;
-			$written_files{$value}{'fh'}     = undef;
-			$written_files{$value}{'number'} = 0;
-			
-			# now write the remainder
-			write_current_data_to_file_part($value);
-		}
-		
-		# maximum is either not defined, or there is enough room left to write
-		else {
-			# we can write with impunity
-			
-			# write the lines
-			for (my $row = 1; $row <= $last_row; $row++) {
-				$out_fh->print(
-					join("\t", @{ $metadata_ref->{'data_table'}->[$row] } ) .
-				"\n");
-				
-				# keep track of the number of lines
-				$written_files{$value}{'number'} += 1;
-				$written_files{$value}{'total'} += 1;
-			}
-			
-			# clear the table contents
-			splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
-			$metadata_ref->{'last_row'} = 0;
-		}
-	}
-	
-	else {
-		# put in a request for a file name
-		request_new_file_name($value);
-		
-		# write the file
-		# this should be within the maximum line limit, so we should be safe
-		my $success = write_data_file(
-			'data'     => $metadata_ref,
-			'filename' => $written_files{$value}{'file'},
-			'gz'       => $gz,
-		);
-		if ($success) {
-			# record the number of lines written
-			$written_files{$value}{'number'} += $last_row;
-			$written_files{$value}{'total'} += $last_row;
-			
-			# update the file name in case it was changed by the write method
-			$written_files{$value}{'file'} = $success;
-		}
-		else {
-			warn "   unable to write $last_row lines! data lost!\n";
-		}
-		
-		# clear the table contents
-		splice( @{ $metadata_ref->{'data_table'} }, 1, $last_row );
-		$metadata_ref->{'last_row'} = 0;
-		
-		# check whether we've filled up the file
-		if (defined $max and $last_row == $max) {
-			$written_files{$value}{'file'} = undef;
-			$written_files{$value}{'number'} = 0;
-		}
-		else {
-			# reopen the file for future writing
-			$written_files{$value}{'fh'} = open_to_write_fh(
-				$written_files{$value}{'file'},
-				$gz,
-				1
-			);
-		}
-	}
-	
-}
 
 sub request_new_file_name {
 	# calculate a new file name based on the current check value and part number
@@ -320,41 +156,47 @@ sub request_new_file_name {
 	
 	my $file;
 	if ($prefix and $prefix eq 'none') {
-		$file = $metadata_ref->{'path'} . $filename_value;
+		$file = $Input->path . $filename_value;
 	}
 	elsif ($prefix) {
 		$file = $prefix . '#' . $filename_value;
 	}
 	else {
-		$file = $metadata_ref->{'path'} . $metadata_ref->{'basename'} . 
-		'#' . $filename_value;
+		$file = $Input->path . $Input->basename . '#' . $filename_value;
 	}
 	
 	# add the file part number, if we're working with maximum line files
 	# padded for proper sorting
 	if (defined $max) {
-		if (defined $written_files{$value}{'parts'}) {
-			$written_files{$value}{'parts'} += 1; # increment
-			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
+		if (defined $out_files{$value}{'parts'}) {
+			$out_files{$value}{'parts'} += 1; # increment
+			$file .= '_' . sprintf("%03d", $out_files{$value}{'parts'});
 		}
 		else {
-			$written_files{$value}{'parts'} = 1; # initial
-			$file .= '_' . sprintf("%03d", $written_files{$value}{'parts'});
+			$out_files{$value}{'parts'} = 1; # initial
+			$file .= '_' . sprintf("%03d", $out_files{$value}{'parts'});
 		}
 	}
 	else {
 		# only 1 part is necessary
-		$written_files{$value}{'parts'} = 1;
+		$out_files{$value}{'parts'} = 1;
 	}
 	
 	# finish the file name
-	$file .= $metadata_ref->{'extension'};
-	$written_files{$value}{'file'}   = $file;
-	$written_files{$value}{'number'} = 0;
+	$file .= $Input->extension;
+	$out_files{$value}{'number'} = 0;
+	
+	# open an output Stream
+	if (exists $out_files{$value}{'stream'}) {
+		# an open stream, close it
+		$out_files{$value}{'stream'}->close_fh;
+	}
+	my $Stream = $Input->duplicate($file);
+	$out_files{$value}{'stream'} = $Stream;
 	
 	# check the total
-	unless (exists $written_files{$value}{'total'}) {
-		$written_files{$value}{'total'}  = 0;
+	unless (exists $out_files{$value}{'total'}) {
+		$out_files{$value}{'total'}  = 0;
 	}
 	
 	# keept track of the number of files opened

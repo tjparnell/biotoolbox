@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.30';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -153,6 +153,11 @@ for internal use. Acceptable values include 10 (refFlat without gene names),
 11 (refFlat with gene names), 12 (knownGene gene prediction table), and 15 
 (an extended gene prediction or genePredExt table).
 
+=item gz =E<gt> $gz
+
+Optional boolean value that indicates whether the output file should be 
+written with compression. This can also be inferred from the file name.
+
 =back
 
 =item duplicate($filename)
@@ -209,19 +214,27 @@ Returns or sets the name of the program generating the list.
 Returns or sets the name or path of the database from which the 
 features were derived.
 
-=back
-
-The following methods may be used to access metadata only.
-
-=over 4
-
 =item gff
+
+Returns or sets the version of loaded GFF files. Supported versions 
+included 1, 2, 2.5 (GTF), and 3.
 
 =item bed
 
-Returns the GFF version number or the number of BED columns 
-indicating that the Data structure is properly formatted as 
-such. A value of 0 means they are not formatted as such.
+Returns or sets the BED file version. Here, the BED version is simply 
+the number of columns.
+
+=item ucsc
+
+Returns or sets the UCSC file format version. Here, the version is 
+simply the number of columns. Supported versions include 10 (gene 
+prediction), 11 (refFlat, or gene prediction with gene name), 12 
+(knownGene table), 15 (extended gene prediction), or 16 (extended 
+gene prediction with bin).
+
+=item vcf
+
+Returns or sets the VCF file version number. VCF support is limited.
 
 =back
 
@@ -493,12 +506,9 @@ sub new {
 	my %args  = @_;
 	
 	# file arguments
-	$args{in}  ||= undef;
+	$args{in}  ||= $args{file} || undef;
 	$args{out} ||= undef;
 	unless ($args{in} or $args{out}) {
-		if (exists $args{filename} or exists $args{file}) {
-			warn "You are using an outdated API! Please update your code!\n";
-		}
 		cluck "a filename must be specified with 'in' or 'out' argument keys!\n";
 		return;
 	}
@@ -575,6 +585,10 @@ sub new {
 			# we trust that the user knows the subtle difference between gff versions
 			$self->add_gff_metadata($args{gff});
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /g[tf]f/) {
+				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
+					$args{gff} == 3 ? '.gff3' : '.gff';
+			}
 		}
 		elsif (exists $args{bed} and $args{bed}) {
 			# use standard names for the number of columns indicated
@@ -584,6 +598,9 @@ sub new {
 			}	
 			$self->add_bed_metadata($args{bed});
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /bed|peak/) {
+				$self->{extension} = '.bed';
+			}
 		}
 		elsif (exists $args{ucsc} and $args{ucsc}) {
 			# a ucsc format such as refFlat, genePred, or genePredExt
@@ -593,8 +610,16 @@ sub new {
 				return;
 			};
 			$self->{'data_table'}->[0] = $self->{'column_names'};
+			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
+				$self->{extension} = '.ucsc';
+			}
 		}
 		# else it will be an empty object with no columns
+		
+		# append gz if necessary
+		if (exists $args{gz} and $args{gz} and $self->extension !~ /gz$/) {
+			$self->{extension} .= '.gz';
+		}
 		
 		# add feature
 		$args{feature} ||= $args{features} || undef;
@@ -641,7 +666,7 @@ sub duplicate {
 		my %md = $self->metadata($i);
 		$Dup->{$i} = \%md;
 	}
-	foreach (qw(feature program db bed gff ucsc headers)) {
+	foreach (qw(feature program db bed gff vcf ucsc headers)) {
 		# various keys
 		$Dup->{$_} = $self->{$_};
 	}
@@ -677,6 +702,10 @@ sub add_column {
 	$self->{data_table}->[0][$column] = $name;
 	$self->{number_columns}++;
 	delete $self->{column_indices} if exists $self->{column_indices};
+	if ($self->gff or $self->bed or $self->ucsc or $self->vcf) {
+		# check if we maintain integrity, at least insofar what we test
+		$self->verify(1); # silence so user doesn't get these messages
+	}
 	return $column;
 }
 

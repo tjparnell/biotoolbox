@@ -42,6 +42,7 @@ sub new {
 		'gff'            => 0,
 		'bed'            => 0,
 		'ucsc'           => 0,
+		'vcf'            => 0,
 		'number_columns' => 0,
 		'last_row'       => 0,
 		'headers'        => 1,
@@ -63,15 +64,17 @@ sub verify {
 	# this function does not rely on any self functions for two reasons
 	# this is a low level integrity checker
 	# this is very old code from before the days of an OO API of Bio::ToolBox
+	# although a lot of things have been added and changed since then....
 	my $self = shift;
-	carp "verify is a read only method" if @_;
+	my $silence = shift || 0; # default is to yell
 	
 	# check for data table
 	unless (
 		defined $self->{'data_table'} and 
 		ref $self->{'data_table'} eq 'ARRAY'
 	) {
-		carp " No data table in passed data structure!";
+		carp sprintf " DATA INTEGRITY ERROR: No data table in %s object!", ref $self
+			unless $silence;
 		return;
 	}
 	
@@ -79,8 +82,8 @@ sub verify {
 	if (defined $self->{'last_row'}) {
 		my $number = scalar( @{ $self->{'data_table'} } ) - 1;
 		if ($self->{'last_row'} != $number) {
-			carp " data table last_row index [$number] doesn't match " . 
-				"metadata value [" . $self->{'last_row'} . "]!\n";
+# 			carp sprintf "TABLE INTEGRITY ERROR: data table last_row index [%d] doesn't match " . 
+# 				"metadata value [%d]!\n",  $number, $self->{'last_row'};
 			# fix it for them
 			$self->{'last_row'} = $number;
 		}
@@ -111,12 +114,14 @@ sub verify {
 			}
 		}
 		if ($too_low) {
-			carp " $too_low rows in data table had fewer than expected columns!\n" . 
-				 "  padded rows " . join(',', @problems) . " with null values\n";
+			print " COLUMN INCONSISTENCY ERRORS: $too_low rows had fewer than expected " . 
+				 "columns!\n  padded rows " . join(',', @problems) . " with null values\n"
+				 unless $silence;
 		}
 		if ($too_high) {
-			carp " $too_high rows in data table had more columns than expected!\n" . 
-				" rows " . join(',', @problems) . "\n";
+			print " COLUMN INCONSISTENCY ERRORS: $too_high rows had more columns than " . 
+				"expected!\n  Problem rows: " . join(',', @problems) . "\n"
+				unless $silence;
 			return;
 		}
 	}
@@ -125,19 +130,29 @@ sub verify {
 			scalar @{ $self->{'data_table'}->[0] };
 	}
 	
-	# check metadata
+	# check metadata and table names
+	my $mdcheck = 0;
 	for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
 		unless (
 			$self->{$i}{'name'} eq 
 			$self->{'data_table'}->[0][$i]
 		) {
-			carp " incorrect or missing metadata!  Column header names don't" .
+			carp sprintf( " TABLE/METADATA MISMATCH ERROR: Column header names don't" .
 				" match metadata name values for index $i!" . 
-				" compare '" . $self->{$i}{'name'} . "' with '" .
-				$self->{'data_table'}->[0][$i] . "'\n";
-			return;
+				"\n  compare '%s' with '%s'\n", $self->{'data_table'}->[0][$i], 
+				$self->{$i}{'name'} ) unless $silence;
+			$mdcheck++;
+		}
+		unless ($self->{$i}{'index'} == $i) {
+			carp sprintf( " METADATA INDEX ERROR: index $i metadata doesn't match its " .
+				"index value %s\n", $self->{$i}{'index'} ) unless $silence;
+			$mdcheck++;
 		}
 	}
+	return if $mdcheck;
+	
+	### Defined file format structure integrity
+	my $error; 
 	
 	# check for proper gff structure
 	if ($self->{'gff'}) {
@@ -148,6 +163,7 @@ sub verify {
 		# check number of columns
 		if ($self->{'number_columns'} != 9) {
 			$gff_check = 0;
+			$error .= " Number of columns not 9.";
 		}
 		
 		# check column indices
@@ -158,6 +174,7 @@ sub verify {
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$gff_check = 0;
+			$error .= " Column 0 name not chromosome-like.";
 		}
 		if (
 			# column 3 should look like start
@@ -165,6 +182,7 @@ sub verify {
 			$self->{3}{'name'} !~ m/start|pos|position/i
 		) {
 			$gff_check = 0;
+			$error .= " Column 3 name not start-like.";
 		}
 		if (
 			# column 4 should look like end
@@ -172,6 +190,7 @@ sub verify {
 			$self->{4}{'name'} !~ m/stop|end|pos|position/i
 		) {
 			$gff_check = 0;
+			$error .= " Column 4 name not stop-like.";
 		}
 		if (
 			# column 6 should look like strand
@@ -179,11 +198,18 @@ sub verify {
 			$self->{6}{'name'} !~ m/strand/i
 		) {
 			$gff_check = 0;
+			$error .= " Column 6 name not strand-like.";
 		}
 		
 		# check column data
-		$gff_check = 0 unless $self->_column_is_integers(3,4);
-		$gff_check = 0 unless $self->_column_is_stranded(6);
+		unless ($self->_column_is_integers(3,4)) {
+			$gff_check = 0;
+			$error .= " Columns 3,4 not integers.";
+		}
+		unless ($self->_column_is_stranded(6)) {
+			$gff_check = 0;
+			$error .= " Column 6 not strand values.";
+		}
 		
 		# update gff value as necessary
 		if ($gff_check == 0) {
@@ -197,6 +223,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
+			print " GFF FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -212,6 +239,7 @@ sub verify {
 			$self->{'number_columns'} > 12 
 		) {
 			$bed_check = 0;
+			$error .= " Number of columns not 3-12.";
 		}
 		
 		# check column index names
@@ -221,31 +249,57 @@ sub verify {
 			m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i
 		) {
 			$bed_check = 0;
+			$error .= " Column 0 name not chromosome-like.";
 		}
 		if (
 			exists $self->{1} and
 			$self->{1}{'name'} !~ m/start|pos|position/i
 		) {
 			$bed_check = 0;
+			$error .= " Column 1 name not start-like.";
 		}
 		if (
 			exists $self->{2} and
 			$self->{2}{'name'} !~ m/stop|end|pos|position/i
 		) {
 			$bed_check = 0;
+			$error .= " Column 2 name not stop-like.";
 		}
 		if (
 			exists $self->{5} and
 			$self->{5}{'name'} !~ m/strand/i
 		) {
 			$bed_check = 0;
+			$error .= " Column 5 name not strand-like.";
 		}
 		
 		# check column data
-		$bed_check = 0 unless $self->_column_is_integers(1,2);
+		unless ($self->_column_is_integers(1,2)) {
+			$bed_check = 0;
+			$error .= " Columns 1,2 not integers.";
+		}
 		if ($self->{'number_columns'} >= 5) {
 			# only check if it is actually present, since could be optional
-			$bed_check = 0 unless $self->_column_is_stranded(5);
+			unless ($self->_column_is_stranded(5) ) {
+				$bed_check = 0;
+				$error .= " Column 5 not strand values.";
+			}
+		}
+		
+		# peak file format
+		if ($self->{'extension'} and 
+			$self->{'extension'} =~ /narrowpeak/i and 
+			$self->{'number_columns'} != 10
+		) {
+			$bed_check = 0;
+			$error .= " NarrowPeak has 10 columns only.";
+		}
+		if ($self->{'extension'} and 
+			$self->{'extension'} =~ /broadpeak/i and 
+			$self->{'number_columns'} != 9
+		) {
+			$bed_check = 0;
+			$error .= " BroadPeak has 9 columns only.";
 		}
 		
 		# reset the BED tag value as appropriate
@@ -263,6 +317,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
+			print " BED FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -270,64 +325,157 @@ sub verify {
 	if ($self->{'ucsc'}) {
 		# if any of these checks fail, we will reset the extension
 		my $ucsc_check = 1; # start with assumption it is correct
+		my $ucsc_type;
 		
 		# check number of columns
 		my $colnumber = $self->{number_columns};
 		if ($colnumber == 16) {
+			$ucsc_type = 'genePredExtBin';
+			# genePredExt with bin
 			# bin name chrom strand txStart txEnd cdsStart cdsEnd 
 			# exonCount exonStarts exonEnds score name2 cdsStartSt 
 			# cdsEndStat exonFrames
-			$ucsc_check = 0 unless $self->{2}{name} =~ 
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
-			$ucsc_check = 0 unless $self->{4}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{5}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
-			$ucsc_check = 0 unless $self->_column_is_stranded(3);
+			unless($self->{2}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i) {
+				$ucsc_check = 0;
+				$error .= " Column 2 name not chromosome-like.";
+			}
+			unless($self->{4}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 4 name not start-like.";
+			}
+			unless($self->{5}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 5 name not stop-like.";
+			}
+			unless($self->{6}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 6 name not start-like.";
+			}
+			unless($self->{7}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 7 name not stop-like.";
+			}
+			unless($self->_column_is_integers(4,5,6,7,8)) {
+				$ucsc_check = 0;
+				$error .= " Columns 4,5,6,7,8 not integers.";
+			}
+			unless($self->_column_is_stranded(3)) {
+				$ucsc_check = 0;
+				$error .= " Column 3 not strand values.";
+			}
 		}		
 		elsif ($colnumber == 15 or $colnumber == 12) {
+			$ucsc_type = $colnumber == 15 ? 'genePredExt' : 'knownGene';
+			# GenePredExt
 			# name chrom strand txStart txEnd cdsStart cdsEnd 
 			# exonCount exonStarts exonEnds score name2 cdsStartSt 
 			# cdsEndStat exonFrames
-			# or 
+			# or knownGene
 			# name chrom strand txStart txEnd cdsStart cdsEnd 
 			# exonCount exonStarts exonEnds proteinID alignID
-			$ucsc_check = 0 unless $self->{1}{name} =~ 
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
-			$ucsc_check = 0 unless $self->{3}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{4}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
-			$ucsc_check = 0 unless $self->_column_is_stranded(2);
+			unless($self->{1}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i) {
+				$ucsc_check = 0;
+				$error .= " Column 1 name not chromosome-like.";
+			}
+			unless($self->{3}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 3 name not start-like.";
+			}
+			unless($self->{4}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 4 name not stop-like.";
+			}
+			unless($self->{5}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 5 name not start-like.";
+			}
+			unless($self->{6}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 6 name not stop-like.";
+			}
+			unless($self->_column_is_integers(3,4,5,6,7)) {
+				$ucsc_check = 0;
+				$error .=  " Columns 3,4,5,6,7 not integers.";
+			}
+			unless($self->_column_is_stranded(2)) {
+				$ucsc_check = 0;
+				$error .= " Column 2 not strand values.";
+			}
 		}		
 		elsif ($colnumber == 11) {
+			$ucsc_type = 'refFlat';
 			# geneName transcriptName chrom strand txStart txEnd 
 			# cdsStart cdsEnd exonCount exonStarts exonEnds
-			$ucsc_check = 0 unless $self->{2}{name} =~ 
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
-			$ucsc_check = 0 unless $self->{4}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{5}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->{6}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{7}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->_column_is_integers(4,5,6,7,8);
-			$ucsc_check = 0 unless $self->_column_is_stranded(3);
+			unless($self->{2}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i) {
+				$ucsc_check = 0;
+				$error .= " Column 2 name not chromosome-like.";
+			}
+			unless($self->{4}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 4 name not start-like.";
+			}
+			unless($self->{5}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 5 name not stop-like.";
+			}
+			unless($self->{6}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 6 name not start-like.";
+			}
+			unless($self->{7}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 7 name not stop-like.";
+			}
+			unless($self->_column_is_integers(4,5,6,7,8)) {
+				$ucsc_check = 0;
+				$error .= " Columns 4,5,6,7,8 not integers.";
+			}
+			unless($self->_column_is_stranded(3)) {
+				$ucsc_check = 0;
+				$error .= " Column 3 not strand values.";
+			}
 		}		
 		elsif ($colnumber == 10) {
+			$ucsc_type = 'genePred';
 			# name chrom strand txStart txEnd cdsStart cdsEnd 
 			# exonCount exonStarts exonEnds
-			$ucsc_check = 0 unless $self->{1}{name} =~ 
-				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i;
-			$ucsc_check = 0 unless $self->{3}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{4}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->{5}{name} =~ /start|position/i;
-			$ucsc_check = 0 unless $self->{6}{name} =~ /stop|end|position/i;
-			$ucsc_check = 0 unless $self->_column_is_integers(3,4,5,6,7);
-			$ucsc_check = 0 unless $self->_column_is_stranded(2);
+			unless($self->{1}{name} =~ 
+				/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i) {
+				$ucsc_check = 0;
+				$error .= " Column 1 name not chromosome-like.";
+			}
+			unless($self->{3}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 3 name not start-like.";
+			}
+			unless($self->{4}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 4 name not stop-like.";
+			}
+			unless($self->{5}{name} =~ /start|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 5 name not start-like.";
+			}
+			unless($self->{6}{name} =~ /stop|end|position/i) {
+				$ucsc_check = 0;
+				$error .= " Column 6 name not stop-like.";
+			}
+			unless($self->_column_is_integers(3,4,5,6,7)) {
+				$ucsc_check = 0;
+				$error .= " Columns 3,4,5,6,7 not integers.";
+			}
+			unless($self->_column_is_stranded(2)) {
+				$ucsc_check = 0;
+				$error .= " Column 2 not strand values.";
+			}
 		}
 		else {
+			$ucsc_type = 'UCSC';
 			$ucsc_check = 0;
+			$error .= " Wrong # of columns.";
 		}
 
 		if ($ucsc_check == 0) {
@@ -343,7 +491,58 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
+			print " $ucsc_type FILE FORMAT ERROR: $error\n" unless $silence;
 		}	
+	}
+	
+	# check VCF format
+	if ($self->{vcf}) {
+		# if any of these checks fail, we will reset the vcf flag to 0
+		# to make it not a vcf file format
+		my $vcf_check = 1; # start with assumption it is correct
+		
+		# check number of columns
+		unless ($self->{'number_columns'} >= 8) {
+			$vcf_check = 0;
+			$error .= " Number of Columns is too few.";
+		}
+		
+		# check column index names
+		if ($self->{0}{'name'} !~ m/chrom/i) {
+			$vcf_check = 0;
+			$error .= " Column 0 name not chromosome.";
+		}
+		if (
+			exists $self->{1} and
+			$self->{1}{'name'} !~ m/^pos|start/i
+		) {
+			$vcf_check = 0;
+			$error .= " Column 1 name not position.";
+		}
+		
+		# check column data
+		unless ($self->_column_is_integers(1)) {
+			$vcf_check = 0;
+			$error .= " Columns 1 not integers.";
+		}
+		
+		# reset the vcf tag value as appropriate
+		if ($vcf_check) {
+			$self->{'vcf'} = 4; # in case we had a fake true, not that it matters here
+		}
+		else {
+			# reset metadata
+			$self->{'vcf'} = 0;
+			$self->{'headers'} = 1;
+			
+			# remove the AUTO key from the metadata
+			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
+				if (exists $self->{$i}{'AUTO'}) {
+					delete $self->{$i}{'AUTO'};
+				}
+			}
+			print " VCF FILE FORMAT ERROR: $error\n" unless $silence;
+		}
 	}
 	
 	# check proper SGR file structure
@@ -354,12 +553,24 @@ sub verify {
 		# there is no sgr field in the data structure
 		# so we're just checking for the extension
 		# we will change the extension as necessary if it doesn't conform
-		if (
-			$self->{'number_columns'} != 3 or
-			$self->{0}{'name'} !~ /^chr|seq|ref/i or
-			$self->{1}{'name'} !~ /^start|position/i or 
-			not $self->_column_is_integers(1)
-		) {
+		my $sgr_check = 1;
+		if ($self->{'number_columns'} != 3) {
+			$sgr_check = 0;
+			$error .= " Column number is not 3.";
+		}
+		if ($self->{0}{'name'} !~ m/^#?(?:chr|chromo|seq|refseq|ref_seq|seq|seq_id)/i) {
+			$sgr_check = 0;
+			$error .= " Column 0 name not chromosome-like.";
+		}
+		if ($self->{1}{'name'} !~ /^start|position/i) {
+			$sgr_check = 0;
+			$error .= " Column 1 name not start-like.";
+		}
+		unless ($self->_column_is_integers(1)) {
+			$sgr_check = 0;
+			$error .= " Columns 1 not integers.";
+		}
+		if ($sgr_check == 0) {
 			# doesn't smell like a SGR file
 			# change the extension so the write subroutine won't think it is
 			# make it a text file
@@ -373,10 +584,12 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
+			print " SGR FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
 	# check file headers value because this may have changed
+	# this can happen when we reset bed/gff/vcf flags when we add columns
 	if (
 		$self->{'bed'} == 0 and 
 		$self->{'gff'} == 0 and 
@@ -389,8 +602,8 @@ sub verify {
 		$self->{'headers'} = 0;
 	}
 	
-	# if we haven't made it here yet, then there was a major structural problem
-	# minor issues should have been fixed
+	# if we have made it here, then there were no major structural problems
+	# file is verified, any minor issues should have been fixed
 	return 1;
 }
 
@@ -398,6 +611,7 @@ sub verify {
 sub _column_is_integers {
 	my $self = shift;
 	my @index = @_;
+	return 1 if ($self->{last_row} == 0); # can't check if table is empty
 	foreach (@index) {
 		return 0 unless exists $self->{$_};
 	}
@@ -556,9 +770,10 @@ sub reorder_column {
 	}
 	$self->{'number_columns'} = scalar @order;
 	delete $self->{column_indices} if exists $self->{column_indices};
-	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
-	$self->gff(0) if $self->gff; 
-	$self->ucsc(0) if $self->ucsc;
+	if ($self->gff or $self->bed or $self->ucsc or $self->vcf) {
+		# check if we maintain integrity, at least insofar what we test
+		$self->verify(1); # silence so user doesn't get these messages
+	}
 	return 1;
 }
 
@@ -639,6 +854,14 @@ sub ucsc {
 		$self->{ucsc} = $_[0];
 	}
 	return $self->{ucsc};
+}
+
+sub vcf {
+	my $self = shift;
+	if (defined $_[0] and $_[0] =~ /^[\d\.]+$/) {
+		$self->{vcf} = $_[0];
+	}
+	return $self->{vcf};
 }
 
 sub number_columns {
@@ -978,6 +1201,10 @@ Returns or sets the number of BED columns in the metadata.
 
 Returns or sets the number of columns in a UCSC-type file 
 format, including genePred and refFlat.
+
+=item vcf
+
+Returns or sets the VCF version value in the metadata.
 
 =item number_columns
 

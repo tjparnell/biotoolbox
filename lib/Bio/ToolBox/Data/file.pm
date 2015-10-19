@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.32';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -18,16 +18,6 @@ use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use IO::File;
 use Statistics::Lite qw(mean min);
-
-# Export for legacy functions
-require Exporter;
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
-our @EXPORT_OK = qw(
-	open_to_read_fh
-	open_to_write_fh
-	check_file
-);
 
 # List of acceptable filename extensions
 our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc)(?:\.gz)?/i;
@@ -158,7 +148,7 @@ sub parse_headers {
 	
 	# check that we have an empty table
 	if ($self->last_row != 0 or $self->number_columns != 0) {
-		carp "Cannot parse file headers onto an existing data table!";
+		cluck "Cannot parse file headers onto an existing data table!";
 		return;
 	}	
 	
@@ -232,6 +222,18 @@ sub parse_headers {
 			$header_line_count++;
 		}
 		
+		# VCF version header
+		elsif ($line =~ /^##fileformat=VCFv([\d\.]+)$/) {
+			# store the VCF version in the hash
+			# this may or may not be present in the gff file, but want to keep
+			# it if it is
+			my $v = $1;
+			$v =~ s/[\r\n]+$//;
+			$self->vcf($v);
+			$self->add_comment($line); # so that it is written properly
+			$header_line_count++;
+		}
+		
 		# any other nonstandard header
 		elsif ($line =~ /^#/) {
 			$self->add_comment($line);
@@ -262,11 +264,12 @@ sub parse_headers {
 				
 				# process the real header line
 				$self->add_standard_metadata( pop @{ $self->{'comments'} } );
-				last PARSE_HEADER_LOOP;
 			}
+			# we will continue here in case the commented header line was part of a 
+			# formatted file type, which will be checked by extension below
 			
 			### a GFF file
-			elsif ($self->extension =~ /g[tf]f/i) {
+			if ($self->extension =~ /g[tf]f/i) {
 				$self->add_gff_metadata;
 				last PARSE_HEADER_LOOP;
 			}
@@ -300,9 +303,8 @@ sub parse_headers {
 				last PARSE_HEADER_LOOP;
 			}
 			
-			
 			### standard text file with headers, i.e. everything else
-			else {
+			unless ($self->number_columns) {
 				# we have not yet parsed the row of data column names
 				# we will do so now
 				
@@ -362,6 +364,8 @@ sub add_data_line {
 		if ($line =~ /\r/ and $line !~ /\n/) {
 			die "File does not appear to have unix line endings!\n" . 
 				" Please convert to unix-style line endings and try again\n";
+			# the line ending is set by a global variable for low-level file reading
+			# at this point it's easier to just die than reset it and start over
 		}
 		warn "Number of columns in line is inconsistent\n";
 		# we will verify the table after loading all the lines to verify 
@@ -470,62 +474,47 @@ sub write_file {
 	
 	# Adjust filename extension if necessary
 	if ($extension =~ /(g[tf]f)/i) {
-		if (not $self->gff and $self->extension ne $extension) {
-			# gff flag is not true and extension came from user and not self
+		if (not $self->gff) {
 			# let's set it to true and see if it passes verification
 			$self->{'gff'} = $extension =~ /gtf/i ? 2.5 : 3; # default
 			unless ($self->verify and $self->gff) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " GFF structure changed, re-setting extension from $extension to .txt\n";
 				$extension =~ s/g[tf]f3?/txt/i;
 			}
 		}
-		elsif (not $self->gff) {
-			# flag not set, reset extension
-			warn " re-setting extension from $extension to .txt\n";
-			$extension =~ s/g[tf]f3?/txt/i;
-		}
 	}
 	elsif ($extension =~ /bedgraph|bed|bdg|narrowpeak|broadpeak/i) {
-		if ($self->bed == 0 and $self->extension ne $extension) {
-			# bed flag is not true and extension came from user and not self
+		if (not $self->bed) {
 			# let's set it to true and see if it passes verification
 			$self->{'bed'} = 1; # a fake true
 			unless ($self->verify and $self->bed) {
-				warn " re-setting extension from $extension to .txt\n";
-				$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
+				warn " BED structure changed, re-setting extension from $extension to .txt\n";
+				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
-		}
-		elsif (not $self->bed) {
-			# flag not set, reset extension
-			warn " re-setting extension from $extension to .txt\n";
-			$extension = $extension =~ /gz$/ ? '.txt.gz' : '.txt';
 		}
 	}
 	elsif ($extension =~ /sgr/i) {
-		if ($self->{'extension'} =~ /sgr/i) {
-			# the original file extension was sgr then it 
-			# likely passed verification above so we will keep it
-		}
-		else {
+		unless ($self->{'extension'} =~ /sgr/i) {
 			# original file was not SGR
 			# let's pretend it was and see if still passes 
 			# the sgr verification relies on the recorded extension
 			$self->{'extension'} = '.sgr';
 			$self->verify;
 			if ($self->extension =~ /txt/) {
-				warn " re-setting extension from $extension to .txt\n";
+				warn " SGR structure changed, re-setting extension from $extension to .txt\n";
 			}
 			$extension = $self->{'extension'};
 		}
 	}
 	elsif ($extension =~ /reff?lat|genepred|ucsc/i) {
-		unless ($self->ucsc) {
+		if ($self->ucsc != $self->number_columns) {
 			# it's not set as a ucsc data
 			# let's set it to true and see if it passes verification
-			$self->ucsc = $self->number_columns; 
-		}
-		if ($self->ucsc != $self->number_columns) {
-			$self->ucsc = $self->number_columns;
+			$self->ucsc($self->number_columns);
+			unless ($self->verify and $self->ucsc) {
+				warn " UCSC structure changed, re-setting extension from $extension to .txt\n";
+				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
+			}
 		}
 	}
 	elsif (not $extension) {
@@ -546,9 +535,14 @@ sub write_file {
 				$extension = '.bed'; # a regular bed file
 			}
 		}
-		
-		# original file had an extension, re-use it if appropriate
+		elsif ($self->ucsc) {
+			# use a generic ucsc format, don't bother to customize it
+			$extension = '.ucsc';
+		}
 		elsif ($self->extension) {
+			# original file had an extension, re-use it if appropriate
+			# why wouldn't this get picked up above???? probably old cruft, 
+			# leave it in for the time being, shouldn't hurt anything
 			if ($self->extension =~ /g[tf]f/i) {
 				$extension = $self->gff ? $self->extension : '.txt';
 			}
@@ -560,15 +554,17 @@ sub write_file {
 				$extension = $self->extension;
 			}
 		}
-		
-		# normal data text file
 		else {
+			# normal data text file
 			$extension = '.txt';
 		}
 	}
 	# otherwise the extension must be good, hope for the best
 	
 	# determine format 
+	# this is an arcane specification of whether we want a "simple" no metadata 
+	# format, or an ordinary text format that may or may not have metadata
+	# it's currently not hurting much, so leave it in for now?
 	unless ($args{'format'}) {
 		if (defined $args{'simple'}) {
 			# an old method of specifying simple
@@ -691,8 +687,8 @@ sub write_file {
 		
 		# Write the primary headers
 		unless (
-			$self->gff or $self->bed or $self->{'ucsc'} or
-			$extension =~ m/sgr|kgg|cdt|peak|vcf/i
+			$self->gff or $self->bed or $self->ucsc or $self->vcf or
+			$extension =~ m/sgr|kgg|cdt|peak/i
 		) {
 			# we only write these for normal text files, not defined format files
 			
@@ -750,7 +746,7 @@ sub write_file {
 				# these are so simple it's not worth writing them
 				next;
 			}
-			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc) {
+			elsif ($extension =~ /sgr|kgg|cdt/i or $self->ucsc or $self->vcf) {
 				# these do not support metadata lines
 				next;
 			}
@@ -1010,8 +1006,6 @@ sub add_column_metadata {
 	else {
 		# metadata hash doesn't exist, so we will add it
 		$data->{$index} = \%temphash;
-		# also update the number of columns
-		$data->{'number_columns'} += 1;
 	}
 	return 1;
 }
@@ -1050,8 +1044,8 @@ sub add_gff_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1059,7 +1053,7 @@ sub add_gff_metadata {
 	$self->{6}{'AUTO'}++;
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1104,8 +1098,8 @@ sub add_bed_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1120,7 +1114,7 @@ sub add_bed_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1150,8 +1144,8 @@ sub add_peak_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1166,7 +1160,7 @@ sub add_peak_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1196,8 +1190,8 @@ sub add_ucsc_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	
 	# set strand style
@@ -1211,7 +1205,7 @@ sub add_ucsc_metadata {
 	}
 	
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	return 1;
 }
 
@@ -1234,14 +1228,14 @@ sub add_sgr_metadata {
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = 
-			$self->{$i}{'name'};
+		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
+			defined $self->{'column_names'}->[$i];
 	}
 	$self->{'number_columns'} = 3; 
 
 
 	# set headers flag to false
-	$self->{'headers'} = 0;
+	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1263,7 +1257,7 @@ sub add_standard_metadata {
 		# confirm that a file metadata exists for this column
 		if (exists $self->{$i}) {
 			unless ($namelist[$i] eq $self->{$i}->{'name'}) {
-				cluck "metadata and header names for column $i do not match!";
+				warn "metadata and header names for column $i do not match!";
 				# set the name to match the actual column name
 				$self->{$i}->{'name'} = $namelist[$i];
 			}

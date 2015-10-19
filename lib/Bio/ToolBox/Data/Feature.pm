@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.30';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -149,6 +149,39 @@ current data row.
 
 Returns an array or array reference representing all the values 
 in the current data row. 
+
+=back
+
+=head2 Special feature attributes
+
+GFF and VCF files have special attributes in the form of key = value pairs. 
+These are stored as specially formatted, character-delimited lists in 
+certain columns. These methods will parse this information and return as 
+a convenient hash reference. 
+
+=over 4
+
+=item gff_attributes
+
+Parses the 9th column of GFF files. URL-escaped characters are converted 
+back to text. Returns a hash reference of key =E<gt> value pairs.
+
+=item vcf_attributes
+
+Parses the INFO (8th column) and all sample columns (10th and higher 
+columns) in a version 4 VCF file. The Sample columns use the FORMAT 
+column (9th column) as keys. The returned hash reference has two levels:
+The first level keys are both the column names and index (0-based). The 
+second level keys are the individual attribute keys to each value. 
+For example:
+
+   my $attr = $row->vcf_attributes;
+   # access by column name
+   my $genotype = $attr->{sample1}{GT};
+   my $depth = $attr->{INFO}{ADP};
+   # access by 0-based column index 
+   my $genotype = $attr->{9}{GT};
+   my $depth = $attr->{7}{ADP}
 
 =back
 
@@ -506,6 +539,9 @@ sub name {
 		return $v;
 	}
 	return $self->{feature}->display_name if exists $self->{feature};
+	if (my $att = $self->gff_attributes) {
+		return $att->{Name} || $att->{ID} || $att->{transcript_name};
+	}
 	return undef;
 }
 
@@ -535,21 +571,79 @@ sub id {
 		return $v;
 	}
 	return $self->{feature}->primary_id if exists $self->{feature};
+	if (my $att = $self->gff_attributes) {
+		return $att->{ID} || $att->{Name} || $att->{transcript_id};
+	}
 	return undef;
 }
 
 sub length {
 	my $self = shift;
 	carp "length is a read only method" if @_;
+	if ($self->{data}->vcf) {
+		# special case for vcf files, measure the length of the ALT allele
+		return CORE::length($self->value(4)); 
+	}
 	my $s = $self->start;
 	my $e = $self->end;
 	if (defined $s and defined $e) {
 		return $e - $s + 1;
 	}
+	elsif (defined $s) {
+		return 1;
+	}
 	else {
 		return undef;
 	}
 }
+
+sub gff_attributes {
+	my $self = shift;
+	return unless ($self->{data}->gff);
+	return $self->{attributes} if (exists $self->{attributes});
+	$self->{attributes} = {};
+	foreach my $g (split(/\s*;\s*/, $self->value(8))) {
+		my ($tag, $value) = split /\s+/, $g;
+		next unless ($tag and $value);
+		# unescape URL encoded values, borrowed from Bio::DB::GFF
+		$value =~ tr/+/ /;
+		$value =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
+		$self->{attributes}->{$tag} = $value;
+	}
+	return $self->{attributes};
+}
+
+sub vcf_attributes {
+	my $self = shift;
+	return unless ($self->{data}->vcf);
+	return $self->{attributes} if (exists $self->{attributes});
+	$self->{attributes} = {};
+	
+	# INFO attributes
+	unless ($self->{data}->name(7) eq 'INFO') {
+		croak "VCF column INFO is missing or improperly formatted!";
+	}
+	my %info = 	map {$_[0] => defined $_[1] ? $_[1] : 1} 
+				map { [ split /=/ ] } 
+				( split /;/, $self->value(7) );
+	$self->{attributes}->{INFO} = \%info;
+	$self->{attributes}->{7}    = \%info;
+	
+	# Sample attributes
+	unless ($self->{data}->name(8) eq 'FORMAT') {
+		croak "VCF column FORMAT is missing or file is improperly formatted!";
+	}
+	my @formatKeys = split /:/, $self->value(8);
+	foreach my $i (9 .. $self->{data}->number_columns - 1) {
+		my $name = $self->{data}->name($i);
+		my @sampleVals = split /:/, $self->value($i);
+		my %sample = map { $formatKeys[$_] => $sampleVals[$_] } (0 .. $#formatKeys);
+		$self->{attributes}->{$name} = \%sample;
+		$self->{attributes}->{$i}    = \%sample;
+	}
+	return $self->{attributes};
+}
+
 
 ### Data collection convenience methods
 
@@ -695,10 +789,11 @@ sub bed_string {
 	# coordinate information
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
+	my $stop  = $args{stop} || $args{end} || $self->stop || 
+		$start + $self->length - 1 || $start;
+	unless ($chr and defined $start) {
 		carp "Not enough information to generate bed string. Need identifiable" . 
-			"chr, start, stop columns";
+			"chromosome and start columns";
 		return;
 	}
 	$start -= 1; # 0-based coordinates
@@ -706,7 +801,7 @@ sub bed_string {
 	
 	# additional information
 	if ($args{bed} >= 4) {
-		my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
+		my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
 		$string .= "\t$name";
 	}
 	if ($args{bed} >= 5) {
@@ -715,7 +810,7 @@ sub bed_string {
 	}
 	if ($args{bed} >= 6) {
 		my $strand = $args{strand} || $self->strand;
-		$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
+		$strand = $strand == 0 ? '+' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
 		$string .= "\t$strand";
 	}
 	# we could go on with other columns, but there's no guarantee that additional 
@@ -732,10 +827,11 @@ sub gff_string {
 	# coordinate information
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
-	my $stop  = $args{stop} || $args{end} || $self->stop;
-	unless ($chr and defined $start and $stop) {
+	my $stop  = $args{stop} || $args{end} || $self->stop || 
+		$start + $self->length - 1 || $start;
+	unless ($chr and defined $start) {
 		carp "Not enough information to generate GFF string. Need identifiable" . 
-			"chr, start, stop columns";
+			"chromosome and start columns";
 		return;
 	}
 	my $strand = $args{strand} || $self->strand;
@@ -759,11 +855,17 @@ sub gff_string {
 	my $phase = '.'; # do not even bother!!!!
 	
 	# attributes
-	my $name = $args{name} || $self->name || 'Feature_' . $self->row_index;
-	my $attributes = "Name = $name";
+	my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
+	my $attributes = "Name=$name";
+	my $id = $args{id} || sprintf("%08d", $self->line_number);
+	$attributes .= "; ID=$id";
 	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
 		foreach my $i (@{$args{attributes}}) {
-			$attributes .= '; ' . $self->{data}->name($i) . ' = ' . $self->value($i);
+			my $k = $self->{data}->name($i);
+			$k =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			my $v = $self->value($i);
+			$v =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+			$attributes .= "; $k=$v";
 		}
 	}
 	

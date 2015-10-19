@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.32';
+our $VERSION = '1.33';
 
 =head1 NAME
 
@@ -69,7 +69,7 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
 This module works with the primary Bio::ToolBox Data structure. Simply, it 
 is a complex data structure representing a tabbed-delimited table (array 
 of arrays), with plenty of options for metadata. Many common bioinformatic 
-file formats are simply tabbed-delimited text files (think BED and GFF). 
+file formats are simply tabbed-delimited text files (think BED, GFF, VCF). 
 Each row is a feature or genomic interval, and each column is a piece of 
 information about that feature, such as name, type, and/or coordinates. 
 We can append to that file additional columns of information, perhaps 
@@ -219,19 +219,27 @@ Returns or sets the name of the program generating the list.
 Returns or sets the name or path of the database from which the 
 features were derived.
 
-=back
-
-The following methods may be used to access metadata only.
-
-=over
-
 =item gff
+
+Returns or sets the version of loaded GFF files. Supported versions 
+included 1, 2, 2.5 (GTF), and 3.
 
 =item bed
 
-Returns the GFF version number or the number of BED columns 
-indicating that the Data structure is properly formatted as 
-such. A value of 0 means they are not formatted as such.
+Returns or sets the BED file version. Here, the BED version is simply 
+the number of columns.
+
+=item ucsc
+
+Returns or sets the UCSC file format version. Here, the version is 
+simply the number of columns. Supported versions include 10 (gene 
+prediction), 11 (refFlat, or gene prediction with gene name), 12 
+(knownGene table), 15 (extended gene prediction), or 16 (extended 
+gene prediction with bin).
+
+=item vcf
+
+Returns or sets the VCF file version number. VCF support is limited.
 
 =back
 
@@ -895,9 +903,10 @@ sub add_column {
 	
 	$self->{number_columns}++;
 	delete $self->{column_indices} if exists $self->{column_indices};
-	$self->bed(0) if $self->bed; # presumption is no longer a proper structure
-	$self->gff(0) if $self->gff; 
-	$self->ucsc(0) if $self->ucsc;
+	if ($self->gff or $self->bed or $self->ucsc or $self->vcf) {
+		# check if we maintain integrity, at least insofar what we test
+		$self->verify(1); # silence so user doesn't get these messages
+	}
 	return $column;
 }
 
@@ -1145,12 +1154,12 @@ sub gsort_data {
 	my $self = shift;
 	
 	# identify indices
-	my $chromo_i = $self->chromo_column;
-	my $start_i  = $self->start_column;
-	unless (defined $chromo_i and defined $start_i) {
-		carp "unable to identify chromosome and start/position columns! table not sorted\n";
+	unless ($self->feature_type eq 'coordinate') {
+		carp "no chromosome and start/position columns to sort!\n";
 		return;
 	}
+	my $chromo_i = $self->chromo_column;
+	my $start_i  = $self->start_column;
 	
 	# Load the data into a temporary hash
 	# The datalines will be put into a hash of hashes: The first key will be 
@@ -1431,7 +1440,7 @@ sub summary_file {
 	}
 	
 	# Prepare score column name
-	my $data_name = $self->basename || $dataset || 'dataset';
+	my $data_name = $dataset || $self->basename || 'dataset';
 	
 	# Prepare array to store the summed data
 	my $summed_data = $self->new(

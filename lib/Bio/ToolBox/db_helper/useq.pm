@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
-our $VERSION = '1.24';
+our $VERSION = '1.33';
 
 
 # Exported names
@@ -23,10 +23,15 @@ our %USEQ_CHROMOS;
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
 	# $USEQ_CHROMOS{useqfile}{chromos}
+	# we also record the chromosome name variant with or without chr prefix
+	# to accommodate different naming conventions
 
 # Opened USeq db objects
 our %OPENED_USEQ;
 	# a cache for opened USeq databases, primarily for collecting scores
+	# caching here is only for local purposes of collecting scores
+	# db_helper also provides caching of db objects but with option to force open in
+	# the case of forking processes - we don't have that here
 
 # The true statement
 1; 
@@ -61,21 +66,10 @@ sub collect_useq_scores {
 	foreach my $useqfile (@useqs) {
 		
 		# open a new db object
-		my $useq;
-		if (exists $OPENED_USEQ{$useqfile}) {
-			# use a cached object
-			$useq = $OPENED_USEQ{$useqfile};
-		}
-		else {
-			# open and cache the bigWig object
-			$useq = open_useq_db($useqfile) or 
-				croak " Unable to open USeq file '$useqfile'! $!\n";
-			$OPENED_USEQ{$useqfile} = $useq;
-			%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
-		}
+		my $useq = _get_useq($useqfile);
 		
 		# check chromosome first
-		next unless exists $USEQ_CHROMOS{$useqfile}{$chromo};
+		$chromo = $USEQ_CHROMOS{$useqfile}{$chromo} or next;
 	
 		# need to collect the scores based on the type of score requested
 		
@@ -173,21 +167,10 @@ sub collect_useq_position_scores {
 	foreach my $useqfile (@useqs) {
 		
 		# open a new db object
-		my $useq;
-		if (exists $OPENED_USEQ{$useqfile}) {
-			# use a cached object
-			$useq = $OPENED_USEQ{$useqfile};
-		}
-		else {
-			# open and cache the bigWig object
-			$useq = open_useq_db($useqfile) or 
-				croak " Unable to open USeq file '$useqfile'! $!\n";
-			$OPENED_USEQ{$useqfile} = $useq;
-			%{ $USEQ_CHROMOS{$useqfile} } = map { $_ => 1 } $useq->seq_ids;
-		}
+		my $useq = _get_useq($useqfile);
 		
 		# check chromosome first
-		next unless exists $USEQ_CHROMOS{$useqfile}{$chromo};
+		$chromo = $USEQ_CHROMOS{$useqfile}{$chromo} or next;
 	
 		# collect the features overlapping the region
 		my $iterator = $useq->get_seq_stream(
@@ -267,6 +250,33 @@ sub open_useq_db {
 	};
 	return unless $useq;
 	
+	return $useq;
+}
+
+
+
+### Internal subroutine for getting the cached USeq object
+sub _get_useq {
+	my $useqfile = shift;
+	
+	return $OPENED_USEQ{$useqfile} if exists $OPENED_USEQ{$useqfile};
+	
+	# open and cache the USeq object
+	my $useq = open_useq_db($useqfile) or 
+		croak " Unable to open USeq file '$useqfile'! $!\n";
+	$OPENED_USEQ{$useqfile} = $useq;
+	
+	# record the chromosomes and possible variants
+	$USEQ_CHROMOS{$useqfile} = {};
+	foreach my $s ($useq->seq_ids) {
+		$USEQ_CHROMOS{$useqfile}{$s} = $s;
+		if ($s =~ /^chr(.+)$/) {
+			$USEQ_CHROMOS{$useqfile}{$1} = $s;
+		}
+		else {
+			$USEQ_CHROMOS{$useqfile}{"chr$s"} = $s;
+		}
+	}
 	return $useq;
 }
 

@@ -7,13 +7,13 @@ use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
 use Bio::SeqFeature::Lite;
-use Bio::ToolBox::legacy_helper qw(
+use Bio::ToolBox::utility qw(
+	format_with_commas
 	open_to_read_fh
 	open_to_write_fh
 );
 use Bio::ToolBox::parser::ucsc;
-use Bio::ToolBox::utility;
-my $VERSION = '1.31';
+my $VERSION = '1.33';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -490,8 +490,7 @@ sub print_current_gene_list {
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'numeric_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'numeric_chr'}{$chr} }) {
 			# print the seqfeature recursively
-			$pos2seqf{'numeric_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1));
 			
 			# print directive to close out all previous features
 			$gff_fh->print("\n###\n"); 
@@ -499,22 +498,19 @@ sub print_current_gene_list {
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_chr'}{$chr} }) {
-			$pos2seqf{'other_chr'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'other_numeric'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_numeric'}{$chr} }) {
-			$pos2seqf{'other_numeric'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other'}{$chr} }) {
-			$pos2seqf{'other'}{$chr}{$start}->version(3); 
-			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff_string(1));
+			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1));
 			$gff_fh->print("\n###\n"); 
 		}
 	}

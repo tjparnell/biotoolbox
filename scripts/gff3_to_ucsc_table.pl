@@ -6,12 +6,9 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::parser::gff;
-use Bio::ToolBox::legacy_helper qw(
-	open_to_write_fh
-);
+use Bio::ToolBox::utility qw(open_to_write_fh format_with_commas);
 
-my $VERSION = '1.31';
-
+my $VERSION = '1.33';
 
 print "\n This program will convert a GFF3 file to UCSC gene table\n";
 
@@ -71,8 +68,8 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-unless ($infile =~ /\.gff 3? (?: \.gz )? $/xi) {
-	die " input file doesn't have a gff extension! Is this a GFF3 file?\n";
+unless ($infile =~ /\.g[tf]f 3? (?: \.gz )? $/xi) {
+	die " input file doesn't have a gff extension! Is this a GFF file?\n";
 }
 
 if ($outfile) {
@@ -84,7 +81,7 @@ if ($outfile) {
 else {
 	# define a new output file name for them
 	$outfile = $infile;
-	$outfile =~ s/\.gff 3? (?: \.gz )? $/.refFlat/xi;
+	$outfile =~ s/\.g[tf]f 3? (?: \.gz )? $/.refFlat/xi;
 }
 unless (defined $gz) {
 	# mimic the input file as far as compression is concerned
@@ -121,9 +118,10 @@ my $count = 0;
 my $string;
 foreach (sort {$a cmp $b} keys %counts) {
 	$count += $counts{$_};
-	$string .= "  Wrote $counts{$_} $_ features\n";
+	$string .= sprintf("  Wrote %s %s features\n", format_with_commas($counts{$_}), $_);
 }
-print " Finished! Wrote $count features to file '$outfile'\n$string";
+printf " Finished! Wrote %s features to file '$outfile'\n$string", 
+	format_with_commas($count);
 
 
 # print warnings about unknown feature types
@@ -163,6 +161,7 @@ sub process_gff_file_to_table {
 	
 	# Process the top features
 	my @top_features = $parser->top_features();
+	printf "parsed %d top features\n", scalar @top_features;
 	while (@top_features) {
 		my $feature = shift @top_features;
 		my $type = lc $feature->primary_tag;
@@ -173,7 +172,7 @@ sub process_gff_file_to_table {
 		}
 		
 		# process the features
-		if ($type eq 'gene' or $type eq 'pseudogene') {
+		if ($type =~ /gene/) {
 			# a gene object, we will need to process it's transcript subfeatures
 			
 			# process the gene object
@@ -181,8 +180,8 @@ sub process_gff_file_to_table {
 			
 		}
 		
-		elsif ($type eq 'mrna') {
-			# a coding transcript
+		elsif ($type =~ /rna|transcript/) {
+			# some sort of RNA transcript
 			
 			# first need to initialize the ucsc table object
 			my $ucsc = initialize_transcript($feature);
@@ -190,37 +189,13 @@ sub process_gff_file_to_table {
 			# collect the names for the transcript
 			collect_names($ucsc, $feature);
 		
-			# process the gene object
-			process_transcript($ucsc, $feature);
-			$counts{$feature->primary_tag} += 1;
-		}
-		
-		elsif ($type =~ /rna|noncoding/) {
-			# a non-coding RNA transcript
-			
-			# first need to initialize the ucsc table object
-			my $ucsc = initialize_transcript($feature);
-			
-			# collect the names for the transcript
-			collect_names($ucsc, $feature);
-		
-			# process the gene object
-			process_nc_transcript($ucsc, $feature);
-			$counts{$feature->primary_tag} += 1;
-		}
-		
-		elsif ($type =~ /transcript/) {
-			# we'll assume this is a protein_coding transcript?
-			# hopefully noncoding transcripts will be caught earlier
-			
-			# first need to initialize the ucsc table object
-			my $ucsc = initialize_transcript($feature);
-			
-			# collect the names for the transcript
-			collect_names($ucsc, $feature);
-		
-			# process the gene object
-			process_transcript($ucsc, $feature);
+			# process the transcript object
+			if (is_coding($feature)) {
+				process_transcript($ucsc, $feature);
+			}
+			else {
+				process_nc_transcript($ucsc, $feature);
+			}
 			$counts{$feature->primary_tag} += 1;
 		}
 		
@@ -246,7 +221,7 @@ sub initialize_transcript {
 		'name'         => undef,
 		'name2'        => undef,
 		'chr'          => $feature->seq_id,
-		'strand'       => $feature->strand > 0 ? '+' : '-', # let's hope there is no 0
+		'strand'       => $feature->strand < 0 ? '-' : '+', # default is + strand
 		'txStart'      => undef,
 		'txEnd'        => undef,
 		'cdsStart'     => undef,
@@ -279,10 +254,10 @@ sub process_gene {
 	foreach my $subfeat ($gene->get_SeqFeatures) {
 		
 		# check the type, and process accordingly
-		my $type = lc($subfeat->primary_tag);
+		my $type = lc $subfeat->primary_tag;
 		
-		if ($type eq 'mrna') {
-			# a protein coding transcript
+		if ($type =~ /rna|transcript/) {
+			# some sort of transcript
 			
 			# initialize the gene table line structure
 			my $ucsc = initialize_transcript($subfeat);
@@ -290,44 +265,24 @@ sub process_gene {
 			# collect the names for the transcript and/or gene
 			collect_names($ucsc, $gene, $subfeat);
 			
-			# process and print the transcript
-			process_transcript($ucsc, $subfeat);
-			
-			$counts{$subfeat->primary_tag} += 1;
-			$transcript_success++;
-		}
-		
-		elsif ($type =~ /rna|pseudogene|transcript/) {
-			# other types of non-coding RNA species
-			# should cover misc_RNA snRNA snoRNA ncRNA rRNA tRNA miRNA etc.
-			# also pseudogenes and processed_transcripts that do not have CDS
-			
-			# initialize the gene table line structure
-			my $ucsc = initialize_transcript($subfeat);
-			
-			# collect the names for the transcript and/or gene
-			collect_names($ucsc, $gene, $subfeat);
-			
-			# process and print the transcript
-			process_nc_transcript($ucsc, $subfeat);
+			# process and print the transcript based on whether it is coding or not
+			if (is_coding($subfeat)) {
+				process_transcript($ucsc, $subfeat);
+			}
+			else {
+				process_nc_transcript($ucsc, $subfeat);
+			}
 			
 			$counts{$subfeat->primary_tag} += 1;
 			$transcript_success++;
 		}
 		
 		elsif ($subfeat->get_SeqFeatures) {
+			# the feature has its own subfeatures - must be a weird transcript
 			# there are some oddball subfeatures, particularly from ensGene, 
 			# that have their own defined exons - essentially their own transcripts
 			# examples include retained_intron, sense_overlapping, etc
 			# we should keep these
-			
-			my $exon_check = 0;
-			my $cds_check  = 0;
-			foreach my $sf ($subfeat->get_SeqFeatures) {
-				$exon_check++ if $sf->primary_tag =~ /^exon$/i;
-				$cds_check++  if $sf->primary_tag =~ /^cds$/i;
-			}
-			next unless $exon_check or $cds_check;
 			
 			# initialize the gene table line structure
 			my $ucsc = initialize_transcript($subfeat);
@@ -335,8 +290,8 @@ sub process_gene {
 			# collect the names for the transcript and/or gene
 			collect_names($ucsc, $gene, $subfeat);
 			
-			# process and print the transcript
-			if ($cds_check) {
+			# process and print the transcript based on whether it is coding or not
+			if (is_coding($subfeat)) {
 				process_transcript($ucsc, $subfeat);
 			}
 			else {
@@ -449,6 +404,7 @@ sub process_transcript {
 	my @exons;
 	my @cds;
 	my @utr;
+	my @codons;
 	foreach my $subf ($transcript->get_SeqFeatures) {
 		
 		# check the type
@@ -464,8 +420,11 @@ sub process_transcript {
 		elsif ($type =~ /utr|untranslated/) {
 			push @utr, $subf;
 		}
-		elsif ($type =~ /codon|intron/) {
-			# ignore these
+		elsif ($type =~ /codon/) {
+			push @codons, $subf;
+		}
+		elsif ($type =~ /intron/) {
+			# ignore these if present, but what about retained_intron???? sigh
 		}
 		else {
 			# catchall for unrecognized feature types
@@ -481,6 +440,19 @@ sub process_transcript {
 			scalar @exons, scalar @cds, scalar @utr, $transcript->display_name; 
 	}
 	
+	# adjust CDS positions with codon information as necessary
+	if (scalar @cds and scalar @codons == 2) {
+		# I am hoping there are two codons, start and stop
+		@cds  = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @cds;
+		@codons  = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @codons;
+	
+		if ($codons[0]->start < $cds[0]->start) {
+			$cds[0]->start( $codons[0]->start );
+		}
+		if ($codons[-1]->end > $cds[-1]->end) {
+			$cds[-1]->end( $codons[-1]->end );
+		}
+	}
 	
 	# process the subfeatures
 	if (@exons and @cds) {
@@ -509,12 +481,6 @@ sub process_transcript {
 sub process_nc_transcript {
 	my ($ucsc, $transcript) = @_;
 	
-	# Record coordinates for this transcript
-	$ucsc->{'txStart'}  = $transcript->start - 1;
-	$ucsc->{'txEnd'}    = $transcript->end;
-	$ucsc->{'cdsStart'} = $transcript->end; # no cds, so set to end
-	$ucsc->{'cdsEnd'}   = $transcript->end;
-	
 	# Get the subfeatures of the transcript
 	# these should be non-coding exons
 	# make sure they are sorted numerically
@@ -522,6 +488,12 @@ sub process_nc_transcript {
 						sort { $a->[1] <=> $b->[1] }
 						map { [$_, $_->start] } 
 						$transcript->get_SeqFeatures;
+	
+	# Record coordinates for this transcript
+	$ucsc->{'txStart'}  = $transcript->start - 1;
+	$ucsc->{'txEnd'}    = $transcript->end;
+	$ucsc->{'cdsStart'} = $transcript->end; # no cds, so set to end
+	$ucsc->{'cdsEnd'}   = $transcript->end;
 	
 	# process subfeatures, if there are any
 	if (@subfeatures) {
@@ -562,12 +534,17 @@ sub process_nc_transcript {
 ### process both exons and cds together
 sub process_exon_cds {
 	my ($ucsc, $exon, $cds) = @_;
-	return if (scalar @$cds > @$exon);
+	if (scalar @$cds > scalar @$exon) {
+		warn sprintf " transcript %s has more CDS (%d) than exon (%d) subfeatures! bad formatting - skipping\n",
+			$ucsc->{name}, scalar @$cds, scalar @$exon;
+		return;
+	}
 	
 	# sort both exons and cds by start position
 	my @exons = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @$exon;
 	my @cdss  = map {$_->[0]} sort {$a->[1] <=> $b->[1]} map {[$_, $_->start]} @$cds;
 	
+	# process the exons and cds together
 	while (@exons) {
 		my $e = shift @exons;
 		
@@ -703,7 +680,7 @@ sub merge_cds_utr_exons {
 			if (
 				defined $ucsc->{'cdsStart'} and
 				not defined $ucsc->{'cdsEnd'} and
-				$e->primary_tag !~ /cds/i
+				$e->primary_tag !~ /cds|codon/i
 			) {
 				# looks like the beginning of the utr
 				# set cdsEnd to previous end
@@ -718,7 +695,7 @@ sub merge_cds_utr_exons {
 		}
 		
 		# check for cdsStart
-		if ($e->primary_tag =~ /cds/i and not defined $ucsc->{'cdsStart'}) {
+		if ($e->primary_tag =~ /cds|codon/i and not defined $ucsc->{'cdsStart'}) {
 			# previous was utr, and now we have CDS
 			$ucsc->{'cdsStart'} = $e->start - 1;
 		}
@@ -755,6 +732,23 @@ sub print_table_item {
 }
 
 
+sub is_coding {
+	my $transcript = shift;
+	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
+	return 1 if $transcript->source =~ /protein.?coding/i;
+	if ($transcript->has_tag('biotype')) {
+		# ensembl type GFFs
+		my ($biotype) = $transcript->get_tag_values('biotype');
+		return 1 if $biotype =~ /protein.?coding/i;
+	}
+	foreach ($transcript->get_SeqFeatures) {
+		# old fashioned way
+		return 1 if $_->primary_tag eq 'CDS';
+	}
+	return 0;
+}
+
+
 
 __END__
 
@@ -769,7 +763,7 @@ A script to convert a GFF3 file to a UCSC style refFlat table
 gff3_to_ucsc_table.pl [--options...] <filename>
   
   Options:
-  --in <filename>
+  --in <filename>   [gff3 gtf]
   --out <filename> 
   --alias
   --gz
@@ -785,7 +779,7 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the input GFF3 file. The file may be compressed with gzip.
+Specify the input GFF3 or GTF file. The file may be compressed with gzip.
 
 =item --out <filename>
 
