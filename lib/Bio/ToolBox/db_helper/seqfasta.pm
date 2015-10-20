@@ -154,38 +154,25 @@ sub _collect_store_data {
 		-end         => $stop,
 		-primary_tag => [@types],
 	);
-	unless ($iterator) {
-		# do we have the wrong chromosome name? try another naming convention
-		if ($chromo =~ /^chr(.+)$/) {
-			# strip chr prefix
-			$chromo = $1;
-		}
-		else {
-			# add chr prefix
-			$chromo = "chr$chromo";
-		}
-		# try again
+	return unless $iterator; # we should always get an iterator back, even if the 
+		# iterator returns nothing useful for us
+	
+	# collect the first feature
+	my $feature = $iterator->next_seq;
+	unless ($feature) {
+		# that's odd, we should get a feature
+		# try rebuilding the iterator with an alternate chromosome name 
+		$chromo = $chromo =~ /^chr(.+)$/i ? $1 : "chr$chromo";
 		$iterator = $db->get_seq_stream(
 			-seq_id      => $chromo,
 			-start       => $start,
 			-end         => $stop,
 			-primary_tag => [@types],
 		);
+		$feature = $iterator->next_seq or return;
 	}
-	return unless $iterator;
 	
-	# collect the first feature
-	my $feature = $iterator->next_seq;
-	return unless $feature;
-	
-	# deal with features that might not be from the chromosome we want
-	# sometimes chromosome matching is sloppy and we get something else
-	# this really should not happen....
-	while ($feature->seq_id ne $chromo) {
-		$feature = $iterator->next_seq || undef;
-	}
-	return unless $feature;
-	
+	# places to stick the scores
 	my @scores;
 	my %pos2data;
 	
