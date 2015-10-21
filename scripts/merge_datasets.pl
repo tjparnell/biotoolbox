@@ -691,7 +691,7 @@ sub request_lookup_indices {
 				printf "  using column $index1 (%s) as lookup index for file %s\n", 
 					$data1->name($index1), $data1->filename;
 				printf "  using column $index2 (%s) as lookup index for file %s\n", 
-					$data2->name($index1), $data2->filename;
+					$data2->name($index2), $data2->filename;
 				
 				# don't go through remaining list
 				last;
@@ -893,7 +893,7 @@ sub print_datasets {
 	my @order;
 	
 	# print the dataset names for this datafile
-	printf " These are the headers in file '%s'\n", . $data->filename;
+	printf " These are the headers in file '%s'\n", $data->filename;
 	
 	# print Numbers
 	if ($index_type eq 'number') {
