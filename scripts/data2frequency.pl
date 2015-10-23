@@ -105,7 +105,7 @@ unless (defined $max) {
 ####### Main ###########
 
 ### Load the file
-my $Input = Bio::ToolBox::Data->(file => $infile) or
+my $Input = Bio::ToolBox::Data->new(file => $infile) or
 	die " No data loaded!\n";
 
 ### Determine the request order
@@ -174,7 +174,7 @@ sub prepare_output_data_structure {
 	) or die " unable to generate data structure!\n";
 	
 	# add metadata
-	$Data->metadate(0,'mininum', $start);
+	$Data->metadata(0,'mininum', $start);
 	$Data->metadata(0,'maximum', $max);
 	$Data->metadata(0, 'bin_number', $binnumber);
 	$Data->metadata(0, 'bin_size', $binsize);
