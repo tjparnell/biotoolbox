@@ -120,6 +120,7 @@ while (my $line = $in_fh->getline) {
 	if ($data[0] =~ /track/i) {
 		# not much useable information in here for us
 		$Output->add_comment($line);
+		next;
 	}
 	
 	# a variable step definition line
@@ -129,7 +130,6 @@ while (my $line = $in_fh->getline) {
 			if (/span=(\w+)/) {$span = $1}
 		}
 		next;
-		
 	} 
 	
 	# a fixed step definition line
@@ -155,7 +155,7 @@ while (my $line = $in_fh->getline) {
 		}
 		$start = $data[0];
 		if ($span) {
-			$stop = $start + $span;
+			$stop = $start + $span - 1;
 		} 
 		else {
 			$stop = $start;
@@ -177,7 +177,7 @@ while (my $line = $in_fh->getline) {
 		$start = $fixstart;
 		$fixstart += $step; # prepare for next round
 		if ($span) {
-			$stop = $start + $span;
+			$stop = $start + $span - 1;
 		} 
 		else {
 			$stop = $start;
