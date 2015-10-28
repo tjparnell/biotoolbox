@@ -623,9 +623,9 @@ sub vcf_attributes {
 	unless ($self->{data}->name(7) eq 'INFO') {
 		croak "VCF column INFO is missing or improperly formatted!";
 	}
-	my %info = 	map {$_[0] => defined $_[1] ? $_[1] : 1} 
-				map { [ split /=/ ] } 
-				( split /;/, $self->value(7) );
+	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : 1} 
+				map { [split(/=/, $_)] } 
+				split(/;/, $self->value(7));
 	$self->{attributes}->{INFO} = \%info;
 	$self->{attributes}->{7}    = \%info;
 	
@@ -637,7 +637,9 @@ sub vcf_attributes {
 	foreach my $i (9 .. $self->{data}->number_columns - 1) {
 		my $name = $self->{data}->name($i);
 		my @sampleVals = split /:/, $self->value($i);
-		my %sample = map { $formatKeys[$_] => $sampleVals[$_] } (0 .. $#formatKeys);
+		my %sample = map { 
+			$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
+			(0 .. $#formatKeys);
 		$self->{attributes}->{$name} = \%sample;
 		$self->{attributes}->{$i}    = \%sample;
 	}
