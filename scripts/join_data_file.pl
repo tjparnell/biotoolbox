@@ -118,9 +118,16 @@ foreach my $file (@ARGV) {
 	print " Merging file $file...   ";
 	
 	# check that file extension matches
-	unless ($Output->extension eq $Data->extension) {
-		die "\n File extensions of input files do not match! Questionable joining!\n" . 
-			" Compare $Output->extension with $Data->extension\n";
+	if ($Output->extension ne $Data->extension) {
+		# double-check we don't have gz extensions confounding our comparison
+		my $outext = $Output->extension;
+		$outext =~ s/\.gz$//i;
+		my $inext = $Data->extension;
+		$inext =~ s/\.gz$//i;
+		if ($outext ne $inext) {
+			warn sprintf("\n File extensions do not match! Compare %s with %s!\n",
+				$Output->extension, $Data->extension);
+		}
 	}
 	
 	# check for equal number of columns

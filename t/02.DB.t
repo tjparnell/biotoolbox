@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 58;
+		plan tests => 60;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -93,15 +93,6 @@ my $score = $row->get_score(
 	'method'  => 'mean',
 );
 # print "mean score with data and ddb is $score\n";
-is(sprintf("%.2f", $score), 0.18, 'mean score across feature');
- 
-# collect mean score
-$score = $row->get_score(
-	db      => $ddb,
-	dataset => 'data',
-	'method'  => 'mean',
-);
-# print "mean score is $score\n";
 is(sprintf("%.2f", $score), 0.18, 'mean score across feature');
  
 # collect max score
@@ -248,6 +239,30 @@ is(scalar(keys %score1), 26, 'number of keys avoided extended relative positione
 );
 # print "position_score is \n" . print_hash(\%score1);
 is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
+
+
+
+# extra test for checking non-conforming chromosome name
+# using sample.bed file as in other tests
+undef $Data;
+undef $stream;
+$Data = Bio::ToolBox::Data->new(file => File::Spec->catfile($Bin, "Data", "sample.bed"));
+isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
+$stream = $Data->row_stream;
+$row = $stream->next_row;
+$score = $row->get_score(
+	db      => $ddb,
+	dataset => 'data',
+	'method'  => 'mean',
+);
+is(sprintf("%.2f", $score), -0.14, 'mean score across first bed feature');
+$row = $stream->next_row;
+$score = $row->get_score(
+	db      => $ddb,
+	dataset => 'data',
+	'method'  => 'median',
+);
+is(sprintf("%.2f", $score), 0.49, 'mean score across second bed feature with alt chromo');
 
 
 
