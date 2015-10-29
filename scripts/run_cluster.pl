@@ -112,7 +112,7 @@ my $check = 1; # assume ok to begin with
 my $error;
 
 # check comment lines
-if (scalar @{ $Data->comments } != 0) {
+if ($Data->comments) {
 	$check = 0;
 	$error .= "  file has extraneous comment lines\n";
 }
