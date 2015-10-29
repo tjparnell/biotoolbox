@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.31';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -31,7 +31,7 @@ Bio::ToolBox::parser::ucsc - Parser for UCSC genePred, refFlat, etc formats
   ### Retrieve array of all assembled genes
   my @genes = $ucsc->top_features;
   
-  # Each gene or transcript is a Bio::SeqFeature::Lite object
+  # Each gene or transcript is a SeqFeatureI compatible object
   printf "gene %s is located at %s:%s-%s\n", 
     $gene->display_name, $gene->seq_id, 
     $gene->start, $gene->end;
@@ -866,7 +866,9 @@ sub from_ucsc_string {
 package Bio::ToolBox::parser::ucsc::builder;
 use strict;
 use Carp qw(carp cluck croak);
-use Bio::SeqFeature::Lite;
+our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
+eval "require $SFCLASS" or croak $@;
+
 
 sub new {
 	my ($class, $line, $ucsc) = @_;
@@ -1251,7 +1253,7 @@ sub build_gene {
 	}
 	else {
 		# build a new gene
-		$gene = Bio::SeqFeature::Lite->new(
+		$gene = $SFCLASS->new(
 			-seq_id        => $self->chrom,
 			-source        => $ucsc->source,
 			-primary_tag   => 'gene',
@@ -1320,7 +1322,7 @@ sub build_transcript {
 	}
 	
 	# Generate the transcript SeqFeature object
-	my $transcript = Bio::SeqFeature::Lite->new(
+	my $transcript = $SFCLASS->new(
 		-seq_id        => $self->chrom,
 		-source        => $ucsc->source,
 		-primary_tag   => $self->type,
@@ -1478,7 +1480,7 @@ sub add_exons {
 		}
 		
 		# build the exon seqfeature
-		my $exon = Bio::SeqFeature::Lite->new(
+		my $exon = $SFCLASS->new(
 			-seq_id        => $transcript->seq_id,
 			-source        => $transcript->source,
 			-primary_tag   => 'exon',
@@ -1629,7 +1631,7 @@ sub add_utrs {
 			
 		# otherwise build the UTR object
 		unless ($utr) {
-			$utr = Bio::SeqFeature::Lite->new(
+			$utr = $SFCLASS->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-start         => $start,
@@ -1657,7 +1659,7 @@ sub add_utrs {
 			
 			# otherwise build the utr
 			unless ($utr2) {
-				$utr2 = Bio::SeqFeature::Lite->new(
+				$utr2 = $SFCLASS->new(
 					-seq_id        => $transcript->seq_id,
 					-source        => $transcript->source,
 					-start         => $start2,
@@ -1793,7 +1795,7 @@ sub add_cds {
 		}
 			
 		# build the CDS object
-		my $cds = Bio::SeqFeature::Lite->new(
+		my $cds = $SFCLASS->new(
 			-seq_id        => $transcript->seq_id,
 			-source        => $transcript->source,
 			-start         => $start,
@@ -1840,7 +1842,7 @@ sub add_codons {
 		
 		# start codon
 		unless ($start_codon) {
-			$start_codon = Bio::SeqFeature::Lite->new(
+			$start_codon = $SFCLASS->new(
 					-seq_id        => $transcript->seq_id,
 					-source        => $transcript->source,
 					-primary_tag   => 'start_codon',
@@ -1856,7 +1858,7 @@ sub add_codons {
 		
 		# stop codon
 		unless ($stop_codon) {
-			$stop_codon = Bio::SeqFeature::Lite->new(
+			$stop_codon = $SFCLASS->new(
 					-seq_id        => $transcript->seq_id,
 					-source        => $transcript->source,
 					-primary_tag   => 'stop_codon',
@@ -1884,7 +1886,7 @@ sub add_codons {
 		
 		# stop codon
 		unless ($stop_codon) {
-			$stop_codon = Bio::SeqFeature::Lite->new(
+			$stop_codon = $SFCLASS->new(
 					-seq_id        => $transcript->seq_id,
 					-source        => $transcript->source,
 					-primary_tag   => 'stop_codon',
@@ -1900,7 +1902,7 @@ sub add_codons {
 		
 		# start codon
 		unless ($start_codon) {
-			$start_codon = Bio::SeqFeature::Lite->new(
+			$start_codon = $SFCLASS->new(
 					-seq_id        => $transcript->seq_id,
 					-source        => $transcript->source,
 					-primary_tag   => 'start_codon',

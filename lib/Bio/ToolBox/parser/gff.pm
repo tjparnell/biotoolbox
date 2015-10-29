@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.33';
+my $VERSION = '1.35';
 
 =head1 NAME
 
@@ -26,8 +26,8 @@ shared between different transcripts of the same gene, are fully supported.
 
 Embedded Fasta sequences are ignored, as are most comment and pragma lines.
 
-The SeqFeature objects that are returned are Bio::SeqFeature::Lite objects. 
-Refer to that documentation for more information.
+The SeqFeature objects that are returned are L<Bio::ToolBox::SeqFeature> 
+objects. Refer to that documentation for more information.
 
 =head1 SYNOPSIS
 
@@ -38,7 +38,7 @@ Refer to that documentation for more information.
   	die "unable to open gff file!\n";
   
   while (my $feature = $parser->next_top_feature() ) {
-	# each $feature is a Bio::SeqFeature::Lite object
+	# each $feature is a SeqFeature object
 	my @children = $feature->get_SeqFeatures();
   }
 
@@ -128,7 +128,7 @@ It is best if methods are not mixed; unexpected results may occur.
 
 =item next_feature()
 
-This method will return a Bio::SeqFeature::Lite object representation of 
+This method will return a SeqFeature object representation of 
 the next feature in the file. Parent - child relationships are NOT 
 assembled. This is best used with simple GFF files with no hierarchies 
 present. This may be used in a while loop until the end of the file 
@@ -137,7 +137,7 @@ automatically skipped.
 
 =item next_top_feature()
 
-This method will return a top level parent Bio::SeqFeature::Lite object 
+This method will return a top level parent SeqFeature object 
 assembled with child features as sub-features. For example, a gene 
 object with mRNA subfeatures, which in turn may have exon and/or CDS 
 subfeatures. Child features are assembled based on the existence of 
@@ -204,7 +204,7 @@ been in the parsed file. These may or may not be useful.
 =item from_gff_string($string)
 
 This method will parse a GFF, GTF, or GFF3 formatted string or line of text 
-and return a Bio::SeqFeature::Lite object.
+and return a SeqFeature object.
 
 =item unescape($text)
 
@@ -226,8 +226,9 @@ attribute, CDS subfeatures, etc. This method tries to determine this.
 
 use strict;
 use Carp qw(carp cluck croak);
-use Bio::SeqFeature::Lite;
-use Bio::ToolBox::Data::file;
+use Bio::ToolBox::Data::file; # only for opening file handles
+our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
+eval "require $SFCLASS" or croak $@;
 
 1;
 
@@ -587,7 +588,7 @@ sub parse_file {
 sub _make_gene_parent {
 	# for generating GTF gene parent features
 	my ($self, $feature) = @_;
-	my $gene = Bio::SeqFeature::Lite->new(
+	my $gene = $SFCLASS->new(
 		-seq_id         => $feature->seq_id,
 		-start          => $feature->start,
 		-end            => $feature->end,
@@ -622,7 +623,7 @@ sub _make_gene_parent {
 sub _make_rna_parent {
 	# for generating GTF transcript parent features
 	my ($self, $feature) = @_;
-	my $rna = Bio::SeqFeature::Lite->new(
+	my $rna = $SFCLASS->new(
 		-seq_id         => $feature->seq_id,
 		-start          => $feature->start,
 		-end            => $feature->end,
@@ -897,7 +898,7 @@ sub _gff_to_seqf {
 	my $self = shift;
 	
 	# generate the basic SeqFeature
-	my $feature = Bio::SeqFeature::Lite->new(
+	my $feature = $SFCLASS->new(
 		-seq_id         => $_[0],
 		-start          => $_[3],
 		-end            => $_[4],
