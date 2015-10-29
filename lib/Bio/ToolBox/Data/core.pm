@@ -235,7 +235,7 @@ sub verify {
 		
 		# check number of columns
 		if (
-			$self->{'number_columns'} < 3 and 
+			$self->{'number_columns'} < 3 or 
 			$self->{'number_columns'} > 12 
 		) {
 			$bed_check = 0;
@@ -502,7 +502,7 @@ sub verify {
 		my $vcf_check = 1; # start with assumption it is correct
 		
 		# check number of columns
-		unless ($self->{'number_columns'} >= 8) {
+		if ($self->{'number_columns'} < 8) {
 			$vcf_check = 0;
 			$error .= " Number of Columns is too few.";
 		}
@@ -597,9 +597,6 @@ sub verify {
 		$self->{'extension'} !~ /sgr/i
 	) {
 		$self->{'headers'} = 1;
-	}
-	else {
-		$self->{'headers'} = 0;
 	}
 	
 	# if we have made it here, then there were no major structural problems
