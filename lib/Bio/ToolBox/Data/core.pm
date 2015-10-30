@@ -235,7 +235,7 @@ sub verify {
 		
 		# check number of columns
 		if (
-			$self->{'number_columns'} < 3 and 
+			$self->{'number_columns'} < 3 or 
 			$self->{'number_columns'} > 12 
 		) {
 			$bed_check = 0;
@@ -271,6 +271,52 @@ sub verify {
 		) {
 			$bed_check = 0;
 			$error .= " Column 5 name not strand-like.";
+		}
+		if (
+			exists $self->{6} and
+			$self->{'extension'} !~ /peak/i and
+			$self->{6}{'name'} !~ m/start|thick|cds/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 6 name not thickStart-like.";
+		}
+		if (
+			exists $self->{7} and
+			$self->{'extension'} !~ /peak/i and
+			$self->{7}{'name'} !~ m/end|stop|thick|cds/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 7 name not thickEnd-like.";
+		}
+		if (
+			exists $self->{8} and
+			$self->{'extension'} !~ /peak/i and
+			$self->{8}{'name'} !~ m/item|rgb|color/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 8 name not itemRGB-like.";
+		}
+		if (
+			exists $self->{9} and
+			$self->{'extension'} !~ /peak/i and
+			$self->{9}{'name'} !~ m/count|number|block|exon/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 9 name not blockCount-like.";
+		}
+		if (
+			exists $self->{10} and
+			$self->{10}{'name'} !~ m/size|length|block|exon/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 10 name not blockSizes-like.";
+		}
+		if (
+			exists $self->{11} and
+			$self->{11}{'name'} !~ m/start|block|exon/i
+		) {
+			$bed_check = 0;
+			$error .= " Column 11 name not blockStarts-like.";
 		}
 		
 		# check column data
@@ -502,7 +548,7 @@ sub verify {
 		my $vcf_check = 1; # start with assumption it is correct
 		
 		# check number of columns
-		unless ($self->{'number_columns'} >= 8) {
+		if ($self->{'number_columns'} < 8) {
 			$vcf_check = 0;
 			$error .= " Number of Columns is too few.";
 		}
@@ -591,15 +637,20 @@ sub verify {
 	# check file headers value because this may have changed
 	# this can happen when we reset bed/gff/vcf flags when we add columns
 	if (
+		$self->{'bed'} or 
+		$self->{'gff'} or 
+		$self->{'ucsc'} or
+		$self->{'extension'} =~ /sgr/i
+	) {
+		$self->{'headers'} = 0;
+	}
+	elsif (
 		$self->{'bed'} == 0 and 
 		$self->{'gff'} == 0 and 
 		$self->{'ucsc'} == 0 and
 		$self->{'extension'} !~ /sgr/i
 	) {
 		$self->{'headers'} = 1;
-	}
-	else {
-		$self->{'headers'} = 0;
 	}
 	
 	# if we have made it here, then there were no major structural problems
