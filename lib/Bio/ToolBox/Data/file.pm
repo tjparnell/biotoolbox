@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.33';
+our $VERSION = '1.34';
 
 =head1 NAME
 
@@ -50,23 +50,6 @@ sub load_file {
 	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
 	# set metadata for converting 0-based starts to 1-based
-	$self->{'0based_starts'} = [];
-	if ($self->{'ucsc'} or $self->{'bed'}) {
-		# same thing for ucsc files
-		# adjust both transcription and coding start
-		#### We should be doing thickStart and blockStarts too ####
-		# but I'm not sure how useful this really would be, plus adds complexity 
-		# that will slow file loading down - it's already pretty complicated
-		foreach my $name (qw(start txStart cdsStart peak)) {
-			my $c = $self->find_column($name);
-			next unless defined $c;
-			next if $self->metadata($c, 'base'); 
-			push @{ $self->{'0based_starts'} }, $c;
-		}
-	}
-	
-	# internal strand plus/minus count for determining conversion
-	$self->{plusminus_count} = 0;
 	
 	# Load the data table
 	while (my $line = $self->{fh}->getline) {		
@@ -83,45 +66,6 @@ sub load_file {
 		# process the line
 		$self->add_data_line($line);
 	}
-	
-	# update metadata as necessary
-	my $strand_i = $self->strand_column;
-	if (defined $strand_i) {
-		if ($self->{plusminus_count}) {
-			# we have converted strand information
-			if (exists $self->{$strand_i}{'strand_style'}) {
-				# just in case, reset it to plusminus
-				$self->{$strand_i}{'strand_style'} = 'plusminus';
-			}
-			else {
-				$self->{$strand_i}{'strand_style'} = 'plusminus';
-				if (exists $self->{$strand_i}{'AUTO'}) {
-					# update automatically generated metadata
-					$self->{$strand_i}{'AUTO'}++;
-				}
-			}
-		}
-		else {
-			# no plusminus count, make sure metadata was not set automatically
-			# but this is technically a problem
-			if (exists $self->{$strand_i}{'strand_style'}) {
-				carp "File format is suspicious! format suggests plus/minus strand format" . 
-					" but none was found!?\n";
-				delete $self->{$strand_i}{'strand_style'};
-				$self->{$strand_i}{'AUTO'}--;
-			}
-		}
-	}
-	foreach my $s (@{ $self->{'0based_starts'} }) {
-		# each column of 0-based start that has been updated
-		$self->{$s}{'base'} = 1;
-		if (exists $self->{$s}{'AUTO'}) {
-			# update automatically generated metadata
-			$self->{$s}{'AUTO'}++;
-		}
-	}
-	delete $self->{'0based_starts'};
-	delete $self->{plusminus_count};
 	
 	# record the index number of the last data row
 	$self->{'last_row'} = scalar @{ $self->{'data_table'} } - 1;
@@ -367,7 +311,6 @@ sub add_data_line {
 			# the line ending is set by a global variable for low-level file reading
 			# at this point it's easier to just die than reset it and start over
 		}
-		warn "Number of columns in line is inconsistent\n";
 		# we will verify the table after loading all the lines to verify 
 	}
 	
@@ -376,51 +319,6 @@ sub add_data_line {
 	# otherwise trailing null values aren't included in @linedata
 	# be sure to handle both newlines and carriage returns
 	$linedata[-1] =~ s/[\r\n]+$//;
-	
-	# convert null values to internal '.'
-	for (my $i = 0; $i < $self->number_columns; $i++) {
-		if (!defined $linedata[$i]) {
-			# not defined position in the array?
-			$linedata[$i] = '.';
-		}
-		elsif ($linedata[$i] eq '') {
-			# a null value
-			$linedata[$i] = '.';
-		}
-	}
-	
-	# convert strand as necessary
-	my $strand_i = $self->strand_column;
-	if (defined $strand_i) {
-		# convert any interpretable value to signed value
-		if ($linedata[$strand_i] eq '+') {
-			# just a simple plus
-			$linedata[$strand_i] = 1;
-			$self->{plusminus_count}++;
-		}
-		elsif ($linedata[$strand_i] eq '-') {
-			# simple minus
-			$linedata[$strand_i] = -1;
-			$self->{plusminus_count}++;
-		}
-		elsif ($linedata[$strand_i] eq '.') {
-			# unstranded GFF format, not BED
-			$linedata[$strand_i] = 0;
-			$self->{plusminus_count}++;
-		}
-		# otherwise assume bioperl convention -1, 0, 1
-		# if it is not, then hope for the best
-		# I am dropping support for the ancient forward, watson, reverse, crick
-		# who uses those anyway?????
-		# some old bioperl scripts may still support it
-	}
-	
-	# adjust start positions
-	if (exists $self->{'0based_starts'}) {
-		foreach my $s (@{ $self->{'0based_starts'} }) {
-			$linedata[$s] += 1;
-		}
-	}
 	
 	# add the line of data
 	push @{ $self->{data_table} }, \@linedata;
@@ -620,52 +518,26 @@ sub write_file {
 	my $newname = $path . $name . $extension;
 	
 	
-	# Convert base to interbase coordinates if necessary
-	if ($self->bed or $self->{'ucsc'}) {
-		# we are writing a confirmed file with zero starts
-		my @starts;
-		foreach my $name (qw(start txStart cdsStart peak)) {
-			my $c = $self->find_column($name);
-			next unless defined $c;
-			if (exists $self->{$c}{'base'} and $self->{$c}{'base'}) {
-				push @starts, $c;
-			}
-		}
-		# convert back to interbase
-		for my $row (1 .. $self->last_row) {
-			foreach my $c (@starts) {
-				$self->{'data_table'}->[$row][$c] -= 1;
-			}
-		}
-		# update metadata
-		foreach my $c (@starts) {
-			delete $self->{$c}{'base'};
-			if (exists $self->{$c}{'AUTO'}) {
-				$self->{$c}{'AUTO'} -= 1;
-			}
-		}
-	}
-	
-	
 	# Convert strand information
 	my $strand_i = $self->strand_column;
-	if (
-		defined $strand_i and (
-			$self->metadata($strand_i, 'strand_style') eq 'plusminus' or 
-			($self->gff or $self->bed or $self->ucsc)
-		)
-	) {
-		# strand information was originally BED and GFF style +,.,-
-		# then convert back to that format before writing
-		for my $row (1 .. $self->last_row) {
-			if ($self->{'data_table'}->[$row][$strand_i] == 1) {
-				$self->{'data_table'}->[$row][$strand_i] = '+';
+	if (defined $strand_i and ($self->gff or $self->bed or $self->ucsc) ) {
+		# convert to +/-/. nomenclature as necessary
+		if ($self->gff) {
+			for my $row (1 .. $self->last_row) {
+				my $s = $self->{'data_table'}->[$row][$strand_i];
+				if ($s =~ /\d/) {
+					$s = $s == 1 ? '+' : $s == -1 ? '-' : '.';
+				}
+				$self->{'data_table'}->[$row][$strand_i] = $s;
 			}
-			elsif ($self->{'data_table'}->[$row][$strand_i] == -1) {
-				$self->{'data_table'}->[$row][$strand_i] = '-';
-			}
-			elsif ($self->{'data_table'}->[$row][$strand_i] == 0) {
-				$self->{'data_table'}->[$row][$strand_i] = '.';
+		}
+		elsif ($self->bed or $self->ucsc) {
+			for my $row (1 .. $self->last_row) {
+				my $s = $self->{'data_table'}->[$row][$strand_i];
+				if ($s =~ /\d/) {
+					$s = $s >= 0 ? '+' : '-';
+				}
+				$self->{'data_table'}->[$row][$strand_i] = $s;
 			}
 		}
 	}
@@ -761,7 +633,6 @@ sub write_file {
 				next if $_ eq 'name'; # already written
 				next if $_ eq 'index'; # internal use only
 				next if $_ eq 'AUTO'; # internal use only
-				next if $_ eq 'strand_style'; # internal use only
 				push @pairs,  $_ . '=' . $self->{$i}{$_};
 			}
 			
@@ -775,7 +646,7 @@ sub write_file {
 	
 	
 	# Write the table column headers
-	if ($self->{'headers'}) {
+	if ($self->{'headers'} or $extension =~ /txt/i) {
 		$fh->print(join("\t", @{ $self->{'data_table'}[0] }), "\n");
 	}
 		
@@ -1048,10 +919,6 @@ sub add_gff_metadata {
 			defined $self->{'column_names'}->[$i];
 	}
 	
-	# set strand style
-	$self->{6}{'strand_style'} = 'plusminus';
-	$self->{6}{'AUTO'}++;
-	
 	# set headers flag to false
 	$self->{'headers'} = 0 unless $self->{0}{'name'} =~ /^#/;
 	
@@ -1101,13 +968,7 @@ sub add_bed_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
-	
-	# set strand style
-	if ($column_count >= 6) {
-		$self->{5}{'strand_style'} = 'plusminus';
-		$self->{5}{'AUTO'}++;
-	}
-	
+
 	# set the feature type
 	unless (defined $self->{'feature'}) {
 		$self->{'feature'} = 'region';
@@ -1146,12 +1007,6 @@ sub add_peak_metadata {
 		# assign the name to the column header
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
-	}
-	
-	# set strand style
-	if ($column_count >= 6) {
-		$self->{5}{'strand_style'} = 'plusminus';
-		$self->{5}{'AUTO'}++;
 	}
 	
 	# set the feature type
@@ -1193,11 +1048,6 @@ sub add_ucsc_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
-	
-	# set strand style
-	my $strand_i = $self->find_column('strand');
-	$self->{$strand_i}{'strand_style'} = 'plusminus';
-	$self->{$strand_i}{'AUTO'}++;
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1296,44 +1146,44 @@ sub standard_column_names {
 		return [qw(Chromosome Source Type Start Stop Score Strand Phase Group)];
 	}
 	elsif ($type eq 'bed12') {
-		return [qw(Chromosome Start End Name Score Strand  
-			thickStart thickEnd itemRGB blockCount blockSizes blockStarts)];
+		return [qw(Chromosome Start0 End Name Score Strand  
+			thickStart0 thickEnd itemRGB blockCount blockSizes blockStarts0)];
 	}
 	elsif ($type eq 'bed6') {
-		return [qw(Chromosome Start End Name Score Strand)];
+		return [qw(Chromosome Start0 End Name Score Strand)];
 	}
 	elsif ($type eq 'bdg') {
-		return [qw(Chromosome Start End Score)];
+		return [qw(Chromosome Start0 End Score)];
 	}
 	elsif ($type eq 'narrowpeak') {
-		return [qw(Chromosome Start End Name Score Strand signalValue 
+		return [qw(Chromosome Start0 End Name Score Strand signalValue 
 			pValue qValue peak)];
 	}
 	elsif ($type eq 'broadpeak') {
-		return [qw(Chromosome Start End Name Score Strand signalValue 
+		return [qw(Chromosome Start0 End Name Score Strand signalValue 
 			pValue qValue)];
 	}
 	elsif ($type eq 'sgr') {
 		return [qw(Chromo Start Score)];
 	}
 	elsif ($type eq 'ucsc16') {
-		return [qw(bin name chrom strand txStart txEnd cdsStart cdsEnd exonCount 
-			exonStarts exonEnds score name2 cdsStartSt cdsEndStat exonFrames)];
+		return [qw(bin name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
+			exonStarts0 exonEnds score name2 cdsStartSt cdsEndStat exonFrames)];
 	}
 	elsif ($type eq 'ucsc15' or $type eq 'genepredext') {
-		return [qw(name chrom strand txStart txEnd cdsStart cdsEnd exonCount 
-			exonStarts exonEnds score name2 cdsStartSt cdsEndStat exonFrames)];
+		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
+			exonStarts0 exonEnds score name2 cdsStartSt cdsEndStat exonFrames)];
 	}
 	elsif ($type eq 'ucsc12' or $type eq 'knowngene') {
-		return [qw(name chrom strand txStart txEnd cdsStart cdsEnd exonCount 
-			exonStarts exonEnds proteinID alignID)];
+		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
+			exonStarts0 exonEnds proteinID alignID)];
 	}
 	elsif ($type eq 'ucsc11' or $type eq 'genepred') {
-		return [qw(geneName transcriptName chrom strand txStart txEnd cdsStart 
-			cdsEnd exonCount exonStarts exonEnds)];
+		return [qw(geneName transcriptName chrom strand txStart0 txEnd cdsStart0 
+			cdsEnd exonCount exonStarts0 exonEnds)];
 	}
 	elsif ($type eq 'ucsc10' or $type eq 'refflat') {
-		return [qw(name chrom strand txStart txEnd cdsStart cdsEnd exonCount 
+		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
 			exonStarts exonEnds)];
 	}
 	else {
