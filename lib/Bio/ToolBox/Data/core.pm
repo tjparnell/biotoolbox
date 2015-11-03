@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.32';
+our $VERSION = '1.34';
 
 =head1 NAME
 
@@ -608,7 +608,7 @@ sub verify {
 			$sgr_check = 0;
 			$error .= " Column 0 name not chromosome-like.";
 		}
-		if ($self->{1}{'name'} !~ /^start|position/i) {
+		if ($self->{1}{'name'} !~ /start|position/i) {
 			$sgr_check = 0;
 			$error .= " Column 1 name not start-like.";
 		}
@@ -1113,7 +1113,7 @@ sub _find_column_indices {
 	my $type   = $self->find_column('^type|class|primary_tag');
 	my $id     = $self->find_column('^primary_id');
 	my $chromo = $self->find_column('^chr|seq|ref|ref.?seq');
-	my $start  = $self->find_column('^start|position|pos|txStart$');
+	my $start  = $self->find_column('^start|position|pos|txStart');
 	my $stop   = $self->find_column('^stop|end|txEnd');
 	my $strand = $self->find_column('^strand');
 	$self->{column_indices} = {
