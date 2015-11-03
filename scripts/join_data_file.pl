@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.33';
+my $VERSION =  '1.34';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -153,9 +153,24 @@ foreach my $file (@ARGV) {
 	}
 	
 	# continue writing the file
-	while (my $row = $Data->next_row) {
-		$Output->add_row($row);
-		$line_count++;
+		# for the sake of speed over data checking, we're taking raw input lines 
+		# and writing directly to the output 
+		# write to the raw output filehandle if we can get it
+		# going through Data::Feature objects is considerably slower and not necessary
+	my $in_fh = $Data->fh; 
+	my $out_fh = $Output->fh; # only get a filehandle if we've started writing the file
+	if ($out_fh) {
+		while (my $line = $in_fh->getline) {
+			$out_fh->print($line);
+			$line_count++;
+		}
+	}
+	else {
+		# not as fast but fast enough
+		while (my $line = $in_fh->getline) {
+			$Output->write_row($line);
+			$line_count++;
+		}
 	}
 	printf " merged %s lines\n", format_with_commas($line_count), 
 		$Data->filename;
