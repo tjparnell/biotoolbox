@@ -5,10 +5,10 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::ToolBox::Data;
+use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.33';
+my $VERSION =  '1.34';
 
 print "\n This program will write a BED file\n";
 
@@ -111,7 +111,7 @@ if (defined $name) {
 
 
 ### Load file
-my $Input = Bio::ToolBox::Data->new(file => $infile) or
+my $Input = Bio::ToolBox::Data::Stream->new(file => $infile) or
 	die "Unable to open file '$infile'!\n";
 
 if ($bigbed) {
@@ -120,8 +120,6 @@ if ($bigbed) {
 		$database = $Input->database or 
 			die " No database name or chromosome file provided for generating bigbed file!\n";
 	}
-	# genomic sort the table, required for making bigbed
-	$Input->gsort_data if $Input->feature_type eq 'coordinate';
 }
 
 
@@ -218,8 +216,7 @@ else {
 unless ($outfile) {
 	$outfile = $Input->path . $Input->basename;
 }
-my $Output = Bio::ToolBox::Data->new(
-	stream  => 1,
+my $Output = Bio::ToolBox::Data::Stream->new(
 	out     => $outfile,
 	bed     => 6,
 	gz      => $gz
@@ -240,9 +237,11 @@ printf " Converting using \n  - chromosome index %s\n  - start index %s\n" .
 my $count = 0; # the number of lines processed
 my $notsorted = 0; # flag to set 
 my ($prev_chr, $prev_start);
+if (defined $start_index and substr($Input->name($start_index), -1) eq '0') {
+	$zero_based = 1; # name suggests 0-based indexing
+}
 my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
-my $stream = $Input->row_stream;
-while (my $row = $stream->next_row) {
+while (my $row = $Input->next_row) {
 	
 	# get the feature from the db if necessary
 	my $f = $row->feature if $do_feature;

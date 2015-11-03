@@ -6,10 +6,10 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
-use Bio::ToolBox::Data;
+use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(ask_user_for_index);
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-my $VERSION =  '1.33';
+my $VERSION =  '1.34';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -115,7 +115,7 @@ unless (defined $use_track) {
 
 
 ### Load input file
-my $Input = Bio::ToolBox::Data->new(file => $infile) or
+my $Input = Bio::ToolBox::Data::Stream->new(file => $infile) or
 	die "Unable to open file '$infile'!\n";
 
 
@@ -147,7 +147,7 @@ unless ($outfile =~ /\.(?:wig|bdg|bedgraph)(?:\.gz)?$/i) {
 	# add extension
 	$outfile .= $bedgraph ? '.bdg' : '.wig';
 }
-my $out_fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+my $out_fh = Bio::ToolBox::Data::Stream->open_to_write_fh($outfile, $gz) or 
 	die " unable to open output file '$outfile' for writing!\n";
 
 # write track line
@@ -159,8 +159,6 @@ if ($use_track) {
 
 ### Start the conversion 
 printf " converting '%s'....\n", $Input->name($score_index);
-# sort by genomic coordinates just in case
-$Input->gsort_data if $Input->feature_type eq 'coordinate';
 if ($bedgraph) {
 	convert_to_bedgraph();
 }
@@ -211,6 +209,10 @@ sub check_indices {
 		unless (defined $start_index) {
 			die " No identifiable start column index!\n";
 		}
+	}
+	if (substr($Input->name($start_index), -1) eq '0') {
+		# name suggests it is 0-based indexed
+		$interbase = 1;
 	}
 	# stop column is optional	
 	
@@ -378,8 +380,7 @@ sub convert_to_fixedStep {
 	my $current_chr; # current chromosome
 	
 	# walk through the data file
-	my $iterator = $Input->row_stream;
-	while (my $row = $iterator->next_row) {
+	while (my $row = $Input->next_row) {
 		# coordinates
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = calculate_position($row);
@@ -409,8 +410,7 @@ sub convert_to_variableStep {
 	my $current_chr; # current chromosome
 	my $previous_pos = 0; # previous position to avoid duplicates in wig file
 	my @scores; # reusable array for putting multiple data points in
-	my $iterator = $Input->row_stream;
-	while (my $row = $iterator->next_row) {
+	while (my $row = $Input->next_row) {
 		# coordinates
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = calculate_position($row);
@@ -479,8 +479,7 @@ sub convert_to_bedgraph {
 	# variables to check for overlap
 	my $current_chr; # current chromosome
 	my $previous_pos; # previous position to avoid overlap
-	my $iterator = $Input->row_stream;
-	while (my $row = $iterator->next_row) {
+	while (my $row = $Input->next_row) {
 		# coordinates
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = defined $start_index ? $row->value($start_index) : $row->start;
