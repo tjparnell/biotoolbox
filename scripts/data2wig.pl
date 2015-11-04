@@ -30,6 +30,7 @@ unless (@ARGV) {
 my (
 	$infile, 
 	$outfile,
+	$fast,
 	$step,
 	$bedgraph,
 	$step_size,
@@ -60,6 +61,7 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # name of input file
 	'out=s'     => \$outfile, # name of output gff file 
+	'fast!'     => \$fast, # fast mode without checks and stuff
 	'step=s'    => \$step, # wig step method
 	'bed|bdg!'  => \$bedgraph, # write a bedgraph file
 	'size=i'    => \$step_size, # wig step size
@@ -130,6 +132,13 @@ check_step();
 
 set_bigwig_options() if $bigwig;
 
+if ($fast) {
+	die "cannot use --midpoint with --fast option!\n" if $midpoint;
+	die "cannot use --attribute with --fast option!\n" if $attribute_name;
+	die "cannot use --format with --fast option!\n" if $format;
+	die "cannot use --method with --fast option!\n" if $method;
+}
+
 my $method_sub = set_method_sub();
 
 # generate the format string
@@ -159,7 +168,16 @@ if ($use_track) {
 
 ### Start the conversion 
 printf " converting '%s'....\n", $Input->name($score_index);
-if ($bedgraph) {
+if ($fast and $bedgraph) {
+	fast_convert_to_bedgraph();
+}
+elsif ($fast and $step eq 'fixed') {
+	fast_convert_to_fixedStep();
+}
+elsif ($fast and $step eq 'variable') {
+	fast_convert_to_variableStep();
+}
+elsif ($bedgraph) {
 	convert_to_bedgraph();
 }
 elsif ($step eq 'fixed') {
@@ -406,6 +424,40 @@ sub convert_to_fixedStep {
 }
 
 
+sub fast_convert_to_fixedStep {
+	my $current_chr; # current chromosome
+	unless (defined $chr_index) {
+		$chr_index = $Input->chromo_column;
+	}
+	unless (defined $start_index) {
+		$start_index = $Input->start_column;
+	}
+	die "coordinate columns not defined!\n" unless 
+		(defined $chr_index and defined $start_index);
+	die "no score column defined!\n" unless (defined $score_index);
+	
+	# simplified loop for conversion
+	while (my $row = $Input->next_row) {
+		# coordinates
+		my $chromosome = $row->value($chr_index);
+		my $start = $row->value($start_index);
+		$start++ if $interbase;
+		
+		# write definition line if necessary
+		if ($chromosome ne $current_chr) {
+			my $def = sprintf "fixedStep chrom=%s start=%d step=%d span=%d\n",
+				 $chromosome, $start, $step_size, $span;
+			$out_fh->print($def);
+			$current_chr = $chromosome;
+		}
+		
+		# collect the score
+		my $score = $row->value($score_index);
+		$out_fh->print("$score\n");
+	}
+}
+
+
 sub convert_to_variableStep {
 	my $current_chr; # current chromosome
 	my $previous_pos = 0; # previous position to avoid duplicates in wig file
@@ -474,6 +526,38 @@ sub convert_to_variableStep {
 }
 
 
+sub fast_convert_to_variableStep {
+	my $current_chr; # current chromosome
+	unless (defined $chr_index) {
+		$chr_index = $Input->chromo_column;
+	}
+	unless (defined $start_index) {
+		$start_index = $Input->start_column;
+	}
+	die "coordinate columns not defined!\n" unless 
+		(defined $chr_index and defined $start_index);
+	die "no score column defined!\n" unless (defined $score_index);
+	
+	# simplified loop for conversion
+	while (my $row = $Input->next_row) {
+		# coordinates
+		my $chromosome = $row->value($chr_index);
+		my $start = $row->value($start_index);
+		$start++ if $interbase;
+		
+		# write definition line if necessary
+		if ($chromosome ne $current_chr) {
+			$out_fh->print("variableStep chrom=$chromosome span=$span\n");
+			$current_chr = $chromosome;
+		}
+		
+		# collect the score
+		my $score = $row->value($score_index);
+		$out_fh->print("$start $score\n");
+	}
+}
+
+
 sub convert_to_bedgraph {
 	
 	# variables to check for overlap
@@ -518,6 +602,39 @@ sub convert_to_bedgraph {
 		# collect the score
 		my $score = get_score($row);
 		next unless defined $score;
+		
+		# write the feature line
+		$out_fh->print(join("\t", $chromosome, $start, $stop, $score), "\n");
+	}
+}
+
+
+sub fast_convert_to_bedgraph {
+	
+	unless (defined $chr_index) {
+		$chr_index = $Input->chromo_column;
+	}
+	unless (defined $start_index) {
+		$start_index = $Input->start_column;
+	}
+	unless (defined $stop_index) {
+		$stop_index = $Input->end_column;
+	}
+	die "coordinate columns not defined!\n" unless 
+		(defined $chr_index and defined $start_index and defined $stop_index);
+	die "no score column defined!\n" unless (defined $score_index);
+	
+	while (my $row = $Input->next_row) {
+		# coordinates
+		my $chromosome = $row->value($chr_index);
+		my $start = $row->value($start_index);
+		my $stop  = $row->value($stop_index);
+		
+		# adjust start position
+		$start-- unless ($interbase);
+		
+		# collect the score
+		my $score = $row->value($score_index);
 		
 		# write the feature line
 		$out_fh->print(join("\t", $chromosome, $start, $stop, $score), "\n");
@@ -618,6 +735,7 @@ data2wig.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
+  --fast
   --step [fixed | variable | bed]
   --bed | --bdg
   --size <integer>
@@ -662,6 +780,14 @@ be gzipped compressed.
 
 Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.
+
+=item --fast
+
+Disable checks for overlapping or duplicated intervals, unsorted data, 
+scores from attributes, formatted score values, valid score values, and 
+calculated midpoint positions. Requires setting the chromosome, start, end 
+(for bedGraph files only), and score column indices. Use only if you trust 
+your input file format and content.
 
 =item --step [fixed | variable | bed]
 
