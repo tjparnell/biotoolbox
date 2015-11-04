@@ -574,7 +574,7 @@ sub collect_binned_data_for_regions {
 		# walk through each feature
 		
 		# determine the segment length
-		my $length = $row->end - $row->start + 1;
+		my $length = $row->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -594,7 +594,7 @@ sub collect_binned_data_for_regions {
 		my $extra;
 		if ($extension_size) {
 			# extension is specific bp in size
-			$extra = int( ($extension_size * $binsize) + 0.5);
+			$extra = $extension_size * $extension;
 		}
 		else {
 			# extension is dependent on feature length
