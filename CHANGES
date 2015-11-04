@@ -1,5 +1,31 @@
 ######## Bio::ToolBox revision history #############
 
+v1.34 
+	- Changed the behavior of automatically converting interbase coordinates 
+	to base coordinates upon loading a file, and converting back as necessary 
+	when writing. This had the side effect of effectively changing coordinates 
+	when writing out nonstandard text files. Conversion is now done on the fly 
+	when using the start method of row Features. Start interbase coordinates 
+	are now recognized by appending a 0 to the column name. Output files should 
+	now look like the input files.
+	- Strand values are not automatically converted upon loading; They are 
+	converted as necessary on the fly using the row Feature strand method.
+	- Null values are not automatically converted to internal '.' null values.
+	They are converted as necessary using the row Feature value method to 
+	maintain backward compatibility.
+	- Scripts data2bed and data2wig go back to using a Stream input to avoid 
+	high memory usage. 
+	- Script data2wig now has a fast option to skip lots of checks on values 
+	and intervals. This speeds up conversion considerably at the risk of 
+	making improper wig files if the source file has issues.
+	- Script join_data_file is considerably faster by simply concatenating 
+	data lines without processing or checking.
+	- Add explicit interbase support to scripts data2gff and data2fasta.
+	- Fix bug were extensions were not scored properly for coordinate features 
+	in script get_binned_data.
+	- Bug fixes regarding bed file integrity checking that were introduced in 
+	the previous release.
+
 v.1.33 (git ba1a70e)
 	- Removed legacy_helper module. All scripts now properly updated to  
 	use Bio::ToolBox::Data and related objects. This was the last step of 
