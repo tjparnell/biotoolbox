@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas parse_list);
-my $VERSION =  '1.33';
+my $VERSION =  '1.34';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -40,6 +40,7 @@ my (
 	$type,
 	$tag,
 	$ask,
+	$interbase,
 	$gz,
 	$help,
 	$print_version,
@@ -61,6 +62,7 @@ GetOptions(
 	'type=s'    => \$type, # test to put in the type column
 	'tag|tags=s'=> \$tag, # comma list of tag column indices
 	'ask'       => \$ask, # request help in assigning indices
+	'zero!'     => \$interbase, # input file is interbase format
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -286,8 +288,13 @@ my $Output = Bio::ToolBox::Data::Stream->new(
 
 
 ### Convert the input stream
-my $count = 0; # the number of lines processed
+# check some things first
 my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
+if (defined $start_index and substr(Input->name($start_index), -1) eq '0') {
+	# start column name suggests it is 0-based
+	$interbase = 1;
+}
+my $count = 0; # the number of lines processed
 while (my $row = $Input->next_row) {
 	
 	# get the feature from the db if necessary
@@ -300,7 +307,9 @@ while (my $row = $Input->next_row) {
 		push @args, 'chromo', $row->value($chr_index);
 	}
 	if (defined $start_index) {
-		push @args, 'start', $row->value($start_index);
+		my $s = $row->value($start_index);
+		$s += 1 if $interbase;
+		push @args, 'start', $s;
 	}
 	if (defined $stop_index) {
 		push @args, 'stop', $row->value($stop_index);
@@ -373,6 +382,7 @@ data2gff.pl [--options...] <filename>
   --tags <column_index,column_index,...>
   --source <text | column_index>
   --type <text | column_index>
+  --zero
   --out <filename> 
   --gz
   --version
@@ -460,6 +470,11 @@ GFF 'type' or 'method' that should be used for the features. If
 not defined, it will use the column name for either 
 the 'score' or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
+
+=item --zero
+
+Input file is in interbase or 0-based coordinates. This should be 
+automatically detected for most known file formats, e.g. BED.
 
 =item --out <filename>
 

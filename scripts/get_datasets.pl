@@ -23,7 +23,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = '1.33';
+my $VERSION = '1.34';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -439,9 +439,13 @@ sub set_defaults {
 	}
 	
 	# check the output file
-	unless ($outfile) {
+	if ($outfile) {
+		
+	}
+	else {
 		# overwrite the input file
 		$outfile = $infile;
+		$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
 	}
 	
 	# Assign database for new feature lists

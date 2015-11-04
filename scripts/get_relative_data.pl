@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.30';
+my $VERSION = '1.34';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -282,6 +282,7 @@ sub check_defaults {
 	unless ($outfile) {
 		if ($infile) {
 			$outfile = $infile;
+			$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
 		}
 		else {
 			die " You must define an output filename !\n Use --help for more information\n";

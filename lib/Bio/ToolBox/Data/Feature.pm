@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.33';
+our $VERSION = '1.34';
 
 =head1 NAME
 
@@ -102,8 +102,7 @@ The coordinates of the feature or segment. Coordinates from known
 0-based file formats, e.g. BED, are returned as 1-based. Coordinates 
 must be integers to be returned. Zero or negative start coordinates 
 are assumed to be accidents or poor programming and transformed to 1. 
-Zero or negative stop coordinates are just ignored. Use the value() 
-method if you don't want this to happen.
+Use the value() method if you don't want this to happen.
 
 =item strand
 
@@ -143,7 +142,8 @@ The length of the feature or segment.
 =item value($index, $new_value)
 
 Returns or sets the value at a specific column index in the 
-current data row.
+current data row. Null values return a '.', symbolizing an 
+internal null value. 
 
 =item row_values
 
@@ -480,7 +480,8 @@ sub value {
 		# set a value
 		$self->{data}->{data_table}->[$row][$column] = $value;
 	}
-	return $self->{data}->{data_table}->[$row][$column];
+	my $v = $self->{data}->{data_table}->[$row][$column];
+	return defined $v ? $v : '.'; # internal null value
 }
 
 sub seq_id {
@@ -499,22 +500,32 @@ sub start {
 	my $self = shift;
 	carp "start is a read only method" if @_;
 	my $i = $self->{data}->start_column;
-	my $v = $self->value($i) if defined $i;
-	$v = $self->{feature}->start if (not defined $v and exists $self->{feature});
-	return undef unless defined $v;
-	return undef unless ($v =~ /^\-?\d+$/);
-	return $v < 1 ? 1 : $v;
+	if (defined $i) {
+		my $v = $self->value($i);
+		$v++ if (substr($self->{data}->name($i), -1) eq '0'); # compensate for 0-based
+		return $v < 1 ? 1 : $v;
+	}
+	elsif (exists $self->{feature}) {
+		return $self->{feature}->start;
+	}
+	else {
+		return;
+	}
 }
 
 sub end {
 	my $self = shift;
 	carp "end is a read only method" if @_;
 	my $i = $self->{data}->stop_column;
-	my $v = $self->value($i) if defined $i;
-	$v = $self->{feature}->end if (not defined $v and exists $self->{feature});
-	return undef unless defined $v;
-	return undef unless ($v =~ /^\-?\d+$/);
-	return $v < 1 ? undef : $v;
+	if (defined $i) {
+		return $self->value($i);
+	}
+	elsif (exists $self->{feature}) {
+		return $self->{feature}->end;
+	}
+	else {
+		return;
+	}
 }
 
 sub stop {
@@ -525,8 +536,17 @@ sub strand {
 	my $self = shift;
 	carp "strand is a read only method" if @_;
 	my $i = $self->{data}->strand_column;
-	return $self->value($i) if defined $i;
-	return $self->{feature}->strand if exists $self->{feature};
+	if (defined $i) {
+		my $str = $self->value($i);
+		if (defined $str and $str !~ /^\-?[01]$/) {
+			$str = $str eq '+' ? 1 : $str eq '-' ? -1 : 0;
+		}
+		$str ||= 0;
+		return $str;
+	}
+	elsif (exists $self->{feature}) {
+		return $self->{feature}->strand;
+	}
 	return 0;
 }
 
