@@ -13,7 +13,7 @@ segment in the genome. As such, this object provides convenient
 methods for accessing and manipulating the values in a row, as well as 
 methods for working with the represented genomic feature.
 
-This class should not be used directly by the user. Rather, Feature 
+This class should NOT be used directly by the user. Rather, Feature 
 objects are generated from a Bio::ToolBox::Data::Iterator object 
 (generated itself from the L<row_stream|Bio::ToolBox::Data/row_stream> 
 function in Bio::ToolBox::Data), or the L<iterate|Bio::ToolBox::Data/iterate> 
@@ -422,15 +422,10 @@ use Bio::ToolBox::db_helper qw(
 ### Initialization
 
 sub new {
-	# this should only be called from Bio::ToolBox::Data* iterators
+	# this should ONLY be called from Bio::ToolBox::Data* iterators
 	my $class = shift;
 	my %self = @_;
-	unless (exists $self{data}) {
-		confess "new() must be called with a data element!";
-	}
-	unless (exists $self{'index'}) {
-		confess "new() must be called with an index integer!";
-	}
+	# we trust that new is called properly with data and index values
 	return bless \%self, $class;
 }
 
