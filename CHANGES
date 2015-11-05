@@ -21,8 +21,8 @@ v1.34
 	- Script join_data_file is considerably faster by simply concatenating 
 	data lines without processing or checking.
 	- Add explicit interbase support to scripts data2gff and data2fasta.
-	- Fix bug were extensions were not scored properly for coordinate features 
-	in script get_binned_data.
+	- Fix critical bug were extensions were not scored properly for coordinate 
+	features in script get_binned_data. Thanks to Mengyao.
 	- Bug fixes regarding bed file integrity checking that were introduced in 
 	the previous release.
 

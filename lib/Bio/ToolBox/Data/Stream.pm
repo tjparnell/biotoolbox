@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.33';
+our $VERSION = '1.34';
 
 =head1 NAME
 
@@ -540,19 +540,8 @@ sub new {
 		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
 		
-		# look for potential start columns to convert from 0-based
-		$self->{'0based_starts'} = [];
-		if ($self->bed or $self->{'ucsc'}) {
-			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = $self->find_column($name);
-				next unless defined $c;
-				next if $self->metadata($c, 'base');
-				push @{ $self->{'0based_starts'} }, $c;
-			}
-		}
-		
-		# potential strand column that may need to be converted
-		$self->{plusminus_count} = 0;
+		# push a dummy row, this will get tossed when the first next_row() is called
+		$self->{data_table}->[1] = $self->{'column_names'}; 
 	}
 	
 	# prepare to write to a new stream
@@ -624,18 +613,6 @@ sub new {
 		# add feature
 		$args{feature} ||= $args{features} || undef;
 		$self->feature($args{feature}) unless $self->feature;
-		
-		# look for potential start columns to convert from 0-based
-		$self->{'0based_starts'} = [];
-		if ($self->{'ucsc'} or $self->{'bed'}) {
-			my @starts;
-			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = $self->find_column($name);
-				next unless defined $c;
-				next if $self->metadata($c, 'base');
-				push @{ $self->{'0based_starts'} }, $c;
-			}
-		}
 	}
 	
 	return $self;
@@ -670,7 +647,6 @@ sub duplicate {
 		# various keys
 		$Dup->{$_} = $self->{$_};
 	}
-	$Dup->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
 	my @comments = $self->comments;
 	push @{$Dup->{comments}}, @comments;
 	
@@ -743,19 +719,16 @@ sub next_row {
 	my $line = $self->{fh}->getline;
 	return unless $line;
 	$self->{line_count}++;
-	if ($line =~ /^#/) {
+	if (substr($line,0,1) eq '#') {
+		# we shouldn't have internal comment lines, but just in case....
+		# could be a gff3 pragma
 		$self->add_comment($line);
 		return $self->next_row;
 	}
-	return $self->next_row if $line !~ m/\w+/;
 	
 	# add the current line to the data table as row 1
-	splice( @{ $self->{data_table} }, 1, 1); # remove the old line
-	my $added = $self->add_data_line($line);
-	unless ($added) {
-		cluck "could not process line '$line'!";
-		return $self->next_row;
-	}
+	pop @{ $self->{data_table} }; # remove the old line
+	$self->add_data_line($line);
 	
 	# return the feature
 	return Bio::ToolBox::Data::Feature->new(
@@ -765,10 +738,7 @@ sub next_row {
 }
 
 
-sub add_row {
-	return shift->write_row(@_);
-}
-
+*add_row = \&write_row;
 
 sub write_row {
 	my $self = shift;
@@ -799,45 +769,16 @@ sub write_row {
 	
 	# identify what kind of data we are dealing with
 	my $data_ref = ref $data;
-	my @values;
 	if ($data_ref eq 'Bio::ToolBox::Data::Feature') {
 		# user passed a Feature object
-		@values = $data->row_values;
+		$self->{fh}->print( join("\t", ($data->row_values)), "\n" );
 	}
 	elsif ($data_ref eq 'ARRAY') {
 		# user passed an array of values
-		@values = @$data;
+		$self->{fh}->print( join("\t", @$data), "\n");
 	}
-	
-	# write the values as necessary
-	if (@values) {
-		# we have an array of values to write
-		# make adjustments as necessary
-		my $strand_i = $self->strand_column;
-		if (defined $strand_i and $values[$strand_i] =~ /\d/) {
-			# strand adjustment
-			if ($values[$strand_i] >= 0) {
-				$values[$strand_i] = '+';
-			}
-			else {
-				$values[$strand_i] = '-';
-			}
-		}
-		if ( @{$self->{'0based_starts'}} ) {
-			# 0-based start coordinate adjustment
-			foreach my $c ( @{$self->{'0based_starts'}} ) {
-				$values[$c] -= 1;
-			}
-		}
-		
-		# write the values
-		$self->{fh}->print( join("\t", @values), "\n" );
-	}
-	
 	else {
-		# no values given
 		# assume the passed data is a string
-		
 		# make sure it has a newline
 		unless ($data =~ /\n$/) {
 			$data .= "\n";
