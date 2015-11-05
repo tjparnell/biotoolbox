@@ -540,19 +540,6 @@ sub new {
 		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
 		
-		# look for potential start columns to convert from 0-based
-		$self->{'0based_starts'} = [];
-		if ($self->bed or $self->{'ucsc'}) {
-			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = $self->find_column($name);
-				next unless defined $c;
-				next if $self->metadata($c, 'base');
-				push @{ $self->{'0based_starts'} }, $c;
-			}
-		}
-		
-		# potential strand column that may need to be converted
-		$self->{plusminus_count} = 0;
 	}
 	
 	# prepare to write to a new stream
@@ -624,18 +611,6 @@ sub new {
 		# add feature
 		$args{feature} ||= $args{features} || undef;
 		$self->feature($args{feature}) unless $self->feature;
-		
-		# look for potential start columns to convert from 0-based
-		$self->{'0based_starts'} = [];
-		if ($self->{'ucsc'} or $self->{'bed'}) {
-			my @starts;
-			foreach my $name (qw(start txStart cdsStart peak)) {
-				my $c = $self->find_column($name);
-				next unless defined $c;
-				next if $self->metadata($c, 'base');
-				push @{ $self->{'0based_starts'} }, $c;
-			}
-		}
 	}
 	
 	return $self;
@@ -670,7 +645,6 @@ sub duplicate {
 		# various keys
 		$Dup->{$_} = $self->{$_};
 	}
-	$Dup->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
 	my @comments = $self->comments;
 	push @{$Dup->{comments}}, @comments;
 	
@@ -812,24 +786,6 @@ sub write_row {
 	# write the values as necessary
 	if (@values) {
 		# we have an array of values to write
-		# make adjustments as necessary
-		my $strand_i = $self->strand_column;
-		if (defined $strand_i and $values[$strand_i] =~ /\d/) {
-			# strand adjustment
-			if ($values[$strand_i] >= 0) {
-				$values[$strand_i] = '+';
-			}
-			else {
-				$values[$strand_i] = '-';
-			}
-		}
-		if ( @{$self->{'0based_starts'}} ) {
-			# 0-based start coordinate adjustment
-			foreach my $c ( @{$self->{'0based_starts'}} ) {
-				$values[$c] -= 1;
-			}
-		}
-		
 		# write the values
 		$self->{fh}->print( join("\t", @values), "\n" );
 	}

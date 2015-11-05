@@ -818,9 +818,6 @@ sub duplicate {
 		# various keys
 		$Dupe->{$_} = $self->{$_};
 	}
-	if (exists $self->{'0based_starts'}) {
-		$Dupe->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
-	}
 	my @comments = $self->comments;
 	push @{$Dupe->{comments}}, @comments;
 	
