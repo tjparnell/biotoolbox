@@ -57,7 +57,7 @@ sub load_file {
 		# data table information
 		
 		# skip comment and empty lines
-		if ($line =~ /^#/) {
+		if (substr($line,0,1) eq '#') {
 			$self->add_comment($line);
 			next;
 		}

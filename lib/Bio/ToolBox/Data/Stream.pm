@@ -540,6 +540,8 @@ sub new {
 		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
 		
+		# push a dummy row, this will get tossed when the first next_row() is called
+		$self->{data_table}->[1] = $self->{'column_names'}; 
 	}
 	
 	# prepare to write to a new stream
@@ -717,19 +719,16 @@ sub next_row {
 	my $line = $self->{fh}->getline;
 	return unless $line;
 	$self->{line_count}++;
-	if ($line =~ /^#/) {
+	if (substr($line,0,1) eq '#') {
+		# we shouldn't have internal comment lines, but just in case....
+		# could be a gff3 pragma
 		$self->add_comment($line);
 		return $self->next_row;
 	}
-	return $self->next_row if $line !~ m/\w+/;
 	
 	# add the current line to the data table as row 1
-	splice( @{ $self->{data_table} }, 1, 1); # remove the old line
-	my $added = $self->add_data_line($line);
-	unless ($added) {
-		cluck "could not process line '$line'!";
-		return $self->next_row;
-	}
+	pop @{ $self->{data_table} }; # remove the old line
+	$self->add_data_line($line);
 	
 	# return the feature
 	return Bio::ToolBox::Data::Feature->new(
@@ -739,10 +738,7 @@ sub next_row {
 }
 
 
-sub add_row {
-	return shift->write_row(@_);
-}
-
+*add_row = \&write_row;
 
 sub write_row {
 	my $self = shift;
@@ -773,27 +769,16 @@ sub write_row {
 	
 	# identify what kind of data we are dealing with
 	my $data_ref = ref $data;
-	my @values;
 	if ($data_ref eq 'Bio::ToolBox::Data::Feature') {
 		# user passed a Feature object
-		@values = $data->row_values;
+		$self->{fh}->print( join("\t", ($data->row_values)), "\n" );
 	}
 	elsif ($data_ref eq 'ARRAY') {
 		# user passed an array of values
-		@values = @$data;
+		$self->{fh}->print( join("\t", @$data), "\n");
 	}
-	
-	# write the values as necessary
-	if (@values) {
-		# we have an array of values to write
-		# write the values
-		$self->{fh}->print( join("\t", @values), "\n" );
-	}
-	
 	else {
-		# no values given
 		# assume the passed data is a string
-		
 		# make sure it has a newline
 		unless ($data =~ /\n$/) {
 			$data .= "\n";
