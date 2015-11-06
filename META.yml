@@ -18,7 +18,7 @@ provides:
     version: '1.34'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.33'
+    version: '1.34'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
     version: '1.34'
@@ -26,7 +26,7 @@ provides:
     file: lib/Bio/ToolBox/Data.pm
   Bio::ToolBox::Data::Stream:
     file: lib/Bio/ToolBox/Data/Stream.pm
-    version: '1.33'
+    version: '1.34'
   Bio::ToolBox::Data::core:
     file: lib/Bio/ToolBox/Data/core.pm
     version: '1.34'
