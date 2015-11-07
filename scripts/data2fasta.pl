@@ -16,7 +16,7 @@ eval {
 	$BAM_OK = 1;
 };
 
-my $VERSION =  '1.33';
+my $VERSION =  '1.34';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -44,6 +44,7 @@ my (
 	$start_i,
 	$stop_i,
 	$strand_i,
+	$interbase,
 	$extend,
 	$concatenate,
 	$pad,
@@ -120,19 +121,25 @@ unless (defined $seq_i) {
 unless (defined $desc_i) {
 	$desc_i = $Input->find_column('description|note');
 }
-unless (defined $chr_i) {
-	$chr_i = $Input->chromo_column;
+my $coords;
+my $do_feature;
+if (defined $chr_i and defined $start_i and defined $stop_i) {
+	# user defined coordinates
+	$coords = 1;
 }
-unless (defined $start_i) {
-	$start_i = $Input->start_column;
+elsif ($Input->feature_type eq 'coordinate') {
+	# Input has coordinate columns
+	$coords = 1;
 }
-unless (defined $stop_i) {
-	$stop_i = $Input->stop_column;
+elsif ($Input->feature_type eq 'named') {
+	# Input has named features that presumably have coordinates in a database
+	$coords = 1;
+	$do_feature = 1;
 }
-unless (defined $strand_i) {
-	$strand_i = $Input->strand_column;
+if (defined $start_i and substr($Input->name($start_i), -1) eq '0') {
+	# name suggests $interbase
+	$interbase = 1;
 }
-
 
 ### Determine mode ###
 if (defined $id_i and defined $seq_i and $concatenate) {
@@ -145,12 +152,12 @@ elsif (defined $id_i and defined $seq_i) {
 	print " writing a multi-fasta with the provided sequence\n";
 	write_direct_multi_fasta();
 }
-elsif (defined $chr_i and $start_i and $stop_i and $concatenate) {
+elsif ($coords and $concatenate) {
 	# collect sequences and concatenate into single
 	print " fetching sequence from $database and writing a concatenated fasta\n";
 	fetch_seq_and_write_single_fasta();
 }
-elsif (defined $chr_i and $start_i and $stop_i) {
+elsif ($coords) {
 	# need to collect sequence
 	print " fetching sequence from $database and writing a multi-fasta\n";
 	fetch_seq_and_write_multi_fasta();
@@ -218,20 +225,11 @@ sub fetch_seq_and_write_single_fasta {
 	# collect concatenated sequences and write
 	my $concat_seq;
 	while (my $row = $Input->next_row) {
-		# get coordinates
-		my $seq_id = $row->seq_id;
-		my $start  = $row->start;
-		my $stop   = $row->stop;
-		if ($extend) {
-			$start -= $extend;
-			$start = 1 if $start < 0;
-			$stop += $extend;
-		}
 		
 		# collect sequence
-		my $sequence = $db->seq($seq_id, $start, $stop);
+		my ($sequence, $seq_id, $start, $stop) = fetch_sequence($row, $db);
 		unless ($sequence) {
-			print "no sequence for $seq_id:$start..$stop! skipping\n";
+			printf "no sequence for $seq_id:$start..$stop! skipping\n";
 			next;
 		}
 	
@@ -280,18 +278,9 @@ sub fetch_seq_and_write_multi_fasta {
 	
 	# collect sequences and write
 	while (my $row = $Input->next_row) {
-		# coordinates
-		my $seq_id = $row->seq_id;
-		my $start  = $row->start;
-		my $stop   = $row->stop;
-		if ($extend) {
-			$start -= $extend;
-			$start = 1 if $start < 0;
-			$stop += $extend;
-		}
 		
 		# collect sequence
-		my $sequence = $db->seq($seq_id, $start, $stop);
+		my ($sequence, $seq_id, $start, $stop) = fetch_sequence($row, $db);
 		unless ($sequence) {
 			print "no sequence for $seq_id:$start..$stop! skipping\n";
 			next;
@@ -316,6 +305,24 @@ sub fetch_seq_and_write_multi_fasta {
 	}
 }
 
+
+sub fetch_sequence {
+	my ($row, $db) = @_;
+	
+	my $f = $row->feature if $do_feature;
+	my $seq_id = defined $chr_i ? $row->value($chr_i) : $row->seq_id;
+	my $start  = defined $start_i ? $row->value($start_i) : $row->start;
+	my $stop   = defined $stop_i ? $row->value($stop_i) : $row->stop;
+	$start += 1 if $interbase;
+	if ($extend) {
+		$start -= $extend;
+		$start = 1 if $start < 0;
+		$stop += $extend;
+	}
+
+	# collect sequence
+	return ($db->seq($seq_id, $start, $stop), $seq_id, $start, $stop);
+}
 
 
 sub open_output_fasta {
@@ -379,6 +386,7 @@ data2fasta.pl [--options...] <filename>
   --stop <index>
   --strand <index>
   --extend <integer>
+  --zero
   --cat
   --pad <integer>
   --out <filename> 
@@ -452,6 +460,11 @@ Optionally provide the number of extra base pairs to extend the start
 and stop positions. This will then include the given number of base 
 pairs of flanking sequence from the database. This only applies when 
 sequence is obtained from the database.
+
+=item --zero
+
+Input file is in interbase or 0-based coordinates. This should be 
+automatically detected for most known file formats, e.g. BED.
 
 =item --cat
 

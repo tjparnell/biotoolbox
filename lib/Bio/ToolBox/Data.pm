@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.33';
+our $VERSION = '1.34';
 
 =head1 NAME
 
@@ -817,9 +817,6 @@ sub duplicate {
 	foreach (qw(feature program db bed gff ucsc headers)) {
 		# various keys
 		$Dupe->{$_} = $self->{$_};
-	}
-	if (exists $self->{'0based_starts'}) {
-		$Dupe->{'0based_starts'} = [ @{ $self->{'0based_starts'} } ];
 	}
 	my @comments = $self->comments;
 	push @{$Dupe->{comments}}, @comments;

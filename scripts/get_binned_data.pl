@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.30';
+my $VERSION = '1.34';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -282,7 +282,13 @@ sub check_defaults {
 	}
 
 	unless ($outfile) {
-		die " You must define an output filename !\n Use --help for more information\n";
+		if ($infile) {
+			$outfile = $infile;
+			$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
+		}
+		else {
+			die " You must define an output filename !\n Use --help for more information\n";
+		}
 	}
 
 	if ($stranded) {
@@ -568,7 +574,7 @@ sub collect_binned_data_for_regions {
 		# walk through each feature
 		
 		# determine the segment length
-		my $length = $row->end - $row->start + 1;
+		my $length = $row->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -588,7 +594,7 @@ sub collect_binned_data_for_regions {
 		my $extra;
 		if ($extension_size) {
 			# extension is specific bp in size
-			$extra = int( ($extension_size * $binsize) + 0.5);
+			$extra = $extension_size * $extension;
 		}
 		else {
 			# extension is dependent on feature length
