@@ -719,6 +719,7 @@ sub next_row {
 	my $line = $self->{fh}->getline;
 	return unless $line;
 	$self->{line_count}++;
+	return $self->next_row unless $line =~ /\w+/;
 	if (substr($line,0,1) eq '#') {
 		# we shouldn't have internal comment lines, but just in case....
 		# could be a gff3 pragma
