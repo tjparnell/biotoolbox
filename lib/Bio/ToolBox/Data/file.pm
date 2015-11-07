@@ -55,13 +55,13 @@ sub load_file {
 	while (my $line = $self->{fh}->getline) {		
 		# the current file position should be at the beginning of the
 		# data table information
+		next if $line !~ m/\w+/;
 		
 		# skip comment and empty lines
 		if (substr($line,0,1) eq '#') {
 			$self->add_comment($line);
 			next;
 		}
-		next if $line !~ m/\w+/;
 		
 		# process the line
 		$self->add_data_line($line);

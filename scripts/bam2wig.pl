@@ -31,7 +31,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.33';
+my $VERSION = '1.34';
 	
 	
 
@@ -140,8 +140,8 @@ if ($print_version) {
 
 ### Check for requirements and set defaults
 # global variables
-my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, 
-	$split_callback, $write_wig, $convertor, $data_ref, $outbase);
+my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, $split_callback, 
+	$write_wig, $convertor, $data_ref, $outbase, $half_extend);
 check_defaults();
 
 # record start time
@@ -447,6 +447,20 @@ sub check_defaults {
 	# determine output format
 	$bedgraph = $use_span ? 1 : 0; 
 	
+	# determine half extend value for extended midpoint
+	if ($use_mid and $ext_value) {
+		$half_extend = int($ext_value/2);
+		$bedgraph = 1;
+		if ($strand) {
+			warn " disabling strand with extended mid. Currently not supported\n";
+			$strand = 0;
+		}
+		if ($splice) {
+			warn " disabling splice with extended mid. Currently not supported\n";
+			$splice = 0;
+		}
+	}
+	
 	# check output file
 	unless ($outfile) {
 		$outfile = $infile;
@@ -520,15 +534,28 @@ sub check_defaults {
 		print " recording shifted-mid positions\n";
 	}
 	elsif ($use_mid and !$strand and !$shift and $paired) {
-		$callback  = \&record_paired_mid;
-		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording mid positions of pairs\n";
+		if ($ext_value) {
+			$callback = \&record_paired_mid_span;
+			$write_wig = \&write_bedgraph;
+			print " recording extended mid from paired alignments\n";
+		}
+		else {
+			$callback  = \&record_paired_mid;
+			$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+			print " recording mid positions of pairs\n";
+		}
 	}
 	elsif ($use_mid and !$strand and !$shift and !$paired) {
-		$callback  = \&record_mid;
-		$split_callback = \&record_split_mid;
-		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording mid position\n";
+		if ($ext_value) {
+			$callback = \&record_mid_span;
+			$write_wig = \&write_bedgraph;
+			print " recording extended mid positions\n";
+		} else {
+			$callback  = \&record_mid;
+			$split_callback = \&record_split_mid;
+			$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+			print " recording mid position\n";
+		}
 	}
 	
 	# spanning
@@ -1459,7 +1486,7 @@ sub process_alignments_on_chromosome {
 	my $seq_length = $sam->target_len($tid);
 	
 	# print chromosome line
-	if ($use_start or $use_mid) {
+	if (not $bedgraph) {
 		foreach ($fh1, $fh2) {
 			next unless defined $_;
 			if ($bin) {
@@ -1508,7 +1535,7 @@ sub process_split_alignments_on_chromosome {
 	my $seq_length = $sam->target_len($tid);
 	
 	# print chromosome line
-	if ($use_start or $use_mid) {
+	if (not $bedgraph) {
 		foreach ($fh1, $fh2) {
 			next unless defined $_;
 			if ($bin) {
@@ -1771,6 +1798,26 @@ sub record_paired_mid {
 }
 
 
+### Record mid span for paired end
+sub record_paired_mid_span {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->reversed; # only take left (forward) alignments, not right
+	return unless $a->proper_pair;
+	return unless $a->mreversed;
+	return unless $a->tid == $a->mtid; # on the same chromosome
+	return if $a->qual < $min_mapq;
+	return if $a->isize > $max_isize;
+	
+	# calculate mid position of the pair
+	my $position = ($a->pos + 1 + int( $a->isize / 2 )) - $half_extend;
+	
+	# record position in forward strand data hash
+	$data->{'f'}{$position} .= "$ext_value,";
+	check_data($data);
+}
+
 ### Record stranded at mid position for paired end
 sub record_stranded_paired_mid {
 	my ($a, $data) = @_;
@@ -1831,6 +1878,20 @@ sub record_split_mid {
 	
 	# record mid position
 	$data->{f}{ int( ($part->start + $part->end) / 2) }++;
+	
+	check_data($data);
+}
+
+
+### Record mid span
+sub record_mid_span {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# record mid position
+	$data->{f}{ int( ($a->pos + 1 + $a->calend) / 2) - $half_extend } .= "$ext_value,";
 	
 	check_data($data);
 }
@@ -2540,6 +2601,8 @@ Manually set the length for reads to be extended when position is set to
 either span or extend. By default, the alignment length is used for single-end
 span, the insertion size for paired-end span, and 2 X the shift value for 
 extend.
+When combined with option --position mid, a span is recorded centered around 
+the midpoint of the alignment, or the midpoint of paired-end reads. 
 
 =item --pe
 
@@ -2871,6 +2934,10 @@ are drawn for visualization purposes only. Values of X represent 10.
 
   ....122244433311.............................112222111122221211111
 
+=item Mid Span (extend value 2)
+
+  ......121.2211.................................1111....1111...11..
+
 =item Stranded Span
 
   F...122244433311..................................................
@@ -2878,11 +2945,11 @@ are drawn for visualization purposes only. Values of X represent 10.
 
 =item Shifted Starts (shift value 26)
 
-  .........................1.1.11..3.11...1.........................
+  ........................1.1...11121.1..1..........................
 
 =item Shifted Span (shift value 26)
 
-  .........................23447776552311111........................
+  ...................11222211112344365544411........................
 
 =item Extend (extend value 52)
 
@@ -2891,6 +2958,10 @@ are drawn for visualization purposes only. Values of X represent 10.
 =item Paired-End Midpoints
 
   ............................1...111..1............................
+
+=item Paired-End Mid span (extend value 6)
+
+  ..........................111123333432111.........................
 
 =item Paired-End Span
 
