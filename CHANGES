@@ -1,6 +1,6 @@
 ######## Bio::ToolBox revision history #############
 
-v1.34 
+v1.34 (git 5d4803c)
 	- Changed the behavior of automatically converting interbase coordinates 
 	to base coordinates upon loading a file, and converting back as necessary 
 	when writing. This had the side effect of effectively changing coordinates 
@@ -20,9 +20,13 @@ v1.34
 	making improper wig files if the source file has issues.
 	- Script join_data_file is considerably faster by simply concatenating 
 	data lines without processing or checking.
+	- Script bam2wig has new recording option, mid extend, to record the 
+	middle portion of alignments or proper paired-end alignments. Credit to 
+	Ohad for recommending.
 	- Add explicit interbase support to scripts data2gff and data2fasta.
 	- Fix critical bug were extensions were not scored properly for coordinate 
 	features in script get_binned_data. Thanks to Mengyao.
+	- Fix bam2wig alignment alignment illustrations in POD. Thanks to Ohad.
 	- Bug fixes regarding bed file integrity checking that were introduced in 
 	the previous release.
 
