@@ -7,6 +7,8 @@ lib/Bio/ToolBox/Data/core.pm
 lib/Bio/ToolBox/Data/file.pm
 lib/Bio/ToolBox/Data/Feature.pm
 lib/Bio/ToolBox/Data/Stream.pm
+lib/Bio/ToolBox/Gene/DB.pm
+lib/Bio/ToolBox/Gene/Utility.pm
 lib/Bio/ToolBox/db_helper.pm
 lib/Bio/ToolBox/db_helper/bam.pm
 lib/Bio/ToolBox/db_helper/bigbed.pm
