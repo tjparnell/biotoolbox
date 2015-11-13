@@ -212,14 +212,6 @@ This method will unescape special characters in a text string. Certain
 characters, including ";" and "=", are reserved for GFF3 formatting and 
 are not allowed, thus requiring them to be escaped.
 
-=item is_coding($transcript)
-
-This method will return a boolean value if the passed transcript object 
-appears to be a coding transcript. GFF and GTF files are not always immediately 
-clear about the type of transcript; there are (unfortunately) multiple ways 
-to encode the feature as a protein coding transcript: primary_tag, source_tag, 
-attribute, CDS subfeatures, etc. This method tries to determine this.
-
 =back
 
 =cut
@@ -971,37 +963,6 @@ sub comments {
 		push @comments, $_;
 	}
 	return wantarray ? @comments : \@comments;
-}
-
-
-sub is_coding {
-	my ($self, $transcript) = @_;
-	return unless $transcript;
-	if ($transcript->primary_tag =~ /gene/i) {
-		# someone passed a gene, check its subfeatures
-		my $code_potential = 0;
-		foreach ($transcript->get_SeqFeatures) {
-			$code_potential += $self->is_coding($_);
-		}
-		return $code_potential;
-	}
-	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
-	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
-		# ensembl type GFFs
-		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	elsif ($transcript->has_tag('gene_biotype')) {
-		# ensembl type GTFs
-		my ($biotype) = $transcript->get_tag_values('gene_biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	foreach ($transcript->get_SeqFeatures) {
-		# old fashioned way
-		return 1 if $_->primary_tag eq 'CDS';
-	}
-	return 0;
 }
 
 
