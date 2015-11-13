@@ -13,19 +13,19 @@ genes, they have a hierarchical structure, typically in this order
 
     gene
       mRNA or transcript
-        CDS
         exon
+        CDS
 
 SeqFeature objects have at a minimum coordinate information, including 
 chromosome, start, stop, and strand, and a name or unique identifier. They 
 often also have type or source information, which usually follows the 
-Sequence Ontology key words 
+Sequence Ontology key words.
 
 This is a fast, efficient, simplified SeqFeature implementation that mostly 
 implements the L<Bio::SeqFeatureI> API, and could be substituted in for other 
 implementations, such L<Bio::SeqFeature::Lite> and L<Bio::SeqFeature::Generic>. 
-Unlike the others, however, it inherits no methods and uses an unorthodox 
-blessed array to store feature attributes. 
+Unlike the others, however, it inherits no classes or methods and uses an 
+unorthodox blessed array to store feature attributes. 
 
 =head1 LIMITATIONS
 
@@ -270,7 +270,7 @@ sub phase {
 	my $self = shift;
 	if (@_) {
 		my $p = $_[0];
-		unless ($p =~ /^[012]$/) {
+		unless ($p =~ /^[012\.]$/) {
 			cluck "phase must be 0, 1, 2 or .!";
 		}
 		$self->[PHASE] = $p;
