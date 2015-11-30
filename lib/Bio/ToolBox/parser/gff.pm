@@ -217,6 +217,19 @@ This method will unescape special characters in a text string. Certain
 characters, including ";" and "=", are reserved for GFF3 formatting and 
 are not allowed, thus requiring them to be escaped.
 
+=item seq_ids
+
+Returns an array or array reference of the names of the chromosomes or 
+reference sequences present in the file. These may be defined by GFF3 
+sequence-region pragmas or inferred from the features.
+
+=item seq_id_lengths
+
+Returns a hash reference to the chromosomes or reference sequences and 
+their corresponding lengths. In this case, the length is either defined 
+by the sequence-region pragma or inferred by the greatest end position of 
+the top features.
+
 =back
 
 =cut
@@ -241,6 +254,7 @@ sub new {
 		'eof'           => 0,
 		'version'       => undef,
 		'comments'      => [],
+		'seq_ids'       => {},
 	};
 	bless $self, $class;
 	
@@ -375,6 +389,17 @@ sub next_feature {
 			# GFF3 subfeature close directive, we no longer pay attention to these 
 			next;
 		}
+		elsif ($line =~ /^##sequence\-region/i) {
+			# sequence region pragma
+			my ($pragma, $seq_id, $start, $stop) = split /\s+/, $line;
+			if (defined $seq_id and $start =~ /^\d+$/ and $stop =~ /^\d+$/) {
+				# we're actually only concerned with the stop coordinate
+				$self->{seq_ids}{$seq_id} = $stop;
+			}
+			else {
+				warn "malformed sequence-region pragma! $line\n";
+			}
+		}
 		elsif ($line =~ /^#/) {
 			# either a pragma or a comment line, may be useful
 			push @{$self->{comments}}, $line;
@@ -434,7 +459,7 @@ sub parse_file {
 	unless ($self->fh) {
 		croak("no file loaded to parse!");
 	}
-	return if $self->{'eof'};
+	return 1 if $self->{'eof'};
 	
 	# Each line will be processed into a SeqFeature object, and then checked 
 	# for parentage. Child objects with a Parent tag will be appropriately 
@@ -571,7 +596,7 @@ sub parse_file {
 		}
 	}
 	
-	# build gene2seqf hash
+	# build gene2seqf and seq_id hashes 
 	foreach (@{ $self->{top_features} }) {
 		my $name = $_->display_name;
 		if (exists $self->{gene2seqf}->{lc $name}) {
@@ -580,6 +605,11 @@ sub parse_file {
 		else {
 			$self->{gene2seqf}->{lc $name} = [$_];
 		}
+		my $s = $_->seq_id;
+		unless (exists $self->{seq_ids}{$s}) {
+			$self->{seq_ids}{$s} = 1;
+		}
+		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
 	}
 	
 	return 1;
@@ -974,6 +1004,18 @@ sub comments {
 	return wantarray ? @comments : \@comments;
 }
 
+
+sub seq_ids {
+	my $self = shift;
+	my @s = keys %{$self->{seq_ids}};
+	return wantarray ? @s : \@s;
+}
+
+
+sub seq_id_lengths {
+	my $self = shift;
+	return $self->{seq_ids};
+}
 
 __END__
 

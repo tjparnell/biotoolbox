@@ -314,6 +314,17 @@ A bare bones method that will convert a tab-delimited text line from a UCSC
 formatted gene table into a SeqFeature object for you. Don't expect alternate 
 transcripts to be assembled into genes. 
 
+=item seq_ids
+
+Returns an array or array reference of the names of the chromosomes or 
+reference sequences present in the table.
+
+=item seq_id_lengths
+
+Returns a hash reference to the chromosomes or reference sequences and 
+their corresponding lengths. In this case, the length is inferred by the 
+greatest gene end position.
+
 =back
 
 =head2 Bio::ToolBox::parser::ucsc::builder
@@ -363,6 +374,7 @@ sub new {
 		'eof'           => 0,
 		'line_count'    => 0,
 		'sfclass'       => 'Bio::ToolBox::SeqFeature', # default class
+		'seq_ids'       => {}, 
 	};
 	bless $self, $class;
 	
@@ -765,6 +777,13 @@ sub parse_table {
 			# the current feature is not in the hash, so add it
 			$self->{gene2seqf}->{ lc $feature->display_name } = [ $feature ];
 		}
+		
+		# check chromosome
+		my $s = $gene->seq_id;
+		unless (exists $self->{seq_ids}{$s}) {
+			$self->{seq_ids}{$s} = $gene->end;
+		}
+		$self->{seq_ids}{$s} = $gene->end if $gene->end > $self->{seq_ids}{$s};
 	}
 	
 	# add to the top list of features, Schwartzian transform and sort
@@ -869,6 +888,16 @@ sub from_ucsc_string {
 	return $builder->build_gene;
 }
 
+sub seq_ids {
+	my $self = shift;
+	my @s = keys %{$self->{seq_ids}};
+	return wantarray ? @s : \@s;
+}
+
+sub seq_id_lengths {
+	my $self = shift;
+	return $self->{seq_ids};
+}
 
 
 
