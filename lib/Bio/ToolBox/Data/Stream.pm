@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.34';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -553,6 +553,7 @@ sub new {
 		# we will not open the file handle quite yet in case the user 
 		# wants to modify metadata
 		$self->{mode} = 1; # set to write mode
+		$self->{fh} = undef;
 		
 		# get names of columns user may have passed
 		my @columns;
@@ -805,7 +806,7 @@ sub fh {
 
 sub close_fh {
 	my $self = shift;
-	$self->{fh}->close;
+	$self->{fh}->close if $self->{fh};
 }
 
 sub DESTROY {

@@ -27,7 +27,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.30';
+my $VERSION = '1.35';
 
 print "\n This script will graph correlation plots for two data sets\n\n";
 
@@ -65,6 +65,10 @@ my (
 	$y_format,
 	$format,
 	$places,
+	$dimension,
+	$xdim,
+	$ydim,
+	$do_regression,
 	$directory,
 	$out,
 	$numbers,
@@ -93,6 +97,10 @@ GetOptions(
 	'format=i'  => \$format, # number of places to format tick labels
 	'xformat=i' => \$x_format, # number of places to format x axis tick labels
 	'yformat=i' => \$y_format, # number of places to format y axis tick labels
+	'dim=i'     => \$dimension, # number of pixels on a side
+	'xdim=i'    => \$xdim, # number of pixels on X side
+	'ydim=i'    => \$ydim, # number of pixels on Y side
+	'regression!' => \$do_regression, # plot a regression line
 	'dir=s'     => \$directory, # optional name of the graph directory
 	'out=s'     => \$out, # output file name
 	'numbers'   => \$numbers, # print the graph numbers in addition to the graph
@@ -111,7 +119,9 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script graph_data.pl, version $VERSION\n\n";
+	print " Biotoolbox script graph_data.pl, version $VERSION\n";
+	printf "  GD support is %s\n", $gd_ok ? "available" : "not installed";
+	print "  Parallel execution is available\n" if $parallel;
 	exit;
 }
 
@@ -145,9 +155,9 @@ else {
 	$type = 'scatter';
 	print " Using default graph type of 'scatter'\n";
 }
-if ($type =~ /smooth/i) {
-	die "Perl module GD::Graph::smoothlines must be installed to graph smooth plots\n"
-		unless $gd_smooth;
+if ($type =~ /smooth/i and not $gd_smooth) {
+	print "Perl module GD::Graph::smoothlines must be installed to graph smooth plots\n" .
+		"Using line type instead\n";
 }
 unless (defined $norm) {
 	# default is no normalization (percent rank)
@@ -182,6 +192,15 @@ unless (defined $x_format) {
 }
 unless (defined $y_format) {
 	$y_format = defined $format ? $format : 0;
+}
+unless (defined $dimension) {
+	$dimension = 600;
+}
+unless (defined $xdim) {
+	$xdim = $dimension;
+}
+unless (defined $ydim) {
+	$ydim = $dimension;
 }
 if ($moving_average) {
 	unless ( $moving_average =~ /^(\d+),(\d+)$/ and $1 >= $2 ) {
@@ -664,19 +683,31 @@ sub graph_scatterplot {
 	# data array will be comprised of three arrays, first is x, second is y (for
 	# the scatter plot of points), third is calculated y (for the linear 
 	# regression line)
-	my @data = ( [ ], [ ], [ ] ); # initialize
-	for (my $i = 0; $i < scalar @{ $xref }; $i++) {
-		my $x = $xref->[$i]; # current x value
-		push @{ $data[0] }, $x; # x values
-		push @{ $data[1] }, $yref->[$i]; # real y values
-		push @{ $data[2] }, ($x * $m) + $q; # calculated y value
+	my @data;
+	if ($do_regression) {
+		@data = ( [ ], [ ], [ ] ); # initialize
+		for (my $i = 0; $i < scalar @{ $xref }; $i++) {
+			my $x = $xref->[$i]; # current x value
+			push @{ $data[0] }, $x; # x values
+			push @{ $data[1] }, $yref->[$i]; # real y values
+			push @{ $data[2] }, ($x * $m) + $q; # calculated y value
+		}
+	}
+	else {
+		# no regression line to be drawn
+		@data = ( [ ], [ ] ); # initialize
+		for (my $i = 0; $i < scalar @{ $xref }; $i++) {
+			my $x = $xref->[$i]; # current x value
+			push @{ $data[0] }, $x; # x values
+			push @{ $data[1] }, $yref->[$i]; # real y values
+		}
 	}
 	
 	# Now prepare the graph
-	my $title = "$xname vs. $yname (r $r_formatted)";
-	my $graph = GD::Graph::mixed->new(600,600);
+	my $title = $do_regression ? "$xname vs $yname (r $r_formatted)" : "$xname vs $yname";
+	my $graph = GD::Graph::mixed->new($xdim,$ydim);
 	$graph->set(
-		types			=> [qw(points lines)],
+		types			=> $do_regression ? [qw(points lines)] : [qw(points)],
 		x_label			=> $xname,
 		y_label			=> $yname,
 		title			=> $title,
@@ -685,7 +716,7 @@ sub graph_scatterplot {
 		marker_size		=> 1,
 		line_types		=> [1],
 		line_width		=> 1,
-		dclrs			=> [qw(lblue red)],
+		dclrs			=> $do_regression ? [qw(lblue red)] : [qw(lblue)],
 	) or warn $graph->error;
 	
 	# set axes
@@ -765,7 +796,7 @@ sub graph_line_plot {
 		$ytitle .= ' (smoothed)'; # if smoothed by moving average
 	}
 	my $title = "$xtitle vs. $ytitle (r $r_formatted)";
-	my $graph = GD::Graph::lines->new(600,600);
+	my $graph = GD::Graph::lines->new($xdim,$ydim);
 	$graph->set(
 		x_label			=> $xtitle,
 		y_label			=> $ytitle,
@@ -850,7 +881,7 @@ sub graph_smoothed_line_plot {
 		$ytitle .= ' (smoothed)'; # if smoothed by moving average
 	}
 	my $title = "$xtitle vs. $ytitle (r $r_formatted)";
-	my $graph = GD::Graph::smoothlines->new(600,600);
+	my $graph = GD::Graph::smoothlines->new($xdim,$ydim);
 	$graph->set(
 		x_label			=> $xtitle,
 		y_label			=> $ytitle,
@@ -1025,29 +1056,33 @@ graph_data.pl [--options] <filename>
   
   Options:
   --in <filename>
-  --type [scatter | line | smooth]
+  --type [scatter | line | smooth]     scatter
   --pair <X_index>,<Y_index>
   --index <X_index&Y_index,...>
   --all
   --ma <window>,<step>
-  --norm
-  --min=<value>
-  --xmin=<value>
-  --ymin=<value>
-  --max=<value>
-  --xmax=<value>
-  --ymax=<value>
-  --ticks <integer>
-  --xticks <integer>
-  --yticks <integer>
-  --format <integer>
-  --xformat <integer>
-  --yformat <integer>
-  --out <base_filename>
-  --dir <foldername>
-  --cpu <integer>
+  --norm                               (disabled)
+  --min=<value>                        (estimated)
+  --xmin=<value>                       (estimated)
+  --ymin=<value>                       (estimated)
+  --max=<value>                        (estimated)
+  --xmax=<value>                       (estimated)
+  --ymax=<value>                       (estimated)
+  --ticks <integer>                    4
+  --xticks <integer>                   4
+  --yticks <integer>                   4
+  --format <integer>                   (none)
+  --xformat <integer>                  (none)
+  --yformat <integer>                  (none)
+  --dim <integer>                      600 pixels
+  --xdim <integer>                     600 pixels
+  --ydim <integer>                     600 pixels
+  --regression                         (disabled)
+  --out <base_filename>                (none)
+  --dir <foldername>                   (input basename)
+  --cpu <integer>                      2
   --version
-  --help
+  --help                               extended documentation
 
 =head1 OPTIONS
 
@@ -1154,6 +1189,19 @@ option. The default is 4.
 Specify explicitly the number of decimal places to format the labels 
 for the major axes' ticks. Both may be set independently or to the same 
 value with the --format option. The default is 0.
+
+=item --dim <integer>
+
+=item --xdim <integer>
+
+=item --ydim <integer>
+
+Specify the dimensions of the graph in pixels. Default is 600 pixels square.
+
+=item --regression
+
+Plot the linear regression line for the data in the scatter plot. Line and 
+smooth type plots do not get a regression line. 
 
 =item --out <base_filename>
 
