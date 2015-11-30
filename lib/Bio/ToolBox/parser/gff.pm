@@ -74,6 +74,11 @@ Pass an anonymous array of primary_tag values to be skipped from the GFF file
 when parsing into SeqFeature objects. For example, some subfeatures can be skipped 
 for expediency when they known in advance not to be needed. See skip() below.
 
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
+
 =back
 
 =item open_file($file)
@@ -256,6 +261,10 @@ sub new {
 			if (exists $options{file} or $options{table}) {
 				$options{file} ||= $options{table};
 				$self->open_file( $options{file} );
+			}
+			if (exists $options{class}) {
+				my $class = $options{class};
+				eval "require $class; $SFCLASS = $class;";
 			}
 		}
 	}

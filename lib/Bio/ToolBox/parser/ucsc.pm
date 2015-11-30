@@ -181,6 +181,11 @@ option is also true.
 
 Pass the appropriate file name for additional information.
 
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
+
 =back
 
 =back
@@ -357,6 +362,7 @@ sub new {
 		'ensembldata'   => {},
 		'eof'           => 0,
 		'line_count'    => 0,
+		'sfclass'       => 'Bio::ToolBox::SeqFeature', # default class
 	};
 	bless $self, $class;
 	
@@ -428,6 +434,9 @@ sub new {
 			}
 			elsif (exists $options{enssrc}) {
 				$self->load_extra_data($options{ensemblsource}, 'ensemblsource');
+			}
+			if (exists $options{class}) {
+				$self->{sfclass} = $options{class};
 			}
 		}
 	}
@@ -866,14 +875,19 @@ sub from_ucsc_string {
 package Bio::ToolBox::parser::ucsc::builder;
 use strict;
 use Carp qw(carp cluck croak);
-our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
-eval "require $SFCLASS" or croak $@;
+our $SFCLASS; # SeqFeature class to use
 
 
 sub new {
 	my ($class, $line, $ucsc) = @_;
 	my %self;
 	my $format;
+	
+	# check SeqFeature class
+	if ($ucsc->{sfclass} ne $SFCLASS) {
+		$SFCLASS = $ucsc->{sfclass};
+		eval "require $SFCLASS" or croak $@;
+	}
 	
 	chomp $line;
 	my @linedata = split /\t/, $line;
@@ -1449,14 +1463,14 @@ sub add_unique_attribute {
 
 sub add_exons {
 	my ($self, $transcript, $gene) = @_;
-	
+	my $ucsc = $self->ucsc;
 	
 	# Add the exons
 	EXON_LOOP:
 	for (my $i = 0; $i < $self->exonCount; $i++) {
 		
 		# first look for existing
-		if ($self->ucsc->share and $gene) {
+		if ($ucsc->share and $gene) {
 			my $exon = $self->find_existing_subfeature($gene, 'exon', 
 				$self->exonStarts->[$i], $self->exonEnds->[$i]);
 			if ($exon) {
@@ -1491,7 +1505,7 @@ sub add_exons {
 		);
 		
 		# add name if requested
-		if ($self->ucsc->do_name) {
+		if ($ucsc->do_name) {
 			$exon->display_name( $transcript->primary_id . ".exon$number" );
 		}
 		
@@ -1502,6 +1516,7 @@ sub add_exons {
 
 sub add_utrs {
 	my ($self, $transcript, $gene) = @_;
+	my $ucsc = $self->ucsc;
 	
 	# we will scan each exon and look for a potential utr and build it
 	my @utrs;
@@ -1625,7 +1640,7 @@ sub add_utrs {
 		my $utr;
 			
 		# look for existing utr
-		if ($self->ucsc->share and $gene) {
+		if ($ucsc->share and $gene) {
 			$utr = $self->find_existing_subfeature($gene, $tag, $start, $stop); 
 		}
 			
@@ -1642,7 +1657,7 @@ sub add_utrs {
 				-primary_id    => $transcript->primary_id . ".utr$number",
 			);
 			$utr->display_name( $transcript->primary_id . ".utr$number" ) if 
-				$self->ucsc->do_name;
+				$ucsc->do_name;
 		}
 		
 		# store this utr seqfeature in a temporary array
@@ -1653,7 +1668,7 @@ sub add_utrs {
 			my $utr2;
 			
 			# look for existing utr
-			if ($self->ucsc->share) {
+			if ($ucsc->share) {
 				$utr2 = $self->find_existing_subfeature($gene, $tag2, $start2, $stop2); 
 			}
 			
@@ -1670,7 +1685,7 @@ sub add_utrs {
 					-primary_id    => $transcript->primary_id . ".utr$number" . "a",
 				);
 				$utr2->display_name( $transcript->primary_id . ".utr$number" . "a" ) 
-					if $self->ucsc->do_name;
+					if $ucsc->do_name;
 			}
 		
 			# store this utr seqfeature in a temporary array
@@ -1826,6 +1841,7 @@ sub add_cds {
 
 sub add_codons {
 	my ($self, $transcript, $gene) = @_;
+	my $ucsc = $self->ucsc;
 	
 	# generate the start and stop codons
 	my ($start_codon, $stop_codon);
@@ -1833,7 +1849,7 @@ sub add_codons {
 		# forward strand
 		
 		# share codons if possible
-		if ($self->ucsc->share and $gene) {
+		if ($ucsc->share and $gene) {
 			$start_codon = $self->find_existing_subfeature($gene, 'start_codon', 
 				$self->cdsStart, $self->cdsStart + 2);
 			$stop_codon = $self->find_existing_subfeature($gene, 'stop_codon', 
@@ -1853,7 +1869,7 @@ sub add_codons {
 					-primary_id    => $transcript->primary_id . '.start_codon',
 			);
 			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
-				$self->ucsc->do_name;
+				$ucsc->do_name;
 		}
 		
 		# stop codon
@@ -1869,7 +1885,7 @@ sub add_codons {
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
 			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
-				$self->ucsc->do_name;
+				$ucsc->do_name;
 		}
 	}
 	
@@ -1877,7 +1893,7 @@ sub add_codons {
 		# reverse strand
 		
 		# share codons if possible
-		if ($self->ucsc->share and $gene) {
+		if ($ucsc->share and $gene) {
 			$stop_codon = $self->find_existing_subfeature($gene, 'stop_codon', 
 				$self->cdsStart, $self->cdsStart + 2);
 			$start_codon = $self->find_existing_subfeature($gene, 'start_codon', 
@@ -1897,7 +1913,7 @@ sub add_codons {
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
 			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
-				$self->ucsc->do_name;
+				$ucsc->do_name;
 		}
 		
 		# start codon
@@ -1914,7 +1930,7 @@ sub add_codons {
 					-display_name  => $transcript->primary_id . '.start_codon',
 			);
 			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
-				$self->ucsc->do_name;
+				$ucsc->do_name;
 		}
 	}
 	
