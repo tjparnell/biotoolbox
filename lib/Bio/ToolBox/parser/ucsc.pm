@@ -779,11 +779,11 @@ sub parse_table {
 		}
 		
 		# check chromosome
-		my $s = $gene->seq_id;
+		my $s = $feature->seq_id;
 		unless (exists $self->{seq_ids}{$s}) {
-			$self->{seq_ids}{$s} = $gene->end;
+			$self->{seq_ids}{$s} = $feature->end;
 		}
-		$self->{seq_ids}{$s} = $gene->end if $gene->end > $self->{seq_ids}{$s};
+		$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
 	}
 	
 	# add to the top list of features, Schwartzian transform and sort
@@ -906,6 +906,7 @@ use strict;
 use Carp qw(carp cluck croak);
 our $SFCLASS; # SeqFeature class to use
 
+1;
 
 sub new {
 	my ($class, $line, $ucsc) = @_;
