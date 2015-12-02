@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.34';
+my $VERSION =  '1.35';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -57,7 +57,8 @@ if ($print_version) {
 
 ### Check for required values
 unless (scalar @ARGV > 1) {
-	die "  OOPS! Two or more data files must be given!\n use $0 --help\n";
+	warn "  Uh oh! Only one file was provided to join!\n";
+	# proceed anyway....
 }
 
 ### Load first file
