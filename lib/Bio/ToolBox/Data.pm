@@ -760,7 +760,7 @@ sub new {
 		my $f = $args{file} || $args{in} || q();
 		my $l = $self->load_file($f);
 		unless ($l) {
-			carp "Cannot load file!\n";
+			carp " Cannot load file!";
 			return;
 		}
 	}
@@ -777,7 +777,7 @@ sub new {
 			$result = get_new_feature_list(%args);
 		}
 		unless ($result) {
-			carp "Cannot generate new $args{features} list!\n";
+			carp " Cannot generate new $args{features} list!";
 			return;
 		}
 	}

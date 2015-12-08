@@ -41,6 +41,10 @@ sub load_file {
 	
 	# open the file and load metadata
 	my $filename = $self->check_file($file);
+	unless ($filename) {
+		print " file '$file' does not exist!\n";
+		return;
+	}
 	$self->add_file_metadata($filename);
 	my $fh = $self->open_to_read_fh;
 	return unless $fh;
