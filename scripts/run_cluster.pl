@@ -12,7 +12,7 @@ eval {
 	$cluster_ok = 1;
 };
 
-my $VERSION =  '1.33';
+my $VERSION =  '1.35';
 
 print "\n A script to run the k-means cluster analysis\n\n";
 
@@ -134,8 +134,8 @@ for (my $i = 0; $i < $Data->number_columns; $i++) {
 }
 
 # check for extraneous data columns
-foreach (qw(chr seq start stop end strand type class source phase)) {
-	my $i = $Data->find_column("^$_");
+foreach (qw(chr seq start stop end strand type source phase)) {
+	my $i = $Data->find_column('^' . $_ . '$');
 	if (defined $i) {
 		$check = 0;
 		$error .= "  file has extraneous column '$_' at position $i\n";
