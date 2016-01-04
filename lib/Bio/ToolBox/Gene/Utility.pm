@@ -147,7 +147,103 @@ sub get_uncommon_exons {
 	return wantarray ? @com : \@com;
 }
 
-sub get_common_alt_exons {
+sub get_alt_common_exons {
+	return _get_alt_common_things('exon', @_);
+}
+
+
+sub get_introns {
+	my $transcript = shift;
+	my @introns;
+	
+	# find the exons and/or CDSs
+	my @exons = get_exons($transcript);
+	return unless @exons;
+	return if (scalar(@exons) == 1);
+	
+	# identify the last exon index position
+	my $last = scalar(@exons) - 1;
+	
+	# forward strand
+	if ($transcript->strand >= 0) {
+		# each intron is created based on the previous exon
+		for (my $i = 0; $i < $last; $i++) {
+			my $e = $exons[$i];
+			my $i = $e->new(
+				-seq_id       => $e->seq_id,
+				-start        => $e->end + 1,
+				-end          => $exons[$i + 1]->start - 1, # up to start of next exon
+				-strand       => $transcript->strand,
+				-primary_tag  => 'intron',
+				-source_tag   => $transcript->source_tag,
+				-primary_id   => $transcript->display_name . ".intron$i",
+				-display_name => $transcript->display_name . ".intron$i",
+			);
+			push @introns, $i;
+		}
+	}
+	
+	# reverse strand
+	else {
+		# each intron is created based on the previous exon
+		# ordering from 5' to 3' end direction for convenience in naming
+		for (my $i = $last; $i > 0; $i--) {
+			my $e = $exons[$i];
+			my $i = $e->new(
+				-seq_id       => $e->seq_id,
+				-start        => $exons[$i - 1]->end + 1, # end of next exon
+				-end          => $e->start - 1,
+				-strand       => $transcript->strand,
+				-primary_tag  => 'intron',
+				-source_tag   => $transcript->source_tag,
+				-primary_id   => $transcript->display_name . ".intron$i",
+				-display_name => $transcript->display_name . ".intron$i",
+			);
+			push @introns, $i;
+		}
+		
+		# reorder the introns based on start position
+		@introns = map { $_->[0] }
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@introns;
+	}
+	
+	# finished
+	return @introns;
+}
+
+
+sub get_alt_introns {
+	my $ca_introns = get_alt_common_introns(@_);
+	my @alts;
+	foreach my $k (keys %$ca_introns) {
+		next if $k eq 'common';
+		next if $k eq 'uncommon';
+		push @alts, @{ $ca_introns->{$k} };
+	}
+	return wantarray ? @alts : \@alts;
+}
+
+sub get_common_introns {
+	my $ca_introns = get_alt_common_introns(@_);
+	my @com = @{ $ca_introns->{common} };
+	return wantarray ? @com : \@com;
+}
+
+sub get_uncommon_introns {
+	my $ca_introns = get_alt_common_introns(@_);
+	my @com = @{ $ca_introns->{uncommon} };
+	return wantarray ? @com : \@com;
+}
+
+sub get_alt_common_introns {
+	return _get_alt_common_things('intron', @_);
+}
+
+sub _get_alt_common_things {
+	# internal subroutine to get either exons or introns
+	my $type = shift; # exon or intron
 	my @transcripts;
 	return unless @_;
 	if (scalar @_ == 1) {
@@ -159,48 +255,46 @@ sub get_common_alt_exons {
 		@transcripts = @_;
 	}
 	
-	# hash of transcript to exons
-	my %tx2exons = (
+	# type of thing to get
+	my $do_exon = $type eq 'exon' ? 1 : 0;
+	
+	# hash of transcript to things
+	my %tx2things = (
 		common => [],
 		uncommon => []
 	);
 	
-	# get exons and put them in has based on coordinates
-	my %pos2exons;
+	# get things and put them in has based on coordinates
+	my %pos2things;
 	foreach my $t (@transcripts) {
-		my @exons = get_exons($t);
-		foreach my $e (@exons) {
-			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
+		my @things = $do_exon ? get_exons($t) : get_introns($t);
+		foreach my $e (@things) {
+			push @{ $pos2things{$e->start}{ $e->end} }, [ $t->display_name, $e ];
 		}
-		$tx2exons{ $t->display_name } = [];
+		$tx2things{ $t->display_name } = [];
 	}
 	
-	
-	# put exons into categories based on commonality
-	# associate exons with unique transcripts, common, or uncommon sets
+	# put things into categories based on commonality
+	# associate things with unique transcripts, common, or uncommon sets
 	my $trx_number = scalar @transcripts;
-	foreach my $s (sort {$a <=> $b} keys %pos2exons) {               # sort on start
-		foreach my $e (sort {$a <=> $b} keys %{ $pos2exons{$s} }) {  # sort on stop
-			my $n = scalar @{ $pos2exons{$s}{$e} };
+	foreach my $s (sort {$a <=> $b} keys %pos2things) {               # sort on start
+		foreach my $e (sort {$a <=> $b} keys %{ $pos2things{$s} }) {  # sort on stop
+			my $n = scalar @{ $pos2things{$s}{$e} };
 			if ($n == 1) {
-				# only 1 exon, must be an alternate
-				push @{ $tx2exons{ $pos2exons{$s}{$e}[0][0] } }, $pos2exons{$s}{$e}[0][1];
+				# only 1 thing, must be an alternate
+				push @{ $tx2things{ $pos2things{$s}{$e}[0][0] } }, $pos2things{$s}{$e}[0][1];
 			}
 			elsif ($n == $trx_number) {
 				# common to all transcripts
-				push @{ $tx2exons{common} }, $pos2exons{$s}{$e}[0][1];
+				push @{ $tx2things{common} }, $pos2things{$s}{$e}[0][1];
 			}
 			else {
 				# common to some but not all transcripts, so uncommon
-				push @{ $tx2exons{uncommon} }, $pos2exons{$s}{$e}[0][1];
+				push @{ $tx2things{uncommon} }, $pos2things{$s}{$e}[0][1];
 			}
 		}
 	}
-	return \%tx2exons;
-}
-
-sub get_introns {
-
+	return \%tx2things;
 }
 
 
@@ -226,7 +320,10 @@ sub get_transcripts {
 	foreach my $subf ($gene->get_SeqFeatures) {
 		push @transcripts, $subf if $subf->primary_tag =~ /rna|transcript/i;
 	}
-	return @transcripts;
+	return map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] }
+		map { [$_, $_->start] } 
+		@transcripts;
 }
 
 
