@@ -68,14 +68,15 @@ use constant {
 	START   => 1,
 	STOP    => 2,
 	STRND   => 3,
-	ID      => 4,
-	NAME    => 5,
+	NAME    => 4,
+	ID      => 5,
 	TYPE    => 6,
 	SRC     => 7,
 	SCORE   => 8,
 	PHASE   => 9,	
 	SUBF    => 10,
 	ATTRB   => 11,
+	PARNT   => 12,
 };
 our $IDCOUNT = 0;
 
@@ -106,28 +107,21 @@ sub new {
 		# bless ourselves early to take advantage of some methods
 		# but otherwise do what we can simply and quickly
 	
-	# required options
+	# primary options
 	$self->[SEQID] = $args{-seq_id} || $args{-seqid} || $args{'-ref'} || 
 		$args{chrom} || undef;
 	$self->[START] = $args{-start} || undef;
 	$self->[STOP] = $args{-end} || $args{-stop} || undef;
-	$self->strand( $args{-strand} || 0);
-	$self->[ID] = $args{-primary_id} || $args{-id} || 
-		sprintf("Feat%s%09d", $$, $IDCOUNT++);
-		# default ID is based on program pid and an incrementing counter
-		# IDs must be unique within the scope of a database, unlike name field
-	$self->[NAME] = $args{-display_name} || $args{-name} || $self->[ID];
+	$self->strand($args{-strand}) if exists $args{-strand};
+	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
+	$self->[ID] = $args{-primary_id} || $args{-id} || undef;
 	
-	# sanity check
-	unless (defined $self->[SEQID] and defined $self->[START] and defined $self->[STOP]) {
-		cluck "$class new method should contain at minimum seq_id, start, end";
-	}
-	if ($self->[START] > $self->[STOP]) {
+	# check orientation
+	if (defined $self->[START] and defined $self->[STOP] and 
+		$self->[START] > $self->[STOP]
+	) {
 		# flip the coordinates around
-		my $start = $self->[START];
-		my $end = $self->[STOP];
-		$self->[STOP] = $start;
-		$self->[START] = $end;
+		($self->[START], $self->[STOP]) = ($self->[STOP], $self->[START]);
 		$self->[STRND] *= -1;
 	}
 	
@@ -171,7 +165,9 @@ sub seq_id {
 	if (@_) {
 		$self->[SEQID] = $_[0];
 	}
-	return $self->[SEQID];
+	my $seqid = defined $self->[SEQID] ? $self->[SEQID] : 
+		defined $self->[PARNT] ? $self->[PARNT]->seq_id : undef;
+	return $seqid;
 }
 
 sub start {
@@ -198,8 +194,9 @@ sub strand {
 		$self->[STRND] = -1 if $self->[STRND] eq '-';
 		$self->[STRND] = 0 if $self->[STRND] eq '.';
 	}
-	$self->[STRND] ||= 0;
-	return $self->[STRND];
+	my $strand = defined $self->[STRND] ? $self->[STRND] : 
+		defined $self->[PARNT] ? $self->[PARNT]->strand : 0;
+	return $strand;
 }
 
 sub display_name {
@@ -214,6 +211,10 @@ sub primary_id {
 	my $self = shift;
 	if (@_) {
 		$self->[ID] = $_[0];
+	}
+	else {
+		# automatically assign a new ID
+		$self->[ID] = sprintf("F%s.%09d", $$, $IDCOUNT++);
 	}
 	return $self->[ID];
 }
@@ -232,8 +233,9 @@ sub source_tag {
 	if (@_) {
 		$self->[SRC] = $_[0];
 	}
-	$self->[SRC] ||= undef;
-	return $self->[SRC];
+	my $source = defined $self->[SRC] ? $self->[SRC] : 
+		defined $self->[PARNT] ? $self->[PARNT]->source_tag : undef;
+	return $source;
 }
 
 sub type {
@@ -298,7 +300,12 @@ sub add_SeqFeature {
 sub get_SeqFeatures {
 	my $self = shift;
 	$self->[SUBF] ||= [];
-	return @{ $self->[SUBF] };
+	my @children;
+	foreach (@{ $self->[SUBF] }) {
+		$_->[PARNT] = $self;
+		push @children, $_;
+	}
+	return wantarray ? @children : \@children;
 }
 
 sub add_tag_value {
