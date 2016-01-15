@@ -86,7 +86,7 @@ our $IDCOUNT = 0;
 # put in plenty of aliases to some of the methods
 *stop = \&end;
 *name = \&display_name;
-*id = \&display_name;
+*id = \&primary_id;
 *method = \&primary_tag;
 *source = \&source_tag;
 *add_segment = \&add_SeqFeature;
@@ -357,6 +357,80 @@ sub all_tags {
 sub length {
 	my $self = shift;
 	return $self->end - $self->start + 1;
+}
+
+
+### Range Methods
+# Borrowed from Bio::RangeI, but does not do strand checks
+
+sub overlaps {
+	my ($self, $other) = @_;
+	return not (
+		$self->start > $other->end or
+		$self->end   < $other->start
+	);
+}
+
+sub contains {
+	my ($self, $other) = @_;
+	return (
+		$other->start >= $self->start and
+		$other->end   <= $self->end
+	);
+}
+
+sub equals {
+	my ($self, $other) = @_;
+	return (
+		$other->start == $self->start and
+		$other->end   == $self->end
+	);
+}
+
+sub intersection {
+	my ($self, $other) = @_;
+	my ($start, $stop);
+	if ($self->start >= $other->start) {
+		$start = $self->start;
+	}
+	else {
+		$start = $other->start;
+	}
+	if ($self->end <= $other->end) {
+		$stop = $self->end;
+	}
+	else {
+		$stop = $other->end;
+	}
+	return if $start > $stop;
+	return $self->new(
+		-seq_id     => $self->seq_id,
+		-start      => $start,
+		-end        => $stop,
+	);
+}
+
+sub union {
+	my ($self, $other) = @_;
+	my ($start, $stop);
+	if ($self->start <= $other->start) {
+		$start = $self->start;
+	}
+	else {
+		$start = $other->start;
+	}
+	if ($self->end >= $other->end) {
+		$stop = $self->end;
+	}
+	else {
+		$stop = $other->end;
+	}
+	return if $start > $stop;
+	return $self->new(
+		-seq_id     => $self->seq_id,
+		-start      => $start,
+		-end        => $stop,
+	);
 }
 
 
