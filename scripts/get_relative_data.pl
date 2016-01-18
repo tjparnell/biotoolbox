@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.34';
+my $VERSION = '1.35';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -930,7 +930,6 @@ sub go_interpolate_values {
 	# determine counts
 	my $lastwindow = $Data->number_columns - 1; 
 		# lastwindow is the index of the last column
-	
 	# walk through each data line and then each window
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
@@ -946,13 +945,16 @@ sub go_interpolate_values {
 				
 				# find the next real value
 				my $next_i;
-				for (my $i = $col + 1; $col <= $lastwindow; $i++) {
+				for (my $i = $col + 1; $i <= $lastwindow; $i++) {
 					if ($row->value($i) ne '.') {
 						$next_i = $i;
 						last;
 					}
 				}
-				next unless defined $next_i;
+				unless (defined $next_i) {
+					$col++;
+					next;
+				}
 				
 				# determine fractional value
 				my $initial = $row->value($col - 1);
