@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.33';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -113,7 +113,7 @@ our @EXPORT_OK = qw(
 	open_to_write_fh
 	check_file
 );
-our $DATA_COLNUMBER = 0;
+our $DATA_COLNAMES  = undef;
 our $DATA_FILENAME  = undef;
 
 ### The True Statement
@@ -212,7 +212,7 @@ sub ask_user_for_index {
 	unless (
 		# we use filename and column number as indicators 
 		$Data->filename eq $DATA_FILENAME and 
-		$Data->number_columns == $DATA_COLNUMBER
+		join(";", $Data->list_columns) == $DATA_COLNAMES
 	) {
 		print " These are the columns in the file\n";
 		my $i = 0;
@@ -222,7 +222,7 @@ sub ask_user_for_index {
 		}
 		# remember for next time
 		$DATA_FILENAME = $Data->filename;
-		$DATA_COLNUMBER = $Data->number_columns;
+		$DATA_COLNAMES = join(";", $Data->list_columns);
 	}
 	print $line;
 	
