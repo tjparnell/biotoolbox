@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.34';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -71,6 +71,15 @@ named database features. The return values include:
 =item unknown: unrecognized
 
 =back
+
+=item column_name
+
+Returns the column name for the given index. 
+
+item data
+
+Returns the parent Bio::ToolBox::Data object, in case you may 
+have lost it by going out of scope.
 
 =back
 
@@ -431,6 +440,16 @@ sub new {
 
 
 ### Set and retrieve values
+
+sub data {
+	return shift->{data};
+}
+
+sub column_name {
+	my ($self, $column) = @_;
+	return unless defined $column;
+	return $self->{data}->name($column);
+}
 
 sub feature_type {
 	my $self = shift;

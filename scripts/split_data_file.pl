@@ -6,7 +6,7 @@ use strict;
 use Pod::Usage;
 use Getopt::Long;
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
+use Bio::ToolBox::utility;
 my $VERSION =  '1.33';
 
 print "\n This script will split a data file by features\n\n";

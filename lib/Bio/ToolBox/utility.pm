@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.33';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -46,17 +46,6 @@ Example
 	my $count = '4327908475';
 	print " The final count was " . format_with_commas($count) . "\n";
 
-=back
-
-=head1 ADDITIONAL SUBROUTINES
-
-These are additional functions that can be optionally exported. Some provide 
-accessibility to the Bio::ToolBox::Data::file functions for opening file 
-handles. If you import these, be sure to import the ones above if you need those 
-too.
-
-=over 4
-
 =item ask_user_for_index($Data, $prompt)
 
 This subroutine will present the list of column names from a Bio::ToolBox::Data 
@@ -71,6 +60,18 @@ depending on context.
 Example
 	
 	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
+
+=back
+
+=head1 LEGACY SUBROUTINES
+
+These are additional functions that can be optionally exported. These provide 
+accessibility to the Bio::ToolBox::Data::file functions that might be needed 
+for old scripts that do not implement Bio::ToolBox::Data objects. You normall 
+should not need these. If you import these, be sure to import the ones above 
+if you need those too.
+
+=over 4
 
 =item open_to_read_fh($file)
 
@@ -106,14 +107,14 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	parse_list
 	format_with_commas
+	ask_user_for_index
 );
 our @EXPORT_OK = qw(
-	ask_user_for_index
 	open_to_read_fh
 	open_to_write_fh
 	check_file
 );
-our $DATA_COLNUMBER = 0;
+our $DATA_COLNAMES  = undef;
 our $DATA_FILENAME  = undef;
 
 ### The True Statement
@@ -212,7 +213,7 @@ sub ask_user_for_index {
 	unless (
 		# we use filename and column number as indicators 
 		$Data->filename eq $DATA_FILENAME and 
-		$Data->number_columns == $DATA_COLNUMBER
+		join(";", $Data->list_columns) == $DATA_COLNAMES
 	) {
 		print " These are the columns in the file\n";
 		my $i = 0;
@@ -222,7 +223,7 @@ sub ask_user_for_index {
 		}
 		# remember for next time
 		$DATA_FILENAME = $Data->filename;
-		$DATA_COLNUMBER = $Data->number_columns;
+		$DATA_COLNAMES = join(";", $Data->list_columns);
 	}
 	print $line;
 	

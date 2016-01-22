@@ -16,7 +16,7 @@ use Bio::ToolBox::utility qw(
 	open_to_write_fh
 );
 use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.33';
+my $VERSION = '1.35';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -231,11 +231,9 @@ sub prepare_data_structure_or_output {
 			# bed structure
 			$Data = Bio::ToolBox::Data->new(
 				feature   => 'region', 
-				datasets  => [qw(Chromosome Start End Name Score Strand)],
+				datasets  => [qw(Chromosome Start0 End Name Score Strand)],
 			);
 			$Data->bed(6); # set the bed parameter
-			$Data->metadata(1, 'base', 1);
-			$Data->metadata(5, 'strand_style', 'plusminus');
 			
 			# position adjustments
 			if ($start_adj) {
@@ -348,7 +346,7 @@ sub record_bed_feature {
 	# record the feature
 	my @fdata = (
 		$seqfeature->seq_id,
-		$seqfeature->start,
+		$seqfeature->start - 1,
 		$seqfeature->end,
 		$seqfeature->display_name || $seqfeature->primary_id || 'region',
 		$seqfeature->score || 0,

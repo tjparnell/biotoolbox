@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.33';
+my $VERSION = '1.35';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -1048,7 +1048,7 @@ sub collect_common_alt_exons {
 	# identify types of transcripts to avoid mixed types
 	my @mRNAs;
 	my @ncRNAs;
-	foreach ($gene->get_SeqFeaturess) {
+	foreach ($gene->get_SeqFeatures) {
 		if (is_coding($_)) {
 			push @mRNAs, $_;
 		}
