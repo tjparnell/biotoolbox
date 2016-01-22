@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas parse_list);
+use Bio::ToolBox::utility;
 my $VERSION =  '1.35';
 
 print "\n This script will convert a data file to a GFF\n\n";

@@ -7,7 +7,7 @@ use Getopt::Long;
 use Statistics::Descriptive;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility qw(ask_user_for_index parse_list);
+use Bio::ToolBox::utility;
 my $VERSION = '1.33';
 
 print "\n This script will convert a datafile into histogram values\n\n";

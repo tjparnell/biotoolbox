@@ -7,7 +7,7 @@ use Pod::Usage;
 use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
-use Bio::ToolBox::utility qw(format_with_commas parse_list ask_user_for_index);
+use Bio::ToolBox::utility;
 my $VERSION = '1.33';
 
 print "\n A tool for manipulating datasets in data files\n";

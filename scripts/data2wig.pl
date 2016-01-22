@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(ask_user_for_index);
+use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 my $VERSION =  '1.34';
 
