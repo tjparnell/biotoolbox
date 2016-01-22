@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.34';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -170,7 +170,7 @@ This will create a new Data object containing the same column
 headers and metadata, but lacking the table content, i.e. no 
 rows of data. File name metadata, if present in the original, is 
 not preserved. The purpose here, for example, is to allow one 
-to selectively copy rows from one row to another.
+to selectively copy rows from one Data object to another.
 
 =back
 
@@ -760,7 +760,7 @@ sub new {
 		my $f = $args{file} || $args{in} || q();
 		my $l = $self->load_file($f);
 		unless ($l) {
-			carp "Cannot load file!\n";
+			carp " Cannot load file!";
 			return;
 		}
 	}
@@ -777,7 +777,7 @@ sub new {
 			$result = get_new_feature_list(%args);
 		}
 		unless ($result) {
-			carp "Cannot generate new $args{features} list!\n";
+			carp " Cannot generate new $args{features} list!";
 			return;
 		}
 	}
@@ -814,7 +814,7 @@ sub duplicate {
 		my %md = $self->metadata($i);
 		$Dupe->{$i} = \%md;
 	}
-	foreach (qw(feature program db bed gff ucsc headers)) {
+	foreach (qw(feature program db bed gff ucsc vcf headers)) {
 		# various keys
 		$Dupe->{$_} = $self->{$_};
 	}

@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas);
+use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 my $VERSION =  '1.34';
 

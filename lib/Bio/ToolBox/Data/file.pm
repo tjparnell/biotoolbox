@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.34';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -20,7 +20,7 @@ use IO::File;
 use Statistics::Lite qw(mean min);
 
 # List of acceptable filename extensions
-our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc)(?:\.gz)?/i;
+our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc|maf)(?:\.gz)?/i;
 
 
 ### The True Statement
@@ -41,6 +41,10 @@ sub load_file {
 	
 	# open the file and load metadata
 	my $filename = $self->check_file($file);
+	unless ($filename) {
+		print " file '$file' does not exist!\n";
+		return;
+	}
 	$self->add_file_metadata($filename);
 	my $fh = $self->open_to_read_fh;
 	return unless $fh;
@@ -48,8 +52,6 @@ sub load_file {
 	$self->{header_line_count} = 0;
 	$self->parse_headers;
 	$self->{data_table}->[0] = $self->{'column_names'}; 
-	
-	# set metadata for converting 0-based starts to 1-based
 	
 	# Load the data table
 	while (my $line = $self->{fh}->getline) {		
@@ -331,6 +333,13 @@ sub add_file_metadata {
 	my ($self, $filename) = @_;
 	confess "no valid filename!" unless defined $filename;
 	my ($basename, $path, $extension) = fileparse($filename, $SUFFIX);
+	unless ($extension) {
+		# look for a nonstandard extension, allowing for .gz extension
+		if ($filename =~ /(\.\w+(?:\.gz)?)$/i) {
+			$extension = $1;
+			$basename =~ s/$extension\Z//;
+		}
+	}
 	$self->{filename}  = $filename;
 	$self->{basename}  = $basename;
 	$self->{path}      = $path;
@@ -437,9 +446,17 @@ sub write_file {
 			# use a generic ucsc format, don't bother to customize it
 			$extension = '.ucsc';
 		}
+		elsif ($name =~ /(\.\w{3}(?:\.gz)?)$/i) {
+			# a non-standard 3 letter file extension
+			# anything else might be construed as part of the filename, so run the 
+			# risk of adding a default extension below
+			$extension = $1;
+			$name =~ s/$extension\Z//;
+		}
 		elsif ($self->extension) {
 			# original file had an extension, re-use it if appropriate
 			# why wouldn't this get picked up above???? probably old cruft, 
+			# or a non-standard or unknown file extension
 			# leave it in for the time being, shouldn't hurt anything
 			if ($self->extension =~ /g[tf]f/i) {
 				$extension = $self->gff ? $self->extension : '.txt';

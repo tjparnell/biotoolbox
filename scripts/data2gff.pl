@@ -6,8 +6,8 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
-use Bio::ToolBox::utility qw(ask_user_for_index format_with_commas parse_list);
-my $VERSION =  '1.34';
+use Bio::ToolBox::utility;
+my $VERSION =  '1.35';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -40,6 +40,7 @@ my (
 	$type,
 	$tag,
 	$ask,
+	$unique,
 	$interbase,
 	$gz,
 	$help,
@@ -62,6 +63,7 @@ GetOptions(
 	'type=s'    => \$type, # test to put in the type column
 	'tag|tags=s'=> \$tag, # comma list of tag column indices
 	'ask'       => \$ask, # request help in assigning indices
+	'unique!'   => \$unique, # make the names unique
 	'zero!'     => \$interbase, # input file is interbase format
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
@@ -294,6 +296,10 @@ if (defined $start_index and substr(Input->name($start_index), -1) eq '0') {
 	# start column name suggests it is 0-based
 	$interbase = 1;
 }
+if ($unique and not (defined $name_index or $name_base)) {
+	die " must provide a name index or name base to make unique feature names!\n";
+}
+my %unique_name_counter; # hash for making unique feature names
 my $count = 0; # the number of lines processed
 while (my $row = $Input->next_row) {
 	
@@ -321,7 +327,9 @@ while (my $row = $Input->next_row) {
 		push @args, 'score', $row->value($score_index);
 	}
 	if (defined $name_index) {
-		push @args, 'name', $row->value($name_index);
+		my $name = $unique ? generate_unique_name($row->value($name_index)) : 
+			$row->value($name_index);
+		push @args, 'name', $name;
 	} elsif (defined $name_base) {
 		push @args, 'name', sprintf("%s_%07d", $name_base, $count);
 	}
@@ -357,6 +365,27 @@ printf " Converted %s lines of input data to GFF file '%s'\n",
 	format_with_commas($count), $Output->filename;
 
 
+sub generate_unique_names {
+	my $name = shift;
+	my $new_name;
+			
+	# check uniqueness
+	if (exists $unique_name_counter{$name} ) {
+		# we've encountered this name before
+		# generate a unique name by appending the count number
+		$unique_name_counter{$name} += 1;
+		$new_name = $name . '.' . $unique_name_counter{$name};
+	}
+	else {
+		# first time for this name
+		# record in the hash
+		$new_name = $name;
+		$unique_name_counter{$name} = 0;
+	}
+	return $new_name;
+}
+
+
 __END__
 
 =head1 NAME
@@ -382,6 +411,7 @@ data2gff.pl [--options...] <filename>
   --tags <column_index,column_index,...>
   --source <text | column_index>
   --type <text | column_index>
+  --unique
   --zero
   --out <filename> 
   --gz
@@ -430,7 +460,7 @@ as the stop or end position column in the gff data.
 The index of the dataset in the data table to be used 
 as the score column in the gff data.
 
-=item --name <column_index>
+=item --name <text | column_index>
 
 Enter either the text that will be shared name among 
 all the features, or the index of the dataset in the data 
@@ -470,6 +500,13 @@ GFF 'type' or 'method' that should be used for the features. If
 not defined, it will use the column name for either 
 the 'score' or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
+
+=item --unique
+
+Indicate whether the feature names should be made unique. A count 
+number is appended to the name of subsequent features to make them 
+unique. Using a base text string for the name will automatically 
+generate unique names.
 
 =item --zero
 

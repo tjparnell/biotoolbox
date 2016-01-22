@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.33';
+my $VERSION = '1.35';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -1038,7 +1038,9 @@ sub copy_metadata {
 	# set the original file name
 	# we are ignoring the AUTO metadata here, which we should respect
 	# we will delete this metadata later
-	$output_data->metadata($index, 'original_file', $data->filename);
+	unless (defined $output_data->metadata($index, 'original_file')) {
+		$output_data->metadata($index, 'original_file', $data->filename);
+	}
 }
 	
 

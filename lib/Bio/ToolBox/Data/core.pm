@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.34';
+our $VERSION = '1.35';
 
 =head1 NAME
 
@@ -324,7 +324,7 @@ sub verify {
 			$bed_check = 0;
 			$error .= " Columns 1,2 not integers.";
 		}
-		if ($self->{'number_columns'} >= 5) {
+		if ($self->{'number_columns'} >= 6) {
 			# only check if it is actually present, since could be optional
 			unless ($self->_column_is_stranded(5) ) {
 				$bed_check = 0;
