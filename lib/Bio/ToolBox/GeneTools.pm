@@ -1,9 +1,9 @@
-package Bio::ToolBox::Gene::Utility;
-our $VERSION = '1.35';
+package Bio::ToolBox::GeneTools;
+our $VERSION = '1.40';
 
 =head1 NAME
 
-Bio::ToolBox::Gene::Utility - Methods for working with gene SeqFeatures
+Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene models
 
 =head1 SYNOPSIS
 
@@ -33,10 +33,10 @@ require Exporter;
 ### Variables
 # Export
 our @ISA = qw(Exporter);
-our @EXPORT = qw(
-);
+our @EXPORT = qw();
 our @EXPORT_OK = qw(
 );
+our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
 
 ### The True Statement
 1; 
@@ -169,7 +169,7 @@ sub get_introns {
 		# each intron is created based on the previous exon
 		for (my $i = 0; $i < $last; $i++) {
 			my $e = $exons[$i];
-			my $i = $e->new(
+			my $i = $SFCLASS->new(
 				-seq_id       => $e->seq_id,
 				-start        => $e->end + 1,
 				-end          => $exons[$i + 1]->start - 1, # up to start of next exon
@@ -189,7 +189,7 @@ sub get_introns {
 		# ordering from 5' to 3' end direction for convenience in naming
 		for (my $i = $last; $i > 0; $i--) {
 			my $e = $exons[$i];
-			my $i = $e->new(
+			my $i = $SFCLASS->new(
 				-seq_id       => $e->seq_id,
 				-start        => $exons[$i - 1]->end + 1, # end of next exon
 				-end          => $e->start - 1,
@@ -299,19 +299,108 @@ sub _get_alt_common_things {
 
 
 sub collapse_transcripts {
+	my @transcripts;
+	return unless @_;
+	my $example = $_[0]; # parent transcript seqfeature to model new transcript on
+	if (scalar @_ == 1) {
+		# someone passed a gene, get the transcripts
+		@transcripts = get_transcripts($_[0]);
+		return if scalar @transcripts == 1;
+	}
+	elsif (scalar @_ > 1) {
+		@transcripts = @_;
+	}
 
+	# get all useable exons to collapse
+	my @exons;
+	foreach my $t (@transcripts) {
+		my @e = get_exons($t);
+		push @exons, @e;
+	}
+	
+	# sort all the exons
+	my @sorted = 	map { $_->[0] }
+					sort { $a->[1] <=> $b->[1] }
+					map { [$_, $_->start] } 
+					@exons;
+	
+	# build new exons from the original - don't keep cruft
+	my $next = shift @sorted;
+	my @new;
+	$new[0] = $SFCLASS->new(
+		-start 			=> $next->start,
+		-end   			=> $next->end,
+		-primary_tag  	=> 'exon',
+	);
+	
+	# work through remaining exons, adding and merging as necessary
+	while (@sorted) {
+		$next = shift @sorted;
+		if ($next->start < $new[-1]->end and $next->end > $new[-1]->end) {
+			# overlapping features, so reassign the end point of exon
+			$new[-1]->end($next->end);
+		}
+		else {
+			# push as new exon
+			push @new, $SFCLASS->new(
+				-start 			=> $next->start,
+				-end   			=> $next->end,
+				-primary_tag  	=> 'exon',
+			);
+		}
+	}
+	
+	# return the assembled transcript
+	return $SFCLASS->new(
+		-seq_id         => $example->seq_id,
+		-start          => $new[0]->start,
+		-end            => $new[-1]->end,
+		-strand         => $example->strand,
+		-primary_tag    => 'transcript',
+		-source         => $example->source_tag,
+		-name           => $example->display_name,
+		-segments       => \@new,
+	);
 }
 
 sub get_transcript_length {
+	my $transcript = shift;
+	my $total = 0;
+	foreach my $e (get_exons($transcript)) {
+		$total += $e->length;
+	}
+	return $total;
+}
 
+sub get_cds {
+	my $transcript = shift;
+	my @cds;
+	foreach my $e (get_exons($transcript)) {
+		push @cds, $e if $e->primary_tag eq 'CDS';
+	}
+	return @cds;
 }
 
 sub get_cdsStart {
-
+	my $transcript = shift;
+	my @cds = get_cds($transcript);
+	return $cds[0]->start;
 }
 
 sub get_cdsEnd {
+	my $transcript = shift;
+	my @cds = get_cds($transcript);
+	return $cds[-1]->end;
+}
 
+sub get_transcript_cds_length {
+	my $transcript = shift;
+	my $total = 0;
+	foreach my $subf ($transcript->get_SeqFeatures) {
+		next unless $subf->primary_tag eq 'CDS';
+		$total += $subf->length;
+	}
+	return $total;
 }
 
 sub get_transcripts {

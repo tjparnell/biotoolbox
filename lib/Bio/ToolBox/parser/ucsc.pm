@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 

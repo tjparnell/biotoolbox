@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 

@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.35';
+my $VERSION = '1.40';
 
 =head1 NAME
 
