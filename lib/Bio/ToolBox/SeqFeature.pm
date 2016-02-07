@@ -94,6 +94,7 @@ our $IDCOUNT = 0;
 *get_all_SeqFeatures = *segments = \&get_SeqFeatures;
 *each_tag_value = \&get_tag_values;
 *get_all_tags = \&all_tags;
+*gff3_string = \&gff_string;
 
 
 #### METHODS ####
@@ -455,6 +456,107 @@ sub union {
 		-start      => $start,
 		-end        => $stop,
 	);
+}
+
+
+
+
+### Export methods
+
+sub version {
+	my $self = shift;
+	if (@_ and $_[0] ne '3') {
+		carp "sorry, only GFF version 3 is currently supported!";
+	}
+	return 3;
+}
+
+sub gff_string {
+	# exports version 3 GFF, sorry, no mechanism for others....
+	my $self = shift;
+	my $recurse = shift || 0;
+	my $childIDs = shift || undef;
+	
+	# map all parent-child relationships
+	if ($recurse and not defined $childIDs) {
+		# we have a top level SeqFeature and we need to go spelunking for IDs
+		$childIDs = {};
+		foreach my $f ($self->get_SeqFeatures) {
+			$f->_spelunk($self->primary_id, $childIDs);
+		}
+	}
+	
+	# basics
+	my $string = join("\t", (
+		$self->seq_id || '.',
+		$self->source_tag || '.',
+		$self->primary_tag,
+		$self->start || 1,
+		$self->end || 1,
+		defined $self->score ? $self->score : '.',
+		$self->strand > 0 ? '+' : $self->strand < 0 ? '-' : '.',
+		defined $self->phase ? $self->phase : '.',
+	) );
+	
+	# group attributes
+	my $attributes = "Name=" . $self->_encode( $self->display_name ) . 
+		'; ID=' . $self->_encode( $self->primary_id );
+	if ($childIDs) {
+		if (exists $childIDs->{$self->primary_id}) {
+			$attributes .= '; Parent=' . join(',', 
+				values %{ $childIDs->{$self->primary_id} });
+			delete $childIDs->{$self->primary_id};
+		}
+	}
+	foreach my $tag ($self->all_tags) {
+		next if $tag eq 'Name';
+		next if $tag eq 'ID';
+		next if $tag eq 'Parent';
+		my $value = $self->get_tag_values($tag);
+		if (ref($value) eq 'ARRAY') {
+			$value = join(",", map { $self->_encode($_) } @$value);
+		}
+		else {
+			$value = $self->_encode($value);
+		}
+		$attributes .= "; $tag=$value";
+	}
+	$string .= "\t$attributes\n";
+	
+	# recurse
+	if ($recurse) {
+		foreach my $f ($self->get_SeqFeatures) {
+			$string .= $f->gff_string(1, $childIDs);
+		}
+	}
+	return $string;
+}
+
+sub _encode {
+	my ($self, $value) = @_;
+	$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+	return $value;
+}
+
+sub _spelunk {
+	my ($self, $parentID, $childIDs);
+	$childIDs->{$self->primary_id}{$parentID} += 1;
+	foreach my $f ($self->get_SeqFeatures) {
+		$f->_spelunk($self->primary_id, $childIDs);
+	}
+}
+
+sub bed_string {
+	my $self = shift;
+	my $string = join("\t", (
+		$self->seq_id || '.',
+		($self->start || 1) - 1,
+		$self->end || 1,
+		$self->display_name || $self->primary_id,
+		defined $self->score ? $self->score : 0,
+		$self->strand >= 0 ? '+' : '-',
+	) );
+	return "$string\n";
 }
 
 
