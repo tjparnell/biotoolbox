@@ -214,7 +214,7 @@ sub primary_id {
 	}
 	else {
 		# automatically assign a new ID
-		$self->[ID] = sprintf("F%s.%09d", $$, $IDCOUNT++);
+		$self->[ID] = sprintf("%s%s.%09d", $self->primary_tag, $$, $IDCOUNT++);
 	}
 	return $self->[ID];
 }
@@ -361,17 +361,26 @@ sub all_tags {
 	return wantarray ? @k : \@k;
 }
 
+sub parent {
+	my $self = shift;
+	return defined $self->[PARNT] ? $self->[PARNT] : undef; 
+}
+
+
+
+
+### Range Methods
+# Borrowed from Bio::RangeI, but does not do strong/weak strand checks
+
 sub length {
 	my $self = shift;
 	return $self->end - $self->start + 1;
 }
 
-
-### Range Methods
-# Borrowed from Bio::RangeI, but does not do strand checks
-
 sub overlaps {
 	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
 	return not (
 		$self->start > $other->end or
 		$self->end   < $other->start
@@ -380,6 +389,8 @@ sub overlaps {
 
 sub contains {
 	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
 	return (
 		$other->start >= $self->start and
 		$other->end   <= $self->end
@@ -388,6 +399,8 @@ sub contains {
 
 sub equals {
 	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
 	return (
 		$other->start == $self->start and
 		$other->end   == $self->end
@@ -396,6 +409,8 @@ sub equals {
 
 sub intersection {
 	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
 	my ($start, $stop);
 	if ($self->start >= $other->start) {
 		$start = $self->start;
@@ -419,6 +434,8 @@ sub intersection {
 
 sub union {
 	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
 	my ($start, $stop);
 	if ($self->start <= $other->start) {
 		$start = $self->start;
