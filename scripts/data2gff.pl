@@ -67,6 +67,7 @@ GetOptions(
 	'zero!'     => \$interbase, # input file is interbase format
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
+	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
