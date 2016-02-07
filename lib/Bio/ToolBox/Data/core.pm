@@ -356,6 +356,9 @@ sub verify {
 			# reset metadata
 			$self->{'bed'} = 0;
 			$self->{'headers'} = 1;
+			my $ext = $self->{'extension'};
+			$self->{'filename'} =~ s/$ext/.txt/;
+			$self->{'extension'} = '.txt';
 			
 			# remove the AUTO key from the metadata
 			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
