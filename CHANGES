@@ -1,5 +1,14 @@
 ######## Bio::ToolBox revision history #############
 
+v1.35 (git e489d52)
+	- Add new options for setting dimensions and linear regression lines in 
+	script graph_data.
+	- Restored unique option in script data2gff.
+	- New convenience methods for Feature objects.
+	- Fixed bug with smoothing interpolation in get_relative_data
+	- Numerous other bug fixes regarding bed files, column names, 
+	file support, warnings.
+
 v1.34 (git 5d4803c)
 	- Changed the behavior of automatically converting interbase coordinates 
 	to base coordinates upon loading a file, and converting back as necessary 
