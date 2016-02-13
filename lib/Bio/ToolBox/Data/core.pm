@@ -332,6 +332,17 @@ sub verify {
 				$error .= " Column 5 not strand values.";
 			}
 		}
+		if ($self->{'number_columns'} == 12) {
+			# bed12 has extra special limitations
+			unless ($self->_column_is_stranded(6,7,9) ) {
+				$bed_check = 0;
+				$error .= " Column 6,7,9 not integers.";
+			}
+			unless ($self->_column_is_comma_integers(10,11) ) {
+				$bed_check = 0;
+				$error .= " Column 10,11 not comma-delimited integers.";
+			}
+		}
 		
 		# peak file format
 		if ($self->{'extension'} and 
@@ -410,6 +421,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= " Columns 4,5,6,7,8 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(9,10)) {
+				$ucsc_check = 0;
+				$error .= " Columns 9,10 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(3)) {
 				$ucsc_check = 0;
 				$error .= " Column 3 not strand values.";
@@ -449,6 +464,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .=  " Columns 3,4,5,6,7 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(8,9)) {
+				$ucsc_check = 0;
+				$error .= " Columns 8,9 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(2)) {
 				$ucsc_check = 0;
 				$error .= " Column 2 not strand values.";
@@ -483,6 +502,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= " Columns 4,5,6,7,8 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(9,10)) {
+				$ucsc_check = 0;
+				$error .= " Columns 9,10 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(3)) {
 				$ucsc_check = 0;
 				$error .= " Column 3 not strand values.";
@@ -516,6 +539,10 @@ sub verify {
 			unless($self->_column_is_integers(3,4,5,6,7)) {
 				$ucsc_check = 0;
 				$error .= " Columns 3,4,5,6,7 not integers.";
+			}
+			unless ($self->_column_is_comma_integers(8,9)) {
+				$ucsc_check = 0;
+				$error .= " Columns 8,9 not comma-delimited integers.";
 			}
 			unless($self->_column_is_stranded(2)) {
 				$ucsc_check = 0;
@@ -673,6 +700,22 @@ sub _column_is_integers {
 	for my $row (1 .. $self->{last_row}) {
 		for my $i (@index) {
 			return 0 unless ($self->{data_table}->[$row][$i] =~ /^\d+$/);
+		}
+	}
+	return 1;
+}
+
+# internal method to check if a column is nothing but comma delimited integers
+sub _column_is_comma_integers {
+	my $self = shift;
+	my @index = @_;
+	return 1 if ($self->{last_row} == 0); # can't check if table is empty
+	foreach (@index) {
+		return 0 unless exists $self->{$_};
+	}
+	for my $row (1 .. $self->{last_row}) {
+		for my $i (@index) {
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d,]+$/);
 		}
 	}
 	return 1;
