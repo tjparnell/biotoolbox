@@ -885,7 +885,12 @@ sub from_ucsc_string {
 	return unless $string;
 	my $builder = Bio::ToolBox::parser::ucsc::builder->new($string, $self);
 	return unless $builder;
-	return $builder->build_gene;
+	if ($self->do_gene) {
+		return $builder->build_gene;
+	}
+	else {
+		return $builder->build_transcript;
+	}
 }
 
 sub seq_ids {
