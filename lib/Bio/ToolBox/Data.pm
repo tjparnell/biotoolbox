@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.35';
+our $VERSION = '1.36';
 
 =head1 NAME
 
@@ -661,7 +661,7 @@ header becomes a row identifier (i.e. the table is transposed). The
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
 L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
-You may pass these options. 
+You may pass these options. They are optional.
 
 =over 4
 
@@ -679,9 +679,17 @@ start is the leftmost column without a recognized standard name.
 The default ending column is the last rightmost column. Indexes are 
 0-based.
 
+=item dataset =E<gt> $name
+
+Pass a string that is the name of the dataset. This could be collected 
+from the metadata, if present. This will become the name of the score 
+column if defined.
+
 =back
 
-If successful, it will return the name of the file saved.
+The name of the summarized column is either the provided dataset name, 
+the defined basename in the metadata of the Data structure, or a generic 
+name. If successful, it will return the name of the file saved.
 
 =back
 
@@ -1358,10 +1366,6 @@ sub summary_file {
 	
 	# Collect passed arguments
 	my %args = @_; 
-	unless (%args) {
-		cluck "no arguments passed!";
-		return;
-	}
 	
 	# load modules
 	eval {
@@ -1428,7 +1432,7 @@ sub summary_file {
 	unless ($dataset) {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) 
-		$dataset = $self->metadata($startcolumn, 'dataset') || 'data_scores';
+		$dataset = $self->metadata($startcolumn, 'dataset') || undef;
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
@@ -1437,7 +1441,7 @@ sub summary_file {
 	}
 	
 	# Prepare score column name
-	my $data_name = $dataset || $self->basename || 'dataset';
+	my $data_name = $dataset ? $dataset : $self->basename ? $self->basename : 'dataset';
 	
 	# Prepare array to store the summed data
 	my $summed_data = $self->new(
@@ -1447,7 +1451,7 @@ sub summary_file {
 	$summed_data->database($self->database);
 	$summed_data->metadata(0, 'number_features', $self->last_row);
 	$summed_data->metadata(2, 'log2', $log);
-	$summed_data->metadata(2, 'dataset', $dataset);
+	$summed_data->metadata(2, 'dataset', $dataset) if $dataset;
 	
 	
 	# Collect summarized data
