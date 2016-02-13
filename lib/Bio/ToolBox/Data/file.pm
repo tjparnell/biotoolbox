@@ -135,7 +135,7 @@ sub taste_file {
 		return 'gff' if $Taste->verify(1);
 	}
 	if ($number == 10) {
-		# possibly a refFlat file
+		# possibly a genePred file
 		$Taste->ucsc(10);
 		return 'ucsc' if $Taste->verify(1);
 		$Taste->ucsc(10);
@@ -144,7 +144,7 @@ sub taste_file {
 		return 'ucsc' if $Taste->verify(1);
 	}
 	if ($number == 11) {
-		# possibly a genePred file
+		# possibly a refFlat file
 		$Taste->ucsc(11);
 		return 'ucsc' if $Taste->verify(1);
 		$Taste->ucsc(11);
@@ -1317,11 +1317,11 @@ sub standard_column_names {
 		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
 			exonStarts0 exonEnds proteinID alignID)];
 	}
-	elsif ($type eq 'ucsc11' or $type eq 'genepred') {
+	elsif ($type eq 'ucsc11' or $type eq 'refflat') {
 		return [qw(geneName transcriptName chrom strand txStart0 txEnd cdsStart0 
 			cdsEnd exonCount exonStarts0 exonEnds)];
 	}
-	elsif ($type eq 'ucsc10' or $type eq 'refflat') {
+	elsif ($type eq 'ucsc10' or $type eq 'genepred') {
 		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
 			exonStarts exonEnds)];
 	}
