@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -530,12 +530,10 @@ sub new {
 			return;
 		}
 		$self->add_file_metadata($filename);
-		my $fh = $self->open_to_read_fh or return;
-		$self->{fh} = $fh;
+		$self->open_to_read_fh or return;
 		$self->{mode} = 0; # read mode
 		
 		# parse column headers
-		$self->{header_line_count} = 0;
 		$self->parse_headers;
 		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
@@ -797,16 +795,6 @@ sub write_row {
 sub mode {
 	my $self = shift;
 	return $self->{mode};
-}
-
-sub fh {
-	my $self = shift;
-	return $self->{fh};
-}
-
-sub close_fh {
-	my $self = shift;
-	$self->{fh}->close if $self->{fh};
 }
 
 sub DESTROY {

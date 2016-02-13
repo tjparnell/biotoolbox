@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -46,10 +46,7 @@ sub load_file {
 		return;
 	}
 	$self->add_file_metadata($filename);
-	my $fh = $self->open_to_read_fh;
-	return unless $fh;
-	$self->{fh} = $fh;
-	$self->{header_line_count} = 0;
+	$self->open_to_read_fh or return;
 	$self->parse_headers;
 	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
@@ -73,7 +70,7 @@ sub load_file {
 	$self->{'last_row'} = scalar @{ $self->{'data_table'} } - 1;
 	
 	# completed loading the file
-	$self->{fh}->close;
+	$self->close_fh;
 	delete $self->{fh};
 	
 	# verify the structure
@@ -86,10 +83,18 @@ sub load_file {
 
 sub parse_headers {
 	my $self = shift;
-	my $fh = shift || $self->{fh};
 	my $noheader = shift || 0; # boolean to indicate no headers are present
-	unless (ref($fh) =~ /^IO/) {
-		confess " must pass an open IO::Handle compatible object!\n";
+	
+	# filehandle
+	my $fh;
+	if (exists $self->{fh} and $self->{fh}) {
+		$fh = $self->{fh};
+	}
+	elsif ($self->filename) {
+		$fh = $self->open_to_read_fh($self->filename);
+	}
+	else {
+		confess " file metadata and/or open filehandle must be set before parsing headers!";
 	}
 	
 	# check that we have an empty table
@@ -714,13 +719,18 @@ sub save {
 
 #### Open a file for reading
 sub open_to_read_fh {
-	my ($self, $file) = @_;
+	my $self = shift;
+	my $file = shift || undef;
+	my $obj = ref($self) =~ /^Bio::ToolBox/ ? 1 : 0;
 	
 	# check file
-	unless ($file) {
-		$file = $self->filename;
+	if (not $file and $obj) {
+		$file = $self->filename || undef;
 	}
-	return unless $file;
+	unless ($file) {
+		carp " no filename provided or associated with object!";
+		return;
+	}
 	
 	# Open filehandle object as appropriate
 	my $fh; 
@@ -738,6 +748,10 @@ sub open_to_read_fh {
 		# the file is uncompressed and space hogging
 		$fh = IO::File->new($file, 'r') or 
 			carp "unable to read '$file' $!\n";
+	}
+	
+	if ($obj) {
+		$self->{fh} = $fh;
 	}
 	return $fh;	
 }
@@ -828,6 +842,18 @@ sub check_file {
 		}
 		return $new_filename;
 	}
+}
+
+
+sub fh {
+	my $self = shift;
+	return $self->{fh} if exists $self->{fh};
+	return;
+}
+
+sub close_fh {
+	my $self = shift;
+	$self->{fh}->close if (exists $self->{fh} and $self->{fh});
 }
 
 
@@ -1514,7 +1540,7 @@ Parses a text line from the file into a Data table row.
 
 This subroutine confirms the existance of a passed filename. If not 
 immediately found, it will attempt to append common file extensions 
-and verifiy its existence. This allows the user to pass only the base 
+and verify its existence. This allows the user to pass only the base 
 file name and not worry about missing the extension. This may be useful 
 in shell scripts.
 

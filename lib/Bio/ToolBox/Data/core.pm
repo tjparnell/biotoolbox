@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -53,6 +53,7 @@ sub new {
 		'path'           => undef,
 		'comments'       => [],
 		'data_table'     => [],
+		'header_line_count' => 0,
 	);
 	
 	# Finished
