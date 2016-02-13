@@ -80,6 +80,113 @@ sub load_file {
 	return 1;
 }
 
+sub taste_file {
+	my $self = shift;
+	my $file = shift;
+	my $Taste = $self->new;
+	my $filename = $self->check_file($file);
+	unless ($filename) {
+		print " file '$file' does not exist!\n";
+		return;
+	}
+	$Taste->add_file_metadata($filename);
+	$Taste->open_to_read_fh or return;
+	$Taste->parse_headers;
+	
+	# check existing metadata
+	if ($Taste->gff) {
+		return 'gff';
+	}
+	elsif ($Taste->bed) {
+		return 'bed';
+	}
+	elsif ($Taste->ucsc) {
+		return 'ucsc';
+	}
+	
+	# load first 10 data lines
+	$Taste->{data_table}->[0] = $self->{'column_names'}; 
+	for (my $i = 1; $i <= 10; $i++) {
+		my $line = $Taste->fh->getline;
+		next if $line !~ m/\w+/;
+		next if $line =~ /^#/;
+		$Taste->add_data_line($line);
+	}
+	$Taste->close_fh;
+	
+	# check if the number of columns match a known format, then verify
+	my $number = $Taste->number_columns;
+	if ($number == 6) {
+		# possibly bed6
+		$Taste->bed(6);
+		return 'bed' if $Taste->verify(1);
+		$Taste->bed(6);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('bed6') );
+		$Taste->{last_row} += 1;
+		return 'bed' if $Taste->verify(1);
+	}
+	if ($number == 9) {
+		# possibly a GFF file
+		$Taste->gff(1);
+		return 'gff' if $Taste->verify(1);
+		$Taste->gff(1);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('gff') );
+		$Taste->{last_row} += 1;
+		return 'gff' if $Taste->verify(1);
+	}
+	if ($number == 10) {
+		# possibly a refFlat file
+		$Taste->ucsc(10);
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->ucsc(10);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc10') );
+		$Taste->{last_row} += 1;
+		return 'ucsc' if $Taste->verify(1);
+	}
+	if ($number == 11) {
+		# possibly a genePred file
+		$Taste->ucsc(11);
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->ucsc(11);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc11') );
+		$Taste->{last_row} += 1;
+		return 'ucsc' if $Taste->verify(1);
+	}
+	if ($number == 12) {
+		# possibly a knownGene or BED12 file
+		$Taste->ucsc(12);
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->bed(12);
+		return 'bed' if $Taste->verify(1);
+		$Taste->ucsc(12);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc12') );
+		$Taste->{last_row} += 1;
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->{data_table}->[0] = $self->standard_column_names('bed12');
+		$Taste->bed(12);
+		return 'bed' if $Taste->verify(1);
+	}
+	if ($number == 15) {
+		# possibly a genePredExt file
+		$Taste->ucsc(15);
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->ucsc(15);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc15') );
+		$Taste->{last_row} += 1;
+		return 'ucsc' if $Taste->verify(1);
+	}
+	if ($number == 16) {
+		# possibly a genePredExt file
+		$Taste->ucsc(16);
+		return 'ucsc' if $Taste->verify(1);
+		$Taste->ucsc(16);
+		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc16') );
+		$Taste->{last_row} += 1;
+		return 'ucsc' if $Taste->verify(1);
+	}
+	return;
+}
+
 
 sub parse_headers {
 	my $self = shift;
@@ -1417,6 +1524,15 @@ and can be used by the user.
 Loads a file into memory. Any metadata lines will be automatically 
 parsed and the table loaded into the Data object. Some basic consistency 
 checks are performed. Structured file formats, such as BED, GFF, etc are 
+
+=item taste_file($filename)
+
+Tastes, or checks, a file for a certain flavor, or known file format. 
+This is based on file extension, metadata headers, and/or file content 
+in the first 10 lines or so. Returns a string based on the file format.
+Values include gff, bed, ucsc, or undefined. Useful for determining if 
+the file represents a known gene table format that lacks a defined file 
+extension, e.g. UCSC formats.
 
 =item add_file_metadata($filename)
 
