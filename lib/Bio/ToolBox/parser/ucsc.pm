@@ -909,7 +909,7 @@ sub seq_id_lengths {
 package Bio::ToolBox::parser::ucsc::builder;
 use strict;
 use Carp qw(carp cluck croak);
-our $SFCLASS; # SeqFeature class to use
+our $SFCLASS = ''; # SeqFeature class to use
 
 1;
 

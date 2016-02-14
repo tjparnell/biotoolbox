@@ -278,7 +278,12 @@ sub new {
 			}
 			if (exists $options{class}) {
 				my $class = $options{class};
-				eval "require $class; $SFCLASS = $class;";
+				if (eval "require $class; 1") {
+					$SFCLASS = $class;
+				}
+				else {
+					croak $@;
+				}
 			}
 		}
 	}
