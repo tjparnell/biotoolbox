@@ -1230,11 +1230,24 @@ sub id_column {
 	return $self->{column_indices}{id};
 }
 
+
+
+#### Special Row methods ####
+
+sub get_seqfeature {
+	my ($self, $row) = @_;
+	return unless ($row and $row <= $self->{last_row});
+	return unless exists $self->{SeqFeatureObjects};
+	return $self->{SeqFeatureObjects}->[$row] || undef;
+}
+
+
+
 __END__
 
 =head1 METHODS REFERENCE
 
-For reference only. Please use L<Bio::ToolBox::Data>
+For quick reference only. Please see L<Bio::ToolBox::Data> for implementation.
 
 =over 4
 
@@ -1402,6 +1415,10 @@ Returns the index of the column that best represents the type.
 
 Returns the index of the column that represents the Primary_ID 
 column used in databases.
+
+=item get_seqfeature
+
+Returns the stored SeqFeature object for a given row.
 
 =back
 

@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.36';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -513,6 +513,27 @@ An example using the iterator is shown below.
 
 =back
 
+=head2 SeqFeature Objects
+
+SeqFeature objects corresponding to data rows can be stored in the Data 
+object. This can be useful if the SeqFeature object is not readily 
+available from a database or is processor intensive in generating or 
+parsing. Note that storing large numbers of objects will increase memory 
+usage. 
+
+=over 4
+
+=item store_seqfeature($row_index, $seqfeature)
+
+Stores the SeqFeature object for the given row index. Only one SeqFeature 
+object can be stored per row.
+
+=item get_seqfeature($row_index)
+
+Retrieves the SeqFeature object for the given row index.
+
+=back
+
 =head2 Data Table Functions
 
 These methods alter the Data table en masse. 
@@ -1002,7 +1023,14 @@ sub iterate {
 	return 1;
 }
 
-
+sub store_seqfeature {
+	my ($self, $row, $seqfeature) = @_;
+	return unless (defined $row and ref($seqfeature));
+	return unless ($row <= $self->last_row);
+	$self->{SeqFeatureObjects} ||= [];
+	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
+	return 1;
+}
 
 
 ### Data structure manipulation

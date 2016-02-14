@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -205,15 +205,18 @@ module.
 
 =item feature
 
-Returns a SeqFeature object from the database using the name and 
+Returns a SeqFeature object representing the feature or item in 
+the current row. If the SeqFeature object is stored in the parent 
+$Data object, it is retrieved from there. Otherwise, the SeqFeature 
+object is retrieved from the database using the name and 
 type values in the current Data table row. The SeqFeature object 
 is requested from the database named in the general metadata. If 
 an alternate database is desired, you should change it first using  
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See <Bio::DB::SeqFeature> and L<Bio::SeqFeatureI> for more information 
-about working with these objects.
+See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
+information about working with these objects.
 
 =item segment
 
@@ -687,14 +690,16 @@ sub feature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
 	return $self->{feature} if exists $self->{feature};
-	return undef unless $self->{data}->database;
+	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
+	return $f if $f;
+	return unless $self->{data}->database;
 	
 	# retrieve the feature from the database
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
-	return undef unless ($id or ($name and $type));
-	my $f = get_feature(
+	return unless ($id or ($name and $type));
+	$f = get_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later
