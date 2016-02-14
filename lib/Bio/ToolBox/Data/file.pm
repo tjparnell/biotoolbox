@@ -83,12 +83,8 @@ sub load_file {
 sub taste_file {
 	my $self = shift;
 	my $file = shift;
+	my $filename = $self->check_file($file) or return;
 	my $Taste = $self->new;
-	my $filename = $self->check_file($file);
-	unless ($filename) {
-		print " file '$file' does not exist!\n";
-		return;
-	}
 	$Taste->add_file_metadata($filename);
 	$Taste->open_to_read_fh or return;
 	$Taste->parse_headers;
@@ -116,15 +112,6 @@ sub taste_file {
 	
 	# check if the number of columns match a known format, then verify
 	my $number = $Taste->number_columns;
-	if ($number == 6) {
-		# possibly bed6
-		$Taste->bed(6);
-		return 'bed' if $Taste->verify(1);
-		$Taste->bed(6);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('bed6') );
-		$Taste->{last_row} += 1;
-		return 'bed' if $Taste->verify(1);
-	}
 	if ($number == 9) {
 		# possibly a GFF file
 		$Taste->gff(1);
@@ -134,7 +121,7 @@ sub taste_file {
 		$Taste->{last_row} += 1;
 		return 'gff' if $Taste->verify(1);
 	}
-	if ($number == 10) {
+	elsif ($number == 10) {
 		# possibly a genePred file
 		$Taste->ucsc(10);
 		return 'ucsc' if $Taste->verify(1);
@@ -143,7 +130,7 @@ sub taste_file {
 		$Taste->{last_row} += 1;
 		return 'ucsc' if $Taste->verify(1);
 	}
-	if ($number == 11) {
+	elsif ($number == 11) {
 		# possibly a refFlat file
 		$Taste->ucsc(11);
 		return 'ucsc' if $Taste->verify(1);
@@ -152,7 +139,7 @@ sub taste_file {
 		$Taste->{last_row} += 1;
 		return 'ucsc' if $Taste->verify(1);
 	}
-	if ($number == 12) {
+	elsif ($number == 12) {
 		# possibly a knownGene or BED12 file
 		$Taste->ucsc(12);
 		return 'ucsc' if $Taste->verify(1);
@@ -166,7 +153,7 @@ sub taste_file {
 		$Taste->bed(12);
 		return 'bed' if $Taste->verify(1);
 	}
-	if ($number == 15) {
+	elsif ($number == 15) {
 		# possibly a genePredExt file
 		$Taste->ucsc(15);
 		return 'ucsc' if $Taste->verify(1);
@@ -175,7 +162,7 @@ sub taste_file {
 		$Taste->{last_row} += 1;
 		return 'ucsc' if $Taste->verify(1);
 	}
-	if ($number == 16) {
+	elsif ($number == 16) {
 		# possibly a genePredExt file
 		$Taste->ucsc(16);
 		return 'ucsc' if $Taste->verify(1);
@@ -1512,11 +1499,12 @@ and can be used by the user.
 
 Loads a file into memory. Any metadata lines will be automatically 
 parsed and the table loaded into the Data object. Some basic consistency 
-checks are performed. Structured file formats, such as BED, GFF, etc are 
+checks are performed. Standard structured file formats, such as BED, 
+GFF, etc, will have standard metadata and column names provided.
 
 =item taste_file($filename)
 
-Tastes, or checks, a file for a certain flavor, or known file format. 
+Tastes, or checks, a file for a certain flavor, or known gene file formats. 
 This is based on file extension, metadata headers, and/or file content 
 in the first 10 lines or so. Returns a string based on the file format.
 Values include gff, bed, ucsc, or undefined. Useful for determining if 
