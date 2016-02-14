@@ -29,7 +29,7 @@ sub new {
 	my $class = shift;
 	
 	# in case someone calls this from an established object
-	if (ref($class) =~ /Bio::ToolBox/) {
+	if (ref($class)) {
 		$class = ref($class);
 	}
 	
