@@ -513,9 +513,9 @@ sub primary_id {
 	if (@_) {
 		$self->[ID] = $_[0];
 	}
-	else {
+	elsif (not defined $self->[ID]) {
 		# automatically assign a new ID
-		$self->[ID] = sprintf("%s%s.%09d", $self->primary_tag, $$, $IDCOUNT++);
+		$self->[ID] = sprintf("%s_%09d", $self->primary_tag, $IDCOUNT++);
 	}
 	return $self->[ID];
 }
