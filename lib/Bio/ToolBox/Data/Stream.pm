@@ -388,7 +388,7 @@ down appropriately. If you had identified one of the
 shifted columns, you may need to re-find or calculate 
 its new index.
 
-=item reorder_column($index1,  $index, ...)
+=item reorder_column($index1,  $index2, ...)
 
 Reorders columns into the specified order. Provide the 
 new desired order of indices. Columns could be duplicated 
@@ -413,6 +413,10 @@ object.
 
 =item next_row()
 
+=item next_line()
+
+=item read_line()
+
 This method reads the next line in the file handle and returns a 
 L<Bio::ToolBox::Data::Feature> object. This object represents the 
 values in the current file row. 
@@ -420,9 +424,13 @@ values in the current file row.
 Note that strand values and 0-based start coordinates are automatically 
 converted to BioPerl conventions if required by the file type.
 
-=item add_row()
+=item add_row( $data )
 
-=item write_row()
+=item add_line( $data )
+
+=item write_row( $data )
+
+=item write_line( $data )
 
 This method writes a new row or line to a file handle. The first 
 time this method is called the file handle is automatically opened for 
@@ -439,16 +447,13 @@ data that is passed.
 
 A Feature object representing a row from another <Bio::ToolBox::Data> 
 data table or Stream. The values from this object will be automatically 
-obtained. B<Note:> Only pass this object if the number and names of the columns 
-are identical between read and write Streams, otherwise very strange 
-things may happen! If you modify the number of columns, then use the second 
-approach below. Modified strand and 0-based coordinates may be adjusted back 
+obtained. Modified strand and 0-based coordinates may be adjusted back 
 as necessary.
 
-=item An array of values
+=item An array reference of values
 
-Pass an array of values. The number of elements should match the number 
-of expected columns. The values will be automatically joined using tabs. 
+Pass an array reference of values. The number of elements should match the 
+number of expected columns. The values will be automatically joined using tabs. 
 This implementation should be used if you using values from another Stream 
 and the number of columns have been modified.
 
@@ -457,9 +462,9 @@ metadata indicates this should be done.
 
 =item A string
 
-Pass a text string. This assumes the values are already concatenated. 
-A new line character is appended if one is not included. No data 
-manipulation (strand or 0-based starts) or sanity checking of the 
+Pass a text string. This assumes the column values are already tab 
+concatenated. A new line character is appended if one is not included. 
+No data manipulation (strand or 0-based starts) or sanity checking of the 
 required number of columns is performed. Use with caution!
 
 =back
@@ -707,6 +712,8 @@ sub copy_column {
 
 #### Row Access ####
 
+*next_line = *read_line = \&next_row;
+
 sub next_row {
 	my $self = shift;
 	if ($self->mode) {
@@ -738,7 +745,7 @@ sub next_row {
 }
 
 
-*add_row = \&write_row;
+*add_row = *add_line = *write_line = \&write_row;
 
 sub write_row {
 	my $self = shift;

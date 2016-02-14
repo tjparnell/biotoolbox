@@ -203,6 +203,8 @@ module.
 
 =over 4
 
+=item seqfeature
+
 =item feature
 
 Returns a SeqFeature object representing the feature or item in 
@@ -530,6 +532,7 @@ sub start {
 	}
 }
 
+*stop = \&end;
 sub end {
 	my $self = shift;
 	carp "end is a read only method" if @_;
@@ -543,10 +546,6 @@ sub end {
 	else {
 		return;
 	}
-}
-
-sub stop {
-	return shift->end;
 }
 
 sub strand {
@@ -686,7 +685,9 @@ sub vcf_attributes {
 
 ### Data collection convenience methods
 
-sub feature {
+*feature = \&seqfeature;
+
+sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
 	return $self->{feature} if exists $self->{feature};
