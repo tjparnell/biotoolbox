@@ -133,8 +133,10 @@ to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
 
-Here, this represents the primary_ID in the database. Note that this 
-number is unique to a specific database, and not portable between databases.
+=item primary_id
+
+Here, this represents the primary_ID in the database. Note that this number 
+is generally unique to a specific database, and not portable between databases.
 
 =item length
 
@@ -566,7 +568,8 @@ sub strand {
 	return 0;
 }
 
-sub name {
+*name = \&display_name;
+sub display_name {
 	my $self = shift;
 	carp "name is a read only method" if @_;
 	my $i = $self->{data}->name_column;
@@ -579,10 +582,6 @@ sub name {
 		return $att->{Name} || $att->{ID} || $att->{transcript_name};
 	}
 	return undef;
-}
-
-sub display_name {
-	return shift->name;
 }
 
 sub type {
@@ -598,7 +597,8 @@ sub type {
 	return undef;
 }
 
-sub id {
+*id = \&primary_id;
+sub primary_id {
 	my $self = shift;
 	carp "id is a read only method" if @_;
 	my $i = $self->{data}->id_column;
@@ -686,7 +686,6 @@ sub vcf_attributes {
 ### Data collection convenience methods
 
 *feature = \&seqfeature;
-
 sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
