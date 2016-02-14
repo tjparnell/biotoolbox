@@ -374,9 +374,9 @@ use constant {
 	SRC     => 7,
 	SCORE   => 8,
 	PHASE   => 9,	
-	SUBF    => 10,
-	ATTRB   => 11,
-	PARNT   => 12,
+	ATTRB   => 10,
+	PARNT   => 11,
+	SUBF    => 12,
 };
 our $IDCOUNT = 0;
 
@@ -587,7 +587,7 @@ sub add_SeqFeature {
 	$self->[SUBF] ||= [];
 	my $count = 0;
 	foreach my $s (@_) {
-		if (ref($s)) {
+		if (ref($s) eq ref($self)) {
 			push @{ $self->[SUBF] }, $s;
 			$count++;
 		}
