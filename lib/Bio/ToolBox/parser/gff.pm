@@ -601,6 +601,12 @@ sub parse_file {
 		}
 	}
 	
+	# report on duplicate IDs
+	if (keys %{ $self->{duplicate_ids} }) {
+		print " The GFF file has errors: the following IDs were duplicated: " . 
+			join(', ', keys %{ $self->{duplicate_ids} }) . "\n";
+	}
+	
 	# build gene2seqf and seq_id hashes 
 	foreach (@{ $self->{top_features} }) {
 		my $name = $_->display_name;
