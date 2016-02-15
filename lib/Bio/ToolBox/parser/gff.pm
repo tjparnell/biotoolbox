@@ -609,12 +609,12 @@ sub parse_file {
 	
 	# build gene2seqf and seq_id hashes 
 	foreach (@{ $self->{top_features} }) {
-		my $name = $_->display_name;
-		if (exists $self->{gene2seqf}->{lc $name}) {
-			push @{ $self->{gene2seqf}->{lc $name} }, $_;
+		my $name = lc $_->display_name;
+		if (exists $self->{gene2seqf}->{$name}) {
+			push @{ $self->{gene2seqf}->{$name} }, $_;
 		}
 		else {
-			$self->{gene2seqf}->{lc $name} = [$_];
+			$self->{gene2seqf}->{$name} = [$_];
 		}
 		my $s = $_->seq_id;
 		unless (exists $self->{seq_ids}{$s}) {
