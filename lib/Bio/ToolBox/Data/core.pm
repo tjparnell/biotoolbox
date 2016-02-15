@@ -671,7 +671,7 @@ sub verify {
 		$self->{'bed'} or 
 		$self->{'gff'} or 
 		$self->{'ucsc'} or
-		$self->{'extension'} =~ /sgr/i
+		($self->{'extension'} and $self->{'extension'} =~ /sgr/i)
 	) {
 		$self->{'headers'} = 0;
 	}
@@ -679,7 +679,7 @@ sub verify {
 		$self->{'bed'} == 0 and 
 		$self->{'gff'} == 0 and 
 		$self->{'ucsc'} == 0 and
-		$self->{'extension'} !~ /sgr/i
+		($self->{'extension'} and $self->{'extension'} !~ /sgr/i)
 	) {
 		$self->{'headers'} = 1;
 	}
@@ -741,6 +741,7 @@ sub open_database {
 	my $self = shift;
 	my $force = shift || 0;
 	return unless $self->{db};
+	return if $self->{db} =~ /^Parsed:/; # we don't open parsed annotation files
 	if (exists $self->{db_connection}) {
 		return $self->{db_connection} unless $force;
 	}
