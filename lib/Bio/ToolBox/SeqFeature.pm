@@ -505,6 +505,7 @@ sub display_name {
 	if (@_) {
 		$self->[NAME] = $_[0];
 	}
+	$self->[NAME] ||= $self->primary_id;
 	return $self->[NAME];
 }
 
@@ -578,7 +579,9 @@ sub phase {
 		}
 		$self->[PHASE] = $p;
 	}
-	$self->[PHASE] ||= '.';
+	unless (defined $self->[PHASE]) {
+		$self->[PHASE] = '.';
+	}
 	return $self->[PHASE];
 }
 
