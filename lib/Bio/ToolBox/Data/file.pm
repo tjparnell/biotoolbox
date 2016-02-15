@@ -1497,10 +1497,15 @@ and can be used by the user.
 
 =item load_file($filename)
 
-Loads a file into memory. Any metadata lines will be automatically 
-parsed and the table loaded into the Data object. Some basic consistency 
-checks are performed. Standard structured file formats, such as BED, 
-GFF, etc, will have standard metadata and column names provided.
+This will load a file into a new, empty Data table. This function is 
+called automatically when a filename is provided to the new() function. 
+The existence of the file is first checked (appending common missing 
+extensions as necessary), metadata and column headers processed and/or 
+generated from default settings, the content loaded into the table, and 
+the structure verified. Error messages may be printed if the structure or 
+format is inconsistent or doesn't match the expected format, e.g a file 
+with a .bed extension doesn't match the UCSC specification.
+Pass the name of the filename.
 
 =item taste_file($filename)
 

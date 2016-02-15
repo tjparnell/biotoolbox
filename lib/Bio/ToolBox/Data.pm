@@ -97,18 +97,17 @@ These are the options available.
 
 =item file =E<gt> $filename
 
+=item in =E<gt> $filename
+
 Provide the path and name to an existing tabbed-delimited text 
-file. BED and GFF files and their variants are accepted. Except 
-for structured files, e.g. BED and GFF, the first line is 
-assumed to be column header names. Commented lines (beginning 
-with #) are parsed as metadata. The files may be compressed 
-(gzip or bzip2).
+file from which to load the contents. This is a shortcut to the 
+load_file() method. See that method for more details.
 
 =item stream =E<gt> 1
 
-Indicate that the file should be opened as a file stream.  
-A Bio::ToolBox::Data::Stream object will be returned. This is a 
-convenience method. 
+Boolean option indicating that the file should be opened as a file  
+stream. A Bio::ToolBox::Data::Stream object will be returned. This 
+is a convenience method. 
 
 =item parse =E<gt> 1
 
@@ -649,14 +648,27 @@ success.
 
 =head2 File Functions
 
-When you are finished modifying the Data table, it may then be written out 
-as a tabbed-delimited text file. If the format corresponds to a valide BED or 
-GFF file, then it may be written in that format. 
-
-Several functions are available for writing the Data table, exporting to a 
-compatible GFF file format, or writing a summary of the Data table.
+The Data table may be read in from a file or written out as a file. In 
+all cases, it is a tab-delimited text file, whether as an ad hoc table 
+or a specific bioinformatic format, e.g. BED, GFF, etc. Multiple common 
+file formats are supported. Column headers are assumed, except in those 
+cases where it is not, e.g. BED, GFF, etc. Metadata may be included as 
+commented lines at the beginning of the file, prefixed with a # symbol.
+Reading and writing gzip compressed files is fully supported.
 
 =over 4
+
+=item load_file($filename)
+
+This will load a file into a new, empty Data table. This function is 
+called automatically when a filename is provided to the new() function. 
+The existence of the file is first checked (appending common missing 
+extensions as necessary), metadata and column headers processed and/or 
+generated from default settings, the content loaded into the table, and 
+the structure verified. Error messages may be printed if the structure or 
+format is inconsistent or doesn't match the expected format, e.g a file 
+with a .bed extension doesn't match the UCSC specification.
+Pass the name of the filename.
 
 =item taste_file($filename)
 
