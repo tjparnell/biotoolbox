@@ -835,7 +835,7 @@ sub new {
 		unless ( $self->parse_table($args{file}) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
-			if ($self->db =~ /^Parsed:(.+)$/) {
+			if ($self->database =~ /^Parsed:(.+)$/) {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
 				$self->parse_table($1); # this may die if it doesn't work
