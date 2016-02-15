@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 180;
+	plan tests => 224;
 }
 else {
-	plan tests => 91;
+	plan tests => 135;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -21,12 +21,17 @@ require_ok 'Bio::ToolBox::parser::gff' or
 	BAIL_OUT "Cannot load Bio::ToolBox::parser::gff";
 require_ok 'Bio::ToolBox::parser::ucsc' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::parser::ucsc";
+require_ok 'Bio::ToolBox::Data' or 
+	BAIL_OUT "Cannot load Bio::ToolBox::Data";
 
 
 # with the introduction of Bio::ToolBox::SeqFeature class, we can test the 
 # parsers with two different seqfeature classes, or possibly more.
 # Thus this test script actually tests two things: the parsers and my seqfeature 
 # object class.
+my $gfffile = File::Spec->catfile($Bin, "Data", "chrI.gff3");
+my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.genePred");
+my $outfile = File::Spec->catfile($Bin, "Data", "tempout.txt");
 
 ### Testing with standard BioPerl Bio::SeqFeature::Lite class
 if ($lite) {
@@ -39,6 +44,9 @@ test_gff('Bio::ToolBox::SeqFeature');
 test_ucsc('Bio::ToolBox::SeqFeature');
 
 
+### Testing Data with gene table parsing
+test_parsed_gff_table();
+test_parsed_ucsc_table();
 
 
 sub test_gff {
@@ -47,7 +55,7 @@ sub test_gff {
 	
 	# open and check parser
 	my $gff = Bio::ToolBox::parser::gff->new(
-		file => File::Spec->catfile($Bin, "Data", "chrI.gff3"),
+		file => $gfffile,
 		class => $sfclass,
 	);
 	isa_ok($gff, 'Bio::ToolBox::parser::gff', 'GFF3 Parser');
@@ -111,7 +119,7 @@ sub test_ucsc {
 	
 	# open and check parser
 	my $ucsc = Bio::ToolBox::parser::ucsc->new(
-		file => File::Spec->catfile($Bin, "Data", "ensGene.genePred"),
+		file => $ucscfile,
 		class => $sfclass,
 	);
 	isa_ok($ucsc, 'Bio::ToolBox::parser::ucsc', 'UCSC Parser');
@@ -168,7 +176,7 @@ sub test_ucsc {
 	undef $e;
 
 	# reload the table
-	my $reload = $ucsc->parse_table( File::Spec->catfile($Bin, "Data", "ensGene.genePred") );
+	my $reload = $ucsc->parse_table($ucscfile);
 	is($reload, 1, "ucsc parse table");
 
 	# top features
@@ -234,5 +242,79 @@ sub test_ucsc {
 	is($counts{other}, 5, "count hash other number");
 
 }
+
+
+sub test_parsed_gff_table {
+	my $Data = Bio::ToolBox::Data->new();
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	my $flavor = $Data->taste_file($gfffile);
+	is($flavor, 'gff', 'GFF file flavor');
+	my $p = $Data->parse_table($gfffile);
+	is($p, 1, 'parsed GFF table');
+	is($Data->number_columns, 3, 'number of columns');
+	is($Data->last_row, 44, 'number of rows');
+	is($Data->database, "Parsed:$gfffile", 'database source');
+	is($Data->name(0), 'Primary_ID', 'First column name');
+	is($Data->name(1), 'Name', 'Second column name');
+	is($Data->name(2), 'Type', 'Third column name');
+	is($Data->value(5,0), 'YAL069W', 'Fifth row ID');
+	is($Data->value(5,1), 'YAL069W', 'Fifth row Name');
+	is($Data->value(5,2), 'gene:SGD', 'Fifth row Type');
+	my $f = $Data->get_seqfeature(5);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Fifth row SeqFeature object');
+	is($f->display_name, 'YAL069W', 'SeqFeature display name');
+	is($f->get_tag_values('orf_classification'), 'Dubious', 'SeqFeature attribute');
+	is($f->start, 335, 'SeqFeature start position');
+	my @subf = $f->get_SeqFeatures;
+	is(scalar @subf, 1, 'Number of SeqFeature sub features');
+	my $f2 = shift @subf;
+	is($f2->type, 'CDS:SGD', 'Sub feature type');
+	is($f2->name, 'YAL069W', 'Sub feature name');
+	
+	# attempt to reload the file
+	my $s = $Data->save($outfile);
+	is($s, $outfile, 'Saved temporary file');
+	undef $Data;
+	$Data = Bio::ToolBox::Data->new(
+		file    => $outfile,
+		parse   => 1,
+	);
+	isa_ok($Data, 'Bio::ToolBox::Data', 'Reloaded file');
+	is($Data->basename, 'tempout', 'file basename');
+	my $f3 = $Data->get_seqfeature(5);
+	isa_ok($f3, 'Bio::ToolBox::SeqFeature', 'Reloaded fifth row SeqFeature object');
+	is($f3->display_name, 'YAL069W', 'SeqFeature display name');
+	is($f3->get_tag_values('orf_classification'), 'Dubious', 'SeqFeature attribute');
+	unlink $outfile;
+}
+
+
+sub test_parsed_ucsc_table {
+	my $Data = Bio::ToolBox::Data->new();
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	my $flavor = $Data->taste_file($ucscfile);
+	is($flavor, 'ucsc', 'UCSC file flavor');
+	my $p = $Data->parse_table($ucscfile);
+	is($p, 1, 'parsed UCSC table');
+	is($Data->number_columns, 3, 'number of columns');
+	is($Data->last_row, 5, 'number of rows');
+	is($Data->database, "Parsed:$ucscfile", 'database source');
+	is($Data->name(0), 'Primary_ID', 'First column name');
+	is($Data->name(1), 'Name', 'Second column name');
+	is($Data->name(2), 'Type', 'Third column name');
+	is($Data->value(1,0), 'ENSG00000125826', 'First row ID');
+	is($Data->value(1,1), 'ENSG00000125826', 'First row Name');
+	is($Data->value(1,2), 'gene:EnsGene', 'First row Type');
+	my $f = $Data->get_seqfeature(1);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
+	is($f->display_name, 'ENSG00000125826', 'SeqFeature display name');
+	is($f->start, 388142, 'SeqFeature start position');
+	my @subf = $f->get_SeqFeatures;
+	is(scalar @subf, 13, 'Number of SeqFeature sub features');
+	my $f2 = shift @subf;
+	is($f2->type, 'mRNA:EnsGene', 'Sub feature type');
+	is($f2->name, 'ENST00000411647', 'Sub feature name');
+}
+
 
 
