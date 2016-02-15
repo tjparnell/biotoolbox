@@ -948,7 +948,8 @@ sub parse_table {
 			die <<PARSEFAIL;
 Not all features in the input file could be matched to a corresponding SeqFeature 
 object in the annotation file $file.
-You should create a new table from your annotation file.
+Double check your input and annotation files. You can create a new table by just 
+providing your annotation file.
 PARSEFAIL
 		}
 	}
@@ -958,6 +959,7 @@ PARSEFAIL
 		$self->add_column('Name');
 		$self->add_column('Type');
 		while (my $f = $parser->next_top_feature) {
+			next if $f->primary_tag =~ /^(?:chromosome|contig|sequence|scaffold)$/;
 			my $index = $self->add_row(
 				[ $f->primary_id, $f->display_name, $f->type,] 
 			);
