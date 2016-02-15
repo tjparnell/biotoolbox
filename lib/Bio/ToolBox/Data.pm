@@ -110,6 +110,15 @@ Indicate that the file should be opened as a file stream.
 A Bio::ToolBox::Data::Stream object will be returned. This is a 
 convenience method. 
 
+=item parse =E<gt> 1
+
+Boolean option indicating that a gene annotation table or file should 
+be parsed into SeqFeature objects and a general table of names and IDs 
+representing those objects be generated. The annotation file may 
+be specified in one of two ways: Through the file option above, 
+or in the database metadata of an existing table file representing 
+previously parsed objects.
+
 =item feature =E<gt> $type
 
 =item feature =E<gt> "$type:$source"
@@ -171,6 +180,16 @@ headers and metadata, but lacking the table content, i.e. no
 rows of data. File name metadata, if present in the original, is 
 not preserved. The purpose here, for example, is to allow one 
 to selectively copy rows from one Data object to another.
+
+=item parse_table($filename)
+
+This will parse a gene annotation table into SeqFeature objects. 
+If this is called from an empty Data object, then the table will 
+be filled with the SeqFeature object names and IDs. If this is 
+called from a non-empty Data object, then the table's contents 
+will be associated with the SeqFeature objects using their name and 
+ID. The stored SeqFeature objects can be retrieved using the 
+get_seqfeature() method.
 
 =back
 
@@ -639,6 +658,15 @@ compatible GFF file format, or writing a summary of the Data table.
 
 =over 4
 
+=item taste_file($filename)
+
+Tastes, or checks, a file for a certain flavor, or known gene file formats. 
+This is based on file extension, metadata headers, and/or file content 
+in the first 10 lines or so. Returns a string based on the file format.
+Values include gff, bed, ucsc, or undefined. Useful for determining if 
+the file represents a known gene table format that lacks a defined file 
+extension, e.g. UCSC formats.
+
 =item save()
 
 =item write_file()
@@ -762,10 +790,14 @@ use Bio::ToolBox::db_helper qw(
 sub new {
 	my $class = shift;
 	my %args  = @_;
-	$args{features} ||= $args{feature} || undef;
+	
+	# check for important arguments
+	$args{features} ||= $args{feature} || 'gene';
+	$args{stream} ||= $args{Stream} || 0;
+	$args{file} ||= $args{in} || undef;
+	$args{parse} ||= 0;
 	
 	# check for stream
-	$args{stream} ||= $args{Stream} || 0;
 	if ($args{stream}) {
 		my $obj;
 		eval {
@@ -784,16 +816,27 @@ sub new {
 	
 	# initialize
 	my $self = $class->SUPER::new();
-	if (exists $args{file} or exists $args{in}) {
+	
+	# prepare a new table based on the provided arguments
+	if ($args{file} and $args{parse}) {
+		# parse from file
+		unless ( $self->parse_table($args{file}) ) {
+			my $l = $self->load_file($args{file});
+			return unless $l;
+			if ($self->db =~ /^Parsed:(.+)$/) {
+				# looks like the loaded file was from a previously parsed table
+				# let's try this again
+				$self->parse_table($1); # this may die if it doesn't work
+			}
+		}
+	}
+	elsif ($args{file}) {
 		# load from file
-		my $f = $args{file} || $args{in} || q();
-		my $l = $self->load_file($f);
-		unless ($l) {
-			carp " Cannot load file!";
+		unless ( $self->load_file($args{file}) ) {
 			return;
 		}
 	}
-	elsif (exists $args{db} and exists $args{features}) {
+	elsif (exists $args{db} and $args{features}) {
 		# generate new list
 		$self->feature($args{features});
 		$self->database($args{db});
@@ -853,6 +896,65 @@ sub duplicate {
 	return $Dupe;
 }
 
+sub parse_table {
+	my ($self, $file) = @_;
+	unless ($file) {
+		carp "no gff file provided to parse!";
+		return;
+	}
+	
+	# the file format determines the parser class
+	my $flavor = $self->taste_file($file) or return;
+	my $class = 'Bio::ToolBox::parser::' . $flavor;
+	unless (eval "require $class; 1") {
+		carp "unable to load $class: $@";
+		return;
+	}
+	
+	# parse the table
+	my $parser = $class->new(
+		file => $file,
+	);
+	$parser->parse_file or return;
+	
+	# store the SeqFeature objects
+	if ($self->last_row > 0) {
+		# we already have a table, presumably representing the features
+		my $count = 0;
+		$self->iterate( sub {
+			my $row = shift;
+			my $f = $parser->find_gene(
+				name  => $row->name,
+				id    => $row->id,
+			);
+			if ($f) {
+				$self->store_seqfeature($row->row_index, $f);
+				$count++;
+			}
+		} );
+		unless ($count == $self->last_row) {
+			die <<PARSEFAIL;
+Not all features in the input file could be matched to a corresponding SeqFeature 
+object in the annotation file $file.
+You should create a new table from your annotation file.
+PARSEFAIL
+		}
+	}
+	else {
+		# create a new table
+		$self->add_column('Primary_ID');
+		$self->add_column('Name');
+		$self->add_column('Type');
+		while (my $f = $parser->next_top_feature) {
+			my $index = $self->add_row(
+				[ $f->primary_id, $f->display_name, $f->type,] 
+			);
+			$self->store_seqfeature($index, $f);
+		}
+		$self->database("Parsed:$file");
+	}
+	return 1;
+}
 
 
 
