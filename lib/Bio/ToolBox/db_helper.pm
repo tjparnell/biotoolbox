@@ -267,30 +267,10 @@ sub open_db_connection {
 	
 	# first check if it is a database reference
 	my $db_ref = ref $database;
-	if ($db_ref =~ /^Bio::DB/) {
+	if ($db_ref =~ /^Bio.+DB/) {
 		# the provided database is already an open database object
 		# nothing to open, return as is
-		
-		# determine the name if possible
-		my $db_name;
-		if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
-			# a SeqFeature database, using any DBI adapter
-			$db_name = $database->{'dbh'}->{'name'}; 
-				# dig through the object internals to identify the original 
-				# name of the database
-				# this should be relatively well documented through DBI
-				# but could break in the future since it's not official API
-		}
-		elsif ($db_ref eq 'Bio::DB::Sam') {
-			# a Bam database
-			$db_name = $database->{'bam_path'};
-		}
-			# determining the database name from other sources is
-			# either not possible or not easy, so won't bother unless
-			# there is a really really good need
-		
-		# return as appropriate either both object and name or just object
-		return wantarray ? ($database, $db_name) : $database;
+		return $database;
 	}
 	
 	# check to see if we have already opened it
@@ -298,7 +278,7 @@ sub open_db_connection {
 		# return the cached database connection
 		# but NOT if user explicitly requested no cached databases
 		# DO NOT reuse database objects if you have forked!!! Bad things happen
-		return wantarray ? ($OPENED_DB{$database}, $database) : $OPENED_DB{$database};
+		return $OPENED_DB{$database};
 	}
 	
 	
@@ -594,7 +574,7 @@ sub open_db_connection {
 		$OPENED_DB{$database} = $db unless $no_cache;
 		
 		# return as appropriate either both object and name or just object
-		return wantarray ? ($db, $database) : $db;
+		return $db;
 	} 
 	else {
 		$error .= " no database could be found or connected!\n";
@@ -603,6 +583,41 @@ sub open_db_connection {
 	}
 }
 
+
+### Retrieve a database name from an db object
+
+=item get_db_name
+
+This subroutine will attempt to get the name of an opened Database 
+object if for some reason it's unknown, i.e. user only provided an 
+opened db object. Only works for some databases, at least those I've 
+bothered to track down and find a usable API call to use.
+
+=cut
+
+sub get_db_name {
+	my $db = shift;
+	return unless $db;
+	my $db_ref = ref($db);
+	return $db unless $db_ref; # presumption that non-object is just a database name 
+	my $db_name;
+	if ($db_ref =~ /^Bio::DB::SeqFeature::Store/) {
+		# a SeqFeature database, using any DBI adapter
+		$db_name = $db->{'dbh'}->{'name'}; 
+			# dig through the object internals to identify the original 
+			# name of the database
+			# this should be relatively well documented through DBI
+			# but could break in the future since it's not official API
+	}
+	elsif ($db_ref eq 'Bio::DB::Sam') {
+		# a Bam database
+		$db_name = $db->{'bam_path'};
+	}
+	# determining the database name from other sources is
+	# either not possible or not easy, so won't bother unless
+	# there is a really really good need
+	return $db_name;
+}
 
 
 ### Retrieve a list of the microrarray data sets from the db
@@ -638,7 +653,8 @@ sub get_dataset_list {
 	my $use_all_features = shift;
 	
 	# Open a db connection 
-	my ($db, $db_name) = open_db_connection($database);
+	my $db = open_db_connection($database);
+	my $db_name = get_db_name($database);
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -1326,7 +1342,8 @@ sub get_new_feature_list {
 	
 	# Open a db connection 
 	$args{'db'} ||= undef;
-	my ($db, $db_name) = open_db_connection($args{'db'});
+	my $db = open_db_connection($args{'db'});
+	my $db_name = get_db_name($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -1468,7 +1485,8 @@ sub get_new_genome_list {
 		
 	# Open a db connection 
 	$args{'db'} ||= undef;
-	my ($db, $db_name) = open_db_connection($args{'db'});
+	my $db = open_db_connection($args{'db'});
+	my $db_name = get_db_name($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -2496,7 +2514,8 @@ sub get_chromosome_list {
 	my $limit = shift || 0;
 	
 	# Open a db connection 
-	my ($db, $db_name) = open_db_connection($database);
+	my $db = open_db_connection($database);
+	my $db_name = get_db_name($database);
 	unless ($db) {
 		carp 'no database connected!';
 		return;
