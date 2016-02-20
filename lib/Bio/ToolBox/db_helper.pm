@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.32';
+our $VERSION = '1.36';
 
 use strict;
 require Exporter;
@@ -2008,11 +2008,13 @@ The keys include
   value    => Indicate which attribute will be returned. Acceptable 
               values include "score", "count", or "length". The  
               default behavior will be to return the score values.
-  avoid    => Boolean value to indicate that other features of the 
-              same type should be avoided. This only works if name 
-              and type was provided. Any positioned scores which 
+  avoid    => Provide an array reference of database feature types 
+              that should be avoided. Any positioned scores which 
               overlap the other feature(s) are not returned. The 
-              default is false (return all values).
+              default is to return all values. A boolean value of 
+              1 can also be passed, in which case the same type 
+              of feature as the search feature will be used. This
+              was the original implementation (v1.35 and below). 
   absolute => Boolean value to indicate that absolute coordinates 
               should be returned, instead of transforming to 
               relative coordinates, which is the default.
@@ -2105,8 +2107,37 @@ sub get_region_dataset_hash {
 	$args{'value'}    ||= 'score';
 	$args{'position'} ||= 5;
 	$args{'extend'}   ||= 0;
-	$args{'avoid'}    ||= 0;
 	$args{'absolute'} ||= 0;
+	
+	# avoid feature types
+	if (exists $args{'avoid'} and defined $args{'avoid'}) {
+		if (ref $args{'avoid'} eq 'ARRAY') {
+			# we have types, presume they're ok
+		}
+		elsif ($args{'avoid'} eq '1') {
+			# old style boolean value
+			if (defined $args{'type'}) {
+				$args{'avoid'} = [ $args{'type'} ];
+			}
+			else {
+				# no type provided, we can't avoid that which is not defined! 
+				# this is an error, but won't complain as we never did before
+				$args{'avoid'} = undef;
+			}
+		}
+		elsif ($args{'avoid'} =~ /w+/i) {
+			# someone passed a string, a feature type perhaps?
+			$args{'avoid'} = [ $args{'avoid'} ];
+		}
+		else {
+			# huh?
+			$args{'avoid'} = undef;
+		}
+	}
+	else {
+		$args{'avoid'} = undef;
+	}
+	
 	
 	
 	# the final coordinates
@@ -2345,35 +2376,35 @@ sub get_region_dataset_hash {
 	
 	
 	### Check for conflicting features
-	if ($args{'avoid'} and $args{'type'}) {
+	if (defined $args{'avoid'}) {
 		# we need to look for any potential overlapping features of the 
-		# same type and remove those scores
+		# provided type and remove those scores
 		
 		# get the overlapping features of the same type
 		my @overlap_features = $db->features(
 			-seq_id  => $fchromo,
 			-start   => $fstart,
 			-end     => $fstop,
-			-type    => $args{'type'}
+			-type    => $args{'avoid'},
 		);
 		if (@overlap_features) {
-			# there are one or more feature of the same type in this 
-			# region
+			# there are one or more feature of the type in this region
 			# one of them is likely the one we're working with
 			# but not necessarily - user may be looking outside original feature
 			# the others are not what we want and therefore need to be 
 			# avoided
 			foreach my $feat (@overlap_features) {
 				# skip the one we want
-				next if ($feat->primary_id == $primary);
+				next if ($feat->primary_id eq $primary);
 				# now eliminate those scores which overlap this feature
+				my $start = $feat->start;
+				my $stop  = $feat->end;
 				foreach my $position (keys %datahash) {
-					
 					# delete the scored position if it overlaps with 
 					# the offending feature
 					if (
-						$position >= $feat->start and
-						$position <= $feat->end
+						$position >= $start and
+						$position <= $stop
 					) {
 						delete $datahash{$position};
 					}
