@@ -7,11 +7,203 @@ Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene mode
 
 =head1 SYNOPSIS
 
+    use Bio::ToolBox::GeneTools qw(is_coding :exon);
+    
+    my $gene; # a SeqFeatureI compliant gene object obtained elsewhere
+    
+    if (is_coding($gene)) { # boolean test
+    	
+    	# collect all exons from all transcripts in gene
+    	my @exons = get_exons($gene);
+    	
+    	# find just the alternate exons used only once
+    	my @alternate_exons = get_alt_exons($gene);
+    }
+
+
 =head1 DESCRIPTION
+
+This module provides numerous exportable functions for working with gene 
+SeqFeature models. This assumes that the gene models follow the BioPerl 
+L<Bio::SeqFeatureI> convention with nested SeqFeature objects representing the 
+gene, transcript, and exons. For example, 
+
+    gene
+      transcript
+        exon
+        CDS
+
+Depending upon how the SeqFeatures were generated or defined, subfeatures 
+may or may not be defined or be obvious. For example, UTRs or introns may 
+not be present. Furthermore, the primary_tag or type may not follow 
+Sequence Ontology terms. Regular expressions are deployed to handle 
+varying naming schemes and exceptions.
+
+These functions should work with most or all <Bio::SeqFeatureI> compliant 
+objects. It has been tested with L<Bio::ToolBox::SeqFeature>, 
+L<Bio::SeqFeature::Lite>, and L<Bio::DB::SeqFeature> classes.
+
+New SeqFeature objects that are generated here, e.g. introns, use the 
+L<Bio::ToolBox::SeqFeature> class for simplicity and expediency. 
 
 =head1 METHODS
 
+=head2 Function Import
+
+None of the functions are exported by default. Specify which ones you want 
+when you import the module. Alternatively, use one of the tags below.
+
 =over 4
+
+=item :all
+
+Import all of the methods.
+
+=item :exon
+
+Import all of the exon methods, including get_exons(), get_alt_exons(), 
+get_common_exons(), get_uncommon_exons(), and get_alt_common_exons().
+
+=item :intron
+
+Import all of the intron methods, including get_introns(), get_alt_introns(), 
+get_common_introns(), get_uncommon_introns(), and get_alt_common_introns().
+
+=item :transcript
+
+Import the transcript related methods, including get_transcripts(), 
+get_transcript_length(), and collapse_transcripts().
+
+=item :cds
+
+Import the CDS pertaining methods, including is_coding(), get_cds(), 
+get_cdsStart(), get_cdsEnd(), and get_transcript_cds_length().
+
+=back
+
+=head2 Exon Methods
+
+Functions to get a list of exons from a gene or transcript
+
+=over 4
+
+=item get_exons($gene)
+
+=item get_exons($transcript)
+
+This will return an array or array reference of all the exon subfeatures in 
+the SeqFeature object, either gene or transcript. No discrimination whether 
+they are used once or more than once. Non-defined exons can be assembled from 
+CDS and/or UTR subfeatures.
+
+=item get_alt_exons($gene)
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used only once in all of the transcripts.
+
+=item get_common_exons($gene)
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used in all of the transcripts.
+
+=item get_uncommon_exons($gene)
+
+This will return an array or array reference of all the exon subfeatures for 
+a multi-transcript gene that are used in some of the transcripts, i.e. more 
+than one but not all.
+
+=item get_alt_common_exons($gene)
+
+This will return a hash reference with several keys, including "common", 
+"uncommon", and each of the transcript IDs. Each key value is an array 
+reference with the exons for that category. The "common" will be all 
+common exons, "uncommon" will be uncommon exons (used more than once but 
+less than all), and each transcript ID will include their specific alternate 
+exons (used only once).
+
+=back
+
+=head2 Intron Methods
+
+Functions to get a list of introns from a gene or transcript. Introns are 
+not usually defined in gene annotation files, but are inferred from the 
+exons and total gene or transcript length. In this case, new SeqFeature 
+elements are generated for each intron.
+
+=over 4
+
+=item get_introns($gene)
+
+=item get_introns($transcript)
+
+This will return an array or array reference of all the intron subfeatures in 
+the SeqFeature object, either gene or transcript. No discrimination whether 
+they are used once or more than once. Non-defined introns can be assembled from 
+CDS and/or UTR subfeatures.
+
+=item get_alt_introns($gene)
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used only once in all of the transcripts.
+
+=item get_common_introns($gene)
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used in all of the transcripts.
+
+=item get_uncommon_introns($gene)
+
+This will return an array or array reference of all the intron subfeatures for 
+a multi-transcript gene that are used in some of the transcripts, i.e. more 
+than one but not all.
+
+=item get_alt_common_introns($gene)
+
+This will return a hash reference with several keys, including "common", 
+"uncommon", and each of the transcript IDs. Each key value is an array 
+reference with the introns for that category. The "common" will be all 
+common introns, "uncommon" will be uncommon introns (used more than once but 
+less than all), and each transcript ID will include their specific alternate 
+introns (used only once).
+
+=back
+
+=head2 Transcript Methods
+
+These methods work on transcripts, typically alternate transcripts from a 
+gene SeqFeature.
+
+=over 4
+
+=item get_transcripts($gene)
+
+Returns an array or array reference of the transcripts associated with a 
+gene feature.
+
+=item collapse_transcripts($gene)
+
+=item collapse_transcripts($transcript1, $transcript2, ...)
+
+This method will collapse all of the transcripts associated with a gene 
+SeqFeature into a single artificial transcript, merging exons as necessary 
+to maximize exon length and minimize introns. This is useful when 
+performing, for example, RNASeq analysis on genes. A single SeqFeature 
+transcript object is returned containing the merged exon subfeatures. 
+
+=item get_transcript_length($transcript)
+
+Calculates and returns the transcribed length of a transcript, i.e 
+the sum of its exon lengths.
+
+=back
+
+=head2 CDS methods
+
+These methods calculate and return a single value.
+
+=over 4
+
+=item is_coding($gene)
 
 =item is_coding($transcript)
 
@@ -20,6 +212,24 @@ appears to be a coding transcript. GFF and GTF files are not always immediately
 clear about the type of transcript; there are (unfortunately) multiple ways 
 to encode the feature as a protein coding transcript: primary_tag, source_tag, 
 attribute, CDS subfeatures, etc. This method tries to determine this.
+
+=item get_cds($transcript)
+
+Returns the CDS subfeatures of the given transcript, if they are 
+defined. 
+
+=item get_cdsStart($transcript)
+
+Returns the start coordinate of the CDS for the given transcript.
+
+=item get_cdsEnd($transcript)
+
+Returns the stop coordinate of the CDS for the given transcript.
+
+=item get_transcript_cds_length($transcript)
+
+Calculates and returns the length of the coding sequence for a 
+transcript, i.e. the sum of the CDS lengths.
 
 =back
 
