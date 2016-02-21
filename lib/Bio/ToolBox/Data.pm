@@ -1617,7 +1617,7 @@ sub summary_file {
 		my @values;
 		for my $row (1..$self->last_row) {
 			my $v = $self->value($row, $column);
-			push @values, $v if $v ne '.';
+			push @values, $v eq '.' ? 0 : $v;  # treat nulls as zero
 		}
 		
 		# adjust if log value

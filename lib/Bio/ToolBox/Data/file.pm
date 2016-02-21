@@ -1621,6 +1621,8 @@ Example
 These methods are used internally by Bio::ToolBox::Core and other objects 
 are not recommended for use by general users. 
 
+=over 4
+
 =item parse_headers
 
 This will determine the file format, parse any metadata lines that may 
@@ -1631,8 +1633,6 @@ by load_file(), and generally need not be called.
 =item add_data_line($line)
 
 Parses a text line from the file into a Data table row.
-
-=item 
 
 =item check_file($filename)
 
