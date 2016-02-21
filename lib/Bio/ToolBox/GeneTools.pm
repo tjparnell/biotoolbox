@@ -28,54 +28,69 @@ attribute, CDS subfeatures, etc. This method tries to determine this.
 use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
+use Bio::ToolBox::SeqFeature;
 
-
-### Variables
-# Export
+### Export
 our @ISA = qw(Exporter);
 our @EXPORT = qw();
 our @EXPORT_OK = qw(
+	get_exons
+	get_alt_exons
+	get_common_exons
+	get_uncommon_exons
+	get_alt_common_exons
+	get_introns
+	get_alt_introns
+	get_common_introns
+	get_uncommon_introns
+	get_alt_common_introns
+	get_transcripts
+	collapse_transcripts
+	get_transcript_length
+	is_coding
+	get_cds
+	get_cdsStart
+	get_cdsEnd
+	get_transcript_cds_length
 );
-our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
+our %EXPORT_TAGS = (
+	all => \@EXPORT_OK,
+	exon => [ qw(
+		get_exons
+		get_alt_exons
+		get_common_exons
+		get_uncommon_exons
+		get_alt_common_exons
+	) ],
+	intron => [ qw(
+		get_introns
+		get_alt_introns
+		get_common_introns
+		get_uncommon_introns
+		get_alt_common_introns
+	) ],
+	transcript => [ qw(
+		get_transcripts
+		collapse_transcripts
+		get_transcript_length
+	) ],
+	cds => [ qw(
+		is_coding
+		get_cds
+		get_cdsStart
+		get_cdsEnd
+		get_transcript_cds_length
+	) ],
+);
 
 ### The True Statement
 1; 
 
 
 
-### Coding Status
-sub is_coding {
-	my $transcript = shift;
-	return unless $transcript;
-	if ($transcript->primary_tag =~ /gene/i) {
-		# someone passed a gene, check its subfeatures
-		my $code_potential = 0;
-		foreach ($transcript->get_SeqFeatures) {
-			$code_potential += is_coding($_);
-		}
-		return $code_potential;
-	}
-	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
-	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
-		# ensembl type GFFs
-		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	elsif ($transcript->has_tag('gene_biotype')) {
-		# ensembl type GTFs
-		my ($biotype) = $transcript->get_tag_values('gene_biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	foreach ($transcript->get_SeqFeatures) {
-		# old fashioned way
-		return 1 if $_->primary_tag eq 'CDS';
-	}
-	return 0;
-}
+######## Exon Methods
 
 sub get_exons {
-	
 	# initialize
 	my $transcript = shift;
 	my @exons;
@@ -109,7 +124,7 @@ sub get_exons {
 		foreach my $t (@transcripts) {
 			# there are possibly duplicates in here if there are alternate transcripts
 			# should we remove them?
-			push @list, collect_exons($t);
+			push @list, get_exons($t);
 		}
 	}
 	else {
@@ -152,6 +167,8 @@ sub get_alt_common_exons {
 }
 
 
+######## Intron Methods
+
 sub get_introns {
 	my $transcript = shift;
 	my @introns;
@@ -169,7 +186,7 @@ sub get_introns {
 		# each intron is created based on the previous exon
 		for (my $i = 0; $i < $last; $i++) {
 			my $e = $exons[$i];
-			my $i = $SFCLASS->new(
+			my $i = Bio::ToolBox::SeqFeature->new(
 				-seq_id       => $e->seq_id,
 				-start        => $e->end + 1,
 				-end          => $exons[$i + 1]->start - 1, # up to start of next exon
@@ -189,7 +206,7 @@ sub get_introns {
 		# ordering from 5' to 3' end direction for convenience in naming
 		for (my $i = $last; $i > 0; $i--) {
 			my $e = $exons[$i];
-			my $i = $SFCLASS->new(
+			my $i = Bio::ToolBox::SeqFeature->new(
 				-seq_id       => $e->seq_id,
 				-start        => $exons[$i - 1]->end + 1, # end of next exon
 				-end          => $e->start - 1,
@@ -212,7 +229,6 @@ sub get_introns {
 	# finished
 	return @introns;
 }
-
 
 sub get_alt_introns {
 	my $ca_introns = get_alt_common_introns(@_);
@@ -298,6 +314,22 @@ sub _get_alt_common_things {
 }
 
 
+
+######## Transcript Methods
+
+sub get_transcripts {
+	my $gene = shift;
+	my @transcripts;
+	foreach my $subf ($gene->get_SeqFeatures) {
+		push @transcripts, $subf if $subf->primary_tag =~ /rna|transcript/i;
+	}
+	return map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] }
+		map { [$_, $_->start] } 
+		@transcripts;
+}
+
+
 sub collapse_transcripts {
 	my @transcripts;
 	return unless @_;
@@ -327,7 +359,7 @@ sub collapse_transcripts {
 	# build new exons from the original - don't keep cruft
 	my $next = shift @sorted;
 	my @new;
-	$new[0] = $SFCLASS->new(
+	$new[0] = Bio::ToolBox::SeqFeature->new(
 		-start 			=> $next->start,
 		-end   			=> $next->end,
 		-primary_tag  	=> 'exon',
@@ -342,7 +374,7 @@ sub collapse_transcripts {
 		}
 		else {
 			# push as new exon
-			push @new, $SFCLASS->new(
+			push @new, Bio::ToolBox::SeqFeature->new(
 				-start 			=> $next->start,
 				-end   			=> $next->end,
 				-primary_tag  	=> 'exon',
@@ -351,7 +383,7 @@ sub collapse_transcripts {
 	}
 	
 	# return the assembled transcript
-	return $SFCLASS->new(
+	return Bio::ToolBox::SeqFeature->new(
 		-seq_id         => $example->seq_id,
 		-start          => $new[0]->start,
 		-end            => $new[-1]->end,
@@ -370,6 +402,40 @@ sub get_transcript_length {
 		$total += $e->length;
 	}
 	return $total;
+}
+
+
+
+######## CDS Methods
+
+sub is_coding {
+	my $transcript = shift;
+	return unless $transcript;
+	if ($transcript->primary_tag =~ /gene/i) {
+		# someone passed a gene, check its subfeatures
+		my $code_potential = 0;
+		foreach ($transcript->get_SeqFeatures) {
+			$code_potential += is_coding($_);
+		}
+		return $code_potential;
+	}
+	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
+	return 1 if $transcript->source =~ /protein.?coding/i;
+	if ($transcript->has_tag('biotype')) {
+		# ensembl type GFFs
+		my ($biotype) = $transcript->get_tag_values('biotype');
+		return 1 if $biotype =~ /protein.?coding/i;
+	}
+	elsif ($transcript->has_tag('gene_biotype')) {
+		# ensembl type GTFs
+		my ($biotype) = $transcript->get_tag_values('gene_biotype');
+		return 1 if $biotype =~ /protein.?coding/i;
+	}
+	foreach ($transcript->get_SeqFeatures) {
+		# old fashioned way
+		return 1 if $_->primary_tag eq 'CDS';
+	}
+	return 0;
 }
 
 sub get_cds {
@@ -401,18 +467,6 @@ sub get_transcript_cds_length {
 		$total += $subf->length;
 	}
 	return $total;
-}
-
-sub get_transcripts {
-	my $gene = shift;
-	my @transcripts;
-	foreach my $subf ($gene->get_SeqFeatures) {
-		push @transcripts, $subf if $subf->primary_tag =~ /rna|transcript/i;
-	}
-	return map { $_->[0] }
-		sort { $a->[1] <=> $b->[1] }
-		map { [$_, $_->start] } 
-		@transcripts;
 }
 
 
