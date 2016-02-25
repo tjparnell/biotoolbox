@@ -1386,6 +1386,14 @@ sub splice_data {
 	}
 	my $part_length = int($self->last_row / $total_parts);
 	
+	# check for SeqFeatureObjects array
+	if (exists $self->{SeqFeatureObjects}) {
+		# it needs to be the same length as the data table, it should be
+		while (scalar @{$self->{SeqFeatureObjects}} < scalar @{$self->{data_table}}) {
+			push @{$self->{SeqFeatureObjects}}, undef;
+		}
+	}
+	
 	# splicing based on which part we do 
 	if ($part == 1) {
 		# remove all but the first part
@@ -1393,6 +1401,12 @@ sub splice_data {
 			@{$self->{'data_table'}}, 
 			$part_length + 1 
 		);
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				$part_length + 1 
+			);
+		}
 	}
 	elsif ($part == $total_parts) {
 		# remove all but the last part
@@ -1401,6 +1415,13 @@ sub splice_data {
 			1,
 			$part_length * ($total_parts - 1) 
 		);
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				1,
+				$part_length * ($total_parts - 1) 
+			);
+		}
 	}
 	else {
 		# splicing in the middle requires two rounds
@@ -1417,6 +1438,18 @@ sub splice_data {
 			1,
 			$part_length * ($part - 1) 
 		);
+		
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				($part * $part_length) + 1
+			);
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				1,
+				$part_length * ($part - 1) 
+			);
+		}
 	}
 	
 	# update last row metadata
