@@ -317,7 +317,7 @@ sub get_exons {
 			push @cdss, $subfeat;
 		}
 		elsif ($type =~ /rna|transcript/i) {
-			push @transcripts;
+			push @transcripts, $subfeat;
 		}
 	}
 	
@@ -343,10 +343,11 @@ sub get_exons {
 	}
 	
 	# return sorted list by start position
-	return  map { $_->[0] }
-			sort { $a->[1] <=> $b->[1] }
-			map { [$_, $_->start] } 
-			@list;
+	my @slist = map { $_->[0] }
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@list;
+	return wantarray ? @slist : \@slist;
 }
 
 sub get_alt_exons {
