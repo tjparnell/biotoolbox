@@ -238,7 +238,6 @@ transcript, i.e. the sum of the CDS lengths.
 use strict;
 use Carp qw(carp cluck croak confess);
 require Exporter;
-use Bio::ToolBox::SeqFeature;
 
 ### Export
 our @ISA = qw(Exporter);
@@ -303,6 +302,7 @@ our %EXPORT_TAGS = (
 sub get_exons {
 	# initialize
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @exons;
 	my @cdss;
 	my @transcripts;
@@ -351,30 +351,34 @@ sub get_exons {
 }
 
 sub get_alt_exons {
-	my $ca_exons = get_alt_common_exons(@_);
+	my $ac_exons = get_alt_common_exons(@_);
 	my @alts;
-	foreach my $k (keys %$ca_exons) {
+	foreach my $k (keys %$ac_exons) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
-		push @alts, @{ $ca_exons->{$k} };
+		push @alts, @{ $ac_exons->{$k} };
+	}
+	if (@alts) {
+		# re-sort in genomic order
+		@alts = map {$_->[1]}
+				sort {$a->[0] <=> $b->[0]}
+				map { [$_->start, $_] } @alts;
 	}
 	return wantarray ? @alts : \@alts;
 }
 
 sub get_common_exons {
-	my $ca_exons = get_alt_common_exons(@_);
-	my @com = @{ $ca_exons->{common} };
-	return wantarray ? @com : \@com;
+	my $ac_exons = get_alt_common_exons(@_);
+	return wantarray ? @{ $ac_exons->{common} } : $ac_exons->{common};
 }
 
 sub get_uncommon_exons {
-	my $ca_exons = get_alt_common_exons(@_);
-	my @com = @{ $ca_exons->{uncommon} };
-	return wantarray ? @com : \@com;
+	my $ac_exons = get_alt_common_exons(@_);
+	return wantarray ? @{ $ac_exons->{uncommon} } : $ac_exons->{uncommon};
 }
 
 sub get_alt_common_exons {
-	return _get_alt_common_things('exon', @_);
+	return _get_alt_common_things(1, @_);
 }
 
 
@@ -382,6 +386,7 @@ sub get_alt_common_exons {
 
 sub get_introns {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @introns;
 	
 	# find the exons and/or CDSs
@@ -397,7 +402,7 @@ sub get_introns {
 		# each intron is created based on the previous exon
 		for (my $i = 0; $i < $last; $i++) {
 			my $e = $exons[$i];
-			my $i = Bio::ToolBox::SeqFeature->new(
+			my $i = $e->new(
 				-seq_id       => $e->seq_id,
 				-start        => $e->end + 1,
 				-end          => $exons[$i + 1]->start - 1, # up to start of next exon
@@ -417,7 +422,7 @@ sub get_introns {
 		# ordering from 5' to 3' end direction for convenience in naming
 		for (my $i = $last; $i > 0; $i--) {
 			my $e = $exons[$i];
-			my $i = Bio::ToolBox::SeqFeature->new(
+			my $i = $e->new(
 				-seq_id       => $e->seq_id,
 				-start        => $exons[$i - 1]->end + 1, # end of next exon
 				-end          => $e->start - 1,
@@ -431,10 +436,12 @@ sub get_introns {
 		}
 		
 		# reorder the introns based on start position
-		@introns = map { $_->[0] }
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@introns;
+		if (@introns) {
+			@introns = map { $_->[0] }
+					sort { $a->[1] <=> $b->[1] }
+					map { [$_, $_->start] } 
+					@introns;
+		}
 	}
 	
 	# finished
@@ -442,48 +449,50 @@ sub get_introns {
 }
 
 sub get_alt_introns {
-	my $ca_introns = get_alt_common_introns(@_);
+	my $ac_introns = get_alt_common_introns(@_);
 	my @alts;
-	foreach my $k (keys %$ca_introns) {
+	foreach my $k (keys %$ac_introns) {
 		next if $k eq 'common';
 		next if $k eq 'uncommon';
-		push @alts, @{ $ca_introns->{$k} };
+		push @alts, @{ $ac_introns->{$k} };
+	}
+	if (@alts) {
+		# re-sort in genomic order
+		@alts = map {$_->[1]}
+				sort {$a->[0] <=> $b->[0]}
+				map { [$_->start, $_] } @alts;
 	}
 	return wantarray ? @alts : \@alts;
 }
 
 sub get_common_introns {
-	my $ca_introns = get_alt_common_introns(@_);
-	my @com = @{ $ca_introns->{common} };
-	return wantarray ? @com : \@com;
+	my $ac_introns = get_alt_common_introns(@_);
+	return wantarray ? @{ $ac_introns->{common} } : $ac_introns->{common};
 }
 
 sub get_uncommon_introns {
-	my $ca_introns = get_alt_common_introns(@_);
-	my @com = @{ $ca_introns->{uncommon} };
-	return wantarray ? @com : \@com;
+	my $ac_introns = get_alt_common_introns(@_);
+	return wantarray ? @{ $ac_introns->{uncommon} } : $ac_introns->{uncommon};
 }
 
 sub get_alt_common_introns {
-	return _get_alt_common_things('intron', @_);
+	return _get_alt_common_things(0, @_);
 }
 
 sub _get_alt_common_things {
 	# internal subroutine to get either exons or introns
-	my $type = shift; # exon or intron
+	my $do_exon = shift; # true for exon, false for intron
 	my @transcripts;
 	return unless @_;
 	if (scalar @_ == 1) {
 		# someone passed a gene, get the transcripts
+		confess "not a SeqFeature object!" unless ref($_[0]) =~ /seqfeature/i;
 		@transcripts = get_transcripts($_[0]);
-		return if scalar @transcripts == 1;
 	}
 	elsif (scalar @_ > 1) {
+		# presume these are transcripts?
 		@transcripts = @_;
 	}
-	
-	# type of thing to get
-	my $do_exon = $type eq 'exon' ? 1 : 0;
 	
 	# hash of transcript to things
 	my %tx2things = (
@@ -491,12 +500,24 @@ sub _get_alt_common_things {
 		uncommon => []
 	);
 	
+	# no transcripts provided?
+	return \%tx2things unless @transcripts;
+	
+	# only one transcript provided?
+	if (scalar @transcripts == 1) {
+		# all exons are alternate by definition
+		my $name = $transcripts[0]->display_name;
+		my @things = $do_exon ? get_exons($transcripts[0]) : get_introns($transcripts[0]);
+		$tx2things{$name} = \@things;
+		return \%tx2things;
+	}
+	
 	# get things and put them in has based on coordinates
 	my %pos2things;
 	foreach my $t (@transcripts) {
 		my @things = $do_exon ? get_exons($t) : get_introns($t);
 		foreach my $e (@things) {
-			push @{ $pos2things{$e->start}{ $e->end} }, [ $t->display_name, $e ];
+			$pos2things{$e->start}{$e->end}{$t->display_name} = _duplicate($e);
 		}
 		$tx2things{ $t->display_name } = [];
 	}
@@ -506,18 +527,18 @@ sub _get_alt_common_things {
 	my $trx_number = scalar @transcripts;
 	foreach my $s (sort {$a <=> $b} keys %pos2things) {               # sort on start
 		foreach my $e (sort {$a <=> $b} keys %{ $pos2things{$s} }) {  # sort on stop
-			my $n = scalar @{ $pos2things{$s}{$e} };
-			if ($n == 1) {
+			my @names = keys %{ $pos2things{$s}{$e} };
+			if (scalar @names == 1) {
 				# only 1 thing, must be an alternate
-				push @{ $tx2things{ $pos2things{$s}{$e}[0][0] } }, $pos2things{$s}{$e}[0][1];
+				push @{ $tx2things{$names[0]} }, $pos2things{$s}{$e}{$names[0]};
 			}
-			elsif ($n == $trx_number) {
-				# common to all transcripts
-				push @{ $tx2things{common} }, $pos2things{$s}{$e}[0][1];
+			elsif (scalar @names == $trx_number) {
+				# common to all transcripts, take the first one as example
+				push @{ $tx2things{common} }, $pos2things{$s}{$e}{$names[0]};
 			}
 			else {
 				# common to some but not all transcripts, so uncommon
-				push @{ $tx2things{uncommon} }, $pos2things{$s}{$e}[0][1];
+				push @{ $tx2things{uncommon} }, $pos2things{$s}{$e}{$names[0]};
 			}
 		}
 	}
@@ -530,6 +551,8 @@ sub _get_alt_common_things {
 
 sub get_transcripts {
 	my $gene = shift;
+	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
+	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	foreach my $subf ($gene->get_SeqFeatures) {
 		push @transcripts, $subf if $subf->primary_tag =~ /rna|transcript/i;
@@ -570,7 +593,8 @@ sub collapse_transcripts {
 	# build new exons from the original - don't keep cruft
 	my $next = shift @sorted;
 	my @new;
-	$new[0] = Bio::ToolBox::SeqFeature->new(
+	$new[0] = $next->new(
+		-seq_id         => $next->seq_id,
 		-start 			=> $next->start,
 		-end   			=> $next->end,
 		-primary_tag  	=> 'exon',
@@ -585,7 +609,8 @@ sub collapse_transcripts {
 		}
 		else {
 			# push as new exon
-			push @new, Bio::ToolBox::SeqFeature->new(
+			push @new, $next->new(
+				-seq_id         => $next->seq_id,
 				-start 			=> $next->start,
 				-end   			=> $next->end,
 				-primary_tag  	=> 'exon',
@@ -594,7 +619,7 @@ sub collapse_transcripts {
 	}
 	
 	# return the assembled transcript
-	return Bio::ToolBox::SeqFeature->new(
+	return $example->new(
 		-seq_id         => $example->seq_id,
 		-start          => $new[0]->start,
 		-end            => $new[-1]->end,
@@ -608,6 +633,7 @@ sub collapse_transcripts {
 
 sub get_transcript_length {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $e (get_exons($transcript)) {
 		$total += $e->length;
@@ -661,13 +687,13 @@ sub get_cds {
 sub get_cdsStart {
 	my $transcript = shift;
 	my @cds = get_cds($transcript);
-	return $cds[0]->start;
+	return @cds ? $cds[0]->start : undef;
 }
 
 sub get_cdsEnd {
 	my $transcript = shift;
 	my @cds = get_cds($transcript);
-	return $cds[-1]->end;
+	return @cds ? $cds[-1]->end : undef;
 }
 
 sub get_transcript_cds_length {
@@ -680,6 +706,22 @@ sub get_transcript_cds_length {
 	return $total;
 }
 
+
+#### internal methods
+
+# internal method to duplicate a seqfeature object with just the essential stuff
+# sometimes we just don't want to bring along all this cruft....
+sub _duplicate {
+	my $f = shift;
+	return $f->new(
+		-seq_id         => $f->seq_id,
+		-start          => $f->start,
+		-end            => $f->end,
+		-strand         => $f->strand,
+		-primary_tag    => $f->primary_tag,
+		-source         => $f->source_tag,
+	);
+}
 
 __END__
 
