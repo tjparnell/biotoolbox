@@ -307,6 +307,11 @@ object.
 Returns a new SeqFeature object representing the merged interval 
 between the $self and $other SeqFeature objects.
 
+=item subtract($other)
+
+Returns a new SeqFeature object representing the interval of the 
+$self object after subtracting the $other SeqFeature object. 
+
 =back
 
 =head2 Export Strings
@@ -762,7 +767,38 @@ sub union {
 	);
 }
 
-
+sub subtract {
+	my ($self, $other) = @_;
+	return unless ($other and ref($other));
+	return unless ($self->seq_id eq $other->seq_id);
+	return if $self->equals($other);
+	my @pieces;
+	if ($self->overlaps($other)) {
+		my $int = $self->intersection($other);
+		if ($self->start < $int->start) {
+			push @pieces, $self->new(
+				-seq_id => $self->seq_id,
+				-start  => $self->start,
+				-end    => $int->start - 1,
+			);
+		}
+		if ($self->end > $int->end) {
+			push @pieces, $self->new(
+				-seq_id => $self->seq_id,
+				-start  => $int->end + 1,
+				-end    => $self->end,
+			);
+		}
+	}
+	else {
+		push @pieces, $self->new(
+			-seq_id     => $self->seq_id,
+			-start      => $self->start,
+			-end        => $self->end,
+		);
+	}
+	return wantarray ? @pieces : \@pieces;
+}
 
 
 ### Export methods
