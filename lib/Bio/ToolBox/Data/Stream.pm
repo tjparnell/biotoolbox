@@ -540,7 +540,6 @@ sub new {
 		
 		# parse column headers
 		$self->parse_headers;
-# 		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
 		
 		# push a dummy row, this will get tossed when the first next_row() is called
@@ -577,7 +576,6 @@ sub new {
 			# use standard names for the number of columns indicated
 			# we trust that the user knows the subtle difference between gff versions
 			$self->add_gff_metadata($args{gff});
-# 			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /g[tf]f/) {
 				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
 					$args{gff} == 3 ? '.gff3' : '.gff';
@@ -590,7 +588,6 @@ sub new {
 				return;
 			}	
 			$self->add_bed_metadata($args{bed});
-# 			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /bed|peak/) {
 				$self->{extension} = '.bed';
 			}
@@ -602,7 +599,6 @@ sub new {
 				carp "unrecognized number of columns for ucsc format!";
 				return;
 			};
-# 			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
 				$self->{extension} = '.ucsc';
 			}
