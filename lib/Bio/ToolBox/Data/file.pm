@@ -1013,9 +1013,7 @@ sub add_column_metadata {
 sub add_gff_metadata {
 	my $self = shift;
 	my $version = shift || undef;
-	
-	# set column number
-	$self->{'number_columns'} = 9; # always 9 columns
+	my $force = shift || 0;
 	
 	# set the gff version based on the extension if it isn't already
 	unless ($self->gff) {
@@ -1032,15 +1030,21 @@ sub add_gff_metadata {
 	for (my $i = 0; $i < 9; $i++) {
 		# loop for each column
 		# set metadata unless it's already loaded
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i];
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
+	}
 	$self->{data_table}->[0] = $self->{'column_names'};
+	
+	# set column number always to 9
+	if ($force or $self->{'number_columns'} == 0) { 
+		$self->{'number_columns'} = 9;
 	}
 	
 	# set headers flag to false
@@ -1068,12 +1072,14 @@ sub add_gff_metadata {
 	# the fourth column is score, not name
 sub add_bed_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 
 	$self->{'number_columns'} = $column_count; 
 	$self->{'bed'} = $column_count;
 	
 	# set column names
 	my $bed_names = $self->standard_column_names(
+		# try to get this from the file extension if available
 		$self->extension =~ /bdg|graph/i ? 'bdg' : 'bed12'
 	);
 	
@@ -1083,14 +1089,15 @@ sub add_bed_metadata {
 	for (my $i = 0; $i < $column_count; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $bed_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
 
@@ -1110,6 +1117,7 @@ sub add_bed_metadata {
 	# see http://genome.ucsc.edu/FAQ/FAQformat.html
 sub add_peak_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 
 	$self->{'number_columns'} = $column_count; 
 	$self->{'bed'} = $column_count;
@@ -1124,14 +1132,15 @@ sub add_peak_metadata {
 	
 	# add metadata
 	for (my $i = 0; $i < $column_count; $i++) {
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'} = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
 	
@@ -1154,6 +1163,7 @@ sub add_peak_metadata {
 	# also biotoolbox script ucsc_table2gff3.pl
 sub add_ucsc_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 	
 	$self->{'number_columns'} = $column_count; 
 	$self->{'ucsc'} = $column_count;
@@ -1165,14 +1175,15 @@ sub add_ucsc_metadata {
 	for (my $i = 0; $i < $column_count; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'}; 
+		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
 	
@@ -1193,20 +1204,22 @@ sub add_ucsc_metadata {
 	# importing to binary BAR files used in T2, USeq, and IGB
 sub add_sgr_metadata {
 	my $self = shift;
+	my $force = shift || 0;
 	
 	# set column metadata
 	my $column_names = $self->standard_column_names('sgr');
 	for (my $i = 0; $i < 3; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'}; 
+		}
 	}
 	$self->{data_table}->[0] = $self->{'column_names'};
 	$self->{'number_columns'} = 3; 
@@ -1649,31 +1662,35 @@ in shell scripts.
 
 Parse a column metadata line from a file into a Data structure.
 
-=item add_gff_metadata()
+=item add_gff_metadata($version, $force)
 
-Add default column metadata for a GFF file.
+Add default column metadata for a GFF file. Specify which GFF version.
 
-=item add_bed_metadata()
+=item add_bed_metadata($column_count, $force)
 
-Add default column metadata for a BED file.
+Add default column metadata for a BED file. Specify the number of BED 
+columns.
 
-=item add_peak_metadata()
+=item add_peak_metadata($column_count, $force)
 
-Add default column metadata for a narrowPeak or broadPeak file.
+Add default column metadata for a narrowPeak or broadPeak file. 
+Specify the number of columns.
 
-=item add_ucsc_metadata()
+=item add_ucsc_metadata($column_count, $force)
 
-Add default column metadata for a UCSC refFlat or genePred file.
+Add default column metadata for a UCSC refFlat or genePred file. 
+Specify the number of columns to define the format.
 
-=item add_sgr_metadata()
+=item add_sgr_metadata($force)
 
 Add default column metadata for a SGR file.
 
-=item add_standard_metadata()
+=item add_standard_metadata($line)
 
-Add default column metadata for a generic file.
+Add default column metadata for a generic file. Pass the text line 
+containing the tab-delimited column headers.
 
-=item standard_column_names()
+=item standard_column_names($format)
 
 Returns an anonymous array of standard file format column header names. 
 Pass a value representing the file format. Values include gff, bed12, 
