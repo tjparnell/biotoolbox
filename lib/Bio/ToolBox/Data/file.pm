@@ -110,62 +110,63 @@ sub taste_file {
 	my $number = $Taste->number_columns;
 	if ($number == 9) {
 		# possibly a GFF file
-		$Taste->gff(1);
-		return 'gff' if $Taste->verify(1);
-		$Taste->gff(1);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('gff') );
-		$Taste->{last_row} += 1;
-		return 'gff' if $Taste->verify(1);
+		$Taste->gff(2);
+		$Taste->verify(1);
+		return 'gff' if $Taste->gff == 2;
+		$Taste->add_gff_metadata(2,1); # force metadata
+		$Taste->verify(1);
+		return 'gff' if $Taste->gff == 2;
 	}
 	elsif ($number == 10) {
 		# possibly a genePred file
 		$Taste->ucsc(10);
-		return 'ucsc' if $Taste->verify(1);
-		$Taste->ucsc(10);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc10') );
-		$Taste->{last_row} += 1;
-		return 'ucsc' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 10;
+		$Taste->add_ucsc_metadata(10,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 10;
 	}
 	elsif ($number == 11) {
 		# possibly a refFlat file
 		$Taste->ucsc(11);
-		return 'ucsc' if $Taste->verify(1);
-		$Taste->ucsc(11);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc11') );
-		$Taste->{last_row} += 1;
-		return 'ucsc' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 11;
+		$Taste->add_ucsc_metadata(11,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 11;
 	}
 	elsif ($number == 12) {
 		# possibly a knownGene or BED12 file
 		$Taste->ucsc(12);
-		return 'ucsc' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 12;
 		$Taste->bed(12);
-		return 'bed' if $Taste->verify(1);
-		$Taste->ucsc(12);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc12') );
-		$Taste->{last_row} += 1;
-		return 'ucsc' if $Taste->verify(1);
-		$Taste->{data_table}->[0] = $self->standard_column_names('bed12');
-		$Taste->bed(12);
-		return 'bed' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'bed' if $Taste->bed == 12;
+		$Taste->add_ucsc_metadata(12,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 12;
+		$Taste->add_bed_metadata(12,1); # force metadata
+		$Taste->verify(1);
+		return 'bed' if $Taste->bed == 12;
 	}
 	elsif ($number == 15) {
 		# possibly a genePredExt file
 		$Taste->ucsc(15);
-		return 'ucsc' if $Taste->verify(1);
-		$Taste->ucsc(15);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc15') );
-		$Taste->{last_row} += 1;
-		return 'ucsc' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 15;
+		$Taste->add_ucsc_metadata(15,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 15;
 	}
 	elsif ($number == 16) {
 		# possibly a genePredExt file
 		$Taste->ucsc(16);
-		return 'ucsc' if $Taste->verify(1);
-		$Taste->ucsc(16);
-		splice( @{$Taste->{data_table}}, 0, 1, $self->standard_column_names('ucsc16') );
-		$Taste->{last_row} += 1;
-		return 'ucsc' if $Taste->verify(1);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 16; 
+		$Taste->add_ucsc_metadata(16,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 16;
 	}
 	return;
 }
