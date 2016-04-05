@@ -270,10 +270,10 @@ Returns an array of all sub SeqFeature objects.
 
 =head2 Range Methods
 
-These are range methods for comparing SeqFeature objects to each other.
+These are range methods for comparing one SeqFeature object to another.
 They are analogous to L<Bio::RangeI> methods.
 
-They currently do not support strand checks.
+They currently do not support strand checks or strand options.
 
 =over 4
 
@@ -289,7 +289,7 @@ with the self object.
 =item contains($other)
 
 Returns a boolean value whether the self object completely 
-contains the $other Seqfeature object.
+contains the $other SeqFeature object.
 
 =item equals($other)
 
@@ -299,20 +299,20 @@ equivalent to the $other SeqFeature object.
 =item intersection($other)
 
 Returns a new SeqFeature object representing the intersection or 
-overlap area between the self object and the $other SeqFeature 
+overlap area between the $self object and the $other SeqFeature 
 object.
 
 =item union($other)
 
-Returns a new Seqfeature object representing the merged interval 
-between the self and $other SeqFeature objects.
+Returns a new SeqFeature object representing the merged interval 
+between the $self and $other SeqFeature objects.
 
 =back
 
 =head2 Export Strings
 
 These methods export the SeqFeature object as a text string in the 
-specified format.
+specified format. New line characters are included.
 
 =over 4
 
@@ -336,9 +336,10 @@ no support is available for recursive printing or BED12 formats.
 
 Because of their underlying array structure, Bio::ToolBox::SeqFeature objects 
 should generally not be used as a base class (unless you know the ramifications 
-of doing so). The following Bio classes and Interfaces may not work, either because 
-they have not been implemented, object structure incompatibility, or simply haven't 
-been tested yet for compatibility (it's possible some can be used).
+of doing so). The following Bio classes and Interfaces are similar and their API 
+was used as a model. However, in most cases they are not likely to work with this 
+module because of object structure incompatibility, although this has not been 
+explicitly tested. 
 
 =over 4
 
@@ -595,7 +596,7 @@ sub add_SeqFeature {
 			$count++;
 		}
 		else {
-			cluck "please use Seqfeature objects when adding sub features!";
+			cluck "please use SeqFeature objects when adding sub features!";
 		}
 	}
 	return $count;
