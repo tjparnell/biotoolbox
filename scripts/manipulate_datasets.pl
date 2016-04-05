@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.33';
+my $VERSION = '1.36';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -2608,6 +2608,7 @@ Available dataset manipulations
   zd - convert dataset to Z-scores
   pd - convert dataset to percentile rank
   L2 - convert dataset to log2
+  L10 - convert dataset to log10
   n0 - convert null values to 0
 Enter the manipulation(s) in order of desired execution  
 LIST
@@ -2680,7 +2681,12 @@ LIST
 		elsif (/^l2$/i) {
 			# convert dataset to log2 values
 			print " converting datasets to log2 values....\n";
-			log2_function(@datasets);
+			log_function(2, @datasets);
+		}
+		elsif (/^l10$/i) {
+			# convert dataset to log10 values
+			print " converting datasets to log10 values....\n";
+			log_function(10, @datasets);
 		}
 		elsif (/^n0$/i) {
 			# convert nulls to 0
@@ -3694,6 +3700,7 @@ listed below and specified using the --target option.
   zd - convert columns to Z-scores
   pd - convert columns to percentile ranks
   L2 - convert values to log2
+  L10 - convert values to log10
   n0 - convert nulls to 0.0
 
 A simple Cluster data text file is written (default file name 

@@ -61,6 +61,7 @@ my (
 	$strand_sense,
 	$set_strand,
 	$avoid,
+	$avoidtype,
 	$long_data,
 	$smooth,
 	$sum,
@@ -87,7 +88,8 @@ GetOptions(
 	'strand=s'   => \$strand_sense, # collected stranded data
 	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'avoid=s'    => \$avoid, # avoid conflicting features
+	'avoid!'     => \$avoid, # avoid conflicting features
+	'avtype=s'   => \$avoidtype, # type of feature to avoid
 	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
@@ -169,18 +171,17 @@ my $startcolumn = $Data->number_columns;
 if ($avoid) {
 	unless ($main_database) {
 		warn " avoid option not supported without an annotation database! Disabling\n";
-		undef $avoid;
+		undef $avoid; # 0 complicates things, leave undefined
 	}
-	if ($avoid eq '1') {
-		# this should be ok, it will default to the current feature type
-	}
-	elsif ($avoid =~ /,/) {
-		# a comma delimited list
-		$avoid = [ split(',', $avoid) ];
-	}
-	else {
-		# presume a single feature type, take it as is
-		$avoid = [ $avoid ];
+	if ($avoidtype) {
+		if ($avoidtype =~ /,/) {
+			# a comma delimited list
+			$avoid = [ split(',', $avoidtype) ];
+		}
+		else {
+			# presume a single feature type, take it as is
+			$avoid = [ $avoidtype ];
+		}
 	}
 }
 
@@ -583,8 +584,10 @@ sub prepare_window_datasets {
 		if ($data_database) {
 			$Data->metadata($new_index, 'db', $data_database);
 		}
-		if (defined $avoid) {
-			$Data->metadata($new_index, 'avoid', 1);
+		if ($avoid) {
+			$Data->metadata($new_index, 'avoid', 
+				ref($avoid) eq 'ARRAY' ? join(',', @$avoid) : $avoid
+			);
 		}
 	}
 	
@@ -685,7 +688,7 @@ sub map_relative_long_data_for_features {
 		
 		if ($avoid) {
 			warn " avoid option is currently not supported with long data collection! Disabling!\n";
-			$avoid = 0; # this shouldn't be the case, I must revisit this!!!!
+			undef $avoid; # this shouldn't be the case, I must revisit this!!!!
 		}
 	}
 }
@@ -1013,7 +1016,8 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
-  --avoid [1|type|type,type,...]
+  --avoid
+  --avtype [type,type,...]
   --long
   --log
   
@@ -1164,18 +1168,24 @@ presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
 
-=item --avoid [1|type|type,type,...]
+=item --avoid
 
-Indicate whether features of the provided type should be avoided 
-when calculating values in a window. Provide a feature type (primary_tag 
-or primary_tag:source) or a comma-delimited list of types. Alternatively, 
-provide a "1", which indicates that the same type as the search feature 
-will be used. After collecting the data, each window is checked for 
-overlapping features of the provided type; if the window overlaps 
-another feature, no value is reported for that window. This option 
-requires using an annotation database (--db option). This is useful to 
-avoid scoring windows that overlap a neighboring gene, for example. The 
-default is false (return all values regardless of overlap).
+Indicate whether neighboring features should be avoided when calculating 
+values in a window. After collecting the data, each window is checked for 
+overlapping features; if the window overlaps another feature, no value 
+is reported for that window. This option requires using an annotation 
+database (--db option). This is useful to avoid scoring windows that 
+overlap a neighboring gene, for example. The default is false (return 
+all values regardless of overlap).
+
+=item --avtype [type,type,...]
+
+Provide a feature type (primary_tag or primary_tag:source) or a 
+comma-delimited list of types to be used when avoiding neighboring 
+features. The default is to avoid features of the same type as that 
+of the query, i.e. collecting data around a feature of type 'gene' 
+will avoid other 'gene' features. This option allows you to avoid 
+other features too, such as 'tRNA' or 'repeat'.
 
 =item --long
 

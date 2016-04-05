@@ -15,7 +15,7 @@ eval {
 	require GD::Graph::smoothlines; 
 	$gd_ok = 1;
 };
-my $VERSION = 1.22;
+my $VERSION = 1.36;
 
 print "\n This script will graph profile plots of genomic data\n\n";
 
@@ -246,7 +246,7 @@ sub find_x_index {
 	# request from the user
 	print " These are the indices of the data file:\n";
 	my $i = 0;
-	foreach ($Data->column_names) {
+	foreach ($Data->list_columns) {
 		print "   $i\t$_\n";
 		$i++;
 	}
