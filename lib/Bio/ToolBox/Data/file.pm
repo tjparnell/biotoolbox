@@ -48,7 +48,6 @@ sub load_file {
 	$self->add_file_metadata($filename);
 	$self->open_to_read_fh or return;
 	$self->parse_headers;
-	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
 	# Load the data table
 	while (my $line = $self->{fh}->getline) {		
@@ -65,9 +64,6 @@ sub load_file {
 		# process the line
 		$self->add_data_line($line);
 	}
-	
-	# record the index number of the last data row
-	$self->{'last_row'} = scalar @{ $self->{'data_table'} } - 1;
 	
 	# completed loading the file
 	$self->close_fh;
@@ -101,7 +97,7 @@ sub taste_file {
 	}
 	
 	# load first 10 data lines
-	$Taste->{data_table}->[0] = $self->{'column_names'}; 
+	$Taste->{data_table}->[0] = $Taste->{'column_names'}; # set table header names
 	for (my $i = 1; $i <= 10; $i++) {
 		my $line = $Taste->fh->getline;
 		next if $line !~ m/\w+/;
@@ -412,6 +408,7 @@ sub add_data_line {
 	
 	# add the line of data
 	push @{ $self->{data_table} }, \@linedata;
+	$self->{last_row} += 1;
 	return 1;
 }
 
@@ -1043,6 +1040,7 @@ sub add_gff_metadata {
 		# assign the name to the column header
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
+	$self->{data_table}->[0] = $self->{'column_names'};
 	}
 	
 	# set headers flag to false
@@ -1094,6 +1092,7 @@ sub add_bed_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1134,6 +1133,7 @@ sub add_peak_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1174,6 +1174,7 @@ sub add_ucsc_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1207,6 +1208,7 @@ sub add_sgr_metadata {
 		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
 			defined $self->{'column_names'}->[$i];
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	$self->{'number_columns'} = 3; 
 
 
@@ -1257,6 +1259,7 @@ sub add_standard_metadata {
 	
 	# put the column names in the metadata
 	push @{ $self->{'column_names'} }, @namelist;
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set headers flag to true
 	$self->{'headers'} = 1;
