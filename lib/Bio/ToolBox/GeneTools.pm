@@ -7,9 +7,12 @@ Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene mode
 
 =head1 SYNOPSIS
 
-    use Bio::ToolBox::GeneTools qw(is_coding :exon);
+    use Bio::ToolBox::GeneTools qw(:all);
     
     my $gene; # a SeqFeatureI compliant gene object obtained elsewhere
+              # for example, from Bio::DB::SeqFeature::Store database
+              # or parsed from a GFF3, GTF, or UCSC-style gene table using 
+              # Bio::ToolBox::parser::(gff,ucsc) parsers
     
     if (is_coding($gene)) { # boolean test
     	
@@ -18,6 +21,13 @@ Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene mode
     	
     	# find just the alternate exons used only once
     	my @alternate_exons = get_alt_exons($gene);
+    	
+    	# collect UTRs, which may not be defined in the original source
+    	my @utrs;
+    	foreach my $t (get_transcripts($gene)) {
+    		my @u = get_utrs($t);
+    		push @utrs, @u;
+    	}
     }
 
 
@@ -43,8 +53,8 @@ These functions should work with most or all <Bio::SeqFeatureI> compliant
 objects. It has been tested with L<Bio::ToolBox::SeqFeature>, 
 L<Bio::SeqFeature::Lite>, and L<Bio::DB::SeqFeature> classes.
 
-New SeqFeature objects that are generated here, e.g. introns, use the 
-L<Bio::ToolBox::SeqFeature> class for simplicity and expediency. 
+New SeqFeature objects that are generated use the same class for 
+simplicity and expediency. 
 
 =head1 METHODS
 
@@ -77,7 +87,7 @@ get_transcript_length(), and collapse_transcripts().
 =item :cds
 
 Import the CDS pertaining methods, including is_coding(), get_cds(), 
-get_cdsStart(), get_cdsEnd(), and get_transcript_cds_length().
+get_cdsStart(), get_cdsEnd(), get_transcript_cds_length(), and get_utrs().
 
 =back
 
@@ -199,7 +209,8 @@ the sum of its exon lengths.
 
 =head2 CDS methods
 
-These methods calculate and return a single value.
+These methods calculate values related to the coding sequence of the 
+mRNA transcripts. 
 
 =over 4
 
@@ -231,6 +242,13 @@ Returns the stop coordinate of the CDS for the given transcript.
 Calculates and returns the length of the coding sequence for a 
 transcript, i.e. the sum of the CDS lengths.
 
+=item get_utrs($transcript)
+
+Returns the 5' and 3' untranslated regions of the transcript. If these are 
+not defined in the SeqFeature subfeature hierarchy, then they will be calculated 
+from the exon and CDS subfeatures, if available. Non-coding transcripts will not 
+return anything. 
+
 =back
 
 =cut
@@ -261,6 +279,7 @@ our @EXPORT_OK = qw(
 	get_cdsStart
 	get_cdsEnd
 	get_transcript_cds_length
+	get_utrs
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -289,6 +308,7 @@ our %EXPORT_TAGS = (
 		get_cdsStart
 		get_cdsEnd
 		get_transcript_cds_length
+		get_utrs
 	) ],
 );
 
@@ -707,6 +727,118 @@ sub get_transcript_cds_length {
 	return $total;
 }
 
+sub get_utrs {
+	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	return unless is_coding($transcript);
+	
+	# collect the various types of subfeatures
+	my @exons;
+	my @cdss;
+	my @utrs;
+	my @transcripts;
+	foreach my $subfeat ($transcript->get_SeqFeatures) {
+		my $type = $subfeat->primary_tag;
+		if ($type =~ /exon/i) {
+			push @exons, $subfeat;
+		}
+		elsif ($type =~ /cds/i) {
+			push @cdss, $subfeat;
+		}
+		elsif ($type =~ /utr|untranslated/i) {
+			push @utrs, $subfeat;
+		}
+		elsif ($type =~ /rna|transcript/i) {
+			push @transcripts, $subfeat;
+		}
+	}
+	
+	# collect the utrs into final list
+	my @list;
+	if (@utrs) {
+		# good, we don't have to do any work
+		@list = @utrs;
+	}
+	elsif (@transcripts) {
+		# someone must've passed us a gene
+		foreach my $t (@transcripts) {
+			my @u = get_utrs($t);
+			push @list, @u;
+		}
+	}
+	elsif (@exons and @cdss) {
+		# calculate the utrs ourselves
+		
+		@exons = map { $_->[0] }
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@exons;
+		@cdss = map { $_->[0] }
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@cdss;
+		my $firstCDS = $cdss[0];
+		my $lastCDS  = $cdss[-1];
+		while (@exons) {
+			my $exon = shift @exons;
+			if ($exon->end < $firstCDS->start) {
+				# whole exon is UTR
+				my $utr = _duplicate($exon);
+				$utr->primary_tag( 
+					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+				$utr->display_name( $exon->display_name . '.utr' );
+				push @list, $utr;
+			}
+			elsif ($exon->overlaps($firstCDS)) {
+				# partial UTR on left side
+				my $pieces = $exon->subtract($firstCDS); # array ref of pieces
+				next unless $pieces;
+				my $utr = $pieces->[0]; # we will want the first one if there are two
+				$utr->primary_tag( 
+					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+				$utr->display_name($exon->display_name . '.utr');
+				$utr->strand($exon->strand);
+				$utr->source($exon->strand);
+				push @list, $utr;
+			}
+			elsif ($exon->start > $firstCDS->end and $exon->end < $lastCDS->start) {
+				# CDS exon
+				next;
+			}
+			elsif ($exon->overlaps($lastCDS)) {
+				# partial UTR
+				my $pieces = $exon->subtract($lastCDS); # array ref of pieces
+				next unless $pieces;
+				my $utr = $pieces->[-1]; # we will want the second one if there are two
+				$utr->primary_tag( 
+					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+				$utr->display_name($exon->display_name . '.utr');
+				$utr->strand($exon->strand);
+				$utr->source($exon->strand);
+				push @list, $utr;
+			}
+			elsif ($exon->start > $lastCDS->end) {
+				# whole exon is UTR
+				my $utr = _duplicate($exon);
+				$utr->primary_tag( 
+					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+				$utr->display_name( $exon->display_name . '.utr' );
+				push @list, $utr;
+			}
+			else {
+				# geometric error
+				croak " programmer geometric error!";
+			}
+		}
+	}
+	else {
+		# nothing usable found to identify UTRs
+		return;
+	}
+	
+	# we have our list
+	return wantarray ? @list : \@list;
+}
 
 #### internal methods
 
