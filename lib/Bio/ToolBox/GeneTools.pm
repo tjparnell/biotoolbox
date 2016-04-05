@@ -334,7 +334,8 @@ sub get_exons {
 		foreach my $t (@transcripts) {
 			# there are possibly duplicates in here if there are alternate transcripts
 			# should we remove them?
-			push @list, get_exons($t);
+			my @e = get_exons($t);
+			push @list, @e;
 		}
 	}
 	else {
@@ -678,8 +679,8 @@ sub is_coding {
 sub get_cds {
 	my $transcript = shift;
 	my @cds;
-	foreach my $e (get_exons($transcript)) {
-		push @cds, $e if $e->primary_tag eq 'CDS';
+	foreach my $subfeat ($transcript->get_SeqFeatures) {
+		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
 	}
 	return @cds;
 }
