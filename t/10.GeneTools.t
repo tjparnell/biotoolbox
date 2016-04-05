@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 51;
+	plan tests => 57;
 }
 
 BEGIN {
@@ -17,13 +17,13 @@ BEGIN {
 }
 
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
-my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.genePred");
+my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.txt");
 
 my $ucsc = Bio::ToolBox::parser::ucsc->new(
 	file    => $ucscfile,
 	do_gene => 1,
 	do_cds  => 1,
-	do_utr  => 1,
+# 	do_utr  => 1,
 );
 
 # parse first feature line
@@ -88,12 +88,18 @@ is(get_transcript_length($t1), 593, 'transcript1 get_transcript_length');
 my @t1_exons = get_exons($t1);
 is(scalar @t1_exons, 5, 'transcript1 exon number');
 my @t1_cds = get_cds($t1);
-is(scalar @t1_cds, 0, 'transcript1 cds number');
+is(scalar @t1_cds, 4, 'transcript1 cds number');
 my @t1_introns = get_introns($t1);
 is(scalar @t1_introns, 4, 'transcript1 intron number');
-is(get_cdsStart($t1), undef, 'transcript1 CDS start');
-is(get_cdsEnd($t1), undef, 'transcript1 CDS stop');
+is(get_cdsStart($t1), 389402, 'transcript1 CDS start');
+is(get_cdsEnd($t1), 398466, 'transcript1 CDS stop');
 is(get_transcript_cds_length($t1), 352, 'transcript1 CDS length');
+my @t1_utrs = get_utrs($t1);
+is(scalar @t1_utrs, 2, 'transcript UTR number');
+is($t1_utrs[0]->start, 388142, 'first UTR start');
+is($t1_utrs[1]->start, 389335, 'second UTR start');
+is($t1_utrs[1]->end, 389401, 'second UTR end');
+is($t1_utrs[1]->primary_tag, 'five_prime_UTR', 'second UTR primary tag');
 
 
 # second transcript
@@ -112,6 +118,8 @@ is(scalar @t2_introns, 1, 'transcript2 intron number');
 is(get_cdsStart($t2), undef, 'transcript2 CDS start');
 is(get_cdsEnd($t2), undef, 'transcript2 CDS stop');
 is(get_transcript_cds_length($t2), 0, 'transcript2 CDS length');
+my @t2_utrs = get_utrs($t2);
+is(scalar @t2_utrs, 0, 'transcript2 UTR number');
 
 
 

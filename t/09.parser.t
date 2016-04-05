@@ -30,7 +30,7 @@ require_ok 'Bio::ToolBox::Data' or
 # Thus this test script actually tests two things: the parsers and my seqfeature 
 # object class.
 my $gfffile = File::Spec->catfile($Bin, "Data", "chrI.gff3");
-my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.genePred");
+my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.txt");
 my $outfile = File::Spec->catfile($Bin, "Data", "tempout.txt");
 
 ### Testing with standard BioPerl Bio::SeqFeature::Lite class
