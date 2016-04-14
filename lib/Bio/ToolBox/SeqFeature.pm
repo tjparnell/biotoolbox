@@ -147,7 +147,7 @@ than the start coordinate.
 =item strand
 
 The strand that the feature is on. The default value is always unstranded, 
-or 0. Any of the following may be supplied: "1 0 -1 + . -". Numeric 
+or 0. Any of the following may be supplied: "C<1 0 -1 + . ->". Numeric 
 integers 1, 0, and -1 are always returned.
 
 =item source
@@ -244,11 +244,6 @@ genes beget transcripts which beget exons.
 Child SeqFeature objects may have more than one parent, for example, shared
 exons between alternate transcripts. In which case, only one exon
 SeqFeature object is generated, but is added to both transcript objects. 
-
-Certain shared attributes may be withheld from child SeqFeature objects, in
-which case they can be inherited from their parent, thus minimizing
-redundancy. For example, seq_id, strand, and source_tag can be inherited,
-as they are unlikely to change.
 
 =over 4
 
@@ -381,8 +376,7 @@ use constant {
 	SCORE   => 8,
 	PHASE   => 9,	
 	ATTRB   => 10,
-	PARNT   => 11,
-	SUBF    => 12,
+	SUBF    => 11,
 };
 our $IDCOUNT = 0;
 
@@ -472,9 +466,7 @@ sub seq_id {
 	if (@_) {
 		$self->[SEQID] = $_[0];
 	}
-	my $seqid = defined $self->[SEQID] ? $self->[SEQID] : 
-		defined $self->[PARNT] ? $self->[PARNT]->seq_id : undef;
-	return $seqid;
+	return defined $self->[SEQID] ? $self->[SEQID] : undef;
 }
 
 sub start {
@@ -482,7 +474,7 @@ sub start {
 	if (@_) {
 		$self->[START] = $_[0];
 	}
-	return $self->[START];
+	return defined $self->[START] ? $self->[START] : undef;
 }
 
 sub end {
@@ -490,7 +482,7 @@ sub end {
 	if (@_) {
 		$self->[STOP] = $_[0];
 	}
-	return $self->[STOP];
+	return defined $self->[STOP] ? $self->[STOP] : undef;
 }
 
 sub strand {
@@ -501,9 +493,7 @@ sub strand {
 		$self->[STRND] = -1 if $self->[STRND] eq '-';
 		$self->[STRND] = 0 if $self->[STRND] eq '.';
 	}
-	my $strand = defined $self->[STRND] ? $self->[STRND] : 
-		defined $self->[PARNT] ? $self->[PARNT]->strand : 0;
-	return $strand;
+	return defined $self->[STRND] ? $self->[STRND] : 0;
 }
 
 sub display_name {
@@ -541,9 +531,7 @@ sub source_tag {
 	if (@_) {
 		$self->[SRC] = $_[0];
 	}
-	my $source = defined $self->[SRC] ? $self->[SRC] : 
-		defined $self->[PARNT] ? $self->[PARNT]->source_tag : undef;
-	return $source;
+	return defined $self->[SRC] ? $self->[SRC] : undef;
 }
 
 sub type {
@@ -597,6 +585,9 @@ sub add_SeqFeature {
 	my $count = 0;
 	foreach my $s (@_) {
 		if (ref($s) eq ref($self)) {
+			$s->seq_id($self->seq_id) unless ($s->seq_id);
+			$s->strand($self->strand) unless ($s->strand);
+			$s->source_tag($self->source_tag) unless ($s->source_tag);
 			push @{ $self->[SUBF] }, $s;
 			$count++;
 		}
@@ -612,7 +603,6 @@ sub get_SeqFeatures {
 	$self->[SUBF] ||= [];
 	my @children;
 	foreach (@{ $self->[SUBF] }) {
-		$_->[PARNT] = $self;
 		push @children, $_;
 	}
 	return wantarray ? @children : \@children;
@@ -669,11 +659,6 @@ sub all_tags {
 	$self->[ATTRB] ||= {};
 	my @k = keys %{ $self->[ATTRB] };
 	return wantarray ? @k : \@k;
-}
-
-sub parent {
-	my $self = shift;
-	return defined $self->[PARNT] ? $self->[PARNT] : undef; 
 }
 
 
