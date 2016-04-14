@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.35';
+our $VERSION = '1.36';
 
 =head1 NAME
 
@@ -304,17 +304,6 @@ sub add_data_line {
 	
 	# do not chomp the line yet, just split into an array
 	my @linedata = split /\t/, $line;
-	
-	# check the number of elements
-	if (scalar @linedata != $self->number_columns ) {
-		if ($line =~ /\r/ and $line !~ /\n/) {
-			die "File does not appear to have unix line endings!\n" . 
-				" Please convert to unix-style line endings and try again\n";
-			# the line ending is set by a global variable for low-level file reading
-			# at this point it's easier to just die than reset it and start over
-		}
-		# we will verify the table after loading all the lines to verify 
-	}
 	
 	# chomp the last element
 	# we do this here to ensure the tab split above gets all of the values
@@ -1497,6 +1486,8 @@ Example
 These methods are used internally by Bio::ToolBox::Core and other objects 
 are not recommended for use by general users. 
 
+=over 4
+
 =item parse_headers
 
 This will determine the file format, parse any metadata lines that may 
@@ -1507,8 +1498,6 @@ by load_file(), and generally need not be called.
 =item add_data_line($line)
 
 Parses a text line from the file into a Data table row.
-
-=item 
 
 =item check_file($filename)
 

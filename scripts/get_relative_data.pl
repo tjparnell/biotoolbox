@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 5001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.35';
+my $VERSION = '1.36';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -61,6 +61,7 @@ my (
 	$strand_sense,
 	$set_strand,
 	$avoid,
+	$avoidtype,
 	$long_data,
 	$smooth,
 	$sum,
@@ -88,6 +89,7 @@ GetOptions(
 	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
 	'avoid!'     => \$avoid, # avoid conflicting features
+	'avtype=s'   => \$avoidtype, # type of feature to avoid
 	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
@@ -167,9 +169,19 @@ my $startcolumn = $Data->number_columns;
 
 # make sure data table supports avoid option
 if ($avoid) {
-	unless ($Data->feature_type eq 'named') {
-		warn " avoid option not supported with current Data table. Disabling\n";
-		$avoid = 0;
+	unless ($main_database) {
+		warn " avoid option not supported without an annotation database! Disabling\n";
+		undef $avoid; # 0 complicates things, leave undefined
+	}
+	if ($avoidtype) {
+		if ($avoidtype =~ /,/) {
+			# a comma delimited list
+			$avoid = [ split(',', $avoidtype) ];
+		}
+		else {
+			# presume a single feature type, take it as is
+			$avoid = [ $avoidtype ];
+		}
 	}
 }
 
@@ -573,7 +585,9 @@ sub prepare_window_datasets {
 			$Data->metadata($new_index, 'db', $data_database);
 		}
 		if ($avoid) {
-			$Data->metadata($new_index, 'avoid', 1);
+			$Data->metadata($new_index, 'avoid', 
+				ref($avoid) eq 'ARRAY' ? join(',', @$avoid) : $avoid
+			);
 		}
 	}
 	
@@ -674,7 +688,7 @@ sub map_relative_long_data_for_features {
 		
 		if ($avoid) {
 			warn " avoid option is currently not supported with long data collection! Disabling!\n";
-			$avoid = 0;
+			undef $avoid; # this shouldn't be the case, I must revisit this!!!!
 		}
 	}
 }
@@ -1003,6 +1017,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --avoid
+  --avtype [type,type,...]
   --long
   --log
   
@@ -1155,14 +1170,22 @@ regions (e.g. BED files). Default is false.
 
 =item --avoid
 
-Indicate whether search features of the same type should be avoided 
-when calculating values in a window. Each window is checked for 
-overlapping features of the same type; if the window does overlap 
-another feature of the same type, no value is reported for the 
-window. This option requires using named database features and must 
-include a feature GFF type column. This is useful to avoid scoring 
-windows that overlap a neighboring gene, for example. The default is 
-false (return all values regardless of overlap).
+Indicate whether neighboring features should be avoided when calculating 
+values in a window. After collecting the data, each window is checked for 
+overlapping features; if the window overlaps another feature, no value 
+is reported for that window. This option requires using an annotation 
+database (--db option). This is useful to avoid scoring windows that 
+overlap a neighboring gene, for example. The default is false (return 
+all values regardless of overlap).
+
+=item --avtype [type,type,...]
+
+Provide a feature type (primary_tag or primary_tag:source) or a 
+comma-delimited list of types to be used when avoiding neighboring 
+features. The default is to avoid features of the same type as that 
+of the query, i.e. collecting data around a feature of type 'gene' 
+will avoid other 'gene' features. This option allows you to avoid 
+other features too, such as 'tRNA' or 'repeat'.
 
 =item --long
 
