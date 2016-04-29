@@ -53,7 +53,7 @@ provides:
     version: '1.14'
   Bio::ToolBox::db_helper::seqfasta:
     file: lib/Bio/ToolBox/db_helper/seqfasta.pm
-    version: '1.33'
+    version: '1.36'
   Bio::ToolBox::db_helper::useq:
     file: lib/Bio/ToolBox/db_helper/useq.pm
     version: '1.33'
@@ -70,7 +70,7 @@ provides:
     file: lib/Bio/ToolBox/parser/ucsc.pm
   Bio::ToolBox::utility:
     file: lib/Bio/ToolBox/utility.pm
-    version: '1.35'
+    version: '1.36'
 recommends:
   Algorithm::Cluster: '0'
   DBD::SQLite: '0'
