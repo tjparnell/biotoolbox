@@ -1,10 +1,11 @@
 ######## Bio::ToolBox revision history #############
 
-v1.36
+v1.36 (git 44b9dea)
 	- added new option to script get_relative_data to allow user to specify 
 	what feature types to avoid
 	- fix bugs in scripts manipulate_datasets when exporting log2 treeview 
 	files and defining x axes in graph_profile
+	- fix annoying bug where manipulate_datasets will not re-show column list
 	- improve data file summarization
 	- some library method optimizations
 
