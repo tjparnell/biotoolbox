@@ -7,6 +7,7 @@ lib/Bio/ToolBox/Data/core.pm
 lib/Bio/ToolBox/Data/file.pm
 lib/Bio/ToolBox/Data/Feature.pm
 lib/Bio/ToolBox/Data/Stream.pm
+lib/Bio/ToolBox/GeneTools.pm
 lib/Bio/ToolBox/db_helper.pm
 lib/Bio/ToolBox/db_helper/bam.pm
 lib/Bio/ToolBox/db_helper/bigbed.pm
@@ -17,6 +18,7 @@ lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
 lib/Bio/ToolBox/parser/gff.pm
 lib/Bio/ToolBox/parser/ucsc.pm
+lib/Bio/ToolBox/SeqFeature.pm
 lib/Bio/ToolBox/utility.pm
 LICENSE
 MANIFEST			This list of files
@@ -65,11 +67,12 @@ t/06.BigWigSet.t
 t/07.USeq.t
 t/08.Wiggle.t
 t/09.parser.t
+t/10.GeneTools.t
 t/Data/biotoolbox.cfg
 t/Data/chrI.gff3
 t/Data/ensemblSource.txt
 t/Data/ensemblToGeneName.txt
-t/Data/ensGene.genePred
+t/Data/ensGene.txt
 t/Data/sample.bed
 t/Data/sample1.bam
 t/Data/sample1.bam.bai

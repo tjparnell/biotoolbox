@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.36';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -97,18 +97,26 @@ These are the options available.
 
 =item file =E<gt> $filename
 
+=item in =E<gt> $filename
+
 Provide the path and name to an existing tabbed-delimited text 
-file. BED and GFF files and their variants are accepted. Except 
-for structured files, e.g. BED and GFF, the first line is 
-assumed to be column header names. Commented lines (beginning 
-with #) are parsed as metadata. The files may be compressed 
-(gzip or bzip2).
+file from which to load the contents. This is a shortcut to the 
+load_file() method. See that method for more details.
 
 =item stream =E<gt> 1
 
-Indicate that the file should be opened as a file stream.  
-A Bio::ToolBox::Data::Stream object will be returned. This is a 
-convenience method. 
+Boolean option indicating that the file should be opened as a file  
+stream. A Bio::ToolBox::Data::Stream object will be returned. This 
+is a convenience method. 
+
+=item parse =E<gt> 1
+
+Boolean option indicating that a gene annotation table or file should 
+be parsed into SeqFeature objects and a general table of names and IDs 
+representing those objects be generated. The annotation file may 
+be specified in one of two ways: Through the file option above, 
+or in the database metadata of an existing table file representing 
+previously parsed objects.
 
 =item feature =E<gt> $type
 
@@ -171,6 +179,16 @@ headers and metadata, but lacking the table content, i.e. no
 rows of data. File name metadata, if present in the original, is 
 not preserved. The purpose here, for example, is to allow one 
 to selectively copy rows from one Data object to another.
+
+=item parse_table($filename)
+
+This will parse a gene annotation table into SeqFeature objects. 
+If this is called from an empty Data object, then the table will 
+be filled with the SeqFeature object names and IDs. If this is 
+called from a non-empty Data object, then the table's contents 
+will be associated with the SeqFeature objects using their name and 
+ID. The stored SeqFeature objects can be retrieved using the 
+get_seqfeature() method.
 
 =back
 
@@ -513,6 +531,27 @@ An example using the iterator is shown below.
 
 =back
 
+=head2 SeqFeature Objects
+
+SeqFeature objects corresponding to data rows can be stored in the Data 
+object. This can be useful if the SeqFeature object is not readily 
+available from a database or is processor intensive in generating or 
+parsing. Note that storing large numbers of objects will increase memory 
+usage. 
+
+=over 4
+
+=item store_seqfeature($row_index, $seqfeature)
+
+Stores the SeqFeature object for the given row index. Only one SeqFeature 
+object can be stored per row.
+
+=item get_seqfeature($row_index)
+
+Retrieves the SeqFeature object for the given row index.
+
+=back
+
 =head2 Data Table Functions
 
 These methods alter the Data table en masse. 
@@ -609,14 +648,36 @@ success.
 
 =head2 File Functions
 
-When you are finished modifying the Data table, it may then be written out 
-as a tabbed-delimited text file. If the format corresponds to a valide BED or 
-GFF file, then it may be written in that format. 
-
-Several functions are available for writing the Data table, exporting to a 
-compatible GFF file format, or writing a summary of the Data table.
+The Data table may be read in from a file or written out as a file. In 
+all cases, it is a tab-delimited text file, whether as an ad hoc table 
+or a specific bioinformatic format, e.g. BED, GFF, etc. Multiple common 
+file formats are supported. Column headers are assumed, except in those 
+cases where it is not, e.g. BED, GFF, etc. Metadata may be included as 
+commented lines at the beginning of the file, prefixed with a # symbol.
+Reading and writing gzip compressed files is fully supported.
 
 =over 4
+
+=item load_file($filename)
+
+This will load a file into a new, empty Data table. This function is 
+called automatically when a filename is provided to the new() function. 
+The existence of the file is first checked (appending common missing 
+extensions as necessary), metadata and column headers processed and/or 
+generated from default settings, the content loaded into the table, and 
+the structure verified. Error messages may be printed if the structure or 
+format is inconsistent or doesn't match the expected format, e.g a file 
+with a .bed extension doesn't match the UCSC specification.
+Pass the name of the filename.
+
+=item taste_file($filename)
+
+Tastes, or checks, a file for a certain flavor, or known gene file formats. 
+This is based on file extension, metadata headers, and/or file content 
+in the first 10 lines or so. Returns a string based on the file format.
+Values include gff, bed, ucsc, or undefined. Useful for determining if 
+the file represents a known gene table format that lacks a defined file 
+extension, e.g. UCSC formats.
 
 =item save()
 
@@ -741,10 +802,14 @@ use Bio::ToolBox::db_helper qw(
 sub new {
 	my $class = shift;
 	my %args  = @_;
-	$args{features} ||= $args{feature} || undef;
+	
+	# check for important arguments
+	$args{features} ||= $args{feature} || 'gene';
+	$args{stream} ||= $args{Stream} || 0;
+	$args{file} ||= $args{in} || undef;
+	$args{parse} ||= 0;
 	
 	# check for stream
-	$args{stream} ||= $args{Stream} || 0;
 	if ($args{stream}) {
 		my $obj;
 		eval {
@@ -763,16 +828,27 @@ sub new {
 	
 	# initialize
 	my $self = $class->SUPER::new();
-	if (exists $args{file} or exists $args{in}) {
+	
+	# prepare a new table based on the provided arguments
+	if ($args{file} and $args{parse}) {
+		# parse from file
+		unless ( $self->parse_table($args{file}) ) {
+			my $l = $self->load_file($args{file});
+			return unless $l;
+			if ($self->database =~ /^Parsed:(.+)$/) {
+				# looks like the loaded file was from a previously parsed table
+				# let's try this again
+				$self->parse_table($1); # this may die if it doesn't work
+			}
+		}
+	}
+	elsif ($args{file}) {
 		# load from file
-		my $f = $args{file} || $args{in} || q();
-		my $l = $self->load_file($f);
-		unless ($l) {
-			carp " Cannot load file!";
+		unless ( $self->load_file($args{file}) ) {
 			return;
 		}
 	}
-	elsif (exists $args{db} and exists $args{features}) {
+	elsif (exists $args{db} and $args{features}) {
 		# generate new list
 		$self->feature($args{features});
 		$self->database($args{db});
@@ -832,6 +908,67 @@ sub duplicate {
 	return $Dupe;
 }
 
+sub parse_table {
+	my ($self, $file) = @_;
+	unless ($file) {
+		carp "no gff file provided to parse!";
+		return;
+	}
+	
+	# the file format determines the parser class
+	my $flavor = $self->taste_file($file) or return;
+	my $class = 'Bio::ToolBox::parser::' . $flavor;
+	unless (eval "require $class; 1") {
+		carp "unable to load $class: $@";
+		return;
+	}
+	
+	# parse the table
+	my $parser = $class->new(
+		file => $file,
+	);
+	$parser->parse_file or return;
+	
+	# store the SeqFeature objects
+	if ($self->last_row > 0) {
+		# we already have a table, presumably representing the features
+		my $count = 0;
+		$self->iterate( sub {
+			my $row = shift;
+			my $f = $parser->find_gene(
+				name  => $row->name,
+				id    => $row->id,
+			);
+			if ($f) {
+				$self->store_seqfeature($row->row_index, $f);
+				$count++;
+			}
+		} );
+		unless ($count == $self->last_row) {
+			die <<PARSEFAIL;
+Not all features in the input file could be matched to a corresponding SeqFeature 
+object in the annotation file $file.
+Double check your input and annotation files. You can create a new table by just 
+providing your annotation file.
+PARSEFAIL
+		}
+	}
+	else {
+		# create a new table
+		$self->add_column('Primary_ID');
+		$self->add_column('Name');
+		$self->add_column('Type');
+		while (my $f = $parser->next_top_feature) {
+			next if $f->primary_tag =~ /^(?:chromosome|contig|sequence|scaffold)$/;
+			my $index = $self->add_row(
+				[ $f->primary_id, $f->display_name, $f->type,] 
+			);
+			$self->store_seqfeature($index, $f);
+		}
+		$self->database("Parsed:$file");
+	}
+	return 1;
+}
 
 
 
@@ -1002,7 +1139,14 @@ sub iterate {
 	return 1;
 }
 
-
+sub store_seqfeature {
+	my ($self, $row, $seqfeature) = @_;
+	return unless (defined $row and ref($seqfeature));
+	return unless ($row <= $self->last_row);
+	$self->{SeqFeatureObjects} ||= [];
+	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
+	return 1;
+}
 
 
 ### Data structure manipulation
@@ -1242,6 +1386,14 @@ sub splice_data {
 	}
 	my $part_length = int($self->last_row / $total_parts);
 	
+	# check for SeqFeatureObjects array
+	if (exists $self->{SeqFeatureObjects}) {
+		# it needs to be the same length as the data table, it should be
+		while (scalar @{$self->{SeqFeatureObjects}} < scalar @{$self->{data_table}}) {
+			push @{$self->{SeqFeatureObjects}}, undef;
+		}
+	}
+	
 	# splicing based on which part we do 
 	if ($part == 1) {
 		# remove all but the first part
@@ -1249,6 +1401,12 @@ sub splice_data {
 			@{$self->{'data_table'}}, 
 			$part_length + 1 
 		);
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				$part_length + 1 
+			);
+		}
 	}
 	elsif ($part == $total_parts) {
 		# remove all but the last part
@@ -1257,6 +1415,13 @@ sub splice_data {
 			1,
 			$part_length * ($total_parts - 1) 
 		);
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				1,
+				$part_length * ($total_parts - 1) 
+			);
+		}
 	}
 	else {
 		# splicing in the middle requires two rounds
@@ -1273,6 +1438,18 @@ sub splice_data {
 			1,
 			$part_length * ($part - 1) 
 		);
+		
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				($part * $part_length) + 1
+			);
+			splice( 
+				@{$self->{SeqFeatureObjects}}, 
+				1,
+				$part_length * ($part - 1) 
+			);
+		}
 	}
 	
 	# update last row metadata

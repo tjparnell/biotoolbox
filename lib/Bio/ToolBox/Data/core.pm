@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -29,7 +29,7 @@ sub new {
 	my $class = shift;
 	
 	# in case someone calls this from an established object
-	if (ref($class) =~ /Bio::ToolBox/) {
+	if (ref($class)) {
 		$class = ref($class);
 	}
 	
@@ -53,6 +53,7 @@ sub new {
 		'path'           => undef,
 		'comments'       => [],
 		'data_table'     => [],
+		'header_line_count' => 0,
 	);
 	
 	# Finished
@@ -331,6 +332,17 @@ sub verify {
 				$error .= " Column 5 not strand values.";
 			}
 		}
+		if ($self->{'number_columns'} == 12) {
+			# bed12 has extra special limitations
+			unless ($self->_column_is_stranded(6,7,9) ) {
+				$bed_check = 0;
+				$error .= " Column 6,7,9 not integers.";
+			}
+			unless ($self->_column_is_comma_integers(10,11) ) {
+				$bed_check = 0;
+				$error .= " Column 10,11 not comma-delimited integers.";
+			}
+		}
 		
 		# peak file format
 		if ($self->{'extension'} and 
@@ -409,6 +421,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= " Columns 4,5,6,7,8 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(9,10)) {
+				$ucsc_check = 0;
+				$error .= " Columns 9,10 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(3)) {
 				$ucsc_check = 0;
 				$error .= " Column 3 not strand values.";
@@ -448,6 +464,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .=  " Columns 3,4,5,6,7 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(8,9)) {
+				$ucsc_check = 0;
+				$error .= " Columns 8,9 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(2)) {
 				$ucsc_check = 0;
 				$error .= " Column 2 not strand values.";
@@ -482,6 +502,10 @@ sub verify {
 				$ucsc_check = 0;
 				$error .= " Columns 4,5,6,7,8 not integers.";
 			}
+			unless ($self->_column_is_comma_integers(9,10)) {
+				$ucsc_check = 0;
+				$error .= " Columns 9,10 not comma-delimited integers.";
+			}
 			unless($self->_column_is_stranded(3)) {
 				$ucsc_check = 0;
 				$error .= " Column 3 not strand values.";
@@ -515,6 +539,10 @@ sub verify {
 			unless($self->_column_is_integers(3,4,5,6,7)) {
 				$ucsc_check = 0;
 				$error .= " Columns 3,4,5,6,7 not integers.";
+			}
+			unless ($self->_column_is_comma_integers(8,9)) {
+				$ucsc_check = 0;
+				$error .= " Columns 8,9 not comma-delimited integers.";
 			}
 			unless($self->_column_is_stranded(2)) {
 				$ucsc_check = 0;
@@ -643,7 +671,7 @@ sub verify {
 		$self->{'bed'} or 
 		$self->{'gff'} or 
 		$self->{'ucsc'} or
-		$self->{'extension'} =~ /sgr/i
+		($self->{'extension'} and $self->{'extension'} =~ /sgr/i)
 	) {
 		$self->{'headers'} = 0;
 	}
@@ -651,7 +679,7 @@ sub verify {
 		$self->{'bed'} == 0 and 
 		$self->{'gff'} == 0 and 
 		$self->{'ucsc'} == 0 and
-		$self->{'extension'} !~ /sgr/i
+		($self->{'extension'} and $self->{'extension'} !~ /sgr/i)
 	) {
 		$self->{'headers'} = 1;
 	}
@@ -677,6 +705,22 @@ sub _column_is_integers {
 	return 1;
 }
 
+# internal method to check if a column is nothing but comma delimited integers
+sub _column_is_comma_integers {
+	my $self = shift;
+	my @index = @_;
+	return 1 if ($self->{last_row} == 0); # can't check if table is empty
+	foreach (@index) {
+		return 0 unless exists $self->{$_};
+	}
+	for my $row (1 .. $self->{last_row}) {
+		for my $i (@index) {
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d,]+$/);
+		}
+	}
+	return 1;
+}
+
 # internal method to check if a column looks like a strand column
 sub _column_is_stranded {
 	my ($self, $index) = @_;
@@ -697,6 +741,7 @@ sub open_database {
 	my $self = shift;
 	my $force = shift || 0;
 	return unless $self->{db};
+	return if $self->{db} =~ /^Parsed:/; # we don't open parsed annotation files
 	if (exists $self->{db_connection}) {
 		return $self->{db_connection} unless $force;
 	}
@@ -1186,11 +1231,24 @@ sub id_column {
 	return $self->{column_indices}{id};
 }
 
+
+
+#### Special Row methods ####
+
+sub get_seqfeature {
+	my ($self, $row) = @_;
+	return unless ($row and $row <= $self->{last_row});
+	return unless exists $self->{SeqFeatureObjects};
+	return $self->{SeqFeatureObjects}->[$row] || undef;
+}
+
+
+
 __END__
 
 =head1 METHODS REFERENCE
 
-For reference only. Please use L<Bio::ToolBox::Data>
+For quick reference only. Please see L<Bio::ToolBox::Data> for implementation.
 
 =over 4
 
@@ -1358,6 +1416,10 @@ Returns the index of the column that best represents the type.
 
 Returns the index of the column that represents the Primary_ID 
 column used in databases.
+
+=item get_seqfeature
+
+Returns the stored SeqFeature object for a given row.
 
 =back
 

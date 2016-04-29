@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -133,8 +133,10 @@ to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
 
-Here, this represents the primary_ID in the database. Note that this 
-number is unique to a specific database, and not portable between databases.
+=item primary_id
+
+Here, this represents the primary_ID in the database. Note that this number 
+is generally unique to a specific database, and not portable between databases.
 
 =item length
 
@@ -203,17 +205,22 @@ module.
 
 =over 4
 
+=item seqfeature
+
 =item feature
 
-Returns a SeqFeature object from the database using the name and 
+Returns a SeqFeature object representing the feature or item in 
+the current row. If the SeqFeature object is stored in the parent 
+$Data object, it is retrieved from there. Otherwise, the SeqFeature 
+object is retrieved from the database using the name and 
 type values in the current Data table row. The SeqFeature object 
 is requested from the database named in the general metadata. If 
 an alternate database is desired, you should change it first using  
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See <Bio::DB::SeqFeature> and L<Bio::SeqFeatureI> for more information 
-about working with these objects.
+See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
+information about working with these objects.
 
 =item segment
 
@@ -527,6 +534,7 @@ sub start {
 	}
 }
 
+*stop = \&end;
 sub end {
 	my $self = shift;
 	carp "end is a read only method" if @_;
@@ -540,10 +548,6 @@ sub end {
 	else {
 		return;
 	}
-}
-
-sub stop {
-	return shift->end;
 }
 
 sub strand {
@@ -564,7 +568,8 @@ sub strand {
 	return 0;
 }
 
-sub name {
+*name = \&display_name;
+sub display_name {
 	my $self = shift;
 	carp "name is a read only method" if @_;
 	my $i = $self->{data}->name_column;
@@ -577,10 +582,6 @@ sub name {
 		return $att->{Name} || $att->{ID} || $att->{transcript_name};
 	}
 	return undef;
-}
-
-sub display_name {
-	return shift->name;
 }
 
 sub type {
@@ -596,7 +597,8 @@ sub type {
 	return undef;
 }
 
-sub id {
+*id = \&primary_id;
+sub primary_id {
 	my $self = shift;
 	carp "id is a read only method" if @_;
 	my $i = $self->{data}->id_column;
@@ -683,18 +685,21 @@ sub vcf_attributes {
 
 ### Data collection convenience methods
 
-sub feature {
+*feature = \&seqfeature;
+sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
 	return $self->{feature} if exists $self->{feature};
-	return undef unless $self->{data}->database;
+	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
+	return $f if $f;
+	return unless $self->{data}->database;
 	
 	# retrieve the feature from the database
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
-	return undef unless ($id or ($name and $type));
-	my $f = get_feature(
+	return unless ($id or ($name and $type));
+	$f = get_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later

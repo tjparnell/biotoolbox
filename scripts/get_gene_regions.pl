@@ -11,10 +11,11 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 );
+use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.35';
+my $VERSION = '1.40';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -42,7 +43,6 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
-	$do_mixed,
 	$bed,
 	$gz,
 	$help,
@@ -62,7 +62,6 @@ GetOptions(
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
-	'mix!'      => \$do_mixed, # mix RNA transcript types from same gene
 	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -88,7 +87,7 @@ if ($print_version) {
 
 ### Check for requirements and set defaults
 unless ($infile or $database) {
-	die " must define a database or input GFF3 file! use --help for more information\n";
+	die " must define a database or input gene table file! use --help for more information\n";
 }
 if ($database =~ /\.(?:gtf|gff3?|txt|refflat|genepred|ucsc)(?:\.gz)?$/i) {
 	# looks like a gene table file was specified as the database
@@ -186,15 +185,7 @@ sub determine_method {
 	# determine the method
 	# also change the name of the request from short to long form
 	my $method;
-	if ($request =~ /^first ?exon$/i) {
-		$request = 'first exon';
-		$method = \&collect_first_exon;
-	}
-	elsif ($request =~ /^last ?exon$/i) {
-		$request = 'last exon';
-		$method = \&collect_last_exon;
-	}
-	elsif ($request =~ /tss/i) {
+	if ($request =~ /tss/i) {
 		$request = 'transcription start site';
 		$method = \&collect_tss;
 	}
@@ -212,6 +203,30 @@ sub determine_method {
 		$request = 'splice sites';
 		$method = \&collect_splice_sites;
 	}
+	elsif ($request =~ /^exons?/i) {
+		$request = 'exon';
+		$method = \&collect_exons;
+	}
+	elsif ($request =~ /^first ?exon$/i) {
+		$request = 'first exon';
+		$method = \&collect_first_exon;
+	}
+	elsif ($request =~ /^last ?exon$/i) {
+		$request = 'last exon';
+		$method = \&collect_last_exon;
+	}
+	elsif ($request =~ /^alt.*exons?/i) {
+		$request = 'alternate exon';
+		$method = \&collect_alt_exons;
+	}
+	elsif ($request =~ /^common ?exons?/i) {
+		$request = 'common exon';
+		$method = \&collect_common_exons;
+	}
+	elsif ($request =~ /^uncommon ?exons?/i) {
+		$request = 'uncommon exon';
+		$method = \&collect_uncommon_exons;
+	}
 	elsif ($request =~ /^introns?$/i) {
 		$method = \&collect_introns;
 	}
@@ -223,17 +238,21 @@ sub determine_method {
 		$request = 'last intron';
 		$method = \&collect_last_intron;
 	}
-	elsif ($request =~ /^alt.*exons?/i) {
-		$request = 'alternate exon';
-		$method = \&collect_common_alt_exons;
+	elsif ($request =~ /^alt.*introns?/i) {
+		$request = 'alternate intron';
+		$method = \&collect_alt_introns;
 	}
-	elsif ($request =~ /^common ?exons?/i) {
-		$request = 'common exon';
-		$method = \&collect_common_alt_exons;
+	elsif ($request =~ /^common ?introns?/i) {
+		$request = 'common intron';
+		$method = \&collect_common_introns;
 	}
-	elsif ($request =~ /^exons?/i) {
-		$request = 'exon';
-		$method = \&collect_exons;
+	elsif ($request =~ /^uncommon ?introns?/i) {
+		$request = 'uncommon intron';
+		$method = \&collect_uncommon_introns;
+	}
+	elsif ($request =~ /utr/i) {
+		$request = 'UTRs';
+		$method = \&collect_utrs;
 	}
 	else {
 		die " unknown region request!\n";
@@ -253,11 +272,17 @@ sub collect_method_from_user {
 		4	=> 'first exon',
 		5	=> 'last exon',
 		6   => 'alternate exons',
-		7   => 'common exons',
-		8	=> 'introns',
-		9   => 'first intron',
-		10  => 'last intron',
-		11	=> 'splice sites',
+		7   => 'uncommon exons',
+		8   => 'common exons',
+		9	=> 'introns',
+		10  => 'first intron',
+		11  => 'last intron',
+		12  => 'alternate introns',
+		13  => 'uncommon introns',
+		14  => 'common introns',
+		15	=> 'splice sites',
+		16  => 'UTRs', 
+		# what about cdsStart, cdsStop?
 	);
 	
 	# request feature from the user
@@ -291,7 +316,7 @@ sub determine_transcript_types {
 	if ($transcript_type) {
 		# provided by the user from the command line
 		if ($transcript_type =~ /,/) {
-			@types = split ",", $transcript_type;
+			@types = split /,/, $transcript_type;
 		}
 		else {
 			push @types, $transcript_type;
@@ -412,18 +437,20 @@ PROMPT
 		# collect the regions based on the primary tag and the method re
 		if ($seqfeat->primary_tag eq 'gene') {
 			# gene
-			my @genes = process_gene($seqfeat, $method);
-			foreach (@genes) {
+			my @regions = process_gene($seqfeat, $method);
+			foreach (@regions) {
 				# each element is an anon array of found feature info
 				$Data->add_row($_);
 			}
 		}
-		elsif ($seqfeat->primary_tag =~ /rna/i) {
+		elsif ($seqfeat->primary_tag =~ /rna|transcript/i) {
 			# transcript
 			my @regions = process_transcript($seqfeat, $method);
 			
-			# add the parent name
-			map { unshift @$_, $seqfeat->display_name } @regions;
+			# remove duplicates if requested
+			if ($unique) {
+				remove_duplicates(\@regions);
+			}
 			
 			foreach (@regions) {
 				# each element is an anon array of found feature info
@@ -461,20 +488,24 @@ sub collect_from_file {
 	$Data->add_comment("Source data file $infile");
 	
 	# open appropriate parser object
+	my $flavor = $Data->taste_file($infile);
+	print " $infile determined to be a $flavor format\n";
 	my $parser;
-	if ($infile =~ /\.(?:gtf|gff3?)(?:\.gz)?$/) {
+	if ($flavor eq 'gff') {
 		$parser = Bio::ToolBox::parser::gff->new(file => $infile) or
 			die " unable to open input file '$infile'!\n";
 	}
-	else {
-		# assuming some sort of ucsc format
-		# it will either work or it won't
+	elsif ($flavor eq 'ucsc') {
+		# some sort of ucsc format
 		$parser = Bio::ToolBox::parser::ucsc->new(
 			file    => $infile,
 			do_gene => 1,
 			do_utr  => 1,
 			do_cds  => 1,
 		) or die " unable to open input file '$infile'!\n";
+	}
+	else {
+		die " $infile is an unrecognized gene table format!\n";
 	}
 	$parser->parse_table or die "unable to parse file '$infile'!\n";
 	
@@ -495,8 +526,10 @@ sub collect_from_file {
 			# transcript
 			my @regions = process_transcript($seqfeat, $method);
 			
-			# add the parent name
-			map { unshift @{$_}, $seqfeat->display_name } @regions;
+			# remove duplicates if requested
+			if ($unique) {
+				remove_duplicates(\@regions);
+			}
 			
 			foreach (@regions) {
 				# each element is an anon array of found feature info
@@ -522,17 +555,16 @@ sub collect_from_file {
 }
 
 
-
 sub generate_output_structure {
 	my $Data = Bio::ToolBox::Data->new(
 		feature  => "region",
-		columns  => [ qw(Parent Transcript Name Chromosome Start Stop Strand) ],
+		columns  => [ qw(Gene Transcript Name Chromosome Start Stop Strand) ],
 	);
 	$Data->program("$0, v $VERSION");
 	my $r = $request;
 	$r =~ s/\s/_/g; # remove spaces
-	$Data->metadata(1,'type', $r);
-	$Data->metadata(2, 'type', $transcript_type);
+	$Data->metadata(1, 'type', $transcript_type);
+	$Data->metadata(2,'type', $r);
 	if ($start_adj) {
 		$Data->metadata(4, 'start_adjusted', $start_adj);
 	}
@@ -550,89 +582,30 @@ sub generate_output_structure {
 
 
 sub process_gene {
-	
 	# passed objects
 	my ($gene, $method) = @_;
+	my @regions;
 	
 	# alternate or common exons require working with gene level
-	if ($request =~ /^alt.*exons?/i) {
-		return collect_common_alt_exons($gene, 1);
-	}
-	elsif ($request =~ /^common ?exons?/i) {
-		return collect_common_alt_exons($gene, 0);
-	}
-	
-	# look for transcripts for this gene
-	my @mRNAs;
-	my @ncRNAs;
-	foreach my $subfeat ($gene->get_SeqFeatures) {
-		if ($subfeat->primary_tag =~ /^mrna$/i) {
-			push @mRNAs, $subfeat;
-		}
-		elsif (acceptable_transcript($subfeat)) {
-			push @ncRNAs, $subfeat;
-		}
-	}
-	
-	# collect the desired regions based on transcript type
-	# must handle cases where 2 or more transcript types from the same gene
-	my @regions;
-	if (@mRNAs and @ncRNAs) {
-		# there are both mRNAs and ncRNAs from the same gene!!!????
-		if ($do_mixed) {
-			# both mixed mRNAs and ncRNAs are perfectly acceptable
-			push @mRNAs, @ncRNAs;
-			foreach (@mRNAs) {
-				my @r = process_transcript($_, $method);
-				if ($r[0]) {
-					push @regions, @r;
-				}
-			}
-		}
-		else {
-			# don't you dare mix your mRNAs with your ncRNAs!!!!
-			if ($do_mrna) {
-				# preferentially take mRNAs if requested
-				foreach (@mRNAs) {
-					my @r = process_transcript($_, $method);
-					if ($r[0]) {
-						push @regions, @r;
-					}
-				}
-			}
-			else {
-				# take everything else
-				foreach (@ncRNAs) {
-					my @r = process_transcript($_, $method);
-					if ($r[0]) {
-						push @regions, @r;
-					}
-				}
-			}
-		}
+	if ($request =~ /alternate|common/i) {
+		@regions = &$method($gene);
 	}
 	else {
-		# only one type of transcript present
-		# mix together and process
-		push @mRNAs, @ncRNAs;
-		foreach (@mRNAs) {
-			my @r = process_transcript($_, $method);
-			if ($r[0]) {
-				push @regions, @r;
-			}
+		foreach my $t (get_transcripts($gene)) {
+			push @regions, &$method($t);
 		}
 	}
-	
 	return unless @regions;
+	
+	# add gene name
+	foreach my $region (@regions) {
+		unshift @$region, $gene->display_name;
+	}
+	
 	
 	# remove duplicates if requested
 	if ($unique) {
 		remove_duplicates(\@regions);
-	}
-	
-	# add the parent name
-	for my $i (0 .. $#regions) {
-		unshift @{ $regions[$i] }, $gene->display_name;
 	}
 	
 	# return the regions
@@ -642,19 +615,18 @@ sub process_gene {
 
 
 sub process_transcript {
-	
 	# passed objects
 	my ($transcript, $method) = @_;
 	
-	# can not process alternate exons with a single transcript
-	return if ($request =~ /^alt.*exons?/i);
-	return if ($request =~ /^common ?exons?/i);
-	
 	# call appropriate method
-	if (acceptable_transcript($transcript)) {
-		return &{$method}($transcript);
+	return unless acceptable_transcript($transcript);
+	my @regions = &$method($transcript);
+	
+	# add non-existent gene name
+	foreach my $region (@regions) {
+		unshift @$region, '.';
 	}
-	return;
+	return @regions;
 }
 
 
@@ -730,17 +702,35 @@ sub collect_tts {
 }
 
 
+sub collect_exons {
+	my $transcript = shift;
+	
+	# process and adjust the exons
+	my @exons;
+	foreach my $e (get_exons($transcript)) {
+		push @exons, _adjust_positions( [ 
+			$transcript->display_name,
+			$e->display_name, 
+			$e->seq_id, 
+			$e->start, 
+			$e->end,
+			$e->strand,
+		] );
+	}
+	
+	return @exons;
+}
+
 
 sub collect_first_exon {
-	
 	my $transcript = shift;
 	
 	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
-	return unless $list;
+	my @list = get_exons($transcript);
+	return unless @list;
 	
 	# the first exon
-	my $first = shift @{ $list };
+	my $first = $transcript->strand >= 0 ? shift @list : pop @list;
 	
 	# identify the exon name if it has one
 	my $name = $first->display_name || 
@@ -758,17 +748,15 @@ sub collect_first_exon {
 }
 
 
-
 sub collect_last_exon {
-	
 	my $transcript = shift;
 	
 	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
-	return unless $list;
+	my @list = get_exons($transcript);
+	return unless @list;
 	
 	# the last exon
-	my $last = pop @{ $list };
+	my $last = $transcript->strand >= 0 ? pop @list : shift @list;
 	
 	# identify the exon name if it has one
 	my $name = $last->display_name || 
@@ -786,6 +774,62 @@ sub collect_last_exon {
 }
 
 
+sub collect_alt_exons {
+	my $gene = shift;
+	my $ac_exons = get_alt_common_exons($gene);
+		# we need the transcript name, so can't use the simpler get_alt_exons()
+	my @exons;
+	foreach my $transcript (keys %$ac_exons) {
+		next if $transcript eq 'common';
+		next if $transcript eq 'uncommon';
+		foreach my $e ( @{ $ac_exons->{$transcript} } ) {
+			push @exons, _adjust_positions( [ 
+				$transcript,
+				$e->display_name, 
+				$e->seq_id, 
+				$e->start, 
+				$e->end,
+				$e->strand,
+			] );
+		}
+	}
+	return @exons;
+}
+
+
+sub collect_uncommon_exons {
+	my $gene = shift;
+	my @exons;
+	foreach my $e (get_uncommon_exons($gene)) {
+		push @exons, _adjust_positions( [ 
+			'uncommon', # more than one transcript, so put generic identifier
+			$e->display_name, 
+			$e->seq_id, 
+			$e->start, 
+			$e->end,
+			$e->strand,
+		] );
+	}
+	return @exons;
+}
+
+
+sub collect_common_exons {
+	my $gene = shift;
+	my @exons;
+	foreach my $e (get_common_exons($gene)) {
+		push @exons, _adjust_positions( [ 
+			'common', # more than one transcript, so put generic identifier
+			$e->display_name, 
+			$e->seq_id, 
+			$e->start, 
+			$e->end,
+			$e->strand,
+		] );
+	}
+	return @exons;
+}
+
 
 sub collect_splice_sites {
 	
@@ -793,7 +837,7 @@ sub collect_splice_sites {
 	my $transcript = shift;
 	
 	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
+	my $list = get_exons($transcript);
 	return unless $list;
 	return if (scalar(@$list) == 1);
 	
@@ -934,51 +978,19 @@ sub collect_splice_sites {
 
 
 sub collect_introns {
-	
-	# seqfeature object
 	my $transcript = shift;
-	
-	# find the exons and/or CDSs
-	my $exons = _collect_exons($transcript);
-	return unless $exons;
-	return if (scalar(@$exons) == 1);
-	
-	# identify the last exon index position
-	my $last = scalar(@$exons) - 1;
 	
 	# collect the introns
 	my @introns;
-	
-	# forward strand
-	if ($transcript->strand == 1) {
-		
-		# walk through each exon
-		for (my $i = 0; $i < $last; $i++) {
-			push @introns, _adjust_positions( [ 
-				$transcript->display_name,
-				$transcript->display_name . ".intron$i", 
-				$transcript->seq_id, 
-				$exons->[$i]->end + 1, 
-				$exons->[$i + 1]->start - 1,
-				$transcript->strand,
-			] );
-		}
-	}
-	
-	# reverse strand
-	else {
-	
-		# walk through each exon
-		for (my $i = 0; $i < $last; $i++) {
-			push @introns, _adjust_positions( [ 
-				$transcript->display_name,
-				$transcript->display_name . ".intron$i", 
-				$transcript->seq_id, 
-				$exons->[$i + 1]->end + 1,
-				$exons->[$i]->start - 1, 
-				$transcript->strand,
-			] );
-		}
+	foreach my $int (get_introns($transcript)) {
+		push @introns, _adjust_positions( [ 
+			$transcript->display_name,
+			$int->display_name, 
+			$int->seq_id, 
+			$int->start, 
+			$int->end,
+			$int->strand,
+		] );
 	}
 	
 	# finished
@@ -987,206 +999,118 @@ sub collect_introns {
 
 
 sub collect_first_intron {
-	
-	# seqfeature object
 	my $transcript = shift;
 	
-	# collect all of the introns
-	my @introns = collect_introns($transcript);
+	# find the introns
+	my @list = get_introns($transcript);
+	return unless @list;
 	
-	# return the first one
-	return shift @introns;
+	# the first intron
+	my $first = $transcript->strand >= 0 ? shift @list : pop @list;
+	return _adjust_positions( [ 
+		$transcript->display_name,
+		$first->display_name, 
+		$first->seq_id, 
+		$first->start, 
+		$first->end,
+		$first->strand,
+	] );
 }
 
 
 sub collect_last_intron {
-	
-	# seqfeature object
 	my $transcript = shift;
 	
-	# collect all of the introns
-	my @introns = collect_introns($transcript);
+	# get the introns
+	my @list = get_introns($transcript);
+	return unless @list;
 	
-	# return the first one
-	return pop @introns;
+	# the last intron
+	my $last = $transcript->strand >= 0 ? pop @list : shift @list;
+	return _adjust_positions( [ 
+		$transcript->display_name,
+		$last->display_name, 
+		$last->seq_id, 
+		$last->start, 
+		$last->end,
+		$last->strand,
+	] );
 }
 
 
-sub collect_exons {
-	
-	my $transcript = shift;
-	
-	# find the exons and/or CDSs
-	my $list = _collect_exons($transcript);
-	return unless $list;
-	
-	# process and adjust the exons
-	my @exons;
-	my $i = 0;
-	foreach my $e (@$list) {
-		my $name = $e->display_name || $transcript->display_name . "_exon$i";
-		push @exons, _adjust_positions( [ 
-			$transcript->display_name,
-			$name, 
-			$e->seq_id, 
-			$e->start, 
-			$e->end,
-			$e->strand,
-		] );
-		$i++;
-	}
-	
-	return @exons;
-}
-
-
-sub collect_common_alt_exons {
-	
+sub collect_alt_introns {
 	my $gene = shift;
-	my $alternate = shift || 0;
-	
-	# identify types of transcripts to avoid mixed types
-	my @mRNAs;
-	my @ncRNAs;
-	foreach ($gene->get_SeqFeatures) {
-		if (is_coding($_)) {
-			push @mRNAs, $_;
-		}
-		else {
-			push @ncRNAs, $_ if acceptable_transcript($_);
-		}
-	}
-	
-	# get list of transcripts, must have more than one
-	my @transcripts;
-	if (@mRNAs and @ncRNAs) {
-		# both RNA types are present
-		# only take those that are requested
-		if ($do_mixed) {
-			# it's ok to mix multiple types
-			push @transcripts, @mRNAs;
-			push @transcripts, @ncRNAs;
-		}
-		elsif ($do_mrna) {
-			push @transcripts, @mRNAs;
-		}
-		else {
-			# all other RNA types
-			push @transcripts, @ncRNAs;
+	my $ac_introns = get_alt_common_introns($gene);
+	my @introns;
+	foreach my $transcript (keys %$ac_introns) {
+		next if $transcript eq 'common';
+		next if $transcript eq 'uncommon';
+		foreach my $i ( @{ $ac_introns->{$transcript} } ) {
+			push @introns, _adjust_positions( [ 
+				$transcript,
+				$i->display_name, 
+				$i->seq_id, 
+				$i->start, 
+				$i->end,
+				$i->strand,
+			] );
 		}
 	}
-	else {
-		# only one type was present
-		push @transcripts, @mRNAs;
-		push @transcripts, @ncRNAs;
-	}
-	return unless (scalar @transcripts > 1);
-	
-	# collect the exons based on transcript type
-	my %pos2exons;
-	my $trx_number = 0;
-	foreach my $t (@transcripts) {
-		next unless acceptable_transcript($t);
-		my $exons = _collect_exons($t);
-		foreach my $e (@$exons) {
-			push @{ $pos2exons{$e->start}{ $e->end} }, [ $t->display_name, $e ];
-		}
-		$trx_number++;
-	}
-	return unless $trx_number > 1;
-	
-	# identify alternate or common exons based on the number of them
-	my @exons;
-	foreach my $s (sort {$a <=> $b} keys %pos2exons) {               # sort on start
-		foreach my $e (sort {$a <=> $b} keys %{ $pos2exons{$s} }) {  # sort on stop
-			
-			# skip if this exon is present in all transcripts and looking for alternates
-			next if (scalar( @{ $pos2exons{$s}{$e} } ) == $trx_number and $alternate);
-			
-			# skip if this exon is not present in all transcripts and looking for common
-			next if (scalar( @{ $pos2exons{$s}{$e} } ) != $trx_number and !$alternate);
-			
-			# record these exons
-			foreach (@{ $pos2exons{$s}{$e} }) {
-				my $tname = $_->[0];
-				my $exon = $_->[1];
-				push @exons, _adjust_positions( [ 
-					$tname,
-					$exon->display_name || $tname . ".$s", 
-					$exon->seq_id, 
-					$exon->start, 
-					$exon->end,
-					$exon->strand,
-				] );
-			}
-		}
-	}
-	
-	# remove duplicates if requested
-	if ($unique) {
-		remove_duplicates(\@exons);
-	}
-	
-	# add the parent name
-	for my $i (0 .. $#exons) {
-		unshift @{ $exons[$i] }, $gene->display_name;
-	}
-	
-	# return the exons
-	return @exons;
+	return @introns;
 }
 
-sub _collect_exons {
-	
-	# initialize
+
+sub collect_uncommon_introns {
+	my $gene = shift;
+	my @introns;
+	foreach my $i (get_uncommon_introns($gene)) {
+		push @introns, _adjust_positions( [ 
+			'uncommon', # more than one transcript, so put generic identifier
+			$i->display_name, 
+			$i->seq_id, 
+			$i->start, 
+			$i->end,
+			$i->strand,
+		] );
+	}
+	return @introns;
+}
+
+
+sub collect_common_introns {
+	my $gene = shift;
+	my @introns;
+	foreach my $i (get_common_introns($gene)) {
+		push @introns, _adjust_positions( [ 
+			'common', # more than one transcript, so put generic identifier
+			$i->display_name, 
+			$i->seq_id, 
+			$i->start, 
+			$i->end,
+			$i->strand,
+		] );
+	}
+	return @introns;
+}
+
+
+sub collect_utrs {
 	my $transcript = shift;
-	my @exons;
-	my @cdss;
 	
-	# go through the subfeatures
-	foreach my $subfeat ($transcript->get_SeqFeatures) {
-		if ($subfeat->primary_tag =~ /exon/i) {
-			push @exons, $subfeat;
-		}
-		elsif ($subfeat->primary_tag =~ /cds|utr|untranslated/i) {
-			push @cdss, $subfeat;
-		}
-	}
-	
-	# check which array we'll use
-	# prefer to use actual exon subfeatures, but those may not be defined
-	my $list;
-	if (@exons) {
-		$list = \@exons;
-	}
-	elsif (@cdss) {
-		$list = \@cdss;
-	}
-	else {
-		# nothing found!
-		return;
+	# process and adjust the UTRs
+	my @utrs;
+	foreach my $u (get_utrs($transcript)) {
+		push @utrs, _adjust_positions( [ 
+			$transcript->display_name,
+			$u->display_name, 
+			$u->seq_id, 
+			$u->start, 
+			$u->end,
+			$u->strand,
+		] );
 	}
 	
-	# sort the list using a Schwartzian transformation by stranded start position
-	my @sorted;
-	if ($transcript->strand == 1) {
-		# forward strand, sort by increasing start positions
-		@sorted = 
-			map { $_->[0] }
-			sort { $a->[1] <=> $b->[1] }
-			map { [$_, $_->start] } 
-			@{ $list };
-	}
-	else {
-		# reverse strand, sort by decreasing end positions
-		@sorted = 
-			map { $_->[0] }
-			sort { $b->[1] <=> $a->[1] }
-			map { [$_, $_->end] }
-			@{ $list };
-	}
-	
-	return \@sorted;
+	return @utrs;
 }
 
 
@@ -1205,22 +1129,6 @@ sub acceptable_transcript {
 		/misc_rna|transcript|retained_intron|antisense|nonsense/i and 
 		$do_miscrna);
 	return 1 if ($t->primary_tag =~ /lincrna/i and $do_lincrna);
-	return 0;
-}
-
-sub is_coding {
-	my $transcript = shift;
-	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
-	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
-		# ensembl type GFFs
-		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	foreach ($transcript->get_SeqFeatures) {
-		# old fashioned way
-		return 1 if $_->primary_tag eq 'CDS';
-	}
 	return 0;
 }
 
@@ -1319,13 +1227,13 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
-  --region [tss|tts|exon|altExon|commonExon|firstExon|lastExon|
-            intron|firstIntron|lastIntron|splice]
+  --region [tss|tts|exon|altExon|uncommonExon|commonExon|firstExon|lastExon|
+            intron|altIntron|uncommonIntron|commonIntron|firstIntron|
+            lastIntron|splice|UTR]
   --start=<integer>
   --stop=<integer>
   --unique
   --slop <integer>
-  --mix
   --bed
   --gz
   --version
@@ -1384,12 +1292,17 @@ possibilities are possible.
      exon        The exons of each transcript
      firstExon   The first exon of each transcript
      lastExon    The last exon of each transcript
-     altExon     All alternate exons from multiple transcripts for each gene
-     commonExon  All common exons between multiple transcripts for each gene
+     altExon     Exons unique to one of several transcripts from a gene
+     uncommonExon Exons shared by 2 or more but not all transcripts
+     commonExon  Exons shared by all transcripts from a gene
      intron      Each intron (usually not defined in the GFF3)
      firstIntron The first intron of each transcript
      lastIntron  The last intron of each transcript
+     altIntron   Introns unique to one of several transcripts from a gene
+     uncommonIntron Introns shared by 2 or more but not all transcripts
+     commonIntron Introns shared by all transcripts of a gene
      splice      The first and last base of each intron
+     UTR         The untranslated regions of each coding transcript
 
 =item --start=<integer>
 
@@ -1417,13 +1330,6 @@ example, when start sites of transcription are not precisely mapped,
 but not useful with defined introns and exons. This does not take 
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
-
-=item --mix
-
-Allow two or more different transcript types from genes to be used.
-Some genes may generate more than one transcript type, for example 
-mRNA and certain non-coding RNAs. By default, only one type of RNA 
-transcript type is accepted. This is usually mRNA, if requested.
 
 =item --bed
 

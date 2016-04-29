@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.36';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -46,12 +46,8 @@ sub load_file {
 		return;
 	}
 	$self->add_file_metadata($filename);
-	my $fh = $self->open_to_read_fh;
-	return unless $fh;
-	$self->{fh} = $fh;
-	$self->{header_line_count} = 0;
+	$self->open_to_read_fh or return;
 	$self->parse_headers;
-	$self->{data_table}->[0] = $self->{'column_names'}; 
 	
 	# Load the data table
 	while (my $line = $self->{fh}->getline) {		
@@ -69,11 +65,8 @@ sub load_file {
 		$self->add_data_line($line);
 	}
 	
-	# record the index number of the last data row
-	$self->{'last_row'} = scalar @{ $self->{'data_table'} } - 1;
-	
 	# completed loading the file
-	$self->{fh}->close;
+	$self->close_fh;
 	delete $self->{fh};
 	
 	# verify the structure
@@ -83,13 +76,116 @@ sub load_file {
 	return 1;
 }
 
+sub taste_file {
+	my $self = shift;
+	my $file = shift;
+	my $filename = $self->check_file($file) or return;
+	my $Taste = $self->new;
+	$Taste->add_file_metadata($filename);
+	$Taste->open_to_read_fh or return;
+	$Taste->parse_headers;
+	
+	# check existing metadata
+	if ($Taste->gff) {
+		return 'gff';
+	}
+	elsif ($Taste->bed) {
+		return 'bed';
+	}
+	elsif ($Taste->ucsc) {
+		return 'ucsc';
+	}
+	
+	# load first 10 data lines
+	$Taste->{data_table}->[0] = $Taste->{'column_names'}; # set table header names
+	for (my $i = 1; $i <= 10; $i++) {
+		my $line = $Taste->fh->getline;
+		next if $line !~ m/\w+/;
+		next if $line =~ /^#/;
+		$Taste->add_data_line($line);
+	}
+	$Taste->close_fh;
+	
+	# check if the number of columns match a known format, then verify
+	my $number = $Taste->number_columns;
+	if ($number == 9) {
+		# possibly a GFF file
+		$Taste->gff(2);
+		$Taste->verify(1);
+		return 'gff' if $Taste->gff == 2;
+		$Taste->add_gff_metadata(2,1); # force metadata
+		$Taste->verify(1);
+		return 'gff' if $Taste->gff == 2;
+	}
+	elsif ($number == 10) {
+		# possibly a genePred file
+		$Taste->ucsc(10);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 10;
+		$Taste->add_ucsc_metadata(10,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 10;
+	}
+	elsif ($number == 11) {
+		# possibly a refFlat file
+		$Taste->ucsc(11);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 11;
+		$Taste->add_ucsc_metadata(11,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 11;
+	}
+	elsif ($number == 12) {
+		# possibly a knownGene or BED12 file
+		$Taste->ucsc(12);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 12;
+		$Taste->bed(12);
+		$Taste->verify(1);
+		return 'bed' if $Taste->bed == 12;
+		$Taste->add_ucsc_metadata(12,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 12;
+		$Taste->add_bed_metadata(12,1); # force metadata
+		$Taste->verify(1);
+		return 'bed' if $Taste->bed == 12;
+	}
+	elsif ($number == 15) {
+		# possibly a genePredExt file
+		$Taste->ucsc(15);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 15;
+		$Taste->add_ucsc_metadata(15,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 15;
+	}
+	elsif ($number == 16) {
+		# possibly a genePredExt file
+		$Taste->ucsc(16);
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 16; 
+		$Taste->add_ucsc_metadata(16,1); # force metadata
+		$Taste->verify(1);
+		return 'ucsc' if $Taste->ucsc == 16;
+	}
+	return;
+}
+
 
 sub parse_headers {
 	my $self = shift;
-	my $fh = shift || $self->{fh};
 	my $noheader = shift || 0; # boolean to indicate no headers are present
-	unless (ref($fh) =~ /^IO/) {
-		confess " must pass an open IO::Handle compatible object!\n";
+	
+	# filehandle
+	my $fh;
+	if (exists $self->{fh} and $self->{fh}) {
+		$fh = $self->{fh};
+	}
+	elsif ($self->filename) {
+		$fh = $self->open_to_read_fh($self->filename);
+	}
+	else {
+		confess " file metadata and/or open filehandle must be set before parsing headers!";
 	}
 	
 	# check that we have an empty table
@@ -303,7 +399,7 @@ sub add_data_line {
 	my ($self, $line) = @_;
 	
 	# do not chomp the line yet, just split into an array
-	my @linedata = split /\t/, $line;
+	my @linedata = split '\t', $line, $self->{number_columns};
 	
 	# chomp the last element
 	# we do this here to ensure the tab split above gets all of the values
@@ -313,6 +409,7 @@ sub add_data_line {
 	
 	# add the line of data
 	push @{ $self->{data_table} }, \@linedata;
+	$self->{last_row} += 1;
 	return 1;
 }
 
@@ -653,7 +750,7 @@ sub write_file {
 	
 	# Write the table column headers
 	if ($self->{'headers'} or $extension =~ /txt/i) {
-		$fh->print(join("\t", @{ $self->{'data_table'}[0] }), "\n");
+		$fh->printf("%s\n", join("\t", @{ $self->{'data_table'}[0] }));
 	}
 		
 	
@@ -673,7 +770,7 @@ sub write_file {
 					push @linedata, $_;
 				}
 			}
-			$fh->print(join("\t", @linedata) . "\n");
+			$fh->printf("%s\n", join("\t", @linedata));
 		}
 	}
 	
@@ -683,8 +780,7 @@ sub write_file {
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
 			# using a tab-delimited format
-			$fh->print( 
-				join("\t", @{ $self->{'data_table'}[$i] }), "\n");
+			$fh->printf("%s\n", join("\t", @{ $self->{'data_table'}[$i] }));
 		}
 	}
 	
@@ -703,13 +799,18 @@ sub save {
 
 #### Open a file for reading
 sub open_to_read_fh {
-	my ($self, $file) = @_;
+	my $self = shift;
+	my $file = shift || undef;
+	my $obj = ref($self) =~ /^Bio::ToolBox/ ? 1 : 0;
 	
 	# check file
-	unless ($file) {
-		$file = $self->filename;
+	if (not $file and $obj) {
+		$file = $self->filename || undef;
 	}
-	return unless $file;
+	unless ($file) {
+		carp " no filename provided or associated with object!";
+		return;
+	}
 	
 	# Open filehandle object as appropriate
 	my $fh; 
@@ -727,6 +828,10 @@ sub open_to_read_fh {
 		# the file is uncompressed and space hogging
 		$fh = IO::File->new($file, 'r') or 
 			carp "unable to read '$file' $!\n";
+	}
+	
+	if ($obj) {
+		$self->{fh} = $fh;
 	}
 	return $fh;	
 }
@@ -820,6 +925,18 @@ sub check_file {
 }
 
 
+sub fh {
+	my $self = shift;
+	return $self->{fh} if exists $self->{fh};
+	return;
+}
+
+sub close_fh {
+	my $self = shift;
+	$self->{fh}->close if (exists $self->{fh} and $self->{fh});
+}
+
+
 ### Internal subroutine to check if a comment line contains headers
 sub _commented_header_line {
 	my ($data, $line) = @_;
@@ -830,7 +947,7 @@ sub _commented_header_line {
 		# take the last line in the other array
 		@commentdata = split /\t/, $data->{'comments'}->[-1];
 	}
-	my @linedata = split /\t/, $line;
+	my @linedata = split '\t', $line;
 	
 	# check if the counts are equal
 	if (scalar @commentdata == scalar @linedata) {
@@ -896,9 +1013,7 @@ sub add_column_metadata {
 sub add_gff_metadata {
 	my $self = shift;
 	my $version = shift || undef;
-	
-	# set column number
-	$self->{'number_columns'} = 9; # always 9 columns
+	my $force = shift || 0;
 	
 	# set the gff version based on the extension if it isn't already
 	unless ($self->gff) {
@@ -915,14 +1030,21 @@ sub add_gff_metadata {
 	for (my $i = 0; $i < 9; $i++) {
 		# loop for each column
 		# set metadata unless it's already loaded
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i];
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
+	}
+	$self->{data_table}->[0] = $self->{'column_names'};
+	
+	# set column number always to 9
+	if ($force or $self->{'number_columns'} == 0) { 
+		$self->{'number_columns'} = 9;
 	}
 	
 	# set headers flag to false
@@ -950,12 +1072,14 @@ sub add_gff_metadata {
 	# the fourth column is score, not name
 sub add_bed_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 
 	$self->{'number_columns'} = $column_count; 
 	$self->{'bed'} = $column_count;
 	
 	# set column names
 	my $bed_names = $self->standard_column_names(
+		# try to get this from the file extension if available
 		$self->extension =~ /bdg|graph/i ? 'bdg' : 'bed12'
 	);
 	
@@ -965,15 +1089,17 @@ sub add_bed_metadata {
 	for (my $i = 0; $i < $column_count; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $bed_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -991,6 +1117,7 @@ sub add_bed_metadata {
 	# see http://genome.ucsc.edu/FAQ/FAQformat.html
 sub add_peak_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 
 	$self->{'number_columns'} = $column_count; 
 	$self->{'bed'} = $column_count;
@@ -1005,15 +1132,17 @@ sub add_peak_metadata {
 	
 	# add metadata
 	for (my $i = 0; $i < $column_count; $i++) {
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'} = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'};
+		}
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1034,6 +1163,7 @@ sub add_peak_metadata {
 	# also biotoolbox script ucsc_table2gff3.pl
 sub add_ucsc_metadata {
 	my ($self, $column_count) = @_;
+	my $force = shift || 0;
 	
 	$self->{'number_columns'} = $column_count; 
 	$self->{'ucsc'} = $column_count;
@@ -1045,15 +1175,17 @@ sub add_ucsc_metadata {
 	for (my $i = 0; $i < $column_count; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'}; 
+		}
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set the feature type
 	unless (defined $self->{'feature'}) {
@@ -1072,21 +1204,24 @@ sub add_ucsc_metadata {
 	# importing to binary BAR files used in T2, USeq, and IGB
 sub add_sgr_metadata {
 	my $self = shift;
+	my $force = shift || 0;
 	
 	# set column metadata
 	my $column_names = $self->standard_column_names('sgr');
 	for (my $i = 0; $i < 3; $i++) {
 		# loop for each column
 		# set name unless it already has one from metadata
-		unless (exists $self->{$i}) {
+		if ($force or not exists $self->{$i}) {
 			$self->{$i}{'name'}  = $column_names->[$i] || 'extraColumn';
 			$self->{$i}{'index'} = $i;
 			$self->{$i}{'AUTO'}  = 3;
 		}
 		# assign the name to the column header
-		$self->{'column_names'}->[$i] = $self->{$i}{'name'} unless 
-			defined $self->{'column_names'}->[$i];
+		if ($force or not defined $self->{'column_names'}->[$i]) {
+			$self->{'column_names'}->[$i] = $self->{$i}{'name'}; 
+		}
 	}
+	$self->{data_table}->[0] = $self->{'column_names'};
 	$self->{'number_columns'} = 3; 
 
 
@@ -1105,7 +1240,7 @@ sub add_sgr_metadata {
 sub add_standard_metadata {
 	my ($self, $line) = @_;
 	
-	my @namelist = split /\t/, $line;
+	my @namelist = split '\t', $line;
 	$namelist[-1] =~ s/[\r\n]+$//;
 	
 	# we will define the columns based on
@@ -1137,6 +1272,7 @@ sub add_standard_metadata {
 	
 	# put the column names in the metadata
 	push @{ $self->{'column_names'} }, @namelist;
+	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set headers flag to true
 	$self->{'headers'} = 1;
@@ -1184,11 +1320,11 @@ sub standard_column_names {
 		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
 			exonStarts0 exonEnds proteinID alignID)];
 	}
-	elsif ($type eq 'ucsc11' or $type eq 'genepred') {
+	elsif ($type eq 'ucsc11' or $type eq 'refflat') {
 		return [qw(geneName transcriptName chrom strand txStart0 txEnd cdsStart0 
 			cdsEnd exonCount exonStarts0 exonEnds)];
 	}
-	elsif ($type eq 'ucsc10' or $type eq 'refflat') {
+	elsif ($type eq 'ucsc10' or $type eq 'genepred') {
 		return [qw(name chrom strand txStart0 txEnd cdsStart0 cdsEnd exonCount 
 			exonStarts exonEnds)];
 	}
@@ -1377,9 +1513,24 @@ and can be used by the user.
 
 =item load_file($filename)
 
-Loads a file into memory. Any metadata lines will be automatically 
-parsed and the table loaded into the Data object. Some basic consistency 
-checks are performed. Structured file formats, such as BED, GFF, etc are 
+This will load a file into a new, empty Data table. This function is 
+called automatically when a filename is provided to the new() function. 
+The existence of the file is first checked (appending common missing 
+extensions as necessary), metadata and column headers processed and/or 
+generated from default settings, the content loaded into the table, and 
+the structure verified. Error messages may be printed if the structure or 
+format is inconsistent or doesn't match the expected format, e.g a file 
+with a .bed extension doesn't match the UCSC specification.
+Pass the name of the filename.
+
+=item taste_file($filename)
+
+Tastes, or checks, a file for a certain flavor, or known gene file formats. 
+This is based on file extension, metadata headers, and/or file content 
+in the first 10 lines or so. Returns a string based on the file format.
+Values include gff, bed, ucsc, or undefined. Useful for determining if 
+the file represents a known gene table format that lacks a defined file 
+extension, e.g. UCSC formats.
 
 =item add_file_metadata($filename)
 
@@ -1503,7 +1654,7 @@ Parses a text line from the file into a Data table row.
 
 This subroutine confirms the existance of a passed filename. If not 
 immediately found, it will attempt to append common file extensions 
-and verifiy its existence. This allows the user to pass only the base 
+and verify its existence. This allows the user to pass only the base 
 file name and not worry about missing the extension. This may be useful 
 in shell scripts.
 
@@ -1511,31 +1662,35 @@ in shell scripts.
 
 Parse a column metadata line from a file into a Data structure.
 
-=item add_gff_metadata()
+=item add_gff_metadata($version, $force)
 
-Add default column metadata for a GFF file.
+Add default column metadata for a GFF file. Specify which GFF version.
 
-=item add_bed_metadata()
+=item add_bed_metadata($column_count, $force)
 
-Add default column metadata for a BED file.
+Add default column metadata for a BED file. Specify the number of BED 
+columns.
 
-=item add_peak_metadata()
+=item add_peak_metadata($column_count, $force)
 
-Add default column metadata for a narrowPeak or broadPeak file.
+Add default column metadata for a narrowPeak or broadPeak file. 
+Specify the number of columns.
 
-=item add_ucsc_metadata()
+=item add_ucsc_metadata($column_count, $force)
 
-Add default column metadata for a UCSC refFlat or genePred file.
+Add default column metadata for a UCSC refFlat or genePred file. 
+Specify the number of columns to define the format.
 
-=item add_sgr_metadata()
+=item add_sgr_metadata($force)
 
 Add default column metadata for a SGR file.
 
-=item add_standard_metadata()
+=item add_standard_metadata($line)
 
-Add default column metadata for a generic file.
+Add default column metadata for a generic file. Pass the text line 
+containing the tab-delimited column headers.
 
-=item standard_column_names()
+=item standard_column_names($format)
 
 Returns an anonymous array of standard file format column header names. 
 Pass a value representing the file format. Values include gff, bed12, 
