@@ -9,7 +9,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
-our $VERSION = '1.33';
+our $VERSION = '1.36';
 our $WIGGLE_OK = 0;
 
 # Exported names
@@ -111,11 +111,8 @@ sub open_store_db {
 		};
 	}
 	
-	unless ($db) {
-		warn "Failed to open Bio::DB::SeqFeature::Store database '$database'";
-	}
-	
 	# return opened database object or nothing if unsuccessful 
+	return unless $db;	
 	return $db;
 }
 
