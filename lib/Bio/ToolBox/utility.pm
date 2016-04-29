@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.35';
+our $VERSION = '1.36';
 
 =head1 NAME
 
@@ -213,7 +213,7 @@ sub ask_user_for_index {
 	unless (
 		# we use filename and column number as indicators 
 		$Data->filename eq $DATA_FILENAME and 
-		join(";", $Data->list_columns) == $DATA_COLNAMES
+		join(";", $Data->list_columns) eq $DATA_COLNAMES
 	) {
 		print " These are the columns in the file\n";
 		my $i = 0;

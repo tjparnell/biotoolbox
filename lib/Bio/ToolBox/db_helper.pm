@@ -415,7 +415,7 @@ sub open_db_connection {
 	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig/i) {
 		
 		# first check that it exists
-		if (-e $database and -r _) {
+		if (-e $database) {
 		
 			# a Bam database
 			if ($database =~ /\.bam$/i) {
@@ -535,14 +535,8 @@ sub open_db_connection {
 		
 		# file does not exist or can be read
 		else {
-			if (not -e _) {
-				# file does not exist
-				$error = " ERROR: file '$database' does not exist!\n";
-			}
-			else {
-				# file must not be readable then
-				$error = " ERROR: file '$database' can not be read!\n";
-			}
+			# file does not exist
+			$error = " ERROR: file '$database' does not exist!\n";
 		}
 	}
 	
@@ -581,7 +575,7 @@ sub open_db_connection {
 	} 
 	else {
 		$error .= " no database could be found or connected!\n";
-		warn $error;
+		print STDERR $error;
 		return;
 	}
 }
