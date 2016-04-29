@@ -399,7 +399,7 @@ sub add_data_line {
 	my ($self, $line) = @_;
 	
 	# do not chomp the line yet, just split into an array
-	my @linedata = split /\t/, $line;
+	my @linedata = split '\t', $line, $self->{number_columns};
 	
 	# chomp the last element
 	# we do this here to ensure the tab split above gets all of the values
@@ -750,7 +750,7 @@ sub write_file {
 	
 	# Write the table column headers
 	if ($self->{'headers'} or $extension =~ /txt/i) {
-		$fh->print(join("\t", @{ $self->{'data_table'}[0] }), "\n");
+		$fh->printf("%s\n", join("\t", @{ $self->{'data_table'}[0] }));
 	}
 		
 	
@@ -770,7 +770,7 @@ sub write_file {
 					push @linedata, $_;
 				}
 			}
-			$fh->print(join("\t", @linedata) . "\n");
+			$fh->printf("%s\n", join("\t", @linedata));
 		}
 	}
 	
@@ -780,8 +780,7 @@ sub write_file {
 			# we will step though the data_table array one row at a time
 			# we will join each row's array of elements into a string to print
 			# using a tab-delimited format
-			$fh->print( 
-				join("\t", @{ $self->{'data_table'}[$i] }), "\n");
+			$fh->printf("%s\n", join("\t", @{ $self->{'data_table'}[$i] }));
 		}
 	}
 	
@@ -948,7 +947,7 @@ sub _commented_header_line {
 		# take the last line in the other array
 		@commentdata = split /\t/, $data->{'comments'}->[-1];
 	}
-	my @linedata = split /\t/, $line;
+	my @linedata = split '\t', $line;
 	
 	# check if the counts are equal
 	if (scalar @commentdata == scalar @linedata) {
@@ -1241,7 +1240,7 @@ sub add_sgr_metadata {
 sub add_standard_metadata {
 	my ($self, $line) = @_;
 	
-	my @namelist = split /\t/, $line;
+	my @namelist = split '\t', $line;
 	$namelist[-1] =~ s/[\r\n]+$//;
 	
 	# we will define the columns based on
