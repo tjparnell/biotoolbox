@@ -345,10 +345,31 @@ sub get_exons {
 	# prefer to use actual exon subfeatures, but those may not be defined
 	my @list;
 	if (@exons) {
-		@list = @exons;
+		@list = map { $_->[0] } 
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@exons;
 	}
 	elsif (@cdss) {
-		@list = @cdss;
+		# duplicate the CDSs as exons
+		@list = map { _duplicate($_) } @cdss;
+		foreach (@list) {$_->primary_tag('exon')} # reset tag
+		
+		# make sure to merge adjacent exons
+		@list = map { $_->[0] } # must sort first
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@list;
+		for (my $i = 0; $i < scalar @list; $i++) {
+			if (defined ($list[ $i + 1 ]) ) {
+				if ($list[$i+1]->start - $list[$i]->end <= 1) {
+					# need to merge
+					$list[$i]->end( $list[$i+1]->end );
+					splice(@list, $i + 1, 1); # remove the merged
+					$i--;
+				} 
+			}
+		}
 	}
 	elsif (@transcripts) {
 		foreach my $t (@transcripts) {
@@ -357,18 +378,17 @@ sub get_exons {
 			my @e = get_exons($t);
 			push @list, @e;
 		}
+		@list = map { $_->[0] } 
+				sort { $a->[1] <=> $b->[1] }
+				map { [$_, $_->start] } 
+				@list;
 	}
 	else {
 		# nothing found!
 		return;
 	}
 	
-	# return sorted list by start position
-	my @slist = map { $_->[0] }
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
-				@list;
-	return wantarray ? @slist : \@slist;
+	return wantarray ? @list : \@list;
 }
 
 sub get_alt_exons {
@@ -575,8 +595,29 @@ sub get_transcripts {
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
 	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
+	my @exons;
 	foreach my $subf ($gene->get_SeqFeatures) {
-		push @transcripts, $subf if $subf->primary_tag =~ /rna|transcript/i;
+		if ($subf->primary_tag =~ /rna|transcript/i) {
+			push @transcripts, $subf;
+		}
+		elsif ($subf->primary_tag =~ /^(?:cds|exon)$/i) {
+			push @exons, $subf;
+		}
+	}
+	if (not @transcripts and @exons) {
+		# some weirdly formatted annotation files skip the transcript
+		# looking at you SGD
+		my $transcript = $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => 'transcript',
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-segments       => \@exons,
+		);
+		push @transcripts, $transcript;
 	}
 	return map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] }
