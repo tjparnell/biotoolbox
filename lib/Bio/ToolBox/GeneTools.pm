@@ -237,6 +237,17 @@ Returns the start coordinate of the CDS for the given transcript.
 
 Returns the stop coordinate of the CDS for the given transcript.
 
+=item get_start_codon($transcript)
+
+Returns a SeqFeature object representing the start codon. If one is 
+not defined in the hierarchy, then a new object is created.
+
+=item get_stop_codon($transcript)
+
+Returns a SeqFeature object representing the stop codon. If one is 
+not defined in the hierarchy, then a new object is created. Not that 
+this assumes that the stop codon is inclusive to the defined CDS.
+
 =item get_transcript_cds_length($transcript)
 
 Calculates and returns the length of the coding sequence for a 
@@ -278,6 +289,8 @@ our @EXPORT_OK = qw(
 	get_cds
 	get_cdsStart
 	get_cdsEnd
+	get_start_codon
+	get_stop_codon
 	get_transcript_cds_length
 	get_utrs
 );
@@ -307,6 +320,8 @@ our %EXPORT_TAGS = (
 		get_cds
 		get_cdsStart
 		get_cdsEnd
+		get_start_codon
+		get_stop_codon
 		get_transcript_cds_length
 		get_utrs
 	) ],
@@ -766,6 +781,93 @@ sub get_transcript_cds_length {
 		$total += $subf->length;
 	}
 	return $total;
+}
+
+sub get_start_codon {
+	my $transcript = shift;
+	return unless is_coding($transcript);
+	my $start_codon;
+	
+	# look for existing one
+	foreach my $subfeat ($transcript->get_SeqFeatures) {
+		$start_codon =  $subfeat if $subfeat->primary_tag =~ /start.?codon/i;
+	}
+	return $start_codon if $start_codon;
+	
+	# otherwise we have to build one
+	my @cdss = map { $_->[0] } 
+			sort { $a->[1] <=> $b->[1] }
+			map { [$_, $_->start] } 
+			get_cds($transcript);
+	if ($transcript->strand >= 0) {
+		$start_codon = $transcript->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'start_codon',
+				-start         => $cdss[0]->start,
+				-end           => $cdss[0]->start + 2,
+				-strand        => 1,
+				-phase         => 0,
+				-primary_id    => $transcript->primary_id . '.start_codon',
+		);
+	}
+	else {
+		$start_codon = $transcript->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'start_codon',
+				-start         => $cdss[-1]->end - 2,
+				-end           => $cdss[-1]->end,
+				-strand        => -1,
+				-phase         => 0,
+				-primary_id    => $transcript->primary_id . '.start_codon',
+		);
+	}
+	return $start_codon;
+}
+
+sub get_stop_codon {
+	my $transcript = shift;
+	return unless is_coding($transcript);
+	my $stop_codon;
+	
+	# look for existing one
+	foreach my $subfeat ($transcript->get_SeqFeatures) {
+		$stop_codon =  $subfeat if $subfeat->primary_tag =~ /stop.?codon/i;
+	}
+	return $stop_codon if $stop_codon;
+	
+	# otherwise we have to build one
+	# this entirely presumes that the stop codon is inclusive to the last cds
+	my @cdss = map { $_->[0] } 
+			sort { $a->[1] <=> $b->[1] }
+			map { [$_, $_->start] } 
+			get_cds($transcript);
+	if ($transcript->strand >= 0) {
+		$stop_codon = $transcript->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'stop_codon',
+				-start         => $cdss[-1]->end - 2,
+				-end           => $cdss[-1]->end,
+				-strand        => 1,
+				-phase         => 0,
+				-primary_id    => $transcript->primary_id . '.stop_codon',
+		);
+	}
+	else {
+		$stop_codon = $transcript->new(
+				-seq_id        => $transcript->seq_id,
+				-source        => $transcript->source,
+				-primary_tag   => 'stop_codon',
+				-start         => $cdss[0]->start,
+				-end           => $cdss[0]->start + 2,
+				-strand        => -1,
+				-phase         => 0,
+				-primary_id    => $transcript->primary_id . '.stop_codon',
+		);
+	}
+	return $stop_codon;
 }
 
 sub get_utrs {
