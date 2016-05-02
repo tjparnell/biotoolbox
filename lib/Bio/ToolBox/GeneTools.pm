@@ -262,6 +262,32 @@ return anything.
 
 =back
 
+=head2 Export methods
+
+These methods are used for exporting a gene and/or transcript model into 
+a text string based on the specified format. 
+
+=over 4
+
+=item gff_string($gene)
+
+This is just a convenience method. SeqFeature objects based on 
+L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, or L<Bio::ToolBox::SeqFeature>
+have a gff_string() method, and this will simply call that method. SeqFeature 
+objects that do not have this method will, of course, cause the script to 
+terminate. 
+
+L<Bio::ToolBox::Feature> also provide a gff_string method.
+
+=item ucsc_string($gene)
+
+This will export a gene or transcript model as a refFlat formatted gene 
+Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
+for details. Multiple transcript genes are exported as multiple text lines 
+concatenated together.
+
+=back
+
 =cut
 
 use strict;
@@ -293,6 +319,8 @@ our @EXPORT_OK = qw(
 	get_stop_codon
 	get_transcript_cds_length
 	get_utrs
+	gff_string
+	ucsc_string
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -324,6 +352,10 @@ our %EXPORT_TAGS = (
 		get_stop_codon
 		get_transcript_cds_length
 		get_utrs
+	) ],
+	export => [ qw(
+		gff_string
+		ucsc_string
 	) ],
 );
 
@@ -983,6 +1015,58 @@ sub get_utrs {
 	return wantarray ? @list : \@list;
 }
 
+
+#### Export methods
+
+sub gff_string {
+	# Bio::ToolBox::SeqFeature and Bio::SeqFeature::Lite objects have this method
+	# otherwise this will die
+	return shift->gff_string(@_);
+}
+
+sub ucsc_string {
+	my $feature = shift;
+	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
+	my @ucsc_list;
+	
+	# process according to type
+	if ($feature->primary_tag =~ /gene/i) {
+		# a gene object, we will need to process it's transcript subfeatures
+		foreach my $transcript (get_transcripts($feature)) {
+			my $ucsc = _process_ucsc_transcript($transcript, $feature);
+			push @ucsc_list, $ucsc if $ucsc;
+		}
+	}
+	elsif ($feature->primary_tag =~ /rna|transcript/i) {
+		# some sort of RNA transcript
+		my $ucsc = _process_ucsc_transcript($feature);
+		push @ucsc_list, $ucsc if $ucsc;
+	}
+	
+	# return strings
+	my $string;
+	foreach my $ucsc (@ucsc_list) {
+		$string .= sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+			$ucsc->{'name2'},
+			$ucsc->{'name'},
+			$ucsc->{'chr'},
+			$ucsc->{'strand'},
+			$ucsc->{'txStart'},
+			$ucsc->{'txEnd'},
+			$ucsc->{'cdsStart'},
+			$ucsc->{'cdsEnd'},
+			$ucsc->{'exonCount'},
+			join(",", @{$ucsc->{'exonStarts'}} ) . ',', 
+			join(",", @{$ucsc->{'exonEnds'}} ) . ',',
+		);
+	}
+	return $string;
+}
+
+
+
+
+
 #### internal methods
 
 # internal method to duplicate a seqfeature object with just the essential stuff
@@ -998,6 +1082,90 @@ sub _duplicate {
 		-source         => $f->source_tag,
 	);
 }
+
+sub _process_ucsc_transcript {
+	my $transcript = shift;
+	my $gene = shift || undef;
+	
+	# initialize ucsc hash
+	my $ucsc = {
+		'name'         => $transcript->display_name || $transcript->primary_id,
+		'name2'        => undef,
+		'chr'          => $transcript->seq_id,
+		'strand'       => $transcript->strand < 0 ? '-' : '+', 
+		'txStart'      => $transcript->start - 1,
+		'txEnd'        => $transcript->end,
+		'cdsStart'     => undef,
+		'cdsEnd'       => undef,
+		'exonCount'    => 0,
+		'exonStarts'   => [],
+		'exonEnds'     => [],
+	};
+	my $score = $transcript->score; # rarely used, but just in case
+	if (defined $score and $score ne '.') {
+		$ucsc->{score} = $score;
+	}
+	
+	# determine gene name
+	if ($gene) {
+		# use provided gene name
+		$ucsc->{'name2'} = $gene->display_name || $gene->primary_id;
+	}
+	else {
+		# reuse the name
+		$ucsc->{'name2'} = $ucsc->{'name'};
+	}
+	
+	# record CDS points
+	if (is_coding($transcript)) {
+		# make sure the CDS are sorted in order
+		my @cds = 
+			map {$_->[1]}
+			sort {$a->[0] <=> $b->[0]}
+			map { [$_->start, $_] }
+			get_cds($transcript);
+		$ucsc->{cdsStart} = $cds[0]->start - 1;
+		$ucsc->{cdsEnd}   = $cds[-1]->end;
+		
+		# adjust CDS positions with codon information as necessary
+		# this usually only happens if codons were explicitly defined and 
+		# not included with the CDS information
+		my $start_codon = get_start_codon($transcript);
+		my $stop_codon = get_stop_codon($transcript);
+		if ($transcript->strand >= 0) {
+			if ($start_codon->start < $ucsc->{cdsStart}) {
+				$ucsc->{cdsStart} = $start_codon->start;
+			}
+			if ($stop_codon->end > $ucsc->{cdsEnd}) {
+				$ucsc->{cdsEnd} = $stop_codon->end;
+			}
+		}
+		else { # negative strand
+			if ($start_codon->end > $ucsc->{cdsEnd}) {
+				$ucsc->{cdsEnd} = $start_codon->end;
+			}
+			if ($stop_codon->start < $ucsc->{cdsStart}) {
+				$ucsc->{cdsStart} = $stop_codon->start;
+			}
+		}
+	}
+	else {
+		# non-coding transcript sets the cds points to the transcript end
+		$ucsc->{cdsStart} = $transcript->end;
+		$ucsc->{cdsEnd}   = $transcript->end;
+	}
+	
+	# record the exons
+	foreach my $exon (get_exons($transcript)) {
+		push @{ $ucsc->{'exonStarts'} }, $exon->start - 1;
+		push @{ $ucsc->{'exonEnds'} }, $exon->end;
+		$ucsc->{'exonCount'} += 1;
+	}
+	
+	return $ucsc;
+}
+
+
 
 __END__
 
