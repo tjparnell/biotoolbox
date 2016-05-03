@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.35';
+my $VERSION = '1.40';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -284,6 +284,11 @@ sub merge_two_datasets {
 	
 	# Initialize the output data structure if necessary
 	$output_data = initialize_output_data_structure($input_data1); 
+	
+	# add comment lines from second files, first was take care of during initialization
+	foreach ($input_data2->comments) {
+		$output_data->add_comment($_);
+	}
 
 	# assign the datasets to the output data in requested order
 	foreach my $request (@order) {
@@ -392,6 +397,11 @@ sub merge_two_datasets_by_lookup {
 	
 	# Initialize the output data structure if necessary
 	$output_data = initialize_output_data_structure($input_data1); 
+	
+	# add comment lines from second files, first was take care of during initialization
+	foreach ($input_data1->comments) {
+		$output_data->add_comment($_);
+	}
 	
 	# assign the datasets to the output data in requested order
 	foreach my $request (@order) {
@@ -505,6 +515,10 @@ sub add_datasets {
 		$index = index_dataset($data, $lookup_i);
 	}
 	
+	# add comment lines from second files, first was take care of during initialization
+	foreach ($data->comments) {
+		$output_data->add_comment($_);
+	}
 	
 	# Merge the new datasets with current output
 	# determine the new order
@@ -997,6 +1011,9 @@ sub initialize_output_data_structure {
 	# we'll re-use the values from file1 
 	$output_data->program( $Data1->program ); # force overwrite value
 	$output_data->database( $Data1->database );
+	foreach ($Data1->comments) {
+		$output_data->add_comment($_);
+	}
 	
 	# assign the filename
 	if ($outfile) {
@@ -1033,13 +1050,6 @@ sub copy_metadata {
 		# no opportunity to rename interactively
 		# use file basename appended with Score
 		$output_data->name($index, $data->basename . '_Score'); 
-	}
-	
-	# set the original file name
-	# we are ignoring the AUTO metadata here, which we should respect
-	# we will delete this metadata later
-	unless (defined $output_data->metadata($index, 'original_file')) {
-		$output_data->metadata($index, 'original_file', $data->filename);
 	}
 }
 	
