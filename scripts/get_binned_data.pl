@@ -1020,7 +1020,7 @@ A program to collect data in bins across a list of features.
  get_binned_data.pl [--options] <filename>
   
   Options for existing files:
-  --in <filename>
+  --in <filename>                  (txt bed gff gtf refFlat ucsc)
   
   Options for new files:
   --db <name | filename>
@@ -1051,7 +1051,7 @@ A program to collect data in bins across a list of features.
   --gz
   --cpu <integer>                                           (2)
   --version
-  --help
+  --help                              show extended documentation
 
 =head1 OPTIONS
 

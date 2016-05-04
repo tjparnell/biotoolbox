@@ -1003,7 +1003,7 @@ A script to collect data in bins around a relative position.
 get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options for existing files:
-  --in <filename> 
+  --in <filename>                  (txt bed gff gtf refFlat ucsc)
   
   Options for new files:
   --db <name|file>
@@ -1035,7 +1035,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --gz
   --cpu <integer>                                           (2)
   --version
-  --help
+  --help                              show extended documentation
 
 =head1 OPTIONS
 
