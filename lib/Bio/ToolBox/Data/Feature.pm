@@ -175,7 +175,7 @@ a convenient hash reference.
 =item gff_attributes
 
 Parses the 9th column of GFF files. URL-escaped characters are converted 
-back to text. Returns a hash reference of key =E<gt> value pairs.
+back to text. Returns a hash reference of key =E<gt> value pairs. 
 
 =item vcf_attributes
 
@@ -193,6 +193,21 @@ For example:
    # access by 0-based column index 
    my $genotype = $attr->{9}{GT};
    my $depth = $attr->{7}{ADP}
+
+=item rewrite_gff_attributes
+
+Rewrites the GFF attributes column (the 9th column) based on the 
+contents of the attributes hash that was previously generated with 
+the gff_attributes() method. Useful when you have modified the 
+contents of the attributes hash.
+
+=item rewrite_vcf_attributes
+
+Rewrite the VCF attributes for the INFO (8th column), FORMAT (9th 
+column), and sample columns (10th and higher columns) based on the 
+contents of the attributes hash that was previously generated with 
+the vcf_attributes() method. Useful when you have modified the 
+contents of the attributes hash.
 
 =back
 
@@ -432,6 +447,7 @@ use Bio::ToolBox::db_helper qw(
 	get_region_dataset_hash
 );
 
+1;
 
 
 
@@ -659,7 +675,8 @@ sub vcf_attributes {
 	unless ($self->{data}->name(7) eq 'INFO') {
 		croak "VCF column INFO is missing or improperly formatted!";
 	}
-	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : 1} 
+	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
+					# some tags are simple and have no value, eg SOMATIC 
 				map { [split(/=/, $_)] } 
 				split(/;/, $self->value(7));
 	$self->{attributes}->{INFO} = \%info;
@@ -682,6 +699,76 @@ sub vcf_attributes {
 	return $self->{attributes};
 }
 
+sub rewrite_gff_attributes {
+	my $self = shift;
+	return unless ($self->{data}->gff);
+	return unless exists $self->{attributes};
+	my @pairs; # of key=value items
+	if (exists $self->{attributes}{ID}) {
+		# I assume this does not need to be escaped!
+		push @pairs, 'ID=' . $self->{attributes}{ID};
+	}
+	if (exists $self->{attributes}{Name}) {
+		my $name = $self->{attributes}{Name};
+		$name =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		push @pairs, "Name=$name";
+	}
+	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes} }) {
+		next if $key eq 'ID';
+		next if $key eq 'Name';
+		my $value = $self->{attributes}{$key};
+		$key =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		push @pairs, "$key=$value";
+	}
+	$self->value(8, join("; ", @pairs));
+	return 1;
+}
+
+sub rewrite_vcf_attributes {
+	my $self = shift;
+	return unless ($self->{data}->vcf);
+	return unless exists $self->{attributes};
+	
+	# INFO
+	my $info = join(';', 
+		map { 
+			defined $self->{attributes}->{INFO}{$_} ? 
+			join('=', $_, $self->{attributes}->{INFO}{$_}) : $_
+		} 
+		sort {$a cmp $b} 
+		keys %{$self->{attributes}->{INFO}}
+	);
+	$info ||= '.'; # sometimes we have nothing left
+	$self->value(7, $info);
+	
+	# FORMAT
+	my @order;
+	push @order, 'GT' if exists $self->{attributes}{9}{GT};
+	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes}{9} } ) {
+		next if $key eq 'GT';
+		push @order, $key;
+	}
+	if (@order) {
+		$self->value(8, join(':', @order));
+	}
+	else {
+		$self->value(8, '.');
+	}
+	
+	# SAMPLES
+	foreach my $i (9 .. $self->{data}->last_column) {
+		if (@order) {
+			$self->value($i, join(":", 
+				map { $self->{attributes}{$i}{$_} } @order 
+			) );
+		}
+		else {
+			$self->value($i, '.');
+		}
+	}
+	return 1;
+}
 
 ### Data collection convenience methods
 
