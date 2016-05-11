@@ -168,9 +168,17 @@ in the current data row.
 GFF and VCF files have special attributes in the form of key = value pairs. 
 These are stored as specially formatted, character-delimited lists in 
 certain columns. These methods will parse this information and return as 
-a convenient hash reference. 
+a convenient hash reference. The keys and values of this hash may be 
+changed, deleted, or added to as desired. To write the changes back to 
+the file, use the rewrite_attributes() to properly write the attributes 
+back to the file with the proper formatting.
 
 =over 4
+
+=item attributes
+
+Generic method that calls either gff_attributes() or vcf_attributes() 
+depending on the data table format. 
 
 =item gff_attributes
 
@@ -193,6 +201,11 @@ For example:
    # access by 0-based column index 
    my $genotype = $attr->{9}{GT};
    my $depth = $attr->{7}{ADP}
+
+=item rewrite_attributes
+
+Generic method that either calls rewrite_gff_attributes() or 
+rewrite_vcf_attributes() depending on the data table format.
 
 =item rewrite_gff_attributes
 
@@ -649,6 +662,13 @@ sub length {
 	}
 }
 
+sub attributes {
+	my $self = shift;
+	return $self->gff_attributes if ($self->{data}->gff);
+	return $self->vcf_attributes if ($self->{data}->vcf);
+	return;
+}
+
 sub gff_attributes {
 	my $self = shift;
 	return unless ($self->{data}->gff);
@@ -697,6 +717,13 @@ sub vcf_attributes {
 		$self->{attributes}->{$i}    = \%sample;
 	}
 	return $self->{attributes};
+}
+
+sub rewrite_attributes {
+	my $self = shift;
+	return $self->rewrite_gff_attributes if ($self->{data}->gff);
+	return $self->rewrite_vcf_attributes if ($self->{data}->vcf);
+	return;
 }
 
 sub rewrite_gff_attributes {
