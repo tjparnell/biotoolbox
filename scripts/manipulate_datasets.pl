@@ -2633,7 +2633,7 @@ LIST
 	# we now have just the columns we want
 	# reset the dataset indices to what we currently have
 	# name and ID should be index 0 and 1
-	@datasets = (2 .. $Data->number_columns - 1);
+	@datasets = (2 .. $Data->last_column);
 	
 	
 	### Second, perform dataset manipulations
@@ -2642,7 +2642,7 @@ LIST
 			# decreasing sort by sum of row values
 			$opt_target = 'sum';
 			combine_function(@datasets);
-			my $i = $Data->number_columns - 1;
+			my $i = $Data->last_column;
 			$opt_direction = 'd';
 			sort_function($i);
 			$Data->delete_column($i);
@@ -2651,7 +2651,7 @@ LIST
 			# decreasing sort by sum of row values
 			$opt_target = 'mean';
 			combine_function(@datasets);
-			my $i = $Data->number_columns - 1;
+			my $i = $Data->last_column;
 			$opt_direction = 'd';
 			sort_function($i);
 			$Data->delete_column($i);

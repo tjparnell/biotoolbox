@@ -969,6 +969,13 @@ sub number_columns {
 	return $self->{number_columns};
 }
 
+sub last_column {
+	my $self = shift;
+	carp "last_column is a read only method" if @_;
+	return $self->{number_columns} - 1;
+}
+
+
 sub last_row {
 	my $self = shift;
 	carp "last_row is a read only method" if @_;
@@ -1321,6 +1328,10 @@ Returns or sets the VCF version value in the metadata.
 =item number_columns
 
 Returns the number of columns in the data table.
+
+=item last_column
+
+Returns the array index of the last column in the data table.
 
 =item last_row
 

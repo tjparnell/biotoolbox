@@ -707,7 +707,7 @@ sub vcf_attributes {
 		croak "VCF column FORMAT is missing or file is improperly formatted!";
 	}
 	my @formatKeys = split /:/, $self->value(8);
-	foreach my $i (9 .. $self->{data}->number_columns - 1) {
+	foreach my $i (9 .. $self->{data}->last_column) {
 		my $name = $self->{data}->name($i);
 		my @sampleVals = split /:/, $self->value($i);
 		my %sample = map { 

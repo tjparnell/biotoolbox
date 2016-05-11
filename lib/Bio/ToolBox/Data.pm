@@ -311,7 +311,12 @@ delete. If an index is not provided, ALL comments will be deleted!
 =head2 The Data table
 
 The Data table is the array of arrays containing all of the 
-actual information. 
+actual information. Rows and columns are indexed using 0-based 
+indexing as with all Perl arrays. Row 0 is always the column 
+header row containing the column names, regardless whether an 
+actual header name existed in the original file format (e.g. 
+BED or GFF formats). Any individual table "cell" can be 
+specified as [$row][$column]. 
 
 =over 4
 
@@ -323,6 +328,12 @@ in ascending (left to right) order.
 =item number_columns
 
 Returns the number of columns in the Data table. 
+
+=item last_column
+
+Returns the array index number for the last (right most) 
+column. This number is always 1 less than the value 
+returned by number_columns() due to 0-based indexing.
 
 =item last_row
 
@@ -379,12 +390,12 @@ new index numbers.
 
 =item add_row(\@values)
 
-=item add_row($row)
+=item add_row($Row)
 
 Add a new row of data values to the end of the Data table. 
 Optionally provide either a reference to an array of values 
 to put in the row, or pass a <Bio::ToolBox::Data::Feature> 
-row object, such as one obtained from another Data object. 
+Row object, such as one obtained from another Data object. 
 If the number of columns do not match, the array is filled 
 up with null values for missing columns, or excess values 
 are dropped.
@@ -1604,7 +1615,7 @@ sub summary_file {
 	}
 	unless (defined $endcolumn) {
 		# take the last or rightmost column
-		$endcolumn = $self->number_columns - 1;
+		$endcolumn = $self->last_column;
 	}
 	unless ($dataset) {
 		# the original dataset name (i.e. the name of the dataset in the 

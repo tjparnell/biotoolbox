@@ -498,7 +498,7 @@ sub collect_binned_data_for_features {
 		my $feature = $row->feature;
 		unless ($feature) {
 			# record null values
-			for my $c ($startcolumn..($Data->number_columns - 1) ) {
+			for my $c ($startcolumn..($Data->last_column) ) {
 				$row->value($c, '.');
 			}
 			next;
@@ -513,7 +513,7 @@ sub collect_binned_data_for_features {
 			# we will skip this feature
 			
 			# but first, put in null values
-			for my $c ($startcolumn..($Data->number_columns - 1) ) {
+			for my $c ($startcolumn..($Data->last_column) ) {
 				$row->value($c, '.');
 			}
 			next;
@@ -582,7 +582,7 @@ sub collect_binned_data_for_regions {
 			# we will skip this feature
 			
 			# but first, put in null values
-			for my $c ($startcolumn..($Data->number_columns - 1) ) {
+			for my $c ($startcolumn..($Data->last_column) ) {
 				$row->value($c, '.');
 			}
 			next;
@@ -638,7 +638,7 @@ sub record_the_bin_values {
 	
 	
 	# assign the scores to the bins in the region
-	for my $column ($startcolumn..($Data->number_columns - 1) ) {
+	for my $column ($startcolumn..($Data->last_column) ) {
 		# we will step through each data column, representing each window (bin)
 		# across the feature's region
 		# any scores within this window will be collected and the mean 
@@ -773,7 +773,7 @@ sub record_individual_bin_values {
 	my ($row, $chromo, $fstart, $fstop, $strand, $length) = @_;
 	
 	# collect the scores to the bins in the region
-	for my $column ($startcolumn..($Data->number_columns - 1) ) {
+	for my $column ($startcolumn..($Data->last_column) ) {
 		# we will step through each data column, representing each window (bin)
 		# across the feature's region
 		# any scores within this window will be collected and the mean 
@@ -863,7 +863,7 @@ sub record_individual_bin_values {
 sub go_interpolate_values {
 	
 	# determine counts
-	my $lastwindow = $Data->number_columns - 1; 
+	my $lastwindow = $Data->last_column; 
 		# lastwindow is the index of the last column
 	
 	# walk through each data line and then each window

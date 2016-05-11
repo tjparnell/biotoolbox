@@ -942,7 +942,7 @@ sub collect_long_data_window_scores {
 sub go_interpolate_values {
 	
 	# determine counts
-	my $lastwindow = $Data->number_columns - 1; 
+	my $lastwindow = $Data->last_column; 
 		# lastwindow is the index of the last column
 	# walk through each data line and then each window
 	my $stream = $Data->row_stream;

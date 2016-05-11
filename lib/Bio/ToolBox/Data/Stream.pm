@@ -309,6 +309,11 @@ in ascending (left to right) order.
 
 Returns the number of columns in the Data table. 
 
+=item last_column
+
+Returns the array index of the last (rightmost) column in the 
+Data table.
+
 =item name($index)
 
 Convenient method to return the name of the column given the 
