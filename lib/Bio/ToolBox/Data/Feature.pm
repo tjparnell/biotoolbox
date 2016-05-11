@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -133,8 +133,10 @@ to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item id
 
-Here, this represents the primary_ID in the database. Note that this 
-number is unique to a specific database, and not portable between databases.
+=item primary_id
+
+Here, this represents the primary_ID in the database. Note that this number 
+is generally unique to a specific database, and not portable between databases.
 
 =item length
 
@@ -166,14 +168,22 @@ in the current data row.
 GFF and VCF files have special attributes in the form of key = value pairs. 
 These are stored as specially formatted, character-delimited lists in 
 certain columns. These methods will parse this information and return as 
-a convenient hash reference. 
+a convenient hash reference. The keys and values of this hash may be 
+changed, deleted, or added to as desired. To write the changes back to 
+the file, use the rewrite_attributes() to properly write the attributes 
+back to the file with the proper formatting.
 
 =over 4
+
+=item attributes
+
+Generic method that calls either gff_attributes() or vcf_attributes() 
+depending on the data table format. 
 
 =item gff_attributes
 
 Parses the 9th column of GFF files. URL-escaped characters are converted 
-back to text. Returns a hash reference of key =E<gt> value pairs.
+back to text. Returns a hash reference of key =E<gt> value pairs. 
 
 =item vcf_attributes
 
@@ -192,6 +202,26 @@ For example:
    my $genotype = $attr->{9}{GT};
    my $depth = $attr->{7}{ADP}
 
+=item rewrite_attributes
+
+Generic method that either calls rewrite_gff_attributes() or 
+rewrite_vcf_attributes() depending on the data table format.
+
+=item rewrite_gff_attributes
+
+Rewrites the GFF attributes column (the 9th column) based on the 
+contents of the attributes hash that was previously generated with 
+the gff_attributes() method. Useful when you have modified the 
+contents of the attributes hash.
+
+=item rewrite_vcf_attributes
+
+Rewrite the VCF attributes for the INFO (8th column), FORMAT (9th 
+column), and sample columns (10th and higher columns) based on the 
+contents of the attributes hash that was previously generated with 
+the vcf_attributes() method. Useful when you have modified the 
+contents of the attributes hash.
+
 =back
 
 =head2 Convenience Methods to database functions
@@ -203,17 +233,22 @@ module.
 
 =over 4
 
+=item seqfeature
+
 =item feature
 
-Returns a SeqFeature object from the database using the name and 
+Returns a SeqFeature object representing the feature or item in 
+the current row. If the SeqFeature object is stored in the parent 
+$Data object, it is retrieved from there. Otherwise, the SeqFeature 
+object is retrieved from the database using the name and 
 type values in the current Data table row. The SeqFeature object 
 is requested from the database named in the general metadata. If 
 an alternate database is desired, you should change it first using  
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See <Bio::DB::SeqFeature> and L<Bio::SeqFeatureI> for more information 
-about working with these objects.
+See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
+information about working with these objects.
 
 =item segment
 
@@ -425,6 +460,7 @@ use Bio::ToolBox::db_helper qw(
 	get_region_dataset_hash
 );
 
+1;
 
 
 
@@ -527,6 +563,7 @@ sub start {
 	}
 }
 
+*stop = \&end;
 sub end {
 	my $self = shift;
 	carp "end is a read only method" if @_;
@@ -540,10 +577,6 @@ sub end {
 	else {
 		return;
 	}
-}
-
-sub stop {
-	return shift->end;
 }
 
 sub strand {
@@ -564,7 +597,8 @@ sub strand {
 	return 0;
 }
 
-sub name {
+*name = \&display_name;
+sub display_name {
 	my $self = shift;
 	carp "name is a read only method" if @_;
 	my $i = $self->{data}->name_column;
@@ -577,10 +611,6 @@ sub name {
 		return $att->{Name} || $att->{ID} || $att->{transcript_name};
 	}
 	return undef;
-}
-
-sub display_name {
-	return shift->name;
 }
 
 sub type {
@@ -596,7 +626,8 @@ sub type {
 	return undef;
 }
 
-sub id {
+*id = \&primary_id;
+sub primary_id {
 	my $self = shift;
 	carp "id is a read only method" if @_;
 	my $i = $self->{data}->id_column;
@@ -631,6 +662,13 @@ sub length {
 	}
 }
 
+sub attributes {
+	my $self = shift;
+	return $self->gff_attributes if ($self->{data}->gff);
+	return $self->vcf_attributes if ($self->{data}->vcf);
+	return;
+}
+
 sub gff_attributes {
 	my $self = shift;
 	return unless ($self->{data}->gff);
@@ -657,7 +695,8 @@ sub vcf_attributes {
 	unless ($self->{data}->name(7) eq 'INFO') {
 		croak "VCF column INFO is missing or improperly formatted!";
 	}
-	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : 1} 
+	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
+					# some tags are simple and have no value, eg SOMATIC 
 				map { [split(/=/, $_)] } 
 				split(/;/, $self->value(7));
 	$self->{attributes}->{INFO} = \%info;
@@ -668,7 +707,7 @@ sub vcf_attributes {
 		croak "VCF column FORMAT is missing or file is improperly formatted!";
 	}
 	my @formatKeys = split /:/, $self->value(8);
-	foreach my $i (9 .. $self->{data}->number_columns - 1) {
+	foreach my $i (9 .. $self->{data}->last_column) {
 		my $name = $self->{data}->name($i);
 		my @sampleVals = split /:/, $self->value($i);
 		my %sample = map { 
@@ -680,21 +719,101 @@ sub vcf_attributes {
 	return $self->{attributes};
 }
 
+sub rewrite_attributes {
+	my $self = shift;
+	return $self->rewrite_gff_attributes if ($self->{data}->gff);
+	return $self->rewrite_vcf_attributes if ($self->{data}->vcf);
+	return;
+}
+
+sub rewrite_gff_attributes {
+	my $self = shift;
+	return unless ($self->{data}->gff);
+	return unless exists $self->{attributes};
+	my @pairs; # of key=value items
+	if (exists $self->{attributes}{ID}) {
+		# I assume this does not need to be escaped!
+		push @pairs, 'ID=' . $self->{attributes}{ID};
+	}
+	if (exists $self->{attributes}{Name}) {
+		my $name = $self->{attributes}{Name};
+		$name =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		push @pairs, "Name=$name";
+	}
+	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes} }) {
+		next if $key eq 'ID';
+		next if $key eq 'Name';
+		my $value = $self->{attributes}{$key};
+		$key =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		$value =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
+		push @pairs, "$key=$value";
+	}
+	$self->value(8, join("; ", @pairs));
+	return 1;
+}
+
+sub rewrite_vcf_attributes {
+	my $self = shift;
+	return unless ($self->{data}->vcf);
+	return unless exists $self->{attributes};
+	
+	# INFO
+	my $info = join(';', 
+		map { 
+			defined $self->{attributes}->{INFO}{$_} ? 
+			join('=', $_, $self->{attributes}->{INFO}{$_}) : $_
+		} 
+		sort {$a cmp $b} 
+		keys %{$self->{attributes}->{INFO}}
+	);
+	$info ||= '.'; # sometimes we have nothing left
+	$self->value(7, $info);
+	
+	# FORMAT
+	my @order;
+	push @order, 'GT' if exists $self->{attributes}{9}{GT};
+	foreach my $key (sort {$a cmp $b} keys %{ $self->{attributes}{9} } ) {
+		next if $key eq 'GT';
+		push @order, $key;
+	}
+	if (@order) {
+		$self->value(8, join(':', @order));
+	}
+	else {
+		$self->value(8, '.');
+	}
+	
+	# SAMPLES
+	foreach my $i (9 .. $self->{data}->last_column) {
+		if (@order) {
+			$self->value($i, join(":", 
+				map { $self->{attributes}{$i}{$_} } @order 
+			) );
+		}
+		else {
+			$self->value($i, '.');
+		}
+	}
+	return 1;
+}
 
 ### Data collection convenience methods
 
-sub feature {
+*feature = \&seqfeature;
+sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
 	return $self->{feature} if exists $self->{feature};
-	return undef unless $self->{data}->database;
+	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
+	return $f if $f;
+	return unless $self->{data}->database;
 	
 	# retrieve the feature from the database
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
-	return undef unless ($id or ($name and $type));
-	my $f = get_feature(
+	return unless ($id or ($name and $type));
+	$f = get_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later

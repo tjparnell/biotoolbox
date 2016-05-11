@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.35';
+our $VERSION = '1.40';
 
 =head1 NAME
 
@@ -309,6 +309,11 @@ in ascending (left to right) order.
 
 Returns the number of columns in the Data table. 
 
+=item last_column
+
+Returns the array index of the last (rightmost) column in the 
+Data table.
+
 =item name($index)
 
 Convenient method to return the name of the column given the 
@@ -388,7 +393,7 @@ down appropriately. If you had identified one of the
 shifted columns, you may need to re-find or calculate 
 its new index.
 
-=item reorder_column($index1,  $index, ...)
+=item reorder_column($index1,  $index2, ...)
 
 Reorders columns into the specified order. Provide the 
 new desired order of indices. Columns could be duplicated 
@@ -413,6 +418,10 @@ object.
 
 =item next_row()
 
+=item next_line()
+
+=item read_line()
+
 This method reads the next line in the file handle and returns a 
 L<Bio::ToolBox::Data::Feature> object. This object represents the 
 values in the current file row. 
@@ -420,9 +429,13 @@ values in the current file row.
 Note that strand values and 0-based start coordinates are automatically 
 converted to BioPerl conventions if required by the file type.
 
-=item add_row()
+=item add_row( $data )
 
-=item write_row()
+=item add_line( $data )
+
+=item write_row( $data )
+
+=item write_line( $data )
 
 This method writes a new row or line to a file handle. The first 
 time this method is called the file handle is automatically opened for 
@@ -439,16 +452,13 @@ data that is passed.
 
 A Feature object representing a row from another <Bio::ToolBox::Data> 
 data table or Stream. The values from this object will be automatically 
-obtained. B<Note:> Only pass this object if the number and names of the columns 
-are identical between read and write Streams, otherwise very strange 
-things may happen! If you modify the number of columns, then use the second 
-approach below. Modified strand and 0-based coordinates may be adjusted back 
+obtained. Modified strand and 0-based coordinates may be adjusted back 
 as necessary.
 
-=item An array of values
+=item An array reference of values
 
-Pass an array of values. The number of elements should match the number 
-of expected columns. The values will be automatically joined using tabs. 
+Pass an array reference of values. The number of elements should match the 
+number of expected columns. The values will be automatically joined using tabs. 
 This implementation should be used if you using values from another Stream 
 and the number of columns have been modified.
 
@@ -457,12 +467,20 @@ metadata indicates this should be done.
 
 =item A string
 
-Pass a text string. This assumes the values are already concatenated. 
-A new line character is appended if one is not included. No data 
-manipulation (strand or 0-based starts) or sanity checking of the 
+Pass a text string. This assumes the column values are already tab 
+concatenated. A new line character is appended if one is not included. 
+No data manipulation (strand or 0-based starts) or sanity checking of the 
 required number of columns is performed. Use with caution!
 
 =back
+
+=item iterate( \&sub )
+
+A convenience method that will process a code reference for every line 
+in the file. Pass a subroutine or code reference. The subroutine will 
+receive the line as a L<Bio::ToolBox::Data::Feature> object, just as with 
+the read_line() method. See also the L<Bio::ToolBox::Data> iterate() 
+method.
 
 =back
 
@@ -530,14 +548,11 @@ sub new {
 			return;
 		}
 		$self->add_file_metadata($filename);
-		my $fh = $self->open_to_read_fh or return;
-		$self->{fh} = $fh;
+		$self->open_to_read_fh or return;
 		$self->{mode} = 0; # read mode
 		
 		# parse column headers
-		$self->{header_line_count} = 0;
 		$self->parse_headers;
-		$self->{data_table}->[0] = $self->{'column_names'}; 
 		$self->{line_count} = $self->{header_line_count};
 		
 		# push a dummy row, this will get tossed when the first next_row() is called
@@ -574,7 +589,6 @@ sub new {
 			# use standard names for the number of columns indicated
 			# we trust that the user knows the subtle difference between gff versions
 			$self->add_gff_metadata($args{gff});
-			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /g[tf]f/) {
 				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
 					$args{gff} == 3 ? '.gff3' : '.gff';
@@ -587,7 +601,6 @@ sub new {
 				return;
 			}	
 			$self->add_bed_metadata($args{bed});
-			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /bed|peak/) {
 				$self->{extension} = '.bed';
 			}
@@ -599,7 +612,6 @@ sub new {
 				carp "unrecognized number of columns for ucsc format!";
 				return;
 			};
-			$self->{'data_table'}->[0] = $self->{'column_names'};
 			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
 				$self->{extension} = '.ucsc';
 			}
@@ -709,6 +721,8 @@ sub copy_column {
 
 #### Row Access ####
 
+*next_line = *read_line = \&next_row;
+
 sub next_row {
 	my $self = shift;
 	if ($self->mode) {
@@ -740,7 +754,7 @@ sub next_row {
 }
 
 
-*add_row = \&write_row;
+*add_row = *add_line = *write_line = \&write_row;
 
 sub write_row {
 	my $self = shift;
@@ -790,6 +804,20 @@ sub write_row {
 	return 1;
 }
 
+sub iterate {
+	my $self = shift;
+	my $code = shift;
+	unless (ref $code eq 'CODE') {
+		cluck "iterate_function() method requires a code reference!";
+		return;
+	}
+	while (my $row = $self->next_row) {
+		&$code($row);
+	}
+	return 1;
+}
+
+
 
 
 #### File handle ####
@@ -797,16 +825,6 @@ sub write_row {
 sub mode {
 	my $self = shift;
 	return $self->{mode};
-}
-
-sub fh {
-	my $self = shift;
-	return $self->{fh};
-}
-
-sub close_fh {
-	my $self = shift;
-	$self->{fh}->close if $self->{fh};
 }
 
 sub DESTROY {

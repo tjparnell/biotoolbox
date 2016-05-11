@@ -14,6 +14,7 @@ use Bio::ToolBox::db_helper qw(
 	check_dataset_for_rpm_support
 );
 use Bio::ToolBox::utility;
+use Bio::ToolBox::GeneTools qw(:transcript);
 
 my $parallel;
 eval {
@@ -23,7 +24,7 @@ eval {
 };
 
 use constant LOG2 => log(2);
-my $VERSION = '1.34';
+my $VERSION = '1.40';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -119,7 +120,7 @@ if ($print_version) {
 # Assign default values
 set_defaults();
 my $start_time = time;
-
+my $collapsed = 0; # global value to indicate transcripts are collapsed
 
 
 
@@ -130,7 +131,7 @@ my $start_time = time;
 # Generate or open Data table
 my $Data;
 if ($infile) {
-	$Data = Bio::ToolBox::Data->new(file => $infile) or 
+	$Data = Bio::ToolBox::Data->new(file => $infile, parse => 1) or 
 		die " unable to load input file '$infile'\n";
 	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
@@ -203,11 +204,8 @@ if ($method eq 'rpm' or $method eq 'rpkm') {
 			printf "   %s total features\n", format_with_commas($sum);
 		}
 		else {
-			warn " $method method requested but not supported for " .
-				"dataset '$d'\n using summed count instead\n";
-			$method = 'sum'; 
-				# this could negatively impact any subsequent datasets
-			last;
+			die " $method method requested but not supported for " .
+				"dataset $d!\n RPM and RPKM are only supported with Bam and BigBed.\n";
 		}
 	}
 }
@@ -595,7 +593,11 @@ sub collect_dataset {
 		# the genomic coordinates or not
 		
 		if ($subfeature) {
-			# collect feature subfeatures
+			# collect exons
+			unless ($collapsed) {
+				$collapsed = collapse_all_features();
+				$collapsed = 1;
+			}
 			get_subfeature_dataset($dataset, $index);
 		}
 		
@@ -627,6 +629,16 @@ sub collect_dataset {
 }
 
 
+sub collapse_all_features {
+	# collect all the transcripts and collapse them
+	$Data->iterate( sub {
+		my $row = shift;
+		my $feature = $row->seqfeature;
+		my $collSeqFeat = collapse_transcripts($feature);
+		$Data->store_seqfeature($row->row_index, $collSeqFeat);
+	} );
+	return 1;
+}
 
 sub get_genome_dataset {
 	my ($dataset, $index) = @_;
@@ -981,96 +993,26 @@ sub get_fractionated_feature_dataset {
 sub get_subfeature_dataset {
 	my ($dataset, $index) = @_;
 	
+	# check for collapsed transcript length index
+	my $length_i = $Data->find_column('Merged_Transcript_Length');
+	unless (defined $length_i) {
+		$length_i = $Data->add_column('Merged_Transcript_Length');
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature;
+			$row->value($length_i, get_transcript_length($f));
+		} );
+		# reorder the dataset
+		$Data->reorder_column(0..$index-1, $length_i, $index);
+		($length_i, $index) = ($index, $length_i);
+	}
+	
 	# collect the scores from the dataset for this index
 	$Data->iterate( sub {
 		my $row = shift;
-		
-		# we need to collect the feature to adjust coordinates
-		my $feature = $row->feature;
-		
-		# Collect and identify the subfeatures
-		# we could use either exons or CDS subfeatures
-		# but we need to separate them from other types of subfeatures
-		my @exons;
-		my @cdss;
-		foreach my $subfeat ($feature->get_SeqFeatures) {
-			if ($subfeat->primary_tag =~ /exon/i) {
-				push @exons, $subfeat;
-			}
-			elsif ($subfeat->primary_tag =~ /utr|untranslated/i) {
-				push @cdss, $subfeat;
-			}
-			elsif ($subfeat->primary_tag =~ /cds/i) {
-				push @cdss, $subfeat;
-			}
-			elsif ($subfeat->primary_tag =~ /rna|transcript/i) {
-				# an RNA subfeature, keep going down another level
-				foreach my $f ($subfeat->get_SeqFeatures) {
-					if ($f->primary_tag =~ /exon/i) {
-						push @exons, $f;
-					}
-					elsif ($f->primary_tag =~ /utr|untranslated/i) {
-						push @cdss, $f;
-					}
-					elsif ($f->primary_tag =~ /cds/i) {
-						push @cdss, $f;
-					}
-				}
-			}
-		}
-		
-		
-		# Determine which subfeatures to collect
-		# we prefer to use exons because they are easier
-		# if exons are not defined then we'll infer them from CDSs and UTRs
-		my @features_to_check;
-		if (@exons) {
-			@features_to_check = @exons;
-		}
-		elsif (@cdss) {
-			@features_to_check = @cdss;
-		}
-		else {
-			# found neither exons, CDSs, or UTRs
-			# possibly because there were no subfeatures
-			# in this case we just take the whole thing
-			push @features_to_check, $feature;
-		}
-		
-		
-		# Order and collapse the subfeatures
-		# we don't want overlapping features
-		my @sorted_features =   map {$_->[1]} 
-								sort {$a->[0] <=> $b->[0]} 
-								map { [$_->start, $_] } 
-								@features_to_check;
-		my @subfeatures;
-		my $current = shift @sorted_features;
-		while ($current) {
-			if (@sorted_features) {
-				my $next = shift @sorted_features;
-				if ($current->overlaps($next) ) {
-					# overlapping features, so reassign the end point to that of the next
-					$current->end($next->end);
-				}
-				else {
-					# no overlap, keep current, next becomes current
-					push @subfeatures, $current;
-					$current = $next;
-				}
-			}
-			else {
-				# no more features
-				push @subfeatures, $current;
-				undef $current;
-			}
-		}
-		
-		
-		# Collect the subfeature values and summed length
-		my $gene_length = 0;
+		my $feature = $row->seqfeature;
 		my @scores;
-		foreach my $subfeat (@subfeatures) {
+		foreach my $subfeat ($feature->get_SeqFeatures) {
 			# we will repeatedly call get_score on this $row feature but using
 			# the subfeature coordinates. as long as we provide everything, nothing 
 			# will be taken from the parent feature
@@ -1092,9 +1034,6 @@ sub get_subfeature_dataset {
 			
 			# record the values
 			push @scores, @$score_ref;
-			
-			# record the subfeature length
-			$gene_length += $subfeat->length;
 		}
 
 		# Calculate the final score
@@ -1165,6 +1104,7 @@ sub get_subfeature_dataset {
 		}
 		elsif ($method eq 'rpkm') {
 			# calculate reads per kb per million
+			my $gene_length = $row->value($length_i);
 			$parent_score = ( sum(@scores) * 1000000000 ) / 
 								( $gene_length * $dataset2sum{$dataset});
 		}
@@ -1275,7 +1215,7 @@ A program to collect data for a list of features
 get_datasets.pl [--options...] [<filename>]
   
   Options for existing files:
-  --in <filename>
+  --in <filename>                  (txt bed gff gtf refFlat ucsc)
   
   Options for new files:
   --db <name | filename>
@@ -1307,7 +1247,7 @@ get_datasets.pl [--options...] [<filename>]
   --gz
   --cpu <integer>                                           (2)
   --version
-  --help
+  --help                              show extended documentation
 
 =head1 OPTIONS
 
@@ -1318,12 +1258,12 @@ The command line flags and descriptions:
 =item --in <filename>
 
 Specify an input file containing either a list of database features or 
-genomic coordinates for which to collect data. The file should be a 
-tab-delimited text file, one row per feature, with columns representing 
-feature identifiers, attributes, coordinates, and/or data values. The 
-first row should be column headers. Bed files are acceptable, as are 
-text files generated by other B<BioToolBox> scripts. Files may be 
-gzipped compressed.
+genomic coordinates for which to collect data. Any tab-delimited text 
+file with recognizable headers is supported. Gene annotation file 
+formats are also supported, including bed, gtf, gff3, refFlat, and 
+UCSC native formats such as gene prediction tables are all supported. 
+Gene annotation files will be parsed as sequence features. 
+Files may be gzipped compressed.
 
 =item --out <filename>
 

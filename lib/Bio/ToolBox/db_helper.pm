@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.36';
+our $VERSION = '1.40';
 
 use strict;
 require Exporter;
@@ -280,6 +280,9 @@ sub open_db_connection {
 		# DO NOT reuse database objects if you have forked!!! Bad things happen
 		return $OPENED_DB{$database};
 	}
+	
+	# skip parsed databases
+	return if $database =~ /^Parsed:/; # we don't open parsed annotation files
 	
 	
 	### Attempt to open the database

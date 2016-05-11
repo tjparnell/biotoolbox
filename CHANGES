@@ -1,5 +1,26 @@
 ######## Bio::ToolBox revision history #############
 
+v1.40
+	- Major update introduces new SeqFeature object Bio::ToolBox::SeqFeature 
+	that is a little faster and more compact than equivalent BioPerl objects. 
+	This is the default object used in gene table parsers.
+	- New Module Bio::ToolBox::GeneTools for working with SeqFeature objects 
+	representing traditional nested feature gene, transcript, exon models.
+	The script get_gene_regions now uses this module, as do other scripts.
+	- Expunged many scripts that are no longer considered part of the primary 
+	mission of the BioToolBox distribution. These are now available in a 
+	separate repository located at https://github.com/tjparnell/HCI-Scripts.
+	- Bio::ToolBox::Data objects can now parse all gene tables into memory 
+	and store the features in the object. This allows gene tables to be 
+	used without requiring a database to be setup.
+	- Added a file tasting method to determine whether a file looks like a 
+	specific file format, e.g. gff, UCSC gene table, etc.
+	- Added numerous little methods and method aliases here and there to 
+	improve functionality
+	- Added attribute rewrite functions for both GFF and VCF files
+	- Improved file format testing
+	- Numerous little optimizations in loading files
+
 v1.36 (git 44b9dea)
 	- added new option to script get_relative_data to allow user to specify 
 	what feature types to avoid

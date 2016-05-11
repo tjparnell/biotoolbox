@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.33';
+my $VERSION = '1.40';
 
 =head1 NAME
 
@@ -26,8 +26,8 @@ shared between different transcripts of the same gene, are fully supported.
 
 Embedded Fasta sequences are ignored, as are most comment and pragma lines.
 
-The SeqFeature objects that are returned are Bio::SeqFeature::Lite objects. 
-Refer to that documentation for more information.
+The SeqFeature objects that are returned are L<Bio::ToolBox::SeqFeature> 
+objects. Refer to that documentation for more information.
 
 =head1 SYNOPSIS
 
@@ -38,7 +38,7 @@ Refer to that documentation for more information.
   	die "unable to open gff file!\n";
   
   while (my $feature = $parser->next_top_feature() ) {
-	# each $feature is a Bio::SeqFeature::Lite object
+	# each $feature is a SeqFeature object
 	my @children = $feature->get_SeqFeatures();
   }
 
@@ -73,6 +73,11 @@ either from the file extension (in the case of gtf and gff3) or from the
 Pass an anonymous array of primary_tag values to be skipped from the GFF file 
 when parsing into SeqFeature objects. For example, some subfeatures can be skipped 
 for expediency when they known in advance not to be needed. See skip() below.
+
+=item class
+
+Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
+create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
 
 =back
 
@@ -128,7 +133,7 @@ It is best if methods are not mixed; unexpected results may occur.
 
 =item next_feature()
 
-This method will return a Bio::SeqFeature::Lite object representation of 
+This method will return a SeqFeature object representation of 
 the next feature in the file. Parent - child relationships are NOT 
 assembled. This is best used with simple GFF files with no hierarchies 
 present. This may be used in a while loop until the end of the file 
@@ -137,7 +142,7 @@ automatically skipped.
 
 =item next_top_feature()
 
-This method will return a top level parent Bio::SeqFeature::Lite object 
+This method will return a top level parent SeqFeature object 
 assembled with child features as sub-features. For example, a gene 
 object with mRNA subfeatures, which in turn may have exon and/or CDS 
 subfeatures. Child features are assembled based on the existence of 
@@ -204,7 +209,7 @@ been in the parsed file. These may or may not be useful.
 =item from_gff_string($string)
 
 This method will parse a GFF, GTF, or GFF3 formatted string or line of text 
-and return a Bio::SeqFeature::Lite object.
+and return a SeqFeature object.
 
 =item unescape($text)
 
@@ -212,13 +217,18 @@ This method will unescape special characters in a text string. Certain
 characters, including ";" and "=", are reserved for GFF3 formatting and 
 are not allowed, thus requiring them to be escaped.
 
-=item is_coding($transcript)
+=item seq_ids
 
-This method will return a boolean value if the passed transcript object 
-appears to be a coding transcript. GFF and GTF files are not always immediately 
-clear about the type of transcript; there are (unfortunately) multiple ways 
-to encode the feature as a protein coding transcript: primary_tag, source_tag, 
-attribute, CDS subfeatures, etc. This method tries to determine this.
+Returns an array or array reference of the names of the chromosomes or 
+reference sequences present in the file. These may be defined by GFF3 
+sequence-region pragmas or inferred from the features.
+
+=item seq_id_lengths
+
+Returns a hash reference to the chromosomes or reference sequences and 
+their corresponding lengths. In this case, the length is either defined 
+by the sequence-region pragma or inferred by the greatest end position of 
+the top features.
 
 =back
 
@@ -226,8 +236,9 @@ attribute, CDS subfeatures, etc. This method tries to determine this.
 
 use strict;
 use Carp qw(carp cluck croak);
-use Bio::SeqFeature::Lite;
-use Bio::ToolBox::Data::file;
+use Bio::ToolBox::Data::file; # only for opening file handles
+our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
+eval "require $SFCLASS" or croak $@;
 
 1;
 
@@ -243,6 +254,7 @@ sub new {
 		'eof'           => 0,
 		'version'       => undef,
 		'comments'      => [],
+		'seq_ids'       => {},
 	};
 	bless $self, $class;
 	
@@ -263,6 +275,15 @@ sub new {
 			if (exists $options{file} or $options{table}) {
 				$options{file} ||= $options{table};
 				$self->open_file( $options{file} );
+			}
+			if (exists $options{class}) {
+				my $class = $options{class};
+				if (eval "require $class; 1") {
+					$SFCLASS = $class;
+				}
+				else {
+					croak $@;
+				}
 			}
 		}
 	}
@@ -373,6 +394,17 @@ sub next_feature {
 			# GFF3 subfeature close directive, we no longer pay attention to these 
 			next;
 		}
+		elsif ($line =~ /^##sequence\-region/i) {
+			# sequence region pragma
+			my ($pragma, $seq_id, $start, $stop) = split /\s+/, $line;
+			if (defined $seq_id and $start =~ /^\d+$/ and $stop =~ /^\d+$/) {
+				# we're actually only concerned with the stop coordinate
+				$self->{seq_ids}{$seq_id} = $stop;
+			}
+			else {
+				warn "malformed sequence-region pragma! $line\n";
+			}
+		}
 		elsif ($line =~ /^#/) {
 			# either a pragma or a comment line, may be useful
 			push @{$self->{comments}}, $line;
@@ -432,7 +464,7 @@ sub parse_file {
 	unless ($self->fh) {
 		croak("no file loaded to parse!");
 	}
-	return if $self->{'eof'};
+	return 1 if $self->{'eof'};
 	
 	# Each line will be processed into a SeqFeature object, and then checked 
 	# for parentage. Child objects with a Parent tag will be appropriately 
@@ -569,15 +601,26 @@ sub parse_file {
 		}
 	}
 	
-	# build gene2seqf hash
+	# report on duplicate IDs
+	if (keys %{ $self->{duplicate_ids} }) {
+		print " The GFF file has errors: the following IDs were duplicated: " . 
+			join(', ', keys %{ $self->{duplicate_ids} }) . "\n";
+	}
+	
+	# build gene2seqf and seq_id hashes 
 	foreach (@{ $self->{top_features} }) {
-		my $name = $_->display_name;
-		if (exists $self->{gene2seqf}->{lc $name}) {
-			push @{ $self->{gene2seqf}->{lc $name} }, $_;
+		my $name = lc $_->display_name;
+		if (exists $self->{gene2seqf}->{$name}) {
+			push @{ $self->{gene2seqf}->{$name} }, $_;
 		}
 		else {
-			$self->{gene2seqf}->{lc $name} = [$_];
+			$self->{gene2seqf}->{$name} = [$_];
 		}
+		my $s = $_->seq_id;
+		unless (exists $self->{seq_ids}{$s}) {
+			$self->{seq_ids}{$s} = 1;
+		}
+		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
 	}
 	
 	return 1;
@@ -587,7 +630,7 @@ sub parse_file {
 sub _make_gene_parent {
 	# for generating GTF gene parent features
 	my ($self, $feature) = @_;
-	my $gene = Bio::SeqFeature::Lite->new(
+	my $gene = $SFCLASS->new(
 		-seq_id         => $feature->seq_id,
 		-start          => $feature->start,
 		-end            => $feature->end,
@@ -622,7 +665,7 @@ sub _make_gene_parent {
 sub _make_rna_parent {
 	# for generating GTF transcript parent features
 	my ($self, $feature) = @_;
-	my $rna = Bio::SeqFeature::Lite->new(
+	my $rna = $SFCLASS->new(
 		-seq_id         => $feature->seq_id,
 		-start          => $feature->start,
 		-end            => $feature->end,
@@ -897,7 +940,7 @@ sub _gff_to_seqf {
 	my $self = shift;
 	
 	# generate the basic SeqFeature
-	my $feature = Bio::SeqFeature::Lite->new(
+	my $feature = $SFCLASS->new(
 		-seq_id         => $_[0],
 		-start          => $_[3],
 		-end            => $_[4],
@@ -973,36 +1016,17 @@ sub comments {
 }
 
 
-sub is_coding {
-	my ($self, $transcript) = @_;
-	return unless $transcript;
-	if ($transcript->primary_tag =~ /gene/i) {
-		# someone passed a gene, check its subfeatures
-		my $code_potential = 0;
-		foreach ($transcript->get_SeqFeatures) {
-			$code_potential += $self->is_coding($_);
-		}
-		return $code_potential;
-	}
-	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
-	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
-		# ensembl type GFFs
-		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	elsif ($transcript->has_tag('gene_biotype')) {
-		# ensembl type GTFs
-		my ($biotype) = $transcript->get_tag_values('gene_biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
-	}
-	foreach ($transcript->get_SeqFeatures) {
-		# old fashioned way
-		return 1 if $_->primary_tag eq 'CDS';
-	}
-	return 0;
+sub seq_ids {
+	my $self = shift;
+	my @s = keys %{$self->{seq_ids}};
+	return wantarray ? @s : \@s;
 }
 
+
+sub seq_id_lengths {
+	my $self = shift;
+	return $self->{seq_ids};
+}
 
 __END__
 
