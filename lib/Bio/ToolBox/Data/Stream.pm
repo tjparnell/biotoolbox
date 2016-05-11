@@ -469,6 +469,14 @@ required number of columns is performed. Use with caution!
 
 =back
 
+=item iterate( \&sub )
+
+A convenience method that will process a code reference for every line 
+in the file. Pass a subroutine or code reference. The subroutine will 
+receive the line as a L<Bio::ToolBox::Data::Feature> object, just as with 
+the read_line() method. See also the L<Bio::ToolBox::Data> iterate() 
+method.
+
 =back
 
 =head2 File Handle methods 
@@ -790,6 +798,20 @@ sub write_row {
 	}
 	return 1;
 }
+
+sub iterate {
+	my $self = shift;
+	my $code = shift;
+	unless (ref $code eq 'CODE') {
+		cluck "iterate_function() method requires a code reference!";
+		return;
+	}
+	while (my $row = $self->next_row) {
+		&$code($row);
+	}
+	return 1;
+}
+
 
 
 
