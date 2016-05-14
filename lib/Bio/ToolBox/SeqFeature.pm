@@ -175,7 +175,8 @@ if no source_tag is defined, simply "primary_tag".
 =item display_name
 
 A text string representing the name of the feature. The name is not 
-required to be a unique value, but generally is.
+required to be a unique value, but generally is. The default name, if 
+none is provided, is the primary_id.
 
 =item id
 
@@ -501,8 +502,7 @@ sub display_name {
 	if (@_) {
 		$self->[NAME] = $_[0];
 	}
-	$self->[NAME] ||= $self->primary_id;
-	return $self->[NAME];
+	return defined $self->[NAME] ? $self->[NAME] : $self->[ID];
 }
 
 sub primary_id {
@@ -560,8 +560,7 @@ sub score {
 	if (@_) {
 		$self->[SCORE] = $_[0];
 	}
-	$self->[SCORE] ||= 0;
-	return $self->[SCORE];
+	return defined $self->[SCORE] ? $self->[SCORE] : undef;
 }
 
 sub phase {
@@ -573,10 +572,7 @@ sub phase {
 		}
 		$self->[PHASE] = $p;
 	}
-	unless (defined $self->[PHASE]) {
-		$self->[PHASE] = '.';
-	}
-	return $self->[PHASE];
+	return defined $self->[PHASE] ? $self->[PHASE] : undef;
 }
 
 sub add_SeqFeature {
@@ -802,6 +798,10 @@ sub gff_string {
 	my $recurse = shift || 0;
 	my $childIDs = shift || undef;
 	
+	# skip myself if we've already printed myself
+	return if ($recurse and $childIDs and 
+		not exists $childIDs->{ $self->primary_id } );
+	
 	# map all parent-child relationships
 	if ($recurse and not defined $childIDs) {
 		# we have a top level SeqFeature and we need to go spelunking for IDs
@@ -824,12 +824,23 @@ sub gff_string {
 	) );
 	
 	# group attributes
-	my $attributes = "Name=" . $self->_encode( $self->display_name ) . 
-		'; ID=' . $self->_encode( $self->primary_id );
+	my $attributes;
+	my $name = $self->display_name;
+	if ($name) {
+		# names are optional and may not exist
+		$attributes = sprintf "Name=%s;ID=%s", $self->_encode($name), 
+			$self->_encode( $self->primary_id );
+	}
+	else {
+		# IDs always exist
+		$attributes = sprintf "ID=%s", $self->_encode( $self->primary_id );
+	}
 	if ($childIDs) {
 		if (exists $childIDs->{$self->primary_id}) {
-			$attributes .= '; Parent=' . join(',', 
-				values %{ $childIDs->{$self->primary_id} });
+			$attributes .= ';Parent=' . join(',', 
+				sort {$a cmp $b} 
+				map { $self->_encode($_) }
+				keys %{ $childIDs->{$self->primary_id} });
 			delete $childIDs->{$self->primary_id};
 		}
 	}
@@ -844,14 +855,15 @@ sub gff_string {
 		else {
 			$value = $self->_encode($value);
 		}
-		$attributes .= "; $tag=$value";
+		$attributes .= ";$tag=$value";
 	}
 	$string .= "\t$attributes\n";
 	
 	# recurse
 	if ($recurse) {
 		foreach my $f ($self->get_SeqFeatures) {
-			$string .= $f->gff_string(1, $childIDs);
+			my $s = $f->gff_string(1, $childIDs);
+			$string .= $s if $s;
 		}
 	}
 	return $string;
@@ -864,7 +876,7 @@ sub _encode {
 }
 
 sub _spelunk {
-	my ($self, $parentID, $childIDs);
+	my ($self, $parentID, $childIDs) = @_;
 	$childIDs->{$self->primary_id}{$parentID} += 1;
 	foreach my $f ($self->get_SeqFeatures) {
 		$f->_spelunk($self->primary_id, $childIDs);
