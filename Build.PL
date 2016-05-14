@@ -50,11 +50,8 @@ sub get_base_options {
 			'Bio::Root::Version'      => '1.0069022',
 		},
 		recommends        => {
-			'Algorithm::Cluster'      => 0,
 			'DBD::SQLite'             => 0,
 			'File::Which'             => 0,
-			'GD::Graph'               => 1.44,
-			'GD::Graph::smoothlines'  => 1.6,
 			'Statistics::LineFit'     => 0.06,
 			'Net::FTP'                => 0,
 			'Parallel::ForkManager'   => 1.02,
