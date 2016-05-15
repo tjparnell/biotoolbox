@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 224;
+	plan tests => 228;
 }
 else {
-	plan tests => 135;
+	plan tests => 137;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -104,6 +104,15 @@ sub test_gff {
 	is($f->primary_tag, 'gene', 'feature3 primary_tag');
 	is($f->display_name, 'YAL055W', 'feature3 display_name');
 	is($f->primary_id, 'YAL055W', 'feature3 primary_id');
+	
+	# export gff3
+	$f->version(3);
+	my $string = $f->gff_string(1);
+	my @stringlines = split "\n", $string;
+	is(scalar @stringlines, 2, 'feature3 gff3 string');
+		# due to random ID numbers and complications in testing the gff3 
+		# structure, we'll just check the number of lines as an easy copout
+	
 	undef $f;
 }
 
@@ -217,6 +226,14 @@ sub test_ucsc {
 	is($e->start, 402798, 'exon start');
 	is($e->stop, 402882, 'exon stop');
 	is($e->primary_tag, 'exon', 'exon primary_tag');
+	
+	# print gene
+	$f->version(3);
+	my $string = $f->gff_string(1);
+	my @stringlines = split "\n", $string;
+	is(scalar @stringlines, 47, 'feature gff3 string');
+		# due to random ID numbers and complications in testing the gff3 
+		# structure, we'll just check the number of lines as an easy copout
 	undef $f;
 	undef $t;
 	undef $e;

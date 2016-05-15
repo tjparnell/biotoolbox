@@ -89,7 +89,7 @@ sub taste_file {
 	if ($Taste->gff) {
 		return 'gff';
 	}
-	elsif ($Taste->bed) {
+	elsif ($Taste->bed == 12) {
 		return 'bed';
 	}
 	elsif ($Taste->ucsc) {
