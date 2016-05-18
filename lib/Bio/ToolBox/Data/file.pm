@@ -199,8 +199,8 @@ sub parse_headers {
 	# first data row which contains the column names
 	$self->program(undef); # reset this to blank, it will be filled by file metadata
 	my $header_line_count = 0;
-	PARSE_HEADER_LOOP:
-	while (my $line = $fh->getline) {		
+	while ($self->number_columns == 0) {		
+		my $line = $fh->getline;
 		# we are not chomping the line here because of possible side effects
 		# with UCSC tables where we have to count elements in the first line
 		# and potential header lines, and the first line has a null value at 
@@ -313,51 +313,39 @@ sub parse_headers {
 			### a GFF file
 			if ($self->extension =~ /g[tf]f/i) {
 				$self->add_gff_metadata;
-				last PARSE_HEADER_LOOP;
 			}
 			
 			### a Bed or BedGraph file
 			elsif ($self->extension =~ /bdg|bed/i) {
-				my $count = scalar(split /\t/, $line);
+				my $count = scalar(split '\t', $line);
 				$self->add_bed_metadata($count);
-				last PARSE_HEADER_LOOP;
 			}
 			
 			### a peak file
 			elsif ($self->extension =~ /peak/i) {
-				my $count = scalar(split /\t/, $line);
+				my $count = scalar(split '\t', $line);
 				$self->add_peak_metadata($count);
-				last PARSE_HEADER_LOOP;
 			}
-			
 			
 			### a UCSC gene table
 			elsif ($self->extension =~ /ref+lat|genepred|ucsc/i) {
-				my $count = scalar(split /\t/, $line);
+				my $count = scalar(split '\t', $line);
 				$self->add_ucsc_metadata($count);
-				last PARSE_HEADER_LOOP;
 			}
-			
 			
 			### a SGR file
 			elsif ($self->extension =~ /sgr/i) {
 				$self->add_sgr_metadata;
-				last PARSE_HEADER_LOOP;
 			}
 			
 			### standard text file with headers, i.e. everything else
 			unless ($self->number_columns) {
 				# we have not yet parsed the row of data column names
 				# we will do so now
-				
-				# generate metadata
 				$self->add_standard_metadata($line);
 				
 				# count as a header line
 				$header_line_count++;
-				
-				# end this loop
-				last PARSE_HEADER_LOOP;
 			}
 		}
 		
@@ -945,7 +933,7 @@ sub _commented_header_line {
 	my @commentdata;
 	if ( scalar @{ $data->{'comments'} } >= 1 ) {
 		# take the last line in the other array
-		@commentdata = split /\t/, $data->{'comments'}->[-1];
+		@commentdata = split '\t', $data->{'comments'}->[-1];
 	}
 	my @linedata = split '\t', $line;
 	
@@ -969,8 +957,8 @@ sub add_column_metadata {
 	
 	# break up the column metadata
 	my %temphash; # a temporary hash to put the column metadata into
-	foreach (split /;/, $line) {
-		my ($key, $value) = split /=/;
+	foreach (split ';', $line) {
+		my ($key, $value) = split '=';
 		if ($key eq 'index') {
 			if ($index != $value) {
 				# the value from the metadata index key should be 
@@ -1271,7 +1259,7 @@ sub add_standard_metadata {
 	}
 	
 	# put the column names in the metadata
-	push @{ $self->{'column_names'} }, @namelist;
+	$self->{'column_names'} = \@namelist;
 	$self->{data_table}->[0] = $self->{'column_names'};
 	
 	# set headers flag to true
