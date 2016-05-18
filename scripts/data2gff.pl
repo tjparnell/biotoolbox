@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.35';
+my $VERSION =  '1.40';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -147,7 +147,6 @@ if ($tag) {
 ### Load file
 my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
 	die "Unable to open file '$infile'!\n";
-
 
 ### Determine indices
 if ($ask) {
@@ -293,14 +292,15 @@ my $Output = Bio::ToolBox::Data::Stream->new(
 ### Convert the input stream
 # check some things first
 my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
-if (defined $start_index and substr(Input->name($start_index), -1) eq '0') {
+if (defined $start_index and substr($Input->name($start_index), -1) eq '0') {
 	# start column name suggests it is 0-based
 	$interbase = 1;
 }
 if ($unique and not (defined $name_index or $name_base)) {
 	die " must provide a name index or name base to make unique feature names!\n";
 }
-my %unique_name_counter; # hash for making unique feature names
+my $unique_name_counter = {}; # hash for making unique feature names
+my $unique_id_counter   = {}; # same for IDs
 my $count = 0; # the number of lines processed
 while (my $row = $Input->next_row) {
 	
@@ -328,14 +328,16 @@ while (my $row = $Input->next_row) {
 		push @args, 'score', $row->value($score_index);
 	}
 	if (defined $name_index) {
-		my $name = $unique ? generate_unique_name($row->value($name_index)) : 
+		my $name = $unique ? 
+			generate_unique_name($row->value($name_index), $unique_name_counter) : 
 			$row->value($name_index);
 		push @args, 'name', $name;
 	} elsif (defined $name_base) {
 		push @args, 'name', sprintf("%s_%07d", $name_base, $count);
 	}
 	if (defined $id_index) {
-		push @args, 'id', $row->value($id_index);
+		my $id = $row->value($id_index);
+		push @args, 'id', generate_unique_name($id, $unique_id_counter);
 	}
 	if (defined $type_index) {
 		push @args, 'type', $row->value($type_index);
@@ -366,22 +368,22 @@ printf " Converted %s lines of input data to GFF file '%s'\n",
 	format_with_commas($count), $Output->filename;
 
 
-sub generate_unique_names {
-	my $name = shift;
+sub generate_unique_name {
+	my ($name, $counter) = @_;
 	my $new_name;
 			
 	# check uniqueness
-	if (exists $unique_name_counter{$name} ) {
+	if (exists $counter->{$name} ) {
 		# we've encountered this name before
 		# generate a unique name by appending the count number
-		$unique_name_counter{$name} += 1;
-		$new_name = $name . '.' . $unique_name_counter{$name};
+		$counter->{$name} += 1;
+		$new_name = $name . '.' . $counter->{$name};
 	}
 	else {
 		# first time for this name
 		# record in the hash
 		$new_name = $name;
-		$unique_name_counter{$name} = 0;
+		$counter->{$name} = 0;
 	}
 	return $new_name;
 }
