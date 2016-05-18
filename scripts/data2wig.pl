@@ -236,6 +236,9 @@ sub check_indices {
 	
 	# score
 	unless (defined $score_index) {
+		$score_index = 	$Input->gff ? 5 : $Input->bed >= 5 ? 4 : undef;
+	}
+	unless (defined $score_index) {
 		# first look for a generic score index
 		$score_index = ask_user_for_index($Input, 
 			" Enter the index for the score column  ");
