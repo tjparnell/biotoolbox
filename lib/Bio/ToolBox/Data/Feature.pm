@@ -1013,14 +1013,14 @@ sub gff_string {
 	my $name = $args{name} || $self->name || 'Feature_' . $self->line_number;
 	my $attributes = "Name=$name";
 	my $id = $args{id} || sprintf("%08d", $self->line_number);
-	$attributes .= "; ID=$id";
+	$attributes .= ";ID=$id";
 	if (exists $args{attributes} and ref($args{attributes}) eq 'ARRAY') {
 		foreach my $i (@{$args{attributes}}) {
 			my $k = $self->{data}->name($i);
 			$k =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
 			my $v = $self->value($i);
 			$v =~ s/([\t\n\r%&\=;, ])/sprintf("%%%X",ord($1))/ge;
-			$attributes .= "; $k=$v";
+			$attributes .= ";$k=$v";
 		}
 	}
 	
