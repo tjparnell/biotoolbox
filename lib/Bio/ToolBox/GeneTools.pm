@@ -104,7 +104,7 @@ Functions to get a list of exons from a gene or transcript
 This will return an array or array reference of all the exon subfeatures in 
 the SeqFeature object, either gene or transcript. No discrimination whether 
 they are used once or more than once. Non-defined exons can be assembled from 
-CDS and/or UTR subfeatures.
+CDS and/or UTR subfeatures. Exons are sorted by start coordinate.
 
 =item get_alt_exons($gene)
 
@@ -149,7 +149,7 @@ elements are generated for each intron.
 This will return an array or array reference of all the intron subfeatures in 
 the SeqFeature object, either gene or transcript. No discrimination whether 
 they are used once or more than once. Non-defined introns can be assembled from 
-CDS and/or UTR subfeatures.
+CDS and/or UTR subfeatures. Introns are sorted by start coordinate.
 
 =item get_alt_introns($gene)
 
@@ -426,8 +426,8 @@ sub get_exons {
 			push @list, @e;
 		}
 		@list = map { $_->[0] } 
-				sort { $a->[1] <=> $b->[1] }
-				map { [$_, $_->start] } 
+				sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+				map { [$_, $_->start, $_->end] } 
 				@list;
 	}
 	else {
@@ -526,14 +526,14 @@ sub get_introns {
 		# reorder the introns based on start position
 		if (@introns) {
 			@introns = map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] }
-					map { [$_, $_->start] } 
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
 					@introns;
 		}
 	}
 	
 	# finished
-	return @introns;
+	return wantarray ? @introns : \@introns;
 }
 
 sub get_alt_introns {
@@ -666,10 +666,11 @@ sub get_transcripts {
 		);
 		push @transcripts, $transcript;
 	}
-	return map { $_->[0] }
-		sort { $a->[1] <=> $b->[1] }
-		map { [$_, $_->start] } 
+	@transcripts = map { $_->[0] }
+		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+		map { [$_, $_->start, $_->length] } 
 		@transcripts;
+	return wantarray ? @transcripts : \@transcripts;
 }
 
 
@@ -790,19 +791,24 @@ sub get_cds {
 	foreach my $subfeat ($transcript->get_SeqFeatures) {
 		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
 	}
-	return @cds;
+	return unless @cds;
+	@cds = map { $_->[0] } 
+			sort { $a->[1] <=> $b->[1] }
+			map { [$_, $_->start] } 
+			@cds;
+	return wantarray ? @cds : \@cds;
 }
 
 sub get_cdsStart {
 	my $transcript = shift;
-	my @cds = get_cds($transcript);
-	return @cds ? $cds[0]->start : undef;
+	my $cds = get_cds($transcript);
+	return defined $cds ? $cds->[0]->start : undef;
 }
 
 sub get_cdsEnd {
 	my $transcript = shift;
-	my @cds = get_cds($transcript);
-	return @cds ? $cds[-1]->end : undef;
+	my $cds = get_cds($transcript);
+	return defined $cds ? $cds->[-1]->end : undef;
 }
 
 sub get_transcript_cds_length {
@@ -827,17 +833,15 @@ sub get_start_codon {
 	return $start_codon if $start_codon;
 	
 	# otherwise we have to build one
-	my @cdss = map { $_->[0] } 
-			sort { $a->[1] <=> $b->[1] }
-			map { [$_, $_->start] } 
-			get_cds($transcript);
+	my $cdss = get_cds($transcript);
+	return unless $cdss;
 	if ($transcript->strand >= 0) {
 		$start_codon = $transcript->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'start_codon',
-				-start         => $cdss[0]->start,
-				-end           => $cdss[0]->start + 2,
+				-start         => $cdss->[0]->start,
+				-end           => $cdss->[0]->start + 2,
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.start_codon',
@@ -848,8 +852,8 @@ sub get_start_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'start_codon',
-				-start         => $cdss[-1]->end - 2,
-				-end           => $cdss[-1]->end,
+				-start         => $cdss->[-1]->end - 2,
+				-end           => $cdss->[-1]->end,
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.start_codon',
@@ -871,17 +875,15 @@ sub get_stop_codon {
 	
 	# otherwise we have to build one
 	# this entirely presumes that the stop codon is inclusive to the last cds
-	my @cdss = map { $_->[0] } 
-			sort { $a->[1] <=> $b->[1] }
-			map { [$_, $_->start] } 
-			get_cds($transcript);
+	my $cdss = get_cds($transcript);
+	return unless $cdss;
 	if ($transcript->strand >= 0) {
 		$stop_codon = $transcript->new(
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss[-1]->end - 2,
-				-end           => $cdss[-1]->end,
+				-start         => $cdss->[-1]->end - 2,
+				-end           => $cdss->[-1]->end,
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -892,8 +894,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss[0]->start,
-				-end           => $cdss[0]->start + 2,
+				-start         => $cdss->[0]->start,
+				-end           => $cdss->[0]->start + 2,
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1118,14 +1120,9 @@ sub _process_ucsc_transcript {
 	
 	# record CDS points
 	if (is_coding($transcript)) {
-		# make sure the CDS are sorted in order
-		my @cds = 
-			map {$_->[1]}
-			sort {$a->[0] <=> $b->[0]}
-			map { [$_->start, $_] }
-			get_cds($transcript);
-		$ucsc->{cdsStart} = $cds[0]->start - 1;
-		$ucsc->{cdsEnd}   = $cds[-1]->end;
+		my $cds = get_cds($transcript);
+		$ucsc->{cdsStart} = $cds->[0]->start - 1;
+		$ucsc->{cdsEnd}   = $cds->[-1]->end;
 		
 		# adjust CDS positions with codon information as necessary
 		# this usually only happens if codons were explicitly defined and 
