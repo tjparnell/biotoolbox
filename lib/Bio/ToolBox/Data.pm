@@ -306,6 +306,35 @@ Appends the text string to the comment array.
 Deletes a comment. Provide the array index of the comment to 
 delete. If an index is not provided, ALL comments will be deleted!
 
+=item vcf_headers
+
+For VCF files, this will partially parse the VCF headers into a 
+hash structure that can be queried or manipulated. Each header 
+line is parsed for the primary key, being the first word after the 
+## prefix, e.g. INFO, FORMAT, FILTER, contig, etc. For the simple 
+values, they are stored as the value. For complex entries, such as 
+with INFO and FORMAT, a second level hash is created with the ID 
+extracted and used as the second level key. The value is always the 
+always the remainder of the string.
+
+For example, the following would be a simple parsed vcf header in 
+code representation.
+
+  $vcf_header = {
+     FORMAT => {
+        GT = q(ID=GT,Number=1,Type=String,Description="Genotype"),
+        AD = q(ID=AD,Number=.,Type=Integer,Description="ref,alt Allelic depths"),
+     },
+     fileDate => 20150715,
+  }
+
+=item rewrite_vcf_headers
+
+If you have altered the vcf headers exported by the vcf_headers() 
+method, then this method will rewrite the hash structure as new 
+comment lines. Do this prior to writing or saving the Data sturcture
+or else you will lose your changed VCF header metadata.
+
 =back
 
 =head2 The Data table

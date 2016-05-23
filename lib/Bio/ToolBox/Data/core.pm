@@ -1038,6 +1038,73 @@ sub delete_comment {
 	}
 }
 
+sub vcf_headers {
+	my $self = shift;
+	return unless $self->vcf;
+	return $self->{vcf_headers} if exists $self->{vcf_headers};
+	my $headers = {};
+	foreach my $comment ($self->comments) {
+		my ($key, $value);
+		if ($comment =~ /^##([\w\-\.]+)=(.+)$/) {
+			$key = $1;
+			$value = $2;
+		}
+		else {
+			# invalid vcf header format!?
+			next;
+		}
+		if ($value !~ /^<.+>$/) {
+			# simple value
+			$headers->{$key} = $value;
+		}
+		else {
+			# process complex values
+			# extract ID with regex which should have
+			my $id = ($value =~ /ID=([\w\-\.:]+)/)[0]; 
+			$headers->{$key}{$id} = $value;
+		}
+	}
+	
+	# store and return
+	$self->{vcf_headers} = $headers;
+	return $headers;
+}
+
+sub rewrite_vcf_headers {
+	my $self = shift;
+	return unless $self->vcf;
+	return unless exists $self->{vcf_headers};
+	my @newComments;
+	
+	# file format always comes first
+	push @newComments, sprintf("##fileformat=%s\n", 
+		$self->{vcf_headers}{fileformat});
+	
+	# common attributes
+	foreach my $key (sort {$a cmp $b} keys %{ $self->{vcf_headers} } ) {
+		next if $key eq 'fileformat';
+		if (ref $self->{vcf_headers}{$key} eq 'HASH') {
+			# we have a complex VCF header with multiple keys
+			# we will rewrite for each ID
+			foreach my $id (sort {$a cmp $b} 
+				keys %{ $self->{vcf_headers}{$key} }
+			) {
+				# to avoid complexity of writing correct formatting
+				push @newComments, sprintf("##%s=%s\n", $key, 
+					$self->{vcf_headers}{$key}{$id} );
+			}
+		}
+		else {
+			# a simple value
+			push @newComments, sprintf("##%s=%s\n", $key, 
+				$self->{vcf_headers}{$key} );
+		}
+	}
+	
+	# replace the headers
+	$self->{comments} = \@newComments;
+}
+
 
 
 #### Column Metadata ####
@@ -1364,6 +1431,14 @@ Adds a string to the list of comments to be included in the metadata.
 =item delete_comment($index)
 
 Deletes the indicated array index from the metadata comments array.
+
+=item vcf_headers
+
+Partially parses VCF metadata header lines into a hash structure.
+
+=item rewrite_vcf_headers
+
+Rewrites the vcf headers back into the metadata comments array.
 
 =item list_columns
 
