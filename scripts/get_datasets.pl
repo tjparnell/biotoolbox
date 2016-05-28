@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 	check_dataset_for_rpm_support
 );
 use Bio::ToolBox::utility;
-use Bio::ToolBox::GeneTools qw(:transcript);
+use Bio::ToolBox::GeneTools qw(:transcript get_exons);
 
 my $parallel;
 eval {
@@ -1012,7 +1012,7 @@ sub get_subfeature_dataset {
 		my $row = shift;
 		my $feature = $row->seqfeature;
 		my @scores;
-		foreach my $subfeat ($feature->get_SeqFeatures) {
+		foreach my $subfeat (get_exons($feature)) {
 			# we will repeatedly call get_score on this $row feature but using
 			# the subfeature coordinates. as long as we provide everything, nothing 
 			# will be taken from the parent feature
