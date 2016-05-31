@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.40';
+our $VERSION = '1.50';
 
 =head1 NAME
 
@@ -856,7 +856,7 @@ sub get_score {
 	}
 	elsif ($self->feature_type eq 'named') {
 		# must retrieve feature from the database first
-		my $f = $self->feature;
+		my $f = $self->seqfeature;
 		return unless $f;
 		$args{chromo} ||= $f->seq_id;
 		$args{start}  ||= $f->start;
@@ -865,12 +865,27 @@ sub get_score {
 	else {
 		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
 	}
+	$args{start} = 1 if $args{start} <= 0;
+	if ($args{stop} < $args{start}) {
+		# coordinates are flipped, reverse strand
+		return if ($args{stop} <= 0);
+		my $stop = $args{start};
+		$args{start} = $args{stop};
+		$args{stop}  = $stop;
+		$args{strand} = -1;
+	}
 	unless (exists $args{strand} and defined $args{strand}) {
 		$args{strand} = $self->strand; 
 	}
-# 	unless ($args{chromo} and defined $args{start}) {
-# 		return;
-# 	}
+	unless ($args{chromo} and defined $args{start}) {
+		return;
+	}
+	
+	# score attributes
+	$args{'method'} ||= 'mean';
+	$args{value}    ||= 'score';
+	$args{stranded} ||= 'all';
+	$args{'log'}    ||= undef;
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
@@ -879,11 +894,18 @@ sub get_score {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
 	}
 	
-	# make sure database is defined in arguments
-	# user could specify ddb but we need only one db
-	$args{db} ||= $args{ddb} || $self->{data}->open_database;
-	
-	return get_chromo_region_score(%args);
+	# get the score
+	return get_segment_score(
+		$args{chromo},
+		$args{start},
+		$args{stop},
+		$args{strand},
+		$args{strandedness},
+		$args{'method'},
+		$args{value},
+		$db,
+		$args{dataset},
+	);
 }
 
 sub get_position_scores {
