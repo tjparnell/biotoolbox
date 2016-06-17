@@ -9,7 +9,7 @@ use Statistics::Lite qw(mean median sum max);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-my $VERSION =  '1.34';
+my $VERSION =  '1.41';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -221,7 +221,8 @@ sub check_indices {
 			die " No identifiable chromosome column index!\n";
 		}
 	}
-	unless (defined $start_index or defined $Input->start_column) {
+	$start_index = $Input->start_column unless defined $start_index;
+	unless (defined $start_index) {
 		$start_index = ask_user_for_index($Input, 
 			" Enter the index for the start or position column  ");
 		unless (defined $start_index) {
@@ -432,9 +433,6 @@ sub fast_convert_to_fixedStep {
 	unless (defined $chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
-	unless (defined $start_index) {
-		$start_index = $Input->start_column;
-	}
 	die "coordinate columns not defined!\n" unless 
 		(defined $chr_index and defined $start_index);
 	die "no score column defined!\n" unless (defined $score_index);
@@ -534,9 +532,6 @@ sub fast_convert_to_variableStep {
 	unless (defined $chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
-	unless (defined $start_index) {
-		$start_index = $Input->start_column;
-	}
 	die "coordinate columns not defined!\n" unless 
 		(defined $chr_index and defined $start_index);
 	die "no score column defined!\n" unless (defined $score_index);
@@ -569,7 +564,7 @@ sub convert_to_bedgraph {
 	while (my $row = $Input->next_row) {
 		# coordinates
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
-		my $start = defined $start_index ? $row->value($start_index) : $row->start;
+		my $start = $row->value($start_index);
 		my $stop  = defined $stop_index ? $row->value($stop_index) : 
 			$row->stop || $row->start;
 		
@@ -617,9 +612,6 @@ sub fast_convert_to_bedgraph {
 	unless (defined $chr_index) {
 		$chr_index = $Input->chromo_column;
 	}
-	unless (defined $start_index) {
-		$start_index = $Input->start_column;
-	}
 	unless (defined $stop_index) {
 		$stop_index = $Input->end_column;
 	}
@@ -647,14 +639,8 @@ sub fast_convert_to_bedgraph {
 
 sub calculate_position {
 	my $row = shift;
-	my $start;
-	if (defined $start_index) {
-		$start = $row->value($start_index);
-		$start += 1 if $interbase;
-	}
-	else {
-		$start = $row->start; # this should handle interbase automatically
-	}
+	my $start = $row->value($start_index);
+	$start += 1 if $interbase;
 	if ($midpoint) {
 		# calculate midpoint and return
 		my $end = defined $stop_index ? $row->value($stop_index) : $row->end;
