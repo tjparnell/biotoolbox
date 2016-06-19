@@ -263,6 +263,14 @@ changed first using the general database() method.
 See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
 about working with Segment objects.
 
+=item get_features(%args)
+
+Returns seqfeature objects from a database.........
+
+
+
+
+
 =item get_score(%args)
 
 This is a convenience method for the 
@@ -841,6 +849,20 @@ sub segment {
 	else {
 		return undef;
 	}
+}
+
+sub get_features {
+	my $self = shift;
+	my %args = @_;
+	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
+	carp "no database defined to get features!" unless defined $db;
+	
+	$args{chromo} ||= $args{seq_id} || $self->seq_id;
+	$args{start}  ||= $self->start;
+	$args{stop}   ||= $args{end} || $self->end;
+	$args{type}   ||= $self->type;
+	
+	return $db->features(%args);
 }
 
 sub get_score {
