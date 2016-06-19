@@ -850,17 +850,17 @@ sub get_score {
 	# verify coordinates based on type of feature
 	if ($self->feature_type eq 'coordinate') {
 		# coordinates are already in the table, use those
-		$args{chromo} ||= $self->seq_id;
+		$args{chromo} ||= $args{seq_id} || $self->seq_id;
 		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
+		$args{stop}   ||= $args{end} || $self->end;
 	}
 	elsif ($self->feature_type eq 'named') {
 		# must retrieve feature from the database first
 		my $f = $self->seqfeature;
 		return unless $f;
-		$args{chromo} ||= $f->seq_id;
+		$args{chromo} ||= $args{seq_id} || $f->seq_id;
 		$args{start}  ||= $f->start;
-		$args{stop}   ||= $f->end;
+		$args{stop}   ||= $args{end} || $f->end;
 	}
 	else {
 		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
