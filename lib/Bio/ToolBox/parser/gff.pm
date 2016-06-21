@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.40';
+my $VERSION = '1.41';
 
 =head1 NAME
 
@@ -391,7 +391,8 @@ sub next_feature {
 			next;
 		}
 		elsif ($line =~ /^###$/) {
-			# GFF3 subfeature close directive, we no longer pay attention to these 
+			# GFF3 subfeature close directive, we no longer pay attention to 
+			# these, although we should.....
 			next;
 		}
 		elsif ($line =~ /^##sequence\-region/i) {
@@ -404,6 +405,7 @@ sub next_feature {
 			else {
 				warn "malformed sequence-region pragma! $line\n";
 			}
+			next;
 		}
 		elsif ($line =~ /^#/) {
 			# either a pragma or a comment line, may be useful
@@ -426,6 +428,7 @@ sub next_feature {
 		# line must be a GFF feature
 		# generate the SeqFeature object for this GFF line and return it
 		my $feature = $self->from_gff_string($line);
+		next unless $feature;
 		next if $feature eq 'skipped';
 		return $feature;
 	}
