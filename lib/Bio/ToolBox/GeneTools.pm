@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.40';
+our $VERSION = '1.41';
 
 =head1 NAME
 
@@ -227,15 +227,23 @@ attribute, CDS subfeatures, etc. This method tries to determine this.
 =item get_cds($transcript)
 
 Returns the CDS subfeatures of the given transcript, if they are 
-defined. 
+defined. Returns either an array or array reference.
 
 =item get_cdsStart($transcript)
 
 Returns the start coordinate of the CDS for the given transcript.
+Note that this is the leftmost (smallest) coordinate of the CDS 
+and not necessarily the coordinate of the start codon, similar to 
+what the UCSC gene tables report. Use the transcript strand to 
+determine the 5' end.
 
 =item get_cdsEnd($transcript)
 
 Returns the stop coordinate of the CDS for the given transcript.
+Note that this is the rightmost (largest) coordinate of the CDS 
+and not necessarily the coordinate of the stop codon, similar to 
+what the UCSC gene tables report. Use the transcript strand to 
+determine the 3' end.
 
 =item get_start_codon($transcript)
 
@@ -358,6 +366,7 @@ our %EXPORT_TAGS = (
 		ucsc_string
 	) ],
 );
+
 
 ### The True Statement
 1; 
@@ -802,13 +811,30 @@ sub get_cds {
 sub get_cdsStart {
 	my $transcript = shift;
 	my $cds = get_cds($transcript);
-	return defined $cds ? $cds->[0]->start : undef;
+	return unless $cds;
+	if ($transcript->strand >= 0) {
+		return $cds->[0]->start;
+	}
+	else {
+		# stop codons may or may not be not included
+		my $codon = get_stop_codon($transcript);
+		return $codon->start < $cds->[0]->start ? 
+			$codon->start : $cds->[0]->start;
+	}
 }
 
 sub get_cdsEnd {
 	my $transcript = shift;
 	my $cds = get_cds($transcript);
-	return defined $cds ? $cds->[-1]->end : undef;
+	return unless $cds;
+	if ($transcript->strand >= 0) {
+		my $codon = get_stop_codon($transcript);
+		return $codon->end > $cds->[-1]->end ? 
+			$codon->end : $cds->[-1]->end;
+	}
+	else {
+		return $cds->[-1]->end;
+	}
 }
 
 sub get_transcript_cds_length {
@@ -1103,10 +1129,6 @@ sub _process_ucsc_transcript {
 		'exonStarts'   => [],
 		'exonEnds'     => [],
 	};
-	my $score = $transcript->score; # rarely used, but just in case
-	if (defined $score and $score ne '.') {
-		$ucsc->{score} = $score;
-	}
 	
 	# determine gene name
 	if ($gene) {
@@ -1120,31 +1142,8 @@ sub _process_ucsc_transcript {
 	
 	# record CDS points
 	if (is_coding($transcript)) {
-		my $cds = get_cds($transcript);
-		$ucsc->{cdsStart} = $cds->[0]->start - 1;
-		$ucsc->{cdsEnd}   = $cds->[-1]->end;
-		
-		# adjust CDS positions with codon information as necessary
-		# this usually only happens if codons were explicitly defined and 
-		# not included with the CDS information
-		my $start_codon = get_start_codon($transcript);
-		my $stop_codon = get_stop_codon($transcript);
-		if ($transcript->strand >= 0) {
-			if ($start_codon->start < $ucsc->{cdsStart}) {
-				$ucsc->{cdsStart} = $start_codon->start;
-			}
-			if ($stop_codon->end > $ucsc->{cdsEnd}) {
-				$ucsc->{cdsEnd} = $stop_codon->end;
-			}
-		}
-		else { # negative strand
-			if ($start_codon->end > $ucsc->{cdsEnd}) {
-				$ucsc->{cdsEnd} = $start_codon->end;
-			}
-			if ($stop_codon->start < $ucsc->{cdsStart}) {
-				$ucsc->{cdsStart} = $stop_codon->start;
-			}
-		}
+		$ucsc->{cdsStart} = get_cdsStart($transcript) - 1;
+		$ucsc->{cdsEnd}   = get_cdsEnd($transcript);
 	}
 	else {
 		# non-coding transcript sets the cds points to the transcript end
