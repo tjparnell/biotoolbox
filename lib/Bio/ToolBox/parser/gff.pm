@@ -873,7 +873,7 @@ sub _gtf_to_seqf {
 	}
 	
 	# convert some tags into GFF3-like conventions
-	if ($feature->primary_tag eq 'gene') {
+	if ($feature->primary_tag =~ /gene/i) {
 		my ($id, $name);
 		if ($feature->has_tag('gene_id')) {
 			($id) = $feature->get_tag_values('gene_id');
@@ -906,14 +906,24 @@ sub _gtf_to_seqf {
 		$feature->add_tag_value('Parent', $parent);
 		if ($feature->has_tag('gene_name')) {
 			my ($alias) = $feature->get_tag_values('gene_name');
-			$feature->add_tag_value('Alias', $alias);
+			$feature->add_tag_value('Alias', $alias) if $alias ne $name;
 		}
 		
 		# update primary_tag to follow BioPerl/BioToolBox/GFF3/traditional conventions
 		# primarily to handle specifically Ensembl GTF file formats
 		if ($feature->primary_tag =~ /^transcript$/i) {
 			# generic transcript type, see if we can make it more specific
-			if ($feature->has_tag('gene_biotype')) {
+			if ($feature->has_tag('transcript_biotype')) {
+				my ($t) = $feature->get_tag_values('transcript_biotype');
+				if ($t =~ /protein_coding/i) {
+					$feature->primary_tag('mRNA');
+				}
+				elsif ($t =~ /rna/i) {
+					# looks like an rna type
+					$feature->primary_tag($t);
+				}
+			}
+			elsif ($feature->has_tag('gene_biotype')) {
 				my ($t) = $feature->get_tag_values('gene_biotype');
 				$t = 'mRNA' if $t =~ /protein_coding/i;
 				$feature->primary_tag($t);
