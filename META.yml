@@ -15,7 +15,7 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.40'
+    version: '1.41'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
     version: '1.40'
@@ -68,7 +68,7 @@ provides:
     version: '1.14'
   Bio::ToolBox::parser::gff:
     file: lib/Bio/ToolBox/parser/gff.pm
-    version: '1.40'
+    version: '1.41'
   Bio::ToolBox::parser::ucsc:
     file: lib/Bio/ToolBox/parser/ucsc.pm
     version: '1.40'
@@ -95,4 +95,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.40'
+version: '1.41'
