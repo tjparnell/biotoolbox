@@ -35,7 +35,7 @@ provides:
     version: '1.40'
   Bio::ToolBox::GeneTools:
     file: lib/Bio/ToolBox/GeneTools.pm
-    version: '1.40'
+    version: '1.41'
   Bio::ToolBox::SeqFeature:
     file: lib/Bio/ToolBox/SeqFeature.pm
     version: '1.40'
