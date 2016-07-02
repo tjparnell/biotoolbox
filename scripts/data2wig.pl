@@ -39,6 +39,7 @@ my (
 	$start_index,
 	$stop_index,
 	$score_index,
+	@score_indices,
 	$attribute_name,
 	$track_name,
 	$use_track,
@@ -69,7 +70,7 @@ GetOptions(
 	'chr=i'     => \$chr_index, # index for the chromosome column
 	'start|pos=i' => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
-	'index|score=i' => \$score_index, # index for the score column
+	'index|score=s' => \$score_index, # index for the score column
 	'attrib=s'  => \$attribute_name, # gff or vcf attribute name to use 
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
@@ -133,10 +134,15 @@ check_step();
 set_bigwig_options() if $bigwig;
 
 if ($fast) {
-	die "cannot use --midpoint with --fast option!\n" if $midpoint;
-	die "cannot use --attribute with --fast option!\n" if $attribute_name;
-	die "cannot use --format with --fast option!\n" if $format;
-	die "cannot use --method with --fast option!\n" if $method;
+	warn "cannot use --midpoint with --fast option!\n" if $midpoint;
+	warn "cannot use --attribute with --fast option!\n" if $attribute_name;
+	warn "cannot use --format with --fast option!\n" if $format;
+	warn "cannot use --method with --fast option!\n" if 
+		($method and not @score_indices);
+	warn "cannot use multiple score indices with --fast option!\n" 
+		if @score_indices;
+	warn "running in slow mode...\n";
+	$fast = 0;
 }
 
 my $method_sub = set_method_sub();
@@ -167,7 +173,11 @@ if ($use_track) {
 
 
 ### Start the conversion 
-printf " converting '%s'....\n", $Input->name($score_index);
+printf " converting '%s'....\n", 
+	@score_indices ? 
+	join(", ", map { $Input->name($_) } @score_indices) :
+	$Input->name($score_index);
+
 if ($fast and $bedgraph) {
 	fast_convert_to_bedgraph();
 }
@@ -246,6 +256,13 @@ sub check_indices {
 		unless (defined $score_index) {
 			die " No identifiable score column index!\n";
 		}
+	}
+	if ($score_index =~ /[,\-]/) {
+		@score_indices = parse_list($score_index);
+	}
+	elsif (ref($score_index) eq 'ARRAY') {
+		# in case returned from interactive 
+		@score_indices = @$score_index;
 	}
 }
 
@@ -670,6 +687,9 @@ sub get_score {
 			$score = $attribs->{$score_index}{$attribute_name} || 0;
 		}
 	}
+	elsif (@score_indices) {
+		$score = &{$method_sub}(map {$row->value($_)} @score_indices);
+	}
 	elsif ($score_index) {
 		$score = $row->value($score_index) || 0;
 	}
@@ -729,7 +749,7 @@ data2wig.pl [--options...] <filename>
   --bed | --bdg
   --size <integer>
   --span <integer>
-  --index | --score <column_index>
+  --index | --score <column_index or list of indices>
   --chr <column_index>
   --start | --pos <column_index>
   --stop | --end <column_index>
@@ -820,13 +840,14 @@ across the oligo rather than the midpoint. The default is inherently 1 bp.
 
 =item --index <column_index>
 
-=item --score <column_index>
+=item --score <column_index or list of column indices>
 
 Indicate the column index (0-based) of the dataset in the data table 
 to be used for the score. If a GFF file is used as input, the score column is 
 automatically selected. If not defined as an option, then the program will
 interactively ask the user for the column index from a list of available
-columns.
+columns. More than one column may be specified, in which case the scores 
+are combined using the method specified.
 
 =item --chr <column_index>
 
