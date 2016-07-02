@@ -42,7 +42,7 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
@@ -69,7 +69,7 @@
       },
       "Bio::ToolBox::GeneTools" : {
          "file" : "lib/Bio/ToolBox/GeneTools.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::SeqFeature" : {
          "file" : "lib/Bio/ToolBox/SeqFeature.pm",
@@ -113,7 +113,7 @@
       },
       "Bio::ToolBox::parser::gff" : {
          "file" : "lib/Bio/ToolBox/parser/gff.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::parser::ucsc" : {
          "file" : "lib/Bio/ToolBox/parser/ucsc.pm",
@@ -136,5 +136,5 @@
          "url" : "https://github.com/tjparnell/biotoolbox"
       }
    },
-   "version" : "1.40"
+   "version" : "1.41"
 }

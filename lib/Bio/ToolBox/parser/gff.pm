@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-my $VERSION = '1.40';
+our $VERSION = '1.41';
 
 =head1 NAME
 
@@ -391,7 +391,8 @@ sub next_feature {
 			next;
 		}
 		elsif ($line =~ /^###$/) {
-			# GFF3 subfeature close directive, we no longer pay attention to these 
+			# GFF3 subfeature close directive, we no longer pay attention to 
+			# these, although we should.....
 			next;
 		}
 		elsif ($line =~ /^##sequence\-region/i) {
@@ -404,6 +405,7 @@ sub next_feature {
 			else {
 				warn "malformed sequence-region pragma! $line\n";
 			}
+			next;
 		}
 		elsif ($line =~ /^#/) {
 			# either a pragma or a comment line, may be useful
@@ -426,6 +428,7 @@ sub next_feature {
 		# line must be a GFF feature
 		# generate the SeqFeature object for this GFF line and return it
 		my $feature = $self->from_gff_string($line);
+		next unless $feature;
 		next if $feature eq 'skipped';
 		return $feature;
 	}
@@ -870,7 +873,7 @@ sub _gtf_to_seqf {
 	}
 	
 	# convert some tags into GFF3-like conventions
-	if ($feature->primary_tag eq 'gene') {
+	if ($feature->primary_tag =~ /gene/i) {
 		my ($id, $name);
 		if ($feature->has_tag('gene_id')) {
 			($id) = $feature->get_tag_values('gene_id');
@@ -903,14 +906,24 @@ sub _gtf_to_seqf {
 		$feature->add_tag_value('Parent', $parent);
 		if ($feature->has_tag('gene_name')) {
 			my ($alias) = $feature->get_tag_values('gene_name');
-			$feature->add_tag_value('Alias', $alias);
+			$feature->add_tag_value('Alias', $alias) if $alias ne $name;
 		}
 		
 		# update primary_tag to follow BioPerl/BioToolBox/GFF3/traditional conventions
 		# primarily to handle specifically Ensembl GTF file formats
 		if ($feature->primary_tag =~ /^transcript$/i) {
 			# generic transcript type, see if we can make it more specific
-			if ($feature->has_tag('gene_biotype')) {
+			if ($feature->has_tag('transcript_biotype')) {
+				my ($t) = $feature->get_tag_values('transcript_biotype');
+				if ($t =~ /protein_coding/i) {
+					$feature->primary_tag('mRNA');
+				}
+				elsif ($t =~ /rna/i) {
+					# looks like an rna type
+					$feature->primary_tag($t);
+				}
+			}
+			elsif ($feature->has_tag('gene_biotype')) {
 				my ($t) = $feature->get_tag_values('gene_biotype');
 				$t = 'mRNA' if $t =~ /protein_coding/i;
 				$feature->primary_tag($t);

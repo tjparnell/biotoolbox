@@ -1,5 +1,14 @@
 ######## Bio::ToolBox revision history #############
 
+v1.41
+	- Added option to combine multiple score columns into a single score 
+	when converting a file to a wig file in script data2wig
+	- Fix critical errors with calculating cdsStart and cdsEnd in the 
+	GeneTools library
+	- Fix bugs in gff parser to continue when encountering errors in 
+	parsing and interpret transcript biotype gtf attributes
+	- Fix bug in properly handling start coordinates in script data2wig
+
 v1.40
 	- Major update introduces new SeqFeature object Bio::ToolBox::SeqFeature 
 	that is a little faster and more compact than equivalent BioPerl objects. 
