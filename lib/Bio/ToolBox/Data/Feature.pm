@@ -854,15 +854,18 @@ sub segment {
 sub get_features {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
+	my $db = $args{db} || $self->{data}->open_database || undef;
 	carp "no database defined to get features!" unless defined $db;
+	return unless $db->can('features');
 	
-	$args{chromo} ||= $args{seq_id} || $self->seq_id;
-	$args{start}  ||= $self->start;
-	$args{stop}   ||= $args{end} || $self->end;
-	$args{type}   ||= $self->type;
+	# convert the argument style for most bioperl db APIs
+	my %opts;
+	$opts{-seq_id} ||= $args{chromo} || $self->seq_id;
+	$opts{-start}  ||= $self->start;
+	$opts{-end}    ||= $args{end} || $self->end;
+	$opts{-type}   ||= $self->type;
 	
-	return $db->features(%args);
+	return $db->features(%opts);
 }
 
 sub get_score {
