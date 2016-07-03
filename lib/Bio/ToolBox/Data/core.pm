@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.40';
+our $VERSION = '1.50';
 
 =head1 NAME
 
@@ -752,9 +752,7 @@ sub open_database {
 }
 
 sub verify_dataset {
-	my $self = shift;
-	my $dataset = shift;
-	my $database = shift; # name or object?
+	my ($self, $dataset, $database) = @_;
 	return unless $dataset;
 	if (exists $self->{verfied_dataset}{$dataset}) {
 		return $self->{verfied_dataset}{$dataset};
