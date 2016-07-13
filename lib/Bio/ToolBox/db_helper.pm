@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.40';
+our $VERSION = '1.50';
 
 use strict;
 require Exporter;
@@ -32,6 +32,7 @@ our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
 our %total_read_number; # for rpm calculations
 our $primary_id_warning; # for out of date primary IDs
 our %OPENED_DB; # cache for some opened Bio::DB databases
+our %DB_METHODS; # cache for database score methods
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -45,8 +46,7 @@ our @EXPORT_OK = qw(
 	get_new_genome_list 
 	validate_included_feature 
 	get_feature 
-	get_chromo_region_score 
-	get_region_dataset_hash 
+	get_segment_score 
 	get_chromosome_list 
 );
 
@@ -1849,85 +1849,6 @@ Examples
 
 =cut
 
-sub get_chromo_region_score {
-	
-	# retrieve passed values
-	my %args = @_; 
-	
-	# check the data source
-	unless ($args{'dataset'}) {
-		confess " no dataset requested!";
-	}
-	
-	# Open a db connection 
-	$args{'db'} ||= $args{'ddb'} || undef;
-	unless ($args{'db'} or $args{'dataset'} =~ /^(?:file|http|ftp)/) {
-		# database is only really necessary if we are not using an indexed file dataset
-		confess "no database provided!";
-	}
-	my $db;
-	if ($args{'db'}) {
-		$db = open_db_connection( $args{'db'} ) or 
-			confess "cannot open database!";
-	}
-	
-	# establish coordinates
-	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
-	return '.' unless $args{'chromo'}; # null value
-	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'start'}    = 1 if ($args{'start'} <= 0);
-	$args{'stop'}   ||= $args{'end'};
-	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : 0;
-	if ($args{'stop'} < $args{'start'}) {
-		# coordinates are flipped, reverse strand
-		return '.' if ($args{'stop'} <= 0);
-		my $stop = $args{'start'};
-		$args{'start'} = $args{'stop'};
-		$args{'stop'}  = $stop;
-		$args{'strand'} = -1;
-	}
-	
-	# define default values as necessary
-	$args{'value'}    ||= 'score';
-	$args{'stranded'} ||= 'all';
-	$args{'log'}      ||= undef;
-	unless (defined $args{'log'}) {
-		# we need to know whether we are working with a log2 dataset or not
-		# as it will adversely affect the math!
-		if ($args{'dataset'} =~ /log2/i) {
-			# if we're smart we'll encode the log2 status in the dataset name
-			# but chances are, we're not that smart
-			$args{'log'} = 1;
-		} else {
-			# otherwise assume it is non-log
-			# unsafe, but what else to do? we'll put the onus on the user
-			$args{'log'} = 0;
-		}
-	}
-	
-	# set RPM sum value if necessary
-	if (exists $args{'rpm_sum'} and defined $args{'rpm_sum'}) {
-		unless (exists $total_read_number{ $args{'dataset'} }) {
-			$total_read_number{ $args{'dataset'} } = $args{'rpm_sum'};
-		}
-	}
-	
-	# get the scores for the region
-	# pass to internal subroutine to combine dataset values
-	return _get_segment_score(
-				$db,
-				$args{'chromo'},
-				$args{'start'},
-				$args{'stop'},
-				$args{'strand'}, 
-				$args{'dataset'},
-				$args{'value'},
-				$args{'method'}, 
-				$args{'stranded'},  
-				$args{'log'},
-	);
-}
-
 
 
 
@@ -2050,420 +1971,124 @@ Example
 
 =cut
 
-sub get_region_dataset_hash {
+
+
+sub get_segment_score {
+	# parameters passed as an array
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	
-	# retrieve passed values
-	my %args = @_; 
+	# determine method
+	my $db_method = _lookup_db_method(\@_);
+	# returns an array reference [&$score_method, $do_return, $database_type]
 	
-	### Initialize parameters
-	
-	# check the data source
-	$args{'dataset'} ||= undef;
-	unless ($args{'dataset'}) {
-		confess " no dataset requested!";
+	# immediately return calculated score
+	if ($db_method->[1]) {
+		return &{ $db_method->[0] }(\@_);
 	}
 	
-	# Open a db connection 
-	$args{'db'} ||= undef;
-	my $db;
-	if ($args{'db'}) {
-		$db = open_db_connection( $args{'db'} ) or 
-			confess "cannot open database!";
+	# otherwise we get a list of scores
+	my $scores = &{ $db_method->[0] }(\@_);
+	my $method = $_[5]; # for convenience
+	return $scores if $method eq 'scores'; # method of scores
+	return _return_null($method) unless (@$scores);
+	
+	# special case for bam files where value type is ncount
+	if ($db_method->[2] eq 'bam' and $_[6] eq 'ncount') {
+		# Convert names into unique counts
+		# the actual method doesn't actually mean anything here
+		my %name2count;
+		foreach (@$scores) { $name2count{$_} += 1 }
+		return scalar(keys %name2count);
 	}
 	
-	# Open the data database if provided
-	$args{'ddb'} ||= undef;
-	my $ddb;
-	if ($args{'ddb'}) {
-		$ddb = open_db_connection( $args{'ddb'} ) or
-			confess "requested data database could not be opened!\n";
+	# calculate a single score for this array of score values
+	my $region_score;
+	if ($method eq 'median') {
+		$region_score = median(@$scores);
 	}
-	else {
-		# reuse something else
-		if ($db) {
-			$ddb = $db;
-		}
-		elsif ($args{'dataset'} =~ /^(?:file|http|ftp)/) {
-			$ddb = $args{'dataset'};
-		}
-		else {
-			confess "no database or indexed dataset supplied!";
-		}
+	elsif ($method eq 'mean') {
+		$region_score = mean(@$scores);
+	} 
+	elsif ($method eq 'range') {
+		# the range value is 'min-max'
+		$region_score = range(@$scores);
 	}
-	
-	# confirm options and check we have what we need 
-	$args{'name'}   ||= undef;
-	$args{'type'}   ||= undef;
-	$args{'id'}     ||= undef;
-	$args{'chromo'} ||= $args{'seq'} || $args{'seq_id'} || undef;
-	$args{'start'}    = exists $args{'start'} ? $args{'start'} : 1;
-	$args{'stop'}   ||= $args{'end'};
-	$args{'strand'}   = exists $args{'strand'} ? $args{'strand'} : undef;
-	unless (
-		(defined $args{'name'} and defined $args{'type'}) or 
-		(defined $args{'chromo'} and $args{'start'} and $args{'stop'})
-	) {
-		return;
-	};
-	if (
-		(defined $args{'stop'} and defined $args{'start'}) and 
-		($args{'stop'} < $args{'start'})
-	) {
-		# coordinates are flipped, reverse strand
-		return '.' if $args{'stop'} < 0;
-		my $stop = $args{'start'};
-		$args{'start'} = $args{'stop'};
-		$args{'stop'}  = $stop;
-		$args{'strand'} = -1;
+	elsif ($method eq 'stddev') {
+		# we are using the standard deviation of the population, 
+		# since these are the only scores we are considering
+		$region_score = stddevp(@$scores);
 	}
-	
-	# assign other defaults
-	$args{'stranded'} ||= 'all';
-	$args{'value'}    ||= 'score';
-	$args{'position'} ||= 5;
-	$args{'extend'}   ||= 0;
-	$args{'absolute'} ||= 0;
-	
-	# avoid feature types
-	if (exists $args{'avoid'} and defined $args{'avoid'}) {
-		if (ref $args{'avoid'} eq 'ARRAY') {
-			# we have types, presume they're ok
-		}
-		elsif ($args{'avoid'} eq '1') {
-			# old style boolean value
-			if (defined $args{'type'}) {
-				$args{'avoid'} = [ $args{'type'} ];
+	elsif ($method eq 'min') {
+		$region_score = min(@$scores);
+	}
+	elsif ($method eq 'max') {
+		$region_score = max(@$scores);
+	}
+	elsif ($method eq 'sum') {
+		$region_score = sum(@$scores);
+	}
+	elsif ($method =~ /count/) {
+		$region_score = scalar(@$scores);
+	}
+	elsif ($method =~ /rpk?m/) {
+		# convert to reads per million mapped
+		# this is only supported by bam and bigbed db
+		# the dataset is stored in $_[8]
+		# the dataset type is stored in $db_method->[2]
+		
+		# total the number of reads if necessary
+		unless (exists $total_read_number{$_[8]} ) {
+			
+			# check the type of database
+			if ($db_method->[2] eq 'bam') {
+				# a bam database
+				
+				$total_read_number{$_[8]} = 
+					sum_total_bam_alignments($_[8]);
+				print "\n [total alignments: ", 
+					format_with_commas( $total_read_number{$_[8]} ), 
+					"]\n";
+			}
+			elsif ($db_method->[2] eq 'bb') {
+				# bigBed database
+				
+				$total_read_number{$_[8]} = 
+					sum_total_bigbed_features($_[8]);
+				print "\n [total features: ", 
+					format_with_commas( $total_read_number{$_[8]} ), 
+					"]\n";
 			}
 			else {
-				# no type provided, we can't avoid that which is not defined! 
-				# this is an error, but won't complain as we never did before
-				$args{'avoid'} = undef;
+				# database is not supported
+				# reset the method
+				$method = 'sum';
 			}
+		}	
+		
+		# calculate the region score according to the method
+		if ($method eq 'rpkm') {
+			$region_score = 
+				( sum(@$scores) * 1000000000 ) / 
+				( ($_[2] - $_[1] + 1) * $total_read_number{$_[8]} );
 		}
-		elsif ($args{'avoid'} =~ /w+/i) {
-			# someone passed a string, a feature type perhaps?
-			$args{'avoid'} = [ $args{'avoid'} ];
+		elsif ($method eq 'rpm') {
+			$region_score = 
+				( sum(@$scores) * 1000000 ) / $total_read_number{$_[8]};
 		}
 		else {
-			# huh?
-			$args{'avoid'} = undef;
+			# this dataset doesn't support rpm methods
+			# use the sum method instead
+			$region_score = sum(@$scores);
 		}
 	}
 	else {
-		$args{'avoid'} = undef;
+		# somehow bad method snuck past our checks
+		confess " unrecognized method '$method'!";
 	}
-	
-	
-	
-	# the final coordinates
-	my $fref_pos; # to remember the feature reference position
-	my $fchromo;
-	my $fstart;
-	my $fstop;
-	my $fstrand;
-	my $primary; # database ID to be used when matching overlapping features
-	
-	
-	
-	### Define the chromosomal region segment
-	# we will use the primary database to establish the intitial feature
-	# and determine the chromosome, start and stop
-	
-	# Extend a named database feature
-	if (
-		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
-		$args{'extend'}
-	) {
-		
-		# first define the feature to get endpoints
-		confess "database required to use named features" unless $db;
-		my $feature = get_feature(
-			'db'    => $db,
-			'id'    => $args{'id'},
-			'name'  => $args{'name'},
-			'type'  => $args{'type'},
-		) or return; 
-		$primary = $feature->primary_id;
-		
-		# determine the strand
-		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
-		
-		# record the feature reference position and strand
-		if ($args{'position'} == 5 and $fstrand >= 0) {
-			$fref_pos = $feature->start;
-		}
-		elsif ($args{'position'} == 3 and $fstrand >= 0) {
-			$fref_pos = $feature->end;
-		}
-		elsif ($args{'position'} == 5 and $fstrand < 0) {
-			$fref_pos = $feature->end;
-		}
-		elsif ($args{'position'} == 3 and $fstrand < 0) {
-			$fref_pos = $feature->start;
-		}
-		elsif ($args{'position'} == 4) {
-			# strand doesn't matter here
-			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
-		}
-		
-		# record final coordinates
-		$fchromo = $feature->seq_id;
-		$fstart  = $feature->start - $args{'extend'};
-		$fstop   = $feature->end + $args{'extend'};
-	} 
-		
-	# Specific start and stop coordinates of a named database feature
-	elsif (
-		( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) and 
-		$args{'start'} and $args{'stop'}
-	) {
-		# first define the feature to get endpoints
-		confess "database required to use named features" unless $db;
-		my $feature = get_feature(
-			'db'    => $db,
-			'id'    => $args{'id'},
-			'name'  => $args{'name'},
-			'type'  => $args{'type'},
-		) or return; 
-		$primary = $feature->primary_id;
-		
-		# determine the strand
-		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
-		
-		# determine the cooridnates based on the identified feature
-		if ($args{'position'} == 5 and $fstrand >= 0) {
-			# feature is on forward, top, watson strand
-			# set segment relative to the 5' end
-			
-			# record final coordinates
-			$fref_pos  = $feature->start;
-			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->start + $args{'start'};
-			$fstop     = $feature->start + $args{'stop'};
-		}
-		
-		elsif ($args{'position'} == 5 and $fstrand < 0) {
-			# feature is on reverse, bottom, crick strand
-			# set segment relative to the 5' end
-			
-			# record final coordinates
-			$fref_pos  = $feature->end;
-			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->end - $args{'stop'};
-			$fstop     = $feature->end - $args{'start'};
-		}
-		
-		elsif ($args{'position'} == 3 and $fstrand >= 0) {
-			# feature is on forward, top, watson strand
-			# set segment relative to the 3' end
-			
-			# record final coordinates
-			$fref_pos = $feature->end;
-			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->end + $args{'start'};
-			$fstop     = $feature->end + $args{'stop'};
-		}
-		
-		elsif ($args{'position'} == 3 and $fstrand < 0) {
-			# feature is on reverse, bottom, crick strand
-			# set segment relative to the 3' end
-			
-			# record final coordinates
-			$fref_pos = $feature->start;
-			$fchromo   = $feature->seq_id;
-			$fstart    = $feature->start - $args{'stop'};
-			$fstop     = $feature->start - $args{'start'};
-		}
-		
-		elsif ($args{'position'} == 4) {
-			# feature can be on any strand
-			# set segment relative to the feature middle
-			
-			# record final coordinates
-			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
-			$fchromo   = $feature->seq_id;
-			$fstart    = $fref_pos + $args{'start'};
-			$fstop     = $fref_pos + $args{'stop'};
-		}
-	}
-	
-	# an entire named database feature
-	elsif ( $args{'id'} or ( $args{'name'} and $args{'type'} ) ) {
-		
-		# first define the feature to get endpoints
-		confess "database required to use named features" unless $db;
-		my $feature = get_feature(
-			'db'    => $db,
-			'id'    => $args{'id'},
-			'name'  => $args{'name'},
-			'type'  => $args{'type'},
-		) or return; 
-		$primary = $feature->primary_id;
-		
-		# determine the strand
-		$fstrand   = defined $args{'strand'} ? $args{'strand'} : $feature->strand;
-		
-		# record the feature reference position and strand
-		if ($args{'position'} == 5 and $fstrand >= 0) {
-			$fref_pos = $feature->start;
-		}
-		elsif ($args{'position'} == 3 and $fstrand >= 0) {
-			$fref_pos = $feature->end;
-		}
-		elsif ($args{'position'} == 5 and $fstrand < 0) {
-			$fref_pos = $feature->end;
-		}
-		elsif ($args{'position'} == 3 and $fstrand < 0) {
-			$fref_pos = $feature->start;
-		}
-		elsif ($args{'position'} == 4) {
-			# strand doesn't matter here
-			$fref_pos = $feature->start + int(($feature->length / 2) + 0.5);
-		}
-		
-		# record final coordinates
-		$fchromo   = $feature->seq_id;
-		$fstart    = $feature->start;
-		$fstop     = $feature->end;
-	}
-	
-	# a genomic region
-	elsif ( $args{'chromo'} and defined $args{'start'} and defined $args{'stop'} ) {
-		# coordinates are easy
-		
-		$fchromo   = $args{'chromo'};
-		if ($args{'extend'}) {
-			# user wants to extend
-			$fstart    = $args{'start'} - $args{'extend'};
-			$fstop     = $args{'stop'}  + $args{'extend'};
-		}
-		else {
-			$fstart    = $args{'start'};
-			$fstop     = $args{'stop'};
-		}
-		$fstart = 1 if $fstart <= 0;
-		
-		# determine the strand
-		$fstrand   = defined $args{'strand'} ? $args{'strand'} : 0; # default is no strand
-		
-		# record the feature reference position and strand
-		if ($args{'position'} == 5 and $fstrand >= 0) {
-			$fref_pos = $args{'start'};
-		}
-		elsif ($args{'position'} == 3 and $fstrand >= 0) {
-			$fref_pos = $args{'stop'};
-		}
-		elsif ($args{'position'} == 5 and $fstrand < 0) {
-			$fref_pos = $args{'stop'};
-		}
-		elsif ($args{'position'} == 3 and $fstrand < 0) {
-			$fref_pos = $args{'start'};
-		}
-		elsif ($args{'position'} == 4) {
-			# strand doesn't matter here
-			$fref_pos = $args{'start'} + 
-				int( ( ($args{'stop'} - $args{'start'} + 1) / 2) + 0.5);
-		}
-	}
-	
-	# or else something is wrong
-	else {
-		confess " programming error! not enough information provided to" .
-			" identify database feature!\n";
-	}
-	
-	# sanity check for $fstart
-	$fstart = 1 if $fstart < 1;
-	
-	### Data collection
-	my %datahash = _get_segment_score(
-		$ddb, # using the data database here
-		$fchromo,
-		$fstart,
-		$fstop,
-		$fstrand, 
-		$args{'dataset'}, 
-		$args{'value'},
-		'indexed', # method
-		$args{'stranded'}, 
-		0, # log value
-	);
-	
-	
-	### Check for conflicting features
-	if (defined $args{'avoid'}) {
-		# we need to look for any potential overlapping features of the 
-		# provided type and remove those scores
-		
-		# get the overlapping features of the same type
-		my @overlap_features = $db->features(
-			-seq_id  => $fchromo,
-			-start   => $fstart,
-			-end     => $fstop,
-			-type    => $args{'avoid'},
-		);
-		if (@overlap_features) {
-			# there are one or more feature of the type in this region
-			# one of them is likely the one we're working with
-			# but not necessarily - user may be looking outside original feature
-			# the others are not what we want and therefore need to be 
-			# avoided
-			foreach my $feat (@overlap_features) {
-				# skip the one we want
-				next if ($feat->primary_id eq $primary);
-				# now eliminate those scores which overlap this feature
-				my $start = $feat->start;
-				my $stop  = $feat->end;
-				foreach my $position (keys %datahash) {
-					# delete the scored position if it overlaps with 
-					# the offending feature
-					if (
-						$position >= $start and
-						$position <= $stop
-					) {
-						delete $datahash{$position};
-					}
-				}
-			}
-		}
-		
-	}
-	
-	
-	
-	### Convert the coordinates to relative positions
-		# previous versions of this function that used Bio::DB::GFF returned 
-		# the coordinates as relative positions, e.g. -200..200
-		# to maintain this compatibility we will convert the coordinates to 
-		# relative positions
-		# most downstream applications of this function expect this, and it's
-		# a little easier to work with. Just a little bit, though....
-	if ($args{'absolute'}) {
-		# do not convert to relative positions
-		return %datahash;
-	}
-	else {
-		my %relative_datahash;
-		if ($fstrand >= 0) {
-			# forward strand
-			foreach my $position (keys %datahash) {
-				# relative position is real position - reference
-				$relative_datahash{ $position - $fref_pos } = $datahash{$position};
-			}
-		}
-		elsif ($fstrand < 0) {
-			# reverse strand
-			foreach my $position (keys %datahash) {
-				# the relative position is -(real position - reference)
-				$relative_datahash{ $fref_pos - $position } = $datahash{$position};
-			}
-		}
-		
-		# return the collected dataset hash
-		return %relative_datahash;
-	}
-}
 
+	# finished
+	return $region_score;
+}
 
 
 
@@ -2821,105 +2446,57 @@ visual marker.
 
 =cut
 
-sub _get_segment_score {
+sub _lookup_db_method {
+	# parameters passed as an array reference
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $param = shift;
 	
-	# get passed arguments
-	my (
-		$db,
-		$chromo,
-		$start,
-		$stop,
-		$strand, 
-		$dataset, 
-		$value_type,
-		$method, 
-		$strandedness, 
-		$log
-	) = @_;
+	# generate a lookup string based on stringified parameters
+	# method, db string, dataset
+	my $lookup = sprintf "%s_%s_%s", $param->[5], scalar $param->[7], 
+		$param->[8];
+	return $DB_METHODS{$lookup} if exists $DB_METHODS{$lookup};
+	# otherwise we determine the appropriate database method and cache the result
 	
-	# define
-	my @scores; # array of collected scores
-	my $dataset_type; # remember what type of database the data is from
-	my $iterator; # seqfeature stream object for reiterating db features
-	my $db_type = $db ? ref $db : undef; # source of the originating db 
+	# conveniences
+	my $method = $param->[5];
+	my $value = $param->[6];
+	my $db = $param->[7];
+	my $dataset = $param->[8];
 	
-	my @datasetlist = split /[&,]/, $dataset; 
-		# multiple datasets may be combined into a single search, for example
-		# transcriptome data that is on f and r strands. These are given as
-		# ampersand or comma delimited lists
-	
-	
-	### Determine where we are going to get the data
-		# first check whether the provided dataset(s) look like a data file
-		# next check whether the database segment object came from a BigWigSet
-		# finally assume it is a SeqFeature database object
-		# then look for a wigfile, bigwigfile, or bamfile attribute
-		# finally then just take the score directly from the database objects
-	
-	### Data source files provided
-	if ($datasetlist[0] =~ /^file|http|ftp/) {
-		
+	# determine the appropriate score method
+	my ($score_method, $do_return, $database_type);
+	if ($dataset =~ /^file|http|ftp/) {
 		# collect the data according to file type
 		
 		# BigWig Data file
-		if ($datasetlist[0] =~ /\.bw$/i) {
+		if ($dataset =~ /\.(?:bw|bigwig)$/i) {
 			# file is in bigwig format
+			# get the dataset scores using Bio::ToolBox::db_helper::bigwig
 			# this uses the Bio::DB::BigWig adaptor
 			
 			# check that we have bigwig support
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
 				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
-				# get the dataset scores using Bio::ToolBox::db_helper::bigwig
-				
-				# the data collection depends on the method
-				if ($value_type eq 'score' and 
+				if ($value eq 'score' and 
 					$method =~ /min|max|mean|sum|count/
 				) {
-					# we can use the low-level, super-speedy, summary method 
-					# warn " using collect_bigwig_score() with file\n";
-					return collect_bigwig_score(
-						$chromo,
-						$start,
-						$stop,
-						$method,
-						@datasetlist
-					);
+					$score_method = &collect_bigwig_score;
+					$do_return = 1;
 				}
-				
-				elsif ($value_type eq 'count' and $method eq 'sum') {
-					# we can use the low-level, super-speedy, summary method 
-					# warn " using collect_bigwig_score() with file\n";
-					return collect_bigwig_score(
-						$chromo,
-						$start,
-						$stop,
-						'count', # special method
-						@datasetlist
-					);
+				elsif ($value eq 'count' and $method eq 'sum') {
+					$score_method = &collect_bigwig_score;
+					$do_return = 1;
 				}
-				
 				elsif ($method eq 'indexed') {
-					# collect hash of position => scores
-					# warn " using collect_bigwig_position_score() with file\n";
-					return collect_bigwig_position_scores(
-						$chromo,
-						$start,
-						$stop,
-						@datasetlist
-					);
+					$score_method = &collect_bigwig_position_scores;
+					$do_return = 1;
 				}
-				
 				else {
-					# use the longer region collection method
-					# warn " using collect_bigwig_scores() with file\n";
-					@scores = collect_bigwig_scores(
-						$chromo,
-						$start,
-						$stop,
-						@datasetlist
-					);
-					$dataset_type = 'bw';
+					$score_method = &collect_bigwig_scores;
+					$do_return = 0;
+					$database_type = 'bw';
 				}
 			}
 			else {
@@ -2929,41 +2506,23 @@ sub _get_segment_score {
 		}		
 		
 		# BigBed Data file
-		elsif ($datasetlist[0] =~ /\.bb$/i) {
+		elsif ($dataset =~ /\.(?:bb|bigbed)$/i) {
 			# data is in bigbed format
+			# get the dataset scores using Bio::ToolBox::db_helper::bigbed
 			# this uses the Bio::DB::BigBed adaptor
 			
 			# check that we have bigbed support
 			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
 				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
-				# get the dataset scores using Bio::ToolBox::db_helper::bigbed
-				
 				if ($method eq 'indexed') {
-					# warn " using collect_bigbed_position_scores() with file\n";
-					return collect_bigbed_position_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
+					$score_method = &collect_bigbed_position_scores;
+					$do_return = 1;
 				}
-				
 				else {
-					# warn " using collect_bigbed_scores() with file\n";
-					@scores = collect_bigbed_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
-					$dataset_type = 'bb';
+					$score_method = &collect_bigbed_scores;
+					$do_return = 0;
+					$database_type = 'bb';
 				}
 			}
 			else {
@@ -2973,48 +2532,23 @@ sub _get_segment_score {
 		}
 		
 		# BAM data file
-		elsif ($datasetlist[0] =~ /\.bam$/i) {
+		elsif ($dataset =~ /\.bam$/i) {
 			# data is in bam format
+			# get the dataset scores using Bio::ToolBox::db_helper::bam
 			# this uses the Bio::DB::Sam adaptor
 			
 			# check that we have Bam support
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
-				# get the dataset scores using Bio::ToolBox::db_helper::bam
-				
 				if ($method eq 'indexed') {
-					# warn " using collect_bam_position_scores() with file\n";
-					return collect_bam_position_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
+					$score_method = &collect_bam_position_scores;
+					$do_return = 1;
 				}
 				else {
 					# warn " using collect_bam_scores() with file\n";
-					@scores = collect_bam_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
-					$dataset_type = 'bam';
-					
-					# Convert names into unique counts
-					# unless the user requested raw scores
-					if ($value_type eq 'ncount' and $method ne 'scores') {
-						my %name2count;
-						foreach (@scores) { $name2count{$_} += 1 }
-						@scores = (); # empty the array
-						push @scores, scalar(keys %name2count);
-					}
+					$score_method = &collect_bam_scores;
+					$do_return = 0;
+					$database_type = 'bam';
 				}
 			}
 			else {
@@ -3024,41 +2558,23 @@ sub _get_segment_score {
 		}
 		
 		# USeq Data file
-		elsif ($datasetlist[0] =~ /\.useq$/i) {
+		elsif ($dataset =~ /\.useq$/i) {
 			# data is in useq format
+			# get the dataset scores using Bio::ToolBox::db_helper::useq
 			# this uses the Bio::DB::USeq adaptor
 			
 			# check that we have bigbed support
 			$USEQ_OK = _load_helper_module('Bio::ToolBox::db_helper::useq') 
 				unless $USEQ_OK;
 			if ($USEQ_OK) {
-				# get the dataset scores using Bio::ToolBox::db_helper::useq
-				
 				if ($method eq 'indexed') {
-					# warn " using collect_useq_position_scores() with file\n";
-					return collect_useq_position_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
+					$score_method = &collect_useq_position_scores;
+					$do_return = 1;
 				}
-				
 				else {
-					# warn " using collect_useq_scores() with file\n";
-					@scores = collect_useq_scores(
-						$chromo,
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type, 
-						@datasetlist
-					);
-					$dataset_type = 'useq';
+					$score_method = &collect_useq_scores;
+					$do_return = 0;
+					$database_type = 'useq';
 				}
 			}
 			else {
@@ -3069,14 +2585,13 @@ sub _get_segment_score {
 		
 		# Unsupported Data file
 		else {
-			confess " Unsupported file type for file '$datasetlist[0]!\n";
+			confess " Unsupported file type for file '$dataset!\n";
 		}
-		
 	}
 	
 	
 	### BigWigSet database
-	elsif ($db_type =~ m/^Bio::DB::BigWigSet/) {
+	elsif (ref($db) =~ m/^Bio::DB::BigWigSet/) {
 		# calling features from a BigWigSet database object
 		
 		# check that we have bigwig support
@@ -3085,80 +2600,32 @@ sub _get_segment_score {
 		confess " BigWigSet support is not enabled! Is Bio::DB::BigFile installed?" 
 			unless $BIGWIG_OK;
 		
-		# we may be able to take advantage of a special low-level 
-		# super-speedy interface based on the BigWigSet summary feature
-		
 		# the data collection depends on the method
-		if ($value_type eq 'score' and 
-			$method =~ /min|max|mean|sum|count/
-		) {
-			# we can use the low-level, super-speedy, summary method 
-			# warn " using collect_bigwigset_score()\n";
-			return collect_bigwigset_score(
-				$db,
-				$chromo,
-				$start,
-				$stop,
-				$strand, 
-				$strandedness, 
-				$method,
-				@datasetlist
-			);
+		if ($value eq 'score' and $method =~ /min|max|mean|sum|count/) {
+			$score_method = &collect_bigwigset_score;
+			$do_return = 1;
 		}
-		elsif ($value_type eq 'count' and $method eq 'sum') {
-			# we can use the low-level, super-speedy, summary method 
-			# warn " using collect_bigwigset_score()\n";
-			return collect_bigwigset_score(
-				$db,
-				$chromo,
-				$start,
-				$stop,
-				$strand, 
-				$strandedness, 
-				'count', # special method
-				@datasetlist
-			);
+		elsif ($value eq 'count' and $method eq 'sum') {
+			$score_method = &collect_bigwigset_score;
+			$do_return = 1;
 		}
-		
-		elsif ($value_type eq 'score' and $method eq 'indexed') {
-			# want positioned score data
-			# warn " using collect_bigwigset_position_score()\n";
-			return collect_bigwigset_position_scores(
-				$db,
-				$chromo,
-				$start,
-				$stop,
-				$strand, 
-				$strandedness, 
-				@datasetlist
-			);
+		elsif ($value eq 'score' and $method eq 'indexed') {
+			$score_method = &collect_bigwigset_position_scores;
+			$do_return = 1;
 		}
-		
 		else {
-			# simply collect a list of the scores
-			# warn " using collect_bigwigset_scores()\n";
-			@scores = collect_bigwigset_scores(
-				$db,
-				$chromo,
-				$start,
-				$stop,
-				$strand, 
-				$strandedness, 
-				@datasetlist
-			);
-			$dataset_type = 'bw';
+			$score_method = &collect_bigwigset_scores;
+			$do_return = 0;
+			$database_type = 'bw';
 		}
 	}
 		
 
-	### SeqFeature database
-	elsif ($db_type =~ m/^Bio::DB/) {
-		# a BioPerl-style database
-		# presumably this is a Bio::DB::SeqFeature::Store database
-		# if not, most Bio::DB databases support generic get_seq_stream() methods
+	### BioPerl style database
+	elsif (ref($db) =~ m/^Bio::DB/) {
+		# a BioPerl style database, including Bio::DB::SeqFeature::Store 
+		# most or all Bio::DB databases support generic get_seq_stream() methods
 		# that return seqfeature objects, which we can use in a generic sense
-		# at best, this will return simple scores
-		# at worst, these generic methods are not supported and it will fail
 		
 		# check that we have support
 		$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
@@ -3166,38 +2633,25 @@ sub _get_segment_score {
 		if ($SEQFASTA_OK) {
 			# get the dataset scores using Bio::ToolBox::db_helper::seqfasta
 			
-			if ($method eq 'indexed') {
-				# warn " using collect_useq_position_scores() with file\n";
-				return collect_store_position_scores(
-					$db,
-					$chromo,
-					$start,
-					$stop,
-					$strand, 
-					$strandedness, 
-					$value_type,
-					@datasetlist
-				);
+			# check that we support methods
+			unless ($db->can('get_seq_stream')) {
+				confess sprintf "unsupported database! cannot use %s as it does not support get_seq_stream method or equivalent", 
+					ref($db);
 			}
 			
+			if ($method eq 'indexed') {
+				$score_method = &collect_store_position_scores;
+				$do_return = 1;
+			}
 			else {
-				# warn " using collect_useq_scores() with file\n";
-				@scores = collect_store_scores(
-					$db,
-					$chromo,
-					$start,
-					$stop,
-					$strand, 
-					$strandedness, 
-					$value_type, 
-					@datasetlist
-				);
-				$dataset_type = 'seqfeature';
+				$score_method = &collect_store_scores;
+				$do_return = 0;
+				$database_type = 'seqfeature';
 			}
 		}
 		else {
 			croak " SeqFeature Store support is not enabled! " . 
-				"Is Bio::DB::SeqFeature::Store properly installed?\n";
+				"Is BioPerl and Bio::DB::SeqFeature::Store properly installed?\n";
 		}
 	}
 	
@@ -3205,130 +2659,15 @@ sub _get_segment_score {
 	### Some other database?
 	else {
 		confess "no database passed!" unless $db;
-		confess "unrecognized database type $db_type!";
+		confess sprintf "unrecognized database type %s!", ref($db);
 	}
 		
 	
-	### Determine region score from collected scores
-	
-	# all scores
-	if ($method eq 'scores') {
-		# just the raw scores are requested
-		# return an array reference
-		return \@scores;
-	}
-	
-	# check that we have scores
-	return _return_null($method) unless (@scores);
-	
-	# requested a single score for this region
-	# we need to combine the data
-	my $region_score;
-	
-	# first deal with log2 values if necessary
-	if ($log) {
-		@scores = map {2 ** $_} @scores;
-	}
-	
-	# determine the region score according to method
-	# we are using subroutines from Statistics::Lite
-	if ($method eq 'median') {
-		# take the median value
-		$region_score = median(@scores);
-	}
-	elsif ($method eq 'mean') {
-		# or take the mean value
-		$region_score = mean(@scores);
-	} 
-	elsif ($method eq 'range') {
-		# or take the range value
-		# this is 'min-max'
-		$region_score = range(@scores);
-	}
-	elsif ($method eq 'stddev') {
-		# or take the standard deviation value
-		# we are using the standard deviation of the population, 
-		# since these are the only scores we are considering
-		$region_score = stddevp(@scores);
-	}
-	elsif ($method eq 'min') {
-		# or take the minimum value
-		$region_score = min(@scores);
-	}
-	elsif ($method eq 'max') {
-		# or take the maximum value
-		$region_score = max(@scores);
-	}
-	elsif ($method eq 'sum') {
-		# sum the number of values
-		$region_score = sum(@scores);
-	}
-	elsif ($method =~ /count/) {
-		# count the number of values
-		$region_score = scalar(@scores);
-	}
-	elsif ($method =~ /rpk?m/) {
-		# convert to reads per million mapped
-		# this is only supported by bam and bigbed db, checked above
-		
-		# total the number of reads if necessary
-		unless (exists $total_read_number{$dataset} ) {
-			
-			# check the type of database
-			if ($dataset_type eq 'bam') {
-				# a bam database
-				
-				$total_read_number{$dataset} = 
-					sum_total_bam_alignments($dataset);
-				print "\n [total alignments: ", 
-					format_with_commas( $total_read_number{$dataset} ), 
-					"]\n";
-			}
-			elsif ($dataset_type eq 'bb') {
-				# bigBed database
-				
-				$total_read_number{$dataset} = 
-					sum_total_bigbed_features($dataset);
-				print "\n [total features: ", 
-					format_with_commas( $total_read_number{$dataset} ), 
-					"]\n";
-			}
-			else {
-				# database is not supported
-				# reset the method
-				$method = 'sum';
-			}
-		}	
-		
-		# calculate the region score according to the method
-		if ($method eq 'rpkm') {
-			$region_score = 
-				( sum(@scores) * 1000000000 ) / 
-				( ($stop - $start + 1) * $total_read_number{$dataset} );
-		}
-		elsif ($method eq 'rpm') {
-			$region_score = 
-				( sum(@scores) * 1000000 ) / $total_read_number{$dataset};
-		}
-		else {
-			# this dataset doesn't support rpm methods
-			# use the sum method instead
-			$region_score = sum(@scores);
-		}
-	}
-	else {
-		# somehow bad method snuck past our checks
-		confess " unrecognized method '$method'!";
-	}
-
-	# convert back to log2 if necessary
-	if ($log) { 
-		$region_score = log($region_score) / LOG2;
-	}
-	
-	# finished
-	return $region_score;
+	### Cache and return the results
+	$DB_METHODS{$lookup} = [$score_method, $do_return, $database_type];
+	return $DB_METHODS{$lookup};
 }
+
 
 
 =item _return_null
