@@ -13,7 +13,6 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types 
 	get_chromosome_list
 	validate_included_feature
-	get_feature
 );
 use Bio::ToolBox::utility;
 my $VERSION = 1.24;

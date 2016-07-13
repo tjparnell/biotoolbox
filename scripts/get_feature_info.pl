@@ -7,7 +7,6 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
-	get_feature
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
