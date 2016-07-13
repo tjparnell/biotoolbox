@@ -812,9 +812,9 @@ sub seqfeature {
 	return $self->{feature} if exists $self->{feature};
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
 	return $f if $f;
-	return unless $self->{data}->database;
 	
 	# retrieve the feature from the database
+	return unless $self->{data}->database;
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
@@ -858,10 +858,10 @@ sub get_features {
 	
 	# convert the argument style for most bioperl db APIs
 	my %opts;
-	$opts{-seq_id} ||= $args{chromo} || $self->seq_id;
-	$opts{-start}  ||= $self->start;
-	$opts{-end}    ||= $args{end} || $self->end;
-	$opts{-type}   ||= $self->type;
+	$opts{-seq_id} = $args{chromo} || $self->seq_id;
+	$opts{-start}  = $args{start}  || $self->start;
+	$opts{-end}    = $args{end}    || $self->end;
+	$opts{-type}   = $args{type}   || $self->type;
 	
 	return $db->features(%opts);
 }
