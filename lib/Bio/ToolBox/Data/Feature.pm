@@ -819,7 +819,7 @@ sub seqfeature {
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
 	return unless ($id or ($name and $type));
-	$f = get_feature(
+	$f = get_db_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later

@@ -45,7 +45,7 @@ our @EXPORT_OK = qw(
 	get_new_feature_list 
 	get_new_genome_list 
 	validate_included_feature 
-	get_feature 
+	get_db_feature 
 	get_segment_score 
 	get_chromosome_list 
 );
@@ -147,7 +147,7 @@ names to export. None are exported by default.
 
   use Bio::ToolBox::db_helper qw(
 	  get_new_feature_list 
-	  get_feature
+	  get_db_feature
   );
 
 This will export the indicated subroutine names into the current namespace. 
@@ -1598,7 +1598,7 @@ sub validate_included_feature {
 
 
 
-=item get_feature
+=item get_db_feature
 
 This subroutine will retrieve a specific feature from a Bio::DB::SeqFeature::Store 
 database for subsequent analysis, manipulation, and/or score retrieval using the 
@@ -1641,7 +1641,7 @@ The first SeqFeature object is returned if found.
 
 =cut
 
-sub get_feature {
+sub get_db_feature {
 	my %args = @_;
 	
 	# Open a db connection 
