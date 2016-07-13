@@ -462,12 +462,10 @@ attribute key.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use Bio::ToolBox::db_helper qw(
-	get_feature
-	get_chromo_region_score
-	get_region_dataset_hash
-);
+use Module::Load;
+use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score);
 
+my $GENETOOL_LOADED = 0;
 1;
 
 
@@ -933,49 +931,329 @@ sub get_score {
 	);
 }
 
-sub get_position_scores {
+sub get_relative_point_position_scores {
 	my $self = shift;
 	my %args = @_;
 	
-	# the get_region_dataset_hash() method can handle both db features and coordinates
-	# therefore, this method will also handle both
-	# set arguments based on the feature type.
-	if ($self->feature_type eq 'named') {
-		# confirm that we have appropriate 
-		$args{id}     ||= $self->id;
-		$args{name}   ||= $self->name;
-		$args{type}   ||= $self->type;
-		# do NOT assign strand here, it will be assigned in db_helper
-	}
-	elsif ($self->feature_type eq 'coordinate') {
-		$args{chromo} ||= $self->seq_id;
-		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
-		unless (exists $args{strand} and defined $args{strand}) {
-			$args{strand} = $self->strand;
-		}
-	}
-	else {
-		# die otherwise we will have this error every time
-		croak "data table does not have coordinates or feature attributes for score collection\n";
-	}
-	
-	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
+	# get the database and verify the dataset
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
 	}
 	
-	$args{db} ||= $self->{data}->open_database;
-	unless ($args{db} or $args{ddb}) {
-		# make sure we provide a database
-		if ($self->{feature} eq 'coordinate' and $args{dataset} =~ /^(?:file|http|ftp)/) {
-			$args{ddb} = $args{dataset};
+	# assign some defaults
+	$args{strandedness} ||= 'all';
+	$args{value}        ||= 'score';
+	$args{position}     ||= 5;
+	$args{coordinate}   ||= undef;
+	$args{avoid}        ||= undef;
+	unless ($args{extend}) {
+		croak "must provide an extend value!";
+	}
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	
+	# Assign coordinates
+	$self->_calculate_reference(\%args) unless $args{coordinate};
+	my $fchromo = $self->seq_id;
+	my $fstart = $args{coordinate} - $args{extend};
+	my $fstop  = $args{coordinate} - $args{extend};
+	my $fstrand = defined $args{strand} ? $args{strand} : $self->strand;
+	
+	# Data collection
+	$fstart = 1 if $fstart < 1; # sanity check
+	my $pos2data = get_segment_score(
+		$fchromo,
+		$fstart,
+		$fstop,
+		$fstrand, 
+		$args{strandedness}, 
+		'index', # method
+		$args{value},
+		$ddb,
+		$args{dataset}, 
+	);
+	
+	# Avoid positions
+	if ($args{avoid}) {
+		$self->_avoid_positions($pos2data, \%args, $fchromo, $fstart, $fstop);
+	}
+	
+	# covert to relative positions
+	if ($args{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %$pos2data : $pos2data;
+	}
+	else {
+		# return the collected dataset hash
+		return $self->_convert_to_relative_positions($pos2data, 
+			$args{coordinate}, $fstrand);
+	}
+}
+
+sub get_region_position_scores {
+	my $self = shift;
+	my %args = @_;
+	
+	# get the database and verify the dataset
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
+	unless ($args{dataset}) {
+		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	}
+	
+	# assign some defaults
+	$args{strandedness} ||= 'all';
+	$args{value}        ||= 'score';
+	$args{extend}       ||= 0;
+	$args{exon}         ||= 0;
+	$args{position}     ||= 5;
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	
+	# get positioned scores over subfeatures only
+	if ($self->feature_type eq 'named' and $args{'exon'}) {
+		# this is more complicated so we have a dedicated method
+		return $self->_get_subfeature_position_scores(\%args, $ddb);
+	}
+	
+	# Assign coordinates
+	my $feature = $self->seqfeature || $self;
+	my $fchromo = $args{chromo} || $args{seq_id} || $feature->seq_id;
+	my $fstart  = $args{start} || $feature->start;
+	my $fstop   = $args{stop} || $args{end} || $feature->end;
+	my $fstrand = defined $args{strand} ? $args{strand} : $feature->strand;
+	if ($args{extend}) {
+		$fstart -= $args{extend};
+		$fstop  += $args{extend};
+	}
+	
+	# Data collection
+	$fstart = 1 if $fstart < 1; # sanity check
+	my $pos2data = get_segment_score(
+		$fchromo,
+		$fstart,
+		$fstop,
+		$fstrand, 
+		$args{strandedness}, 
+		'index', # method
+		$args{value},
+		$ddb,
+		$args{dataset}, 
+	);
+	
+	# Avoid positions
+	if ($args{avoid}) {
+		$self->_avoid_positions($pos2data, \%args, $fchromo, $fstart, $fstop);
+	}
+	
+	# covert to relative positions
+	if ($args{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %$pos2data : $pos2data;
+	}
+	else {
+		# return data converted to relative positions
+		$self->_calculate_reference(\%args);
+		return $self->_convert_to_relative_positions($pos2data, 
+			$args{coordinate}, $fstrand);
+	}
+}
+
+sub _get_subfeature_position_scores {
+	my ($self, $args, $ddb) = @_;
+	
+	# load GeneTools
+	unless ($GENETOOL_LOADED) {
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		if ($@) {
+			croak "missing required modules! $@";
+		}
+		else {
+			$GENETOOL_LOADED = 1;
 		}
 	}
 	
-	return get_region_dataset_hash(%args);
+	# feature
+	my $feature = $self->seqfeature;
+	unless ($feature) {
+		carp "no SeqFeature available! Cannot collect exon data!";
+		return;
+	}
+	my $length = get_transcript_length($feature);
+	
+	# collect over each exon
+	# we will adjust the positions of each reported score so that 
+	# it will appear as if all the exons are adjacent to each other
+	# and no introns exist
+	my %regionscores;
+	my $current_end = $feature->start;
+	my $adjustment = 0;
+	foreach my $exon (get_exons($feature)) {
+		
+		# collect scores
+		my $exon_scores = get_segment_score(
+			$exon->seq_id,
+			$exon->start,
+			$exon->end,
+			defined $args->{strand} ? $args->{strand} : $exon->strand, 
+			$args->{strandedness}, 
+			'index', # method
+			$args->{value},
+			$ddb,
+			$args->{dataset}, 
+		);
+		
+		# adjust scores
+		$adjustment = $exon->start - $current_end;
+		foreach my $p (keys %$exon_scores) {
+			$regionscores{ $p - $adjustment } = $exon_scores->{$p};
+		}
+		
+		# reset
+		$current_end += $exon->length;
+	}
+	
+	# collect extensions if requested
+	if ($args->{extension}) {
+		# left side
+		my $ext_scores = get_segment_score(
+			$feature->seq_id,
+			$feature->start - $args->{extension},
+			$feature->start - 1,
+			defined $args->{strand} ? $args->{strand} : $feature->strand, 
+			$args->{strandedness}, 
+			'index', # method
+			$args->{value},
+			$ddb,
+			$args->{dataset}, 
+		);
+		foreach my $p (keys %$ext_scores) {
+			# no adjustment should be needed
+			$regionscores{$p} = $ext_scores->{$p};
+		}
+		
+		# right side
+		$ext_scores = get_segment_score(
+			$feature->seq_id,
+			$feature->end + $args->{extension},
+			$feature->end + 1,
+			defined $args->{strand} ? $args->{strand} : $feature->strand, 
+			$args->{strandedness}, 
+			'index', # method
+			$args->{value},
+			$ddb,
+			$args->{dataset}, 
+		);
+		foreach my $p (keys %$ext_scores) {
+			# the adjustment should be the same as the last exon
+			$regionscores{$p - $adjustment} = $ext_scores->{$p};
+		}
+	}
+	
+	return wantarray ? %regionscores : \%regionscores;
+}
+
+sub _calculate_reference {
+	my ($self, $args) = @_;
+	my $feature = $self->seqfeature || $self;
+	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	if ($args->{position} == 5 and $strand >= 0) {
+		$args->{coordinate} = $feature->start;
+	}
+	elsif ($args->{position} == 3 and $strand >= 0) {
+		$args->{coordinate} = $feature->end;
+	}
+	elsif ($args->{position} == 5 and $strand < 0) {
+		$args->{coordinate} = $feature->end;
+	}
+	elsif ($args->{position} == 3 and $strand < 0) {
+		$args->{coordinate} = $feature->start;
+	}
+	elsif ($args->{position} == 4) {
+		# strand doesn't matter here
+		$args->{coordinate} = $feature->start + 
+			int(($feature->length / 2) + 0.5);
+	}
+	else {
+		croak "position must be one of 5, 3, or 4";
+	}
+}
+
+sub _avoid_positions {
+	my ($self, $pos2data, $args, $seqid, $start, $stop) = @_;
+	
+	# first check the list of avoid types
+	if (ref $args->{avoid} eq 'ARRAY') {
+		# we have types, presume they're ok
+	}
+	elsif ($args->{avoid} eq '1') {
+		# old style boolean value
+		if (defined $args->{type}) {
+			$args->{avoid} = [ $args->{type} ];
+		}
+		else {
+			# no type provided, we can't avoid that which is not defined! 
+			# this is an error, but won't complain as we never did before
+			$args->{avoid} = $self->type;
+		}
+	}
+	elsif ($args->{avoid} =~ /w+/i) {
+		# someone passed a string, a feature type perhaps?
+		$args->{avoid} = [ $args->{avoid} ];
+	}
+	
+	### Check for conflicting features
+	my $db = $args->{db} || $self->open_database;
+	my @overlap_features = $self->get_features(
+		seq_id  => $seqid,
+		start   => $start,
+		end     => $stop,
+		type    => $args->{avoid},
+	);
+	
+	# get the overlapping features of the same type
+	if (@overlap_features) {
+		my $primary = $self->primary_id;
+		# there are one or more feature of the type in this region
+		# one of them is likely the one we're working with
+		# but not necessarily - user may be looking outside original feature
+		# the others are not what we want and therefore need to be 
+		# avoided
+		foreach my $feat (@overlap_features) {
+			# skip the one we want
+			next if ($feat->primary_id eq $primary);
+			# now eliminate those scores which overlap this feature
+			my $start = $feat->start;
+			my $stop  = $feat->end;
+			foreach my $position (keys %$pos2data) {
+				# delete the scored position if it overlaps with 
+				# the offending feature
+				if (
+					$position >= $start and
+					$position <= $stop
+				) {
+					delete $pos2data->{$position};
+				}
+			}
+		}
+	}
+}
+
+sub _convert_to_relative_positions {
+	my ($self, $pos2data, $position, $strand) = @_;
+	
+	my %relative_pos2data;
+	if ($strand >= 0) {
+		foreach my $p (keys %$pos2data) {
+			$relative_pos2data{ $p - $position } = $pos2data->{$p};
+		}
+	}
+	elsif ($strand < 0) {
+		foreach my $p (keys %$pos2data) {
+			$relative_pos2data{ $position - $p } = $pos2data->{$p};
+		}
+	}
+	return wantarray ? %relative_pos2data : \%relative_pos2data;
 }
 
 
