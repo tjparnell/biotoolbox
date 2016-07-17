@@ -7,7 +7,7 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-our $VERSION = '1.33';
+our $VERSION = '1.50';
 
 
 # Exported names
@@ -39,6 +39,55 @@ our %OPENED_BW;
 	# caching here is only for local purposes of collecting scores
 	# db_helper also provides caching of db objects but with option to force open in
 	# the case of forking processes - we don't have that here
+
+# Methods Cache lookup
+	# pre-define the methods code for processing summary objects to avoid 
+	# excessive if-elsif tests every data cycle
+our %ONE_SUMMARY_METHOD = (
+	'mean'  => sub {return binMean(shift) },
+	'sum'   => sub {return shift->{sumData} },
+	'min'   => sub {return shift->{minVal} },
+	'max'   => sub {return shift->{maxVal} },
+	'count' => sub {return shift->{validCount} },
+	'stddev'=> sub {return binStdev(shift) },
+);
+our %MULTI_SUMMARY_METHOD = (
+	'mean'  => sub {
+				my $summaries = shift;
+				my $sum = 0;
+				my $count = 0;
+				foreach my $s (@$summaries) {
+					$sum += $s->{sumData};
+					$count += $s->{validCount};
+				}
+				return $count ? $sum/$count : '.';
+			},
+	'sum'   => sub {
+				my $summaries = shift;
+				my $sum = 0;
+				foreach my $s (@$summaries) {
+					$sum += $s->{sumData};
+				}
+				return $sum;
+			},
+	'min'   => sub {
+				my $summaries = shift;
+				return min( map {$_->{minVal}} @$summaries);
+			},
+	'max'   => sub {
+				my $summaries = shift;
+				return max( map {$_->{maxVal}} @$summaries);
+			},
+	'count' => sub {
+				my $summaries = shift;
+				my $count = 0;
+				foreach my $s (@$summaries) {
+					$count += $s->{validCount};
+				}
+				return $count;
+			},
+	'stddev'=> sub {croak "cannot calculate stddev value from multiple bigWig Summary objects!"},
+);
 
 # The true statement
 1; 
@@ -84,7 +133,7 @@ sub collect_bigwig_score {
 	}
 	
 	# now process the summary features
-	return _process_summaries($method, @summaries);
+	return _process_summaries($method, \@summaries);
 }
 
 
@@ -291,7 +340,7 @@ sub collect_bigwigset_score {
 	}
 	
 	# now process the summary features
-	return _process_summaries($method, @summaries);
+	return _process_summaries($method, \@summaries);
 }
 
 
@@ -650,105 +699,21 @@ sub _record_seqids {
 ### Internal subroutine for processing summary features
 # for personal use only
 sub _process_summaries {
-	my ($method, @summaries) = @_;
+	my ($method, $summaries) = @_;
 	
-	## Process the collected summaries
-	my $value;
-	
-	# No summaries
-	if (scalar @summaries == 0) {
-		# nothing was found!
-		
-		# return empty handed
-		if ($method =~ /sum|count/) {
-			$value = 0;
-		}
-		else {
-			# internal null
-			$value = '.';
-		}
-	}
-	
-	# One summary
-	elsif (scalar @summaries == 1) {
+	# calculate a value based on the number of summary features
+	if (scalar @$summaries == 1) {
 		# great! only one summary returned
-		
-		# return based on the method
-		if ($method eq 'mean') {
-			$value = binMean( $summaries[0] );
-		}
-		elsif ($method eq 'sum') {
-			$value = $summaries[0]->{sumData};
-		}
-		elsif ($method eq 'min') {
-			$value = $summaries[0]->{minVal};
-		}
-		elsif ($method eq 'max') {
-			$value = $summaries[0]->{maxVal};
-		}
-		elsif ($method eq 'count') {
-			$value = $summaries[0]->{validCount};
-		}
-		elsif ($method eq 'stddev') {
-			$value = binStdev( $summaries[0] );
-		}
-		else {
-			confess " unknown method $method!\n";
-		}
+		return &{ $ONE_SUMMARY_METHOD{$method} }($summaries->[0]);
 	}
-	
-	# Multiple summaries
-	else {
+	elsif (scalar @$summaries > 1) {
 		# more than one summary
-		# this will take a little more work
-		
-		# return based on the method
-		if ($method eq 'mean') {
-			my $sum = 0;
-			my $count = 0;
-			foreach my $s (@summaries) {
-				$sum += $s->{sumData};
-				$count += $s->{validCount};
-			}
-			$value = $count ? $sum/$count : '.';
-		}
-		elsif ($method eq 'sum') {
-			my $sum = 0;
-			foreach my $s (@summaries) {
-				$sum += $s->{sumData};
-			}
-			$value = $sum;
-		}
-		elsif ($method eq 'min') {
-			$value = min( map { $_->{minVal} } @summaries);
-		}
-		elsif ($method eq 'max') {
-			$value = max( map { $_->{maxVal} } @summaries);
-		}
-		elsif ($method eq 'count') {
-			my $count = 0;
-			foreach my $s (@summaries) {
-				$count += $s->{validCount};
-			}
-			$value = $count;
-		}
-		elsif ($method eq 'stddev') {
-			carp " can not determine correct stddev value with " . 
-				scalar(@summaries) . " bigwig summaries!\n";
-			# take the first one only as something to report
-			$value = binStdev( $summaries[0] );
-		}
-		else {
-			confess " unknown method $method!\n";
-		}
+		return &{ $MULTI_SUMMARY_METHOD{$method} }($summaries);
 	}
-	
-	# Done
-	unless (defined $value) {
-		# one last check to avoid undefined values
-		$value = $method =~ /sum|count/ ? 0 : '.';
+	else {
+		# no summaries
+		return $method =~ /sum|count/ ? 0 : '.';
 	}
-	return $value;
 }
 
 
