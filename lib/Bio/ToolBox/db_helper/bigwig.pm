@@ -99,94 +99,75 @@ our %MULTI_SUMMARY_METHOD = (
 ### Collect single BigWig score
 sub collect_bigwig_score {
 	
-	# Pass the required information
-	unless (scalar @_ >= 5) {
-		confess " At least five arguments must be passed to collect BigWig score!\n";
-	}
-	my ($chromo, $start, $stop, $method, @wig_files) = @_;
-	
-	# Confirm the method 
-	unless ($method =~ /^min|max|mean|count|sum|stddev$/) {
-		confess " can not use method $method!\n";
-	}
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# Collecting summary features
 	# we will collect a summary object for each requested wig feature  
-	my @summaries;
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $bwfile (@wig_files) {
-		my $bw = _get_bw($bwfile);
+	my @summaries;
+	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
+		my $bw = _get_bw($options->[$bw_i]);
 		
 		# first check that the chromosome is present
-		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
+		$chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
 		
-		# collect summary score
-		my @features = $bw->features(
-			-seq_id    => $chromo,
-			-start     => $start,
-			-end       => $stop,
-			-type      => 'summary',
+		# use a low level method to get a single summary hash for 1 bin
+		my $sumArrays = $bw->bigWigSummaryArrayExtended(
+			# chromo, 0-based start, stop, bin
+			$chromo, $options->[1] - 1, $options->[2], 1
 		);
-		push @summaries, $features[0]->score;
+		push @summaries, $sumArrays->[0];
 	}
 	
 	# now process the summary features
-	return _process_summaries($method, \@summaries);
+	return _process_summaries($options->[5], \@summaries);
 }
 
 
 ### Collect multiple BigWig scores
 sub collect_bigwig_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 4) {
-		confess " At least four arguments must be passed to collect BigWig scores!\n";
-	}
-	my ($chromo, $start, $stop, @wig_files) = @_;
-	
-	# initialize 
-	my @scores; 
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $bwfile (@wig_files) {
+	my @scores; 
+	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
 	
 		# open db object
-		my $bw = _get_bw($bwfile);
+		my $bw = _get_bw($options->[$bw_i]);
 		
 		# first check that the chromosome is present
-		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
+		$chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
 		
-		# initialize a feature stream for this segment
-		my $iterator = $bw->features(
-			-seq_id     => $chromo,
-			-start      => $start,
-			-end        => $stop,
-			-type       => 'region',
-			-iterator   => 1,
-		);
-		
-		# collect the scores
-		while (my $f = $iterator->next_seq) {
-			push @scores, $f->score;
+		# initialize low level stream for this segment
+		my $list = $bw->bigWigIntervalQuery(
+			$chromo, $options->[1] - 1, $options->[2] );
+		my $f = $list->head;
+		while ($f) {
+			# print $f->start,"..",$f->end,": ",$f->value,"\n";
+			push @scores, $f->value; 
+			$f = $f->next;
 		}
 	} 
 	
 	# return collected data
-	return @scores;
+	return wantarray ? @scores : \@scores;
 }
 
 
 ### Collect positioned BigWig scores
 sub collect_bigwig_position_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 4) {
-		confess " At least four arguments must be passed to collect BigWig position scores!\n";
-	}
-	my ($chromo, $start, $stop, @wig_files) = @_;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# initialize 
 	my %pos2data; # hash of position => score
@@ -194,27 +175,23 @@ sub collect_bigwig_position_scores {
 	
 	# Walk through each requested feature
 	# There is likely only one
-	foreach my $bwfile (@wig_files) {
+	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
 	
 		# Open the BigWig file
-		my $bw = _get_bw($bwfile);
+		my $bw = _get_bw($options->[$bw_i]);
 		
 		# first check that the chromosome is present
-		$chromo = $BIGWIG_CHROMOS{$bwfile}{$chromo} or next;
+		$chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
 		
-		# initialize a feature stream for this segment
-		my $iterator = $bw->features(
-			-seq_id     => $chromo,
-			-start      => $start,
-			-end        => $stop,
-			-type       => 'region',
-			-iterator   => 1,
-		);
-		
-		# collect the scores
-		while (my $f = $iterator->next_seq) {
+		# initialize low level stream for this segment
+		my $list = $bw->bigWigIntervalQuery(
+			$chromo, $options->[1] - 1, $options->[2] );
+		my $f = $list->head;
+		while ($f) {
+			# print $f->start,"..",$f->end,": ",$f->value,"\n";
 			# process the feature
 			_process_position_score_feature($f, \%pos2data, \%duplicates);
+			$f = $f->next;
 		}
 	} 
 	
@@ -224,30 +201,24 @@ sub collect_bigwig_position_scores {
 	}
 	
 	# return collected data
-	return %pos2data;
+	return wantarray ? %pos2data : \$pos2data;
 }
 
 
 
 sub collect_bigwigset_score {
 	
-	# Pass the required information
-	unless (scalar @_ >= 8) {
-		confess " At least eight arguments must be passed to collect BigWigSet score!\n";
-	}
-	my ($db, $chromo, $start, $stop, $strand, $stranded, $method, @types) = @_;
-	
-	# Confirm the method 
-	unless ($method =~ /^min|max|mean|count|sum|stddev$/) {
-		confess " can not use method $method!\n";
-	}
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# Confirm the chromosome
-	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]} 
+		|| undef;
 	unless (defined $chromo) {
 		# chromosome is not present, at least in the first bigwig in the set
 		# return null
-		return $method =~ /sum|count/ ? 0 : '.';
+		return $options->[5] =~ /sum|count/ ? 0 : '.';
 	}
 	
 	# Reset which feature_type to collect from the database
@@ -263,24 +234,26 @@ sub collect_bigwigset_score {
 	# Work through all the requested feature types
 	# the BigWigSet feature request doesn't work well with multiple features
 	# so we'll do them one at a time
-	foreach my $type (@types) {
-	
+	for (my $i = 8; $i < scalar @$options; $i++) {
+		my $type = $options->[i];
+		
 		# Collect the summary features
+		# no low-level joy here, use the high level API
 		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
 		my @features = $db->features(
 			-seq_id   => $chromo,
-			-start    => $start,
-			-end      => $stop,
+			-start    => $options->[1],
+			-end      => $options->[2],
 			-type     => $type,
 		);
 		# if the type doesn't work, then try display_name instead
 		unless (@features) {
 			@features = $db->features(
 				-seq_id   => $chromo,
-				-start    => $start,
-				-end      => $stop,
+				-start    => $options->[1],
+				-end      => $options->[2],
 				-name     => $type,
 			);
 		}
@@ -292,8 +265,8 @@ sub collect_bigwigset_score {
 		
 		# Stranded features
 		if (
-			$strand != 0 and
-			($stranded eq 'sense' or $stranded eq 'antisense')
+			$options->[3] != 0 and
+			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -313,13 +286,13 @@ sub collect_bigwigset_score {
 					$fstrand == 0 or
 					(
 						# sense data
-						$strand == $fstrand 
-						and $stranded eq 'sense'
+						$options->[3] == $fstrand 
+						and $options->[4] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$strand != $fstrand  
-						and $stranded eq 'antisense'
+						$options->[3] != $fstrand  
+						and $options->[4] eq 'antisense'
 					)
 				) {
 					# we have acceptable data to collect
@@ -340,7 +313,7 @@ sub collect_bigwigset_score {
 	}
 	
 	# now process the summary features
-	return _process_summaries($method, \@summaries);
+	return _process_summaries($options->[5], \@summaries);
 }
 
 
@@ -348,14 +321,12 @@ sub collect_bigwigset_score {
 
 sub collect_bigwigset_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigWigSet scores!\n";
-	}
-	my ($db, $chromo, $start, $stop, $strand, $stranded, @types) = @_;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# Confirm the chromosome
-	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]}; 
 	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
 		# return nothing
@@ -370,9 +341,11 @@ sub collect_bigwigset_scores {
 	my @scores; 
 	
 	# Go through each feature type requested
-	foreach my $type (@types) {
+	for (my $i = 8; $i < scalar @$options; $i++) {
+		my $type = $options->[i];
 		
 		# Collect the feature scores
+		# no low-level joy here, use the high level API
 		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
@@ -382,8 +355,8 @@ sub collect_bigwigset_scores {
 			# use an iterator to process them
 		my $iterator = $db->get_seq_stream(
 			-seq_id   => $chromo,
-			-start    => $start,
-			-end      => $stop,
+			-start    => $options->[1],
+			-end      => $options->[2],
 			-type     => $type,
 		);
 		
@@ -395,8 +368,8 @@ sub collect_bigwigset_scores {
 			# try again using display_name instead
 			$iterator = $db->get_seq_stream(
 				-seq_id   => $chromo,
-				-start    => $start,
-				-end      => $stop,
+				-start    => $options->[1],
+				-end      => $options->[2],
 				-name     => $type,
 			);
 			$feature = $iterator->next_seq;
@@ -406,8 +379,8 @@ sub collect_bigwigset_scores {
 		
 		# Stranded features
 		if (
-			$strand != 0 and
-			($stranded eq 'sense' or $stranded eq 'antisense')
+			$options->[3] != 0 and
+			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -427,13 +400,13 @@ sub collect_bigwigset_scores {
 					$fstrand == 0 or
 					(
 						# sense data
-						$fstrand == $strand 
-						and $stranded eq 'sense'
+						$options->[3] == $fstrand 
+						and $options->[4] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$fstrand != $strand  
-						and $stranded eq 'antisense'
+						$options->[3] != $fstrand  
+						and $options->[4] eq 'antisense'
 					)
 				) {
 					# we have acceptable data to collect
@@ -456,21 +429,20 @@ sub collect_bigwigset_scores {
 	}
 	
 	# Finished
-	return @scores;
+	return wantarray ? @scores : \@scores;;
 }
 
 
 
 sub collect_bigwigset_position_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigWigSet position scores!\n";
-	}
-	my ($db, $chromo, $start, $stop, $strand, $stranded, @types) = @_;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# Confirm the chromosome
-	$chromo = $BIGWIG_CHROMOS{ ($db->bigwigs)[0] }{$chromo} || undef;
+	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]} 
+		|| undef;
 	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
 		# return nothing
@@ -486,7 +458,8 @@ sub collect_bigwigset_position_scores {
 	my %duplicates;
 	
 	# Go through each feature type requested
-	foreach my $type (@types) {
+	for (my $i = 8; $i < scalar @$options; $i++) {
+		my $type = $options->[i];
 		
 		# Collect the feature scores
 		$type =~ s/\:.+$//; # strip the source if present
@@ -496,10 +469,11 @@ sub collect_bigwigset_position_scores {
 			# region, we will get lots of features returned, one for each 
 			# datapoint
 			# use an iterator to process them
+		# no low-level joy here, use the high level API
 		my $iterator = $db->get_seq_stream(
 			-seq_id   => $chromo,
-			-start    => $start,
-			-end      => $stop,
+			-start    => $options->[1],
+			-end      => $options->[2],
 			-type     => $type,
 		);
 		
@@ -511,8 +485,8 @@ sub collect_bigwigset_position_scores {
 			# try again using display_name instead
 			$iterator = $db->get_seq_stream(
 				-seq_id   => $chromo,
-				-start    => $start,
-				-end      => $stop,
+				-start    => $options->[1],
+				-end      => $options->[2],
 				-name     => $type,
 			);
 			$feature = $iterator->next_seq;
@@ -522,8 +496,8 @@ sub collect_bigwigset_position_scores {
 		
 		# Stranded features
 		if (
-			$strand != 0 and
-			($stranded eq 'sense' or $stranded eq 'antisense')
+			$options->[3] != 0 and
+			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -545,13 +519,13 @@ sub collect_bigwigset_position_scores {
 					$strand == 0 or
 					(
 						# sense data
-						$fstrand == $strand 
-						and $stranded eq 'sense'
+						$options->[3] == $fstrand 
+						and $options->[4] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$fstrand != $strand  
-						and $stranded eq 'antisense'
+						$options->[3] != $fstrand  
+						and $options->[4] eq 'antisense'
 					)
 				) {
 					# acceptable data point
@@ -729,7 +703,8 @@ sub _process_position_score_feature {
 		# for most wig features this is almost certainly a single point
 		# but just in case this is spanned data, we will record the 
 		# value at every position
-	for (my $pos = $f->start; $pos <= $f->end; $pos++) {
+		# remember low level features are 0-based
+	for (my $pos = $f->start + 1; $pos <= $f->end; $pos++) {
 		
 		# check for duplicate positions
 		# duplicates should not normally exist for a single wig file
@@ -742,21 +717,21 @@ sub _process_position_score_feature {
 				# append an incrementing number at the end
 				$duplicates->{$pos} += 1; # increment first
 				my $new = $pos . '.' . $duplicates->{$pos};
-				$pos2data->{$new} = $f->score;
+				$pos2data->{$new} = $f->value;
 			}
 			else {
 				# first time duplicate
 				
 				# record this one
 				my $new = $pos . '.1';
-				$pos2data->{$new} = $f->score;
+				$pos2data->{$new} = $f->value;
 				
 				# remember
 				$duplicates->{$pos} = 1;
 			}
 		}
 		else {
-			$pos2data->{$pos} = $f->score;
+			$pos2data->{$pos} = $f->value;
 		}
 	}
 }
