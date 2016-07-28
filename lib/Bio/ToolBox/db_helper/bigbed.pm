@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
-our $VERSION = 1.33;
+our $VERSION = '1.50';
 
 
 # Exported names
@@ -41,33 +41,29 @@ our %OPENED_BB;
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigBed scores!\n";
-	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
-		# method can be score, count, or length
-	
-	# initialize the score array
-	# this will record score, count, or lengths per the method
-	my @scores;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
-	foreach my $bedfile (@bed_features) {
+	my @scores;
+	for (my $i = 8; $i < scalar @$options; $i++) {
 	
 		# open the bedfile
-		my $bb = _get_bb($bedfile);
+		my $bb = _get_bb($options->[$i]);
 			
 		# first check that the chromosome is present
-		$chromo = $BIGBED_CHROMOS{$bedfile}{$chromo} or next;
+		my $chromo = $BIGBED_CHROMOS{$options->[$i]}{$options->[0]} or next;
 		
 		# collect the features overlapping the region
+			# we are using the high level API rather than the low-level
+			# since we getting the individual scores from each bed element
 		my $bb_stream = $bb->features(
 			-seq_id   => $chromo, 
-			-start    => $start, 
-			-end      => $stop,
+			-start    => $options->[1], 
+			-end      => $options->[2],
 			-iterator => 1,
 		);
 		
@@ -76,33 +72,33 @@ sub collect_bigbed_scores {
 			
 			# First check whether the strand is acceptable
 			if (
-				$stranded eq 'all' # all data is requested
+				$options->[4] eq 'all' # all data is requested
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$strand == $bed->strand 
-					and $stranded eq 'sense'
+					$options->[3] == $bed->strand 
+					and $options->[4] eq 'sense'
 				) 
 				or (
 					# antisense data
-					$strand != $bed->strand  
-					and $stranded eq 'antisense'
+					$options->[3] != $bed->strand  
+					and $options->[4] eq 'antisense'
 				)
 			) {
 				# we have acceptable data to collect
 			
 				# store the appropriate datapoint
-				if ($method eq 'score') {
+				if ($options->[5] eq 'score') {
 					push @scores, $bed->score;
 				}
-				elsif ($method eq 'count') {
+				elsif ($options->[5] eq 'count') {
 					$scores[0] += 1;
 				}
-				elsif ($method eq 'pcount') {
+				elsif ($options->[5] eq 'pcount') {
 					$scores[0] += 1 if 
 						($bed->start >= $start and $bed->end <= $stop);
 				}
-				elsif ($method eq 'length') {
+				elsif ($options->[5] eq 'length') {
 					push @scores, $bed->length;
 				}
 			}
@@ -119,31 +115,26 @@ sub collect_bigbed_scores {
 ### Collect positioned BigBed scores
 sub collect_bigbed_position_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect BigBed position scores!\n";
-	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @bed_features) = @_;
-		# method can be score, count, or length
-	
-	# set up hash, either position => count or position => [scores]
-	my %bed_data;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# look at each bedfile
 	# usually there is only one, but there may be more
-	foreach my $bedfile (@bed_features) {
+	my %bed_data;
+	for (my $i = 8; $i < scalar @$options; $i++) {
 	
 		# open the bedfile
-		my $bb = _get_bb($bedfile);
+		my $bb = _get_bb($options->[$i]);
 			
 		# first check that the chromosome is present
-		$chromo = $BIGBED_CHROMOS{$bedfile}{$chromo} or next;
+		my $chromo = $BIGBED_CHROMOS{$options->[$i]}{$options->[0]} or next;
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
 			-seq_id   => $chromo, 
-			-start    => $start, 
-			-end      => $stop,
+			-start    => $options->[1], 
+			-end      => $options->[2],
 			-iterator => 1,
 		);
 		
@@ -152,17 +143,17 @@ sub collect_bigbed_position_scores {
 			
 			# First check whether the strand is acceptable
 			if (
-				$stranded eq 'all' # all data is requested
+				$options->[4] eq 'all' # all data is requested
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$strand == $bed->strand 
-					and $stranded eq 'sense'
+					$options->[3] == $bed->strand 
+					and $options->[4] eq 'sense'
 				) 
 				or (
 					# antisense data
-					$strand != $bed->strand  
-					and $stranded eq 'antisense'
+					$options->[3] != $bed->strand  
+					and $options->[4] eq 'antisense'
 				)
 			) {
 				# we have acceptable data to collect
@@ -184,23 +175,23 @@ sub collect_bigbed_position_scores {
 				next unless (
 					# want to avoid those whose midpoint are not technically 
 					# within the region of interest
-					$position >= $start and $position <= $stop
+					$position >= $options->[1] and $position <= $options->[2]
 				);
 				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
-				if ($method eq 'score') {
+				if ($options->[5] eq 'score') {
 					# perform addition to force the score to be a scalar value
 					push @{ $bed_data{$position} }, $bed->score + 0;
 				}
-				elsif ($method eq 'count') {
+				elsif ($options->[5] eq 'count') {
 					$bed_data{$position} += 1;
 				}
-				elsif ($method eq 'pcount') {
+				elsif ($options->[5] eq 'pcount') {
 					$bed_data{$position} += 1 if 
-						($bed->start <= $start and $bed->end <= $stop);
+						($bed->start <= $options->[1] and $bed->end <= $options->[2]);
 				}
-				elsif ($method eq 'length') {
+				elsif ($options->[5] eq 'length') {
 					# I hope that length is supported, but not sure
 					# may have to calculate myself
 					push @{ $bed_data{$position} }, $bed->length;
@@ -210,7 +201,7 @@ sub collect_bigbed_position_scores {
 	}
 
 	# combine multiple datapoints at the same position
-	if ($method eq 'score' or $method eq 'length') {
+	if ($options->[5] eq 'score' or $options->[5] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %bed_data) {
@@ -219,7 +210,7 @@ sub collect_bigbed_position_scores {
 	}
 	
 	# return collected data
-	return %bed_data;
+	return wantarray ? %bed_data \%bed_data;
 }
 
 
@@ -312,28 +303,20 @@ Bio::ToolBox::db_helper::bigbed
 
 =head1 DESCRIPTION
 
-This module supports the use of bigBed file in the biotoolbox scripts.
-It is used to collect the dataset scores from a binary 
-bigBed file (.bb). The file may be local or remote.
-
-Scores may be restricted to strand by specifying the desired strandedness. 
-For example, to collect transcription data over a gene, pass the strandedness 
-value 'sense'. If the strand of the region database object (representing the 
-gene) matches the strand of the bed feature, then the data for that bed 
-feature is collected.  
-
-For loading bigbed files into a Bio::DB database, see the biotoolbox perl 
-script 'big_filegff3.pl'.
+This module provides support for binary BigBed files to the 
+L<Bio::ToolBox> package. 
 
 =head1 USAGE
 
-The module requires Lincoln Stein's Bio::DB::BigBed to be installed. 
+The module requires L<Bio::DB::BigBed> to be installed, which in turn 
+requires the UCSC Kent C library to be installed.
 
-Load the module at the beginning of your program.
+In general, this module should not be used directly. Use the methods 
+available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
 
-	use Bio::ToolBox::db_helper::bigbed;
+All subroutines are exported by default.
 
-It will automatically export the name of the subroutines. 
+=head2 Available subroutines
 
 =over
 
@@ -341,63 +324,19 @@ It will automatically export the name of the subroutines.
 
 This subroutine will collect only the data values from a binary bigbed file 
 for the specified database region. The positional information of the 
-scores is not retained, and the values are best further processed through 
-some statistical method (mean, median, etc.).
+scores is not retained.
 
-The subroutine is passed seven or more arguments in the following order:
+The subroutine is passed a parameter array reference. See below for details.
 
-=over 4
-
-=item 1. The chromosome or seq_id
-
-=item 2. The start position of the segment to collect 
-
-=item 3. The stop or end position of the segment to collect 
-
-=item 4. The strand of the feature or segment.
-
-The BioPerl strand values must be used, i.e. -1, 0, or 1.
-
-=item 5. The strandedness of the bed elements to collect.
-
-A scalar value representing the desired strandedness of the data 
-to be collected. Acceptable values include "sense", "antisense", 
-or "all". Only those scores which match the indicated 
-strandedness are collected.
-
-=item 6. The value type of the data to collect.
- 
-Acceptable values include score, count, pcount, and length.
-
-   score returns the score of each bed element within the 
-   region. Make sure the BigBed elements contain a score 
-   column.
-   
-   count returns the number of elements that overlap the 
-   search region. 
-   
-   pcount, or precise count, returns the count of elements 
-   that only fall within the region and do not extend beyond
-   the search region.
-   
-   length returns the lengths of all overlapping elements. 
-
-=item 7. The paths to one or more BigBed files
-
-Always provide the BigBed path. Opened BigBed file objects are 
-cached. Both local and remote files are supported.
-
-=back
-
-The subroutine returns an array of the defined dataset values found within 
-the region of interest. 
+The subroutine returns an array or array reference of the requested dataset 
+values found within the region of interest. 
 
 =item collect_bigbed_position_scores
 
 This subroutine will collect the score values from a binary bigBed file 
 for the specified database region keyed by position. 
 
-The subroutine is passed the same arguments as collect_bigbed_scores().
+The subroutine is passed a parameter array reference. See below for details.
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. The feature midpoint is used 
@@ -424,6 +363,68 @@ sequence alignments.
 Pass either the name of a bigBed file (.bb), either local or remote, or an 
 opened BigBed database object. A scalar value of the total number of features 
 is returned.
+
+=back
+
+=head2 Data Collection Parameters Reference
+
+The data collection subroutines are passed an array reference of parameters. 
+The recommended  method for data collection is to use get_segment_score() method from 
+L<Bio::ToolBox::db_helper>. 
+
+The parameters array reference includes these items:
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 1. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Should be standard BioPerl representation: -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect 
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The method for combining scores.
+
+Not used here. 
+
+=item 7. The value type of data to collect
+
+Acceptable values include score, count, pcount, ncount, and length.
+
+   * score returns the basepair coverage of alignments over the 
+   region of interest
+   
+   * count returns the number of alignments that overlap the 
+   search region. 
+   
+   * pcount, or precise count, returns the count of alignments 
+   whose start and end fall within the region. 
+   
+   * ncount, or named count, returns an array of alignment read  
+   names. Use this to avoid double-counting paired-end reads by 
+   counting only unique names. Reads are taken if they overlap 
+   the search region.
+   
+   length returns the lengths of all overlapping alignments 
+
+=item 8. A database object.
+
+Not used here.
+
+=item 9 and higher. Paths to one or more BigBed files
+
+Opened BigBed file objects are cached. Both local and remote files are 
+supported.
 
 =back
 

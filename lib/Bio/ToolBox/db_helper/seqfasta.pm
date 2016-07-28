@@ -9,7 +9,7 @@ use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
-our $VERSION = '1.36';
+our $VERSION = '1.50';
 our $WIGGLE_OK = 0;
 
 # Exported names
@@ -133,23 +133,19 @@ sub collect_store_position_scores {
 
 sub _collect_store_data {
 	# pass the required information
-	unless (scalar @_ >= 9) {
-		confess " At least eight arguments must be passed to collect db scores!\n";
-	}
-	my ($do_index, $db, $chromo, $start, $stop, $strand, $strandedness, 
-		$value_type, @types) = @_;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my ($do_index, $options) = @_;
 	
-	my $db_ref = ref $db;
-	unless ($db_ref =~ /Bio::DB/) {
-		croak "An opened database object must be passed!";
-	}
+	# database feature types
+	my @types = splice(@$options, 8);
 	
-	# set up iterator
-	my $iterator = $db->get_seq_stream(
-		-seq_id      => $chromo,
-		-start       => $start,
-		-end         => $stop,
-		-primary_tag => [@types],
+	# set up iterator from database
+	my $iterator = $options->[7]->get_seq_stream(
+		-seq_id      => $options->[0],
+		-start       => $options->[1],
+		-end         => $options->[2],
+		-primary_tag => \@types,
 	);
 	return unless $iterator; # we should always get an iterator back, even if the 
 		# iterator returns nothing useful for us
@@ -159,12 +155,12 @@ sub _collect_store_data {
 	unless ($feature) {
 		# that's odd, we should get a feature
 		# try rebuilding the iterator with an alternate chromosome name 
-		$chromo = $chromo =~ /^chr(.+)$/i ? $1 : "chr$chromo";
+		$chromo = $options->[0] =~ /^chr(.+)$/i ? $1 : "chr$chromo";
 		$iterator = $db->get_seq_stream(
 			-seq_id      => $chromo,
-			-start       => $start,
-			-end         => $stop,
-			-primary_tag => [@types],
+			-start       => $options->[1],
+			-end         => $options->[2],
+			-primary_tag => \@types,
 		);
 		$feature = $iterator->next_seq or return;
 	}
@@ -190,10 +186,8 @@ sub _collect_store_data {
 			
 			# get the full list of features to pass off to the 
 			# helper subroutine
-			my @features;
-			push @features, $feature;
 			while (my $f = $iterator->next_seq) {
-				push @features, $f;
+				push @$options, $f;
 			}
 			
 			# check that we have wiggle support
@@ -210,25 +204,11 @@ sub _collect_store_data {
 				
 				if ($do_index) {
 					# warn " using collect_wig_position_scores() from tag\n";
-					return collect_wig_position_scores(
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type,
-						@features
-					);
+					return collect_wig_position_scores($options);
 				}
 				else {
 					# warn " using collect_wig_scores() from tag\n";
-					return collect_wig_scores(
-						$start,
-						$stop,
-						$strand, 
-						$strandedness, 
-						$value_type,
-						@features
-					);
+					return collect_wig_scores($options);
 				}
 			}
 			else {
@@ -260,18 +240,17 @@ sub _collect_store_data {
 	
 		# Check which data to take based on strand
 		if (
-			$strandedness eq 'all' # all data is requested
-			or $strand == 0 # region is unstranded
+			$options->[4] eq 'all' # all data is requested
 			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$strand == $feature->strand 
-				and $strandedness eq 'sense'
+				$options->[3] == $feature->strand 
+				and $options->[4] eq 'sense'
 			) 
 			or (
 				# antisense data
-				$strand != $feature->strand  
-				and $strandedness eq 'antisense'
+				$options->[3] != $feature->strand  
+				and $options->[4] eq 'antisense'
 			)
 		) {
 			# we have acceptable data to collect
@@ -304,7 +283,8 @@ sub _collect_store_data {
 				}
 				elsif ($value_type eq 'pcount') {
 					$pos2data{$position} += 1 if 
-						($feature->start >= $start and $feature->end <= $stop);
+						($feature->start >= $options->[1] and 
+						$feature->end <= $options->[2]);
 				}
 				elsif ($value_type eq 'length') {
 					push @{ $pos2data{$position} }, $feature->length;
@@ -323,7 +303,8 @@ sub _collect_store_data {
 				}
 				elsif ($value_type eq 'pcount') {
 					$scores[0] += 1 if 
-						($feature->start >= $start and $feature->end <= $stop);
+						($feature->start >= $options->[1] and 
+						$feature->end <= $options->[2]);
 				}
 				elsif ($value_type eq 'length') {
 					push @scores, $feature->length;
@@ -339,7 +320,8 @@ sub _collect_store_data {
 	# combine multiple values recorded at the same position
 	if (
 		$do_index and 
-		($value_type eq 'score' or $value_type eq 'length')
+		($options->[6] eq 'score' or $options->[6] eq 'length')
+		# options 6 is the value type
 	) {
 		# each 'value' is an array of one or more scores or lengths 
 		# from the datapoints collected above
@@ -353,7 +335,12 @@ sub _collect_store_data {
 	}
 	
 	# return the appropriate data	
-	return $do_index ? %pos2data : @scores;
+	if ($do_index) {
+		return wantarray ? %pos2data : \%pos2data;
+	}
+	else {
+		return wantarray ? @scores : \@scores;
+	}
 }
 
 
@@ -367,20 +354,39 @@ Bio::ToolBox::db_helper::seqfasta
 
 =head1 DESCRIPTION
 
-This module supports opening L<Bio::DB::SeqFeature::Store> and 
-L<Bio::DB::Fasta> BioPerl database adaptors. It also supports collecting 
-feature scores from L<Bio::DB::SeqFeature::Store> databases. Unsupported 
-BioPerl-style database adaptors that support generic methods may also 
-be used, although success may vary.
+This module provides support for L<Bio::DB::SeqFeature::Store> and 
+L<Bio::DB::Fasta> BioPerl database adaptors. Other BioPerl-style 
+databases may have limited support.
+
+=head1 USAGE
+
+The module requires BioPerl to be installed, which includes database adaptors 
+L<Bio::DB::SeqFeature::Store> and L<Bio::DB::Fasta>. The database storage 
+adapter, e.g MySQL, SQLite, etc., will have additional requirements.
+
+In general, this module should not be used directly. Use the methods 
+available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
+
+All subroutines are exported by default.
 
 =head2 Opening databases
 
-For Fasta databases, either a single fasta file or a directory of fasta 
-files may be provided.
+=over 4
 
-For SeqFeature Store databases, the connection parameters are stored in 
-a configuration file, C<.biotoolbox.cfg>. Multiple database containers 
-are supported, including MySQL, SQLite, and in-memory. 
+=item open_store_db()
+
+Opens a L<Bio::DB::SeqFeature::Store> database. The connection parameters 
+are typically stored in a configuration file, C<.biotoolbox.cfg>. Multiple 
+database containers are supported, including MySQL, SQLite, and in-memory. 
+
+Pass the name of the database or database file.
+
+=item open_fasta_db()
+
+Opens a L<Bio::DB::Fasta> database. Either a single fasta file or a directory 
+of fasta files may be provided. Pass the path name to the file or directory.
+
+=back
 
 =head2 Collecting scores
 
@@ -397,61 +403,88 @@ of the binary wiggle (.wib) files. If the seqfeature objects returned from the
 database include the wigfile attribute, then these objects are forwarded on to 
 the L<Bio::ToolBox::db_helper::wiggle> adaptor for appropriate score collection.
 
-=head1 USAGE
-
-The module requires the BioPerl adaptors L<Bio::DB::SeqFeature::Store> and 
-L<Bio::DB::Fasta>. 
-
-Load the module at the beginning of your program.
-
-	use Bio::ToolBox::db_helper::seqfasta;
-
-It will automatically export the name of the subroutines. 
-
 =over
 
-=item collect_store_scores
+=item collect_store_scores()
 
 This subroutine will collect only the score values from database features
 for the specified database region. The positional information of the 
 scores is not retained, and the values may be further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed eight or more arguments in the following order:
-    
-    1) The opened database object. A database name or file is not ok.
-    2) The chromosome name
-    3) The start position of the segment to collect from
-    4) The stop or end position of the segment to collect from
-    5) The strand of the original feature (or region), -1, 0, or 1.
-    6) A scalar value representing the desired strandedness of the data 
-       to be collected. Only those scores which match the indicated 
-       strandedness are collected. Acceptable values include 
-        "sense", 
-        "antisense", 
-        "none" or "no".
-    7) The type of data collected. Acceptable values include 
-       'score' (returns the score), 
-       'count' (the number of defined positions with scores), or 
-       'length' (the wig step is used here).  
-    8) One or more feature types or primary_tags to perform the 
-       database search. If nothing is provided, then usually everything 
-       in the database is returned!
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine returns an array of the defined dataset values found within 
-the region of interest. 
+The subroutine returns an array or array reference of the requested dataset 
+values found within the region of interest. 
 
-=item collect_wig_position_scores
+=item collect_wig_position_scores()
 
 This subroutine will collect the score values form features in the database 
 for the specified region keyed by position. 
 
-The subroutine is passed the same arguments as collect_wig_scores().
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine returns a hash of the defined dataset values found within 
-the region of interest keyed by position. Note that only one value is 
-returned per position, regardless of the number of dataset features 
+The subroutine returns a hash or hash reference of the requested dataset 
+values found within the region of interest keyed by position. Note that only 
+one value is returned per position, regardless of the number of dataset features 
 passed.
+
+=back
+
+=head2 Data Collection Parameters Reference
+
+The data collection subroutines are passed an array reference of parameters. 
+The recommended  method for data collection is to use get_segment_score() method from 
+L<Bio::ToolBox::db_helper>. 
+
+The parameters array reference includes these items:
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 1. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Should be standard BioPerl representation: -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect 
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The method for combining scores.
+
+Not used here. 
+
+=item 7. The value type of data to collect
+
+Acceptable values include score, count, pcount, ncount, and length.
+
+   * score returns the basepair coverage of alignments over the 
+   region of interest
+   
+   * count returns the number of alignments that overlap the 
+   search region. 
+   
+   * pcount, or precise count, returns the count of alignments 
+   whose start and end fall within the region. 
+   
+   * ncount, or named count, returns an array of alignment read  
+   names. Use this to avoid double-counting paired-end reads by 
+   counting only unique names. Reads are taken if they overlap 
+   the search region.
+   
+   length returns the lengths of all overlapping alignments 
+
+=item 8. A database object.
+
+=item 9 and higher. Database feature types.
 
 =back
 

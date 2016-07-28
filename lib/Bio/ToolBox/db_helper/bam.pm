@@ -13,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.33';
+our $VERSION = '1.50';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -139,22 +139,19 @@ sub collect_bam_position_scores {
 	
 	# collect the raw data
 	# set the do_index boolean to true
-	my %bam_data = _collect_bam_data(1, @_);
+	my $bam_data = _collect_bam_data(1, @_);
 	
-	# grab the method from the passed arguments
-	my $method = $_[3];
-	
-	# combine multiple datapoints at the same position
-	if ($method eq 'length') {
+	# check the requested method
+	if ($_[0]->[5] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
-		foreach my $position (keys %bam_data) {
-			$bam_data{$position} = mean( @{$bam_data{$position}} );
+		foreach my $position (keys %$bam_data) {
+			$bam_data->{$position} = mean( @{$bam_data->{$position}} );
 		}
 	}
 	
 	# return collected data
-	return %bam_data;
+	return wantarray %$bam_data : $bam_data;
 }
 
 
@@ -163,21 +160,9 @@ sub collect_bam_position_scores {
 ### Actual collection of scores
 sub _collect_bam_data {
 	
-	# pass the required information
-	unless (scalar @_ >= 8) {
-		confess " At least eight arguments must be passed to collect Bam data!\n";
-	}
-	my (
-		$do_index, 
-		$chromo,
-		$start,
-		$stop,
-		$strand, 
-		$stranded, 
-		$value_type, 
-		@bam_features
-	) = @_;
-		# value_type can be score, count, or length
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my ($do_index, $options) = @_;
 	
 	# initialize score structures
 	# which one is used depends on the $do_index boolean variable
@@ -186,9 +171,10 @@ sub _collect_bam_data {
 	
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	foreach my $bamfile (@bam_features) {
+	for (my $b = 8; $b < scalar @$options; $b++) {
 	
 		## Open the Bam File
+		my $bamfile = $options->[$b];
 		my $bam = $OPENED_BAM{$bamfile} || undef;
 		unless ($bam) {
 			# open and cache the bam file
@@ -210,12 +196,12 @@ sub _collect_bam_data {
 		}
 			
 		# first check that the chromosome is present
-		$chromo = $BAM_CHROMOS{$bamfile}{$chromo} or next;
+		my $chromo = $BAM_CHROMOS{$bamfile}{$options->[0]} or next;
 		
 		# convert coordinates into low level coordinates
 		# consumed by the low level Bam API
-		my ($tid, $zstart, $end) = 
-			$bam->header->parse_region("$chromo:$start\-$stop");
+		my ($tid, $zstart, $end) = $bam->header->parse_region(
+			sprintf("%s:%d-%d", $chromo, $options->[1], $options->[2]) );
 	
 		
 		## Collect the data according to the requested value type
@@ -223,7 +209,7 @@ sub _collect_bam_data {
 		# process the actual alignments (count or length)
 		
 		## Coverage
-		if ($value_type eq 'score') {
+		if ($options->[6] eq 'score') {
 			# collecting scores, or in this case, basepair coverage of 
 			# alignments over the requested region
 			
@@ -241,9 +227,9 @@ sub _collect_bam_data {
 				
 				# check whether we need to index the scores
 				if ($do_index) {
-					for (my $i = $start; $i <= $stop; $i++) {
+					for (my $i = $options->[1]; $i <= $options->[2]; $i++) {
 						# move the scores into the position score hash
-						$pos2data{$i} += $coverage->[ $i - $start ];
+						$pos2data{$i} += $coverage->[ $i - $options->[2] ];
 					}
 				}
 				else {
@@ -259,12 +245,12 @@ sub _collect_bam_data {
 			# working with actual alignments
 			
 			## Set the callback and a callback data structure
-			my $callback = _assign_callback($stranded, $strand, $value_type, $do_index);
+			my $callback = _assign_callback($do_index, $options);
 			my %data = (
 				'scores' => \@scores,
 				'index'  => \%pos2data,
-				'start'  => $start,
-				'stop'   => $stop,
+				'start'  => $options->[1],
+				'stop'   => $options->[2],
 			);
 			
 			# get the alignments
@@ -276,10 +262,10 @@ sub _collect_bam_data {
 	
 	## Return collected data
 	if ($do_index) {
-		return %pos2data;
+		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
-		return @scores;
+		return wantarray ? @scores : \@scores;
 	}
 }
 
@@ -432,7 +418,12 @@ sub _assign_callback {
 	# there are so many different subroutines because I want to increase 
 	# efficiency by limiting the number of conditional tests in one generic subroutine
 	
-	my ($stranded, $strand, $value_type, $do_index) = @_;
+	# pass the original options array reference
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my ($do_index, $options) = @_;
+	my $stranded = $options->[4];
+	my $strand = $options->[3];
+	my $value_type = $options->[6];
 	
 	# check the current list of calculated callbacks
 		# this process is pretty lengthy, especially to do it for every single 
@@ -1012,35 +1003,22 @@ Bio::ToolBox::db_helper::bam
 
 =head1 DESCRIPTION
 
-This module is used to collect the dataset scores from a binary 
-bam file (.bam) of alignments. Bam files may be local or remote, 
-and are usually prefixed with 'file:', 'http://', of 'ftp://'.
-
-Collected data values may be restricted to strand by specifying the desired 
-strandedness (sense, antisense, or all), 
-depending on the method of data collection. Collecting scores, or basepair 
-coverage of alignments over the region of interest, does not currently support 
-stranded data collection (as of this writing). However, enumerating 
-alignments (count method) and collecting alignment lengths do support 
-stranded data collection. Alignments are checked to see whether their midpoint 
-is within the search interval before counting or length collected. 
-
-As of version 1.30, paired-end bam files are properly handled with regards 
-to strand; Strand is determined by the orientation of the first mate. However, 
-pairs are still counted as two alignments, not one. To avoid this, use the 
-value_type of 'ncount' and count the number of unique alignment names. 
-(Previous versions treated all paired-end alignments as single-end alignments, 
-severely limiting usefulness.)
+This module provides support for binary bam alignment files to the 
+L<Bio::ToolBox> package through the samtools C library. 
 
 =head1 USAGE
 
-The module requires Lincoln Stein's Bio::DB::Sam to be installed. 
+The module requires L<Bio::DB::Sam> to be installed, which in turn 
+requires the samtools C library version 1.20 or less to be installed.
 
-Load the module at the beginning of your program.
+In general, this module should not be used directly. Use the methods 
+available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
 
-	use Bio::ToolBox::db_helper::bam;
+All subroutines are exported by default.
 
-It will automatically export the name of the subroutines. 
+=head2 Available subroutines
+
+All subroutines are exported by default.
 
 =over
 
@@ -1076,67 +1054,39 @@ what to do before using this method!
 
 This subroutine will collect only the data values from a binary bam file 
 for the specified database region. The positional information of the 
-scores is not retained, and the values are best further processed through 
-some statistical method (mean, median, etc.).
+scores is not retained.
 
-The subroutine is passed seven or more arguments in the following order:
+Collected data values may be restricted to strand by specifying the desired 
+strandedness (sense, antisense, or all), 
+depending on the method of data collection. Collecting scores, or basepair 
+coverage of alignments over the region of interest, does not currently support 
+stranded data collection (as of this writing). However, enumerating 
+alignments (count method) and collecting alignment lengths do support 
+stranded data collection. Alignments are checked to see whether their midpoint 
+is within the search interval before counting or length collected. 
 
-=over 4
+As of version 1.30, paired-end bam files are properly handled with regards 
+to strand; Strand is determined by the orientation of the first mate. However, 
+pairs are still counted as two alignments, not one. To avoid this, use the 
+value_type of 'ncount' and count the number of unique alignment names. 
+(Previous versions treated all paired-end alignments as single-end alignments, 
+severely limiting usefulness.)
 
-=item 1. The chromosome or seq_id
+The subroutine is passed a parameter array reference. See below for details.
 
-=item 2. The start position of the segment to collect 
-
-=item 3. The stop or end position of the segment to collect 
-
-=item 4. The strand of the segment to collect
-
-Strand values should be in BioPerl standard values, i.e. -1, 0, or 1.
-
-=item 5. The strandedness of the data to collect
-
-A scalar value representing the desired strandedness of the data 
-to be collected. Acceptable values include "sense", "antisense", 
-or "all". Only those scores which match the indicated 
-strandedness are collected.
-
-=item 6. The value type of data to collect
-
-Acceptable values include score, count, pcount, ncount, and length.
-
-   * score returns the basepair coverage of alignments over the 
-   region of interest
-   
-   * count returns the number of alignments that overlap the 
-   search region. 
-   
-   * pcount, or precise count, returns the count of alignments 
-   whose start and end fall within the region. 
-   
-   * ncount, or named count, returns an array of alignment read  
-   names. Use this to avoid double-counting paired-end reads by 
-   counting only unique names. Reads are taken if they overlap 
-   the search region.
-   
-   length returns the lengths of all overlapping alignments 
-
-=item 7. Paths to one or more Bam files
-
-=back
-
-The subroutine returns an array of the defined dataset values found within 
-the region of interest. 
+The subroutine returns an array or array reference of the requested dataset 
+values found within the region of interest. 
 
 =item collect_bam_position_scores
 
 This subroutine will collect the score values from a binary bam file 
 for the specified database region keyed by position. 
 
-The subroutine is passed the same arguments as collect_bam_scores().
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine returns a hash of the defined dataset values found within 
-the region of interest keyed by position. The feature midpoint is used 
-as the key position. When multiple features are found at the same 
+The subroutine returns a hash or hash reference of the defined dataset values 
+found within the region of interest keyed by position. The feature midpoint 
+is used as the key position. When multiple features are found at the same 
 position, a simple mean (for length data methods) or sum 
 (for count methods) is returned. The ncount value type is not supported 
 with positioned scores.
@@ -1178,6 +1128,65 @@ conservative two processes when it is installed.
 =back
        
 The subroutine will return the number of alignments.
+
+=back
+
+=head2 Data Collection Parameters Reference
+
+The data collection subroutines are passed an array reference of parameters. 
+The recommended  method for data collection is to use get_segment_score() method from 
+L<Bio::ToolBox::db_helper>. 
+
+The parameters array reference includes these items:
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 1. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Should be standard BioPerl representation: -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect 
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The method for combining scores.
+
+Not used here. 
+
+=item 7. The value type of data to collect
+
+Acceptable values include score, count, pcount, ncount, and length.
+
+   * score returns the basepair coverage of alignments over the 
+   region of interest
+   
+   * count returns the number of alignments that overlap the 
+   search region. 
+   
+   * pcount, or precise count, returns the count of alignments 
+   whose start and end fall within the region. 
+   
+   * ncount, or named count, returns an array of alignment read  
+   names. Use this to avoid double-counting paired-end reads by 
+   counting only unique names. Reads are taken if they overlap 
+   the search region.
+   
+   length returns the lengths of all overlapping alignments 
+
+=item 8. A database object.
+
+Not used here.
+
+=item 9 and higher. Paths to one or more Bam files
 
 =back
 

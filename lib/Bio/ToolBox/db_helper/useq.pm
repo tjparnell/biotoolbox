@@ -6,7 +6,7 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
-our $VERSION = '1.33';
+our $VERSION = '1.50';
 
 
 # Exported names
@@ -40,55 +40,52 @@ our %OPENED_USEQ;
 
 sub collect_useq_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect useq scores!\n";
-	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @useqs) = @_;
-		# method can be score, count, or length
-	
-	# initialize the score array
-	# this will record score, count, or lengths per the method
-	my @scores;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# adjust strand method
-	# do not need to adjust if stranded is sense
-	if ($stranded eq 'antisense') {
-		$strand = $strand * -1;
+	my $strand;
+	if ($options->[4] eq 'antisense') {
+		$strand = $options->[3] * -1;
 	}
-	elsif ($stranded eq 'all') {
+	elsif ($options->[4] eq 'all') {
 		# Bio::DB::USeq will translate this properly, and collect from 
 		# both strands as necessary
 		$strand = 0;
 	}
+	else {
+		# default
+		$strand = $options->[3];
+	}
 	
 	# unlikely there are more than one useq file, but just in case
-	foreach my $useqfile (@useqs) {
+	my @scores;
+	for (my $i = 8; $i < scalar @$options; $i++) {
 		
 		# open a new db object
-		my $useq = _get_useq($useqfile);
+		my $useq = _get_useq($options->[$i]);
 		
 		# check chromosome first
-		$chromo = $USEQ_CHROMOS{$useqfile}{$chromo} or next;
+		my $chromo = $USEQ_CHROMOS{$options->[$i]}{$options->[0]} or next;
 	
 		# need to collect the scores based on the type of score requested
 		
-		if ($method eq 'score') {
+		if ($options->[5] eq 'score') {
 			# need to collect scores
-			my @region_scores = $useq->scores(
+			push @scores, $useq->scores(
 				-seq_id     => $chromo,
-				-start      => $start,
-				-end        => $stop,
+				-start      => $options->[1], 
+				-end        => $options->[2],
 				-strand     => $strand,
 			);
-			push @scores, @region_scores;
 		}
-		elsif ($method eq 'count') {
+		elsif ($options->[5] eq 'count') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $start,
-				-end        => $stop,
+				-start      => $options->[1], 
+				-end        => $options->[2],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -98,12 +95,12 @@ sub collect_useq_scores {
 				$scores[0] += 1;
 			}
 		}
-		elsif ($method eq 'pcount') {
+		elsif ($options->[5] eq 'pcount') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $start,
-				-end        => $stop,
+				-start      => $options->[1], 
+				-end        => $options->[2],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -114,12 +111,12 @@ sub collect_useq_scores {
 					($f->start >= $start and $f->end <= $stop);
 			}
 		}
-		elsif ($method eq 'length') {
+		elsif ($options->[5] eq 'length') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $start,
-				-end        => $stop,
+				-start      => $options->[1], 
+				-end        => $options->[2],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -141,42 +138,40 @@ sub collect_useq_scores {
 
 sub collect_useq_position_scores {
 	
-	# pass the required information
-	unless (scalar @_ >= 7) {
-		confess " At least seven arguments must be passed to collect useq scores!\n";
-	}
-	my ($chromo, $start, $stop, $strand, $stranded, $method, @useqs) = @_;
-		# method can be score, count, or length
-	
-	# initialize the score array
-	# this will record score, count, or lengths per the method
-	my %pos2score;
+	# passed options as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $options = shift;
 	
 	# adjust strand method
-	# do not need to adjust if stranded is sense
-	if ($stranded eq 'antisense') {
-		$strand = $strand * -1;
+	my $strand;
+	if ($options->[4] eq 'antisense') {
+		$strand = $options->[3] * -1;
 	}
-	elsif ($stranded eq 'all') {
+	elsif ($options->[4] eq 'all') {
 		# Bio::DB::USeq will translate this properly, and collect from 
 		# both strands as necessary
 		$strand = 0;
 	}
+	else {
+		# default
+		$strand = $options->[3];
+	}
 	
 	# unlikely there are more than one useq file, but just in case
-	foreach my $useqfile (@useqs) {
+	my %pos2score;
+	for (my $i = 8; $i < scalar @$options; $i++) {
 		
 		# open a new db object
-		my $useq = _get_useq($useqfile);
+		my $useq = _get_useq($options->[$i]);
 		
 		# check chromosome first
-		$chromo = $USEQ_CHROMOS{$useqfile}{$chromo} or next;
+		my $chromo = $USEQ_CHROMOS{$options->[$i]}{$options->[0]} or next;
 	
 		# collect the features overlapping the region
 		my $iterator = $useq->get_seq_stream(
 			-seq_id     => $chromo,
-			-start      => $start,
-			-end        => $stop,
+			-start      => $options->[1], 
+			-end        => $options->[2],
 			-strand     => $strand,
 		);
 		return unless $iterator;
@@ -201,28 +196,28 @@ sub collect_useq_position_scores {
 			next unless (
 				# want to avoid those whose midpoint are not technically 
 				# within the region of interest
-				$position >= $start and $position <= $stop
+				$position >= $options->[1] and $position <= $options->[2]
 			);
 			
 			# record the value
-			if ($method eq 'score') {
+			if ($options->[5] eq 'score') {
 				push @{ $pos2score{$position} }, $f->score;
 			}
-			elsif ($method eq 'count') {
+			elsif ($options->[5] eq 'count') {
 				$pos2score{$position} += 1;
 			}
-			elsif ($method eq 'pcount') {
+			elsif ($options->[5] eq 'pcount') {
 				$pos2score{$position} += 1 if 
-					($f->start >= $start and $f->end <= $stop);
+					($f->start >= $options->[1] and $f->end <= $options->[2]);
 			}
-			elsif ($method eq 'length') {
+			elsif ($options->[5] eq 'length') {
 				push @{ $pos2score{$position} }, $f->length;
 			}
 		}
 	}
 	
 	# combine multiple datapoints at the same position
-	if ($method eq 'score' or $method eq 'length') {
+	if ($options->[5] eq 'score' or $options->[5] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %pos2score) {
@@ -231,7 +226,7 @@ sub collect_useq_position_scores {
 	}
 	
 	# return collected data
-	return %pos2score;
+	return wantarray ? %pos2score : \%pos2score;
 }
 
 
@@ -290,33 +285,28 @@ Bio::ToolBox::db_helper::useq
 
 =head1 DESCRIPTION
 
-This module supports the use of useq file in the Bio::ToolBox distribution.
+This module provides support for USeq files to the L<Bio::ToolBox> package. 
 Useq files are zip archives representing either intervals or scores. They 
 may be used similarly to either bigWig or bigBed files. More information 
 about useq files may be found at L<http://useq.sourceforge.net/useqArchiveFormat.html>.
 USeq files use the extension F<.useq>.
 
-Scores from useq files may be collected using this module. Either a single 
-score from an interval, or a hash of scores associated with positions across 
-an interval. 
-
-Scores may be restricted to strand by specifying the desired strandedness. 
-For example, to collect transcription data over a gene, pass the strandedness 
-value 'sense'. If the strand of the region database object (representing the 
-gene) matches the strand of the bed feature, then the data for that bed 
-feature is collected.  
-
 =head1 USAGE
 
-The module requires the Bio::DB::USeq package to be installed. 
+The module requires L<Bio::DB::USeq> to be installed.
 
-Load the module at the beginning of your program.
+In general, this module should not be used directly. Use the methods 
+available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
 
-	use Bio::ToolBox::db_helper::useq;
-
-It will automatically export the name of the subroutines. 
+All subroutines are exported by default.
 
 =over
+
+=item open_useq_db()
+
+This subroutine will open a useq database connection. Pass the local 
+path to a useq file (.useq extension). It will return the opened 
+Bio::DB::USeq database object.
 
 =item collect_useq_scores()
 
@@ -325,66 +315,84 @@ for the specified database region. The positional information of the
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed seven or more arguments in the following order:
+The subroutine is passed a parameter array reference. See below for details.
 
-=over 4
-
-=item 1. The chromosome or seq_id
-
-=item 2. The start position of the segment to collect 
-
-=item 3. The stop or end position of the segment to collect 
-
-=item 4. The strand of the segment to collect
-
-Strand values should be in BioPerl standard values, i.e. -1, 0, or 1.
-
-=item 5. The strandedness of the data to collect
-
-A scalar value representing the desired strandedness of the data 
-to be collected. Acceptable values include "sense", "antisense", 
-or "all". Only those scores which match the indicated 
-strandedness are collected.
-
-=item 6. The value type of data to collect
-
-Acceptable values include score, count, pcount, and length.
-
-   score returns the feature scores
-   
-   count returns the number of features that overlap the 
-   search region. 
-   
-   pcount, or precise count, returns the count of features 
-   that only fall within the region. 
-   
-   length returns the lengths of all overlapping features 
-
-=item 7. Paths to one or more USeq files
-
-=back
-
-The subroutine returns an array of the defined dataset values found within 
-the region of interest. 
+The subroutine returns an array or array reference of the requested dataset 
+values found within the region of interest. 
 
 =item collect_useq_position_scores()
 
 This subroutine will collect the score values from a binary useq file 
 for the specified database region keyed by position. 
 
-The subroutine is passed the same arguments as collect_useq_scores().
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine returns a hash of the defined dataset values found within 
-the region of interest keyed by position. The feature midpoint is used 
-as the key position. When multiple features are found at the same 
+The subroutine returns a hash or hash reference of the defined dataset values 
+found within the region of interest keyed by position. The feature midpoint 
+is used as the key position. When multiple features are found at the same 
 position, a simple mean (for score or length data methods) or sum 
 (for count methods) is returned.
 
-=item open_useq_db()
+=back
 
-This subroutine will open a useq database connection. Pass the local 
-path to a useq file (.useq extension). It will return the opened 
-Bio::DB::USeq database object.
+=head2 Data Collection Parameters Reference
+
+The data collection subroutines are passed an array reference of parameters. 
+The recommended  method for data collection is to use get_segment_score() method from 
+L<Bio::ToolBox::db_helper>. 
+
+The parameters array reference includes these items:
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+=item 1. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Should be standard BioPerl representation: -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect 
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The method for combining scores.
+
+Not used here. 
+
+=item 7. The value type of data to collect
+
+Acceptable values include score, count, pcount, ncount, and length.
+
+   * score returns the basepair coverage of alignments over the 
+   region of interest
+   
+   * count returns the number of alignments that overlap the 
+   search region. 
+   
+   * pcount, or precise count, returns the count of alignments 
+   whose start and end fall within the region. 
+   
+   * ncount, or named count, returns an array of alignment read  
+   names. Use this to avoid double-counting paired-end reads by 
+   counting only unique names. Reads are taken if they overlap 
+   the search region.
+   
+   length returns the lengths of all overlapping alignments 
+
+=item 8. A database object.
+
+Not used here.
+
+=item 9 and higher. Paths to one or more USeq files
+
+Opened USeq file objects are cached. 
 
 =back
 
