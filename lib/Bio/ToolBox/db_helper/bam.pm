@@ -13,6 +13,17 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 our $VERSION = '1.50';
 
 # Exported names
@@ -139,10 +150,11 @@ sub collect_bam_position_scores {
 	
 	# collect the raw data
 	# set the do_index boolean to true
-	my $bam_data = _collect_bam_data(1, @_);
+	my $param = shift;
+	my $bam_data = _collect_bam_data(1, $param);
 	
 	# check the requested method
-	if ($_[0]->[5] eq 'length') {
+	if ($param->[VAL] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %$bam_data) {
@@ -151,7 +163,7 @@ sub collect_bam_position_scores {
 	}
 	
 	# return collected data
-	return wantarray %$bam_data : $bam_data;
+	return wantarray ? %$bam_data : $bam_data;
 }
 
 
@@ -160,9 +172,9 @@ sub collect_bam_position_scores {
 ### Actual collection of scores
 sub _collect_bam_data {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my ($do_index, $options) = @_;
+	my ($do_index, $param) = @_;
 	
 	# initialize score structures
 	# which one is used depends on the $do_index boolean variable
@@ -171,10 +183,10 @@ sub _collect_bam_data {
 	
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	for (my $b = 8; $b < scalar @$options; $b++) {
+	for (my $b = 8; $b < scalar @$param; $b++) {
 	
 		## Open the Bam File
-		my $bamfile = $options->[$b];
+		my $bamfile = $param->[$b];
 		my $bam = $OPENED_BAM{$bamfile} || undef;
 		unless ($bam) {
 			# open and cache the bam file
@@ -196,12 +208,12 @@ sub _collect_bam_data {
 		}
 			
 		# first check that the chromosome is present
-		my $chromo = $BAM_CHROMOS{$bamfile}{$options->[0]} or next;
+		my $chromo = $BAM_CHROMOS{$bamfile}{$param->[CHR]} or next;
 		
 		# convert coordinates into low level coordinates
 		# consumed by the low level Bam API
 		my ($tid, $zstart, $end) = $bam->header->parse_region(
-			sprintf("%s:%d-%d", $chromo, $options->[1], $options->[2]) );
+			sprintf("%s:%d-%d", $chromo, $param->[STRT], $param->[STOP]) );
 	
 		
 		## Collect the data according to the requested value type
@@ -209,7 +221,7 @@ sub _collect_bam_data {
 		# process the actual alignments (count or length)
 		
 		## Coverage
-		if ($options->[6] eq 'score') {
+		if ($param->[VAL] eq 'score') {
 			# collecting scores, or in this case, basepair coverage of 
 			# alignments over the requested region
 			
@@ -227,9 +239,9 @@ sub _collect_bam_data {
 				
 				# check whether we need to index the scores
 				if ($do_index) {
-					for (my $i = $options->[1]; $i <= $options->[2]; $i++) {
+					for (my $i = $param->[STRT]; $i <= $param->[STOP]; $i++) {
 						# move the scores into the position score hash
-						$pos2data{$i} += $coverage->[ $i - $options->[2] ];
+						$pos2data{$i} += $coverage->[ $i - $param->[STRT] ];
 					}
 				}
 				else {
@@ -245,12 +257,12 @@ sub _collect_bam_data {
 			# working with actual alignments
 			
 			## Set the callback and a callback data structure
-			my $callback = _assign_callback($do_index, $options);
+			my $callback = _assign_callback($do_index, $param);
 			my %data = (
 				'scores' => \@scores,
 				'index'  => \%pos2data,
-				'start'  => $options->[1],
-				'stop'   => $options->[2],
+				'start'  => $param->[STRT],
+				'stop'   => $param->[STOP],
 			);
 			
 			# get the alignments
@@ -418,72 +430,67 @@ sub _assign_callback {
 	# there are so many different subroutines because I want to increase 
 	# efficiency by limiting the number of conditional tests in one generic subroutine
 	
-	# pass the original options array reference
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my ($do_index, $options) = @_;
-	my $stranded = $options->[4];
-	my $strand = $options->[3];
-	my $value_type = $options->[6];
+	my ($do_index, $param) = @_;
 	
 	# check the current list of calculated callbacks
-		# this process is pretty lengthy, especially to do it for every single 
-		# data collection, so we cache the calculate callback method to speed up 
-		# subsequent data collections
-		# it's likely only one method is ever employed in an execution, but just in case
-		# we will cache all that we calculate
-	if (exists $CALLBACKS{"$stranded$strand$value_type$do_index"}) {
-		return $CALLBACKS{"$stranded$strand$value_type$do_index"};
-	}
+		# cache the calculated callback method to speed up subsequent data 
+		# collections it's likely only one method is ever employed in an 
+		# execution, but just in case we will cache all that we calculate
+	my $string = sprintf "%s_%s_%s_%d", $param->[STND], $param->[STR], 
+		$param->[VAL], $do_index;
+	return $CALLBACKS{$string} if exists $CALLBACKS{$string};
 	
 	# determine the callback method based on requested criteria
 	my $callback;
 	
 	# all reads, either strand
 	if (
-		$stranded eq 'all' and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_all_count_indexed;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_all_precise_count_indexed;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_all_count_array;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_all_precise_count_array;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'ncount' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_all_name_array;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'length' and 
 		$do_index
 	) {
 		$callback = \&_all_length_indexed;
 	}
 	elsif (
-		$stranded eq 'all' and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'all' and 
+		$param->[VAL] eq 'length' and 
 		!$do_index
 	) {
 		$callback = \&_all_length_array;
@@ -492,57 +499,57 @@ sub _assign_callback {
 	
 	# sense, forward strand 
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_forward_count_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_forward_precise_count_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_forward_count_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_precise_count_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'ncount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_name_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'length' and 
 		$do_index
 	) {
 		$callback = \&_forward_length_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand >= 0 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'length' and 
 		!$do_index
 	) {
 		$callback = \&_forward_length_array;
@@ -551,57 +558,57 @@ sub _assign_callback {
 	
 	# sense, reverse strand
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_reverse_count_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_reverse_precise_count_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_count_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_precise_count_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'ncount' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_name_array;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'length' and 
 		$do_index
 	) {
 		$callback = \&_reverse_length_indexed;
 	}
 	elsif (
-		$stranded eq 'sense' and 
-		$strand == -1 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'length' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_length_array;
@@ -610,57 +617,57 @@ sub _assign_callback {
 	
 	# anti-sense, forward strand 
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_reverse_count_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_reverse_precise_count_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_count_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_precise_count_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'ncount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_name_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'length' and 
 		$do_index
 	) {
 		$callback = \&_reverse_length_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand >= 0 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[VAL] eq 'length' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_length_array;
@@ -669,57 +676,57 @@ sub _assign_callback {
 	
 	# anti-sense, reverse strand
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_forward_count_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_forward_precise_count_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'count' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_forward_count_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'pcount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_precise_count_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'ncount' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_name_array;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'length' and 
 		$do_index
 	) {
 		$callback = \&_forward_length_indexed;
 	}
 	elsif (
-		$stranded eq 'antisense' and 
-		$strand == -1 and 
-		$value_type eq 'length' and 
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[VAL] eq 'length' and 
 		!$do_index
 	) {
 		$callback = \&_forward_length_array ;
@@ -727,7 +734,7 @@ sub _assign_callback {
 	
 	# unacceptable combination
 	elsif (
-		$value_type eq 'ncount' and 
+		$param->[VAL] eq 'ncount' and 
 		$do_index
 	) {
 		# I don't see any reason to collect names in an indexed fashion
@@ -737,12 +744,12 @@ sub _assign_callback {
 	
 	# I goofed
 	else {
-		confess("Programmer error: stranded $stranded, strand $strand, value_type ". 
-				"$value_type, index $do_index\n");
+		confess sprintf "Programmer error: stranded %s, strand %s, value type %s, do_index %d", 
+			$param->[STND], $param->[STR], $param->[VAL], $do_index;
 	}
 	
 	# remember next time 
-	$CALLBACKS{"$stranded$strand$value_type$do_index"} = $callback;
+	$CALLBACKS{$string} = $callback;
 	
 	return $callback;
 }

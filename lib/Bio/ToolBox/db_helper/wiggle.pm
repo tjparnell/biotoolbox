@@ -5,6 +5,17 @@ require Exporter;
 use strict;
 use Carp;
 use Bio::Graphics::Wiggle;
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 our $VERSION = '1.50';
 
 
@@ -47,31 +58,31 @@ sub collect_wig_scores {
 
 sub collect_wig_position_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# look at each wigfile
 	# usually there is only one, but for stranded data there may be 
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
 	my %pos2score; # position => score
-	for (my $i = 8; $i < scalar @$options; $i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 		
-		my $feature = $options->[$i];
+		my $feature = $param->[$d];
 		
 		# Check which data to take based on strand
 		if (
-			$options->[4] eq 'all' # all data is requested
+			$param->[STND] eq 'all' # all data is requested
 			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$options->[3] == $feature->strand 
-				and $options->[4] eq 'sense'
+				$param->[STR] == $feature->strand 
+				and $param->[STND] eq 'sense'
 			) 
 			or (
 				# antisense data
-				$options->[3] != $feature->strand  
-				and $options->[4] eq 'antisense'
+				$param->[STR] != $feature->strand  
+				and $param->[STND] eq 'antisense'
 			)
 		) {
 			# we have acceptable data to collect
@@ -105,29 +116,29 @@ sub collect_wig_position_scores {
 				}
 				
 				# adjust as necessary to avoid wig errors
-				if ($options->[1] < $wig->start) {
+				if ($param->[STRT] < $wig->start) {
 					# adjust the start position
-					$options->[1] = $wig->start;
+					$param->[STRT] = $wig->start;
 				}
-				elsif ($options->[1] > $wig->end) {
+				elsif ($param->[STRT] > $wig->end) {
 					# nothing we can do here, no values
 					return;
 				}
-				if ($options->[2] > $wig->end) {
+				if ($param->[STOP] > $wig->end) {
 					# adjust the end position
-					$options->[2] = $wig->end;
+					$param->[STOP] = $wig->end;
 				}
-				elsif ($options->[2] < $wig->start) {
+				elsif ($param->[STOP] < $wig->start) {
 					# nothing we can do here, no values
 					return;
 				}
 				
 				# collect the wig values
-				my $scores_ref = $wig->values($start => $stop);
+				my $scores_ref = $wig->values($param->[STRT] => $param->[STOP]);
 				
 				# re-associate position with the scores
 				my $step = $wig->step || 1; # step should always be defined but just in case
-				my $pos = $start;
+				my $pos = $param->[STRT];
 				foreach my $s (@{ $scores_ref }) {
 					#print Dumper($s);
 					if (defined $s) {
@@ -137,17 +148,17 @@ sub collect_wig_position_scores {
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						if ($options->[5] eq 'score') {	
+						if ($param->[METH] eq 'score') {	
 							$pos2score{$pos} = $s;
 						}
-						elsif ($options->[5] eq 'count') {
+						elsif ($param->[METH] eq 'count') {
 							$pos2score{$pos} = 1;
 						}
-						elsif ($options->[5] eq 'length') {
+						elsif ($param->[METH] eq 'length') {
 							$pos2score{$pos} = $step;
 						}
 						else {
-							confess "unknown method $method!";
+							confess "unknown method!";
 						}
 					}
 					

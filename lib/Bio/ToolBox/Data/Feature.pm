@@ -905,10 +905,9 @@ sub get_score {
 	}
 	
 	# score attributes
-	$args{'method'} ||= 'mean';
-	$args{value}    ||= 'score';
-	$args{stranded} ||= 'all';
-	$args{'log'}    ||= undef;
+	$args{'method'}     ||= 'mean';
+	$args{value}        ||= 'score';
+	$args{strandedness} ||= 'all';
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;

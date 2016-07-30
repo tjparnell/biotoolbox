@@ -6,6 +6,17 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::BigBed;
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 our $VERSION = '1.50';
 
 
@@ -41,29 +52,29 @@ our %OPENED_BB;
 ### Collect BigBed scores only
 sub collect_bigbed_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# look at each bedfile
 	# usually there is only one, but for stranded data there may be 
 	# two bedfiles (+ and -), so we'll check each bed file for strand info
 	my @scores;
-	for (my $i = 8; $i < scalar @$options; $i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 	
 		# open the bedfile
-		my $bb = _get_bb($options->[$i]);
+		my $bb = _get_bb($param->[$d]);
 			
 		# first check that the chromosome is present
-		my $chromo = $BIGBED_CHROMOS{$options->[$i]}{$options->[0]} or next;
+		my $chromo = $BIGBED_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# collect the features overlapping the region
 			# we are using the high level API rather than the low-level
 			# since we getting the individual scores from each bed element
 		my $bb_stream = $bb->features(
 			-seq_id   => $chromo, 
-			-start    => $options->[1], 
-			-end      => $options->[2],
+			-start    => $param->[STRT], 
+			-end      => $param->[STOP],
 			-iterator => 1,
 		);
 		
@@ -72,33 +83,33 @@ sub collect_bigbed_scores {
 			
 			# First check whether the strand is acceptable
 			if (
-				$options->[4] eq 'all' # all data is requested
+				$param->[STND] eq 'all' # all data is requested
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$options->[3] == $bed->strand 
-					and $options->[4] eq 'sense'
+					$param->[STR] == $bed->strand 
+					and $param->[STND] eq 'sense'
 				) 
 				or (
 					# antisense data
-					$options->[3] != $bed->strand  
-					and $options->[4] eq 'antisense'
+					$param->[STR] != $bed->strand  
+					and $param->[STND] eq 'antisense'
 				)
 			) {
 				# we have acceptable data to collect
 			
 				# store the appropriate datapoint
-				if ($options->[5] eq 'score') {
+				if ($param->[METH] eq 'score') {
 					push @scores, $bed->score;
 				}
-				elsif ($options->[5] eq 'count') {
+				elsif ($param->[METH] eq 'count') {
 					$scores[0] += 1;
 				}
-				elsif ($options->[5] eq 'pcount') {
-					$scores[0] += 1 if 
-						($bed->start >= $start and $bed->end <= $stop);
+				elsif ($param->[METH] eq 'pcount') {
+					$scores[0] += 1 if ($bed->start >= $param->[STRT] and 
+						$bed->end <= $param->[STOP]);
 				}
-				elsif ($options->[5] eq 'length') {
+				elsif ($param->[METH] eq 'length') {
 					push @scores, $bed->length;
 				}
 			}
@@ -115,26 +126,26 @@ sub collect_bigbed_scores {
 ### Collect positioned BigBed scores
 sub collect_bigbed_position_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# look at each bedfile
 	# usually there is only one, but there may be more
 	my %bed_data;
-	for (my $i = 8; $i < scalar @$options; $i++) {
+	for (my $i = 8; $i < scalar @$param; $i++) {
 	
 		# open the bedfile
-		my $bb = _get_bb($options->[$i]);
+		my $bb = _get_bb($param->[$i]);
 			
 		# first check that the chromosome is present
-		my $chromo = $BIGBED_CHROMOS{$options->[$i]}{$options->[0]} or next;
+		my $chromo = $BIGBED_CHROMOS{$param->[$i]}{$param->[CHR]} or next;
 		
 		# collect the features overlapping the region
 		my $bb_stream = $bb->features(
 			-seq_id   => $chromo, 
-			-start    => $options->[1], 
-			-end      => $options->[2],
+			-start    => $param->[STRT], 
+			-end      => $param->[STOP],
 			-iterator => 1,
 		);
 		
@@ -143,17 +154,17 @@ sub collect_bigbed_position_scores {
 			
 			# First check whether the strand is acceptable
 			if (
-				$options->[4] eq 'all' # all data is requested
+				$param->[STND] eq 'all' # all data is requested
 				or $bed->strand == 0 # unstranded data
 				or ( 
 					# sense data
-					$options->[3] == $bed->strand 
-					and $options->[4] eq 'sense'
+					$param->[STR] == $bed->strand 
+					and $param->[STND] eq 'sense'
 				) 
 				or (
 					# antisense data
-					$options->[3] != $bed->strand  
-					and $options->[4] eq 'antisense'
+					$param->[STR] != $bed->strand  
+					and $param->[STND] eq 'antisense'
 				)
 			) {
 				# we have acceptable data to collect
@@ -175,23 +186,23 @@ sub collect_bigbed_position_scores {
 				next unless (
 					# want to avoid those whose midpoint are not technically 
 					# within the region of interest
-					$position >= $options->[1] and $position <= $options->[2]
+					$position >= $param->[STRT] and $position <= $param->[STOP]
 				);
 				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
-				if ($options->[5] eq 'score') {
+				if ($param->[METH] eq 'score') {
 					# perform addition to force the score to be a scalar value
 					push @{ $bed_data{$position} }, $bed->score + 0;
 				}
-				elsif ($options->[5] eq 'count') {
+				elsif ($param->[METH] eq 'count') {
 					$bed_data{$position} += 1;
 				}
-				elsif ($options->[5] eq 'pcount') {
+				elsif ($param->[METH] eq 'pcount') {
 					$bed_data{$position} += 1 if 
-						($bed->start <= $options->[1] and $bed->end <= $options->[2]);
+						($bed->start <= $param->[STRT] and $bed->end <= $param->[STOP]);
 				}
-				elsif ($options->[5] eq 'length') {
+				elsif ($param->[METH] eq 'length') {
 					# I hope that length is supported, but not sure
 					# may have to calculate myself
 					push @{ $bed_data{$position} }, $bed->length;
@@ -201,7 +212,7 @@ sub collect_bigbed_position_scores {
 	}
 
 	# combine multiple datapoints at the same position
-	if ($options->[5] eq 'score' or $options->[5] eq 'length') {
+	if ($param->[METH] eq 'score' or $param->[METH] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %bed_data) {
@@ -210,7 +221,7 @@ sub collect_bigbed_position_scores {
 	}
 	
 	# return collected data
-	return wantarray ? %bed_data \%bed_data;
+	return wantarray ? %bed_data : \%bed_data;
 }
 
 

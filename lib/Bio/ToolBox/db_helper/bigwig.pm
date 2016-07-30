@@ -7,6 +7,17 @@ use Carp;
 use Statistics::Lite qw(min max mean);
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 our $VERSION = '1.50';
 
 
@@ -99,9 +110,9 @@ our %MULTI_SUMMARY_METHOD = (
 ### Collect single BigWig score
 sub collect_bigwig_score {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# Collecting summary features
 	# we will collect a summary object for each requested wig feature  
@@ -109,46 +120,46 @@ sub collect_bigwig_score {
 	# Walk through each requested feature
 	# There is likely only one
 	my @summaries;
-	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
-		my $bw = _get_bw($options->[$bw_i]);
+	for (my $d = DATA; $d < scalar @$param; $d++) {
+		my $bw = _get_bw($param->[$d]);
 		
 		# first check that the chromosome is present
-		$chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
+		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# use a low level method to get a single summary hash for 1 bin
 		my $sumArrays = $bw->bigWigSummaryArrayExtended(
 			# chromo, 0-based start, stop, bin
-			$chromo, $options->[1] - 1, $options->[2], 1
+			$chromo, $param->[STRT] - 1, $param->[STOP], 1
 		);
 		push @summaries, $sumArrays->[0];
 	}
 	
 	# now process the summary features
-	return _process_summaries($options->[5], \@summaries);
+	return _process_summaries($param->[METH], \@summaries);
 }
 
 
 ### Collect multiple BigWig scores
 sub collect_bigwig_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# Walk through each requested feature
 	# There is likely only one
 	my @scores; 
-	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 	
 		# open db object
-		my $bw = _get_bw($options->[$bw_i]);
+		my $bw = _get_bw($param->[$d]);
 		
 		# first check that the chromosome is present
-		$chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
+		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# initialize low level stream for this segment
 		my $list = $bw->bigWigIntervalQuery(
-			$chromo, $options->[1] - 1, $options->[2] );
+			$chromo, $param->[STRT] - 1, $param->[STOP] );
 		my $f = $list->head;
 		while ($f) {
 			# print $f->start,"..",$f->end,": ",$f->value,"\n";
@@ -165,9 +176,9 @@ sub collect_bigwig_scores {
 ### Collect positioned BigWig scores
 sub collect_bigwig_position_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# initialize 
 	my %pos2data; # hash of position => score
@@ -175,17 +186,17 @@ sub collect_bigwig_position_scores {
 	
 	# Walk through each requested feature
 	# There is likely only one
-	for (my $bw_i = 8; $bw_i < scalar @$options; $bw_i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 	
 		# Open the BigWig file
-		my $bw = _get_bw($options->[$bw_i]);
+		my $bw = _get_bw($param->[$d]);
 		
 		# first check that the chromosome is present
-		my $chromo = $BIGWIG_CHROMOS{$options->[$bw_i]}{$options->[0]} or next;
+		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# initialize low level stream for this segment
 		my $list = $bw->bigWigIntervalQuery(
-			$chromo, $options->[1] - 1, $options->[2] );
+			$chromo, $param->[STRT] - 1, $param->[STOP] );
 		my $f = $list->head;
 		while ($f) {
 			# print $f->start,"..",$f->end,": ",$f->value,"\n";
@@ -223,31 +234,31 @@ sub collect_bigwig_position_scores {
 	}
 	
 	# return collected data
-	return wantarray ? %pos2data : \$pos2data;
+	return wantarray ? %pos2data : \%pos2data;
 }
 
 
 
 sub collect_bigwigset_score {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]} 
+	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]} 
 		|| undef;
 	unless (defined $chromo) {
 		# chromosome is not present, at least in the first bigwig in the set
 		# return null
-		return $options->[5] =~ /sum|count/ ? 0 : '.';
+		return $param->[METH] =~ /sum|count/ ? 0 : '.';
 	}
 	
 	# Reset which feature_type to collect from the database
 	# this is normally set to region when we opened the bigwigset db
 	# but it may be changed by a previous method
 	# we now want summary feature_type
-	$db->feature_type('summary');
+	$param->[DB]->feature_type('summary');
 	
 	# Collecting summary features
 	# we will collect a summary object for each requested wig feature  
@@ -256,26 +267,26 @@ sub collect_bigwigset_score {
 	# Work through all the requested feature types
 	# the BigWigSet feature request doesn't work well with multiple features
 	# so we'll do them one at a time
-	for (my $i = 8; $i < scalar @$options; $i++) {
-		my $type = $options->[i];
+	for (my $d = DATA; $d < scalar @$param; $d++) {
+		my $type = $param->[$d];
 		
 		# Collect the summary features
 		# no low-level joy here, use the high level API
 		$type =~ s/\:.+$//; # strip the source if present
 			# features method only works with primary_tag, not full 
 			# primary_tag:source type
-		my @features = $db->features(
+		my @features = $param->[DB]->features(
 			-seq_id   => $chromo,
-			-start    => $options->[1],
-			-end      => $options->[2],
+			-start    => $param->[STRT],
+			-end      => $param->[STOP],
 			-type     => $type,
 		);
 		# if the type doesn't work, then try display_name instead
 		unless (@features) {
-			@features = $db->features(
+			@features = $param->[DB]->features(
 				-seq_id   => $chromo,
-				-start    => $options->[1],
-				-end      => $options->[2],
+				-start    => $param->[STRT],
+				-end      => $param->[STOP],
 				-name     => $type,
 			);
 		}
@@ -287,8 +298,8 @@ sub collect_bigwigset_score {
 		
 		# Stranded features
 		if (
-			$options->[3] != 0 and
-			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
+			$param->[STR] != 0 and
+			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -308,13 +319,13 @@ sub collect_bigwigset_score {
 					$fstrand == 0 or
 					(
 						# sense data
-						$options->[3] == $fstrand 
-						and $options->[4] eq 'sense'
+						$param->[STR] == $fstrand 
+						and $param->[STND] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$options->[3] != $fstrand  
-						and $options->[4] eq 'antisense'
+						$param->[STR] != $fstrand  
+						and $param->[STND] eq 'antisense'
 					)
 				) {
 					# we have acceptable data to collect
@@ -335,7 +346,7 @@ sub collect_bigwigset_score {
 	}
 	
 	# now process the summary features
-	return _process_summaries($options->[5], \@summaries);
+	return _process_summaries($param->[METH], \@summaries);
 }
 
 
@@ -343,12 +354,12 @@ sub collect_bigwigset_score {
 
 sub collect_bigwigset_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]}; 
+	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]}; 
 	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
 		# return nothing
@@ -357,14 +368,14 @@ sub collect_bigwigset_scores {
 	# this is normally set to region when we opened the bigwigset db
 	# but it may be changed by a previous method
 	# we now want region feature_type
-	$db->feature_type('region');
+	$param->[DB]->feature_type('region');
 	
 	# initialize collection array
 	my @scores; 
 	
 	# Go through each feature type requested
-	for (my $i = 8; $i < scalar @$options; $i++) {
-		my $type = $options->[i];
+	for (my $i = 8; $i < scalar @$param; $i++) {
+		my $type = $param->[$i];
 		
 		# Collect the feature scores
 		# no low-level joy here, use the high level API
@@ -375,10 +386,10 @@ sub collect_bigwigset_scores {
 			# region, we will get lots of features returned, one for each 
 			# datapoint
 			# use an iterator to process them
-		my $iterator = $db->get_seq_stream(
+		my $iterator = $param->[DB]->get_seq_stream(
 			-seq_id   => $chromo,
-			-start    => $options->[1],
-			-end      => $options->[2],
+			-start    => $param->[STRT],
+			-end      => $param->[STOP],
 			-type     => $type,
 		);
 		
@@ -388,10 +399,10 @@ sub collect_bigwigset_scores {
 			# uh oh, no feature! perhaps we didn't correctly identify the 
 			# correct bigwig in the set
 			# try again using display_name instead
-			$iterator = $db->get_seq_stream(
+			$iterator = $param->[DB]->get_seq_stream(
 				-seq_id   => $chromo,
-				-start    => $options->[1],
-				-end      => $options->[2],
+				-start    => $param->[STRT],
+				-end      => $param->[STOP],
 				-name     => $type,
 			);
 			$feature = $iterator->next_seq;
@@ -401,8 +412,8 @@ sub collect_bigwigset_scores {
 		
 		# Stranded features
 		if (
-			$options->[3] != 0 and
-			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
+			$param->[STR] != 0 and
+			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -422,13 +433,13 @@ sub collect_bigwigset_scores {
 					$fstrand == 0 or
 					(
 						# sense data
-						$options->[3] == $fstrand 
-						and $options->[4] eq 'sense'
+						$param->[STR] == $fstrand 
+						and $param->[STND] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$options->[3] != $fstrand  
-						and $options->[4] eq 'antisense'
+						$param->[STR] != $fstrand  
+						and $param->[STND] eq 'antisense'
 					)
 				) {
 					# we have acceptable data to collect
@@ -458,12 +469,12 @@ sub collect_bigwigset_scores {
 
 sub collect_bigwigset_position_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($options->[7]->bigwigs)[0] }{$options->[0]} 
+	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]} 
 		|| undef;
 	return unless (defined $chromo);
 		# chromosome is not present, at least in the first bigwig in the set
@@ -473,15 +484,15 @@ sub collect_bigwigset_position_scores {
 	# this is normally set to region when we opened the bigwigset db
 	# but it may be changed by a previous method
 	# we now want region feature_type
-	$db->feature_type('region');
+	$param->[DB]->feature_type('region');
 	
 	# initialize collection hash, position => score
 	my %pos2data; 
 	my %duplicates;
 	
 	# Go through each feature type requested
-	for (my $i = 8; $i < scalar @$options; $i++) {
-		my $type = $options->[i];
+	for (my $i = 8; $i < scalar @$param; $i++) {
+		my $type = $param->[$i];
 		
 		# Collect the feature scores
 		$type =~ s/\:.+$//; # strip the source if present
@@ -492,10 +503,10 @@ sub collect_bigwigset_position_scores {
 			# datapoint
 			# use an iterator to process them
 		# no low-level joy here, use the high level API
-		my $iterator = $db->get_seq_stream(
+		my $iterator = $param->[DB]->get_seq_stream(
 			-seq_id   => $chromo,
-			-start    => $options->[1],
-			-end      => $options->[2],
+			-start    => $param->[STRT],
+			-end      => $param->[STOP],
 			-type     => $type,
 		);
 		
@@ -505,10 +516,10 @@ sub collect_bigwigset_position_scores {
 			# uh oh, no feature! perhaps we didn't correctly identify the 
 			# correct bigwig in the set
 			# try again using display_name instead
-			$iterator = $db->get_seq_stream(
+			$iterator = $param->[DB]->get_seq_stream(
 				-seq_id   => $chromo,
-				-start    => $options->[1],
-				-end      => $options->[2],
+				-start    => $param->[STRT],
+				-end      => $param->[STOP],
 				-name     => $type,
 			);
 			$feature = $iterator->next_seq;
@@ -518,8 +529,8 @@ sub collect_bigwigset_position_scores {
 		
 		# Stranded features
 		if (
-			$options->[3] != 0 and
-			($options->[4] eq 'sense' or $options->[4] eq 'antisense')
+			$param->[STR] != 0 and
+			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
 		) {
 			# we will have to check the strand for each object
 			# feature objects we collect don't have the standard strand set
@@ -538,16 +549,16 @@ sub collect_bigwigset_position_scores {
 				
 				# collect score if strand is appropriate
 				if (
-					$strand == 0 or
+					$param->[STR] == 0 or
 					(
 						# sense data
-						$options->[3] == $fstrand 
-						and $options->[4] eq 'sense'
+						$param->[STR] == $fstrand 
+						and $param->[STND] eq 'sense'
 					) 
 					or (
 						# antisense data
-						$options->[3] != $fstrand  
-						and $options->[4] eq 'antisense'
+						$param->[STR] != $fstrand  
+						and $param->[STND] eq 'antisense'
 					)
 				) {
 					# acceptable data point

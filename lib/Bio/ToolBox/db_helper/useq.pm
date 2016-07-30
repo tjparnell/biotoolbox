@@ -6,6 +6,17 @@ use strict;
 use Carp;
 use Statistics::Lite qw(mean);
 use Bio::DB::USeq;
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 our $VERSION = '1.50';
 
 
@@ -40,52 +51,52 @@ our %OPENED_USEQ;
 
 sub collect_useq_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# adjust strand method
 	my $strand;
-	if ($options->[4] eq 'antisense') {
-		$strand = $options->[3] * -1;
+	if ($param->[STND] eq 'antisense') {
+		$strand = $param->[STR] * -1;
 	}
-	elsif ($options->[4] eq 'all') {
+	elsif ($param->[STND] eq 'all') {
 		# Bio::DB::USeq will translate this properly, and collect from 
 		# both strands as necessary
 		$strand = 0;
 	}
 	else {
 		# default
-		$strand = $options->[3];
+		$strand = $param->[STR];
 	}
 	
 	# unlikely there are more than one useq file, but just in case
 	my @scores;
-	for (my $i = 8; $i < scalar @$options; $i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 		
 		# open a new db object
-		my $useq = _get_useq($options->[$i]);
+		my $useq = _get_useq($param->[$d]);
 		
 		# check chromosome first
-		my $chromo = $USEQ_CHROMOS{$options->[$i]}{$options->[0]} or next;
+		my $chromo = $USEQ_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 	
 		# need to collect the scores based on the type of score requested
 		
-		if ($options->[5] eq 'score') {
+		if ($param->[METH] eq 'score') {
 			# need to collect scores
 			push @scores, $useq->scores(
 				-seq_id     => $chromo,
-				-start      => $options->[1], 
-				-end        => $options->[2],
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
 				-strand     => $strand,
 			);
 		}
-		elsif ($options->[5] eq 'count') {
+		elsif ($param->[METH] eq 'count') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $options->[1], 
-				-end        => $options->[2],
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -95,12 +106,12 @@ sub collect_useq_scores {
 				$scores[0] += 1;
 			}
 		}
-		elsif ($options->[5] eq 'pcount') {
+		elsif ($param->[METH] eq 'pcount') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $options->[1], 
-				-end        => $options->[2],
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -108,15 +119,15 @@ sub collect_useq_scores {
 			# collect the lengths of each feature
 			while (my $f = $iterator->next_seq) {
 				$scores[0] += 1 if 
-					($f->start >= $start and $f->end <= $stop);
+					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
 			}
 		}
-		elsif ($options->[5] eq 'length') {
+		elsif ($param->[METH] eq 'length') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
-				-start      => $options->[1], 
-				-end        => $options->[2],
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
 				-strand     => $strand,
 			);
 			return unless $iterator;
@@ -127,7 +138,7 @@ sub collect_useq_scores {
 			}
 		}
 		else {
-			confess " unrecognized method $method!";
+			confess " unrecognized method!";
 		}
 	}
 	
@@ -138,40 +149,40 @@ sub collect_useq_scores {
 
 sub collect_useq_position_scores {
 	
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my $options = shift;
+	my $param = shift;
 	
 	# adjust strand method
 	my $strand;
-	if ($options->[4] eq 'antisense') {
-		$strand = $options->[3] * -1;
+	if ($param->[STND] eq 'antisense') {
+		$strand = $param->[STR] * -1;
 	}
-	elsif ($options->[4] eq 'all') {
+	elsif ($param->[STND] eq 'all') {
 		# Bio::DB::USeq will translate this properly, and collect from 
 		# both strands as necessary
 		$strand = 0;
 	}
 	else {
 		# default
-		$strand = $options->[3];
+		$strand = $param->[STR];
 	}
 	
 	# unlikely there are more than one useq file, but just in case
 	my %pos2score;
-	for (my $i = 8; $i < scalar @$options; $i++) {
+	for (my $d = DATA; $d < scalar @$param; $d++) {
 		
 		# open a new db object
-		my $useq = _get_useq($options->[$i]);
+		my $useq = _get_useq($param->[$d]);
 		
 		# check chromosome first
-		my $chromo = $USEQ_CHROMOS{$options->[$i]}{$options->[0]} or next;
+		my $chromo = $USEQ_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 	
 		# collect the features overlapping the region
 		my $iterator = $useq->get_seq_stream(
 			-seq_id     => $chromo,
-			-start      => $options->[1], 
-			-end        => $options->[2],
+			-start      => $param->[STRT], 
+			-end        => $param->[STOP],
 			-strand     => $strand,
 		);
 		return unless $iterator;
@@ -196,28 +207,28 @@ sub collect_useq_position_scores {
 			next unless (
 				# want to avoid those whose midpoint are not technically 
 				# within the region of interest
-				$position >= $options->[1] and $position <= $options->[2]
+				$position >= $param->[STRT] and $position <= $param->[STOP]
 			);
 			
 			# record the value
-			if ($options->[5] eq 'score') {
+			if ($param->[METH] eq 'score') {
 				push @{ $pos2score{$position} }, $f->score;
 			}
-			elsif ($options->[5] eq 'count') {
+			elsif ($param->[METH] eq 'count') {
 				$pos2score{$position} += 1;
 			}
-			elsif ($options->[5] eq 'pcount') {
+			elsif ($param->[METH] eq 'pcount') {
 				$pos2score{$position} += 1 if 
-					($f->start >= $options->[1] and $f->end <= $options->[2]);
+					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
 			}
-			elsif ($options->[5] eq 'length') {
+			elsif ($param->[METH] eq 'length') {
 				push @{ $pos2score{$position} }, $f->length;
 			}
 		}
 	}
 	
 	# combine multiple datapoints at the same position
-	if ($options->[5] eq 'score' or $options->[5] eq 'length') {
+	if ($param->[METH] eq 'score' or $param->[METH] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %pos2score) {

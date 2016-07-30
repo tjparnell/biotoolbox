@@ -8,6 +8,17 @@ use Statistics::Lite qw(mean);
 use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	VAL  => 6,  # value type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
 
 our $VERSION = '1.50';
 our $WIGGLE_OK = 0;
@@ -133,18 +144,18 @@ sub collect_store_position_scores {
 
 sub _collect_store_data {
 	# pass the required information
-	# passed options as array ref
+	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my ($do_index, $options) = @_;
+	my ($do_index, $param) = @_;
 	
 	# database feature types
-	my @types = splice(@$options, 8);
+	my @types = splice(@$param, 8);
 	
 	# set up iterator from database
-	my $iterator = $options->[7]->get_seq_stream(
-		-seq_id      => $options->[0],
-		-start       => $options->[1],
-		-end         => $options->[2],
+	my $iterator = $param->[DB]->get_seq_stream(
+		-seq_id      => $param->[CHR],
+		-start       => $param->[STRT],
+		-end         => $param->[STOP],
 		-primary_tag => \@types,
 	);
 	return unless $iterator; # we should always get an iterator back, even if the 
@@ -155,11 +166,11 @@ sub _collect_store_data {
 	unless ($feature) {
 		# that's odd, we should get a feature
 		# try rebuilding the iterator with an alternate chromosome name 
-		$chromo = $options->[0] =~ /^chr(.+)$/i ? $1 : "chr$chromo";
-		$iterator = $db->get_seq_stream(
+		my $chromo = $param->[CHR] =~ /^chr(.+)$/i ? $1 : 'chr' . $param->[CHR];
+		$iterator = $param->[DB]->get_seq_stream(
 			-seq_id      => $chromo,
-			-start       => $options->[1],
-			-end         => $options->[2],
+			-start       => $param->[STRT],
+			-end         => $param->[STOP],
 			-primary_tag => \@types,
 		);
 		$feature = $iterator->next_seq or return;
@@ -187,7 +198,7 @@ sub _collect_store_data {
 			# get the full list of features to pass off to the 
 			# helper subroutine
 			while (my $f = $iterator->next_seq) {
-				push @$options, $f;
+				push @$param, $f;
 			}
 			
 			# check that we have wiggle support
@@ -204,11 +215,11 @@ sub _collect_store_data {
 				
 				if ($do_index) {
 					# warn " using collect_wig_position_scores() from tag\n";
-					return collect_wig_position_scores($options);
+					return collect_wig_position_scores($param);
 				}
 				else {
 					# warn " using collect_wig_scores() from tag\n";
-					return collect_wig_scores($options);
+					return collect_wig_scores($param);
 				}
 			}
 			else {
@@ -240,17 +251,17 @@ sub _collect_store_data {
 	
 		# Check which data to take based on strand
 		if (
-			$options->[4] eq 'all' # all data is requested
+			$param->[STND] eq 'all' # all data is requested
 			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$options->[3] == $feature->strand 
-				and $options->[4] eq 'sense'
+				$param->[STR] == $feature->strand 
+				and $param->[STND] eq 'sense'
 			) 
 			or (
 				# antisense data
-				$options->[3] != $feature->strand  
-				and $options->[4] eq 'antisense'
+				$param->[STR] != $feature->strand  
+				and $param->[STND] eq 'antisense'
 			)
 		) {
 			# we have acceptable data to collect
@@ -275,18 +286,18 @@ sub _collect_store_data {
 				}
 				
 				# store the appropriate value
-				if ($value_type eq 'score') {
+				if ($param->[VAL] eq 'score') {
 					push @{ $pos2data{$position} }, $feature->score;
 				}
-				elsif ($value_type eq 'count') {
+				elsif ($param->[VAL] eq 'count') {
 					$pos2data{$position} += 1;
 				}
-				elsif ($value_type eq 'pcount') {
+				elsif ($param->[VAL] eq 'pcount') {
 					$pos2data{$position} += 1 if 
-						($feature->start >= $options->[1] and 
-						$feature->end <= $options->[2]);
+						($feature->start >= $param->[STRT] and 
+						$feature->end <= $param->[STOP]);
 				}
-				elsif ($value_type eq 'length') {
+				elsif ($param->[VAL] eq 'length') {
 					push @{ $pos2data{$position} }, $feature->length;
 				}
 			}
@@ -295,18 +306,18 @@ sub _collect_store_data {
 				# just store the score in the array
 				
 				# store the appropriate value
-				if ($value_type eq 'score') {
+				if ($param->[VAL] eq 'score') {
 					push @scores, $feature->score;
 				}
-				elsif ($value_type eq 'count') {
+				elsif ($param->[VAL] eq 'count') {
 					$scores[0] += 1;
 				}
-				elsif ($value_type eq 'pcount') {
+				elsif ($param->[VAL] eq 'pcount') {
 					$scores[0] += 1 if 
-						($feature->start >= $options->[1] and 
-						$feature->end <= $options->[2]);
+						($feature->start >= $param->[STRT] and 
+						$feature->end <= $param->[STOP]);
 				}
-				elsif ($value_type eq 'length') {
+				elsif ($param->[VAL] eq 'length') {
 					push @scores, $feature->length;
 				}
 			}
@@ -320,7 +331,7 @@ sub _collect_store_data {
 	# combine multiple values recorded at the same position
 	if (
 		$do_index and 
-		($options->[6] eq 'score' or $options->[6] eq 'length')
+		($param->[VAL] eq 'score' or $param->[VAL] eq 'length')
 		# options 6 is the value type
 	) {
 		# each 'value' is an array of one or more scores or lengths 
