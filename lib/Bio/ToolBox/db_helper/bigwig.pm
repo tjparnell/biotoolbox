@@ -127,7 +127,7 @@ sub collect_bigwig_score {
 		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# use a low level method to get a single summary hash for 1 bin
-		my $sumArrays = $bw->bigWigSummaryArrayExtended(
+		my $sumArrays = $bw->bf->bigWigSummaryArrayExtended(
 			# chromo, 0-based start, stop, bin
 			$chromo, $param->[STRT] - 1, $param->[STOP], 1
 		);
@@ -158,7 +158,7 @@ sub collect_bigwig_scores {
 		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# initialize low level stream for this segment
-		my $list = $bw->bigWigIntervalQuery(
+		my $list = $bw->bf->bigWigIntervalQuery(
 			$chromo, $param->[STRT] - 1, $param->[STOP] );
 		my $f = $list->head;
 		while ($f) {
@@ -195,7 +195,7 @@ sub collect_bigwig_position_scores {
 		my $chromo = $BIGWIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 		
 		# initialize low level stream for this segment
-		my $list = $bw->bigWigIntervalQuery(
+		my $list = $bw->bf->bigWigIntervalQuery(
 			$chromo, $param->[STRT] - 1, $param->[STOP] );
 		my $f = $list->head;
 		while ($f) {

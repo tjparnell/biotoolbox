@@ -131,13 +131,13 @@ sub open_store_db {
 
 sub collect_store_scores {
 	# collect only the scores
-	return _collect_store_data(0, @_);
+	return _collect_store_data(0, shift);
 }
 
 
 sub collect_store_position_scores {
 	# collect positioned scores
-	return _collect_store_data(1, @_);
+	return _collect_store_data(1, shift);
 }
 
 

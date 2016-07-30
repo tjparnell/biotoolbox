@@ -82,7 +82,7 @@ sub collect_useq_scores {
 	
 		# need to collect the scores based on the type of score requested
 		
-		if ($param->[METH] eq 'score') {
+		if ($param->[VAL] eq 'score') {
 			# need to collect scores
 			push @scores, $useq->scores(
 				-seq_id     => $chromo,
@@ -91,7 +91,7 @@ sub collect_useq_scores {
 				-strand     => $strand,
 			);
 		}
-		elsif ($param->[METH] eq 'count') {
+		elsif ($param->[VAL] eq 'count') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
@@ -106,7 +106,7 @@ sub collect_useq_scores {
 				$scores[0] += 1;
 			}
 		}
-		elsif ($param->[METH] eq 'pcount') {
+		elsif ($param->[VAL] eq 'pcount') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,
@@ -122,7 +122,7 @@ sub collect_useq_scores {
 					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
 			}
 		}
-		elsif ($param->[METH] eq 'length') {
+		elsif ($param->[VAL] eq 'length') {
 			# need to collect features across the region
 			my $iterator = $useq->get_seq_stream(
 				-seq_id     => $chromo,

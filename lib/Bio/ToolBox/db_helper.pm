@@ -1988,7 +1988,7 @@ sub get_segment_score {
 	# parameters passed as an array
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	confess "incorrect number of parameters passed!" unless scalar @_ >= 9;
-	my $param = \@_;
+	my $param = [@_];
 	
 	# determine method
 	my $db_method = _lookup_db_method($param);
@@ -2474,12 +2474,6 @@ sub _lookup_db_method {
 	return $DB_METHODS{$lookup} if exists $DB_METHODS{$lookup};
 	# otherwise we determine the appropriate database method and cache the result
 	
-	# conveniences
-	my $param->[METH] = $param->[5];
-	my $param->[VAL] = $param->[6];
-	my $param->[DB] = $param->[7];
-	my $param->[DATA] = $param->[8];
-	
 	# determine the appropriate score method
 	my ($score_method, $do_return, $database_type);
 	if ($param->[DATA] =~ /^file|http|ftp/) {
@@ -2498,19 +2492,19 @@ sub _lookup_db_method {
 				if ($param->[VAL] eq 'score' and 
 					$param->[METH] =~ /min|max|mean|sum|count/
 				) {
-					$score_method = &collect_bigwig_score;
+					$score_method = \&collect_bigwig_score;
 					$do_return = 1;
 				}
 				elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-					$score_method = &collect_bigwig_score;
+					$score_method = \&collect_bigwig_score;
 					$do_return = 1;
 				}
 				elsif ($param->[METH] eq 'indexed') {
-					$score_method = &collect_bigwig_position_scores;
+					$score_method = \&collect_bigwig_position_scores;
 					$do_return = 1;
 				}
 				else {
-					$score_method = &collect_bigwig_scores;
+					$score_method = \&collect_bigwig_scores;
 					$do_return = 0;
 					$database_type = 'bw';
 				}
@@ -2532,11 +2526,11 @@ sub _lookup_db_method {
 				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				if ($param->[METH] eq 'indexed') {
-					$score_method = &collect_bigbed_position_scores;
+					$score_method = \&collect_bigbed_position_scores;
 					$do_return = 1;
 				}
 				else {
-					$score_method = &collect_bigbed_scores;
+					$score_method = \&collect_bigbed_scores;
 					$do_return = 0;
 					$database_type = 'bb';
 				}
@@ -2557,12 +2551,12 @@ sub _lookup_db_method {
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
 				if ($param->[METH] eq 'indexed') {
-					$score_method = &collect_bam_position_scores;
+					$score_method = \&collect_bam_position_scores;
 					$do_return = 1;
 				}
 				else {
 					# warn " using collect_bam_scores() with file\n";
-					$score_method = &collect_bam_scores;
+					$score_method = \&collect_bam_scores;
 					$do_return = 0;
 					$database_type = 'bam';
 				}
@@ -2584,11 +2578,11 @@ sub _lookup_db_method {
 				unless $USEQ_OK;
 			if ($USEQ_OK) {
 				if ($param->[METH] eq 'indexed') {
-					$score_method = &collect_useq_position_scores;
+					$score_method = \&collect_useq_position_scores;
 					$do_return = 1;
 				}
 				else {
-					$score_method = &collect_useq_scores;
+					$score_method = \&collect_useq_scores;
 					$do_return = 0;
 					$database_type = 'useq';
 				}
@@ -2620,19 +2614,19 @@ sub _lookup_db_method {
 		
 		# the data collection depends on the method
 		if ($param->[VAL] eq 'score' and $param->[METH] =~ /min|max|mean|sum|count/) {
-			$score_method = &collect_bigwigset_score;
+			$score_method = \&collect_bigwigset_score;
 			$do_return = 1;
 		}
 		elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-			$score_method = &collect_bigwigset_score;
+			$score_method = \&collect_bigwigset_score;
 			$do_return = 1;
 		}
 		elsif ($param->[VAL] eq 'score' and $param->[METH] eq 'indexed') {
-			$score_method = &collect_bigwigset_position_scores;
+			$score_method = \&collect_bigwigset_position_scores;
 			$do_return = 1;
 		}
 		else {
-			$score_method = &collect_bigwigset_scores;
+			$score_method = \&collect_bigwigset_scores;
 			$do_return = 0;
 			$database_type = 'bw';
 		}
@@ -2659,11 +2653,11 @@ sub _lookup_db_method {
 			}
 			
 			if ($param->[METH] eq 'indexed') {
-				$score_method = &collect_store_position_scores;
+				$score_method = \&collect_store_position_scores;
 				$do_return = 1;
 			}
 			else {
-				$score_method = &collect_store_scores;
+				$score_method = \&collect_store_scores;
 				$do_return = 0;
 				$database_type = 'seqfeature';
 			}
