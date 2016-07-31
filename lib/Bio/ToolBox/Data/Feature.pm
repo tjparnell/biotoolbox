@@ -953,10 +953,10 @@ sub get_relative_point_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
 	
 	# Assign coordinates
-	$self->_calculate_reference(\%args) unless $args{coordinate};
+	$self->_calculate_reference(\%args) unless defined $args{coordinate};
 	my $fchromo = $self->seq_id;
 	my $fstart = $args{coordinate} - $args{extend};
-	my $fstop  = $args{coordinate} - $args{extend};
+	my $fstop  = $args{coordinate} + $args{extend};
 	my $fstrand = defined $args{strand} ? $args{strand} : $self->strand;
 	
 	# Data collection
@@ -967,7 +967,7 @@ sub get_relative_point_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'index', # method
+		'indexed', # method
 		$args{value},
 		$ddb,
 		$args{dataset}, 
@@ -1034,7 +1034,7 @@ sub get_region_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'index', # method
+		'indexed', # method
 		$args{value},
 		$ddb,
 		$args{dataset}, 
@@ -1096,7 +1096,7 @@ sub _get_subfeature_position_scores {
 			$exon->end,
 			defined $args->{strand} ? $args->{strand} : $exon->strand, 
 			$args->{strandedness}, 
-			'index', # method
+			'indexed', # method
 			$args->{value},
 			$ddb,
 			$args->{dataset}, 
@@ -1121,7 +1121,7 @@ sub _get_subfeature_position_scores {
 			$feature->start - 1,
 			defined $args->{strand} ? $args->{strand} : $feature->strand, 
 			$args->{strandedness}, 
-			'index', # method
+			'indexed', # method
 			$args->{value},
 			$ddb,
 			$args->{dataset}, 
@@ -1138,7 +1138,7 @@ sub _get_subfeature_position_scores {
 			$feature->end + 1,
 			defined $args->{strand} ? $args->{strand} : $feature->strand, 
 			$args->{strandedness}, 
-			'index', # method
+			'indexed', # method
 			$args->{value},
 			$ddb,
 			$args->{dataset}, 
@@ -1202,7 +1202,7 @@ sub _avoid_positions {
 	}
 	
 	### Check for conflicting features
-	my $db = $args->{db} || $self->open_database;
+	my $db = $args->{db} || $self->{data}->open_database;
 	my @overlap_features = $self->get_features(
 		seq_id  => $seqid,
 		start   => $start,

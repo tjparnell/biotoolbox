@@ -1991,21 +1991,23 @@ sub get_segment_score {
 	my $param = [@_];
 	
 	# determine method
-	my $db_method = _lookup_db_method($param);
-	# returns an array reference [&$score_method, $do_return, $database_type]
+	my ($db_method, $do_return, $db_type) = _lookup_db_method($param);
 	
-	# immediately return calculated score
-	if ($db_method->[1]) {
-		return &{ $db_method->[0] }($param);
+	# immediately return calculated score if appropriate
+	if ($do_return) {
+		return &{$db_method}($param);
 	}
 	
 	# otherwise we get a list of scores
-	my $scores = &{ $db_method->[0] }($param);
-	return $scores if $param->[METH] eq 'scores'; # method of scores
-	return _return_null($param->[METH]) unless (@$scores);
+	my $scores = &{$db_method}($param);
+	return $scores if $param->[METH] eq 'scores'; 
+	if (not defined $scores or scalar @$scores == 0) {
+		return 0 if $param->[METH] =~ /count|sum/;
+		return '.';	
+	}
 	
 	# special case for bam files where value type is ncount
-	if ($db_method->[2] eq 'bam' and $param->[VAL] eq 'ncount') {
+	if ($db_type eq 'bam' and $param->[VAL] eq 'ncount') {
 		# Convert names into unique counts
 		# the actual method doesn't actually mean anything here
 		my %name2count;
@@ -2052,7 +2054,7 @@ sub get_segment_score {
 		unless (exists $total_read_number{$param->[DATA]} ) {
 			
 			# check the type of database
-			if ($db_method->[2] eq 'bam') {
+			if ($db_type eq 'bam') {
 				# a bam database
 				
 				$total_read_number{$param->[DATA]} = 
@@ -2061,7 +2063,7 @@ sub get_segment_score {
 					format_with_commas( $total_read_number{$param->[DATA]} ), 
 					"]\n";
 			}
-			elsif ($db_method->[2] eq 'bb') {
+			elsif ($db_type eq 'bb') {
 				# bigBed database
 				
 				$total_read_number{$param->[DATA]} = 
@@ -2465,17 +2467,18 @@ sub _lookup_db_method {
 	my $param = shift;
 	
 	# open database if necessary
-	$param->[DB] = open_db_connection($param->[DB]) if $param->[DB];
+	$param->[DB] = open_db_connection($param->[DB]) if 
+		($param->[DB] and not ref($param->[DB]));
 	
 	# generate a lookup string based on stringified parameters
 	# method, db string, dataset
 	my $lookup = sprintf "%s_%s_%s", $param->[METH], scalar $param->[DB], 
 		$param->[DATA];
-	return $DB_METHODS{$lookup} if exists $DB_METHODS{$lookup};
+	return @{ $DB_METHODS{$lookup} } if exists $DB_METHODS{$lookup};
 	# otherwise we determine the appropriate database method and cache the result
 	
 	# determine the appropriate score method
-	my ($score_method, $do_return, $database_type);
+	my ($score_method, $do_return, $db_type);
 	if ($param->[DATA] =~ /^file|http|ftp/) {
 		# collect the data according to file type
 		
@@ -2506,7 +2509,7 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_bigwig_scores;
 					$do_return = 0;
-					$database_type = 'bw';
+					$db_type = 'bw';
 				}
 			}
 			else {
@@ -2532,7 +2535,7 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_bigbed_scores;
 					$do_return = 0;
-					$database_type = 'bb';
+					$db_type = 'bb';
 				}
 			}
 			else {
@@ -2558,7 +2561,7 @@ sub _lookup_db_method {
 					# warn " using collect_bam_scores() with file\n";
 					$score_method = \&collect_bam_scores;
 					$do_return = 0;
-					$database_type = 'bam';
+					$db_type = 'bam';
 				}
 			}
 			else {
@@ -2584,7 +2587,7 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_useq_scores;
 					$do_return = 0;
-					$database_type = 'useq';
+					$db_type = 'useq';
 				}
 			}
 			else {
@@ -2628,7 +2631,7 @@ sub _lookup_db_method {
 		else {
 			$score_method = \&collect_bigwigset_scores;
 			$do_return = 0;
-			$database_type = 'bw';
+			$db_type = 'bw';
 		}
 	}
 		
@@ -2659,7 +2662,7 @@ sub _lookup_db_method {
 			else {
 				$score_method = \&collect_store_scores;
 				$do_return = 0;
-				$database_type = 'seqfeature';
+				$db_type = 'seqfeature';
 			}
 		}
 		else {
@@ -2678,34 +2681,10 @@ sub _lookup_db_method {
 		
 	
 	### Cache and return the results
-	$DB_METHODS{$lookup} = [$score_method, $do_return, $database_type];
-	return $DB_METHODS{$lookup};
+	$DB_METHODS{$lookup} = [$score_method, $do_return, $db_type];
+	return ($score_method, $do_return, $db_type);
 }
 
-
-
-=item _return_null
-
-Internal method for returning a 0 or internal null '.' character based 
-on the method being used.
-
-=cut
-
-sub _return_null {
-	my $method = shift;
-	
-	# return based on the method
-	if ($method eq 'sum') { 
-		return 0;
-	}
-	elsif ($method =~ /count/) { 
-		return 0;
-	}
-	else {
-		# internal null value
-		return '.';
-	}
-}
 
 
 sub _load_helper_module {
