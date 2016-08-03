@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigWigSet; 1}) {
-		plan tests => 22;
+		plan tests => 25;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigWigSet not available';
@@ -120,7 +120,7 @@ is(sprintf("%.2f", $score), 0.38, 'row antisense median score') or
 
 
 ### Try positioned score index
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => 'sample3',
 	'value'    => 'score',
 	'stranded' => 'sense',
@@ -132,4 +132,23 @@ is(scalar keys %pos2scores, 44, 'number of positioned scores');
 # }
 is(sprintf("%.2f", $pos2scores{55}), 4.16, 'score at position 55');
 is(sprintf("%.2f", $pos2scores{255}), 2.03, 'score at position 255');
+
+
+
+
+### Try relative positioned score index
+%pos2scores = $row->get_relative_point_position_scores(
+	'dataset'  => 'sample3',
+	'value'    => 'score',
+	'stranded' => 'sense',
+	'position' => 5,
+	'extend'   => 200,
+);
+is(scalar keys %pos2scores, 49, 'number of relative positioned scores');
+# print "found ", scalar keys %pos2scores, " positions with reads\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(sprintf("%.2f", $pos2scores{55}), 4.16, 'score at relative position 55');
+is(sprintf("%.2f", $pos2scores{-25}), 1.73, 'score at relative position -25');
 

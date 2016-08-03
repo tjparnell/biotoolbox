@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 60;
+		plan tests => 57;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -145,7 +145,7 @@ $score = $row->get_score(
 is($score, 1, 'mean length of scores across feature');
 
 # collect position scores
-my %score1 = $row->get_position_scores(
+my %score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 );
@@ -162,24 +162,21 @@ isa_ok($row, 'Bio::ToolBox::Data::Feature', 'row Feature');
 is($row->name, 'YAL044C', 'Feature name');
 
 # collect 5' relative position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 5,
 );
-# print "5' position_score is \n" . print_hash(\%score1);
 is(min(keys %score1), -467, 'min 5prime relative position in positioned score hash');
 is(max(keys %score1), 467, 'max 5prime relative position in positioned score hash');
 is($score1{218}, 0.62, 'score at position 218 in 5prime relative positioned score hash');
 
 # collect 3' relative position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 3,
 );
 # print "3' position_score is \n" . print_hash(\%score1);
@@ -187,22 +184,8 @@ is(min(keys %score1), -430, 'min 3prime relative position in positioned score ha
 is(max(keys %score1), 481, 'max 3prime relative position in positioned score hash');
 is($score1{187}, 0.75, 'score at position 187 in 3prime relative positioned score hash');
 
-# collect absolute position scores
-%score1 = $row->get_position_scores(
-	ddb     => $ddb,
-	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
-	position => 5,
-	absolute => 1,
-);
-# print "position_score is \n" . print_hash(\%score1);
-is(min(keys %score1), 57995, 'absolute min position in positioned score hash');
-is(max(keys %score1), 58929, 'absolute max position in positioned score hash');
-is($score1{58212}, 0.52, 'score at absolute position 58212 in positioned score hash');
-
-# collect extended relative position scores
-%score1 = $row->get_position_scores(
+# collect region extended relative position scores
+%score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 	extend  => 500,
@@ -214,8 +197,8 @@ is(max(keys %score1), 58929, 'max extended relative position in positioned score
 is($score1{58532}, 0.34, 'score at position 58532 in extended relative positioned score hash');
 is(scalar(keys %score1), 39, 'number of keys extended relative positioned score hash');
 
-# collect extended relative position scores
-%score1 = $row->get_position_scores(
+# collect avoided extended relative position scores
+%score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 	extend  => 1000,
@@ -229,11 +212,10 @@ is($score1{58532}, 0.34, 'score at position 58532 in avoided extended relative p
 is(scalar(keys %score1), 26, 'number of keys avoided extended relative positioned score hash');
 
 # collect absolute position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 4,
 	value   => 'count',
 );

@@ -111,7 +111,7 @@ is(sprintf("%.2f", $score), '0.49', 'row median score');
 
 
 ### Try positioned score index
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => 'sample2',
 	'value'    => 'score',
 );

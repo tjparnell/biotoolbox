@@ -184,7 +184,7 @@ is(sprintf("%.2f", $score), 146.53, 'row mean score for sense strand');
 $row = $stream->next_row;
 is($row->name, 'YAL044W-A', 'row name');
 
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
 	'value'    => 'count',
 );
@@ -196,7 +196,7 @@ is(scalar keys %pos2scores, 111, 'number of positioned scores');
 is($pos2scores{2}, 1, 'positioned score at 1');
 is($pos2scores{20}, 2, 'positioned score at 20');
 
-%pos2scores = $row->get_position_scores(
+%pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
 	'value'    => 'count',
 	'absolute' => 1,
