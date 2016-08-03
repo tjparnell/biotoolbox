@@ -197,6 +197,7 @@ sub _collect_store_data {
 			
 			# get the full list of features to pass off to the 
 			# helper subroutine
+			push @$param, $feature;
 			while (my $f = $iterator->next_seq) {
 				push @$param, $f;
 			}
@@ -223,7 +224,7 @@ sub _collect_store_data {
 				}
 			}
 			else {
-				croak " Wiggle support is not enabled! " . 
+				croak " Wiggle support is not enabled! $@\n" . 
 					"Is Bio::Graphics::Wiggle installed?\n";
 			}
 		}

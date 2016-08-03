@@ -114,6 +114,11 @@ sub collect_bigwig_score {
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my $param = shift;
 	
+	# change the method for a special situation
+	if ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
+		$param->[METH] = 'count';
+	}
+	
 	# Collecting summary features
 	# we will collect a summary object for each requested wig feature  
 	
@@ -128,7 +133,7 @@ sub collect_bigwig_score {
 		
 		# use a low level method to get a single summary hash for 1 bin
 		my $sumArrays = $bw->bf->bigWigSummaryArrayExtended(
-			# chromo, 0-based start, stop, bin
+			# chromo, 0-based start, stop, # bins
 			$chromo, $param->[STRT] - 1, $param->[STOP], 1
 		);
 		push @summaries, $sumArrays->[0];
@@ -244,6 +249,11 @@ sub collect_bigwigset_score {
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my $param = shift;
+	
+	# change the method for a special situation
+	if ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
+		$param->[METH] = 'count';
+	}
 	
 	# Confirm the chromosome
 	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]} 
@@ -586,7 +596,7 @@ sub collect_bigwigset_position_scores {
 	
 	
 	# Finished
-	return %pos2data;
+	return wantarray ? %pos2data : \%pos2data;
 }
 
 

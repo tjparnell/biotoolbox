@@ -99,25 +99,28 @@ sub collect_bigbed_scores {
 				# we have acceptable data to collect
 			
 				# store the appropriate datapoint
-				if ($param->[METH] eq 'score') {
+				if ($param->[VAL] eq 'score') {
 					push @scores, $bed->score;
 				}
-				elsif ($param->[METH] eq 'count') {
+				elsif ($param->[VAL] eq 'count') {
 					$scores[0] += 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
+				elsif ($param->[VAL] eq 'pcount') {
 					$scores[0] += 1 if ($bed->start >= $param->[STRT] and 
 						$bed->end <= $param->[STOP]);
 				}
-				elsif ($param->[METH] eq 'length') {
+				elsif ($param->[VAL] eq 'length') {
 					push @scores, $bed->length;
+				}
+				else {
+					confess sprintf "unrecognized value type! %s", $param->[VAL];
 				}
 			}
 		}
 	}
 
 	# return collected data
-	return @scores;
+	return wantarray ? @scores : \@scores;
 }
 
 
@@ -191,28 +194,31 @@ sub collect_bigbed_position_scores {
 				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
-				if ($param->[METH] eq 'score') {
+				if ($param->[VAL] eq 'score') {
 					# perform addition to force the score to be a scalar value
 					push @{ $bed_data{$position} }, $bed->score + 0;
 				}
-				elsif ($param->[METH] eq 'count') {
+				elsif ($param->[VAL] eq 'count') {
 					$bed_data{$position} += 1;
 				}
-				elsif ($param->[METH] eq 'pcount') {
+				elsif ($param->[VAL] eq 'pcount') {
 					$bed_data{$position} += 1 if 
 						($bed->start <= $param->[STRT] and $bed->end <= $param->[STOP]);
 				}
-				elsif ($param->[METH] eq 'length') {
+				elsif ($param->[VAL] eq 'length') {
 					# I hope that length is supported, but not sure
 					# may have to calculate myself
 					push @{ $bed_data{$position} }, $bed->length;
+				}
+				else {
+					confess sprintf "unrecognized value type! %s", $param->[VAL];
 				}
 			}
 		}
 	}
 
 	# combine multiple datapoints at the same position
-	if ($param->[METH] eq 'score' or $param->[METH] eq 'length') {
+	if ($param->[VAL] eq 'score' or $param->[VAL] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %bed_data) {

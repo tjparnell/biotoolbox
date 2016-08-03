@@ -142,7 +142,7 @@ sub collect_useq_scores {
 		}
 	}
 	
-	return @scores;
+	return wantarray ? @scores : \@scores;
 }
 
 
@@ -211,24 +211,27 @@ sub collect_useq_position_scores {
 			);
 			
 			# record the value
-			if ($param->[METH] eq 'score') {
+			if ($param->[VAL] eq 'score') {
 				push @{ $pos2score{$position} }, $f->score;
 			}
-			elsif ($param->[METH] eq 'count') {
+			elsif ($param->[VAL] eq 'count') {
 				$pos2score{$position} += 1;
 			}
-			elsif ($param->[METH] eq 'pcount') {
+			elsif ($param->[VAL] eq 'pcount') {
 				$pos2score{$position} += 1 if 
 					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
 			}
-			elsif ($param->[METH] eq 'length') {
+			elsif ($param->[VAL] eq 'length') {
 				push @{ $pos2score{$position} }, $f->length;
+			}
+			else {
+				confess sprintf "unrecognized value type! %s", $param->[VAL];
 			}
 		}
 	}
 	
 	# combine multiple datapoints at the same position
-	if ($param->[METH] eq 'score' or $param->[METH] eq 'length') {
+	if ($param->[VAL] eq 'score' or $param->[VAL] eq 'length') {
 		# each value is an array of one or more datapoints
 		# we will take the simple mean
 		foreach my $position (keys %pos2score) {

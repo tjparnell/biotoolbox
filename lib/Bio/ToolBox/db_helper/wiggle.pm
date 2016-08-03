@@ -46,7 +46,7 @@ our %OPENED_WIGFILES; # opened wigfile objects
 sub collect_wig_scores {
 	# we will actually call collect_wig_position_scores()
 	# but only return the values
-	my $wig_data = collect_wig_position_scores(@_);
+	my $wig_data = collect_wig_position_scores(shift);
 	return unless $wig_data;
 	
 	# return the values
@@ -69,6 +69,7 @@ sub collect_wig_position_scores {
 	for (my $d = DATA; $d < scalar @$param; $d++) {
 		
 		my $feature = $param->[$d];
+		confess "dataset is not a seqfeature object!" unless ref($feature) =~ /seqfeature/i;
 		
 		# Check which data to take based on strand
 		if (
@@ -148,13 +149,13 @@ sub collect_wig_position_scores {
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						if ($param->[METH] eq 'score') {	
+						if ($param->[VAL] eq 'score') {	
 							$pos2score{$pos} = $s;
 						}
-						elsif ($param->[METH] eq 'count') {
+						elsif ($param->[VAL] eq 'count') {
 							$pos2score{$pos} = 1;
 						}
-						elsif ($param->[METH] eq 'length') {
+						elsif ($param->[VAL] eq 'length') {
 							$pos2score{$pos} = $step;
 						}
 						else {

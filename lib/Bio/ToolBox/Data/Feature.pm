@@ -809,6 +809,10 @@ sub rewrite_vcf_attributes {
 sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
+	# normally this is only for named features in a data table
+	# skip this for coordinate features like bed files
+	return unless $self->feature_type eq 'named';
+	
 	return $self->{feature} if exists $self->{feature};
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
 	return $f if $f;
@@ -907,7 +911,7 @@ sub get_score {
 	# score attributes
 	$args{'method'}     ||= 'mean';
 	$args{value}        ||= 'score';
-	$args{strandedness} ||= 'all';
+	$args{strandedness} ||= $args{stranded} || 'all';
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
@@ -942,7 +946,7 @@ sub get_relative_point_position_scores {
 	}
 	
 	# assign some defaults
-	$args{strandedness} ||= 'all';
+	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{value}        ||= 'score';
 	$args{position}     ||= 5;
 	$args{coordinate}   ||= undef;
@@ -1002,7 +1006,7 @@ sub get_region_position_scores {
 	}
 	
 	# assign some defaults
-	$args{strandedness} ||= 'all';
+	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{value}        ||= 'score';
 	$args{extend}       ||= 0;
 	$args{exon}         ||= 0;

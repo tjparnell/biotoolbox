@@ -1656,11 +1656,11 @@ sub get_db_feature {
 	my %args = @_;
 	
 	# Open a db connection 
-	$args{'db'} ||= undef;
-	my $db = open_db_connection($args{'db'});
-	unless ($db) {
-		croak 'no database connection for getting a feature!';
+	$args{db} ||= undef;
+	unless ($args{db}) {
+		croak 'no database provided for getting a feature!';
 	}
+	my $db = open_db_connection($args{db});
 	my $db_ref = ref $db;
 	
 	# get the name of the feature
@@ -1669,14 +1669,14 @@ sub get_db_feature {
 	# check for values and internal nulls
 	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
 	$args{'type'} ||= undef;
-	undef $name         if $name eq '.';
-	undef $args{'id'}   if $args{'id'} eq '.';
-	undef $args{'type'} if $args{'type'} eq '.';
+	undef $name         if $name and $name eq '.';
+	undef $args{'id'}   if $args{'id'} and $args{'id'} eq '.';
+	undef $args{'type'} if $args{'type'} and $args{'type'} eq '.';
 	
 	# quick method for feature retrieval
-	if (defined $args{'id'} and $db_ref =~ /SeqFeature::Store/) {
+	if (defined $args{'id'} and $db->can('fetch')) {
 		# we have a unique primary_id to identify the feature
-		# fetch method only works with Bio::DB::SeqFeature::Store databases
+		# usually this pulls out the feature directly
 		my $feature = $db->fetch($args{'id'}) || undef; 
 		
 		# check that the feature we pulled out is what we want
@@ -2000,7 +2000,7 @@ sub get_segment_score {
 	
 	# otherwise we get a list of scores
 	my $scores = &{$db_method}($param);
-	return $scores if $param->[METH] eq 'scores'; 
+	return wantarray ? @$scores: $scores if $param->[METH] eq 'scores'; 
 	if (not defined $scores or scalar @$scores == 0) {
 		return 0 if $param->[METH] =~ /count|sum/;
 		return '.';	
@@ -2499,6 +2499,7 @@ sub _lookup_db_method {
 					$do_return = 1;
 				}
 				elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
+					$param->[METH] = 'count'; # special method
 					$score_method = \&collect_bigwig_score;
 					$do_return = 1;
 				}
@@ -2621,6 +2622,7 @@ sub _lookup_db_method {
 			$do_return = 1;
 		}
 		elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
+			$param->[METH] = 'count'; # special method
 			$score_method = \&collect_bigwigset_score;
 			$do_return = 1;
 		}
