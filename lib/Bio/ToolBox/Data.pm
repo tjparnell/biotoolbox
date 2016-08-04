@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.40';
+our $VERSION = '1.41';
 
 =head1 NAME
 
@@ -108,6 +108,13 @@ load_file() method. See that method for more details.
 Boolean option indicating that the file should be opened as a file  
 stream. A Bio::ToolBox::Data::Stream object will be returned. This 
 is a convenience method. 
+
+=item noheader =E<gt> 1
+
+Boolean option indicating that the file does not have file headers, 
+in which case dummy headers are provided. This is not necessary for 
+defined file types that don't normally have file headers, such as 
+BED, GFF, or UCSC files.
 
 =item parse =E<gt> 1
 
@@ -848,6 +855,7 @@ sub new {
 	$args{stream} ||= $args{Stream} || 0;
 	$args{file} ||= $args{in} || undef;
 	$args{parse} ||= 0;
+	$args{noheader} ||= 0;
 	
 	# check for stream
 	if ($args{stream}) {
@@ -884,7 +892,7 @@ sub new {
 	}
 	elsif ($args{file}) {
 		# load from file
-		unless ( $self->load_file($args{file}) ) {
+		unless ( $self->load_file($args{file}, $args{noheader}) ) {
 			return;
 		}
 	}
