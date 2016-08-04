@@ -46,7 +46,7 @@
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::Data::Feature" : {
          "file" : "lib/Bio/ToolBox/Data/Feature.pm",
@@ -57,7 +57,7 @@
       },
       "Bio::ToolBox::Data::Stream" : {
          "file" : "lib/Bio/ToolBox/Data/Stream.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::Data::core" : {
          "file" : "lib/Bio/ToolBox/Data/core.pm",
@@ -65,7 +65,7 @@
       },
       "Bio::ToolBox::Data::file" : {
          "file" : "lib/Bio/ToolBox/Data/file.pm",
-         "version" : "1.40"
+         "version" : "1.41"
       },
       "Bio::ToolBox::GeneTools" : {
          "file" : "lib/Bio/ToolBox/GeneTools.pm",
