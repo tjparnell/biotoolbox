@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.40';
+our $VERSION = '1.41';
 
 =head1 NAME
 
@@ -118,6 +118,13 @@ types supported include all those listed in L<Bio::ToolBox::file_helper>.
 Provide the path and name of the file to open for writing. No check is made 
 for pre-existing files; if it exists it will be overwritten! A new data 
 object is prepared, therefore column names must be provided. 
+
+=item noheader =E<gt> 1
+
+Boolean option indicating that the input file does not have file headers, 
+in which case dummy headers are provided. This is not necessary for 
+defined file types that don't normally have file headers, such as 
+BED, GFF, or UCSC files. Ignored for output files.
 
 =item columns =E<gt> [qw(Column1 Column2 ...)]
 
@@ -563,6 +570,7 @@ sub new {
 		cluck "cannot define both 'in' and 'out' arguments!\n";
 		return;
 	} 
+	$args{noheader} ||= 0;
 	
 	# prepare object
 	my $self = $class->SUPER::new();
@@ -581,7 +589,7 @@ sub new {
 		$self->{mode} = 0; # read mode
 		
 		# parse column headers
-		$self->parse_headers;
+		$self->parse_headers($args{noheader});
 		$self->{line_count} = $self->{header_line_count};
 		
 		# push a dummy row, this will get tossed when the first next_row() is called

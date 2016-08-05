@@ -1,6 +1,9 @@
 ######## Bio::ToolBox revision history #############
 
 v1.41
+	- Added no header option when loading text files missing a 
+	column header row. Updated script manipulate_datasets to take 
+	advantage of the feature.
 	- Added option to combine multiple score columns into a single score 
 	when converting a file to a wig file in script data2wig
 	- Fix critical errors with calculating cdsStart and cdsEnd in the 

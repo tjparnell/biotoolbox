@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.36';
+my $VERSION = '1.41';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -39,6 +39,7 @@ my ( # command line option variables
 	$opt_direction, 
 	$opt_name, 
 	$opt_log, 
+	$noheader,
 	$gz, 
 	$help,
 	$print_version,
@@ -59,6 +60,7 @@ GetOptions(
 	'dir=s'     => \$opt_direction, # sort order
 	'name=s'    => \$opt_name, # new dataset name
 	'log!'      => \$opt_log, # data values are in log2 space
+	'noheader'  => \$noheader, # file has no headers
 	'gz!'       => \$gz, # write gzipped data file
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -94,7 +96,8 @@ unless ($infile) {
 
 
 ### Load file
-my $Data = Bio::ToolBox::Data->new(file => $infile) 
+$noheader = defined $noheader ? $noheader : 0;
+my $Data = Bio::ToolBox::Data->new(file => $infile, noheader => $noheader) 
 	or die "no data loaded from file '$infile'!";
 printf "    Loaded '$infile' with %s data rows and %s columns\n\n", 
 	format_with_commas($Data->last_row), $Data->number_columns;
@@ -1007,7 +1010,7 @@ sub toss_nulls_function {
 			if (_is_null($v)) {
 				$check++;
 			} 
-			elsif ($v == 0) {
+			elsif ($v eq '0') {
 				# we have a 0 value, what to do?
 				if (not defined $zero and $function) {
 					# running automatically, do not both user
@@ -3226,6 +3229,7 @@ manipulate_datasets.pl [--options ...] <input_filename>
   --out <filename>
   --log
   --gz
+  --noheader
   --version
   --help
   --doc
@@ -3339,6 +3343,12 @@ extensions will be appended as necessary.
 Indicate whether the data is (not) in log2 space. This is required to ensure 
 accurate mathematical calculations in some manipulations. This is not necessary 
 when the log status is appropriately recorded in the dataset metadata.
+
+=item --noheader
+
+Indicate that the input file has no column header line, and that dummy 
+headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
+file formats.
 
 =item --gz 
 

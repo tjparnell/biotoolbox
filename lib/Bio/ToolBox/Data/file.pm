@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.40';
+our $VERSION = '1.41';
 
 =head1 NAME
 
@@ -31,7 +31,9 @@ our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|
 ### Load new version data table from file
 
 sub load_file {
-	my ($self, $file) = @_;
+	my $self = shift;
+	my $file = shift;
+	my $noheader = shift || 0; # may not be present
 	
 	# check that we have an empty table
 	if ($self->last_row != 0 or $self->number_columns != 0 or $self->filename) {
@@ -47,7 +49,7 @@ sub load_file {
 	}
 	$self->add_file_metadata($filename);
 	$self->open_to_read_fh or return;
-	$self->parse_headers;
+	$self->parse_headers($noheader);
 	
 	# Load the data table
 	while (my $line = $self->{fh}->getline) {		
@@ -352,7 +354,9 @@ sub parse_headers {
 	}
 	
 	# No header was requested
-	if ($noheader) {
+	if ($noheader and not $self->bed and not $self->gff and 
+		not $self->vcf and not $self->ucsc
+	) {
 		# which means that what we used as a header is actually the first data row
 		
 		# fix the column names
@@ -363,7 +367,7 @@ sub parse_headers {
 		}
 		# adjust metadata
 		$header_line_count -= 1;
-		$self->{'headers'} = 0; 
+		$self->{'headers'} = -1; # special case, we never write headers here 
 	}
 	
 	
@@ -737,7 +741,7 @@ sub write_file {
 	
 	
 	# Write the table column headers
-	if ($self->{'headers'} or $extension =~ /txt/i) {
+	if ($self->{'headers'} == 1) {
 		$fh->printf("%s\n", join("\t", @{ $self->{'data_table'}[0] }));
 	}
 		
@@ -1627,12 +1631,14 @@ are not recommended for use by general users.
 
 =over 4
 
-=item parse_headers
+=item parse_headers($noheader)
 
 This will determine the file format, parse any metadata lines that may 
 be present, add metadata and inferred column names for known file formats, 
 and determine the table column header names. This is automatically called 
 by load_file(), and generally need not be called.
+
+Pass a true boolean option if there were no headers in the file.
 
 =item add_data_line($line)
 
