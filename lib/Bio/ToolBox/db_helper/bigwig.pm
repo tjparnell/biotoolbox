@@ -51,6 +51,14 @@ our %OPENED_BW;
 	# db_helper also provides caching of db objects but with option to force open in
 	# the case of forking processes - we don't have that here
 
+# BigWigSet bigWig IDs
+our %BIGWIGSET_WIGS; 
+	# cache for the bigwigs from a BigWigSet used in a query
+	# we want to use low level bigWig access which isn't normally 
+	# available from the high level BigWigSet, so we identify the 
+	# bigWigs from the bigWigSet and cache them here 
+
+
 # Methods Cache lookup
 	# pre-define the methods code for processing summary objects to avoid 
 	# excessive if-elsif tests every data cycle
@@ -99,6 +107,7 @@ our %MULTI_SUMMARY_METHOD = (
 			},
 	'stddev'=> sub {croak "cannot calculate stddev value from multiple bigWig Summary objects!"},
 );
+
 
 # The true statement
 1; 
@@ -255,108 +264,13 @@ sub collect_bigwigset_score {
 		$param->[METH] = 'count';
 	}
 	
-	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]} 
-		|| undef;
-	unless (defined $chromo) {
-		# chromosome is not present, at least in the first bigwig in the set
-		# return null
-		return $param->[METH] =~ /sum|count/ ? 0 : '.';
-	}
+	# lookup the bigWig files based on the parameters
+	my $ids = _lookup_bigwigset_wigs($param);
+	return unless scalar(@$ids) > 0;
+	push @$param, @$ids;
 	
-	# Reset which feature_type to collect from the database
-	# this is normally set to region when we opened the bigwigset db
-	# but it may be changed by a previous method
-	# we now want summary feature_type
-	$param->[DB]->feature_type('summary');
-	
-	# Collecting summary features
-	# we will collect a summary object for each requested wig feature  
-	my @summaries;
-	
-	# Work through all the requested feature types
-	# the BigWigSet feature request doesn't work well with multiple features
-	# so we'll do them one at a time
-	for (my $d = DATA; $d < scalar @$param; $d++) {
-		my $type = $param->[$d];
-		
-		# Collect the summary features
-		# no low-level joy here, use the high level API
-		$type =~ s/\:.+$//; # strip the source if present
-			# features method only works with primary_tag, not full 
-			# primary_tag:source type
-		my @features = $param->[DB]->features(
-			-seq_id   => $chromo,
-			-start    => $param->[STRT],
-			-end      => $param->[STOP],
-			-type     => $type,
-		);
-		# if the type doesn't work, then try display_name instead
-		unless (@features) {
-			@features = $param->[DB]->features(
-				-seq_id   => $chromo,
-				-start    => $param->[STRT],
-				-end      => $param->[STOP],
-				-name     => $type,
-			);
-		}
-			# since we're collecting summary features, we will only get one 
-			# per bigwig file that matches the request
-			# no need for a seqfeature stream
-		
-		# Determine which features to take based on strandedness
-		
-		# Stranded features
-		if (
-			$param->[STR] != 0 and
-			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
-		) {
-			# we will have to check the strand for each object
-			# feature objects we collect don't have the standard strand set
-			# instead, we will have to get the attribute tag named strand
-			
-			# check each feature
-			foreach my $f (@features) {
-				
-				# get the feature strand
-				my $fstrand = 0; # default
-				if ($f->has_tag('strand') ) {
-					($fstrand) = $f->get_tag_values('strand');
-				}
-				
-				# collect summary if strand is appropriate
-				if (
-					$fstrand == 0 or
-					(
-						# sense data
-						$param->[STR] == $fstrand 
-						and $param->[STND] eq 'sense'
-					) 
-					or (
-						# antisense data
-						$param->[STR] != $fstrand  
-						and $param->[STND] eq 'antisense'
-					)
-				) {
-					# we have acceptable data to collect
-					push @summaries, $f->score;
-				}
-			}
-		}
-		
-		# Non-stranded features
-		else {
-			# take all the features found
-			
-			# keep all the summaries
-			foreach my $f (@features) {
-				push @summaries, $f->score;
-			}
-		}
-	}
-	
-	# now process the summary features
-	return _process_summaries($param->[METH], \@summaries);
+	# use the low level single bigWig API 
+	return collect_bigwig_score($param);
 }
 
 
@@ -368,111 +282,13 @@ sub collect_bigwigset_scores {
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my $param = shift;
 	
-	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]}; 
-	return unless (defined $chromo);
-		# chromosome is not present, at least in the first bigwig in the set
-		# return nothing
+	# lookup the bigWig files based on the parameters
+	my $ids = _lookup_bigwigset_wigs($param);
+	return unless scalar(@$ids) > 0;
+	push @$param, @$ids;
 	
-	# Reset which feature_type to collect from the database
-	# this is normally set to region when we opened the bigwigset db
-	# but it may be changed by a previous method
-	# we now want region feature_type
-	$param->[DB]->feature_type('region');
-	
-	# initialize collection array
-	my @scores; 
-	
-	# Go through each feature type requested
-	for (my $i = 8; $i < scalar @$param; $i++) {
-		my $type = $param->[$i];
-		
-		# Collect the feature scores
-		# no low-level joy here, use the high level API
-		$type =~ s/\:.+$//; # strip the source if present
-			# features method only works with primary_tag, not full 
-			# primary_tag:source type
-			# since the default feature_type for the bigwigset database is 
-			# region, we will get lots of features returned, one for each 
-			# datapoint
-			# use an iterator to process them
-		my $iterator = $param->[DB]->get_seq_stream(
-			-seq_id   => $chromo,
-			-start    => $param->[STRT],
-			-end      => $param->[STOP],
-			-type     => $type,
-		);
-		
-		# check that we have a feature stream
-		my $feature = $iterator->next_seq;
-		unless ($feature) {
-			# uh oh, no feature! perhaps we didn't correctly identify the 
-			# correct bigwig in the set
-			# try again using display_name instead
-			$iterator = $param->[DB]->get_seq_stream(
-				-seq_id   => $chromo,
-				-start    => $param->[STRT],
-				-end      => $param->[STOP],
-				-name     => $type,
-			);
-			$feature = $iterator->next_seq;
-		}
-		
-		# Determine which features to take based on strandedness
-		
-		# Stranded features
-		if (
-			$param->[STR] != 0 and
-			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
-		) {
-			# we will have to check the strand for each object
-			# feature objects we collect don't have the standard strand set
-			# instead, we will have to get the attribute tag named strand
-			
-			# check each feature
-			while ($feature) {
-				
-				# get the feature strand
-				my $fstrand = 0; # default
-				if ($feature->has_tag('strand') ) {
-					($fstrand) = $feature->get_tag_values('strand');
-				}
-				
-				# collect score if strand is appropriate
-				if (
-					$fstrand == 0 or
-					(
-						# sense data
-						$param->[STR] == $fstrand 
-						and $param->[STND] eq 'sense'
-					) 
-					or (
-						# antisense data
-						$param->[STR] != $fstrand  
-						and $param->[STND] eq 'antisense'
-					)
-				) {
-					# we have acceptable data to collect
-					push @scores, $feature->score;
-				}
-				
-				# prepare for the next feature
-				$feature = $iterator->next_seq;
-			}
-		}
-		
-		# Non-stranded features
-		else {
-			# take all the features found
-			while ($feature) {
-				push @scores, $feature->score;
-				$feature = $iterator->next_seq;
-			}
-		}
-	}
-	
-	# Finished
-	return wantarray ? @scores : \@scores;;
+	# use the low level single bigWig API 
+	return collect_bigwig_scores($param);
 }
 
 
@@ -483,120 +299,13 @@ sub collect_bigwigset_position_scores {
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my $param = shift;
 	
-	# Confirm the chromosome
-	my $chromo = $BIGWIG_CHROMOS{ ($param->[DB]->bigwigs)[0] }{$param->[CHR]} 
-		|| undef;
-	return unless (defined $chromo);
-		# chromosome is not present, at least in the first bigwig in the set
-		# return nothing
+	# lookup the bigWig files based on the parameters
+	my $ids = _lookup_bigwigset_wigs($param);
+	return unless scalar(@$ids) > 0;
+	push @$param, @$ids;
 	
-	# Reset which feature_type to collect from the database
-	# this is normally set to region when we opened the bigwigset db
-	# but it may be changed by a previous method
-	# we now want region feature_type
-	$param->[DB]->feature_type('region');
-	
-	# initialize collection hash, position => score
-	my %pos2data; 
-	my %duplicates;
-	
-	# Go through each feature type requested
-	for (my $i = 8; $i < scalar @$param; $i++) {
-		my $type = $param->[$i];
-		
-		# Collect the feature scores
-		$type =~ s/\:.+$//; # strip the source if present
-			# features method only works with primary_tag, not full 
-			# primary_tag:source type
-			# since the default feature_type for the bigwigset database is 
-			# region, we will get lots of features returned, one for each 
-			# datapoint
-			# use an iterator to process them
-		# no low-level joy here, use the high level API
-		my $iterator = $param->[DB]->get_seq_stream(
-			-seq_id   => $chromo,
-			-start    => $param->[STRT],
-			-end      => $param->[STOP],
-			-type     => $type,
-		);
-		
-		# check that we have a feature stream
-		my $feature = $iterator->next_seq if $iterator;
-		unless ($feature) {
-			# uh oh, no feature! perhaps we didn't correctly identify the 
-			# correct bigwig in the set
-			# try again using display_name instead
-			$iterator = $param->[DB]->get_seq_stream(
-				-seq_id   => $chromo,
-				-start    => $param->[STRT],
-				-end      => $param->[STOP],
-				-name     => $type,
-			);
-			$feature = $iterator->next_seq;
-		}
-		
-		# Determine which features to take based on strandedness
-		
-		# Stranded features
-		if (
-			$param->[STR] != 0 and
-			($param->[STND] eq 'sense' or $param->[STND] eq 'antisense')
-		) {
-			# we will have to check the strand for each object
-			# feature objects we collect don't have the standard strand set
-			# instead, we will have to get the attribute tag named strand
-			
-			# Check each feature
-			
-			# Stranded features
-			while ($feature) {
-				
-				# get the feature strand
-				my $fstrand = 0; # default
-				if ($feature->has_tag('strand') ) {
-					($fstrand) = $feature->get_tag_values('strand');
-				}
-				
-				# collect score if strand is appropriate
-				if (
-					$param->[STR] == 0 or
-					(
-						# sense data
-						$param->[STR] == $fstrand 
-						and $param->[STND] eq 'sense'
-					) 
-					or (
-						# antisense data
-						$param->[STR] != $fstrand  
-						and $param->[STND] eq 'antisense'
-					)
-				) {
-					# acceptable data point
-					_process_position_score_feature($feature, \%pos2data, \%duplicates);
-				}
-				$feature = $iterator->next_seq;
-			}
-		}
-		
-		# Non-stranded features
-		else {
-			# take all the features found
-			while ($feature) {
-				# process
-				_process_position_score_feature($feature, \%pos2data, \%duplicates);
-				$feature = $iterator->next_seq;
-			}
-		}
-	}
-	
-	# Remove duplicates
-	if (%duplicates) {
-		_remove_duplicate_positions(\%pos2data, \%duplicates);
-	}
-	
-	
-	# Finished
-	return wantarray ? %pos2data : \%pos2data;
+	# use the low level single bigWig API 
+	return collect_bigwig_position_scores($param);
 }
 
 
@@ -655,20 +364,43 @@ sub open_bigwigset_db {
 	# we will assume all of the bigwigs have the same chromosomes!
 	_record_seqids($paths[0], $bws->get_bigwig($paths[0]) );
 	
-	# check for potential implied strandedness
+	# check for potential implied strandedness based on the file name
+		# because the database features are not true SeqFeature objects, 
+		# the strand method isn't really supported as expected with SeqFeature
+		# instead it is treated as an attribute, and typical strand convention 
+		# of -1, 0, 1 gets messed up with regex matching, so we'll silently 
+		# use minus, none, and plus as strand attribute values
 	my $md = $bws->metadata;
 	foreach my $i (keys %$md) {
-		my $f = $md->{$i}{'dbid'}; # the file path
+		my $f = $md->{$i}{dbid}; # the file path
 		if ($f =~ /(?:f|for|forward|top|plus|\+)\.bw$/i) {
 			# implied forward strand 
-			unless (exists $md->{$i}{'strand'}) {
-				$bws->set_bigwig_attributes($f, {'strand' => 1});
+			if (exists $md->{$i}{strand}) {
+				$md->{$i}{strand} = 'plus' if $md->{$i}{strand} eq '1';
+			}
+			else {
+				$bws->set_bigwig_attributes($f, {strand => 'plus'});
 			}
 		}
 		elsif ($f =~ /(?:r|rev|reverse|bottom|minus|\-)\.bw$/i) {
 			# implied reverse strand 
-			unless (exists $md->{$i}{'strand'}) {
-				$bws->set_bigwig_attributes($f, {'strand' => -1});
+			if (exists $md->{$i}{strand}) {
+				$md->{$i}{strand} = 'minus' if $md->{$i}{strand} eq '-1';
+			}
+			else {
+				$bws->set_bigwig_attributes($f, {strand => 'minus'});
+			}
+		}
+		else {
+			# check for strand anyway
+			if (exists $md->{$i}{strand}) {
+				$md->{$i}{strand} = 'plus' if $md->{$i}{strand} eq '1';
+				$md->{$i}{strand} = 'minus' if $md->{$i}{strand} eq '-1';
+				$md->{$i}{strand} = 'none' if $md->{$i}{strand} eq '0';
+			}
+			else {
+				# assign a non-strand just in case
+				$md->{$i}{strand} = 'none';
 			}
 		}
 	}
@@ -691,7 +423,7 @@ sub _get_bw {
 	return $bw;
 }
 
-	# record the chromosomes and possible variants
+# record the chromosomes and possible variants
 sub _record_seqids {
 	my ($bwfile, $bw) = @_;
 	$BIGWIG_CHROMOS{$bwfile} = {};
@@ -729,47 +461,6 @@ sub _process_summaries {
 }
 
 
-
-### Internal subroutine for processing position and score from features
-# for personal use only
-sub _process_position_score_feature {
-	
-	# collect the feature and hashes
-	my ($f, $pos2data, $duplicates) = @_;
-	
-	# process across the length of this feature
-		# for most wig features this is almost certainly a single point
-		# but just in case this is spanned data, we will record the 
-		# value at every position
-	for (my $pos = $f->start; $pos <= $f->end; $pos++) {
-		
-		# check for duplicate positions
-		# duplicates should not normally exist for a single wig file
-		# but we may be working with multiple wigs that are being combined
-		if (exists $pos2data->{$pos} ) {
-			
-			if (exists $duplicates->{$pos} ) {
-				# we have lots of duplicates at this position!
-				
-				# append an incrementing number at the end
-				$duplicates->{$pos} += 1; # increment first
-				my $new = sprintf("%d.%d", $pos, $duplicates->{$pos});
-				$pos2data->{$new} = $f->score;
-			}
-			else {
-				# first time duplicate
-				my $new = $pos . '.1';
-				$pos2data->{$new} = $f->score;
-				$duplicates->{$pos} = 1;
-			}
-		}
-		else {
-			$pos2data->{$pos} = $f->score;
-		}
-	}
-}
-
-
 ### Internal subroutine for removing duplicate positions from pos2data hash
 # for personal use only
 sub _remove_duplicate_positions {
@@ -791,6 +482,68 @@ sub _remove_duplicate_positions {
 		}
 		$pos2data->{$pos} = mean(@values);
 	}
+}
+
+
+### Internal subroutine to identify and cache selected bigWigs from a BigWigSet
+sub _lookup_bigwigset_wigs {
+	# passed parameters as array ref
+	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	my $param = shift;
+	
+	# the datasets, could be either types or names, unfortunately
+	my @types = splice(@$param, DATA);
+	
+	# we cache the list of looked up bigwigs to avoid doing this over and over
+	my $lookup = sprintf("%s_%s_%s", join('_', @types), $param->[STND], 
+		$param->[STR]);
+	return $BIGWIGSET_WIGS{$lookup} if exists $BIGWIGSET_WIGS{$lookup};
+	
+	# I want to access the bigWigs through the low level API for speed
+	# but first I need to find out which ones to use
+	# use internal methods to filter the bigWigs in the same manner 
+	# that get_seq_stream does in BigWigSet
+	
+	# filter first by type
+	my @ids = $param->[DB]->_filter_ids_by_type(\@types, 
+		[ $param->[DB]->bigwigs ] );
+	
+	# try filtering by name if that doesn't work
+	unless (@ids) {
+    	@ids = $param->[DB]->_filter_ids_by_name(\@types, 
+    	[ $param->[DB]->bigwigs ] );
+    }
+	
+	# then check for strand
+	if ($param->[STND] ne 'all' and $param->[STR] != 0) {
+    	# looks like we are collecting stranded data
+    	# try to filter again based on strand attribute
+    	# remember to accept 0 strand attributes as well
+    	# create an array of acceptable strand values to filter on
+    		# remember that strand is an ordinary attribute and does not 
+    		# behave like the typical SeqFeature strand attribute
+    	my @strands;
+    	if ($param->[STND] eq 'sense') {
+			@strands = 
+				$param->[STR] == -1 ? qw(minus none) :
+				$param->[STR] == 1  ? qw(plus none) : qw(minus plus none);
+		}
+		elsif ($param->[STND] eq 'antisense') {
+			@strands = 
+				$param->[STR] == -1 ? qw(plus none) :
+				$param->[STR] == 1  ? qw(minus none) : qw(minus plus none);
+		}
+		else {
+			confess sprintf "bad strandedness value: %s", $param->[STND];
+		}
+    	# then filter based on attribute
+    	@ids = $param->[DB]->_filter_ids_by_attribute(
+    		{strand => \@strands}, \@ids);
+    }
+	
+	# cache and return
+	$BIGWIGSET_WIGS{$lookup} = \@ids;
+	return \@ids;
 }
 
 
