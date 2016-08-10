@@ -681,7 +681,7 @@ sub verify {
 		$self->{'ucsc'} == 0 and
 		($self->{'extension'} and $self->{'extension'} !~ /sgr/i)
 	) {
-		$self->{'headers'} = 1;
+		$self->{'headers'} = 1 unless $self->{'headers'} == -1;
 	}
 	
 	# if we have made it here, then there were no major structural problems

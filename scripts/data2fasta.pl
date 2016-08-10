@@ -140,6 +140,10 @@ if (defined $start_i and substr($Input->name($start_i), -1) eq '0') {
 	# name suggests $interbase
 	$interbase = 1;
 }
+printf " Found ID column %s\n", defined $id_i ? $id_i : '-';
+printf " Found Sequence column %s\n", defined $seq_i ? $seq_i : '-';
+printf " Found Description column %s\n", defined $desc_i ? $desc_i : '-';
+
 
 ### Determine mode ###
 if (defined $id_i and defined $seq_i and $concatenate) {
