@@ -892,6 +892,14 @@ sub get_score {
 	else {
 		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
 	}
+	
+	# adjust coordinates as necessary
+	if (exists $args{extend} and $args{extend}) {
+		$args{start} -= $args{extend};
+		$args{stop}  += $args{extend};
+	}
+	
+	# check coordinates
 	$args{start} = 1 if $args{start} <= 0;
 	if ($args{stop} < $args{start}) {
 		# coordinates are flipped, reverse strand
@@ -904,9 +912,7 @@ sub get_score {
 	unless (exists $args{strand} and defined $args{strand}) {
 		$args{strand} = $self->strand; 
 	}
-	unless ($args{chromo} and defined $args{start}) {
-		return;
-	}
+	return unless ($args{chromo} and defined $args{start});
 	
 	# score attributes
 	$args{'method'}     ||= 'mean';
