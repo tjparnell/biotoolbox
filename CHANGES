@@ -6,6 +6,9 @@ v1.41
 	advantage of the feature.
 	- Added option to combine multiple score columns into a single score 
 	when converting a file to a wig file in script data2wig
+	- Added option to split gff or vcf data files by an attribute tag 
+	in script split_data_file
+	- Improve handling of writing vcf files
 	- Fix critical errors with calculating cdsStart and cdsEnd in the 
 	GeneTools library
 	- Fix bugs in gff parser to continue when encountering errors in 
