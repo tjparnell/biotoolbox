@@ -7,7 +7,7 @@ use Pod::Usage;
 use Getopt::Long;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.33';
+my $VERSION =  '1.41';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -28,6 +28,7 @@ unless (@ARGV) {
 my (
 	$infile, 
 	$index,
+	$tag,
 	$max,
 	$gz,
 	$prefix,
@@ -39,6 +40,7 @@ my (
 GetOptions( 
 	'in=s'        => \$infile, # specify the input data file
 	'index|col=i' => \$index, # index for the column to use for splitting
+	'tag=s'       => \$tag, # attribute tag name
 	'max=i'       => \$max, # maximum number of lines per file
 	'prefix=s'    => \$prefix, # output file prefix
 	'gz!'         => \$gz, # compress output files
@@ -86,17 +88,32 @@ my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
 	die "Unable to open input file!\n";
 
 # Identify the column
-unless (defined $index) {
+unless (defined $index or defined $tag) {
 	$index = ask_user_for_index($Input, 
 		"  Enter the column index number containing the values to split by   ");
 	unless (defined $index) {
 		die " Must provide a valid index!\n";
 	}
 }
+if ($tag) {
+	unless ($Input->gff or $Input->vcf) {
+		die " Input file must be in GFF or VCF format to use attribute tags!";
+	}
+	if ($Input->vcf and not defined $index) {
+		die " Please provide a column index for accessing VCF attributes.\n" . 
+			" The INFO column is 0-based index 7, and sample columns begin\n" . 
+			" at index 9.\n";
+	}
+	elsif ($Input->gff) {
+		$index = 8;
+	}
+}
 
 
 ### Split the file
-printf " Splitting file by elements in column %s...\n", $Input->name($index);
+printf " Splitting file by elements in column %s%s...\n", 
+	$Input->name($index), 
+	$tag ? ", attribute tag $tag" : "";
 my %out_files; # a hash of the file names written
 	# we can't assume that all the data elements we're splitting on are 
 	# contiguous in the file
@@ -109,7 +126,14 @@ my $split_count = 0;
 while (my $row = $Input->next_row) {
 	
 	# Get the check value
-	my $check = $row->value($index);
+	my $check;
+	if ($tag) {
+		my $attrib = $row->attributes;
+		$check = $attrib->{$tag} || $attrib->{$index}{$tag} || undef;
+	}
+	else {
+		$check = $row->value($index);
+	}
 	unless (exists $out_files{$check}{'stream'}) {
 		request_new_file_name($check);
 	}
@@ -218,13 +242,14 @@ A script to split a data file by rows based on common data values.
 split_data_file.pl [--options] <filename>
   
   Options:
-  --in <filename>
+  --in <filename>               (txt bed gff gtf vcf refFlat ucsc etc)
   --index <column_index>
+  --tag <text>
   --max <integer>
   --prefix <text>
   --gz
   --version
-  --help
+  --help                        show extended documentation
 
 =head1 OPTIONS
 
@@ -239,11 +264,16 @@ The file may be compressed with gzip.
 
 =item --index <column_index>
 
-=item --col <column_index>
-
 Provide the index number of the column or dataset containing the values 
 used to split the file. If not specified, then the index is requested 
 from the user in an interactive mode.
+
+=item --tag <text>
+
+Provide the attribute tag name that contains the values to split the 
+file. Attributes are supported by GFF and VCF files. If splitting a 
+VCF file, please also provide the column index. The INFO column is 
+index 7, and sample columns begin at index 9.
 
 =item --max <integer>
 
@@ -284,6 +314,13 @@ resulting in multiple files representing each chromosome found in the
 original file. The column containing the values to split and group 
 should be indicated; if the column is not sepcified, it may be 
 selected interactively from a list of column headers. 
+
+This program can also split files based on an attribute tag in GFF or 
+VCF files. Attributes are often specially formatted delimited key value 
+pairs associated with each feature in the file. Provide the name of the 
+attribute tag to split the file. Since attributes may vary based on 
+the feature type, an interactive list is not supplied from which to 
+choose the attribute.
 
 If the max argument is set, then each group will be written to one or 
 more files, with each file having no more than the indicated maximum 
