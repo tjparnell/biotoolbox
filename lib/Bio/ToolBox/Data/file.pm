@@ -478,6 +478,16 @@ sub write_file {
 			}
 		}
 	}
+	elsif ($extension =~ /vcf/i) {
+		if (not $self->vcf) {
+			# let's set it to true and see if it passes verification
+			$self->{'vcf'} = 1; # a fake true
+			unless ($self->verify and $self->vcf) {
+				warn " VCF structure changed, re-setting extension from $extension to .txt\n";
+				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
+			}
+		}
+	}
 	elsif ($extension =~ /sgr/i) {
 		unless ($self->{'extension'} =~ /sgr/i) {
 			# original file was not SGR
@@ -523,6 +533,9 @@ sub write_file {
 		elsif ($self->ucsc) {
 			# use a generic ucsc format, don't bother to customize it
 			$extension = '.ucsc';
+		}
+		elsif ($self->vcf) {
+			$extension = '.vcf';
 		}
 		elsif ($name =~ /(\.\w{3}(?:\.gz)?)$/i) {
 			# a non-standard 3 letter file extension
@@ -597,6 +610,19 @@ sub write_file {
 		$extension .= '.gz';
 	}
 	elsif (not $args{'gz'} and $extension =~ /\.gz$/i) {
+		$extension =~ s/\.gz$//i;
+	}
+	
+	# additional check for vcf.gz files
+	# vcf.gz typically use bgzip for tabix purposes, but there is no guarantee 
+	# that bgzip is in the path, unlike the universal gzip
+	# this may change in the future as we implement smarter tests to incorporate
+	# custom bgzip paths probably from biotoolbox.cfg config file....
+	if ($self->vcf and $args{gz}) {
+		# turn off compression to avoid gzip'ing when we really should use 
+		# bgzip instead
+		warn " turning off unsupported gzip/bgzip for vcf files\n";
+		$args{gz} = 0;
 		$extension =~ s/\.gz$//i;
 	}
 	
@@ -859,15 +885,15 @@ sub open_to_write_fh {
 		}
 	}
 	
+	# add gz extension if necessary
+	if ($gz and $filename !~ m/\.gz$/i) {
+		$filename .= '.gz';
+	}
+	
 	# check file append mode
 	unless (defined $append) {
 		# default is not to append
 		$append = 0;
-	}
-	
-	# add gz extension if necessary
-	if ($gz and $filename !~ m/\.gz$/i) {
-		$filename .= '.gz';
 	}
 	
 	
