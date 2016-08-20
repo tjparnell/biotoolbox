@@ -21,7 +21,7 @@ our @EXPORT_OK = qw(
 );
 
 
-our $VERSION = '1.14';
+our $VERSION = '1.42';
 
 1;
 
@@ -37,56 +37,61 @@ sub wig_to_bigwig_conversion {
 	}
 	
 	# wigfile
-	$args{'wig'} ||= undef;
-	unless ($args{'wig'}) {
+	$args{wig} ||= undef;
+	unless ($args{wig}) {
 		cluck "no wig file passed!";
 		return;
 	}
 	
 	
 	# Identify bigwig conversion utility
-	my $utility = $args{'wig'} =~ /\.(?:bdg|bedgraph|bed)$/i ? 'bedGraphToBigWig' :
-				'wigToBigWig';
-	$args{'bwapppath'} ||= undef;
-	unless ($args{'bwapppath'}) {
+	$args{bwapppath} ||= undef;
+	unless ($args{bwapppath}) {
 		# check for an entry in the configuration file
-		$args{'bwapppath'} = $BTB_CONFIG->param("applications.$utility") || 
+		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || 
 				undef;
 	}
-	unless ($args{'bwapppath'}) {
+	unless ($args{bwapppath}) {
 		# try checking the system path as a final resort
 		eval {
 			require File::Which;
 			File::Which->import;
-			$args{'bwapppath'} = which($utility);
+			$args{bwapppath} = which('wigToBigWig');
 		};
-		add_program($args{'bwapppath'}) if $args{'bwapppath'};
+		add_program($args{bwapppath}) if $args{bwapppath};
 	}
-	unless ($args{'bwapppath'}) {
-		carp " Utility '$utility' not specified and can not be found!" . 
+	unless ($args{bwapppath}) {
+		# last attempt to use Bio::DB::BigFile
+		# this is not a recommended method, and produces different sized 
+		# bw files, I think because of different internal settings
+		# this may be deprecated
+		eval {
+			require Bio::DB::BigFile;
+			if (Bio::DB::BigFile->can('createBigWig')) {
+				$args{bwapppath} = 'BioDBBigFile';
+			}
+		};
+	}
+	unless ($args{bwapppath}) {
+		warn " Utility 'wigToBigWig' not specified and can not be found!" . 
 			" Conversion failed!\n";
 		return;
 	}
 	
-	# verify utility
-	unless ($args{'bwapppath'} =~ /$utility\Z/) {
-		carp " Wrong utility for the type of wig file! Unable to convert!\n";
-		return;
-	}
 	
 	# Generate list of chromosome sizes if necessary
-	$args{'chromo'} ||= undef;
-	unless ($args{'chromo'}) {
+	$args{chromo} ||= undef;
+	unless ($args{chromo}) {
 		# a pre-generated list of chromosome sizes was not provided
 		# need to generate one from the database
-		$args{'db'} ||= undef;
-		unless ($args{'db'}) {
+		$args{db} ||= undef;
+		unless ($args{db}) {
 			carp " No requisite database or chromosome info file provided!" .
 				" Conversion failed\n";
 			return;
 		}
-		$args{'chromo'} = generate_chromosome_file($args{'db'});
-		unless ($args{'chromo'}) {
+		$args{chromo} = generate_chromosome_file($args{db});
+		unless ($args{chromo}) {
 			carp " Cannot generate chromosome info file! Conversion failed\n";
 			return;
 		}
@@ -95,29 +100,32 @@ sub wig_to_bigwig_conversion {
 	
 	# Generate the bw file name
 	# we can substitute one of three possible names for bw
-	my $bw_file = $args{'wig'};
+	my $bw_file = $args{wig};
 	$bw_file =~ s/\.(?:bed|bdg|bedgraph|wig)$/.bw/;
 	
 	
 	# Generate the bigwig file 
-	print " converting $args{'wig'} to bigWig....\n";
-	if ($args{'bwapppath'} =~ /wigToBigWig$/) {
+	printf " converting %s to bigWig....\n", $args{wig};
+	if ($args{bwapppath} =~ /wigToBigWig$/) {
 		# include the -clip option in case there are any positions 
 		# out of bounds of the chromosome
 		# it will just warn instead of fail
-		system $args{'bwapppath'}, '-clip', $args{'wig'}, $args{'chromo'}, $bw_file;
+		system $args{bwapppath}, '-clip', $args{wig}, $args{chromo}, $bw_file;
 	}
-	elsif ($args{'bwapppath'} =~ /bedGraphToBigWig$/) {
+	elsif ($args{bwapppath} =~ /bedGraphToBigWig$/) {
 		# this doesn't have the -clip option, too bad
-		system $args{'bwapppath'}, $args{'wig'}, $args{'chromo'}, $bw_file;
+		system $args{bwapppath}, $args{wig}, $args{chromo}, $bw_file;
+	}
+	elsif ($args{bwapppath} eq 'BioDBBigFile') {
+		Bio::DB::BigFile->createBigWig($args{wig}, $args{chromo}, $bw_file);
 	}
 	
 	# check the result
 	if (-e $bw_file and -s $bw_file) {
 		# conversion successful
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($args{chromo} =~ /^chr_sizes_\w{5}/) {
 			# we no longer need our temp chromosome file
-			unlink $args{'chromo'};
+			unlink $args{chromo};
 		}
 		return $bw_file;
 	}
@@ -127,9 +135,9 @@ sub wig_to_bigwig_conversion {
 			# 0-byte file was created
 			unlink $bw_file;
 		}
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($args{chromo} =~ /^chr_sizes_\w{5}/) {
 			# leave the temp chromosome file as a courtesy
-			warn " Leaving temporary chromosome file '$args{'chromo'}'\n";
+			warn " Leaving temporary chromosome file '$args{chromo}'\n";
 		}
 		return;
 	}
@@ -147,30 +155,30 @@ sub bed_to_bigbed_conversion {
 	}
 	
 	# bedfile
-	$args{'bed'} ||= undef;
-	unless ($args{'bed'}) {
+	$args{bed} ||= undef;
+	unless ($args{bed}) {
 		carp "no bed file passed!";
 		return;
 	}
 	
 	
 	# identify bigbed conversion utility
-	$args{'bbapppath'} ||= undef;
-	unless ($args{'bbapppath'}) {
+	$args{bbapppath} ||= undef;
+	unless ($args{bbapppath}) {
 		# check for an entry in the configuration file
-		$args{'bbapppath'} = $BTB_CONFIG->param('applications.bedToBigBed') || 
+		$args{bbapppath} = $BTB_CONFIG->param('applications.bedToBigBed') || 
 			undef;
 	}
-	unless ($args{'bbapppath'}) {
+	unless ($args{bbapppath}) {
 		# try checking the system path as a final resort
 		eval {
 			require File::Which;
 			File::Which->import;
-			$args{'bbapppath'} = which('bedToBigBed');
+			$args{bbapppath} = which('bedToBigBed');
 		};
-		add_program($args{'bbapppath'}) if $args{'bbapppath'};
+		add_program($args{bbapppath}) if $args{bbapppath};
 	}
-	unless ($args{'bbapppath'}) {
+	unless ($args{bbapppath}) {
 		carp " Utility 'bedToBigBed' not specified and can not be found!" . 
 			" Conversion failed!\n";
 		return;
@@ -178,18 +186,18 @@ sub bed_to_bigbed_conversion {
 	
 	
 	# Generate list of chromosome sizes if necessary
-	$args{'chromo'} ||= undef;
-	unless ($args{'chromo'}) {
+	$args{chromo} ||= undef;
+	unless ($args{chromo}) {
 		# a pre-generated list of chromosome sizes was not provided
 		# need to generate one from the database
-		$args{'db'} ||= undef;
-		unless ($args{'db'}) {
+		$args{db} ||= undef;
+		unless ($args{db}) {
 			carp " No requisite database or chromosome info file provided!" .
 				" Conversion failed\n";
 			return;
 		}
-		$args{'chromo'} = generate_chromosome_file($args{'db'});
-		unless ($args{'chromo'}) {
+		$args{chromo} = generate_chromosome_file($args{db});
+		unless ($args{chromo}) {
 			carp " Cannot generate chromosome info file! Conversion failed\n";
 			return;
 		}
@@ -197,21 +205,21 @@ sub bed_to_bigbed_conversion {
 	
 	
 	# Generate the bb file name
-	my $bb_file = $args{'bed'};
+	my $bb_file = $args{bed};
 	$bb_file =~ s/\.bed$/.bb/;
 	
 	
 	# Generate the bigBed file using Jim Kent's utility
-	print " converting $args{'bed'} to BigBed....\n";
-	system $args{'bbapppath'}, $args{'bed'}, $args{'chromo'}, $bb_file;
+	print " converting $args{bed} to BigBed....\n";
+	system $args{bbapppath}, $args{bed}, $args{chromo}, $bb_file;
 	
 	
 	# Check the result
 	if (-e $bb_file and -s $bb_file) {
 		# conversion successful
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($args{chromo} =~ /^chr_sizes_\w{5}/) {
 			# we no longer need our temp chromosome file
-			unlink $args{'chromo'};
+			unlink $args{chromo};
 		}
 		return $bb_file;
 	}
@@ -221,9 +229,9 @@ sub bed_to_bigbed_conversion {
 			# 0-byte file was created
 			unlink $bb_file;
 		}
-		if ($args{'chromo'} =~ /^chr_sizes_\w{5}/) {
+		if ($args{chromo} =~ /^chr_sizes_\w{5}/) {
 			# leave the temp chromosome file as a courtesy
-			warn " Leaving temporary chromosome file '$args{'chromo'}'\n";
+			warn " Leaving temporary chromosome file '$args{chromo}'\n";
 		}
 		return;
 	}
@@ -291,23 +299,28 @@ names of the subroutines to export. None are automatically exported.
 =item wig_to_bigwig_conversion()
 
 This subroutine will convert a wig file to a bigWig file. See the UCSC 
-documentation regarding wig (http://genome.ucsc.edu/goldenPath/help/wiggle.html)
-and bigWig (http://genome.ucsc.edu/goldenPath/help/bigWig.html) file formats. 
-It uses Jim Kent's wigToBigWig or bedGraphToBigWig utility to perform the 
-conversion, depending on the format of the wig file. The utility must be 
-available on the system for the conversion to succeed. 
+documentation regarding L<wig|http://genome.ucsc.edu/goldenPath/help/wiggle.html>
+and L<bigWig|http://genome.ucsc.edu/goldenPath/help/bigWig.html> file formats. 
+It uses the UCSC I<wigToBigWig> utility to perform the conversion. The utility 
+must be available on the system for the conversion to succeed. 
+
+For bedGraph format wig files, the utility I<bedGraphToBigWig> may be substituted 
+if desired, but I<wigToBigWig> can sufficiently handle all wig formats. When 
+no utility is available but L<Bio::DB::BigFile> is installed, then the module 
+may be used for generating the bigWig file.
 
 The conversion requires a list of chromosome name and sizes in a simple text 
 file, where each line is comprised of two columns, "<chromosome name> 
 <size in bases>". This file may be specified, or automatically generated if 
-given a Bio::DB database name (preferred to ensure genome version 
+given a C<Bio::DB> database name (preferred to ensure genome version 
 compatibility).
 
 After running the utility, the existence of a non-zero byte bigWig file 
 is checked. If it does, then the name of the file is returned. If not, 
 an error is printed and nothing is returned. 
 
-Pass the function an anonymous hash of arguments, including the following:
+Pass the function an array of key =E<gt> value arguments, including the 
+following:
 
   Required:
   wig         => The name of the wig source file. 
@@ -318,15 +331,15 @@ Pass the function an anonymous hash of arguments, including the following:
                  above, as an alternative to providing the database name.
   bwapppath   => Provide the full path to Jim Kent's wigToBigWig 
                  utility. This parameter may instead be defined in the 
-                 configuration file "biotoolbox.cfg". 
+                 configuration file C<biotoolbox.cfg>. 
 
 Example
 
 	my $wig_file = 'example_wig';
-	my $bw_file = wig_to_bigwig_conversion( {
-			'wig'   => $wig_file,
-			'db'    => $database,
-	} );
+	my $bw_file = wig_to_bigwig_conversion(
+		'wig'   => $wig_file,
+		'db'    => $database,
+	);
 	if (-e $bw_file) {
 		print " success! wrote bigwig file $bw_file\n";
 		unlink $wig_file; # no longer necessary
@@ -338,22 +351,23 @@ Example
 =item bed_to_bigbed_conversion
 
 This subroutine will convert a bed file to a bigBed file. See the UCSC 
-documentation regarding bed (http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED)
-and bigBed (http://genome.ucsc.edu/goldenPath/help/bigBed.html) file formats. 
-It uses Jim Kent's bedToBigBed utility to perform the conversion. This 
+documentation regarding L<bed|http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED>
+and L<bigBed|http://genome.ucsc.edu/goldenPath/help/bigBed.html> file formats. 
+It uses the UCSC I<bedToBigBed> utility to perform the conversion. This 
 must be present on the system for the conversion to succeed. 
 
 The conversion requires a list of chromosome name and sizes in a simple text 
 file, where each line is comprised of two columns, "<chromosome name> 
 <size in bases>". This file may be specified, or automatically generated if 
-given a Bio::DB database name (preferred to ensure genome version 
+given a C<Bio::DB> database name (preferred to ensure genome version 
 compatibility).
 
 After running the utility, the existence of a non-zero byte bigBed file 
 is checked. If it does, then the name of the file is returned. If not, 
 an error is printed and nothing is returned. 
 
-Pass the function an anonymous hash of arguments, including the following:
+Pass the function an array of key =E<gt> value arguments, including the 
+following:
 
   Required:
   bed         => The name of the bed source file. 
@@ -362,17 +376,17 @@ Pass the function an anonymous hash of arguments, including the following:
   Optional: 
   chromo      => The name of the chromosome sizes text file, described 
                  above, as an alternative to providing the database name.
-  bbapppath   => Provide the full path to Jim Kent's bedToBigBed  
+  bbapppath   => Provide the full path to the UCSC bedToBigBed  
                  utility. This parameter may instead be defined in the 
                  configuration file "biotoolbox.cfg". 
 
 Example
 
 	my $bed_file = 'example.bed';
-	my $bb_file = bed_to_bigbed_conversion( {
-			'bed'   => $bed_file,
-			'db'    => $database,
-	} );
+	my $bb_file = bed_to_bigbed_conversion(
+		'bed'   => $bed_file,
+		'db'    => $database,
+	);
 	if ($bb_file) {
 		print " success! wrote bigBed file $bb_file\n";
 	}
@@ -387,14 +401,14 @@ the big file conversion utilities from an available database. It is a
 two column text file, the first column is the chromosome name, and the 
 second column is the length in bp. The file is written in the 
 current directory with a name of "chr_sizesXXXXX", where X are random 
-characters as defined by File::Temp. 
+characters as defined by L<File::Temp>. 
 
 The chromosome names and lengths are obtained from a Bio::DB 
 database using the C<Bio::ToolBox::db_helper::get_chromosome_list()> 
 subroutine.
 
 Pass the subroutine a database name, path to a supported database file, 
-or opened Bio::DB object.
+or opened C<Bio::DB> object.
 
 The file will be written, closed, and the filename returned.
 
