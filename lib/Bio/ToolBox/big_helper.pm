@@ -5,6 +5,7 @@ require Exporter;
 use strict;
 use Carp qw(carp cluck);
 use File::Temp;
+use IO::File;
 use Bio::ToolBox::db_helper qw(get_chromosome_list);
 use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
 
@@ -16,6 +17,7 @@ our @EXPORT = qw(
 );
 our @EXPORT_OK = qw(
 	wig_to_bigwig_conversion
+	open_wig_to_bigwig_fh
 	bed_to_bigbed_conversion
 	generate_chromosome_file
 );
@@ -142,6 +144,79 @@ sub wig_to_bigwig_conversion {
 		return;
 	}
 }
+
+
+### Open a file handle to wigToBigWig
+sub open_wig_to_bigwig_fh {
+	
+	# Collect passed arguments
+	my %args = @_; 
+	unless (%args) {
+		cluck "no arguments passed!";
+		return;
+	}
+	
+	# bigWig output file
+	$args{bw} ||= $args{wig} || $args{out} || $args{file} || undef;
+	unless ($args{bw}) {
+		cluck "no output bw file name passed!";
+		return;
+	}
+	unless ($args{bw} =~ /\.bw$/i) {
+		$args{bw} .= '.bw';
+	}
+	
+	# Identify bigwig conversion utility
+	$args{bwapppath} ||= undef;
+	unless ($args{bwapppath}) {
+		# check for an entry in the configuration file
+		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || 
+				undef;
+	}
+	unless ($args{bwapppath}) {
+		# try checking the system path as a final resort
+		eval {
+			require File::Which;
+			File::Which->import;
+			$args{bwapppath} = which('wigToBigWig');
+		};
+		add_program($args{bwapppath}) if $args{bwapppath};
+	}
+	unless ($args{bwapppath} =~ /wigToBigWig$/) {
+		warn " Utility 'wigToBigWig' not specified and can not be found!" . 
+			" Conversion failed!\n";
+		return;
+	}
+
+	# Generate list of chromosome sizes if necessary
+	$args{chromo} ||= undef;
+	unless ($args{chromo}) {
+		# a pre-generated list of chromosome sizes was not provided
+		# need to generate one from the database
+		$args{db} ||= undef;
+		unless ($args{db}) {
+			carp " No requisite database or chromosome info file provided!" .
+				" Conversion failed\n";
+			return;
+		}
+		$args{chromo} = generate_chromosome_file($args{db});
+		unless ($args{chromo}) {
+			carp " Cannot generate chromosome info file! Conversion failed\n";
+			return;
+		}
+	}
+	
+	# open the filehandle
+	my $command = sprintf "%s stdin %s %s", $args{bwapppath}, $args{chromo}, 
+		$args{bw};
+	my $bwfh = IO::File->new("| $command") or 
+		die "cannot open wigToBigWig!\n";
+		# wigToBigWig will always die anyway if something is wrong
+		# cannot trap it with an eval, since it doesn't just error out
+		# but actually exits, dragging the whole Perl process with it
+	return $bwfh;
+}
+
 
 
 ### Bed to BigBed file conversion
@@ -347,6 +422,52 @@ Example
 	else {
 		print " failure! see STDERR for errors\n";
 	};
+
+=item open_wig_to_bigwig_fh
+
+This subroutine will open a forked process to the UCSC I<wigToBigWig> utility 
+as a file handle, allowing wig lines to be "printed" to the utility for 
+conversion. This is useful for writing directly to a bigWig file without 
+having to write a temporary wig file first. This is also useful when you 
+have multiple wig files, for example individual wig files from separate 
+forked processes, that need to be combined into a bigWig file. 
+
+Note that the I<wigToBigWig> utility does not handle errors gracefully 
+and will immediately fail upon encountering errors, usually also bringing 
+the main Perl process with it. Make sure the chromosome file is accurate 
+and the wig lines are properly formatted and in order! 
+
+Pass the function an array of key =E<gt> value arguments. An L<IO::File> 
+object will be returned. Upon the closing the file handle, the 
+I<wigToBigWig> utility will generate the bigWig file.
+
+  Required:
+  bw          => The output file name for the bigWig file.
+                 Also accepts the keys file, wig, and out. 
+  chromo      => The name of the chromosome sizes text file, described 
+                 in wig_to_bigwig_conversion()
+  Optional: 
+  db          => Alternatively, provide an opened database object from which 
+                 to generate a temporary chromosome sizes file. It is up to the 
+                 user to delete this file.
+  bwapppath   => Provide the full path to the UCSC I<wigToBigWig> 
+                 utility. This parameter may instead be defined in the 
+                 configuration file C<biotoolbox.cfg>. 
+
+  Example:
+	my $bw_file = 'example.bw';
+	my $chromo_file = generate_chromosome_file($db);
+	my $bwfh = open_wig_to_bigwig_fh(
+		file    => $bw_file,
+		chromo  => $chromo_file,
+	);
+	foreach (@wig_lines) {
+		$bwfh->print("$_\n");
+	}
+	$bwfh->close;
+		# this signals the forked wigToBigWig process to write 
+		# the bigWig file, which may take a few seconds to minutes
+	unlink $chromo_file;
 
 =item bed_to_bigbed_conversion
 
