@@ -1,5 +1,15 @@
 ######## Bio::ToolBox revision history #############
 
+v1.42
+	- Changed bigWig convertor method to use primarily the wigToBigWig 
+	utility for simplicity
+	- Introduced new method to open a wigToBigWig utility filehandle to 
+	"print" wig files directly to a bigWig
+	- Fixed a critical bug in script get_gene_regions where transcripts 
+	weren't being filtered
+	- Improved file format taste testing to avoid GFF false positives
+	- Improved UCSC gene table parser behavior
+
 v1.41
 	- Added no header option when loading text files missing a 
 	column header row. Updated script manipulate_datasets to take 
