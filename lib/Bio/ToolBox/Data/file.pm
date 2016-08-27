@@ -115,9 +115,6 @@ sub taste_file {
 		$Taste->gff(2);
 		$Taste->verify(1);
 		return 'gff' if $Taste->gff == 2;
-		$Taste->add_gff_metadata(2,1); # force metadata
-		$Taste->verify(1);
-		return 'gff' if $Taste->gff == 2;
 	}
 	elsif ($number == 10) {
 		# possibly a genePred file

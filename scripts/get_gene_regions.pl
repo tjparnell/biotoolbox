@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.40';
+my $VERSION = '1.42';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -592,6 +592,7 @@ sub process_gene {
 	}
 	else {
 		foreach my $t (get_transcripts($gene)) {
+			next unless acceptable_transcript($t);
 			push @regions, &$method($t);
 		}
 	}
