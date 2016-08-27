@@ -60,8 +60,7 @@ is($segment->start, 54989, 'segment start');
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 49, 'row sum of count') or 
@@ -71,7 +70,6 @@ is($score, 49, 'row sum of count') or
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -87,8 +85,7 @@ is($row->strand, -1, 'row strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "score count sum for ", $row->name, " is $score\n";
 is($score, 7, 'row count sum') or 

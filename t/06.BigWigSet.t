@@ -61,8 +61,7 @@ is($segment->start, 54989, 'segment start');
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => 'sample3',
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 435, 'row sum of count') or 
@@ -72,7 +71,6 @@ is($score, 435, 'row sum of count') or
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -88,7 +86,6 @@ is($row->strand, -1, 'row strand');
 
 $score = $row->get_score(
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'all',
 );
@@ -99,7 +96,6 @@ is(sprintf("%.2f", $score), 1.69, 'row median score') or
 # try stranded data collection
 $score = $row->get_score(
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'sense',
 );
@@ -109,7 +105,6 @@ is(sprintf("%.2f", $score), 2.74, 'row sense median score') or
 
 $score = $row->get_score(
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'antisense',
 );
@@ -139,7 +134,6 @@ is(sprintf("%.2f", $pos2scores{255}), 2.03, 'score at position 255');
 ### Try relative positioned score index
 %pos2scores = $row->get_relative_point_position_scores(
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'stranded' => 'sense',
 	'position' => 5,
 	'extend'   => 200,

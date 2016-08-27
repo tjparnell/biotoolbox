@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigBed; 1}) {
-		plan tests => 33;
+		plan tests => 37;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigBed not available';
@@ -65,17 +65,15 @@ is($segment->start, 54989, 'segment start');
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 453, 'row sum of read count score');
+is($score, 453, 'row read count score');
 
 # mean coverage
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -85,41 +83,19 @@ is(sprintf("%.2f", $score), 143.81, 'row mean score');
 $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'pcount',
-	'method'   => 'sum',
+	'method'   => 'pcount',
 );
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 414, 'row sum of read precise count score');
+is($score, 414, 'row precise count');
 
-# read length mean
+# read named count sum
 $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'length',
-	'method'   => 'median',
+	'method'   => 'ncount',
 );
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 73, 'median of read length');
-
-# read count rpm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 320367, 'read count as rpm');
-
-# read count rpkm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpkm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 171411, 'read count as rpkm');
+is($score, 453, 'row named count');
 
 
 
@@ -134,8 +110,7 @@ is($row->strand, -1, 'row strand');
 # try stranded data collection
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'all',
 );
 # print "all read count sum for ", $row->name, " is $score\n";
@@ -143,8 +118,7 @@ is($score, 183, 'row sum of count score for all strands');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'sense',
 );
 # print "sense read count sum for ", $row->name, " is $score\n";
@@ -152,8 +126,7 @@ is($score, 86, 'row sum of count score for sense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'antisense',
 );
 # print "antisense read count sum for ", $row->name, " is $score\n";
@@ -161,7 +134,6 @@ is($score, 97, 'row sum of count score for antisense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 	'stranded' => 'sense',
 );
@@ -170,7 +142,6 @@ is(sprintf("%.2f", $score), 146.88, 'row mean score for sense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 	'stranded' => 'antisense',
 );
@@ -186,19 +157,43 @@ is($row->name, 'YAL044W-A', 'row name');
 
 my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
-	'value'    => 'count',
+	'method'   => 'count',
 );
-is(scalar keys %pos2scores, 111, 'number of positioned scores');
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
+is(scalar keys %pos2scores, 111, 'number of positioned scores');
 is($pos2scores{2}, 1, 'positioned score at 1');
 is($pos2scores{20}, 2, 'positioned score at 20');
 
 %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
-	'value'    => 'count',
+	'method'   => 'pcount',
+);
+# print "found ", scalar keys %pos2scores, " positioned precise counts \n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 12, 'number of positioned precise counts');
+is($pos2scores{2}, 1, 'positioned precise count at 1');
+is($pos2scores{15}, 2, 'positioned precise count at 15');
+
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'method'   => 'ncount',
+);
+# print "found ", scalar keys %pos2scores, " positioned named counts\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 111, 'number of positioned named counts');
+is($pos2scores{7}, 2, 'positioned named count at 7');
+is($pos2scores{36}, 1, 'positioned named count at 36');
+
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'method'   => 'count',
 	'absolute' => 1,
 	'stranded' => 'antisense',
 );

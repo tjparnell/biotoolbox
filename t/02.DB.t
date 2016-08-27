@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 57;
+		plan tests => 61;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -128,21 +128,28 @@ is(sprintf("%.2f", $score), '0.30', 'mean score across 5 prime feature');
 $score = $row->get_score(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	'method'  => 'sum',
-	value   => 'count',
+	'method' => 'count',
 );
 # print "median score is $score\n";
-is($score, 60, 'sum count across feature');
+is($score, 60, 'count across feature');
 
-# collect mean length score
+# collect pcount score
 $score = $row->get_score(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	'method'  => 'mean',
-	value   => 'length',
+	'method' => 'pcount',
 );
-# print "median score is $score\n";
-is($score, 1, 'mean length of scores across feature');
+# print "pcount score is $score\n";
+is($score, 60, 'pcount across feature');
+
+# collect ncount score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method' => 'ncount',
+);
+# print "ncount score is $score\n";
+is($score, 60, 'ncount across feature');
 
 # collect position scores
 my %score1 = $row->get_region_position_scores(
@@ -153,6 +160,16 @@ my %score1 = $row->get_region_position_scores(
 is(min(keys %score1), 58, 'min position in positioned score hash');
 is(max(keys %score1), 2342, 'max position in positioned score hash');
 is($score1{686}, 0.26, 'score at position 686 in positioned score hash');
+
+%score1 = $row->get_region_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method' => 'ncount',
+);
+# print "position_score ncount is \n" . print_hash(\%score1);
+is(min(keys %score1), 58, 'min position in positioned ncount hash');
+is(max(keys %score1), 2342, 'max position in positioned ncount hash');
+is($score1{686}, 1, 'score at position 686 in positioned ncount hash');
 
 
 
@@ -217,7 +234,7 @@ is(scalar(keys %score1), 26, 'number of keys avoided extended relative positione
 	dataset => 'data:sample2',
 	extend  => 500,
 	position => 4,
-	value   => 'count',
+	'method' => 'count',
 );
 # print "position_score is \n" . print_hash(\%score1);
 is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
