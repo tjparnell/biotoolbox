@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.41';
+our $VERSION = '1.42';
 
 =head1 NAME
 
@@ -336,7 +336,7 @@ sub open_file {
 		# do not set in preference of gff pragma
 	}
 	else {
-		cluck("file doesn't look like a GFF file!\n");
+		carp("file doesn't look like a GFF file!\n");
 		return;
 	}
 	
