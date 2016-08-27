@@ -13,9 +13,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -53,7 +52,7 @@ our %OPENED_BB;
 sub collect_bigbed_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# look at each bedfile
@@ -99,27 +98,25 @@ sub collect_bigbed_scores {
 				# we have acceptable data to collect
 			
 				# store the appropriate datapoint
-				if ($param->[VAL] eq 'score') {
-					push @scores, $bed->score;
+				if ($param->[METH] eq 'count') {
+					push @scores, 1;
 				}
-				elsif ($param->[VAL] eq 'count') {
-					$scores[0] += 1;
-				}
-				elsif ($param->[VAL] eq 'pcount') {
-					$scores[0] += 1 if ($bed->start >= $param->[STRT] and 
+				elsif ($param->[METH] eq 'pcount') {
+					push @scores, 1 if ($bed->start >= $param->[STRT] and 
 						$bed->end <= $param->[STOP]);
 				}
-				elsif ($param->[VAL] eq 'length') {
-					push @scores, $bed->length;
+				elsif ($param->[METH] eq 'ncount') {
+					push @scores, $bed->display_name || $bed->primary_id;
 				}
 				else {
-					confess sprintf "unrecognized value type! %s", $param->[VAL];
+					push @scores, $bed->score;
 				}
 			}
 		}
 	}
 
 	# return collected data
+	
 	return wantarray ? @scores : \@scores;
 }
 
@@ -130,13 +127,16 @@ sub collect_bigbed_scores {
 sub collect_bigbed_position_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
+	
+	# adjust the method to strip the index flag
+	$param->[METH] =~ s/^indexed_//;
 	
 	# look at each bedfile
 	# usually there is only one, but there may be more
-	my %bed_data;
-	for (my $i = 8; $i < scalar @$param; $i++) {
+	my %pos2data;
+	for (my $i = DATA; $i < scalar @$param; $i++) {
 	
 		# open the bedfile
 		my $bb = _get_bb($param->[$i]);
@@ -194,40 +194,71 @@ sub collect_bigbed_position_scores {
 				
 				# store the appropriate datapoint
 				# for score and length, we're putting these into an array
-				if ($param->[VAL] eq 'score') {
-					# perform addition to force the score to be a scalar value
-					push @{ $bed_data{$position} }, $bed->score + 0;
+				if ($param->[METH] eq 'count') {
+					$pos2data{$position} += 1;
 				}
-				elsif ($param->[VAL] eq 'count') {
-					$bed_data{$position} += 1;
-				}
-				elsif ($param->[VAL] eq 'pcount') {
-					$bed_data{$position} += 1 if 
+				elsif ($param->[METH] eq 'pcount') {
+					$pos2data{$position} += 1 if 
 						($bed->start <= $param->[STRT] and $bed->end <= $param->[STOP]);
 				}
-				elsif ($param->[VAL] eq 'length') {
-					# I hope that length is supported, but not sure
-					# may have to calculate myself
-					push @{ $bed_data{$position} }, $bed->length;
-				}
+				elsif ($param->[METH] eq 'ncount') {
+					$pos2data{$position} ||= [];
+					push @{ $pos2data{$position} }, $bed->display_name || 
+						$bed->primary_id;
+ 				}
 				else {
-					confess sprintf "unrecognized value type! %s", $param->[VAL];
+					# everything else we just take the score
+					push @{ $pos2data{$position} }, $bed->score + 0;
 				}
 			}
 		}
 	}
 
 	# combine multiple datapoints at the same position
-	if ($param->[VAL] eq 'score' or $param->[VAL] eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
-		foreach my $position (keys %bed_data) {
-			$bed_data{$position} = mean( @{$bed_data{$position}} );
+	if ($param->[METH] eq 'ncount') {
+		foreach my $position (keys %pos2data) {
+			my %name2count;
+			foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
+			$pos2data{$position} = scalar(keys %name2count);
+		}
+	}
+	elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
+		# do nothing, these aren't arrays
+	}
+	elsif ($param->[METH] eq 'mean') {
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = mean( @{$pos2data{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'median') {
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = median( @{$pos2data{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'min') {
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = min( @{$pos2data{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'max') {
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = max( @{$pos2data{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'sum') {
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = sum( @{$pos2data{$position}} );
+		}
+	}
+	else {
+		# just take the mean for everything else
+		foreach my $position (keys %pos2data) {
+			$pos2data{$position} = mean( @{$pos2data{$position}} );
 		}
 	}
 	
 	# return collected data
-	return wantarray ? %bed_data : \%bed_data;
+	return wantarray ? %pos2data : \%pos2data;
 }
 
 
@@ -412,11 +443,7 @@ strandedness are collected.
 
 =item 6. The method for combining scores.
 
-Not used here. 
-
-=item 7. The value type of data to collect
-
-Acceptable values include score, count, pcount, ncount, and length.
+Acceptable values include score, count, and pcount.
 
    * score returns the basepair coverage of alignments over the 
    region of interest
@@ -432,13 +459,11 @@ Acceptable values include score, count, pcount, ncount, and length.
    counting only unique names. Reads are taken if they overlap 
    the search region.
    
-   length returns the lengths of all overlapping alignments 
-
-=item 8. A database object.
+=item 7. A database object.
 
 Not used here.
 
-=item 9 and higher. Paths to one or more BigBed files
+=item 8 and higher. Paths to one or more BigBed files
 
 Opened BigBed file objects are cached. Both local and remote files are 
 supported.

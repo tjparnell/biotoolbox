@@ -12,9 +12,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -59,7 +58,7 @@ sub collect_wig_scores {
 sub collect_wig_position_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# look at each wigfile
@@ -149,17 +148,11 @@ sub collect_wig_position_scores {
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						if ($param->[VAL] eq 'score') {	
-							$pos2score{$pos} = $s;
-						}
-						elsif ($param->[VAL] eq 'count') {
+						if ($param->[METH] eq 'count') {
 							$pos2score{$pos} = 1;
 						}
-						elsif ($param->[VAL] eq 'length') {
-							$pos2score{$pos} = $step;
-						}
 						else {
-							confess "unknown method!";
+							$pos2score{$pos} = $s;
 						}
 					}
 					
@@ -274,11 +267,7 @@ strandedness are collected.
 
 =item 6. The method for combining scores.
 
-Not used here. 
-
-=item 7. The value type of data to collect
-
-Acceptable values include score, count, and length.
+Acceptable values include score and count.
 
    * score returns the basepair coverage of alignments over the 
    region of interest
@@ -286,13 +275,11 @@ Acceptable values include score, count, and length.
    * count returns the number of alignments that overlap the 
    search region. 
    
-   * length returns the lengths of all overlapping alignments 
-
-=item 8. A database object.
+=item 7. A database object.
 
 not used here.
 
-=item 9 and higher. Database features.
+=item 8 and higher. Database features.
 
 These are the SeqFeature objects that contain the file path to the 
 binary wig files.

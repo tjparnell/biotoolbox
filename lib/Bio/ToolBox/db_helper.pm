@@ -24,9 +24,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 
 
@@ -1986,8 +1985,8 @@ Example
 
 sub get_segment_score {
 	# parameters passed as an array
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	confess "incorrect number of parameters passed!" unless scalar @_ >= 9;
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
+	confess "incorrect number of parameters passed!" unless scalar @_ >= 8;
 	my $param = [@_];
 	
 	# determine method
@@ -2000,29 +1999,20 @@ sub get_segment_score {
 	
 	# otherwise we get a list of scores
 	my $scores = &{$db_method}($param);
-	return wantarray ? @$scores: $scores if $param->[METH] eq 'scores'; 
+	return wantarray ? @$scores : $scores if $param->[METH] eq 'scores'; 
 	if (not defined $scores or scalar @$scores == 0) {
 		return 0 if $param->[METH] =~ /count|sum/;
 		return '.';	
 	}
 	
-	# special case for bam files where value type is ncount
-	if ($db_type eq 'bam' and $param->[VAL] eq 'ncount') {
-		# Convert names into unique counts
-		# the actual method doesn't actually mean anything here
-		my %name2count;
-		foreach (@$scores) { $name2count{$_} += 1 }
-		return scalar(keys %name2count);
-	}
-	
 	# calculate a single score for this array of score values
 	my $region_score;
-	if ($param->[METH] eq 'median') {
-		$region_score = median(@$scores);
-	}
-	elsif ($param->[METH] eq 'mean') {
+	if ($param->[METH] eq 'mean') {
 		$region_score = mean(@$scores);
 	} 
+	elsif ($param->[METH] eq 'median') {
+		$region_score = median(@$scores);
+	}
 	elsif ($param->[METH] eq 'range') {
 		# the range value is 'min-max'
 		$region_score = range(@$scores);
@@ -2041,60 +2031,19 @@ sub get_segment_score {
 	elsif ($param->[METH] eq 'sum') {
 		$region_score = sum(@$scores);
 	}
-	elsif ($param->[METH] =~ /count/) {
+	elsif ($param->[METH] eq 'ncount') {
+		# Convert names into unique counts
+		my %name2count;
+		foreach (@$scores) { $name2count{$_} += 1 }
+		$region_score = scalar(keys %name2count);
+	}
+	elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
 		$region_score = scalar(@$scores);
 	}
 	elsif ($param->[METH] =~ /rpk?m/) {
-		# convert to reads per million mapped
-		# this is only supported by bam and bigbed db
-		# the dataset is stored in $_[8]
-		# the dataset type is stored in $db_method->[2]
-		
-		# total the number of reads if necessary
-		unless (exists $total_read_number{$param->[DATA]} ) {
-			
-			# check the type of database
-			if ($db_type eq 'bam') {
-				# a bam database
-				
-				$total_read_number{$param->[DATA]} = 
-					sum_total_bam_alignments($param->[DATA]);
-				print "\n [total alignments: ", 
-					format_with_commas( $total_read_number{$param->[DATA]} ), 
-					"]\n";
-			}
-			elsif ($db_type eq 'bb') {
-				# bigBed database
-				
-				$total_read_number{$param->[DATA]} = 
-					sum_total_bigbed_features($param->[DATA]);
-				print "\n [total features: ", 
-					format_with_commas( $total_read_number{$param->[DATA]} ), 
-					"]\n";
-			}
-			else {
-				# database is not supported
-				# reset the method
-				$param->[METH] = 'sum';
-			}
-		}	
-		
-		# calculate the region score according to the method
-		if ($param->[METH] eq 'rpkm') {
-			$region_score = 
-				( sum(@$scores) * 1000000000 ) / 
-				( ($param->[STOP] - $param->[STRT] + 1) * 
-				$total_read_number{$param->[DATA]} );
-		}
-		elsif ($param->[METH] eq 'rpm') {
-			$region_score = 
-				( sum(@$scores) * 1000000 ) / $total_read_number{$param->[DATA]};
-		}
-		else {
-			# this dataset doesn't support rpm methods
-			# use the sum method instead
-			$region_score = sum(@$scores);
-		}
+		confess " The rpm methods have been deprecated due to complexity and " .
+			"the variable way of calculating the value. Collect counts and " . 
+			"calculate your preferred way.\n";
 	}
 	else {
 		# somehow bad method snuck past our checks
@@ -2463,7 +2412,7 @@ visual marker.
 
 sub _lookup_db_method {
 	# parameters passed as an array reference
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# open database if necessary
@@ -2492,19 +2441,12 @@ sub _lookup_db_method {
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
 				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
-				if ($param->[VAL] eq 'score' and 
-					$param->[METH] =~ /min|max|mean|sum|count/
-				) {
-					$score_method = \&collect_bigwig_score;
-					$do_return = 1;
-				}
-				elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-					$param->[METH] = 'count'; # special method
-					$score_method = \&collect_bigwig_score;
-					$do_return = 1;
-				}
-				elsif ($param->[METH] eq 'indexed') {
+				if ($param->[METH] =~ /^indexed/) {
 					$score_method = \&collect_bigwig_position_scores;
+					$do_return = 1;
+				}
+				elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
+					$score_method = \&collect_bigwig_score;
 					$do_return = 1;
 				}
 				else {
@@ -2529,7 +2471,7 @@ sub _lookup_db_method {
 			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
 				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
-				if ($param->[METH] eq 'indexed') {
+				if ($param->[METH] =~ /^indexed/) {
 					$score_method = \&collect_bigbed_position_scores;
 					$do_return = 1;
 				}
@@ -2554,12 +2496,11 @@ sub _lookup_db_method {
 			# check that we have Bam support
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
-				if ($param->[METH] eq 'indexed') {
+				if ($param->[METH] =~ /^indexed/) {
 					$score_method = \&collect_bam_position_scores;
 					$do_return = 1;
 				}
 				else {
-					# warn " using collect_bam_scores() with file\n";
 					$score_method = \&collect_bam_scores;
 					$do_return = 0;
 					$db_type = 'bam';
@@ -2581,7 +2522,7 @@ sub _lookup_db_method {
 			$USEQ_OK = _load_helper_module('Bio::ToolBox::db_helper::useq') 
 				unless $USEQ_OK;
 			if ($USEQ_OK) {
-				if ($param->[METH] eq 'indexed') {
+				if ($param->[METH] =~ /^indexed/) {
 					$score_method = \&collect_useq_position_scores;
 					$do_return = 1;
 				}
@@ -2617,17 +2558,12 @@ sub _lookup_db_method {
 			unless $BIGWIG_OK;
 		
 		# the data collection depends on the method
-		if ($param->[VAL] eq 'score' and $param->[METH] =~ /min|max|mean|sum|count/) {
-			$score_method = \&collect_bigwigset_score;
-			$do_return = 1;
-		}
-		elsif ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-			$param->[METH] = 'count'; # special method
-			$score_method = \&collect_bigwigset_score;
-			$do_return = 1;
-		}
-		elsif ($param->[VAL] eq 'score' and $param->[METH] eq 'indexed') {
+		if ($param->[METH] =~ /^indexed/) {
 			$score_method = \&collect_bigwigset_position_scores;
+			$do_return = 1;
+		}
+		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
+			$score_method = \&collect_bigwigset_score;
 			$do_return = 1;
 		}
 		else {
@@ -2657,7 +2593,7 @@ sub _lookup_db_method {
 					ref($param->[DB]);
 			}
 			
-			if ($param->[METH] eq 'indexed') {
+			if ($param->[METH] =~ /^indexed/) {
 				$score_method = \&collect_store_position_scores;
 				$do_return = 1;
 			}

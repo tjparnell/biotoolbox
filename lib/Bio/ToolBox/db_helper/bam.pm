@@ -20,9 +20,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -153,15 +152,6 @@ sub collect_bam_position_scores {
 	my $param = shift;
 	my $bam_data = _collect_bam_data(1, $param);
 	
-	# check the requested method
-	if ($param->[VAL] eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
-		foreach my $position (keys %$bam_data) {
-			$bam_data->{$position} = mean( @{$bam_data->{$position}} );
-		}
-	}
-	
 	# return collected data
 	return wantarray ? %$bam_data : $bam_data;
 }
@@ -173,17 +163,22 @@ sub collect_bam_position_scores {
 sub _collect_bam_data {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my ($do_index, $param) = @_;
+	
+	# make method compatible
+	if ($do_index) {
+		$param->[METH] =~ s/^indexed_//;
+	}
 	
 	# initialize score structures
 	# which one is used depends on the $do_index boolean variable
 	my %pos2data; # either position => count or position => [scores]
-	my @scores; # just scores
+	my $scores = []; # just scores
 	
 	# look at each bamfile
 	# usually there is only one, but there may be more than one
-	for (my $b = 8; $b < scalar @$param; $b++) {
+	for (my $b = DATA; $b < scalar @$param; $b++) {
 	
 		## Open the Bam File
 		my $bamfile = $param->[$b];
@@ -217,13 +212,26 @@ sub _collect_bam_data {
 	
 		
 		## Collect the data according to the requested value type
-		# we will either use simple coverage (score method) or
-		# process the actual alignments (count or length)
-		
-		## Coverage
-		if ($param->[VAL] eq 'score') {
-			# collecting scores, or in this case, basepair coverage of 
-			# alignments over the requested region
+		# we will either use simple coverage or alignments (count)
+		if ($param->[METH] =~ /count/) {
+			# Need to collect and count alignments
+			
+			## Set the callback and a callback data structure
+			my $callback = _assign_callback($do_index, $param);
+			my %data = (
+				'scores' => $scores,
+				'index'  => \%pos2data,
+				'start'  => $param->[STRT],
+				'stop'   => $param->[STOP],
+			);
+			
+			# get the alignments
+			# we are using the low level API to eke out performance
+			$bam->bam_index->fetch($bam->bam, $tid, $zstart, $end, $callback, \%data);
+		}
+		else {
+			## Coverage
+			# I am assuming everything else is working with read coverage
 			
 			# generate the coverage, this will ignore strand
 			my $coverage = $bam->bam_index->coverage(
@@ -236,7 +244,6 @@ sub _collect_bam_data {
 			# convert the coverage data
 			# by default, this should return the coverage at 1 bp resolution
 			if (scalar @$coverage) {
-				
 				# check whether we need to index the scores
 				if ($do_index) {
 					for (my $i = $param->[STRT]; $i <= $param->[STOP]; $i++) {
@@ -245,30 +252,18 @@ sub _collect_bam_data {
 					}
 				}
 				else {
-					@scores = @$coverage;
+					$scores = $coverage;
 				}
 			}
 		}
-		
-		
-		## Alignments
-		else {
-			# either collecting counts or length
-			# working with actual alignments
-			
-			## Set the callback and a callback data structure
-			my $callback = _assign_callback($do_index, $param);
-			my %data = (
-				'scores' => \@scores,
-				'index'  => \%pos2data,
-				'start'  => $param->[STRT],
-				'stop'   => $param->[STOP],
-			);
-			
-			# get the alignments
-			# we are using the low level API to eke out performance
-			$bam->bam_index->fetch($bam->bam, $tid, $zstart, $end, $callback, \%data);
-			
+	}
+	
+	# process the ncount arrays
+	if ($do_index and $param->[METH] eq 'ncount') {
+		foreach my $position (keys %pos2data) {
+			my %name2count;
+			foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
+			$pos2data{$position} = scalar(keys %name2count);
 		}
 	}
 	
@@ -277,7 +272,7 @@ sub _collect_bam_data {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
-		return wantarray ? @scores : \@scores;
+		return wantarray ? @$scores : $scores;
 	}
 }
 
@@ -434,12 +429,13 @@ sub _assign_callback {
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
 	my ($do_index, $param) = @_;
 	
+	
 	# check the current list of calculated callbacks
 		# cache the calculated callback method to speed up subsequent data 
 		# collections it's likely only one method is ever employed in an 
 		# execution, but just in case we will cache all that we calculate
 	my $string = sprintf "%s_%s_%s_%d", $param->[STND], $param->[STR], 
-		$param->[VAL], $do_index;
+		$param->[METH], $do_index;
 	return $CALLBACKS{$string} if exists $CALLBACKS{$string};
 	
 	# determine the callback method based on requested criteria
@@ -448,52 +444,45 @@ sub _assign_callback {
 	# all reads, either strand
 	if (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_all_count_indexed;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_all_precise_count_indexed;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_all_count_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_all_precise_count_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'ncount' and 
+		$param->[METH] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_all_name_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'length' and 
+		$param->[METH] eq 'ncount' and 
 		$do_index
 	) {
-		$callback = \&_all_length_indexed;
-	}
-	elsif (
-		$param->[STND] eq 'all' and 
-		$param->[VAL] eq 'length' and 
-		!$do_index
-	) {
-		$callback = \&_all_length_array;
+		$callback = \&_all_name_indexed;
 	}
 	
 	
@@ -501,7 +490,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_forward_count_indexed;
@@ -509,7 +498,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_forward_precise_count_indexed;
@@ -517,7 +506,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_forward_count_array;
@@ -525,7 +514,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_precise_count_array;
@@ -533,7 +522,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'ncount' and 
+		$param->[METH] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_name_array;
@@ -541,18 +530,10 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'length' and 
+		$param->[METH] eq 'ncount' and 
 		$do_index
 	) {
-		$callback = \&_forward_length_indexed;
-	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'length' and 
-		!$do_index
-	) {
-		$callback = \&_forward_length_array;
+		$callback = \&_forward_name_indexed;
 	}
 	
 	
@@ -560,7 +541,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_reverse_count_indexed;
@@ -568,7 +549,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_reverse_precise_count_indexed;
@@ -576,7 +557,15 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'ncount' and 
+		$do_index
+	) {
+		$callback = \&_reverse_name_indexed;
+	}
+	elsif (
+		$param->[STND] eq 'sense' and 
+		$param->[STR] == -1 and 
+		$param->[METH] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_count_array;
@@ -584,7 +573,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_precise_count_array;
@@ -592,26 +581,10 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'ncount' and 
+		$param->[METH] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_name_array;
-	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[VAL] eq 'length' and 
-		$do_index
-	) {
-		$callback = \&_reverse_length_indexed;
-	}
-	elsif (
-		$param->[STND] eq 'sense' and 
-		$param->[STR] == -1 and 
-		$param->[VAL] eq 'length' and 
-		!$do_index
-	) {
-		$callback = \&_reverse_length_array;
 	}
 	
 	
@@ -619,7 +592,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_reverse_count_indexed;
@@ -627,7 +600,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_reverse_precise_count_indexed;
@@ -635,7 +608,15 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'ncount' and 
+		$do_index
+	) {
+		$callback = \&_reverse_name_indexed;
+	}
+	elsif (
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] >= 0 and 
+		$param->[METH] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_count_array;
@@ -643,7 +624,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_precise_count_array;
@@ -651,26 +632,10 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'ncount' and 
+		$param->[METH] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_reverse_name_array;
-	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'length' and 
-		$do_index
-	) {
-		$callback = \&_reverse_length_indexed;
-	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] >= 0 and 
-		$param->[VAL] eq 'length' and 
-		!$do_index
-	) {
-		$callback = \&_reverse_length_array;
 	}
 	
 	
@@ -678,7 +643,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'count' and 
 		$do_index
 	) {
 		$callback = \&_forward_count_indexed;
@@ -686,7 +651,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		$do_index
 	) {
 		$callback = \&_forward_precise_count_indexed;
@@ -694,7 +659,15 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'count' and 
+		$param->[METH] eq 'ncount' and 
+		$do_index
+	) {
+		$callback = \&_forward_name_indexed;
+	}
+	elsif (
+		$param->[STND] eq 'antisense' and 
+		$param->[STR] == -1 and 
+		$param->[METH] eq 'count' and 
 		!$do_index
 	) {
 		$callback = \&_forward_count_array;
@@ -702,7 +675,7 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'pcount' and 
+		$param->[METH] eq 'pcount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_precise_count_array;
@@ -710,42 +683,16 @@ sub _assign_callback {
 	elsif (
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
-		$param->[VAL] eq 'ncount' and 
+		$param->[METH] eq 'ncount' and 
 		!$do_index
 	) {
 		$callback = \&_forward_name_array;
 	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[VAL] eq 'length' and 
-		$do_index
-	) {
-		$callback = \&_forward_length_indexed;
-	}
-	elsif (
-		$param->[STND] eq 'antisense' and 
-		$param->[STR] == -1 and 
-		$param->[VAL] eq 'length' and 
-		!$do_index
-	) {
-		$callback = \&_forward_length_array ;
-	}
-	
-	# unacceptable combination
-	elsif (
-		$param->[VAL] eq 'ncount' and 
-		$do_index
-	) {
-		# I don't see any reason to collect names in an indexed fashion
-		# If there is a reason, let me know and I will figure out how to code it
-		confess "invalid combination: value_type=ncount and do_index=true!";
-	}
 	
 	# I goofed
 	else {
-		confess sprintf "Programmer error: stranded %s, strand %s, value type %s, do_index %d", 
-			$param->[STND], $param->[STR], $param->[VAL], $do_index;
+		confess sprintf "Programmer error: stranded %s, strand %s, method %s, do_index %d", 
+			$param->[STND], $param->[STR], $param->[METH], $do_index;
 	}
 	
 	# remember next time 
@@ -762,7 +709,7 @@ sub _all_count_indexed {
 	my ($a, $data) = @_;
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+		( $pos >= $data->{start} and $pos <= $data->{stop} );
 }
 
 sub _all_precise_count_indexed {
@@ -772,33 +719,27 @@ sub _all_precise_count_indexed {
 	$data->{'index'}{$pos}++;
 }
 
+sub _all_name_indexed {
+	my ($a, $data) = @_;
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	$data->{'index'}{$pos} ||= [];
+	push @{ $data->{'index'}{$pos} }, $a->qname;
+}
+
 sub _all_count_array {
 	my ($a, $data) = @_;
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _all_precise_count_array {
 	my ($a, $data) = @_;
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _all_name_array {
 	my ($a, $data) = @_;
-	push @{ $data->{'scores'} }, $a->qname; # query or read name
-}
-
-sub _all_length_indexed {
-	my ($a, $data) = @_;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
-	}
-}
-
-sub _all_length_array {
-	my ($a, $data) = @_;
-	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
+	push @{ $data->{scores} }, $a->qname; # query or read name
 }
 
 sub _forward_count_indexed {
@@ -813,7 +754,7 @@ sub _forward_count_indexed {
 	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+		( $pos >= $data->{start} and $pos <= $data->{stop} );
 }
 
 sub _forward_precise_count_indexed {
@@ -831,6 +772,21 @@ sub _forward_precise_count_indexed {
 	$data->{'index'}{$pos}++;
 }
 
+sub _forward_name_indexed {
+	my ($a, $data) = @_;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and $a->reversed);
+		return if (not $first and not $a->reversed);
+	}
+	else {
+		return if $a->reversed;
+	}
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	$data->{'index'}{$pos} ||= [];
+	push @{ $data->{'index'}{$pos} }, $a->qname;
+}
+
 sub _forward_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
@@ -841,7 +797,7 @@ sub _forward_count_array {
 	else {
 		return if $a->reversed;
 	}
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _forward_precise_count_array {
@@ -855,7 +811,7 @@ sub _forward_precise_count_array {
 		return if $a->reversed;
 	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _forward_name_array {
@@ -868,36 +824,7 @@ sub _forward_name_array {
 	else {
 		return if $a->reversed;
 	}
-	push @{ $data->{'scores'} }, $a->qname;
-}
-
-sub _forward_length_indexed {
-	my ($a, $data) = @_;
-	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
-	}
-	else {
-		return if $a->reversed;
-	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
-	}
-}
-
-sub _forward_length_array {
-	my ($a, $data) = @_;
-	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
-	}
-	else {
-		return if $a->reversed;
-	}
-	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
+	push @{ $data->{scores} }, $a->qname;
 }
 
 sub _reverse_count_indexed {
@@ -912,7 +839,7 @@ sub _reverse_count_indexed {
 	}
 	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
 	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{'start'} and $pos <= $data->{'stop'} );
+		( $pos >= $data->{start} and $pos <= $data->{stop} );
 }
 
 sub _reverse_precise_count_indexed {
@@ -930,6 +857,21 @@ sub _reverse_precise_count_indexed {
 	$data->{'index'}{$pos}++;
 }
 
+sub _reverse_name_indexed {
+	my ($a, $data) = @_;
+	if ($a->paired) {
+		my $first = $a->get_tag_values('FIRST_MATE');
+		return if ($first and not $a->reversed);
+		return if (not $first and $a->reversed);
+	}
+	else {
+		return unless $a->reversed;
+	}
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	$data->{'index'}{$pos} ||= [];
+	push @{ $data->{'index'}{$pos} }, $a->qname;
+}
+
 sub _reverse_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
@@ -940,7 +882,7 @@ sub _reverse_count_array {
 	else {
 		return unless $a->reversed;
 	}
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _reverse_precise_count_array {
@@ -954,7 +896,7 @@ sub _reverse_precise_count_array {
 		return unless $a->reversed;
 	}
 	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	$data->{'scores'}->[0] += 1;
+	push @{$data->{scores}}, 1;
 }
 
 sub _reverse_name_array {
@@ -967,37 +909,9 @@ sub _reverse_name_array {
 	else {
 		return unless $a->reversed;
 	}
-	push @{ $data->{'scores'} }, $a->qname;
+	push @{ $data->{scores} }, $a->qname;
 }
 
-sub _reverse_length_indexed {
-	my ($a, $data) = @_;
-	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
-	}
-	else {
-		return unless $a->reversed;
-	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	if ( $pos >= $data->{'start'} and $pos <= $data->{'stop'} ) {
-		push @{ $data->{'index'}{$pos} }, ($a->calend - $a->pos);
-	}
-}
-
-sub _reverse_length_array {
-	my ($a, $data) = @_;
-	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
-	}
-	else {
-		return unless $a->reversed;
-	}
-	push @{ $data->{'scores'} }, ($a->calend - $a->pos);
-}
 
 
 
@@ -1167,11 +1081,7 @@ strandedness are collected.
 
 =item 6. The method for combining scores.
 
-Not used here. 
-
-=item 7. The value type of data to collect
-
-Acceptable values include score, count, pcount, ncount, and length.
+Acceptable values include score, count, pcount, and ncount.
 
    * score returns the basepair coverage of alignments over the 
    region of interest
@@ -1187,13 +1097,11 @@ Acceptable values include score, count, pcount, ncount, and length.
    counting only unique names. Reads are taken if they overlap 
    the search region.
    
-   length returns the lengths of all overlapping alignments 
-
-=item 8. A database object.
+=item 7. A database object.
 
 Not used here.
 
-=item 9 and higher. Paths to one or more Bam files
+=item 8 and higher. Paths to one or more Bam files
 
 =back
 

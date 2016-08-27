@@ -13,9 +13,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -52,7 +51,7 @@ our %OPENED_USEQ;
 sub collect_useq_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# adjust strand method
@@ -81,64 +80,61 @@ sub collect_useq_scores {
 		my $chromo = $USEQ_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
 	
 		# need to collect the scores based on the type of score requested
-		
-		if ($param->[VAL] eq 'score') {
-			# need to collect scores
+		if ($param->[METH] eq 'count') {
+			# need to collect features across the region
+			my $iterator = $useq->get_seq_stream(
+				-seq_id     => $chromo,
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
+				-strand     => $strand,
+			);
+			return unless $iterator;
+			
+			# count each feature
+			while (my $f = $iterator->next_seq) {
+				push @scores, 1;
+			}
+		}
+		elsif ($param->[METH] eq 'ncount') {
+			# need to collect features across the region
+			my $iterator = $useq->get_seq_stream(
+				-seq_id     => $chromo,
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
+				-strand     => $strand,
+			);
+			return unless $iterator;
+			
+			# store the names
+			while (my $f = $iterator->next_seq) {
+				push @scores, $f->display_name || $f->primary_id;
+				# if no display name, a primary_id should automatically be generated
+			}
+		}
+		elsif ($param->[METH] eq 'pcount') {
+			# need to collect features across the region
+			my $iterator = $useq->get_seq_stream(
+				-seq_id     => $chromo,
+				-start      => $param->[STRT], 
+				-end        => $param->[STOP],
+				-strand     => $strand,
+			);
+			return unless $iterator;
+			
+			# precisely count each feature
+			while (my $f = $iterator->next_seq) {
+				push @scores, 1 if 
+					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
+			}
+		}
+		else {
+			# everything else is just scores
 			push @scores, $useq->scores(
 				-seq_id     => $chromo,
 				-start      => $param->[STRT], 
 				-end        => $param->[STOP],
 				-strand     => $strand,
 			);
-		}
-		elsif ($param->[VAL] eq 'count') {
-			# need to collect features across the region
-			my $iterator = $useq->get_seq_stream(
-				-seq_id     => $chromo,
-				-start      => $param->[STRT], 
-				-end        => $param->[STOP],
-				-strand     => $strand,
-			);
-			return unless $iterator;
-			
-			# collect the lengths of each feature
-			while (my $f = $iterator->next_seq) {
-				$scores[0] += 1;
-			}
-		}
-		elsif ($param->[VAL] eq 'pcount') {
-			# need to collect features across the region
-			my $iterator = $useq->get_seq_stream(
-				-seq_id     => $chromo,
-				-start      => $param->[STRT], 
-				-end        => $param->[STOP],
-				-strand     => $strand,
-			);
-			return unless $iterator;
-			
-			# collect the lengths of each feature
-			while (my $f = $iterator->next_seq) {
-				$scores[0] += 1 if 
-					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
-			}
-		}
-		elsif ($param->[VAL] eq 'length') {
-			# need to collect features across the region
-			my $iterator = $useq->get_seq_stream(
-				-seq_id     => $chromo,
-				-start      => $param->[STRT], 
-				-end        => $param->[STOP],
-				-strand     => $strand,
-			);
-			return unless $iterator;
-			
-			# collect the lengths of each feature
-			while (my $f = $iterator->next_seq) {
-				push @scores, $f->length;
-			}
-		}
-		else {
-			confess " unrecognized method!";
 		}
 	}
 	
@@ -150,8 +146,11 @@ sub collect_useq_scores {
 sub collect_useq_position_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
+	
+	# adjust the method to strip the index flag
+	$param->[METH] =~ s/^indexed_//;
 	
 	# adjust strand method
 	my $strand;
@@ -187,7 +186,7 @@ sub collect_useq_position_scores {
 		);
 		return unless $iterator;
 		
-		# collect the lengths of each feature
+		# collect each feature
 		while (my $f = $iterator->next_seq) {
 			
 			# determine position to record
@@ -211,29 +210,63 @@ sub collect_useq_position_scores {
 			);
 			
 			# record the value
-			if ($param->[VAL] eq 'score') {
-				push @{ $pos2score{$position} }, $f->score;
-			}
-			elsif ($param->[VAL] eq 'count') {
+			if ($param->[METH] eq 'count') {
 				$pos2score{$position} += 1;
 			}
-			elsif ($param->[VAL] eq 'pcount') {
+			elsif ($param->[METH] eq 'ncount') {
+				$pos2score{$position} ||= [];
+				push @{ $pos2score{$position} }, $f->display_name || 
+					$f->primary_id;
+			}
+			elsif ($param->[METH] eq 'pcount') {
 				$pos2score{$position} += 1 if 
 					($f->start >= $param->[STRT] and $f->end <= $param->[STOP]);
 			}
-			elsif ($param->[VAL] eq 'length') {
-				push @{ $pos2score{$position} }, $f->length;
-			}
 			else {
-				confess sprintf "unrecognized value type! %s", $param->[VAL];
+				# everything else we take the score
+				push @{ $pos2score{$position} }, $f->score;
 			}
 		}
 	}
 	
 	# combine multiple datapoints at the same position
-	if ($param->[VAL] eq 'score' or $param->[VAL] eq 'length') {
-		# each value is an array of one or more datapoints
-		# we will take the simple mean
+	if ($param->[METH] eq 'ncount') {
+		foreach my $position (keys %pos2score) {
+			my %name2count;
+			foreach (@{$pos2score{$position}}) { $name2count{$_} += 1 }
+			$pos2score{$position} = scalar(keys %name2count);
+		}
+	}
+	elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
+		# do nothing, these aren't arrays
+	}
+	elsif ($param->[METH] eq 'mean') {
+		foreach my $position (keys %pos2score) {
+			$pos2score{$position} = mean( @{$pos2score{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'median') {
+		foreach my $position (keys %pos2score) {
+			$pos2score{$position} = median( @{$pos2score{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'min') {
+		foreach my $position (keys %pos2score) {
+			$pos2score{$position} = min( @{$pos2score{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'max') {
+		foreach my $position (keys %pos2score) {
+			$pos2score{$position} = max( @{$pos2score{$position}} );
+		}
+	}
+	elsif ($param->[METH] eq 'sum') {
+		foreach my $position (keys %pos2score) {
+			$pos2score{$position} = sum( @{$pos2score{$position}} );
+		}
+	}
+	else {
+		# just take the mean for everything else
 		foreach my $position (keys %pos2score) {
 			$pos2score{$position} = mean( @{$pos2score{$position}} );
 		}
@@ -344,7 +377,7 @@ The subroutine is passed a parameter array reference. See below for details.
 The subroutine returns a hash or hash reference of the defined dataset values 
 found within the region of interest keyed by position. The feature midpoint 
 is used as the key position. When multiple features are found at the same 
-position, a simple mean (for score or length data methods) or sum 
+position, a simple mean (for score methods) or sum 
 (for count methods) is returned.
 
 =back
@@ -378,11 +411,7 @@ strandedness are collected.
 
 =item 6. The method for combining scores.
 
-Not used here. 
-
-=item 7. The value type of data to collect
-
-Acceptable values include score, count, pcount, ncount, and length.
+Acceptable values include score, count, ncount, and pcount.
 
    * score returns the basepair coverage of alignments over the 
    region of interest
@@ -398,13 +427,11 @@ Acceptable values include score, count, pcount, ncount, and length.
    counting only unique names. Reads are taken if they overlap 
    the search region.
    
-   length returns the lengths of all overlapping alignments 
-
-=item 8. A database object.
+=item 7. A database object.
 
 Not used here.
 
-=item 9 and higher. Paths to one or more USeq files
+=item 8 and higher. Paths to one or more USeq files
 
 Opened USeq file objects are cached. 
 

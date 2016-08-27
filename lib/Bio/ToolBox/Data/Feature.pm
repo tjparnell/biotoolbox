@@ -916,7 +916,6 @@ sub get_score {
 	
 	# score attributes
 	$args{'method'}     ||= 'mean';
-	$args{value}        ||= 'score';
 	$args{strandedness} ||= $args{stranded} || 'all';
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
@@ -934,7 +933,6 @@ sub get_score {
 		$args{strand},
 		$args{strandedness},
 		$args{'method'},
-		$args{value},
 		$db,
 		$args{dataset},
 	);
@@ -953,10 +951,10 @@ sub get_relative_point_position_scores {
 	
 	# assign some defaults
 	$args{strandedness} ||= $args{stranded} || 'all';
-	$args{value}        ||= 'score';
 	$args{position}     ||= 5;
 	$args{coordinate}   ||= undef;
 	$args{avoid}        ||= undef;
+	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
 	unless ($args{extend}) {
 		croak "must provide an extend value!";
 	}
@@ -977,8 +975,7 @@ sub get_relative_point_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'indexed', # method
-		$args{value},
+		'indexed_' . $args{'method'},
 		$ddb,
 		$args{dataset}, 
 	);
@@ -1013,10 +1010,10 @@ sub get_region_position_scores {
 	
 	# assign some defaults
 	$args{strandedness} ||= $args{stranded} || 'all';
-	$args{value}        ||= 'score';
 	$args{extend}       ||= 0;
 	$args{exon}         ||= 0;
 	$args{position}     ||= 5;
+	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
 	
 	# get positioned scores over subfeatures only
@@ -1044,8 +1041,7 @@ sub get_region_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'indexed', # method
-		$args{value},
+		'indexed_' . $args{'method'},
 		$ddb,
 		$args{dataset}, 
 	);
@@ -1107,7 +1103,6 @@ sub _get_subfeature_position_scores {
 			defined $args->{strand} ? $args->{strand} : $exon->strand, 
 			$args->{strandedness}, 
 			'indexed', # method
-			$args->{value},
 			$ddb,
 			$args->{dataset}, 
 		);
@@ -1132,7 +1127,6 @@ sub _get_subfeature_position_scores {
 			defined $args->{strand} ? $args->{strand} : $feature->strand, 
 			$args->{strandedness}, 
 			'indexed', # method
-			$args->{value},
 			$ddb,
 			$args->{dataset}, 
 		);
@@ -1149,7 +1143,6 @@ sub _get_subfeature_position_scores {
 			defined $args->{strand} ? $args->{strand} : $feature->strand, 
 			$args->{strandedness}, 
 			'indexed', # method
-			$args->{value},
 			$ddb,
 			$args->{dataset}, 
 		);

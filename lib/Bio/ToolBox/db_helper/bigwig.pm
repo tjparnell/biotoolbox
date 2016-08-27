@@ -14,9 +14,8 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	VAL  => 6,  # value type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
+	DB   => 6,  # database object
+	DATA => 7,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -120,13 +119,8 @@ our %MULTI_SUMMARY_METHOD = (
 sub collect_bigwig_score {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
-	# change the method for a special situation
-	if ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-		$param->[METH] = 'count';
-	}
 	
 	# Collecting summary features
 	# we will collect a summary object for each requested wig feature  
@@ -157,8 +151,11 @@ sub collect_bigwig_score {
 sub collect_bigwig_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
+	
+	# we don't have support for pcount and ncount, so make sure we change those
+	$param->[METH] = 'count' if $param->[METH] =~ /\wcount/;
 	
 	# Walk through each requested feature
 	# There is likely only one
@@ -191,8 +188,14 @@ sub collect_bigwig_scores {
 sub collect_bigwig_position_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
+	
+	# strip the method index prefix, we no longer need
+	$param->[METH] =~ s/^indexed_//;
+	
+	# we don't have support for pcount and ncount, so make sure we change those
+	$param->[METH] = 'count' if $param->[METH] =~ /\wcount/;
 	
 	# initialize 
 	my %pos2data; # hash of position => score
@@ -256,13 +259,8 @@ sub collect_bigwig_position_scores {
 sub collect_bigwigset_score {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
-	# change the method for a special situation
-	if ($param->[VAL] eq 'count' and $param->[METH] eq 'sum') {
-		$param->[METH] = 'count';
-	}
 	
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
@@ -279,7 +277,7 @@ sub collect_bigwigset_score {
 sub collect_bigwigset_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# lookup the bigWig files based on the parameters
@@ -296,7 +294,7 @@ sub collect_bigwigset_scores {
 sub collect_bigwigset_position_scores {
 	
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# lookup the bigWig files based on the parameters
@@ -488,7 +486,7 @@ sub _remove_duplicate_positions {
 ### Internal subroutine to identify and cache selected bigWigs from a BigWigSet
 sub _lookup_bigwigset_wigs {
 	# passed parameters as array ref
-	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
 	# the datasets, could be either types or names, unfortunately
@@ -689,18 +687,16 @@ strandedness are collected.
 =item 6. The method for combining scores.
 
 Acceptable values include mean, min, max, stddev, sum, and count.
-Used when collecting a single value over a genomic segnment.
+Used when collecting a single value over a genomic segnment. 
+Methods of pcount and ncount are technically supported, but are 
+treated the same as count.
 
-=item 7. The value type of data to collect
-
-Typically only 'score' is accepted here.
-
-=item 8. A database object.
+=item 7. A database object.
 
 Pass the opened L<Bio::DB::BigWigSet> database object when working 
 with BigWigSets.
 
-=item 9 and higher. BigWig file names or BigWigSet database types.
+=item 8 and higher. BigWig file names or BigWigSet database types.
 
 Opened BigWig objects are cached. Both local and remote BigWig files 
 are supported. 
