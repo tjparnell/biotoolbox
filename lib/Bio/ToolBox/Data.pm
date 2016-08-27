@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.41';
+our $VERSION = '1.42';
 
 =head1 NAME
 
@@ -972,9 +972,8 @@ sub parse_table {
 	}
 	
 	# parse the table
-	my $parser = $class->new(
-		file => $file,
-	);
+	my $parser = $class->new() or return;
+	$parser->open_file($file) or return,
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
