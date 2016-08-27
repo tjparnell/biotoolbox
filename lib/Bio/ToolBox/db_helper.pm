@@ -57,6 +57,7 @@ our @EXPORT_OK = qw(
 	validate_included_feature 
 	get_db_feature 
 	get_segment_score 
+	calculate_score
 	get_chromosome_list 
 );
 
@@ -2000,58 +2001,64 @@ sub get_segment_score {
 	# otherwise we get a list of scores
 	my $scores = &{$db_method}($param);
 	return wantarray ? @$scores : $scores if $param->[METH] eq 'scores'; 
+	
+	# calculate a single score for this array of score values
+	return calculate_score($param->[METH], $scores);
+}
+
+
+sub calculate_score {
+	my ($method, $scores) = @_;
+	
+	# empty score
 	if (not defined $scores or scalar @$scores == 0) {
-		return 0 if $param->[METH] =~ /count|sum/;
+		return 0 if $method =~ /count|sum/;
 		return '.';	
 	}
 	
-	# calculate a single score for this array of score values
-	my $region_score;
-	if ($param->[METH] eq 'mean') {
-		$region_score = mean(@$scores);
+	# calculate a score based on the method
+	if ($method eq 'mean') {
+		return mean(@$scores);
 	} 
-	elsif ($param->[METH] eq 'median') {
-		$region_score = median(@$scores);
+	elsif ($method eq 'median') {
+		return median(@$scores);
 	}
-	elsif ($param->[METH] eq 'range') {
+	elsif ($method eq 'range') {
 		# the range value is 'min-max'
-		$region_score = range(@$scores);
+		return range(@$scores);
 	}
-	elsif ($param->[METH] eq 'stddev') {
+	elsif ($method eq 'stddev') {
 		# we are using the standard deviation of the population, 
 		# since these are the only scores we are considering
-		$region_score = stddevp(@$scores);
+		return stddevp(@$scores);
 	}
-	elsif ($param->[METH] eq 'min') {
-		$region_score = min(@$scores);
+	elsif ($method eq 'min') {
+		return min(@$scores);
 	}
-	elsif ($param->[METH] eq 'max') {
-		$region_score = max(@$scores);
+	elsif ($method eq 'max') {
+		return max(@$scores);
 	}
-	elsif ($param->[METH] eq 'sum') {
-		$region_score = sum(@$scores);
+	elsif ($method eq 'sum') {
+		return sum(@$scores);
 	}
-	elsif ($param->[METH] eq 'ncount') {
+	elsif ($method eq 'ncount') {
 		# Convert names into unique counts
 		my %name2count;
 		foreach (@$scores) { $name2count{$_} += 1 }
-		$region_score = scalar(keys %name2count);
+		return scalar(keys %name2count);
 	}
-	elsif ($param->[METH] eq 'count' or $param->[METH] eq 'pcount') {
-		$region_score = scalar(@$scores);
+	elsif ($method eq 'count' or $method eq 'pcount') {
+		return scalar(@$scores);
 	}
-	elsif ($param->[METH] =~ /rpk?m/) {
+	elsif ($method =~ /rpk?m/) {
 		confess " The rpm methods have been deprecated due to complexity and " .
 			"the variable way of calculating the value. Collect counts and " . 
 			"calculate your preferred way.\n";
 	}
 	else {
 		# somehow bad method snuck past our checks
-		confess " unrecognized method '$param->[METH]'!";
+		confess " unrecognized method '$method'!";
 	}
-
-	# finished
-	return $region_score;
 }
 
 
