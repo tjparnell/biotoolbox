@@ -463,7 +463,7 @@ attribute key.
 use strict;
 use Carp qw(carp cluck croak confess);
 use Module::Load;
-use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score);
+use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score calculate_score);
 
 my $GENETOOL_LOADED = 0;
 1;
@@ -874,6 +874,24 @@ sub get_score {
 	my $self = shift;
 	my %args = @_;
 	
+	# verify the dataset for the user, cannot trust whether it has been done or not
+	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
+	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
+	unless ($args{dataset}) {
+		croak "provided dataset was unrecognized format or otherwise could not be verified!";
+	}
+	
+	# score attributes
+	$args{'method'}     ||= 'mean';
+	$args{strandedness} ||= $args{stranded} || 'all';
+	
+	# get positioned scores over subfeatures only
+	$args{exon} ||= 0;
+	if ($self->feature_type eq 'named' and $args{exon}) {
+		# this is more complicated so we have a dedicated method
+		return $self->_get_subfeature_scores($db, \%args);
+	}
+	
 	# verify coordinates based on type of feature
 	if ($self->feature_type eq 'coordinate') {
 		# coordinates are already in the table, use those
@@ -914,17 +932,6 @@ sub get_score {
 	}
 	return unless ($args{chromo} and defined $args{start});
 	
-	# score attributes
-	$args{'method'}     ||= 'mean';
-	$args{strandedness} ||= $args{stranded} || 'all';
-	
-	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
-	unless ($args{dataset}) {
-		croak "provided dataset was unrecognized format or otherwise could not be verified!";
-	}
-	
 	# get the score
 	return get_segment_score(
 		$args{chromo},
@@ -936,6 +943,47 @@ sub get_score {
 		$db,
 		$args{dataset},
 	);
+}
+
+sub _get_subfeature_scores {
+	my ($self, $db, $args) = @_;
+	
+	# load GeneTools
+	unless ($GENETOOL_LOADED) {
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		if ($@) {
+			croak "missing required modules! $@";
+		}
+		else {
+			$GENETOOL_LOADED = 1;
+		}
+	}
+	
+	# feature
+	my $feature = $self->seqfeature;
+	unless ($feature) {
+		carp "no SeqFeature available! Cannot collect exon data!";
+		return;
+	}
+	
+	# collect over each exon
+	my @scores;
+	foreach my $exon (get_exons($feature)) {
+		my $exon_scores = get_segment_score(
+			$exon->seq_id,
+			$exon->start,
+			$exon->end,
+			defined $args->{strand} ? $args->{strand} : $exon->strand, 
+			$args->{strandedness}, 
+			'scores', # method
+			$db,
+			$args->{dataset}, 
+		);
+		push @scores, @$exon_scores;
+	}
+	
+	# combine all the scores based on the requested method
+	return calculate_score($args->{'method'}, \@scores);
 }
 
 sub get_relative_point_position_scores {
