@@ -959,7 +959,7 @@ sub duplicate {
 sub parse_table {
 	my ($self, $file) = @_;
 	unless ($file) {
-		carp "no gff file provided to parse!";
+		carp "no annotation file provided to parse!";
 		return;
 	}
 	
@@ -973,7 +973,7 @@ sub parse_table {
 	
 	# parse the table
 	my $parser = $class->new() or return;
-	$parser->open_file($file) or return,
+	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
