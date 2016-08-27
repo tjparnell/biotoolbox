@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.40';
+our $VERSION = '1.42';
 
 =head1 NAME
 
@@ -166,8 +166,7 @@ CDSs, UTRs, and start and stop codons. Default is false.
 
 Pass a boolean (1 or 0) value to recycle shared subfeatures (exons and UTRs) 
 between multiple transcripts of the same gene. This results in reduced 
-memory usage, and smaller exported GFF3 files. Default is true if the do_genes 
-option is also true. 
+memory usage, and smaller exported GFF3 files. Default is true. 
 
 =item refseqsum
 
@@ -361,12 +360,12 @@ sub new {
 			'rrna'       => 0,
 			'other'      => 0,
 		},
-		'do_gene'       => 0, # if we read our own file, then yes do genes
-		'do_cds'        => 0, # do not complicate by parsing other features
-		'do_utr'        => 0, # unless specifically requested
+		'do_gene'       => 1, 
+		'do_cds'        => 0, 
+		'do_utr'        => 0, 
 		'do_codon'      => 0,
 		'do_name'       => 0,
-		'share'         => 0, # only share if we parse into genes below
+		'share'         => 1, 
 		'refseqsum'     => {}, 
 		'refseqstat'    => {},
 		'kgxref'        => {},
@@ -384,8 +383,6 @@ sub new {
 			# short and sweet, just a file, we assume
 			my $file = shift @_;
 			$self->open_file($file);
-			$self->do_gene(1);
-			$self->share(1);
 		}
 		else {
 			my %options = @_;
@@ -395,9 +392,6 @@ sub new {
 			}
 			if (exists $options{do_gene}) {
 				$self->do_gene($options{do_gene});
-			}
-			elsif ($self->fh) {
-				$self->do_gene(1);
 			}
 			if (exists $options{do_cds}) {
 				$self->do_cds($options{do_cds});
@@ -413,9 +407,6 @@ sub new {
 			}
 			if (exists $options{share}) {
 				$self->share($options{share});
-			}
-			elsif ($self->fh) {
-				$self->share(1);
 			}
 			if (exists $options{source}) {
 				$self->source($options{source});
