@@ -5,15 +5,8 @@ use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
 use Module::Load; # for dynamic loading during runtime
-use Statistics::Lite qw(
-	sum
-	mean
-	median
-	min
-	max
-	range
-	stddevp
-);
+use List::Util qw(min max sum);
+use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant {
@@ -2018,10 +2011,31 @@ sub calculate_score {
 	
 	# calculate a score based on the method
 	if ($method eq 'mean') {
-		return mean(@$scores);
+		my $n = scalar(@$scores);
+		return 0 if $n == 0;
+		return $scores->[0] if $n == 1;
+		return sum(@$scores)/$n;
 	} 
+	elsif ($method eq 'sum') {
+		return sum(@$scores);
+	}
 	elsif ($method eq 'median') {
 		return median(@$scores);
+	}
+	elsif ($method eq 'min') {
+		return min(@$scores);
+	}
+	elsif ($method eq 'max') {
+		return max(@$scores);
+	}
+	elsif ($method eq 'count' or $method eq 'pcount') {
+		return scalar(@$scores);
+	}
+	elsif ($method eq 'ncount') {
+		# Convert names into unique counts
+		my %name2count;
+		foreach (@$scores) { $name2count{$_} += 1 }
+		return scalar(keys %name2count);
 	}
 	elsif ($method eq 'range') {
 		# the range value is 'min-max'
@@ -2031,24 +2045,6 @@ sub calculate_score {
 		# we are using the standard deviation of the population, 
 		# since these are the only scores we are considering
 		return stddevp(@$scores);
-	}
-	elsif ($method eq 'min') {
-		return min(@$scores);
-	}
-	elsif ($method eq 'max') {
-		return max(@$scores);
-	}
-	elsif ($method eq 'sum') {
-		return sum(@$scores);
-	}
-	elsif ($method eq 'ncount') {
-		# Convert names into unique counts
-		my %name2count;
-		foreach (@$scores) { $name2count{$_} += 1 }
-		return scalar(keys %name2count);
-	}
-	elsif ($method eq 'count' or $method eq 'pcount') {
-		return scalar(@$scores);
 	}
 	elsif ($method =~ /rpk?m/) {
 		confess " The rpm methods have been deprecated due to complexity and " .
