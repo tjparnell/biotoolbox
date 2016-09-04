@@ -1984,7 +1984,7 @@ sub get_segment_score {
 	my $param = [@_];
 	
 	# determine method
-	my ($db_method, $do_return, $db_type) = _lookup_db_method($param);
+	my ($db_method, $do_return) = _lookup_db_method($param);
 	
 	# immediately return calculated score if appropriate
 	if ($do_return) {
@@ -2430,7 +2430,7 @@ sub _lookup_db_method {
 	# otherwise we determine the appropriate database method and cache the result
 	
 	# determine the appropriate score method
-	my ($score_method, $do_return, $db_type);
+	my ($score_method, $do_return);
 	if ($param->[DATA] =~ /^file|http|ftp/) {
 		# collect the data according to file type
 		
@@ -2455,7 +2455,6 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_bigwig_scores;
 					$do_return = 0;
-					$db_type = 'bw';
 				}
 			}
 			else {
@@ -2481,7 +2480,6 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_bigbed_scores;
 					$do_return = 0;
-					$db_type = 'bb';
 				}
 			}
 			else {
@@ -2506,7 +2504,6 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_bam_scores;
 					$do_return = 0;
-					$db_type = 'bam';
 				}
 			}
 			else {
@@ -2532,7 +2529,6 @@ sub _lookup_db_method {
 				else {
 					$score_method = \&collect_useq_scores;
 					$do_return = 0;
-					$db_type = 'useq';
 				}
 			}
 			else {
@@ -2572,7 +2568,6 @@ sub _lookup_db_method {
 		else {
 			$score_method = \&collect_bigwigset_scores;
 			$do_return = 0;
-			$db_type = 'bw';
 		}
 	}
 		
@@ -2603,7 +2598,6 @@ sub _lookup_db_method {
 			else {
 				$score_method = \&collect_store_scores;
 				$do_return = 0;
-				$db_type = 'seqfeature';
 			}
 		}
 		else {
@@ -2622,8 +2616,8 @@ sub _lookup_db_method {
 		
 	
 	### Cache and return the results
-	$DB_METHODS{$lookup} = [$score_method, $do_return, $db_type];
-	return ($score_method, $do_return, $db_type);
+	$DB_METHODS{$lookup} = [$score_method, $do_return];
+	return ($score_method, $do_return);
 }
 
 
