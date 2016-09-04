@@ -1117,7 +1117,7 @@ sub _get_subfeature_position_scores {
 	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1132,13 +1132,14 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	my $length = get_transcript_length($feature);
+	my $length = $args->{'length'} || get_transcript_length($feature);
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
 	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
 	# it will appear as if all the exons are adjacent to each other
 	# and no introns exist
-	my %regionscores;
+	my %pos2data;
 	my $current_end = $feature->start;
 	my $adjustment = 0;
 	foreach my $exon (get_exons($feature)) {
@@ -1148,7 +1149,7 @@ sub _get_subfeature_position_scores {
 			$exon->seq_id,
 			$exon->start,
 			$exon->end,
-			defined $args->{strand} ? $args->{strand} : $exon->strand, 
+			$fstrand, 
 			$args->{strandedness}, 
 			'indexed', # method
 			$ddb,
@@ -1158,7 +1159,7 @@ sub _get_subfeature_position_scores {
 		# adjust scores
 		$adjustment = $exon->start - $current_end;
 		foreach my $p (keys %$exon_scores) {
-			$regionscores{ $p - $adjustment } = $exon_scores->{$p};
+			$pos2data{ $p - $adjustment } = $exon_scores->{$p};
 		}
 		
 		# reset
@@ -1172,7 +1173,7 @@ sub _get_subfeature_position_scores {
 			$feature->seq_id,
 			$feature->start - $args->{extension},
 			$feature->start - 1,
-			defined $args->{strand} ? $args->{strand} : $feature->strand, 
+			$fstrand, 
 			$args->{strandedness}, 
 			'indexed', # method
 			$ddb,
@@ -1180,7 +1181,7 @@ sub _get_subfeature_position_scores {
 		);
 		foreach my $p (keys %$ext_scores) {
 			# no adjustment should be needed
-			$regionscores{$p} = $ext_scores->{$p};
+			$pos2data{$p} = $ext_scores->{$p};
 		}
 		
 		# right side
@@ -1188,7 +1189,7 @@ sub _get_subfeature_position_scores {
 			$feature->seq_id,
 			$feature->end + $args->{extension},
 			$feature->end + 1,
-			defined $args->{strand} ? $args->{strand} : $feature->strand, 
+			$fstrand, 
 			$args->{strandedness}, 
 			'indexed', # method
 			$ddb,
@@ -1196,11 +1197,21 @@ sub _get_subfeature_position_scores {
 		);
 		foreach my $p (keys %$ext_scores) {
 			# the adjustment should be the same as the last exon
-			$regionscores{$p - $adjustment} = $ext_scores->{$p};
+			$pos2data{$p - $adjustment} = $ext_scores->{$p};
 		}
 	}
 	
-	return wantarray ? %regionscores : \%regionscores;
+	# covert to relative positions
+	if ($args->{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %pos2data : \%pos2data;
+	}
+	else {
+		# return data converted to relative positions
+		$self->_calculate_reference($args);
+		return $self->_convert_to_relative_positions(\%pos2data, 
+			$args->{coordinate}, $fstrand);
+	}
 }
 
 sub _calculate_reference {
