@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.41';
+our $VERSION = '1.50';
 
 =head1 NAME
 
@@ -203,7 +203,9 @@ transcript object is returned containing the merged exon subfeatures.
 =item get_transcript_length($transcript)
 
 Calculates and returns the transcribed length of a transcript, i.e 
-the sum of its exon lengths.
+the sum of its exon lengths. Warning! If you pass a gene object, you 
+will get the maximum of all transcript exon lengths, which may not be 
+what you anticipate!
 
 =back
 
@@ -753,6 +755,15 @@ sub collapse_transcripts {
 sub get_transcript_length {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	if ($transcript->primary_tag =~ /gene/i) {
+		# someone passed a gene object!!!!
+		my @lengths;
+		foreach my $t (get_transcripts($transcript)) {
+			push @lengths, get_transcript_length($t);
+		}
+		# return the longest transcript length
+		return  (sort {$b <=> $a} @lengths)[0];
+	}
 	my $total = 0;
 	foreach my $e (get_exons($transcript)) {
 		$total += $e->length;
