@@ -5,29 +5,22 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(sum mean median min max stddevp);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	check_dataset_for_rpm_support
+	calculate_score
 );
 use Bio::ToolBox::utility;
+use Bio::ToolBox::GeneTools qw(:transcript);
 my $parallel;
 eval {
 	# check for parallel support
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant LOG2 => log(2);
-use constant DATASET_HASH_LIMIT => 5001;
-		# This constant determines the maximum size of the dataset hash to be 
-		# returned from the get_region_dataset_hash(). To increase performance, 
-		# the program normally queries the database once for each feature or 
-		# region, and a hash returned with potentially a score for each basepair. 
-		# This may become unwieldy for very large regions, which may be better 
-		# served by separate database queries for each window.
-my $VERSION = '1.40';
+my $VERSION = '1.50';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -52,8 +45,8 @@ my (
 	$data_database,
 	$dataset,
 	$feature,
+	$subfeature,
 	$method,
-	$value_type,
 	$stranded,
 	$bins,
 	$extension,
@@ -62,7 +55,6 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
-	$log,
 	$set_strand,
 	$gz,
 	$cpu,
@@ -74,12 +66,12 @@ my (
 GetOptions( 
 	'in=s'        => \$infile, # input file
 	'out=s'       => \$outfile, # name of outfile
-	'db=s'       => \$main_database, # main or annotation database name
-	'ddb=s'      => \$data_database, # data database
+	'db=s'        => \$main_database, # main or annotation database name
+	'ddb=s'       => \$data_database, # data database
 	'data=s'      => \$dataset, # dataset name
 	'feature=s'   => \$feature, # what type of feature to work with
+	'exons!'      => \$subfeature, # indicate to restrict to subfeatures
 	'method=s'    => \$method, # method for collecting the data
-	'value=s'     => \$value_type, # type of data to collect
 	'strand=s'    => \$stranded, # indicate whether stranded data should be taken
 	'bins=i'      => \$bins, # number of bins
 	'ext=i'       => \$extension, # number of bins to extend beyond the feature
@@ -88,7 +80,6 @@ GetOptions(
 	'long!'       => \$long_data, # collecting long data features
 	'smooth!'     => \$smooth, # do not interpolate over missing values
 	'sum'         => \$sum, # determine a final average for all the features
-	'log!'        => \$log, # dataset is in log2 space
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
 	'gz!'         => \$gz, # compress the output file
@@ -118,6 +109,7 @@ if ($print_version) {
 ### Check for required values
 check_defaults();
 my $start_time = time;
+my $collapsed = 0; # global value to indicate transcripts are collapsed
 
 
 
@@ -134,7 +126,7 @@ if ($infile) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-			print "   Re-run without --db option if you do not want this to happen\n";
+# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
@@ -156,8 +148,6 @@ else {
 	) or die " unable to generate new feature list\n";
 }
 $Data->program("$0, v $VERSION");
-
-
 
 # the number of columns already in the data array
 my $startcolumn = $Data->number_columns; 
@@ -238,7 +228,6 @@ if ($sum) {
 		'filename'    => $outfile,
 		'startcolumn' => $startcolumn,
 		'dataset'     => $dataset,
-		'log'         => $log,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -251,6 +240,9 @@ if ($sum) {
 
 
 ## Write main output
+unless ($outfile) {
+	$outfile = $Data->path . $Data->basename;
+}
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -281,14 +273,8 @@ sub check_defaults {
 		die " You must define a feature!\n Use --help for more information\n";
 	}
 
-	unless ($outfile) {
-		if ($infile) {
-			$outfile = $infile;
-			$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
-		}
-		else {
-			die " You must define an output filename !\n Use --help for more information\n";
-		}
+	unless ($outfile or $infile) {
+		die " You must define an output filename !\n Use --help for more information\n";
 	}
 
 	if ($stranded) {
@@ -304,22 +290,6 @@ sub check_defaults {
 		$stranded = 'all'; # default is no strand information
 	}
 
-	if (defined $value_type) {
-		# validate the requested value type
-		unless (
-			$value_type eq 'score' or
-			$value_type eq 'count' or
-			$value_type eq 'length'
-		) {
-			die " unknown value type '$value_type'!\n";
-		}
-	}
-	else {
-		# default value
-		print " Collecting default data 'score' values\n";
-		$value_type = 'score';
-	}
-
 	if (defined $method) {
 		unless (
 			$method eq 'mean' or 
@@ -328,26 +298,20 @@ sub check_defaults {
 			$method eq 'min' or 
 			$method eq 'max' or 
 			$method eq 'stddev' or
-			$method eq 'rpm'
+			$method =~ /^\w?count/
 		) {
 			die " '$method' is not recognized for method\n Use --help for more information\n";
 		}
 	
-		if ($method =~ /rpm/) {
-			# make sure we collect the right values
-			$value_type = 'count';
-		}
 	} 
 	else {
-		# set default method
-		if ($value_type eq 'count') {
-			$method = 'sum';
-		}
-		else {
-			$method = 'mean';
-		}
+		$method = 'mean';
 	}
-
+	
+	if ($subfeature and $long_data) {
+		die " Long data collection is incompatible with exon subfeatures\n Use --help for more information\n";
+	}
+	
 	# assign default values
 	unless (defined $bins) {
 		# dividing gene into 10 (10%) bins seems reasonable to me
@@ -359,24 +323,18 @@ sub check_defaults {
 		$extension = 0;
 	}
 
-	unless (defined $log) {
-		# default is that data is not in log 2
-		$log = 0;
-	}
-
 	unless (defined $smooth) {
 		# default is to not include smoothing
 		$smooth = 0;
 	}
 
 	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
+		$cpu ||= 4;
 	}
 	else {
 		# disable cores
 		print " disabling parallel CPU execution, no support present\n" if $cpu;
-		$cpu = 0;
+		$cpu = 1;
 	}
 }
 
@@ -408,8 +366,17 @@ sub parallel_execution {
 			$ddb = open_db_connection($data_database, 1);
 		}
 		
+		# Prepare the metadata and header names
+		my $binsize = (100/$bins); 
+		prepare_bins($binsize);
+		
 		# Collect the data
-		collect_binned_data();
+		if ($long_data) {
+			collect_binned_long_data($binsize);
+		}
+		else {
+			collect_binned_data($binsize);
+		}
 		
 		# Interpolate values
 		if ($smooth) {
@@ -451,8 +418,17 @@ sub parallel_execution {
 ## Run in single thread
 sub single_execution {
 	
+	# Prepare the metadata and header names
+	my $binsize = (100/$bins); 
+	prepare_bins($binsize);
+	
 	# Collect the data
-	collect_binned_data();
+	if ($long_data) {
+		collect_binned_long_data($binsize);
+	}
+	else {
+		collect_binned_data($binsize);
+	}
 	
 	# Interpolate values
 	if ($smooth) {
@@ -462,50 +438,27 @@ sub single_execution {
 }
 
 
-## Collect the binned data across the gene
-sub collect_binned_data {
-	
-	## Prepare the metadata and header names
-	my $binsize = (100/$bins); 
-	prepare_bins($binsize);
-	
-	
-	## Select the appropriate method for data collection
-	if ($Data->feature_type eq 'coordinate') {
-		# using genome segments
-		collect_binned_data_for_regions($binsize);
-	}
-	elsif ($Data->feature_type eq 'named') {
-		# using named features
-		collect_binned_data_for_features($binsize);
-	}
-	else {
-		die " Unable to identify columns with feature identifiers!\n" .
-			" File must have Name and Type, or Chromo, Start, Stop columns\n";
-	}
-}	
 
-
-
-sub collect_binned_data_for_features {	
+sub collect_binned_data {	
 	my $binsize = shift;
+	
+	# collapse transcripts if needed
+	if ($subfeature and not $collapsed) {
+		$collapsed = collapse_all_features();
+	}
+	my $length_i = $Data->find_column('Merged_Transcript_Length');
+	
 	
 	## Collect the data
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
 		# identify the feature first
-		my $feature = $row->feature;
-		unless ($feature) {
-			# record null values
-			for my $c ($startcolumn..($Data->last_column) ) {
-				$row->value($c, '.');
-			}
-			next;
-		}
+		my $feature = $row->feature || $row;
 		
 		# define the starting and ending points based on gene length
-		my $length = $feature->length;
+		my $length = $length_i ? $row->value($length_i) : 
+			$feature->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -534,99 +487,144 @@ sub collect_binned_data_for_features {
 			}
 		}
 		
-		# collect the data based on whether we want a hash or separate scores
-		if ($length + (2 * $extra) > DATASET_HASH_LIMIT or $long_data) {
-			# we will be collecting scores for each bin as separate db queries
-			record_individual_bin_values(
-				$row, 
-				$feature->seq_id, 
-				$feature->start, 
-				$feature->end, 
-				$set_strand ? $row->strand : $feature->strand, 
-				$length,
-			);
-		}
-		else {
-			# collect the region scores in a single db query
-			my %regionscores = $row->get_position_scores(
-				'ddb'       => $ddb,
-				'dataset'   => $dataset,
-				'value'     => $value_type,
-				'extend'    => $extra,
-				'stranded'  => $stranded,
-				'strand'    => $set_strand ? $row->strand : $feature->strand,
-			);
-		
-			# record the scores for each bin
-			record_the_bin_values($row, $length, \%regionscores);
-		}
+		my $regionscores = $row->get_region_position_scores(
+			'ddb'       => $ddb,
+			'dataset'   => $dataset,
+			'method'    => $method,
+			'extend'    => $extra,
+			'stranded'  => $stranded,
+			'strand'    => $set_strand ? $row->strand : $feature->strand,
+			'exon'      => $subfeature,
+			'length'    => $length,
+		);
+		# record the scores for each bin
+		record_the_bin_values($row, $length, $regionscores);
 	}	
 }
 
 
-
-sub collect_binned_data_for_regions {
+sub collect_binned_long_data {	
 	my $binsize = shift;
 	
 	## Collect the data
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
-		# walk through each feature
 		
-		# determine the segment length
-		my $length = $row->length;
+		# identify the feature or use the row
+		my $feature = $row->feature || $row;
+		my $fstart = $feature->start;
+		my $fstop = $feature->end;
+		my $strand = $set_strand ? $row->strand : $feature->strand;
+		my $length = $feature->length;
 		
-		# check the length
-		if (defined $min_length and $length < $min_length) {
-			# this feature is too short to divided into bins
-			# we will skip this feature
+		# collect the scores to the bins in the region
+		for my $column ($startcolumn..($Data->last_column) ) {
+			# we will step through each data column, representing each window (bin)
+			# across the feature's region
+			# any scores within this window will be collected and the mean 
+			# value reported
+		
+			# convert the window start and stop coordinates (as percentages) to
+			# actual bp
+			# this depends on whether the binsize is explicitly defined in bp or
+			# is a fraction of the feature length
+			my ($start, $stop);
+			if ($Data->metadata($column, 'bin_size') =~ /bp$/) {
+				# the bin size is explicitly defined
 			
-			# but first, put in null values
-			for my $c ($startcolumn..($Data->last_column) ) {
-				$row->value($c, '.');
+				# the start and stop points are relative to either the feature
+				# start (always 0) or the end (the feature length), depending
+				# upon whether the 5' or 3' end of the feature
+			
+				# determine this by the sign of the start position
+				if ($Data->metadata($column, 'start') < 0 and $strand >= 0) {
+					# the start position is less than 0, implying the 5' end
+					# the reference position will be the feature start on plus strand
+					$start = $fstart + $Data->metadata($column, 'start');
+					$stop  = $fstart + $Data->metadata($column, 'stop');
+				}
+				elsif ($Data->metadata($column, 'start') < 0 and $strand < 0) {
+					# the start position is less than 0, implying the 5' end
+					# the reference position will be the feature end on minus strand
+					$start = $fstop - $Data->metadata($column, 'start');
+					$stop  = $fstop - $Data->metadata($column, 'stop');
+				}
+				elsif ($Data->metadata($column, 'start') >= 0 and $strand >= 0) {
+					# the start position is greather than 0, implying the 3' end
+					# the reference position will be the feature start on plus strand
+					$start = $fstop + $Data->metadata($column, 'start');
+					$stop  = $fstop + $Data->metadata($column, 'stop');
+				}
+				elsif ($Data->metadata($column, 'start') >= 0 and $strand < 0) {
+					# the start position is greather than 0, implying the 3' end
+					# the reference position will be the feature end on minus strand
+					$start = $fstart - $Data->metadata($column, 'start');
+					$stop  = $fstart - $Data->metadata($column, 'stop');
+				}
+				else {
+					warn " unable to unable to identify region orientation: start " . 
+						$Data->metadata($column, 'start') . ", strand $strand\n";
+					return;
+				}
 			}
-			next;
-		}
+			else {
+				# otherwise the bin size is based on feature length
+				if ($strand >= 0) {
+					# forward plus strand
+					$start = int( $fstart + 
+						($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
+					$stop  = int( $fstart + 
+						($Data->metadata($column, 'stop') * 0.01 * $length) - 1 + 0.5);
+				}
+				else {
+					# reverse minus strand
+					$start = int( $fstop - 
+						($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
+					$stop  = int( $fstop - 
+						($Data->metadata($column, 'stop') * 0.01 * $length) + 1 + 0.5);
+				}
+			}
 		
-		# the starting and ending points will be calculated from the number of
-		# extensions, the binsize (multiply by 0.01 to get fraction), and the gene
-		# length. No extensions should give just the length of the gene.
-		my $extra;
-		if ($extension_size) {
-			# extension is specific bp in size
-			$extra = $extension_size * $extension;
-		}
-		else {
-			# extension is dependent on feature length
-			$extra = int( ($extension * $binsize * 0.01 * $length) + 0.5);
-		}
-		
-		# collect the data based on whether we want a hash or separate scores
-		if ($length + (2 * $extra) > DATASET_HASH_LIMIT or $long_data) {
-			# we will be collecting scores for each bin as separate db queries
-			record_individual_bin_values(
-				$row, 
-				$row->seq_id, 
-				$row->start, 
-				$row->end, 
-				$row->strand, 
-				$length,
+			# collect the data for this bin
+			my $score = $row->get_score(
+				'ddb'         => $ddb,
+				'dataset'     => $dataset,
+				'chromo'      => $feature->seq_id,
+				'start'       => $start,
+				'stop'        => $stop,
+				'strand'      => $strand,
+				'method'      => $method,
+				'stranded'    => $stranded,
 			);
+			$row->value($column, $score);
 		}
-		else {
-			# collect the region scores in a single db query
-			my %regionscores = $row->get_position_scores(
-				'ddb'      => $ddb,
-				'dataset'  => $dataset,
-				'value'    => $value_type,
-				'extend'   => $extra,
-				'stranded' => $stranded,
-			);
-			
-			# record the scores for each bin
-			record_the_bin_values($row, $length, \%regionscores);
-		}
+	}	
+}
+
+
+sub collapse_all_features {
+	# collect all the transcripts and collapse them
+	
+	# check for collapsed transcript length index
+	my $length_i = $Data->find_column('Merged_Transcript_Length');
+	unless (defined $length_i) {
+		$length_i = $Data->add_column('Merged_Transcript_Length');
 	}
+	$Data->iterate( sub {
+		my $row = shift;
+		my $feature = $row->seqfeature;
+		my $collSeqFeat = collapse_transcripts($feature);
+		$Data->store_seqfeature($row->row_index, $collSeqFeat);
+		if ($length_i) {
+			$row->value($length_i, get_transcript_length($feature));
+		}
+	} );
+	
+	# reorder columns
+	my @neworder = (0 .. $startcolumn - 1, $length_i, $startcolumn .. $Data->last_column - 1);
+	$Data->reorder_column(@neworder);
+	$startcolumn++;
+	return 1;
 }
 
 
@@ -691,169 +689,11 @@ sub record_the_bin_values {
 			push @scores, $regionscores->{$n} if exists $regionscores->{$n};
 		}
 		
-		
 		# calculate the value
-		my $window_score;
-		if (@scores) {
-			# we have values in the window
-			
-			# combine the scores according to the specified method
-			if ($method eq 'sum') {
-				# either the count or the sum methods require that the 
-				# scores be summed
-				$window_score = sum(@scores);
-				
-			}
-			
-			else {
-				# method of mean or median to combine the scores
-			
-				# convert from log2 if necessary
-				if ($log) {
-					@scores = map { 2 ** $_ } @scores;
-				}
-				
-				# calculate the score appropriately
-				if ($method eq 'mean') {
-					$window_score = mean(@scores); 
-				}
-				elsif ($method eq 'median') {
-					$window_score = median(@scores); 
-				}
-				elsif ($method eq 'min') {
-					$window_score = min(@scores); 
-				}
-				elsif ($method eq 'max') {
-					$window_score = max(@scores); 
-				}
-				elsif ($method eq 'sum') {
-					$window_score = sum(@scores);
-				}
-				elsif ($method eq 'stddev') {
-					$window_score = stddev(@scores);
-				}
-				elsif ($method eq 'rpm') {
-					$window_score = ( sum(@scores) * 1000000 ) / $rpm_read_sum;
-				}
-				
-				# convert back to log if necessary
-				if ($log) {
-					if ($window_score != 0) {
-						$window_score = log($window_score) / LOG2;
-					}
-					else {
-						$window_score = '.';
-					}
-				}
-			}
-		} 
-		else {
-			# no values in this window
-			if ($method eq 'sum' or $method eq 'rpm') {
-				# score gets 0
-				$window_score = 0;
-			}
-			else {
-				# no score gets a null symbol
-				$window_score = '.'; 
-			}
-		}
-		
+		my $window_score = calculate_score($method, \@scores);
 		
 		# record the value
 		$row->value($column, $window_score);
-	}
-}
-
-
-
-
-## Record individual bin scores using separate db queries
-sub record_individual_bin_values {
-	my ($row, $chromo, $fstart, $fstop, $strand, $length) = @_;
-	
-	# collect the scores to the bins in the region
-	for my $column ($startcolumn..($Data->last_column) ) {
-		# we will step through each data column, representing each window (bin)
-		# across the feature's region
-		# any scores within this window will be collected and the mean 
-		# value reported
-		
-		# convert the window start and stop coordinates (as percentages) to
-		# actual bp
-		# this depends on whether the binsize is explicitly defined in bp or
-		# is a fraction of the feature length
-		my ($start, $stop);
-		if ($Data->metadata($column, 'bin_size') =~ /bp$/) {
-			# the bin size is explicitly defined
-			
-			# the start and stop points are relative to either the feature
-			# start (always 0) or the end (the feature length), depending
-			# upon whether the 5' or 3' end of the feature
-			
-			# determine this by the sign of the start position
-			if ($Data->metadata($column, 'start') < 0 and $strand >= 0) {
-				# the start position is less than 0, implying the 5' end
-				# the reference position will be the feature start on plus strand
-				$start = $fstart + $Data->metadata($column, 'start');
-				$stop  = $fstart + $Data->metadata($column, 'stop');
-			}
-			elsif ($Data->metadata($column, 'start') < 0 and $strand < 0) {
-				# the start position is less than 0, implying the 5' end
-				# the reference position will be the feature end on minus strand
-				$start = $fstop - $Data->metadata($column, 'start');
-				$stop  = $fstop - $Data->metadata($column, 'stop');
-			}
-			elsif ($Data->metadata($column, 'start') >= 0 and $strand >= 0) {
-				# the start position is greather than 0, implying the 3' end
-				# the reference position will be the feature start on plus strand
-				$start = $fstop + $Data->metadata($column, 'start');
-				$stop  = $fstop + $Data->metadata($column, 'stop');
-			}
-			elsif ($Data->metadata($column, 'start') >= 0 and $strand < 0) {
-				# the start position is greather than 0, implying the 3' end
-				# the reference position will be the feature end on minus strand
-				$start = $fstart - $Data->metadata($column, 'start');
-				$stop  = $fstart - $Data->metadata($column, 'stop');
-			}
-			else {
-				warn " unable to unable to identify region orientation: start " . 
-					$Data->metadata($column, 'start') . ", strand $strand\n";
-				return;
-			}
-		}
-		else {
-			# otherwise the bin size is based on feature length
-			if ($strand >= 0) {
-				# forward plus strand
-				$start = int( $fstart + 
-					($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
-				$stop  = int( $fstart + 
-					($Data->metadata($column, 'stop') * 0.01 * $length) - 1 + 0.5);
-			}
-			else {
-				# reverse minus strand
-				$start = int( $fstop - 
-					($Data->metadata($column, 'start') * 0.01 * $length) + 0.5);
-				$stop  = int( $fstop - 
-					($Data->metadata($column, 'stop') * 0.01 * $length) + 1 + 0.5);
-			}
-		}
-		
-		# collect the data for this bin
-		my $score = $row->get_score(
-			'ddb'         => $ddb,
-			'dataset'     => $dataset,
-			'chromo'      => $chromo,
-			'start'       => $start,
-			'stop'        => $stop,
-			'strand'      => $strand,
-			'method'      => $method,
-			'value'       => $value_type,
-			'stranded'    => $stranded,
-			'log'         => $log,
-		);
-		$row->value($column, $score);
 	}
 }
 
@@ -980,7 +820,7 @@ sub _set_metadata {
 	my ($start, $stop, $binsize, $unit) = @_;
 	
 	# set new name
-	my $name = $start . '..' . $stop . $unit;
+	my $name = sprintf "%s..%s%s", $start, $stop, $unit;
 	
 	# set new index
 	my $new_index = $Data->add_column($name);
@@ -989,10 +829,8 @@ sub _set_metadata {
 	# set the metadata
 	$Data->metadata($new_index, 'start' , $start);
 	$Data->metadata($new_index, 'stop' , $stop);
-	$Data->metadata($new_index, 'log2' , $log);
 	$Data->metadata($new_index, 'dataset' , $dataset);
 	$Data->metadata($new_index, 'method' , $method);
-	$Data->metadata($new_index, 'value' , $value_type);
 	$Data->metadata($new_index, 'bin_size' , $binsize . $unit);
 	$Data->metadata($new_index, 'strand' , $stranded);
 	if ($set_strand) {

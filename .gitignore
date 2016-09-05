@@ -19,3 +19,5 @@ nytprof.out
 *.bs
 /_eumm/
 *.tar.gz
+
+.DS_Store

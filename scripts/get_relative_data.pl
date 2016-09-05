@@ -5,12 +5,12 @@
 use strict;
 use Pod::Usage;
 use Getopt::Long;
-use Statistics::Lite qw(mean median sum stddevp min max);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	check_dataset_for_rpm_support
+	calculate_score
 );
 use Bio::ToolBox::utility;
 my $parallel;
@@ -19,15 +19,14 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant LOG2 => log(2);
-use constant DATASET_HASH_LIMIT => 5001;
+use constant DATASET_HASH_LIMIT => 20001;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.40';
+my $VERSION = '1.50';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -53,7 +52,6 @@ my (
 	$data_database,
 	$dataset, 
 	$feature, 
-	$value_type,
 	$method,
 	$win, 
 	$number,
@@ -65,7 +63,6 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
-	$log,
 	$gz,
 	$cpu,
 	$help,
@@ -80,7 +77,6 @@ GetOptions(
 	'ddb=s'      => \$data_database, # data database
 	'data=s'     => \$dataset, # dataset name
 	'feature=s'  => \$feature, # type of feature
-	'value=s'    => \$value_type, # the type of data to collect
 	'method=s'   => \$method, # method to combine data
 	'window=i'   => \$win, # window size
 	'number=i'   => \$number, # number of windows
@@ -93,7 +89,6 @@ GetOptions(
 	'long!'      => \$long_data, # collecting long data features
 	'smooth!'    => \$smooth, # smooth by interpolation
 	'sum!'       => \$sum, # generate average profile
-	'log!'       => \$log, # data is in log2 space
 	'gz!'        => \$gz, # compress the output file
 	'cpu=i'      => \$cpu, # number of execution threads
 	'help'       => \$help, # print help
@@ -253,7 +248,6 @@ if ($sum) {
 		'filename'    => $outfile,
 		'startcolumn' => $startcolumn,
 		'dataset'     => $dataset,
-		'log'         => $log,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -265,6 +259,9 @@ if ($sum) {
 
 
 ## Output the data
+unless ($outfile) {
+	$outfile = $Data->path . $Data->basename;
+}
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -291,14 +288,8 @@ sub check_defaults {
 		die " You must define a database or input file!\n Use --help for more information\n";
 	}
 
-	unless ($outfile) {
-		if ($infile) {
-			$outfile = $infile;
-			$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
-		}
-		else {
-			die " You must define an output filename !\n Use --help for more information\n";
-		}
+	unless ($outfile or $infile) {
+		die " You must define an output filename !\n Use --help for more information\n";
 	}
 
 	unless ($feature or $infile) {
@@ -315,27 +306,6 @@ sub check_defaults {
 		$number = 20;
 	}
 
-	unless (defined $log) {
-		# default is to assume not log2
-		$log = 0;
-	}
-
-	if (defined $value_type) {
-		# check the region method or type of data value to collect
-		unless (
-				$value_type eq 'score' or
-				$value_type eq 'length' or
-				$value_type eq 'count'
-		) {
-			die " Unknown data value '$value_type'!\n " . 
-				"Use --help for more information\n";
-		}
-	}
-	else {
-		# default is to take the score
-		$value_type = 'score';
-	}
-
 	if (defined $method) {
 		# check the requested method
 		unless (
@@ -345,24 +315,13 @@ sub check_defaults {
 				$method eq 'min' or
 				$method eq 'max' or
 				$method eq 'stddev' or
-				$method eq 'rpm'
+				$method =~ /^\w?count$/
 		) {
 			die " Unknown method '$method'!\n Use --help for more information\n";
 		}
-	
-		if ($method eq 'rpm') {
-			# make sure we collect the right values
-			$value_type = 'count';
-		}
 	}
 	else {
-		# set default method
-		if ($value_type eq 'count') {
-			$method = 'sum';
-		}
-		else {
-			$method = 'mean';
-		}
+		$method = 'mean';
 	}
 
 	if (defined $position) {
@@ -402,8 +361,7 @@ sub check_defaults {
 	}
 
 	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
+		$cpu ||= 4;
 	}
 	else {
 		# disable cores
@@ -439,10 +397,24 @@ sub parallel_execution {
 			$ddb = open_db_connection($data_database, 1);
 		}
 		
-		# Collect the data
-		map_relative_data();
-
+		# Add the columns for each window 
+		# and calculate the relative starting and ending points
+		my ($starting_point, $ending_point) = prepare_window_datasets();
 	
+		# determine long data collection for very large regions
+		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+			$long_data = 1;
+		}
+	
+		# Select the appropriate method for data collection
+		if ($long_data) {
+			map_relative_long_data($starting_point, $ending_point);
+		}
+		elsif ($Data->feature_type eq 'named' and not $long_data) {
+			# mapping point data features using named features
+			map_relative_data($starting_point, $ending_point);
+		}
+
 		# Interpolate values
 		if ($smooth) {
 			print " Interpolating missing values....\n";
@@ -484,10 +456,24 @@ sub parallel_execution {
 ## Run in single thread
 sub single_execution {
 	
-	# Collect the data
-	map_relative_data();
+	# Add the columns for each window 
+	# and calculate the relative starting and ending points
+	my ($starting_point, $ending_point) = prepare_window_datasets();
 
-	
+	# determine long data collection for very large regions
+	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+		$long_data = 1;
+	}
+
+	# Select the appropriate method for data collection
+	if ($long_data) {
+		map_relative_long_data($starting_point, $ending_point);
+	}
+	elsif ($Data->feature_type eq 'named' and not $long_data) {
+		# mapping point data features using named features
+		map_relative_data($starting_point, $ending_point);
+	}
+
 	# Interpolate values
 	if ($smooth) {
 		print " Interpolating missing values....\n";
@@ -500,30 +486,19 @@ sub single_execution {
 sub prepare_window_datasets {
 	
 	# Determine starting and ending points
-	my $startingpoint = 0 - ($win * $number); 
+	my $starting_point = 0 - ($win * $number); 
 		# default values will give startingpoint of -1000
-	my $endingpoint = $win * $number; 
+	my $ending_point = $win * $number; 
 		# likewise default values will give endingpoint of 1000
 	
 	# Print collection statement
-	print " Collecting ";
-	if ($log) { 
-		print "log2 ";
-	}
-	print "data from $startingpoint to $endingpoint at the ";
-	if ($position == 3) {
-		print "3' end"; 
-	}
-	elsif ($position == 4) {
-		print "midpoint";
-	}
-	else {
-		print "5' end";
-	}
-	print " in $win bp windows...\n";
+	print " ";
+	printf " Collecting data from %d to %d at the %s in %d bp windows...\n", 
+		$starting_point, $ending_point, $position == 3 ? "3' end" : 
+		$position == 4 ? "midpoint" : "5' end", $win;
 	
 	# Prepare and annotate the header names and metadata
-	for (my $start = $startingpoint; $start < $endingpoint; $start += $win) {
+	for (my $start = $starting_point; $start < $ending_point; $start += $win) {
 		# we will be progressing from the starting to ending point
 		# in increments of window size
 		
@@ -562,10 +537,8 @@ sub prepare_window_datasets {
 		$Data->metadata($new_index, 'start' , $start);
 		$Data->metadata($new_index, 'stop' , $stop);
 		$Data->metadata($new_index, 'window' , $win);
-		$Data->metadata($new_index, 'log2' , $log);
 		$Data->metadata($new_index, 'dataset' , $dataset);
 		$Data->metadata($new_index, 'method' , $method);
-		$Data->metadata($new_index, 'value' , $value_type);
 		if ($position == 5) {
 			$Data->metadata($new_index, 'relative_position', '5prime_end');
 		}
@@ -591,348 +564,124 @@ sub prepare_window_datasets {
 		}
 	}
 	
-	return ($startingpoint, $endingpoint);
+	return ($starting_point, $ending_point);
 }
 
 
-
-## Collect the nucleosome occupancy data
+## Collect relative scores using single database call
 sub map_relative_data {
-	
-	# Add the columns for each window 
-	# and calculate the relative starting and ending points
-	my ($starting_point, $ending_point) = prepare_window_datasets();
-	
-	
-	# determine long data collection for very large regions
-	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-		# This could potentially create performance issues where returned hashes   
-		# for each feature or interval are too big for efficient data collection.
-		# Better to collect data for individual windows using the long data method.
-		$long_data = 1;
-	}
-	
-	# Select the appropriate method for data collection
-	if ($Data->feature_type eq 'coordinate' and not $long_data) {
-		# mapping point data features using genome segments
-		map_relative_data_for_regions($starting_point, $ending_point);
-	}
-	elsif ($Data->feature_type eq 'coordinate' and $long_data) {
-		# mapping long data features using genome segments
-		map_relative_long_data_for_regions();
-	}
-	elsif ($Data->feature_type eq 'named' and not $long_data) {
-		# mapping point data features using named features
-		map_relative_data_for_features($starting_point, $ending_point);
-	}
-	elsif ($Data->feature_type eq 'named' and $long_data) {
-		# mapping long data features using named features
-		map_relative_long_data_for_features();
-	}
-	else {
-		die " Unable to identify columns with feature identifiers!\n" .
-			" File must have Primary_ID or Name and Type, or Chromo, Start, Stop columns\n";
-	}
-}
-
-
-sub map_relative_data_for_features {
 	my ($starting_point, $ending_point) = @_;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
-		my %regionscores = $row->get_position_scores(
+		my $regionscores = $row->get_relative_point_position_scores(
 			'ddb'         => $ddb,
 			'dataset'     => $dataset,
-			'start'       => $starting_point,
-			'stop'        => $ending_point,
 			'position'    => $position,
-			'value'       => $value_type,
+			'extend'      => $ending_point, # equivalent to the extension
 			'stranded'    => $strand_sense,
 			'strand'      => $set_strand ? $row->strand : undef, 
 			'avoid'       => $avoid,
 		);
 		
-		# record the scores
-		record_scores($row, \%regionscores);
-	}
-}
-
-
-
-sub map_relative_long_data_for_features {
-	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
+		# assign the scores to the windows in the region
+		for (
+			# we will process each window one at a time
+			# proceed by the column index for each window
+			my $column = $startcolumn; 
+			$column < $Data->number_columns; 
+			$column++
+		) {
 		
-		# get feature from the database
-		my $feature = $row->feature;
-		unless ($feature) {
-			# record a null values
-			for (my $c = $startcolumn; $c < $Data->number_columns; $c++) {
-				$row->value($c, '.');
+			# record nulls if no data returned
+			unless (scalar keys %$regionscores) {
+				$row->value($column, '.');
+				next;
 			}
-			next;
-		}
 		
-		# Collect the scores for each window
-		collect_long_data_window_scores(
-			$row,
-			$feature->seq_id,
-			$feature->start,
-			$feature->end,
-			$set_strand ? $row->strand : $feature->strand,
-		);
+			# get start and stop
+			my $start = $Data->metadata($column, 'start');
+			my $stop = $Data->metadata($column, 'stop');
 		
-		if ($avoid) {
-			warn " avoid option is currently not supported with long data collection! Disabling!\n";
-			undef $avoid; # this shouldn't be the case, I must revisit this!!!!
+			# collect a score at each position in the window
+			my @scores;
+			for (my $n = $start; $n <= $stop; $n++) {
+				# we will walk through the window one bp at a time
+				# look for a score associated with the position
+				push @scores, $regionscores->{$n} if exists $regionscores->{$n};
+			}
+			
+			# put the value into the data table
+			$row->value($column, calculate_score($method, \@scores) );
 		}
 	}
 }
 
-sub map_relative_data_for_regions {
+
+## Collect relative data using individual window database calls
+sub map_relative_long_data {
 	my ($starting_point, $ending_point) = @_;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
-		# calculate new coordinates based on relative adjustments
-			# this is a little tricky, because we're working with absolute 
-			# coordinates but we want relative coordinates, so we must do 
-			# the appropriate conversions
-		my ($start, $stop, $region_start);
+		# get feature from the database if necessary
+		my $feature = $row->seqfeature || $row;
 		
-		if ($row->strand >= 0 and $position == 5) {
+		# calculate a reference point
+		my $reference;
+		if ($feature->strand >= 0 and $position == 5) {
 			# 5' end of forward strand
-			$region_start = $row->start;
-			$start = $row->start + $starting_point;
-			$stop  = $row->start + $ending_point;
+			$reference = $feature->start;
 		}
-		
-		elsif ($row->strand == -1 and $position == 5) {
+		elsif ($feature->strand == -1 and $position == 5) {
 			# 5' end of reverse strand
-			$region_start = $row->stop;
-			$start = $row->stop - $ending_point;
-			$stop  = $row->stop - $starting_point;
+			$reference = $feature->stop;
 		}
-		
-		elsif ($row->strand >= 0 and $position == 3) {
+		elsif ($feature->strand >= 0 and $position == 3) {
 			# 3' end of forward strand
-			$region_start = $row->stop;
-			$start = $row->stop + $starting_point;
-			$stop  = $row->stop + $ending_point;
+			$reference = $feature->stop;
 		}
-		
-		elsif ($row->strand == -1 and $position == 3) {
+		elsif ($feature->strand == -1 and $position == 3) {
 			# 3' end of reverse strand
-			$region_start = $row->start;
-			$start = $row->start - $ending_point;
-			$stop  = $row->start - $starting_point;
+			$reference = $feature->start;
 		}
-		
 		elsif ($position == 4) {
 			# midpoint regardless of strand
-			$region_start = int( ( ($row->stop + $row->start) / 2) + 0.5);
-			$start = $region_start + $starting_point;
-			$stop  = $region_start + $ending_point;
+			$reference = int( ( ($feature->stop + $feature->start) / 2) + 0.5);
 		}
-		
 		else {
 			# something happened
 			die " programming error!? feature " . 
-				" at data row $row->row_index\n";
+				" at data row $row\n";
 		}
 		
-		# collect the region scores
-		my %regionscores = $row->get_position_scores(
+		# collect the data for every window 
+		for (
+			my $column = $startcolumn; 
+			$column < $Data->number_columns; 
+			$column++
+		) {
+			# we must modify the start and stop position with the adjustments
+			# recorded in the current column metadata
+			my $score = $row->get_score(
 				'db'          => $ddb,
 				'dataset'     => $dataset,
-				'start'       => $start,
-				'stop'        => $stop,
-				'value'       => $value_type,
+				'chromo'      => $feature->seq_id,
+				'start'       => $feature->strand >= 0 ? 
+									$reference + $Data->metadata($column, 'start') :
+									$reference - $Data->metadata($column, 'start'),
+				'stop'        => $feature->strand >= 0 ? 
+									$reference + $Data->metadata($column, 'stop') : 
+									$reference - $Data->metadata($column, 'stop'),
+				'strand'      => $feature->strand,
+				'method'      => $method,
 				'stranded'    => $strand_sense,
-		);
-		
-		# convert the regions scores back into relative scores
-		my %relative_scores;
-		foreach my $position (keys %regionscores) {
-			$relative_scores{ $position + $starting_point } = 
-				$regionscores{$position};
+			);
+			$row->value($column, $score);
 		}
-		
-		# record the scores
-		record_scores($row, \%relative_scores);
-	}
-}
-
-
-
-sub map_relative_long_data_for_regions {
-	
-	# Collect the data
-	my $stream = $Data->row_stream;
-	while (my $row = $stream->next_row) {
-		# Collect the scores for each window
-		collect_long_data_window_scores(
-			$row, $row->seq_id, $row->start, $row->end, $row->strand);
-	}
-}
-
-
-
-sub record_scores {
-	
-	# row object and raw scores
-	my ($row, $regionscores) = @_;
-	
-	# assign the scores to the windows in the region
-	for (
-		# we will process each window one at a time
-		# proceed by the column index for each window
-		my $column = $startcolumn; 
-		$column < $Data->number_columns; 
-		$column++
-	) {
-		
-		# record nulls if no data returned
-		unless (scalar keys %$regionscores) {
-			$row->value($column, '.');
-			next;
-		}
-		
-		# get start and stop
-		my $start = $Data->metadata($column, 'start');
-		my $stop = $Data->metadata($column, 'stop');
-		
-		# collect a score at each position in the window
-		my @scores;
-		for (my $n = $start; $n <= $stop; $n++) {
-			# we will walk through the window one bp at a time
-			# look for a score associated with the position
-			push @scores, $regionscores->{$n} if exists $regionscores->{$n};
-		}
-		
-		# deal with log scores if necessary
-		if ($log) {
-			@scores = map { 2 ** $_ } @scores;
-		}
-		
-		# calculate the combined score for the window
-		my $winscore;
-		if (@scores) {
-			# we have scores, so calculate a value based on the method
-			
-			if ($method eq 'mean') {
-				$winscore = mean(@scores);
-			}
-			elsif ($method eq 'median') {
-				$winscore = median(@scores);
-			}
-			elsif ($method eq 'stddev') {
-				$winscore = stddevp(@scores);
-			}
-			elsif ($method eq 'sum') {
-				$winscore = sum(@scores);
-			}
-			elsif ($method eq 'min') {
-				$winscore = sum(@scores);
-			}
-			elsif ($method eq 'max') {
-				$winscore = sum(@scores);
-			}
-			elsif ($method eq 'rpm') {
-				$winscore = ( sum(@scores) * 1000000 ) / $rpm_read_sum;
-			}
-			
-			# deal with log2 scores
-			if ($log) { 
-				# put back in log2 space if necessary
-				$winscore = log($winscore) / LOG2;
-			}
-		}
-		else {
-			# no scores
-			# assign a "null" value
-			$winscore = $method eq 'sum' ? 0 : '.';
-		}
-		
-		# put the value into the data table
-		$row->value($column, $winscore);
-	}
-}
-
-
-
-## Collecting long data in windows
-sub collect_long_data_window_scores {
-	
-	# passed row object and coordinates
-	my (
-		$row,
-		$fchromo,
-		$fstart,
-		$fstop,
-		$fstrand
-	) = @_;
-	
-	# Translate the actual reference start position based on requested 
-	# reference position and region strand
-	my $reference;
-	if ($fstrand >= 0 and $position == 5) {
-		# 5' end of forward strand
-		$reference = $fstart;
-	}
-	elsif ($fstrand == -1 and $position == 5) {
-		# 5' end of reverse strand
-		$reference = $fstop;
-	}
-	elsif ($fstrand >= 0 and $position == 3) {
-		# 3' end of forward strand
-		$reference = $fstop;
-	}
-	elsif ($fstrand == -1 and $position == 3) {
-		# 3' end of reverse strand
-		$reference = $fstart;
-	}
-	elsif ($position == 4) {
-		# midpoint regardless of strand
-		$reference = int( ( ($fstop + $fstart) / 2) + 0.5);
-	}
-	else {
-		# something happened
-		die " programming error!? feature " . 
-			" at data row $row\n";
-	}
-	
-	# collect the data for every window 
-	for (
-		my $column = $startcolumn; 
-		$column < $Data->number_columns; 
-		$column++
-	) {
-		# we must modify the start and stop position with the adjustments
-		# recorded in the current column metadata
-		my $score = $row->get_score(
-			'db'          => $ddb,
-			'dataset'     => $dataset,
-			'chromo'      => $fchromo,
-			'start'       => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'start') :
-								$reference - $Data->metadata($column, 'start'),
-			'stop'        => $fstrand >= 0 ? 
-								$reference + $Data->metadata($column, 'stop') : 
-								$reference - $Data->metadata($column, 'stop'),
-			'strand'      => $fstrand,
-			'method'      => $method,
-			'value'       => $value_type,
-			'stranded'    => $strand_sense,
-			'log'         => $log,
-		);
-		$row->value($column, $score);
 	}
 }
 
@@ -1013,13 +762,11 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --ddb <name|file>
   --data <dataset_name | filename>
   --method [mean|median|min|max|stddev|sum|rpm]             (mean)
-  --value [score|count|pcount|length]                       (score)
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --avoid
   --avtype [type,type,...]
   --long
-  --log
   
   Bin specification:
   --win <integer>                                           (50)
@@ -1199,12 +946,6 @@ subsequently assigning scores to windows. This may result in counting
 features more than once if it overlaps more than one window, a result 
 that may or may not be desired. Execution time will likely increase. 
 Default is false.
-
-=item --log
-
-Dataset values are (not) in log2 space and should be treated 
-accordingly. Output values will be in the same space. The default is 
-false (nolog).
 
 =item --win <integer>
 
