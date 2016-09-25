@@ -291,7 +291,9 @@ sub set_defaults {
 	
 	# Check for required values
 	unless ($infile) {
-		if (@ARGV) {
+		if (@ARGV and not $feature) {
+			# making an assumption that first unnamed variable is input file
+			# but only if no new file feature defined
 			$infile = shift @ARGV;
 		}
 		else {
@@ -306,6 +308,7 @@ sub set_defaults {
 		unless ($feature) {
 			die  " You must define an input file or new feature type! see help\n";
 		}
+		# database for new files checked below
 	}
 	if (defined $start_adj or defined $stop_adj) {
 		unless (defined $start_adj and defined $stop_adj) {
@@ -345,7 +348,7 @@ sub set_defaults {
 	if ($method) {
 		# check the method that was defined on the command line
 		unless ($method =~ 
-			m/^(?:median|mean|stddev|min|max|range|sum|count)$/
+			m/^(?:median|mean|stddev|min|max|range|sum|count|pcount|ncount)$/
 		) {
 			die " unknown method '$method'!";
 		}
@@ -385,8 +388,7 @@ sub set_defaults {
 		# fractional start and stop requested
 		unless ($limit) {
 			# set a minimum size limit on sub fractionating a feature
-			# 1000 bp seems like a reasonable cut off, no?
-			$limit = 1000;
+			$limit = 10;
 		}
 		if ($position == 4) {
 			die " set position to 5 or 3 only when using fractional start and stop\n";
@@ -493,6 +495,11 @@ sub collect_dataset {
 	
 	my $dataset = shift;
 	
+	# collapse transcripts if needed
+	if ($subfeature and not $collapsed) {
+		$collapsed = collapse_all_features();
+	}
+	
 	# set the new metadata for this new dataset
 	my $index = add_new_dataset($dataset);
 	
@@ -501,11 +508,6 @@ sub collect_dataset {
 		unless (defined $Data->strand_column) {
 			die " requested to set strand but a strand column was not found!\n";
 		}
-	}
-	
-	# collapse transcripts if needed
-	if ($subfeature and not $collapsed) {
-		$collapsed = collapse_all_features();
 	}
 	
 	# collect 
@@ -766,7 +768,8 @@ A program to collect data for a list of features
 =head1 SYNOPSIS
 
 get_datasets.pl [--options...] [<filename>]
-get_datasets.pl [--options...] <filename> <data1> <data2...>
+
+get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   
   Options for existing files:
   --in <filename>                  (txt bed gff gtf refFlat ucsc)
@@ -1001,7 +1004,7 @@ use the 5' end, or the start position of unstranded features.
 
 Optionally specify the minimum size limit for subfractionating a feature's 
 region. Used in combination with fstart and fstop to prevent taking a 
-subregion from a region too small to support it. The default is 1000 bp.
+subregion from a region too small to support it. The default is 10 bp.
 
 =item --gz
 
