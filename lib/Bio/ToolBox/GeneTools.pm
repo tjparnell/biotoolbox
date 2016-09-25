@@ -692,7 +692,8 @@ sub collapse_transcripts {
 	if (scalar @_ == 1) {
 		# someone passed a gene, get the transcripts
 		@transcripts = get_transcripts($_[0]);
-		return if scalar @transcripts == 1;
+		return unless @transcripts;
+		return $transcripts[0] if scalar @transcripts == 1;
 	}
 	elsif (scalar @_ > 1) {
 		@transcripts = @_;
