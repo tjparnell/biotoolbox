@@ -9,7 +9,6 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
-	check_dataset_for_rpm_support
 	calculate_score
 );
 use Bio::ToolBox::utility;
@@ -173,22 +172,6 @@ $dataset = verify_or_request_feature_types(
 unless ($dataset) {
 	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
 } 
-
-# Check the RPM method if necessary
-my $rpm_read_sum;
-if ($method eq 'rpm') {
-	print " Checking RPM support for dataset '$dataset'...\n";
-	$rpm_read_sum = check_dataset_for_rpm_support($dataset, $ddb, $cpu);
-		# this step can be multi-threaded
-	if ($rpm_read_sum) {
-		printf " %s total features\n", format_with_commas($rpm_read_sum);
-	}
-	else {
-		die " RPM method not supported! Try something else\n";
-	}
-}
-
-
 
 
 
@@ -867,8 +850,8 @@ A program to collect data in bins across a list of features.
   Options for data collection:
   --ddb <name | filename>
   --data <dataset_name | filename>
-  --method [mean|median|stddev|min|max|sum|rpm]             (mean)
-  --value [score|count|pcount|length]                       (score)
+  --method [mean|median|stddev|min|max|range|sum|          (mean)
+            count|pcount|ncount]
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --long
@@ -951,7 +934,7 @@ Alternatively, the dataset may be a database file, including bigWig (.bw),
 bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
 remote (specified with a http: or ftp: prefix).
 
-=item --method [mean|median|stddev|min|max|range|sum|rpm]
+=item --method <text>
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -972,40 +955,19 @@ genomic region of the feature. Accepted values include:
 
 =item * range   Returns difference of max and min
 
-=item * rpm     Reads Per Million mapped, Bam/BigBed only
-
-=back
-
-=item --value [score|count|pcount|length]
-
-Optionally specify the type of data value to collect from the dataset or 
-data file. Four values are accepted: score, count, pcount, or length. 
-The default value type is score. Note that some data sources only support certain 
-types of data values. The types are detailed below.
-
-=over 4
-
-=item * score
-
-The default value. Supported by wig, bigWig, USeq, bigBed (if the features 
-include the score column), GFF features, and Bam (returns non-transformed 
-base pair coverage).
-
 =item * count
 
-Counts the number of features that overlap the search region. For long 
-features (> 1 bp), these may include features that overlap or span beyond 
-the search region. Supported by all databases.
+Counts the number of overlapping items.
 
 =item * pcount (precise count)
 
-Counts only those features that are contained within the search region, 
-not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+Counts the number of items that precisely fall within the query 
+region. Partially overlapping are not counted.
 
-=item * length
+=item * ncount (name count)
 
-Returns the length of long features. Supported by Bam, bigBed, USeq, and 
-GFF features.
+Counts unique names. Useful when spliced alignments overlap more 
+than one exon and you want to avoid double-counting.
 
 =back
 
