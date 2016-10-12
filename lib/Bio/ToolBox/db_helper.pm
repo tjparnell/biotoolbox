@@ -1111,16 +1111,12 @@ then it will return undefined.
 
 Pass this subroutine one or two values. The first is the name of the 
 dataset. Ideally it should be validated using verify_or_request_feature_types() 
-and have an appropriate prefix (file, http, or ftp). If it does not 
-have a prefix, then it is assumed to be a database feature. The second 
-passed feature is the name of a BioPerl database or an opened database 
-object. This database will be checked for the indicated dataset, and 
-the first returned feature checked for an attribute pointing to a 
-supported file.
+and have an appropriate prefix (file, http, or ftp). 
 
-For multi-threaded execution pass a third value, the number of CPU cores 
-available to count Bam files. The default is 2 for environments where 
-Parallel::ForkManager is installed, or 1 where it is not.
+For multi-threaded execution pass a second value, the number of CPU cores 
+available to count Bam files. This will speed up counting bam files 
+considerably. The default is 2 for environments where Parallel::ForkManager 
+is installed, or 1 where it is not.
 
 =cut
 
@@ -1128,21 +1124,15 @@ sub check_dataset_for_rpm_support {
 	
 	# get passed dataset and databases
 	my $dataset  = shift;
-	my $database = shift;
 	my $cpu      = shift;
 	
-	# check that we haven't done this already
-	
-	
-	# Check the dataset to see if supports RPM or RPKM method
-	# if so, then calculate the total number of reads
+	# Calculate the total number of reads
 	# this uses the global variable $rpkm_read_sum
 	my $rpm_read_sum;
 	
 	if (exists $total_read_number{$dataset}) {
 		# this dataset has already been summed
 		# no need to do it again
-		
 		$rpm_read_sum = $total_read_number{$dataset};
 	}
 	
@@ -1175,89 +1165,6 @@ sub check_dataset_for_rpm_support {
 		else {
 			carp " BigBed support is not available! " . 
 				"Is Bio::DB::BigBed installed?\n";
-			return;
-		}
-	}
-	
-	elsif ($dataset !~ /^file|ftp|http/i) {
-		# a database feature
-		# this feature might point to a bam or bigbed file
-		
-		# Check the database
-		my $db; # the database object to be used
-		if (defined $database) {
-			my $db_ref = ref $database;
-			if ($db_ref =~ /^Bio::DB/) {
-				$db = $database;
-			}
-			else {
-				# the name of a database was passed, create a database connection
-				$db = open_db_connection($database);
-				unless ($db) {
-					carp " No database to check feature '$dataset' for RPM support!\n";
-					return;
-				}
-			}
-		}
-		else {
-			carp " No database to check feature '$dataset' for RPM support!\n";
-			return;
-		}
-		
-		# get a sample of the features from the database
-		my @features;
-		if ($dataset =~ /&/) {
-			# in case we have a combined datasets
-			@features = $db->features(-type => [ split /&/, $dataset ]);
-		}
-		else {
-			@features = $db->features(-type => $dataset);
-		}
-		unless (@features) {
-			 # no feature found
-			 # basically nothing to do
-			 return;
-		}
-		
-		# look for the database file in the attributes
-		if ($features[0]->has_tag('bamfile')) {
-			# specifying a bam file
-			my ($bamfile) = $features[0]->get_tag_values('bamfile');
-			
-			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
-			if ($BAM_OK) {
-				# Bio::ToolBox::db_helper::bam was loaded ok
-				# sum the number of reads in the dataset
-				$rpm_read_sum = sum_total_bam_alignments($bamfile, 0, 0, $cpu);
-			}
-			else {
-				carp " Bam support is not available! " . 
-					"Is Bio::DB::Sam installed?\n";
-				return;
-			}
-		}
-		
-		elsif ($features[0]->has_tag('bigbedfile')) {
-			# specifying a bigbed file
-			my ($bedfile) = $features[0]->get_tag_values('bigbedfile');
-			
-			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
-				unless $BIGBED_OK;
-			if ($BIGBED_OK) {
-				# Bio::ToolBox::db_helper::bigbed was loaded ok
-				# sum the number of features in the dataset
-				$rpm_read_sum = sum_total_bigbed_features($bedfile);
-			}
-			else {
-				carp " BigBed support is not available! " . 
-					"Is Bio::DB::BigBed installed?\n";
-				return;
-			}
-		}
-		
-		else {
-			# can't find an appropriate dataset
-			# nothing to do
 			return;
 		}
 	}
