@@ -974,22 +974,12 @@ sides of the relative position (40 total) of 50 bp size, corresponding to
 2 kb total (+/- 1 kb). Windows without a value may be interpolated 
 (smoothed) from neigboring values, if available.
 
-The default value that is collected is a dataset score (e.g. microarray 
-values). However, other values may be collected, including 'count' or 
-'length'. Use the --method argument to collect alternative values.
-
 Stranded data may be collected. If the feature does not have an inherent 
 strand, one may be specified to enforce stranded collection or a particular 
 orientation. 
 
 When features overlap, or the collection windows of one feature overlaps 
 with another feature, then data may be ignored and not collected (--avoid).
-
-The program writes out a tim data formatted text file. It will also 
-generate a '*_summed.txt' file, in which each the mean value of all 
-features for each window is generated and written as a data row. This 
-summed data may be graphed using the biotoolbox script L<graph_profile.pl> 
-or merged with other summed data sets for comparison.
 
 =head1 EXAMPLES
 
@@ -1017,13 +1007,11 @@ from the midpoint of each feature.
 You want to collect scores in intervals around the transcription start 
 site of genes in an annotation database, but also avoid intervals that 
 may overlap neighboring genes. You want to collect alignment counts 
-from a Bam file in a stranded fashion. You also want to plot the profile.
+from a Bam file in a stranded fashion. 
 
   get_relative_data.pl --db annotation --feature gene --avoid --strand \
-  sense --value count --method sum --data alignments.bam --out gene_tss
-  
-  graph_profile.pl --in gene_tss_summed.txt --min 0 --max 100
-  
+  sense --method count --data alignments.bam --out gene_tss
+    
 =back
 
 =head1 AUTHOR

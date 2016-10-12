@@ -1073,9 +1073,6 @@ of bins may be specified as a command argument (default 10). Additionally,
 extra bins may be extended on either side of the gene (default 0 on either 
 side). The bin size is determined as a percentage of gene length.
 
-The program writes out a tim data formatted text file. It will also 
-optionally generate a summary or average profile for all of the features. 
-
 =head1 EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
@@ -1100,13 +1097,11 @@ feature as well as five 100 bp intervals outside of each interval.
 =item Collect scores in intervals for genes
 
 You want to collect stranded alignment counts from a Bam file for genes 
-in an annotation database, then generate a profile graph.
+in an annotation database.
 
-  get_binned_data.pl --db annotation --feature gene --strand sense --value \
-  count --method sum --data alignments.bam --out gene_profile --sum
+  get_binned_data.pl --db annotation --feature gene --strand sense \
+  --method count --data alignments.bam --out gene_profile --sum
   
-  graph_profile.pl --in gene_profile_summed.txt --min 0 --max 100
-
 =back
 
 =head1 AUTHOR

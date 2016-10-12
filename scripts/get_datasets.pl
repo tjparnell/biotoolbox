@@ -1135,11 +1135,6 @@ Stranded data may be collected, if the dataset supports stranded information.
 Also, two or more datasets may be combined and treated as one. Note that 
 collecting stranded data may significantly slow down data collection.
 
-The output file is a standard tim data formatted file, a tab delimited 
-file format with each row a genomic feature and each column a dataset. 
-Metadata regarding the datasets are stored in comment lines at the beginning 
-of the file. The file may be gzipped.
-
 =head1 EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
