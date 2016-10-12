@@ -15,13 +15,13 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.41'
+    version: '1.50'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.41'
+    version: '1.42'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
-    version: '1.40'
+    version: '1.50'
   Bio::ToolBox::Data::Iterator:
     file: lib/Bio/ToolBox/Data.pm
   Bio::ToolBox::Data::Stream:
@@ -29,49 +29,49 @@ provides:
     version: '1.41'
   Bio::ToolBox::Data::core:
     file: lib/Bio/ToolBox/Data/core.pm
-    version: '1.40'
+    version: '1.50'
   Bio::ToolBox::Data::file:
     file: lib/Bio/ToolBox/Data/file.pm
     version: '1.41'
   Bio::ToolBox::GeneTools:
     file: lib/Bio/ToolBox/GeneTools.pm
-    version: '1.41'
+    version: '1.50'
   Bio::ToolBox::SeqFeature:
     file: lib/Bio/ToolBox/SeqFeature.pm
     version: '1.40'
   Bio::ToolBox::big_helper:
     file: lib/Bio/ToolBox/big_helper.pm
-    version: '1.14'
+    version: '1.42'
   Bio::ToolBox::db_helper:
     file: lib/Bio/ToolBox/db_helper.pm
-    version: '1.40'
+    version: '1.50'
   Bio::ToolBox::db_helper::bam:
     file: lib/Bio/ToolBox/db_helper/bam.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::bigbed:
     file: lib/Bio/ToolBox/db_helper/bigbed.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::bigwig:
     file: lib/Bio/ToolBox/db_helper/bigwig.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::config:
     file: lib/Bio/ToolBox/db_helper/config.pm
     version: '1.14'
   Bio::ToolBox::db_helper::seqfasta:
     file: lib/Bio/ToolBox/db_helper/seqfasta.pm
-    version: '1.36'
+    version: '1.50'
   Bio::ToolBox::db_helper::useq:
     file: lib/Bio/ToolBox/db_helper/useq.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::wiggle:
     file: lib/Bio/ToolBox/db_helper/wiggle.pm
-    version: '1.14'
+    version: '1.50'
   Bio::ToolBox::parser::gff:
     file: lib/Bio/ToolBox/parser/gff.pm
-    version: '1.41'
+    version: '1.42'
   Bio::ToolBox::parser::ucsc:
     file: lib/Bio/ToolBox/parser/ucsc.pm
-    version: '1.40'
+    version: '1.42'
   Bio::ToolBox::parser::ucsc::builder:
     file: lib/Bio/ToolBox/parser/ucsc.pm
   Bio::ToolBox::utility:
@@ -95,4 +95,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.41'
+version: '1.50'
