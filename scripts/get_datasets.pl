@@ -22,7 +22,6 @@ eval {
 	$parallel = 1;
 };
 
-use constant LOG2 => log(2);
 my $VERSION = '1.50';
 
 
@@ -58,6 +57,7 @@ my (
 	$fstop,
 	$limit,
 	$position,
+	$fpkm_method,
 	$win,
 	$step,
 	$set_strand,
@@ -87,6 +87,7 @@ GetOptions(
 	'fstop=f'    => \$fstop, # fractional stop position
 	'limit=i'    => \$limit, # size limit to fractionate a feature
 	'pos=s'      => \$position, # set the relative feature position
+	'fpkm|rpkm=s' => \$fpkm_method, # set the fpkm method  
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
@@ -189,21 +190,19 @@ unless (@datasets) {
 	die " No verifiable datasets provided. Check your file path, database, or dataset.\n";
 }
 
-# Working with RPM and RPKM value datasets
-# global values
-my %dataset2sum; # for tot
-# total reads in Bam file when using rpkm method
-if ($method eq 'rpm' or $method eq 'rpkm') {
+# Working with RPKM value datasets
+my %dataset2sum; # for genomic totals of reads for rpkm determination
+if ($fpkm_method eq 'genome') {
 	foreach my $d (@datasets) {
-		print " Checking RPM support for dataset '$d'...\n";
-		my $sum = check_dataset_for_rpm_support($d, $ddb, $cpu);
+		print " Summing total reads for dataset '$d'...\n";
+		my $sum = check_dataset_for_rpm_support($d, $cpu);
 		if ($sum) {
 			$dataset2sum{$d} = $sum;
 			printf "   %s total features\n", format_with_commas($sum);
 		}
 		else {
 			die " $method method requested but not supported for " .
-				"dataset $d!\n RPM and RPKM are only supported with Bam and BigBed.\n";
+				"dataset $d!\n FPKM is only supported with Bam and BigBed.\n";
 		}
 	}
 }
@@ -358,6 +357,16 @@ sub set_defaults {
 		$method = 'mean';
 	}
 	
+	# check fpkm method
+	if ($fpkm_method) {
+		unless ($fpkm_method eq 'region' or $fpkm_method eq 'genome') {
+			die " fpkm option must be one of 'region' or 'genome'! see help\n";
+		}
+		unless ($method =~ /count/) {
+			die " method must be a count if you use the fpkm option!\n";
+		}
+	}
+	
 	# check strandedness of data to collect
 	if (defined $stranded) { 
 		# check the strand request that was defined on the command line
@@ -473,6 +482,8 @@ sub parallel_execution {
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
+	
+	calculate_fpkm_values() if $fpkm_method;
 }
 
 
@@ -486,6 +497,7 @@ sub single_execution {
 		}
 		last if $dataset eq 'none';
 	}
+	calculate_fpkm_values() if $fpkm_method;
 }
 
 
@@ -754,7 +766,48 @@ sub add_new_dataset {
 
 
 
-
+sub calculate_fpkm_values {
+	print " Calculating FPKM values....\n";
+	
+	# calculate which indices;
+	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
+	
+	# work through each collected dataset
+	foreach my $index (@indices) {
+	
+		# determine total number of reads for this dataset
+		my $total;
+		if ($fpkm_method eq 'genome') {
+			# this was calculated earlier
+			$total = $dataset2sum{ $Data->metadata($index, 'dataset') };
+		}
+		else {
+			# use the total from the counted regions or genes
+			$total = 0;
+			$Data->iterate( sub {
+				my $row = shift;
+				$total += $row->value($index);
+			} );
+		}
+		next unless $total;
+	
+		# add new column
+		my $fpkm_index = $Data->add_column($Data->name($index) . '_FPKM');
+		$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
+		$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
+		$Data->metadata($fpkm_index, 'total_count', $total); 
+		my $length_i = $Data->find_column('Merged_Transcript_Length');
+	
+		# calculate and store the fpkms
+		$Data->iterate( sub {
+			my $row = shift;
+			my $length = $length_i ? $row->value($length_i) : $row->length;
+			$length ||= 1; # how would a zero sneak in here? shouldn't happen 
+			my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
+			$row->value($fpkm_index, $fpkm);
+		} );
+	}
+}
 
 
 __END__
@@ -788,7 +841,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --exons
-  --log
+  --fpkm [region|genome]
   
   Adjustments to features:
   --extend <integer>
@@ -963,6 +1016,33 @@ are not defined, then CDS and UTR subfeatures are used, or the entire
 gene or transcript if no appropriate subfeatures are found. Note that 
 the options extend, start, stop, fstart, and fstop are ignored. 
 Default is false. 
+
+=item --fpkm [region|genome]
+
+Optionally indicate that counts should be converted to Fragments Per 
+Kilobase per Million mapped (FPKM). This is a method for normalizing 
+sequence read depth and is used with Bam (or optionally bigBed) files. 
+Two methods exist for normalizing: 
+
+=over 4
+
+=item region 
+
+Uses the sum of counts over all input regions examined and ignores 
+non-counted reads
+
+=item genome
+
+Uses the sum of all reads across the genome, regardless of whether 
+it was counted in an input region or not
+
+=back
+
+The region method is best used with RNASeq data and a complete gene 
+annotation table. The genome method is best used with partial annotation 
+tables or other Seq types, such as ChIPSeq. This option can only be used 
+with one of the count methods (count, ncount, pcount). The FPKM values 
+are appended as additional columns in the output table.
 
 =item --extend <integer>
 
