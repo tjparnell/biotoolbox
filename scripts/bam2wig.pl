@@ -31,7 +31,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.34';
+my $VERSION = '1.42';
 	
 	
 
@@ -379,7 +379,7 @@ sub check_defaults {
 		$splice = 0;
 	}
 	if ($shift and $splice) {
-		die " enabling both shift and splices is not allowed. Pick one.\n";
+		die " enabling both shift and splices is currently not allowed. Pick one.\n";
 	}
 	if ($shift and $paired) {
 		warn " disabling shift with paired reads\n";
@@ -416,10 +416,6 @@ sub check_defaults {
 		}
 		else {
 			$correlation_min = 0.25;
-		}
-		if ($strand) {
-			warn " disabling strand with shift enabled\n";
-			$strand = 0;
 		}
 	}
 	
@@ -484,17 +480,13 @@ sub check_defaults {
 	}
 	
 	# impossibilities
-	elsif ($strand and $shift) {
-		# this should not happen, strand is disabled with shift
-		die " programming error!\n";
-	}
 	elsif ($use_start and $paired) {
 		# this should not happen, paired start is changed to paired mid
-		die " programming error!\n";
+		die " start and paired programming error! position $position, start $use_start, mid $use_mid, span $use_span, paired $paired, splice $splice, strand $strand, shift $shift, extension value $ext_value, bin $bin, bin size $bin_size\n";
 	}
 	elsif ($shift and $paired) {
 		# this should not happen, shift is disabled with paired
-		die " programming error!\n";
+		die " shift and paired programming error! position $position, start $use_start, mid $use_mid, span $use_span, paired $paired, splice $splice, strand $strand, shift $shift, extension value $ext_value, bin $bin, bin size $bin_size\n";
 	}
 	
 	# start positions
@@ -508,30 +500,40 @@ sub check_defaults {
 		$callback  = \&record_stranded_start;
 		$split_callback = \&record_split_stranded_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, start positions\n";
+		print " recording stranded start positions\n";
+	}
+	elsif ($use_start and $strand and $shift and !$paired) {
+		$callback  = \&record_stranded_shifted_start;
+		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+		print " recording stranded, shifted start positions\n";
 	}
 	elsif ($use_start and !$strand and $shift and !$paired) {
 		$callback  = \&record_shifted_start;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording shifted-start positions\n";
+		print " recording shifted start positions\n";
 	}
 	
 	# mid positions
 	elsif ($use_mid and $strand and !$shift and $paired) {
 		$callback = \&record_stranded_paired_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, mid positions of pairs\n";
+		print " recording stranded mid positions of pairs\n";
 	}
 	elsif ($use_mid and $strand and !$shift and !$paired) {
 		$callback = \&record_stranded_mid;
 		$split_callback = \&record_split_stranded_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording stranded, mid positions\n";
+		print " recording stranded mid positions\n";
 	}
 	elsif ($use_mid and !$strand and $shift and !$paired) {
 		$callback  = \&record_shifted_mid;
 		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
-		print " recording shifted-mid positions\n";
+		print " recording shifted mid positions\n";
+	}
+	elsif ($use_mid and $strand and $shift and !$paired) {
+		$callback  = \&record_stranded_shifted_mid;
+		$write_wig = $bin ? \&write_fixstep : \&write_varstep;
+		print " recording stranded, shifted mid positions\n";
 	}
 	elsif ($use_mid and !$strand and !$shift and $paired) {
 		if ($ext_value) {
@@ -622,9 +624,26 @@ sub check_defaults {
 			print " recording shifted positions spanning alignments\n";
 		}
 	}
+	elsif ($use_span and $strand and $shift and !$paired) {
+		if ($position eq 'extend') {
+			$callback  = \&record_stranded_extended;
+			$write_wig = \&write_bedgraph;
+			print " recording stranded extended alignments\n";
+		}
+		elsif ($ext_value) {
+			$callback  = \&record_stranded_shifted_extended;
+			$write_wig = \&write_bedgraph;
+			print " recording stranded, shifted, extended alignments\n";
+		}
+		else {
+			$callback  = \&record_stranded_shifted_span;
+			$write_wig = \&write_bedgraph;
+			print " recording stranded, shifted positions spanning alignments\n";
+		}
+	}
 	else {
 		# what else is left!?
-		die " programming error!\n";
+		die " programming error! position $position, start $use_start, mid $use_mid, span $use_span, paired $paired, splice $splice, strand $strand, shift $shift, extension value $ext_value, bin $bin, bin size $bin_size\n";
 	}
 	
 	
@@ -1673,6 +1692,26 @@ sub record_shifted_start {
 }
 
 
+### Record at shifted start position
+sub record_stranded_shifted_start {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# shift based on strand, record based on strand
+	if ($a->reversed) {
+		# reverse strand
+		$data->{r}{ $a->calend - $shift_value }++;
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + 1 + $shift_value }++;
+	}
+	check_data($data);
+}
+
+
 ### Record at start position
 sub record_start {
 	my ($a, $data) = @_;
@@ -1768,6 +1807,29 @@ sub record_shifted_mid {
 	if ($a->reversed) {
 		# reverse strand
 		$data->{f}{ $pos - $shift_value }++;
+	}
+	else {
+		# forward strand
+		$data->{f}{ $pos + $shift_value }++;
+	}
+	check_data($data);
+}
+
+
+### Record at shifted mid position
+sub record_stranded_shifted_mid {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# calculate mid position
+	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
+	
+	# shift based on strand, record on forward
+	if ($a->reversed) {
+		# reverse strand
+		$data->{r}{ $pos - $shift_value }++;
 	}
 	else {
 		# forward strand
@@ -2055,6 +2117,27 @@ sub record_extended {
 }
 
 
+### Record stranded extended alignment
+sub record_stranded_extended {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# start based on strand, record based on strand
+	if ($a->reversed) {
+		# reverse strand
+		# must calculate the start position of the 3 prime extended fragment
+		$data->{r}{ $a->calend - $ext_value } .= "$ext_value,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos } .= "$ext_value,";
+	}
+	check_data($data);
+}
+
+
 ### Record shifted span alignment
 sub record_shifted_span {
 	my ($a, $data) = @_;
@@ -2077,6 +2160,28 @@ sub record_shifted_span {
 }
 
 
+### Record stranded shifted span alignment
+sub record_stranded_shifted_span {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# start based on strand, record based on strand
+	my $length = $a->calend - $a->pos;
+	if ($a->reversed) {
+		# reverse strand
+		# start position of the 3 prime extended fragment
+		$data->{r}{ $a->pos - $shift_value } .= "$length,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + $shift_value} .= "$length,";
+	}
+	check_data($data);
+}
+
+
 sub record_shifted_extended {
 	my ($a, $data) = @_;
 	
@@ -2088,6 +2193,26 @@ sub record_shifted_extended {
 		# reverse strand
 		# start position of the 3 prime extended fragment
 		$data->{f}{ $a->pos - $shift_value } .= "$ext_value,";
+	}
+	else {
+		# forward strand
+		$data->{f}{ $a->pos + $shift_value} .= "$ext_value,";
+	}
+	check_data($data);
+}
+
+
+sub record_stranded_shifted_extended {
+	my ($a, $data) = @_;
+	
+	# check
+	return if $a->qual < $min_mapq;
+	
+	# start based on strand, record based on strand
+	if ($a->reversed) {
+		# reverse strand
+		# start position of the 3 prime extended fragment
+		$data->{r}{ $a->pos - $shift_value } .= "$ext_value,";
 	}
 	else {
 		# forward strand
