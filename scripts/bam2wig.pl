@@ -1168,34 +1168,6 @@ sub write_model_file {
 
 
 
-### Pre-check alignment lengths for extend value
-sub check_alignment_lengths {
-	
-	# start check alignments from the beginning, do not care about chromosome
-	my $bam = $sam->bam;
-	my @lengths;
-	my $count = 0;
-	while (my $a = $bam->read1) {
-		last if $count == 2000; # go through first 2000, seems reasonable
-		next if $a->unmapped;
-		push @lengths, $a->calend - $a->pos;
-		$count++;
-	}
-	
-	# check if the lengths are all equal
-	if (all_equal(\@lengths)) {
-		return $lengths[0];
-	}
-	else {
-		printf "  %s alignments, mean %.2f +/- %.2f, min %s, max %s\n", 
-			scalar @lengths, mean(@lengths), stddev(@lengths), 
-			min(@lengths), max(@lengths);
-		return 0;
-	}
-}
-
-
-
 ### Collect alignment coverage
 sub process_bam_coverage {
 	# using the low level bam coverage method, not strand specific
