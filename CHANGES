@@ -7,6 +7,7 @@ v1.42
 	"print" wig files directly to a bigWig
 	- Updated bam2wig and data2wig scripts to write directly to the 
 	bigWig utility and skip writing temporary intermediate wig file
+	- Added functionality to bam2wig to record stranded shifted counts
 	- Fixed a critical bug in script get_gene_regions where transcripts 
 	weren't being filtered
 	- Improved file format taste testing to avoid GFF false positives
