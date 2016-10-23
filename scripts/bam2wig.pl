@@ -12,7 +12,10 @@ use Bio::ToolBox::utility qw(
 	open_to_read_fh 
 	open_to_write_fh 
 ); 
-use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
+use Bio::ToolBox::big_helper qw(
+	open_wig_to_bigwig_fh 
+	generate_chromosome_file
+);
 eval {
 	# check for bam support
 	require Bio::ToolBox::db_helper::bam;
@@ -141,7 +144,7 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # global variables
 my ($use_start, $use_mid, $use_span, $bin, $bedgraph, $callback, $split_callback, 
-	$write_wig, $convertor, $data_ref, $outbase, $half_extend);
+	$write_wig, $convertor, $data_ref, $outbase, $half_extend, $chromo_file);
 check_defaults();
 
 # record start time
@@ -236,7 +239,7 @@ else {
 
 
 ### Finish
-printf " Finished in %.1f min\n", (time - $start_time)/60;
+printf " Finished in %.3f min\n", (time - $start_time)/60;
 
 
 
@@ -462,10 +465,6 @@ sub check_defaults {
 		$outfile = $infile;
 		$outfile =~ s/\.bam$//;
 	}
-	if (defined $gz) {
-		# overide to false if bigwig is true
-		undef $gz if $bigwig;
-	} 
 	(undef, undef, $outbase) = File::Spec->splitpath($outfile);
 	$outfile =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # strip extension if present
 	$outbase =~ s/\.(?:wig|bdg|bedgraph)(?:\.gz)?$//i; # splitpath doesn't do extensions
@@ -690,25 +689,35 @@ sub check_defaults {
 
 ### Open the output file handle 
 sub open_wig_file {
-	my ($name, $track) = @_;
+	my ($name, $do_bw) = @_;
 	
-	# add extension to filename
+	# open a bigWig file handle if requested
+	if ($bigwig and $do_bw) {
+		$name .= '.bw' unless $name =~ /\.bw$/;
+		$chromo_file = generate_chromosome_file($sam);
+		my $fh = open_wig_to_bigwig_fh(
+			file   => $name,
+			chromo => $chromo_file,
+		);
+		if ($fh) {
+			return ($name, $fh);
+		}
+		else {
+			# we couldn't open a wigToBigWig filehandle for some reason
+			# so default to standard wig file
+			# typically a failure of wigToBigWig will bring the entire process
+			# down, so this may not be all that necessary
+			print " unable to open a bigWig file, writing standard wig file\n";
+			$name =~ s/\.bw$//;
+		}
+	}
+	
+	# otherwise we open a text wig file
 	$name .= $bedgraph ? '.bdg' : '.wig';
 	$name .= '.gz', if $gz;
-		
-	
-	# open
 	my $fh = open_to_write_fh($name, $gz) or 
 		die " unable to open output wig file '$name'!\n";
 		
-	# write track line
-	if ($bedgraph) {
-		$fh->print("track type=bedGraph\n") if $track;
-	}
-	else {
-		$fh->print("track type=wiggle_0\n") if $track;
-	}
-	
 	# finished
 	return ($name, $fh);
 }
@@ -1172,7 +1181,7 @@ sub write_model_file {
 sub process_bam_coverage {
 	# using the low level bam coverage method, not strand specific
 	
-	# open wig file
+	# open wig or bigWig file handle
 	my ($filename, $fh) = open_wig_file($outfile, 1);
 	
 	# determine the dump size
@@ -1189,13 +1198,10 @@ sub process_bam_coverage {
 		process_bam_coverage_on_chromosome($fh, $tid, $dump);
 	}
 	
+	# finish
 	$fh->close;
+	unlink $chromo_file if $chromo_file;
 	print " Wrote file $filename\n";
-	
-	# convert to bigwig if requested
-	if ($bigwig) {
-		convert_to_bigwig($filename);
-	}
 }
 
 
@@ -1212,11 +1218,7 @@ sub parallel_process_bam_coverage {
 	# but we want to keep the coverage array reasonable size, 10000 elements
 	# is plenty. we'll do some math to make it a multiple of bin_size to fit
 	my $dump = $bin_size * int( 10000 / $bin_size); 
-	
-	# we don't want child files to be compressed, takes too much CPU time
-	my $original_gz = $gz;
-	$gz = 0;
-	
+		
 	# prepare ForkManager
 	print " Forking into $cpu children for parallel conversion\n";
 	my $pm = Parallel::ForkManager->new($cpu);
@@ -1233,7 +1235,9 @@ sub parallel_process_bam_coverage {
 		$sam->clone;
 		
 		# then write the chromosome coverage in separate chromosome file
-		my ($filename, $fh) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
+		# do not write bigWig files, just text wig files
+		my ($filename, $fh) = open_wig_file(
+			$outfile . '#' . sprintf("%05d", $tid), 0);
 		process_bam_coverage_on_chromosome($fh, $tid, $dump);
 		
 		# finished with this chromosome
@@ -1242,11 +1246,10 @@ sub parallel_process_bam_coverage {
 	}
 	$pm->wait_all_children;
 	
-	# merge the children files back into one output file
-	print " merging separate chromosome files\n";
+	# find children
 	my @files = glob "$outfile#*";
 	die "can't find children files!\n" unless (@files);
-	$gz = $original_gz;
+	# open new output wig file, bigWig if requested
 	my ($filename, $fh) = open_wig_file($outfile, 1);
 	while (@files) {
 		my $file = shift @files;
@@ -1255,12 +1258,9 @@ sub parallel_process_bam_coverage {
 		$in->close;
 		unlink $file;
 	}
+	$fh->close;
+	unlink $chromo_file if $chromo_file;
 	print " Wrote file $filename\n";
-	
-	# convert to bigwig if requested
-	if ($bigwig) {
-		convert_to_bigwig($filename);
-	}
 }
 
 
@@ -1311,6 +1311,7 @@ sub process_alignments {
 	
 	# open wig files
 	my ($filename1, $filename2, $fh1, $fh2);
+	
 	if ($strand and !$flip) {
 		($filename1, $fh1) = open_wig_file("$outfile\_f", 1);
 		($filename2, $fh2) = open_wig_file("$outfile\_r", 1);
@@ -1342,23 +1343,15 @@ sub process_alignments {
 	# finished
 	$fh1->close;
 	$fh2->close if $fh2;
+	unlink $chromo_file if $chromo_file;
 	print " Wrote file $filename1\n";
 	print " Wrote file $filename2\n" if $filename2;
-	
-	# convert to bigwig if requested
-	if ($bigwig) {
-		convert_to_bigwig($filename1, $filename2);
-	}
 }
 
 
 
 ### Process alignments in parallel
 sub parallel_process_alignments {
-	
-	# we don't want child files to be compressed, takes too much CPU time
-	my $original_gz = $gz;
-	$gz = 0;
 	
 	# prepare ForkManager
 	print " Forking into $cpu children for parallel conversion\n";
@@ -1378,15 +1371,20 @@ sub parallel_process_alignments {
 		# open chromosome wig files
 		my ($filename1, $filename2, $fh1, $fh2);
 		if ($strand and !$flip) {
-			($filename1, $fh1) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
-			($filename2, $fh2) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
+			($filename1, $fh1) = open_wig_file(
+				$outfile . '_f#' . sprintf("%05d", $tid), 0);
+			($filename2, $fh2) = open_wig_file(
+				$outfile . '_r#' . sprintf("%05d", $tid), 0);
 		}
 		elsif ($strand and $flip) {
-			($filename1, $fh1) = open_wig_file($outfile . '_r#' . sprintf("%05d", $tid));
-			($filename2, $fh2) = open_wig_file($outfile . '_f#' . sprintf("%05d", $tid));
+			($filename1, $fh1) = open_wig_file(
+				$outfile . '_r#' . sprintf("%05d", $tid), 0);
+			($filename2, $fh2) = open_wig_file(
+				$outfile . '_f#' . sprintf("%05d", $tid), 0);
 		}
 		else {
-			($filename1, $fh1) = open_wig_file($outfile . '#' . sprintf("%05d", $tid));
+			($filename1, $fh1) = open_wig_file(
+				$outfile . '#' . sprintf("%05d", $tid), 0);
 		}
 	
 		# processing depends on whether we need to split splices or not
@@ -1405,6 +1403,7 @@ sub parallel_process_alignments {
 	$pm->wait_all_children;
 	
 	# merge the children files back into one output file
+	# allow to make bigWig file if requested
 	print " merging separate chromosome files\n";
 	my ($filename1, $filename2);
 	if ($strand) {
@@ -1414,10 +1413,8 @@ sub parallel_process_alignments {
 		my @rfiles = glob "$outfile\_r#*";
 		die "can't find children files!\n" unless (@ffiles and @rfiles);
 		
-		$gz = $original_gz;
+		# combine forward files, bigWig if necessary
 		my $fh;
-		
-		# combine forward files
 		($filename1, $fh) = open_wig_file("$outfile\_f", 1);
 		while (@ffiles) {
 			my $file = shift @ffiles;
@@ -1429,7 +1426,7 @@ sub parallel_process_alignments {
 		$fh->close;
 		print " Wrote file $filename1\n";
 		
-		# combine reverse files
+		# combine reverse files, bigWig if necessary
 		($filename2, $fh) = open_wig_file("$outfile\_r", 1);
 		while (@rfiles) {
 			my $file = shift @rfiles;
@@ -1442,11 +1439,10 @@ sub parallel_process_alignments {
 		print " Wrote file $filename2\n";
 	}
 	else {
-		# single wig file
+		# output single wig file, bigWig if requested
 		
 		my @files = glob "$outfile#*";
 		die "can't find children files!\n" unless (@files);
-		$gz = $original_gz;
 		my $fh;
 		($filename1, $fh) = open_wig_file($outfile, 1);
 		while (@files) {
@@ -1459,11 +1455,7 @@ sub parallel_process_alignments {
 		$fh->close;
 		print " Wrote file $filename1\n";
 	}
-	
-	# convert to bigwig if requested
-	if ($bigwig) {
-		convert_to_bigwig($filename1, $filename2);
-	}
+	unlink $chromo_file if $chromo_file;
 }
 
 
@@ -2445,28 +2437,6 @@ sub all_equal {
 }
 
 
-### Convert to BigWig format
-sub convert_to_bigwig {
-	my @files = @_;
-	
-	foreach my $file (@files) {
-		next unless defined $file;
-		my $bw_file = wig_to_bigwig_conversion(
-			'wig'       => $file,
-			'db'        => $sam,
-			'bwapppath' => $bwapp,
-		);
-		if ($bw_file) {
-			print " Converted to $bw_file\n";
-			unlink $file;
-		}
-		else {
-			print " BigWig conversion failed! see standard error for details\n";
-		}
-	}
-}
-
-
 sub _write_array_to_bedgraph {
 	my ($data, $final, $max_pos, $buffer, $offset, $fh, $special) = @_;
 	
@@ -2595,7 +2565,7 @@ bam2wig.pl [--options...] <filename.bam>
   Output options:
   --out <filename> 
   --bw
-  --bwapp </path/to/wigToBigWig or /path/to/bedGraphToBigWig>
+  --bwapp /path/to/wigToBigWig
   --gz
   
   General options:
@@ -2791,12 +2761,12 @@ input file.
 Specify whether or not the wig file should be further converted into 
 an indexed, compressed, binary BigWig file. The default is false.
 
-=item --bwapp < /path/to/wigToBigWig or /path/to/bedGraphToBigWig >
+=item --bwapp /path/to/wigToBigWig
 
-Specify the full path to Jim Kent's bigWig conversion utility. Two 
-different utilities may be used, bedGraphToBigWig or wigToBigWig, 
-depending on the format of the wig file generated. The application 
-paths may be set in the biotoolbox.cfg file.
+Optionally specify the full path to the UCSC wigToBigWig conversion 
+utility. The application path may be set in the .biotoolbox.cfg file 
+or found in the default executable path, which makes this option 
+unnecessary.
 
 =item --gz
 
