@@ -8,8 +8,11 @@ use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
-my $VERSION =  '1.41';
+use Bio::ToolBox::big_helper qw(
+	open_wig_to_bigwig_fh 
+	generate_chromosome_file
+);
+my $VERSION =  '1.42';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -51,7 +54,6 @@ my (
 	$bw_app_path,
 	$database,
 	$chromo_file,
-	$keep,
 	$gz,
 	$help,
 	$print_version,
@@ -82,7 +84,6 @@ GetOptions(
 	'db=s'      => \$database, # database for bigwig file generation
 	'chromof=s' => \$chromo_file, # name of a chromosome file
 	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
-	'keep!'     => \$keep, # keep the wig file after converting to bigWig
 	'gz!'       => \$gz, # boolean to compress output file
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
@@ -158,18 +159,32 @@ unless ($outfile) {
 	# automatically generate output file name based on track name
 	$outfile = $track_name;
 }
-unless ($outfile =~ /\.(?:wig|bdg|bedgraph)(?:\.gz)?$/i) {
-	# add extension
-	$outfile .= $bedgraph ? '.bdg' : '.wig';
+my $out_fh;
+if ($bigwig) {
+	# we will write directly to a bigWig file
+	unless ($chromo_file) {
+		$chromo_file = generate_chromosome_file($database) or 
+			die "unable to generate chromosome file needed for bigWig conversion!\n";
+	}
+	$outfile .= '.bw' unless $outfile =~ /\.bw$/;
+	$out_fh = open_wig_to_bigwig_fh(
+		file   => $outfile,
+		chromo => $chromo_file,
+	) or die "unable to open a wigToBigWig file handle!\n";
 }
-my $out_fh = Bio::ToolBox::Data::Stream->open_to_write_fh($outfile, $gz) or 
-	die " unable to open output file '$outfile' for writing!\n";
+else {
+	# we will write to a wig file
+	unless ($outfile =~ /\.(?:wig|bdg|bedgraph)(?:\.gz)?$/i) {
+		$outfile .= $bedgraph ? '.bdg' : '.wig';
+	}
+	$out_fh = Bio::ToolBox::Data::Stream->open_to_write_fh($outfile, $gz) or 
+		die " unable to open output file '$outfile' for writing!\n";
 
-# write track line
-if ($use_track) {
-	print {$out_fh} "track type=wiggle_0 name=$track_name\n";
+	# write track line
+	if ($use_track) {
+		print {$out_fh} "track type=wiggle_0 name=$track_name\n";
+	}
 }
-
 
 
 ### Start the conversion 
@@ -201,21 +216,8 @@ elsif ($step eq 'variable') {
 
 # close files
 $out_fh->close;
-
-
-
-### Finish Up
-if ($bigwig) {
-	# requested to continue and generate a binary bigwig file
-	print " temporary wig file '$outfile' generated\n";
-	print " converting to bigwig file....\n";
-	convert_to_bigwig();
-}
-else {
-	# no big wig file needed, we're finished
-	print " finished! wrote file '$outfile'\n";
-}
-
+unlink $chromo_file if ($bigwig and $database and $chromo_file =~ /^chr_sizes_\w{5}$/);
+print " finished! wrote file '$outfile'\n";
 
 
 
@@ -704,28 +706,6 @@ sub get_score {
 }
 
 
-sub convert_to_bigwig {
-	
-	# perform the conversion
-	my $bw_file = wig_to_bigwig_conversion(
-			'wig'       => $outfile,
-			'db'        => $database,
-			'chromo'    => $chromo_file,
-			'bwapppath' => $bw_app_path,
-	);
-
-	
-	# confirm
-	if ($bw_file) {
-		print " bigwig file '$bw_file' generated\n";
-		unlink $outfile unless $keep; # remove the wig file
-	}
-	else {
-		die " bigwig file not generated! see standard error\n";
-	}
-}
-
-
 
 
 
@@ -764,7 +744,6 @@ data2wig.pl [--options...] <filename>
   --chromof <filename>
   --db <database>
   --bwapp </path/to/wigToBigWig>
-  --keep
   --gz
   --version
   --help
@@ -925,8 +904,7 @@ Default is mean.
 =item --bw
 
 Indicate that a binary BigWig file should be generated instead of 
-a text wiggle file. A .wig file is first generated, then converted to 
-a .bw file, and then the .wig file is removed.
+a text wiggle file. 
 
 =item --chromof <filename>
 
@@ -938,22 +916,16 @@ Alternatively, provide a name of a database, below.
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
 or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
-length information may be obtained. For more information about using databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. It 
-may be supplied from the input file metadata.
+length information may be obtained. It may be supplied from the input 
+file metadata.
 
 =item --bwapp </path/to/wigToBigWig>
 
-Specify the path to the UCSC wigToBigWig or bedGraphToBigWig conversion 
-utility. The default is to first check the BioToolBox configuration 
-file C<biotoolbox.cfg> for the application path. Failing that, it will 
-search the default environment path for the utility. If found, it will 
-automatically execute the utility to convert the wig file.
-
-=item --keep
-
-Keep the wig or bedGraph file after converting to a bigWig file. The 
-default is to delete the file if the bigWig conversion is successful.
+Specify the path to the UCSC wigToBigWig conversion utility. The default 
+is to first check the BioToolBox configuration file C<biotoolbox.cfg> for 
+the application path. Failing that, it will search the default 
+environment path for the utility. If found, it will automatically 
+execute the utility to convert the wig file.
 
 =item --gz
 
