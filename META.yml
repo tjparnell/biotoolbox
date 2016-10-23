@@ -15,10 +15,10 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.41'
+    version: '1.42'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
-    version: '1.41'
+    version: '1.42'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
     version: '1.40'
@@ -41,7 +41,7 @@ provides:
     version: '1.40'
   Bio::ToolBox::big_helper:
     file: lib/Bio/ToolBox/big_helper.pm
-    version: '1.14'
+    version: '1.42'
   Bio::ToolBox::db_helper:
     file: lib/Bio/ToolBox/db_helper.pm
     version: '1.40'
@@ -68,10 +68,10 @@ provides:
     version: '1.14'
   Bio::ToolBox::parser::gff:
     file: lib/Bio/ToolBox/parser/gff.pm
-    version: '1.41'
+    version: '1.42'
   Bio::ToolBox::parser::ucsc:
     file: lib/Bio/ToolBox/parser/ucsc.pm
-    version: '1.40'
+    version: '1.42'
   Bio::ToolBox::parser::ucsc::builder:
     file: lib/Bio/ToolBox/parser/ucsc.pm
   Bio::ToolBox::utility:
@@ -95,4 +95,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.41'
+version: '1.42'
