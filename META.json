@@ -42,7 +42,7 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.42"
+         "version" : "1.43"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
@@ -136,5 +136,5 @@
          "url" : "https://github.com/tjparnell/biotoolbox"
       }
    },
-   "version" : "1.42"
+   "version" : "1.43"
 }
