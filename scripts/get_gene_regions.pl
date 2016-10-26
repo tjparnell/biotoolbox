@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.42';
+my $VERSION = '1.43';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -603,7 +603,6 @@ sub process_gene {
 		unshift @$region, $gene->display_name;
 	}
 	
-	
 	# remove duplicates if requested
 	if ($unique) {
 		remove_duplicates(\@regions);
@@ -1179,22 +1178,41 @@ sub remove_duplicates {
 	# look for duplicates using a quick hash of seen positions
 	my %seenit;
 	my @to_remove;
-	for my $i (0 .. $#{ $regions } ) {
-		# we will be using the start position as a unique identifier
-		# to account for the slop factor,
-		# we'll be adding/subtracting the slop value to/from the start position
-		# if this position matches anything else, we'll assume it's a duplicate
+	
+	if ($slop) {
+		# to simplify, we only use the start position when using slop, since 
+		# the end position is going to be too variable and flapping in the 
+		# breeze, so to speak 
+		# not entirely accurate, but that's slop for you
+		for my $i (0 .. $#{ $regions } ) {
+			# we will be using the start position as the unique identifier
+			# to account for the slop factor, we'll be adding/subtracting the 
+			# slop value to/from the start position
+			# if this position matches anything else, we'll assume it's a duplicate
 		
-		foreach my $pos ( 
-			# generate an array of possible start positions
-			# with a default slop of 0, this will only be 1 position
-			($regions->[$i]->[3] - $slop) .. ($regions->[$i]->[3] + $slop)
-		) {
-			if (exists $seenit{ $pos }) {
+			foreach my $pos ( 
+				# generate an array of possible start positions
+				# with a default slop of 0, this will only be 1 position
+				($regions->[$i]->[4] - $slop) .. ($regions->[$i]->[4] + $slop)
+			) {
+				if (exists $seenit{ $pos }) {
+					push @to_remove, $i;
+				}
+				else {
+					$seenit{ $pos } = 1;
+				}
+			}
+		}
+	}
+	else {
+		# without slop, we look for precise matches based on both start and end
+		for my $i (0 .. $#{ $regions } ) {
+			my ($s, $e) = ($regions->[$i]->[4], $regions->[$i]->[5]);
+			if (exists $seenit{$s}{$e}) {
 				push @to_remove, $i;
 			}
 			else {
-				$seenit{ $pos } = 1;
+				$seenit{$s}{$e} = 1;
 			}
 		}
 	}
@@ -1318,8 +1336,10 @@ the feature startpoint or endpoint, depending on its orientation.
 
 =item --unique
 
-For gene features only, take only the unique regions. Useful when 
-multiple alternative transcripts are defined for a single gene.
+Compare start and stop coordinates of each collected region from 
+each feature and remove duplicate regions. When the --slop option 
+is provided, only the start coordinate plus/minus the slop factor 
+is checked. 
 
 =item --slop <integer>
 
