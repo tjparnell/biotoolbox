@@ -1,5 +1,9 @@
 ######## Bio::ToolBox revision history #############
 
+v1.43
+	- Fix bug with unique option in script get_gene_regions where 
+	too many regions were being discarded. Thanks to Mengyao.
+
 v1.42
 	- Changed bigWig convertor method to use primarily the wigToBigWig 
 	utility for simplicity
