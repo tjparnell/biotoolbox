@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.42';
+our $VERSION = '1.43';
 
 =head1 NAME
 
@@ -44,7 +44,7 @@ objects. Refer to that documentation for more information.
 
 =head1 METHODS
 
-=head2 Initializing the parser.
+=head2 Initializing the parser. 
 
 =over 4
 
@@ -79,7 +79,18 @@ for expediency when they known in advance not to be needed. See skip() below.
 Pass the name of a L<Bio::SeqFeatureI> compliant class that will be used to 
 create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>.
 
+=item simplify
+
+Pass a boolean value to simplify the SeqFeature objects parsed from the GFF 
+file and ignore extraneous attributes.
+
 =back
+
+=head2 Parser behavior
+
+These are additional class methods that control the parsing behavior of a 
+new object. Unpredictable behavior may occur if you implement these in the 
+midst of parsing a file.
 
 =item open_file($file)
 
@@ -121,6 +132,14 @@ a list of the primary_tag values to be skipped. Examples include
 =item * stop_codon
 
 =back
+
+=item simplify(1)
+
+Pass a boolean true value to simplify the attributes of GFF3 and GTF files 
+that may have considerable numbers of tags, e.g. Ensembl files. Only 
+essential information, including name, ID, and parentage, is retained. 
+Useful if you're trying to quickly parse annotation files for basic 
+information.
 
 =back
 
@@ -240,6 +259,9 @@ use Bio::ToolBox::Data::file; # only for opening file handles
 our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
 eval "require $SFCLASS" or croak $@;
 
+our $GTF_simple_ids = qr/gene_id|transcript_id|gene_name|transcript_name|gene_source|transcript_biotype/;
+our $GFF3_simple_ids = qr/ID|Name|Parent/;
+
 1;
 
 sub new {
@@ -255,6 +277,7 @@ sub new {
 		'version'       => undef,
 		'comments'      => [],
 		'seq_ids'       => {},
+		'simplify'      => 0,
 	};
 	bless $self, $class;
 	
@@ -268,6 +291,9 @@ sub new {
 			if (exists $options{skip}) {
 				my @s = @{ $options{skip} };
 				$self->skip(@s);
+			}
+			if (exists $options{simplify}) {
+				$self->simplify( $options{simplify} );
 			}
 			if (exists $options{version}) {
 				$self->version($options{version});
@@ -299,6 +325,14 @@ sub skip {
 	}
 	my @skips = keys %{ $self->{skip_types} };
 	return wantarray ? @skips : \@skips;
+}
+
+sub simplify {
+	my $self = shift;
+	if (defined $_[0]) {
+		$self->{simplify} = shift;
+	}
+	return $self->{simplify};
 }
 
 sub version {
@@ -825,9 +859,9 @@ sub _gff3_to_seqf {
 	
 	# process groups
 	foreach my $g (split(/\s*;\s*/, $group)) {
-		
 		my ($tag, $value) = split /=/, $g;
 		$tag = $self->unescape($tag);
+		next if ($self->{simplify} and not $tag =~ $GFF3_simple_ids);
 		my @values = map { $self->unescape($_) } split(/,/, $value);
 		
 		# determine the appropriate attribute based on tag name
@@ -854,79 +888,74 @@ sub _gtf_to_seqf {
 	my $feature = $self->_gff_to_seqf(@_);
 	
 	# process groups
-	foreach my $g (split(/;\s+/, $group)) { # supposed to be "; " as delimiter
-		my ($tag, $value, @bits) = split /\s+/, $g;
+	my %attributes;
+	my ($transcript_id, $transcript_name, $gene_id, $gene_name);
+	foreach my $g (split('; ', $group)) { # supposed to be "; " as delimiter
+		my ($tag, $value, @bits) = split ' ', $g;
+		next if ($self->{simplify} and not $tag =~ $GTF_simple_ids);
 		if (@bits) {
 			# value had spaces in it!
 			foreach (@bits) {$value .= " $_"}
 		}
 		$value =~ s/[";]//g; # remove the flanking double quotes, assume no internal quotes
-		$feature->add_tag_value($tag, $value);
+		if ($tag eq 'transcript_id') {
+			$transcript_id = $value;
+		}
+		elsif ($tag eq 'transcript_name') {
+			$transcript_name = $value;
+		}
+		elsif ($tag eq 'gene_id') {
+			$gene_id = $value;
+		}
+		elsif ($tag eq 'gene_name') {
+			$gene_name = $value;
+		}
+		else {
+			$attributes{$tag} = $value;
+		}
 	}
 	
-	# change some Ensembl tags
-	# Ensembl GTFs use the source tag as the biotype, instead of a the real source
+	## Change some Ensembl tags
+	# sometimes Ensembl GTFs use the source tag as the biotype, instead of a the real source
 	my $original_source = $feature->source; # keep this for later
-	if ($feature->has_tag('gene_source')) {
-		my ($s) = $feature->get_tag_values('gene_source');
-		$feature->source($s);
+	if (exists $attributes{'gene_source'}) {
+		$feature->source($attributes{'gene_source'});
+		delete $attributes{'gene_source'} if $self->{simplify};
 	}
 	
 	# convert some tags into GFF3-like conventions
 	if ($feature->primary_tag =~ /gene/i) {
-		my ($id, $name);
-		if ($feature->has_tag('gene_id')) {
-			($id) = $feature->get_tag_values('gene_id');
-		}	
-		if ($feature->has_tag('gene_name')) {
-			($name) = $feature->get_tag_values('gene_name');
-		}
-		else {
-			$name = $id;
-		}
-		$feature->primary_id($id);
-		$feature->display_name($name);
+		$feature->primary_id($gene_id);
+		$feature->display_name($gene_name);
 	}
 	elsif ($feature->primary_tag =~ /transcript|rna/i) {
-		my ($id, $name, $parent);
-		if ($feature->has_tag('transcript_id')) {
-			($id) = $feature->get_tag_values('transcript_id');
-		}	
-		if ($feature->has_tag('transcript_name')) {
-			($name) = $feature->get_tag_values('transcript_name');
-		}
-		else {
-			$name = $id;
-		}
-		if ($feature->has_tag('gene_id')) {
-			($parent) = $feature->get_tag_values('gene_id');
-		}	
-		$feature->primary_id($id);
-		$feature->display_name($name);
-		$feature->add_tag_value('Parent', $parent);
-		if ($feature->has_tag('gene_name')) {
-			my ($alias) = $feature->get_tag_values('gene_name');
-			$feature->add_tag_value('Alias', $alias) if $alias ne $name;
-		}
+		$feature->primary_id($transcript_id);
+		$feature->display_name($transcript_name);
+		$feature->add_tag_value('Parent', $gene_id) if $gene_id;
 		
 		# update primary_tag to follow BioPerl/BioToolBox/GFF3/traditional conventions
-		# primarily to handle specifically Ensembl GTF file formats
+		# primarily to handle some Ensembl GTF file formats
 		if ($feature->primary_tag =~ /^transcript$/i) {
 			# generic transcript type, see if we can make it more specific
-			if ($feature->has_tag('transcript_biotype')) {
-				my ($t) = $feature->get_tag_values('transcript_biotype');
-				if ($t =~ /protein_coding/i) {
+			if (exists $attributes{'transcript_biotype'}) {
+				if ($attributes{'transcript_biotype'} =~ /protein_coding/i) {
 					$feature->primary_tag('mRNA');
 				}
-				elsif ($t =~ /rna/i) {
+				elsif ($attributes{'transcript_biotype'} =~ /rna/i) {
 					# looks like an rna type
-					$feature->primary_tag($t);
+					$feature->primary_tag($attributes{'transcript_biotype'});
 				}
+				delete $attributes{'transcript_biotype'} if $self->{simplify};
 			}
-			elsif ($feature->has_tag('gene_biotype')) {
-				my ($t) = $feature->get_tag_values('gene_biotype');
-				$t = 'mRNA' if $t =~ /protein_coding/i;
-				$feature->primary_tag($t);
+			elsif (exists $attributes{'gene_biotype'}) {
+				if ($attributes{'gene_biotype'} =~ /protein_coding/i) {
+					$feature->primary_tag('mRNA');
+				}
+				elsif ($attributes{'gene_biotype'} =~ /rna/i) {
+					# looks like an rna type
+					$feature->primary_tag($attributes{'gene_biotype'});
+				}
+				delete $attributes{'gene_biotype'} if $self->{simplify};
 			}
 			elsif ($original_source =~ /protein_coding/i) {
 				$feature->primary_tag('mRNA');
@@ -939,10 +968,14 @@ sub _gtf_to_seqf {
 	else {
 		# other features are assumed to be transcript children
 		# not required to set a primary_id
-		if ($feature->has_tag('transcript_id')) {
-			my ($parent) = $feature->get_tag_values('transcript_id');
-			$feature->add_tag_value('Parent', $parent);
+		if ($transcript_id) {
+			$feature->add_tag_value('Parent', $transcript_id);
 		}	
+	}
+	
+	# add remaining attributes to the feature
+	foreach my $key (keys %attributes) {
+		$feature->add_tag_value($key, $attributes{$key});
 	}
 	
 	return $feature;
