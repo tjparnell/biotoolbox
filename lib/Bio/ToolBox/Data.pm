@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.42';
+our $VERSION = '1.43';
 
 =head1 NAME
 
@@ -973,6 +973,7 @@ sub parse_table {
 	
 	# parse the table
 	my $parser = $class->new() or return;
+	$parser->simplify(1) if $flavor eq 'gff';
 	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
