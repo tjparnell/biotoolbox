@@ -10,7 +10,7 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 228;
+	plan tests => 229;
 }
 else {
 	plan tests => 137;
@@ -86,6 +86,8 @@ sub test_gff {
 	is($f->primary_tag, 'gene', 'feature2 primary_tag');
 	is($f->display_name, 'YAL069W', 'feature2 display_name');
 	is($f->primary_id, 'YAL069W', 'feature2 primary_id');
+	my ($tag) = $f->get_tag_values('orf_classification');
+	is($tag, 'Dubious', 'feature2 attribute');
 	my @subf = $f->get_SeqFeatures;
 	is(scalar @subf, 1, 'feature2 subfeatures');
 	is($subf[0]->primary_tag, 'CDS', 'feature2 subfeature primary_tag');
@@ -280,7 +282,7 @@ sub test_parsed_gff_table {
 	my $f = $Data->get_seqfeature(4);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Fifth row SeqFeature object');
 	is($f->display_name, 'YAL069W', 'SeqFeature display name');
-	is($f->get_tag_values('orf_classification'), 'Dubious', 'SeqFeature attribute');
+	is($f->get_tag_values('orf_classification'), undef, 'missing SeqFeature attribute');
 	is($f->start, 335, 'SeqFeature start position');
 	my @subf = $f->get_SeqFeatures;
 	is(scalar @subf, 1, 'Number of SeqFeature sub features');
@@ -301,7 +303,6 @@ sub test_parsed_gff_table {
 	my $f3 = $Data->get_seqfeature(4);
 	isa_ok($f3, 'Bio::ToolBox::SeqFeature', 'Reloaded fifth row SeqFeature object');
 	is($f3->display_name, 'YAL069W', 'SeqFeature display name');
-	is($f3->get_tag_values('orf_classification'), 'Dubious', 'SeqFeature attribute');
 	unlink $outfile;
 }
 

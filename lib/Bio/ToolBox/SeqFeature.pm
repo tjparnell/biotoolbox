@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.40';
+our $VERSION = '1.43';
 
 =head1 NAME
 
@@ -233,6 +233,10 @@ it may return an array or array reference.
 =item attributes
 
 Returns an array or reference to the key value hash;
+
+=item remove_tag($key)
+
+Deletes the indicated attribute.
 
 =back
 
@@ -657,6 +661,13 @@ sub all_tags {
 	return wantarray ? @k : \@k;
 }
 
+sub remove_tag {
+	my ($self, $key) = @_;
+	$self->[ATTRB] ||= {};
+	if (exists $self->[ATTRB]->{$key}) {
+		delete $self->[ATTRB]->{$key};
+	}
+}
 
 
 

@@ -23,7 +23,7 @@ our @EXPORT_OK = qw(
 );
 
 
-our $VERSION = '1.42';
+our $VERSION = '1.43';
 
 1;
 
@@ -166,23 +166,28 @@ sub open_wig_to_bigwig_fh {
 		$args{bw} .= '.bw';
 	}
 	
+	# preferred utility
+	$args{bedgraph} ||= $args{bedGraph} || 0;
+	
 	# Identify bigwig conversion utility
 	$args{bwapppath} ||= undef;
 	unless ($args{bwapppath}) {
 		# check for an entry in the configuration file
-		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || 
-				undef;
+		$args{bwapppath} = $args{bedgraph} ? 
+			$BTB_CONFIG->param("applications.bedGraphToBigWig") : 
+			$BTB_CONFIG->param("applications.wigToBigWig") || undef;
 	}
 	unless ($args{bwapppath}) {
 		# try checking the system path as a final resort
 		eval {
 			require File::Which;
 			File::Which->import;
-			$args{bwapppath} = which('wigToBigWig');
+			$args{bwapppath} = $args{bedgraph} ? which('bedGraphToBigWig') : 
+				which('wigToBigWig');
 		};
 		add_program($args{bwapppath}) if $args{bwapppath};
 	}
-	unless ($args{bwapppath} =~ /wigToBigWig$/) {
+	unless ($args{bwapppath} =~ /ToBigWig$/) {
 		warn " Utility 'wigToBigWig' not specified and can not be found!" . 
 			" Conversion failed!\n";
 		return;
@@ -210,7 +215,7 @@ sub open_wig_to_bigwig_fh {
 	my $command = sprintf "%s stdin %s %s", $args{bwapppath}, $args{chromo}, 
 		$args{bw};
 	my $bwfh = IO::File->new("| $command") or 
-		die "cannot open wigToBigWig!\n";
+		die sprintf("cannot open %s!\n", $args{bwapppath});
 		# wigToBigWig will always die anyway if something is wrong
 		# cannot trap it with an eval, since it doesn't just error out
 		# but actually exits, dragging the whole Perl process with it
@@ -441,6 +446,11 @@ Pass the function an array of key =E<gt> value arguments. An L<IO::File>
 object will be returned. Upon the closing the file handle, the 
 I<wigToBigWig> utility will generate the bigWig file.
 
+Note that the UCSC utility I<bedGraphToBigWig> may be alternatively 
+specified when using the bedGraph format only. The I<wigToBigWig> 
+utility can handle any wig format; however, the I<bedGraphToBigWig> 
+utility mysteriously generates smaller bigWig files than I<wigToBigWig>. 
+
   Required:
   bw          => The output file name for the bigWig file.
                  Also accepts the keys file, wig, and out. 
@@ -450,9 +460,12 @@ I<wigToBigWig> utility will generate the bigWig file.
   db          => Alternatively, provide an opened database object from which 
                  to generate a temporary chromosome sizes file. It is up to the 
                  user to delete this file.
-  bwapppath   => Provide the full path to the UCSC I<wigToBigWig> 
-                 utility. This parameter may instead be defined in the 
-                 configuration file C<biotoolbox.cfg>. 
+  bwapppath   => Provide the full path to the UCSC I<wigToBigWig> or 
+                 I<bedGraphToBigWig> utility. The path may be obtained from 
+                 the configuration file C<biotoolbox.cfg>. 
+  bedgraph    => Provide a boolean value to indicate a preference to use  
+                 the UCSC I<bedGraphToBigWig> utility instead. This 
+                 option has no effect if you specify your own path.
 
   Example:
 	my $bw_file = 'example.bw';
