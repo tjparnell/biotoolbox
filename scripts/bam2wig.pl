@@ -34,7 +34,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.42';
+my $VERSION = '1.43';
 	
 	
 
@@ -696,8 +696,10 @@ sub open_wig_file {
 		$name .= '.bw' unless $name =~ /\.bw$/;
 		$chromo_file = generate_chromosome_file($sam);
 		my $fh = open_wig_to_bigwig_fh(
-			file   => $name,
-			chromo => $chromo_file,
+			file      => $name,
+			chromo    => $chromo_file,
+			bwapppath => $bwapp,
+			bedgraph  => $bedgraph ? 1 : 0,
 		);
 		if ($fh) {
 			return ($name, $fh);
@@ -2763,21 +2765,21 @@ an indexed, compressed, binary BigWig file. The default is false.
 
 =item --bwapp /path/to/wigToBigWig
 
-Optionally specify the full path to the UCSC wigToBigWig conversion 
+Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
 utility. The application path may be set in the .biotoolbox.cfg file 
 or found in the default executable path, which makes this option 
-unnecessary.
+unnecessary. When writing span or extend bedGraph files, the UCSC 
+utility I<bedGraphToBigWig> may optionally be used if desired.
 
 =item --gz
 
 Specify whether (or not) the output file should be compressed with 
-gzip. The default is compress the output unless a BigWig file is 
-requested. Disable with --nogz.
+gzip. Disable with --nogz.
 
 =item --cpu <integer>
 
 Specify the number of CPU cores to execute in parallel. This requires 
-the installation of Parallel::ForkManager. With support enabled, the 
+the installation of L<Parallel::ForkManager>. With support enabled, the 
 default is 2. Disable multi-threaded execution by setting to 1. 
 
 =item --max_cnt <integer>

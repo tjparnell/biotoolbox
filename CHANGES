@@ -1,5 +1,15 @@
 ######## Bio::ToolBox revision history #############
 
+v1.43
+	- Fix bug with unique option in script get_gene_regions where 
+	too many regions were being discarded. Thanks to Mengyao.
+	- Fix bug with generating bigWig files in script bam2wig, and 
+	restore option to prefer bedGraphToBigWig if so desired
+	- Add option to ignore extraneous attribute tags when parsing
+	GFF and GTF files to reduce memory (simplify). Enable this 
+	option by default when parsing annotation files when loading a 
+	table in Bio::ToolBox::Data. 
+
 v1.42
 	- Changed bigWig convertor method to use primarily the wigToBigWig 
 	utility for simplicity
