@@ -46,7 +46,7 @@
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
-         "version" : "1.42"
+         "version" : "1.43"
       },
       "Bio::ToolBox::Data::Feature" : {
          "file" : "lib/Bio/ToolBox/Data/Feature.pm",
@@ -73,11 +73,11 @@
       },
       "Bio::ToolBox::SeqFeature" : {
          "file" : "lib/Bio/ToolBox/SeqFeature.pm",
-         "version" : "1.40"
+         "version" : "1.43"
       },
       "Bio::ToolBox::big_helper" : {
          "file" : "lib/Bio/ToolBox/big_helper.pm",
-         "version" : "1.42"
+         "version" : "1.43"
       },
       "Bio::ToolBox::db_helper" : {
          "file" : "lib/Bio/ToolBox/db_helper.pm",
@@ -113,7 +113,7 @@
       },
       "Bio::ToolBox::parser::gff" : {
          "file" : "lib/Bio/ToolBox/parser/gff.pm",
-         "version" : "1.42"
+         "version" : "1.43"
       },
       "Bio::ToolBox::parser::ucsc" : {
          "file" : "lib/Bio/ToolBox/parser/ucsc.pm",
