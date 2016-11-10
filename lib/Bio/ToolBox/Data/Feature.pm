@@ -940,6 +940,7 @@ sub get_score {
 		$args{strand},
 		$args{strandedness},
 		$args{'method'},
+		0, # return type should be a calculated value
 		$db,
 		$args{dataset},
 	);
@@ -975,7 +976,8 @@ sub _get_subfeature_scores {
 			$exon->end,
 			defined $args->{strand} ? $args->{strand} : $exon->strand, 
 			$args->{strandedness}, 
-			'scores', # method
+			$args->{method},
+			1, # return type should be an array reference of scores
 			$db,
 			$args->{dataset}, 
 		);
@@ -1023,7 +1025,8 @@ sub get_relative_point_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'indexed_' . $args{'method'},
+		$args{'method'},
+		2, # return type should be a hash reference of positioned scores
 		$ddb,
 		$args{dataset}, 
 	);
@@ -1089,7 +1092,8 @@ sub get_region_position_scores {
 		$fstop,
 		$fstrand, 
 		$args{strandedness}, 
-		'indexed_' . $args{'method'},
+		$args{'method'},
+		2, # return type should be a hash reference of positioned scores
 		$ddb,
 		$args{dataset}, 
 	);
@@ -1151,7 +1155,8 @@ sub _get_subfeature_position_scores {
 			$exon->end,
 			$fstrand, 
 			$args->{strandedness}, 
-			'indexed', # method
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
 			$ddb,
 			$args->{dataset}, 
 		);
@@ -1175,7 +1180,8 @@ sub _get_subfeature_position_scores {
 			$feature->start - 1,
 			$fstrand, 
 			$args->{strandedness}, 
-			'indexed', # method
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
 			$ddb,
 			$args->{dataset}, 
 		);
@@ -1191,7 +1197,8 @@ sub _get_subfeature_position_scores {
 			$feature->end + 1,
 			$fstrand, 
 			$args->{strandedness}, 
-			'indexed', # method
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
 			$ddb,
 			$args->{dataset}, 
 		);

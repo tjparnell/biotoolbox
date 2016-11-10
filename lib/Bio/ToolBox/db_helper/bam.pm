@@ -20,8 +20,9 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	DB   => 6,  # database object
-	DATA => 7,  # first dataset, additional may be present
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -32,7 +33,6 @@ our @EXPORT = qw(
 	check_bam_index
 	write_new_bam_file
 	collect_bam_scores
-	collect_bam_position_scores
 	sum_total_bam_alignments
 );
 
@@ -134,45 +134,15 @@ sub write_new_bam_file {
 
 
 
-### Collect Bam scores only
+### Collect Bam scores
 sub collect_bam_scores {
-	# set the do_index boolean to false
-	# return the scores
-	return _collect_bam_data(0, @_);
-}
-
-
-
-
-### Collect positioned Bam scores
-sub collect_bam_position_scores {
-	
-	# collect the raw data
-	# set the do_index boolean to true
-	my $param = shift;
-	my $bam_data = _collect_bam_data(1, $param);
-	
-	# return collected data
-	return wantarray ? %$bam_data : $bam_data;
-}
-
-
-
-
-### Actual collection of scores
-sub _collect_bam_data {
 	
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
-	my ($do_index, $param) = @_;
-	
-	# make method compatible
-	if ($do_index) {
-		$param->[METH] =~ s/^indexed_//;
-	}
+	my $param = shift;
 	
 	# initialize score structures
-	# which one is used depends on the $do_index boolean variable
+	# which one is used depends on the return type variable
 	my %pos2data; # either position => count or position => [scores]
 	my $scores = []; # just scores
 	
@@ -217,7 +187,7 @@ sub _collect_bam_data {
 			# Need to collect and count alignments
 			
 			## Set the callback and a callback data structure
-			my $callback = _assign_callback($do_index, $param);
+			my $callback = _assign_callback($param);
 			my %data = (
 				'scores' => $scores,
 				'index'  => \%pos2data,
@@ -245,7 +215,7 @@ sub _collect_bam_data {
 			# by default, this should return the coverage at 1 bp resolution
 			if (scalar @$coverage) {
 				# check whether we need to index the scores
-				if ($do_index) {
+				if ($param->[RETT] == 2) {
 					for (my $i = $param->[STRT]; $i <= $param->[STOP]; $i++) {
 						# move the scores into the position score hash
 						$pos2data{$i} += $coverage->[ $i - $param->[STRT] ];
@@ -259,7 +229,7 @@ sub _collect_bam_data {
 	}
 	
 	# process the ncount arrays
-	if ($do_index and $param->[METH] eq 'ncount') {
+	if ($param->[RETT] == 2 and $param->[METH] eq 'ncount') {
 		foreach my $position (keys %pos2data) {
 			my %name2count;
 			foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
@@ -268,7 +238,7 @@ sub _collect_bam_data {
 	}
 	
 	## Return collected data
-	if ($do_index) {
+	if ($param->[RETT] == 2) {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {
@@ -427,7 +397,7 @@ sub _assign_callback {
 	
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, value, db, dataset
-	my ($do_index, $param) = @_;
+	my $param = shift;
 	
 	
 	# check the current list of calculated callbacks
@@ -435,7 +405,7 @@ sub _assign_callback {
 		# collections it's likely only one method is ever employed in an 
 		# execution, but just in case we will cache all that we calculate
 	my $string = sprintf "%s_%s_%s_%d", $param->[STND], $param->[STR], 
-		$param->[METH], $do_index;
+		$param->[METH], $param->[RETT];
 	return $CALLBACKS{$string} if exists $CALLBACKS{$string};
 	
 	# determine the callback method based on requested criteria
@@ -445,42 +415,42 @@ sub _assign_callback {
 	if (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'count' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_all_count_indexed;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'pcount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_all_precise_count_indexed;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'count' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_all_count_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'pcount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_all_precise_count_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'ncount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_all_name_array;
 	}
 	elsif (
 		$param->[STND] eq 'all' and 
 		$param->[METH] eq 'ncount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_all_name_indexed;
 	}
@@ -491,7 +461,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'count' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_count_indexed;
 	}
@@ -499,7 +469,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'pcount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_precise_count_indexed;
 	}
@@ -507,7 +477,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'count' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_count_array;
 	}
@@ -515,7 +485,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'pcount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_precise_count_array;
 	}
@@ -523,7 +493,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'ncount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_name_array;
 	}
@@ -531,7 +501,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'ncount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_name_indexed;
 	}
@@ -542,7 +512,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'count' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_count_indexed;
 	}
@@ -550,7 +520,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'pcount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_precise_count_indexed;
 	}
@@ -558,7 +528,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'ncount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_name_indexed;
 	}
@@ -566,7 +536,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'count' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_count_array;
 	}
@@ -574,7 +544,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'pcount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_precise_count_array;
 	}
@@ -582,7 +552,7 @@ sub _assign_callback {
 		$param->[STND] eq 'sense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'ncount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_name_array;
 	}
@@ -593,7 +563,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'count' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_count_indexed;
 	}
@@ -601,7 +571,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'pcount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_precise_count_indexed;
 	}
@@ -609,7 +579,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'ncount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_reverse_name_indexed;
 	}
@@ -617,7 +587,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'count' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_count_array;
 	}
@@ -625,7 +595,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'pcount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_precise_count_array;
 	}
@@ -633,7 +603,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] >= 0 and 
 		$param->[METH] eq 'ncount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_reverse_name_array;
 	}
@@ -644,7 +614,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'count' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_count_indexed;
 	}
@@ -652,7 +622,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'pcount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_precise_count_indexed;
 	}
@@ -660,7 +630,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'ncount' and 
-		$do_index
+		$param->[RETT] == 2
 	) {
 		$callback = \&_forward_name_indexed;
 	}
@@ -668,7 +638,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'count' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_count_array;
 	}
@@ -676,7 +646,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'pcount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_precise_count_array;
 	}
@@ -684,7 +654,7 @@ sub _assign_callback {
 		$param->[STND] eq 'antisense' and 
 		$param->[STR] == -1 and 
 		$param->[METH] eq 'ncount' and 
-		!$do_index
+		$param->[RETT] != 2
 	) {
 		$callback = \&_forward_name_array;
 	}
@@ -692,7 +662,7 @@ sub _assign_callback {
 	# I goofed
 	else {
 		confess sprintf "Programmer error: stranded %s, strand %s, method %s, do_index %d", 
-			$param->[STND], $param->[STR], $param->[METH], $do_index;
+			$param->[STND], $param->[STR], $param->[METH], $param->[RETT];
 	}
 	
 	# remember next time 

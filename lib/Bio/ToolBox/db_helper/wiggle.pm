@@ -12,8 +12,9 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	DB   => 6,  # database object
-	DATA => 7,  # first dataset, additional may be present
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 

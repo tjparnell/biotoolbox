@@ -14,8 +14,9 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	DB   => 6,  # database object
-	DATA => 7,  # first dataset, additional may be present
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
 };
 our $VERSION = '1.50';
 
@@ -190,9 +191,6 @@ sub collect_bigwig_position_scores {
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
-	# strip the method index prefix, we no longer need
-	$param->[METH] =~ s/^indexed_//;
 	
 	# we don't have support for pcount and ncount, so make sure we change those
 	$param->[METH] = 'count' if $param->[METH] =~ /\wcount/;

@@ -15,8 +15,9 @@ use constant {
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	DB   => 6,  # database object
-	DATA => 7,  # first dataset, additional may be present
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
 };
 
 our $VERSION = '1.50';
@@ -28,7 +29,6 @@ our @EXPORT = qw(
 	open_fasta_db
 	open_store_db
 	collect_store_scores
-	collect_store_position_scores
 );
 
 1;
@@ -129,28 +129,10 @@ sub open_store_db {
 
 
 sub collect_store_scores {
-	# collect only the scores
-	return _collect_store_data(0, shift);
-}
-
-
-sub collect_store_position_scores {
-	# collect positioned scores
-	return _collect_store_data(1, shift);
-}
-
-
-
-sub _collect_store_data {
 	# pass the required information
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
-	my ($do_index, $param) = @_;
-	
-	# fix the method
-	if ($do_index) {
-		$param->[METH] =~ s/^indexed_//;
-	}
+	my $param = shift;
 	
 	# database feature types
 	my @types = splice(@$param, DATA);
@@ -218,7 +200,7 @@ sub _collect_store_data {
 			if ($WIGGLE_OK) {
 				# get the dataset scores using Bio::ToolBox::db_helper::wiggle
 				
-				if ($do_index) {
+				if ($param->[RETT] == 2) {
 					# warn " using collect_wig_position_scores() from tag\n";
 					return collect_wig_position_scores($param);
 				}
@@ -275,7 +257,7 @@ sub _collect_store_data {
 			# much easier to collect
 			
 			# store data in either indexed hash or score array
-			if ($do_index) {
+			if ($param->[RETT] == 2) {
 			
 				# determine position to record
 				my $position;
@@ -339,7 +321,7 @@ sub _collect_store_data {
 	
 	# post-process the collected position->score values 
 	# combine multiple values recorded at the same position
-	if ($do_index) {
+	if ($param->[RETT] == 2) {
 		if ($param->[METH] eq 'ncount') {
 			foreach my $position (keys %pos2data) {
 				my %name2count;
@@ -384,7 +366,7 @@ sub _collect_store_data {
 	}
 	
 	# return the appropriate data	
-	if ($do_index) {
+	if ($param->[RETT] == 2) {
 		return wantarray ? %pos2data : \%pos2data;
 	}
 	else {

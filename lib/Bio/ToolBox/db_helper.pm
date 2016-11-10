@@ -10,15 +10,15 @@ use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::utility;
 use constant {
-	LOG2 => log(2),
 	CHR  => 0,  # chromosome
 	STRT => 1,  # start
 	STOP => 2,  # stop
 	STR  => 3,  # strand
 	STND => 4,  # strandedness
 	METH => 5,  # method
-	DB   => 6,  # database object
-	DATA => 7,  # first dataset, additional may be present
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
 };
 
 
@@ -265,13 +265,13 @@ sub open_db_connection {
 	my $database = shift;
 	my $no_cache = shift || 0;
 	unless ($database) {
-		cluck 'no database name passed!';
+# 		cluck 'no database name passed!';
 		return;
 	}
 	
 	# first check if it is a database reference
 	my $db_ref = ref $database;
-	if ($db_ref =~ /^Bio.+DB/) {
+	if ($db_ref =~ /DB/) {
 		# the provided database is already an open database object
 		# nothing to open, return as is
 		return $database;
@@ -1886,24 +1886,39 @@ Example
 
 sub get_segment_score {
 	# parameters passed as an array
-	# chromosome, start, stop, strand, strandedness, method, db, dataset
-	confess "incorrect number of parameters passed!" unless scalar @_ >= 8;
-	my $param = [@_];
+	# we will be passing this array on as a reference to the appropriate 
+	# imported helper subroutine
+	# chromosome, start, stop, strand, strandedness, method, return type, db, dataset
+	confess "incorrect number of parameters passed!" unless scalar @_ >= 9;
+	
+	# check the database
+	$_[DB] = open_db_connection($_[DB]) if ($_[DB] and not ref($_[DB]));
 	
 	# determine method
-	my ($db_method, $do_return) = _lookup_db_method($param);
+	my $db_method = $DB_METHODS{$_[METH]}{$_[RETT]}{$_[DB]}{$_[DATA]} || 
+		_lookup_db_method(\@_);
 	
+	# return type values
+		# 0 = calculate score
+		# 1 = score array
+		# 2 = hash position scores
 	# immediately return calculated score if appropriate
-	if ($do_return) {
-		return &{$db_method}($param);
+	if ($_[RETT] > 0) {
+		# immediately return either indexed hash or array of scores
+		return &{$db_method}(\@_);
 	}
-	
-	# otherwise we get a list of scores
-	my $scores = &{$db_method}($param);
-	return wantarray ? @$scores : $scores if $param->[METH] eq 'scores'; 
-	
-	# calculate a single score for this array of score values
-	return calculate_score($param->[METH], $scores);
+	else {
+		# calculate a score 
+		my $scores = &{$db_method}(\@_);
+		# this might be an array reference of scores that need to be combined
+		# or it could be a single scalar score which just needs to be returned
+		if (ref($scores)) {
+			return calculate_score($_[METH], $scores);
+		}
+		else {
+			return $scores;
+		}
+	}
 }
 
 
@@ -2322,22 +2337,10 @@ visual marker.
 
 sub _lookup_db_method {
 	# parameters passed as an array reference
-	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
 	
-	# open database if necessary
-	$param->[DB] = open_db_connection($param->[DB]) if 
-		($param->[DB] and not ref($param->[DB]));
-	
-	# generate a lookup string based on stringified parameters
-	# method, db string, dataset
-	my $lookup = sprintf "%s_%s_%s", $param->[METH], scalar $param->[DB], 
-		$param->[DATA];
-	return @{ $DB_METHODS{$lookup} } if exists $DB_METHODS{$lookup};
-	# otherwise we determine the appropriate database method and cache the result
-	
 	# determine the appropriate score method
-	my ($score_method, $do_return);
+	my $score_method;
 	if ($param->[DATA] =~ /^file|http|ftp/) {
 		# collect the data according to file type
 		
@@ -2351,17 +2354,14 @@ sub _lookup_db_method {
 			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
 				unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
-				if ($param->[METH] =~ /^indexed/) {
+				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigwig_position_scores;
-					$do_return = 1;
 				}
 				elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
 					$score_method = \&collect_bigwig_score;
-					$do_return = 1;
 				}
 				else {
 					$score_method = \&collect_bigwig_scores;
-					$do_return = 0;
 				}
 			}
 			else {
@@ -2380,13 +2380,11 @@ sub _lookup_db_method {
 			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
 				unless $BIGBED_OK;
 			if ($BIGBED_OK) {
-				if ($param->[METH] =~ /^indexed/) {
+				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigbed_position_scores;
-					$do_return = 1;
 				}
 				else {
 					$score_method = \&collect_bigbed_scores;
-					$do_return = 0;
 				}
 			}
 			else {
@@ -2404,14 +2402,7 @@ sub _lookup_db_method {
 			# check that we have Bam support
 			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
 			if ($BAM_OK) {
-				if ($param->[METH] =~ /^indexed/) {
-					$score_method = \&collect_bam_position_scores;
-					$do_return = 1;
-				}
-				else {
-					$score_method = \&collect_bam_scores;
-					$do_return = 0;
-				}
+				$score_method = \&collect_bam_scores;
 			}
 			else {
 				croak " Bam support is not enabled! " . 
@@ -2429,13 +2420,11 @@ sub _lookup_db_method {
 			$USEQ_OK = _load_helper_module('Bio::ToolBox::db_helper::useq') 
 				unless $USEQ_OK;
 			if ($USEQ_OK) {
-				if ($param->[METH] =~ /^indexed/) {
+				if ($param->[RETT] == 2) {
 					$score_method = \&collect_useq_position_scores;
-					$do_return = 1;
 				}
 				else {
 					$score_method = \&collect_useq_scores;
-					$do_return = 0;
 				}
 			}
 			else {
@@ -2464,17 +2453,14 @@ sub _lookup_db_method {
 			unless $BIGWIG_OK;
 		
 		# the data collection depends on the method
-		if ($param->[METH] =~ /^indexed/) {
+		if ($param->[RETT] == 2) {
 			$score_method = \&collect_bigwigset_position_scores;
-			$do_return = 1;
 		}
 		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
 			$score_method = \&collect_bigwigset_score;
-			$do_return = 1;
 		}
 		else {
 			$score_method = \&collect_bigwigset_scores;
-			$do_return = 0;
 		}
 	}
 		
@@ -2491,21 +2477,12 @@ sub _lookup_db_method {
 			unless $SEQFASTA_OK;
 		if ($SEQFASTA_OK) {
 			# get the dataset scores using Bio::ToolBox::db_helper::seqfasta
-			
 			# check that we support methods
 			unless ($param->[DB]->can('get_seq_stream')) {
 				confess sprintf "unsupported database! cannot use %s as it does not support get_seq_stream method or equivalent", 
 					ref($param->[DB]);
 			}
-			
-			if ($param->[METH] =~ /^indexed/) {
-				$score_method = \&collect_store_position_scores;
-				$do_return = 1;
-			}
-			else {
-				$score_method = \&collect_store_scores;
-				$do_return = 0;
-			}
+			$score_method = \&collect_store_scores;
 		}
 		else {
 			croak " SeqFeature Store support is not enabled! " . 
@@ -2523,8 +2500,9 @@ sub _lookup_db_method {
 		
 	
 	### Cache and return the results
-	$DB_METHODS{$lookup} = [$score_method, $do_return];
-	return ($score_method, $do_return);
+	$DB_METHODS{$param->[METH]}{$param->[RETT]}{$param->[DB]}{$param->[DATA]} = 
+		$score_method;
+	return $score_method;
 }
 
 
