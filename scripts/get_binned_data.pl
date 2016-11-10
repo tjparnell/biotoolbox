@@ -855,7 +855,6 @@ A program to collect data in bins across a list of features.
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --long
-  --(no)log
   
   Bin specification:
   --bins <integer>                                          (10)
@@ -997,11 +996,6 @@ some windows. This option forces the program to collect data separately
 at each window, rather than once for each file feature or region and 
 subsequently assigning scores to windows. Execution times may be 
 longer than otherwise. Default is false.
-
-=item --(no)log
-
-Dataset values are (not) in log2 space and should be treated 
-accordingly. Output values will be in the same space.
 
 =item --bins <integer>
 
