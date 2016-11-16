@@ -19,6 +19,7 @@ use base 'Bio::ToolBox::Data::file';
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
+	$BAM_ADAPTER
 );
 
 1;
@@ -927,6 +928,14 @@ sub database {
 		}
 	}
 	return $self->{db};
+}
+
+sub bam_adapter {
+	my $self = shift;
+	if (@_) {
+		$BAM_ADAPTER = shift;
+	}
+	return $BAM_ADAPTER;
 }
 
 sub gff {

@@ -9,11 +9,11 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	if (eval {require Bio::DB::Sam; 1}) {
-		plan tests => 37;
+	if (eval {require Bio::DB::HTS; 1}) {
+		plan tests => 38;
 	}
 	else {
-		plan skip_all => 'Optional module Bio::DB::Sam not available';
+		plan skip_all => 'Optional module Bio::DB::HTS not available';
 	}
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
@@ -31,10 +31,11 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
+is($Data->bam_adapter('hts'), 'hts', 'set preferred database adapter to hts');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
-isa_ok($db, 'Bio::DB::Sam', 'connected database');
+isa_ok($db, 'Bio::DB::HTS', 'connected database');
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
@@ -56,7 +57,7 @@ is($row->name, 'YAL047C', 'row name');
 
 # try a segment
 my $segment = $row->segment;
-isa_ok($segment, 'Bio::DB::Sam::Segment', 'row segment');
+isa_ok($segment, 'Bio::DB::HTS::Segment', 'row segment');
 is($segment->start, 54989, 'segment start');
 
 # read count sum

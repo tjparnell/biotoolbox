@@ -29,6 +29,7 @@ our $BIGBED_OK   = 0;
 our $BIGWIG_OK   = 0;
 our $SEQFASTA_OK = 0;
 our $USEQ_OK     = 0;
+our $BAM_ADAPTER = undef; # preference for which bam adapter to use
 
 # define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
@@ -41,6 +42,7 @@ our %DB_METHODS; # cache for database score methods
 our @ISA = qw(Exporter);
 our @EXPORT = qw();
 our @EXPORT_OK = qw(
+	$BAM_ADAPTER
 	open_db_connection
 	get_dataset_list 
 	verify_or_request_feature_types 
@@ -53,7 +55,8 @@ our @EXPORT_OK = qw(
 	calculate_score
 	get_chromosome_list 
 );
-
+	# BAM_OK variable exposed only to allow switching between bam adapters 
+	# in test - normally something never needed
 
 # The true statement
 1; 
@@ -302,7 +305,7 @@ sub open_db_connection {
 		# a remote Bam database
 		if ($database =~ /\.bam$/i) {
 			# open using Bam adaptor
-			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
+			_load_bam_helper_module() unless $BAM_OK;
 			if ($BAM_OK) {
 				$db = open_bam_db($database);
 				unless ($db) {
@@ -312,7 +315,7 @@ sub open_db_connection {
 			}
 			else {
 				$error = " Bam database cannot be loaded because\n" . 
-					" Bio::DB::Sam is not installed\n";
+					" Bio::DB::Sam or Bio::DB::HTS is not installed\n";
 			}
 		}
 		
@@ -423,9 +426,8 @@ sub open_db_connection {
 		
 			# a Bam database
 			if ($database =~ /\.bam$/i) {
-				# open using BigWig adaptor
-				$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') 
-					unless $BAM_OK;
+				# open using appropriate bam adaptor
+				_load_bam_helper_module() unless $BAM_OK;
 				if ($BAM_OK) {
 					undef $@;
 					$db = open_bam_db($database);
@@ -436,7 +438,7 @@ sub open_db_connection {
 				}
 				else {
 					$error = " Bam database cannot be loaded because\n" . 
-						" Bio::DB::Sam is not installed\n";
+						" Bio::DB::Sam or Bio::DB::HTS is not installed\n";
 				}
 			}
 			
@@ -611,8 +613,12 @@ sub get_db_name {
 			# but could break in the future since it's not official API
 	}
 	elsif ($db_ref eq 'Bio::DB::Sam') {
-		# a Bam database
-		$db_name = $db->{'bam_path'};
+		# a Samtools Bam database
+		$db_name = $db->bam_path;
+	}
+	elsif ($db_ref eq 'Bio::DB::HTS') {
+		# a HTSlib Bam database
+		$db_name = $db->hts_path;
 	}
 	# determining the database name from other sources is
 	# either not possible or not easy, so won't bother unless
@@ -1139,7 +1145,7 @@ sub check_dataset_for_rpm_support {
 	elsif ($dataset =~ /\.bam$/) {
 		# a bam file dataset
 		
-		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
+		_load_bam_helper_module() unless $BAM_OK;
 		if ($BAM_OK) {
 			# Bio::ToolBox::db_helper::bam was loaded ok
 			# sum the number of reads in the dataset
@@ -1147,7 +1153,7 @@ sub check_dataset_for_rpm_support {
 		}
 		else {
 			carp " Bam support is not available! " . 
-				"Is Bio::DB::Sam installed?\n";
+				"Is Bio::DB::Sam or Bio::DB::HTS installed?\n";
 			return;
 		}
 	}
@@ -2101,8 +2107,8 @@ sub get_chromosome_list {
 		}
 	}
 	
-	# Bam
-	elsif (ref $db eq 'Bio::DB::Sam') {
+	# Samtools Bam
+	elsif (ref $db eq 'Bio::DB::Sam' or ref $db eq 'Bio::DB::HTS') {
 		for my $tid (0 .. $db->n_targets - 1) {
 			# each chromosome is internally represented in the bam file as 
 			# a numeric target identifier
@@ -2400,7 +2406,7 @@ sub _lookup_db_method {
 			# this uses the Bio::DB::Sam adaptor
 			
 			# check that we have Bam support
-			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam') unless $BAM_OK;
+			_load_bam_helper_module() unless $BAM_OK;
 			if ($BAM_OK) {
 				$score_method = \&collect_bam_scores;
 			}
@@ -2518,6 +2524,22 @@ sub _load_helper_module {
 	return $success;
 }
 
+
+
+sub _load_bam_helper_module {
+	if ($BAM_ADAPTER =~ /sam/i) {
+		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
+	}
+	elsif ($BAM_ADAPTER =~ /hts/i) {
+		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+	}
+	else {
+		# try hts first, then sam
+		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts')
+			|| _load_helper_module('Bio::ToolBox::db_helper::bam');
+	}
+	return $BAM_OK;
+}
 
 
 =back
