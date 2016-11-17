@@ -614,7 +614,9 @@ sub get_db_name {
 	}
 	elsif ($db_ref eq 'Bio::DB::Sam') {
 		# a Samtools Bam database
-		$db_name = $db->bam_path;
+		# old versions <=1.39 don't have the bam_path method, so it's easier
+		# to explicitly grab it from the object internals
+		$db_name = $db->{bam_path};
 	}
 	elsif ($db_ref eq 'Bio::DB::HTS') {
 		# a HTSlib Bam database
