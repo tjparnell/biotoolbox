@@ -265,80 +265,364 @@ about working with Segment objects.
 
 =item get_features(%args)
 
-Returns seqfeature objects from a database.........
+Returns seqfeature objects from a database that overlap the Feature 
+or interval in the current Data table row. This is essentially a 
+convenience wrapper for a Bio::DB style I<features> method using the 
+coordinates of the Feature. Optionally pass an array of key value pairs 
+to specify alternate coordinates if so desired. Potential keys 
+include 
 
+=over 4
 
+=item seq_id
 
+=item start
 
+=item end
+
+=item type  The type of database features to retrieve.
+
+=item db    An alternate database object to collect from.
+
+=back
+
+=back
+
+=head2 Data collection
+
+The following methods allow for data collection from various 
+sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
+
+=over 4
 
 =item get_score(%args)
 
-This is a convenience method for the 
-L<get_chromo_region_score|Bio::ToolBox::db_helper/get_chromo_region_score> 
-method. It will return a single score value for the region defined by the 
-coordinates or typed named feature in the current data row. If 
-the Data table has coordinates, then those will be automatically 
-used. If the Data table has typed named features, then the 
-coordinates will automatically be looked up for you by requesting 
-a SeqFeature object from the database.
+This method collects a single score over the feature or interval. 
+Usually a mathematical or statistical value is employed to derive the 
+single score. Pass an array of key value pairs to control data collection.
+Keys include the following:
 
-The name of the dataset from which to collect the data must be 
-provided. This may be a GFF type in a SeqFeature database, a 
-BigWig member in a BigWigSet database, or a path to a BigWig, 
-BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the L<Bio::ToolBox::db_helper> 
-for full details.
+=over 4
 
-If you wish to override coordinates that are present in the 
-Data table, for example to extend or shift the given coordinates 
-by some amount, then simply pass the new start and end 
-coordinates as options to this method.
+=item db
 
-Here is an example of collecting mean values from a BigWig 
-and adding the scores to the Data table.
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item method
+
+Specify the mathematical or statistical method combining multiple scores 
+over the interval into one value. Options include the following:
+
+=over 4
+
+=item mean (default)
+
+=item sum
+
+=item min
+
+=item max
+
+=item median
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=item range  (Min - Max difference)
+
+=item stddev  Standard deviation
+
+=back
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item exon
+
+Boolean option to indicate that the data collection should only 
+occur over exonic subfeatures, and not over introns. Requires that 
+the Data table Feature be a named SeqFeature gene that contains exon 
+subfeatures, for example parsed from a gene table file.
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. 
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=back
   
-  my $index = $Data->add_column('MyData');
-  my $stream = $Data->row_stream;
+Example:
+
   while (my $row = $stream->next_row) {
      my $score = $row->get_score(
         'method'    => 'mean',
         'dataset'   => '/path/to/MyData.bw',
+        'exon'      => 1,
      );
-     $row->value($index, $score);
   }
 
-=item get_position_scores(%args)
 
-This is a convenience method for the 
-L<get_region_dataset_hash|Bio::ToolBox::db_helper/get_region_dataset_hash> 
-method. It will return a hash of 
-positions =E<gt> scores over the region defined by the 
-coordinates or typed named feature in the current data row. 
-The coordinates for the interrogated region will be 
-automatically provided.
+=item get_relative_point_position_scores(%args)
 
-Just like the L<get_score> method, the dataset from which to 
-collect the scores must be provided, along with any other 
-optional arguments. 
+This method collects indexed position scores centered around a 
+specific reference point. The returned data is a hash of 
+relative positions (example -20, -10, 1, 10, 20) and their score 
+values. Pass an array of key value pairs to control data collection.
+Keys include the following:
 
-If you wish to override coordinates that are present in the 
-Data table, for example to extend or shift the given coordinates 
-by some amount, then simply pass the new start and end 
-coordinates as options to this method.
+=over 4
 
-Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a L<BigWigSet|Bio::DB::BigWigSet> 
-directory.
-  
-  my $stream = $Data->row_stream;
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item extend
+
+Indicate the number of base pairs to extend from the reference coordinate. 
+This option is required!
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a I<primary_tag:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=back
+
+=back
+
+Example:
+
   while (my $row = $stream->next_row) {
-     my %position2score = $row->get_position_scores(
+     my $pos2score = $row->get_relative_point_position_scores(
         'ddb'       => '/path/to/BigWigSet/',
         'dataset'   => 'MyData',
         'position'  => 5,
-     )
-     # do something with %position2score
+        'extend'    => 1000,
+     );
   }
+
+=item get_region_position_scores(%args)
+
+This method collects indexed position scores across a defined 
+region or interval. The returned data is a hash of positions and 
+their score values. The positions are by default relative to a 
+region coordinate, usually to the 5' end. Pass an array of key value 
+pairs to control data collection. Keys include the following:
+
+=over 4
+
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item exon
+
+Boolean option to indicate that the data collection should only 
+occur over exonic subfeatures, and not over introns. Requires that 
+the Data table Feature be a named SeqFeature gene that contains exon 
+subfeatures, for example parsed from a gene table file. 
+
+When converting to relative coordinates, the coordinates will be relative 
+to the length of the sum of the exons, i.e. the length of the introns 
+will be ignored.
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. 
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a I<primary_tag:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=back
+
+=back
+
+Example:
+
+  while (my $row = $stream->next_row) {
+     my $pos2score = $row->get_relative_point_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'extend'    => 1000,
+     );
+  }
+
 
 =back
 
