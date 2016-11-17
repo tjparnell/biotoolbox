@@ -396,8 +396,7 @@ sub parallel_execution {
 		if ($long_data) {
 			map_relative_long_data($starting_point, $ending_point);
 		}
-		elsif ($Data->feature_type eq 'named' and not $long_data) {
-			# mapping point data features using named features
+		else {
 			map_relative_data($starting_point, $ending_point);
 		}
 
@@ -455,8 +454,7 @@ sub single_execution {
 	if ($long_data) {
 		map_relative_long_data($starting_point, $ending_point);
 	}
-	elsif ($Data->feature_type eq 'named' and not $long_data) {
-		# mapping point data features using named features
+	else {
 		map_relative_data($starting_point, $ending_point);
 	}
 
