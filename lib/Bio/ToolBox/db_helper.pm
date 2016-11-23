@@ -2154,6 +2154,9 @@ sub _lookup_db_method {
 				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigwig_position_scores;
 				}
+				elsif ($param->[RETT] == 1) {
+					$score_method = \&collect_bigwig_scores;
+				}
 				elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
 					$score_method = \&collect_bigwig_score;
 				}
@@ -2252,6 +2255,9 @@ sub _lookup_db_method {
 		# the data collection depends on the method
 		if ($param->[RETT] == 2) {
 			$score_method = \&collect_bigwigset_position_scores;
+		}
+		if ($param->[RETT] == 1) {
+			$score_method = \&collect_bigwigset_scores;
 		}
 		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
 			$score_method = \&collect_bigwigset_score;
