@@ -708,8 +708,8 @@ sub collapse_transcripts {
 	
 	# sort all the exons
 	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] }
-					map { [$_, $_->start] } 
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
 					@exons;
 	
 	# build new exons from the original - don't keep cruft
@@ -725,19 +725,26 @@ sub collapse_transcripts {
 	# work through remaining exons, adding and merging as necessary
 	while (@sorted) {
 		$next = shift @sorted;
-		if ($next->start < $new[-1]->end and $next->end > $new[-1]->end) {
-			# overlapping features, so reassign the end point of exon
-			$new[-1]->end($next->end);
+		my ($ns, $ne) = ($next->start, $next->end); # new start & end
+		my ($os, $oe) = ($new[-1]->start, $new[-1]->end); # old start & end
+		if ($ns == $os and $ne > $oe) {
+			# same beginning, further end
+			$new[-1]->end($ne);
 		}
-		else {
-			# push as new exon
+		elsif ($ns > $os and $ns < $oe and $ne > $oe) {
+			# overlapping start, further end
+			$new[-1]->end($ne);
+		}
+		elsif ($ns > $oe) {
+			# completely new exon
 			push @new, $next->new(
 				-seq_id         => $next->seq_id,
-				-start 			=> $next->start,
-				-end   			=> $next->end,
+				-start 			=> $ns,
+				-end   			=> $ne,
 				-primary_tag  	=> 'exon',
 			);
 		}
+		# all other possibilities we can skip
 	}
 	
 	# return the assembled transcript
