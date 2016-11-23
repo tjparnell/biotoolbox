@@ -486,7 +486,6 @@ sub _lookup_bigwigset_wigs {
 	# passed parameters as array ref
 	# chromosome, start, stop, strand, strandedness, method, db, dataset
 	my $param = shift;
-	
 	# the datasets, could be either types or names, unfortunately
 	my @types = splice(@$param, DATA);
 	
@@ -499,15 +498,18 @@ sub _lookup_bigwigset_wigs {
 	# but first I need to find out which ones to use
 	# use internal methods to filter the bigWigs in the same manner 
 	# that get_seq_stream does in BigWigSet
+	my @ids = $param->[DB]->bigwigs;
 	
 	# filter first by type
-	my @ids = $param->[DB]->_filter_ids_by_type(\@types, 
-		[ $param->[DB]->bigwigs ] );
+	@ids = $param->[DB]->_filter_ids_by_type(\@types, \@ids );
 	
 	# try filtering by name if that doesn't work
 	unless (@ids) {
-    	@ids = $param->[DB]->_filter_ids_by_name(\@types, 
-    	[ $param->[DB]->bigwigs ] );
+    	my @bwids = $param->[DB]->bigwigs;
+    	foreach my $t (@types) {
+    		my @found = $param->[DB]->_filter_ids_by_name($t, \@bwids);
+			push @ids, @found if (@found);
+    	}
     }
 	
 	# then check for strand
