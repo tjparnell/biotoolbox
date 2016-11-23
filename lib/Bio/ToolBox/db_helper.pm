@@ -1843,12 +1843,19 @@ sub get_segment_score {
 	# we will be passing this array on as a reference to the appropriate 
 	# imported helper subroutine
 	# chromosome, start, stop, strand, strandedness, method, return type, db, dataset
-	confess "incorrect number of parameters passed!" unless scalar @_ >= 9;
+	confess "incorrect number of parameters passed!" unless scalar @_ == 9;
 	
 	# check the database
 	$_[DB] = open_db_connection($_[DB]) if ($_[DB] and not ref($_[DB]));
 	
+	# check for combined datasets
+	if ($_[DATA] =~ /&/) {
+		push @_, (split '&', pop @_);
+	}
+	
 	# determine method
+		# yes, we're only checking the first dataset, but they should all 
+		# be the same type
 	my $db_method = $DB_METHODS{$_[METH]}{$_[RETT]}{$_[DB]}{$_[DATA]} || 
 		_lookup_db_method(\@_);
 	
