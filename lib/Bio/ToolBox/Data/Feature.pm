@@ -1265,7 +1265,7 @@ sub _get_subfeature_scores {
 			$db,
 			$args->{dataset}, 
 		);
-		push @scores, @$exon_scores;
+		push @scores, @$exon_scores if defined $exon_scores;
 	}
 	
 	# combine all the scores based on the requested method
@@ -1394,7 +1394,7 @@ sub get_region_position_scores {
 	}
 	else {
 		# return data converted to relative positions
-		$self->_calculate_reference(\%args);
+		$self->_calculate_reference(\%args) unless defined $args{coordinate};
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args{coordinate}, $fstrand);
 	}
