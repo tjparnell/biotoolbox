@@ -548,12 +548,9 @@ sub collapse_all_features {
 	}
 	$Data->iterate( sub {
 		my $row = shift;
-		my $feature = $row->seqfeature;
-		my $collSeqFeat = collapse_transcripts($feature);
+		my $collSeqFeat = collapse_transcripts($row->seqfeature);
 		$Data->store_seqfeature($row->row_index, $collSeqFeat);
-		if ($length_i) {
-			$row->value($length_i, get_transcript_length($feature));
-		}
+		$row->value($length_i, get_transcript_length($collSeqFeat));
 	} );
 	return 1;
 }
