@@ -1245,6 +1245,7 @@ sub _find_column_indices {
 	my $start  = $self->find_column('^start|position|pos|txStart');
 	my $stop   = $self->find_column('^stop|end|txEnd');
 	my $strand = $self->find_column('^strand');
+	my $score  = $self->find_column('^score$');
 	$self->{column_indices} = {
 		'name'      => $name,
 		'type'      => $type,
@@ -1255,6 +1256,7 @@ sub _find_column_indices {
 		'stop'      => $stop,
 		'end'       => $stop,
 		'strand'    => $strand,
+		'score'     => $score,
 	};
 	return 1;
 }
@@ -1312,6 +1314,12 @@ sub id_column {
 	return $self->{column_indices}{id};
 }
 
+sub score_column {
+	my $self = shift;
+	carp "score_column is a read only method" if @_;
+	$self->_find_column_indices unless exists $self->{column_indices};
+	return $self->{column_indices}{score};
+}
 
 
 #### Special Row methods ####
@@ -1509,6 +1517,11 @@ Returns the index of the column that best represents the type.
 
 Returns the index of the column that represents the Primary_ID 
 column used in databases.
+
+=item score_column
+
+Returns the index of the column that represents the Score 
+column in certain formats, such as GFF, BED, bedGraph, etc.
 
 =item get_seqfeature
 

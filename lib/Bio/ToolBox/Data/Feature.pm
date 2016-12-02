@@ -142,6 +142,12 @@ is generally unique to a specific database, and not portable between databases.
 
 The length of the feature or segment.
 
+=item score
+
+Returns the value of the Score column, if one is available. Typically 
+associated with defined file formats, such as GFF files (6th column), 
+BED and related Peak files (5th column), and bedGraph (4th column).
+
 =back
 
 =head2 Accessing and setting values in the row.
@@ -950,6 +956,12 @@ sub length {
 	else {
 		return undef;
 	}
+}
+
+sub score {
+	my $self = shift;
+	my $c = $self->{data}->score_column;
+	return defined $c ? $self->value($c) : undef;
 }
 
 sub attributes {
