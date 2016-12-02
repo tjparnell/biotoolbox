@@ -720,6 +720,7 @@ sub collapse_transcripts {
 		-seq_id         => $next->seq_id,
 		-start 			=> $next->start,
 		-end   			=> $next->end,
+		-strand         => $next->strand,
 		-primary_tag  	=> 'exon',
 	);
 	
@@ -742,6 +743,7 @@ sub collapse_transcripts {
 				-seq_id         => $next->seq_id,
 				-start 			=> $ns,
 				-end   			=> $ne,
+				-strand         => $next->strand,
 				-primary_tag  	=> 'exon',
 			);
 		}
