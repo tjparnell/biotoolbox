@@ -689,7 +689,6 @@ use constant {
 	DATA => 8,  # first dataset, additional may be present
 };
 
-
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
 our $BAM_OK      = 0;
@@ -2135,7 +2134,6 @@ sub _features_to_classes {
 sub _lookup_db_method {
 	# parameters passed as an array reference
 	my $param = shift;
-	
 	# determine the appropriate score method
 	my $score_method;
 	if ($param->[DATA] =~ /^file|http|ftp/) {
@@ -2256,7 +2254,7 @@ sub _lookup_db_method {
 		if ($param->[RETT] == 2) {
 			$score_method = \&collect_bigwigset_position_scores;
 		}
-		if ($param->[RETT] == 1) {
+		elsif ($param->[RETT] == 1) {
 			$score_method = \&collect_bigwigset_scores;
 		}
 		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
