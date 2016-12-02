@@ -117,7 +117,6 @@ is(sprintf("%.2f", $score), 0.38, 'row antisense median score') or
 ### Try positioned score index
 my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => 'sample3',
-	'value'    => 'score',
 	'stranded' => 'sense',
 );
 is(scalar keys %pos2scores, 44, 'number of positioned scores');
