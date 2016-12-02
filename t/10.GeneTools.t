@@ -66,13 +66,13 @@ is($alt_introns[0]->start, 388316, 'first alt gene intron start');
 # collapsed transcript
 my $collapsedT = collapse_transcripts(@transcripts);
 isa_ok($collapsedT, 'Bio::ToolBox::SeqFeature', 'collapsed transcript object');
-is(get_transcript_length($collapsedT), 19570, 'collapsed transcript length');
+is(get_transcript_length($collapsedT), 3839, 'collapsed transcript length');
 my @collapsedT_exons = get_exons($collapsedT);
-is(scalar @collapsedT_exons, 80, 'collapsed transcript exon number');
+is(scalar @collapsedT_exons, 14, 'collapsed transcript exon number');
 my @collapsedT_cds = get_cds($collapsedT);
 is(scalar @collapsedT_cds, 0, 'collapsed transcript cds number');
 my @collapsedT_introns = get_introns($collapsedT);
-is(scalar @collapsedT_introns, 79, 'collapsed transcript intron number');
+is(scalar @collapsedT_introns, 13, 'collapsed transcript intron number');
 is(get_cdsStart($collapsedT), undef, 'collapsed transcript CDS start');
 is(get_cdsEnd($collapsedT), undef, 'collapsed transcript CDS stop');
 is(get_transcript_cds_length($collapsedT), 0, 'collapsed transcript CDS length');
