@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.43';
+our $VERSION = '1.44';
 
 =head1 NAME
 
@@ -651,7 +651,7 @@ sub get_tag_values {
 sub attributes {
 	my $self = shift;
 	$self->[ATTRB] ||= {};
-	return wantarray ? @{ $self->[ATTRB] } : $self->[ATTRB];
+	return wantarray ? %{ $self->[ATTRB] } : $self->[ATTRB];
 }
 
 sub all_tags {
