@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.43';
+our $VERSION = '1.44';
 
 =head1 NAME
 
@@ -528,7 +528,8 @@ sub parse_file {
 			# complain if it isn't
 			if (exists $loaded{$id}) {
 				# record how many times we've seen this
-				$self->{duplicate_ids}{$id}++;
+				$self->{duplicate_ids}{$id}++ unless 
+					$feature->primary_tag eq 'CDS'; # Ensembl CDS recycle IDs
 				
 				# check to see if this is child feature
 				unless ($feature->has_tag('Parent')) {
