@@ -330,6 +330,7 @@ our @EXPORT_OK = qw(
 	gff_string
 	gtf_string
 	ucsc_string
+	filter_transcript_support_level
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -1189,6 +1190,82 @@ sub ucsc_string {
 		);
 	}
 	return $string;
+}
+
+
+
+#### filter methods
+
+sub filter_transcript_support_level {
+	my $gene = shift;
+	my $min_tsl = shift || 'best'; 
+	my @list = qw(1 2 3 4 5 NA Missing);
+	
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# categorize transcripts
+	my %results = map { $_ => [] } @list;
+	foreach my $t (@transcripts) {
+		my ($tsl) = $t->get_tag_values('transcript_support_level');
+		$tsl ||= 'Missing'; # default in case nothing is present
+		push @{ $results{$tsl} }, $t;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	if ($min_tsl eq 'best') {
+		# progress through all levels and keep the highest set
+		foreach my $tsl (@list) {
+			if (scalar @{ $results{$tsl} }) {
+				@keepers = @{ $results{$tsl} };
+				last;
+			}
+		}
+	}
+	elsif ($min_tsl =~ /^\d$/) {
+		for (my $tsl = 1; $tsl <= $min_tsl; $tsl++) {
+			push @keepers, @{ $results{$tsl} };
+		}
+	}
+	elsif ($min_tsl eq 'NA') {
+		@keepers = @{ $results{'NA'} };
+	}
+	else {
+		confess "unrecognized minimum TSL value '$min_tsl' Check the documentation!";
+	}
+	@keepers = @{ $results{'Missing'} } unless @keepers;
+	
+	# return
+	if (ref($gene) =~ /seqfeature/i) {
+		# we can't delete subfeatures, so we're forced to create a new 
+		# parent gene and reattach the filtered transcripts
+		my %attributes = $gene->attributes;
+		return $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => $gene->primary_tag,
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-id             => $gene->primary_id,
+			-attributes     => \%attributes,
+			-segments       => \@keepers,
+		);
+	}
+	else {
+		return \@keepers;
+	}
 }
 
 
