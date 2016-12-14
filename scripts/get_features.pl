@@ -16,7 +16,7 @@ use Bio::ToolBox::utility qw(
 	open_to_write_fh
 );
 use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.35';
+my $VERSION = '1.44';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -534,7 +534,7 @@ sub adjust_coordinates {
 	}
 	
 	# make sure no negative coordinates sneak through
-	$seqfeature->start = 1 if $seqfeature->start < 1;
+	$seqfeature->start(1) if $seqfeature->start < 1;
 }
 
 
