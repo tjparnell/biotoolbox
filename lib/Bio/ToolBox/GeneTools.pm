@@ -1085,11 +1085,14 @@ sub ucsc_string {
 		my $ucsc = _process_ucsc_transcript($feature);
 		push @ucsc_list, $ucsc if $ucsc;
 	}
+	else {
+		return;
+	}
 	
 	# return strings
 	my $string;
 	foreach my $ucsc (@ucsc_list) {
-		$string .= sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+		$string .= sprintf("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n", 
 			$ucsc->{'name2'},
 			$ucsc->{'name'},
 			$ucsc->{'chr'},
@@ -1157,8 +1160,18 @@ sub _process_ucsc_transcript {
 	
 	# record CDS points
 	if (is_coding($transcript)) {
-		$ucsc->{cdsStart} = get_cdsStart($transcript) - 1;
-		$ucsc->{cdsEnd}   = get_cdsEnd($transcript);
+		my $start = get_cdsStart($transcript);
+		my $stop  = get_cdsEnd($transcript);
+		if ($start and $stop) {
+			$ucsc->{cdsStart} = $start - 1;
+			$ucsc->{cdsEnd}   = $stop;
+		}
+		else {
+			# if we don't have cds start/stop, then assign to transcript end 
+			# as if it is a noncoding transcript, regardless of primary_tag
+			$ucsc->{cdsStart} = $transcript->end;
+			$ucsc->{cdsEnd}   = $transcript->end;
+		}
 	}
 	else {
 		# non-coding transcript sets the cds points to the transcript end
