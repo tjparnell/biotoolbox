@@ -785,13 +785,20 @@ sub is_coding {
 	}
 	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
 	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
+	if ($transcript->has_tag('transcript_biotype')) {
+		# ensembl type GTFs
+		my ($biotype) = $transcript->get_tag_values('transcript_biotype');
+		return $biotype =~ /protein.?coding/i ? 1 : 0;
+	}
+	elsif ($transcript->has_tag('biotype')) {
 		# ensembl type GFFs
 		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
+		return $biotype =~ /protein.?coding/i ? 1 : 0;
 	}
 	elsif ($transcript->has_tag('gene_biotype')) {
 		# ensembl type GTFs
+		# must be careful here, gene_biotype of course pertains to gene, 
+		# and not necessarily this particular transcript
 		my ($biotype) = $transcript->get_tag_values('gene_biotype');
 		return 1 if $biotype =~ /protein.?coding/i;
 	}
