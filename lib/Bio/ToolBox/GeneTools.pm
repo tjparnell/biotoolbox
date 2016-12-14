@@ -328,6 +328,7 @@ our @EXPORT_OK = qw(
 	get_transcript_cds_length
 	get_utrs
 	gff_string
+	gtf_string
 	ucsc_string
 );
 our %EXPORT_TAGS = (
@@ -363,6 +364,7 @@ our %EXPORT_TAGS = (
 	) ],
 	export => [ qw(
 		gff_string
+		gtf_string
 		ucsc_string
 	) ],
 );
@@ -1065,6 +1067,86 @@ sub gff_string {
 	# Bio::ToolBox::SeqFeature and Bio::SeqFeature::Lite objects have this method
 	# otherwise this will die
 	return shift->gff_string(@_);
+}
+
+sub gtf_string {
+	my $feature = shift;
+	my $gene = shift || undef; # only present when recursing
+	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
+	
+	# process a gene 
+	if ($feature->primary_tag =~ /gene/i and not defined $gene) {
+		my $string;
+		foreach my $t (get_transcripts($feature)) {
+			$string .= gtf_string($t, $feature);
+		}
+		return $string;
+	}
+	
+	# check that we have transcribed feature with exons
+	my @exons = get_exons($feature);
+	return unless @exons; # no exon subfeatures? must not be a transcript....
+	
+	# mandatory identifiers
+	my ($gene_id, $gene_name);
+	if ($gene) {
+		$gene_id = $gene->primary_id || $gene->display_name;
+		$gene_name = $gene->display_name;
+	}
+	my $trx_id = $feature->primary_id || $feature->display_name;
+	my $trx_name = $feature->display_name;
+	my $group = "gene_id \"$gene_id\"; transcript_id \"$trx_id\""; 
+	my $name = "gene_name \"$gene_name\"; transcript_name \"$trx_name\"";
+	
+	# convert transcript 
+	# transcript is technically not part of the GTF standard....
+	# but it's mostly harmless and generally helpful
+	my $string = join("\t", (
+		$feature->seq_id || '.',
+		$feature->source_tag || '.',
+		$feature->primary_tag =~ /transcript|rna/i ? 'transcript' : 
+			$feature->primary_tag, # something else not recognizable
+		$feature->start,
+		$feature->end,
+		defined $feature->score ? $feature->score : '.',
+		$feature->strand < 0 ? '-' : '+',
+		'.',
+		"$group; $name"
+	) );
+	
+	# add additional transcript attributes that might be interesting to keep
+	my ($biotype) = $feature->get_tag_values('transcript_biotype') || 
+		$feature->get_tag_values('biotype') || $feature->primary_tag;
+	$string .= "; transcript_biotype \"$biotype\"" if $biotype;
+	my ($tsl) = $feature->get_tag_values('transcript_support_level');
+	$string .= "; transcript_support_level \"$tsl\"" if $tsl;
+	$string .= "\n";
+	
+	# convert exon subfeatures collected above
+	if (is_coding($feature)) {
+		my @cds = get_cds($feature);
+		push @cds, get_stop_codon($feature);
+		push @cds, get_start_codon($feature);
+		@exons = map { $_->[0] } 
+			sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+			map { [$_, $_->start, $_->end] } ( @exons, @cds );
+	}
+	foreach my $subf (@exons) {
+		$string .= join("\t", (
+			$subf->seq_id || '.',
+			$subf->source_tag || '.',
+			$subf->primary_tag,
+			$subf->start,
+			$subf->end,
+			defined $subf->score ? $subf->score : '.',
+			$subf->strand < 0 ? '-' : '+',
+			defined $subf->phase ? $subf->phase : '.',
+			"$group\n"
+		) );
+	}
+	
+	# finished
+	return $string;
 }
 
 sub ucsc_string {
