@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.41';
+our $VERSION = '1.44';
 
 =head1 NAME
 
@@ -649,7 +649,8 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
+	return $gene if ( $gene->primary_tag !~ /gene/i and 
+		$gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	my @exons;
 	foreach my $subf ($gene->get_SeqFeatures) {
