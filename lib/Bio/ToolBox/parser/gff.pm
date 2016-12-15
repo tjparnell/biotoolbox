@@ -684,7 +684,7 @@ sub _make_gene_parent {
 		$gene->primary_id(($feature->get_tag_values('gene_name')));
 	}
 	else {
-		$gene->display_id(($feature->get_tag_values('Parent')));
+		$gene->primary_id(($feature->get_tag_values('Parent')));
 	}
 	
 	if ($feature->has_tag('gene_name')) {
