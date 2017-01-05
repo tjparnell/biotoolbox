@@ -1226,7 +1226,7 @@ sub filter_transcript_support_level {
 	# take appropriate transcripts
 	my @keepers;
 	if ($min_tsl eq 'best') {
-		# progress through all levels and keep the highest set
+		# progress through all levels and keep only the highest set
 		foreach my $tsl (@list) {
 			if (scalar @{ $results{$tsl} }) {
 				@keepers = @{ $results{$tsl} };
@@ -1234,12 +1234,34 @@ sub filter_transcript_support_level {
 			}
 		}
 	}
-	elsif ($min_tsl =~ /^\d$/) {
-		for (my $tsl = 1; $tsl <= $min_tsl; $tsl++) {
-			push @keepers, @{ $results{$tsl} };
+	elsif ($min_tsl =~ /^best(\d)$/) {
+		# progress through all levels and take all up to specified max
+		my $max = $1;
+		foreach my $tsl (1 .. 5) {
+			if (scalar @{ $results{$tsl} }) {
+				if ($tsl <= $max) {
+					push @keepers, @{ $results{$tsl} };
+				}
+				elsif (not @keepers and $tsl > $max) {
+					# go ahead and take it if we have no other option
+					push @keepers, @{ $results{$tsl} };
+				}
+			}
+		}
+		# still take the NA and Missing if nothing else
+		if (scalar @keepers == 0 and scalar @{ $results{'NA'} }) {
+			@keepers = @{ $results{'NA'} };
+		}
+		elsif (scalar @keepers == 0 and scalar @{ $results{'Missing'} }) {
+			@keepers = @{ $results{'Missing'} };
 		}
 	}
+	elsif ($min_tsl =~ /^\d$/) {
+		# take only the specified level
+		@keepers = @{ $results{$min_tsl} };
+	}
 	elsif ($min_tsl eq 'NA') {
+		# take only the NA guys
 		@keepers = @{ $results{'NA'} };
 	}
 	else {
