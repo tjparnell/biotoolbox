@@ -89,6 +89,11 @@ get_transcript_length(), and collapse_transcripts().
 Import the CDS pertaining methods, including is_coding(), get_cds(), 
 get_cdsStart(), get_cdsEnd(), get_transcript_cds_length(), and get_utrs().
 
+=item :export
+
+Import all of the export methods, including gff_string(), gtf_string(), 
+and ucsc_string();
+
 =back
 
 =head2 Exon Methods
@@ -285,7 +290,14 @@ have a gff_string() method, and this will simply call that method. SeqFeature
 objects that do not have this method will, of course, cause the script to 
 terminate. 
 
-L<Bio::ToolBox::Feature> also provide a gff_string method.
+L<Bio::ToolBox::Data::Feature> also provides a gff_string method.
+
+=item gtf_string($gene)
+
+This will export a gene or transcript model as a series of GTF formatted 
+text lines, following the defined Gene Transfer Format (also known as GFF 
+version 2.5). It will ensure that each feature is properly tagged with the 
+gene_id and transcript_id attributes. 
 
 =item ucsc_string($gene)
 
@@ -293,6 +305,62 @@ This will export a gene or transcript model as a refFlat formatted gene
 Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
 for details. Multiple transcript genes are exported as multiple text lines 
 concatenated together.
+
+=back
+
+=head2 Filter methods
+
+These methods are used to filter genes.
+
+=over 4
+
+=item filter_transcript_support_level($gene)
+
+=item filter_transcript_support_level($gene, $level)
+
+This will filter a gene object for transcripts that match or exceed the 
+provided transcript support level. This assumes that the transcripts 
+contain the attribute tag 'transcript_support_level', which are present in 
+Ensembl provided GFF3 and GTF annotation files. The values are a digit (1-5), 
+or 'NA', where 1 is experimentally supported and 5 is entirely predicted 
+with no experimental evidence. See for example 
+L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>. 
+
+Pass a gene SeqFeature object with one or more transcript subfeatures. 
+Alternatively, an array reference of transcripts could be passed as well.
+
+A level may be provided as a second argument. The default is 'best'.
+
+=over 4
+
+=item best
+
+Only the transcripts with the highest existing value will be retained.
+
+=item best<digit>
+
+All transcripts up to the indicated level are retained. For example, 
+'best3' would indicate that transcripts with support levels 1, 2, and 3 
+would be retained. 
+
+=item <digit>
+
+Only transcripts at the given level are retained.
+
+=item NA
+
+Only transcripts with 'NA' as the value are retained. These are typically 
+pseudogenes or single-exon transcripts.
+
+=back
+
+If none of the transcripts have the attribute, then all are returned 
+(nothing is filtered). 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
 
 =back
 
