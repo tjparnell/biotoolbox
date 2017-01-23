@@ -1,5 +1,14 @@
 ######## Bio::ToolBox revision history #############
 
+v1.44
+	- Added new function to GeneTools for exporting to GTF format.
+	- Added new function to filter transcript subfeatures in a gene 
+	SeqFeature object by available Ensembl Transcript Support Level tags.
+	- Fixed critical bug with collapsing multiple transcripts in 
+	GeneTools function that resulted in too many overlapping exons.
+	- Fixed bug in exporting non-coding gene models to UCSC refFlat format.
+	- Other minor bug fixes.
+
 v1.43
 	- Fix bug with unique option in script get_gene_regions where 
 	too many regions were being discarded. Thanks to Mengyao.
