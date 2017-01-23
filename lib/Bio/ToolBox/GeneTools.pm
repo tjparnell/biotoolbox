@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.41';
+our $VERSION = '1.44';
 
 =head1 NAME
 
@@ -88,6 +88,11 @@ get_transcript_length(), and collapse_transcripts().
 
 Import the CDS pertaining methods, including is_coding(), get_cds(), 
 get_cdsStart(), get_cdsEnd(), get_transcript_cds_length(), and get_utrs().
+
+=item :export
+
+Import all of the export methods, including gff_string(), gtf_string(), 
+and ucsc_string();
 
 =back
 
@@ -285,7 +290,14 @@ have a gff_string() method, and this will simply call that method. SeqFeature
 objects that do not have this method will, of course, cause the script to 
 terminate. 
 
-L<Bio::ToolBox::Feature> also provide a gff_string method.
+L<Bio::ToolBox::Data::Feature> also provides a gff_string method.
+
+=item gtf_string($gene)
+
+This will export a gene or transcript model as a series of GTF formatted 
+text lines, following the defined Gene Transfer Format (also known as GFF 
+version 2.5). It will ensure that each feature is properly tagged with the 
+gene_id and transcript_id attributes. 
 
 =item ucsc_string($gene)
 
@@ -293,6 +305,62 @@ This will export a gene or transcript model as a refFlat formatted gene
 Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format9>
 for details. Multiple transcript genes are exported as multiple text lines 
 concatenated together.
+
+=back
+
+=head2 Filter methods
+
+These methods are used to filter genes.
+
+=over 4
+
+=item filter_transcript_support_level($gene)
+
+=item filter_transcript_support_level($gene, $level)
+
+This will filter a gene object for transcripts that match or exceed the 
+provided transcript support level. This assumes that the transcripts 
+contain the attribute tag 'transcript_support_level', which are present in 
+Ensembl provided GFF3 and GTF annotation files. The values are a digit (1-5), 
+or 'NA', where 1 is experimentally supported and 5 is entirely predicted 
+with no experimental evidence. See for example 
+L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>. 
+
+Pass a gene SeqFeature object with one or more transcript subfeatures. 
+Alternatively, an array reference of transcripts could be passed as well.
+
+A level may be provided as a second argument. The default is 'best'.
+
+=over 4
+
+=item best
+
+Only the transcripts with the highest existing value will be retained.
+
+=item best<digit>
+
+All transcripts up to the indicated level are retained. For example, 
+'best3' would indicate that transcripts with support levels 1, 2, and 3 
+would be retained. 
+
+=item <digit>
+
+Only transcripts at the given level are retained.
+
+=item NA
+
+Only transcripts with 'NA' as the value are retained. These are typically 
+pseudogenes or single-exon transcripts.
+
+=back
+
+If none of the transcripts have the attribute, then all are returned 
+(nothing is filtered). 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
 
 =back
 
@@ -328,7 +396,9 @@ our @EXPORT_OK = qw(
 	get_transcript_cds_length
 	get_utrs
 	gff_string
+	gtf_string
 	ucsc_string
+	filter_transcript_support_level
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -363,6 +433,7 @@ our %EXPORT_TAGS = (
 	) ],
 	export => [ qw(
 		gff_string
+		gtf_string
 		ucsc_string
 	) ],
 );
@@ -649,7 +720,8 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
+	return $gene if ( $gene->primary_tag !~ /gene/i and 
+		$gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	my @exons;
 	foreach my $subf ($gene->get_SeqFeatures) {
@@ -705,8 +777,8 @@ sub collapse_transcripts {
 	
 	# sort all the exons
 	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] }
-					map { [$_, $_->start] } 
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
 					@exons;
 	
 	# build new exons from the original - don't keep cruft
@@ -716,25 +788,34 @@ sub collapse_transcripts {
 		-seq_id         => $next->seq_id,
 		-start 			=> $next->start,
 		-end   			=> $next->end,
+		-strand         => $next->strand,
 		-primary_tag  	=> 'exon',
 	);
 	
 	# work through remaining exons, adding and merging as necessary
 	while (@sorted) {
 		$next = shift @sorted;
-		if ($next->start < $new[-1]->end and $next->end > $new[-1]->end) {
-			# overlapping features, so reassign the end point of exon
-			$new[-1]->end($next->end);
+		my ($ns, $ne) = ($next->start, $next->end); # new start & end
+		my ($os, $oe) = ($new[-1]->start, $new[-1]->end); # old start & end
+		if ($ns == $os and $ne > $oe) {
+			# same beginning, further end
+			$new[-1]->end($ne);
 		}
-		else {
-			# push as new exon
+		elsif ($ns > $os and $ns < $oe and $ne > $oe) {
+			# overlapping start, further end
+			$new[-1]->end($ne);
+		}
+		elsif ($ns > $oe) {
+			# completely new exon
 			push @new, $next->new(
 				-seq_id         => $next->seq_id,
-				-start 			=> $next->start,
-				-end   			=> $next->end,
+				-start 			=> $ns,
+				-end   			=> $ne,
+				-strand         => $next->strand,
 				-primary_tag  	=> 'exon',
 			);
 		}
+		# all other possibilities we can skip
 	}
 	
 	# return the assembled transcript
@@ -777,13 +858,20 @@ sub is_coding {
 	}
 	return 1 if $transcript->primary_tag =~ /mrna/i; # assumption
 	return 1 if $transcript->source =~ /protein.?coding/i;
-	if ($transcript->has_tag('biotype')) {
+	if ($transcript->has_tag('transcript_biotype')) {
+		# ensembl type GTFs
+		my ($biotype) = $transcript->get_tag_values('transcript_biotype');
+		return $biotype =~ /protein.?coding/i ? 1 : 0;
+	}
+	elsif ($transcript->has_tag('biotype')) {
 		# ensembl type GFFs
 		my ($biotype) = $transcript->get_tag_values('biotype');
-		return 1 if $biotype =~ /protein.?coding/i;
+		return $biotype =~ /protein.?coding/i ? 1 : 0;
 	}
 	elsif ($transcript->has_tag('gene_biotype')) {
 		# ensembl type GTFs
+		# must be careful here, gene_biotype of course pertains to gene, 
+		# and not necessarily this particular transcript
 		my ($biotype) = $transcript->get_tag_values('gene_biotype');
 		return 1 if $biotype =~ /protein.?coding/i;
 	}
@@ -1052,6 +1140,86 @@ sub gff_string {
 	return shift->gff_string(@_);
 }
 
+sub gtf_string {
+	my $feature = shift;
+	my $gene = shift || undef; # only present when recursing
+	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
+	
+	# process a gene 
+	if ($feature->primary_tag =~ /gene/i and not defined $gene) {
+		my $string;
+		foreach my $t (get_transcripts($feature)) {
+			$string .= gtf_string($t, $feature);
+		}
+		return $string;
+	}
+	
+	# check that we have transcribed feature with exons
+	my @exons = get_exons($feature);
+	return unless @exons; # no exon subfeatures? must not be a transcript....
+	
+	# mandatory identifiers
+	my ($gene_id, $gene_name);
+	if ($gene) {
+		$gene_id = $gene->primary_id || $gene->display_name;
+		$gene_name = $gene->display_name;
+	}
+	my $trx_id = $feature->primary_id || $feature->display_name;
+	my $trx_name = $feature->display_name;
+	my $group = "gene_id \"$gene_id\"; transcript_id \"$trx_id\""; 
+	my $name = "gene_name \"$gene_name\"; transcript_name \"$trx_name\"";
+	
+	# convert transcript 
+	# transcript is technically not part of the GTF standard....
+	# but it's mostly harmless and generally helpful
+	my $string = join("\t", (
+		$feature->seq_id || '.',
+		$feature->source_tag || '.',
+		$feature->primary_tag =~ /transcript|rna/i ? 'transcript' : 
+			$feature->primary_tag, # something else not recognizable
+		$feature->start,
+		$feature->end,
+		defined $feature->score ? $feature->score : '.',
+		$feature->strand < 0 ? '-' : '+',
+		'.',
+		"$group; $name"
+	) );
+	
+	# add additional transcript attributes that might be interesting to keep
+	my ($biotype) = $feature->get_tag_values('transcript_biotype') || 
+		$feature->get_tag_values('biotype') || $feature->primary_tag;
+	$string .= "; transcript_biotype \"$biotype\"" if $biotype;
+	my ($tsl) = $feature->get_tag_values('transcript_support_level');
+	$string .= "; transcript_support_level \"$tsl\"" if $tsl;
+	$string .= "\n";
+	
+	# convert exon subfeatures collected above
+	if (is_coding($feature)) {
+		my @cds = get_cds($feature);
+		push @cds, get_stop_codon($feature);
+		push @cds, get_start_codon($feature);
+		@exons = map { $_->[0] } 
+			sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+			map { [$_, $_->start, $_->end] } ( @exons, @cds );
+	}
+	foreach my $subf (@exons) {
+		$string .= join("\t", (
+			$subf->seq_id || '.',
+			$subf->source_tag || '.',
+			$subf->primary_tag,
+			$subf->start,
+			$subf->end,
+			defined $subf->score ? $subf->score : '.',
+			$subf->strand < 0 ? '-' : '+',
+			defined $subf->phase ? $subf->phase : '.',
+			"$group\n"
+		) );
+	}
+	
+	# finished
+	return $string;
+}
+
 sub ucsc_string {
 	my $feature = shift;
 	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
@@ -1070,11 +1238,14 @@ sub ucsc_string {
 		my $ucsc = _process_ucsc_transcript($feature);
 		push @ucsc_list, $ucsc if $ucsc;
 	}
+	else {
+		return;
+	}
 	
 	# return strings
 	my $string;
 	foreach my $ucsc (@ucsc_list) {
-		$string .= sprintf("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s\n", 
+		$string .= sprintf("%s\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%d\t%s\t%s\n", 
 			$ucsc->{'name2'},
 			$ucsc->{'name'},
 			$ucsc->{'chr'},
@@ -1089,6 +1260,104 @@ sub ucsc_string {
 		);
 	}
 	return $string;
+}
+
+
+
+#### filter methods
+
+sub filter_transcript_support_level {
+	my $gene = shift;
+	my $min_tsl = shift || 'best'; 
+	my @list = qw(1 2 3 4 5 NA Missing);
+	
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# categorize transcripts
+	my %results = map { $_ => [] } @list;
+	foreach my $t (@transcripts) {
+		my ($tsl) = $t->get_tag_values('transcript_support_level');
+		$tsl ||= 'Missing'; # default in case nothing is present
+		push @{ $results{$tsl} }, $t;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	if ($min_tsl eq 'best') {
+		# progress through all levels and keep only the highest set
+		foreach my $tsl (@list) {
+			if (scalar @{ $results{$tsl} }) {
+				@keepers = @{ $results{$tsl} };
+				last;
+			}
+		}
+	}
+	elsif ($min_tsl =~ /^best(\d)$/) {
+		# progress through all levels and take all up to specified max
+		my $max = $1;
+		foreach my $tsl (1 .. 5) {
+			if (scalar @{ $results{$tsl} }) {
+				if ($tsl <= $max) {
+					push @keepers, @{ $results{$tsl} };
+				}
+				elsif (not @keepers and $tsl > $max) {
+					# go ahead and take it if we have no other option
+					push @keepers, @{ $results{$tsl} };
+				}
+			}
+		}
+		# still take the NA and Missing if nothing else
+		if (scalar @keepers == 0 and scalar @{ $results{'NA'} }) {
+			@keepers = @{ $results{'NA'} };
+		}
+		elsif (scalar @keepers == 0 and scalar @{ $results{'Missing'} }) {
+			@keepers = @{ $results{'Missing'} };
+		}
+	}
+	elsif ($min_tsl =~ /^\d$/) {
+		# take only the specified level
+		@keepers = @{ $results{$min_tsl} };
+	}
+	elsif ($min_tsl eq 'NA') {
+		# take only the NA guys
+		@keepers = @{ $results{'NA'} };
+	}
+	else {
+		confess "unrecognized minimum TSL value '$min_tsl' Check the documentation!";
+	}
+	@keepers = @{ $results{'Missing'} } unless @keepers;
+	
+	# return
+	if (ref($gene) =~ /seqfeature/i) {
+		# we can't delete subfeatures, so we're forced to create a new 
+		# parent gene and reattach the filtered transcripts
+		my %attributes = $gene->attributes;
+		return $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => $gene->primary_tag,
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-id             => $gene->primary_id,
+			-attributes     => \%attributes,
+			-segments       => \@keepers,
+		);
+	}
+	else {
+		return \@keepers;
+	}
 }
 
 
@@ -1142,8 +1411,18 @@ sub _process_ucsc_transcript {
 	
 	# record CDS points
 	if (is_coding($transcript)) {
-		$ucsc->{cdsStart} = get_cdsStart($transcript) - 1;
-		$ucsc->{cdsEnd}   = get_cdsEnd($transcript);
+		my $start = get_cdsStart($transcript);
+		my $stop  = get_cdsEnd($transcript);
+		if ($start and $stop) {
+			$ucsc->{cdsStart} = $start - 1;
+			$ucsc->{cdsEnd}   = $stop;
+		}
+		else {
+			# if we don't have cds start/stop, then assign to transcript end 
+			# as if it is a noncoding transcript, regardless of primary_tag
+			$ucsc->{cdsStart} = $transcript->end;
+			$ucsc->{cdsEnd}   = $transcript->end;
+		}
 	}
 	else {
 		# non-coding transcript sets the cds points to the transcript end
