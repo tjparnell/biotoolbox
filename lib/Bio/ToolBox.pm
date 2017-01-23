@@ -192,7 +192,7 @@ L<https://code.google.com/p/biotoolbox/>.
 
 Bugs and issues should be submitted at L<https://github.com/tjparnell/biotoolbox/issues>.
 
-=head1 AUTHOR
+=head1 LICENSE AND AUTHOR
 
  Timothy J. Parnell, PhD
  Dept of Oncological Sciences
