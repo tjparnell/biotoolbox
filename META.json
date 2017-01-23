@@ -69,11 +69,11 @@
       },
       "Bio::ToolBox::GeneTools" : {
          "file" : "lib/Bio/ToolBox/GeneTools.pm",
-         "version" : "1.50"
+         "version" : "1.44"
       },
       "Bio::ToolBox::SeqFeature" : {
          "file" : "lib/Bio/ToolBox/SeqFeature.pm",
-         "version" : "1.43"
+         "version" : "1.44"
       },
       "Bio::ToolBox::big_helper" : {
          "file" : "lib/Bio/ToolBox/big_helper.pm",
@@ -113,7 +113,7 @@
       },
       "Bio::ToolBox::parser::gff" : {
          "file" : "lib/Bio/ToolBox/parser/gff.pm",
-         "version" : "1.43"
+         "version" : "1.44"
       },
       "Bio::ToolBox::parser::ucsc" : {
          "file" : "lib/Bio/ToolBox/parser/ucsc.pm",
