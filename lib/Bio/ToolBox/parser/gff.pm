@@ -86,11 +86,15 @@ file and ignore extraneous attributes.
 
 =back
 
+=back
+
 =head2 Parser behavior
 
 These are additional class methods that control the parsing behavior of a 
 new object. Unpredictable behavior may occur if you implement these in the 
 midst of parsing a file.
+
+=over 4
 
 =item open_file($file)
 
