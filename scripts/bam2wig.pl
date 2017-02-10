@@ -34,7 +34,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.43';
+my $VERSION = '1.45';
 	
 	
 
@@ -699,7 +699,6 @@ sub open_wig_file {
 			file      => $name,
 			chromo    => $chromo_file,
 			bwapppath => $bwapp,
-			bedgraph  => $bedgraph ? 1 : 0,
 		);
 		if ($fh) {
 			return ($name, $fh);
