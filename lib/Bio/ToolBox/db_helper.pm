@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.40';
+our $VERSION = '1.45';
 
 use strict;
 require Exporter;
@@ -374,43 +374,6 @@ sub open_db_connection {
 	
 	}
 	
-	# a directory, presumably of bigwig files
-	elsif (-d $database) {
-		# try opening using the BigWigSet adaptor
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-			unless $BIGWIG_OK;
-		if ($BIGWIG_OK) {
-			$db = open_bigwigset_db($database);
-			unless ($db) {
-				$error = " ERROR: could not open local BigWigSet " . 
-					"directory '$database'!\n";
-				$error .= "   Does directory contain bigWig .bw files?\n";
-			}
-		}
-		else {
-			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
-				" Bio::DB::BigWigSet is not installed\n";
-		}
-		
-		# try opening with the Fasta adaptor
-		unless ($db) {
-			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
-				unless $SEQFASTA_OK;
-			if ($SEQFASTA_OK) {
-				$db = open_fasta_db($database);
-				unless ($db) {
-					$error .= " ERROR: could not open fasta directory '$database'!\n";
-					$error .= "   Does directory contain fasta files? If it contains a" . 
-						" directory.index file,\n   try deleting it and try again.\n";
-				}
-			}
-			else {
-				$error .= " Module Bio::DB::Fasta is required to open presumed fasta " . 
-					"directory\n";
-			}
-		}
-	}
-	
 	# check for a known file type
 	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig/i) {
 		
@@ -540,17 +503,54 @@ sub open_db_connection {
 		}
 	}
 	
+	# a directory, presumably of bigwig files
+	elsif (-d $database) {
+		# try opening using the BigWigSet adaptor
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+			unless $BIGWIG_OK;
+		if ($BIGWIG_OK) {
+			$db = open_bigwigset_db($database);
+			unless ($db) {
+				$error = " ERROR: could not open local BigWigSet " . 
+					"directory '$database'!\n";
+				$error .= "   Does directory contain bigWig .bw files?\n";
+			}
+		}
+		else {
+			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
+				" Bio::DB::BigWigSet is not installed\n";
+		}
+		
+		# try opening with the Fasta adaptor
+		unless ($db) {
+			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+				unless $SEQFASTA_OK;
+			if ($SEQFASTA_OK) {
+				$db = open_fasta_db($database);
+				unless ($db) {
+					$error .= " ERROR: could not open fasta directory '$database'!\n";
+					$error .= "   Does directory contain fasta files? If it contains a" . 
+						" directory.index file,\n   try deleting it and try again.\n";
+				}
+			}
+			else {
+				$error .= " Module Bio::DB::Fasta is required to open presumed fasta " . 
+					"directory\n";
+			}
+		}
+	}
+	
 	# unrecognized real file
 	elsif (-e $database) {
 		# file exists, I just don't recognize the extension
 		$error = " File '$database' type and/or extension is not recognized\n";
 	}
 	
-	# otherwise assume the name of a SeqFeature::Store database in the configuration
 	
-	# attempt to open using information from the configuration
-	# using default connection information as necessary
-	unless ($db) {
+	# otherwise assume the name of a SeqFeature::Store database in the configuration
+	else {
+		# attempt to open using information from the configuration
+		# using default connection information as necessary
 		$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
 			unless $SEQFASTA_OK;
 		if ($SEQFASTA_OK) {
@@ -574,7 +574,6 @@ sub open_db_connection {
 		return $db;
 	} 
 	else {
-		$error .= " no database could be found or connected!\n";
 		print STDERR $error;
 		return;
 	}
