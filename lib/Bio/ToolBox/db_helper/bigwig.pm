@@ -63,16 +63,17 @@ our %BIGWIGSET_WIGS;
 	# pre-define the methods code for processing summary objects to avoid 
 	# excessive if-elsif tests every data cycle
 our %ONE_SUMMARY_METHOD = (
-	'mean'  => sub {return binMean(shift) },
-	'sum'   => sub {return shift->{sumData} },
-	'min'   => sub {return shift->{minVal} },
-	'max'   => sub {return shift->{maxVal} },
-	'count' => sub {return shift->{validCount} },
-	'stddev'=> sub {return binStdev(shift) },
+	'mean'  => sub {return unless $_[0]; return binMean($_[0]) },
+	'sum'   => sub {return 0 unless $_[0]; return $_[0]->{sumData} },
+	'min'   => sub {return unless $_[0]; return $_[0]->{minVal} },
+	'max'   => sub {return unless $_[0]; return $_[0]->{maxVal} },
+	'count' => sub {return 0 unless $_[0]; return $_[0]->{validCount} },
+	'stddev'=> sub {return unless $_[0]; return binStdev($_[0]) },
 );
 our %MULTI_SUMMARY_METHOD = (
 	'mean'  => sub {
 				my $summaries = shift;
+				return unless $summaries->[0];
 				my $sum = 0;
 				my $count = 0;
 				foreach my $s (@$summaries) {
@@ -83,6 +84,7 @@ our %MULTI_SUMMARY_METHOD = (
 			},
 	'sum'   => sub {
 				my $summaries = shift;
+				return 0 unless $summaries->[0];
 				my $sum = 0;
 				foreach my $s (@$summaries) {
 					$sum += $s->{sumData};
@@ -91,14 +93,17 @@ our %MULTI_SUMMARY_METHOD = (
 			},
 	'min'   => sub {
 				my $summaries = shift;
+				return unless $summaries->[0];
 				return min( map {$_->{minVal}} @$summaries);
 			},
 	'max'   => sub {
 				my $summaries = shift;
+				return unless $summaries->[0];
 				return max( map {$_->{maxVal}} @$summaries);
 			},
 	'count' => sub {
 				my $summaries = shift;
+				return 0 unless $summaries->[0];
 				my $count = 0;
 				foreach my $s (@$summaries) {
 					$count += $s->{validCount};
