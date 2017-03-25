@@ -32,7 +32,7 @@ provides:
     version: '1.50'
   Bio::ToolBox::Data::file:
     file: lib/Bio/ToolBox/Data/file.pm
-    version: '1.41'
+    version: '1.45'
   Bio::ToolBox::GeneTools:
     file: lib/Bio/ToolBox/GeneTools.pm
     version: '1.44'
@@ -41,7 +41,7 @@ provides:
     version: '1.44'
   Bio::ToolBox::big_helper:
     file: lib/Bio/ToolBox/big_helper.pm
-    version: '1.43'
+    version: '1.45'
   Bio::ToolBox::db_helper:
     file: lib/Bio/ToolBox/db_helper.pm
     version: '1.50'

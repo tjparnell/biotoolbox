@@ -34,7 +34,7 @@ use constant {
 	LOG2            => log(2),
 	LOG10           => log(10),
 };
-my $VERSION = '1.43';
+my $VERSION = '1.45';
 	
 	
 
@@ -699,7 +699,6 @@ sub open_wig_file {
 			file      => $name,
 			chromo    => $chromo_file,
 			bwapppath => $bwapp,
-			bedgraph  => $bedgraph ? 1 : 0,
 		);
 		if ($fh) {
 			return ($name, $fh);
@@ -1465,6 +1464,7 @@ sub parallel_process_alignments {
 ### Process alignments for a specific chromosome
 sub process_alignments_on_chromosome {
 	my ($fh1, $fh2, $tid) = @_;
+	my $chr_start_time = time;
 	
 	# sequence info
 	my $seq_id = $sam->target_name($tid);
@@ -1505,8 +1505,8 @@ sub process_alignments_on_chromosome {
 	
 	# finish up this chromosome
 	&$write_wig(\%data, 1); # final write
-	printf " Converted %s alignments on $seq_id in %.3f minutes\n", 
-		format_with_commas( $data{'tcount'}), (time - $start_time)/60;
+	printf " Converted %s alignments on $seq_id in %d seconds\n", 
+		format_with_commas( $data{'tcount'}), time - $chr_start_time;
 }
 
 

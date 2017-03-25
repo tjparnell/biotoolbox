@@ -1,5 +1,10 @@
 ######## Bio::ToolBox revision history #############
 
+v1.45
+	- Fix endless loop bug with opening files with metadata but no data,
+	e.g. empty VCF files
+	- Revert support for opening bedGraphToBigWig file handles
+
 v1.44
 	- Added new function to GeneTools for exporting to GTF format.
 	- Added new function to filter transcript subfeatures in a gene 

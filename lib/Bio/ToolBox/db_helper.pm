@@ -1,6 +1,60 @@
 package Bio::ToolBox::db_helper;
 our $VERSION = '1.50';
 
+use strict;
+require Exporter;
+use Carp qw(carp cluck croak confess);
+use Module::Load; # for dynamic loading during runtime
+use Statistics::Lite qw(
+	sum
+	mean
+	median
+	min
+	max
+	range
+	stddevp
+);
+use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::utility;
+use constant LOG2 => log(2);
+
+
+# check values for dynamically loaded helper modules
+# these are loaded only when needed during runtime to avoid wasting resources
+our $BAM_OK      = 0;
+our $BIGBED_OK   = 0;
+our $BIGWIG_OK   = 0;
+our $SEQFASTA_OK = 0;
+our $USEQ_OK     = 0;
+
+# define reusable variables
+our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
+our %total_read_number; # for rpm calculations
+our $primary_id_warning; # for out of date primary IDs
+our %OPENED_DB; # cache for some opened Bio::DB databases
+
+# Exported names
+our @ISA = qw(Exporter);
+our @EXPORT = qw();
+our @EXPORT_OK = qw(
+	open_db_connection
+	get_dataset_list 
+	verify_or_request_feature_types 
+	check_dataset_for_rpm_support 
+	get_new_feature_list 
+	get_new_genome_list 
+	validate_included_feature 
+	get_feature 
+	get_chromo_region_score 
+	get_region_dataset_hash 
+	get_chromosome_list 
+);
+
+
+# The true statement
+1; 
+>>>>>>> master
+
 =head1 NAME
 
 Bio::ToolBox::db_helper - helper interface to various database formats
@@ -846,43 +900,6 @@ sub open_db_connection {
 	
 	}
 	
-	# a directory, presumably of bigwig files
-	elsif (-d $database) {
-		# try opening using the BigWigSet adaptor
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-			unless $BIGWIG_OK;
-		if ($BIGWIG_OK) {
-			$db = open_bigwigset_db($database);
-			unless ($db) {
-				$error = " ERROR: could not open local BigWigSet " . 
-					"directory '$database'!\n";
-				$error .= "   Does directory contain bigWig .bw files?\n";
-			}
-		}
-		else {
-			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
-				" Bio::DB::BigWigSet is not installed\n";
-		}
-		
-		# try opening with the Fasta adaptor
-		unless ($db) {
-			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
-				unless $SEQFASTA_OK;
-			if ($SEQFASTA_OK) {
-				$db = open_fasta_db($database);
-				unless ($db) {
-					$error .= " ERROR: could not open fasta directory '$database'!\n";
-					$error .= "   Does directory contain fasta files? If it contains a" . 
-						" directory.index file,\n   try deleting it and try again.\n";
-				}
-			}
-			else {
-				$error .= " Module Bio::DB::Fasta is required to open presumed fasta " . 
-					"directory\n";
-			}
-		}
-	}
-	
 	# check for a known file type
 	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig/i) {
 		
@@ -1011,17 +1028,54 @@ sub open_db_connection {
 		}
 	}
 	
+	# a directory, presumably of bigwig files
+	elsif (-d $database) {
+		# try opening using the BigWigSet adaptor
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
+			unless $BIGWIG_OK;
+		if ($BIGWIG_OK) {
+			$db = open_bigwigset_db($database);
+			unless ($db) {
+				$error = " ERROR: could not open local BigWigSet " . 
+					"directory '$database'!\n";
+				$error .= "   Does directory contain bigWig .bw files?\n";
+			}
+		}
+		else {
+			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
+				" Bio::DB::BigWigSet is not installed\n";
+		}
+		
+		# try opening with the Fasta adaptor
+		unless ($db) {
+			$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+				unless $SEQFASTA_OK;
+			if ($SEQFASTA_OK) {
+				$db = open_fasta_db($database);
+				unless ($db) {
+					$error .= " ERROR: could not open fasta directory '$database'!\n";
+					$error .= "   Does directory contain fasta files? If it contains a" . 
+						" directory.index file,\n   try deleting it and try again.\n";
+				}
+			}
+			else {
+				$error .= " Module Bio::DB::Fasta is required to open presumed fasta " . 
+					"directory\n";
+			}
+		}
+	}
+	
 	# unrecognized real file
 	elsif (-e $database) {
 		# file exists, I just don't recognize the extension
 		$error = " File '$database' type and/or extension is not recognized\n";
 	}
 	
-	# otherwise assume the name of a SeqFeature::Store database in the configuration
 	
-	# attempt to open using information from the configuration
-	# using default connection information as necessary
-	unless ($db) {
+	# otherwise assume the name of a SeqFeature::Store database in the configuration
+	else {
+		# attempt to open using information from the configuration
+		# using default connection information as necessary
 		$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
 			unless $SEQFASTA_OK;
 		if ($SEQFASTA_OK) {
@@ -1045,7 +1099,6 @@ sub open_db_connection {
 		return $db;
 	} 
 	else {
-		$error .= " no database could be found or connected!\n";
 		print STDERR $error;
 		return;
 	}

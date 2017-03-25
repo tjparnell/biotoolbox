@@ -186,9 +186,7 @@ version of this data collection script, see the BioToolBox script B<get_datasets
 =head1 REPOSITORY
 
 Source code for the Bio::ToolBox package is maintained at 
-L<https://github.com/tjparnell/biotoolbox/>. Extensive documentation, including How To 
-documents, installation guides, and script documentation, can be found at 
-L<https://code.google.com/p/biotoolbox/>.
+L<https://github.com/tjparnell/biotoolbox/>. 
 
 Bugs and issues should be submitted at L<https://github.com/tjparnell/biotoolbox/issues>.
 
@@ -199,6 +197,8 @@ Bugs and issues should be submitted at L<https://github.com/tjparnell/biotoolbox
  Huntsman Cancer Institute
  University of Utah
  Salt Lake City, UT, 84112
+
+=head1 LICENSE
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the Artistic License 2.0. 

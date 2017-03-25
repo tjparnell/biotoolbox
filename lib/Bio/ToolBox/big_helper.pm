@@ -23,7 +23,7 @@ our @EXPORT_OK = qw(
 );
 
 
-our $VERSION = '1.43';
+our $VERSION = '1.45';
 
 1;
 
@@ -166,24 +166,18 @@ sub open_wig_to_bigwig_fh {
 		$args{bw} .= '.bw';
 	}
 	
-	# preferred utility
-	$args{bedgraph} ||= $args{bedGraph} || 0;
-	
 	# Identify bigwig conversion utility
 	$args{bwapppath} ||= undef;
 	unless ($args{bwapppath}) {
 		# check for an entry in the configuration file
-		$args{bwapppath} = $args{bedgraph} ? 
-			$BTB_CONFIG->param("applications.bedGraphToBigWig") : 
-			$BTB_CONFIG->param("applications.wigToBigWig") || undef;
+		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || undef;
 	}
 	unless ($args{bwapppath}) {
 		# try checking the system path as a final resort
 		eval {
 			require File::Which;
 			File::Which->import;
-			$args{bwapppath} = $args{bedgraph} ? which('bedGraphToBigWig') : 
-				which('wigToBigWig');
+			$args{bwapppath} = which('wigToBigWig');
 		};
 		add_program($args{bwapppath}) if $args{bwapppath};
 	}
@@ -446,11 +440,6 @@ Pass the function an array of key =E<gt> value arguments. An L<IO::File>
 object will be returned. Upon the closing the file handle, the 
 I<wigToBigWig> utility will generate the bigWig file.
 
-Note that the UCSC utility I<bedGraphToBigWig> may be alternatively 
-specified when using the bedGraph format only. The I<wigToBigWig> 
-utility can handle any wig format; however, the I<bedGraphToBigWig> 
-utility mysteriously generates smaller bigWig files than I<wigToBigWig>. 
-
   Required:
   bw          => The output file name for the bigWig file.
                  Also accepts the keys file, wig, and out. 
@@ -460,12 +449,9 @@ utility mysteriously generates smaller bigWig files than I<wigToBigWig>.
   db          => Alternatively, provide an opened database object from which 
                  to generate a temporary chromosome sizes file. It is up to the 
                  user to delete this file.
-  bwapppath   => Provide the full path to the UCSC I<wigToBigWig> or 
-                 I<bedGraphToBigWig> utility. The path may be obtained from 
-                 the configuration file C<biotoolbox.cfg>. 
-  bedgraph    => Provide a boolean value to indicate a preference to use  
-                 the UCSC I<bedGraphToBigWig> utility instead. This 
-                 option has no effect if you specify your own path.
+  bwapppath   => Provide the full path to the UCSC I<wigToBigWig>utility. 
+                 The path may be obtained from the configuration file 
+                 C<biotoolbox.cfg>. 
 
   Example:
 	my $bw_file = 'example.bw';
