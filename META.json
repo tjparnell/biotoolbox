@@ -29,6 +29,7 @@
          },
          "requires" : {
             "Bio::DB::BigFile" : "1.07",
+            "Bio::DB::HTS" : "2.5",
             "Bio::DB::Sam" : "1.36",
             "Bio::DB::USeq" : "0.2",
             "Bio::Root::Version" : "1.0069022",
@@ -83,6 +84,10 @@
          "file" : "lib/Bio/ToolBox/db_helper.pm",
          "version" : "1.50"
       },
+      "Bio::ToolBox::db_helper::alignment_callbacks" : {
+         "file" : "lib/Bio/ToolBox/db_helper/alignment_callbacks.pm",
+         "version" : "1.50"
+      },
       "Bio::ToolBox::db_helper::bam" : {
          "file" : "lib/Bio/ToolBox/db_helper/bam.pm",
          "version" : "1.50"
@@ -98,6 +103,10 @@
       "Bio::ToolBox::db_helper::config" : {
          "file" : "lib/Bio/ToolBox/db_helper/config.pm",
          "version" : "1.14"
+      },
+      "Bio::ToolBox::db_helper::hts" : {
+         "file" : "lib/Bio/ToolBox/db_helper/hts.pm",
+         "version" : "1.50"
       },
       "Bio::ToolBox::db_helper::seqfasta" : {
          "file" : "lib/Bio/ToolBox/db_helper/seqfasta.pm",
