@@ -1,60 +1,6 @@
 package Bio::ToolBox::db_helper;
 our $VERSION = '1.50';
 
-use strict;
-require Exporter;
-use Carp qw(carp cluck croak confess);
-use Module::Load; # for dynamic loading during runtime
-use Statistics::Lite qw(
-	sum
-	mean
-	median
-	min
-	max
-	range
-	stddevp
-);
-use Bio::ToolBox::db_helper::config;
-use Bio::ToolBox::utility;
-use constant LOG2 => log(2);
-
-
-# check values for dynamically loaded helper modules
-# these are loaded only when needed during runtime to avoid wasting resources
-our $BAM_OK      = 0;
-our $BIGBED_OK   = 0;
-our $BIGWIG_OK   = 0;
-our $SEQFASTA_OK = 0;
-our $USEQ_OK     = 0;
-
-# define reusable variables
-our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
-our %total_read_number; # for rpm calculations
-our $primary_id_warning; # for out of date primary IDs
-our %OPENED_DB; # cache for some opened Bio::DB databases
-
-# Exported names
-our @ISA = qw(Exporter);
-our @EXPORT = qw();
-our @EXPORT_OK = qw(
-	open_db_connection
-	get_dataset_list 
-	verify_or_request_feature_types 
-	check_dataset_for_rpm_support 
-	get_new_feature_list 
-	get_new_genome_list 
-	validate_included_feature 
-	get_feature 
-	get_chromo_region_score 
-	get_region_dataset_hash 
-	get_chromosome_list 
-);
-
-
-# The true statement
-1; 
->>>>>>> master
-
 =head1 NAME
 
 Bio::ToolBox::db_helper - helper interface to various database formats
