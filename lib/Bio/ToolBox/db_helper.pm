@@ -606,6 +606,32 @@ Example
 		print "chromosome $name is $length bp\n";
 	}
 
+=item low_level_bam_coverage($sam, $tid, $start, $stop)
+
+This is a convenience method for running the low level bam coverage method. 
+Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
+supported, and each has slight variation in the API syntax, this method helps 
+to abstract the actual method and use the appropriate syntax depending on 
+which adapter is loaded. It is best if the $sam object was opened using the 
+open_db_connection() method, or that C<$BAM_ADAPTER> is set.
+
+NOTE that this is the LOW level coverage method based on the index object, 
+and not the similarly named high level API method. Read the adapter 
+documentation for proper usage.
+
+=item low_level_bam_fetch($sam, $tid, $start, $stop, $callback, $data)
+
+This is a convenience method for running the low level bam fetch method. 
+Since both L<Bio::DB::Sam> and L<Bio::DB::HTS> bam file adapters are 
+supported, and each has slight variation in the API syntax, this method helps 
+to abstract the actual method and use the appropriate syntax depending on 
+which adapter is loaded. It is best if the $sam object was opened using the 
+open_db_connection() method, or that C<$BAM_ADAPTER> is set.
+
+NOTE that this is the LOW level fetch method based on the index object, 
+and not the similarly named high level API method. Read the adapter 
+documentation for proper usage.
+
 =back
 
 =head1 INTERNAL SUBROUTINES
@@ -721,6 +747,8 @@ our @EXPORT_OK = qw(
 	get_segment_score 
 	calculate_score
 	get_chromosome_list 
+	low_level_bam_coverage
+	low_level_bam_fetch
 );
 
 # The true statement
@@ -2099,6 +2127,40 @@ sub get_chromosome_list {
 }
 
 
+sub low_level_bam_fetch {
+	my ($sam, $tid, $start, $stop, $callback, $data) = @_;
+	# run the the low level bam fetch based on which adapter is being used
+	unless ($BAM_ADAPTER) {
+		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
+	}
+	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+		# using Bio::DB::HTS
+		return $sam->hts_index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
+	}
+	else {
+		# assume using Bio::DB::Sam
+		return $sam->bam_index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
+	}
+}
+
+
+sub low_level_bam_coverage {
+	my ($sam, $tid, $start, $stop) = @_;
+	# run the the low level bam coverage based on which adapter is being used
+	unless ($BAM_ADAPTER) {
+		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
+	}
+	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+		# using Bio::DB::HTS
+		return $sam->hts_index->coverage($sam->hts_file, $tid, $start, $stop);
+	}
+	else {
+		# assume using Bio::DB::Sam
+		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
+	}
+}
+
+
 ### Internal subroutine to convert a feature category into a list of classes
 sub _features_to_classes {
 	my $feature = shift;
@@ -2327,9 +2389,17 @@ sub _load_bam_helper_module {
 	}
 	else {
 		# try hts first, then sam
-		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts')
-			|| _load_helper_module('Bio::ToolBox::db_helper::bam');
+		# be sure to set BAM_ADAPTER upon success
+		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+		if ($BAM_OK) {
+			$BAM_ADAPTER = 'hts';
+		}
+		else {
+			$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
+			$BAM_ADAPTER = 'sam' if $BAM_OK;
+		}
 	}
+	print " using $BAM_ADAPTER bam adaptor\n";
 	return $BAM_OK;
 }
 
