@@ -47,14 +47,14 @@ sub get_base_options {
 			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
-			'Bio::Root::Version'      => '1.0069022',
 		},
 		recommends        => {
 			'DBD::SQLite'             => 0,
 			'File::Which'             => 0,
-			'Statistics::LineFit'     => 0.06,
 			'Net::FTP'                => 0,
+			'Bio::Root::Version'      => '1.0069023',
 			'Parallel::ForkManager'   => 1.02,
+			'Set::IntervalTree'       => 0.10,
 		},
 		script_files => [
 			'scripts/bam2wig.pl',
@@ -86,7 +86,7 @@ sub get_base_options {
 sub check_useq {
 	if ($] >= 5.010000) {
 		# Bio::DB::USeq requires perl 5.10
-		$options->{'requires'}{'Bio::DB::USeq'} = 0.20;
+		$options->{'recommends'}{'Bio::DB::USeq'} = 0.23;
 	}
 }
 
