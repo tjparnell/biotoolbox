@@ -1294,7 +1294,13 @@ sub process_alignments {
 				# we need to scale each sam source individually and take an average
 				# calculate normalization factor for each sam file
 				@norms = map { 1_000_000 / ($_ * scalar(@sams)) } @totals;
-				$rpm = 0; # do not normalize again below
+			}
+			elsif ($rpm and not $do_mean) {
+				# scale them all the same
+				my $factor = 1_000_000 / ( sum(@totals) * scalar(@sams) );
+				foreach (@sams) {
+					push @norms, $factor;
+				}
 			}
 			elsif (not $rpm and $do_mean) {
 				# just need to take an average
@@ -1434,8 +1440,14 @@ sub parallel_process_alignments {
 				# we need to scale each sam source individually and take an average
 				# calculate normalization factor for each sam file
 				@norms = map { 1_000_000 / ($_ * scalar(@sams)) } @totals;
-				$rpm = 0; # do not normalize again below
 				
+			}
+			elsif ($rpm and not $do_mean) {
+				# scale them all the same
+				my $factor = 1_000_000 / ( sum(@totals) * scalar(@sams) );
+				foreach (@sams) {
+					push @norms, $factor;
+				}
 			}
 			elsif (not $rpm and $do_mean) {
 				# just need to take an average
