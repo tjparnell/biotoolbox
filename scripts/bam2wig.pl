@@ -2477,12 +2477,12 @@ bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
   
  Paired-end alignments:
   --pe                          treat as paired-end alignments
-  --minsize <integer>           maximum allowed insertion size (30)
-  --maxsize <integer>           minimum allowed insertion size (600)
+  --minsize <integer>           minimum allowed insertion size (30)
+  --maxsize <integer>           maximum allowed insertion size (600)
   
  Alignment filtering options:
   --qual <integer>              minimum mapping quality (0)          
-  --nosecondary                 skip primary alignments (false)
+  --nosecondary                 skip secondary alignments (false)
   --noduplicate                 skip marked duplicate alignments (false)
   --nosupplementary             skip supplementary alignments (false)
   --chrskip <regex>             regular expression to skip chromosomes
