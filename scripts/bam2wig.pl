@@ -2045,13 +2045,18 @@ sub se_spliced_callback {
 
 sub se_start {
 	my ($a, $data, $score) = @_;
-	$data->{f}->[$a->pos - $data->{f_offset}] += $score;
+	if ($a->reversed) {
+		$data->{f}->[$a->calend - 1 - $data->{f_offset}] += $score;
+	}
+	else {
+		$data->{f}->[$a->pos - $data->{f_offset}] += $score;
+	}
 }
 
 sub se_shift_start {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		my $pos = $a->calend -1 - $shift_value - $data->{f_offset};
+		my $pos = $a->calend - 1 - $shift_value - $data->{f_offset};
 		$data->{f}->[$pos] += $score if $pos >= 0;
 	}
 	else {
