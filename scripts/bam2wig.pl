@@ -217,8 +217,8 @@ my $black_list_hash = process_black_list();
 
 
 ### Calculate shift value
-if ($shift) {
-	unless ($shift_value or ($use_extend and $extend_value)) {
+if ($shift or $use_extend) {
+	unless ((shift and $shift_value) or ($use_extend and $extend_value)) {
 		print " Calculating 3' shift value...\n";
 		$shift_value = determine_shift_value();
 	}
@@ -396,9 +396,9 @@ sub check_defaults {
 	}
 	
 	# check to shift position or not
-	if ($shift) {
+	if ($shift or $use_extend) {
 		# set parameters for calculating shift value 
-		unless ($shift_value) {
+		unless ($shift_value or $extend_value) {
 			# not provided by user, empirical calculation required
 			eval {
 				# required for calculating shift
@@ -677,7 +677,8 @@ sub determine_shift_value {
 		# do each chromosome in parallel
 		print "   Forking into children for parallel scanning\n";
 		printf "   Scanning %s\n", join(", ", map { $sam->target_name($_) } @chromosomes);
-		print "SeqID\t#Intervals\tMeanCount\tMaxCount\tStdDCount\tMinCutoff\tMaxCutoff\t#Collected\n";
+		print "SeqID\t#Intervals\tMean\tMax\tStdDev\tMinCutoff\tMaxCutoff\t#Collected\n"
+			if $verbose;
 		
 		# set up 
 		my $pm = Parallel::ForkManager->new($cpu);
@@ -710,7 +711,8 @@ sub determine_shift_value {
 	else {
 		# one chromosome at a time
 		printf "   Scanning %s\n", join(", ", map { $sam->target_name($_) } @chromosomes);
-		print "SeqID\t#Intervals\tMean\tMax\tStdDev\tMinCutoff\tMaxCutoff\t#Collected\n";
+		print "SeqID\t#Intervals\tMean\tMax\tStdDev\tMinCutoff\tMaxCutoff\t#Collected\n"
+			if $verbose;
 		for my $tid (@chromosomes) {
 			
 			# calculate the correlation
@@ -894,8 +896,10 @@ sub scan_high_coverage {
 	foreach my $p (keys %pos2depth) {
 		push @collected, $p if $pos2depth{$p} > $mincutoff and $pos2depth{$p} < $maxcutoff;
 	}
-	printf "%s\t%d\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%d\n", $sam->target_name($tid), 
-		$count, $mean, $max, $sd, $mincutoff, $maxcutoff, scalar(@collected); 
+	if ($verbose) {
+		printf "%s\t%d\t%.1f\t%.1f\t%.1f\t%.1f\t%.1f\t%d\n", $sam->target_name($tid), 
+			$count, $mean, $max, $sd, $mincutoff, $maxcutoff, scalar(@collected); 
+	}
 	
 	return (\@collected, \%data);
 }
