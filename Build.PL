@@ -47,6 +47,7 @@ sub get_base_options {
 			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
+			'List::Util'              => 0,
 		},
 		recommends        => {
 			'DBD::SQLite'             => 0,
