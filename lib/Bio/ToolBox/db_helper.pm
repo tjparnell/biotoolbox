@@ -2399,7 +2399,7 @@ sub _load_bam_helper_module {
 			$BAM_ADAPTER = 'sam' if $BAM_OK;
 		}
 	}
-	print " using $BAM_ADAPTER bam adaptor\n";
+# 	print " using $BAM_ADAPTER bam adaptor\n";
 	return $BAM_OK;
 }
 
