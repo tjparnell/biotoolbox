@@ -994,29 +994,28 @@ sub vcf_attributes {
 	$self->{attributes} = {};
 	
 	# INFO attributes
-	unless ($self->{data}->name(7) eq 'INFO') {
-		croak "VCF column INFO is missing or improperly formatted!";
+	my %info;
+	if ($self->{data}->name(7) eq 'INFO') {
+		%info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
+						# some tags are simple and have no value, eg SOMATIC 
+					map { [split(/=/, $_)] } 
+					split(/;/, $self->value(7));
 	}
-	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
-					# some tags are simple and have no value, eg SOMATIC 
-				map { [split(/=/, $_)] } 
-				split(/;/, $self->value(7));
 	$self->{attributes}->{INFO} = \%info;
 	$self->{attributes}->{7}    = \%info;
 	
 	# Sample attributes
-	unless ($self->{data}->name(8) eq 'FORMAT') {
-		croak "VCF column FORMAT is missing or file is improperly formatted!";
-	}
-	my @formatKeys = split /:/, $self->value(8);
-	foreach my $i (9 .. $self->{data}->last_column) {
-		my $name = $self->{data}->name($i);
-		my @sampleVals = split /:/, $self->value($i);
-		my %sample = map { 
-			$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
-			(0 .. $#formatKeys);
-		$self->{attributes}->{$name} = \%sample;
-		$self->{attributes}->{$i}    = \%sample;
+	if ($self->{data}->number_columns > 8) {
+		my @formatKeys = split /:/, $self->value(8);
+		foreach my $i (9 .. $self->{data}->last_column) {
+			my $name = $self->{data}->name($i);
+			my @sampleVals = split /:/, $self->value($i);
+			my %sample = map { 
+				$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
+				(0 .. $#formatKeys);
+			$self->{attributes}->{$name} = \%sample;
+			$self->{attributes}->{$i}    = \%sample;
+		}
 	}
 	return $self->{attributes};
 }
