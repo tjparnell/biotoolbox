@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.41';
+my $VERSION = '1.50';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1603,7 +1603,7 @@ sub maximum_function {
 			my $row = shift;
 			my $v = $row->value($index);
 			next if _is_null($v);
-			if ($v < $value) {
+			if ($v > $value) {
 				$row->value($index, $value);
 				$count++;
 			}
