@@ -1,5 +1,23 @@
 ######## Bio::ToolBox revision history #############
 
+v1.50
+	- Major upgrade of the data collection libraries to simplify data 
+	collection and improve efficiency. The value type is no longer 
+	specified, being rolled into the specified collection method. Low 
+	level optimizations have been added to improve speed. 
+	- Added support for the modern Bio::DB::HTS module for Bam files, 
+	while keeping support for the older Bio::DB::Sam module. 
+	- Rewrite of data collection scripts to work with the improved libraries
+	- Script bam2wig is completely rewritten to handle multiple bam 
+	files for merging, independent bam scaling, improved alignment 
+	filtering, customizable output, improved cross-strand correlation 
+	for peak shifting, improved speed and memory management, and lots 
+	more features.
+	- Numerous other features and changes too small to mention
+	- Relaxed requirements for external modules, namely BioPerl, so 
+	that scripts and functions that don't absolutely require them can 
+	still be used. All database functions will require it though.
+
 v1.45
 	- Fix endless loop bug with opening files with metadata but no data,
 	e.g. empty VCF files
