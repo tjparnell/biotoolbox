@@ -21,19 +21,20 @@
       },
       "runtime" : {
          "recommends" : {
+            "Bio::DB::USeq" : "0.23",
+            "Bio::Root::Version" : "1.0069023",
             "DBD::SQLite" : "0",
             "File::Which" : "0",
             "Net::FTP" : "0",
             "Parallel::ForkManager" : "1.02",
-            "Statistics::LineFit" : "0.06"
+            "Set::IntervalTree" : "0.1"
          },
          "requires" : {
             "Bio::DB::BigFile" : "1.07",
             "Bio::DB::HTS" : "2.5",
             "Bio::DB::Sam" : "1.36",
-            "Bio::DB::USeq" : "0.2",
-            "Bio::Root::Version" : "1.0069022",
             "Config::Simple" : "4.58",
+            "List::Util" : "0",
             "Module::Load" : "0",
             "Statistics::Descriptive" : "3",
             "Statistics::Lite" : "3.2"
