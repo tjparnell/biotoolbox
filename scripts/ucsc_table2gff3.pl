@@ -91,7 +91,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n\n";
+	print " Biotoolbox script ucsc_table2gff3.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
