@@ -9,11 +9,11 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	if (eval {require Bio::DB::Sam; 1}) {
-		plan tests => 33;
+	if (eval {require Bio::DB::HTS; 1}) {
+		plan tests => 38;
 	}
 	else {
-		plan skip_all => 'Optional module Bio::DB::Sam not available';
+		plan skip_all => 'Optional module Bio::DB::HTS not available';
 	}
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
@@ -31,10 +31,11 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
+is($Data->bam_adapter('hts'), 'hts', 'set preferred database adapter to hts');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
-isa_ok($db, 'Bio::DB::Sam', 'connected database');
+isa_ok($db, 'Bio::DB::HTS', 'connected database');
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
@@ -56,15 +57,14 @@ is($row->name, 'YAL047C', 'row name');
 
 # try a segment
 my $segment = $row->segment;
-isa_ok($segment, 'Bio::DB::Sam::Segment', 'row segment');
+isa_ok($segment, 'Bio::DB::HTS::Segment', 'row segment');
 is($segment->start, 54989, 'segment start');
 
 # read count sum
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 453, 'row sum of read count score');
@@ -73,7 +73,6 @@ is($score, 453, 'row sum of read count score');
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -83,41 +82,20 @@ is(sprintf("%.2f", $score), 16.33, 'row mean coverage');
 $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'pcount',
-	'method'   => 'sum',
+	'method'   => 'pcount',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 414, 'row sum of read precise count score');
 
-# read length mean
+# read ncount sum
 $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'length',
-	'method'   => 'median',
+	'method'   => 'ncount',
 );
-# print "count sum for ", $row->name, " is $score\n";
-is($score, 73, 'median of read length');
+# print "ncount sum for ", $row->name, " is $score\n";
+is($score, 453, 'row read name count score');
 
-# read count rpm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 320367, 'read count as rpm');
-
-# read count rpkm
-$score = $row->get_score(
-	'db'       => $dataset,
-	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'rpkm',
-);
-# print "count sum for ", $row->name, " is $score\n";
-is(int($score), 171411, 'read count as rpkm');
 
 
 
@@ -129,8 +107,7 @@ is($row->strand, -1, 'row strand');
 # try stranded data collection
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'all',
 );
 # print "all read count sum for ", $row->name, " is $score\n";
@@ -138,8 +115,7 @@ is($score, 183, 'row sum of count score for all strands');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'sense',
 );
 # print "sense read count sum for ", $row->name, " is $score\n";
@@ -147,8 +123,7 @@ is($score, 86, 'row sum of count score for sense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 	'stranded' => 'antisense',
 );
 # print "antisense read count sum for ", $row->name, " is $score\n";
@@ -156,7 +131,6 @@ is($score, 97, 'row sum of count score for antisense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 	'stranded' => 'sense',
 );
@@ -179,23 +153,47 @@ is(sprintf("%.2f", $score), 29.38, 'row mean coverage for sense strand');
 $row = $stream->next_row;
 is($row->name, 'YAL044W-A', 'row name');
 
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
-	'value'    => 'count',
+	'method'   => 'count',
 );
 is(scalar keys %pos2scores, 110, 'number of positioned scores');
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is($pos2scores{1}, 1, 'positioned score at 1');
-is($pos2scores{20}, 2, 'positioned score at 20');
+is($pos2scores{1}, 1, 'positioned count at 1');
+is($pos2scores{20}, 2, 'positioned count at 20');
 
-%pos2scores = $row->get_position_scores(
+%pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
-	'value'    => 'count',
+	'method'   => 'pcount',
+);
+# print "found ", scalar keys %pos2scores, " positions with precise reads\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 86, 'number of precise positioned scores');
+is($pos2scores{37}, 1, 'precise positioned count at 37');
+is($pos2scores{50}, 2, 'precise positioned count at 50');
+
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'method'   => 'ncount',
+);
+# print "found ", scalar keys %pos2scores, " positions of named reads\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 140, 'number of named positioned scores');
+is($pos2scores{-16}, 3, 'positioned named count at -16');
+is($pos2scores{38}, 2, 'positioned named count at 38');
+
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
 	'absolute' => 1,
 	'stranded' => 'antisense',
+	'method'   => 'count',
 );
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {

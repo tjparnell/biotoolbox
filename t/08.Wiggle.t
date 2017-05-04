@@ -67,8 +67,7 @@ is($segment->start, 54989, 'segment start');
 my $score = $row->get_score(
 	'db'       => $database,
 	'dataset'  => 'sample2',
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 49, 'row sum of count');
@@ -77,7 +76,6 @@ is($score, 49, 'row sum of count');
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => 'sample2',
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -93,15 +91,13 @@ is($row->strand, -1, 'row strand');
 # try stranded data collection
 $score = $row->get_score(
 	'dataset'  => 'sample2',
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "score count sum for ", $row->name, " is $score\n";
 is($score, 7, 'row count sum');
 
 $score = $row->get_score(
 	'dataset'  => 'sample2',
-	'value'    => 'score',
 	'method'   => 'median',
 );
 # print "score median for ", $row->name, " is $score\n";
@@ -111,9 +107,8 @@ is(sprintf("%.2f", $score), '0.49', 'row median score');
 
 
 ### Try positioned score index
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => 'sample2',
-	'value'    => 'score',
 );
 is(scalar keys %pos2scores, 7, 'number of positioned scores');
 # print "found ", scalar keys %pos2scores, " positions with reads\n";

@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.40';
+our $VERSION = '1.50';
 
 =head1 NAME
 
@@ -19,6 +19,7 @@ use base 'Bio::ToolBox::Data::file';
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
+	$BAM_ADAPTER
 );
 
 1;
@@ -752,9 +753,7 @@ sub open_database {
 }
 
 sub verify_dataset {
-	my $self = shift;
-	my $dataset = shift;
-	my $database = shift; # name or object?
+	my ($self, $dataset, $database) = @_;
 	return unless $dataset;
 	if (exists $self->{verfied_dataset}{$dataset}) {
 		return $self->{verfied_dataset}{$dataset};
@@ -929,6 +928,14 @@ sub database {
 		}
 	}
 	return $self->{db};
+}
+
+sub bam_adapter {
+	my $self = shift;
+	if (@_) {
+		$BAM_ADAPTER = shift;
+	}
+	return $BAM_ADAPTER;
 }
 
 sub gff {
@@ -1238,6 +1245,7 @@ sub _find_column_indices {
 	my $start  = $self->find_column('^start|position|pos|txStart');
 	my $stop   = $self->find_column('^stop|end|txEnd');
 	my $strand = $self->find_column('^strand');
+	my $score  = $self->find_column('^score$');
 	$self->{column_indices} = {
 		'name'      => $name,
 		'type'      => $type,
@@ -1248,6 +1256,7 @@ sub _find_column_indices {
 		'stop'      => $stop,
 		'end'       => $stop,
 		'strand'    => $strand,
+		'score'     => $score,
 	};
 	return 1;
 }
@@ -1305,6 +1314,12 @@ sub id_column {
 	return $self->{column_indices}{id};
 }
 
+sub score_column {
+	my $self = shift;
+	carp "score_column is a read only method" if @_;
+	$self->_find_column_indices unless exists $self->{column_indices};
+	return $self->{column_indices}{score};
+}
 
 
 #### Special Row methods ####
@@ -1502,6 +1517,11 @@ Returns the index of the column that best represents the type.
 
 Returns the index of the column that represents the Primary_ID 
 column used in databases.
+
+=item score_column
+
+Returns the index of the column that represents the Score 
+column in certain formats, such as GFF, BED, bedGraph, etc.
 
 =item get_seqfeature
 

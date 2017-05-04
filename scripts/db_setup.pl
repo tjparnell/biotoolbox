@@ -70,7 +70,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " BioToolBox script db_setup.pl, version $VERSION\n\n";
+	print " BioToolBox script db_setup.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 

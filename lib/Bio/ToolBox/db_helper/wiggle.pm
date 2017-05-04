@@ -5,7 +5,18 @@ require Exporter;
 use strict;
 use Carp;
 use Bio::Graphics::Wiggle;
-our $VERSION = '1.14';
+use constant {
+	CHR  => 0,  # chromosome
+	STRT => 1,  # start
+	STOP => 2,  # stop
+	STR  => 3,  # strand
+	STND => 4,  # strandedness
+	METH => 5,  # method
+	RETT => 6,  # return type
+	DB   => 7,  # database object
+	DATA => 8,  # first dataset, additional may be present
+};
+our $VERSION = '1.50';
 
 
 # Exported names
@@ -33,44 +44,46 @@ our %OPENED_WIGFILES; # opened wigfile objects
 ### Modules ###
 
 sub collect_wig_scores {
-	
 	# we will actually call collect_wig_position_scores()
 	# but only return the values
-	
-	my %wig_data = collect_wig_position_scores(@_);
+	my $wig_data = collect_wig_position_scores(shift);
+	return unless $wig_data;
 	
 	# return the values
-	return values %wig_data;
+	my @values = values %$wig_data;
+	return wantarray ? @values : \@values;
 }
 
 
 
 sub collect_wig_position_scores {
 	
-	# pass the required information
-	my ($start, $stop, $strand, $stranded, $method, @wig_features) = @_;
-	
-	# set up hash, position => score
-	my %wig_data;
+	# passed parameters as array ref
+	# chromosome, start, stop, strand, strandedness, method, db, dataset
+	my $param = shift;
 	
 	# look at each wigfile
 	# usually there is only one, but for stranded data there may be 
 	# two wigfiles (+ and -), so we'll check each wig file for strand info
-	foreach my $feature (@wig_features) {
-	
+	my %pos2score; # position => score
+	for (my $d = DATA; $d < scalar @$param; $d++) {
+		
+		my $feature = $param->[$d];
+		confess "dataset is not a seqfeature object!" unless ref($feature) =~ /seqfeature/i;
+		
 		# Check which data to take based on strand
 		if (
-			$stranded eq 'all' # stranded data not requested
+			$param->[STND] eq 'all' # all data is requested
 			or $feature->strand == 0 # unstranded data
 			or ( 
 				# sense data
-				$strand == $feature->strand 
-				and $stranded eq 'sense'
+				$param->[STR] == $feature->strand 
+				and $param->[STND] eq 'sense'
 			) 
 			or (
 				# antisense data
-				$strand != $feature->strand  
-				and $stranded eq 'antisense'
+				$param->[STR] != $feature->strand  
+				and $param->[STND] eq 'antisense'
 			)
 		) {
 			# we have acceptable data to collect
@@ -80,7 +93,7 @@ sub collect_wig_position_scores {
 				
 				# get wigfile name
 				my @wigfiles = $feature->get_tag_values('wigfile');
-				my $wigfile = shift @wigfiles;
+				my $wigfile = shift @wigfiles; # there should only be one wigfile
 				confess " no wigfile passed!\n" unless $wigfile;
 				
 				# check for opened wigfile
@@ -104,29 +117,29 @@ sub collect_wig_position_scores {
 				}
 				
 				# adjust as necessary to avoid wig errors
-				if ($start < $wig->start) {
+				if ($param->[STRT] < $wig->start) {
 					# adjust the start position
-					$start = $wig->start;
+					$param->[STRT] = $wig->start;
 				}
-				elsif ($start > $wig->end) {
+				elsif ($param->[STRT] > $wig->end) {
 					# nothing we can do here, no values
 					return;
 				}
-				if ($stop > $wig->end) {
+				if ($param->[STOP] > $wig->end) {
 					# adjust the end position
-					$stop = $wig->end;
+					$param->[STOP] = $wig->end;
 				}
-				elsif ($stop < $wig->start) {
+				elsif ($param->[STOP] < $wig->start) {
 					# nothing we can do here, no values
 					return;
 				}
 				
 				# collect the wig values
-				my $scores_ref = $wig->values($start => $stop);
+				my $scores_ref = $wig->values($param->[STRT] => $param->[STOP]);
 				
 				# re-associate position with the scores
-				my $step = $wig->step;
-				my $pos = $start;
+				my $step = $wig->step || 1; # step should always be defined but just in case
+				my $pos = $param->[STRT];
 				foreach my $s (@{ $scores_ref }) {
 					#print Dumper($s);
 					if (defined $s) {
@@ -136,22 +149,15 @@ sub collect_wig_position_scores {
 						# positions where there was no original data
 						# hence the defined check here
 						# store a real value in the hash keyed under the position
-						if ($method eq 'score') {	
-							$wig_data{$pos} = $s;
-						}
-						elsif ($method eq 'count') {
-							$wig_data{$pos} = 1;
-						}
-						elsif ($method eq 'length') {
-							$wig_data{$pos} = $step;
+						if ($param->[METH] eq 'count') {
+							$pos2score{$pos} = 1;
 						}
 						else {
-							confess "unknown method $method!";
+							$pos2score{$pos} = $s;
 						}
 					}
 					
 					# adjust position by the step size, 
-					# regardless whether defined or not
 					$pos += $step;
 				}
 			}
@@ -159,7 +165,7 @@ sub collect_wig_position_scores {
 	}	
 	
 	# return the wig data hash
-	return %wig_data;
+	return wantarray ? %pos2score : \%pos2score;
 }
 
 
@@ -174,77 +180,110 @@ Bio::ToolBox::db_helper::wiggle
 
 =head1 DESCRIPTION
 
-This module is used to collect the dataset scores from a binary 
-wig file (.wib) that is referenced in the database. Typically, a single 
-feature representing the dataset is present across each chromosome. The 
-feature should contain an attribute ('wigfile') that references the 
-location of the binary file representing the dataset scores. The file is 
-read using the Bio::Graphics::Wiggle module, and the values extracted from the 
-region of interest. 
+This module provides support for legacy binary wiggle (.wib) files. These are 
+not BigWig files, which are supported through the L<Bio::ToolBox::Data::db_helper::bigwig> 
+module. Rather, these are condensed binary representations of text wiggle files 
+developed for use with the L<http://gmod.org/gbrowse GBrowse>. Use the 
+modern BigWig adapter for improved and more efficient access.
 
-Scores may be restricted to strand by specifying the desired strandedness. 
-For example, to collect transcription data over a gene, pass the strandedness 
-value 'sense'. If the strand of the region database object (representing the 
-gene) matches the strand of the wig file data feature, then the data is 
-collected.
-
-For loading wig files into a Bio::DB database, see the perl script 
-'wiggle2gff3.pl' included with the Bio::Graphics distribution, as well as 
-Bio::Graphics::Wiggle::Loader.
-
-To speed up the program and avoid repetitive opening and 
-closing of the files, the opened wig file object is stored in a global 
-hash in case it is needed again.
- 
 =head1 USAGE
 
-The module requires Lincoln Stein's Bio::Graphics to be installed. 
+The module requires L<Bio::Perl> and L<Bio::Graphics> to be installed.
 
-Load the module at the beginning of your program.
+In general, this module should not be used directly. Use the methods 
+available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
 
-	use Bio::ToolBox::db_helper::wiggle;
-
-It will automatically export the name of the subroutines. 
+All subroutines are exported by default.
 
 =over
 
-=item collect_wig_scores
+=item collect_wig_scores()
 
-This subroutine will collect only the score values from a binary wig file 
-for the specified database region. The positional information of the 
-scores is not retained, and the values are best further processed through 
-some statistical method (mean, median, etc.).
+This subroutine will collect dataset scores from a binary wig file (.wib).
+ 
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine is passed three or more arguments in the following order:
-    
-    1) The start position of the segment to collect from
-    2) The stop or end position of the segment to collect from
-    3) The strand of the original feature (or region), -1, 0, or 1.
-    4) A scalar value representing the desired strandedness of the data 
-       to be collected. Acceptable values include "sense", "antisense", 
-       "none" or "no". Only those scores which match the indicated 
-       strandedness are collected.
-    5) The method or type of data collected. 
-       Acceptable values include 'score' (returns the score), 
-       'count' (the number of defined positions with scores), or 
-       'length' (the wig step is used here).  
-    6) One or more database feature objects that contain the reference 
-       to the wib file. They should contain the attribute 'wigfile'.
+The subroutine returns an array or array reference of the requested dataset 
+values found within the region of interest. 
 
-The subroutine returns an array of the defined dataset values found within 
-the region of interest. 
-
-=item collect_wig_position_scores
+=item collect_wig_position_scores()
 
 This subroutine will collect the score values from a binary wig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed the same arguments as collect_wig_scores().
+The subroutine is passed a parameter array reference. See below for details.
 
-The subroutine returns a hash of the defined dataset values found within 
-the region of interest keyed by position. Note that only one value is 
-returned per position, regardless of the number of dataset features 
+The subroutine returns a hash or hash reference of the requested dataset values 
+found within the region of interest keyed by position. Note that only one 
+value is returned per position, regardless of the number of dataset features 
 passed.
+
+=back
+
+=head2 Binary wiggle files
+
+Binary wiggle files (.wib) files are referenced via a SeqFeature object. 
+These features are typically stored from a L<Bio::DB::SeqFeature::Store> 
+database. A single feature representing the dataset is present across 
+each chromosome. The feature should contain an attribute ('wigfile') that 
+references the location of the binary file representing the dataset scores. 
+The file is opened and the values extracted from the region of interest. 
+
+For loading wig files into a L<Bio::DB::SeqFeature::Store> database, see 
+the perl script 'wiggle2gff3.pl' included with the L<Bio::Graphics> 
+distribution, as well as L<Bio::Graphics::Wiggle::Loader>.
+
+To speed up the program and avoid repetitive opening and 
+closing of the files, the opened wig file object is stored in a global 
+hash in case it is needed again.
+
+=head2 Data Collection Parameters Reference
+
+The data collection subroutines are passed an array reference of parameters. 
+The recommended  method for data collection is to use get_segment_score() method from 
+L<Bio::ToolBox::db_helper>. 
+
+The parameters array reference includes these items:
+
+=over 4
+
+=item 1. The chromosome or seq_id
+
+Not used here.
+
+=item 1. The start position of the segment to collect 
+
+=item 3. The stop or end position of the segment to collect 
+
+=item 4. The strand of the segment to collect
+
+Should be standard BioPerl representation: -1, 0, or 1.
+
+=item 5. The strandedness of the data to collect 
+
+A scalar value representing the desired strandedness of the data 
+to be collected. Acceptable values include "sense", "antisense", 
+or "all". Only those scores which match the indicated 
+strandedness are collected.
+
+=item 6. The method for combining scores.
+
+Acceptable values include score and count.
+
+   * score returns the basepair coverage of alignments over the 
+   region of interest
+   
+   * count returns the number of alignments that overlap the 
+   search region. 
+   
+=item 7. A database object.
+
+not used here.
+
+=item 8 and higher. Database features.
+
+These are the SeqFeature objects that contain the file path to the 
+binary wig files.
 
 =back
 

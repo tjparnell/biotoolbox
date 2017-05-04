@@ -15,13 +15,13 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.45'
+    version: '1.50'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
     version: '1.43'
   Bio::ToolBox::Data::Feature:
     file: lib/Bio/ToolBox/Data/Feature.pm
-    version: '1.40'
+    version: '1.50'
   Bio::ToolBox::Data::Iterator:
     file: lib/Bio/ToolBox/Data.pm
   Bio::ToolBox::Data::Stream:
@@ -29,7 +29,7 @@ provides:
     version: '1.41'
   Bio::ToolBox::Data::core:
     file: lib/Bio/ToolBox/Data/core.pm
-    version: '1.40'
+    version: '1.50'
   Bio::ToolBox::Data::file:
     file: lib/Bio/ToolBox/Data/file.pm
     version: '1.45'
@@ -44,28 +44,34 @@ provides:
     version: '1.45'
   Bio::ToolBox::db_helper:
     file: lib/Bio/ToolBox/db_helper.pm
-    version: '1.45'
+    version: '1.50'
+  Bio::ToolBox::db_helper::alignment_callbacks:
+    file: lib/Bio/ToolBox/db_helper/alignment_callbacks.pm
+    version: '1.50'
   Bio::ToolBox::db_helper::bam:
     file: lib/Bio/ToolBox/db_helper/bam.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::bigbed:
     file: lib/Bio/ToolBox/db_helper/bigbed.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::bigwig:
     file: lib/Bio/ToolBox/db_helper/bigwig.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::config:
     file: lib/Bio/ToolBox/db_helper/config.pm
     version: '1.14'
+  Bio::ToolBox::db_helper::hts:
+    file: lib/Bio/ToolBox/db_helper/hts.pm
+    version: '1.50'
   Bio::ToolBox::db_helper::seqfasta:
     file: lib/Bio/ToolBox/db_helper/seqfasta.pm
-    version: '1.36'
+    version: '1.50'
   Bio::ToolBox::db_helper::useq:
     file: lib/Bio/ToolBox/db_helper/useq.pm
-    version: '1.33'
+    version: '1.50'
   Bio::ToolBox::db_helper::wiggle:
     file: lib/Bio/ToolBox/db_helper/wiggle.pm
-    version: '1.14'
+    version: '1.50'
   Bio::ToolBox::parser::gff:
     file: lib/Bio/ToolBox/parser/gff.pm
     version: '1.44'
@@ -78,21 +84,23 @@ provides:
     file: lib/Bio/ToolBox/utility.pm
     version: '1.36'
 recommends:
+  Bio::DB::USeq: '0.23'
+  Bio::Root::Version: '1.0069023'
   DBD::SQLite: '0'
   File::Which: '0'
   Net::FTP: '0'
   Parallel::ForkManager: '1.02'
-  Statistics::LineFit: '0.06'
+  Set::IntervalTree: '0.1'
 requires:
   Bio::DB::BigFile: '1.07'
+  Bio::DB::HTS: '2.5'
   Bio::DB::Sam: '1.36'
-  Bio::DB::USeq: '0.2'
-  Bio::Root::Version: '1.0069022'
   Config::Simple: '4.58'
+  List::Util: '0'
   Module::Load: '0'
   Statistics::Descriptive: '3'
   Statistics::Lite: '3.2'
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.45'
+version: '1.50'

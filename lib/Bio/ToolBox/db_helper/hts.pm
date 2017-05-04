@@ -1,11 +1,11 @@
-package Bio::ToolBox::db_helper::bam;
+package Bio::ToolBox::db_helper::hts;
 
 # modules
 require Exporter;
 use strict;
 use Carp;
 use File::Copy;
-use Bio::DB::Sam;
+use Bio::DB::HTS;
 use Bio::ToolBox::db_helper::alignment_callbacks;
 our $parallel;
 eval {
@@ -52,6 +52,9 @@ our %OPENED_BAM;
 	# db_helper also provides caching of db objects but with option to force open in
 	# the case of forking processes - we don't have that here
 
+# Lookup hash for caching callback methods
+our %CALLBACKS;
+
 # The true statement
 1; 
 
@@ -70,7 +73,7 @@ sub open_bam_db {
 	# open the bam database object
 	my $sam;
 	eval {
-		$sam = Bio::DB::Sam->new(-bam => $path);
+		$sam = Bio::DB::HTS->new(-bam => $path);
 	};
 	return unless $sam;
 	# we specifically do not cache the bam object or chromosome names here
@@ -81,12 +84,11 @@ sub open_bam_db {
 
 ### Check for a bam index 
 sub check_bam_index {
-	# the old samtools always expects a .bam.bai index file
+	# HTSlib can accept either .bam.bai or .bai, but the Perl adapter 
+	# still accepts just .bam.bai, I think....
 	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that 
 	# doesn't always work as expected. Best to create the index BEFORE opening
-	
 	my $bamfile = shift;
-	return if ($bamfile =~ /^(?:http|ftp)/i); # I can't do much with remote files
 	
 	# we will check the modification time to make sure index is newer
 	my $bam_mtime = (stat($bamfile))[9];
@@ -102,7 +104,7 @@ sub check_bam_index {
 			# index is older than bam file
 			print " index $bam_index is old. Attempting to update time stamp.\n";
 			my $now = time;
-			utime($now, $now, $bam_index) || Bio::DB::Bam->reindex($bamfile);
+			utime($now, $now, $bam_index) || Bio::DB::HTSfile->reindex($bamfile);
 		}
 	}
 	elsif (-e $alt_index) {
@@ -115,7 +117,7 @@ sub check_bam_index {
 	}
 	else {
 		# make a new index
-		Bio::DB::Bam->reindex($bamfile);
+		Bio::DB::HTSfile->reindex($bamfile);
 	}
 }
 
@@ -125,7 +127,7 @@ sub check_bam_index {
 sub write_new_bam_file {
 	my $file = shift;
 	$file .= '.bam' unless $file =~ /\.bam$/i;
-	my $bam = Bio::DB::Bam->open($file, 'w');
+	my $bam = Bio::DB::HTSfile->open($file, 'wb');
 	carp "unable to open bam file $file!\n" unless $bam;
 	return $bam;
 }
@@ -195,15 +197,15 @@ sub collect_bam_scores {
 			
 			# get the alignments
 			# we are using the low level API to eke out performance
-			$bam->bam_index->fetch($bam->bam, $tid, $zstart, $end, $callback, \%data);
+			$bam->hts_index->fetch($bam->hts_file, $tid, $zstart, $end, $callback, \%data);
 		}
 		else {
 			## Coverage
 			# I am assuming everything else is working with read coverage
 			
 			# generate the coverage, this will ignore strand
-			my $coverage = $bam->bam_index->coverage(
-				$bam->bam,
+			my $coverage = $bam->hts_index->coverage(
+				$bam->hts_file,
 				$tid,
 				$zstart, # 0-based coordinates
 				$end,
@@ -261,16 +263,16 @@ sub sum_total_bam_alignments {
 	
 	
 	# Open Bam file if necessary
-	my $sam;
-	my $sam_ref = ref $sam_file;
-	if ($sam_ref =~ /Bio::DB::Sam/) {
+	my $bam;
+	my $bam_ref = ref $sam_file;
+	if ($bam_ref =~ /Bio::DB::HTS/) {
 		# we have an opened sam db object
-		$sam = $sam_file;
+		$bam = $sam_file;
 	}
 	else {
 		# we have a name of a sam file
-		$sam = open_bam_db($sam_file);
-		return unless ($sam);
+		$bam = open_bam_db($sam_file);
+		return unless ($bam);
 	}
 	
 	# prepare the counting subroutine
@@ -281,11 +283,11 @@ sub sum_total_bam_alignments {
 		# process the reads according to single or paired-end
 		# paired end alignments
 		if ($paired) {
-			$sam->bam_index->fetch(
-				$sam->bam, 
+			$bam->hts_index->fetch(
+				$bam->hts_file, 
 				$tid, 
 				0, 
-				$sam->target_len($tid), 
+				$bam->target_len($tid), 
 				sub {
 					my ($a, $number) = @_;
 					
@@ -303,11 +305,11 @@ sub sum_total_bam_alignments {
 		
 		# single end alignments
 		else {
-			$sam->bam_index->fetch(
-				$sam->bam, 
+			$bam->hts_index->fetch(
+				$bam->hts_file, 
 				$tid, 
 				0, 
-				$sam->target_len($tid), 
+				$bam->target_len($tid), 
 				sub {
 					my ($a, $number) = @_;
 					
@@ -332,8 +334,8 @@ sub sum_total_bam_alignments {
 		# generate relatively equal lists of chromosome for each process based on length
 		my @chromosomes = map { $_->[0] }
 			sort { $b->[1] <=> $a->[1] }
-			map { [$_, $sam->target_len($_)] } 
-			(0 .. $sam->n_targets - 1);
+			map { [$_, $bam->target_len($_)] } 
+			(0 .. $bam->n_targets - 1);
 		my @list; # array of arrays, [process][chromosome id]
 		my $i = 1;
 		while (@chromosomes) {
@@ -354,7 +356,7 @@ sub sum_total_bam_alignments {
 			$pm->start and next;
 	
 			### In child
-			$sam->clone; # to make it fork safe
+			$bam->clone; # to make it fork safe
 			my $count = 0;
 			foreach ( @{$list[$n]} ) {
 				# count each chromosome in this process list
@@ -367,7 +369,7 @@ sub sum_total_bam_alignments {
 	
 	else {
 		# loop through all the chromosomes in one execution thread
-		for my $tid (0 .. $sam->n_targets - 1) {
+		for my $tid (0 .. $bam->n_targets - 1) {
 			# each chromosome is internally represented in the bam file as 
 			# a numeric target identifier
 			$total_read_number += &{$counter}($tid);
@@ -384,17 +386,17 @@ __END__
 
 =head1 NAME
 
-Bio::ToolBox::db_helper::bam
+Bio::ToolBox::db_helper::hts
 
 =head1 DESCRIPTION
 
 This module provides support for binary bam alignment files to the 
-L<Bio::ToolBox> package through the samtools C library. 
+L<Bio::ToolBox> package through the HTSlib C library. 
 
 =head1 USAGE
 
-The module requires L<Bio::DB::Sam> to be installed, which in turn 
-requires the samtools C library version 1.20 or less to be installed.
+The module requires L<Bio::DB::HTS> to be installed, which in turn 
+requires the HTSlib version 1.x.
 
 In general, this module should not be used directly. Use the methods 
 available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  

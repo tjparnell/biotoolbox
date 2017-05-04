@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.40';
+our $VERSION = '1.50';
 
 =head1 NAME
 
@@ -142,6 +142,12 @@ is generally unique to a specific database, and not portable between databases.
 
 The length of the feature or segment.
 
+=item score
+
+Returns the value of the Score column, if one is available. Typically 
+associated with defined file formats, such as GFF files (6th column), 
+BED and related Peak files (5th column), and bedGraph (4th column).
+
 =back
 
 =head2 Accessing and setting values in the row.
@@ -263,74 +269,366 @@ changed first using the general database() method.
 See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
 about working with Segment objects.
 
+=item get_features(%args)
+
+Returns seqfeature objects from a database that overlap the Feature 
+or interval in the current Data table row. This is essentially a 
+convenience wrapper for a Bio::DB style I<features> method using the 
+coordinates of the Feature. Optionally pass an array of key value pairs 
+to specify alternate coordinates if so desired. Potential keys 
+include 
+
+=over 4
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item type  The type of database features to retrieve.
+
+=item db    An alternate database object to collect from.
+
+=back
+
+=back
+
+=head2 Data collection
+
+The following methods allow for data collection from various 
+sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc. 
+
+=over 4
+
 =item get_score(%args)
 
-This is a convenience method for the 
-L<get_chromo_region_score|Bio::ToolBox::db_helper/get_chromo_region_score> 
-method. It will return a single score value for the region defined by the 
-coordinates or typed named feature in the current data row. If 
-the Data table has coordinates, then those will be automatically 
-used. If the Data table has typed named features, then the 
-coordinates will automatically be looked up for you by requesting 
-a SeqFeature object from the database.
+This method collects a single score over the feature or interval. 
+Usually a mathematical or statistical value is employed to derive the 
+single score. Pass an array of key value pairs to control data collection.
+Keys include the following:
 
-The name of the dataset from which to collect the data must be 
-provided. This may be a GFF type in a SeqFeature database, a 
-BigWig member in a BigWigSet database, or a path to a BigWig, 
-BigBed, Bam, or USeq file. Additional parameters may also be 
-specified; please see the L<Bio::ToolBox::db_helper> 
-for full details.
+=over 4
 
-If you wish to override coordinates that are present in the 
-Data table, for example to extend or shift the given coordinates 
-by some amount, then simply pass the new start and end 
-coordinates as options to this method.
+=item db
 
-Here is an example of collecting mean values from a BigWig 
-and adding the scores to the Data table.
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item method
+
+Specify the mathematical or statistical method combining multiple scores 
+over the interval into one value. Options include the following:
+
+=over 4
+
+=item mean (default)
+
+=item sum
+
+=item min
+
+=item max
+
+=item median
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=item range  (Min - Max difference)
+
+=item stddev  Standard deviation
+
+=back
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item exon
+
+Boolean option to indicate that the data collection should only 
+occur over exonic subfeatures, and not over introns. Requires that 
+the Data table Feature be a named SeqFeature gene that contains exon 
+subfeatures, for example parsed from a gene table file.
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. 
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=back
   
-  my $index = $Data->add_column('MyData');
-  my $stream = $Data->row_stream;
+Example:
+
   while (my $row = $stream->next_row) {
      my $score = $row->get_score(
         'method'    => 'mean',
         'dataset'   => '/path/to/MyData.bw',
+        'exon'      => 1,
      );
-     $row->value($index, $score);
   }
 
-=item get_position_scores(%args)
 
-This is a convenience method for the 
-L<get_region_dataset_hash|Bio::ToolBox::db_helper/get_region_dataset_hash> 
-method. It will return a hash of 
-positions =E<gt> scores over the region defined by the 
-coordinates or typed named feature in the current data row. 
-The coordinates for the interrogated region will be 
-automatically provided.
+=item get_relative_point_position_scores(%args)
 
-Just like the L<get_score> method, the dataset from which to 
-collect the scores must be provided, along with any other 
-optional arguments. 
+This method collects indexed position scores centered around a 
+specific reference point. The returned data is a hash of 
+relative positions (example -20, -10, 1, 10, 20) and their score 
+values. Pass an array of key value pairs to control data collection.
+Keys include the following:
 
-If you wish to override coordinates that are present in the 
-Data table, for example to extend or shift the given coordinates 
-by some amount, then simply pass the new start and end 
-coordinates as options to this method.
+=over 4
 
-Here is an example for collecting positioned scores around 
-the 5 prime end of a feature from a L<BigWigSet|Bio::DB::BigWigSet> 
-directory.
-  
-  my $stream = $Data->row_stream;
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item extend
+
+Indicate the number of base pairs to extend from the reference coordinate. 
+This option is required!
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a I<primary_tag:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=back
+
+=back
+
+Example:
+
   while (my $row = $stream->next_row) {
-     my %position2score = $row->get_position_scores(
+     my $pos2score = $row->get_relative_point_position_scores(
         'ddb'       => '/path/to/BigWigSet/',
         'dataset'   => 'MyData',
         'position'  => 5,
-     )
-     # do something with %position2score
+        'extend'    => 1000,
+     );
   }
+
+=item get_region_position_scores(%args)
+
+This method collects indexed position scores across a defined 
+region or interval. The returned data is a hash of positions and 
+their score values. The positions are by default relative to a 
+region coordinate, usually to the 5' end. Pass an array of key value 
+pairs to control data collection. Keys include the following:
+
+=over 4
+
+=item db
+
+=item ddb
+
+Specify a Bio::DB database from which to collect the data. The default 
+value is the database specified in the Data table metadata, if present.
+Examples include a L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> 
+database.
+
+=item dataset 
+
+Specify the name of the dataset. If a database was specified, then this 
+value would be the I<primary_tag> or I<type:source> feature found in the 
+database. Otherwise, the name of a data file, such as a bam, bigWig, 
+bigBed, or USeq file, would be provided here. This options is required!
+
+=item exon
+
+Boolean option to indicate that the data collection should only 
+occur over exonic subfeatures, and not over introns. Requires that 
+the Data table Feature be a named SeqFeature gene that contains exon 
+subfeatures, for example parsed from a gene table file. 
+
+When converting to relative coordinates, the coordinates will be relative 
+to the length of the sum of the exons, i.e. the length of the introns 
+will be ignored.
+
+=item extend
+
+Specify the number of basepairs that the Data table Feature's 
+coordinates should be extended in both directions. 
+
+=item seq_id
+
+=item chromo
+
+=item start
+
+=item end
+
+=item stop
+
+=item strand
+
+Optionally specify zero or more alternate coordinates to use. 
+By default, these are obtained from the Data table Feature.
+
+=item position
+
+Indicate the position of the reference point relative to the Data table 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+midpoint (get it? it's between 5 and 3). Default is 5.
+
+=item coordinate
+
+Optionally provide the real chromosomal coordinate as the reference point.
+
+=item absolute 
+
+Boolean option to indicate that the returned hash of positions and scores 
+should not be transformed into relative positions but kept as absolute 
+chromosomal coordinates.
+
+=item avoid
+
+Provide a I<primary_tag:source> database feature type to avoid overlapping 
+scores. Each found score is checked for overlapping features and is 
+discarded if found to do so. The database should be set to use this.
+
+=item strandedness 
+
+Specify what strand from which the data should be taken, with respect 
+to the Feature strand. Three options are available. Only really relevant 
+for data sources that support strand. 
+
+=over 4
+
+=item sense  The same strand as the Feature.
+
+=item antisense  The opposite strand as the Feature.
+
+=item all  Strand is ignored, all is taken (default).
+
+=back
+
+=item method
+
+Only required when counting objects.
+
+=over 4
+
+=item count  Count all overlapping items.
+
+=item pcount  Precisely count only containing (not overlapping) items.
+
+=item ncount  Count overlapping unique names only.
+
+=back
+
+=back
+
+Example:
+
+  while (my $row = $stream->next_row) {
+     my $pos2score = $row->get_relative_point_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'extend'    => 1000,
+     );
+  }
+
 
 =back
 
@@ -454,12 +752,10 @@ attribute key.
 
 use strict;
 use Carp qw(carp cluck croak confess);
-use Bio::ToolBox::db_helper qw(
-	get_feature
-	get_chromo_region_score
-	get_region_dataset_hash
-);
+use Module::Load;
+use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score calculate_score);
 
+my $GENETOOL_LOADED = 0;
 1;
 
 
@@ -662,6 +958,12 @@ sub length {
 	}
 }
 
+sub score {
+	my $self = shift;
+	my $c = $self->{data}->score_column;
+	return defined $c ? $self->value($c) : undef;
+}
+
 sub attributes {
 	my $self = shift;
 	return $self->gff_attributes if ($self->{data}->gff);
@@ -692,29 +994,28 @@ sub vcf_attributes {
 	$self->{attributes} = {};
 	
 	# INFO attributes
-	unless ($self->{data}->name(7) eq 'INFO') {
-		croak "VCF column INFO is missing or improperly formatted!";
+	my %info;
+	if ($self->{data}->name(7) eq 'INFO') {
+		%info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
+						# some tags are simple and have no value, eg SOMATIC 
+					map { [split(/=/, $_)] } 
+					split(/;/, $self->value(7));
 	}
-	my %info = 	map {$_->[0] => defined $_->[1] ? $_->[1] : undef} 
-					# some tags are simple and have no value, eg SOMATIC 
-				map { [split(/=/, $_)] } 
-				split(/;/, $self->value(7));
 	$self->{attributes}->{INFO} = \%info;
 	$self->{attributes}->{7}    = \%info;
 	
 	# Sample attributes
-	unless ($self->{data}->name(8) eq 'FORMAT') {
-		croak "VCF column FORMAT is missing or file is improperly formatted!";
-	}
-	my @formatKeys = split /:/, $self->value(8);
-	foreach my $i (9 .. $self->{data}->last_column) {
-		my $name = $self->{data}->name($i);
-		my @sampleVals = split /:/, $self->value($i);
-		my %sample = map { 
-			$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
-			(0 .. $#formatKeys);
-		$self->{attributes}->{$name} = \%sample;
-		$self->{attributes}->{$i}    = \%sample;
+	if ($self->{data}->number_columns > 8) {
+		my @formatKeys = split /:/, $self->value(8);
+		foreach my $i (9 .. $self->{data}->last_column) {
+			my $name = $self->{data}->name($i);
+			my @sampleVals = split /:/, $self->value($i);
+			my %sample = map { 
+				$formatKeys[$_] => defined $sampleVals[$_] ? $sampleVals[$_] : undef } 
+				(0 .. $#formatKeys);
+			$self->{attributes}->{$name} = \%sample;
+			$self->{attributes}->{$i}    = \%sample;
+		}
 	}
 	return $self->{attributes};
 }
@@ -803,17 +1104,21 @@ sub rewrite_vcf_attributes {
 sub seqfeature {
 	my $self = shift;
 	carp "feature is a read only method" if @_;
+	# normally this is only for named features in a data table
+	# skip this for coordinate features like bed files
+	return unless $self->feature_type eq 'named';
+	
 	return $self->{feature} if exists $self->{feature};
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
 	return $f if $f;
-	return unless $self->{data}->database;
 	
 	# retrieve the feature from the database
+	return unless $self->{data}->database;
 	my $id   = $self->id;
 	my $name = $self->name;
 	my $type = $self->type || $self->{data}->feature;
 	return unless ($id or ($name and $type));
-	$f = get_feature(
+	$f = get_db_feature(
 		'db'    => $self->{data}->open_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later
@@ -843,34 +1148,26 @@ sub segment {
 	}
 }
 
+sub get_features {
+	my $self = shift;
+	my %args = @_;
+	my $db = $args{db} || $self->{data}->open_database || undef;
+	carp "no database defined to get features!" unless defined $db;
+	return unless $db->can('features');
+	
+	# convert the argument style for most bioperl db APIs
+	my %opts;
+	$opts{-seq_id} = $args{chromo} || $self->seq_id;
+	$opts{-start}  = $args{start}  || $self->start;
+	$opts{-end}    = $args{end}    || $self->end;
+	$opts{-type}   = $args{type}   || $self->type;
+	
+	return $db->features(%opts);
+}
+
 sub get_score {
 	my $self = shift;
 	my %args = @_;
-	
-	# verify coordinates based on type of feature
-	if ($self->feature_type eq 'coordinate') {
-		# coordinates are already in the table, use those
-		$args{chromo} ||= $self->seq_id;
-		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
-	}
-	elsif ($self->feature_type eq 'named') {
-		# must retrieve feature from the database first
-		my $f = $self->feature;
-		return unless $f;
-		$args{chromo} ||= $f->seq_id;
-		$args{start}  ||= $f->start;
-		$args{stop}   ||= $f->end;
-	}
-	else {
-		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
-	}
-	unless (exists $args{strand} and defined $args{strand}) {
-		$args{strand} = $self->strand; 
-	}
-# 	unless ($args{chromo} and defined $args{start}) {
-# 		return;
-# 	}
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
 	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
@@ -879,56 +1176,447 @@ sub get_score {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
 	}
 	
-	# make sure database is defined in arguments
-	# user could specify ddb but we need only one db
-	$args{db} ||= $args{ddb} || $self->{data}->open_database;
+	# score attributes
+	$args{'method'}     ||= 'mean';
+	$args{strandedness} ||= $args{stranded} || 'all';
 	
-	return get_chromo_region_score(%args);
+	# get positioned scores over subfeatures only
+	$args{exon} ||= 0;
+	if ($self->feature_type eq 'named' and $args{exon}) {
+		# this is more complicated so we have a dedicated method
+		return $self->_get_subfeature_scores($db, \%args);
+	}
+	
+	# verify coordinates based on type of feature
+	if ($self->feature_type eq 'coordinate') {
+		# coordinates are already in the table, use those
+		$args{chromo} ||= $args{seq_id} || $self->seq_id;
+		$args{start}  ||= $self->start;
+		$args{stop}   ||= $args{end} || $self->end;
+	}
+	elsif ($self->feature_type eq 'named') {
+		# must retrieve feature from the database first
+		my $f = $self->seqfeature;
+		return unless $f;
+		$args{chromo} ||= $args{seq_id} || $f->seq_id;
+		$args{start}  ||= $f->start;
+		$args{stop}   ||= $args{end} || $f->end;
+	}
+	else {
+		croak "data table does not have identifiable coordinate or feature identification columns for score collection";
+	}
+	
+	# adjust coordinates as necessary
+	if (exists $args{extend} and $args{extend}) {
+		$args{start} -= $args{extend};
+		$args{stop}  += $args{extend};
+	}
+	
+	# check coordinates
+	$args{start} = 1 if $args{start} <= 0;
+	if ($args{stop} < $args{start}) {
+		# coordinates are flipped, reverse strand
+		return if ($args{stop} <= 0);
+		my $stop = $args{start};
+		$args{start} = $args{stop};
+		$args{stop}  = $stop;
+		$args{strand} = -1;
+	}
+	unless (exists $args{strand} and defined $args{strand}) {
+		$args{strand} = $self->strand; 
+	}
+	return unless ($args{chromo} and defined $args{start});
+	
+	# get the score
+	return get_segment_score(
+		$args{chromo},
+		$args{start},
+		$args{stop},
+		$args{strand},
+		$args{strandedness},
+		$args{'method'},
+		0, # return type should be a calculated value
+		$db,
+		$args{dataset},
+	);
 }
 
-sub get_position_scores {
+sub _get_subfeature_scores {
+	my ($self, $db, $args) = @_;
+	
+	# load GeneTools
+	unless ($GENETOOL_LOADED) {
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		if ($@) {
+			croak "missing required modules! $@";
+		}
+		else {
+			$GENETOOL_LOADED = 1;
+		}
+	}
+	
+	# feature
+	my $feature = $self->seqfeature;
+	unless ($feature) {
+		carp "no SeqFeature available! Cannot collect exon data!";
+		return;
+	}
+	
+	# collect over each exon
+	my @scores;
+	foreach my $exon (get_exons($feature)) {
+		my $exon_scores = get_segment_score(
+			$exon->seq_id,
+			$exon->start,
+			$exon->end,
+			defined $args->{strand} ? $args->{strand} : $exon->strand, 
+			$args->{strandedness}, 
+			$args->{method},
+			1, # return type should be an array reference of scores
+			$db,
+			$args->{dataset}, 
+		);
+		push @scores, @$exon_scores if defined $exon_scores;
+	}
+	
+	# combine all the scores based on the requested method
+	return calculate_score($args->{'method'}, \@scores);
+}
+
+sub get_relative_point_position_scores {
 	my $self = shift;
 	my %args = @_;
 	
-	# the get_region_dataset_hash() method can handle both db features and coordinates
-	# therefore, this method will also handle both
-	# set arguments based on the feature type.
-	if ($self->feature_type eq 'named') {
-		# confirm that we have appropriate 
-		$args{id}     ||= $self->id;
-		$args{name}   ||= $self->name;
-		$args{type}   ||= $self->type;
-		# do NOT assign strand here, it will be assigned in db_helper
-	}
-	elsif ($self->feature_type eq 'coordinate') {
-		$args{chromo} ||= $self->seq_id;
-		$args{start}  ||= $self->start;
-		$args{stop}   ||= $self->end;
-		unless (exists $args{strand} and defined $args{strand}) {
-			$args{strand} = $self->strand;
-		}
-	}
-	else {
-		# die otherwise we will have this error every time
-		croak "data table does not have coordinates or feature attributes for score collection\n";
-	}
-	
-	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database;
-	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
+	# get the database and verify the dataset
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
 	}
 	
-	$args{db} ||= $self->{data}->open_database;
-	unless ($args{db} or $args{ddb}) {
-		# make sure we provide a database
-		if ($self->{feature} eq 'coordinate' and $args{dataset} =~ /^(?:file|http|ftp)/) {
-			$args{ddb} = $args{dataset};
+	# assign some defaults
+	$args{strandedness} ||= $args{stranded} || 'all';
+	$args{position}     ||= 5;
+	$args{coordinate}   ||= undef;
+	$args{avoid}        ||= undef;
+	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
+	unless ($args{extend}) {
+		croak "must provide an extend value!";
+	}
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	
+	# Assign coordinates
+	$self->_calculate_reference(\%args) unless defined $args{coordinate};
+	my $fchromo = $self->seq_id;
+	my $fstart = $args{coordinate} - $args{extend};
+	my $fstop  = $args{coordinate} + $args{extend};
+	my $fstrand = defined $args{strand} ? $args{strand} : $self->strand;
+	
+	# Data collection
+	$fstart = 1 if $fstart < 1; # sanity check
+	my $pos2data = get_segment_score(
+		$fchromo,
+		$fstart,
+		$fstop,
+		$fstrand, 
+		$args{strandedness}, 
+		$args{'method'},
+		2, # return type should be a hash reference of positioned scores
+		$ddb,
+		$args{dataset}, 
+	);
+	
+	# Avoid positions
+	if ($args{avoid}) {
+		$self->_avoid_positions($pos2data, \%args, $fchromo, $fstart, $fstop);
+	}
+	
+	# covert to relative positions
+	if ($args{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %$pos2data : $pos2data;
+	}
+	else {
+		# return the collected dataset hash
+		return $self->_convert_to_relative_positions($pos2data, 
+			$args{coordinate}, $fstrand);
+	}
+}
+
+sub get_region_position_scores {
+	my $self = shift;
+	my %args = @_;
+	
+	# get the database and verify the dataset
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
+	unless ($args{dataset}) {
+		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
+	}
+	
+	# assign some defaults
+	$args{strandedness} ||= $args{stranded} || 'all';
+	$args{extend}       ||= 0;
+	$args{exon}         ||= 0;
+	$args{position}     ||= 5;
+	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	
+	# get positioned scores over subfeatures only
+	if ($self->feature_type eq 'named' and $args{'exon'}) {
+		# this is more complicated so we have a dedicated method
+		return $self->_get_subfeature_position_scores(\%args, $ddb);
+	}
+	
+	# Assign coordinates
+	my $feature = $self->seqfeature || $self;
+	my $fchromo = $args{chromo} || $args{seq_id} || $feature->seq_id;
+	my $fstart  = $args{start} || $feature->start;
+	my $fstop   = $args{stop} || $args{end} || $feature->end;
+	my $fstrand = defined $args{strand} ? $args{strand} : $feature->strand;
+	if ($args{extend}) {
+		$fstart -= $args{extend};
+		$fstop  += $args{extend};
+	}
+	
+	# Data collection
+	$fstart = 1 if $fstart < 1; # sanity check
+	my $pos2data = get_segment_score(
+		$fchromo,
+		$fstart,
+		$fstop,
+		$fstrand, 
+		$args{strandedness}, 
+		$args{'method'},
+		2, # return type should be a hash reference of positioned scores
+		$ddb,
+		$args{dataset}, 
+	);
+	
+	# Avoid positions
+	if ($args{avoid}) {
+		$self->_avoid_positions($pos2data, \%args, $fchromo, $fstart, $fstop);
+	}
+	
+	# covert to relative positions
+	if ($args{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %$pos2data : $pos2data;
+	}
+	else {
+		# return data converted to relative positions
+		$self->_calculate_reference(\%args) unless defined $args{coordinate};
+		return $self->_convert_to_relative_positions($pos2data, 
+			$args{coordinate}, $fstrand);
+	}
+}
+
+sub _get_subfeature_position_scores {
+	my ($self, $args, $ddb) = @_;
+	
+	# load GeneTools
+	unless ($GENETOOL_LOADED) {
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
+		if ($@) {
+			croak "missing required modules! $@";
+		}
+		else {
+			$GENETOOL_LOADED = 1;
 		}
 	}
 	
-	return get_region_dataset_hash(%args);
+	# feature
+	my $feature = $self->seqfeature;
+	unless ($feature) {
+		carp "no SeqFeature available! Cannot collect exon data!";
+		return;
+	}
+	my $length = $args->{'length'} || get_transcript_length($feature);
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	
+	# collect over each exon
+	# we will adjust the positions of each reported score so that 
+	# it will appear as if all the exons are adjacent to each other
+	# and no introns exist
+	my %pos2data;
+	my $current_end = $feature->start;
+	my $adjustment = 0;
+	foreach my $exon (get_exons($feature)) {
+		
+		# collect scores
+		my $exon_scores = get_segment_score(
+			$exon->seq_id,
+			$exon->start,
+			$exon->end,
+			$fstrand, 
+			$args->{strandedness}, 
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
+			$ddb,
+			$args->{dataset}, 
+		);
+		
+		# adjust scores
+		$adjustment = $exon->start - $current_end;
+		foreach my $p (keys %$exon_scores) {
+			$pos2data{ $p - $adjustment } = $exon_scores->{$p};
+		}
+		
+		# reset
+		$current_end += $exon->length;
+	}
+	
+	# collect extensions if requested
+	if ($args->{extension}) {
+		# left side
+		my $ext_scores = get_segment_score(
+			$feature->seq_id,
+			$feature->start - $args->{extension},
+			$feature->start - 1,
+			$fstrand, 
+			$args->{strandedness}, 
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
+			$ddb,
+			$args->{dataset}, 
+		);
+		foreach my $p (keys %$ext_scores) {
+			# no adjustment should be needed
+			$pos2data{$p} = $ext_scores->{$p};
+		}
+		
+		# right side
+		$ext_scores = get_segment_score(
+			$feature->seq_id,
+			$feature->end + $args->{extension},
+			$feature->end + 1,
+			$fstrand, 
+			$args->{strandedness}, 
+			$args->{method},
+			2, # return type should be a hash reference of positioned scores
+			$ddb,
+			$args->{dataset}, 
+		);
+		foreach my $p (keys %$ext_scores) {
+			# the adjustment should be the same as the last exon
+			$pos2data{$p - $adjustment} = $ext_scores->{$p};
+		}
+	}
+	
+	# covert to relative positions
+	if ($args->{absolute}) {
+		# do not convert to relative positions
+		return wantarray ? %pos2data : \%pos2data;
+	}
+	else {
+		# return data converted to relative positions
+		$self->_calculate_reference($args);
+		return $self->_convert_to_relative_positions(\%pos2data, 
+			$args->{coordinate}, $fstrand);
+	}
+}
+
+sub _calculate_reference {
+	my ($self, $args) = @_;
+	my $feature = $self->seqfeature || $self;
+	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	if ($args->{position} == 5 and $strand >= 0) {
+		$args->{coordinate} = $feature->start;
+	}
+	elsif ($args->{position} == 3 and $strand >= 0) {
+		$args->{coordinate} = $feature->end;
+	}
+	elsif ($args->{position} == 5 and $strand < 0) {
+		$args->{coordinate} = $feature->end;
+	}
+	elsif ($args->{position} == 3 and $strand < 0) {
+		$args->{coordinate} = $feature->start;
+	}
+	elsif ($args->{position} == 4) {
+		# strand doesn't matter here
+		$args->{coordinate} = $feature->start + 
+			int(($feature->length / 2) + 0.5);
+	}
+	else {
+		croak "position must be one of 5, 3, or 4";
+	}
+}
+
+sub _avoid_positions {
+	my ($self, $pos2data, $args, $seqid, $start, $stop) = @_;
+	
+	# first check the list of avoid types
+	if (ref $args->{avoid} eq 'ARRAY') {
+		# we have types, presume they're ok
+	}
+	elsif ($args->{avoid} eq '1') {
+		# old style boolean value
+		if (defined $args->{type}) {
+			$args->{avoid} = [ $args->{type} ];
+		}
+		else {
+			# no type provided, we can't avoid that which is not defined! 
+			# this is an error, but won't complain as we never did before
+			$args->{avoid} = $self->type;
+		}
+	}
+	elsif ($args->{avoid} =~ /w+/i) {
+		# someone passed a string, a feature type perhaps?
+		$args->{avoid} = [ $args->{avoid} ];
+	}
+	
+	### Check for conflicting features
+	my $db = $args->{db} || $self->{data}->open_database;
+	my @overlap_features = $self->get_features(
+		seq_id  => $seqid,
+		start   => $start,
+		end     => $stop,
+		type    => $args->{avoid},
+	);
+	
+	# get the overlapping features of the same type
+	if (@overlap_features) {
+		my $primary = $self->primary_id;
+		# there are one or more feature of the type in this region
+		# one of them is likely the one we're working with
+		# but not necessarily - user may be looking outside original feature
+		# the others are not what we want and therefore need to be 
+		# avoided
+		foreach my $feat (@overlap_features) {
+			# skip the one we want
+			next if ($feat->primary_id eq $primary);
+			# now eliminate those scores which overlap this feature
+			my $start = $feat->start;
+			my $stop  = $feat->end;
+			foreach my $position (keys %$pos2data) {
+				# delete the scored position if it overlaps with 
+				# the offending feature
+				if (
+					$position >= $start and
+					$position <= $stop
+				) {
+					delete $pos2data->{$position};
+				}
+			}
+		}
+	}
+}
+
+sub _convert_to_relative_positions {
+	my ($self, $pos2data, $position, $strand) = @_;
+	
+	my %relative_pos2data;
+	if ($strand >= 0) {
+		foreach my $p (keys %$pos2data) {
+			$relative_pos2data{ $p - $position } = $pos2data->{$p};
+		}
+	}
+	elsif ($strand < 0) {
+		foreach my $p (keys %$pos2data) {
+			$relative_pos2data{ $position - $p } = $pos2data->{$p};
+		}
+	}
+	return wantarray ? %relative_pos2data : \%relative_pos2data;
 }
 
 

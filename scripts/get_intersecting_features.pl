@@ -13,7 +13,6 @@ use Bio::ToolBox::db_helper qw(
 	verify_or_request_feature_types 
 	get_chromosome_list
 	validate_included_feature
-	get_feature
 );
 use Bio::ToolBox::utility;
 my $VERSION = 1.24;
@@ -72,7 +71,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script get_intersecting_features.pl, version $VERSION\n\n";
+	print " Biotoolbox script get_intersecting_features.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
