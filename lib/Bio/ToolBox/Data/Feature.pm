@@ -1164,7 +1164,7 @@ sub seqfeature {
 	my $type = $self->type || $self->{data}->feature;
 	return unless ($id or ($name and $type));
 	$f = get_db_feature(
-		'db'    => $self->{data}->open_database,
+		'db'    => $self->{data}->open_meta_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later
 		'type'  => $type,
@@ -1181,7 +1181,7 @@ sub segment {
 		my $chromo = $self->seq_id;
 		my $start  = $self->start;
 		my $stop   = $self->end || $start;
-		my $db = $self->{data}->open_database;
+		my $db = $self->{data}->open_meta_database;
 		return $db ? $db->segment($chromo, $start, $stop) : undef;
 	}
 	elsif ($self->feature_type eq 'named') {
@@ -1196,7 +1196,7 @@ sub segment {
 sub get_features {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{db} || $self->{data}->open_database || undef;
+	my $db = $args{db} || $self->{data}->open_meta_database || undef;
 	carp "no database defined to get features!" unless defined $db;
 	return unless $db->can('features');
 	
@@ -1213,7 +1213,7 @@ sub get_features {
 sub get_sequence {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{db} || $args{database} || $self->{data}->open_database || undef;
+	my $db = $args{db} || $args{database} || $self->{data}->open_meta_database || undef;
 	my $seqid = $args{seq_id} || $args{chromo} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->end;
@@ -1240,7 +1240,7 @@ sub get_score {
 	my %args = @_;
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
+	my $db = $args{ddb} || $args{db} || $self->{data}->open_meta_database || undef;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
@@ -1358,7 +1358,7 @@ sub get_relative_point_position_scores {
 	my %args = @_;
 	
 	# get the database and verify the dataset
-	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
@@ -1373,7 +1373,7 @@ sub get_relative_point_position_scores {
 	unless ($args{extend}) {
 		croak "must provide an extend value!";
 	}
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# Assign coordinates
 	$self->_calculate_reference(\%args) unless defined $args{coordinate};
@@ -1418,7 +1418,7 @@ sub get_region_position_scores {
 	my %args = @_;
 	
 	# get the database and verify the dataset
-	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
@@ -1430,7 +1430,7 @@ sub get_region_position_scores {
 	$args{exon}         ||= 0;
 	$args{position}     ||= 5;
 	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
 	if ($self->feature_type eq 'named' and $args{'exon'}) {
@@ -1636,7 +1636,7 @@ sub _avoid_positions {
 	}
 	
 	### Check for conflicting features
-	my $db = $args->{db} || $self->{data}->open_database;
+	my $db = $args->{db} || $self->{data}->open_meta_database;
 	my @overlap_features = $self->get_features(
 		seq_id  => $seqid,
 		start   => $start,
