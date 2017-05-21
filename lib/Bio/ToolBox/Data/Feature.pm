@@ -124,6 +124,10 @@ or unstranded.
 
 The name of the feature.
 
+=item coordinate
+
+Returns a coordinate string formatted as "seqid:start-stop".
+
 =item type
 
 The type of feature. Typically either primary_tag or primary_tag:source_tag. 
@@ -907,6 +911,15 @@ sub display_name {
 		return $att->{Name} || $att->{ID} || $att->{transcript_name};
 	}
 	return undef;
+}
+
+sub coordinate {
+	my $self = shift;
+	carp "name is a read only method" if @_;
+	my $coord = sprintf("%s:%d", $self->seq_id, $self->start);
+	my $end = $self->end;
+	$coord .= "-$end" if $end;
+	return CORE::length($coord) > 2 ? $coord : undef;
 }
 
 sub type {

@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 141;
+	plan tests => 145;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -108,8 +108,10 @@ isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'Iterator object');
 my $row = $stream->next_row;
 isa_ok($row, 'Bio::ToolBox::Data::Feature', 'Feature object');
 is($row->value(0), 'chrI', 'row object value of chromo index');
+is($row->seq_id, 'chrI', 'row object chromosome value');
 is($row->start, 1, 'row object start value');
 is($row->end, 230218, 'row object end value');
+is($row->coordinate, 'chrI:1-230218', 'row object coordinate string');
 
 # add row feature
 my $added_row_i = $Dupe->add_row($row);
@@ -245,6 +247,7 @@ is($row->value(0), 'chrI', 'row object value of chromo index');
 is($row->start, 35155, 'row object start value');
 is($row->end, 36303, 'row object end value');
 is($row->name, 'Feature41', 'row object feature name');
+is($row->coordinate, 'chrI:35155-36303', 'row object coordinate string');
 undef $row;
 undef $stream;
 undef $Data;
@@ -285,6 +288,7 @@ is($f->seq_id, 'chrI', 'feature seq_id');
 is($f->start, 35155, 'feature start position transformed');
 is($f->stop, 36303, 'feature stop position');
 is($f->name, 'Feature41', 'feature name');
+is($f->coordinate, 'chrI:35155-36303', 'feature coordinate string');
 
 $Stream->close_fh;
 undef $Stream;
