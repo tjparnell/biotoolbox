@@ -296,6 +296,33 @@ include
 
 =back
 
+=item get_sequence(%args)
+
+Fetches genomic sequence based on the coordinates of the current seqfeature 
+or interval in the current Feature. This requires a database that 
+contains the genomic sequence, either the database specified in the 
+Data table metadata or an external indexed genomic fasta file. The 
+sequence is returned as simple string. If the feature is on the reverse 
+strand, then the reverse complement sequence is automatically returned. 
+Pass an array of key value pairs to specify alternate coordinates if so 
+desired. Potential keys include
+
+=over 4
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item strand
+
+=item extend  Indicate additional basepairs of sequence added to both sides
+
+=item db  The fasta file or database from which to fetch the sequence
+
+=back
+
 =back
 
 =head2 Data collection
@@ -757,7 +784,12 @@ attribute key.
 use strict;
 use Carp qw(carp cluck croak confess);
 use Module::Load;
-use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score calculate_score);
+use Bio::ToolBox::db_helper qw(
+	get_db_feature 
+	get_segment_score
+	calculate_score
+	get_genomic_sequence
+);
 
 my $GENETOOL_LOADED = 0;
 1;
@@ -1176,6 +1208,31 @@ sub get_features {
 	$opts{-type}   = $args{type}   || $self->type;
 	
 	return $db->features(%opts);
+}
+
+sub get_sequence {
+	my $self = shift;
+	my %args = @_;
+	my $db = $args{db} || $args{database} || $self->{data}->open_database || undef;
+	my $seqid = $args{seq_id} || $args{chromo} || $self->seq_id;
+	my $start = $args{start} || $self->start;
+	my $stop  = $args{stop} || $args{end} || $self->end;
+	my $strand = $self->strand;
+	if (exists $args{strand}) {
+		# user supplied strand, gotta check it
+		$strand = $args{strand} =~ /\-|r/i ? -1 : 1;
+	}
+	if (exists $args{extend} and $args{extend}) {
+		$start -= $args{extend};
+		$start = 1 if $start <= 0;
+		$stop += $args{extend};
+	}
+	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
+	if ($strand == -1) {
+		$seq =~ tr/gatcGATC/ctagCTAG/;
+		$seq = reverse $seq;
+	}
+	return $seq;
 }
 
 sub get_score {

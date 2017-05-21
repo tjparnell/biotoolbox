@@ -166,6 +166,18 @@ a useq archive file (file.useq). See
 L<http://useq.sourceforge.net/useqArchiveFormat.html> for more information. 
 Files may only be local.
 
+=item Bio::DB::HTS::Faidx database
+
+An indexed genomic multi-fasta adapter for rapidly fetching genomic 
+sequence using the HTSlib library. If the fasta is not indexed with a 
+C<.fai> file, it will be automatically indexed upon opening. 
+
+=item Bio::DB::Sam::Fai database
+
+An indexed genomic multi-fasta adapter for rapidly fetching genomic 
+sequence using the samtools C library. If the fasta is not indexed with a 
+C<.fai> file, it will be automatically indexed upon opening. 
+
 =item Bio::DB::Fasta Database
 
 A database of fasta sequences. A single multi-fasta or a directory of 
@@ -632,6 +644,16 @@ NOTE that this is the LOW level fetch method based on the index object,
 and not the similarly named high level API method. Read the adapter 
 documentation for proper usage.
 
+=item get_genomic_sequence($db, $chrom, $start, $stop)
+
+This is a wrapper function for fetching genomic sequence from three different 
+possible fasta database adapters (which all have different APIs), including 
+the L<Bio::DB::Fasta>, L<Bio::DB::HTS::Faidx>, and L<Bio::DB::Sam::Fai> adapters, 
+as well as L<Bio::DB::SeqFeature::Store> and possibly other BioPerl databases. 
+Pass the opened database object, chromosome, start, and stop coordinates. This 
+assumes BioPerl standard 1-base coordinates. Only the forward sequence is 
+retrieved. The sequence is returned as a simple string.
+
 =back
 
 =head1 INTERNAL SUBROUTINES
@@ -749,6 +771,7 @@ our @EXPORT_OK = qw(
 	get_chromosome_list 
 	low_level_bam_coverage
 	low_level_bam_fetch
+	get_genomic_sequence
 );
 
 # The true statement
@@ -854,6 +877,12 @@ sub open_db_connection {
 			$error = " ERROR: remote useq files are not supported!\n";
 		}
 		
+		# a remote fasta file???
+		elsif ($database =~ /\.fa(?:sta)?$/i) {
+			# uh oh! remote fasta files are not supported
+			$error = " ERROR: remote fasta files are not supported!\n";
+		}
+		
 		# a presumed remote directory, presumably of bigwig files
 		else {
 			# open using BigWigSet adaptor
@@ -956,21 +985,31 @@ sub open_db_connection {
 			
 			# a Fasta File
 			elsif ($database =~ /\.fa(?:sta)?$/i) {
-				# open using the Fasta adaptor
-				$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
-					unless $SEQFASTA_OK;
-				if ($SEQFASTA_OK) {
-					$db = open_fasta_db($database);
+				# first try a modern fai indexed adapter
+				_load_bam_helper_module() unless $BAM_OK;
+				if ($BAM_OK) {
+					$db = open_indexed_fasta($database);
 					unless ($db) {
-						$error .= " ERROR: could not open fasta file '$database'!\n";
-						if (-e "$database\.index") {
-							$error .= "   Try deleting $database\.index and try again\n";
-						}
+						$error .= " ERROR: could not open indexed fasta file '$database'!\n";
 					}
 				}
 				else {
-					$error .= " Fasta file could not be loaded because Bio::DB::Fasta" . 
-						" is not installed\n";
+				# open using the old slow BioPerl Fasta adaptor
+					$SEQFASTA_OK = _load_helper_module('Bio::ToolBox::db_helper::seqfasta') 
+						unless $SEQFASTA_OK;
+					if ($SEQFASTA_OK) {
+						$db = open_fasta_db($database);
+						unless ($db) {
+							$error .= " ERROR: could not open fasta file '$database'!\n";
+							if (-e "$database\.index") {
+								$error .= "   Try deleting $database\.index and try again\n";
+							}
+						}
+					}
+					else {
+						$error .= " Fasta file could not be loaded because neither" . 
+							" Bio::DB::HTS, Bio::DB::Sam, or Bio::DB::Fasta is installed\n";
+					}
 				}
 			}
 			
@@ -2016,9 +2055,10 @@ sub get_chromosome_list {
 	# Database specific approaches to collecting chromosomes
 	# I used to have one generic approach, but idiosyncrasies and potential 
 	# bugs make me use different approaches for better consistency
+	my $type = ref($db);
 	
 	# SeqFeature::Store
-	if (ref $db =~ /^Bio::DB::SeqFeature::Store/) {
+	if ($type =~ /^Bio::DB::SeqFeature::Store/) {
 		for my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
@@ -2034,7 +2074,7 @@ sub get_chromosome_list {
 	}
 	
 	# Bigfile
-	elsif (ref $db eq 'Bio::DB::BigWig' or ref $db eq 'Bio::DB::BigBed') {
+	elsif ($type eq 'Bio::DB::BigWig' or $type eq 'Bio::DB::BigBed') {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
@@ -2051,7 +2091,7 @@ sub get_chromosome_list {
 	}
 	
 	# Samtools Bam
-	elsif (ref $db eq 'Bio::DB::Sam' or ref $db eq 'Bio::DB::HTS') {
+	elsif ($type eq 'Bio::DB::Sam' or $type eq 'Bio::DB::HTS') {
 		for my $tid (0 .. $db->n_targets - 1) {
 			# each chromosome is internally represented in the bam file as 
 			# a numeric target identifier
@@ -2070,8 +2110,20 @@ sub get_chromosome_list {
 		}
 	}
 	
-	# Fasta
-	elsif (ref $db eq 'Bio::DB::Fasta') {
+	# Fast through modern HTS fai index
+	elsif ($type eq 'Bio::DB::HTS::Faidx') {
+		for my $chr ($db->get_all_sequence_ids) {
+			# check for excluded
+			next if exists $excluded_chr_lookup{$chr};
+			
+			# get length and store it
+			my $length = $db->length($chr);
+			push @chrom_lengths, [$chr, $length];
+		}
+	}
+	
+	# Fasta through old BioPerl adapter
+	elsif ($type eq 'Bio::DB::Fasta') {
 		for my $chr ($db->get_all_ids) {
 			
 			# check for excluded chromosomes
@@ -2086,13 +2138,13 @@ sub get_chromosome_list {
 		}
 	}
 	
-	# other Bioperl
-	else {
+	# other Bioperl adapter?????
+	elsif ($db->can('seq_ids')) {
 		foreach my $chr ($db->seq_ids) {
-			
+		
 			# check for excluded chromosomes
 			next if (exists $excluded_chr_lookup{$chr} );
-			
+		
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
 			my @segments = $db->segment($chr);
@@ -2102,21 +2154,25 @@ sub get_chromosome_list {
 				$segment = shift @segments;
 				last if $segment->seq_id eq $chr;
 			}
-			
+		
 			# check segment
 			unless ($segment) {
 				carp " No genome segment for seq_id $chr!!?? skipping\n";
 				next;
 			}
-			
+		
 			# get the chromosome length
 			my $length = $segment->length;
-			
+		
 			# store
 			push @chrom_lengths, [ $chr, $length ];
-		}	
+		}
 	}
 	
+	else {
+		carp " Unable to identify chromosomes in database type '$type'. Try using a different database file or adapter\n";
+		return;
+	}
 	
 	# Return
 	unless (@chrom_lengths) {
@@ -2128,6 +2184,7 @@ sub get_chromosome_list {
 
 
 sub low_level_bam_fetch {
+	confess "incorrect number of parameters passed!" unless scalar @_ == 6;
 	my ($sam, $tid, $start, $stop, $callback, $data) = @_;
 	# run the the low level bam fetch based on which adapter is being used
 	unless ($BAM_ADAPTER) {
@@ -2145,6 +2202,7 @@ sub low_level_bam_fetch {
 
 
 sub low_level_bam_coverage {
+	confess "incorrect number of parameters passed!" unless scalar @_ == 4;
 	my ($sam, $tid, $start, $stop) = @_;
 	# run the the low level bam coverage based on which adapter is being used
 	unless ($BAM_ADAPTER) {
@@ -2159,6 +2217,32 @@ sub low_level_bam_coverage {
 		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
 	}
 }
+
+
+sub get_genomic_sequence {
+	confess "incorrect number of parameters passed!" unless scalar @_ == 4;
+	my ($db, $chrom, $start, $stop) = @_;
+	
+	# check database
+	my $type = ref($db);
+	$db = open_db_connection($db) if not $type;
+	
+	# return sequence based on the type of database adapter we're using
+	if ($type eq 'Bio::DB::HTS::Faidx') {
+		return $db->get_sequence_no_length("$chrom:$start-$stop");
+	}
+	elsif ($type eq 'Bio::DB::Sam::Fai') {
+		return $db->fetch("$chrom:$start-$stop");
+	}
+	elsif ($db->can('seq')) {
+		# BioPerl database including Bio::DB::Fasta and Bio::DB::SeqFeature::Store
+		return $db->seq($chrom, $start, $stop);
+	}
+	else {
+		confess "unsupported database $type for collecting genomic sequence!\n";
+	}
+}
+
 
 
 ### Internal subroutine to convert a feature category into a list of classes
@@ -2386,6 +2470,10 @@ sub _load_bam_helper_module {
 	}
 	elsif ($BAM_ADAPTER =~ /hts/i) {
 		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+	}
+	elsif ($BAM_ADAPTER =~ /none/i) {
+		# basically for testing purposes, don't use a module
+		return;
 	}
 	else {
 		# try hts first, then sam

@@ -30,6 +30,7 @@ our $VERSION = '1.50';
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
+	open_indexed_fasta
 	check_bam_index
 	write_new_bam_file
 	collect_bam_scores
@@ -76,6 +77,19 @@ sub open_bam_db {
 	# we specifically do not cache the bam object or chromosome names here
 	
 	return $sam;
+}
+
+
+### Open an indexed fasta file
+sub open_indexed_fasta {
+	my $fasta = shift;
+	if ($fasta =~ /\.gz$/) {
+		die " Bio::DB::Sam::Fai doesn't support compressed fasta files! Please decompress\n";
+	}
+	my $fai;
+	eval {$fai = Bio::DB::Sam::Fai->load($fasta)};
+		# this should automatically build the fai index if possible
+	return $fai if defined $fai;
 }
 
 
@@ -417,10 +431,20 @@ in the parent directory.
 
 It will return the opened database object.
 
+=item open_indexed_fasta()
+
+This will open an indexed fasta file using the L<Bio::DB::Sam::Fai> 
+module. It requires a F<.fa.fai> file to built, and one should be 
+automatically built if it is not present. This provides a very fast 
+interface to fetch genomic sequences, but no other support is 
+provided. Pass the path to an uncompressed genomic fasta file 
+(multiple sequences in one file is supported, but separate chromosome 
+sequence files are not). The fasta index object is returned.
+
 =item check_bam_index()
 
 This subroutine will check whether a bam index file is present and, 
-if not, generate one. The Bio::DB::Sam module uses the samtools 
+if not, generate one. The L<Bio::DB::Sam> module uses the samtools 
 style index extension, F<.bam.bai>, as opposed to the picard style 
 extension, F<.bai>. If a F<.bai> index is present, it will copy the 
 file as F<.bam.bai> index. Unfortunately, a F<.bai> index cannot be 
