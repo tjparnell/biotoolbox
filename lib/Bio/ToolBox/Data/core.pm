@@ -1264,8 +1264,8 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = $self->find_column('^name|geneName|transcriptName|geneid|id|alias');
-	my $type   = $self->find_column('^type|class|primary_tag');
+	my $name   = $self->find_column('^name|gene.?name|transcript.?name|geneid|id|gene|alias');
+	my $type   = $self->find_column('^type|class|primary_tag|biotype');
 	my $id     = $self->find_column('^primary_id');
 	my $chromo = $self->find_column('^chr|seq|ref|ref.?seq');
 	my $start  = $self->find_column('^start|position|pos|txStart');
