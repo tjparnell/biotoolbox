@@ -74,3 +74,5 @@ t/Data/sample3/metadata.txt
 t/Data/sample3/sample3_f.bw
 t/Data/sample3/sample3_r.bw
 t/Data/sample3.useq
+t/Data/sequence.fa
+

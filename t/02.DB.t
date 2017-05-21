@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 61;
+		plan tests => 63;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -265,6 +265,25 @@ is(sprintf("%.2f", $score), 0.49, 'mean score across second bed feature with alt
 
 
 
+# Test for sequence retrieval using Bio::DB::Fasta
+# reusing the Data object immediately above
+$Data->bam_adapter('none'); # to ensure we use BioPerl's Bio::DB::Fasta
+my $fasta = File::Spec->catfile($Bin, "Data", "sequence.fa");
+print "opening $fasta...\n";
+my $fdb = Bio::ToolBox::Data->open_database($fasta);
+isa_ok($fdb, 'Bio::DB::Fasta', 'BioPerl fasta adapter database');
+# reuse row object from above, but we will specify our own coordinates since our 
+# fasta file is too small and doesn't cover the bed coordinates
+my $sequence = $row->get_sequence(
+	db      => $fdb,
+	seq_id  => 'chrI',
+	start   => 257,
+	end     => 275,
+	strand  => 1,
+);
+is($sequence, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence');
+undef $fdb;
+unlink "$fasta.index";
 
 
 sub print_hash {
