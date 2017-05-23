@@ -1314,8 +1314,13 @@ sub process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
-				for my $i (0 .. $#norms) {
-					$norms[$i] *= $scale_values[$i];
+				if (@norms) {
+					for my $i (0 .. $#norms) {
+						$norms[$i] *= $scale_values[$i];
+					}
+				}
+				else {
+					@norms = @scale_values;
 				}
 			}
 			
@@ -1461,8 +1466,13 @@ sub parallel_process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
-				for my $i (0 .. $#norms) {
-					$norms[$i] *= $scale_values[$i];
+				if (@norms) {
+					for my $i (0 .. $#norms) {
+						$norms[$i] *= $scale_values[$i];
+					}
+				}
+				else {
+					@norms = @scale_values;
 				}
 			}
 			
