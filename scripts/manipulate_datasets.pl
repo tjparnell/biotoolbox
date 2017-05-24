@@ -680,22 +680,10 @@ sub coordinate_function {
 	my $new_position = $Data->add_column('Coordinate');
 	
 	# generate coordinates
-	if (defined $stop_i) {
-		# we have a stop coordinate to use
-		$Data->iterate( sub {
-			my $row = shift;
-			my $coord = join("", $row->seq_id, ':', $row->start, '-', $row->end);
-			$row->value($new_position, $coord);
-		} );
-	}
-	else {
-		# we don't have a stop coordinate to use
-		$Data->iterate( sub {
-			my $row = shift;
-			my $coord = join(':', $row->seq_id, $row->start);
-			$row->value($new_position, $coord);
-		} );
-	}
+	$Data->iterate( sub {
+		my $row = shift;
+		$row->value($new_position, $row->coordinate);
+	} );
 	
 	print " Coordinate string generated as new column $new_position\n";
 	return 1;

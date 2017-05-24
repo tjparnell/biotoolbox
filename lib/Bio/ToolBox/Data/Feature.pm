@@ -124,6 +124,10 @@ or unstranded.
 
 The name of the feature.
 
+=item coordinate
+
+Returns a coordinate string formatted as "seqid:start-stop".
+
 =item type
 
 The type of feature. Typically either primary_tag or primary_tag:source_tag. 
@@ -289,6 +293,33 @@ include
 =item type  The type of database features to retrieve.
 
 =item db    An alternate database object to collect from.
+
+=back
+
+=item get_sequence(%args)
+
+Fetches genomic sequence based on the coordinates of the current seqfeature 
+or interval in the current Feature. This requires a database that 
+contains the genomic sequence, either the database specified in the 
+Data table metadata or an external indexed genomic fasta file. The 
+sequence is returned as simple string. If the feature is on the reverse 
+strand, then the reverse complement sequence is automatically returned. 
+Pass an array of key value pairs to specify alternate coordinates if so 
+desired. Potential keys include
+
+=over 4
+
+=item seq_id
+
+=item start
+
+=item end
+
+=item strand
+
+=item extend  Indicate additional basepairs of sequence added to both sides
+
+=item db  The fasta file or database from which to fetch the sequence
 
 =back
 
@@ -753,7 +784,12 @@ attribute key.
 use strict;
 use Carp qw(carp cluck croak confess);
 use Module::Load;
-use Bio::ToolBox::db_helper qw(get_db_feature get_segment_score calculate_score);
+use Bio::ToolBox::db_helper qw(
+	get_db_feature 
+	get_segment_score
+	calculate_score
+	get_genomic_sequence
+);
 
 my $GENETOOL_LOADED = 0;
 1;
@@ -907,6 +943,15 @@ sub display_name {
 		return $att->{Name} || $att->{ID} || $att->{transcript_name};
 	}
 	return undef;
+}
+
+sub coordinate {
+	my $self = shift;
+	carp "name is a read only method" if @_;
+	my $coord = sprintf("%s:%d", $self->seq_id, $self->start);
+	my $end = $self->end;
+	$coord .= "-$end" if $end;
+	return CORE::length($coord) > 2 ? $coord : undef;
 }
 
 sub type {
@@ -1119,7 +1164,7 @@ sub seqfeature {
 	my $type = $self->type || $self->{data}->feature;
 	return unless ($id or ($name and $type));
 	$f = get_db_feature(
-		'db'    => $self->{data}->open_database,
+		'db'    => $self->{data}->open_meta_database,
 		'id'    => $id,
 		'name'  => $name, # we can handle "name; alias" lists later
 		'type'  => $type,
@@ -1136,7 +1181,7 @@ sub segment {
 		my $chromo = $self->seq_id;
 		my $start  = $self->start;
 		my $stop   = $self->end || $start;
-		my $db = $self->{data}->open_database;
+		my $db = $self->{data}->open_meta_database;
 		return $db ? $db->segment($chromo, $start, $stop) : undef;
 	}
 	elsif ($self->feature_type eq 'named') {
@@ -1151,7 +1196,7 @@ sub segment {
 sub get_features {
 	my $self = shift;
 	my %args = @_;
-	my $db = $args{db} || $self->{data}->open_database || undef;
+	my $db = $args{db} || $self->{data}->open_meta_database || undef;
 	carp "no database defined to get features!" unless defined $db;
 	return unless $db->can('features');
 	
@@ -1165,12 +1210,37 @@ sub get_features {
 	return $db->features(%opts);
 }
 
+sub get_sequence {
+	my $self = shift;
+	my %args = @_;
+	my $db = $args{db} || $args{database} || $self->{data}->open_meta_database || undef;
+	my $seqid = $args{seq_id} || $args{chromo} || $self->seq_id;
+	my $start = $args{start} || $self->start;
+	my $stop  = $args{stop} || $args{end} || $self->end;
+	my $strand = $self->strand;
+	if (exists $args{strand}) {
+		# user supplied strand, gotta check it
+		$strand = $args{strand} =~ /\-|r/i ? -1 : 1;
+	}
+	if (exists $args{extend} and $args{extend}) {
+		$start -= $args{extend};
+		$start = 1 if $start <= 0;
+		$stop += $args{extend};
+	}
+	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
+	if ($strand == -1) {
+		$seq =~ tr/gatcGATC/ctagCTAG/;
+		$seq = reverse $seq;
+	}
+	return $seq;
+}
+
 sub get_score {
 	my $self = shift;
 	my %args = @_;
 	
 	# verify the dataset for the user, cannot trust whether it has been done or not
-	my $db = $args{ddb} || $args{db} || $self->{data}->open_database || undef;
+	my $db = $args{ddb} || $args{db} || $self->{data}->open_meta_database || undef;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $db);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!";
@@ -1288,7 +1358,7 @@ sub get_relative_point_position_scores {
 	my %args = @_;
 	
 	# get the database and verify the dataset
-	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
@@ -1303,7 +1373,7 @@ sub get_relative_point_position_scores {
 	unless ($args{extend}) {
 		croak "must provide an extend value!";
 	}
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# Assign coordinates
 	$self->_calculate_reference(\%args) unless defined $args{coordinate};
@@ -1348,7 +1418,7 @@ sub get_region_position_scores {
 	my %args = @_;
 	
 	# get the database and verify the dataset
-	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_database;
+	my $ddb = $args{ddb} || $args{db} || $self->{data}->open_meta_database;
 	$args{dataset} = $self->{data}->verify_dataset($args{dataset}, $ddb);
 	unless ($args{dataset}) {
 		croak "provided dataset was unrecognized format or otherwise could not be verified!\n";
@@ -1360,7 +1430,7 @@ sub get_region_position_scores {
 	$args{exon}         ||= 0;
 	$args{position}     ||= 5;
 	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
-	$args{avoid} = undef unless ($args{db} or $self->{data}->open_database);
+	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
 	if ($self->feature_type eq 'named' and $args{'exon'}) {
@@ -1566,7 +1636,7 @@ sub _avoid_positions {
 	}
 	
 	### Check for conflicting features
-	my $db = $args->{db} || $self->{data}->open_database;
+	my $db = $args->{db} || $self->{data}->open_meta_database;
 	my @overlap_features = $self->get_features(
 		seq_id  => $seqid,
 		start   => $start,

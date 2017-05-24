@@ -30,6 +30,7 @@ our $VERSION = '1.50';
 our @ISA = qw(Exporter);
 our @EXPORT = qw(
 	open_bam_db
+	open_indexed_fasta
 	check_bam_index
 	write_new_bam_file
 	collect_bam_scores
@@ -82,12 +83,21 @@ sub open_bam_db {
 }
 
 
+### Open an indexed fasta file
+sub open_indexed_fasta {
+	my $fasta = shift;
+	eval {require Bio::DB::HTS::Faidx}; # this should be available
+	my $fai = Bio::DB::HTS::Faidx->new($fasta);
+# 	eval {$fai};
+		# this should automatically build the fai index if possible
+	return $fai if defined $fai;
+}
+
+
 ### Check for a bam index 
 sub check_bam_index {
 	# HTSlib can accept either .bam.bai or .bai, but the Perl adapter 
 	# still accepts just .bam.bai, I think....
-	# I find that relying on -autoindex yields a flaky Bio::DB::Sam object that 
-	# doesn't always work as expected. Best to create the index BEFORE opening
 	my $bamfile = shift;
 	
 	# we will check the modification time to make sure index is newer
@@ -418,6 +428,16 @@ automatically indexed upon opening if the user has write permissions
 in the parent directory. 
 
 It will return the opened database object.
+
+=item open_indexed_fasta()
+
+This will open an indexed fasta file using the L<Bio::DB::HTS::Faidx> 
+module. It requires a F<.fai> file to built, and one should be 
+automatically built if it is not present. This provides a very fast 
+interface to fetch genomic sequences, but no other support is 
+provided. Pass the path to an uncompressed genomic fasta file 
+(multiple sequences in one file is supported, but separate chromosome 
+sequence files are not). The fasta index object is returned.
 
 =item check_bam_index()
 

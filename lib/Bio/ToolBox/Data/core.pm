@@ -740,6 +740,25 @@ sub _column_is_stranded {
 
 sub open_database {
 	my $self = shift;
+	if (not defined $_[0]) {
+		return $self->open_meta_database;
+	}
+	elsif ($_[0] eq '0' or $_[0] eq '1') {
+		# likely a boolean value to indicate force
+		return $self->open_meta_database($_[0]);
+	}
+	elsif ($_[0] =~ /[a-zA-Z]+/) {
+		# likely the name of a database
+		return $self->open_new_database(@_);
+	}
+	else {
+		# original default
+		return $self->open_meta_database(@_);
+	}
+}
+
+sub open_meta_database {
+	my $self = shift;
 	my $force = shift || 0;
 	return unless $self->{db};
 	return if $self->{db} =~ /^Parsed:/; # we don't open parsed annotation files
@@ -750,6 +769,13 @@ sub open_database {
 	return unless $db;
 	$self->{db_connection} = $db;
 	return $db;
+}
+
+sub open_new_database {
+	my $self = shift;
+	my $database = shift;
+	my $force = shift || 0;
+	return open_db_connection($database, $force);
 }
 
 sub verify_dataset {
@@ -764,7 +790,7 @@ sub verify_dataset {
 			$self->{verfied_dataset}{$dataset} = $dataset;
 			return $dataset;
 		}
-		$database ||= $self->open_database;
+		$database ||= $self->open_meta_database;
 		my ($verified) = verify_or_request_feature_types(
 			# normally returns an array of verified features, we're only checking one
 			db      => $database,
@@ -1238,8 +1264,8 @@ sub _find_column_indices {
 	# these do not include parentheses for grouping
 	# non-capturing parentheses will be added later in the sub for proper 
 	# anchoring and grouping - long story why, don't ask
-	my $name   = $self->find_column('^name|geneName|transcriptName|geneid|id|alias');
-	my $type   = $self->find_column('^type|class|primary_tag');
+	my $name   = $self->find_column('^name|gene.?name|transcript.?name|geneid|id|gene|alias');
+	my $type   = $self->find_column('^type|class|primary_tag|biotype');
 	my $id     = $self->find_column('^primary_id');
 	my $chromo = $self->find_column('^chr|seq|ref|ref.?seq');
 	my $start  = $self->find_column('^start|position|pos|txStart');
@@ -1353,10 +1379,22 @@ columns), and special file format structure.
 
 =item open_database
 
+This is wrapper method that tries to do the right thing and passes 
+on to either open_meta_database() or open_new_database() methods. 
+Basically a legacy method for open_meta_database().
+
+=item open_meta_database
+
 Open the database that is listed in the metadata. Returns the 
 database connection. Pass a true value to force a new database 
 connection to be opened, rather than returning a cached connection 
 object (useful when forking).
+
+=item open_new_database($database)
+
+Convenience method for opening a second or new database that is 
+not specified in the metadata, useful for data collection. This 
+is a shortcut to Bio::ToolBox::db_helper::open_db_connection().
 
 =item verify_dataset($dataset)
 

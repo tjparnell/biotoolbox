@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::Sam; 1}) {
-		plan tests => 38;
+		plan tests => 40;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::Sam not available';
@@ -20,10 +20,12 @@ BEGIN {
 
 require_ok 'Bio::ToolBox::Data' or 
 	BAIL_OUT "Cannot load Bio::ToolBox::Data";
-use_ok( 'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support', 'get_chromosome_list' );
+use_ok( 'Bio::ToolBox::db_helper', 'check_dataset_for_rpm_support', 'get_chromosome_list',
+		'get_genomic_sequence' );
 
 
 my $dataset = File::Spec->catfile($Bin, "Data", "sample1.bam");
+my $fasta = File::Spec->catfile($Bin, "Data", 'sequence.fa');
 
 ### Open a test file
 my $infile = File::Spec->catfile($Bin, "Data", "sample.bed");
@@ -46,6 +48,14 @@ is($chromos[0][1], 230208, 'length of first chromosome');
 # check total mapped alignments
 my $total = check_dataset_for_rpm_support($dataset);
 is($total, 1414, "number of mapped alignments in bam");
+
+# check fasta
+my $fdb = $Data->open_new_database($fasta);
+isa_ok($fdb, 'Bio::DB::Sam::Fai', 'Sam Fai fasta database');
+my $seq = get_genomic_sequence($fdb, 'chrI', 257, 275);
+is($seq, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence');
+unlink "$fasta.fai";
+
 
 ### Initialize row stream
 my $stream = $Data->row_stream;
