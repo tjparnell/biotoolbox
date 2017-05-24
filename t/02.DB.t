@@ -261,7 +261,7 @@ $score = $row->get_score(
 	dataset => 'data',
 	'method'  => 'median',
 );
-is(sprintf("%.2f", $score), 0.49, 'mean score across second bed feature with alt chromo');
+is(sprintf("%.1f", $score), 0.5, 'median score across second bed feature with alt chromo');
 
 
 
