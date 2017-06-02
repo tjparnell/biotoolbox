@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.41';
+our $VERSION = '1.45';
 
 =head1 NAME
 
@@ -198,8 +198,7 @@ sub parse_headers {
 	# first data row which contains the column names
 	$self->program(undef); # reset this to blank, it will be filled by file metadata
 	my $header_line_count = 0;
-	while ($self->number_columns == 0) {		
-		my $line = $fh->getline;
+	while (my $line = $fh->getline) {		
 		# we are not chomping the line here because of possible side effects
 		# with UCSC tables where we have to count elements in the first line
 		# and potential header lines, and the first line has a null value at 
@@ -347,8 +346,19 @@ sub parse_headers {
 				$header_line_count++;
 			}
 		}
-		
+		last if $self->number_columns != 0;
 	}
+	
+	# if we didn't find columns, check that it wasn't actually commented
+	# for example, an empty vcf file
+	if ($self->number_columns == 0 and 
+		scalar(@{ $self->{comments} }) and 
+		$self->{comments}->[-1] =~ /\t/
+	) {
+		# process the real header line
+		$self->add_standard_metadata( pop @{ $self->{'comments'} } );
+	}
+		
 	
 	# No header was requested
 	if ($noheader and not $self->bed and not $self->gff and 

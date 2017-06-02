@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 60;
+		plan tests => 63;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -128,24 +128,31 @@ is(sprintf("%.2f", $score), '0.30', 'mean score across 5 prime feature');
 $score = $row->get_score(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	'method'  => 'sum',
-	value   => 'count',
+	'method' => 'count',
 );
 # print "median score is $score\n";
-is($score, 60, 'sum count across feature');
+is($score, 60, 'count across feature');
 
-# collect mean length score
+# collect pcount score
 $score = $row->get_score(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	'method'  => 'mean',
-	value   => 'length',
+	'method' => 'pcount',
 );
-# print "median score is $score\n";
-is($score, 1, 'mean length of scores across feature');
+# print "pcount score is $score\n";
+is($score, 60, 'pcount across feature');
+
+# collect ncount score
+$score = $row->get_score(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method' => 'ncount',
+);
+# print "ncount score is $score\n";
+is($score, 60, 'ncount across feature');
 
 # collect position scores
-my %score1 = $row->get_position_scores(
+my %score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 );
@@ -153,6 +160,16 @@ my %score1 = $row->get_position_scores(
 is(min(keys %score1), 58, 'min position in positioned score hash');
 is(max(keys %score1), 2342, 'max position in positioned score hash');
 is($score1{686}, 0.26, 'score at position 686 in positioned score hash');
+
+%score1 = $row->get_region_position_scores(
+	ddb     => $ddb,
+	dataset => 'data:sample2',
+	'method' => 'ncount',
+);
+# print "position_score ncount is \n" . print_hash(\%score1);
+is(min(keys %score1), 58, 'min position in positioned ncount hash');
+is(max(keys %score1), 2342, 'max position in positioned ncount hash');
+is($score1{686}, 1, 'score at position 686 in positioned ncount hash');
 
 
 
@@ -162,24 +179,21 @@ isa_ok($row, 'Bio::ToolBox::Data::Feature', 'row Feature');
 is($row->name, 'YAL044C', 'Feature name');
 
 # collect 5' relative position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 5,
 );
-# print "5' position_score is \n" . print_hash(\%score1);
 is(min(keys %score1), -467, 'min 5prime relative position in positioned score hash');
 is(max(keys %score1), 467, 'max 5prime relative position in positioned score hash');
 is($score1{218}, 0.62, 'score at position 218 in 5prime relative positioned score hash');
 
 # collect 3' relative position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 3,
 );
 # print "3' position_score is \n" . print_hash(\%score1);
@@ -187,22 +201,8 @@ is(min(keys %score1), -430, 'min 3prime relative position in positioned score ha
 is(max(keys %score1), 481, 'max 3prime relative position in positioned score hash');
 is($score1{187}, 0.75, 'score at position 187 in 3prime relative positioned score hash');
 
-# collect absolute position scores
-%score1 = $row->get_position_scores(
-	ddb     => $ddb,
-	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
-	position => 5,
-	absolute => 1,
-);
-# print "position_score is \n" . print_hash(\%score1);
-is(min(keys %score1), 57995, 'absolute min position in positioned score hash');
-is(max(keys %score1), 58929, 'absolute max position in positioned score hash');
-is($score1{58212}, 0.52, 'score at absolute position 58212 in positioned score hash');
-
-# collect extended relative position scores
-%score1 = $row->get_position_scores(
+# collect region extended relative position scores
+%score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 	extend  => 500,
@@ -214,8 +214,8 @@ is(max(keys %score1), 58929, 'max extended relative position in positioned score
 is($score1{58532}, 0.34, 'score at position 58532 in extended relative positioned score hash');
 is(scalar(keys %score1), 39, 'number of keys extended relative positioned score hash');
 
-# collect extended relative position scores
-%score1 = $row->get_position_scores(
+# collect avoided extended relative position scores
+%score1 = $row->get_region_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
 	extend  => 1000,
@@ -229,13 +229,12 @@ is($score1{58532}, 0.34, 'score at position 58532 in avoided extended relative p
 is(scalar(keys %score1), 26, 'number of keys avoided extended relative positioned score hash');
 
 # collect absolute position scores
-%score1 = $row->get_position_scores(
+%score1 = $row->get_relative_point_position_scores(
 	ddb     => $ddb,
 	dataset => 'data:sample2',
-	start   => -500,
-	stop    => 500,
+	extend  => 500,
 	position => 4,
-	value   => 'count',
+	'method' => 'count',
 );
 # print "position_score is \n" . print_hash(\%score1);
 is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
@@ -262,10 +261,29 @@ $score = $row->get_score(
 	dataset => 'data',
 	'method'  => 'median',
 );
-is(sprintf("%.2f", $score), 0.49, 'mean score across second bed feature with alt chromo');
+is(sprintf("%.1f", $score), 0.5, 'median score across second bed feature with alt chromo');
 
 
 
+# Test for sequence retrieval using Bio::DB::Fasta
+# reusing the Data object immediately above
+$Data->bam_adapter('none'); # to ensure we use BioPerl's Bio::DB::Fasta
+my $fasta = File::Spec->catfile($Bin, "Data", "sequence.fa");
+print "opening $fasta...\n";
+my $fdb = Bio::ToolBox::Data->open_database($fasta);
+isa_ok($fdb, 'Bio::DB::Fasta', 'BioPerl fasta adapter database');
+# reuse row object from above, but we will specify our own coordinates since our 
+# fasta file is too small and doesn't cover the bed coordinates
+my $sequence = $row->get_sequence(
+	db      => $fdb,
+	seq_id  => 'chrI',
+	start   => 257,
+	end     => 275,
+	strand  => 1,
+);
+is($sequence, 'ACCCTACCATTACCCTACC', 'fetched fasta sequence');
+undef $fdb;
+unlink "$fasta.index";
 
 
 sub print_hash {

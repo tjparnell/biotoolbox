@@ -41,9 +41,22 @@ Installation is simple with the standard Perl incantation.
 Released version may be obtained though the CPAN repository using 
 your favorite package manager. For a quick installation, 
 the following command will get you started using the system perl and 
-your personal PERL5 library.
+your personal home PERL5 library.
 
 	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::ToolBox
+
+
+
+ADDITIONAL MODULES
+
+To make the installation as lean and simple as possible, only the minimal 
+additional Perl modules are required, while the remainder are only 
+recommended. These can be installed subsequently as necessary as the need 
+arises. Most of the database adapters, including those for Bam, BigWig, 
+and BigBed, require external library dependencies that must be compiled 
+separately. See the respective modules for installation instructions.
+
+Most scripts should fail gently with warnings about missing modules.
 
 
 

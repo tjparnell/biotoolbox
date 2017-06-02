@@ -5,18 +5,15 @@
 use strict;
 use Getopt::Long;
 use Pod::Usage;
-use Bio::Seq;
-use Bio::SeqIO;
-use Bio::ToolBox::db_helper qw(open_db_connection);
-use Bio::ToolBox::Data::Stream;
-my $BAM_OK;
-eval { 
-	# we want access to Bio::DB::Sam::Fai
-	require Bio::DB::Sam;
-	$BAM_OK = 1;
+use Bio::ToolBox::Data;
+my $bio;
+eval {
+	require Bio::Seq;
+	require Bio::SeqIO;
+	$bio = 1;
 };
 
-my $VERSION =  '1.34';
+my $VERSION =  '1.50';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -44,7 +41,6 @@ my (
 	$start_i,
 	$stop_i,
 	$strand_i,
-	$interbase,
 	$extend,
 	$concatenate,
 	$pad,
@@ -84,13 +80,27 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script data2fasta.pl, version $VERSION\n\n";
+	print " Biotoolbox script data2fasta.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
 
 
 ### Check for requirements
+unless ($bio) {
+	print <<END;
+ This program requires Bio::Seq to ensure properly formatted fasta files.
+ Please install the Bio::Perl package. You will need this to also obtain
+ fasta indexing and retrieval modules, including Bio::DB::HTS, Bio::DB::Sam, 
+ or Bio::DB::Fasta.
+END
+	exit;
+}
 unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
@@ -103,7 +113,7 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or 
+my $Input = Bio::ToolBox::Data->new(in => $infile, stream => 1) or 
 	die "unable to open input file!\n";
 unless ($database) {
 	$database = $Input->database;
@@ -136,23 +146,20 @@ elsif ($Input->feature_type eq 'named') {
 	$coords = 1;
 	$do_feature = 1;
 }
-if (defined $start_i and substr($Input->name($start_i), -1) eq '0') {
-	# name suggests $interbase
-	$interbase = 1;
-}
-printf " Found ID column %s\n", defined $id_i ? $id_i : '-';
-printf " Found Sequence column %s\n", defined $seq_i ? $seq_i : '-';
-printf " Found Description column %s\n", defined $desc_i ? $desc_i : '-';
 
 
 ### Determine mode ###
 if (defined $id_i and defined $seq_i and $concatenate) {
 	# sequence is already in the source file
+	printf " Found Sequence column %s\n", defined $seq_i ? $seq_i : '-';
+	printf " Found Description column %s\n", defined $desc_i ? $desc_i : '-';
 	print " writing a single concatenated fasta with the provided sequence\n";
 	write_direct_single_fasta();
 }
 elsif (defined $id_i and defined $seq_i) {
 	# sequence is already in the source file
+	printf " Found Sequence column %s\n", defined $seq_i ? $seq_i : '-';
+	printf " Found Description column %s\n", defined $desc_i ? $desc_i : '-';
 	print " writing a multi-fasta with the provided sequence\n";
 	write_direct_multi_fasta();
 }
@@ -220,34 +227,46 @@ sub fetch_seq_and_write_single_fasta {
 	# fetch sequence from database and write concatenated fasta file
 	
 	# Open fasta database
-	unless ($database) {
-		die " Must provide a database or genomic fasta file(s)!\n";
+	my $db;
+	if ($database) {
+		$db = $Input->open_new_database($database);
+		unless ($db) {
+			die " Could not open database '$database' to use!\n";
+		}
 	}
-	my $db = open_sequence_db() or 
-		die " Unable to open database '$database'!\n";
+	elsif ($Input->database) {
+		# cool, database defined in metadata, we'll use that
+		# hope it works....
+	}
+	else {
+		die " A sequence or fasta database must be provided to collect sequence!\n";
+	}
 	
 	# collect concatenated sequences and write
 	my $concat_seq;
 	while (my $row = $Input->next_row) {
 		
-		# collect sequence
-		my ($sequence, $seq_id, $start, $stop) = fetch_sequence($row, $db);
+		# make sure we parse and/or fetch the seqfeature if need be
+		# this isn't necessarily automatic....
+		my $f = $row->seqfeature if $do_feature;
+		
+		# collect provided arguments for generating sequence
+		my @args;
+		push @args, ('db', $db) if $db;
+		push @args, ('start', $row->value($start_i)) if defined $start_i;
+		push @args, ('stop', $row->value($stop_i)) if defined $stop_i;
+		push @args, ('seq_id', $row->value($chr_i)) if defined $chr_i;
+		push @args, ('strand', $row->value($strand_i)) if defined $strand_i;
+		push @args, ('extend', $extend) if $extend;
+		
+		# collect sequence using provided arguments as necessary
+		my $sequence = $row->get_sequence(@args);
 		unless ($sequence) {
-			printf "no sequence for $seq_id:$start..$stop! skipping\n";
+			printf "no sequence for line %d, %s", $row->line_number, 
+				$row->name || $row->coordinate;
 			next;
 		}
 	
-		# reverse if necessary
-		if ($row->strand < 0) {
-			# we will create a quick Bio::Seq object to do the reverse complementation
-			my $seq = Bio::Seq->new(
-				-id     => 'temp',
-				-seq    => $sequence,
-			);
-			my $rev = $seq->revcom;
-			$sequence = $rev->seq;
-		}
-		
 		# concatenate the sequence
 		$concat_seq .= $sequence;
 		$concat_seq .= 'N' x $pad if $pad;
@@ -271,11 +290,20 @@ sub fetch_seq_and_write_multi_fasta {
 	# fetch sequence from database and write multi-fasta file
 	
 	# Open fasta database
-	unless ($database) {
-		die " Must provide a database or genomic fasta file(s)!\n";
+	my $db;
+	if ($database) {
+		$db = $Input->open_new_database($database);
+		unless ($db) {
+			die " Could not open database '$database' to use!\n";
+		}
 	}
-	my $db = open_sequence_db() or 
-		die " Unable to open database '$database'!\n";
+	elsif ($Input->database) {
+		# cool, database defined in metadata, we'll use that
+		# hope it works....
+	}
+	else {
+		die " A sequence or fasta database must be provided to collect sequence!\n";
+	}
 	
 	# open output file
 	my $seq_io = open_output_fasta();
@@ -283,49 +311,39 @@ sub fetch_seq_and_write_multi_fasta {
 	# collect sequences and write
 	while (my $row = $Input->next_row) {
 		
-		# collect sequence
-		my ($sequence, $seq_id, $start, $stop) = fetch_sequence($row, $db);
+		# make sure we parse and/or fetch the seqfeature if need be
+		# this isn't necessarily automatic....
+		my $f = $row->seqfeature if $do_feature;
+		
+		# collect provided arguments for generating sequence
+		my @args;
+		push @args, ('db', $db) if $db;
+		push @args, ('start', $row->value($start_i)) if defined $start_i;
+		push @args, ('stop', $row->value($stop_i)) if defined $stop_i;
+		push @args, ('seq_id', $row->value($chr_i)) if defined $chr_i;
+		push @args, ('strand', $row->value($strand_i)) if defined $strand_i;
+		push @args, ('extend', $extend) if $extend;
+		
+		# collect sequence based on values obtained above
+		my $sequence = $row->get_sequence(@args);
 		unless ($sequence) {
-			print "no sequence for $seq_id:$start..$stop! skipping\n";
+			printf "no sequence for line %d, %s", $row->line_number, 
+				$row->name || $row->coordinate;
 			next;
 		}
 	
 		# create seq object
 		my $seq = Bio::Seq->new(
-			-id     => $row->name || "$seq_id:$start..$stop",
+			-id     => $row->name || $row->coordinate,
 			-seq    => $sequence,
 		);
 		if (defined $desc_i) {
 			$seq->desc( $row->value($desc_i) );
 		}
 		
-		# reverse if necessary
-		if ($row->strand < 0) {
-			$seq = $seq->revcom();
-		}
-		
 		# write out
 		$seq_io->write_seq($seq);
 	}
-}
-
-
-sub fetch_sequence {
-	my ($row, $db) = @_;
-	
-	my $f = $row->feature if $do_feature;
-	my $seq_id = defined $chr_i ? $row->value($chr_i) : $row->seq_id;
-	my $start  = defined $start_i ? $row->value($start_i) : $row->start;
-	my $stop   = defined $stop_i ? $row->value($stop_i) : $row->stop;
-	$start += 1 if $interbase;
-	if ($extend) {
-		$start -= $extend;
-		$start = 1 if $start < 0;
-		$stop += $extend;
-	}
-
-	# collect sequence
-	return ($db->seq($seq_id, $start, $stop), $seq_id, $start, $stop);
 }
 
 
@@ -343,7 +361,7 @@ sub open_output_fasta {
 	}
 	
 	# open for writing
-	my $out_fh = Bio::ToolBox::Data::Stream->open_to_write_fh($outfile, $gz) or 
+	my $out_fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
 		die "unable to open '$outfile' for writing!\n";
 	
 	# open SeqIO object
@@ -354,18 +372,6 @@ sub open_output_fasta {
 	return $seq_io;
 }
 
-
-sub open_sequence_db {
-	my $db;
-	if ($database =~ /\.fa(?:sta)?$/i and $BAM_OK) {
-		# this is a limited but very fast sequence accessor
-		$db = Bio::DB::Sam::Fai->open($database);
-	}
-	else {
-		$db = open_db_connection($database);
-	}
-	return $db;
-}
 
 __END__
 
@@ -381,7 +387,7 @@ data2fasta.pl [--options...] <filename>
   
   Options:
   --in <filename>
-  --db <name|file|directory>
+  --db <name|fasta>
   --id <index>
   --seq <index>
   --desc <index>
@@ -390,7 +396,6 @@ data2fasta.pl [--options...] <filename>
   --stop <index>
   --strand <index>
   --extend <integer>
-  --zero
   --cat
   --pad <integer>
   --out <filename> 
@@ -411,15 +416,17 @@ with columns representing the sequence id or name, sequence, description,
 chromosome, start, stop, and/or strand information. The file may be 
 compressed with gzip.
 
-=item --db <name|file|directory>
+=item --db <name|fasta>
 
 Provide the name of an uncompressed Fasta file (multi-fasta is ok) or 
 directory containing multiple fasta files representing the genomic 
-sequence. The directory must be writeable for a small index file to be 
-written. If Bam support is available, the fasta file can be 
-indexed with samtools, allowing for a faster fasta experience. 
-Alternatively, the name of a Bio::DB::SeqFeature::Store 
-annotation database that contains genomic sequence may be provided. 
+sequence. If Bam file support is available, then the fasta will be 
+indexed and searched with a fasta index .fai file. If not, then the 
+fasta can by indexed by the older L<Bio::DB::Fasta> adapter, which 
+also supports a directory of multiple fasta files. If the index is 
+not present, then the parent directory must be writeable.
+Alternatively, the name of a L<Bio::DB::SeqFeature::Store> 
+annotation database that contains genomic sequence may also be provided. 
 The database name may be obtained from the input file metadata. 
 Required only if collecting sequence from genomic coordinates.
 
@@ -465,11 +472,6 @@ and stop positions. This will then include the given number of base
 pairs of flanking sequence from the database. This only applies when 
 sequence is obtained from the database.
 
-=item --zero
-
-Input file is in interbase or 0-based coordinates. This should be 
-automatically detected for most known file formats, e.g. BED.
-
 =item --cat
 
 Optionally indicate that all of the sequences should be concatenated 
@@ -513,8 +515,10 @@ the file, it will generate the fasta file directly from the file content.
 
 Alternatively, if only genomic position information (chromosome, start, 
 stop, and optionally strand) is present in the file, then the sequence will 
-be retrieved from a database, either a Bio::DB::SeqFeature::Store database, 
-a genomic sequence multi-fasta, or a directory of multiple fasta files. 
+be retrieved from a database. Multiple database adapters are supported for 
+indexing genomic fastas, including the L<Bio::DB::HTS> package, the 
+L<Bio::DB::Sam> package, or the BioPerl L<Bio::DB::Fasta> adapter. Annotation 
+databases such as L<Bio::DB::SeqFeature::Store> are also supported.  
 If strand information is provided, then the sequence reverse complement 
 is returned for reverse strand coordinates.
 

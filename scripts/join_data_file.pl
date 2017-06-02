@@ -51,7 +51,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script join_data_file.pl, version $VERSION\n\n";
+	print " Biotoolbox script join_data_file.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 

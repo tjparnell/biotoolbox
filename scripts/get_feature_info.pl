@@ -7,7 +7,6 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
-	get_feature
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
@@ -66,7 +65,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script get_feature_info.pl, version $VERSION\n\n";
+	print " Biotoolbox script get_feature_info.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 

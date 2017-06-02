@@ -47,14 +47,15 @@ sub get_base_options {
 			'Module::Load'            => 0,
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
-			'Bio::Root::Version'      => '1.0069022',
+			'List::Util'              => 0,
 		},
 		recommends        => {
 			'DBD::SQLite'             => 0,
 			'File::Which'             => 0,
-			'Statistics::LineFit'     => 0.06,
 			'Net::FTP'                => 0,
+			'Bio::Root::Version'      => '1.0069023',
 			'Parallel::ForkManager'   => 1.02,
+			'Set::IntervalTree'       => 0.10,
 		},
 		script_files => [
 			'scripts/bam2wig.pl',
@@ -86,25 +87,33 @@ sub get_base_options {
 sub check_useq {
 	if ($] >= 5.010000) {
 		# Bio::DB::USeq requires perl 5.10
-		$options->{'requires'}{'Bio::DB::USeq'} = 0.20;
+		$options->{'recommends'}{'Bio::DB::USeq'} = 0.23;
 	}
 }
 
 
 sub check_sam {
-	
 	# check to see if it is installed
-	my $sam_ok;
+	# request a minimum version if it is, otherwise recommend
+	# we're going to prefer the new modern HTS library, but old sam one is ok
+	my ($sam_ok, $hts_ok);
 	eval {require Bio::DB::Sam; $sam_ok = 1;};
-	if ($sam_ok) {
-		# Bam support is currently installed
-		# request a minimum version
-		# if they don't meet this minimum, let's hope the user
-		# knows how to rectify it.....
+	eval {require Bio::DB::HTS; $hts_ok = 1;};
+	if ($sam_ok and $hts_ok) {
 		$options->{'requires'}{'Bio::DB::Sam'} = 1.36;
+		$options->{'requires'}{'Bio::DB::HTS'} = 2.5;
+	}
+	elsif ($sam_ok and not $hts_ok) {
+		# only old version, recommend new one
+		$options->{'requires'}{'Bio::DB::Sam'} = 1.36;
+		$options->{'recommends'}{'Bio::DB::HTS'} = 2.5;
+	}
+	elsif (not $sam_ok and $hts_ok) {
+		# skip the old adapter
+		$options->{'requires'}{'Bio::DB::HTS'} = 2.5;
 	}
 	else {
-		$options->{'recommends'}{'Bio::DB::Sam'} = 1.36;
+		$options->{'recommends'}{'Bio::DB::HTS'} = 2.5;
 	}
 }
 

@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigWig; 1}) {
-		plan tests => 21;
+		plan tests => 24;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigWig not available';
@@ -60,8 +60,7 @@ is($segment->start, 54989, 'segment start');
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 49, 'row sum of count') or 
@@ -71,7 +70,6 @@ is($score, 49, 'row sum of count') or
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -85,11 +83,9 @@ $row = $stream->next_row;
 is($row->start, 57029, 'row start position');
 is($row->strand, -1, 'row strand');
 
-# try stranded data collection
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "score count sum for ", $row->name, " is $score\n";
 is($score, 7, 'row count sum') or 
@@ -108,7 +104,7 @@ is(sprintf("%.2f", $score), '0.50', 'row median score') or
 
 
 ### Try positioned score index
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
 	'value'    => 'score',
 );
@@ -119,6 +115,24 @@ is(scalar keys %pos2scores, 7, 'number of positioned scores');
 # }
 is(sprintf("%.2f", $pos2scores{8}), '0.50', 'positioned score at 8');
 is(sprintf("%.2f", $pos2scores{142}), 0.58, 'positioned score at 142');
+undef %pos2scores;
+
+
+
+### Try relative positioned score index
+my $pos2scores = $row->get_relative_point_position_scores(
+	'dataset'  => $dataset,
+	'value'    => 'score',
+	'position' => 5,
+	'extend'   => 200,
+);
+is(scalar keys %$pos2scores, 9, 'number of relative positioned scores');
+# print "found ", scalar keys %$pos2scores, " positions with reads\n";
+# foreach (sort {$a <=> $b} keys %$pos2scores) {
+# 	print "  $_ => $pos2scores->{$_}\n";
+# }
+is(sprintf("%.2f", $pos2scores->{-114}), 0.41, 'relative positioned score at -114');
+is(sprintf("%.2f", $pos2scores->{96}), 0.48, 'relative positioned score at 96');
 
 
 # BigWig does not support stranded data collection

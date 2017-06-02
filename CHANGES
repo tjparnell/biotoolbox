@@ -1,5 +1,33 @@
 ######## Bio::ToolBox revision history #############
 
+v1.50
+	- Major upgrade of the data collection libraries to simplify data 
+	collection and improve efficiency. The value type is no longer 
+	specified, being rolled into the specified collection method. Low 
+	level optimizations have been added to improve speed. Increases 
+	from 30% to over 300% have been measured, depending on the 
+	collection method and adapter.
+	- Rewrite of data collection scripts to work with the improved libraries
+	- Added support for the modern Bio::DB::HTS module for Bam files, 
+	while keeping support for the older Bio::DB::Sam module. 
+	- Added more agnostic support for multiple different fasta indexing 
+	adapters
+	- Script bam2wig is completely rewritten to handle multiple bam 
+	files for merging, independent bam scaling, improved alignment 
+	filtering, customizable output, improved cross-strand correlation 
+	for peak shifting, improved speed and memory management, and lots 
+	more features.
+	- Updated script data2fasta
+	- Numerous other features and changes too small to mention
+	- Relaxed requirements for external modules, namely BioPerl, so 
+	that scripts and functions that don't absolutely require them can 
+	still be used. All database functions will require it though.
+
+v1.45
+	- Fix endless loop bug with opening files with metadata but no data,
+	e.g. empty VCF files
+	- Revert support for opening bedGraphToBigWig file handles
+
 v1.44
 	- Added new function to GeneTools for exporting to GTF format.
 	- Added new function to filter transcript subfeatures in a gene 

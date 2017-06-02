@@ -6,7 +6,6 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use File::Spec;
-use Statistics::Lite qw(sum mean median min max range stddevp);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -14,7 +13,7 @@ use Bio::ToolBox::db_helper qw(
 	check_dataset_for_rpm_support
 );
 use Bio::ToolBox::utility;
-use Bio::ToolBox::GeneTools qw(:transcript get_exons);
+use Bio::ToolBox::GeneTools qw(:transcript);
 
 my $parallel;
 eval {
@@ -23,8 +22,7 @@ eval {
 	$parallel = 1;
 };
 
-use constant LOG2 => log(2);
-my $VERSION = '1.40';
+my $VERSION = '1.50';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -50,8 +48,6 @@ my (
 	$data_database,
 	$feature,
 	$method,
-	$value_type,
-	$log,
 	$stranded,
 	$subfeature,
 	$extend,
@@ -61,6 +57,7 @@ my (
 	$fstop,
 	$limit,
 	$position,
+	$fpkm_method,
 	$win,
 	$step,
 	$set_strand,
@@ -80,9 +77,7 @@ GetOptions(
 	'ddb=s'      => \$data_database, # data database
 	'feature=s'  => \$feature, # name of genomic feature to analyze
 	'method=s'   => \$method, # method of collecting & reporting data
-	'value=s'    => \$value_type, # type of data to collect
 	'data=s'     => \@datasets, # the list of datasets to collect data from
-	'log!'       => \$log, # dataset is in log2 space
 	'strand=s'   => \$stranded, # indicate strandedness of data
 	'exons!'     => \$subfeature, # indicate to restrict to subfeatures
 	'extend=i'   => \$extend, # extend the size of the genomic feature
@@ -92,6 +87,7 @@ GetOptions(
 	'fstop=f'    => \$fstop, # fractional stop position
 	'limit=i'    => \$limit, # size limit to fractionate a feature
 	'pos=s'      => \$position, # set the relative feature position
+	'fpkm|rpkm=s' => \$fpkm_method, # set the fpkm method  
 	'win=i'      => \$win, # indicate the size of genomic intervals
 	'step=i'     => \$step, # step size for genomic intervals
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
@@ -113,7 +109,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script get_datasets.pl, version $VERSION\n\n";
+	print " Biotoolbox script get_datasets.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
@@ -133,7 +134,8 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(file => $infile, parse => 1) or 
 		die " unable to load input file '$infile'\n";
-	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
+	printf " Loaded %s features from $infile.\n", 
+		format_with_commas( $Data->last_row );
 	
 	# update main database as necessary
 	if ($main_database) {
@@ -141,7 +143,7 @@ if ($infile) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-			print "   Re-run without --db option if you do not want this to happen\n";
+# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
@@ -150,7 +152,9 @@ if ($infile) {
 	}
 	
 	# update feature type as necessary
-	if (not defined $Data->feature and not defined $Data->type_column and defined $feature) {
+	if (not defined $Data->feature and not defined $Data->type_column and 
+		defined $feature
+	) {
 		$Data->feature($feature);
 	}
 }
@@ -191,21 +195,19 @@ unless (@datasets) {
 	die " No verifiable datasets provided. Check your file path, database, or dataset.\n";
 }
 
-# Working with RPM and RPKM value datasets
-# global values
-my %dataset2sum; # for tot
-# total reads in Bam file when using rpkm method
-if ($method eq 'rpm' or $method eq 'rpkm') {
+# Working with RPKM value datasets
+my %dataset2sum; # for genomic totals of reads for rpkm determination
+if ($fpkm_method eq 'genome') {
 	foreach my $d (@datasets) {
-		print " Checking RPM support for dataset '$d'...\n";
-		my $sum = check_dataset_for_rpm_support($d, $ddb, $cpu);
+		print " Summing total reads for dataset '$d'...\n";
+		my $sum = check_dataset_for_rpm_support($d, $cpu);
 		if ($sum) {
 			$dataset2sum{$d} = $sum;
 			printf "   %s total features\n", format_with_commas($sum);
 		}
 		else {
 			die " $method method requested but not supported for " .
-				"dataset $d!\n RPM and RPKM are only supported with Bam and BigBed.\n";
+				"dataset $d!\n FPKM is only supported with Bam and BigBed.\n";
 		}
 	}
 }
@@ -249,7 +251,7 @@ if ($cpu > 1) {
 if ($cpu > 1) {
 	# parallel execution
 	# print statements here before we fork, less we have duplicate statements!
-	print " Collecting $method $value_type from datasets @datasets...\n";
+	print " Collecting $method scores from datasets @datasets...\n";
 	print " Forking into $cpu children for parallel data collection\n";
 	parallel_execution();
 }
@@ -263,6 +265,9 @@ else {
 # write the output file
 # we will rewrite the file after each collection
 # appropriate extensions and compression should be taken care of
+unless ($outfile) {
+	$outfile = $Data->path . $Data->basename;
+}
 my $success = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -290,7 +295,9 @@ sub set_defaults {
 	
 	# Check for required values
 	unless ($infile) {
-		if (@ARGV) {
+		if (@ARGV and not $feature) {
+			# making an assumption that first unnamed variable is input file
+			# but only if no new file feature defined
 			$infile = shift @ARGV;
 		}
 		else {
@@ -305,6 +312,7 @@ sub set_defaults {
 		unless ($feature) {
 			die  " You must define an input file or new feature type! see help\n";
 		}
+		# database for new files checked below
 	}
 	if (defined $start_adj or defined $stop_adj) {
 		unless (defined $start_adj and defined $stop_adj) {
@@ -319,8 +327,7 @@ sub set_defaults {
 	
 	# check parallel support
 	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
+		$cpu ||= 4;
 	}
 	else {
 		# disable cores
@@ -329,6 +336,9 @@ sub set_defaults {
 	}
 	
 	# check datasets
+	if (not @datasets and @ARGV) {
+		@datasets = @ARGV;
+	}
 	if ($datasets[0] =~ /,/) {
 		# seems to be a comma delimited list, possibly more than one?????
 		my @list;
@@ -342,59 +352,23 @@ sub set_defaults {
 	if ($method) {
 		# check the method that was defined on the command line
 		unless ($method =~ 
-			m/^(?:median|mean|stddev|min|max|range|sum|count|enumerate|rpm|rpkm)$/
+			m/^(?:median|mean|stddev|min|max|range|sum|count|pcount|ncount)$/
 		) {
 			die " unknown method '$method'!";
-		}
-		
-		# set appropriate options for specific methods
-		my $count_check;
-		if ($method eq 'count') {
-			# convenience method
-			$method = 'sum';
-			$count_check = 1;
-		}
-		elsif ($method eq 'enumerate') {
-			# convenience method
-			$method = 'sum';
-			$count_check = 1;
-		}
-		elsif ($method eq 'rpkm' or $method eq 'rpm') {
-			$count_check = 1;
-		}
-		
-		# make sure we have an appropriate count value_type
-		if ($count_check) {
-			if ($subfeature and not defined $value_type and $datasets[0] =~ /\.bam$/i) {
-				$value_type = 'ncount'; # special mode to count unique names
-				print " setting value type to 'ncount' when using subfeatures with bam datasets\n";
-			}
-			else {
-				$value_type ||= 'count';
-			}
-			unless ($value_type =~ /count/) {
-				die " value type must be count, pcount, or ncount with method $method!";
-			}
 		}
 	}
 	else {
 		# set the default to use the mean
-		unless ($datasets[0] =~ m/none/) {
-			$method = 'mean';
-		}
+		$method = 'mean';
 	}
 	
-	# check the type of value to collect
-	if (defined $value_type) {
-		# validate the requested value type
-		unless ($value_type =~ m/^(?:score|pcount|ncount|count|length)$/) {
-			die " unknown value type '$value_type'!\n";
+	# check fpkm method
+	if ($fpkm_method) {
+		unless ($fpkm_method eq 'region' or $fpkm_method eq 'genome') {
+			die " fpkm option must be one of 'region' or 'genome'! see help\n";
 		}
-	}
-	else {
-		# default value
-		unless ($datasets[0] =~ /none/) {
-			$value_type = 'score';
+		unless ($method =~ /count/) {
+			die " method must be a count if you use the fpkm option!\n";
 		}
 	}
 	
@@ -428,22 +402,11 @@ sub set_defaults {
 		# fractional start and stop requested
 		unless ($limit) {
 			# set a minimum size limit on sub fractionating a feature
-			# 1000 bp seems like a reasonable cut off, no?
-			$limit = 1000;
+			$limit = 10;
 		}
 		if ($position == 4) {
 			die " set position to 5 or 3 only when using fractional start and stop\n";
 		}
-	}
-	
-	# check the output file
-	if ($outfile) {
-		
-	}
-	else {
-		# overwrite the input file
-		$outfile = $infile;
-		$outfile =~ s/\.(?:bed|g[tf]f.?|narrowpeak|broadpeak)(?:\.gz)?$/.txt/i;
 	}
 	
 	# Assign database for new feature lists
@@ -524,6 +487,8 @@ sub parallel_execution {
 	}
 	my $count = $Data->reload_children(@files);
 	printf " reloaded %s features from children\n", format_with_commas($count);
+	
+	calculate_fpkm_values() if $fpkm_method;
 }
 
 
@@ -532,11 +497,12 @@ sub single_execution {
 	# collect the datasets
 	foreach my $dataset (@datasets) {
 		unless ($dataset eq 'none') {
-			print " Collecting $method $value_type from dataset '$dataset'...\n";
+			print " Collecting $method scores from dataset '$dataset'...\n";
 			collect_dataset($dataset);
 		}
 		last if $dataset eq 'none';
 	}
+	calculate_fpkm_values() if $fpkm_method;
 }
 
 
@@ -545,6 +511,11 @@ sub single_execution {
 sub collect_dataset {
 	
 	my $dataset = shift;
+	
+	# collapse transcripts if needed
+	if ($subfeature and not $collapsed) {
+		$collapsed = collapse_all_features();
+	}
 	
 	# set the new metadata for this new dataset
 	my $index = add_new_dataset($dataset);
@@ -556,91 +527,40 @@ sub collect_dataset {
 		}
 	}
 	
-	# we need to determine how we will collect the data from the features
-	# using genomic windows or regions, or named features?
-	# are we modifying or extending the coordinates of the region or feature?
-	
-	# Genomic regions
-	if ($Data->feature_type eq 'coordinate') {
-		
-		# collect the genome dataset based on whether we need to modify 
-		# the genomic coordinates or not
-		
-		if (defined $extend) {
-			# extend the region on both sides
-			get_extended_genome_dataset($dataset, $index);
-		}
-		
-		elsif (defined $start_adj and defined $stop_adj) {
-			# specifically defined relative start and stop positions
-			get_adjusted_genome_dataset($dataset, $index);
-		}
-		
-		elsif (defined $fstart and defined $fstop) {
-			# use a subfraction of the region
-			get_fractionated_genome_dataset($dataset, $index);
-		}
-		
-		else {
-			# no modifications to the position
-			get_genome_dataset($dataset, $index);
-		}
+	# collect 
+	if (defined $start_adj and defined $stop_adj) {
+		# specifically defined relative start and stop positions
+		get_adjusted_dataset($dataset, $index);
 	}
-	
-	# Named features
-	elsif ($Data->feature_type eq 'named') {
-		# collect the named feature dataset based on whether we need to modify 
-		# the genomic coordinates or not
-		
-		if ($subfeature) {
-			# collect exons
-			unless ($collapsed) {
-				$collapsed = collapse_all_features();
-				$collapsed = 1;
-			}
-			get_subfeature_dataset($dataset, $index);
-		}
-		
-		elsif (defined $extend) {
-			# extend the region on both sides
-			get_extended_feature_dataset($dataset, $index);
-		}
-		
-		elsif (defined $start_adj and defined $stop_adj) {
-			# specifically defined relative start and stop positions
-			get_adjusted_feature_dataset($dataset, $index);
-		}
-		
-		elsif (defined $fstart and defined $fstop) {
-			# use a subfraction of the region
-			get_fractionated_feature_dataset($dataset, $index);
-		}
-		
-		else {
-			# no modifications to the position
-			get_feature_dataset($dataset, $index);
-		}
+	elsif (defined $fstart and defined $fstop) {
+		# use a subfraction of the region
+		get_fractionated_genome_dataset($dataset, $index);
 	}
-	
 	else {
-		die " Unable to identify columns with feature identifiers!\n" .
-			" File must have Name and Type, or Chromo, Start, Stop columns\n";
+		# everything else
+		get_dataset($dataset, $index);
 	}
 }
 
 
 sub collapse_all_features {
 	# collect all the transcripts and collapse them
+	
+	# check for collapsed transcript length index
+	my $length_i = $Data->find_column('Merged_Transcript_Length');
+	unless (defined $length_i) {
+		$length_i = $Data->add_column('Merged_Transcript_Length');
+	}
 	$Data->iterate( sub {
 		my $row = shift;
-		my $feature = $row->seqfeature;
-		my $collSeqFeat = collapse_transcripts($feature);
+		my $collSeqFeat = collapse_transcripts($row->seqfeature);
 		$Data->store_seqfeature($row->row_index, $collSeqFeat);
+		$row->value($length_i, get_transcript_length($collSeqFeat));
 	} );
 	return 1;
 }
 
-sub get_genome_dataset {
+sub get_dataset {
 	my ($dataset, $index) = @_;
 	
 	# collect the scores from the dataset for this index
@@ -649,220 +569,25 @@ sub get_genome_dataset {
 		my $score = $row->get_score(
 			'db'        => $ddb,
 			'dataset'   => $dataset,
-			'value'     => $value_type,
 			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
 			'stranded'  => $stranded,
+			'extend'    => $extend,
+			'exon'      => $subfeature,
 		);
 		$row->value($index, $score);
 	} );
 }
 
 
-sub get_extended_genome_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		my $score = $row->get_score(
-			# we need to extend the coordinates
-			'start'     => $row->start - $extend,
-			'stop'      => $row->end - $extend,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'value'     => $value_type,
-			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
-			'stranded'  => $stranded,
-		);
-		$row->value($index, $score);
-	} );
-}
-
-
-sub get_adjusted_genome_dataset {
+sub get_adjusted_dataset {
 	my ($dataset, $index) = @_;
 	
 	# collect the scores from the dataset for this index
 	$Data->iterate( sub {
 		my $row = shift;
 		
-		# adjust coordinates as requested
-		# depends on feature strand and relative position
-		my ($start, $stop);
-		if ($position == 5 and $row->strand >= 0) { 
-			# 5' end of forward strand
-			$start = $row->start + $start_adj;
-			$stop  = $row->start + $stop_adj;
-		}
-		elsif ($position == 5 and $row->strand < 0) { 
-			# 5' end of reverse strand
-			$start = $row->end - $stop_adj;
-			$stop  = $row->end - $start_adj;
-		}
-		elsif ($position == 3 and $row->strand >= 0) { 
-			# 3' end of forward strand
-			$start = $row->end + $start_adj;
-			$stop  = $row->end + $stop_adj;
-		}
-		elsif ($position == 3 and $row->strand < 0) {
-			# 3' end of reverse strand
-			$start = $row->start - $stop_adj;
-			$stop  = $row->start - $start_adj;
-		}
-		elsif ($position == 4) {
-			# middle position
-			my $middle = int( ($row->end - $row->start) / 2);
-			if ($row->strand >= 0) {
-				$start = $middle + $start_adj;
-				$stop  = $middle + $stop_adj;
-			}
-			else {
-				$start = $middle - $stop_adj;
-				$stop  = $middle - $start_adj;
-			}
-		}
-		
-		# now collect score
-		my $score = $row->get_score(
-			'start'     => $start,
-			'stop'      => $stop,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'value'     => $value_type,
-			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
-			'stranded'  => $stranded,
-		);
-		$row->value($index, $score);
-	} );
-}
-
-
-
-sub get_fractionated_genome_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# calculate length
-		my $length = $row->end - $row->start + 1;
-		
-		# calculate new fractional start and stop positions
-		# the fraction depends on the length
-		# this depends on both feature orientation and the 
-		# relative position requested
-		my $relative_start = int( ($length * $fstart) + 0.5);
-		my $relative_stop  = int( ($length * $fstop) + 0.5);
-		my ($start, $stop);
-		if ($length >= $limit) {
-			# length exceeds our minimum limit
-			# we can take a fractional length
-			
-			if ($position == 5 and $row->strand >= 0) { 
-				# 5' end of forward strand
-				$start = $row->start + $relative_start;
-				$stop  = $row->start + $relative_stop;
-			}
-			elsif ($position == 5 and $row->strand < 0) { 
-				# 5' end of reverse strand
-				$start = $row->end - $relative_stop;
-				$stop  = $row->end - $relative_start;
-			}
-			elsif ($position == 3 and $row->strand >= 0) { 
-				# 3' end of forward strand
-				$start = $row->end + $relative_start;
-				$stop  = $row->end + $relative_stop;
-			}
-			elsif ($position == 3 and $row->strand < 0) {
-				# 3' end of reverse strand
-				$start = $row->start - $relative_stop;
-				$stop  = $row->start - $relative_start;
-			}
-			# midpoint is not accepted
-		}
-		else {
-			# length doesn't meet minimum limit
-			# simply take the whole fragment
-			$start = $row->start;
-			$stop  = $row->end;
-		}
-		
-		# now collect score
-		my $score = $row->get_score(
-			'start'     => $start,
-			'stop'      => $stop,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'value'     => $value_type,
-			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
-			'stranded'  => $stranded,
-		);
-		$row->value($index, $score);
-	} );
-}
-
-
-
-sub get_feature_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		my $score = $row->get_score(
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'value'     => $value_type,
-			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
-			'stranded'  => $stranded,
-			'strand'    => $set_strand ? $row->strand : undef,
-		);
-		$row->value($index, $score);
-	} );
-}
-
-
-
-sub get_extended_feature_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# collect score
-		my $score = $row->get_score(
-			'start'     => $row->start - $extend,
-			'stop'      => $row->end + $extend,
-			'db'        => $ddb,
-			'dataset'   => $dataset,
-			'value'     => $value_type,
-			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
-			'stranded'  => $stranded,
-			'strand'    => $set_strand ? $row->strand : undef,
-		);
-		$row->value($index, $score);
-	} );
-}
-
-
-
-sub get_adjusted_feature_dataset {
-	my ($dataset, $index) = @_;
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		
-		# we need to collect the feature to adjust coordinates
-		my $feature = $row->feature;
+		# make sure we work with the represented seqfeature if present
+		my $feature = $row->seqfeature || $row;
 		
 		# adjust coordinates as requested
 		# depends on feature strand and relative position
@@ -890,7 +615,7 @@ sub get_adjusted_feature_dataset {
 		elsif ($position == 4) {
 			# middle position
 			my $middle = int( ($feature->end - $feature->start) / 2);
-			if ($feature->strand >= 0) {
+			if ($row->strand >= 0) {
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
 			}
@@ -906,11 +631,8 @@ sub get_adjusted_feature_dataset {
 			'stop'      => $stop,
 			'db'        => $ddb,
 			'dataset'   => $dataset,
-			'value'     => $value_type,
 			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
 			'stranded'  => $stranded,
-			'strand'    => $set_strand ? $row->strand : undef,
 		);
 		$row->value($index, $score);
 	} );
@@ -918,16 +640,15 @@ sub get_adjusted_feature_dataset {
 
 
 
-
-sub get_fractionated_feature_dataset {
+sub get_fractionated_dataset {
 	my ($dataset, $index) = @_;
 	
 	# collect the scores from the dataset for this index
 	$Data->iterate( sub {
 		my $row = shift;
 		
-		# we need to collect the feature to adjust coordinates
-		my $feature = $row->feature;
+		# make sure we work with the represented seqfeature if present
+		my $feature = $row->seqfeature || $row;
 		
 		# calculate length
 		my $length = $feature->length;
@@ -978,146 +699,13 @@ sub get_fractionated_feature_dataset {
 			'stop'      => $stop,
 			'db'        => $ddb,
 			'dataset'   => $dataset,
-			'value'     => $value_type,
 			'method'    => $method,
-			'log'       => $Data->metadata($index, 'log2'),
 			'stranded'  => $stranded,
-			'strand'    => $set_strand ? $row->strand : undef,
 		);
 		$row->value($index, $score);
 	} );
 }
 
-
-
-sub get_subfeature_dataset {
-	my ($dataset, $index) = @_;
-	
-	# check for collapsed transcript length index
-	my $length_i = $Data->find_column('Merged_Transcript_Length');
-	unless (defined $length_i) {
-		$length_i = $Data->add_column('Merged_Transcript_Length');
-		$Data->iterate( sub {
-			my $row = shift;
-			my $f = $row->seqfeature;
-			$row->value($length_i, get_transcript_length($f));
-		} );
-		# reorder the dataset
-		$Data->reorder_column(0..$index-1, $length_i, $index);
-		($length_i, $index) = ($index, $length_i);
-	}
-	
-	# collect the scores from the dataset for this index
-	$Data->iterate( sub {
-		my $row = shift;
-		my $feature = $row->seqfeature;
-		my @scores;
-		foreach my $subfeat (get_exons($feature)) {
-			# we will repeatedly call get_score on this $row feature but using
-			# the subfeature coordinates. as long as we provide everything, nothing 
-			# will be taken from the parent feature
-			my $score_ref = $row->get_score(
-				'db'        => $ddb,
-				'dataset'   => $dataset,
-				'chromo'    => $subfeat->seq_id,
-				'start'     => $subfeat->start,
-				'stop'      => $subfeat->end,
-				'strand'    => $set_strand ? $row->strand : $subfeat->strand,
-				'stranded'  => $stranded,
-				'value'     => $value_type,
-				'method'    => 'scores', # special method to return array ref of scores
-				'log'       => $Data->metadata($index, 'log2'),
-			);
-			# we don't want a single value for each subfeature
-			# rather we will collect the raw scores and then combine them
-			# ourselves later
-			
-			# record the values
-			push @scores, @$score_ref;
-		}
-
-		# Calculate the final score
-		unless (@scores) {
-			# no data collected!? record null or zero value
-			if ($method =~ /sum|count|rpm|rpkm/) {
-				$row->value($index, 0);
-			}
-			else {
-				$row->value($index, '.');
-			}
-			next;
-		}
-		
-		# take unique bam alignments only and recalculate sum
-		if ($value_type eq 'ncount') {
-			my %name2count;
-			foreach (@scores) { $name2count{$_} += 1 }
-			@scores = (); # empty the array
-			push @scores, scalar(keys %name2count);
-		}
-		
-		# convert log2 values if necessary
-		if ($Data->metadata($index, 'log2')) {
-			@scores = map {2 ** $_} @scores;
-		}
-		
-		# final score is calculated according to the requested method
-		my $parent_score;
-		if ($method eq 'median') {
-			# take the median value
-			$parent_score = median(@scores);
-		}
-		elsif ($method eq 'mean') {
-			# or take the mean value
-			$parent_score = mean(@scores);
-		} 
-		elsif ($method eq 'range') {
-			# or take the range value
-			# this is 'min-max'
-			$parent_score = range(@scores);
-		}
-		elsif ($method eq 'stddev') {
-			# or take the standard deviation value
-			# we are using the standard deviation of the population, 
-			# since these are the only scores we are considering
-			$parent_score = stddevp(@scores);
-		}
-		elsif ($method eq 'min') {
-			# or take the minimum value
-			$parent_score = min(@scores);
-		}
-		elsif ($method eq 'max') {
-			# or take the maximum value
-			$parent_score = max(@scores);
-		}
-		elsif ($method eq 'count') {
-			# count the number of values
-			$parent_score = sum(@scores);
-		}
-		elsif ($method eq 'sum') {
-			# sum the number of values
-			$parent_score = sum(@scores);
-		}
-		elsif ($method eq 'rpm') {
-			# calculate reads per per million
-			$parent_score = ( sum(@scores) * 1000000 ) / $dataset2sum{$dataset};
-		}
-		elsif ($method eq 'rpkm') {
-			# calculate reads per kb per million
-			my $gene_length = $row->value($length_i);
-			$parent_score = ( sum(@scores) * 1000000000 ) / 
-								( $gene_length * $dataset2sum{$dataset});
-		}
-	
-		# convert back to log2 if necessary
-		if ($Data->metadata($index, 'log2')) { 
-			$parent_score = log($parent_score) / LOG2;
-		}
-		
-		# record
-		$row->value($index, $parent_score);
-	} );
-}
 
 
 # subroutine to record the metadata for a dataset
@@ -1145,31 +733,12 @@ sub add_new_dataset {
 	}
 	
 	
-	# determine the log2 status of the dataset or not
-	# this will adversely affect the math if not set correctly!
-	my $logstatus;
-	if (defined $log) {
-		# defined globally for all datasets by command line argument
-		$logstatus = $log;
-	} else {
-		if ($dataset =~ /log2/i) {
-			# if we're smart we'll encode the log2 status in the dataset name
-			$logstatus = 1;
-		} else {
-			# otherwise assume it is non-log
-			# unsafe, but what else to do? we'll put the onus on the user
-			$logstatus = 0;
-		}
-	}
-	
 	# add new column
 	my $index = $Data->add_column($column_name);
 	
 	# update metadata 
 	$Data->metadata($index, 'dataset', $dataset);
 	$Data->metadata($index, 'method', $method);
-	$Data->metadata($index, 'value', $value_type);
-	$Data->metadata($index, 'log2', $logstatus);
 	$Data->metadata($index, 'strand', $stranded);
 	$Data->metadata($index, 'extend', $extend)   if defined $extend;
 	$Data->metadata($index, 'start', $start_adj) if defined $start_adj;	
@@ -1199,7 +768,48 @@ sub add_new_dataset {
 
 
 
-
+sub calculate_fpkm_values {
+	print " Calculating FPKM values....\n";
+	
+	# calculate which indices;
+	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
+	
+	# work through each collected dataset
+	foreach my $index (@indices) {
+	
+		# determine total number of reads for this dataset
+		my $total;
+		if ($fpkm_method eq 'genome') {
+			# this was calculated earlier
+			$total = $dataset2sum{ $Data->metadata($index, 'dataset') };
+		}
+		else {
+			# use the total from the counted regions or genes
+			$total = 0;
+			$Data->iterate( sub {
+				my $row = shift;
+				$total += $row->value($index);
+			} );
+		}
+		next unless $total;
+	
+		# add new column
+		my $fpkm_index = $Data->add_column($Data->name($index) . '_FPKM');
+		$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
+		$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
+		$Data->metadata($fpkm_index, 'total_count', $total); 
+		my $length_i = $Data->find_column('Merged_Transcript_Length');
+	
+		# calculate and store the fpkms
+		$Data->iterate( sub {
+			my $row = shift;
+			my $length = $length_i ? $row->value($length_i) : $row->length;
+			$length ||= 1; # how would a zero sneak in here? shouldn't happen 
+			my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
+			$row->value($fpkm_index, $fpkm);
+		} );
+	}
+}
 
 
 __END__
@@ -1213,6 +823,8 @@ A program to collect data for a list of features
 =head1 SYNOPSIS
 
 get_datasets.pl [--options...] [<filename>]
+
+get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   
   Options for existing files:
   --in <filename>                  (txt bed gff gtf refFlat ucsc)
@@ -1226,12 +838,12 @@ get_datasets.pl [--options...] [<filename>]
   Options for data collection:
   --ddb <name | filename>
   --data <none | file | type>, ...
-  --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]  (mean)
-  --value [score|count|pcount|ncount|length]                (score)
+  --method [mean|median|stddev|min|max|range|sum|          (mean)
+            count|pcount|ncount]
   --strand [all|sense|antisense]                            (all)
   --force_strand
   --exons
-  --log
+  --fpkm [region|genome]
   
   Adjustments to features:
   --extend <integer>
@@ -1340,7 +952,7 @@ be local or remote (specified with a http: or ftp: prefix).
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
 
-=item --method [mean|median|stddev|min|max|range|sum|rpm|rpkm]
+=item --method <text>
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -1361,53 +973,19 @@ genomic region of the feature. Accepted values include:
 
 =item * range   Returns difference of max and min
 
-=item * rpm     Reads Per Million mapped, Bam/BigBed only
-
-=item * rpkm    Reads Per Kilobase per Million Mapped, Bam/BigBed only
-
-=back
-
-When collecting data using rpkm, the normalized sum of the reads is 
-divided by the length of the feature requested (the Kilobase part in rpkm). 
-Note that for mRNA or gene features, this will be the sum of the exon 
-lengths, not the gene or transcript.
-  
-=item --value [score|count|pcount|ncount|length]
-
-Optionally specify the type of data value to collect from the dataset or 
-data file. Four values are accepted: score, count, pcount, or length. 
-The default value type is score. Note that some data sources only support certain 
-types of data values. The types are detailed below.
-
-=over 4
-
-=item * score
-
-The default value. Supported by wig, bigWig, USeq, bigBed (if the features 
-include the score column), GFF features, and Bam (returns non-transformed 
-base pair coverage).
-
 =item * count
 
-Counts the number of features that overlap the search region. For long 
-features (> 1 bp), these may include features that overlap or span beyond 
-the search region. Supported by all databases.
+Counts the number of overlapping items.
 
 =item * pcount (precise count)
 
-Counts only those features that are contained within the search region, 
-not overlapping. Supported by Bam, bigBed, USeq, and GFF features.
+Counts the number of items that precisely fall within the query 
+region. Partially overlapping are not counted.
 
 =item * ncount (name count)
 
-Counts unique names. Useful when counting paired alignments to avoid 
-double-counting paired reads from the same fragment. Any overlap is 
-counted. Currently supported by Bam datasets only. 
-
-=item * length
-
-Returns the length of long features. Supported by Bam, bigBed, USeq, and 
-GFF features.
+Counts unique names. Useful when spliced alignments overlap more 
+than one exon and you want to avoid double-counting.
 
 =back
 
@@ -1441,12 +1019,32 @@ gene or transcript if no appropriate subfeatures are found. Note that
 the options extend, start, stop, fstart, and fstop are ignored. 
 Default is false. 
 
-=item --log
+=item --fpkm [region|genome]
 
-Indicate the dataset is (not) in log2 space. The log2 status of the dataset is 
-critical for accurately mathematically combining the dataset values in the 
-feature's genomic region. It may be determined automatically if the dataset 
-name includes the phrase "log2".
+Optionally indicate that counts should be converted to Fragments Per 
+Kilobase per Million mapped (FPKM). This is a method for normalizing 
+sequence read depth and is used with Bam (or optionally bigBed) files. 
+Two methods exist for normalizing: 
+
+=over 4
+
+=item region 
+
+Uses the sum of counts over all input regions examined and ignores 
+non-counted reads
+
+=item genome
+
+Uses the sum of all reads across the genome, regardless of whether 
+it was counted in an input region or not
+
+=back
+
+The region method is best used with RNASeq data and a complete gene 
+annotation table. The genome method is best used with partial annotation 
+tables or other Seq types, such as ChIPSeq. This option can only be used 
+with one of the count methods (count, ncount, pcount). The FPKM values 
+are appended as additional columns in the output table.
 
 =item --extend <integer>
 
@@ -1488,7 +1086,7 @@ use the 5' end, or the start position of unstranded features.
 
 Optionally specify the minimum size limit for subfractionating a feature's 
 region. Used in combination with fstart and fstop to prevent taking a 
-subregion from a region too small to support it. The default is 1000 bp.
+subregion from a region too small to support it. The default is 10 bp.
 
 =item --gz
 
@@ -1539,11 +1137,6 @@ Stranded data may be collected, if the dataset supports stranded information.
 Also, two or more datasets may be combined and treated as one. Note that 
 collecting stranded data may significantly slow down data collection.
 
-The output file is a standard tim data formatted file, a tab delimited 
-file format with each row a genomic feature and each column a dataset. 
-Metadata regarding the datasets are stored in comment lines at the beginning 
-of the file. The file may be gzipped.
-
 =head1 EXAMPLES
 
 These are some examples of some common scenarios for collecting data.
@@ -1588,7 +1181,7 @@ the genome and put them in a bigBed file. Now you want to count how
 many exist in each upstream region of each gene.
   
   get_datasets.pl --db annotation --feature gene --start=-5000 \
-  --stop=0 --data tfbs.bb --method sum --value count --out tfbs_sums.txt
+  --stop=0 --data tfbs.bb --method count --out tfbs_sums.txt
 
 =item Many datasets at once
 
@@ -1615,7 +1208,7 @@ You are interested in sequencing depth across the genome to look for
 depleted regions. You count reads in 1 kb intervals across the genome.
   
   get_datasets.pl --db genome.fasta --feature genome --win 1000 \
-  --data alignments.bam --value count --method sum --out coverage.txt
+  --data alignments.bam --method count --out coverage.txt
 
 =item Middle of feature
 

@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::USeq; 1}) {
-		plan tests => 22;
+		plan tests => 36;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::USeq not available';
@@ -57,21 +57,37 @@ my $segment = $row->segment;
 isa_ok($segment, 'Bio::DB::USeq::Segment', 'row segment');
 is($segment->start, 54989, 'segment start');
 
-# score count sum
+# score count
 my $score = $row->get_score(
 	'db'       => $dataset,
 	'dataset'  => $dataset,
-	'value'    => 'count',
-	'method'   => 'sum',
+	'method'   => 'count',
 );
 # print "count sum for ", $row->name, " is $score\n";
-is($score, 437, 'row sum of count');
+is($score, 437, 'row score count');
+
+# score precise count
+$score = $row->get_score(
+	'db'       => $dataset,
+	'dataset'  => $dataset,
+	'method'   => 'pcount',
+);
+# print "precise count for ", $row->name, " is $score\n";
+is($score, 431, 'row precise count');
+
+# score name count
+$score = $row->get_score(
+	'db'       => $dataset,
+	'dataset'  => $dataset,
+	'method'   => 'ncount',
+);
+# print "name count for ", $row->name, " is $score\n";
+is($score, 437, 'row name count');
 
 # score mean coverage
 $score = $row->get_score(
 	'db'       => $db,
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
@@ -86,7 +102,6 @@ is($row->strand, -1, 'row strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'all',
 );
@@ -96,7 +111,6 @@ is(sprintf("%.2f", $score), 1.67, 'row median score');
 # try stranded data collection
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'sense',
 );
@@ -105,7 +119,6 @@ is(sprintf("%.2f", $score), 2.71, 'row sense median score');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'method'   => 'median',
 	'stranded' => 'antisense',
 );
@@ -115,16 +128,75 @@ is(sprintf("%.2f", $score), 0.38, 'row antisense median score');
 
 
 ### Try positioned score index
-my %pos2scores = $row->get_position_scores(
+my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
-	'value'    => 'score',
 	'stranded' => 'sense',
 );
-is(scalar keys %pos2scores, 44, 'number of positioned scores');
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
+is(scalar keys %pos2scores, 44, 'number of positioned scores');
 is(sprintf("%.2f", $pos2scores{55}), 4.16, 'score at position 55');
 is(sprintf("%.2f", $pos2scores{255}), 2.03, 'score at position 255');
+
+# positioned count
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'count',
+);
+# print "found ", scalar keys %pos2scores, " positions with counts\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 44, 'number of positioned counts');
+is($pos2scores{47}, 1, 'count at position 47');
+is($pos2scores{167}, 1, 'count at position 167');
+
+# positioned pcount
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'pcount',
+);
+# print "found ", scalar keys %pos2scores, " positions with precise counts\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 42, 'number of positioned precise counts');
+is($pos2scores{15}, 1, 'precise count at position 15');
+is($pos2scores{127}, 1, 'precise count at position 127');
+
+# positioned ncount
+%pos2scores = $row->get_region_position_scores(
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'method'   => 'ncount',
+);
+# print "found ", scalar keys %pos2scores, " positions with named counts\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(scalar keys %pos2scores, 44, 'number of positioned named counts');
+is($pos2scores{7}, 1, 'named count at position 7');
+is($pos2scores{335}, 1, 'named count at position 335');
+
+
+
+### Try relative positioned score index
+%pos2scores = $row->get_relative_point_position_scores(
+	'dataset'  => $dataset,
+	'stranded' => 'sense',
+	'position' => 5,
+	'extend'   => 200,
+);
+is(scalar keys %pos2scores, 49, 'number of relative positioned scores');
+# print "found ", scalar keys %pos2scores, " positions with reads\n";
+# foreach (sort {$a <=> $b} keys %pos2scores) {
+# 	print "  $_ => $pos2scores{$_}\n";
+# }
+is(sprintf("%.2f", $pos2scores{55}), 4.16, 'score at relative position 55');
+is(sprintf("%.2f", $pos2scores{-25}), 1.73, 'score at relative position -25');
+
 

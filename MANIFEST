@@ -9,10 +9,12 @@ lib/Bio/ToolBox/Data/Feature.pm
 lib/Bio/ToolBox/Data/Stream.pm
 lib/Bio/ToolBox/GeneTools.pm
 lib/Bio/ToolBox/db_helper.pm
+lib/Bio/ToolBox/db_helper/alignment_callbacks.pm
 lib/Bio/ToolBox/db_helper/bam.pm
 lib/Bio/ToolBox/db_helper/bigbed.pm
 lib/Bio/ToolBox/db_helper/bigwig.pm
 lib/Bio/ToolBox/db_helper/config.pm
+lib/Bio/ToolBox/db_helper/hts.pm
 lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
@@ -47,7 +49,8 @@ scripts/split_data_file.pl
 scripts/ucsc_table2gff3.pl
 t/01.Data.t
 t/02.DB.t
-t/03.Bam.t
+t/03.Bam-HTS.t
+t/03.Bam-Samtools.t
 t/04.BigBed.t
 t/05.BigWig.t
 t/06.BigWigSet.t
@@ -71,3 +74,5 @@ t/Data/sample3/metadata.txt
 t/Data/sample3/sample3_f.bw
 t/Data/sample3/sample3_r.bw
 t/Data/sample3.useq
+t/Data/sequence.fa
+

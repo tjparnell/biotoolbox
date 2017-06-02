@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.41';
+my $VERSION = '1.50';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -83,7 +83,12 @@ if ($help) {
 
 # Print version
 if ($print_version) {
-	print " Biotoolbox script manipulate_datasets.pl, version $VERSION\n\n";
+	print " Biotoolbox script manipulate_datasets.pl, version $VERSION\n";
+	eval {
+		require Bio::ToolBox;
+		my $v = Bio::ToolBox->VERSION;
+		print " Biotoolbox package version $v\n";
+	};
 	exit;
 }
 
@@ -675,22 +680,10 @@ sub coordinate_function {
 	my $new_position = $Data->add_column('Coordinate');
 	
 	# generate coordinates
-	if (defined $stop_i) {
-		# we have a stop coordinate to use
-		$Data->iterate( sub {
-			my $row = shift;
-			my $coord = join("", $row->seq_id, ':', $row->start, '-', $row->end);
-			$row->value($new_position, $coord);
-		} );
-	}
-	else {
-		# we don't have a stop coordinate to use
-		$Data->iterate( sub {
-			my $row = shift;
-			my $coord = join(':', $row->seq_id, $row->start);
-			$row->value($new_position, $coord);
-		} );
-	}
+	$Data->iterate( sub {
+		my $row = shift;
+		$row->value($new_position, $row->coordinate);
+	} );
 	
 	print " Coordinate string generated as new column $new_position\n";
 	return 1;
@@ -1603,7 +1596,7 @@ sub maximum_function {
 			my $row = shift;
 			my $v = $row->value($index);
 			next if _is_null($v);
-			if ($v < $value) {
+			if ($v > $value) {
 				$row->value($index, $value);
 				$count++;
 			}
