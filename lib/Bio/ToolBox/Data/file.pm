@@ -543,6 +543,11 @@ sub write_file {
 			}
 		}
 	}
+	elsif ($extension =~ /txt/i) {
+		# plain old text file, sounds good to me
+		# make sure headers are enabled
+		$self->{'headers'} = 1;
+	}
 	elsif (not $extension) {
 		# no extension was available
 		# try and determine one from metadata
