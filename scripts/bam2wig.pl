@@ -10,6 +10,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
 	low_level_bam_fetch
+	$BAM_ADAPTER
 );
 use Bio::ToolBox::utility qw(
 	format_with_commas
@@ -141,6 +142,7 @@ GetOptions(
 	'intron=i'  => \$max_intron, # maximum intron size to allow
 	'window=i'  => \$window, # window size to control memory usage
 	'verbose!'  => \$verbose, # print sample correlations
+	'adapter=s' => \$BAM_ADAPTER, # explicitly set the adapter version
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -210,7 +212,7 @@ if ($splice) {
 		'Bio::DB::HTS::AlignWrapper';
 	eval { require $wrapper_ref; 1 };
 }
-
+printf " Using the %s Bam adapter\n", ref($sams[0]) if $verbose;
 
 ### Process user provided black lists
 my $black_list_hash = process_black_list();
