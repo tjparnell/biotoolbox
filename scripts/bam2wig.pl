@@ -10,6 +10,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
 	low_level_bam_fetch
+	$BAM_ADAPTER
 );
 use Bio::ToolBox::utility qw(
 	format_with_commas
@@ -27,7 +28,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.50';
+my $VERSION = '1.51';
 	
 	
 
@@ -141,6 +142,7 @@ GetOptions(
 	'intron=i'  => \$max_intron, # maximum intron size to allow
 	'window=i'  => \$window, # window size to control memory usage
 	'verbose!'  => \$verbose, # print sample correlations
+	'adapter=s' => \$BAM_ADAPTER, # explicitly set the adapter version
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -210,7 +212,7 @@ if ($splice) {
 		'Bio::DB::HTS::AlignWrapper';
 	eval { require $wrapper_ref; 1 };
 }
-
+printf " Using the %s Bam adapter\n", ref($sams[0]) if $verbose;
 
 ### Process user provided black lists
 my $black_list_hash = process_black_list();
@@ -1959,10 +1961,16 @@ sub pe_callback {
 	my ($a, $data) = @_;
 	
 	# check paired status
-	return unless $a->proper_pair;
-	return unless $a->tid == $a->mtid; # same chromosome, redundant with proper_pair?
-	return if $a->isize > $max_isize;
-	return if $a->isize < $min_isize;
+	return unless $a->proper_pair; # both alignments are mapped
+	return unless $a->tid == $a->mtid; # same chromosome?
+	my $isize = $a->isize; 
+	if ($a->reversed) {
+		# in proper FR pairs reverse alignments are negative
+		return if $isize > 0; # pair is RF orientation
+		$isize = abs($isize);
+	}
+	return if $isize > $max_isize;
+	return if $isize < $min_isize;
 	
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
@@ -1985,10 +1993,8 @@ sub pe_callback {
 	}
 	
 	# look for pair
-	my $f; # the forward alignment
 	if ($a->reversed) {
-		$f = $data->{pair}->{$a->qname} || undef;
-		return unless $f; # no pair, no record
+		my $f = $data->{pair}->{$a->qname} or return;
 		delete $data->{pair}->{$a->qname};
 		
 		# scale by number of hits

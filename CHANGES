@@ -1,5 +1,12 @@
 ######## Bio::ToolBox revision history #############
 
+v1.51
+	- Add additional checks when loading malformed files that have a 
+	missing column header or extraneous hidden columns (extra tabs)
+	- Add format checks for numeric columns in some file formats
+	- Fix major bug in script bam2wig that prevented paired-end 
+	alignments from working
+	
 v1.50
 	- Major upgrade of the data collection libraries to simplify data 
 	collection and improve efficiency. The value type is no longer 

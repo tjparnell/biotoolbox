@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.45';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -377,13 +377,32 @@ sub parse_headers {
 		$self->{'headers'} = -1; # special case, we never write headers here 
 	}
 	
+	# Header sanity check
+		# some exported file formats, such as from R, do not include a proper 
+		# header for the first column, as these are assumed to be row names
+		# this will result in incorrectly parsed files where the last columns 
+		# will be merged into one column with an internal tab - not good
+		# need to handle these
+	my $nextline = $fh->getline;
+	if ($nextline) {
+		my @nextdata = split '\t', $nextline;
+		if (scalar(@nextdata) - 1 == $self->number_columns) {
+			# whoops! we caught a off-by-one discrepancy between header and data row
+			my $old_last = $self->last_column;
+			$fh->close; # having this open complicates changing columns....
+			
+			# add a new "column" (just metadata for now) and move it to the beginning
+			my $i = $self->add_column('Column1');
+			$self->reorder_column($i, 0 .. $old_last);
+		}
+	}
 	
-	# close and re-open the file
+	# re-open the file
 		# I tried using seek functions - but they don't work with binary gzip 
 		# files, and I can't get the seek function to return the same position
 		# as simply advancing through the file like below
 		# so I'll just do it the old way and close/open and advance
-	$fh->close;
+	$fh->close if $fh; # may have been closed from the sanity check above
 	$fh = $self->open_to_read_fh;
 	for (1 .. $header_line_count) {
 		my $line = $fh->getline;
@@ -406,6 +425,11 @@ sub add_data_line {
 	# be sure to handle both newlines and carriage returns
 	$linedata[-1] =~ s/[\r\n]+$//;
 	
+	# check for extra remaining tabs
+	if (index($linedata[-1], "\t") != -1) {
+		die "FILE INCONSISTENCY ERRORS! line has additional tabs (columns) than headers!\n $line";
+	}
+		
 	# add the line of data
 	push @{ $self->{data_table} }, \@linedata;
 	$self->{last_row} += 1;
@@ -518,6 +542,11 @@ sub write_file {
 				$extension = $extension =~ /gz$/i ? '.txt.gz' : '.txt';
 			}
 		}
+	}
+	elsif ($extension =~ /txt/i) {
+		# plain old text file, sounds good to me
+		# make sure headers are enabled
+		$self->{'headers'} = 1;
 	}
 	elsif (not $extension) {
 		# no extension was available
