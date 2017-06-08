@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -75,7 +75,7 @@ sub verify {
 		defined $self->{'data_table'} and 
 		ref $self->{'data_table'} eq 'ARRAY'
 	) {
-		carp sprintf " DATA INTEGRITY ERROR: No data table in %s object!", ref $self
+		carp sprintf "\n DATA INTEGRITY ERROR: No data table in %s object!", ref $self
 			unless $silence;
 		return;
 	}
@@ -115,19 +115,29 @@ sub verify {
 				}
 			}
 		}
-		if ($too_low) {
-			print " COLUMN INCONSISTENCY ERRORS: $too_low rows had fewer than expected " . 
-				 "columns!\n  padded rows " . join(',', @problems) . " with null values\n"
-				 unless $silence;
-		}
-		if ($too_high) {
-			print " COLUMN INCONSISTENCY ERRORS: $too_high rows had more columns than " . 
-				"expected!\n  Problem rows: " . join(',', @problems) . "\n"
-				unless $silence;
-			return;
+		
+		# we found errors
+		if (@problems) {
+			# collapse problem list into compact string
+			# from http://www.perlmonks.org/?node_id=87538
+			my $problem = join(',', @problems);
+			$problem =~ s/(?<!\d)(\d+)(?:,((??{$++1}))(?!\d))+/$1-$+/g;
+
+			if ($too_low) {
+				print "\n COLUMN INCONSISTENCY ERRORS: $too_low rows had fewer than expected " . 
+					 "columns!\n  padded rows $problem with null values\n"
+					 unless $silence;
+			}
+			if ($too_high) {
+				print "\n COLUMN INCONSISTENCY ERRORS: $too_high rows had more columns than " . 
+					"expected!\n  Problem rows: $problem\n"
+					unless $silence;
+				return;
+			}
 		}
 	}
 	else {
+		# this wasn't set???? then set it
 		$self->{'number_columns'} = 
 			scalar @{ $self->{'data_table'}->[0] };
 	}
@@ -139,14 +149,14 @@ sub verify {
 			$self->{$i}{'name'} eq 
 			$self->{'data_table'}->[0][$i]
 		) {
-			carp sprintf( " TABLE/METADATA MISMATCH ERROR: Column header names don't" .
+			printf( "\n TABLE/METADATA MISMATCH ERROR: Column header names don't" .
 				" match metadata name values for index $i!" . 
 				"\n  compare '%s' with '%s'\n", $self->{'data_table'}->[0][$i], 
 				$self->{$i}{'name'} ) unless $silence;
 			$mdcheck++;
 		}
 		unless ($self->{$i}{'index'} == $i) {
-			carp sprintf( " METADATA INDEX ERROR: index $i metadata doesn't match its " .
+			printf( "\n METADATA INDEX ERROR: index $i metadata doesn't match its " .
 				"index value %s\n", $self->{$i}{'index'} ) unless $silence;
 			$mdcheck++;
 		}
@@ -208,6 +218,10 @@ sub verify {
 			$gff_check = 0;
 			$error .= " Columns 3,4 not integers.";
 		}
+		unless ($self->_column_is_numeric(5)) {
+			$gff_check = 0;
+			$error .= " Column 5 not numeric.";
+		}
 		unless ($self->_column_is_stranded(6)) {
 			$gff_check = 0;
 			$error .= " Column 6 not strand values.";
@@ -225,7 +239,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
-			print " GFF FILE FORMAT ERROR: $error\n" unless $silence;
+			print "\n GFF FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -326,11 +340,25 @@ sub verify {
 			$bed_check = 0;
 			$error .= " Columns 1,2 not integers.";
 		}
+		if ($self->{'number_columns'} >= 5) { 
+			# only check if it is actually present, since could be optional
+			unless ($self->_column_is_numeric(4) ) {
+				$bed_check = 0;
+				$error .= " Column 4 not numeric.";
+			}
+		}
 		if ($self->{'number_columns'} >= 6) {
 			# only check if it is actually present, since could be optional
 			unless ($self->_column_is_stranded(5) ) {
 				$bed_check = 0;
 				$error .= " Column 5 not strand values.";
+			}
+		}
+		if ($self->{'extension'} and 
+			$self->{'extension'} =~ /peak/i) {
+			unless ($self->_column_is_numeric(6,7,8) ) {
+				$bed_check = 0;
+				$error .= " Columns 6,7,8 not numeric.";
 			}
 		}
 		if ($self->{'number_columns'} == 12) {
@@ -379,7 +407,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
-			print " BED FILE FORMAT ERROR: $error\n" unless $silence;
+			print "\n BED FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -569,7 +597,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
-			print " $ucsc_type FILE FORMAT ERROR: $error\n" unless $silence;
+			print "\n $ucsc_type FILE FORMAT ERROR: $error\n" unless $silence;
 		}	
 	}
 	
@@ -619,7 +647,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
-			print " VCF FILE FORMAT ERROR: $error\n" unless $silence;
+			print "\n VCF FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -662,7 +690,7 @@ sub verify {
 					delete $self->{$i}{'AUTO'};
 				}
 			}
-			print " SGR FILE FORMAT ERROR: $error\n" unless $silence;
+			print "\n SGR FILE FORMAT ERROR: $error\n" unless $silence;
 		}
 	}
 	
@@ -705,6 +733,24 @@ sub _column_is_integers {
 	}
 	return 1;
 }
+
+# internal method to check if a column appears numeric, i.e. scores
+sub _column_is_numeric {
+	my $self = shift;
+	my @index = @_;
+	return 1 if ($self->{last_row} == 0); # can't check if table is empty
+	foreach (@index) {
+		return 0 unless exists $self->{$_};
+	}
+	for my $row (1 .. $self->{last_row}) {
+		for my $i (@index) {
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d\-\.,eE]+$/);
+		}
+	}
+	return 1;
+}
+
+
 
 # internal method to check if a column is nothing but comma delimited integers
 sub _column_is_comma_integers {
