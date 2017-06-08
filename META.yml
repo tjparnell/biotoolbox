@@ -15,7 +15,7 @@ name: Bio-ToolBox
 provides:
   Bio::ToolBox:
     file: lib/Bio/ToolBox.pm
-    version: '1.50'
+    version: '1.51'
   Bio::ToolBox::Data:
     file: lib/Bio/ToolBox/Data.pm
     version: '1.43'
@@ -29,10 +29,10 @@ provides:
     version: '1.41'
   Bio::ToolBox::Data::core:
     file: lib/Bio/ToolBox/Data/core.pm
-    version: '1.50'
+    version: '1.51'
   Bio::ToolBox::Data::file:
     file: lib/Bio/ToolBox/Data/file.pm
-    version: '1.45'
+    version: '1.51'
   Bio::ToolBox::GeneTools:
     file: lib/Bio/ToolBox/GeneTools.pm
     version: '1.44'
@@ -103,4 +103,4 @@ requires:
 resources:
   license: http://dev.perl.org/licenses/
   repository: https://github.com/tjparnell/biotoolbox
-version: '1.50'
+version: '1.51'
