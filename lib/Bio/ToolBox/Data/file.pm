@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.45';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -406,6 +406,11 @@ sub add_data_line {
 	# be sure to handle both newlines and carriage returns
 	$linedata[-1] =~ s/[\r\n]+$//;
 	
+	# check for extra remaining tabs
+	if (index($linedata[-1], "\t") != -1) {
+		die "FILE INCONSISTENCY ERRORS! line has additional tabs (columns) than headers!\n $line";
+	}
+		
 	# add the line of data
 	push @{ $self->{data_table} }, \@linedata;
 	$self->{last_row} += 1;
