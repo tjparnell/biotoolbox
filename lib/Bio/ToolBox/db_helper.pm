@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -724,18 +724,8 @@ use Module::Load; # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources

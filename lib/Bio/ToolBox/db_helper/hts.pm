@@ -5,26 +5,16 @@ require Exporter;
 use strict;
 use Carp;
 use File::Copy;
-use Bio::DB::HTS;
+use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::alignment_callbacks;
+use Bio::DB::HTS;
 our $parallel;
 eval {
 	# check for parallel support, when counting bam alignments
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 # Exported names
 our @ISA = qw(Exporter);
