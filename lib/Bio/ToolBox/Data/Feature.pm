@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -1316,7 +1316,7 @@ sub _get_subfeature_scores {
 	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
