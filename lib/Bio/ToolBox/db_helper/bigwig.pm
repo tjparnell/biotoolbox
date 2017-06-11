@@ -4,7 +4,7 @@ package Bio::ToolBox::db_helper::bigwig;
 require Exporter;
 use strict;
 use Carp;
-use Statistics::Lite qw(min max mean);
+use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
@@ -471,7 +471,7 @@ sub _remove_duplicate_positions {
 			push @values, $pos2data->{ "$pos\.$i" };
 			delete $pos2data->{ "$pos\.$i" };
 		}
-		$pos2data->{$pos} = mean(@values);
+		$pos2data->{$pos} = sum(@values) / scalar(@values);
 	}
 }
 

@@ -4,7 +4,8 @@ require Exporter;
 use Carp;
 use strict;
 use Module::Load; # for dynamic loading during runtime
-use Statistics::Lite qw(mean);
+use List::Util qw(min max sum);
+use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Fasta;
@@ -324,7 +325,8 @@ sub collect_store_scores {
 		}
 		elsif ($param->[METH] eq 'mean') {
 			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = mean( @{$pos2data{$position}} );
+				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
+										scalar( @{$pos2data{$position}} );
 			}
 		}
 		elsif ($param->[METH] eq 'median') {
@@ -350,7 +352,8 @@ sub collect_store_scores {
 		else {
 			# just take the mean for everything else
 			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = mean( @{$pos2data{$position}} );
+				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
+										scalar( @{$pos2data{$position}} );
 			}
 		}
 	}
