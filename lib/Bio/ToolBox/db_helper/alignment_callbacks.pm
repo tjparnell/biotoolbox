@@ -641,4 +641,30 @@ sub _reverse_name_array {
 	push @{ $data->{scores} }, $a->qname;
 }
 
+__END__
+
+=head1 NAME
+
+Bio::ToolBox::db_helper::alignment_callbacks
+
+=head1 DESCRIPTION
+
+This module provides common callback subroutines for working with bam alignments. 
+It is generalized and may be used with either L<Bio::DB::Sam> or L<Bio::DB::HTS> 
+alignments. 
+
+It's not meant to be used by individuals. 
+Please see L<Bio::ToolBox::db_helper::bam> or L<Bio::ToolBox::db_helper::hts>.
+
+=head1 AUTHOR
+
+ Timothy J. Parnell, PhD
+ Huntsman Cancer Institute
+ University of Utah
+ Salt Lake City, UT, 84112
+
+This package is free software; you can redistribute it and/or modify
+it under the terms of the Artistic License 2.0.  
+
+
 
