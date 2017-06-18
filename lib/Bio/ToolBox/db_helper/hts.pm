@@ -228,15 +228,6 @@ sub collect_bam_scores {
 		}
 	}
 	
-	# process the ncount arrays
-	if ($param->[RETT] == 2 and $param->[METH] eq 'ncount') {
-		foreach my $position (keys %pos2data) {
-			my %name2count;
-			foreach (@{$pos2data{$position}}) { $name2count{$_} += 1 }
-			$pos2data{$position} = scalar(keys %name2count);
-		}
-	}
-	
 	## Return collected data
 	if ($param->[RETT] == 2) {
 		return wantarray ? %pos2data : \%pos2data;
