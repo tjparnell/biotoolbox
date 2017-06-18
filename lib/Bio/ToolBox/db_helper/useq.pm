@@ -231,8 +231,8 @@ sub collect_useq_position_scores {
 	}
 	elsif ($param->[METH] eq 'mean') {
 		foreach my $position (keys %pos2score) {
-			$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-									scalar( @{$pos2data{$position}} );
+			$pos2score{$position} = sum( @{$pos2score{$position}} ) / 
+									scalar( @{$pos2score{$position}} );
 		}
 	}
 	elsif ($param->[METH] eq 'median') {
@@ -258,8 +258,8 @@ sub collect_useq_position_scores {
 	else {
 		# just take the mean for everything else
 		foreach my $position (keys %pos2score) {
-			$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
-									scalar( @{$pos2data{$position}} );
+			$pos2score{$position} = sum( @{$pos2score{$position}} ) / 
+									scalar( @{$pos2score{$position}} );
 		}
 	}
 	
