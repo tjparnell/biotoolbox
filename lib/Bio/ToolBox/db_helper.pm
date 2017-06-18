@@ -2190,13 +2190,16 @@ sub low_level_bam_fetch {
 	unless ($BAM_ADAPTER) {
 		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
-	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
 		return $sam->hts_index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
 	}
-	else {
-		# assume using Bio::DB::Sam
+	elsif ($BAM_ADAPTER eq 'sam') {
+		# using Bio::DB::Sam
 		return $sam->bam_index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
+	}
+	else {
+		confess "no bam adapter loaded!\n";
 	}
 }
 
@@ -2208,13 +2211,16 @@ sub low_level_bam_coverage {
 	unless ($BAM_ADAPTER) {
 		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
-	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
 		return $sam->hts_index->coverage($sam->hts_file, $tid, $start, $stop);
 	}
-	else {
-		# assume using Bio::DB::Sam
+	elsif ($BAM_ADAPTER eq 'sam') {
+		# using Bio::DB::Sam
 		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
+	}
+	else {
+		confess "no bam adapter loaded!\n";
 	}
 }
 
@@ -2467,9 +2473,11 @@ sub _load_helper_module {
 sub _load_bam_helper_module {
 	if ($BAM_ADAPTER =~ /sam/i) {
 		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
+		$BAM_ADAPTER = 'sam'; # for internal consistency
 	}
 	elsif ($BAM_ADAPTER =~ /hts/i) {
 		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+		$BAM_ADAPTER = 'hts'; # for internal consistency
 	}
 	elsif ($BAM_ADAPTER =~ /none/i) {
 		# basically for testing purposes, don't use a module
