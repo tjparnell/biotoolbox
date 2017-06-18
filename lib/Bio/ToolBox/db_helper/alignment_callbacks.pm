@@ -333,86 +333,147 @@ sub assign_callback {
 #### Callback subroutines 
 # the following are all of the callback subroutines 
 
+# we explicitly check that alignment start and/or stop overlap the search coordinates
+# to avoid e.g. weird alignments with massive splice junctions that would nevertheless 
+# be pulled out by the bam index search
+
 sub _all_count_indexed {
 	my ($a, $data) = @_;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{start} and $pos <= $data->{stop} );
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($a->reversed) {
+		$data->{'index'}{$e}++;
+	}
+	else {
+		$data->{'index'}{$s}++;
+	}
 }
 
 sub _all_precise_count_indexed {
 	my ($a, $data) = @_;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
+	my $s = $a->pos + 1;
+	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
+	if ($a->reversed) {
+		$data->{'index'}{$s}++;
+	}
+	else {
+		$data->{'index'}{$a->calend}++;
+	}
 }
 
 sub _all_name_indexed {
 	my ($a, $data) = @_;
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos} ||= [];
-	push @{ $data->{'index'}{$pos} }, $a->qname;
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($a->reversed) {
+		# since we're working with names, only record the 5' end of fragment
+		return if ($a->paired and $a->proper_pair); # not the end we're looking for
+		$data->{'index'}{$e} ||= [];
+		push @{ $data->{'index'}{$e} }, $a->qname;
+	}
+	else {
+		$data->{'index'}{$s} ||= [];
+		push @{ $data->{'index'}{$s} }, $a->qname;
+# 		$data->{'index'}{$s} .= $a->qname . "\t";
+# 		$data->{'index'}{$a->qname} = $s;
+	}
 }
 
 sub _all_count_array {
 	my ($a, $data) = @_;
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
 	push @{$data->{scores}}, 1;
 }
 
 sub _all_precise_count_array {
 	my ($a, $data) = @_;
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
+	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
 }
 
 sub _all_name_array {
 	my ($a, $data) = @_;
-	push @{ $data->{scores} }, $a->qname; # query or read name
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	push @{ $data->{scores} }, $a->qname;
 }
 
 sub _forward_count_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $r;
 	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{start} and $pos <= $data->{stop} );
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($r) {
+		$data->{'index'}{$e}++;
+	}
+	else {
+		$data->{'index'}{$s}++;
+	}
 }
 
 sub _forward_precise_count_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $r;
 	}
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
+	my $s = $a->pos + 1;
+	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
+	if ($r) {
+		$data->{'index'}{$s}++;
+	}
+	else {
+		$data->{'index'}{$a->calend}++;
+	}
 }
 
 sub _forward_name_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $r;
 	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos} ||= [];
-	push @{ $data->{'index'}{$pos} }, $a->qname;
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($r) {
+		$data->{'index'}{$e} ||= [];
+		push @{ $data->{'index'}{$e} }, $a->qname;
+	}
+	else {
+		$data->{'index'}{$s} ||= [];
+		push @{ $data->{'index'}{$s} }, $a->qname;
+	}
 }
 
 sub _forward_count_array {
@@ -425,6 +486,10 @@ sub _forward_count_array {
 	else {
 		return if $a->reversed;
 	}
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
 	push @{$data->{scores}}, 1;
 }
 
@@ -438,7 +503,7 @@ sub _forward_precise_count_array {
 	else {
 		return if $a->reversed;
 	}
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
+	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
 }
 
@@ -452,52 +517,80 @@ sub _forward_name_array {
 	else {
 		return if $a->reversed;
 	}
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
 	push @{ $data->{scores} }, $a->qname;
 }
 
 sub _reverse_count_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $r;
 	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++ if 
-		( $pos >= $data->{start} and $pos <= $data->{stop} );
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($r) {
+		$data->{'index'}{$e}++;
+	}
+	else {
+		$data->{'index'}{$s}++;
+	}
 }
 
 sub _reverse_precise_count_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $r;
 	}
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos}++;
+	my $s = $a->pos + 1;
+	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
+	if ($r) {
+		$data->{'index'}{$s}++;
+	}
+	else {
+		$data->{'index'}{$a->calend}++;
+	}
 }
 
 sub _reverse_name_indexed {
 	my ($a, $data) = @_;
+	my $r = $a->reversed;
 	if ($a->paired) {
 		my $first = $a->get_tag_values('FIRST_MATE');
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $r;
 	}
-	my $pos = int( ($a->pos + 1 + $a->calend) / 2);
-	$data->{'index'}{$pos} ||= [];
-	push @{ $data->{'index'}{$pos} }, $a->qname;
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
+	if ($r) {
+		$data->{'index'}{$e} ||= [];
+		push @{ $data->{'index'}{$e} }, $a->qname;
+	}
+	else {
+		$data->{'index'}{$s} ||= [];
+		push @{ $data->{'index'}{$s} }, $a->qname;
+	}
 }
 
 sub _reverse_count_array {
@@ -510,6 +603,10 @@ sub _reverse_count_array {
 	else {
 		return unless $a->reversed;
 	}
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
 	push @{$data->{scores}}, 1;
 }
 
@@ -523,7 +620,7 @@ sub _reverse_precise_count_array {
 	else {
 		return unless $a->reversed;
 	}
-	return unless ($a->pos >= $data->{start} and $a->calend <= $data->{stop} );
+	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
 }
 
@@ -537,6 +634,10 @@ sub _reverse_name_array {
 	else {
 		return unless $a->reversed;
 	}
+	my $s = $a->pos + 1;
+	my $e = $a->calend;
+	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
+					($e >= $data->{start} and $e <= $data->{stop}) );
 	push @{ $data->{scores} }, $a->qname;
 }
 
