@@ -19,7 +19,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.50';
+my $VERSION = '1.51';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -622,7 +622,6 @@ sub record_the_bin_values {
 	# get the passed values
 	my ($row, $length, $regionscores) = @_;
 	
-	
 	# assign the scores to the bins in the region
 	for my $column ($startcolumn..($Data->last_column) ) {
 		# we will step through each data column, representing each window (bin)
@@ -671,11 +670,9 @@ sub record_the_bin_values {
 		}
 		
 		# collect the scores for this window
-		my @scores;
-		for (my $n = $start; $n <= $stop; $n++) {
-			# we will walk through each bp in the window looking for a score
-			push @scores, $regionscores->{$n} if exists $regionscores->{$n};
-		}
+		my @scores = 	map { $regionscores->{$_} } 
+						grep { $_ >= $start and $_ <= $stop}
+						keys %$regionscores;
 		
 		# calculate the value
 		my $window_score = calculate_score($method, \@scores);
