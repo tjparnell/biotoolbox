@@ -1972,7 +1972,17 @@ sub calculate_score {
 	elsif ($method eq 'ncount') {
 		# Convert names into unique counts
 		my %name2count;
-		foreach (@$scores) { $name2count{$_} += 1 }
+		foreach my $s (@$scores) { 
+			if (ref($s) eq 'ARRAY') {
+				# this is likely from a ncount indexed hash
+				foreach (@$s) {
+					$name2count{$_} += 1;
+				} 
+			}
+			else {
+				$name2count{$s} += 1;
+			}
+		}
 		return scalar(keys %name2count);
 	}
 	elsif ($method eq 'range') {
