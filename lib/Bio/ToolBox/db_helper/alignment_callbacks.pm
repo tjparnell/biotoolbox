@@ -411,9 +411,9 @@ sub _forward_count_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and $r);
+		return if (not $first and not $r);
 	}
 	else {
 		return if $r;
@@ -434,9 +434,9 @@ sub _forward_precise_count_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and $r);
+		return if (not $first and not $r);
 	}
 	else {
 		return if $r;
@@ -455,9 +455,9 @@ sub _forward_name_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and $r);
+		return if (not $first and not $r);
 	}
 	else {
 		return if $r;
@@ -479,7 +479,7 @@ sub _forward_name_indexed {
 sub _forward_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
@@ -496,7 +496,7 @@ sub _forward_count_array {
 sub _forward_precise_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
@@ -510,7 +510,7 @@ sub _forward_precise_count_array {
 sub _forward_name_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and $a->reversed);
 		return if (not $first and not $a->reversed);
 	}
@@ -528,9 +528,9 @@ sub _reverse_count_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and not $r);
+		return if (not $first and $r);
 	}
 	else {
 		return unless $r;
@@ -551,9 +551,9 @@ sub _reverse_precise_count_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and not $r);
+		return if (not $first and $r);
 	}
 	else {
 		return unless $r;
@@ -572,9 +572,9 @@ sub _reverse_name_indexed {
 	my ($a, $data) = @_;
 	my $r = $a->reversed;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
+		return if ($first and not $r);
+		return if (not $first and $r);
 	}
 	else {
 		return unless $r;
@@ -596,7 +596,7 @@ sub _reverse_name_indexed {
 sub _reverse_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
@@ -613,7 +613,7 @@ sub _reverse_count_array {
 sub _reverse_precise_count_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
@@ -627,7 +627,7 @@ sub _reverse_precise_count_array {
 sub _reverse_name_array {
 	my ($a, $data) = @_;
 	if ($a->paired) {
-		my $first = $a->get_tag_values('FIRST_MATE');
+		my $first = $a->flag & 0x40; # true if FIRST_MATE
 		return if ($first and not $a->reversed);
 		return if (not $first and $a->reversed);
 	}
