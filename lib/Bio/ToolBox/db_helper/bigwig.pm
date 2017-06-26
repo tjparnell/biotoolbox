@@ -4,21 +4,11 @@ package Bio::ToolBox::db_helper::bigwig;
 require Exporter;
 use strict;
 use Carp;
-use Statistics::Lite qw(min max mean);
+use List::Util qw(min max sum);
+use Bio::ToolBox::db_helper::constants;
 use Bio::DB::BigWig qw(binMean binStdev);
 use Bio::DB::BigWigSet;
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 
 # Exported names
@@ -481,7 +471,7 @@ sub _remove_duplicate_positions {
 			push @values, $pos2data->{ "$pos\.$i" };
 			delete $pos2data->{ "$pos\.$i" };
 		}
-		$pos2data->{$pos} = mean(@values);
+		$pos2data->{$pos} = sum(@values) / scalar(@values);
 	}
 }
 

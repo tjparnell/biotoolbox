@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -1316,7 +1316,7 @@ sub _get_subfeature_scores {
 	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_transcript_cds_length get_exons));
+		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1508,16 +1508,21 @@ sub _get_subfeature_position_scores {
 	# we will adjust the positions of each reported score so that 
 	# it will appear as if all the exons are adjacent to each other
 	# and no introns exist
-	my %pos2data;
+	my $pos2data = {};
+	my $namecheck = {}; # to check unique names when using ncount method....
 	my $current_end = $feature->start;
 	my $adjustment = 0;
 	foreach my $exon (get_exons($feature)) {
 		
+		# exon positions
+		my $start = $exon->start;
+		my $end = $exon->end;
+		
 		# collect scores
 		my $exon_scores = get_segment_score(
 			$exon->seq_id,
-			$exon->start,
-			$exon->end,
+			$start,
+			$end,
 			$fstrand, 
 			$args->{strandedness}, 
 			$args->{method},
@@ -1526,11 +1531,10 @@ sub _get_subfeature_position_scores {
 			$args->{dataset}, 
 		);
 		
-		# adjust scores
-		$adjustment = $exon->start - $current_end;
-		foreach my $p (keys %$exon_scores) {
-			$pos2data{ $p - $adjustment } = $exon_scores->{$p};
-		}
+		# adjust the scores
+		$adjustment = $start - $current_end;
+		$self->_process_exon_scores($exon_scores, $pos2data, $adjustment, $start, $end, 
+			$namecheck, $args->{method});
 		
 		# reset
 		$current_end += $exon->length;
@@ -1539,10 +1543,12 @@ sub _get_subfeature_position_scores {
 	# collect extensions if requested
 	if ($args->{extension}) {
 		# left side
+		my $start = $feature->start - $args->{extension};
+		my $end = $feature->start - 1;
 		my $ext_scores = get_segment_score(
 			$feature->seq_id,
-			$feature->start - $args->{extension},
-			$feature->start - 1,
+			$start,
+			$end,
 			$fstrand, 
 			$args->{strandedness}, 
 			$args->{method},
@@ -1550,16 +1556,19 @@ sub _get_subfeature_position_scores {
 			$ddb,
 			$args->{dataset}, 
 		);
-		foreach my $p (keys %$ext_scores) {
-			# no adjustment should be needed
-			$pos2data{$p} = $ext_scores->{$p};
-		}
+
+		# no adjustment should be needed
+		$self->_process_exon_scores($ext_scores, $pos2data, 0, $start, $end, 
+			$namecheck, $args->{method});
+		
 		
 		# right side
+		$start = $feature->end + $args->{extension};
+		$end = $feature->end + 1;
 		$ext_scores = get_segment_score(
 			$feature->seq_id,
-			$feature->end + $args->{extension},
-			$feature->end + 1,
+			$start,
+			$end,
 			$fstrand, 
 			$args->{strandedness}, 
 			$args->{method},
@@ -1567,21 +1576,21 @@ sub _get_subfeature_position_scores {
 			$ddb,
 			$args->{dataset}, 
 		);
-		foreach my $p (keys %$ext_scores) {
-			# the adjustment should be the same as the last exon
-			$pos2data{$p - $adjustment} = $ext_scores->{$p};
-		}
+
+		# the adjustment should be the same as the last exon
+		$self->_process_exon_scores($ext_scores, $pos2data, $adjustment, $start, $end, 
+			$namecheck, $args->{method});
 	}
 	
 	# covert to relative positions
 	if ($args->{absolute}) {
 		# do not convert to relative positions
-		return wantarray ? %pos2data : \%pos2data;
+		return wantarray ? %$pos2data : $pos2data;
 	}
 	else {
 		# return data converted to relative positions
 		$self->_calculate_reference($args);
-		return $self->_convert_to_relative_positions(\%pos2data, 
+		return $self->_convert_to_relative_positions($pos2data, 
 			$args->{coordinate}, $fstrand);
 	}
 }
@@ -1689,6 +1698,37 @@ sub _convert_to_relative_positions {
 	return wantarray ? %relative_pos2data : \%relative_pos2data;
 }
 
+sub _process_exon_scores {
+	my ($self, $exon_scores, $pos2data, $adjustment, $start, $end, 
+		$namecheck, $method) = @_;
+	
+	# ncount method
+	if ($method eq 'ncount') {
+		# we need to check both names and adjust position
+		foreach my $p (keys %$exon_scores) {
+			next unless ($p >= $start and $p <= $end); 
+			foreach my $n (@{ $exon_scores->{$p} }) {
+				if (exists $namecheck->{$n} ) {
+					$namecheck->{$n}++;
+					next;
+				}
+				else {
+					$namecheck->{$n} = 1;
+					my $a = $p - $adjustment;
+					$pos2data->{$a} ||= [];
+					push @{ $pos2data->{$a} }, $n;
+				}
+			}
+		}
+	}
+	else {
+		# just adjust scores
+		foreach my $p (keys %$exon_scores) {
+			next unless ($p >= $start and $p <= $end); 
+			$pos2data->{ $p - $adjustment } = $exon_scores->{$p};
+		}
+	}
+}
 
 ### String export
 

@@ -4,23 +4,14 @@ require Exporter;
 use Carp;
 use strict;
 use Module::Load; # for dynamic loading during runtime
-use Statistics::Lite qw(mean);
+use List::Util qw(min max sum);
+use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
 
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 our $WIGGLE_OK = 0;
 
 # Exported names
@@ -334,7 +325,8 @@ sub collect_store_scores {
 		}
 		elsif ($param->[METH] eq 'mean') {
 			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = mean( @{$pos2data{$position}} );
+				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
+										scalar( @{$pos2data{$position}} );
 			}
 		}
 		elsif ($param->[METH] eq 'median') {
@@ -360,7 +352,8 @@ sub collect_store_scores {
 		else {
 			# just take the mean for everything else
 			foreach my $position (keys %pos2data) {
-				$pos2data{$position} = mean( @{$pos2data{$position}} );
+				$pos2data{$position} = sum( @{$pos2data{$position}} ) / 
+										scalar( @{$pos2data{$position}} );
 			}
 		}
 	}

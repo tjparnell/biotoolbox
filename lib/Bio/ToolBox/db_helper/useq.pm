@@ -4,20 +4,11 @@ package Bio::ToolBox::db_helper::useq;
 require Exporter;
 use strict;
 use Carp;
-use Statistics::Lite qw(mean);
+use List::Util qw(min max sum);
+use Statistics::Lite qw(median);
+use Bio::ToolBox::db_helper::constants;
 use Bio::DB::USeq;
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 
 # Exported names
@@ -240,7 +231,8 @@ sub collect_useq_position_scores {
 	}
 	elsif ($param->[METH] eq 'mean') {
 		foreach my $position (keys %pos2score) {
-			$pos2score{$position} = mean( @{$pos2score{$position}} );
+			$pos2score{$position} = sum( @{$pos2score{$position}} ) / 
+									scalar( @{$pos2score{$position}} );
 		}
 	}
 	elsif ($param->[METH] eq 'median') {
@@ -266,7 +258,8 @@ sub collect_useq_position_scores {
 	else {
 		# just take the mean for everything else
 		foreach my $position (keys %pos2score) {
-			$pos2score{$position} = mean( @{$pos2score{$position}} );
+			$pos2score{$position} = sum( @{$pos2score{$position}} ) / 
+									scalar( @{$pos2score{$position}} );
 		}
 	}
 	

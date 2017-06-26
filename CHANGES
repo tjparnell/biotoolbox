@@ -1,11 +1,19 @@
 ######## Bio::ToolBox revision history #############
 
 v1.51
+	- Changed how bam alignments are recorded for indexed position 
+	data hashes. Alignments are now recorded at their 5' postion 
+	instead of midpoint, which wrecked havoc with large gaps and pairs.
+	- Reporting indexed bam alignment names (ncount method) now returns 
+	the actual names rather than count. The db_helper calculate_score 
+	method can properly count these. This avoids double-counting across 
+	exons, etc. 
+	- Fix major bug in script bam2wig that prevented paired-end 
+	alignments from working. Thanks to Mengyao for pointing this out.
 	- Add additional checks when loading malformed files that have a 
 	missing column header or extraneous hidden columns (extra tabs)
 	- Add format checks for numeric columns in some file formats
-	- Fix major bug in script bam2wig that prevented paired-end 
-	alignments from working
+	- Miscellaneous code improvements here and there
 	
 v1.50
 	- Major upgrade of the data collection libraries to simplify data 
