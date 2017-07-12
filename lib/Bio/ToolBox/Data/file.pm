@@ -1299,6 +1299,9 @@ sub add_standard_metadata {
 	
 	# we will define the columns based on
 	for my $i (0..$#namelist) {
+		# make up a name if one doesn't exist
+		$namelist[$i] ||= "Column_$i";
+		
 		# confirm that a file metadata exists for this column
 		if (exists $self->{$i}) {
 			unless ($namelist[$i] eq $self->{$i}->{'name'}) {
