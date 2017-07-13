@@ -60,6 +60,8 @@ provides:
   Bio::ToolBox::db_helper::config:
     file: lib/Bio/ToolBox/db_helper/config.pm
     version: '1.14'
+  Bio::ToolBox::db_helper::constants:
+    file: lib/Bio/ToolBox/db_helper/constants.pm
   Bio::ToolBox::db_helper::hts:
     file: lib/Bio/ToolBox/db_helper/hts.pm
     version: '1.51'
