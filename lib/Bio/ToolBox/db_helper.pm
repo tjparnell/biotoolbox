@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.50';
+our $VERSION = '1.51';
 
 =head1 NAME
 
@@ -724,18 +724,8 @@ use Module::Load; # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::config;
+use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
-use constant {
-	CHR  => 0,  # chromosome
-	STRT => 1,  # start
-	STOP => 2,  # stop
-	STR  => 3,  # strand
-	STND => 4,  # strandedness
-	METH => 5,  # method
-	RETT => 6,  # return type
-	DB   => 7,  # database object
-	DATA => 8,  # first dataset, additional may be present
-};
 
 # check values for dynamically loaded helper modules
 # these are loaded only when needed during runtime to avoid wasting resources
@@ -1982,7 +1972,17 @@ sub calculate_score {
 	elsif ($method eq 'ncount') {
 		# Convert names into unique counts
 		my %name2count;
-		foreach (@$scores) { $name2count{$_} += 1 }
+		foreach my $s (@$scores) { 
+			if (ref($s) eq 'ARRAY') {
+				# this is likely from a ncount indexed hash
+				foreach (@$s) {
+					$name2count{$_} += 1;
+				} 
+			}
+			else {
+				$name2count{$s} += 1;
+			}
+		}
 		return scalar(keys %name2count);
 	}
 	elsif ($method eq 'range') {
@@ -2190,13 +2190,16 @@ sub low_level_bam_fetch {
 	unless ($BAM_ADAPTER) {
 		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
-	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
 		return $sam->hts_index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
 	}
-	else {
-		# assume using Bio::DB::Sam
+	elsif ($BAM_ADAPTER eq 'sam') {
+		# using Bio::DB::Sam
 		return $sam->bam_index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
+	}
+	else {
+		confess "no bam adapter loaded!\n";
 	}
 }
 
@@ -2208,13 +2211,16 @@ sub low_level_bam_coverage {
 	unless ($BAM_ADAPTER) {
 		$BAM_ADAPTER = ref($sam) =~ /hts/i ? 'hts' : 'sam';
 	}
-	if ($BAM_ADAPTER eq 'hts' or $BAM_ADAPTER =~ /hts/i) {
+	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
 		return $sam->hts_index->coverage($sam->hts_file, $tid, $start, $stop);
 	}
-	else {
-		# assume using Bio::DB::Sam
+	elsif ($BAM_ADAPTER eq 'sam') {
+		# using Bio::DB::Sam
 		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
+	}
+	else {
+		confess "no bam adapter loaded!\n";
 	}
 }
 
@@ -2467,9 +2473,11 @@ sub _load_helper_module {
 sub _load_bam_helper_module {
 	if ($BAM_ADAPTER =~ /sam/i) {
 		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::bam');
+		$BAM_ADAPTER = 'sam'; # for internal consistency
 	}
 	elsif ($BAM_ADAPTER =~ /hts/i) {
 		$BAM_OK = _load_helper_module('Bio::ToolBox::db_helper::hts');
+		$BAM_ADAPTER = 'hts'; # for internal consistency
 	}
 	elsif ($BAM_ADAPTER =~ /none/i) {
 		# basically for testing purposes, don't use a module

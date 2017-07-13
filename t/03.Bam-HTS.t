@@ -171,13 +171,13 @@ my %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
 	'method'   => 'count',
 );
-is(scalar keys %pos2scores, 110, 'number of positioned scores');
+is(scalar keys %pos2scores, 150, 'number of positioned scores');
 # print "found ", scalar keys %pos2scores, " positions with reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is($pos2scores{1}, 1, 'positioned count at 1');
-is($pos2scores{20}, 2, 'positioned count at 20');
+is($pos2scores{6}, 1, 'positioned count at 6');
+is($pos2scores{-21}, 2, 'positioned count at -21');
 
 %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
@@ -187,9 +187,9 @@ is($pos2scores{20}, 2, 'positioned count at 20');
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is(scalar keys %pos2scores, 86, 'number of precise positioned scores');
+is(scalar keys %pos2scores, 89, 'number of precise positioned scores');
 is($pos2scores{37}, 1, 'precise positioned count at 37');
-is($pos2scores{50}, 2, 'precise positioned count at 50');
+is($pos2scores{72}, 2, 'precise positioned count at 72');
 
 %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
@@ -197,11 +197,11 @@ is($pos2scores{50}, 2, 'precise positioned count at 50');
 );
 # print "found ", scalar keys %pos2scores, " positions of named reads\n";
 # foreach (sort {$a <=> $b} keys %pos2scores) {
-# 	print "  $_ => $pos2scores{$_}\n";
+# 	printf "  $_ => %s\n", join(',', @{$pos2scores{$_}});
 # }
-is(scalar keys %pos2scores, 140, 'number of named positioned scores');
-is($pos2scores{-16}, 3, 'positioned named count at -16');
-is($pos2scores{38}, 2, 'positioned named count at 38');
+is(scalar keys %pos2scores, 150, 'number of named positioned scores');
+is($pos2scores{6}->[0], 'HWI-EAS240_0001:7:64:6158:10466#0/1', 'positioned named at 6');
+is(scalar @{$pos2scores{56}}, 2, 'positioned name count at 56');
 
 %pos2scores = $row->get_region_position_scores(
 	'dataset'  => $dataset,
@@ -213,6 +213,6 @@ is($pos2scores{38}, 2, 'positioned named count at 38');
 # foreach (sort {$a <=> $b} keys %pos2scores) {
 # 	print "  $_ => $pos2scores{$_}\n";
 # }
-is(scalar keys %pos2scores, 63, 'number of positioned scores');
-is($pos2scores{57556}, 2, 'positioned score at 57556');
-is($pos2scores{57840}, 1, 'positioned score at 57840');
+is(scalar keys %pos2scores, 79, 'number of positioned scores');
+is($pos2scores{57593}, 2, 'positioned score at 57593');
+is($pos2scores{57613}, 1, 'positioned score at 57613');

@@ -10,6 +10,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
 	low_level_bam_fetch
+	$BAM_ADAPTER
 );
 use Bio::ToolBox::utility qw(
 	format_with_commas
@@ -27,7 +28,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.50';
+my $VERSION = '1.51';
 	
 	
 
@@ -126,7 +127,7 @@ GetOptions(
 	'minsize=i' => \$min_isize, # minimum paired insert size to accept
 	'fraction!'  => \$multi_hit_scale, # scale by number of hits
 	'rpm!'      => \$rpm, # calculate reads per million
-	'separate!' => \$do_mean, # rpm scale separately
+	'separate|mean!' => \$do_mean, # rpm scale separately
 	'scale=f'   => \@scale_values, # user specified scale value
 	'chrskip=s' => \$chr_exclude, # regex for skipping chromosomes
 	'blacklist=s' => \$black_list, # file for skipping regions
@@ -141,6 +142,7 @@ GetOptions(
 	'intron=i'  => \$max_intron, # maximum intron size to allow
 	'window=i'  => \$window, # window size to control memory usage
 	'verbose!'  => \$verbose, # print sample correlations
+	'adapter=s' => \$BAM_ADAPTER, # explicitly set the adapter version
 	'help'      => \$help, # request help
 	'version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -210,7 +212,7 @@ if ($splice) {
 		'Bio::DB::HTS::AlignWrapper';
 	eval { require $wrapper_ref; 1 };
 }
-
+printf " Using the %s Bam adapter\n", ref($sams[0]) if $verbose;
 
 ### Process user provided black lists
 my $black_list_hash = process_black_list();
@@ -1959,10 +1961,16 @@ sub pe_callback {
 	my ($a, $data) = @_;
 	
 	# check paired status
-	return unless $a->proper_pair;
-	return unless $a->tid == $a->mtid; # same chromosome, redundant with proper_pair?
-	return if $a->isize > $max_isize;
-	return if $a->isize < $min_isize;
+	return unless $a->proper_pair; # both alignments are mapped
+	return unless $a->tid == $a->mtid; # same chromosome?
+	my $isize = $a->isize; 
+	if ($a->reversed) {
+		# in proper FR pairs reverse alignments are negative
+		return if $isize > 0; # pair is RF orientation
+		$isize = abs($isize);
+	}
+	return if $isize > $max_isize;
+	return if $isize < $min_isize;
 	
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
@@ -1985,10 +1993,8 @@ sub pe_callback {
 	}
 	
 	# look for pair
-	my $f; # the forward alignment
 	if ($a->reversed) {
-		$f = $data->{pair}->{$a->qname} || undef;
-		return unless $f; # no pair, no record
+		my $f = $data->{pair}->{$a->qname} or return;
 		delete $data->{pair}->{$a->qname};
 		
 		# scale by number of hits
@@ -2474,7 +2480,7 @@ bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
  
  Reporting options (pick one):
   --start                       record at 5' position
-  --mid                         record at midpoint of alignment
+  --mid                         record at midpoint of alignment or pair
   --span                        record across entire alignment or pair
   --extend                      extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
@@ -2511,7 +2517,7 @@ bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
  Score options:
   --rpm                         scale depth to Reads Per Million mapped
   --scale <float>               explicit scaling factor, repeat for each bam file
-  --separate                    scale multiple bam files independently before merging
+  --mean or --separate          scale multiple bams independently before averaging
   --fraction                    assign fractional counts to all multi-mapped alignments                    
   --format <integer>            number of decimal positions (4)
  
@@ -2779,21 +2785,23 @@ supplied for each bam file. If supplying multiple, use the option multiple
 times or give a comma-delimited list. The values should be in the same order 
 as the bam files. 
 
---separate
+=item --mean
 
-When combining multiple bam files with the rpm option, scale each bam file 
-separately before adding together. This allows for a more accurate averaging 
-of replicates without biasing towards samples with more reads. Otherwise, 
-the default behavior is to simply add the files together prior to scaling. 
+=item --separate
 
---fraction
+When processing multiple bam files, this option will take the mean or average 
+across all bam files. Without this option, the bam files are simply added. 
+When combined with the rpm option, each bam file will be scaled separately 
+before taking the average.  
+
+=item --fraction
 
 Indicate that multi-mapping alignments should be given fractional counts 
 instead of full counts. The number of alignments is determined using the 
 NH alignment tag. If a read has 10 alignments, then each alignment is 
 given a count of 0.1. 
 
---format <integer>
+=item --format <integer>
 
 Indicate the number of decimal postions reported in the wig file. This 
 is only applicable when rpm, scale, or fraction options are provided. 

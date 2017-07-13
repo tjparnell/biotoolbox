@@ -25,7 +25,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.50';
+my $VERSION = '1.51';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -594,12 +594,9 @@ sub map_relative_data {
 			my $stop = $Data->metadata($column, 'stop');
 		
 			# collect a score at each position in the window
-			my @scores;
-			for (my $n = $start; $n <= $stop; $n++) {
-				# we will walk through the window one bp at a time
-				# look for a score associated with the position
-				push @scores, $regionscores->{$n} if exists $regionscores->{$n};
-			}
+			my @scores = 	map { $regionscores->{$_} } 
+							grep { $_ >= $start and $_ <= $stop}
+							keys %$regionscores;
 			
 			# put the value into the data table
 			$row->value($column, calculate_score($method, \@scores) );
