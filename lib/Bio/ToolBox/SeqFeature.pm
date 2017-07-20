@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.44';
+our $VERSION = '1.52';
 
 =head1 NAME
 
@@ -506,7 +506,7 @@ sub display_name {
 	if (@_) {
 		$self->[NAME] = $_[0];
 	}
-	return defined $self->[NAME] ? $self->[NAME] : $self->[ID];
+	return defined $self->[NAME] ? $self->[NAME] : $self->primary_id;
 }
 
 sub primary_id {
@@ -600,7 +600,7 @@ sub add_SeqFeature {
 
 sub get_SeqFeatures {
 	my $self = shift;
-	$self->[SUBF] ||= [];
+	return unless $self->[SUBF];
 	my @children;
 	foreach (@{ $self->[SUBF] }) {
 		push @children, $_;
@@ -628,13 +628,13 @@ sub add_tag_value {
 
 sub has_tag {
 	my ($self, $key) = @_;
-	$self->[ATTRB] ||= {};
+	return unless $self->[ATTRB];
 	return exists $self->[ATTRB]->{$key};
 }
 
 sub get_tag_values {
 	my ($self, $key) = @_;
-	$self->[ATTRB] ||= {};
+	return unless $self->[ATTRB];
 	if (exists $self->[ATTRB]->{$key}) {
 		if (ref($self->[ATTRB]->{$key}) eq 'ARRAY') {
 			return wantarray ? @{ $self->[ATTRB]->{$key} } : $self->[ATTRB]->{$key};
@@ -650,20 +650,20 @@ sub get_tag_values {
 
 sub attributes {
 	my $self = shift;
-	$self->[ATTRB] ||= {};
+	return unless $self->[ATTRB];
 	return wantarray ? %{ $self->[ATTRB] } : $self->[ATTRB];
 }
 
 sub all_tags {
 	my $self = shift;
-	$self->[ATTRB] ||= {};
+	return unless $self->[ATTRB];
 	my @k = keys %{ $self->[ATTRB] };
 	return wantarray ? @k : \@k;
 }
 
 sub remove_tag {
 	my ($self, $key) = @_;
-	$self->[ATTRB] ||= {};
+	return unless $self->[ATTRB];
 	if (exists $self->[ATTRB]->{$key}) {
 		delete $self->[ATTRB]->{$key};
 	}
