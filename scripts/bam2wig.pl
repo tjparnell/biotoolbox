@@ -28,7 +28,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.51';
+my $VERSION = '1.52';
 	
 	
 
@@ -236,9 +236,11 @@ if ($shift or $use_extend) {
 		print " Alignments will be shifted by $shift_value bp\n";
 	}
 }
-# set another global value
+# set center extension global value
 my $half_extend = int($extend_value / 2);
-
+if ($use_cspan) {
+	print " Alignments will be center extended by $half_extend bp both directions\n";
+}
 
 ### Process bam file
 # process according to type of data collected and alignment type
@@ -622,9 +624,8 @@ sub check_defaults {
 }
 
 sub process_black_list {
-	if ($black_list) {
-		eval {require 'Bio::ToolBox::Data';1;} or 
-			die "unable to load Bio::ToolBox::Data!!!\n";
+	if ($black_list and -e $black_list) {
+		eval {require 'Bio::ToolBox::Data'};
 		eval {require 'Set::IntervalTree';1;} or 
 			do {
 				warn " PROBLEM! Please install Set::IntervalTree to use black lists\n";
@@ -1316,6 +1317,7 @@ sub process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
+				print " Scaling depth with user-supplied factor\n";
 				if (@norms) {
 					for my $i (0 .. $#norms) {
 						$norms[$i] *= $scale_values[$i];
@@ -1325,6 +1327,7 @@ sub process_alignments {
 					@norms = @scale_values;
 				}
 			}
+			printf "  Normalization factors: %s\n", join(' ', @norms) if $verbose;
 			
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
@@ -1468,6 +1471,7 @@ sub parallel_process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
+				print " Scaling depth with user-supplied factor\n";
 				if (@norms) {
 					for my $i (0 .. $#norms) {
 						$norms[$i] *= $scale_values[$i];
@@ -1477,6 +1481,7 @@ sub parallel_process_alignments {
 					@norms = @scale_values;
 				}
 			}
+			printf "  Normalization factors: %s\n", join(' ', @norms) if $verbose;
 			
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
