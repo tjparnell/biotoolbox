@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.44';
+our $VERSION = '1.52';
 
 =head1 NAME
 
@@ -136,6 +136,10 @@ common exons, "uncommon" will be uncommon exons (used more than once but
 less than all), and each transcript ID will include their specific alternate 
 exons (used only once).
 
+For genes with only a single transcript, all exons will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
+
 =back
 
 =head2 Intron Methods
@@ -180,6 +184,10 @@ reference with the introns for that category. The "common" will be all
 common introns, "uncommon" will be uncommon introns (used more than once but 
 less than all), and each transcript ID will include their specific alternate 
 introns (used only once).
+
+For genes with only a single transcript, all introns will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
 
 =back
 
@@ -675,10 +683,10 @@ sub _get_alt_common_things {
 	
 	# only one transcript provided?
 	if (scalar @transcripts == 1) {
-		# all exons are alternate by definition
-		my $name = $transcripts[0]->display_name;
+		# all exons are common by definition
+# 		my $name = $transcripts[0]->display_name;
 		my @things = $do_exon ? get_exons($transcripts[0]) : get_introns($transcripts[0]);
-		$tx2things{$name} = \@things;
+		$tx2things{common} = \@things;
 		return \%tx2things;
 	}
 	
