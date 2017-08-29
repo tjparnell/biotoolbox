@@ -15,7 +15,7 @@ use Bio::ToolBox::db_helper qw(
 	validate_included_feature
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.24;
+my $VERSION = 1.52;
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -39,6 +39,7 @@ my (
 	$start,
 	$stop,
 	$extend,
+	$adjustment_position,
 	$reference_position,
 	$outfile,
 	$gz,
@@ -52,6 +53,7 @@ GetOptions(
 	'feature=s'  => \@search_features, # the feature(s) to look for
 	'start=i'    => \$start, # the relative start position
 	'stop=i'     => \$stop, # the relative stop position
+	'pos=s'      => \$adjustment_position, # the coordinate to make start and stop adjustments
 	'extend=i'   => \$extend, # extend lookup-feature by this amount
 	'ref=s'      => \$reference_position, # relative position when calc distance
 	'out=s'      => \$outfile, # output file name
@@ -88,6 +90,9 @@ unless ($infile) {
 }
 unless ($reference_position) {
 	$reference_position = 'start';
+}
+unless ($adjustment_position) {
+	$reference_position = '5';
 }
 unless (defined $gz) {
 	$gz = 0;
@@ -227,13 +232,13 @@ sub intersect_named_features {
 			# this segment will not have a strand, and I can not set it 
 		}
 		
-		# specific relative start, stop from feature 5' position
+		# specific relative start, stop from indicated position
 		elsif (defined $start and defined $stop) {
 			# we'll adjust the coordinates specifically
-			# this is relative to the start position
+			# this is relative to the indicated position
 			
 			# establish region based on the feature's orientation
-			if ($feature->strand >= 0) {
+			if ($adjustment_position eq '5' and $feature->strand >= 0) {
 				# Watson strand or unstranded
 				$region = $db->segment(
 					$feature->seq_id,
@@ -241,7 +246,7 @@ sub intersect_named_features {
 					$feature->start + $stop
 				);
 			}
-			elsif ($feature->strand < 0) {
+			elsif ($adjustment_position eq '5' and $feature->strand < 0) {
 				# Crick strand
 				$region = $db->segment(
 					$feature->seq_id,
@@ -249,17 +254,51 @@ sub intersect_named_features {
 					$feature->end - $start
 				);
 			}	
-			# this segment will not have a strand, and I can not set it 
-				
+			if ($adjustment_position eq '3' and $feature->strand >= 0) {
+				# Watson strand or unstranded
+				$region = $db->segment(
+					$feature->seq_id,
+					$feature->end + $start, 
+					$feature->end + $stop
+				);
+			}
+			elsif ($adjustment_position eq '3' and $feature->strand < 0) {
+				# Crick strand
+				$region = $db->segment(
+					$feature->seq_id,
+					$feature->start - $stop, 
+					$feature->start - $start
+				);
+			}	
+			elsif ($adjustment_position eq 'm' and $feature->strand >= 0) {
+				# midpoint
+				my $mid = int( ($feature->start + $feature->end) / 2);
+				$region = $db->segment(
+					$feature->seq_id,
+					$mid + $start, 
+					$mid + $stop
+				);
+			}
+			elsif ($adjustment_position eq 'm' and $feature->strand >= 0) {
+				# midpoint
+				my $mid = int( ($feature->start + $feature->end) / 2);
+				$region = $db->segment(
+					$feature->seq_id,
+					$mid - $start, 
+					$mid - $stop
+				);
+			}
 		}
 		
 		# default is entire region
 		else {
-			
 			# establish region as is
 			$region = $feature->segment();
 			# this segment will have strand
 		}
+		
+		# sanity check
+		$region->start(1) if $region->start <= 0;
 		
 		# check region
 		if ($region) {
@@ -650,6 +689,7 @@ get_intersecting_features.pl [--options] <filename>
   --feature <text>
   --start <integer>
   --stop <integer>
+  --pos [5 | m | 3]
   --extend <integer>
   --ref [start | mid]
   --out <filename>
@@ -691,13 +731,22 @@ GFF "type" or a "type:method" string. If not specifed, then the database
 will be queried for potential GFF types and a list presented to the user to 
 select one.
 
-=item --start <integer>, --stop <integer>
+=item --start <integer>
 
-Optionally specify the relative start and stop positions from the 5' end (or 
-start coordinate for non-stranded features) with which to restrict the region 
-when searching for target features. For example, specify "--start=-200 
+=item --stop <integer>
+
+Optionally specify the relative start and stop positions from the 5' end 
+(default) or the end specified by the "--pos" option with which to restrict 
+the search region for target features. For example, specify "--start=-200 
 --stop=0" to restrict to the promoter region of genes. Both positions must 
 be specified. Default is to take the entire region of the reference feature.
+
+=item --pos [ 5 | m | 3 ]
+
+Indicate the relative position from which to make the adjustments to the 
+search window. Both start and stop adjustments may be made from the 
+respective 5 prime, 3 prime, or middle position as dictated by the feature's 
+strand value. 
 
 =item --extend <integer>
 
