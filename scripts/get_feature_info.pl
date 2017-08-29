@@ -10,7 +10,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.33';
+my $VERSION = '1.52';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -102,6 +102,18 @@ if ($use_type) {
 	$Data->feature($use_type);
 }
 
+# check columns
+{
+	my $name_i = $Data->name_column;
+	my $id_i   = $Data->id_column;
+	my $type_i = $Data->type_column;
+	unless (defined $name_i or defined $id_i) {
+		die " unable to identify a name or ID column. Database lookup unlikely to work\n";
+	}
+	unless (defined $type_i or $use_type) {
+		warn " No type column present or type specified. Database lookup may have problems\n";
+	}
+}
 
 
 ### Establish database connection
@@ -333,7 +345,8 @@ sub collect_attributes_for_list {
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
-		my $feature = $row->feature;
+		my $feature = $row->feature(1);
+			# pass a true value to force the seqfeature lookup
 		if ($feature) {
 			# get the attribute(s)
 			for (my $i = 0; $i < scalar @list; $i++) {
