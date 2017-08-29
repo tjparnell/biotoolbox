@@ -278,10 +278,18 @@ transcript, i.e. the sum of the CDS lengths.
 
 =item get_utrs($transcript)
 
-Returns the 5' and 3' untranslated regions of the transcript. If these are 
+Returns both 5' and 3' untranslated regions of the transcript. If these are 
 not defined in the SeqFeature subfeature hierarchy, then they will be calculated 
 from the exon and CDS subfeatures, if available. Non-coding transcripts will not 
 return anything. 
+
+=item get_5p_utrs($transcript)
+
+Returns only the 5' untranslated regions of the transcript.
+
+=item get_3p_utrs($transcript)
+
+Returns only the 3' untranslated regions of the transcript.
 
 =back
 
@@ -405,6 +413,11 @@ our @EXPORT_OK = qw(
 	get_stop_codon
 	get_transcript_cds_length
 	get_utrs
+	get_transcript_utr_length
+	get_5p_utrs
+	get_3p_utrs
+	get_transcript_5p_utr_length
+	get_transcript_3p_utr_length
 	gff_string
 	gtf_string
 	ucsc_string
@@ -439,7 +452,14 @@ our %EXPORT_TAGS = (
 		get_start_codon
 		get_stop_codon
 		get_transcript_cds_length
+	) ],
+	utr => [ qw(
 		get_utrs
+		get_5p_utrs
+		get_3p_utrs
+		get_transcript_utr_length
+		get_transcript_5p_utr_length
+		get_transcript_3p_utr_length
 	) ],
 	export => [ qw(
 		gff_string
@@ -1151,6 +1171,62 @@ sub get_utrs {
 	
 	# we have our list
 	return wantarray ? @list : \@list;
+}
+
+sub get_transcript_utr_length {
+	my $transcript = shift;
+	my $utrs = get_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
+}
+
+sub get_5p_utrs {
+	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	return unless is_coding($transcript);
+	
+	# get all UTRs
+	my $utrs = get_utrs($transcript);
+	return unless scalar(@$utrs);
+	
+	my @fivers = grep { $_->primary_tag =~ /5|five/i } @$utrs;
+	return wantarray ? @fivers : \@fivers;
+}
+
+sub get_3p_utrs {
+	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	return unless is_coding($transcript);
+	
+	# get all UTRs
+	my $utrs = get_utrs($transcript);
+	return unless scalar(@$utrs);
+	
+	my @threes = grep { $_->primary_tag =~ /3|three/i } @$utrs;
+	return wantarray ? @threes : \@threes;
+}
+
+sub get_transcript_5p_utr_length {
+	my $transcript = shift;
+	my $utrs = get_5p_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
+}
+
+sub get_transcript_3p_utr_length {
+	my $transcript = shift;
+	my $utrs = get_3p_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
 }
 
 
