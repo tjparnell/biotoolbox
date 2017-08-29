@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.51';
+our $VERSION = '1.52';
 
 =head1 NAME
 
@@ -259,6 +259,16 @@ present in the table, then nothing is returned.
 
 See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
 information about working with these objects.
+
+This method normally only works with "named" feature_types in a 
+L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
+information, i.e. chromosome, start, and stop columns, then it will 
+likely be recognized as a "coordinate" feature_type and not work.
+
+Pass a true value to this method to force the seqfeature lookup. This 
+will still require the presence of Name, ID, and/or Type columns to 
+perform the database lookup. The L<Bio::ToolBox::Data> method feature() 
+is used to determine the type if a Type column is not present.
 
 =item segment
 
@@ -1148,10 +1158,11 @@ sub rewrite_vcf_attributes {
 *feature = \&seqfeature;
 sub seqfeature {
 	my $self = shift;
+	my $force = shift || 0;
 	carp "feature is a read only method" if @_;
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
-	return unless $self->feature_type eq 'named';
+	return unless $self->feature_type eq 'named' or $force;
 	
 	return $self->{feature} if exists $self->{feature};
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
