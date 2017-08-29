@@ -695,7 +695,9 @@ sub _get_alt_common_things {
 	foreach my $t (@transcripts) {
 		my @things = $do_exon ? get_exons($t) : get_introns($t);
 		foreach my $e (@things) {
-			$pos2things{$e->start}{$e->end}{$t->display_name} = _duplicate($e);
+			my $new_e =  _duplicate($e);
+			$new_e->display_name( $e->display_name ); # keep the exon name
+			$pos2things{$e->start}{$e->end}{$t->display_name} = $new_e;
 		}
 		$tx2things{ $t->display_name } = [];
 	}
