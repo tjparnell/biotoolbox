@@ -19,7 +19,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.51';
+my $VERSION = '1.52';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -631,7 +631,7 @@ sub record_the_bin_values {
 		
 		# record nulls if no data returned
 		unless (scalar keys %$regionscores) {
-			$row->value($column, '.');
+			$row->value($column, calculate_score($method, undef));
 			next;
 		}
 		
