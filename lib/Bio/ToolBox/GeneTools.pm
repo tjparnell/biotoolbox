@@ -1144,7 +1144,7 @@ sub get_utrs {
 				next unless $pieces;
 				my $utr = $pieces->[-1]; # we will want the second one if there are two
 				$utr->primary_tag( 
-					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+					$transcript->strand >= 0 ? 'three_prime_UTR' : 'five_prime_UTR' );
 				$utr->display_name($exon->display_name . '.utr');
 				$utr->strand($exon->strand);
 				$utr->source($exon->strand);
@@ -1154,7 +1154,7 @@ sub get_utrs {
 				# whole exon is UTR
 				my $utr = _duplicate($exon);
 				$utr->primary_tag( 
-					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
+					$transcript->strand >= 0 ? 'three_prime_UTR' : 'five_prime_UTR' );
 				$utr->display_name( $exon->display_name . '.utr' );
 				push @list, $utr;
 			}
