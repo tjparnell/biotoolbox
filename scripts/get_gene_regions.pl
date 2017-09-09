@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.43';
+my $VERSION = '1.52';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -36,7 +36,6 @@ my (
 	$infile,
 	$outfile,
 	$database,
-	$feature,
 	$request,
 	$transcript_type,
 	$start_adj,
@@ -413,7 +412,7 @@ sub collect_from_database {
 PROMPT
 	@features = verify_or_request_feature_types(
 		'db'      => $db,
-		'feature' => $feature,
+		'feature' => \@features,
 		'prompt'  => $prompt,
 		'single'  => 0,
 		'limit'   => 'gene|rna',

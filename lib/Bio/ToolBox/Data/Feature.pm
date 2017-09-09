@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.51';
+our $VERSION = '1.52';
 
 =head1 NAME
 
@@ -260,6 +260,16 @@ present in the table, then nothing is returned.
 See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
 information about working with these objects.
 
+This method normally only works with "named" feature_types in a 
+L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
+information, i.e. chromosome, start, and stop columns, then it will 
+likely be recognized as a "coordinate" feature_type and not work.
+
+Pass a true value to this method to force the seqfeature lookup. This 
+will still require the presence of Name, ID, and/or Type columns to 
+perform the database lookup. The L<Bio::ToolBox::Data> method feature() 
+is used to determine the type if a Type column is not present.
+
 =item segment
 
 Returns a database Segment object corresponding to the coordinates 
@@ -402,17 +412,30 @@ for data sources that support strand.
 
 =back
 
-=item exon
+=item subfeature
 
-Boolean option to indicate that the data collection should only 
-occur over exonic subfeatures, and not over introns. Requires that 
-the Data table Feature be a named SeqFeature gene that contains exon 
-subfeatures, for example parsed from a gene table file.
+Specify the subfeature type from which to collect the scores. Typically 
+a SeqFeature object representing a transcript is provided, and the 
+indicated subfeatures are collected from object. Pass the name of the 
+subfeature to use. Accepted values include the following.
+
+=over 4 
+
+=item exon  All exons included
+
+=item cds  The CDS or coding sequence are extracted from mRNA
+
+=item 5p_utr  The 5' UTR of mRNA
+
+=item 3p_utr  The 3' UTR of mRNA
+
+=back
 
 =item extend
 
 Specify the number of basepairs that the Data table Feature's 
-coordinates should be extended in both directions. 
+coordinates should be extended in both directions. Ignored 
+when used with the subfeature option.
 
 =item seq_id
 
@@ -564,16 +587,27 @@ value would be the I<primary_tag> or I<type:source> feature found in the
 database. Otherwise, the name of a data file, such as a bam, bigWig, 
 bigBed, or USeq file, would be provided here. This options is required!
 
-=item exon
+=item subfeature
 
-Boolean option to indicate that the data collection should only 
-occur over exonic subfeatures, and not over introns. Requires that 
-the Data table Feature be a named SeqFeature gene that contains exon 
-subfeatures, for example parsed from a gene table file. 
+Specify the subfeature type from which to collect the scores. Typically 
+a SeqFeature object representing a transcript is provided, and the 
+indicated subfeatures are collected from object. When converting to 
+relative coordinates, the coordinates will be relative to the length of 
+the sum of the subfeatures, i.e. the length of the introns will be ignored.
 
-When converting to relative coordinates, the coordinates will be relative 
-to the length of the sum of the exons, i.e. the length of the introns 
-will be ignored.
+Pass the name of the subfeature to use. Accepted values include the following.
+
+=over 4 
+
+=item exon  All exons included
+
+=item cds  The CDS or coding sequence are extracted from mRNA
+
+=item 5p_utr  The 5' UTR of mRNA
+
+=item 3p_utr  The 3' UTR of mRNA
+
+=back
 
 =item extend
 
@@ -1148,10 +1182,11 @@ sub rewrite_vcf_attributes {
 *feature = \&seqfeature;
 sub seqfeature {
 	my $self = shift;
+	my $force = shift || 0;
 	carp "feature is a read only method" if @_;
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
-	return unless $self->feature_type eq 'named';
+	return unless $self->feature_type eq 'named' or $force;
 	
 	return $self->{feature} if exists $self->{feature};
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
@@ -1251,8 +1286,8 @@ sub get_score {
 	$args{strandedness} ||= $args{stranded} || 'all';
 	
 	# get positioned scores over subfeatures only
-	$args{exon} ||= 0;
-	if ($self->feature_type eq 'named' and $args{exon}) {
+	$args{subfeature} = $args{exon} ||= q();
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_scores($db, \%args);
 	}
@@ -1316,7 +1351,7 @@ sub _get_subfeature_scores {
 	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
+		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1332,9 +1367,27 @@ sub _get_subfeature_scores {
 		return;
 	}
 	
+	# get the subfeatures
+	my @subfeatures;
+	if ($args->{subfeature} eq 'exon') {
+		@subfeatures = get_exons($feature);
+	}
+	elsif ($args->{subfeature} eq 'cds') {
+		@subfeatures = get_cds($feature);
+	}
+	elsif ($args->{subfeature} eq '5p_utr') {
+		@subfeatures = get_5p_utrs($feature);
+	}
+	elsif ($args->{subfeature} eq '3p_utr') {
+		@subfeatures = get_3p_utrs($feature);
+	}
+	else {
+		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
+	}
+	
 	# collect over each exon
 	my @scores;
-	foreach my $exon (get_exons($feature)) {
+	foreach my $exon (@subfeatures) {
 		my $exon_scores = get_segment_score(
 			$exon->seq_id,
 			$exon->start,
@@ -1433,7 +1486,8 @@ sub get_region_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
-	if ($self->feature_type eq 'named' and $args{'exon'}) {
+	$args{subfeature} = $args{exon} ||= q();
+	if ($self->feature_type eq 'named' and $args{'subfeature'}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_position_scores(\%args, $ddb);
 	}
@@ -1486,7 +1540,7 @@ sub _get_subfeature_position_scores {
 	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_transcript_length get_exons));
+		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1501,8 +1555,25 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	my $length = $args->{'length'} || get_transcript_length($feature);
 	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	
+	# get the subfeatures
+	my @subfeatures;
+	if ($args->{subfeature} eq 'exon') {
+		@subfeatures = get_exons($feature);
+	}
+	elsif ($args->{subfeature} eq 'cds') {
+		@subfeatures = get_cds($feature);
+	}
+	elsif ($args->{subfeature} eq '5p_utr') {
+		@subfeatures = get_5p_utrs($feature);
+	}
+	elsif ($args->{subfeature} eq '3p_utr') {
+		@subfeatures = get_3p_utrs($feature);
+	}
+	else {
+		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
+	}
 	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
@@ -1510,9 +1581,9 @@ sub _get_subfeature_position_scores {
 	# and no introns exist
 	my $pos2data = {};
 	my $namecheck = {}; # to check unique names when using ncount method....
-	my $current_end = $feature->start;
+	my $current_end = $subfeatures[0]->start;
 	my $adjustment = 0;
-	foreach my $exon (get_exons($feature)) {
+	foreach my $exon (@subfeatures) {
 		
 		# exon positions
 		my $start = $exon->start;

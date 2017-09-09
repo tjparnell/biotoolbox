@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.44';
+our $VERSION = '1.52';
 
 =head1 NAME
 
@@ -136,6 +136,10 @@ common exons, "uncommon" will be uncommon exons (used more than once but
 less than all), and each transcript ID will include their specific alternate 
 exons (used only once).
 
+For genes with only a single transcript, all exons will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
+
 =back
 
 =head2 Intron Methods
@@ -180,6 +184,10 @@ reference with the introns for that category. The "common" will be all
 common introns, "uncommon" will be uncommon introns (used more than once but 
 less than all), and each transcript ID will include their specific alternate 
 introns (used only once).
+
+For genes with only a single transcript, all introns will be marked as "common" 
+for simplicity, although technically they could all be considered "alternate" 
+since they're only used once.
 
 =back
 
@@ -270,10 +278,18 @@ transcript, i.e. the sum of the CDS lengths.
 
 =item get_utrs($transcript)
 
-Returns the 5' and 3' untranslated regions of the transcript. If these are 
+Returns both 5' and 3' untranslated regions of the transcript. If these are 
 not defined in the SeqFeature subfeature hierarchy, then they will be calculated 
 from the exon and CDS subfeatures, if available. Non-coding transcripts will not 
 return anything. 
+
+=item get_5p_utrs($transcript)
+
+Returns only the 5' untranslated regions of the transcript.
+
+=item get_3p_utrs($transcript)
+
+Returns only the 3' untranslated regions of the transcript.
 
 =back
 
@@ -397,6 +413,11 @@ our @EXPORT_OK = qw(
 	get_stop_codon
 	get_transcript_cds_length
 	get_utrs
+	get_transcript_utr_length
+	get_5p_utrs
+	get_3p_utrs
+	get_transcript_5p_utr_length
+	get_transcript_3p_utr_length
 	gff_string
 	gtf_string
 	ucsc_string
@@ -431,7 +452,14 @@ our %EXPORT_TAGS = (
 		get_start_codon
 		get_stop_codon
 		get_transcript_cds_length
+	) ],
+	utr => [ qw(
 		get_utrs
+		get_5p_utrs
+		get_3p_utrs
+		get_transcript_utr_length
+		get_transcript_5p_utr_length
+		get_transcript_3p_utr_length
 	) ],
 	export => [ qw(
 		gff_string
@@ -675,10 +703,10 @@ sub _get_alt_common_things {
 	
 	# only one transcript provided?
 	if (scalar @transcripts == 1) {
-		# all exons are alternate by definition
-		my $name = $transcripts[0]->display_name;
+		# all exons are common by definition
+# 		my $name = $transcripts[0]->display_name;
 		my @things = $do_exon ? get_exons($transcripts[0]) : get_introns($transcripts[0]);
-		$tx2things{$name} = \@things;
+		$tx2things{common} = \@things;
 		return \%tx2things;
 	}
 	
@@ -687,7 +715,9 @@ sub _get_alt_common_things {
 	foreach my $t (@transcripts) {
 		my @things = $do_exon ? get_exons($t) : get_introns($t);
 		foreach my $e (@things) {
-			$pos2things{$e->start}{$e->end}{$t->display_name} = _duplicate($e);
+			my $new_e =  _duplicate($e);
+			$new_e->display_name( $e->display_name ); # keep the exon name
+			$pos2things{$e->start}{$e->end}{$t->display_name} = $new_e;
 		}
 		$tx2things{ $t->display_name } = [];
 	}
@@ -1141,6 +1171,62 @@ sub get_utrs {
 	
 	# we have our list
 	return wantarray ? @list : \@list;
+}
+
+sub get_transcript_utr_length {
+	my $transcript = shift;
+	my $utrs = get_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
+}
+
+sub get_5p_utrs {
+	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	return unless is_coding($transcript);
+	
+	# get all UTRs
+	my $utrs = get_utrs($transcript);
+	return unless scalar(@$utrs);
+	
+	my @fivers = grep { $_->primary_tag =~ /5|five/i } @$utrs;
+	return wantarray ? @fivers : \@fivers;
+}
+
+sub get_3p_utrs {
+	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
+	return unless is_coding($transcript);
+	
+	# get all UTRs
+	my $utrs = get_utrs($transcript);
+	return unless scalar(@$utrs);
+	
+	my @threes = grep { $_->primary_tag =~ /3|three/i } @$utrs;
+	return wantarray ? @threes : \@threes;
+}
+
+sub get_transcript_5p_utr_length {
+	my $transcript = shift;
+	my $utrs = get_5p_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
+}
+
+sub get_transcript_3p_utr_length {
+	my $transcript = shift;
+	my $utrs = get_3p_utrs($transcript);
+	my $total = 0;
+	foreach my $utr (@$utrs) {
+		$total += $utr->length;
+	}
+	return $total;
 }
 
 

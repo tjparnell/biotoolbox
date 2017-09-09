@@ -1,5 +1,26 @@
 ######## Bio::ToolBox revision history #############
 
+v1.52
+	- Added binning option to wig files in script bam2wig. Default 
+	is to write wig files in 10 bp bins with significant decreases 
+	in runtime and memory usage while not appreciably diminishing 
+	resolution. 
+	- Add support to calculate shift values without doing wig 
+	conversion in script bam2wig
+	- Add support for mRNA transcript subfeatures, including CDS, 
+	5 prime UTR, and 3 prime UTRs, in data collection scripts 
+	get_datasets and get_binned_data.
+	- Add new UTR methods to GeneTools library
+	- Changed behavior of reporting common and alternate exons and 
+	introns in GeneTools. Genes with single transcripts now report 
+	all exons and introns as common for simplicity.
+	- Add option to search at the 5 prime, middle, or 3 prime end 
+	of features in script get_intersecting_features
+	- Fix bug in specifying which database feature to collect 
+	regions from in script get_gene_regions
+	- Fix bug where tables with coordinates could not be used in 
+	database lookups in script get_feature_info
+
 v1.51
 	- Changed how bam alignments are recorded for indexed position 
 	data hashes. Alignments are now recorded at their 5' postion 

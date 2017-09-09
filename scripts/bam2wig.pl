@@ -6,6 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use List::Util qw(sum);
+use List::MoreUtils qw(natatime);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	low_level_bam_coverage
@@ -28,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.51';
+my $VERSION = '1.52';
 	
 	
 
@@ -79,6 +80,7 @@ my (
 	$do_mean,
 	$chr_exclude,
 	$black_list,
+	$bin_size,
 	$dec_precison,
 	$bigwig,
 	$do_fixstep,
@@ -131,6 +133,7 @@ GetOptions(
 	'scale=f'   => \@scale_values, # user specified scale value
 	'chrskip=s' => \$chr_exclude, # regex for skipping chromosomes
 	'blacklist=s' => \$black_list, # file for skipping regions
+	'bin=i'     => \$bin_size, # size for binning the data
 	'format=i'  => \$dec_precison, # format to number of decimal positions
 	'bw!'       => \$bigwig, # generate bigwig file
 	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
@@ -172,8 +175,9 @@ if ($print_version) {
 ### Check for requirements and set defaults
 # more global variables
 my ($main_callback, $callback, $wig_writer, $outbase, $chromo_file,
-	$binpack, $buflength);
+	$binpack, $buflength, $coverage_dump, $coverage_sub);
 check_defaults();
+my $items = $paired ? 'fragments' : 'alignments';
 
 # record start time
 my $start_time = time;
@@ -220,10 +224,14 @@ my $black_list_hash = process_black_list();
 
 ### Calculate shift value
 if ($shift or $use_extend) {
-	unless ((shift and $shift_value) or ($use_extend and $extend_value)) {
+	unless (($shift and $shift_value) or ($use_extend and $extend_value)) {
 		print " Calculating 3' shift value...\n";
 		$shift_value = determine_shift_value();
 	}
+	
+	# quietly exit here after determining shift value if no wig is to be generated
+	exit unless ($use_start or $use_extend or $use_span or $use_mid or $use_cspan 
+				or $use_coverage);
 	
 	# precalculate double shift when recording extended position
 	if ($use_extend) {
@@ -236,9 +244,11 @@ if ($shift or $use_extend) {
 		print " Alignments will be shifted by $shift_value bp\n";
 	}
 }
-# set another global value
+# set center extension global value
 my $half_extend = int($extend_value / 2);
-
+if ($use_cspan) {
+	print " $items will be center extended by $half_extend bp both directions\n";
+}
 
 ### Process bam file
 # process according to type of data collected and alignment type
@@ -362,8 +372,12 @@ sub check_defaults {
 			" --start, --mid, --span, --cpsan, --extend, or --coverage\n";
 	}
 	elsif (not $position_check) {
-		die " Please select one of the following modes:\n" . 
-			" --start, --mid, --span, --cspan, --extend, or --coverage\n";
+		# we allow no position if user has selected shift so that we can calculate
+		# the shift value without running through entire wig conversion
+		unless ($shift) {
+			die " Please select one of the following modes:\n" . 
+				" --start, --mid, --span, --cspan, --extend, or --coverage\n";
+		}
 	}
 	
 	# check splices
@@ -452,13 +466,17 @@ sub check_defaults {
 		$duplicate = 1;
 	}
 	
-	# set decimal formatting
-	unless (defined $dec_precison) {
-		$dec_precison = 4 if ($rpm or $multi_hit_scale or @scale_values);
+	# set bin size
+	if ($bin_size) {
+		die "bin size cannot be negative!\n" if $bin_size < 0;
+	}
+	else {
+		# set default to 10 bp
+		$bin_size = ($use_span or $use_cspan or $use_extend) ? 10 : 1;
 	}
 	
 	# determine binary file packing and length
-	if ($multi_hit_scale) {
+	if ($multi_hit_scale or ($use_coverage and $bin_size > 1)) {
 		# pack as floating point values
 		$binpack = 'f';
 	}
@@ -469,10 +487,42 @@ sub check_defaults {
 	}
 	$buflength = length(pack($binpack, 1));
 	
+	# set coverage dump size and subroutine code global values
+	# this is for processing the coverage dump array
+	if ($use_coverage) {
+		if ($bin_size > 1) {
+			$coverage_dump = int(1000 / $bin_size) * $bin_size;
+			$coverage_dump = $bin_size if $coverage_dump == 0;
+			$coverage_sub = sub {
+				my ($coverage, $chrom_data) = @_;
+				my @binned_scores;
+				my $iterator = natatime $bin_size, @$coverage;
+				while (my @values = $iterator->()) {
+					push @binned_scores, mean(@values);
+				}
+				$$chrom_data .= pack("$binpack*", @binned_scores);
+			};
+		}
+		else {
+			$coverage_dump = 1000;
+			$coverage_sub = sub {
+				my ($coverage, $chrom_data) = @_;
+				$$chrom_data .= pack("$binpack*", @$coverage);
+			};
+		}
+	}
+	
 	# set window length for processing through packed binary chromosome strings
 	$window ||= 10000;
 		# empirical tests show a window of 1000 to 10000 is best, bigger or smaller 
 		# result in longer execution times
+	
+	
+	# set decimal formatting
+	unless (defined $dec_precison) {
+		$dec_precison = 4 if ($rpm or $multi_hit_scale or @scale_values);
+		$dec_precison = 1 if ($use_coverage and $bin_size > 1);
+	}
 	
 	
 	# check output file
@@ -492,21 +542,31 @@ sub check_defaults {
 	# determine output format
 	unless ($do_bedgraph or $do_varstep or $do_fixstep) {
 		# pick an appropriate format for the user
-		if ($use_span or $use_extend or $use_cspan) {
-			$do_bedgraph = 1;
+		if ($use_span or $use_extend or $use_cspan or $use_coverage) {
+			if ($bin_size > 1) {
+				$do_fixstep = 1;
+			}
+			else {
+				$do_bedgraph = 1;
+			}
 		}
 		elsif ($use_start or $use_mid) {
-			$do_varstep = 1;
-		}
-		elsif ($use_coverage) {
-			$do_fixstep = 1;
-		}
-		else {
-			die " No recording mode defined to set wig type!\n";
+			if ($bin_size > 1) {
+				$do_fixstep = 1;
+			}
+			else {
+				$do_varstep = 1;
+			}
 		}
 	}
 	if ( ($do_bedgraph + $do_varstep + $do_fixstep) > 1) {
 		die " Please select only one of --bedgraph, --fixstep, or --varstep\n";
+	}
+	if ($do_varstep and $bin_size > 1) {
+		warn " Writing variableStep wig files with bin size of $bin_size bp is not supported!" . 
+			"\n Writing fixedStep wig file instead\n";
+		$do_varstep = 0;
+		$do_fixstep = 1;
 	}
 	
 	# set wig writer method
@@ -617,19 +677,31 @@ sub check_defaults {
 		$callback = \&pe_strand_center_span;
 	}
 	else {
-		die "programmer error!\n";
+		die "programmer error!\n" unless $shift; # special exception
+	}
+	
+	# summary of wig file being written
+	if ($do_bedgraph) {
+		print " Writing bedGraph format in $bin_size bp increments\n";
+	}
+	elsif ($do_varstep) {
+		printf " Writing variableStep format in $bin_size bp bins\n";
+	}
+	elsif ($do_fixstep) {
+		printf " Writing fixedStep format in $bin_size bp bins\n";
 	}
 }
 
 sub process_black_list {
-	if ($black_list) {
-		eval {require 'Bio::ToolBox::Data';1;} or 
-			die "unable to load Bio::ToolBox::Data!!!\n";
-		eval {require 'Set::IntervalTree';1;} or 
-			do {
-				warn " PROBLEM! Please install Set::IntervalTree to use black lists\n";
-				undef $black_list;
-			};
+	if ($black_list and -e $black_list) {
+		eval {require 'Bio::ToolBox::Data'};
+		my $i = 0;
+		eval {require Set::IntervalTree; $i = 1;};
+		unless ($i) {
+			warn " PROBLEM! Please install Set::IntervalTree to use black lists\n";
+			undef $black_list;
+			return;
+		}
 		my %black_list_hash = map { $_ => [] } @seq_list;
 		my $Data = Bio::ToolBox::Data->new(file => $black_list) or 
 			die "unable to read black list file '$black_list'\n";
@@ -1215,25 +1287,25 @@ sub process_bam_coverage_on_chromosome {
 	
 	# walk through the chromosome in 1 kb increments
 	my $chrom_data;
-	for (my $start = 0; $start < $seq_length; $start += 1000) {
+	for (my $start = 0; $start < $seq_length; $start += $coverage_dump) {
 		# set endpoint
-		my $end = $start + 1000;
+		my $end = $start + $coverage_dump;
 		$end = $seq_length if $end > $seq_length;
 		
 		# using the low level interface for a little more performance
 		my $coverage = low_level_bam_coverage($sam, $tid, $start, $end);
 		
 		# record the coverage
-		$chrom_data .= pack("$binpack*", @$coverage);
+		&$coverage_sub($coverage, \$chrom_data);
 	}
 	
 	# write out chromosome binary file, set count to arbitrary 0
 	if ($do_temp_bin) {
-		write_bin_file($chrom_data, 
+		write_bin_file(\$chrom_data, 
 			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin') );
 	}
 	else {
-		&$wig_writer($chrom_data, $binpack, $seq_id, $seq_length, 
+		&$wig_writer(\$chrom_data, $binpack, $seq_id, $seq_length, 
 			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig') );
 	}
 	
@@ -1257,7 +1329,7 @@ sub process_alignments {
 	}
 	
 	if ($verbose) {
-		printf " Finished converting alignments in %.3f minutes\n", 
+		printf " Finished converting $items in %.3f minutes\n", 
 			(time - $start_time) / 60;
 	}
 	
@@ -1290,7 +1362,7 @@ sub process_alignments {
 			if ($rpm) {
 				print " Normalizing depth\n" if $rpm;
 				for my $i (0 .. $#totals) {
-					printf "  %s had %s total counted alignments\n", $bamfiles[$i], 
+					printf "  %s had %s total counted $items\n", $bamfiles[$i], 
 						format_with_commas($totals[$i]);
 				}
 			}
@@ -1316,6 +1388,7 @@ sub process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
+				print " Scaling depth with user-supplied factor\n";
 				if (@norms) {
 					for my $i (0 .. $#norms) {
 						$norms[$i] *= $scale_values[$i];
@@ -1325,6 +1398,7 @@ sub process_alignments {
 					@norms = @scale_values;
 				}
 			}
+			printf "  Normalization factors: %s\n", join(' ', @norms) if $verbose;
 			
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
@@ -1347,7 +1421,7 @@ sub process_alignments {
 			# determine scaling factor
 			my $scale_factor;
 			if ($rpm) {
-				printf " Normalizing depth based on %s total counted alignments\n",
+				printf " Normalizing depth based on %s total counted $items\n",
 					format_with_commas($totals[0]); 
 				$scale_factor = 1_000_000 / $totals[0];
 			}
@@ -1366,7 +1440,7 @@ sub process_alignments {
 			foreach my $seq_id (@seq_list) {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
-					normalize_wig_file($files{$seq_id}{$strand}{0}, $scale_factor, $seq_id);
+					normalize_bin_file($files{$seq_id}{$strand}{0}, $scale_factor, $seq_id);
 				}
 			}
 		}
@@ -1406,7 +1480,7 @@ sub parallel_process_alignments {
 	$pm->wait_all_children;
 	
 	if ($verbose) {
-		printf " Finished converting alignments in %.3f minutes\n", 
+		printf " Finished converting $items in %.3f minutes\n", 
 			(time - $start_time) / 60;
 	}
 	
@@ -1440,7 +1514,7 @@ sub parallel_process_alignments {
 			if ($rpm) {
 				print " Normalizing depth\n" if $rpm;
 				for my $i (0 .. $#totals) {
-					printf "  %s had %s total counted alignments\n", $bamfiles[$i], 
+					printf "  %s had %s total counted $items\n", $bamfiles[$i], 
 						format_with_commas($totals[$i]);
 				}
 			}
@@ -1468,6 +1542,7 @@ sub parallel_process_alignments {
 		
 			# add scale values on top as necessary
 			if (@scale_values) {
+				print " Scaling depth with user-supplied factor\n";
 				if (@norms) {
 					for my $i (0 .. $#norms) {
 						$norms[$i] *= $scale_values[$i];
@@ -1477,6 +1552,7 @@ sub parallel_process_alignments {
 					@norms = @scale_values;
 				}
 			}
+			printf "  Normalization factors: %s\n", join(' ', @norms) if $verbose;
 			
 			# merge the samples
 			foreach my $seq_id (@seq_list) {
@@ -1522,7 +1598,7 @@ sub parallel_process_alignments {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
 					$pm->start and next;
-					normalize_wig_file($files{$seq_id}{$strand}{0}, $scale_factor, $seq_id);
+					normalize_bin_file($files{$seq_id}{$strand}{0}, $scale_factor, $seq_id);
 					$pm->finish;
 				}
 			}
@@ -1574,10 +1650,10 @@ sub process_alignments_on_chromosome {
 	low_level_bam_fetch($sam, $tid, 0, $seq_length, $main_callback, $data);
 	
 	# pack remaining data
-	my $fdiff = $seq_length - $data->{f_offset};
+	my $fdiff = int($seq_length/$bin_size) - $data->{f_offset};
 	$data->{fpack} .= pack("$binpack$fdiff", @{$data->{f}});
 	if ($do_strand) {
-		my $rdiff = $seq_length - $data->{r_offset};
+		my $rdiff = int($seq_length/$bin_size) - $data->{r_offset};
 		$data->{rpack} .= pack("$binpack*", @{$data->{r}});
 	}
 	
@@ -1585,24 +1661,24 @@ sub process_alignments_on_chromosome {
 	# we always write the forward strand, and reverse strand if stranded data
 	if ($do_temp_bin) {
 		# write a temporary binary file for merging later
-		write_bin_file($data->{fpack}, 
+		write_bin_file(\$data->{fpack}, 
 			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') );
-		write_bin_file($data->{rpack}, 
+		write_bin_file(\$data->{rpack}, 
 			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin') ) 
 			if $do_strand;
 	}
 	else {
 		# write a chromosome specific wig file
-		&$wig_writer($data->{fpack}, $binpack, $seq_id, $seq_length, 
+		&$wig_writer(\$data->{fpack}, $binpack, $seq_id, $seq_length, 
 			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') );
-		&$wig_writer($data->{rpack}, $binpack, $seq_id, $seq_length, 
+		&$wig_writer(\$data->{rpack}, $binpack, $seq_id, $seq_length, 
 			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.wig') ) 
 			if $do_strand;
 	}
 	
 	# verbose status line 
 	if ($verbose) {
-		printf "  Converted %s alignments on $seq_id in %d seconds\n", 
+		printf "  Converted %s $items on $seq_id in %d seconds\n", 
 			format_with_commas( $data->{count}), time - $chr_start_time;
 		if ($paired and keys %{$data->{pair}}) {
 			printf "   %d orphan paired alignments were left behind and not counted!\n", 
@@ -1613,10 +1689,11 @@ sub process_alignments_on_chromosome {
 
 sub write_bin_file {
 	my ($data, $filename) = @_;
+		# note that $data is a reference
 	my $fh = open_to_write_fh($filename) or 
 		die " unable to write temporary file '$filename'!\n";
 	$fh->binmode;
-	$fh->print($data);
+	$fh->print($$data);
 	$fh->close;
 }
 
@@ -1624,6 +1701,7 @@ sub merge_bin_files {
 	my ($seq_id, $strand, $total, $files, $norm_factors) = @_;
 	my $merge_start_time = time;
 	my $long_window = 100 * $window;
+	my $seq_bin_length = int($seq_name2length{$seq_id} / $bin_size);
 	
 	# open filehandles to each binary file
 	my %fhs;
@@ -1638,10 +1716,10 @@ sub merge_bin_files {
 	# march along chromosome in defined windows to keep memory usage down
 	# apply normalization as data is loaded into the combined chrom_data array
 	my $chrom_data; 
-	for (my $pos = 0; $pos < $seq_name2length{$seq_id}; $pos += $long_window) {
+	for (my $pos = 0; $pos < $seq_bin_length; $pos += $long_window) {
 		# check length
-		my $len = ($pos + $window) > $seq_name2length{$seq_id} ? 
-					($seq_name2length{$seq_id} - $pos) : $long_window;
+		my $len = ($pos + $window) > $seq_bin_length ? 
+					($seq_bin_length - $pos) : $long_window;
 		my $binary_len = $len * $buflength;
 		
 		# collect the data from the first file handle
@@ -1686,7 +1764,7 @@ sub merge_bin_files {
 	}
 	
 	# now rewrite the merged bin file
-	&$wig_writer($chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, 
+	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, 
 		join('.', $outbase, '0', $seq_id, $total, $strand, 'temp.wig') );
 	if ($verbose) {
 		printf "  Merged%s $seq_id temp files in %d seconds\n", 
@@ -1694,9 +1772,10 @@ sub merge_bin_files {
 	}
 }
 
-sub normalize_wig_file {
+sub normalize_bin_file {
 	my ($file, $scale_factor, $seq_id) = @_;
 	my $norm_start_time = time;
+	my $seq_bin_length = int($seq_name2length{$seq_id} / $bin_size);
 	my $long_window = 10 * $window;
 	
 	# open file
@@ -1707,10 +1786,10 @@ sub normalize_wig_file {
 	# march along chromosome in defined windows to keep memory usage down
 	# apply normalization as data is loaded into the combined chrom_data array
 	my $chrom_data; 
-	for (my $pos = 0; $pos < $seq_name2length{$seq_id}; $pos += $long_window) {
+	for (my $pos = 0; $pos < $seq_bin_length; $pos += $long_window) {
 		# check length
-		my $len = ($pos + $long_window) > $seq_name2length{$seq_id} ? 
-					($seq_name2length{$seq_id} - $pos) : $long_window;
+		my $len = ($pos + $long_window) > $seq_bin_length ? 
+					($seq_bin_length - $pos) : $long_window;
 		
 		# read, unpack, normalize, and re-pack current window from binary file
 		my $string;
@@ -1721,7 +1800,7 @@ sub normalize_wig_file {
 	unlink $file;
 	# now write the wig file
 	$file =~ s/\.bin$/.wig/;
-	&$wig_writer($chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file);
+	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file);
 	if ($verbose) {
 		printf "  Scaled $seq_id temp file in %d seconds\n", time - $norm_start_time;
 	}
@@ -1790,24 +1869,26 @@ sub write_final_wig_file {
 
 sub write_bedgraph {
 	my ($data, $packer, $seq_id, $seq_length, $filename) = @_;	
+		# note that $data is a reference
 	
 	# set the printf formatter for decimal or integer
 	my $formatter = $dec_precison ? 
 		"$seq_id\t%d\t%d\t%." . $dec_precison. "f\n" : "$seq_id\t%d\t%d\t%s\n";
 	
 	# work though chromosome
+	my $seq_bin_length = int($seq_length / $bin_size);
 	my $buflength = length(pack($packer, 1));
 	my $out_string;
 	my $cpos = 0; # current position
 	my $lpos = 0; # last position
 	my $cval = 0; # current value
-	for (my $pos = 0; $pos < $seq_length; $pos += $window) {
+	for (my $pos = 0; $pos < $seq_bin_length; $pos += $window) {
 		# check length
-		my $len = ($pos + $window) > $seq_length ? ($seq_length - $pos) : $window;
+		my $len = ($pos + $window) > $seq_bin_length ? ($seq_bin_length - $pos) : $window;
 		
 		# unpack current window from the passed binary string
 		my @win_data = unpack("$packer*", 
-			substr($data, $pos * $buflength, $len * $buflength));
+			substr($$data, $pos * $buflength, $len * $buflength));
 		
 		# work through current window
 		foreach my $value (@win_data) {
@@ -1815,7 +1896,9 @@ sub write_bedgraph {
 				$cpos++;
 			}
 			else {
-				$out_string .= sprintf($formatter, $lpos, $cpos, $cval);
+				my $end = $cpos * $bin_size;
+				$end = $seq_length if $end > $seq_length;
+				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval);
 				$lpos = $cpos;
 				$cval = $value;
 				$cpos++;
@@ -1825,8 +1908,11 @@ sub write_bedgraph {
 	
 	# final write
 	if ($cpos > $lpos) {
-		$out_string .= sprintf($formatter, $lpos, $cpos, $cval);
+		my $end = $cpos * $bin_size;
+		$end = $seq_length if $end != $seq_length;
+		$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval);
 	}
+	
 	
 	# write wig file
 	my ($filename, $outfh) = open_wig_file($filename, 0);
@@ -1836,22 +1922,24 @@ sub write_bedgraph {
 
 sub write_fixstep {
 	my ($data, $packer, $seq_id, $seq_length, $filename) = @_;	
+		# note that $data is a reference
 
 	# set the printf formatter for decimal or integer
 	my $formatter = $dec_precison ? "%." . $dec_precison . "f\n" : "%s\n";
 	
 	# write fixStep header
-	my $out_string = "fixedStep chrom=$seq_id start=1 step=1 span=1\n";
+	my $out_string = "fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n";
 	
 	# work though chromosome
+	my $seq_bin_length = int($seq_length / $bin_size);
 	my $buflength = length(pack($packer, 1));
-	for (my $pos = 0; $pos < $seq_length; $pos += $window) {
+	for (my $pos = 0; $pos < $seq_bin_length; $pos += $window) {
 		# check length
-		my $len = ($pos + $window) > $seq_length ? ($seq_length - $pos) : $window;
+		my $len = ($pos + $window) > $seq_bin_length ? ($seq_bin_length - $pos) : $window;
 		
 		# unpack current window from the passed binary string
 		my @win_data = unpack("$packer*", 
-			substr($data, $pos * $buflength, $len * $buflength));
+			substr($$data, $pos * $buflength, $len * $buflength));
 		
 		# work through current window
 		foreach my $value (@win_data) {
@@ -1867,11 +1955,13 @@ sub write_fixstep {
 
 sub write_varstep {
 	my ($data, $packer, $seq_id, $seq_length, $filename) = @_;	
+		# note that $data is a reference
 
 	# set the printf formatter for decimal or integer
 	my $formatter = $dec_precison ? "%d\t%." . $dec_precison. "f\n" : "%d\t%s\n";
 	
 	# write fixStep header
+	# we are only supporting bin_size of 1 bp for varStep
 	my $out_string = "variableStep chrom=$seq_id\n";
 	
 	# work though chromosome
@@ -1882,7 +1972,7 @@ sub write_varstep {
 		
 		# unpack current window from the passed binary string
 		my @win_data = unpack("$packer*", 
-			substr($data, $pos * $buflength, $len * $buflength));
+			substr($$data, $pos * $buflength, $len * $buflength));
 		
 		# work through current window
 		for (my $i = 0; $i <= $#win_data; $i++) {
@@ -1970,7 +2060,7 @@ sub pe_callback {
 		$isize = abs($isize);
 	}
 	return if $isize > $max_isize;
-	return if $isize < $min_isize;
+	return if $isize < $min_isize; 
 	
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
@@ -1984,16 +2074,17 @@ sub pe_callback {
 	if ($data->{black_list}) {
 		my $results;
 		if ($a->reversed) {
-			$results = $data->{black_list}->fetch($a->calend - $a->isize, $a->calend);
+			$results = $data->{black_list}->fetch($a->calend - $isize, $a->calend);
 		}
 		else {
-			$results = $data->{black_list}->fetch($a->pos, $a->pos + $a->isize);
+			$results = $data->{black_list}->fetch($a->pos, $a->pos + $isize);
 		}
 		return if @$results;
 	}
 	
 	# look for pair
 	if ($a->reversed) {
+		# since we look for FR pairs, the F read should already be found
 		my $f = $data->{pair}->{$a->qname} or return;
 		delete $data->{pair}->{$a->qname};
 		
@@ -2035,39 +2126,46 @@ sub se_spliced_callback {
 	my ($a, $data, $score) = @_;
 	my $aw = $wrapper_ref->new($a, $data->{sam});
 	my @segments = $aw->get_SeqFeatures;
+	
+	# check intron size from the cigar string
 	my $size = 1;
 	my $cigars = $aw->cigar_array;
 	foreach my $c (@$cigars) {
+		# each element is [operation, size]
 		$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
 	}
 	return if $size > $max_intron; # exceed maximum intron size
+	
+	# record
 	if ($use_start) {
 		foreach my $segment (@segments) {
 			if ($do_strand and $a->reversed) {
 				# reverse strand
-				$data->{r}->[$segment->start - 1 - $data->{r_offset}] += $score;
+				my $pos = int( $segment->end / $bin_size );
+				$data->{r}->[$pos - $data->{r_offset}] += $score;
 			}
 			else {
 				# otherwise forward strand
-				$data->{f}->[$segment->start - 1 - $data->{f_offset}] += $score;
+				my $pos = int( ($segment->start - 1) / $bin_size );
+				$data->{f}->[$pos - $data->{f_offset}] += $score;
 			}
 		}
 	}
 	elsif ($use_span) {
 		foreach my $segment (@segments) {
+			my $start = int( ($segment->start - 1) / $bin_size);
+			my $end = int($segment->end / $bin_size);
 			if ($do_strand and $a->reversed) {
 				# reverse strand
-				for ($segment->start - 1 - $data->{r_offset} .. 
-					$segment->end - $data->{r_offset}
-				) {
+				my $start = int( ($segment->start - 1) / $bin_size);
+				my $end = int($segment->end / $bin_size);
+				foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
 					$data->{r}->[$_] += $score;
 				}
 			}
 			else {
 				# otherwise forward strand
-				for ($segment->start - 1  - $data->{f_offset} .. 
-					$segment->end - $data->{f_offset}
-				) {
+				foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 					$data->{f}->[$_] += $score;
 				}
 			}
@@ -2078,30 +2176,33 @@ sub se_spliced_callback {
 sub se_start {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		$data->{f}->[$a->calend - 1 - $data->{f_offset}] += $score;
+		$data->{f}->[int( ($a->calend - 1) / $bin_size) - $data->{f_offset}] += $score;
 	}
 	else {
-		$data->{f}->[$a->pos - $data->{f_offset}] += $score;
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
 	}
 }
 
 sub se_shift_start {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		my $pos = $a->calend - 1 - $shift_value - $data->{f_offset};
-		$data->{f}->[$pos] += $score if $pos >= 0;
+		my $pos = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 	else {
-		$data->{f}->[$a->pos + $shift_value - $data->{f_offset}] += $score;
+		my $pos = int( ($a->pos + $shift_value) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
 	}
 }
 
 sub se_strand_start {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		$data->{r}->[$a->calend - 1 - $data->{r_offset}] += $score;
+		my $pos = int( ($a->calend - 1) / $bin_size);
+		$data->{r}->[$pos - $data->{r_offset}] += $score;
 	}
 	else {
+		my $pos = int( $a->pos / $bin_size );
 		$data->{f}->[$a->pos - $data->{f_offset}] += $score;
 	}
 }
@@ -2109,40 +2210,42 @@ sub se_strand_start {
 sub se_shift_strand_start {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		my $pos = $a->calend -1 - $shift_value - $data->{r_offset};
-		$data->{r}->[$pos] += $score if $pos >= 0;
+		my $pos = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		$data->{r}->[$pos - $data->{r_offset}] += $score if $pos >= 0;
 	}
 	else {
-		$data->{f}->[$a->pos + $shift_value - $data->{f_offset}] += $score;
+		my $pos = int( ($a->pos + $shift_value) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
 	}
 }
 
 sub se_mid {
 	my ($a, $data, $score) = @_;
-	my $mid = int( ($a->pos + $a->calend -1) / 2);
-	$data->{f}->[$mid - $data->{f_offset}] += $score;
+	my $pos = int( int( ($a->pos + $a->calend - 1) / 2) / $bin_size);
+	$data->{f}->[$pos - $data->{f_offset}] += $score;
 }
 
 sub se_shift_mid {
 	my ($a, $data, $score) = @_;
 	my $mid = int( ($a->pos + $a->calend -1) / 2);
 	if ($a->reversed) {
-		my $pos = $mid - $shift_value;
+		my $pos = int( ($mid - $shift_value) / $bin_size);
 		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 	else {
-		$data->{f}->[$mid + $shift_value - $data->{f_offset}] += $score;
+		my $pos = int( ($mid + $shift_value) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
 	}
 }
 
 sub se_strand_mid {
 	my ($a, $data, $score) = @_;
-	my $mid = int( ($a->pos + $a->calend -1) / 2);
+	my $pos = int( int( ($a->pos + $a->calend -1) / 2) / $bin_size);
 	if ($a->reversed) {
-		$data->{r}->[$mid - $data->{r_offset}] += $score;
+		$data->{r}->[$pos - $data->{r_offset}] += $score;
 	}
 	else {
-		$data->{f}->[$mid - $data->{f_offset}] += $score;
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
 	}
 }
 
@@ -2150,30 +2253,35 @@ sub se_shift_strand_mid {
 	my ($a, $data, $score) = @_;
 	my $mid = int( ($a->pos + $a->calend -1) / 2);
 	if ($a->reversed) {
-		my $pos = $mid - $shift_value;
+		my $pos = int( ($mid - $shift_value) / $bin_size);
 		$data->{r}->[$pos - $data->{r_offset}] += $score if $pos >= 0;
 	}
 	else {
-		$data->{f}->[$mid + $shift_value - $data->{f_offset}] += $score;
+		my $pos = int( ($mid + $shift_value) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
 	}
 }
 
 sub se_span {
 	my ($a, $data, $score) = @_;
-	foreach ($a->pos - $data->{f_offset} .. $a->calend - 1 - $data->{f_offset}) {
+	my $s = int($a->pos / $bin_size) - $data->{f_offset};
+	my $e = int( ($a->calend - 1) / $bin_size) - $data->{f_offset};
+	foreach ($s .. $e) {
 		$data->{f}->[$_] += $score;
 	}
 }
 
 sub se_strand_span {
 	my ($a, $data, $score) = @_;
+	my $s = int($a->pos / $bin_size);
+	my $e = int( ($a->calend - 1) / $bin_size);
 	if ($a->reversed) {
-		foreach ($a->pos - $data->{r_offset} .. $a->calend - 1 - $data->{r_offset}) {
+		foreach ($s - $data->{r_offset} .. $e - $data->{r_offset}) {
 			$data->{r}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($a->pos - $data->{f_offset} .. $a->calend - 1 - $data->{f_offset}) {
+		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2182,16 +2290,16 @@ sub se_strand_span {
 sub se_shift_span {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		foreach ($a->pos - $shift_value - $data->{r_offset} .. 
-			$a->calend - 1 - $shift_value - $data->{r_offset} 
-		) {
+		my $s = int( ($a->pos - $shift_value) / $bin_size);
+		my $e = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score if $_ >= 0;
 		}
 	}
 	else {
-		foreach ($a->pos + $shift_value - $data->{f_offset} .. 
-			$a->calend - 1 + $shift_value - $data->{f_offset}
-		) {
+		my $s = int( ($a->pos + $shift_value) / $bin_size);
+		my $e = int( ($a->calend - 1 + $shift_value) / $bin_size);
+		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2200,27 +2308,29 @@ sub se_shift_span {
 sub se_shift_strand_span {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		foreach ($a->pos - $shift_value - $data->{r_offset} .. 
-			$a->calend - 1 - $shift_value - $data->{r_offset}
-		) {
+		my $s = int( ($a->pos - $shift_value) / $bin_size);
+		my $e = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		foreach ($s - $data->{r_offset} .. $e - $data->{r_offset} ) {
 			$data->{r}->[$_] += $score if $_ >= 0;
 		}
 	}
 	else {
-		foreach ($a->pos + $shift_value - $data->{f_offset} .. 
-			$a->calend - 1 + $shift_value - $data->{f_offset}
-		) {
+		my $s = int( ($a->pos + $shift_value) / $bin_size);
+		my $e = int( ($a->calend - 1 + $shift_value) / $bin_size);
+		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
 }
 
 sub se_center_span {
-	my ($a, $data, $score) = @_;
+	my ($a, $data, $score) = @_;	
 	my $mid = int( ($a->pos + $a->calend -1) / 2);
 	my $start = $mid - $half_extend + 1;
 	$start = 0 if $start < 0;
-	foreach ($start - $data->{f_offset} .. $mid + $half_extend - $data->{f_offset}) {
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
+	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 		$data->{f}->[$_] += $score;
 	}
 }
@@ -2230,17 +2340,15 @@ sub se_strand_center_span {
 	my $mid = int( ($a->pos + $a->calend -1) / 2);
 	my $start = $mid - $half_extend + 1;
 	$start = 0 if $start < 0;
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
 	if ($a->reversed) {
-		foreach ($start - $data->{r_offset} .. 
-			$mid + $half_extend - $data->{r_offset}
-		) {
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
 			$data->{r}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($mid - $half_extend + 1 - $data->{f_offset} .. 
-			$mid + $half_extend - $data->{f_offset}
-		) {
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2256,15 +2364,17 @@ sub se_extend {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
 		my $start = $a->calend - $extend_value;
-		$start = 0 if $start < 0; # avoid negative positions in array
-		foreach ($start - $data->{f_offset} .. $a->calend - 1 - $data->{f_offset}) {
+		$start = 0 if $start < 0;
+		$start = int($start / $bin_size);
+		my $end = int( ($a->calend - 1) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($a->pos - $data->{f_offset} ..
-			 $a->pos + $extend_value - 1 - $data->{f_offset}
-		) {
+		my $start = int($a->pos / $bin_size);
+		my $end = int( ($a->pos + $extend_value - 1) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2274,15 +2384,17 @@ sub se_strand_extend {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
 		my $start = $a->calend - $extend_value;
-		$start = 0 if $start < 0; # avoid negative positions in array
-		foreach ($start - $data->{r_offset} .. $a->calend - 1 - $data->{r_offset}) {
+		$start = 0 if $start < 0;
+		$start = int($start / $bin_size);
+		my $end = int( ($a->calend - 1) / $bin_size);
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
 			$data->{r}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($a->pos - $data->{f_offset} .. 
-			$a->pos + $extend_value - 1 - $data->{f_offset}
-		) {
+		my $start = int($a->pos / $bin_size);
+		my $end = int( ($a->pos + $extend_value - 1) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2292,17 +2404,17 @@ sub se_shift_extend {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
 		my $start = $a->calend - $shift_value - $extend_value;
-		$start = 0 if $start < 0; # avoid negative positions in array
-		foreach ($start - $data->{f_offset} .. 
-			$a->calend - 1 - $shift_value - $data->{f_offset}
-		) {
+		$start = 0 if $start < 0; 
+		$start = int($start / $bin_size);
+		my $end = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($a->pos + $shift_value - $data->{f_offset} .. 
-			$a->pos + $shift_value + $extend_value - 1 - $data->{f_offset}
-		) {
+		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		my $end = int( ($a->pos + $shift_value + $extend_value - 1) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2312,17 +2424,17 @@ sub se_shift_strand_extend {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
 		my $start = $a->calend - $shift_value - $extend_value;
-		$start = 0 if $start < 0; # avoid negative positions in array
-		foreach ($start - $data->{r_offset} .. 
-			$a->calend - 1 - $shift_value - $data->{r_offset}
-		) {
+		$start = 0 if $start < 0; 
+		$start = int($start / $bin_size);
+		my $end = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 			$data->{r}->[$_] += $score;
 		}
 	}
 	else {
-		foreach ($a->pos + $shift_value - $data->{f_offset} .. 
-			$a->pos + $shift_value + $extend_value - 1 - $data->{f_offset}
-		) {
+		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		my $end = int( ($a->pos + $shift_value + $extend_value - 1) / $bin_size);
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2336,13 +2448,13 @@ sub pe_strand_start {
 
 sub pe_mid {
 	my ($a, $data, $score) = @_;
-	my $mid = $a->pos + int( $a->isize / 2 );
+	my $mid = int( ($a->pos + int( $a->isize / 2 ) ) / $bin_size);
 	$data->{f}->[$mid - $data->{f_offset}] += $score;
 }
 
 sub pe_strand_mid {
 	my ($a, $data, $score) = @_;
-	my $mid = $a->pos + int( $a->isize / 2 );
+	my $mid = int( ($a->pos + int( $a->isize / 2 ) ) / $bin_size);
 	my $flag = $a->flag;
 	if ($flag & 0x0040) {
 		# first read
@@ -2366,27 +2478,27 @@ sub pe_strand_mid {
 
 sub pe_span {
 	my ($a, $data, $score) = @_;
-	foreach ($a->pos  - $data->{f_offset} .. $a->pos  - $data->{f_offset} + $a->isize) {
+	my $start = int($a->pos / $bin_size);
+	my $end = int( ($a->pos + $a->isize) / $bin_size);
+	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 		$data->{f}->[$_] += $score;
 	}
 }
 
 sub pe_strand_span {
 	my ($a, $data, $score) = @_;
+	my $start = int($a->pos / $bin_size);
+	my $end = int( ($a->pos + $a->isize) / $bin_size);
 	my $flag = $a->flag;
 	if ($flag & 0x0040) {
 		# first read
 		if ($a->reversed) {
-			foreach ($a->pos - $data->{r_offset} .. 
-				$a->pos - $data->{r_offset} + $a->isize
-			) {
+			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 				$data->{r}->[$_] += $score;
 			}
 		}
 		else {
-			foreach ($a->pos - $data->{f_offset} .. 
-				$a->pos - $data->{f_offset} + $a->isize
-			) {
+			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 				$data->{f}->[$_] += $score;
 			}
 		}
@@ -2394,16 +2506,12 @@ sub pe_strand_span {
 	elsif ($flag & 0x0080) {
 		# second read
 		if ($a->reversed) {
-			foreach ($a->pos - $data->{f_offset} .. 
-				$a->pos - $data->{f_offset} + $a->isize
-			) {
+			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 				$data->{f}->[$_] += $score;
 			}
 		}
 		else {
-			foreach ($a->pos - $data->{r_offset} .. 
-				$a->pos - $data->{r_offset} + $a->isize
-			) {
+			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 				$data->{r}->[$_] += $score;
 			}
 		}
@@ -2413,9 +2521,9 @@ sub pe_strand_span {
 sub pe_center_span {
 	my ($a, $data, $score) = @_;
 	my $position = $a->pos + int( $a->isize / 2 );
-	foreach ($position - $half_extend - $data->{f_offset} .. 
-		$position - $data->{f_offset} + $half_extend
-	) {
+	my $start = int( ($position - $half_extend) / $bin_size);
+	my $end = int( ($position + $half_extend) / $bin_size);
+	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 		$data->{f}->[$_] += $score;
 	}
 }
@@ -2423,20 +2531,18 @@ sub pe_center_span {
 sub pe_strand_center_span {
 	my ($a, $data, $score) = @_;
 	my $position = $a->pos + int( $a->isize / 2 );
+	my $start = int( ($position - $half_extend) / $bin_size);
+	my $end = int( ($position + $half_extend) / $bin_size);
 	my $flag = $a->flag;
 	if ($flag & 0x0040) {
 		# first read
 		if ($a->reversed) {
-			foreach ($position - $data->{r_offset} - $half_extend .. 
-				$position - $data->{r_offset} + $half_extend
-			) {
+			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 				$data->{r}->[$_] += $score;
 			}
 		}
 		else {
-			foreach ($position - $data->{f_offset} - $half_extend .. 
-				$position - $data->{f_offset} + $half_extend
-			) {
+			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 				$data->{f}->[$_] += $score;
 			}
 		}
@@ -2444,16 +2550,12 @@ sub pe_strand_center_span {
 	elsif ($flag & 0x0080) {
 		# second read
 		if ($a->reversed) {
-			foreach ($position - $data->{f_offset} - $half_extend .. 
-				$position - $data->{f_offset} + $half_extend
-			) {
+			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 				$data->{f}->[$_] += $score;
 			}
 		}
 		else {
-			foreach ($position - $data->{r_offset} - $half_extend .. 
-				$position - $data->{r_offset} + $half_extend
-			) {
+			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 				$data->{r}->[$_] += $score;
 			}
 		}
@@ -2523,13 +2625,14 @@ bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
  
  Output options:
   --out <filename>              output file name, default is bam file basename
+  --bin <integer>               bin size for span or extend mode (10)
   --bw                          convert to bigWig format
   --bwapp /path/to/wigToBigWig  path to external converter
   --gz                          gzip compress output
   
  Wig format:
-  --bdg                         bedGraph, default for span, cspan, extend
-  --fix                         fixedStep, default for coverage
+  --bdg                         bedGraph, default for span and extend at bin 1
+  --fix                         fixedStep, default for bin > 1
   --var                         varStep, default for start, mid
   
  General options:
@@ -2818,6 +2921,13 @@ The default value is 4 decimal positions.
 Specify the output base filename. An appropriate extension will be 
 added automatically. By default it uses the base name of the 
 input file.
+
+=item --bin <integer>
+
+Specify the bin size in bp for the output wig file. In general, specifying 
+a larger bin size will decrease the run time and memory requirements in 
+exchange for loss of resolution. The default for span, center span, or 
+extend mode is 10 bp; all other modes is 1 bp. 
 
 =item --bw
 
