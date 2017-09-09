@@ -13,7 +13,7 @@ use Bio::ToolBox::db_helper qw(
 	check_dataset_for_rpm_support
 );
 use Bio::ToolBox::utility;
-use Bio::ToolBox::GeneTools qw(:transcript);
+use Bio::ToolBox::GeneTools qw(:transcript :cds :utr);
 
 my $parallel;
 eval {
@@ -22,7 +22,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.50';
+my $VERSION = '1.52';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -50,6 +50,7 @@ my (
 	$method,
 	$stranded,
 	$subfeature,
+	$exon_subfeature,
 	$extend,
 	$start_adj,
 	$stop_adj,
@@ -79,7 +80,8 @@ GetOptions(
 	'method=s'   => \$method, # method of collecting & reporting data
 	'data=s'     => \@datasets, # the list of datasets to collect data from
 	'strand=s'   => \$stranded, # indicate strandedness of data
-	'exons!'     => \$subfeature, # indicate to restrict to subfeatures
+	'subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
+	'exons!'     => \$exon_subfeature, # old parameter
 	'extend=i'   => \$extend, # extend the size of the genomic feature
 	'start=i'    => \$start_adj, # adjustment to relative position
 	'stop=i'     => \$stop_adj, # adjustment relative position
@@ -427,6 +429,15 @@ sub set_defaults {
 			die " You must define a database or an appropriate dataset file! see help\n";
 		}
 	}
+	
+	# Check subfeatures
+	if ($exon_subfeature) {
+		# legacy option
+		$subfeature = 'exon';
+	}
+	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
+		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	} 
 }
 
 
@@ -513,7 +524,8 @@ sub collect_dataset {
 	my $dataset = shift;
 	
 	# collapse transcripts if needed
-	if ($subfeature and not $collapsed) {
+	if ($subfeature eq 'exon' and not $collapsed) {
+		# we only collapse genes with exonic subfeatures, not other types of subfeature
 		$collapsed = collapse_all_features();
 	}
 	
@@ -572,7 +584,7 @@ sub get_dataset {
 			'method'    => $method,
 			'stranded'  => $stranded,
 			'extend'    => $extend,
-			'exon'      => $subfeature,
+			'subfeature' => $subfeature,
 		);
 		$row->value($index, $score);
 	} );
@@ -774,6 +786,45 @@ sub calculate_fpkm_values {
 	# calculate which indices;
 	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
 	
+	# identify the length column
+	my $length_i = $Data->find_column('Merged_Transcript_Length');
+	if (not defined $length_i and defined $subfeature) {
+		# we need to calculate the custom length of the subfeatures
+		# first check to see if the column exists, and if not, calculate lengths for all
+		if ($subfeature eq '5p_utr') {
+			$length_i = $Data->find_column('Transcript_5pUTR_Length');
+			unless (defined $length_i) {
+				$length_i = $Data->add_column('Transcript_5pUTR_Length');
+				$Data->iterate( sub {
+					my $row = shift;
+					$row->value($length_i, 
+						get_transcript_5p_utr_length($row->seqfeature));
+				} );
+			}
+		}
+		elsif ($subfeature eq 'cds') {
+			$length_i = $Data->find_column('Transcript_CDS_Length');
+			unless (defined $length_i) {
+				$length_i = $Data->add_column('Transcript_CDS_Length');
+				$Data->iterate( sub {
+					my $row = shift;
+					$row->value($length_i, get_transcript_cds_length($row->seqfeature));
+				} );
+			}
+		}
+		elsif ($subfeature eq '3p_utr') {
+			$length_i = $Data->find_column('Transcript_3pUTR_Length');
+			unless (defined $length_i) {
+				$length_i = $Data->add_column('Transcript_3pUTR_Length');
+				$Data->iterate( sub {
+					my $row = shift;
+					$row->value($length_i, 
+						get_transcript_3p_utr_length($row->seqfeature));
+				} );
+			}
+		}
+	}
+	
 	# work through each collected dataset
 	foreach my $index (@indices) {
 	
@@ -798,13 +849,12 @@ sub calculate_fpkm_values {
 		$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
 		$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
 		$Data->metadata($fpkm_index, 'total_count', $total); 
-		my $length_i = $Data->find_column('Merged_Transcript_Length');
 	
 		# calculate and store the fpkms
 		$Data->iterate( sub {
 			my $row = shift;
-			my $length = $length_i ? $row->value($length_i) : $row->length;
-			$length ||= 1; # how would a zero sneak in here? shouldn't happen 
+			my $length = defined $length_i ? $row->value($length_i) : $row->length;
+			$length ||= 1; # why would the length be zero?
 			my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
 			$row->value($fpkm_index, $fpkm);
 		} );
@@ -842,7 +892,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
             count|pcount|ncount]
   --strand [all|sense|antisense]                            (all)
   --force_strand
-  --exons
+  --subfeature [exon|cds|5p_utr|3p_utr]
   --fpkm [region|genome]
   
   Adjustments to features:
@@ -1009,15 +1059,18 @@ presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
 
+=item --subfeature [ exon | cds | 5p_utr | 3p_utr ]
+
+Optionally specify the type of subfeature to collect from, rather than 
+the entire gene. If the parent feature is gene and the subfeature is exon, 
+then all transcripts of the gene will be collapsed. The other subfeatures 
+(cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
+coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
+and fstop are ignored. Default is null. 
+
 =item --exons
 
-Optionally indicate that data should be collected only over the exon 
-subfeatures of a gene or transcript, rather than the entire gene. 
-Subfeatures with a primary_tag of exon are preferentially taken. If exons 
-are not defined, then CDS and UTR subfeatures are used, or the entire 
-gene or transcript if no appropriate subfeatures are found. Note that 
-the options extend, start, stop, fstart, and fstop are ignored. 
-Default is false. 
+Legacy option for specifying --subfeature exon.
 
 =item --fpkm [region|genome]
 

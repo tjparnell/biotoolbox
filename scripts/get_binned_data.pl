@@ -45,6 +45,7 @@ my (
 	$dataset,
 	$feature,
 	$subfeature,
+	$exon_subfeature,
 	$method,
 	$stranded,
 	$bins,
@@ -69,7 +70,8 @@ GetOptions(
 	'ddb=s'       => \$data_database, # data database
 	'data=s'      => \$dataset, # dataset name
 	'feature=s'   => \$feature, # what type of feature to work with
-	'exons!'      => \$subfeature, # indicate to restrict to subfeatures
+	'subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
+	'exons!'      => \$exon_subfeature, # old parameter
 	'method=s'    => \$method, # method for collecting the data
 	'strand=s'    => \$stranded, # indicate whether stranded data should be taken
 	'bins=i'      => \$bins, # number of bins
@@ -296,8 +298,20 @@ sub check_defaults {
 		$method = 'mean';
 	}
 	
+	# subfeatures
 	if ($subfeature and $long_data) {
 		die " Long data collection is incompatible with exon subfeatures\n Use --help for more information\n";
+	}
+	if ($exon_subfeature) {
+		# legacy option
+		$subfeature = 'exon';
+	}
+	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
+		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	}
+	if ($subfeature and $subfeature ne 'exon' and $extension) {
+		print " disabling $extension with non-exon subfeatures\n";
+		$extension = 0;
 	}
 	
 	# assign default values
@@ -431,7 +445,7 @@ sub collect_binned_data {
 	my $binsize = shift;
 	
 	# collapse transcripts if needed
-	if ($subfeature and not $collapsed) {
+	if ($subfeature eq 'exon' and not $collapsed) {
 		$collapsed = collapse_all_features();
 	}
 	my $length_i = $Data->find_column('Merged_Transcript_Length');
@@ -482,7 +496,7 @@ sub collect_binned_data {
 			'extend'    => $extra,
 			'stranded'  => $stranded,
 			'strand'    => $set_strand ? $row->strand : $feature->strand,
-			'exon'      => $subfeature,
+			'subfeature' => $subfeature,
 			'length'    => $length,
 		);
 		# record the scores for each bin
@@ -856,6 +870,7 @@ A program to collect data in bins across a list of features.
             count|pcount|ncount]
   --strand [all|sense|antisense]                            (all)
   --force_strand
+  --subfeature [exon|cds|5p_utr|3p_utr]
   --long
   
   Bin specification:
@@ -987,6 +1002,19 @@ each feature regardless of its original orientation. This requires the
 presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
+
+=item --subfeature [ exon | cds | 5p_utr | 3p_utr ]
+
+Optionally specify the type of subfeature to collect from, rather than 
+the entire gene. If the parent feature is gene and the subfeature is exon, 
+then all transcripts of the gene will be collapsed. The other subfeatures 
+(cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
+coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
+and fstop are ignored. Default is null. 
+
+=item --exons
+
+Legacy option for specifying --subfeature exon.
 
 =item --long
 
