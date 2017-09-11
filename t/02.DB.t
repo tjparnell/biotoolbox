@@ -12,7 +12,7 @@ use Statistics::Lite qw(min max);
 
 BEGIN {
 	if (eval {require Bio::DB::SeqFeature::Store::memory; 1}) {
-		plan tests => 63;
+		plan tests => 88;
 	}
 	else {
 		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
@@ -81,6 +81,9 @@ is($row->stop, 61052, 'Feature stop, defined'); # uses db feature for stop
 my $segment = $row->segment;
 isa_ok($segment, 'Bio::DB::SeqFeature::Segment', 'db segment from row Feature');
 
+
+
+### Using a second test database for data collection
 # verify data from a data database
 my $ddb = File::Spec->catfile($Bin, "Data", "sample2.gff3");
 my $verified = $Data->verify_dataset('data:sample2', $ddb);
@@ -241,7 +244,117 @@ is($score1{-5}, 1, 'count at relative position -5 in positioned score hash');
 
 
 
-# extra test for checking non-conforming chromosome name
+### Repeat score collection with advanced annotation
+undef(%score1);
+undef($score);
+undef($feature);
+undef($row);
+undef($stream);
+undef($Data);
+$Data = Bio::ToolBox::Data->new(
+	'db'      => $ddb,
+	'feature' => 'mRNA:tim',
+	# we need to work with transcripts here, not genes
+);
+isa_ok($Data, 'Bio::ToolBox::Data', 'db collected gene table');
+
+# check metadata
+is($Data->feature, 'mRNA:tim', 'feature');
+is($Data->feature_type, 'named', 'feature type');
+
+# check data table
+is($Data->number_columns, 3, 'number of columns');
+is($Data->last_row, 4, 'last row');
+
+# columns
+is($Data->id_column, 0, 'primary ID column');
+is($Data->name_column, 1, 'identify name column');
+is($Data->type_column, 2, 'identify type column');
+
+# check first feature
+$Data->sort_data(1, 'i');
+$stream = $Data->row_stream;
+isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator');
+$row = $stream->next_row;
+isa_ok($row, 'Bio::ToolBox::Data::Feature', 'row Feature');
+is($row->type, 'mRNA:tim', 'Feature type');
+is($row->name, 'YAL030W', 'Feature name');
+
+# test SeqFeature
+$feature = $row->feature;
+isa_ok($feature, 'Bio::DB::SeqFeature', 'db SeqFeature from row Feature');
+
+# test subfeature scores, should use same database
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'count',
+);
+is($score, 13, 'count score across mRNA');
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'count',
+	subfeature => 'exon',
+);
+is($score, 9, 'count score across subfeature exons');
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'count',
+	subfeature => 'cds',
+);
+is($score, 8, 'count score across subfeature CDS');
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'pcount',
+	subfeature => '5p_utr',
+);
+# we do a precise count here because a quirk of BDBSFS adapter returns EVERYTHING found
+# when nothing fits in the coordinate search window. bug or feature? ugh.
+is($score, 0, 'pcount score across subfeature 5p UTR');
+$score = $row->get_score(
+	dataset => 'data:sample2',
+	'method'  => 'pcount',
+	subfeature => '3p_utr',
+);
+# another bug? should return 1 with method count, but it returns all????
+is($score, 1, 'pcount score across subfeature 3p UTR');
+
+%score1 = $row->get_region_position_scores(
+	dataset => 'data:sample2',
+	subfeature => 'CDS',
+);
+# print "CDS position_score is \n" . print_hash(\%score1);
+is($score1{26}, 0.482, 'score at position 26 in CDS region position scores');
+is($score1{206}, 0.524, 'score at position 206 in CDS region position scores');
+
+
+
+# test next feature 
+$row = $stream->next_row;
+is($row->name, 'YAL043C', 'Feature name');
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'count',
+	subfeature => 'exon',
+);
+is($score, 61, 'count score across exon');
+$score = $row->get_score(
+	dataset => 'data',
+	'method'  => 'count',
+	subfeature => 'cds',
+);
+is($score, 60, 'count score across multi-subfeature CDS');
+
+%score1 = $row->get_region_position_scores(
+	dataset => 'data:sample2',
+	subfeature => 'cds',
+);
+# print "CDS position_score is \n" . print_hash(\%score1);
+is($score1{321}, 0.443, 'score at position 321 in CDS region position scores');
+is($score1{2372}, 0.037, 'score at position 2372 in CDS region position scores');
+
+
+
+### Extra test for checking non-conforming chromosome name
 # using sample.bed file as in other tests
 undef $Data;
 undef $stream;
@@ -265,7 +378,7 @@ is(sprintf("%.1f", $score), 0.5, 'median score across second bed feature with al
 
 
 
-# Test for sequence retrieval using Bio::DB::Fasta
+### Test for sequence retrieval using Bio::DB::Fasta
 # reusing the Data object immediately above
 $Data->bam_adapter('none'); # to ensure we use BioPerl's Bio::DB::Fasta
 my $fasta = File::Spec->catfile($Bin, "Data", "sequence.fa");
