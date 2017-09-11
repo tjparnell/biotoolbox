@@ -1286,7 +1286,7 @@ sub get_score {
 	$args{strandedness} ||= $args{stranded} || 'all';
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} = $args{exon} ||= q();
+	$args{subfeature} ||= $args{exon} || q();
 	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_scores($db, \%args);
