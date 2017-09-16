@@ -1903,7 +1903,8 @@ sub write_bedgraph {
 			else {
 				my $end = $cpos * $bin_size;
 				$end = $seq_length if $end > $seq_length;
-				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval);
+				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
+					if $end; # this avoids writing nonexistent start 0 end 0 lines
 				$lpos = $cpos;
 				$cval = $value;
 				$cpos++;
