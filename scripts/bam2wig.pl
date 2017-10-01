@@ -204,7 +204,10 @@ my @seq_list;
 my %seq_name2length;
 for my $tid (0 .. $sams[0]->n_targets - 1) {
 	my $chr = $sams[0]->target_name($tid);
-	next if $chr_exclude and $chr =~ $chr_exclude;
+	if ($chr_exclude and $chr =~ $chr_exclude) {
+		print "  skipping sequence $chr\n" if $verbose;
+		next;
+	}
 	push @seq_list, $chr;
 	$seq_name2length{$chr} = $sams[0]->target_len($tid);
 }
@@ -711,6 +714,8 @@ sub process_black_list {
 				[ $row->start - 1, $row->end ]
 				if exists $black_list_hash{ $row->seq_id };
 		} );
+		printf " Loaded %s blacklist regions\n", 
+			format_with_commas($Data->last_row);
 		return \%black_list_hash;
 	}
 	return;
@@ -1898,7 +1903,8 @@ sub write_bedgraph {
 			else {
 				my $end = $cpos * $bin_size;
 				$end = $seq_length if $end > $seq_length;
-				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval);
+				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
+					if $end; # this avoids writing nonexistent start 0 end 0 lines
 				$lpos = $cpos;
 				$cval = $value;
 				$cpos++;

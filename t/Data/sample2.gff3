@@ -1,18 +1,28 @@
 ##gff-version 3
 # sample annotation and data scores
 chrI	SGD	chromosome	1	230218	.	.	.	ID=chrI;Name=chrI
-chrI	SGD	gene	54989	56857	.	-	.	ID=YAL047C;Name=YAL047C;gene=SPC72;Alias=SPC72,LDB4;Note=Component%20of%20the%20cytoplasmic%20Tub4p%20(gamma-tubulin)%20complex%2C%20binds%20spindle%20pole%20bodies%20and%20links%20them%20to%20microtubules%3B%20has%20roles%20in%20astral%20microtubule%20formation%20and%20stabilization;orf_classification=Verified
-chrI	SGD	CDS	54989	56857	.	-	0	Parent=YAL047C;Name=YAL047C;gene=SPC72;Alias=SPC72,LDB4;Note=Component%20of%20the%20cytoplasmic%20Tub4p%20(gamma-tubulin)%20complex%2C%20binds%20spindle%20pole%20bodies%20and%20links%20them%20to%20microtubules%3B%20has%20roles%20in%20astral%20microtubule%20formation%20and%20stabilization;orf_classification=Verified
-chrI	SGD	gene	57029	57385	.	-	.	ID=YAL046C;Name=YAL046C;gene=AIM1;Alias=AIM1;Note=Protein%20involved%20in%20mitochondrial%20function%20or%20organization%3B%20null%20mutant%20displays%20elevated%20frequency%20of%20mitochondrial%20genome%20loss;orf_classification=Verified
-chrI	SGD	CDS	57029	57385	.	-	0	Parent=YAL046C;Name=YAL046C;gene=AIM1;Alias=AIM1;Note=Protein%20involved%20in%20mitochondrial%20function%20or%20organization%3B%20null%20mutant%20displays%20elevated%20frequency%20of%20mitochondrial%20genome%20loss;orf_classification=Verified
-chrI	SGD	gene	57488	57796	.	-	.	ID=YAL045C;Name=YAL045C;Note=Dubious%20open%20reading%20frame%20unlikely%20to%20encode%20a%20protein%2C%20based%20on%20available%20experimental%20and%20comparative%20sequence%20data%3B%20almost%20completely%20overlaps%20YAL044W-A;orf_classification=Dubious
-chrI	SGD	CDS	57488	57796	.	-	0	Parent=YAL045C;Name=YAL045C;Note=Dubious%20open%20reading%20frame%20unlikely%20to%20encode%20a%20protein%2C%20based%20on%20available%20experimental%20and%20comparative%20sequence%20data%3B%20almost%20completely%20overlaps%20YAL044W-A;orf_classification=Dubious
-chrI	SGD	gene	57518	57850	.	+	.	ID=YAL044W-A;Name=YAL044W-A;Note=Putative%20protein%20of%20unknown%20function%3B%20similar%20to%20S.%20pombe%20uvi31%20which%20is%20a%20putative%20DNA%20repair%20protein;orf_classification=Uncharacterized
-chrI	SGD	CDS	57518	57850	.	+	0	Parent=YAL044W-A;Name=YAL044W-A;Note=Putative%20protein%20of%20unknown%20function%3B%20similar%20to%20S.%20pombe%20uvi31%20which%20is%20a%20putative%20DNA%20repair%20protein;orf_classification=Uncharacterized
-chrI	SGD	gene	57950	58462	.	-	.	ID=YAL044C;Name=YAL044C;gene=GCV3;Alias=GCV3;Note=H%20subunit%20of%20the%20mitochondrial%20glycine%20decarboxylase%20complex%2C%20required%20for%20the%20catabolism%20of%20glycine%20to%205%2C10-methylene-THF%3B%20also%20required%20for%20all%20protein%20lipoylation%3B%20expression%20is%20regulated%20by%20levels%20of%205%2C10-methylene-THF;orf_classification=Verified
-chrI	SGD	CDS	57950	58462	.	-	0	Parent=YAL044C;Name=YAL044C;gene=GCV3;Alias=GCV3;Note=H%20subunit%20of%20the%20mitochondrial%20glycine%20decarboxylase%20complex%2C%20required%20for%20the%20catabolism%20of%20glycine%20to%205%2C10-methylene-THF%3B%20also%20required%20for%20all%20protein%20lipoylation%3B%20expression%20is%20regulated%20by%20levels%20of%205%2C10-methylene-THF;orf_classification=Verified
-chrI	SGD	gene	58695	61052	.	-	.	ID=YAL043C;Name=YAL043C;gene=PTA1;Alias=PTA1,FUN39;Note=Subunit%20of%20holo-CPF%2C%20a%20multiprotein%20complex%20and%20functional%20homolog%20of%20mammalian%20CPSF%2C%20required%20for%20the%20cleavage%20and%20polyadenylation%20of%20mRNA%20and%20snoRNA%203'%20ends%3B%20involved%20in%20pre-tRNA%20processing%3B%20binds%20to%20the%20phosphorylated%20CTD%20of%20RNAPII;orf_classification=Verified
-chrI	SGD	CDS	58695	61052	.	-	0	Parent=YAL043C;Name=YAL043C;gene=PTA1;Alias=PTA1,FUN39;Note=Subunit%20of%20holo-CPF%2C%20a%20multiprotein%20complex%20and%20functional%20homolog%20of%20mammalian%20CPSF%2C%20required%20for%20the%20cleavage%20and%20polyadenylation%20of%20mRNA%20and%20snoRNA%203'%20ends%3B%20involved%20in%20pre-tRNA%20processing%3B%20binds%20to%20the%20phosphorylated%20CTD%20of%20RNAPII;orf_classification=Verified
+###
+chrI	tim	gene	54955	56922	.	-	.	Name=SPC72;ID=SPC72
+chrI	tim	mRNA	54955	56922	.	-	.	Name=YAL047C;ID=YAL047C;Parent=SPC72
+chrI	tim	exon	54955	56922	.	-	.	Name=YAL047C.exon0;ID=YAL047C.exon0;Parent=YAL047C
+chrI	tim	CDS	54989	56857	.	-	0	Name=YAL047C.cds0;ID=YAL047C.cds0;Parent=YAL047C
+###
+chrI	tim	gene	57263	57782	.	+	.	Name=SNC1;ID=SNC1
+chrI	tim	mRNA	57263	57782	.	+	.	Name=YAL030W;ID=YAL030W;Parent=SNC1
+chrI	tim	exon	57263	57387	.	+	.	Name=YAL030W.exon0;ID=YAL030W.exon0;Parent=YAL030W
+chrI	tim	exon	57501	57782	.	+	.	Name=YAL030W.exon1;ID=YAL030W.exon1;Parent=YAL030W
+chrI	tim	CDS	57286	57387	.	+	0	Name=YAL030W.cds0;ID=YAL030W.cds0;Parent=YAL030W
+chrI	tim	CDS	57501	57752	.	+	0	Name=YAL030W.cds1;ID=YAL030W.cds1;Parent=YAL030W
+###
+chrI	tim	gene	57875	58482	.	-	.	Name=GCV3;ID=GCV3
+chrI	tim	mRNA	57875	58482	.	-	.	Name=YAL044C;ID=YAL044C;Parent=GCV3
+chrI	tim	exon	57875	58482	.	-	.	Name=YAL044C.exon0;ID=YAL044C.exon0;Parent=YAL044C
+chrI	tim	CDS	57950	58462	.	-	0	Name=YAL044C.cds0;ID=YAL044C.cds0;Parent=YAL044C
+###
+chrI	tim	gene	58683	61082	.	-	.	Name=PTA1;ID=PTA1
+chrI	tim	mRNA	58683	61082	.	-	.	Name=YAL043C;ID=YAL043C;Parent=PTA1
+chrI	tim	exon	58683	61082	.	-	.	Name=YAL043C.exon0;ID=YAL043C.exon0;Parent=YAL043C
+chrI	tim	CDS	58695	61052	.	-	0	Name=YAL043C.cds0;ID=YAL043C.cds0;Parent=YAL043C
 ###
 chrI	sample2	data	55043	55043	-0.551	.	.	Name=data1
 chrI	sample2	data	55116	55116	-0.55	.	.	Name=data2

@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 57;
+	plan tests => 79;
 }
 
 BEGIN {
@@ -101,10 +101,19 @@ is($t1_utrs[1]->start, 389335, 'second UTR start');
 is($t1_utrs[1]->end, 389401, 'second UTR end');
 is($t1_utrs[1]->primary_tag, 'five_prime_UTR', 'second UTR primary tag');
 
+my @fivep_utrs = get_5p_utrs($t1);
+is(scalar @fivep_utrs, 2, '5 prime UTR number');
+is($fivep_utrs[0]->start, 388142, '5 prime UTR start');
+my @threep_utrs = get_3p_utrs($t1);
+is(scalar @threep_utrs, 0, '3 prime UTR number');
+is(get_transcript_5p_utr_length($t1), 241, '5 prime UTR length');
+is(get_transcript_3p_utr_length($t1), 0, '3 prime UTR length');
+is(get_transcript_utr_length($t1), 241, 'combined UTR length');
+
 
 # second transcript
 my $t2 = shift @transcripts;
-isa_ok($t2, 'Bio::ToolBox::SeqFeature', 'first transcript object');
+isa_ok($t2, 'Bio::ToolBox::SeqFeature', 'second transcript object');
 is(is_coding($t2), 0, 'transcript2 is_coding');
 is($t2->primary_tag, 'ncRNA', 'transcript2 primary_tag');
 is($t2->primary_id, 'ENST00000465226', 'transcript2 primary_id');
@@ -120,6 +129,32 @@ is(get_cdsEnd($t2), undef, 'transcript2 CDS stop');
 is(get_transcript_cds_length($t2), 0, 'transcript2 CDS length');
 my @t2_utrs = get_utrs($t2);
 is(scalar @t2_utrs, 0, 'transcript2 UTR number');
+
+
+
+# third transcript
+my $t3 = shift @transcripts;
+is(is_coding($t3), 1, 'transcript3 is_coding');
+is($t3->primary_tag, 'mRNA', 'transcript3 primary_tag');
+is($t3->primary_id, 'ENST00000382214', 'transcript3 primary_id');
+is(get_transcript_length($t3), 2752, 'transcript3 get_transcript_length');
+my @t3_exons = get_exons($t3);
+is(scalar @t3_exons, 12, 'transcript3 exon number');
+is(get_cdsStart($t3), 389402, 'transcript3 CDS start');
+is(get_cdsEnd($t3), 407963, 'transcript3 CDS stop');
+is(get_transcript_cds_length($t3), 1011, 'transcript3 CDS length');
+my @t3_utrs = get_utrs($t3);
+is(scalar @t3_utrs, 5, 'transcript3 UTR number');
+
+@fivep_utrs = get_5p_utrs($t3);
+is(scalar @fivep_utrs, 1, '5 prime UTR number');
+is($fivep_utrs[0]->start, 388694, '5 prime UTR start');
+@threep_utrs = get_3p_utrs($t3);
+is(scalar @threep_utrs, 4, '3 prime UTR number');
+is($threep_utrs[0]->start, 407964, '3 prime UTR start');
+is(get_transcript_5p_utr_length($t3), 708, '5 prime UTR length');
+is(get_transcript_3p_utr_length($t3), 1033, '3 prime UTR length');
+is(get_transcript_utr_length($t3), 1741, 'combined UTR length');
 
 
 

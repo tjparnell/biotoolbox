@@ -585,13 +585,22 @@ sub process_gene {
 	my ($gene, $method) = @_;
 	my @regions;
 	
-	# alternate or common exons require working with gene level
+	# need to pull out the appropriate transcript types from the gene
+	my @transcripts;
+	foreach my $t (get_transcripts($gene)) {
+		next unless acceptable_transcript($t);
+		push @transcripts, $t;
+	}
+	return unless @transcripts;
+	
+	# alternate or common exons require working with multiple transcripts
 	if ($request =~ /alternate|common/i) {
-		@regions = &$method($gene);
+		# pass all the transcripts together
+		@regions = &$method(@transcripts);
 	}
 	else {
-		foreach my $t (get_transcripts($gene)) {
-			next unless acceptable_transcript($t);
+		# do each transcript one at a time
+		foreach my $t (@transcripts) {
 			push @regions, &$method($t);
 		}
 	}
@@ -774,8 +783,7 @@ sub collect_last_exon {
 
 
 sub collect_alt_exons {
-	my $gene = shift;
-	my $ac_exons = get_alt_common_exons($gene);
+	my $ac_exons = get_alt_common_exons(@_);
 		# we need the transcript name, so can't use the simpler get_alt_exons()
 	my @exons;
 	foreach my $transcript (keys %$ac_exons) {
@@ -797,9 +805,8 @@ sub collect_alt_exons {
 
 
 sub collect_uncommon_exons {
-	my $gene = shift;
 	my @exons;
-	foreach my $e (get_uncommon_exons($gene)) {
+	foreach my $e (get_uncommon_exons(@_)) {
 		push @exons, _adjust_positions( [ 
 			'uncommon', # more than one transcript, so put generic identifier
 			$e->display_name, 
@@ -814,9 +821,8 @@ sub collect_uncommon_exons {
 
 
 sub collect_common_exons {
-	my $gene = shift;
 	my @exons;
-	foreach my $e (get_common_exons($gene)) {
+	foreach my $e (get_common_exons(@_)) {
 		push @exons, _adjust_positions( [ 
 			'common', # more than one transcript, so put generic identifier
 			$e->display_name, 
@@ -1038,8 +1044,7 @@ sub collect_last_intron {
 
 
 sub collect_alt_introns {
-	my $gene = shift;
-	my $ac_introns = get_alt_common_introns($gene);
+	my $ac_introns = get_alt_common_introns(@_);
 	my @introns;
 	foreach my $transcript (keys %$ac_introns) {
 		next if $transcript eq 'common';
@@ -1060,9 +1065,8 @@ sub collect_alt_introns {
 
 
 sub collect_uncommon_introns {
-	my $gene = shift;
 	my @introns;
-	foreach my $i (get_uncommon_introns($gene)) {
+	foreach my $i (get_uncommon_introns(@_)) {
 		push @introns, _adjust_positions( [ 
 			'uncommon', # more than one transcript, so put generic identifier
 			$i->display_name, 
@@ -1077,9 +1081,8 @@ sub collect_uncommon_introns {
 
 
 sub collect_common_introns {
-	my $gene = shift;
 	my @introns;
-	foreach my $i (get_common_introns($gene)) {
+	foreach my $i (get_common_introns(@_)) {
 		push @introns, _adjust_positions( [ 
 			'common', # more than one transcript, so put generic identifier
 			$i->display_name, 
