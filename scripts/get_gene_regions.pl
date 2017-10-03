@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.52';
+my $VERSION = '1.53';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -42,6 +42,7 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
+	$tsl,
 	$bed,
 	$gz,
 	$help,
@@ -61,6 +62,7 @@ GetOptions(
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
+	'tsl=s'     => \$tsl, # filter transcript support level
 	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -592,6 +594,13 @@ sub process_gene {
 		push @transcripts, $t;
 	}
 	return unless @transcripts;
+	
+	# filter for transcript support level if requested
+	if ($tsl) {
+		my $new_transcripts = filter_transcript_support_level(\@transcripts, $tsl);
+		return unless scalar @$new_transcripts;
+		@transcripts = @$new_transcripts;
+	}
 	
 	# alternate or common exons require working with multiple transcripts
 	if ($request =~ /alternate|common/i) {
@@ -1255,6 +1264,7 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --stop=<integer>
   --unique
   --slop <integer>
+  --tsl [best|best1|best2|best3|best4|best5|1|2|3|4|5|NA]
   --bed
   --gz
   --version
@@ -1353,6 +1363,22 @@ example, when start sites of transcription are not precisely mapped,
 but not useful with defined introns and exons. This does not take 
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
+
+=item --tsl <level>
+
+Filter transcripts on the Ensembl GTF/GFF3 attribute 'transcript_support_level', 
+which is described at L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>.
+Provide a level of support to filter. Values include: 
+    
+    1       All splice junctions supported by evidence
+    2       Transcript flagged as suspect or only support from multiple ESTs
+    3       Only support from single EST
+    4       Best supporting EST is suspect
+    5       No support
+    best    Transcripts at the best (lowest) available level are taken
+    best1   The word followed by a digit 1-5, indicating any transcript 
+            at or better (lower) than the indicated level
+    NA      Only transcripts without a level (NA) are retained.
 
 =item --bed
 
