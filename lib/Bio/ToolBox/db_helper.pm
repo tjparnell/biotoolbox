@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.51';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -1932,6 +1932,10 @@ sub get_segment_score {
 			return calculate_score($_[METH], $scores);
 		}
 		else {
+			if (not defined $scores) {
+				return 0 if $_[METH] =~ /count|sum/;
+				return '.';
+			}
 			return $scores;
 		}
 	}
