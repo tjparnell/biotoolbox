@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.52';
+my $VERSION = '1.53';
 	
 	
 
@@ -284,7 +284,6 @@ else {
 
 
 ### Finish
-unlink $chromo_file if $chromo_file;
 printf " Finished in %.3f min\n", (time - $start_time)/60;
 
 
@@ -1130,7 +1129,7 @@ sub open_wig_file {
 	if ($bigwig and $do_bw) {
 		print " Writing directly to bigWig converter\n";
 		$name .= '.bw' unless $name =~ /\.bw$/;
-		$chromo_file = generate_chromosome_file($sams[0]);
+		$chromo_file = generate_chromosome_file($sams[0]) unless $chromo_file;
 		my $fh = open_wig_to_bigwig_fh(
 			file      => $name,
 			chromo    => $chromo_file,
@@ -1841,6 +1840,7 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outbase\_f", @f_filelist) if $i == 1;
 				merge_wig_files("$outbase\_r", @r_filelist) if $i == 2;
+				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1848,6 +1848,7 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outbase\_f", @f_filelist);
 			merge_wig_files("$outbase\_r", @r_filelist);
+			unlink $chromo_file if $chromo_file;
 		}
 	}
 	elsif ($do_strand and $flip) {
@@ -1858,6 +1859,7 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outbase\_r", @f_filelist) if $i == 1;
 				merge_wig_files("$outbase\_f", @r_filelist) if $i == 2;
+				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1865,10 +1867,12 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outbase\_r", @f_filelist);
 			merge_wig_files("$outbase\_f", @r_filelist);
+			unlink $chromo_file if $chromo_file;
 		}
 	}
 	else {
 		merge_wig_files($outbase, @f_filelist);
+		unlink $chromo_file if $chromo_file;
 	}
 }
 
