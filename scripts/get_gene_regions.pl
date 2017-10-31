@@ -190,14 +190,14 @@ sub determine_method {
 		$request = 'transcription start site';
 		$method = \&collect_tss;
 	}
-	elsif ($request =~ /start site/i) {
+	elsif ($request eq 'transcription start site') {
 		$method = \&collect_tss;
 	}
 	elsif ($request =~ /tts/i) {
 		$request = 'transcription stop site';
 		$method = \&collect_tts;
 	}
-	elsif ($request =~ /stop site/i) {
+	elsif ($request eq 'transcription stop site') {
 		$method = \&collect_tts;
 	}
 	elsif ($request =~ /^splices?/i) {
@@ -255,6 +255,14 @@ sub determine_method {
 		$request = 'UTRs';
 		$method = \&collect_utrs;
 	}
+	elsif ($request =~ /cds ?start/i) {
+		$request = 'CDS start';
+		$method = \&collect_cds_start;
+	}
+	elsif ($request =~ /cds ?stop/i) {
+		$request = 'CDS stop';
+		$method = \&collect_cds_stop;
+	}
 	else {
 		die " unknown region request!\n";
 	}
@@ -283,7 +291,8 @@ sub collect_method_from_user {
 		14  => 'common introns',
 		15	=> 'splice sites',
 		16  => 'UTRs', 
-		# what about cdsStart, cdsStop?
+		17  => 'CDS start',
+		18  => 'CDS stop',
 	);
 	
 	# request feature from the user
@@ -1124,6 +1133,43 @@ sub collect_utrs {
 	return @utrs;
 }
 
+sub collect_cds_start {
+	
+	# get seqfeature objects
+	my $transcript = shift;
+	
+	# get the cds start
+	my $pos = get_cdsStart($transcript);
+	return unless $pos;
+	
+	# get other things
+	my $chromo = $transcript->seq_id;
+	my $strand = $transcript->strand;
+	my $name = $transcript->display_name . '_cdsStart';
+	
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $pos, $pos, $strand] 
+	);
+}
+
+sub collect_cds_stop {
+	
+	# get seqfeature objects
+	my $transcript = shift;
+	
+	# get the cds start
+	my $pos = get_cdsEnd($transcript);
+	return unless $pos;
+	
+	# get other things
+	my $chromo = $transcript->seq_id;
+	my $strand = $transcript->strand;
+	my $name = $transcript->display_name . '_cdsStart';
+	
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $pos, $pos, $strand] 
+	);
+}
 
 sub acceptable_transcript {
 	my $t = shift;
@@ -1259,7 +1305,7 @@ get_gene_regions.pl [--options...] --in <filename> --out <filename>
   --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
   --region [tss|tts|exon|altExon|uncommonExon|commonExon|firstExon|lastExon|
             intron|altIntron|uncommonIntron|commonIntron|firstIntron|
-            lastIntron|splice|UTR]
+            lastIntron|splice|UTR|cdsStart|cdsStop]
   --start=<integer>
   --stop=<integer>
   --unique
@@ -1334,6 +1380,8 @@ possibilities are possible.
      commonIntron Introns shared by all transcripts of a gene
      splice      The first and last base of each intron
      UTR         The untranslated regions of each coding transcript
+     cdsStart    The first base of the CDS
+     cdsStop     The last base of the CDS
 
 =item --start=<integer>
 
