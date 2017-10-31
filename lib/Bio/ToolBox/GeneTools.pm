@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.52';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -948,8 +948,13 @@ sub get_cdsStart {
 	else {
 		# stop codons may or may not be not included
 		my $codon = get_stop_codon($transcript);
-		return $codon->start < $cds->[0]->start ? 
-			$codon->start : $cds->[0]->start;
+		if ($codon) {
+			return $codon->start < $cds->[0]->start ? 
+				$codon->start : $cds->[0]->start;
+		}
+		else {
+			return $cds->[0]->start;
+		}
 	}
 }
 
@@ -959,8 +964,12 @@ sub get_cdsEnd {
 	return unless $cds;
 	if ($transcript->strand >= 0) {
 		my $codon = get_stop_codon($transcript);
-		return $codon->end > $cds->[-1]->end ? 
-			$codon->end : $cds->[-1]->end;
+		if ($codon) {
+			return $codon->end > $cds->[-1]->end ? $codon->end : $cds->[-1]->end;
+		}
+		else {
+			return $cds->[-1]->end;
+		}
 	}
 	else {
 		return $cds->[-1]->end;
