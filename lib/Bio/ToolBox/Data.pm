@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.43';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -769,6 +769,10 @@ header becomes a row identifier (i.e. the table is transposed). The
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
 L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
+For data from L<get_binned_data.pl> where the columns are expressed 
+as percentile bins, the reported midpoint column is automatically 
+converted based on a length of 1000 bp.
+
 You may pass these options. They are optional.
 
 =over 4
@@ -1658,6 +1662,8 @@ sub summary_file {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) 
 		$dataset = $self->metadata($startcolumn, 'dataset') || undef;
+		$dataset =~ s/^(?:file|http|ftp):\/*//;
+		$dataset =~ s/\.(?:bw|bam|bb|big.*|useq)$//;
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
@@ -1678,6 +1684,8 @@ sub summary_file {
 	$summed_data->metadata(2, 'log2', $log);
 	$summed_data->metadata(2, 'dataset', $dataset) if $dataset;
 	
+	# tag for remembering we're working with percentile bins
+	my $do_percentile = 0;
 	
 	# Collect summarized data
 	for (
@@ -1693,6 +1701,15 @@ sub summary_file {
 			$self->metadata($column, 'stop'),	
 		) or undef; 
 		
+		# convert midpoint to fraction of 1000 for plotting if necessary
+		if (substr($self->name($column), -1) eq '%') {
+			$midpoint *= 10; # midpoint * 0.01 * 1000 bp
+			$do_percentile++;
+		}
+		if ($do_percentile and substr($self->name($column), -2) eq 'bp') {
+			# working on the extension after the percentile bins
+			$midpoint += 1000;
+		}
 		
 		# collect the values in the column
 		my @values;
