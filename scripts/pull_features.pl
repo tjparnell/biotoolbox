@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.33';
+my $VERSION =  '1.53';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -30,6 +30,7 @@ my (
 	$outfile,
 	$data_index,
 	$list_index,
+	$group_index,
 	$order,
 	$sum,
 	$startcolumn,
@@ -44,6 +45,7 @@ GetOptions(
 	'out=s'      => \$outfile, # the new output file name
 	'dindex=i'   => \$data_index, # index to look up in the data file
 	'lindex=i'   => \$list_index, # index of look up values in list file
+	'gindex=i'   => \$group_index, # index of group in list file
 	'order=s'    => \$order, # the order to keep the values
 	'sum'        => \$sum, # flag to re-sum the pulled values
 	'starti=i'   => \$startcolumn, # index of column to start summarizing
@@ -173,6 +175,7 @@ sub identify_indices {
 		# the answer is obvious
 		print "  using .kgg file as list\n";
 		$list_index = 0;
+		$group_index = 1;
 		# KGG files have column headers
 	}
 		
@@ -256,6 +259,15 @@ sub identify_indices {
 		}
 	}
 	
+	# check for group number
+	if ($List->number_columns > 1 and not defined $group_index) {
+		my $i = $List->find_column('group');
+		if (defined $i) {
+			$group_index = $i;
+		}
+		# do we ask for a group or not????? probably not.... keep original functionality
+	}
+	
 	# End automatic guessing of index numbers, ask the user
 	unless (defined $list_index) {
 		$list_index = ask_user_for_index($List, 
@@ -285,12 +297,12 @@ sub collect_request_list {
 		# hash pulled{ group# } -> { 'feature_order' } = [unique_id,...]
 	
 	
-	# Check whether we're working with a Cluster .kgg file
-	if ($listfile =~ /\.kgg$/i) {
+	# check if we have multiple groups to work with
+	if (defined $group_index) {
 		$List->iterate( sub {
 			my $row = shift;
-			my $id    = $row->value(0);
-			my $group = $row->value(1);
+			my $id    = $row->value($list_index);
+			my $group = $row->value($group_index);
 			
 			# store the identifier in the requests hash
 			# the gene identifier is the key, the cluster group number is the value
@@ -309,7 +321,7 @@ sub collect_request_list {
 		} );
 	}
 	
-	# otherwise a simple text file
+	# otherwise a simple one group list file
 	else {
 		# prepare the order array
 		# using group ID of 0
@@ -498,6 +510,7 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
   --out <filename>
   --dindex <integer>
   --lindex <integer>
+  --gindex <index>
   --order [list | data]
   --sum
   --starti <integer>
@@ -539,6 +552,13 @@ If not specified, then the program will attempt to identify
 appropriate matching columns with the same header name. If none 
 are specified, the user must select interactively from a list of 
 available column names. 
+
+=item --gindex <integer>
+
+Specify the group column from the list file. This allows the data 
+file to be split into multiple output group files. A column named 
+'group' will automatically be identified. A .kgg file will 
+automatically use the Cluster column as the group index.
 
 =item --order [list | data]
 
@@ -592,10 +612,12 @@ All rows from the source data file that match an identifier in the list
 will be written to the new file. The order of the features in the output 
 file may match either the list file or the data file. 
 
+If the list file has a second group column, then the rows for each group 
+will be written to separate files, with the output file name appended with 
+the group identifier. Use the gindex option to specify the group column.
+
 The program will also accept a Cluster gene file (with .kgg extension) 
-as a list file. In this case, all of the genes for each cluster are 
-written into separate files, with the output file name appended with the 
-cluster number. 
+as a list file with group information, where the clusters are the groups. 
 
 The program will optionally regenerate a summed data file, in which values 
 in the specified data columns are averaged and written out as rows in a 
