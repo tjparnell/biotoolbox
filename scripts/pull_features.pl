@@ -33,6 +33,7 @@ my (
 	$group_index,
 	$order,
 	$sum,
+	$sum_only,
 	$startcolumn,
 	$stopcolumn,
 	$log,
@@ -47,7 +48,8 @@ GetOptions(
 	'lindex=i'   => \$list_index, # index of look up values in list file
 	'gindex=i'   => \$group_index, # index of group in list file
 	'order=s'    => \$order, # the order to keep the values
-	'sum'        => \$sum, # flag to re-sum the pulled values
+	'sum!'       => \$sum, # flag to re-sum the pulled values
+	'sumonly!'   => \$sum_only, # only save the summary file
 	'starti=i'   => \$startcolumn, # index of column to start summarizing
 	'stopi=i'    => \$stopcolumn, # index of column to stop summarizing
 	'log!'       => \$log, # values are in log, respect log status
@@ -89,6 +91,8 @@ unless (defined $listfile) {
 unless (defined $outfile) {
 	die " no output data file name given!\n";
 }
+
+$sum = 1 if $sum_only;
 
 my $list_order;
 if ($order) {
@@ -464,13 +468,15 @@ sub write_files {
 		}
 		
 		# write the file
-		my $write_results = $group_Data->save;
-			# no file name, using the filename recorded in the out data
-		if ($write_results) {
-			print " Wrote new datafile '$write_results'\n";
-		}
-		else {
-			print " Unable to write datafile '$write_results'!!!\n";
+		if (not $sum_only) {
+			my $write_results = $group_Data->save;
+				# no file name, using the filename recorded in the out data
+			if ($write_results) {
+				print " Wrote new datafile '$write_results'\n";
+			}
+			else {
+				print " Unable to write datafile '$write_results'!!!\n";
+			}
 		}
 		
 		# Summarize the pulled data
@@ -513,6 +519,7 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
   --gindex <index>
   --order [list | data]
   --sum
+  --sumonly
   --starti <integer>
   --stopi <integer>
   --log
@@ -572,6 +579,12 @@ in the data file. The default is list.
 Indicate that the pulled data should be averaged across all 
 features at each position, suitable for graphing. A separate text 
 file with '_summed' appended to the filename will be written.
+
+=item --sumonly
+
+Indicate that only a summary file should be written, and that the 
+pulled data file should be skipped. Useful if you're just after 
+the summary for graphing purposes.
 
 =item --starti <integer>
 
