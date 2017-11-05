@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.52';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -1262,6 +1262,7 @@ sub get_sequence {
 		$start = 1 if $start <= 0;
 		$stop += $args{extend};
 	}
+	return unless (defined $seqid and defined $start and defined $stop);
 	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
 	if ($strand == -1) {
 		$seq =~ tr/gatcGATC/ctagCTAG/;
