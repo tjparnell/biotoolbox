@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.51';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -363,7 +363,7 @@ sub verify {
 		}
 		if ($self->{'number_columns'} == 12) {
 			# bed12 has extra special limitations
-			unless ($self->_column_is_stranded(6,7,9) ) {
+			unless ($self->_column_is_integers(6,7,9) ) {
 				$bed_check = 0;
 				$error .= " Column 6,7,9 not integers.";
 			}
