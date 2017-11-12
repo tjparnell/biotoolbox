@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.44';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -12,11 +12,11 @@ This module parses a GFF file into SeqFeature objects. It natively
 handles GFF3, GTF, and general GFF files. 
 
 For both GFF3 and GTF files, fully nested gene models, typically 
-gene => transcript => (exon, CDS, etc), may be built using the appropriate 
+gene =E<gt> transcript =E<gt> (exon, CDS, etc), may be built using the appropriate 
 attribute tags. For GFF3 files, these include ID and Parent tags; for GTF 
-these include gene_id and transcript_id tags. 
+these include C<gene_id> and C<transcript_id> tags. 
 
-For GFF3 files, any feature without a Parent tag is assumed to be a 
+For GFF3 files, any feature without a C<Parent> tag is assumed to be a 
 parent. Children features referencing a parent feature that has not been 
 loaded are considered orphans. Orphans are attempted to be re-associated 
 with missing parents after the file is completely parsed. Any orphans left 
@@ -44,11 +44,26 @@ objects. Refer to that documentation for more information.
 
 =head1 METHODS
 
-=head2 Initializing the parser. 
+=head2 Initialize and modify the parser. 
+
+These are class methods to initialize the parser with an annotation file 
+and modify the parsing behavior. Most parameters can be set either upon 
+initialization or as class methods on the object. Unpredictable behavior 
+may occur if you implement these in the midst of parsing a file. 
+
+Do not open subsequent files with the same object. Always create a new 
+object to parse a new file
 
 =over 4
 
-=item new()
+=item new
+
+  my $parser = Bio::ToolBox::parser::gff->new($filename);
+  my $parser = Bio::ToolBox::parser::gff->new(
+      file    => 'file.gtf.gz',
+      do_gene => 1,
+      do_utr  => 1,
+  );
 
 Initialize a new gff parser object. Pass a single value (a GFF file name) 
 to open a file. Alternatively, pass an array of key value pairs to control 
@@ -65,14 +80,8 @@ extension. The file may be gzip compressed.
 
 Specify the version. Normally this is not needed, as version can be determined 
 either from the file extension (in the case of gtf and gff3) or from the 
-##gff-version pragma at the top of the file. Acceptable values include 1, 2, 
+C<##gff-version> pragma at the top of the file. Acceptable values include 1, 2, 
 2.5 (gtf), or 3.
-
-=item skip 
-
-Pass an anonymous array of primary_tag values to be skipped from the GFF file 
-when parsing into SeqFeature objects. For example, some subfeatures can be skipped 
-for expediency when they known in advance not to be needed. See skip() below.
 
 =item class
 
@@ -84,60 +93,41 @@ create the SeqFeature objects. The default is to use L<Bio::ToolBox::SeqFeature>
 Pass a boolean value to simplify the SeqFeature objects parsed from the GFF 
 file and ignore extraneous attributes.
 
-=back
+=item do_gene
+
+Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
+name under a single gene object. Default is true.
+
+=item do_cds
+
+=item do_exon
+
+=item do_utr
+
+=item do_codon
+
+Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
+are always parsed, but CDS, five_prime_UTR, three_prime_UTR, stop_codon, and 
+start_codon features may be optionally parsed. Default is false.
 
 =back
 
-=head2 Parser behavior
+=item open_file
 
-These are additional class methods that control the parsing behavior of a 
-new object. Unpredictable behavior may occur if you implement these in the 
-midst of parsing a file.
-
-=over 4
-
-=item open_file($file)
+  $parser->open_file($file) or die "unable to open $file!";
 
 Pass the name of a GFF file to be parsed. The file may optionally be gzipped 
 (.gz extension). Do not open a new file when one has already opened a file. 
 Create a new object for a new file, or concatenate the GFF files.
 
-=item fh()
-
-=item fh($filehandle)
-
-This method returns the IO::File object of the opened GFF file. A new 
-file may be parsed by passing an opened IO::File or other object that 
-inherits IO::Handle methods.  
-
 =item version
 
 Set or get the GFF version of the current file. Acceptable values include 1, 2, 
-2.5 (gtf), or 3.
+2.5 (gtf), or 3. Normally this is determined by file extension or 
+C<gff-version> pragma on the first line, and should not need to be set by the 
+user in most circumstances.
 
-=item skip(@types)
-
-Pass an array of primary_tag values that should be skipped during 
-parsing. This can simplify and speed up parsing if certain types of subfeatures 
-are known in advance not to be needed. Only exact matches are allowed. 
-Best if this method is called prior to file parsing. This method also returns 
-a list of the primary_tag values to be skipped. Examples include
-
-=over 4
-
-=item * CDS
-
-=item * five_prime_UTR
-
-=item * three_prime_UTR
-
-=item * start_codon
-
-=item * stop_codon
-
-=back
-
-=item simplify(1)
+=item simplify
 
 Pass a boolean true value to simplify the attributes of GFF3 and GTF files 
 that may have considerable numbers of tags, e.g. Ensembl files. Only 
@@ -150,33 +140,24 @@ information.
 =head2 Feature retrieval
 
 The following methods parse the GFF file lines into SeqFeature objects. 
-It is best if methods are not mixed; unexpected results may occur. 
+It is best if these methods are not mixed; unexpected results may occur. 
 
 =over 4
 
-=item next_feature()
-
-This method will return a SeqFeature object representation of 
-the next feature in the file. Parent - child relationships are NOT 
-assembled. This is best used with simple GFF files with no hierarchies 
-present. This may be used in a while loop until the end of the file 
-is reached. Pragmas are ignored and comment lines and sequence are 
-automatically skipped. 
-
-=item next_top_feature()
+=item next_top_feature
 
 This method will return a top level parent SeqFeature object 
 assembled with child features as sub-features. For example, a gene 
 object with mRNA subfeatures, which in turn may have exon and/or CDS 
 subfeatures. Child features are assembled based on the existence of 
 proper Parent attributes in child features. If no Parent attributes are 
-included in the GFF file, then this will behave as next_feature().
+included in the GFF file, then this will behave as L</next_feature>.
 
-Child features (those containing a Parent attribute) 
+Child features (those containing a C<Parent> attribute) 
 are associated with the parent feature. A warning will be issued about lost 
 children (orphans). Shared subfeatures, for example exons common to 
 multiple transcripts, are associated properly with each parent. An opportunity 
-to rescue orphans is available using the orphans() method.
+to rescue orphans is available using the L</orphans> method.
 
 Note that subfeatures may not necessarily be in ascending genomic order 
 when associated with the feature, depending on their order in the GFF3 
@@ -195,6 +176,15 @@ This method will return an array of the top (parent) features defined in
 the GFF file. This is similar to the next_top_feature() method except that 
 all features are returned at once. 
 
+=item next_feature
+
+This method will return a SeqFeature object representation of 
+the next feature in the file. Parent - child relationships are NOT 
+assembled. This is best used with simple GFF files with no hierarchies 
+present. This may be used in a while loop until the end of the file 
+is reached. Pragmas are ignored and comment lines and sequence are 
+automatically skipped. 
+
 =back
 
 =head2 Other methods
@@ -204,20 +194,32 @@ SeqFeature objects.
 
 =over 4
 
+=item fh
+
+This method returns the L<IO::File> object of the opened GFF file. 
+
 =item parse_file
 
-Parses the file into memory.  
+Parses the entire file into memory. This is automatically called when 
+either L</top_features> or L</next_top_feature> is called. 
 
 =item find_gene
 
-Pass a gene name, or an array of key = values (name, display_name, 
-ID, primary_ID, and/or coordinate information), that can be used 
-to find a gene already loaded into memory. Only really successful if the 
-entire file is loaded into memory. Genes with a matching name are 
-confirmed by a matching ID or overlapping coordinates, if available. 
-Otherwise the first match is returned.
+  my $gene = $parser->find_gene(
+       name => $display_name,
+       id   => $primary_id,
+  ) or warn "gene $display_name can not be found!";
+
+Pass a gene name, or an array of key =E<gt> values (C<name>, C<display_name>, 
+C<ID>, C<primary_ID>, and/or coordinate information), that can be used 
+to find a gene already loaded into memory. Only useful after </parse_file> 
+is called. Genes with a matching name are confirmed by a matching ID or 
+overlapping coordinates, if available. Otherwise the first match is returned.
 
 =item orphans
+
+  my @orphans = $parser->orphans;
+  printf "we have %d orphans left over!", scalar @orpans;
 
 This method will return an array of orphan SeqFeature objects that indicated 
 they had a parent but said parent could not be found. Typically, this is an 
@@ -229,12 +231,14 @@ be a good idea to check this after retrieving all top features.
 This method will return an array of the comment or pragma lines that may have 
 been in the parsed file. These may or may not be useful.
 
-=item from_gff_string($string)
+=item from_gff_string
 
-This method will parse a GFF, GTF, or GFF3 formatted string or line of text 
-and return a SeqFeature object.
+  my $seqfeature = $parser->from_gff_string($string);
 
-=item unescape($text)
+This method will parse a single GFF, GTF, or GFF3 formatted string or line 
+of text and return a SeqFeature object.
+
+=item unescape
 
 This method will unescape special characters in a text string. Certain 
 characters, including ";" and "=", are reserved for GFF3 formatting and 
@@ -248,9 +252,14 @@ sequence-region pragmas or inferred from the features.
 
 =item seq_id_lengths
 
+  my $seq2len = $parser->seq_id_lengths;
+  foreach (keys %$seq2len) {
+    printf "chromosome %s is %d bp long\n", $_, $seq2len->{$_};
+  }
+
 Returns a hash reference to the chromosomes or reference sequences and 
 their corresponding lengths. In this case, the length is either defined 
-by the sequence-region pragma or inferred by the greatest end position of 
+by the C<sequence-region> pragma or inferred by the greatest end position of 
 the top features.
 
 =back
@@ -259,12 +268,10 @@ the top features.
 
 use strict;
 use Carp qw(carp cluck croak);
-use Bio::ToolBox::Data::file; # only for opening file handles
+use Bio::ToolBox::Data; 
 our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
 eval "require $SFCLASS" or croak $@;
-
-our $GTF_simple_ids = qr/gene_id|transcript_id|gene_name|transcript_name|gene_source|transcript_biotype/;
-our $GFF3_simple_ids = qr/ID|Name|Parent/;
+our $gff_convertor_sub; # reference to the gff convertor subroutine
 
 1;
 
@@ -275,36 +282,54 @@ sub new {
 		'top_features'  => [],
 		'orphans'       => [],
 		'duplicate_ids' => {},
-		'skip_types'    => {},
-		'gene2seqf'     => {},
+		'loaded'        => {},
 		'eof'           => 0,
-		'version'       => undef,
+		'do_gene'       => 1, 
+		'do_exon'       => 0,
+		'do_cds'        => 0, 
+		'do_utr'        => 0, 
+		'do_codon'      => 0,
+		'gff3'          => 0,
+		'gtf'           => 0,
 		'comments'      => [],
 		'seq_ids'       => {},
 		'simplify'      => 0,
+		'typelist'      => '',
 	};
 	bless $self, $class;
 	
 	# check for options
 	if (@_) {
 		if (scalar @_ == 1) {
-			$self->open_file($_[0]);
+			$self->open_file($_[0]) or croak "unable to open file!";
 		}
 		else {
 			my %options = @_;
-			if (exists $options{skip}) {
-				my @s = @{ $options{skip} };
-				$self->skip(@s);
-			}
 			if (exists $options{simplify}) {
 				$self->simplify( $options{simplify} );
+			}
+			if (exists $options{do_gene}) {
+				$self->do_gene($options{do_gene});
+			}
+			if (exists $options{do_exon}) {
+				$self->do_exon($options{do_exon});
+			}
+			if (exists $options{do_cds}) {
+				$self->do_cds($options{do_cds});
+			}
+			if (exists $options{do_utr}) {
+				$self->do_utr($options{do_utr});
+			}
+			if (exists $options{do_codon}) {
+				$self->do_codon($options{do_codon});
 			}
 			if (exists $options{version}) {
 				$self->version($options{version});
 			}
 			if (exists $options{file} or $options{table}) {
 				$options{file} ||= $options{table};
-				$self->open_file( $options{file} );
+				$self->open_file( $options{file} ) or 
+				croak "unable to open file!";
 			}
 			if (exists $options{class}) {
 				my $class = $options{class};
@@ -322,14 +347,45 @@ sub new {
 	return $self;
 }
 
-sub skip {
+sub do_gene {
 	my $self = shift;
-	foreach (@_) {
-		$self->{skip_types}->{$_} = undef;
+	if (@_) {
+		$self->{'do_gene'} = shift;
 	}
-	my @skips = keys %{ $self->{skip_types} };
-	return wantarray ? @skips : \@skips;
-}
+	return $self->{'do_gene'};
+}	
+
+sub do_exon {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_exon'} = shift;
+	}
+	return $self->{'do_exon'};
+}	
+
+sub do_cds {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_cds'} = shift;
+	}
+	return $self->{'do_cds'};
+}	
+
+sub do_utr {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_utr'} = shift;
+	}
+	return $self->{'do_utr'};
+}	
+
+sub do_codon {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_codon'} = shift;
+	}
+	return $self->{'do_codon'};
+}	
 
 sub simplify {
 	my $self = shift;
@@ -341,13 +397,22 @@ sub simplify {
 
 sub version {
 	my $self = shift;
-	my $v = shift;
-	if (defined $v and $v =~ /^(?:1|2|2\.5|3)$/) {
-		if (defined $self->{version} and $self->{version} ne $v) {
-			warn sprintf(" GFF version information (extension, pragma, etc) mismatch! compare %s with %s! using %s\n", 
-				$self->{version}, $v, $v);
+	if (@_) {
+		my $v = shift;
+		if ($v eq '3') {
+			$self->{version} = $v;
+			$self->{gff3} = 1;
 		}
-		$self->{version} = $v;
+		elsif ($v eq '2.5' or $v eq '2.2') {
+			$self->{version} eq '2.5';
+			$self->{gtf} = 1;
+		}
+		elsif ($v eq '2' or $v eq '1') {
+			$self->{version} eq $v;
+		}
+		else {
+			warn "unrecognized GFF version '$v'!\n";
+		}
 	}
 	return $self->{version};
 }
@@ -362,30 +427,21 @@ sub open_file {
 		return;
 	}
 	
-	# check extension
-	if ($filename =~ /\.gtf(?:\.gz)?$/i) {
-		$self->version(2.5);
-	}
-	elsif ($filename =~ /\.gff3(?:\.gz)?$/i) {
-		$self->version(3);
-	}
-	elsif ($filename =~ /\.gff(?:\.gz)?$/i) {
-		# could be anything
-		# do not set in preference of gff pragma
-	}
-	else {
-		carp("file doesn't look like a GFF file!\n");
+	# check type list
+	my $typelist = Bio::ToolBox::Data->check_gff_type_list($filename);
+	if ($typelist !~ /\w+/) {
+		warn "GFF file has no evident types!? $filename may not be a valid GFF file";
 		return;
 	}
-	
+	$self->{typelist} = $typelist;
 	
 	# Open filehandle object 
-	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename) or
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
 	
 	# check gff version pragma
 	my $first = $fh->getline;
-	if ($first =~ /^##gff\-version\s+(\d\.?\d?)\s*$/i) {
+	if ($first =~ /^##gff.version\s+([\d\.]+)\s*$/i) {
 		# override any version that may have been inferred from the extension
 		# based on the assumption that this pragma is correct
 		$self->version($1);
@@ -394,17 +450,26 @@ sub open_file {
 		# no pragma, reopen the file
 		$fh->close;
 		$fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
+		# set version based on file type extension????
+		if ($filename =~ /\.gtf.*$/i) {
+			$self->version('2.5');
+			$self->{gtf} = 1;
+		}
+		elsif ($filename =~ /\.gff3.*$/i) {
+			$self->version('3');
+			$self->{gff3} = 1;
+		}
 	}
 	$self->fh($fh);
 	return 1;
 }
 
 sub fh {
-	my $self = shift;
-	if (@_) {
-		$self->{'fh'} = shift;
-	}
-	return $self->{'fh'};
+	return shift->{fh};
+}
+
+sub typelist {
+	return shift->{typelist};
 }
 
 sub next_feature {
@@ -419,48 +484,45 @@ sub next_feature {
 	# look for the next feature line
 	while (my $line = $self->fh->getline) {
 		
-		chomp $line;
+		# check first character
+		my $firstchar = substr($line, 0, 1);
 		
 		# skip any comment and pragma lines that we might encounter
-		if ($line =~ /^##gff\-version\s+(\d\.?\d?)\s*$/i) {
-			# override any version that may have been inferred from the extension
-			# based on the assumption that this pragma is correct
-			$self->version($1);
-			next;
-		}
-		elsif ($line =~ /^###$/) {
-			# GFF3 subfeature close directive, we no longer pay attention to 
-			# these, although we should.....
-			next;
-		}
-		elsif ($line =~ /^##sequence\-region/i) {
-			# sequence region pragma
-			my ($pragma, $seq_id, $start, $stop) = split /\s+/, $line;
-			if (defined $seq_id and $start =~ /^\d+$/ and $stop =~ /^\d+$/) {
-				# we're actually only concerned with the stop coordinate
-				$self->{seq_ids}{$seq_id} = $stop;
+		if ($firstchar eq '#') {
+			if ($line =~ /^###$/) {
+				# a close pragma, all we can do is check for orphans
+				# a properly written shouldn't have any orphans, but just in case
+				$self->check_orphanage;
+				next;
+			}
+			elsif ($line =~ /^##sequence.region/i) {
+				# sequence region pragma
+				my ($pragma, $seq_id, $start, $stop) = split /\s+/, $line;
+				if (defined $seq_id and $start =~ /^\d+$/ and $stop =~ /^\d+$/) {
+					# we're actually only concerned with the stop coordinate
+					$self->{seq_ids}{$seq_id} = $stop;
+				}
+				else {
+					warn "malformed sequence-region pragma! $line\n";
+				}
+				next;
 			}
 			else {
-				warn "malformed sequence-region pragma! $line\n";
+				# must be some sort of pragma or a comment line, may be useful, keep it
+				push @{$self->{comments}}, $line;
+				next;
 			}
+		}
+		elsif ($firstchar eq "\n") {
+			# presumably an empty line
 			next;
 		}
-		elsif ($line =~ /^#/) {
-			# either a pragma or a comment line, may be useful
-			push @{$self->{comments}}, $line;
-			next;
-		}
-		elsif ($line =~ /^$/) {
-			# an empty line
-			next;
-		}
-		elsif ($line =~ /^>/) {
-			# fasta header line, skip
-			next;
-		}
-		elsif ($line =~ /^[agctn]+$/i) {
-			# fasta sequence, skip
-			next;
+		elsif ($firstchar eq '>') {
+			# fasta header line
+			# this is almost always at the end of the file, and rarely is sequence put 
+			# into GFF files anyway, so let's assume it's the end of the file 
+			$self->{'eof'} = 1;
+			return;
 		}
 		
 		# line must be a GFF feature
@@ -483,7 +545,7 @@ sub next_top_feature {
 		croak("no GFF3 file loaded to parse!");
 	}
 	unless ($self->{'eof'}) {
-		$self->parse_file;
+		$self->parse_file or croak "unable to parse file!";
 	}
 	return shift @{ $self->{top_features} };
 }
@@ -514,37 +576,66 @@ sub parse_file {
 	# found, it will be lost. Features without a parent are assumed to be 
 	# top-level features.
 	
-	# a loaded hash to check for unique feature IDs and to find parents
-	my %loaded;
-	
 	printf "  Parsing %s format file....\n", 
 		$self->version eq '3' ? 'GFF3' : 
-		$self->version eq '2.5' ? 'GTF' : 'GFF';
+		$self->version =~ /2\../ ? 'GTF' : 'GFF';
+	
+	
 	TOP_FEATURE_LOOP:
 	while (my $feature = $self->next_feature) {
 		
 		### Process the feature
 		# check the ID
 		my $id = $feature->primary_id;
+			# if the seqfeature didn't have an ID specified from the file, then 
+			# Bio::ToolBox::SeqFeature will autogenerate one, but Bio::SeqFeature::Lite
+			# will not - so we will likely lose that feature
 		if ($id) {
-			# this ID should be unique in the GFF file
-			# and all parents must have IDs
-			# complain if it isn't
-			if (exists $loaded{$id}) {
-				# record how many times we've seen this
-				$self->{duplicate_ids}{$id}++ unless 
-					$feature->primary_tag eq 'CDS'; # Ensembl CDS recycle IDs
-				
-				# check to see if this is child feature
-				unless ($feature->has_tag('Parent')) {
-					# without a parent, this must be an orphan, or a malformed GFF3 file
-					# anyway, keep this as an orphan
-					$self->_add_orphan($feature);
-					next TOP_FEATURE_LOOP;
+			# remember this feature since we have an ID
+			if (exists $self->{loaded}{$id}) {
+				# this ID should be unique in the GFF file
+				# otherwise it might be a shared duplicate or a malformed GFF file
+				my $existing = $self->{loaded}{$id};
+				if ($existing->primary_tag eq $feature->primary_tag and
+					$existing->start == $feature->start and 
+					$existing->end   == $feature->end
+				) {
+					# definitely looks like a duplicate feature
+					my ($p) = $feature->get_tag_values('Parent');
+					if ($p and exists $self->{loaded}{$p}) {
+						# excellent! add this parent to the original existing feature
+						$existing->add_tag_value('Parent', $p);
+						next TOP_FEATURE_LOOP;
+					}
+					else {
+						# duplicate without a parent! not good
+						my $tag = $feature->primary_tag;
+						$self->{duplicate_ids}{$id}++ unless 
+							$tag eq 'CDS' or $tag eq 'exon'; # Ensembl CDS recycle IDs
+						# either way, add this as an orphan
+						$self->_add_orphan($feature);
+						next TOP_FEATURE_LOOP;
+					}
+				}
+				else {
+					# definitely not a duplicate feature
+					# record how many times we've seen this
+					my $tag = $feature->primary_tag;
+					$self->{duplicate_ids}{$id}++ unless 
+						$tag eq 'CDS' or $tag eq 'exon'; # Ensembl CDS recycle IDs
+					
+					# check to see if this is child feature
+					unless ($feature->has_tag('Parent')) {
+						# without a parent, this must be an orphan, or a malformed GFF3 file
+						# anyway, keep this as an orphan
+						$self->_add_orphan($feature);
+						next TOP_FEATURE_LOOP;
+					}
 				}
 			} 
 			else {
-				$loaded{$id} = $feature;
+				# unique ID, so remember it
+				$self->{loaded}{$id} = $feature;
 			}
 		}
 		# if the feature didn't have an ID, we'll just assume it is
@@ -554,43 +645,23 @@ sub parse_file {
 		if ($feature->has_tag('Parent')) {
 			# must be a child
 			# there may be more than one parent, per the GFF3 specification
-			foreach my $parent ( $feature->get_tag_values('Parent') ) {
-				if (exists $loaded{$parent}) {
+			foreach my $parent_id ( $feature->get_tag_values('Parent') ) {
+				if (exists $self->{loaded}{$parent_id}) {
 					# we've seen this id
 					# associate the child with the parent
-					$loaded{$parent}->add_SeqFeature($feature);
+					my $parent = $self->{loaded}{$parent_id};
+					$parent->add_SeqFeature($feature);
 					
-					# check boundaries - especially important for gtf when gene may 
-					# not be defined. won't hurt otherwise.
-					if ($feature->start < $loaded{$parent}->start) {
-						$loaded{$parent}->start( $feature->start );
-					}
-					if ($feature->end > $loaded{$parent}->end) {
-						$loaded{$parent}->end( $feature->end );
-					}
-				}
-				elsif ($self->version == 2.5) {
-					# gene parents likely not specified in the file, so must infer
-					
-					if ($feature->primary_tag =~ /gene/i) {
-						# I assume we're good here
-					}
-					elsif ($feature->primary_tag =~ /rna|transcript/i) {
-						# we need to make the gene parent
-						my $gene = $self->_make_gene_parent($feature);
-						$loaded{ $gene->primary_id } = $gene;
-						$gene->add_SeqFeature($feature);
-						push @{ $self->{top_features} }, $gene;
-					}
-					else {
-						# we need to make both the gene and transcript parents
-						my $gene = $self->_make_gene_parent($feature);
-						$loaded{ $gene->primary_id } = $gene;
-						push @{ $self->{top_features} }, $gene;
-						my $transcript = $self->_make_rna_parent($feature);
-						$loaded{ $transcript->primary_id } = $transcript;
-						$transcript->add_SeqFeature($feature);
-						$gene->add_SeqFeature($transcript);
+					# check boundaries for gtf genes
+					# gtf genes may not be explicitly defined so must correct as necessary
+					# gff3 files won't have this issue
+					if ($self->{gtf}) {
+						if ($feature->start < $parent->start) {
+							$parent->start( $feature->start );
+						}
+						if ($feature->end > $parent->end) {
+							$parent->end( $feature->end );
+						}
 					}
 				}
 				else {
@@ -609,33 +680,7 @@ sub parse_file {
 	
 	# check for orphans
 	if (scalar @{ $self->{orphans} }) {
-		
-		my @reunited; # list of indices to delete after reuniting orphan with parent
-		
-		# go through the list of orphans
-		for (my $i = 0; $i < scalar @{ $self->{orphans} }; $i++) {
-			my $orphan = $self->{orphans}->[$i];
-			my $success = 0;
-			
-			# find the parent
-			foreach my $parent ($orphan->get_tag_values('Parent') ) {
-				if (exists $loaded{$parent}) {
-					# we have loaded the parent
-					# associate each orphan feature with the parent
-					$loaded{$parent}->add_SeqFeature($orphan);
-					$success++;
-				}
-			}
-			# delete the orphan from the array if it found it's long lost parent
-			push @reunited, $i if $success;
-		}
-		
-		# clean up the orphanage
-		while (@reunited) {
-			my $i = pop @reunited;
-			splice(@{ $self->{orphans} }, $i, 1);
-		}
-		
+		$self->check_orphanage;
 		# report
 		if (scalar @{ $self->{orphans} }) {
 			carp " " . scalar @{ $self->{orphans} } . " features could not be " . 
@@ -649,90 +694,62 @@ sub parse_file {
 			join(', ', keys %{ $self->{duplicate_ids} }) . "\n";
 	}
 	
-	# build gene2seqf and seq_id hashes 
-	foreach (@{ $self->{top_features} }) {
-		my $name = lc $_->display_name;
-		if (exists $self->{gene2seqf}->{$name}) {
-			push @{ $self->{gene2seqf}->{$name} }, $_;
-		}
-		else {
-			$self->{gene2seqf}->{$name} = [$_];
-		}
-		my $s = $_->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
-			$self->{seq_ids}{$s} = 1;
-		}
-		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
-	}
-	
 	return 1;
 }
 
 
 sub _make_gene_parent {
 	# for generating GTF gene parent features
-	my ($self, $feature) = @_;
+	my ($self, $fields, $gene_id) = @_;
 	my $gene = $SFCLASS->new(
-		-seq_id         => $feature->seq_id,
-		-start          => $feature->start,
-		-end            => $feature->end,
-		-strand         => $feature->strand,
-		-source         => $feature->source,
+		-seq_id         => $fields->[0],
 		-primary_tag    => 'gene',
+		-start          => $fields->[3],
+		-end            => $fields->[4],
+		-strand         => $fields->[6],
+		-primary_id     => $gene_id,
 	);
 	
-	if ($feature->has_tag('gene_id')) {
-		$gene->primary_id(($feature->get_tag_values('gene_id')));
-	}
-	elsif ($feature->has_tag('gene_name')) {
-		$gene->primary_id(($feature->get_tag_values('gene_name')));
+	if ($fields->[8] =~ /gene_name "([^"]+)";?/) {
+		$gene->display_name($1);
 	}
 	else {
-		$gene->primary_id(($feature->get_tag_values('Parent')));
-	}
-	
-	if ($feature->has_tag('gene_name')) {
-		$gene->display_name(($feature->get_tag_values('gene_name')));
-	}
-	elsif ($feature->has_tag('gene_id')) {
-		$gene->display_name(($feature->get_tag_values('gene_id')));
-	}
-	else {
-		$gene->display_name(($feature->get_tag_values('Parent')));
+		$gene->display_name($gene_id);
 	}
 	return $gene;
 }
 
 
 sub _make_rna_parent {
-	# for generating GTF transcript parent features
-	my ($self, $feature) = @_;
+	# for generating GTF gene parent features
+	my ($self, $fields, $transcript_id) = @_;
 	my $rna = $SFCLASS->new(
-		-seq_id         => $feature->seq_id,
-		-start          => $feature->start,
-		-end            => $feature->end,
-		-strand         => $feature->strand,
-		-source         => $feature->source,
-		-primary_tag    => 'transcript', # probably mRNA, but since we don't know
+		-seq_id         => $fields->[0],
+		-primary_tag    => 'transcript',
+		-start          => $fields->[3],
+		-end            => $fields->[4],
+		-strand         => $fields->[6],
+		-primary_id     => $transcript_id,
 	);
-	if ($feature->has_tag('transcript_id')) {
-		$rna->primary_id(($feature->get_tag_values('transcript_id')));
-	}
-	elsif ($feature->has_tag('transcript_name')) {
-		$rna->primary_id(($feature->get_tag_values('transcript_name')));
+	
+	if ($fields->[8] =~ /transcript_name "([^"]+)";?/) {
+		$rna->display_name($1);
 	}
 	else {
-		$rna->display_id(($feature->get_tag_values('Parent')));
+		$rna->display_name($transcript_id);
 	}
 	
-	if ($feature->has_tag('transcript_name')) {
-		$rna->display_name(($feature->get_tag_values('transcript_name')));
-	}
-	elsif ($feature->has_tag('transcript_id')) {
-		$rna->display_name(($feature->get_tag_values('transcript_id')));
-	}
-	else {
-		$rna->display_name(($feature->get_tag_values('Parent')));
+	# add extra information if possible
+	unless ($self->simplify) {
+		if ($fields->[8] =~ /transcript_biotype "([^"]+)";?/) {
+			$rna->add_tag_value('transcript_biotype', $1);
+		}
+		elsif ($fields->[8] =~ /transcript_type "([^"]+)";?/) {
+			$rna->add_tag_value('transcript_type', $1);
+		}
+		if ($fields->[8] =~ /transcript_source "([^"]+)";?/) {
+			$rna->source($1);
+		}
 	}
 	return $rna;
 }
@@ -740,6 +757,21 @@ sub _make_rna_parent {
 
 sub find_gene {
 	my $self = shift;
+	
+	# check that we have gene2seqf table
+	unless (exists $self->{gene2seqf}) {
+		croak "must parse file first!" unless $self->{'eof'};
+		$self->{gene2seqf} = {};
+		foreach (@{ $self->{top_features} }) {
+			my $name = lc $_->display_name;
+			if (exists $self->{gene2seqf}->{$name}) {
+				push @{ $self->{gene2seqf}->{$name} }, $_;
+			}
+			else {
+				$self->{gene2seqf}->{$name} = [$_];
+			}
+		}
+	}
 	
 	# get the name and coordinates from arguments
 	my ($name, $id, $chrom, $start, $end, $strand);
@@ -828,45 +860,50 @@ sub from_gff_string {
 	}
 	
 	# check the primary_tag
-	if (exists $self->{skip_types}{$fields[2]}) {
-		return 'skipped';
+	return 'skipped' if (lc $fields[2] eq 'cds' and not $self->{do_cds});
+	return 'skipped' if ($fields[2] =~ /exon/i and not $self->{do_exon});
+	return 'skipped' if ($fields[2] =~ /utr|untranslated/i and not $self->{do_utr});
+	return 'skipped' if (lc $fields[2] eq 'gene' and not $self->{do_gene});
+	
+	# check convertor
+	unless (defined $gff_convertor_sub) {
+		if ($self->{gff3}) {
+			$gff_convertor_sub =\&_gff3_to_seqf;
+		}
+		elsif ($self->{gtf}) {
+			if ($self->{simplify}) {
+				$gff_convertor_sub = \&_gtf_to_seqf_simple;
+			}
+			else {
+				$gff_convertor_sub = \&_gtf_to_seqf_full;
+			}
+			# double check we have transcript information
+			unless ($self->{typelist} =~ /transcript|rna/i) {
+				# we will have to rely on exon and/or cds information to get transcript 
+				unless ($self->{do_exon} or $self->{do_cds}) {
+					$self->do_exon(1);
+				}
+			}
+		}
+		else {
+			$gff_convertor_sub = \&_gff2_to_seqf;
+		}
 	}
 	
 	# parse appropriately
-	if ($self->version eq '3') {
-		return $self->_gff3_to_seqf(@fields);
-	}
-	elsif ($self->version eq '2.5') {
-		return $self->_gtf_to_seqf(@fields);
-	}
-	else {
-		# generic gff1 or gff2 format or poorly defined gff3 or gtf file
-		# hope for the best!
-		my $feature = $self->_gff_to_seqf(@fields);
-		
-		# process groups
-		# we have no uniform method of combining features, so we'll leave the tags 
-		# as is and hope for the best
-		foreach my $g (split(/\s*;\s*/, $fields[8])) {
-			my ($tag, $value) = split /\s+/, $g;
-			next unless ($tag and $value);
-			$feature->add_tag_value($tag, $value);
-		}
-		return $feature;
-	}
+	return &$gff_convertor_sub(\@fields);
 }
 
 
 sub _gff3_to_seqf {
-	my $self = shift;
-	my $group = $_[8];
-	my $feature = $self->_gff_to_seqf(@_);
+	my ($self, $fields) = @_;
+	my $group = $fields->[8];
+	my $feature = $self->_gff_to_seqf($fields);
 	
 	# process groups
 	foreach my $g (split(/\s*;\s*/, $group)) {
 		my ($tag, $value) = split /=/, $g;
 		$tag = $self->unescape($tag);
-		next if ($self->{simplify} and not $tag =~ $GFF3_simple_ids);
 		my @values = map { $self->unescape($_) } split(/,/, $value);
 		
 		# determine the appropriate attribute based on tag name
@@ -876,150 +913,212 @@ sub _gff3_to_seqf {
 		elsif ($tag eq 'ID') {
 			$feature->primary_id($values[0]);
 		}
-		else {
+		elsif (lc $tag eq 'exon_id') {
+			# ensembl GFF3 store the exon id but doesn't record it as the ID, why?
+			$feature->primary_id($values[0]);
+		}
+		elsif ($self->{simplify}) {
 			foreach (@values) {
 				$feature->add_tag_value($tag, $_);
 			}
 		}
 	}
-	
 	return $feature;
 }
 
 
-sub _gtf_to_seqf {
-	my $self = shift;
-	my $group = $_[8];
-	my $feature = $self->_gff_to_seqf(@_);
+sub _gtf_to_seqf_simple {
+
+	my ($self, $fields) = @_;
+	my $group = $fields->[8];
+	my $feature = $self->_gff_to_seqf($fields);
 	
-	# process groups
+	# extract essential tags
+	my ($gene_id, $transcript_id);
+	if ($group =~ /gene_id "([^"]+)";?/) {
+		$gene_id = $1;
+	}
+	if ($group =~ /transcript_id "([^"]+)";?/) {
+		$transcript_id = $1;
+	}
+	unless ($gene_id and $transcript_id) {
+		# improperly formatted GTF file without these two items, nothing more to do
+		return $feature;
+	}
+	
+	# common subfeatures including exon, CDS, UTR, and codons
+	if ($fields->[2] =~ /cds|exon|utr|codon|untranslated/i)  {
+		$feature->add_tag_value('Parent', $transcript_id);
+		
+		# exon id if present
+		if ($fields->[2] eq 'exon' and $group =~ /exon_id "([^"]+)";?/) {
+			$feature->primary_id($1);
+		}
+		
+		# check gene parent
+		unless (exists $self->{loaded}{$gene_id}) {
+			my $gene = $self->_make_gene_parent($fields, $gene_id);
+			$self->{loaded}{$gene_id} = $gene;
+		}
+		
+		# check transcript parent
+		unless (exists $self->{loaded}{$transcript_id}) {
+			my $rna = $self->_make_rna_parent($fields, $transcript_id);
+			$self->{loaded}{$transcript_id} = $rna;
+		}
+	}
+	
+	# a transcript feature
+	elsif ($fields->[2] =~ /rna|transcript/) {
+		# these are sometimes present in GTF files, such as from Ensembl
+		# but are not required and often absent
+		$feature->primary_id($transcript_id);
+		$feature->add_tag_value('Parent', $gene_id);
+		
+		# transcript information
+		if ($group =~ /transcript_name "([^"]+)";?/) {
+			$feature->display_name($1);
+		}
+		
+		# check whether parent was loaded and add gene information if not
+		unless (exists $self->{loaded}{$gene_id}) {
+			my $gene = $self->_make_gene_parent($fields, $gene_id);
+			$self->{loaded}{$gene_id} = $gene;
+		}
+	}
+	
+	# a gene feature
+	if ($fields->[2] eq 'gene') {
+		# these are sometimes present in GTF files, such as from Ensembl
+		# but are not required and often absent
+		$feature->primary_id($gene_id);
+		if ($group =~ /gene_name "([^"]+)";?/) {
+			$feature->display_name($1);
+		}
+	}
+	
+	# anything else, like CNS (conserved noncoding sequence) doesn't get any 
+	# further special attributes, as far as I can tell
+	return $feature;
+}
+
+
+sub _gtf_to_seqf_full {
+	
+	my ($self, $fields) = @_;
+	my $group = $fields->[8];
+	my $feature = $self->_gff_to_seqf($fields);
+	
+	# process the group tags
 	my %attributes;
-	my ($transcript_id, $transcript_name, $gene_id, $gene_name);
 	foreach my $g (split('; ', $group)) { # supposed to be "; " as delimiter
 		my ($tag, $value, @bits) = split ' ', $g;
-		next if ($self->{simplify} and not $tag =~ $GTF_simple_ids);
-		if (@bits) {
-			# value had spaces in it!
-			foreach (@bits) {$value .= " $_"}
-		}
 		$value =~ s/[";]//g; # remove the flanking double quotes, assume no internal quotes
-		if ($tag eq 'transcript_id') {
-			$transcript_id = $value;
-		}
-		elsif ($tag eq 'transcript_name') {
-			$transcript_name = $value;
-		}
-		elsif ($tag eq 'gene_id') {
-			$gene_id = $value;
-		}
-		elsif ($tag eq 'gene_name') {
-			$gene_name = $value;
-		}
-		else {
-			$attributes{$tag} = $value;
-		}
+		$attributes{$tag} = $value;
 	}
 	
-	## Change some Ensembl tags
-	# sometimes Ensembl GTFs use the source tag as the biotype, instead of a the real source
-	my $original_source = $feature->source; # keep this for later
-	if (exists $attributes{'gene_source'}) {
-		$feature->source($attributes{'gene_source'});
-		delete $attributes{'gene_source'} if $self->{simplify};
-	}
-	
-	# convert some tags into GFF3-like conventions
-	if ($feature->primary_tag =~ /gene/i) {
-		$feature->primary_id($gene_id);
-		$feature->display_name($gene_name);
-	}
-	elsif ($feature->primary_tag =~ /transcript|rna/i) {
-		$feature->primary_id($transcript_id);
-		$feature->display_name($transcript_name);
-		$feature->add_tag_value('Parent', $gene_id) if $gene_id;
+	# assign special tags based on the feature type
+	if ($fields->[2] =~ /cds|exon|utr|codon|untranslated/i) {
+		$feature->add_tag_value('Parent', $attributes{'transcript_id'});
 		
-		# update primary_tag to follow BioPerl/BioToolBox/GFF3/traditional conventions
-		# primarily to handle some Ensembl GTF file formats
-		if ($feature->primary_tag =~ /^transcript$/i) {
-			# generic transcript type, see if we can make it more specific
-			if (exists $attributes{'transcript_biotype'}) {
-				if ($attributes{'transcript_biotype'} =~ /protein_coding/i) {
-					$feature->primary_tag('mRNA');
-				}
-				elsif ($attributes{'transcript_biotype'} =~ /rna/i) {
-					# looks like an rna type
-					$feature->primary_tag($attributes{'transcript_biotype'});
-				}
-				delete $attributes{'transcript_biotype'} if $self->{simplify};
-			}
-			elsif (exists $attributes{'gene_biotype'}) {
-				if ($attributes{'gene_biotype'} =~ /protein_coding/i) {
-					$feature->primary_tag('mRNA');
-				}
-				elsif ($attributes{'gene_biotype'} =~ /rna/i) {
-					# looks like an rna type
-					$feature->primary_tag($attributes{'gene_biotype'});
-				}
-				delete $attributes{'gene_biotype'} if $self->{simplify};
-			}
-			elsif ($original_source =~ /protein_coding/i) {
-				$feature->primary_tag('mRNA');
-			}
-			elsif ($original_source =~ /rna|antisense|transcript|nonsense_mediated/i) {
-				$feature->primary_tag($original_source);
-			}
+		# exon id if present
+		if ($fields->[2] eq 'exon' and exists $attributes{'exon_id'}) {
+			$feature->primary_id($attributes{'exon_id'});
+		}
+		
+		# check gene parent
+		my $gene_id = $attributes{gene_id} || undef;
+		if ($gene_id and not exists $self->{loaded}{$gene_id}) {
+			my $gene = $self->_make_gene_parent($fields, $gene_id);
+			$self->{loaded}{$gene_id} = $gene;
+		}
+		
+		# check transcript parent
+		my $transcript_id = $attributes{transcript_id} || undef;
+		if ($transcript_id and not exists $self->{loaded}{$transcript_id}) {
+			my $rna = $self->_make_rna_parent($fields, $transcript_id);
+			$self->{loaded}{$transcript_id} = $rna;
 		}
 	}
-	else {
-		# other features are assumed to be transcript children
-		# not required to set a primary_id
-		if ($transcript_id) {
-			$feature->add_tag_value('Parent', $transcript_id);
-		}	
+	
+	# transcript
+	elsif ($fields->[2] =~ /transcript|rna/) {
+		# these are sometimes present in GTF files, such as from Ensembl
+		
+		# transcript information
+		$feature->primary_id($attributes{transcript_id});
+		delete $attributes{transcript_id};
+		if (exists $attributes{transcript_name}) {
+			$feature->display_name($attributes{transcript_name});
+			delete $attributes{transcript_name};
+		}
+		
+		# check gene parent
+		my $gene_id = $attributes{gene_id} || undef;
+		if ($gene_id and not exists $self->{loaded}{$gene_id}) {
+			my $gene = $self->_make_gene_parent($fields, $gene_id);
+			$self->{loaded}{$gene_id} = $gene;
+		}
+		$feature->add_tag_value('Parent', $gene_id);
 	}
 	
-	# add remaining attributes to the feature
+	# gene
+	elsif ($fields->[2] eq 'gene') {
+		# these are sometimes present in GTF files, such as from Ensembl
+		# but are not required and often absent
+		$feature->primary_id($attributes{gene_id});
+		delete $attributes{gene_id};
+		if (exists $attributes{gene_name}) {
+			$feature->display_name($attributes{gene_name});
+			delete $attributes{gene_name};
+		}
+	}
+	
+	# store remaining attributes
 	foreach my $key (keys %attributes) {
 		$feature->add_tag_value($key, $attributes{$key});
 	}
+	return $feature;
+}
+
+
+sub _gff2_to_seqf {
+	# generic gff1 or gff2 format or poorly defined gff3 or gtf file
+	# hope for the best!
+	my ($self, $fields) = @_;
+	my $feature = $self->_gff_to_seqf($fields);
 	
+	# process groups
+	# we have no uniform method of combining features, so we'll leave the tags 
+	# as is and hope for the best
+	foreach my $g (split(/\s*;\s*/, $fields->[8])) {
+		my ($tag, $value) = split /\s+/, $g;
+		next unless ($tag and $value);
+		$feature->add_tag_value($tag, $value);
+	}
 	return $feature;
 }
 
 
 sub _gff_to_seqf {
-	my $self = shift;
+	my ($self, $fields) = @_;
 	
 	# generate the basic SeqFeature
 	my $feature = $SFCLASS->new(
-		-seq_id         => $_[0],
-		-start          => $_[3],
-		-end            => $_[4],
+		-seq_id         => $fields->[0],
+		-source         => $fields->[1],
+		-primary_tag    => $fields->[2],
+		-start          => $fields->[3],
+		-end            => $fields->[4],
+		-strand         => $fields->[6],
 	);
 	
-	# add more attributes
-	if ($_[2] ne '.') {
-		$feature->primary_tag($_[2]);
+	# add more attributes if they're not null
+	if ($fields->[5] ne '.') {
+		$feature->score($fields->[5]);
 	}
-	if ($_[1] ne '.') {
-		$feature->source($_[1]);
-	}
-	if ($_[5] ne '.') {
-		$feature->score($_[5]);
-	}
-	if ($_[7] =~ /^[012]$/) {
-		$feature->phase($_[7]);
-	}
-	
-	# add strand
-	if ($_[6] eq '+') {
-		$feature->strand(1);
-	}
-	elsif ($_[6] eq '-') {
-		$feature->strand(-1);
-	}
-	else {
-		$feature->strand(0);
+	if ($fields->[7] ne '.') {
+		$feature->phase($fields->[7]);
 	}
 	
 	# finished
@@ -1030,9 +1129,7 @@ sub _gff_to_seqf {
 sub unescape {
   # Borrowed unashamedly from bioperl Bio::Tools::GFF
   # which in turn was borrowed from Bio::DB::GFF
-  
   my $self = shift;
-  
   my $v = shift;
   $v =~ tr/+/ /;
   $v =~ s/%([0-9a-fA-F]{2})/chr hex($1)/ge;
@@ -1046,6 +1143,36 @@ sub _add_orphan {
 	return 1;
 }
 
+
+sub check_orphanage {
+	my $self = shift;
+	return unless scalar @{ $self->{orphans} };
+	
+	# go through the list of orphans
+	my @reunited; # list of indices to delete after reuniting orphan with parent
+	for (my $i = 0; $i < scalar @{ $self->{orphans} }; $i++) {
+		my $orphan = $self->{orphans}->[$i];
+		my $success = 0;
+		
+		# find the parent
+		foreach my $parent ($orphan->get_tag_values('Parent') ) {
+			if (exists $self->{loaded}{$parent}) {
+				# we have loaded the parent
+				# associate each orphan feature with the parent
+				$self->{loaded}{$parent}->add_SeqFeature($orphan);
+				$success++;
+			}
+		}
+		# delete the orphan from the array if it found it's long lost parent
+		push @reunited, $i if $success;
+	}
+	
+	# clean up the orphanage
+	while (@reunited) {
+		my $i = pop @reunited;
+		splice(@{ $self->{orphans} }, $i, 1);
+	}
+}
 
 sub orphans {
 	my $self = shift;
@@ -1069,6 +1196,9 @@ sub comments {
 
 sub seq_ids {
 	my $self = shift;
+	unless (scalar keys %{$self->{seq_ids}}) {
+		$self->_get_seq_ids;
+	}
 	my @s = keys %{$self->{seq_ids}};
 	return wantarray ? @s : \@s;
 }
@@ -1076,7 +1206,22 @@ sub seq_ids {
 
 sub seq_id_lengths {
 	my $self = shift;
+	unless (scalar keys %{$self->{seq_ids}}) {
+		$self->_get_seq_ids;
+	}
 	return $self->{seq_ids};
+}
+
+sub _get_seq_ids {
+	my $self = shift;
+	return unless $self->{'eof'};
+	foreach (@{ $self->{top_features} }) {
+		my $s = $_->seq_id;
+		unless (exists $self->{seq_ids}{$s}) {
+			$self->{seq_ids}{$s} = 1;
+		}
+		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
+	}
 }
 
 __END__
