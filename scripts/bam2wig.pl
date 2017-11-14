@@ -2532,6 +2532,7 @@ sub pe_center_span {
 	my ($a, $data, $score) = @_;
 	my $position = $a->pos + int( $a->isize / 2 );
 	my $start = int( ($position - $half_extend) / $bin_size);
+	$start = 0 if $start < 0;
 	my $end = int( ($position + $half_extend) / $bin_size);
 	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 		$data->{f}->[$_] += $score;
@@ -2542,6 +2543,7 @@ sub pe_strand_center_span {
 	my ($a, $data, $score) = @_;
 	my $position = $a->pos + int( $a->isize / 2 );
 	my $start = int( ($position - $half_extend) / $bin_size);
+	$start = 0 if $start < 0;
 	my $end = int( ($position + $half_extend) / $bin_size);
 	my $flag = $a->flag;
 	if ($flag & 0x0040) {
