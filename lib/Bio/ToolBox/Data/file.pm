@@ -170,6 +170,28 @@ sub taste_file {
 	return;
 }
 
+sub sample_gff_type_list {
+	my ($self, $file) = @_;
+	my $Check = $self->new;
+	my $filename = $Check->check_file($file) or return;
+	$Check->add_file_metadata($filename);
+	$Check->open_to_read_fh or return;
+	$Check->parse_headers;
+	return unless $Check->gff;
+	my %types;
+	my $count = 0; 
+	while ($count < 1000) {
+		my $line = $Check->{fh}->getline or last;
+		next if $line !~ m/\w+/;
+		next if $line =~ /^#/;
+		my @fields = split('\t', $line);
+		$types{ $fields[2] } += 1;
+		$count++;
+	}
+	$Check->close_fh;
+	return join(',', keys %types);
+}
+
 
 sub parse_headers {
 	my $self = shift;
@@ -1588,6 +1610,14 @@ in the first 10 lines or so. Returns a string based on the file format.
 Values include gff, bed, ucsc, or undefined. Useful for determining if 
 the file represents a known gene table format that lacks a defined file 
 extension, e.g. UCSC formats.
+
+=item sample_gff_type_list($filename)
+
+Checks the different types of features available in a GFF formatted file. 
+It will temporarily open the file, read the first 1000 lines or so, and 
+compile a list of the values in the 3rd column of the GFF file. It will 
+return a comma-delimited string of these values upon success, suitable 
+for regular expression checking. 
 
 =item add_file_metadata($filename)
 
