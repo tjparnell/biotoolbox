@@ -752,7 +752,7 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ( $gene->primary_tag !~ /gene/i and 
+	return $gene if ( $gene->primary_tag !~ /gene$/i and 
 		$gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	my @exons;
@@ -867,7 +867,7 @@ sub collapse_transcripts {
 sub get_transcript_length {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	if ($transcript->primary_tag =~ /gene/i) {
+	if ($transcript->primary_tag =~ /gene$/i) {
 		# someone passed a gene object!!!!
 		my @lengths;
 		foreach my $t (get_transcripts($transcript)) {
@@ -890,7 +890,7 @@ sub get_transcript_length {
 sub is_coding {
 	my $transcript = shift;
 	return unless $transcript;
-	if ($transcript->primary_tag =~ /gene/i) {
+	if ($transcript->primary_tag =~ /gene$/i) {
 		# someone passed a gene, check its subfeatures
 		my $code_potential = 0;
 		foreach ($transcript->get_SeqFeatures) {
@@ -1253,7 +1253,7 @@ sub gtf_string {
 	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
 	
 	# process a gene 
-	if ($feature->primary_tag =~ /gene/i and not defined $gene) {
+	if ($feature->primary_tag =~ /gene$/i and not defined $gene) {
 		my $string;
 		foreach my $t (get_transcripts($feature)) {
 			$string .= gtf_string($t, $feature);
@@ -1333,7 +1333,7 @@ sub ucsc_string {
 	my @ucsc_list;
 	
 	# process according to type
-	if ($feature->primary_tag =~ /gene/i) {
+	if ($feature->primary_tag =~ /gene$/i) {
 		# a gene object, we will need to process it's transcript subfeatures
 		foreach my $transcript (get_transcripts($feature)) {
 			my $ucsc = _process_ucsc_transcript($transcript, $feature);
@@ -1380,7 +1380,7 @@ sub filter_transcript_support_level {
 	
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene/i) {
+	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene$/i) {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif (ref($gene) eq 'ARRAY') {
