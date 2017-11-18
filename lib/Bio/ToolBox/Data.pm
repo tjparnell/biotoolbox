@@ -623,6 +623,37 @@ object can be stored per row.
 
 Retrieves the SeqFeature object for the given row index.
 
+=item collapse_gene_transcripts
+
+  my $success = $Data->collapse_gene_transcripts;
+
+This method will iterate through a Data table and collapse multiple alternative 
+transcript subfeatures of stored gene SeqFeature objects in the table. Exons 
+of multiple transcripts will be merged, maximizing exon size and minimizing 
+intron size. Genes with only one transcript will not be affected. Stored 
+SeqFeature objects that are do not have a C<primary_tag> of "gene" are silently 
+skipped. Refer to the L<Bio::ToolBox::GeneTools/collapse_transcripts> method 
+for more details. The number of rows successfully collapsed is returned. 
+
+=item add_transcript_length
+
+  my $length_index = $Data->add_transcript_length;
+  my $length_index = $Data->add_transcript_length('cds');
+
+This method will generate a new column in the Data table representing the 
+length of a transcript, i.e. the sum of the length of subfeatures for 
+the stored SeqFeature object in the Data table. The default subfeature is 
+'exon'; however, alternative subfeature types may be passed to the method 
+and used. These include 'cds', '5p_utr', and '3p_utr' for CDS, the 5' UTR, 
+and the 3' UTR, respectively. See the corresponding transcript length 
+methods in L<Bio::ToolBox::GeneTools> for more information. If a length 
+is not calculated, for example the feature C<primary_tag> is a "gene", 
+then the simple length of the feature is recorded. 
+
+The name of the new column is one of "Merged_Transcript_Length" for exon, 
+"Transcript_CDS_Length", "Transcript_5p_UTR_Length", or "Transcript_3p_UTR_Length". 
+The index of the new length column is returned. 
+
 =back
 
 =head2 Data Table Functions
@@ -1237,6 +1268,9 @@ sub iterate {
 	return 1;
 }
 
+
+#### Stored SeqFeature manipulation
+
 sub store_seqfeature {
 	my ($self, $row, $seqfeature) = @_;
 	unless (defined $row and ref($seqfeature)) {
@@ -1247,6 +1281,84 @@ sub store_seqfeature {
 	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
 	return 1;
 }
+
+sub collapse_gene_transcripts {
+	my $self = shift;
+	unless (exists $self->{SeqFeatureObjects}) {
+		carp "no SeqFeature objects stored for collapsing!";
+		return;
+	}
+	
+	# load module
+	my $class = "Bio::ToolBox::GeneTools";
+	eval {load $class, qw(collapse_transcripts)};
+	if ($@) {
+		carp "unable to load $class! cannot collapse transcripts!";
+		return;
+	}
+	
+	# collapse the transcripts
+	my $success = 0;
+	for (my $i = 1; $i <= $self->last_row; $i++) {
+		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+		my $collSeqFeat = collapse_transcripts($feature) or next;
+		$success += $self->store_seqfeature($i, $collSeqFeat);
+	}
+	return $success;
+}
+
+sub add_transcript_length {
+	my $self = shift;
+	my $subfeature = shift || 'exon';
+	unless (exists $self->{SeqFeatureObjects}) {
+		carp "no SeqFeature objects stored for collapsing!";
+		return;
+	}
+	
+	# load module
+	my $class = "Bio::ToolBox::GeneTools";
+	eval {load $class, qw(get_transcript_length get_transcript_cds_length
+		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
+	if ($@) {
+		carp "unable to load $class! cannot collapse transcripts!";
+		return;
+	}
+	
+	# determine name and calculation method
+	my $length_calculator;
+	my $length_name;
+	if ($subfeature eq 'exon') {
+		$length_calculator = \&get_transcript_length;
+		$length_name= 'Merged_Transcript_Length';
+	}
+	elsif ($subfeature eq 'cds') {
+		$length_calculator = \&get_transcript_cds_length;
+		$length_name= 'Transcript_CDS_Length';
+	}
+	elsif ($subfeature eq '5p_utr') {
+		$length_calculator = \&get_transcript_5p_utr_length;
+		$length_name= 'Transcript_5p_UTR_Length';
+	}
+	elsif ($subfeature eq '3p_utr') {
+		$length_calculator = \&get_transcript_3p_utr_length;
+		$length_name= 'Transcript_3p_UTR_Length';
+	}
+	else {
+		carp "unrecognized subfeature type '$subfeature'! No length calculated";
+		return;
+	}
+	
+	# add new column and calculate
+	my $length_i = $self->add_column($length_name);
+	for (my $i = 1; $i <= $self->last_row; $i++) {
+		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+		my $length = &$length_calculator($feature);
+		$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+	}
+	
+	return $length_i;
+}
+
 
 
 ### Data structure manipulation
