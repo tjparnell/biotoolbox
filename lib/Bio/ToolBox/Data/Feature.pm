@@ -1489,8 +1489,8 @@ sub get_region_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} = $args{exon} ||= q();
-	if ($self->feature_type eq 'named' and $args{'subfeature'}) {
+	$args{subfeature} ||= $args{exon} || q();
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_position_scores(\%args, $ddb);
 	}
@@ -1581,13 +1581,19 @@ sub _get_subfeature_position_scores {
 		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
 	}
 	
+	# reset the practical start and stop to the actual subfeatures' final start and stop
+	# we can no longer rely on the feature start and stop, consider CDS
+	# these subfeatures should already be genomic sorted by GeneTools
+	my $practical_start = $subfeatures[0]->start;
+	my $practical_stop  = $subfeatures[-1]->end;
+	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
 	# it will appear as if all the exons are adjacent to each other
 	# and no introns exist
 	my $pos2data = {};
 	my $namecheck = {}; # to check unique names when using ncount method....
-	my $current_end = $subfeatures[0]->start;
+	my $current_end = $practical_start;
 	my $adjustment = 0;
 	foreach my $exon (@subfeatures) {
 		
@@ -1618,10 +1624,10 @@ sub _get_subfeature_position_scores {
 	}
 	
 	# collect extensions if requested
-	if ($args->{extension}) {
+	if ($args->{extend}) {
 		# left side
-		my $start = $feature->start - $args->{extension};
-		my $end = $feature->start - 1;
+		my $start = $practical_start - $args->{extend};
+		my $end = $practical_start - 1;
 		my $ext_scores = get_segment_score(
 			$feature->seq_id,
 			$start,
@@ -1640,8 +1646,8 @@ sub _get_subfeature_position_scores {
 		
 		
 		# right side
-		$start = $feature->end + $args->{extension};
-		$end = $feature->end + 1;
+		$start = $practical_stop + 1;
+		$end = $practical_stop + $args->{extend};
 		$ext_scores = get_segment_score(
 			$feature->seq_id,
 			$start,
@@ -1666,6 +1672,8 @@ sub _get_subfeature_position_scores {
 	}
 	else {
 		# return data converted to relative positions
+		$args->{practical_start} = $practical_start;
+		$args->{practical_stop} = $practical_stop;
 		$self->_calculate_reference($args);
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args->{coordinate}, $fstrand);
@@ -1677,21 +1685,21 @@ sub _calculate_reference {
 	my $feature = $self->seqfeature || $self;
 	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
 	if ($args->{position} == 5 and $strand >= 0) {
-		$args->{coordinate} = $feature->start;
+		$args->{coordinate} = $args->{practical_start} || $feature->start;
 	}
 	elsif ($args->{position} == 3 and $strand >= 0) {
-		$args->{coordinate} = $feature->end;
+		$args->{coordinate} = $args->{practical_stop} || $feature->end;
 	}
 	elsif ($args->{position} == 5 and $strand < 0) {
-		$args->{coordinate} = $feature->end;
+		$args->{coordinate} = $args->{practical_stop} || $feature->end;
 	}
 	elsif ($args->{position} == 3 and $strand < 0) {
-		$args->{coordinate} = $feature->start;
+		$args->{coordinate} = $args->{practical_start} || $feature->start;
 	}
 	elsif ($args->{position} == 4) {
 		# strand doesn't matter here
-		$args->{coordinate} = $feature->start + 
-			int(($feature->length / 2) + 0.5);
+		my $s = $args->{practical_start} || $feature->start;
+		$args->{coordinate} = $s + int(($feature->length / 2) + 0.5);
 	}
 	else {
 		croak "position must be one of 5, 3, or 4";
