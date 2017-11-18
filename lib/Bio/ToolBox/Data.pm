@@ -187,7 +187,10 @@ rows of data. File name metadata, if present in the original, is
 not preserved. The purpose here, for example, is to allow one 
 to selectively copy rows from one Data object to another.
 
-=item parse_table($filename)
+=item parse_table
+
+  $Data->parse_table($file)
+  $Data->parse_table($file, $feature, $subfeature)
 
 This will parse a gene annotation table into SeqFeature objects. 
 If this is called from an empty Data object, then the table will 
@@ -196,6 +199,29 @@ called from a non-empty Data object, then the table's contents
 will be associated with the SeqFeature objects using their name and 
 ID. The stored SeqFeature objects can be retrieved using the 
 get_seqfeature() method.
+
+Pass the method the gene table filename to be parsed. This may 
+be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
+These will be parsed using Bio::ToolBox::parser::* adapters.
+
+One or two additional options may be passed in addition. Both 
+are text strings that will be used in a case-insensitive regular 
+expression, so 'rna' will match all RNA types (mRNA, snRNA, etc).
+
+=over 4
+
+=item 1. $feature
+
+The primary_tag or feature type of the top features from the table.
+The default value is 'gene'.
+
+=item 2. $subfeature
+
+The primary_tag or feature type  of any subfeatures to additionally 
+be parsed. Typically these include exon, CDS, or UTR. The default is 
+nothing.
+
+=back
 
 =back
 
@@ -884,13 +910,15 @@ sub new {
 	# prepare a new table based on the provided arguments
 	if ($args{file} and $args{parse}) {
 		# parse from file
-		unless ( $self->parse_table($args{file}) ) {
+		my $subfeature = $args{subfeature} || '';
+		unless ( $self->parse_table($args{file}, $args{features}, $subfeature) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
 			if ($self->database =~ /^Parsed:(.+)$/) {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
-				$self->parse_table($1); # this may die if it doesn't work
+				# this may die if it doesn't work
+				$self->parse_table($1, $args{features}, $subfeature); 
 			}
 		}
 	}
@@ -961,23 +989,40 @@ sub duplicate {
 }
 
 sub parse_table {
-	my ($self, $file) = @_;
+	my $self = shift;
+	my $file = shift;
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
+	my $feature = shift || 'gene';
+	my $subfeature = shift || '';
 	
 	# the file format determines the parser class
 	my $flavor = $self->taste_file($file) or return;
 	my $class = 'Bio::ToolBox::parser::' . $flavor;
-	unless (eval "require $class; 1") {
-		carp "unable to load $class: $@";
+	eval {load $class};
+	if ($@) {
+		carp "unable to load $class! cannot parse $flavor!";
 		return;
 	}
 	
-	# parse the table
+	# set parser parameters
 	my $parser = $class->new() or return;
-	$parser->simplify(1) if $flavor eq 'gff';
+	$parser->simplify(1);
+	if ($subfeature) {
+		$parser->do_exon(1) if $subfeature =~ /exon/i;
+		$parser->do_cds(1) if $subfeature =~ /cds/i;
+		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+	}
+	if ($feature =~ /gene$/i) {
+		$parser->do_gene(1);
+	}
+	else {
+		$parser->do_gene(0);
+	}
+	
+	# parse the table
 	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
@@ -1011,11 +1056,13 @@ PARSEFAIL
 		$self->add_column('Name');
 		$self->add_column('Type');
 		while (my $f = $parser->next_top_feature) {
-			next if $f->primary_tag =~ /^(?:chromosome|contig|sequence|scaffold)$/;
-			my $index = $self->add_row(
-				[ $f->primary_id, $f->display_name, $f->type,] 
-			);
-			$self->store_seqfeature($index, $f);
+			my $type = $f->type;
+			if ($f->type =~ /$feature/i) {
+				my $index = $self->add_row(
+					[ $f->primary_id, $f->display_name, $f->type,] 
+				);
+				$self->store_seqfeature($index, $f);
+			}
 		}
 		$self->database("Parsed:$file");
 	}
