@@ -1228,8 +1228,7 @@ sub iterate {
 	my $self = shift;
 	my $code = shift;
 	unless (ref $code eq 'CODE') {
-		cluck "iterate_function() method requires a code reference!";
-		return;
+		confess "iterate_function() method requires a code reference!";
 	}
 	my $stream = $self->row_stream;
 	while (my $row = $stream->next_row) {
@@ -1240,8 +1239,10 @@ sub iterate {
 
 sub store_seqfeature {
 	my ($self, $row, $seqfeature) = @_;
-	return unless (defined $row and ref($seqfeature));
-	return unless ($row <= $self->last_row);
+	unless (defined $row and ref($seqfeature)) {
+		confess "must provide a row index and SeqFeature object!";
+	}
+	confess "invalid row index" unless ($row <= $self->last_row);
 	$self->{SeqFeatureObjects} ||= [];
 	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
 	return 1;
