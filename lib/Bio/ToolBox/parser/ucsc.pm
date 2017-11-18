@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.42';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -147,15 +147,17 @@ such as 'refGene' or 'ensGene', it will be used instead.
 Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
 name under a single gene object. Default is true.
 
+-item do_exon
+
 =item do_cds
 
 =item do_utr
 
 =item do_codon
 
-Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
-are always parsed, but CDS, five_prime_UTR, three_prime_UTR, stop_codon, and 
-start_codon features may be optionally parsed. Default is false.
+Pass a boolean (1 or 0) value to parse certain subfeatures, including exon, 
+CDS, five_prime_UTR, three_prime_UTR, stop_codon, and start_codon features. 
+Default is false.
 
 =item do_name
 
@@ -199,6 +201,8 @@ new tables.
 =item source
 
 =item do_gene
+
+=item do_exon
 
 =item do_cds
 
@@ -361,6 +365,7 @@ sub new {
 			'other'      => 0,
 		},
 		'do_gene'       => 1, 
+		'do_exon'       => 0,
 		'do_cds'        => 0, 
 		'do_utr'        => 0, 
 		'do_codon'      => 0,
@@ -460,12 +465,25 @@ sub source {
 	return $self->{'source'};
 }
 
+sub simplify {
+	# this doesn't do anything, for now, but maintain compatibility with gff parser
+	return 0;
+}
+
 sub do_gene {
 	my $self = shift;
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
 	return $self->{'do_gene'};
+}	
+
+sub do_exon {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_exon'} = shift;
+	}
+	return $self->{'do_exon'};
 }	
 
 sub do_cds {
@@ -1391,7 +1409,9 @@ sub build_transcript {
 	}
 	
 	# add the exons
-	$self->add_exons($transcript, $gene);
+	if ($ucsc->do_exon) {
+		$self->add_exons($transcript, $gene);
+	}
 	
 	# add CDS, UTRs, and codons if necessary
 	if ($transcript->primary_tag eq 'mRNA') {
