@@ -808,6 +808,15 @@ sub collapse_transcripts {
 		push @exons, @e;
 	}
 	
+	# check that we have exons - weirdo files may just have CDS!!!????
+	unless (@exons) {
+		foreach my $t (@transcripts) {
+			my @e = get_cds($t);
+			push @exons, @e;
+		}
+	}
+	return unless (@exons);
+	
 	# sort all the exons
 	my @sorted = 	map { $_->[0] }
 					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
