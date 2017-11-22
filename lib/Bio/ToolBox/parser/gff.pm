@@ -525,10 +525,6 @@ sub next_feature {
 				next;
 			}
 		}
-		elsif ($firstchar eq "\n") {
-			# presumably an empty line
-			next;
-		}
 		elsif ($firstchar eq '>') {
 			# fasta header line
 			# this is almost always at the end of the file, and rarely is sequence put 
@@ -537,30 +533,62 @@ sub next_feature {
 			return;
 		}
 		
-		# line must be a GFF feature
+		# line must be a GFF feature 
 		chomp $line;
 		my @fields = split('\t', $line);
+		next unless scalar(@fields) == 9;
 		
-		# check the primary_tag
+		# check the primary_tag and generate the SeqFeature object for known types
 		my $type = lc $fields[2];
 		if ($type eq 'cds') {
-			next unless $self->do_cds;
+			if ($self->do_cds) {
+				return &$gff_convertor_sub($self, \@fields);
+			} else {
+				next;
+			}
 		}
 		elsif ($type eq 'exon') {
-			next unless $self->do_exon;
+			if ($self->do_exon) {
+				return &$gff_convertor_sub($self, \@fields);
+			} else {
+				next;
+			}
 		}
 		elsif ($type =~ /utr|untranslated/) {
-			next unless $self->do_utr;
+			if ($self->do_utr) {
+				return &$gff_convertor_sub($self, \@fields);
+			} else {
+				next;
+			}
 		}
 		elsif ($type =~ /codon/) {
-			next unless $self->do_codon;
+			if ($self->do_codon) {
+				return &$gff_convertor_sub($self, \@fields);
+			} else {
+				next;
+			}
 		}
 		elsif ($type =~ /gene$/) {
-			next unless $self->do_gene;
+			if ($self->do_gene) {
+				return &$gff_convertor_sub($self, \@fields);
+			} else {
+				next;
+			}
 		}
-		
-		# generate the SeqFeature object for this GFF line and return it
-		return &$gff_convertor_sub($self, \@fields);
+		elsif ($type =~ /transcript|rna/) {
+			return &$gff_convertor_sub($self, \@fields);
+		}
+		elsif ($type =~ /chromosome|contig|scaffold/) {
+			# gff3 files can record the chromosome as a gff record
+			# process this as a region
+			$self->{seq_ids}{$fields[0]} = $fields[4];
+			next;
+		}
+		else {
+			# everything else must be some non-standard weird element
+			# only process this if the user wants everything
+			return &$gff_convertor_sub($self, \@fields) unless $self->simplify;
+		}
 	}
 	
 	# presumably reached the end of the file
