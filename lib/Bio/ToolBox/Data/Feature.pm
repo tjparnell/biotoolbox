@@ -1673,8 +1673,9 @@ sub _get_subfeature_position_scores {
 	}
 	else {
 		# return data converted to relative positions
+		# can no longer use original coordinates, but instead the new shifted coordinates
 		$args->{practical_start} = $practical_start;
-		$args->{practical_stop} = $practical_stop;
+		$args->{practical_stop} = $current_end; 
 		$self->_calculate_reference($args);
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args->{coordinate}, $fstrand);
