@@ -1841,7 +1841,7 @@ sub summary_file {
 	);
 	$summed_data->database($self->database);
 	$summed_data->metadata(0, 'number_features', $self->last_row);
-	$summed_data->metadata(2, 'log2', $log);
+	$summed_data->metadata(2, 'log2', $log) if $log;
 	$summed_data->metadata(2, 'dataset', $dataset) if $dataset;
 	
 	# tag for remembering we're working with percentile bins
