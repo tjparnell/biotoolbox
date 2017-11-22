@@ -398,6 +398,9 @@ sub new {
 			if (exists $options{do_gene}) {
 				$self->do_gene($options{do_gene});
 			}
+			if (exists $options{do_exon}) {
+				$self->do_exon($options{do_exon});
+			}
 			if (exists $options{do_cds}) {
 				$self->do_cds($options{do_cds});
 			}

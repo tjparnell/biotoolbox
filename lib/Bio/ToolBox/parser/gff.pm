@@ -982,7 +982,7 @@ sub _gff3_to_seqf {
 			# ensembl GFF3 store the exon id but doesn't record it as the ID, why?
 			$feature->primary_id($values[0]);
 		}
-		elsif ($self->{simplify}) {
+		elsif (not $self->{simplify}) {
 			foreach (@values) {
 				$feature->add_tag_value($tag, $_);
 			}
