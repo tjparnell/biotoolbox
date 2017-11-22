@@ -13,7 +13,6 @@ use Bio::ToolBox::db_helper qw(
 	check_dataset_for_rpm_support
 );
 use Bio::ToolBox::utility;
-use Bio::ToolBox::GeneTools qw(:transcript :cds :utr);
 
 my $parallel;
 eval {
@@ -22,7 +21,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.52';
+my $VERSION = '1.53';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -134,10 +133,13 @@ my $collapsed = 0; # global value to indicate transcripts are collapsed
 # Generate or open Data table
 my $Data;
 if ($infile) {
-	$Data = Bio::ToolBox::Data->new(file => $infile, parse => 1) or 
-		die " unable to load input file '$infile'\n";
-	printf " Loaded %s features from $infile.\n", 
-		format_with_commas( $Data->last_row );
+	$Data = Bio::ToolBox::Data->new(
+		file       => $infile, 
+		parse      => 1,
+		feature    => $feature,
+		subfeature => $subfeature,
+	) or die " unable to load input file '$infile'\n";
+	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# update main database as necessary
 	if ($main_database) {
@@ -145,7 +147,6 @@ if ($infile) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
@@ -296,6 +297,9 @@ sub set_defaults {
 	# command line
 	
 	# Check for required values
+	unless ($main_database) {
+		$feature ||= 'gene';
+	}
 	unless ($infile) {
 		if (@ARGV and not $feature) {
 			# making an assumption that first unnamed variable is input file
@@ -310,9 +314,6 @@ sub set_defaults {
 	if ($new) {
 		unless ($outfile) {
 			die " You must define an output filename!";
-		}
-		unless ($feature) {
-			die  " You must define an input file or new feature type! see help\n";
 		}
 		# database for new files checked below
 	}
@@ -425,6 +426,10 @@ sub set_defaults {
 			# take the first element
 			$main_database = $datasets[0];
 		}
+		elsif (defined $infile) {
+			# input could be a gene table in gff or ucsc format to be parsed
+			# hope for the best here....
+		}
 		else {
 			die " You must define a database or an appropriate dataset file! see help\n";
 		}
@@ -467,6 +472,11 @@ sub parallel_execution {
 			$ddb = open_db_connection($data_database, 1);
 		}
 		
+		# collapse transcripts if needed
+		if ($feature eq 'gene' and $subfeature eq 'exon') {
+			$Data->collapse_gene_transcripts;
+		}
+		
 		# collect the dataset
 		foreach my $dataset (@datasets) {
 			unless ($dataset eq 'none') {
@@ -505,6 +515,12 @@ sub parallel_execution {
 
 
 sub single_execution {
+	
+	# collapse transcripts if needed
+	if ($feature eq 'gene' and $subfeature eq 'exon') {
+		$Data->collapse_gene_transcripts;
+	}
+		
 	# collect the datasets
 	foreach my $dataset (@datasets) {
 		unless ($dataset eq 'none') {
@@ -520,14 +536,7 @@ sub single_execution {
 
 # Dataset collection
 sub collect_dataset {
-	
 	my $dataset = shift;
-	
-	# collapse transcripts if needed
-	if ($subfeature eq 'exon' and not $collapsed) {
-		# we only collapse genes with exonic subfeatures, not other types of subfeature
-		$collapsed = collapse_all_features();
-	}
 	
 	# set the new metadata for this new dataset
 	my $index = add_new_dataset($dataset);
@@ -554,23 +563,6 @@ sub collect_dataset {
 	}
 }
 
-
-sub collapse_all_features {
-	# collect all the transcripts and collapse them
-	
-	# check for collapsed transcript length index
-	my $length_i = $Data->find_column('Merged_Transcript_Length');
-	unless (defined $length_i) {
-		$length_i = $Data->add_column('Merged_Transcript_Length');
-	}
-	$Data->iterate( sub {
-		my $row = shift;
-		my $collSeqFeat = collapse_transcripts($row->seqfeature);
-		$Data->store_seqfeature($row->row_index, $collSeqFeat);
-		$row->value($length_i, get_transcript_length($collSeqFeat));
-	} );
-	return 1;
-}
 
 sub get_dataset {
 	my ($dataset, $index) = @_;
@@ -758,7 +750,7 @@ sub add_new_dataset {
 	$Data->metadata($index, 'fstart', $fstart)   if defined $fstart;	
 	$Data->metadata($index, 'fstop', $fstop)     if defined $fstop;	
 	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
-	$Data->metadata($index, 'exons', 'yes')      if $subfeature;	
+	$Data->metadata($index, 'subfeature', $subfeature) if $subfeature;	
 	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
 	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
 		exists $dataset2sum{$dataset};
@@ -786,42 +778,23 @@ sub calculate_fpkm_values {
 	# calculate which indices;
 	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
 	
-	# identify the length column
-	my $length_i = $Data->find_column('Merged_Transcript_Length');
-	if (not defined $length_i and defined $subfeature) {
-		# we need to calculate the custom length of the subfeatures
-		# first check to see if the column exists, and if not, calculate lengths for all
-		if ($subfeature eq '5p_utr') {
-			$length_i = $Data->find_column('Transcript_5pUTR_Length');
-			unless (defined $length_i) {
-				$length_i = $Data->add_column('Transcript_5pUTR_Length');
-				$Data->iterate( sub {
-					my $row = shift;
-					$row->value($length_i, 
-						get_transcript_5p_utr_length($row->seqfeature));
-				} );
-			}
+	# identify the length column as necessary
+	my $length_i;
+	if ($subfeature) {
+		if ($subfeature eq 'exon') {
+			$length_i = $Data->find_column('Merged_Transcript_Length');
 		}
 		elsif ($subfeature eq 'cds') {
 			$length_i = $Data->find_column('Transcript_CDS_Length');
-			unless (defined $length_i) {
-				$length_i = $Data->add_column('Transcript_CDS_Length');
-				$Data->iterate( sub {
-					my $row = shift;
-					$row->value($length_i, get_transcript_cds_length($row->seqfeature));
-				} );
-			}
+		}
+		elsif ($subfeature eq '5p_utr') {
+			$length_i = $Data->find_column('Transcript_5pUTR_Length');
 		}
 		elsif ($subfeature eq '3p_utr') {
 			$length_i = $Data->find_column('Transcript_3pUTR_Length');
-			unless (defined $length_i) {
-				$length_i = $Data->add_column('Transcript_3pUTR_Length');
-				$Data->iterate( sub {
-					my $row = shift;
-					$row->value($length_i, 
-						get_transcript_3p_utr_length($row->seqfeature));
-				} );
-			}
+		}
+		unless (defined $length_i) {
+			$length_i = $Data->add_transcript_length($subfeature);
 		}
 	}
 	

@@ -12,14 +12,13 @@ use Bio::ToolBox::db_helper qw(
 	calculate_score
 );
 use Bio::ToolBox::utility;
-use Bio::ToolBox::GeneTools qw(:transcript);
 my $parallel;
 eval {
 	# check for parallel support
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.52';
+my $VERSION = '1.53';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -115,15 +114,18 @@ if ($print_version) {
 ### Check for required values
 check_defaults();
 my $start_time = time;
-my $collapsed = 0; # global value to indicate transcripts are collapsed
-
+my $length_i; # global value for the merged transcript length
 
 
 ### Generate or load the dataset
 my $Data;
 if ($infile) {
-	$Data = Bio::ToolBox::Data->new(file => $infile, parse => 1) or 
-		die " unable to load input file '$infile'\n";
+	$Data = Bio::ToolBox::Data->new(
+		file       => $infile, 
+		parse      => 1,
+		feature    => $feature,
+		subfeature => $subfeature,
+	) or die " unable to load input file '$infile'\n";
 	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# update main database as necessary
@@ -132,7 +134,6 @@ if ($infile) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
@@ -256,11 +257,8 @@ sub check_defaults {
 		# a tim data file used as an input file would also define one
 		die " You must define a database or input file!\n";
 	}
-
-	unless ($feature or $infile) {
-		# the feature must be defined
-		# a tim data file used as an input file would also define one
-		die " You must define a feature!\n Use --help for more information\n";
+	unless ($main_database) {
+		$feature ||= 'gene';
 	}
 
 	unless ($outfile or $infile) {
@@ -308,10 +306,6 @@ sub check_defaults {
 	}
 	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
 		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
-	}
-	if ($subfeature and $subfeature ne 'exon' and $extension) {
-		print " disabling $extension with non-exon subfeatures\n";
-		$extension = 0;
 	}
 	
 	# assign default values
@@ -368,6 +362,17 @@ sub parallel_execution {
 			$ddb = open_db_connection($data_database, 1);
 		}
 		
+		# collapse transcripts if needed
+		if ($feature eq 'gene' and $subfeature eq 'exon') {
+			$Data->collapse_gene_transcripts;
+		}
+		
+		# calculate length if necessary
+		if ($subfeature) {
+			$length_i = $Data->add_transcript_length($subfeature);
+			$startcolumn++;
+		}
+	
 		# Prepare the metadata and header names
 		my $binsize = (100/$bins); 
 		prepare_bins($binsize);
@@ -420,6 +425,17 @@ sub parallel_execution {
 ## Run in single thread
 sub single_execution {
 	
+	# collapse transcripts if needed
+	if ($feature eq 'gene' and $subfeature eq 'exon') {
+		$Data->collapse_gene_transcripts;
+	}
+	
+	# calculate length if necessary
+	if ($subfeature) {
+		$length_i = $Data->add_transcript_length($subfeature);
+		$startcolumn++;
+	}
+	
 	# Prepare the metadata and header names
 	my $binsize = (100/$bins); 
 	prepare_bins($binsize);
@@ -444,13 +460,6 @@ sub single_execution {
 sub collect_binned_data {	
 	my $binsize = shift;
 	
-	# collapse transcripts if needed
-	if ($subfeature eq 'exon' and not $collapsed) {
-		$collapsed = collapse_all_features();
-	}
-	my $length_i = $Data->find_column('Merged_Transcript_Length');
-	
-	
 	## Collect the data
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
@@ -459,8 +468,7 @@ sub collect_binned_data {
 		my $feature = $row->feature || $row;
 		
 		# define the starting and ending points based on gene length
-		my $length = $length_i ? $row->value($length_i) : 
-			$feature->length;
+		my $length = defined $length_i ? $row->value($length_i) : $feature->length;
 		
 		# check the length
 		if (defined $min_length and $length < $min_length) {
@@ -602,33 +610,6 @@ sub collect_binned_long_data {
 		}
 	}	
 }
-
-
-sub collapse_all_features {
-	# collect all the transcripts and collapse them
-	
-	# check for collapsed transcript length index
-	my $length_i = $Data->find_column('Merged_Transcript_Length');
-	unless (defined $length_i) {
-		$length_i = $Data->add_column('Merged_Transcript_Length');
-	}
-	$Data->iterate( sub {
-		my $row = shift;
-		my $feature = $row->seqfeature;
-		my $collSeqFeat = collapse_transcripts($feature);
-		$Data->store_seqfeature($row->row_index, $collSeqFeat);
-		if ($length_i) {
-			$row->value($length_i, get_transcript_length($feature));
-		}
-	} );
-	
-	# reorder columns
-	my @neworder = (0 .. $startcolumn - 1, $length_i, $startcolumn .. $Data->last_column - 1);
-	$Data->reorder_column(@neworder);
-	$startcolumn++;
-	return 1;
-}
-
 
 
 sub record_the_bin_values {
