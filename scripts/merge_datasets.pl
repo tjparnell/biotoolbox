@@ -6,7 +6,7 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.40';
+my $VERSION = '1.53';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -234,19 +234,24 @@ sub read_file {
 		my $coord_i = $Data->add_column('MergeDatasetCoordinate');
 		
 		# generate coordinates
-		if (defined $Data->stop_column) {
+		# we will take the exact coordinate columns, in case we're working with 
+		my $chr = $Data->chromo_column;
+		my $start = $Data->start_column;
+		my $stop = $Data->stop_column;
+		if (defined $stop) {
 			# merge chromosome:start-stop
 			$Data->iterate( sub {
 				my $row = shift;
-				$row->value($coord_i, sprintf("%s:%s-%s", $row->seq_id, $row->start, 
-					$row->end));
+				$row->value($coord_i, sprintf("%s:%s-%s", $row->value($chr), 
+					$row->value($start), $row->value($stop)));
 			} );
 		}
 		else {
 			# merge chromosome:start
 			$Data->iterate( sub {
 				my $row = shift;
-				$row->value($coord_i, sprintf("%s:%s", $row->seq_id, $row->start));
+				$row->value($coord_i, sprintf("%s:%s", $row->value($chr), 
+					$row->value($start)));
 			} );
 		}
 	}
