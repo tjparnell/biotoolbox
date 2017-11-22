@@ -1565,20 +1565,21 @@ sub _get_subfeature_position_scores {
 	
 	# get the subfeatures
 	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
+	my $subf = lc $args->{subfeature};
+	if ($subf eq 'exon') {
 		@subfeatures = get_exons($feature);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
+	elsif ($subf eq 'cds') {
 		@subfeatures = get_cds($feature);
 	}
-	elsif ($args->{subfeature} eq '5p_utr') {
+	elsif ($subf eq '5p_utr') {
 		@subfeatures = get_5p_utrs($feature);
 	}
-	elsif ($args->{subfeature} eq '3p_utr') {
+	elsif ($subf eq '3p_utr') {
 		@subfeatures = get_3p_utrs($feature);
 	}
 	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
+		croak "unrecognized subfeature parameter '$subf'!";
 	}
 	
 	# reset the practical start and stop to the actual subfeatures' final start and stop
