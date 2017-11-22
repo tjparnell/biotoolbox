@@ -501,21 +501,50 @@ sub collect_from_file {
 	my $flavor = $Data->taste_file($infile);
 	print " $infile determined to be a $flavor format\n";
 	my $parser;
+	my $type_string;
 	if ($flavor eq 'gff') {
 		$parser = Bio::ToolBox::parser::gff->new(file => $infile) or
 			die " unable to open input file '$infile'!\n";
+		# we never know what's going to be present in a GFF file, so let's check first
+		$type_string = $parser->typelist;
 	}
 	elsif ($flavor eq 'ucsc') {
 		# some sort of ucsc format
-		$parser = Bio::ToolBox::parser::ucsc->new(
-			file    => $infile,
-			do_gene => 1,
-			do_utr  => 1,
-			do_cds  => 1,
-		) or die " unable to open input file '$infile'!\n";
+		$parser = Bio::ToolBox::parser::ucsc->new(file => $infile) or 
+			die " unable to open input file '$infile'!\n";
+		# we typically know what's going to be in a UCSC formatted file
+		$type_string = 'gene,RNA,exon,cds,utr,codon';
 	}
 	else {
 		die " $infile is an unrecognized gene table format!\n";
+	}
+	$parser->do_gene(1); # assume we always want genes?
+	if ($request =~ /exon|splice|intron/i) {
+		$parser->do_exon(1);
+	}
+	elsif ($request =~ /utr/i) {
+		if ($type_string =~ /utr/i) {
+			$parser->do_utr(1);
+		}
+		else {
+			$parser->do_exon(1);
+			$parser->do_cds(1);
+		}
+	}
+	elsif ($request =~ /cds st/i) {
+		if ($type_string =~ /codon/) {
+			$parser->do_codon(1);
+		}
+		else {
+			$parser->do_cds(1);
+		}
+	}
+	if ($tsl or $type_string !~ /rna/i) {
+		# we need the extra attributes for transcript_support_level and biotype
+		$parser->simplify(0);
+	}
+	else {
+		$parser->simplify(1);
 	}
 	$parser->parse_table or die "unable to parse file '$infile'!\n";
 	
