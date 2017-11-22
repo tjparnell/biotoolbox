@@ -323,8 +323,8 @@ is($score, 1, 'pcount score across subfeature 3p UTR');
 	subfeature => 'CDS',
 );
 # print "CDS position_score is \n" . print_hash(\%score1);
-is($score1{26}, 0.482, 'score at position 26 in CDS region position scores');
-is($score1{206}, 0.524, 'score at position 206 in CDS region position scores');
+is($score1{3}, 0.482, 'score at position 3 in CDS region position scores');
+is($score1{161}, 0.392, 'score at position 161 in CDS region position scores');
 
 
 
@@ -349,8 +349,8 @@ is($score, 60, 'count score across multi-subfeature CDS');
 	subfeature => 'cds',
 );
 # print "CDS position_score is \n" . print_hash(\%score1);
-is($score1{321}, 0.443, 'score at position 321 in CDS region position scores');
-is($score1{2372}, 0.037, 'score at position 2372 in CDS region position scores');
+is($score1{322}, 0.461, 'score at position 321 in CDS region position scores');
+is($score1{2314}, 0.262, 'score at position 2313 in CDS region position scores');
 
 
 

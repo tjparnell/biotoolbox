@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 229;
+	plan tests => 239;
 }
 else {
-	plan tests => 137;
+	plan tests => 145;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -59,25 +59,39 @@ sub test_gff {
 		class => $sfclass,
 	);
 	isa_ok($gff, 'Bio::ToolBox::parser::gff', 'GFF3 Parser');
+	is($gff->do_gene, 1, 'gff do_gene');
+	is($gff->do_exon, 0, 'gff do_exon');
 	my $fh = $gff->fh;
 	isa_ok($fh, 'IO::File', 'IO filehandle');
 	is($gff->version, 3, 'GFF version');
-	my @skips = $gff->skip(qw(repeat_region telomere nucleotide_match binding_site 
-		ARS long_terminal_repeat region));
-	is(scalar @skips, 7, 'skipped items');
-
+	my $list = $gff->typelist;
+	# print "gff type list is $list\n";
+	# region,binding_site,CDS,repeat_region,long_terminal_repeat,gene,chromosome,nucleotide_match,ARS,telomere
+	is(length($list), 104, 'gff type list length'); # random order, so just check length
+	
 	# parse first feature line
 	my $f = $gff->next_feature;
 	isa_ok($f, $sfclass, 'first feature object');
 	is($f->seq_id, 'chrI', 'feature seq_id');
 	is($f->start, 1, 'feature start');
-	is($f->stop, 230218, 'feature stop');
-	is($f->primary_tag, 'chromosome', 'feature primary_tag');
-	is($f->display_name, 'chrI', 'feature display_name');
-	is($f->primary_id, 'chrI', 'feature primary_id');
-	undef $f;
+	is($f->stop, 62, 'feature stop');
+	is($f->primary_tag, 'repeat_region', 'feature primary_tag');
+	is($f->display_name, 'TEL01L-TR', 'feature display_name');
+	is($f->primary_id, 'TEL01L-TR', 'feature primary_id');
 
-	# parse next top feature
+
+	# parse gene table
+	undef $gff;
+	$gff = Bio::ToolBox::parser::gff->new(
+		file => $gfffile,
+		class => $sfclass,
+		do_gene => 1,
+		do_cds => 1,
+		simplify => 1,
+	);
+	is($gff->parse_table, 1, 'parse gff file');
+	
+	# next top
 	$f = $gff->next_top_feature;
 	isa_ok($f, $sfclass, 'next top feature object');
 	is($f->seq_id, 'chrI', 'feature2 seq_id');
@@ -86,8 +100,6 @@ sub test_gff {
 	is($f->primary_tag, 'gene', 'feature2 primary_tag');
 	is($f->display_name, 'YAL069W', 'feature2 display_name');
 	is($f->primary_id, 'YAL069W', 'feature2 primary_id');
-	my ($tag) = $f->get_tag_values('orf_classification');
-	is($tag, 'Dubious', 'feature2 attribute');
 	my @subf = $f->get_SeqFeatures;
 	is(scalar @subf, 1, 'feature2 subfeatures');
 	is($subf[0]->primary_tag, 'CDS', 'feature2 subfeature primary_tag');
@@ -132,13 +144,14 @@ sub test_ucsc {
 	my $ucsc = Bio::ToolBox::parser::ucsc->new(
 		file => $ucscfile,
 		class => $sfclass,
+		do_exon => 1,
 	);
 	isa_ok($ucsc, 'Bio::ToolBox::parser::ucsc', 'UCSC Parser');
 	my $fh = $ucsc->fh;
 	isa_ok($fh, 'IO::File', 'IO filehandle');
 	is($ucsc->do_gene, 1, 'ucsc do_gene');
 	is($ucsc->do_cds, 0, 'ucsc do_cds');
-	is($ucsc->do_utr, 0, 'ucsc do_utr');
+	is($ucsc->do_exon, 1, 'ucsc do_exon');
 	is($ucsc->do_codon, 0, 'ucsc do_codon');
 	is($ucsc->do_name, 0, 'ucsc do_name');
 	is($ucsc->share, 1, 'ucsc share');
@@ -271,24 +284,43 @@ sub test_parsed_gff_table {
 	my $p = $Data->parse_table($gfffile);
 	is($p, 1, 'parsed GFF table');
 	is($Data->number_columns, 3, 'number of columns');
-	is($Data->last_row, 43, 'number of rows');
+	is($Data->last_row, 33, 'number of rows');
 	is($Data->database, "Parsed:$gfffile", 'database source');
 	is($Data->name(0), 'Primary_ID', 'First column name');
 	is($Data->name(1), 'Name', 'Second column name');
 	is($Data->name(2), 'Type', 'Third column name');
-	is($Data->value(4,0), 'YAL069W', 'Fifth row ID');
-	is($Data->value(4,1), 'YAL069W', 'Fifth row Name');
-	is($Data->value(4,2), 'gene:SGD', 'Fifth row Type');
-	my $f = $Data->get_seqfeature(4);
+	is($Data->value(1,0), 'YAL069W', 'First row ID');
+	is($Data->value(1,1), 'YAL069W', 'First row Name');
+	is($Data->value(1,2), 'gene:SGD', 'First row Type');
+	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Fifth row SeqFeature object');
 	is($f->display_name, 'YAL069W', 'SeqFeature display name');
 	is($f->get_tag_values('orf_classification'), undef, 'missing SeqFeature attribute');
 	is($f->start, 335, 'SeqFeature start position');
 	my @subf = $f->get_SeqFeatures;
+	is(scalar @subf, 0, 'Number of SeqFeature sub features');
+	
+	# reparse with subfeatures
+	undef $f;
+	undef $Data;
+	$Data = Bio::ToolBox::Data->new(
+		file => $gfffile,
+		parse => 1,
+		feature => 'gene',
+		subfeature => 'CDS'
+	);
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	is($Data->last_row, 33, 'number of rows');
+	$f = $Data->get_seqfeature(3);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Third row SeqFeature object');
+	is($f->display_name, 'YAL068C', 'SeqFeature display name');
+	is($f->start, 1807, 'SeqFeature start position');
+	@subf = $f->get_SeqFeatures;
 	is(scalar @subf, 1, 'Number of SeqFeature sub features');
+	
 	my $f2 = shift @subf;
 	is($f2->type, 'CDS:SGD', 'Sub feature type');
-	is($f2->name, 'YAL069W', 'Sub feature name');
+	is($f2->name, 'YAL068C', 'Sub feature name');
 	
 	# attempt to reload the file
 	my $s = $Data->save($outfile);
@@ -302,7 +334,7 @@ sub test_parsed_gff_table {
 	is($Data->basename, 'tempout', 'file basename');
 	my $f3 = $Data->get_seqfeature(4);
 	isa_ok($f3, 'Bio::ToolBox::SeqFeature', 'Reloaded fifth row SeqFeature object');
-	is($f3->display_name, 'YAL069W', 'SeqFeature display name');
+	is($f3->display_name, 'YAL067W-A', 'SeqFeature display name');
 	unlink $outfile;
 }
 
