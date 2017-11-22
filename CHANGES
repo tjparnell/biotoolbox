@@ -1,5 +1,29 @@
 ######## Bio::ToolBox revision history #############
 
+v1.53
+	- Significantly streamlined GTF and GFF3 parsing to improve 
+	loading times. By default, no subfeatures are parsed and must 
+	be explicitly turned on as needed.
+	- Improved parsing gene tables (GTF, UCSC, etc) as an input 
+	file to scripts. Now supports defining both the feature and 
+	subfeature types to process. One more reason not to use an 
+	annotation database.
+	- Fixed critical bug with collecting data across subfeatures, 
+	e.g. get_binned_data. Subfeatures were not being properly 
+	parsed and coordinates weren't converted to relative positions 
+	correctly. Thanks to Zhizhou for reporting.
+	- New methods in Data objects for collapsing gene transcripts 
+	and calculating transcript lengths.
+	- Fix bug with paired-end center span recording in bam2wig.
+	Thanks to Yixuan for reporting.
+	- Summary files now report bin midpoints based on 1000 bp length.
+	- Script pull_features allow multiple groups in a list file, 
+	and write only summary files if desired.
+	- Bug fix in collecting sequence. Thanks to Patrick.
+	- Add support for collecting cds Start and Stop in script 
+	get_gene_regions
+	- Numerous small bug fixes
+
 v1.52
 	- Added binning option to wig files in script bam2wig. Default 
 	is to write wig files in 10 bp bins with significant decreases 
