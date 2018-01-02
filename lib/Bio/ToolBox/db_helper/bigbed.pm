@@ -359,13 +359,23 @@ All subroutines are exported by default.
 
 =over
 
+=item open_bigbed_db
+
+This subroutine will open a BigBed database connection. Pass either the 
+local path to a bigBed file (F<.bb> or F<.bigbed> extension) or the URL 
+of a remote bigBed file. It will return the opened database object.
+
+The opened BigBed object is cached for later use. If you do not want this 
+(for example, when forking), pass a second true argument.
+
 =item collect_bigbed_scores
 
 This subroutine will collect only the data values from a binary bigbed file 
 for the specified database region. The positional information of the 
 scores is not retained.
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns an array or array reference of the requested dataset 
 values found within the region of interest. 
@@ -375,7 +385,8 @@ values found within the region of interest.
 This subroutine will collect the score values from a binary bigBed file 
 for the specified database region keyed by position. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. The feature midpoint is used 
@@ -383,23 +394,14 @@ as the key position. When multiple features are found at the same
 position, a simple mean (for score or length data methods) or sum 
 (for count methods) is returned.
 
-=item open_bigbed_db()
-
-This subroutine will open a BigBed database connection. Pass either the 
-local path to a bigBed file (.bb extension) or the URL of a remote bigBed 
-file. It will return the opened database object.
-
-The opened BigBed object is cached for later use. If you do not want this 
-(for example, when forking), pass a second true argument.
-
-=item sum_total_bigbed_features()
+=item sum_total_bigbed_features
 
 This subroutine will sum the total number of bed features present in a 
 BigBed file. This may be useful, for example, in calculating fragments 
 (reads) per million mapped values when the bigbed file represents 
 sequence alignments.
 
-Pass either the name of a bigBed file (.bb), either local or remote, or an 
+Pass either the name of a bigBed file (F<.bb>), either local or remote, or an 
 opened BigBed database object. A scalar value of the total number of features 
 is returned.
 
@@ -408,31 +410,34 @@ is returned.
 =head2 Data Collection Parameters Reference
 
 The data collection subroutines are passed an array reference of parameters. 
-The recommended  method for data collection is to use get_segment_score() method from 
-L<Bio::ToolBox::db_helper>. 
+The recommended  method for data collection is to use the 
+L<Bio::ToolBox::db_helper/get_segment_score> method. 
+
 
 The parameters array reference includes these items:
 
 =over 4
 
-=item 1. The chromosome or seq_id
+=item 1. chromosome
 
-=item 1. The start position of the segment to collect 
+=item 1. start coordinate
 
-=item 3. The stop or end position of the segment to collect 
+=item 3. stop coordinate 
 
-=item 4. The strand of the segment to collect
+Coordinates are in BioPerl-style 1-base system.
+
+=item 4. strand
 
 Should be standard BioPerl representation: -1, 0, or 1.
 
-=item 5. The strandedness of the data to collect 
+=item 5. strandedness
 
 A scalar value representing the desired strandedness of the data 
 to be collected. Acceptable values include "sense", "antisense", 
 or "all". Only those scores which match the indicated 
 strandedness are collected.
 
-=item 6. The method for combining scores.
+=item 6. score method
 
 Acceptable values include score, count, and pcount.
 
@@ -449,17 +454,22 @@ Acceptable values include score, count, and pcount.
    names. Use this to avoid double-counting paired-end reads by 
    counting only unique names. Reads are taken if they overlap 
    the search region.
-   
-=item 7. A database object.
+
+=item 7. database
 
 Not used here.
 
-=item 8 and higher. Paths to one or more BigBed files
+=item 8. path to BigBed file
 
+Subsequent bam files may also be provided as additional list items.
 Opened BigBed file objects are cached. Both local and remote files are 
 supported.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::db_helper>, L<Bio::DB::BigBed>
 
 =head1 AUTHOR
 

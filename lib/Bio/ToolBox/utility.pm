@@ -15,7 +15,10 @@ The following subroutines are automatically exported when you use this module.
 
 =over 4
 
-=item parse_list()
+=item parse_list
+
+	my $index_request = '1,2,5-7';
+	my @indices = parse_list($index_request); # returns [1,2,5,6,7]
 
 This subroutine parses a scalar value into a list of values. The scalar is 
 a text string of numbers (usually column or dataset indices) delimited by 
@@ -26,13 +29,10 @@ Pass the module the scalar string.
 
 It will return the array of numbers.
 
-Example
-	
-	my $index_request = '1,2,5-7';
-	my @indices = parse_list($index_request); # returns [1,2,5,6,7]
+=item format_with_commas
 
-
-=item format_with_commas()
+	my $count = '4327908475';
+	printf " The final count was %s\n", format_with_commas($count);
 
 This subroutine process a large number (e.g. 4327908475) into a human-friendly 
 version with commas delimiting the thousands (4,327,908,475).
@@ -41,14 +41,11 @@ Pass the module a scalar string with a number value.
 
 It will return a scalar value containing the formatted number.
 
-Example
-	
-	my $count = '4327908475';
-	print " The final count was " . format_with_commas($count) . "\n";
+=item ask_user_for_index
 
-=item ask_user_for_index($Data, $prompt)
+	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
 
-This subroutine will present the list of column names from a Bio::ToolBox::Data 
+This subroutine will present the list of column names from a L<Bio::ToolBox::Data> 
 structure along with their numeric indexes to the user and prompt for one 
 or more to be selected and entered. The function is smart enough to only print 
 the list once (if it hasn't changed) so as not to annoy the user with repeated 
@@ -57,39 +54,40 @@ or a generic one is used. The list of indices are validated, and a warning print
 for invalid responses. The responses are then returned as a single value or array, 
 depending on context.
 
-Example
-	
-	my @answers = ask_user_for_index($Data, 'Please enter 2 or more columns   ');
-
 =back
 
 =head1 LEGACY SUBROUTINES
 
 These are additional functions that can be optionally exported. These provide 
-accessibility to the Bio::ToolBox::Data::file functions that might be needed 
-for old scripts that do not implement Bio::ToolBox::Data objects. You normall 
+accessibility to the L<Bio::ToolBox::Data::file> functions that might be needed 
+for old scripts that do not implement L<Bio::ToolBox::Data> objects. You normally 
 should not need these. If you import these, be sure to import the ones above 
 if you need those too.
 
 =over 4
 
-=item open_to_read_fh($file)
+=item open_to_read_fh
 
-Opens a file as an IO::Handle read only object. Transparently handles gzip and bzip2 
-compression. 
+Wrapper around L<Bio::ToolBox::Data::file/open_to_read_fh>.
+Opens a file as an L<IO::Handle> read only object. Transparently handles gzip 
+and bzip2 compression. 
 
-=item open_to_write_fh($file, $gz, $append)
+=item open_to_write_fh
 
-Opens a file as an IO::Handle write only object. Pass the file name as the option.
+   my $fh = open_to_write_fh($file, $gz, $append);
+
+Wrapper around L<Bio::ToolBox::Data::file/open_to_write_fh>. 
+Opens a file as an L<IO::Handle> write only object. Pass the file name as the option.
 Optionally provide a boolean value if you want the file to be written as a compressed 
 gzip file. Pass another boolean value if you want to append to an existing file; 
 otherwise an existing file with the same name will be overwritten!
 
-=item check_file($file)
+=item check_file
 
+Wrapper around the L<Bio::ToolBox::Data::file/check_file> method.
 Checks to see if a file exists. If not, some common missing extensions are appended 
 and then existence is re-checked. If a file is found, the name is returned so that 
-it could be opened. Useful, for example, if you forget the .txt or .gz extensions.
+it could be opened. Useful, for example, if you forget the F<.txt> or F<.gz> extensions.
 
 =back
 

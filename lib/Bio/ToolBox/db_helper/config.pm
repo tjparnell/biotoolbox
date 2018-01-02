@@ -171,24 +171,24 @@ helper applications.
 
 The default location for the file is in the user's home directory. 
 Alternatively, the location of the file may be referenced through an 
-Environment setting under the key 'BIOTOOLBOX'.
+Environment setting under the key C<BIOTOOLBOX>.
 
 The file is intended to be edited by the user for their custom installation. 
 The file is a simple INI style text file. The format is detailed below.
 
 =head1 FORMAT
 
-The BioToolBox configuration file is a simple INI-style text file. Blocks 
-of settings begin with a [header] line, followed by lines of key = value. 
-The value may be single text or comma delimited lists. Examples of settings 
-include the following.
+The BioToolBox configuration file F<.biotoolbox.cfg> is a simple INI-style 
+text file. Blocks of settings begin with a C<[header]> line, followed by lines 
+of key = value. The value may be single text or comma delimited lists. Examples of 
+settings include the following.
 
 =over 4
 
 =item default_db
 
 These are default settings that are shared by all databases.
-  
+
   [default_db]
   user                     = nobody
   pass                     = hello
@@ -198,41 +198,41 @@ These are default settings that are shared by all databases.
   window                   = 500
 
 The user and password keys are for authenticating to a relational 
-database. B<WARNING!!!!!!!!!!!!>
-For sanity and security sake, please, PLEASE, generate a read-only 
+database. B<WARNING!>
+For sanity and security sake, please, B<PLEASE>, generate a read-only 
 user for relational database access. Do NOT use a privileged account. 
 Any password written here is for all to see and is merely a convenience.
 
 The adaptor key specifies the module driver for connecting to the relational 
-database containing the Bio::DB::SeqFeature::Store database. Acceptable 
-values include DBI::mysql, DBI::Pg, or DBI::SQLite. 
+database containing the L<Bio::DB::SeqFeature::Store> database. Acceptable 
+values include C<DBI::mysql>, C<DBI::Pg>, or C<DBI::SQLite>. 
 
 The dsn key defines the string for connecting to the database. For example, 
 to connect to a mysql database 'genome' on localhost through a socket
-	
+
 	dbi:mysql:genome
 
 to connect to a remote mysql database
-	
+
 	dbi:mysql:host=127.0.0.1;port=3306;database=genome
 
 The dsn_prefix key simply drops the database name, allowing it to be used 
 with any database name.
 
-See the documentation for Bio::DB::SeqFeature::Store for syntax of 
-adaptor and dsn_prefix keys. 
+See the documentation for L<Bio::DB::SeqFeature::Store> for syntax of 
+C<adaptor> and C<dsn_prefix> keys. 
 
-The chromosome_exclude key provides a list of chromosomes to avoid when 
+The C<chromosome_exclude> key provides a list of chromosomes to avoid when 
 generating either a list of genomic window intervals or genes. For 
 example, the mitochondrial chromosome is usually not included when 
 performing analyses. 
 
 The window is the size in bp when generating genomic window intervals. It 
-is used by the Bio::ToolBox::db_helper::get_new_genome_list() function.
+is used by the <<Bio::ToolBox::db_helper/get_new_genome_list> function.
 
 Multiple database sections may be included. Simply name the section after the 
 name of the database. Database specific keys may be included, and missing 
-keys will default to the default_db values. 
+keys will default to the C<default_db> values. 
 
 =item Feature Alias Lists
 
@@ -241,7 +241,7 @@ for these features in the database.
 
 Specify as either the GFF "type" or "type:source". These represent GFF 
 columns 3 and 2:3, respectively.
-  
+
   [features]
   rna         = ncRNA, snRNA, snoRNA, tRNA
   orf         = gene, ORF
@@ -253,10 +253,10 @@ Some features in the database you simply don't want in your list. For
 example, in the cerevisiaie GFF3 annotation, dubious genes are included 
 as gene features, but have the GFF "orf_classification" tag value of 
 "Dubious". I don't want these features. Ever. These tags are checked 
-using the Bio::ToolBox::db_helper::get_new_feature_list() function.
+using the L<Bio::ToolBox::db_helper/get_new_feature_list> function.
 
 Specify the tag key and the tag value(s) to be excluded
-  
+
   [exclude_tags]
   orf_classification    = Dubious
 
@@ -265,7 +265,7 @@ Specify the tag key and the tag value(s) to be excluded
 Some BioToolBox scripts require helper programs. Enter the name of the 
 helper program and the full path of its location. Executable programs 
 may also be automatically found in the system path.
-  
+
   [applications]
   wigToBigWig      = /usr/local/bin/wigToBigWig
   java             = /usr/bin/java
@@ -275,9 +275,9 @@ may also be automatically found in the system path.
 
 =head1 USAGE
 
-The module exports a single Config::Simple object ($BTB_CONFIG) representing 
+The module exports a single L<Config::Simple> object (C<$BTB_CONFIG>) representing 
 the biotoolbox settings in the configuration file. Please refer to the 
-documentation for Config::Simple for usage.
+documentation for L<Config::Simple> for usage.
 
 If an existing configuration file is not present, then it will write a new 
 default file in the user's home directory. I make the assumption that the 
@@ -300,7 +300,7 @@ Follow the FORMAT examples for details on what to provide.
 It will attempt to rewrite the configuration file, if the user has write 
 privileges. If not, then it will attempt to write a new file in the user's 
 home root directory. It will return true upon success. 
-   
+
    my $success = add_database(
       'name'    => 'hg19',
       'adaptor' => 'DBI::SQLite',
@@ -320,6 +320,10 @@ home root directory. It will return true upon success.
    my $success = add_program('/path/to/wigToBigWig');
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data>, L<Bio::ToolBox::db_helper>
 
 =head1 AUTHOR
 

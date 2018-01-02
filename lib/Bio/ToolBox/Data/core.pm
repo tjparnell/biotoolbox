@@ -1426,8 +1426,8 @@ columns), and special file format structure.
 =item open_database
 
 This is wrapper method that tries to do the right thing and passes 
-on to either open_meta_database() or open_new_database() methods. 
-Basically a legacy method for open_meta_database().
+on to either L</open_meta_database> or L</open_new_database> methods. 
+Basically a legacy method for L</open_meta_database>.
 
 =item open_meta_database
 
@@ -1436,26 +1436,29 @@ database connection. Pass a true value to force a new database
 connection to be opened, rather than returning a cached connection 
 object (useful when forking).
 
-=item open_new_database($database)
+=item open_new_database
 
 Convenience method for opening a second or new database that is 
 not specified in the metadata, useful for data collection. This 
-is a shortcut to Bio::ToolBox::db_helper::open_db_connection().
+is a shortcut to L<Bio::ToolBox::db_helper/open_db_connection>.
+Pass the database name.
 
-=item verify_dataset($dataset)
+=item verify_dataset
 
 Verifies the existence of a dataset or data file before collecting 
 data from it. Multiple datasets may be verified. This is a convenience 
-method to Bio::ToolBox::db_helper::verify_or_request_feature_types().
+method to L<Bio::ToolBox::db_helper/verify_or_request_feature_types>.
+Pass the name of the dataset to verify.
 
-=item delete_column(@indices)
+=item delete_column
 
-Delete one or more columns in a data table.
+Delete one or more columns in a data table. Pass a list of the 
+indices to delete.
 
-=item reorder_column(@indices)
+=item reorder_column
 
 Reorder the columns in a data table. Allows for skipping (deleting) and 
-duplicating columns.
+duplicating columns. Pass a list of the new index order.
 
 =item feature
 
@@ -1523,11 +1526,11 @@ Returns the recognized extension of the filename listed in the metadata.
 
 Returns an array of comment lines present in the metadata.
 
-=item add_comment($string)
+=item add_comment
 
 Adds a string to the list of comments to be included in the metadata.
 
-=item delete_comment($index)
+=item delete_comment
 
 Deletes the indicated array index from the metadata comments array.
 
@@ -1543,31 +1546,29 @@ Rewrites the vcf headers back into the metadata comments array.
 
 Returns an array of the column names
 
-=item name($index)
+=item name
 
-=item name($index, $newname)
-
-Returns or sets the name of the column.
+Returns or sets the name of the column. Pass the index, and optionally new name.
 
 =item metadata($index, $key)
 
-=item metadata($index, $key, $value)
+Returns or sets the metadata keyE<sol>value pair for a specific column.
+Pass the index, key, and optionally new value.
 
-Returns or sets the metadata key/value pair for a specific column.
+=item delete_metadata
 
-=item delete_metadata($index, $key)
+Deletes the metadata key for a column. Pass the index and key.
 
-Deletes the metadata key for a column.
- 
-=item copy_metadata($source, $target)
+=item copy_metadata
 
 Copies the metadata values from one column to another column.
+Pass the source and target indices.
 
-=item find_column("string")
+=item find_column
 
 Returns the column index for the column with the specified name. Name 
 searches are case insensitive and can tolerate a # prefix character. 
-The first match is returned.
+The first match is returned. Pass the name to search.
 
 =item chromo_column
 
@@ -1612,6 +1613,10 @@ column in certain formats, such as GFF, BED, bedGraph, etc.
 Returns the stored SeqFeature object for a given row.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data>
 
 =head1 AUTHOR
 

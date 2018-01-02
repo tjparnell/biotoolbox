@@ -6,7 +6,7 @@ our $VERSION = '1.41';
 Bio::ToolBox::Data::Stream - Read, Write, and Manipulate Data File Line by Line
 
 =head1 SYNOPSIS
-  
+
   use Bio::ToolBox::Data;
   
   ### Open a pre-existing file
@@ -90,13 +90,16 @@ either the Feature object or the array of values to be written.
 
 =head2 Initializing the structure
 
+A new Bio::ToolBox::Data::Stream object may be generated directly, or indirectly 
+through the L<Bio::ToolBox::Data> module.
+
 =over 4
 
-=item new()
+=item new
 
-Create a new Bio::ToolBox::Data::Stream object. For simplicity, a new file 
-may also be opened using the L<Bio::ToolBox::Data> new function.
-	
+	my $Stream = Bio::ToolBox::Data::Stream->new(
+	   in           => $filename,
+	);
 	my $Stream = Bio::ToolBox::Data->new(
 	   stream       => 1,
 	   in           => $filename,
@@ -107,33 +110,38 @@ read or write mode, determined by the mode given through the options.
 
 =over 4
 
-=item in =E<gt> $filename
+=item in
 
-Provide the path and name of the file to open for reading. File types are 
+Provide the path of the file to open for reading. File types are 
 recognized by the extension, and compressed files (.gz) are supported. File 
 types supported include all those listed in L<Bio::ToolBox::file_helper>. 
 
-=item out =E<gt> $filename
+=item out
 
-Provide the path and name of the file to open for writing. No check is made 
+Provide the path of the file to open for writing. No check is made 
 for pre-existing files; if it exists it will be overwritten! A new data 
 object is prepared, therefore column names must be provided. 
 
-=item noheader =E<gt> 1
+=item noheader
 
 Boolean option indicating that the input file does not have file headers, 
 in which case dummy headers are provided. This is not necessary for 
 defined file types that don't normally have file headers, such as 
 BED, GFF, or UCSC files. Ignored for output files.
 
-=item columns =E<gt> [qw(Column1 Column2 ...)]
+=item columns
+
+	my $Stream = Bio::ToolBox::Data::Stream->new(
+	   out      => $filename,
+	   columns  => [qw(Column1 Column2 ...)],
+	);
 
 When a new file is written, provide the names of the columns as an 
 anonymous array. If no columns are provided, then a completely empty 
 data structure is made. Columns must be added with the add_column() 
 method below.
 
-=item gff =E<gt> $gff_version
+=item gff
 
 When writing a GFF file, provide a GFF version. When this is given, the 
 nine standard column names and metadata are automatically provided based 
@@ -141,7 +149,7 @@ on the file format specification. Note that the column names are not
 actually written in the file, but are maintained for internal use. 
 Acceptable versions include 1, 2, 2.5 (GTF), and 3 (GFF3).
 
-=item bed =E<gt> $number_of_bed_columns
+=item bed
 
 When writing a BED file, provide the number of bed columns that the file 
 will have. When this is given, the standard column names and metadata 
@@ -150,7 +158,7 @@ specification. Note that column names are not actually written to the file,
 but are maintained for internal use. Acceptable values are integers from 
 3 to 12. 
 
-=item ucsc =E<gt> $number_of_columns
+=item ucsc
 
 When writing a UCSC-style file format, provide the number of bed columns 
 that the file will have. When this is given, the standard column names and 
@@ -160,14 +168,16 @@ for internal use. Acceptable values include 10 (refFlat without gene names),
 11 (refFlat with gene names), 12 (knownGene gene prediction table), and 15 
 (an extended gene prediction or genePredExt table).
 
-=item gz =E<gt> $gz
+=item gz
 
 Optional boolean value that indicates whether the output file should be 
 written with compression. This can also be inferred from the file name.
 
 =back
 
-=item duplicate($filename)
+=item duplicate
+
+   my $Out_Stream = $Stream->duplicate($new_filename);
 
 For an opened-to-read Stream object, you may duplicate the object as a new 
 opened-to_write Stream object that maintains the same columns and metadata. 
@@ -186,9 +196,7 @@ of the file, and so must be set prior to iterating through the file.
 
 =over 4
 
-=item feature()
-
-=item feature($text)
+=item feature
 
 Returns or sets the name of the features used to collect 
 the list of features. The actual feature types are listed 
@@ -212,11 +220,11 @@ named database features. The return values include:
 
 =back
 
-=item program($name)
+=item program
 
 Returns or sets the name of the program generating the list.
 
-=item database($name)
+=item database
 
 Returns or sets the name or path of the database from which the 
 features were derived.
@@ -247,6 +255,9 @@ Returns or sets the VCF file version number. VCF support is limited.
 
 =head2 File information
 
+These methods provide information about the file from which the 
+data table was loaded. This does not include parsed annotation tables.
+
 =over 4
 
 =item filename
@@ -261,10 +272,13 @@ Returns the filename, full path, basename, and extension of
 the filename. Concatenating the last three values will reconstitute 
 the first original filename.
 
-=item add_file_metadata($filename)
+=item add_file_metadata
+
+  $Data->add_file_metadata('/path/to/file.txt');
 
 Add filename metadata. This will automatically parse the path, 
-basename, and recognized extension from the passed filename.
+basename, and recognized extension from the passed filename and 
+set the appropriate metadata attributes.
 
 =back
 
@@ -279,13 +293,11 @@ beginning with a #) that were not parsed as metadata.
 
 Returns a copy of the array containing commented lines.
 
-=item add_comment($text)
+=item add_comment
 
 Appends the text string to the comment array.
 
 =item delete_comment
-
-=item delete_comment($index)
 
 Deletes a comment. Provide the array index of the comment to 
 delete. If an index is not provided, ALL comments will be deleted!
@@ -350,14 +362,18 @@ Returns the number of columns in the Data table.
 Returns the array index of the last (rightmost) column in the 
 Data table.
 
-=item name($index)
+=item name
+
+  $Stream->name($index, $new_name);
+  my $name = $Stream->name($i);
 
 Convenient method to return the name of the column given the 
-index number.
+index number. A column may also be renamed by passing a new name.
 
-=item metadata($index, $key)
+=item metadata
 
-=item metadata($index, $key, $new_value)
+  $Stream->metadata($index, $key, $new_value);
+  my $value = $Stream->metadata($index, $key)
 
 Returns or sets the metadata value for a specific $key for a 
 specific column $index.
@@ -368,7 +384,26 @@ the name of a new $key that is not present
 If no key is provided, then a hash or hash reference is returned 
 representing the entire metadata for that column.
 
-=item find_column($name)
+=item copy_metadata
+
+  $Stream->copy_metadata($source, $target);
+
+This method will copy the metadata (everything except name and 
+index) between the source column and target column. Returns 1 if 
+successful.  
+
+=item delete_metadata
+
+  $Stream->delete_metadata($index, $key);
+
+Deletes a column-specific metadata $key and value for a specific 
+column $index. If a $key is not provided, then all metadata keys 
+for that index will be deleted.
+
+=item find_column
+
+  my $i = $Stream->find_column('Gene');
+  my $i = $Stream->find_column('^Gene$')
 
 Searches the column names for the specified column name. This 
 employs a case-insensitive grep search, so simple substitutions 
@@ -390,7 +425,7 @@ may be made.
 
 These methods will return the identified column best matching 
 the description. Returns C<undef> if that column is not present. 
-These use the find_column() method with a predefined list of 
+These use the L</find_column> method with a predefined list of 
 aliases.
 
 =back
@@ -400,13 +435,15 @@ aliases.
 These methods allow modification to the number and order of the 
 columns in a Stream object. These methods can only be employed 
 prior to opening a file handle for writing, i.e. before the first 
-write_row() method is called. This enables one, for example, to 
+L</write_row> method is called. This enables one, for example, to 
 duplicate a read-only Stream object to create a write-only Stream, 
 add or delete columns, and then begin the row iteration.
 
 =over 4
 
-=item add_column($name)
+=item add_column
+
+  my $i = $Stream->add_column($name);
 
 Appends a new column at the rightmost position (highest 
 index). It adds the column header name and creates a 
@@ -414,14 +451,16 @@ new column metadata hash. Pass a text string representing
 the new column name. It returns the new column index if 
 successful.
 
-=item copy_column($index)
+=item copy_column
+
+  my $j = $Stream->copy_column($i);
 
 This will copy a column, appending the duplicate column at 
 the rightmost position (highest index). It will duplicate 
 column metadata as well. It will return the new index 
 position.
 
-=item delete_column($index1, $index2, ...)
+=item delete_column
 
 Deletes one or more specified columns. Any remaining 
 columns rightwards will have their indices shifted 
@@ -429,7 +468,9 @@ down appropriately. If you had identified one of the
 shifted columns, you may need to re-find or calculate 
 its new index.
 
-=item reorder_column($index1,  $index2, ...)
+=item reorder_column
+
+  $Data->reorder_column($c,$b,$a,$a);
 
 Reorders columns into the specified order. Provide the 
 new desired order of indices. Columns could be duplicated 
@@ -446,17 +487,17 @@ iterated through, one row at a time. This is typically a one-way
 direction. If you need to go back or start over, the easiest thing 
 to do is re-open the file as a new Stream object. 
 
-There are two main methods, next_row() for reading and write_row() 
+There are two main methods, L</next_row> for reading and L</write_row> 
 for writing. They cannot and should not be used on the same Stream 
 object.
 
 =over 4
 
-=item next_row()
+=item next_row
 
-=item next_line()
+=item next_line
 
-=item read_line()
+=item read_line
 
 This method reads the next line in the file handle and returns a 
 L<Bio::ToolBox::Data::Feature> object. This object represents the 
@@ -465,13 +506,16 @@ values in the current file row.
 Note that strand values and 0-based start coordinates are automatically 
 converted to BioPerl conventions if required by the file type.
 
-=item add_row( $data )
+=item add_row
 
-=item add_line( $data )
+=item add_line
 
-=item write_row( $data )
+=item write_row
 
-=item write_line( $data )
+=item write_line
+
+  $Data->add_row(\@values);
+  $Data->add_row($Row); # Bio::ToolBox::Data::Feature object
 
 This method writes a new row or line to a file handle. The first 
 time this method is called the file handle is automatically opened for 
@@ -484,14 +528,14 @@ data that is passed.
 
 =over 4
 
-=item A <Bio::ToolBox::Data::Feature> object
+=item * A Feature object
 
-A Feature object representing a row from another <Bio::ToolBox::Data> 
+A Feature object representing a row from another L<Bio::ToolBox::Data> 
 data table or Stream. The values from this object will be automatically 
 obtained. Modified strand and 0-based coordinates may be adjusted back 
 as necessary.
 
-=item An array reference of values
+=item * An array reference of values
 
 Pass an array reference of values. The number of elements should match the 
 number of expected columns. The values will be automatically joined using tabs. 
@@ -501,7 +545,7 @@ and the number of columns have been modified.
 Manipulation of strand and 0-based starts may be performed if the 
 metadata indicates this should be done.
 
-=item A string
+=item * A string
 
 Pass a text string. This assumes the column values are already tab 
 concatenated. A new line character is appended if one is not included. 
@@ -510,13 +554,19 @@ required number of columns is performed. Use with caution!
 
 =back
 
-=item iterate( \&sub )
+=item iterate
+
+    $Stream->iterate( sub {
+       my $row = shift;
+       my $number = $row->value($index);
+       my $log_number = log($number);
+       $row->value($index, $log_number);
+    } );
 
 A convenience method that will process a code reference for every line 
 in the file. Pass a subroutine or code reference. The subroutine will 
 receive the line as a L<Bio::ToolBox::Data::Feature> object, just as with 
-the read_line() method. See also the L<Bio::ToolBox::Data> iterate() 
-method.
+the L</read_line> method. 
 
 =back
 
@@ -542,6 +592,10 @@ Returns the L<IO::File> compatible file handle object representing
 the file handle. Use with caution.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data>, L<Bio::ToolBox::Data::Feature>
 
 =cut
 

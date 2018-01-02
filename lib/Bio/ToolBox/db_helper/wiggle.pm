@@ -170,10 +170,10 @@ Bio::ToolBox::db_helper::wiggle
 
 =head1 DESCRIPTION
 
-This module provides support for legacy binary wiggle (.wib) files. These are 
+This module provides support for legacy binary wiggle (F<.wib>) files. These are 
 not BigWig files, which are supported through the L<Bio::ToolBox::Data::db_helper::bigwig> 
 module. Rather, these are condensed binary representations of text wiggle files 
-developed for use with the L<http://gmod.org/gbrowse GBrowse>. Use the 
+developed for use with the L<GBrowse browser|http://gmod.org/gbrowse>. Use the 
 modern BigWig adapter for improved and more efficient access.
 
 =head1 USAGE
@@ -187,21 +187,22 @@ All subroutines are exported by default.
 
 =over
 
-=item collect_wig_scores()
+=item collect_wig_scores
 
 This subroutine will collect dataset scores from a binary wig file (.wib).
- 
+
 The subroutine is passed a parameter array reference. See below for details.
 
 The subroutine returns an array or array reference of the requested dataset 
 values found within the region of interest. 
 
-=item collect_wig_position_scores()
+=item collect_wig_position_scores
 
 This subroutine will collect the score values from a binary wig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns a hash or hash reference of the requested dataset values 
 found within the region of interest keyed by position. Note that only one 
@@ -212,10 +213,10 @@ passed.
 
 =head2 Binary wiggle files
 
-Binary wiggle files (.wib) files are referenced via a SeqFeature object. 
+Binary wiggle files (F<.wib>) files are referenced via a SeqFeature object. 
 These features are typically stored from a L<Bio::DB::SeqFeature::Store> 
 database. A single feature representing the dataset is present across 
-each chromosome. The feature should contain an attribute ('wigfile') that 
+each chromosome. The feature should contain an attribute C<wigfile> that 
 references the location of the binary file representing the dataset scores. 
 The file is opened and the values extracted from the region of interest. 
 
@@ -230,33 +231,33 @@ hash in case it is needed again.
 =head2 Data Collection Parameters Reference
 
 The data collection subroutines are passed an array reference of parameters. 
-The recommended  method for data collection is to use get_segment_score() method from 
-L<Bio::ToolBox::db_helper>. 
+The recommended  method for data collection is to use the 
+L<Bio::ToolBox::db_helper/get_segment_score> method. 
 
 The parameters array reference includes these items:
 
 =over 4
 
-=item 1. The chromosome or seq_id
+=item 1. chromosome
 
-Not used here.
+=item 2. start coordinate
 
-=item 1. The start position of the segment to collect 
+=item 3. stop coordinate 
 
-=item 3. The stop or end position of the segment to collect 
+Coordinates are in BioPerl-style 1-base system.
 
-=item 4. The strand of the segment to collect
+=item 4. strand
 
 Should be standard BioPerl representation: -1, 0, or 1.
 
-=item 5. The strandedness of the data to collect 
+=item 5. strandedness
 
 A scalar value representing the desired strandedness of the data 
 to be collected. Acceptable values include "sense", "antisense", 
 or "all". Only those scores which match the indicated 
 strandedness are collected.
 
-=item 6. The method for combining scores.
+=item 6. score method
 
 Acceptable values include score and count.
 
@@ -265,17 +266,22 @@ Acceptable values include score and count.
    
    * count returns the number of alignments that overlap the 
    search region. 
-   
+
 =item 7. A database object.
 
-not used here.
+Not used here.
 
-=item 8 and higher. Database features.
+=item 8. Database features.
 
 These are the SeqFeature objects that contain the file path to the 
-binary wig files.
+binary wig files. Provide the C<type> or C<primary_tag>.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::db_helper>, 
+L<Bio::Graphics>, L<Bio::DB::SeqFeature::Store>
 
 =head1 AUTHOR
 

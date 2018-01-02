@@ -34,8 +34,11 @@ objects. Refer to that documentation for more information.
   use Bio::ToolBox::parser::gff;
   my $filename = 'file.gff3';
   
-  my $parser = Bio::ToolBox::parser::gff->new($filename) or 
-  	die "unable to open gff file!\n";
+  my $parser = Bio::ToolBox::parser::gff->new(
+  	file    => $filename,
+  	do_gene => 1,
+  	do_exon => 1,
+  ) or die "unable to open gff file!\n";
   
   while (my $feature = $parser->next_top_feature() ) {
 	# each $feature is a SeqFeature object
@@ -107,8 +110,8 @@ name under a single gene object. Default is true.
 =item do_codon
 
 Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
-are always parsed, but CDS, five_prime_UTR, three_prime_UTR, stop_codon, and 
-start_codon features may be optionally parsed. Default is false.
+are always parsed, but C<CDS>, C<five_prime_UTR>, C<three_prime_UTR>, C<stop_codon>, 
+and C<start_codon> features may be optionally parsed. Default is false.
 
 =back
 
@@ -117,7 +120,7 @@ start_codon features may be optionally parsed. Default is false.
   $parser->open_file($file) or die "unable to open $file!";
 
 Pass the name of a GFF file to be parsed. The file may optionally be gzipped 
-(.gz extension). Do not open a new file when one has already opened a file. 
+(F<.gz> extension). Do not open a new file when one has already opened a file. 
 Create a new object for a new file, or concatenate the GFF files.
 
 =item version
@@ -164,23 +167,26 @@ when associated with the feature, depending on their order in the GFF3
 file and whether shared subfeatures are present or not. When calling 
 subfeatures in your program, you may want to sort the subfeatures. For 
 example
-  
+
   my @subfeatures = map { $_->[0] }
                     sort { $a->[1] <=> $b->[1] }
                     map { [$_, $_->start] }
                     $parent->get_SeqFeatures;
 
-=item top_features()
+=item top_features
 
 This method will return an array of the top (parent) features defined in 
-the GFF file. This is similar to the next_top_feature() method except that 
+the GFF file. This is similar to the L</next_top_feature> method except that 
 all features are returned at once. 
 
 =item next_feature
 
 This method will return a SeqFeature object representation of 
-the next feature in the file. Parent - child relationships are NOT 
-assembled. This is best used with simple GFF files with no hierarchies 
+the next feature (line) in the file. Parent - child relationships are 
+NOT assembled; however, undefined parents in a GTF file may still be 
+generated, just not returned. 
+
+This method is best used with simple GFF files with no hierarchies 
 present. This may be used in a while loop until the end of the file 
 is reached. Pragmas are ignored and comment lines and sequence are 
 automatically skipped. 
@@ -270,6 +276,10 @@ by the C<sequence-region> pragma or inferred by the greatest end position of
 the top features.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, L<Bio::Tools::GFF>
 
 =cut
 

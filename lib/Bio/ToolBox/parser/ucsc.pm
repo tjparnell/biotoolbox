@@ -222,13 +222,16 @@ the options to the new method.
 Set or retrieve the file handle of the current table. This module uses 
 IO::Handle objects. Be careful manipulating file handles of open tables!
 
-=item open_file($file)
+=item open_file
 
 Pass the name of a new table to parse. Existing gene models loaded in 
 memory, if any, are discarded. Counts are reset to 0. Supplemental 
 tables are not discarded.
 
 =item load_extra_data($file, $type)
+
+	my $file = 'hg19_refSeqSummary.txt.gz';
+	my success = $ucsc->load_extra_data($file, 'summary');
 
 Pass two values, the file name of the supplemental file and the type 
 of supplemental data. Values can include the following 
@@ -279,7 +282,7 @@ get all features.
 
 =item top_features
 
-This method is similar to next_top_feature(), but instead returns an array 
+This method is similar to L</next_top_feature>, but instead returns an array 
 of all the top features. 
 
 =back
@@ -294,12 +297,17 @@ SeqFeature objects.
 =item parse_table
 
 Parses the table into memory. If a table wasn't provided using the 
-new() or open_file() methods, then a filename can be passed to this 
+L</new> or L</open_file> methods, then a filename can be passed to this 
 method and it will automatically be opened for you. 
 
 =item find_gene
 
-Pass a gene name, or an array of key = values (name, display_name, 
+	my $gene = $ucsc->find_gene(
+		display_name => 'ABC1',
+		primary_id   => 'gene000001',
+	);
+
+Pass a gene name, or an array of key =E<gt> values (name, display_name, 
 ID, primary_ID, and/or coordinate information), that can be used 
 to find a gene already loaded into memory. Only really successful if the 
 entire table is loaded into memory. Genes with a matching name are 
@@ -334,6 +342,10 @@ greatest gene end position.
 
 This is a private module that is responsible for building SeqFeature 
 objects from UCSC table lines. It is not intended for general public use.
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>
 
 =cut
 
