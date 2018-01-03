@@ -25,7 +25,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.51';
+my $VERSION = '1.53';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -130,8 +130,11 @@ my $start_time = time;
 ## Generate or load the input dataset
 my $Data;
 if ($infile) {
-	$Data = Bio::ToolBox::Data->new(file => $infile, parse => 1) or 
-		die " unable to load input file '$infile'\n";
+	$Data = Bio::ToolBox::Data->new(
+		file       => $infile, 
+		parse      => 1,
+		feature    => $feature || 'gene',
+	) or die " unable to load input file '$infile'\n";
 	printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
 	
 	# update main database as necessary

@@ -23,7 +23,7 @@ my $ucsc = Bio::ToolBox::parser::ucsc->new(
 	file    => $ucscfile,
 	do_gene => 1,
 	do_cds  => 1,
-# 	do_utr  => 1,
+ 	do_exon => 1,
 );
 
 # parse first feature line

@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = '1.52';
+our $VERSION = '1.53';
 
 1;
 
@@ -30,8 +30,6 @@ a set of common tools for working with them.
 
 =item * Support for Bam, BigWig, BigBed, wig, and USeq data formats
 
-=item * Intersection with other known annotation
-
 =item * Works with any genomic annotation in GTF, GFF3, and UCSC formats
 
 =back
@@ -42,48 +40,14 @@ different specialized BioPerl and related modules. Instead of
 writing numerous scripts specialized for each data format (wig, 
 bigWig, Bam), one script can now work with any data format. 
 
-In many cases, working with genomic annotation in databases assumes 
-the use of Bio::DB::SeqFeature::Store formatted databases, available 
-with a number of different backend support, including SQLite, MySQL, 
-and others. 
-
-=head1 SCRIPTS
-
-The Bio::ToolBox comes complete with an entire suite of high 
-quality scripts ready for a wide variety of analyses. 
-
-=over 4
-
-=item * Preparation of databases from public annotation sources
-
-=item * Annotated feature collection and selection
-
-=item * Data collection and scoring
-
-=item * File format manipulation and conversion
-
-=item * Some low-level processing of raw data
-
-=item * Simple analysis and graphing of collected data
-
-=back
-
 =head1 LIBRARIES
 
 The libraries and modules are available to extend existing 
 scripts or to write your own. 
 
-The primary module, which provides a convenient 
-object-oriented interface for working with data files and 
-collecting data. It is the one most users will want to work with.
-
-The remaining modules are support and general modules. They 
-are collections of exportable subroutines without a convenient 
-object-oriented interface. 
-
 =over 4
 
-=item Bio::ToolBox::Data
+=item L<Bio::ToolBox::Data>
 
 This is the primary library module for working with a table of data, 
 either generated as a new list from a database of annotation, or 
@@ -97,10 +61,9 @@ microarray or sequencing data for each interval listed in the data
 table.
 
 This module uses an object-oriented interface. Many of the methods 
-will be familiar to users of BioPerl, from which this module draws 
-heavily.
+and API will be familiar to users of L<Bio::Perl>.
 
-=item Bio::ToolBox::Data::Feature
+=item L<Bio::ToolBox::Data::Feature>
 
 This is the object class for working with individual rows in a table 
 of data. It provides a number of conventions for working with the rows 
@@ -108,80 +71,70 @@ in a standard fashion, for example returning the start column value
 regardless of which column it is or whether the table is bed or gff or 
 an arbitrary text file. A number of convenience methods are present for 
 collecting data from data files. This module is not used directly by the 
-user, but its objects are returned when using Bio::ToolBox::Data.
+user, but its objects are returned when using L<Bio::ToolBox::Data> iterators.
 
-=item Bio::ToolBox::db_helper
+=item Annotation parsers
 
-This helper library interacts with databases, including a variety of 
-BioPerl-style Bio::DB::* databases such as SeqFeature::Store, Bam, 
-BigWig, BigBed, BigWigSet, and USeq. In most cases, unless specifically 
-stated otherwise, most database functions assume the use of 
-Bio::DB::SeqFeature::Store databases, particularly with regards to 
-genomic annotation. The functions are fairly well abstracted, and the 
-library will take care of handling the database specifics appropriately.
+Included are two generic parsers for loading an entire genome-worth of 
+annotation into memory within a reasonably short amount of time. 
 
-=item Bio::ToolBox::big_helper
+=over 4
 
-This helper library takes care of converting text versions of wiggle, 
-bedGraph, and Bed file formats into UCSC BigWig and BigBed formats.
+=item L<Bio::ToolBox::parser::gff>
+
+This parses both GTF and GFF3 file formats. Unlike many other GFF parsers 
+that work line-by-line only, this maintains parent and child hierarchical 
+relationships as parent feature and child subfeatures. To further maintain 
+control and reduce unnecessary parsing, unwanted feature types can be 
+selectively skipped.
+
+=item L<Bio::ToolBox::parser::ucsc>
+
+This parses various UCSC file formats, including different refFlat, GenePred, 
+and knownGene flavors. Genes, transcripts, and exons are assembled into 
+hierarchical child-parent relationships as desired.
 
 =back
 
-=head1 EXAMPLE
+=item L<Bio::ToolBox::SeqFeature>
 
-The following is a simplified example of using the library to create 
-a data collection script using an input file of gene identifiers 
-(from a database) or a BED file of coordinates. The dataset could be 
-a Bam, BigBed, BigWig, or USeq file of genomic data.
+This is a fast, lean, simple object class for representing genomic features. 
+It supports, for the most part, the L<Bio::SeqFreatureI> and L<Bio::RangeI> API 
+interface without the dependencies. It uses an unorthodox blessed-array object 
+structure, which provides measurable improvements in memory consumption and 
+speed when loading thousands of annotated SeqFeature objects (think hg19 or hg38 
+annotation). 
 
-  
-  use Bio::ToolBox::Data;
-  
-  my $file = $ARGV[0];
-  my $dataset = $ARGV[1];
-  unless ($file and $dataset) {
-      die "usage: $0 <input_file> <dataset_file>\n";
-  }
-  
-  ### Open a pre-existing file
-  my $Data = Bio::ToolBox::Data->new(
-        file    => $file,
-  );
-  
-  ### Add new dataset column and metadata
-  my $index = $Data->add_column('Data');
-  $Data->metadata($index, 'dataset', $dataset);
-  $Data->metadata($index, 'method', 'mean');
-  $Data->metadata($index, 'stranded', 'sense');
-  
-  ### Iterate through the Data structure one row at a time
-  my $stream = $Data->row_stream;
-  while (my $row = $stream->next_row) {
-  	  my $value = $row->get_score(
-  	      dataset   => $dataset,
-  	      method    => 'mean',
-  	      stranded  => 'sense',
-  	  );
-  	  $row->value($index, $value);
-  }
-  
-  ### write the data to file
-  my $success = $Data->write_file();
-  print "wrote file $success\n"; # file extension will be automatically changed 
-  
+=item L<Bio::ToolBox::GeneTools>
 
-The example illustrates the simplicity of opening an input file, automatically 
-identifying the file format and necessary columns for establishing genomic 
-intervals, automatically handling the genomic dataset file from which to 
-collect the data, iterating through the table, collecting the score for each 
-genomic interval from the dataset, and writing the changed table to a new 
-file. Since the input format (BED file) is no longer proper, it will 
-automatically change the extension and write a text file complete with metadata.
+This is a collection of exportable functions for working with L<Bio::SeqFeatureI> 
+compliant objects representing genes and transcripts. It works with objects derived 
+from one of the L<"Annotation parsers"> or a L<Bio::DB::SeqFeature::Store> database. 
+The functions make hard things easy, such as identifying whether a transcript is 
+coding or not (is it encoded in the C<primary_tag> or C<source_tag> or GFF 
+attribute or does it have C<CDS> subfeatures?), or identify the alternative exons 
+or introns of a multi-transcript gene, or pull out the C<5'> UTR (which is likely 
+not explicitly defined in the table).
 
-The script could easily be modified to add or alter functionality. For 
-example, use a different method of combining scores for each interval, or 
-restricting scoring to a fraction of the defined interval. For a fully-featured 
-version of this data collection script, see the BioToolBox script B<get_datasets.pl>.
+=back
+
+=head1 SCRIPTS
+
+The BioToolBox package comes complete with a suite of high-quality production-ready 
+scripts ready for a variety of analyses. Look in the scripts folder for details. 
+A sampling of what can be done include the following:
+
+=over 4
+
+=item * Annotated feature collection and selection
+
+=item * Data collection and scoring for features
+
+=item * Data file format manipulation and conversion
+
+=item * Low-level processing of sequencing data into customizable wig representation
+
+=back
 
 =head1 REPOSITORY
 
@@ -189,6 +142,12 @@ Source code for the Bio::ToolBox package is maintained at
 L<https://github.com/tjparnell/biotoolbox/>. 
 
 Bugs and issues should be submitted at L<https://github.com/tjparnell/biotoolbox/issues>.
+
+=head1 SEE ALSO
+
+L<Bio::Perl>, L<Bio::DB::SeqFeature::Store>, L<Bio::SeqFeatureI>, L<Bio::DB::BigWig>, 
+L<Bio::DB::BigBed>, L<Bio::DB::Sam>, L<Bio::DB::HTS>, L<Bio::DB::USeq>, 
+L<Bio::ViennaNGS>
 
 =head1 AUTHOR
 

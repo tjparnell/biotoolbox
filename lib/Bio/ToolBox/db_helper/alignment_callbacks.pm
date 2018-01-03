@@ -651,10 +651,13 @@ Bio::ToolBox::db_helper::alignment_callbacks
 
 This module provides common callback subroutines for working with bam alignments. 
 It is generalized and may be used with either L<Bio::DB::Sam> or L<Bio::DB::HTS> 
-alignments. 
+adapter objects. 
 
 It's not meant to be used by individuals. 
-Please see L<Bio::ToolBox::db_helper::bam> or L<Bio::ToolBox::db_helper::hts>.
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data>, L<Bio::ToolBox::Data::Feature>
 
 =head1 AUTHOR
 

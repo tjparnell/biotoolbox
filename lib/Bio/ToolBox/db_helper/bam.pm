@@ -402,17 +402,17 @@ All subroutines are exported by default.
 
 =over
 
-=item open_bam_db()
+=item open_bam_db
 
 This subroutine will open a Bam database connection. Pass either the 
-local path to a Bam file (.bam extension) or the URL of a remote Bam 
+local path to a Bam file (F<.bam> extension) or the URL of a remote Bam 
 file. A remote bam file must be indexed. A local bam file may be 
 automatically indexed upon opening if the user has write permissions 
 in the parent directory. 
 
 It will return the opened database object.
 
-=item open_indexed_fasta()
+=item open_indexed_fasta
 
 This will open an indexed fasta file using the L<Bio::DB::Sam::Fai> 
 module. It requires a F<.fa.fai> file to built, and one should be 
@@ -422,23 +422,23 @@ provided. Pass the path to an uncompressed genomic fasta file
 (multiple sequences in one file is supported, but separate chromosome 
 sequence files are not). The fasta index object is returned.
 
-=item check_bam_index()
+=item check_bam_index
 
 This subroutine will check whether a bam index file is present and, 
 if not, generate one. The L<Bio::DB::Sam> module uses the samtools 
-style index extension, F<.bam.bai>, as opposed to the picard style 
+style index extension, F<.bam.bai>, as opposed to the Picard style 
 extension, F<.bai>. If a F<.bai> index is present, it will copy the 
 file as F<.bam.bai> index. Unfortunately, a F<.bai> index cannot be 
 used directly.
 
 This method is called automatically prior to opening a bam database. 
 
-=item write_new_bam_file()
+=item write_new_bam_file
 
 This subroutine will open a new empty Bam file. Pass the name of the 
-new file as the argument. It will return a Bio::DB::Bam object to 
-which you can write a header followed by alignments. Be sure you know 
-what to do before using this method! 
+new file as the argument. It will return a low level L<Bio::DB::Bam> 
+object to which you can write a header followed by alignments. Be 
+sure you know what to do before using this method! 
 
 =item collect_bam_scores
 
@@ -462,7 +462,8 @@ value_type of 'ncount' and count the number of unique alignment names.
 (Previous versions treated all paired-end alignments as single-end alignments, 
 severely limiting usefulness.)
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns an array or array reference of the requested dataset 
 values found within the region of interest. 
@@ -472,7 +473,8 @@ values found within the region of interest.
 This subroutine will collect the score values from a binary bam file 
 for the specified database region keyed by position. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns a hash or hash reference of the defined dataset values 
 found within the region of interest keyed by position. The feature midpoint 
@@ -481,7 +483,7 @@ position, a simple mean (for length data methods) or sum
 (for count methods) is returned. The ncount value type is not supported 
 with positioned scores.
 
-=item sum_total_bam_alignments()
+=item sum_total_bam_alignments
 
 This subroutine will sum the total number of properly mapped alignments 
 in a bam file. Pass the subroutine one to four arguments in the following 
@@ -492,7 +494,7 @@ order.
 =item 1. Bam file path or object 
 
 The name of the Bam file which should be counted. Alternatively, an 
-opened Bio::DB::Sam object may also be given. Required.
+opened L<Bio::DB::Sam> object may also be given. Required.
 
 =item 2. Minimum mapping quality (integer)
 
@@ -512,7 +514,7 @@ alignments as single-end.
 Optionally pass the number of parallel processes to execute 
 when counting alignments. Walking through a Bam file is 
 time consuming but can be easily parallelized. The module 
-Parallel::ForkManager is required, and the default is a 
+L<Parallel::ForkManager> is required, and the default is a 
 conservative two processes when it is installed.
 
 =back
@@ -524,31 +526,31 @@ The subroutine will return the number of alignments.
 =head2 Data Collection Parameters Reference
 
 The data collection subroutines are passed an array reference of parameters. 
-The recommended  method for data collection is to use get_segment_score() method from 
-L<Bio::ToolBox::db_helper>. 
+The recommended  method for data collection is to use the
+L<Bio::ToolBox::db_helper/get_segment_score> method. 
 
 The parameters array reference includes these items:
 
 =over 4
 
-=item 1. The chromosome or seq_id
+=item 1. chromosome
 
-=item 1. The start position of the segment to collect 
+=item 1. start coordinate
 
-=item 3. The stop or end position of the segment to collect 
+=item 3. stop coordinate
 
-=item 4. The strand of the segment to collect
+=item 4. strand
 
 Should be standard BioPerl representation: -1, 0, or 1.
 
-=item 5. The strandedness of the data to collect 
+=item 5. strandedness
 
 A scalar value representing the desired strandedness of the data 
 to be collected. Acceptable values include "sense", "antisense", 
 or "all". Only those scores which match the indicated 
 strandedness are collected.
 
-=item 6. The method for combining scores.
+=item 6. score method
 
 Acceptable values include score, count, pcount, and ncount.
 
@@ -565,14 +567,21 @@ Acceptable values include score, count, pcount, and ncount.
    names. Use this to avoid double-counting paired-end reads by 
    counting only unique names. Reads are taken if they overlap 
    the search region.
-   
-=item 7. A database object.
+
+=item 7. Database object.
 
 Not used here.
 
-=item 8 and higher. Paths to one or more Bam files
+=item 8. Paths to bam file
+
+Subsequent bam files may also be provided as additional list items.
+Opened Bam file objects are cached. 
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::db_helper>, L<Bio::DB::Sam>
 
 =head1 AUTHOR
 

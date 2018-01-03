@@ -8,7 +8,7 @@ use Getopt::Long;
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.50';
+my $VERSION = '1.53';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1740,7 +1740,7 @@ sub delog_function {
 	else {
 		# otherwise request from user
 		@indices = _request_indices(
-			" Enter one or more dataset index numbers to convert from log2  "
+			" Enter one or more dataset index numbers to convert from log  "
 		);
 	}
 	unless (@indices) {
@@ -1759,7 +1759,7 @@ sub delog_function {
 	foreach my $index (@indices) {
 		
 		# check the log metadata status
-		$base ||= $Data->metadata($index, 'log') || 0;
+		$base = $Data->metadata($index, 'log') || 0;
 		unless ($base) {
 			$base = 2 if ($Data->metadata($index, 'log2'));
 			$base = 10 if ($Data->metadata($index, 'log10'));

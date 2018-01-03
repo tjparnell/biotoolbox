@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.42';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -147,15 +147,17 @@ such as 'refGene' or 'ensGene', it will be used instead.
 Pass a boolean (1 or 0) value to combine multiple transcripts with the same gene 
 name under a single gene object. Default is true.
 
+-item do_exon
+
 =item do_cds
 
 =item do_utr
 
 =item do_codon
 
-Pass a boolean (1 or 0) value to parse certain subfeatures. Exon subfeatures 
-are always parsed, but CDS, five_prime_UTR, three_prime_UTR, stop_codon, and 
-start_codon features may be optionally parsed. Default is false.
+Pass a boolean (1 or 0) value to parse certain subfeatures, including exon, 
+CDS, five_prime_UTR, three_prime_UTR, stop_codon, and start_codon features. 
+Default is false.
 
 =item do_name
 
@@ -200,6 +202,8 @@ new tables.
 
 =item do_gene
 
+=item do_exon
+
 =item do_cds
 
 =item do_utr
@@ -218,13 +222,16 @@ the options to the new method.
 Set or retrieve the file handle of the current table. This module uses 
 IO::Handle objects. Be careful manipulating file handles of open tables!
 
-=item open_file($file)
+=item open_file
 
 Pass the name of a new table to parse. Existing gene models loaded in 
 memory, if any, are discarded. Counts are reset to 0. Supplemental 
 tables are not discarded.
 
 =item load_extra_data($file, $type)
+
+	my $file = 'hg19_refSeqSummary.txt.gz';
+	my success = $ucsc->load_extra_data($file, 'summary');
 
 Pass two values, the file name of the supplemental file and the type 
 of supplemental data. Values can include the following 
@@ -275,7 +282,7 @@ get all features.
 
 =item top_features
 
-This method is similar to next_top_feature(), but instead returns an array 
+This method is similar to L</next_top_feature>, but instead returns an array 
 of all the top features. 
 
 =back
@@ -290,12 +297,17 @@ SeqFeature objects.
 =item parse_table
 
 Parses the table into memory. If a table wasn't provided using the 
-new() or open_file() methods, then a filename can be passed to this 
+L</new> or L</open_file> methods, then a filename can be passed to this 
 method and it will automatically be opened for you. 
 
 =item find_gene
 
-Pass a gene name, or an array of key = values (name, display_name, 
+	my $gene = $ucsc->find_gene(
+		display_name => 'ABC1',
+		primary_id   => 'gene000001',
+	);
+
+Pass a gene name, or an array of key =E<gt> values (name, display_name, 
 ID, primary_ID, and/or coordinate information), that can be used 
 to find a gene already loaded into memory. Only really successful if the 
 entire table is loaded into memory. Genes with a matching name are 
@@ -331,6 +343,10 @@ greatest gene end position.
 This is a private module that is responsible for building SeqFeature 
 objects from UCSC table lines. It is not intended for general public use.
 
+=head1 SEE ALSO
+
+L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>
+
 =cut
 
 use strict;
@@ -361,6 +377,7 @@ sub new {
 			'other'      => 0,
 		},
 		'do_gene'       => 1, 
+		'do_exon'       => 0,
 		'do_cds'        => 0, 
 		'do_utr'        => 0, 
 		'do_codon'      => 0,
@@ -392,6 +409,9 @@ sub new {
 			}
 			if (exists $options{do_gene}) {
 				$self->do_gene($options{do_gene});
+			}
+			if (exists $options{do_exon}) {
+				$self->do_exon($options{do_exon});
 			}
 			if (exists $options{do_cds}) {
 				$self->do_cds($options{do_cds});
@@ -460,12 +480,25 @@ sub source {
 	return $self->{'source'};
 }
 
+sub simplify {
+	# this doesn't do anything, for now, but maintain compatibility with gff parser
+	return 0;
+}
+
 sub do_gene {
 	my $self = shift;
 	if (@_) {
 		$self->{'do_gene'} = shift;
 	}
 	return $self->{'do_gene'};
+}	
+
+sub do_exon {
+	my $self = shift;
+	if (@_) {
+		$self->{'do_exon'} = shift;
+	}
+	return $self->{'do_exon'};
 }	
 
 sub do_cds {
@@ -1391,7 +1424,9 @@ sub build_transcript {
 	}
 	
 	# add the exons
-	$self->add_exons($transcript, $gene);
+	if ($ucsc->do_exon) {
+		$self->add_exons($transcript, $gene);
+	}
 	
 	# add CDS, UTRs, and codons if necessary
 	if ($transcript->primary_tag eq 'mRNA') {

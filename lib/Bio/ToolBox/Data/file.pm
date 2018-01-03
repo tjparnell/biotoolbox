@@ -170,6 +170,28 @@ sub taste_file {
 	return;
 }
 
+sub sample_gff_type_list {
+	my ($self, $file) = @_;
+	my $Check = $self->new;
+	my $filename = $Check->check_file($file) or return;
+	$Check->add_file_metadata($filename);
+	$Check->open_to_read_fh or return;
+	$Check->parse_headers;
+	return unless $Check->gff;
+	my %types;
+	my $count = 0; 
+	while ($count < 1000) {
+		my $line = $Check->{fh}->getline or last;
+		next if $line !~ m/\w+/;
+		next if $line =~ /^#/;
+		my @fields = split('\t', $line);
+		$types{ $fields[2] } += 1;
+		$count++;
+	}
+	$Check->close_fh;
+	return join(',', keys %types);
+}
+
 
 sub parse_headers {
 	my $self = shift;
@@ -1398,7 +1420,7 @@ __END__
 These are methods for providing file IO for the L<Bio::ToolBox::Data> 
 data structure. These file IO methods work with any generic tab-delimited 
 text file of rows and columns. It also properly handles comment, metadata, 
-and column-specific metadata custom to Bio::ToolBox programs.
+and column-specific metadata custom to L<Bio::ToolBox> programs.
 Special file formats used in bioinformatics, including for example
 GFF and BED files, are automatically recognized by their file extension and 
 appropriate metadata added. 
@@ -1415,9 +1437,9 @@ this data structure.
 The data file format is described below, and following that a 
 description of the data structure.
 
-=head1 RECOGNIZED  FILE FORMATS
+=head1 RECOGNIZED FILE FORMATS
 
-Bio::ToolBox will recognize a number of standard bioinformatic file 
+L<Bio::ToolBox> will recognize a number of standard bioinformatic file 
 formats, almost all of which are recognized by their extension. Recognition 
 is NOT guaranteed if an alternate file extension is used!!!!
 
@@ -1425,47 +1447,55 @@ These formats include
 
 =over 4
 
-=item BED .bed .bedgraph .bdg
+=item BED 
 
+These include file extensions F<.bed>, F<.bedgraph>, and F<.bdg>.
 Bed files must have 3-12 columns. BedGraph files must have 4 columns.
 
-=item GFF .gff .gff3 .gtf
+=item GFF
 
-These may also be recognized by the gff-version pragma. These must have 
-9 columns.
+These include file extensions F<.gff>, F<.gff3>, and F<.gtf>. 
+The specific format may also be recognized by the C<gff-version> pragma. 
+These files must have 9 columns.
 
-=item UCSC tables .refFlat .genePred 
+=item UCSC tables
 
-These are typically recognized by the number of columns, and can include 
-simple refFlat, gene prediction, extended gene prediction, and known Gene 
-tables. 
+These include file extensions F<.refFlat>, F<.genePred>, and F<.ucsc>. In 
+some cases, a simple F<.txt> can also be recognized if the file matches the 
+expected file structure. Different formats are typically recognized by the 
+number of columns, and can include simple refFlat, gene prediction, extended 
+gene prediction, and known Gene tables. The Bin column may or may not be present.
 
-=item Peak files .narrowPeak .broadPeak 
+=item Peak files
 
+These include file extensions F<.narrowPeak> and F<.broadPeak>. 
 These are special "BED6+4" file formats. 
 
-=item CDT .cdt
+=item CDT
 
+These include file extension F<.cdt>. 
 Cluster data files used with Cluster 3.0 and Treeview.
 
 =item SGR
 
-Rare file format of chromosome, position, score.
+Rare file format of chromosome, position, score. File extension F<.sgr>.
 
-=item TEXT .txt
+=item TEXT
 
-Almost any tab-delimited text file can be loaded.
+Almost any tab-delimited text file with a F<.txt> extension can be loaded.
 
-=item Compression .gz .bz2
+=item Compressed files
 
+File extension F<.gz> and F<.bz2> are recognized as compressed files.
 Compressed files are usually read through an external decompression 
 program. All of the above formats can be loaded as compressed files.
+
 
 =back
 
 =head1 DEFAULT BIO::TOOLBOX DATA TEXT FILE FORMAT
 
-When not writing to a defined format, e.g. BED or GFF, a Bio::ToolBox 
+When not writing to a defined format, e.g. BED or GFF, a L<Bio::ToolBox> 
 Data structure is written as a simple tab-delimited text file, with the 
 first line being the column header names. Such files are easily parsed 
 by other programs. 
@@ -1563,12 +1593,12 @@ boolean indicating the values are in log2 space or not
 
 =head1 USER METHODS REFERENCE
 
-These methods are generally available to Bio::ToolBox::Data objects 
+These methods are generally available to L<Bio::ToolBox::Data> objects 
 and can be used by the user.
 
 =over
 
-=item load_file($filename)
+=item load_file
 
 This will load a file into a new, empty Data table. This function is 
 called automatically when a filename is provided to the new() function. 
@@ -1577,28 +1607,37 @@ extensions as necessary), metadata and column headers processed and/or
 generated from default settings, the content loaded into the table, and 
 the structure verified. Error messages may be printed if the structure or 
 format is inconsistent or doesn't match the expected format, e.g a file 
-with a .bed extension doesn't match the UCSC specification.
+with a F<.bed> extension doesn't match the UCSC specification.
 Pass the name of the filename.
 
-=item taste_file($filename)
+=item taste_file
 
 Tastes, or checks, a file for a certain flavor, or known gene file formats. 
 This is based on file extension, metadata headers, and/or file content 
 in the first 10 lines or so. Returns a string based on the file format.
 Values include gff, bed, ucsc, or undefined. Useful for determining if 
 the file represents a known gene table format that lacks a defined file 
-extension, e.g. UCSC formats.
+extension, e.g. UCSC formats. Pass the path to the file to check.
 
-=item add_file_metadata($filename)
+=item sample_gff_type_list
 
-Add or update the file metadata to a Data object. This will automatically 
-parse the path, basename, and recognized file extension.
+Checks the different types of features available in a GFF formatted file. 
+It will temporarily open the file, read the first 1000 lines or so, and 
+compile a list of the values in the 3rd column of the GFF file. It will 
+return a comma-delimited string of these values upon success, suitable 
+for regular expression checking. Pass the name of the GFF file to check.
 
-=item write_file()
+=item add_file_metadata
 
-=item save()
+Add or update the file metadata to a L<Bio::ToolBox::Data> object. 
+This will automatically parse the path, basename, and recognized file extension.
+Pass the file name.
 
-This method will write out a Bio::ToolBox Data structure to file. 
+=item write_file
+
+=item save
+
+This method will write out a L<Bio::ToolBox::Data> structure to file. 
 Zero or more values may be passed to the method.
 
 Pass no values, and the filename stored in the metadata will be used in 
@@ -1638,18 +1677,18 @@ The method will return the real name of the file written if the write was
 successful. The filename may be modified slightly as necessary, for example 
 append or change the file extension to match the specified file format.
 
-=item open_to_read_fh()
+=item open_to_read_fh
 
 This subroutine will open a file for reading. If the passed filename has
-a '.gz' extension, it will appropriately open the file through a gunzip 
+a F<.gz> extension, it will appropriately open the file through a gunzip 
 filter.
 
 Pass the subroutine the filename. It will return a scalar reference to the
-open filehandle. The filehandle is an IO::Handle object and may be manipulated
+open filehandle. The filehandle is an L<IO::Handle> object and may be manipulated
 as such.
 
 Example
-	
+
 	my $filename = 'my_data.txt.gz';
 	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
 	while (my $line = $fh->getline) {
@@ -1658,10 +1697,10 @@ Example
 	$fh->close;
 	
 
-=item open_to_write_fh()
+=item open_to_write_fh
 
 This subroutine will open a file for writing. If the passed filename has
-a '.gz' extension, it will appropriately open the file through a gzip 
+a F<.gz> extension, it will appropriately open the file through a gzip 
 filter.
 
 Pass the subroutine three values: the filename, a boolean value indicating
@@ -1671,85 +1710,88 @@ optional. The compression status may be determined automatically by the
 presence or absence of the passed filename extension; the default is no 
 compression. The default is also to write a new file and not to append.
 
-If gzip compression is requested, but the filename does not have a '.gz' 
+If gzip compression is requested, but the filename does not have a F<.gz> 
 extension, it will be automatically added. However, the change in file name 
 is not passed back to the originating program; beware!
 
 The subroutine will return a scalar reference to the open filehandle. The 
-filehandle is an IO::Handle object and may be manipulated as such.
+filehandle is an L<IO::Handle> object and may be manipulated as such.
 
 Example
-	
+
 	my $filename = 'my_data.txt.gz';
 	my $gz = 1; # compress output file with gzip
 	my $fh = Bio::ToolBox::Data::file->open_to_write_fh($filename, $gz);
 	# write to new compressed file
 	$fh->print("something interesting\n");
 	$fh->close;
-	
+
 =back
 
 =head1 OTHER METHODS
 
-These methods are used internally by Bio::ToolBox::Core and other objects 
+These methods are used internally by L<Bio::ToolBox::Core> and other objects 
 are not recommended for use by general users. 
 
 =over 4
 
-=item parse_headers($noheader)
+=item parse_headers
 
 This will determine the file format, parse any metadata lines that may 
 be present, add metadata and inferred column names for known file formats, 
 and determine the table column header names. This is automatically called 
-by load_file(), and generally need not be called.
+by L</load_file>, and generally need not be called.
 
 Pass a true boolean option if there were no headers in the file.
 
-=item add_data_line($line)
+=item add_data_line
 
-Parses a text line from the file into a Data table row.
+Parses a text line from the file into a Data table row. Pass the text line.
 
-=item check_file($filename)
+=item check_file
 
 This subroutine confirms the existance of a passed filename. If not 
 immediately found, it will attempt to append common file extensions 
 and verify its existence. This allows the user to pass only the base 
 file name and not worry about missing the extension. This may be useful 
-in shell scripts.
+in shell scripts. Pass the file name.
 
-=item add_column_metadata()
+=item add_column_metadata
 
 Parse a column metadata line from a file into a Data structure.
 
-=item add_gff_metadata($version, $force)
+=item add_gff_metadata
 
-Add default column metadata for a GFF file. Specify which GFF version.
+Add default column metadata for a GFF file. 
+Specify which GFF version. A second boolean value can be passed to 
+force the method.
 
-=item add_bed_metadata($column_count, $force)
+=item add_bed_metadata
 
 Add default column metadata for a BED file. Specify the number of BED 
-columns.
+columns. Pass a second boolean to force the method.
 
-=item add_peak_metadata($column_count, $force)
+=item add_peak_metadata
 
 Add default column metadata for a narrowPeak or broadPeak file. 
-Specify the number of columns.
+Specify the number of columns. Pass a second boolean to force the method.
 
-=item add_ucsc_metadata($column_count, $force)
+=item add_ucsc_metadata
 
 Add default column metadata for a UCSC refFlat or genePred file. 
-Specify the number of columns to define the format.
+Specify the number of columns to define the format. 
+Pass a second boolean to force the method.
 
-=item add_sgr_metadata($force)
+=item add_sgr_metadata
 
-Add default column metadata for a SGR file.
+Add default column metadata for a SGR file. Pass a boolean to force the method.
 
-=item add_standard_metadata($line)
+=item add_standard_metadata
 
 Add default column metadata for a generic file. Pass the text line 
 containing the tab-delimited column headers.
 
-=item standard_column_names($format)
+=item standard_column_names
 
 Returns an anonymous array of standard file format column header names. 
 Pass a value representing the file format. Values include gff, bed12, 
@@ -1757,6 +1799,10 @@ bed6, bdg, narrowpeak, broadpeak, sgr, ucsc16, ucsc15, genepredext,
 ucsc12, knowngene, ucsc11, genepred, ucsc10, refflat.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data>
 
 =head1 AUTHOR
 

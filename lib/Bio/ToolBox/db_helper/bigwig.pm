@@ -568,7 +568,26 @@ All subroutines are exported by default.
 
 =over
 
-=item collect_bigwig_score()
+=item open_bigwig_db
+
+This subroutine will open a BigWig database connection. Pass either the 
+local path to a bigWig file (F<.bw> or F<.bigwig> extension) or the URL 
+of a remote bigWig file. It will return the opened database object.
+
+=item open_bigwigset_db
+
+This subroutine will open a BigWigSet database connection using a directory 
+of BigWig files and one metadata index file, as described in 
+L<Bio::DB::BigWigSet>. Essentially, this treats a directory of BigWig files as 
+a single database with each BigWig file representing a different feature 
+with unique attributes (type, source, strand, etc). 
+
+Pass the subroutine a scalar value representing the local path to the 
+directory. It presumes a feature_type of 'region', as expected by the other 
+L<Bio::ToolBox> db_helper subroutines and modules. It will return the opened 
+database object.
+
+=item collect_bigwig_score
 
 This subroutine will collect a single value from a binary bigWig file. 
 It uses the low-level summary method to collect the statistical 
@@ -576,45 +595,50 @@ information and is therefore significantly faster than the other
 methods, which rely upon parsing individual data points across the 
 region.
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The object will return either a valid score or a null value.
 
-=item collect_bigwigset_score()
+=item collect_bigwigset_score
 
-Similar to collect_bigwig_score() but using a BigWigSet database of 
+Similar to L</collect_bigwig_score> but using a BigWigSet database of 
 BigWig files. Unlike individual BigWig files, BigWigSet features support 
 stranded data collection if a strand attribute is defined in the metadata 
 file. 
 
-The subroutine is passed a parameter array reference. See below for details.
-    
-=item collect_bigwig_scores()
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
+
+=item collect_bigwig_scores
 
 This subroutine will collect only the score values from a binary BigWig file 
 for the specified database region. The positional information of the 
 scores is not retained.
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns an array or array reference of the requested dataset 
 values found within the region of interest. 
 
-=item collect_bigwigset_scores()
+=item collect_bigwigset_scores
 
-Similar to collect_bigwig_scores() but using a BigWigSet database of 
+Similar to L</collect_bigwig_scores> but using a BigWigSet database of 
 BigWig files. Unlike individual BigWig files, BigWigSet features support 
 stranded data collection if a strand attribute is defined in the metadata 
 file. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
-=item collect_bigwig_position_scores()
+=item collect_bigwig_position_scores
 
 This subroutine will collect the score values from a binary BigWig file 
 for the specified database region keyed by position. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns a hash of the defined dataset values found within 
 the region of interest keyed by position. Note that only one value is 
@@ -622,81 +646,75 @@ returned per position, regardless of the number of dataset features
 passed. Usually this isn't a problem as only one dataset is examined at a 
 time.
 
-=item collect_bigwigset_position_score()
+=item collect_bigwigset_position_score
 
-Similar to collect_bigwig_position_scores() but using a BigWigSet database 
+Similar to L</collect_bigwig_position_scores> but using a BigWigSet database 
 of BigWig files. Unlike individual BigWig files, BigWigSet features support 
 stranded data collection if a strand attribute is defined in the metadata 
 file. 
 
 The subroutine is passed a parameter array reference. See below for details.
 
-=item open_bigwig_db()
-
-This subroutine will open a BigWig database connection. Pass either the 
-local path to a bigWig file (.bw extension) or the URL of a remote bigWig 
-file. It will return the opened database object.
-
-=item open_bigwigset_db()
-
-This subroutine will open a BigWigSet database connection using a directory 
-of BigWig files and one metadata index file, as described in 
-Bio::DB::BigWigSet. Essentially, this treats a directory of BigWig files as 
-a single database with each BigWig file representing a different feature 
-with unique attributes (type, source, strand, etc). 
-
-Pass the subroutine a scalar value representing the local path to the 
-directory. It presumes a feature_type of 'region', as expected by the other 
-Bio::ToolBox::db_helper subroutines and modules. It will return the opened database 
-object.
-
 =back
 
 =head2 Data Collection Parameters Reference
 
 The data collection subroutines are passed an array reference of parameters. 
-The recommended  method for data collection is to use get_segment_score() method from 
-L<Bio::ToolBox::db_helper>. 
+The recommended  method for data collection is to use the 
+L<Bio::ToolBox::db_helper/get_segment_score> method. 
 
 The parameters array reference includes these items:
 
 =over 4
 
-=item 1. The chromosome or seq_id
+=item 1. chromosome
 
-=item 1. The start position of the segment to collect 
+=item 1. start coordinate
 
-=item 3. The stop or end position of the segment to collect 
+=item 3. stop coordinate 
 
-=item 4. The strand of the segment to collect
+Coordinates are in BioPerl-style 1-base system.
+
+=item 4. strand
 
 Should be standard BioPerl representation: -1, 0, or 1.
 
-=item 5. The strandedness of the data to collect 
+=item 5. strandedness
 
 A scalar value representing the desired strandedness of the data 
 to be collected. Acceptable values include "sense", "antisense", 
 or "all". Only those scores which match the indicated 
 strandedness are collected.
 
-=item 6. The method for combining scores.
+=item 6. score method
 
 Acceptable values include mean, min, max, stddev, sum, and count.
 Used when collecting a single value over a genomic segnment. 
-Methods of pcount and ncount are technically supported, but are 
+
+B<Note>: methods of pcount and ncount are technically supported, but are 
 treated the same as count.
 
 =item 7. A database object.
 
 Pass the opened L<Bio::DB::BigWigSet> database object when working 
-with BigWigSets.
+with BigWigSets. Otherwise, pass C<undef> for BigWig files.
 
-=item 8 and higher. BigWig file names or BigWigSet database types.
+=item 8. Dataset name
 
-Opened BigWig objects are cached. Both local and remote BigWig files 
-are supported. 
+For BigWig files, pass the path of the local or URL of a remote bigWig 
+file. Opened BigWig objects are cached. 
+
+For BigWigSet databases, pass the name of the dataset within the 
+BigWigSet database to use. Either the C<name> or C<type> may be used.
+
+Additional dataset items may be added to the list when merging data.
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::db_helper>, L<Bio::DB::BigWig>, 
+L<Bio::DB::BigWigSet>
 
 =head1 AUTHOR
 

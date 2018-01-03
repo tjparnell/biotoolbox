@@ -334,36 +334,38 @@ USeq files use the extension F<.useq>.
 The module requires L<Bio::DB::USeq> to be installed.
 
 In general, this module should not be used directly. Use the methods 
-available in L<Bio::ToolBox::db_helper> or <Bio::ToolBox::Data>.  
+available in L<Bio::ToolBox::db_helper> or L<Bio::ToolBox::Data>.  
 
 All subroutines are exported by default.
 
 =over
 
-=item open_useq_db()
+=item open_useq_db
 
 This subroutine will open a useq database connection. Pass the local 
-path to a useq file (.useq extension). It will return the opened 
-Bio::DB::USeq database object.
+path to a useq file (F<.useq> extension). It will return the opened 
+L<Bio::DB::USeq> database object.
 
-=item collect_useq_scores()
+=item collect_useq_scores
 
 This subroutine will collect only the data values from a binary useq file 
 for the specified database region. The positional information of the 
 scores is not retained, and the values are best further processed through 
 some statistical method (mean, median, etc.).
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns an array or array reference of the requested dataset 
 values found within the region of interest. 
 
-=item collect_useq_position_scores()
+=item collect_useq_position_scores
 
 This subroutine will collect the score values from a binary useq file 
 for the specified database region keyed by position. 
 
-The subroutine is passed a parameter array reference. See below for details.
+The subroutine is passed a parameter array reference. See 
+L</"Data Collection Parameters Reference"> below for details.
 
 The subroutine returns a hash or hash reference of the defined dataset values 
 found within the region of interest keyed by position. The feature midpoint 
@@ -376,31 +378,33 @@ position, a simple mean (for score methods) or sum
 =head2 Data Collection Parameters Reference
 
 The data collection subroutines are passed an array reference of parameters. 
-The recommended  method for data collection is to use get_segment_score() method from 
-L<Bio::ToolBox::db_helper>. 
+The recommended  method for data collection is to use the 
+L<Bio::ToolBox::db_helper/get_segment_score> method. 
 
 The parameters array reference includes these items:
 
 =over 4
 
-=item 1. The chromosome or seq_id
+=item 1. chromosome
 
-=item 1. The start position of the segment to collect 
+=item 2. start coordinate
 
-=item 3. The stop or end position of the segment to collect 
+=item 3. stop coordinate 
 
-=item 4. The strand of the segment to collect
+Coordinates are in BioPerl-style 1-base system.
+
+=item 4. strand
 
 Should be standard BioPerl representation: -1, 0, or 1.
 
-=item 5. The strandedness of the data to collect 
+=item 5. strandedness
 
 A scalar value representing the desired strandedness of the data 
 to be collected. Acceptable values include "sense", "antisense", 
 or "all". Only those scores which match the indicated 
 strandedness are collected.
 
-=item 6. The method for combining scores.
+=item 6. score method
 
 Acceptable values include score, count, ncount, and pcount.
 
@@ -417,16 +421,21 @@ Acceptable values include score, count, ncount, and pcount.
    names. Use this to avoid double-counting paired-end reads by 
    counting only unique names. Reads are taken if they overlap 
    the search region.
-   
+
 =item 7. A database object.
 
 Not used here.
 
-=item 8 and higher. Paths to one or more USeq files
+=item 8. Path to USeq files
 
+Additional USeq files may be appended to the list when merging. 
 Opened USeq file objects are cached. 
 
 =back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::db_helper>, L<Bio::DB::USeq>
 
 =head1 AUTHOR
 

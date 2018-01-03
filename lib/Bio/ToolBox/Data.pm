@@ -1,33 +1,37 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.43';
+our $VERSION = '1.53';
 
 =head1 NAME
 
 Bio::ToolBox::Data - Reading, writing, and manipulating data structure
 
 =head1 SYNOPSIS
-  
+
   use Bio::ToolBox::Data;
   
-  ### Create new gene list from database
-  my $Data = Bio::ToolBox::Data->new(
-        db      => 'hg19',
-        feature => 'gene:ensGene',
-  );
-  
-  my $Data = Bio::ToolBox::Data->new(
-        db      => 'hg19',
-        feature => 'genome',
-        win     => 1000,
-        step    => 1000,
-  );
-  
-  
   ### Open a pre-existing file
+  # a data table with same columns as input file
   my $Data = Bio::ToolBox::Data->new(
         file    => 'coordinates.bed',
   );
   
+  ### Parse a GTF, GFF3, refFlat, or genePred gene table
+  # data table with names and references to fully parsed 
+  # SeqFeature transcript objects with exon SeqFeature subfeatures
+  my $Data = Bio::ToolBox::Data->new(
+  	    file    => 'annotation.gtf.gz',
+  	    parse   => 1,
+  	    feature => 'transcript',
+  	    subfeature => 'exon'
+  );
+  
+  ### New gene list from a Bio::DB::SeqFeature::Store database
+  # data table with name and reference ID to database SeqFeature objects
+  my $Data = Bio::ToolBox::Data->new(
+        db      => 'hg19.sqlite',
+        feature => 'gene:ensGene',
+  );
+    
   
   ### Get a specific value
   my $value = $Data->value($row, $column);
@@ -36,6 +40,11 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   ### Replace or add a value
   $Data->value($row, $column, $new_value);
   
+  ### Add a column
+  my $new_index = $Data->add_column('Data2');
+  
+  ### Find a column
+  my $old_index = $Data->find_column('Data1');
   
   ### Iterate through a Data structure one row at a time
   my $stream = $Data->row_stream;
@@ -46,14 +55,17 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   	  my $start  = $row->start;
   	  my $stop   = $row->end;
   	  
-  	  # generate a Bio::Seq object from the database using 
+  	  # work with the referenced SeqFeature object
+  	  my $seqf = $row->seqfeature;
+  	  
+  	  # generate a new Bio::Seq object from the database using 
   	  # these coordinates 
   	  my $region = $db->segment($seq_id, $start, $stop);
   	  
   	  # modify a row value
-  	  my $value = $row->value($column);
+  	  my $value = $row->value($old_index);
   	  my $new_value = $value + 1;
-  	  $row->value($column, $new_value);
+  	  $row->value($new_index, $new_value);
   }
   
   
@@ -63,7 +75,7 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
        gz           => 1,
   );
   print "wrote new file $success\n"; # file is new_data.txt.gz
-  
+
 =head1 DESCRIPTION
 
 This module works with the primary Bio::ToolBox Data structure. Simply, it 
@@ -83,7 +95,7 @@ table to a new file.
 
 =over 4
 
-=item new()
+=item new
 
 Initialize a new Data structure. This generally requires options, 
 provided as an array of key =E<gt> values. A new list of features 
@@ -95,28 +107,36 @@ These are the options available.
 
 =over 4
 
-=item file =E<gt> $filename
+=item file
 
-=item in =E<gt> $filename
+=item in
+
+  my $Data = Bio::ToolBox::Data->new(file => $file);
 
 Provide the path and name to an existing tabbed-delimited text 
 file from which to load the contents. This is a shortcut to the 
 load_file() method. See that method for more details.
 
-=item stream =E<gt> 1
+=item stream
+
+  my $Data = Bio::ToolBox::Data->new(file => $file, stream => 1);
 
 Boolean option indicating that the file should be opened as a file  
-stream. A Bio::ToolBox::Data::Stream object will be returned. This 
+stream. A L<Bio::ToolBox::Data::Stream> object will be returned. This 
 is a convenience method. 
 
-=item noheader =E<gt> 1
+=item noheader
+
+  my $Data = Bio::ToolBox::Data->new(file => $file, noheader => 1);
 
 Boolean option indicating that the file does not have file headers, 
 in which case dummy headers are provided. This is not necessary for 
 defined file types that don't normally have file headers, such as 
 BED, GFF, or UCSC files.
 
-=item parse =E<gt> 1
+=item parse
+
+  my $Data = Bio::ToolBox::Data->new(file => $file, parse => 1);
 
 Boolean option indicating that a gene annotation table or file should 
 be parsed into SeqFeature objects and a general table of names and IDs 
@@ -125,50 +145,59 @@ be specified in one of two ways: Through the file option above,
 or in the database metadata of an existing table file representing 
 previously parsed objects.
 
-=item feature =E<gt> $type
+=item db
 
-=item feature =E<gt> "$type:$source"
-
-=item feature =E<gt> 'genome'
-
-For de novo lists from an annotation database, provide the GFF 
-type or type:source (columns 3 and 2) for collection. A comma 
-delimited string may be accepted (not an array). 
-
-For a list of genomic intervals across the genome, specify a 
-feature of 'genome'.
-
-=item db =E<gt> $name
-
-=item db =E<gt> $path
-
-=item db =E<gt> $database_object
+  my $Data = Bio::ToolBox::Data->new(db => 'hg19', feature => 'gene');
 
 Provide the name of the database from which to collect the 
 features. It may be a short name, whereupon it is checked in 
-the Bio::ToolBox configuration file C<.biotoolbox.cfg> for 
+the L<Bio::ToolBox> configuration file F<.biotoolbox.cfg> for 
 connection information. Alternatively, a path to a database 
 file or directory may be given. 
 
-If you already have an opened Bio::DB::SeqFeature::Store database 
-object, you can simply pass that. See Bio::ToolBox::db_helper for 
+If you already have an opened L<Bio::DB::SeqFeature::Store> database 
+object, you can simply pass that. See L<Bio::ToolBox::db_helper> for 
 more information. However, this in general should be discouraged, 
 since the name of the database will not be properly recorded when 
 saving to file. It is better to simply pass the name of database 
 again; multiple connections to the same database are smartly handled 
 in the background.
 
-=item win =E<gt> $integer
+=item feature
 
-=item step =E<gt> $integer
+  my $Data = Bio::ToolBox::Data->new(file => $filename, feature => 'gene');
+
+For de novo lists from an annotation database, provide the GFF 
+type or type:source (columns 3 and 2) for collection. A comma 
+delimited string may be accepted for databases. For parsed files, 
+only a simple string is accepted.
+
+For a list of genomic intervals across the genome, specify a 
+feature of 'genome' with a database object.
+
+=item subfeature
+
+When parsing annotation files such as GTF, one or more subfeature 
+types, e.g. C<exon> or C<utr>, may be specified as a comma-delimited 
+string. This ensures that the subfeatures will be parsed into 
+SeqFeature objects. Otherwise, only the top level features will be 
+parsed. This expedites parsing by skipping unwanted features.
+
+=item win
+
+=item step
+
+  my $Data = Bio::ToolBox::Data->new(db => $dbname, win => $integer);
 
 If generating a list of genomic intervals, optionally provide 
 the window and step values. Default values are defined in 
 the Bio::ToolBox configuration file C<.biotoolbox.cfg>.
 
-=item columns =E<gt> [qw(Column1 Column2 ...)]
+=item columns
 
-=item datasets =E<gt> [qw(Column1 Column2 ...)]
+=item datasets
+
+  my $Data = Bio::ToolBox::Data->new(columns => [qw(Column1 Column2 ...)] );
 
 When no file is given or database given to search, then a new, 
 empty Data object is returned. In this case, you may optionally 
@@ -179,7 +208,7 @@ may also optionally provide a general feature name, if desired.
 
 If successful, the method will return a Bio::ToolBox::Data object.
 
-=item duplicate()
+=item duplicate
 
 This will create a new Data object containing the same column 
 headers and metadata, but lacking the table content, i.e. no 
@@ -187,7 +216,10 @@ rows of data. File name metadata, if present in the original, is
 not preserved. The purpose here, for example, is to allow one 
 to selectively copy rows from one Data object to another.
 
-=item parse_table($filename)
+=item parse_table
+
+  $Data->parse_table($file)
+  $Data->parse_table($file, $feature, $subfeature)
 
 This will parse a gene annotation table into SeqFeature objects. 
 If this is called from an empty Data object, then the table will 
@@ -197,21 +229,45 @@ will be associated with the SeqFeature objects using their name and
 ID. The stored SeqFeature objects can be retrieved using the 
 get_seqfeature() method.
 
+Pass the method the gene table filename to be parsed. This may 
+be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
+These will be parsed using Bio::ToolBox::parser::* adapters.
+
+One or two additional options may be passed in addition. Both 
+are text strings that will be used in a case-insensitive regular 
+expression, so 'rna' will match all RNA types (mRNA, snRNA, etc).
+
+=over 4
+
+=item 1. C<$feature>
+
+The primary_tag or feature type of the top features from the table.
+The default value is 'gene'.
+
+=item 2. C<$subfeature>
+
+The primary_tag or feature type  of any subfeatures to additionally 
+be parsed. Typically these include exon, CDS, or UTR. The default is 
+nothing.
+
+=back
+
 =back
 
 =head2 General Metadata
 
 There is a variety of general metadata regarding the Data 
-structure. 
-
-The following methods may be used to access or set these 
-metadata properties.  
+structure. The following methods may be used to access or set these 
+metadata properties. Some of these are stored as comment lines at 
+the beginning of the file, and will be read or set when the file is 
+loaded.
 
 =over
 
-=item feature()
+=item feature
 
-=item feature($text)
+  $Data->feature('something');
+  my $feature = $Data->feature;
 
 Returns or sets the name of the features used to collect 
 the list of features. The actual feature types are listed 
@@ -227,19 +283,26 @@ named database features. The return values include:
 
 =over 4
 
-=item coordinate: Table includes at least chromosome and start
+=item * coordinate
 
-=item named: Table includes name, type, and/or Primary_ID
+Table includes at least chromosome and start columns.
 
-=item unknown: unrecognized
+=item * named
+
+Table includes name, type, and/or Primary_ID, possibly 
+referring to named database features.
+
+=item * unknown
+
+Table is unrecognized format.
 
 =back
 
-=item program($name)
+=item program
 
 Returns or sets the name of the program generating the list.
 
-=item database($name)
+=item database
 
 Returns or sets the name or path of the database from which the 
 features were derived.
@@ -270,6 +333,9 @@ Returns or sets the VCF file version number. VCF support is limited.
 
 =head2 File information
 
+These methods provide information about the file from which the 
+data table was loaded. This does not include parsed annotation tables.
+
 =over 4
 
 =item filename
@@ -284,31 +350,33 @@ Returns the filename, full path, basename, and extension of
 the filename. Concatenating the last three values will reconstitute 
 the first original filename.
 
-=item add_file_metadata($filename)
+=item add_file_metadata
+
+  $Data->add_file_metadata('/path/to/file.txt');
 
 Add filename metadata. This will automatically parse the path, 
-basename, and recognized extension from the passed filename.
+basename, and recognized extension from the passed filename and 
+set the appropriate metadata attributes.
 
 =back
 
-=head2 Comments
+=head2 Metadata comments
 
 Comments are any other commented lines from a text file (lines 
-beginning with a #) that were not parsed as metadata.
+beginning with a #) that were not parsed as general metadata.
 
 =over 4
 
 =item comments
 
-Returns a copy of the array containing commented lines.
+Returns a copy of the array containing commented lines. Each 
+comment line becomes an element in the array.
 
-=item add_comment($text)
+=item add_comment
 
 Appends the text string to the comment array.
 
 =item delete_comment
-
-=item delete_comment($index)
 
 Deletes a comment. Provide the array index of the comment to 
 delete. If an index is not provided, ALL comments will be deleted!
@@ -352,7 +420,7 @@ indexing as with all Perl arrays. Row 0 is always the column
 header row containing the column names, regardless whether an 
 actual header name existed in the original file format (e.g. 
 BED or GFF formats). Any individual table "cell" can be 
-specified as [$row][$column]. 
+specified as C<[$row][$column]>. 
 
 =over 4
 
@@ -377,15 +445,21 @@ Returns the array index number of the last row.
 Since the header row is index 0, this is also the 
 number of actual content rows.
 
-=item column_values($index)
+=item column_values
+
+  my $values = $Data->column_values($i);
 
 Returns an array or array reference representing the values 
 in the specified column. This includes the column header as 
 the first element. Pass the method the column index.
 
-=item add_column($name)
+=item add_column
 
-=item add_column(\@column_data)
+  # add empty column with name
+  my $i = $Data->add_column($name);
+  
+  # add entire column
+  my $i = $Data->add_column(\@array);
 
 Appends a new column to the Data table at the 
 rightmost position (highest index). It adds the column 
@@ -400,14 +474,18 @@ number of elements.
 
 It returns the new column index if successful.
 
-=item copy_column($index)
+=item copy_column
+
+  my $j = $Data->copy_column($i);
 
 This will copy a column, appending the duplicate column at 
 the rightmost position (highest index). It will duplicate 
 column metadata as well. It will return the new index 
 position.
 
-=item delete_column($index1, $index2, ...)
+=item delete_column
+
+  $Data->delete_column($i, $j);
 
 Deletes one or more specified columns. Any remaining 
 columns rightwards will have their indices shifted 
@@ -415,7 +493,9 @@ down appropriately. If you had identified one of the
 shifted columns, you may need to re-find or calculate 
 its new index.
 
-=item reorder_column($index1,  $index, ...)
+=item reorder_column
+
+  $Data->reorder_column($c,$b,$a,$a);
 
 Reorders columns into the specified order. Provide the 
 new desired order of indices. Columns could be duplicated 
@@ -424,34 +504,38 @@ new index numbers.
 
 =item add_row
 
-=item add_row(\@values)
-
-=item add_row($Row)
+  $Data->add_row(\@values);
+  $Data->add_row($Row); # Bio::ToolBox::Data::Feature object
 
 Add a new row of data values to the end of the Data table. 
 Optionally provide either a reference to an array of values 
-to put in the row, or pass a <Bio::ToolBox::Data::Feature> 
+to put in the row, or pass a L<Bio::ToolBox::Data::Feature> 
 Row object, such as one obtained from another Data object. 
 If the number of columns do not match, the array is filled 
 up with null values for missing columns, or excess values 
 are dropped.
 
-=item delete_row($row1, $row2, ...)
+=item delete_row
+
+  $Data->delete_row($i, $j);
 
 Deletes one or more specified rows. Rows are spliced out 
 highest to lowest index to avoid issues. Be very careful 
 deleting rows while simultaneously iterating through the 
 table!
 
-=item row_values($row)
+=item row_values
+
+  my $row_values = $Data->row_values($i);
 
 Returns a copy of an array for the specified row index. 
 Modifying this returned array does not migrate back to the 
-Data table; Use the value method below instead.
+Data table; Use the L</value> method below instead.
 
-=item value($row, $column)
+=item value
 
-=item value($row, $column, $new_value)
+  my $value = $Data->value($row, $column);
+  $Data->value($row, $column, $new_value);
 
 Returns or sets the value at a specific row or column index.
 Index positions are 0-based (header row is index 0). 
@@ -469,16 +553,18 @@ the beginning of the file.
 
 =over 4
 
-=item name($index)
+=item name
 
-=item name($index, $new_name)
+  $Data->name($index, $new_name);
+  my $name = $Data->name($i);
 
 Convenient method to return the name of the column given the 
 index number. A column may also be renamed by passing a new name.
 
-=item metadata($index, $key)
+=item metadata
 
-=item metadata($index, $key, $new_value)
+  $Data->metadata($index, $key, $new_value);
+  my $value = $Data->metadata($index, $key)
 
 Returns or sets the metadata value for a specific $key for a 
 specific column $index.
@@ -489,19 +575,26 @@ the name of a new $key that is not present
 If no key is provided, then a hash or hash reference is returned 
 representing the entire metadata for that column.
 
-=item copy_metadata($source, $target)
+=item copy_metadata
+
+  $Data->copy_metadata($source, $target);
 
 This method will copy the metadata (everything except name and 
 index) between the source column and target column. Returns 1 if 
 successful.  
 
-=item delete_metadata($index, $key);
+=item delete_metadata
+
+  $Data->delete_metadata($index, $key);
 
 Deletes a column-specific metadata $key and value for a specific 
 column $index. If a $key is not provided, then all metadata keys 
 for that index will be deleted.
 
-=item find_column($name)
+=item find_column
+
+  my $i = $Data->find_column('Gene');
+  my $i = $Data->find_column('^Gene$')
 
 Searches the column names for the specified column name. This 
 employs a case-insensitive grep search, so simple substitutions 
@@ -523,58 +616,36 @@ may be made.
 
 These methods will return the identified column best matching 
 the description. Returns C<undef> if that column is not present. 
-These use the find_column() method with a predefined list of 
+These use the L</find_column> method with a predefined list of 
 aliases.
 
 =back
 
-=head2 Efficient Data Access
+=head2 Working with databases
 
-Most of the time we need to iterate over the Data table, one row 
-at a time, collecting data or processing information. These methods 
-simplify the process.
+These are methods for working primarily with annotation databases.
 
 =over 4
 
-=item iterate(sub {})
+=item open_database
 
-This method will process a code reference on every row in the data 
-table. Pass a subroutine or code reference. The subroutine will 
-receive the row as a Bio::ToolBox::Data::Feature object. With this 
-object, you can retrieve values, set values, and add new values. 
-For example
-    
-    $Data->iterate( sub {
-       my $row = shift;
-       my $number = $row->value($index);
-       my $log_number = log($number);
-       $row->value($index, $log_number);
-    } );
+This is wrapper method that tries to do the right thing and passes 
+on to either L</open_meta_database> or L</open_new_database> methods. 
+Basically a legacy method for L</open_meta_database>.
 
-=item row_stream()
+=item open_meta_database
 
-This returns an Bio::ToolBox::Data::Iterator object, which has one 
-method, next_row(). Call this method repeatedly until it returns 
-C<undef> to work through each row of data.
+Open the database that is listed in the metadata. Returns the 
+database connection. Pass a true value to force a new database 
+connection to be opened, rather than returning a cached connection 
+object (useful when forking).
 
-Users of the Bio::DB family of database adaptors may recognize the 
-analogy to the seq_stream() method.
+=item open_new_database
 
-=item next_row()
-
-Called from a Bio::ToolBox::Data::Iterator object, it returns a 
-Bio::ToolBox::Data::Feature object. This object represents the 
-values in the current Data table row.
-
-An example using the iterator is shown below.
-  
-  my $stream = $Data->row_stream;
-  while (my $row = $stream->next_row) {
-     # each $row is a Bio::ToolBox::Data::Feature object
-     # representing the row in the data table
-     my $value = $row->value($index);
-     # do something with $value
-  }
+Convenience method for opening a second or new database that is 
+not specified in the metadata, useful for data collection. This 
+is a shortcut to L<Bio::ToolBox::db_helper/open_db_connection>.
+Pass the database name.
 
 =back
 
@@ -586,16 +657,56 @@ available from a database or is processor intensive in generating or
 parsing. Note that storing large numbers of objects will increase memory 
 usage. 
 
+SeqFeature objects are usually either L<Bio::DB::SeqFeature>, 
+L<Bio::SeqFeature::Lite>, or L<Bio::DB::SeqFeature> objects, depending 
+upon their source. More information can obtained from the L<Bio::SeqFeatureI> 
+abstract API.
+
 =over 4
 
-=item store_seqfeature($row_index, $seqfeature)
+=item store_seqfeature
+
+  $Data->store_seqfeature($row_index, $seqfeature);
 
 Stores the SeqFeature object for the given row index. Only one SeqFeature 
 object can be stored per row.
 
-=item get_seqfeature($row_index)
+=item get_seqfeature
+
+  my $feature = $Data->get_seqfeature($row_index);
 
 Retrieves the SeqFeature object for the given row index.
+
+=item collapse_gene_transcripts
+
+  my $success = $Data->collapse_gene_transcripts;
+
+This method will iterate through a Data table and collapse multiple alternative 
+transcript subfeatures of stored gene SeqFeature objects in the table. Exons 
+of multiple transcripts will be merged, maximizing exon size and minimizing 
+intron size. Genes with only one transcript will not be affected. Stored 
+SeqFeature objects that are do not have a C<primary_tag> of "gene" are silently 
+skipped. Refer to the L<Bio::ToolBox::GeneTools/collapse_transcripts> method 
+for more details. The number of rows successfully collapsed is returned. 
+
+=item add_transcript_length
+
+  my $length_index = $Data->add_transcript_length;
+  my $length_index = $Data->add_transcript_length('cds');
+
+This method will generate a new column in the Data table representing the 
+length of a transcript, i.e. the sum of the length of subfeatures for 
+the stored SeqFeature object in the Data table. The default subfeature is 
+C<exon>; however, alternative subfeature types may be passed to the method 
+and used. These include C<cds>, C<5p_utr>, and C<3p_utr> for CDS, the 5C<'> UTR, 
+and the 3C<'> UTR, respectively. See the corresponding transcript length 
+methods in L<Bio::ToolBox::GeneTools> for more information. If a length 
+is not calculated, for example the feature C<primary_tag> is a "gene", 
+then the simple length of the feature is recorded. 
+
+The name of the new column is one of "Merged_Transcript_Length" for exon, 
+"Transcript_CDS_Length", "Transcript_5p_UTR_Length", or "Transcript_3p_UTR_Length". 
+The index of the new length column is returned. 
 
 =back
 
@@ -605,7 +716,7 @@ These methods alter the Data table en masse.
 
 =over 4
 
-=item verify()
+=item verify
 
 This method will verify the Data structure, including the metadata and the 
 Data table. It ensures that the table has the correct number of rows and 
@@ -619,7 +730,9 @@ is set to null.
 
 This method is automatically called prior to writing the Data table to file.
 
-=item sort_data($index, $direction);
+=item sort_data
+
+  $Data->sort_data($index, 'i'); # increasing sort
 
 This method will sort the Data table by the values in the indicated column. 
 It will automatically determine whether the contents of the column are 
@@ -640,20 +753,8 @@ names are sorted first by their digits (e.g. chr2 before chr10), and then
 alphanumerically. Base coordinates are sorted by increasing value. 
 Identical positions are kept in their original order.
 
-=item splice_data($current_part, $total_parts)
+=item splice_data
 
-This method will splice the Data table into $total_parts number of pieces, 
-retaining the $current_part piece. The other parts are discarded. This 
-method is intended to be used when a program is forked into separate 
-processes, allowing each child process to work on a subset of the original 
-Data table. 
-
-Two values are passed to the method. The first is the current part number, 
-1-based. The second value is the total number of parts that the table 
-should be divided, corresponding to the number of concurrent processes. 
-One easy approach to forking is to use L<Parallel::ForkManager>. The 
-example below shows how to fork into four concurrent processes.
-	
 	my $Data = Bio::ToolBox::Data->new(file => $file);
 	my $pm = Parallel::ForkManager->new(4);
 	for my $i (1..4) {
@@ -669,21 +770,33 @@ example below shows how to fork into four concurrent processes.
 	# reload children files
 	$Data->reload_children(glob "$file_*");
 
+This method will splice the Data table into C<$total_parts> number of pieces, 
+retaining the C<$current_part> piece. The other parts are discarded. This 
+method is intended to be used when a program is forked into separate 
+processes, allowing each child process to work on a subset of the original 
+Data table. 
+
+Two values are passed to the method. The first is the current part number, 
+1-based. The second value is the total number of parts that the table 
+should be divided, corresponding to the number of concurrent processes. 
+One easy approach to forking is to use L<Parallel::ForkManager>. The 
+above example shows how to fork into four concurrent processes.
+
 Since each forked child process is separate from their parent process, 
 their contents must be reloaded into the current Data object. The 
 L<Parallel::ForkManager> documentation recommends going through a disk 
 file intermediate. Therefore, write each child Data object to file using 
 a unique name. Once all children have been reaped, they can be reloaded 
-into the current Data object using the reload_children() method.
+into the current Data object using the L</reload_children> method.
 
 Remember that if you fork your script into child processes, any database 
 connections must be re-opened; they are typically not clone safe. If you 
-have an existing database connection by using the open_database() method, 
-it should be automatically re-opened for you when you use the splice_data() 
-method, but you will need to call open_database() again in the child 
+have an existing database connection by using the L</open_database> method, 
+it should be automatically re-opened for you when you use the L</splice_data> 
+method, but you will need to call L</open_database> again in the child 
 process to obtain the new database object.
 
-=item reload_children(@children_files)
+=item reload_children
 
 Discards the current data table in memory and reloads two or more files 
 written from forked children processes. Provide the name of the child 
@@ -700,24 +813,29 @@ all cases, it is a tab-delimited text file, whether as an ad hoc table
 or a specific bioinformatic format, e.g. BED, GFF, etc. Multiple common 
 file formats are supported. Column headers are assumed, except in those 
 cases where it is not, e.g. BED, GFF, etc. Metadata may be included as 
-commented lines at the beginning of the file, prefixed with a # symbol.
+commented lines at the beginning of the file, prefixed with a C<#> symbol.
 Reading and writing gzip compressed files is fully supported.
 
 =over 4
 
-=item load_file($filename)
+=item load_file
+
+  $Data->load_file($filename);
 
 This will load a file into a new, empty Data table. This function is 
-called automatically when a filename is provided to the new() function. 
+called automatically when a filename is provided to the L</new> function. 
 The existence of the file is first checked (appending common missing 
 extensions as necessary), metadata and column headers processed and/or 
 generated from default settings, the content loaded into the table, and 
 the structure verified. Error messages may be printed if the structure or 
 format is inconsistent or doesn't match the expected format, e.g a file 
-with a .bed extension doesn't match the UCSC specification.
+with a F<.bed> extension doesn't match the UCSC specification.
 Pass the name of the filename.
 
-=item taste_file($filename)
+=item taste_file
+
+  my $flavor = $Data->taste_file($filename);
+  # returns gff, bed, ucsc, or undef
 
 Tastes, or checks, a file for a certain flavor, or known gene file formats. 
 This is based on file extension, metadata headers, and/or file content 
@@ -726,23 +844,29 @@ Values include gff, bed, ucsc, or undefined. Useful for determining if
 the file represents a known gene table format that lacks a defined file 
 extension, e.g. UCSC formats.
 
-=item save()
+=item save
 
-=item write_file()
+=item write_file
 
-=item write_file($filename)
+  my $success = $Data->save;
+  my $success = $Data->save('my_file.txt');
+  my $success = $Data->save(filename => $file, gz => 1);
+  print "file $success was saved!\n";
 
-=item write_file(%options)
+Pass the file name to be written. If no file name is passed, then 
+the filename and path stored in the metadata are used, if present.
 
 These methods will write the Data structure out to file. It will 
 be first verified as to proper structure. Opened BED and GFF files 
 are checked to see if their structure is maintained. If so, they 
 are written in the same format; if not, they are written as regular 
-tab-delimited text files. You may pass additional options.
+tab-delimited text files. 
+
+You may pass additional options.
 
 =over 4
 
-=item filename =E<gt> $filename
+=item filename
 
 Optionally pass a new filename. Required for new objects; previous 
 opened files may be overwritten if a new name is not provided. If 
@@ -751,17 +875,17 @@ that no longer match the defined format lose the .bed and gain a .txt
 extension. Compression may or add or strip .gz as appropriate. If 
 a path is not provided, the current working directory is used.
 
-=item gz =E<gt> boolean
+=item gz
 
-Change the compression status of the output file. The default is to 
-maintain the status of the original opened file.
+Boolean value to change the compression status of the output file. The 
+default is to maintain the status of the original opened file.
 
 =back
 
 If the file save is successful, it will return the full path and 
 name of the saved file, complete with any changes to the file extension.
 
-=item summary_file(%options)
+=item summary_file
 
 Write a separate file summarizing columns of data (mean values). 
 The mean value of each column becomes a row value, and each column 
@@ -769,25 +893,29 @@ header becomes a row identifier (i.e. the table is transposed). The
 best use of this is to summarize the mean profile of windowed data 
 collected across a feature. See the Bio::ToolBox scripts 
 L<get_relative_data.pl> and L<get_binned_data.pl> as examples. 
+For data from L<get_binned_data.pl> where the columns are expressed 
+as percentile bins, the reported midpoint column is automatically 
+converted based on a length of 1000 bp.
+
 You may pass these options. They are optional.
 
 =over 4
 
-=item filename =E<gt> $filename
+=item filename
 
 Pass an optional new filename. The default is to take the basename 
 and append "_summed" to it.
 
-=item startcolumn =E<gt> $index
+=item startcolumn
 
-=item stopcolumn =E<gt> $index
+=item stopcolumn
 
 Provide the starting and ending columns to summarize. The default 
 start is the leftmost column without a recognized standard name. 
 The default ending column is the last rightmost column. Indexes are 
 0-based.
 
-=item dataset =E<gt> $name
+=item dataset
 
 Pass a string that is the name of the dataset. This could be collected 
 from the metadata, if present. This will become the name of the score 
@@ -808,16 +936,16 @@ from which you are collecting must be verified prior to collection.
 This ensures that the proper database adaptor is available and loaded, 
 and that the dataset is correctly specified (otherwise nothing would be 
 collected). This verification is normally performed transparently when 
-you call L<get_score|Bio::ToolBox::Data::Feature/get_score>() or 
-L<get_position_scores|Bio::ToolBox::Data::Feature/get_position_scores>().
+you call L<get_score|Bio::ToolBox::Data::Feature/get_score> or 
+L<get_position_scores|Bio::ToolBox::Data::Feature/get_position_scores>.
 However, datasets may be explicitly verified prior to calling the score 
 methods. 
 
 =over 4
 
-=item verify_dataset($dataset)
+=item verify_dataset
 
-=item verify_dataset($dataset, $database)
+ my $dataset = $Data->verify_dataset($dataset, $database);
 
 Pass the name of the dataset (GFF type or type:source) for a GFF3-based 
 database, e.g. <Bio::DB::SeqFeature::Store>, or path and file name for a 
@@ -829,6 +957,58 @@ L<Bio::ToolBox::db_helper/verify_or_request_feature_types>.
 The name of the verified dataset, with a prefix if necessary, is returned.
 
 =back
+
+=head2 Efficient Data Access
+
+Most of the time we need to iterate over the Data table, one row 
+at a time, collecting data or processing information. These methods 
+simplify the process.
+
+=over 4
+
+=item iterate
+
+    $Data->iterate( sub {
+       my $row = shift;
+       my $number = $row->value($index);
+       my $log_number = log($number);
+       $row->value($index, $log_number);
+    } );
+
+This method will process a code reference on every row in the data 
+table. Pass a subroutine or code reference. The subroutine will 
+receive the row as a L<Bio::ToolBox::Data::Feature> object. With this 
+object, you can retrieve values, set values, and add new values. 
+
+=item row_stream
+
+This returns an C<Bio::ToolBox::Data::Iterator> object, which has one 
+method, C<next_row()>. Call this method repeatedly until it returns 
+C<undef> to work through each row of data.
+
+Users of the C<Bio::DB> family of database adaptors may recognize the 
+analogy to the C<seq_stream()> method.
+
+=item next_row
+
+  my $stream = $Data->row_stream;
+  while (my $row = $stream->next_row) {
+     # each $row is a Bio::ToolBox::Data::Feature object
+     # representing the row in the data table
+     my $value = $row->value($index);
+     # do something with $value
+  }
+
+Called from a C<Bio::ToolBox::Data::Iterator> object, it returns a 
+L<Bio::ToolBox::Data::Feature> object. 
+
+=back
+
+=head1 SEE ALSO
+
+L<Bio::ToolBox::Data::Feature>, L<Bio::ToolBox::SeqFeature>, L<Bio::DB::Sam>,
+L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigBed>, L<Bio::DB::USeq>, 
+L<Bio::DB::SeqFeature::Store>, L<Bio::Perl>
 
 =cut
 
@@ -880,13 +1060,15 @@ sub new {
 	# prepare a new table based on the provided arguments
 	if ($args{file} and $args{parse}) {
 		# parse from file
-		unless ( $self->parse_table($args{file}) ) {
+		my $subfeature = $args{subfeature} || '';
+		unless ( $self->parse_table($args{file}, $args{features}, $subfeature) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
 			if ($self->database =~ /^Parsed:(.+)$/) {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
-				$self->parse_table($1); # this may die if it doesn't work
+				# this may die if it doesn't work
+				$self->parse_table($1, $args{features}, $subfeature); 
 			}
 		}
 	}
@@ -957,23 +1139,40 @@ sub duplicate {
 }
 
 sub parse_table {
-	my ($self, $file) = @_;
+	my $self = shift;
+	my $file = shift;
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
+	my $feature = shift || 'gene';
+	my $subfeature = shift || '';
 	
 	# the file format determines the parser class
 	my $flavor = $self->taste_file($file) or return;
 	my $class = 'Bio::ToolBox::parser::' . $flavor;
-	unless (eval "require $class; 1") {
-		carp "unable to load $class: $@";
+	eval {load $class};
+	if ($@) {
+		carp "unable to load $class! cannot parse $flavor!";
 		return;
 	}
 	
-	# parse the table
+	# set parser parameters
 	my $parser = $class->new() or return;
-	$parser->simplify(1) if $flavor eq 'gff';
+	$parser->simplify(1);
+	if ($subfeature) {
+		$parser->do_exon(1) if $subfeature =~ /exon/i;
+		$parser->do_cds(1) if $subfeature =~ /cds/i;
+		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+	}
+	if ($feature =~ /gene$/i) {
+		$parser->do_gene(1);
+	}
+	else {
+		$parser->do_gene(0);
+	}
+	
+	# parse the table
 	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
@@ -1007,11 +1206,13 @@ PARSEFAIL
 		$self->add_column('Name');
 		$self->add_column('Type');
 		while (my $f = $parser->next_top_feature) {
-			next if $f->primary_tag =~ /^(?:chromosome|contig|sequence|scaffold)$/;
-			my $index = $self->add_row(
-				[ $f->primary_id, $f->display_name, $f->type,] 
-			);
-			$self->store_seqfeature($index, $f);
+			my $type = $f->type;
+			if ($f->type =~ /$feature/i) {
+				my $index = $self->add_row(
+					[ $f->primary_id, $f->display_name, $f->type,] 
+				);
+				$self->store_seqfeature($index, $f);
+			}
 		}
 		$self->database("Parsed:$file");
 	}
@@ -1177,8 +1378,7 @@ sub iterate {
 	my $self = shift;
 	my $code = shift;
 	unless (ref $code eq 'CODE') {
-		cluck "iterate_function() method requires a code reference!";
-		return;
+		confess "iterate_function() method requires a code reference!";
 	}
 	my $stream = $self->row_stream;
 	while (my $row = $stream->next_row) {
@@ -1187,14 +1387,97 @@ sub iterate {
 	return 1;
 }
 
+
+#### Stored SeqFeature manipulation
+
 sub store_seqfeature {
 	my ($self, $row, $seqfeature) = @_;
-	return unless (defined $row and ref($seqfeature));
-	return unless ($row <= $self->last_row);
+	unless (defined $row and ref($seqfeature)) {
+		confess "must provide a row index and SeqFeature object!";
+	}
+	confess "invalid row index" unless ($row <= $self->last_row);
 	$self->{SeqFeatureObjects} ||= [];
 	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
 	return 1;
 }
+
+sub collapse_gene_transcripts {
+	my $self = shift;
+	unless (exists $self->{SeqFeatureObjects}) {
+		carp "no SeqFeature objects stored for collapsing!";
+		return;
+	}
+	
+	# load module
+	my $class = "Bio::ToolBox::GeneTools";
+	eval {load $class, qw(collapse_transcripts)};
+	if ($@) {
+		carp "unable to load $class! cannot collapse transcripts!";
+		return;
+	}
+	
+	# collapse the transcripts
+	my $success = 0;
+	for (my $i = 1; $i <= $self->last_row; $i++) {
+		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+		my $collSeqFeat = collapse_transcripts($feature) or next;
+		$success += $self->store_seqfeature($i, $collSeqFeat);
+	}
+	return $success;
+}
+
+sub add_transcript_length {
+	my $self = shift;
+	my $subfeature = shift || 'exon';
+	unless (exists $self->{SeqFeatureObjects}) {
+		carp "no SeqFeature objects stored for collapsing!";
+		return;
+	}
+	
+	# load module
+	my $class = "Bio::ToolBox::GeneTools";
+	eval {load $class, qw(get_transcript_length get_transcript_cds_length
+		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
+	if ($@) {
+		carp "unable to load $class! cannot collapse transcripts!";
+		return;
+	}
+	
+	# determine name and calculation method
+	my $length_calculator;
+	my $length_name;
+	if ($subfeature eq 'exon') {
+		$length_calculator = \&get_transcript_length;
+		$length_name= 'Merged_Transcript_Length';
+	}
+	elsif ($subfeature eq 'cds') {
+		$length_calculator = \&get_transcript_cds_length;
+		$length_name= 'Transcript_CDS_Length';
+	}
+	elsif ($subfeature eq '5p_utr') {
+		$length_calculator = \&get_transcript_5p_utr_length;
+		$length_name= 'Transcript_5p_UTR_Length';
+	}
+	elsif ($subfeature eq '3p_utr') {
+		$length_calculator = \&get_transcript_3p_utr_length;
+		$length_name= 'Transcript_3p_UTR_Length';
+	}
+	else {
+		carp "unrecognized subfeature type '$subfeature'! No length calculated";
+		return;
+	}
+	
+	# add new column and calculate
+	my $length_i = $self->add_column($length_name);
+	for (my $i = 1; $i <= $self->last_row; $i++) {
+		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+		my $length = &$length_calculator($feature);
+		$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+	}
+	
+	return $length_i;
+}
+
 
 
 ### Data structure manipulation
@@ -1658,6 +1941,8 @@ sub summary_file {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) 
 		$dataset = $self->metadata($startcolumn, 'dataset') || undef;
+		$dataset =~ s/^(?:file|http|ftp):\/*//;
+		$dataset =~ s/\.(?:bw|bam|bb|big.*|useq)$//;
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
@@ -1675,9 +1960,11 @@ sub summary_file {
 	);
 	$summed_data->database($self->database);
 	$summed_data->metadata(0, 'number_features', $self->last_row);
-	$summed_data->metadata(2, 'log2', $log);
+	$summed_data->metadata(2, 'log2', $log) if $log;
 	$summed_data->metadata(2, 'dataset', $dataset) if $dataset;
 	
+	# tag for remembering we're working with percentile bins
+	my $do_percentile = 0;
 	
 	# Collect summarized data
 	for (
@@ -1693,6 +1980,15 @@ sub summary_file {
 			$self->metadata($column, 'stop'),	
 		) or undef; 
 		
+		# convert midpoint to fraction of 1000 for plotting if necessary
+		if (substr($self->name($column), -1) eq '%') {
+			$midpoint *= 10; # midpoint * 0.01 * 1000 bp
+			$do_percentile++;
+		}
+		if ($do_percentile and substr($self->name($column), -2) eq 'bp') {
+			# working on the extension after the percentile bins
+			$midpoint += 1000;
+		}
 		
 		# collect the values in the column
 		my @values;

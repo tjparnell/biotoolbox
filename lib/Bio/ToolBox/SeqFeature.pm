@@ -5,7 +5,7 @@ our $VERSION = '1.52';
 
 Bio::ToolBox::SeqFeature - Fast, simple SeqFeature implementation
 
-head1 SYNOPSIS
+=head1 SYNOPSIS
 
    # create a transcript
    my $transcript = Bio::ToolBox::SeqFeature->new(
@@ -37,7 +37,7 @@ head1 SYNOPSIS
    
    # get attribute
    my $value = $transcript->get_tag_values($key);
-   
+
 =head1 DESCRIPTION
 
 SeqFeature objects represent functional elements on a genomic or chromosomal 
@@ -59,7 +59,7 @@ implements the L<Bio::SeqFeatureI> API, and could be substituted for other
 implementations, such L<Bio::SeqFeature::Lite> and L<Bio::SeqFeature::Generic>. 
 Unlike the others, however, it inherits no classes or methods and uses an 
 unorthodox blessed array to store feature attributes, decreasing memory 
-requirements and complexity. 
+requirements and overhead complexity. 
 
 =head1 METHODS
 
@@ -69,7 +69,7 @@ ideas, which this module tries to implement.
 =head2 Creating new SeqFeature objects
 
 New, empty SeqFeature objects can be generated, but in general they should be  
-generated with location and other attributes. Pass an array of key = value 
+generated with location and other attributes. Pass an array of key =E<gt> value 
 pairs. Most of the accession methods may be used as key tags to the new method. 
 The following attribute keys are accepted.
 
@@ -176,7 +176,7 @@ if no source_tag is defined, simply "primary_tag".
 
 A text string representing the name of the feature. The name is not 
 required to be a unique value, but generally is. The default name, if 
-none is provided, is the primary_id.
+none is provided, is the C<primary_id>.
 
 =item id
 
@@ -206,11 +206,13 @@ ID, and Parent.
 
 =over 4
 
-=item add_tag_value($key, $value)
+=item add_tag_value
 
-Sets the special attribute $key to $value. If you have more than one 
+    $seqf->add_tag_value($key, $value);
+
+Sets the special attribute C<$key> to C<$value>. If you have more than one 
 value, $value should be an anonymous array of text values. Following 
-GFF convention, $key should not comprise of special characters, including 
+GFF convention, C<$key> should not comprise of special characters, including 
 ";,= ".
 
 =item all_tags
@@ -227,7 +229,7 @@ Boolean method whether the SeqFeature object contains the attribute.
 
 =item each_tag_value($key)
 
-Returns the value for attribute $key. If multiple values are present, 
+Returns the value for attribute C<$key>. If multiple values are present, 
 it may return an array or array reference.
 
 =item attributes
@@ -252,9 +254,9 @@ SeqFeature object is generated, but is added to both transcript objects.
 
 =over 4
 
-=item add_SeqFeature($feature1, ...)
+=item add_SeqFeature
 
-=item add_segment($feature1, ...)
+=item add_segment
 
 Pass one or more SeqFeature objects to be associated as children.
 
@@ -281,36 +283,48 @@ They currently do not support strand checks or strand options.
 
 Returns the length of the SeqFeature object.
 
-=item overlaps($other)
+=item overlaps
 
-Returns a boolean value whether the $other SeqFeature object overlaps 
+	my $overlap_check = $seqf1->overlaps($other_seqf);
+
+Returns a boolean value whether a second SeqFeature object overlaps 
 with the self object.
 
-=item contains($other)
+=item contains
+
+	my $check = $seqf1->contains($seqf2);
 
 Returns a boolean value whether the self object completely 
-contains the $other SeqFeature object.
+contains a second SeqFeature object.
 
-=item equals($other)
+=item equals
+
+	my $check = $seqf1->equals($seqf2);
 
 Returns a boolean value whether the self object coordinates are 
-equivalent to the $other SeqFeature object.
+equivalent to a second SeqFeature object.
 
-=item intersection($other)
+=item intersection
+
+	my $check = $seqf1->intersection($seqf2);
 
 Returns a new SeqFeature object representing the intersection or 
-overlap area between the $self object and the $other SeqFeature 
+overlap area between the self object and a second SeqFeature 
 object.
 
 =item union($other)
 
-Returns a new SeqFeature object representing the merged interval 
-between the $self and $other SeqFeature objects.
+	my $new_seqf = $seqf1->union($seqf2);
 
-=item subtract($other)
+Returns a new SeqFeature object representing the merged interval 
+between the self and a second SeqFeature object.
+
+=item subtract
+
+	my $new_seqf = $seqf1->subtract($seqf2);
 
 Returns a new SeqFeature object representing the interval of the 
-$self object after subtracting the $other SeqFeature object. 
+self object after subtracting a second SeqFeature object. 
 
 =back
 
@@ -364,6 +378,10 @@ explicitly tested.
 
 =back
 
+=head1 SEE ALSO
+
+L<Bio::SeqFeatureI>, L<Bio::SeqFeature::Lite>, L<Bio::Seqfeature::Generic>, 
+L<Bio::RangeI>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::ucsc>
 
 =cut
 

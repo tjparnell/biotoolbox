@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.52';
+my $VERSION = '1.53';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -42,6 +42,7 @@ my (
 	$stop_adj,
 	$unique,
 	$slop,
+	$tsl,
 	$bed,
 	$gz,
 	$help,
@@ -61,6 +62,7 @@ GetOptions(
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'unique!'   => \$unique, # boolean to ensure uniqueness
 	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
+	'tsl=s'     => \$tsl, # filter transcript support level
 	'bed!'      => \$bed, # convert the output to bed format
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -188,14 +190,14 @@ sub determine_method {
 		$request = 'transcription start site';
 		$method = \&collect_tss;
 	}
-	elsif ($request =~ /start site/i) {
+	elsif ($request eq 'transcription start site') {
 		$method = \&collect_tss;
 	}
 	elsif ($request =~ /tts/i) {
 		$request = 'transcription stop site';
 		$method = \&collect_tts;
 	}
-	elsif ($request =~ /stop site/i) {
+	elsif ($request eq 'transcription stop site') {
 		$method = \&collect_tts;
 	}
 	elsif ($request =~ /^splices?/i) {
@@ -205,6 +207,10 @@ sub determine_method {
 	elsif ($request =~ /^exons?/i) {
 		$request = 'exon';
 		$method = \&collect_exons;
+	}
+	elsif ($request =~ /^collapsed ?exons?/i) {
+		$request = 'collapsed exon';
+		$method = \&collect_collapsed_exons;
 	}
 	elsif ($request =~ /^first ?exon$/i) {
 		$request = 'first exon';
@@ -228,6 +234,10 @@ sub determine_method {
 	}
 	elsif ($request =~ /^introns?$/i) {
 		$method = \&collect_introns;
+	}
+	elsif ($request =~ /^collapsed ?introns?/i) {
+		$request = 'collapsed intron';
+		$method = \&collect_collapsed_introns;
 	}
 	elsif ($request =~ /^first ?intron/i) {
 		$request = 'first intron';
@@ -253,6 +263,14 @@ sub determine_method {
 		$request = 'UTRs';
 		$method = \&collect_utrs;
 	}
+	elsif ($request =~ /cds ?start/i) {
+		$request = 'CDS start';
+		$method = \&collect_cds_start;
+	}
+	elsif ($request =~ /cds ?stop/i) {
+		$request = 'CDS stop';
+		$method = \&collect_cds_stop;
+	}
 	else {
 		die " unknown region request!\n";
 	}
@@ -268,20 +286,23 @@ sub collect_method_from_user {
 		1	=> 'transcription start site',
 		2	=> 'transcription stop site',
 		3   => 'exons',
-		4	=> 'first exon',
-		5	=> 'last exon',
-		6   => 'alternate exons',
-		7   => 'uncommon exons',
-		8   => 'common exons',
-		9	=> 'introns',
-		10  => 'first intron',
-		11  => 'last intron',
-		12  => 'alternate introns',
-		13  => 'uncommon introns',
-		14  => 'common introns',
-		15	=> 'splice sites',
-		16  => 'UTRs', 
-		# what about cdsStart, cdsStop?
+		4   => 'collapsed exons',
+		5	=> 'first exon',
+		6	=> 'last exon',
+		7   => 'alternate exons',
+		8   => 'uncommon exons',
+		9   => 'common exons',
+		10	=> 'introns',
+		11  => 'collapsed introns',
+		12  => 'first intron',
+		13  => 'last intron',
+		14  => 'alternate introns',
+		15  => 'uncommon introns',
+		16  => 'common introns',
+		17	=> 'splice sites',
+		18  => 'UTRs', 
+		19  => 'CDS start',
+		20  => 'CDS stop',
 	);
 	
 	# request feature from the user
@@ -490,21 +511,50 @@ sub collect_from_file {
 	my $flavor = $Data->taste_file($infile);
 	print " $infile determined to be a $flavor format\n";
 	my $parser;
+	my $type_string;
 	if ($flavor eq 'gff') {
 		$parser = Bio::ToolBox::parser::gff->new(file => $infile) or
 			die " unable to open input file '$infile'!\n";
+		# we never know what's going to be present in a GFF file, so let's check first
+		$type_string = $parser->typelist;
 	}
 	elsif ($flavor eq 'ucsc') {
 		# some sort of ucsc format
-		$parser = Bio::ToolBox::parser::ucsc->new(
-			file    => $infile,
-			do_gene => 1,
-			do_utr  => 1,
-			do_cds  => 1,
-		) or die " unable to open input file '$infile'!\n";
+		$parser = Bio::ToolBox::parser::ucsc->new(file => $infile) or 
+			die " unable to open input file '$infile'!\n";
+		# we typically know what's going to be in a UCSC formatted file
+		$type_string = 'gene,RNA,exon,cds,utr,codon';
 	}
 	else {
 		die " $infile is an unrecognized gene table format!\n";
+	}
+	$parser->do_gene(1); # assume we always want genes?
+	if ($request =~ /exon|splice|intron/i) {
+		$parser->do_exon(1);
+	}
+	elsif ($request =~ /utr/i) {
+		if ($type_string =~ /utr/i) {
+			$parser->do_utr(1);
+		}
+		else {
+			$parser->do_exon(1);
+			$parser->do_cds(1);
+		}
+	}
+	elsif ($request =~ /cds st/i) {
+		if ($type_string =~ /codon/) {
+			$parser->do_codon(1);
+		}
+		else {
+			$parser->do_cds(1);
+		}
+	}
+	if ($tsl or $type_string !~ /rna/i) {
+		# we need the extra attributes for transcript_support_level and biotype
+		$parser->simplify(0);
+	}
+	else {
+		$parser->simplify(1);
 	}
 	$parser->parse_table or die "unable to parse file '$infile'!\n";
 	
@@ -593,8 +643,15 @@ sub process_gene {
 	}
 	return unless @transcripts;
 	
+	# filter for transcript support level if requested
+	if ($tsl) {
+		my $new_transcripts = filter_transcript_support_level(\@transcripts, $tsl);
+		return unless scalar @$new_transcripts;
+		@transcripts = @$new_transcripts;
+	}
+	
 	# alternate or common exons require working with multiple transcripts
-	if ($request =~ /alternate|common/i) {
+	if ($request =~ /alternate|common|collapsed/i) {
 		# pass all the transcripts together
 		@regions = &$method(@transcripts);
 	}
@@ -727,6 +784,12 @@ sub collect_exons {
 	}
 	
 	return @exons;
+}
+
+
+sub collect_collapsed_exons {
+	my $transcript = collapse_transcripts(@_);
+	return collect_exons($transcript);
 }
 
 
@@ -1003,6 +1066,12 @@ sub collect_introns {
 }
 
 
+sub collect_collapsed_introns {
+	my $transcript = collapse_transcripts(@_);
+	return collect_introns($transcript);
+}
+
+
 sub collect_first_intron {
 	my $transcript = shift;
 	
@@ -1115,6 +1184,43 @@ sub collect_utrs {
 	return @utrs;
 }
 
+sub collect_cds_start {
+	
+	# get seqfeature objects
+	my $transcript = shift;
+	
+	# get the cds start
+	my $pos = get_cdsStart($transcript);
+	return unless $pos;
+	
+	# get other things
+	my $chromo = $transcript->seq_id;
+	my $strand = $transcript->strand;
+	my $name = $transcript->display_name . '_cdsStart';
+	
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $pos, $pos, $strand] 
+	);
+}
+
+sub collect_cds_stop {
+	
+	# get seqfeature objects
+	my $transcript = shift;
+	
+	# get the cds start
+	my $pos = get_cdsEnd($transcript);
+	return unless $pos;
+	
+	# get other things
+	my $chromo = $transcript->seq_id;
+	my $strand = $transcript->strand;
+	my $name = $transcript->display_name . '_cdsStart';
+	
+	return _adjust_positions( 
+		[$transcript->display_name, $name, $chromo, $pos, $pos, $strand] 
+	);
+}
 
 sub acceptable_transcript {
 	my $t = shift;
@@ -1238,23 +1344,25 @@ A script to collect specific, often un-annotated regions from genes.
 
 =head1 SYNOPSIS
 
-get_gene_regions.pl [--options...] --db <text> --out <filename>
-
 get_gene_regions.pl [--options...] --in <filename> --out <filename>
   
+get_gene_regions.pl [--options...] --db <text> --out <filename>
+
   Options:
-  --db <text>
   --in <filename>  (gff,gtf,gff3,refFlat,genePred,knownGene)
+  --db <text>
   --out <filename> 
   --feature <type | type:source>
   --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
-  --region [tss|tts|exon|altExon|uncommonExon|commonExon|firstExon|lastExon|
-            intron|altIntron|uncommonIntron|commonIntron|firstIntron|
-            lastIntron|splice|UTR]
+  --region [tss|tts|cdsStart|cdsStop|splice|UTR|exon|collapsedExon|
+            altExon|uncommonExon|commonExon|firstExon|lastExon|
+            intron|collapsedIntron|altIntron|uncommonIntron|commonIntron|
+            firstIntron|lastIntron]
   --start=<integer>
   --stop=<integer>
   --unique
   --slop <integer>
+  --tsl [best|best1|best2|best3|best4|best5|1|2|3|4|5|NA]
   --bed
   --gz
   --version
@@ -1266,20 +1374,17 @@ The command line flags and descriptions:
 
 =over 4
 
+=item --in <filename>
+
+Provide a gene table or annotation file, including GTF, GFF, GFF3, UCSC 
+refFlat, UCSC genePred or genePredExt, or UCSC knownGene table. Files 
+may be gzipped.
+
 =item --db <text>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. A database is 
-required for generating new data files with features. For more information 
-about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
-Also see C<--in> as an alternative.
-
-=item --in <filename>
-
-Alternative to a database, a gene table or annotation file may be provided. 
-A GTF, GFF, GFF3, or UCSC gene table, including refFlat, genePred (gene 
-prediction), or known gene table may be provided. Files may be gzipped.
+from which gene or feature annotation may be obtained. Only required if 
+an input gene table is not provided.
 
 =item --out <filename>
 
@@ -1305,25 +1410,29 @@ will be presented from which the user may select.
 =item --region <region>
 
 Specify the type of region to retrieve. If not specified on the command 
-line, the list is presented interactively to the user for selection. Ten 
-possibilities are possible.
+line, the list is presented interactively to the user for selection. The 
+possibilities are listed below.
      
-     tss         The first base of transcription
-     tts         The last base of transcription
-     exon        The exons of each transcript
-     firstExon   The first exon of each transcript
-     lastExon    The last exon of each transcript
-     altExon     Exons unique to one of several transcripts from a gene
-     uncommonExon Exons shared by 2 or more but not all transcripts
-     commonExon  Exons shared by all transcripts from a gene
-     intron      Each intron (usually not defined in the GFF3)
-     firstIntron The first intron of each transcript
-     lastIntron  The last intron of each transcript
-     altIntron   Introns unique to one of several transcripts from a gene
-     uncommonIntron Introns shared by 2 or more but not all transcripts
-     commonIntron Introns shared by all transcripts of a gene
-     splice      The first and last base of each intron
-     UTR         The untranslated regions of each coding transcript
+  tss           The first base of transcription
+  tts           The last base of transcription
+  exon          The exons of each transcript
+  collapsedExon The exons after collapsing all gene transcripts
+  firstExon     The first exon of each transcript
+  lastExon      The last exon of each transcript
+  altExon       Exons unique to one of several transcripts from a gene
+  uncommonExon  Exons shared by 2 or more but not all transcripts
+  commonExon    Exons shared by all transcripts from a gene
+  intron        Each intron (usually not defined in the GFF3)
+  collapsedIntron Introns after collapsing all gene transcripts
+  firstIntron   The first intron of each transcript
+  lastIntron    The last intron of each transcript
+  altIntron     Introns unique to one of several transcripts from a gene
+  uncommonIntron Introns shared by 2 or more but not all transcripts
+  commonIntron  Introns shared by all transcripts of a gene
+  splice        The first and last base of each intron
+  UTR           The untranslated regions of each coding transcript
+  cdsStart      The first base of the CDS
+  cdsStop       The last base of the CDS
 
 =item --start=<integer>
 
@@ -1353,6 +1462,22 @@ example, when start sites of transcription are not precisely mapped,
 but not useful with defined introns and exons. This does not take 
 into consideration transcripts from other genes, only the current 
 gene. The default is 0 (no sloppiness).
+
+=item --tsl <level>
+
+Filter transcripts on the Ensembl GTF/GFF3 attribute 'transcript_support_level', 
+which is described at L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>.
+Provide a level of support to filter. Values include: 
+    
+    1       All splice junctions supported by evidence
+    2       Transcript flagged as suspect or only support from multiple ESTs
+    3       Only support from single EST
+    4       Best supporting EST is suspect
+    5       No support
+    best    Transcripts at the best (lowest) available level are taken
+    best1   The word followed by a digit 1-5, indicating any transcript 
+            at or better (lower) than the indicated level
+    NA      Only transcripts without a level (NA) are retained.
 
 =item --bed
 

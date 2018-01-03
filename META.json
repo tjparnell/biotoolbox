@@ -10,7 +10,7 @@
    ],
    "meta-spec" : {
       "url" : "http://search.cpan.org/perldoc?CPAN::Meta::Spec",
-      "version" : "2"
+      "version" : 2
    },
    "name" : "Bio-ToolBox",
    "prereqs" : {
@@ -44,15 +44,15 @@
    "provides" : {
       "Bio::ToolBox" : {
          "file" : "lib/Bio/ToolBox.pm",
-         "version" : "1.52"
+         "version" : "1.53"
       },
       "Bio::ToolBox::Data" : {
          "file" : "lib/Bio/ToolBox/Data.pm",
-         "version" : "1.43"
+         "version" : "1.53"
       },
       "Bio::ToolBox::Data::Feature" : {
          "file" : "lib/Bio/ToolBox/Data/Feature.pm",
-         "version" : "1.52"
+         "version" : "1.53"
       },
       "Bio::ToolBox::Data::Iterator" : {
          "file" : "lib/Bio/ToolBox/Data.pm"
@@ -63,7 +63,7 @@
       },
       "Bio::ToolBox::Data::core" : {
          "file" : "lib/Bio/ToolBox/Data/core.pm",
-         "version" : "1.51"
+         "version" : "1.53"
       },
       "Bio::ToolBox::Data::file" : {
          "file" : "lib/Bio/ToolBox/Data/file.pm",
@@ -71,7 +71,7 @@
       },
       "Bio::ToolBox::GeneTools" : {
          "file" : "lib/Bio/ToolBox/GeneTools.pm",
-         "version" : "1.52"
+         "version" : "1.53"
       },
       "Bio::ToolBox::SeqFeature" : {
          "file" : "lib/Bio/ToolBox/SeqFeature.pm",
@@ -83,7 +83,7 @@
       },
       "Bio::ToolBox::db_helper" : {
          "file" : "lib/Bio/ToolBox/db_helper.pm",
-         "version" : "1.51"
+         "version" : "1.53"
       },
       "Bio::ToolBox::db_helper::alignment_callbacks" : {
          "file" : "lib/Bio/ToolBox/db_helper/alignment_callbacks.pm",
@@ -126,11 +126,11 @@
       },
       "Bio::ToolBox::parser::gff" : {
          "file" : "lib/Bio/ToolBox/parser/gff.pm",
-         "version" : "1.44"
+         "version" : "1.53"
       },
       "Bio::ToolBox::parser::ucsc" : {
          "file" : "lib/Bio/ToolBox/parser/ucsc.pm",
-         "version" : "1.42"
+         "version" : "1.53"
       },
       "Bio::ToolBox::parser::ucsc::builder" : {
          "file" : "lib/Bio/ToolBox/parser/ucsc.pm"
@@ -149,5 +149,5 @@
          "url" : "https://github.com/tjparnell/biotoolbox"
       }
    },
-   "version" : "1.52"
+   "version" : "1.53"
 }

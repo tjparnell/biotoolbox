@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.52';
+our $VERSION = '1.53';
 
 =head1 NAME
 
@@ -21,7 +21,7 @@ function in Bio::ToolBox::Data. Please see the respective documentation
 for more information.
 
 Example of working with a stream object.
-	
+
 	  my $Data = Bio::ToolBox::Data->new(file => $file);
 	  
 	  # stream method
@@ -64,11 +64,11 @@ named database features. The return values include:
 
 =over 4
 
-=item coordinate: Table includes at least chromosome and start
+=item * coordinate: Table includes at least chromosome and start
 
-=item named: Table includes name, type, and/or Primary_ID
+=item * named: Table includes name, type, and/or Primary_ID
 
-=item unknown: unrecognized
+=item * unknown: unrecognized
 
 =back
 
@@ -78,7 +78,7 @@ Returns the column name for the given index.
 
 item data
 
-Returns the parent Bio::ToolBox::Data object, in case you may 
+Returns the parent L<Bio::ToolBox::Data> object, in case you may 
 have lost it by going out of scope.
 
 =back
@@ -87,13 +87,13 @@ have lost it by going out of scope.
 
 These methods return the corresponding value, if present in the 
 data table, based on the column header name. If the row represents 
-a named database object, try calling the feature() method first. 
+a named database object, try calling the L</feature> method first. 
 This will retrieve the database SeqFeature object, and the attributes 
 can then be retrieved using the methods below or on the actual 
 database SeqFeature object.
 
 These methods do not set attribute values. If you need to change the 
-values in a table, use the value() method below.
+values in a table, use the L</value> method below.
 
 =over 4
 
@@ -111,7 +111,7 @@ The coordinates of the feature or segment. Coordinates from known
 0-based file formats, e.g. BED, are returned as 1-based. Coordinates 
 must be integers to be returned. Zero or negative start coordinates 
 are assumed to be accidents or poor programming and transformed to 1. 
-Use the value() method if you don't want this to happen.
+Use the L</value> method if you don't want this to happen.
 
 =item strand
 
@@ -158,9 +158,12 @@ BED and related Peak files (5th column), and bedGraph (4th column).
 
 =over 4
 
-=item value($index)
+=item value
 
-=item value($index, $new_value)
+  # retrieve a value 
+  my $v = $row->value($index);
+  # set a value
+  $row->value($index, $v + 1);
 
 Returns or sets the value at a specific column index in the 
 current data row. Null values return a '.', symbolizing an 
@@ -214,14 +217,14 @@ For example:
 
 =item rewrite_attributes
 
-Generic method that either calls rewrite_gff_attributes() or 
-rewrite_vcf_attributes() depending on the data table format.
+Generic method that either calls L</rewrite_gff_attributes> or 
+L</rewrite_vcf_attributes> depending on the data table format.
 
 =item rewrite_gff_attributes
 
 Rewrites the GFF attributes column (the 9th column) based on the 
 contents of the attributes hash that was previously generated with 
-the gff_attributes() method. Useful when you have modified the 
+the L</gff_attributes> method. Useful when you have modified the 
 contents of the attributes hash.
 
 =item rewrite_vcf_attributes
@@ -229,7 +232,7 @@ contents of the attributes hash.
 Rewrite the VCF attributes for the INFO (8th column), FORMAT (9th 
 column), and sample columns (10th and higher columns) based on the 
 contents of the attributes hash that was previously generated with 
-the vcf_attributes() method. Useful when you have modified the 
+the L</vcf_attributes> method. Useful when you have modified the 
 contents of the attributes hash.
 
 =back
@@ -238,7 +241,7 @@ contents of the attributes hash.
 
 The next three functions are convenience methods for using the 
 attributes in the current data row to interact with databases. 
-They are wrappers to methods in the <Bio::ToolBox::db_helper> 
+They are wrappers to methods in the L<Bio::ToolBox::db_helper> 
 module.
 
 =over 4
@@ -257,7 +260,7 @@ an alternate database is desired, you should change it first using
 the $Data-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
-See <Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
+See L<Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
 information about working with these objects.
 
 This method normally only works with "named" feature_types in a 
@@ -283,7 +286,9 @@ changed first using the general database() method.
 See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
 about working with Segment objects.
 
-=item get_features(%args)
+=item get_features
+
+  my @overlap_features = $row->get_features(type => $type);
 
 Returns seqfeature objects from a database that overlap the Feature 
 or interval in the current Data table row. This is essentially a 
@@ -300,13 +305,17 @@ include
 
 =item end
 
-=item type  The type of database features to retrieve.
+=item type
 
-=item db    An alternate database object to collect from.
+The type of database features to retrieve.
+
+=item db
+
+An alternate database object to collect from.
 
 =back
 
-=item get_sequence(%args)
+=item get_sequence
 
 Fetches genomic sequence based on the coordinates of the current seqfeature 
 or interval in the current Feature. This requires a database that 
@@ -327,9 +336,13 @@ desired. Potential keys include
 
 =item strand
 
-=item extend  Indicate additional basepairs of sequence added to both sides
+=item extend
 
-=item db  The fasta file or database from which to fetch the sequence
+Indicate additional basepairs of sequence added to both sides
+
+=item db
+
+The fasta file or database from which to fetch the sequence
 
 =back
 
@@ -342,7 +355,12 @@ sources, including bam, bigwig, bigbed, useq, Bio::DB databases, etc.
 
 =over 4
 
-=item get_score(%args)
+=item get_score
+
+  my $score = $row->get_score(
+       dataset => 'scores.bw',
+       method  => 'max',
+  );
 
 This method collects a single score over the feature or interval. 
 Usually a mathematical or statistical value is employed to derive the 
@@ -374,25 +392,35 @@ over the interval into one value. Options include the following:
 
 =over 4
 
-=item mean (default)
+=item * mean
 
-=item sum
+=item * sum
 
-=item min
+=item * min
 
-=item max
+=item * max
 
-=item median
+=item * median
 
-=item count  Count all overlapping items.
+=item * count
 
-=item pcount  Precisely count only containing (not overlapping) items.
+Count all overlapping items.
 
-=item ncount  Count overlapping unique names only.
+=item * pcount
 
-=item range  (Min - Max difference)
+Precisely count only containing (not overlapping) items.
 
-=item stddev  Standard deviation
+=item * ncount
+
+Count overlapping unique names only.
+
+=item * range
+
+The difference between minimum and maximum values.
+
+=item * stddev
+
+Standard deviation.
 
 =back
 
@@ -404,11 +432,17 @@ for data sources that support strand.
 
 =over 4
 
-=item sense  The same strand as the Feature.
+=item * sense
 
-=item antisense  The opposite strand as the Feature.
+The same strand as the Feature.
 
-=item all  Strand is ignored, all is taken (default).
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
 
 =back
 
@@ -421,13 +455,21 @@ subfeature to use. Accepted values include the following.
 
 =over 4 
 
-=item exon  All exons included
+=item * exon
 
-=item cds  The CDS or coding sequence are extracted from mRNA
+All exons included
 
-=item 5p_utr  The 5' UTR of mRNA
+=item * cds
 
-=item 3p_utr  The 3' UTR of mRNA
+The CDS or coding sequence are extracted from mRNA
+
+=item * 5p_utr
+
+The 5' UTR of mRNA
+
+=item * 3p_utr
+
+The 3' UTR of mRNA
 
 =back
 
@@ -454,18 +496,16 @@ By default, these are obtained from the Data table Feature.
 
 =back
   
-Example:
+=item get_relative_point_position_scores
 
   while (my $row = $stream->next_row) {
-     my $score = $row->get_score(
-        'method'    => 'mean',
-        'dataset'   => '/path/to/MyData.bw',
-        'exon'      => 1,
+     my $pos2score = $row->get_relative_point_position_scores(
+        'ddb'       => '/path/to/BigWigSet/',
+        'dataset'   => 'MyData',
+        'position'  => 5,
+        'extend'    => 1000,
      );
   }
-
-
-=item get_relative_point_position_scores(%args)
 
 This method collects indexed position scores centered around a 
 specific reference point. The returned data is a hash of 
@@ -494,7 +534,7 @@ bigBed, or USeq file, would be provided here. This options is required!
 =item position
 
 Indicate the position of the reference point relative to the Data table 
-Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
+Feature. 5 is the 5C<'> coordinate, 3 is the 3C<'> coordinate, and 4 is the 
 midpoint (get it? it's between 5 and 3). Default is 5.
 
 =item extend
@@ -526,11 +566,17 @@ for data sources that support strand.
 
 =over 4
 
-=item sense  The same strand as the Feature.
+=item * sense
 
-=item antisense  The opposite strand as the Feature.
+The same strand as the Feature.
 
-=item all  Strand is ignored, all is taken (default).
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
 
 =back
 
@@ -540,17 +586,23 @@ Only required when counting objects.
 
 =over 4
 
-=item count  Count all overlapping items.
+=item * count
 
-=item pcount  Precisely count only containing (not overlapping) items.
+Count all overlapping items.
 
-=item ncount  Count overlapping unique names only.
+=item * pcount
+
+Precisely count only containing (not overlapping) items.
+
+=item * ncount
+
+Count overlapping unique names only.
 
 =back
 
 =back
 
-Example:
+=item get_region_position_scores
 
   while (my $row = $stream->next_row) {
      my $pos2score = $row->get_relative_point_position_scores(
@@ -560,8 +612,6 @@ Example:
         'extend'    => 1000,
      );
   }
-
-=item get_region_position_scores(%args)
 
 This method collects indexed position scores across a defined 
 region or interval. The returned data is a hash of positions and 
@@ -599,13 +649,21 @@ Pass the name of the subfeature to use. Accepted values include the following.
 
 =over 4 
 
-=item exon  All exons included
+=item * exon
 
-=item cds  The CDS or coding sequence are extracted from mRNA
+All exons included
 
-=item 5p_utr  The 5' UTR of mRNA
+=item * cds
 
-=item 3p_utr  The 3' UTR of mRNA
+The CDS or coding sequence are extracted from mRNA
+
+=item * 5p_utr
+
+The 5' UTR of mRNA
+
+=item * 3p_utr
+
+The 3' UTR of mRNA
 
 =back
 
@@ -659,11 +717,17 @@ for data sources that support strand.
 
 =over 4
 
-=item sense  The same strand as the Feature.
+=item * sense
 
-=item antisense  The opposite strand as the Feature.
+The same strand as the Feature.
 
-=item all  Strand is ignored, all is taken (default).
+=item * antisense
+
+The opposite strand as the Feature.
+
+=item * all
+
+Strand is ignored, all is taken (default).
 
 =back
 
@@ -673,27 +737,21 @@ Only required when counting objects.
 
 =over 4
 
-=item count  Count all overlapping items.
+=item * count
 
-=item pcount  Precisely count only containing (not overlapping) items.
+Count all overlapping items.
 
-=item ncount  Count overlapping unique names only.
+=item * pcount
+
+Precisely count only containing (not overlapping) items.
+
+=item * ncount
+
+Count overlapping unique names only.
 
 =back
 
 =back
-
-Example:
-
-  while (my $row = $stream->next_row) {
-     my $pos2score = $row->get_relative_point_position_scores(
-        'ddb'       => '/path/to/BigWigSet/',
-        'dataset'   => 'MyData',
-        'position'  => 5,
-        'extend'    => 1000,
-     );
-  }
-
 
 =back
 
@@ -705,13 +763,13 @@ return a formatted tab-delimited text string suitable for printing to
 file. The string does not include a line ending character.
 
 These methods rely on coordinates being present in the source table. 
-If the row feature represents a database item, the feature() method 
+If the row feature represents a database item, the L</feature> method 
 should be called prior to these methods, allowing the feature to be 
 retrieved from the database and coordinates obtained.
 
 =over 4
 
-=item bed_string(%args)
+=item bed_string
 
 Returns a BED formatted string. By default, a 6-element string is 
 generated, unless otherwise specified. Pass an array of key values 
@@ -720,42 +778,46 @@ are supported.
 
 =over 4
 
-=item bed => <integer>
+=item bed
 
 Specify the number of BED elements to include. The number of elements 
 correspond to the number of columns in the BED file specification. A 
 minimum of 3 (chromosome, start, stop) is required, and maximum of 6 
 is allowed (chromosome, start, stop, name, score, strand). 
 
-=item chromo => <text>
+=item chromo
 
-=item seq_id => <text>
+=item seq_id
 
-=item start  => <integer>
+Provide a text string of an alternative chromosome or sequence name.
 
-=item stop   => <integer>
+=item start
 
-=item end    => <integer>
+=item stop
 
-=item strand => $strand
+=item end
 
-Provide alternate values from those defined or missing in the current 
-row Feature. Note that start values are automatically converted to 0-base 
+Provide alternative integers for the start and stop coordinates. 
+Note that start values are automatically converted to 0-base 
 by subtracting 1.
 
-=item name => <text>
+=item strand
 
-Provide alternate or missing name value to be used as text in the 4th 
+Provide alternate an alternative strand value. 
+
+=item name
+
+Provide an alternate or missing name value to be used as text in the 4th 
 column. If no name is provided or available, a default name is generated.
 
-=item score => <number>
+=item score
 
 Provide a numerical value to be included as the score. BED files typically 
 use integer values ranging from 1..1000. 
 
 =back
 
-=item gff_string(%args)
+=item gff_string
 
 Returns a GFF3 formatted string. Pass an array of key values 
 to control how the string is generated. The following arguments 
@@ -763,47 +825,47 @@ are supported.
 
 =over 4
 
-=item chromo => <text>
+=item chromo
 
-=item seq_id => <text>
+=item seq_id
 
-=item start  => <integer>
+=item start
 
-=item stop   => <integer>
+=item stop
 
-=item end    => <integer>
+=item end
 
-=item strand => $strand
+=item strand
 
 Provide alternate values from those defined or missing in the current 
 row Feature. 
 
-=item source => <text>
+=item source
 
 Provide a text string to be used as the source_tag value in the 2nd 
 column. The default value is null ".".
 
-=item primary_tag => <text>
+=item primary_tag
 
 Provide a text string to be used as the primary_tag value in the 3rd 
 column. The default value is null ".".
 
-=item type => <text>
+=item type
 
 Provide a text string. This can be either a "primary_tag:source_tag" value 
 as used by GFF based BioPerl databases, or "primary_tag" alone.
 
-=item score => <number>
+=item score
 
 Provide a numerical value to be included as the score. The default 
 value is null ".". 
 
-=item name => <text>
+=item name
 
 Provide alternate or missing name value to be used as the display_name. 
 If no name is provided or available, a default name is generated.
 
-=item attributes => [index],
+=item attributes
 
 Provide an anonymous array reference of one or more row Feature indices 
 to be used as GFF attributes. The name of the column is used as the GFF 
@@ -1262,6 +1324,7 @@ sub get_sequence {
 		$start = 1 if $start <= 0;
 		$stop += $args{extend};
 	}
+	return unless (defined $seqid and defined $start and defined $stop);
 	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
 	if ($strand == -1) {
 		$seq =~ tr/gatcGATC/ctagCTAG/;
@@ -1366,7 +1429,7 @@ sub _get_subfeature_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if (lc $feature->primary_tag eq 'gene') {
+	if ($feature->primary_tag =~ /gene$/i) {
 		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
 	}
 	
@@ -1488,8 +1551,8 @@ sub get_region_position_scores {
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} = $args{exon} ||= q();
-	if ($self->feature_type eq 'named' and $args{'subfeature'}) {
+	$args{subfeature} ||= $args{exon} || q();
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_position_scores(\%args, $ddb);
 	}
@@ -1557,28 +1620,35 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if (lc $feature->primary_tag eq 'gene') {
+	if ($feature->primary_tag =~ /gene$/i) {
 		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
 	}
 	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
 	
 	# get the subfeatures
 	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
+	my $subf = lc $args->{subfeature};
+	if ($subf eq 'exon') {
 		@subfeatures = get_exons($feature);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
+	elsif ($subf eq 'cds') {
 		@subfeatures = get_cds($feature);
 	}
-	elsif ($args->{subfeature} eq '5p_utr') {
+	elsif ($subf eq '5p_utr') {
 		@subfeatures = get_5p_utrs($feature);
 	}
-	elsif ($args->{subfeature} eq '3p_utr') {
+	elsif ($subf eq '3p_utr') {
 		@subfeatures = get_3p_utrs($feature);
 	}
 	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
+		croak "unrecognized subfeature parameter '$subf'!";
 	}
+	
+	# reset the practical start and stop to the actual subfeatures' final start and stop
+	# we can no longer rely on the feature start and stop, consider CDS
+	# these subfeatures should already be genomic sorted by GeneTools
+	my $practical_start = $subfeatures[0]->start;
+	my $practical_stop  = $subfeatures[-1]->end;
 	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
@@ -1586,7 +1656,7 @@ sub _get_subfeature_position_scores {
 	# and no introns exist
 	my $pos2data = {};
 	my $namecheck = {}; # to check unique names when using ncount method....
-	my $current_end = $subfeatures[0]->start;
+	my $current_end = $practical_start;
 	my $adjustment = 0;
 	foreach my $exon (@subfeatures) {
 		
@@ -1617,10 +1687,10 @@ sub _get_subfeature_position_scores {
 	}
 	
 	# collect extensions if requested
-	if ($args->{extension}) {
+	if ($args->{extend}) {
 		# left side
-		my $start = $feature->start - $args->{extension};
-		my $end = $feature->start - 1;
+		my $start = $practical_start - $args->{extend};
+		my $end = $practical_start - 1;
 		my $ext_scores = get_segment_score(
 			$feature->seq_id,
 			$start,
@@ -1639,8 +1709,8 @@ sub _get_subfeature_position_scores {
 		
 		
 		# right side
-		$start = $feature->end + $args->{extension};
-		$end = $feature->end + 1;
+		$start = $practical_stop + 1;
+		$end = $practical_stop + $args->{extend};
 		$ext_scores = get_segment_score(
 			$feature->seq_id,
 			$start,
@@ -1665,6 +1735,9 @@ sub _get_subfeature_position_scores {
 	}
 	else {
 		# return data converted to relative positions
+		# can no longer use original coordinates, but instead the new shifted coordinates
+		$args->{practical_start} = $practical_start;
+		$args->{practical_stop} = $current_end; 
 		$self->_calculate_reference($args);
 		return $self->_convert_to_relative_positions($pos2data, 
 			$args->{coordinate}, $fstrand);
@@ -1676,21 +1749,21 @@ sub _calculate_reference {
 	my $feature = $self->seqfeature || $self;
 	my $strand = defined $args->{strand} ? $args->{strand} : $feature->strand;
 	if ($args->{position} == 5 and $strand >= 0) {
-		$args->{coordinate} = $feature->start;
+		$args->{coordinate} = $args->{practical_start} || $feature->start;
 	}
 	elsif ($args->{position} == 3 and $strand >= 0) {
-		$args->{coordinate} = $feature->end;
+		$args->{coordinate} = $args->{practical_stop} || $feature->end;
 	}
 	elsif ($args->{position} == 5 and $strand < 0) {
-		$args->{coordinate} = $feature->end;
+		$args->{coordinate} = $args->{practical_stop} || $feature->end;
 	}
 	elsif ($args->{position} == 3 and $strand < 0) {
-		$args->{coordinate} = $feature->start;
+		$args->{coordinate} = $args->{practical_start} || $feature->start;
 	}
 	elsif ($args->{position} == 4) {
 		# strand doesn't matter here
-		$args->{coordinate} = $feature->start + 
-			int(($feature->length / 2) + 0.5);
+		my $s = $args->{practical_start} || $feature->start;
+		$args->{coordinate} = $s + int(($feature->length / 2) + 0.5);
 	}
 	else {
 		croak "position must be one of 5, 3, or 4";
