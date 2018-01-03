@@ -75,4 +75,6 @@
 # Avoid extra scripts when building distribution
 \bextras/
 
+# Avoid Markdown
+\.md$
 

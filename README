@@ -2,49 +2,35 @@ Bio::ToolBox - Tools for querying and analysis of genomic data
 
 DESCRIPTION
 
-This is a collection of libraries and high-quality end-user 
+The Bio::ToolBox libraries provide a unified, abstracted interface 
+to multiple common bioinformatic file formats, gene annotation 
+(bed, gff, gtf, UCSC formats), and data storage formats (bam, bigWig, 
+bigBed, USeq). Included are several high-quality end-user 
 scripts for bioinformatic analysis, including working with gene 
 annotation, collecting data scores from a variety of modern file 
-formats, and conversion between file formats. 
-
-The Bio::ToolBox libraries provide a unified, abstracted interface 
-to multiple common gene annotation formats and the collection of data 
-from multiple data files. They rely on BioPerl SeqFeature libraries 
-and related adaptors to access binary file formats including Bam, 
-BigWig, BigBed, and USeq. 
-
-The Bio::ToolBox package includes scripts for setting up databases 
-of annotation, collecting annotated features, collecting genomic data 
-relative to features, manipulating and analyzing data, and data format 
-conversion. 
-
+formats relative to genomic annotation, and conversion between 
+common file formats. 
 
 
 REQUIREMENTS
 
 These are Perl modules and scripts. They require Perl and a 
 command-line environment. They have been developed and tested on Mac 
-OS X and linux; Microsoft Windows compatability is not tested but 
-should mostly work.
-
+OS X and linux; Microsoft Windows compatability is not tested 
+nor guaranteed.
 
 
 INSTALLATION
 
 Installation is simple with the standard Perl incantation.
+
     perl ./Build.PL
-    ./Build installdeps     # if necessary
     ./Build
     ./Build test
     ./Build install
 
-Released version may be obtained though the CPAN repository using 
-your favorite package manager. For a quick installation, 
-the following command will get you started using the system perl and 
-your personal home PERL5 library.
-
-	curl -L http://cpanmin.us | perl - local::lib App::cpanminus Bio::ToolBox
-
+Released versions may be obtained though the CPAN repository using 
+your favorite package manager. 
 
 
 ADDITIONAL MODULES
@@ -57,45 +43,6 @@ and BigBed, require external library dependencies that must be compiled
 separately. See the respective modules for installation instructions.
 
 Most scripts should fail gently with warnings about missing modules.
-
-
-
-
-USAGE OF PROVIDED SCRIPTS
-
-* Configuration *
-There is a configuration file that may be customized for your particular
-installation. The default file is written to ~/.biotoolbox.cfg. It is a simple
-INI-style file that is used to set up database connection profiles, feature
-aliases, helper application locations, etc. The file may be edited by users. 
-More documentation can be found in the Bio::ToolBox::db_helper::config 
-documentation. This file is automatically written as needed; it is not 
-installed by the Installer.
-
-* Execution *
-All biotoolbox scripts are designed to be run from the command line or
-executed from another script. Some programs, for example
-manipulate_datasets.pl, also provide an interactive interface to allow for
-spontaneous work or when the exact index number or name of the dataset in
-the file or database is not immediately known.
-
-* Help *
-All scripts require command line options for execution. Executing the
-program without any options will present a synopsis of the options that are
-available. Most programs also have a --help option, which will display
-detailed information about the program and execution (usually by displaying
-the internal POD). The options are given in the long format (--help, for
-example), but may be shortened to single letters if the first letter is
-unique (-h, for example).
-
-* File Formats *
-Many of the programs are designed to input and output a tabbed-delimited 
-text format (unix line endings), where the rows represent genomic features, 
-bins, etc. and the columns represent descriptive information and data. The 
-first line in the table are the column headings. Metadata about each 
-column are recorded in header lines at the beginning of the file and 
-prefixed by a # symbol. The files may be compressed with gzip. More 
-information may be found Bio::ToolBox::Data.
 
 
 
