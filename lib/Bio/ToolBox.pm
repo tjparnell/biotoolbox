@@ -24,7 +24,7 @@ a set of common tools for working with them.
 
 =item * Support for BED, GFF, VCF, narrowPeak files
 
-=item * Scoring intervals with datasets from microarray and sequencing
+=item * Scoring intervals and annotation with datasets from microarray or sequencing experiments, including ChIPSeq, RNASeq, and more
 
 =item * ChIPSeq, RNASeq, microarray expression
 
@@ -113,7 +113,7 @@ from one of the L<"Annotation parsers"> or a L<Bio::DB::SeqFeature::Store> datab
 The functions make hard things easy, such as identifying whether a transcript is 
 coding or not (is it encoded in the C<primary_tag> or C<source_tag> or GFF 
 attribute or does it have C<CDS> subfeatures?), or identify the alternative exons 
-or introns of a multi-transcript gene, or pull out the C<5'> UTR (which is likely 
+or introns of a multi-transcript gene, or pull out the 5' UTR (which is likely 
 not explicitly defined in the table).
 
 =back
@@ -133,6 +133,9 @@ A sampling of what can be done include the following:
 =item * Data file format manipulation and conversion
 
 =item * Low-level processing of sequencing data into customizable wig representation
+
+Scripts have built-in documentation. Execute the script without any options to print 
+a synopsis of available options, or add C<--help> to print the full documentation.
 
 =back
 
