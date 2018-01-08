@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -822,16 +822,20 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ( $gene->primary_tag !~ /gene$/i and 
-		$gene->primary_tag =~ /rna|transcript/i);
+	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	my @exons;
+	my @other;
 	foreach my $subf ($gene->get_SeqFeatures) {
-		if ($subf->primary_tag =~ /rna|transcript/i) {
+		if ($subf->primary_tag =~ /rna|transcript|\bprocessed/i) {
 			push @transcripts, $subf;
 		}
-		elsif ($subf->primary_tag =~ /^(?:cds|exon)$/i) {
+		elsif ($subf->primary_tag =~ /^(?:cds|exon|\w+codon)$/i) {
 			push @exons, $subf;
+		}
+		else {
+			# wierdo subfeature types like unprocessed_pseudogene
+			push @other, $subf;
 		}
 	}
 	if (not @transcripts and @exons) {
@@ -849,6 +853,11 @@ sub get_transcripts {
 		);
 		push @transcripts, $transcript;
 	}
+	elsif (not @transcripts and not @exons and @other) {
+		# well, what choice do we have? 
+		# we can assume these are transcripts, because what else could they be?
+		@transcripts = @other;
+	} 
 	@transcripts = map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
 		map { [$_, $_->start, $_->length] } 
