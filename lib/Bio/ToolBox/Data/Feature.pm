@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -1429,9 +1429,6 @@ sub _get_subfeature_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if ($feature->primary_tag =~ /gene$/i) {
-		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
-	}
 	
 	# get the subfeatures
 	my @subfeatures;
@@ -1450,7 +1447,9 @@ sub _get_subfeature_scores {
 	else {
 		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
 	}
-	# collect over each exon
+	# it's possible nothing is returned, which means no score will be calculated
+	
+	# collect over each subfeature
 	my @scores;
 	foreach my $exon (@subfeatures) {
 		my $exon_scores = get_segment_score(
@@ -1620,9 +1619,6 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if ($feature->primary_tag =~ /gene$/i) {
-		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
-	}
 	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
 	
 	# get the subfeatures
@@ -1642,6 +1638,11 @@ sub _get_subfeature_position_scores {
 	}
 	else {
 		croak "unrecognized subfeature parameter '$subf'!";
+	}
+	
+	# it's possible no subfeatures are returned
+	unless (@subfeatures) {
+		return;
 	}
 	
 	# reset the practical start and stop to the actual subfeatures' final start and stop
