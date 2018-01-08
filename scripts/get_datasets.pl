@@ -21,7 +21,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.53';
+my $VERSION = '1.54';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -473,8 +473,12 @@ sub parallel_execution {
 		}
 		
 		# collapse transcripts if needed
-		if ($feature eq 'gene' and $subfeature eq 'exon') {
-			$Data->collapse_gene_transcripts;
+		if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+			my $c = $Data->collapse_gene_transcripts;
+			if ($c != $Data->last_row) {
+				printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
+					$Data->last_row - $c;
+			}
 		}
 		
 		# collect the dataset
@@ -517,8 +521,12 @@ sub parallel_execution {
 sub single_execution {
 	
 	# collapse transcripts if needed
-	if ($feature eq 'gene' and $subfeature eq 'exon') {
-		$Data->collapse_gene_transcripts;
+	if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+		my $c = $Data->collapse_gene_transcripts;
+		if ($c != $Data->last_row) {
+			printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
+				$Data->last_row - $c;
+		}
 	}
 		
 	# collect the datasets
