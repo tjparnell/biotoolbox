@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -1019,6 +1019,7 @@ use Module::Load;
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list 
 	get_new_genome_list 
+	get_db_feature
 );
 
 1;
@@ -1391,20 +1392,20 @@ sub iterate {
 #### Stored SeqFeature manipulation
 
 sub store_seqfeature {
-	my ($self, $row, $seqfeature) = @_;
-	unless (defined $row and ref($seqfeature)) {
+	my ($self, $row_i, $seqfeature) = @_;
+	unless (defined $row_i and ref($seqfeature)) {
 		confess "must provide a row index and SeqFeature object!";
 	}
-	confess "invalid row index" unless ($row <= $self->last_row);
+	confess "invalid row index" unless ($row_i <= $self->last_row);
 	$self->{SeqFeatureObjects} ||= [];
-	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
+	$self->{SeqFeatureObjects}->[$row_i] = $seqfeature;
 	return 1;
 }
 
 sub collapse_gene_transcripts {
 	my $self = shift;
-	unless (exists $self->{SeqFeatureObjects}) {
-		carp "no SeqFeature objects stored for collapsing!";
+	unless ($self->feature_type eq 'named') {
+		carp "Table does not contain named features!";
 		return;
 	}
 	
@@ -1418,11 +1419,34 @@ sub collapse_gene_transcripts {
 	
 	# collapse the transcripts
 	my $success = 0;
-	for (my $i = 1; $i <= $self->last_row; $i++) {
-		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
-		my $collSeqFeat = collapse_transcripts($feature) or next;
-		$success += $self->store_seqfeature($i, $collSeqFeat);
+	if (exists $self->{SeqFeatureObjects}) {
+		# we should have stored SeqFeature objects, probably from parsed table
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+			my $collSeqFeat = collapse_transcripts($feature) or next;
+			$success += $self->store_seqfeature($i, $collSeqFeat);
+		}
 	}
+	else {
+		# no stored SeqFeature objects, probably names pointing to a database
+		# we will have to fetch the feature from a database
+		my $db = $self->open_meta_database(1) or  # force open a new db connection
+			confess "No SeqFeature objects stored and no database connection!";
+		my $name_i = $self->name_column;
+		my $id_i = $self->id_column;
+		my $type_i = $self->type_column;
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = get_db_feature(
+				db    => $db,
+				name  => $self->value($i, $name_i) || undef,
+				type  => $self->value($i, $type_i) || undef,
+				id    => $self->value($i, $id_i) || undef,
+			) or next;
+			my $collSeqFeat = collapse_transcripts($feature) or next;
+			$success += $self->store_seqfeature($i, $collSeqFeat);
+		}
+	}
+	
 	return $success;
 }
 
@@ -1469,10 +1493,35 @@ sub add_transcript_length {
 	
 	# add new column and calculate
 	my $length_i = $self->add_column($length_name);
-	for (my $i = 1; $i <= $self->last_row; $i++) {
-		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
-		my $length = &$length_calculator($feature);
-		$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+	if (exists $self->{SeqFeatureObjects}) {
+		# we should have stored SeqFeature objects, probably from parsed table
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+			my $length = &$length_calculator($feature);
+			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+		}
+	}
+	else {
+		# no stored SeqFeature objects, probably names pointing to a database
+		# we will have to fetch the feature from a database
+		my $db = $self->open_meta_database(1) or  # force open a new db connection
+			confess "No SeqFeature objects stored and no database connection!";
+		my $name_i = $self->name_column;
+		my $id_i = $self->id_column;
+		my $type_i = $self->type_column;
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = get_db_feature(
+				db    => $db,
+				name  => $self->value($i, $name_i) || undef,
+				type  => $self->value($i, $type_i) || undef,
+				id    => $self->value($i, $id_i) || undef,
+			) or next;
+			my $length = &$length_calculator($feature);
+			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+			$self->store_seqfeature($i, $feature);
+				# to store or not to store? May explode memory, but could save from 
+				# expensive db calls later
+		}
 	}
 	
 	return $length_i;
