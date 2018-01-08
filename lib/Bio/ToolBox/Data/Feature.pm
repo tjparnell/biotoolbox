@@ -1256,17 +1256,14 @@ sub seqfeature {
 	
 	# retrieve the feature from the database
 	return unless $self->{data}->database;
-	my $id   = $self->id;
-	my $name = $self->name;
-	my $type = $self->type || $self->{data}->feature;
-	return unless ($id or ($name and $type));
 	$f = get_db_feature(
 		'db'    => $self->{data}->open_meta_database,
-		'id'    => $id,
-		'name'  => $name, # we can handle "name; alias" lists later
-		'type'  => $type,
+		'id'    => $self->id || undef,
+		'name'  => $self->name || undef, 
+		'type'  => $self->type || $self->{data}->feature,
 	);
-	$self->{feature} = $f if $f;
+	return unless $f;
+	$self->{feature} = $f;
 	return $f;
 }
 
