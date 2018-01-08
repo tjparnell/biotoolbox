@@ -978,6 +978,7 @@ sub get_transcript_length {
 sub is_coding {
 	my $transcript = shift;
 	return unless $transcript;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	if ($transcript->primary_tag =~ /gene$/i) {
 		# someone passed a gene, check its subfeatures
 		my $code_potential = 0;
@@ -1014,6 +1015,8 @@ sub is_coding {
 
 sub get_cds {
 	my $transcript = shift;
+	return unless $transcript;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @cds;
 	foreach my $subfeat ($transcript->get_SeqFeatures) {
 		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
