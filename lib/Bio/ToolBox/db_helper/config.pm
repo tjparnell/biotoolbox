@@ -5,7 +5,7 @@ require Exporter;
 use File::Spec;
 use Carp;
 use Config::Simple;
-our $VERSION = '1.14';
+our $VERSION = '1.54';
 
 # variables
 our $default;
@@ -26,8 +26,6 @@ user                     = nobody
 pass                     = hello
 adaptor                  = DBI::mysql
 dsn_prefix               = dbi:mysql:
-chromosome_exclude       = chrMito, chrMT, 2-micron
-window                   = 500
 
 [example_remote]
 user                     = me
@@ -37,14 +35,6 @@ dsn                      = dbi:mysql:host=127.0.0.1;port=3306;database=example
 [example_sqlite]
 adaptor                  = DBI::SQLite
 dsn                      = /path/to/example.sqlite
-
-[features]
-rna         = ncRNA, snRNA, snoRNA, tRNA
-orf         = gene, ORF
-repeat      = repeat_region, long_terminal_repeat, transposable_element_gene, LTR_retrotransposon
-
-[exclude_tags]
-orf_classification    = Dubious
 
 [applications]
 
@@ -164,9 +154,7 @@ Bio::ToolBox::db_helper::config
 =head1 DESCRIPTION
 
 This module accesses the biotoolbox configuration file. This file stores 
-multiple database connection settings, as well as default behaviors when 
-accessing information from the database, such as excluded attribute tags, 
-reference sequence GFF type, etc. It also stores the paths to various 
+multiple database connection settings. It also stores the paths to various 
 helper applications. 
 
 The default location for the file is in the user's home directory. 
@@ -194,8 +182,6 @@ These are default settings that are shared by all databases.
   pass                     = hello
   adaptor                  = DBI::mysql
   dsn_prefix               = dbi:mysql:
-  chromosome_exclude       = chrMito, chrMT, 2-micron
-  window                   = 500
 
 The user and password keys are for authenticating to a relational 
 database. B<WARNING!>
@@ -222,43 +208,9 @@ with any database name.
 See the documentation for L<Bio::DB::SeqFeature::Store> for syntax of 
 C<adaptor> and C<dsn_prefix> keys. 
 
-The C<chromosome_exclude> key provides a list of chromosomes to avoid when 
-generating either a list of genomic window intervals or genes. For 
-example, the mitochondrial chromosome is usually not included when 
-performing analyses. 
-
-The window is the size in bp when generating genomic window intervals. It 
-is used by the <<Bio::ToolBox::db_helper/get_new_genome_list> function.
-
 Multiple database sections may be included. Simply name the section after the 
 name of the database. Database specific keys may be included, and missing 
 keys will default to the C<default_db> values. 
-
-=item Feature Alias Lists
-
-These are aliases for one or more GFF feature types when searching 
-for these features in the database.
-
-Specify as either the GFF "type" or "type:source". These represent GFF 
-columns 3 and 2:3, respectively.
-
-  [features]
-  rna         = ncRNA, snRNA, snoRNA, tRNA
-  orf         = gene, ORF
-  repeat      = repeat_region, long_terminal_repeat, transposable_element_gene, LTR_retrotransposon
-
-=item Exclude Tags
-
-Some features in the database you simply don't want in your list. For 
-example, in the cerevisiaie GFF3 annotation, dubious genes are included 
-as gene features, but have the GFF "orf_classification" tag value of 
-"Dubious". I don't want these features. Ever. These tags are checked 
-using the L<Bio::ToolBox::db_helper/get_new_feature_list> function.
-
-Specify the tag key and the tag value(s) to be excluded
-
-  [exclude_tags]
-  orf_classification    = Dubious
 
 =item Applications
 
@@ -268,8 +220,7 @@ may also be automatically found in the system path.
 
   [applications]
   wigToBigWig      = /usr/local/bin/wigToBigWig
-  java             = /usr/bin/java
-  Bar2Gr           = /usr/local/USeq/Apps/Bar2Gr
+  bedToBigBed      = /usr/local/bin/bedToBigBed
 
 =back
 
