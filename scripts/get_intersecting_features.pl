@@ -12,10 +12,9 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types 
 	get_chromosome_list
-	validate_included_feature
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.52;
+my $VERSION = 1.54;
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -481,37 +480,17 @@ sub process_region {
 		my $f = shift @features;
 		
 		# record information
-		if ( validate_included_feature($f) ) {
-			# the feature is ok to use (doesn't have tag to exclude it)
-			$row->value($number_i, 1);
-			$row->value($name_i, $f->display_name);
-			$row->value($type_i, $f->type);
-			$row->value($strand_i, $f->strand);
-			$row->value($distance_i, determine_distance($region, $region_strand, $f));
-			$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
-		}
-		else {
-			# the feature should be excluded
-			process_no_feature($row, $number_i, $name_i, $type_i, $strand_i, 
-				$distance_i, $overlap_i);
-		}
+		$row->value($number_i, 1);
+		$row->value($name_i, $f->display_name);
+		$row->value($type_i, $f->type);
+		$row->value($strand_i, $f->strand);
+		$row->value($distance_i, determine_distance($region, $region_strand, $f));
+		$row->value($overlap_i, determine_overlap($region, $region_strand, $f));
 	}
 	
 	elsif (scalar @features > 1) {
 		# more than one feature
 		# need to identify the most appropriate one
-		
-		# first check for excluded feature tags
-		for (my $i = $#features - 1; $i >= 0; $i -= 1) {
-			# walk through the list and delete any that should be excluded
-			# we're working backwards to avoid indexing problems with splice
-			unless ( validate_included_feature($features[$i]) ) {
-				splice(@features, $i, 1);
-			}
-		}
-		
-		
-		# next we'll take the one with the most overlap first
 		my $f;
 		if (scalar @features > 1) {
 			my %overlap2f;
