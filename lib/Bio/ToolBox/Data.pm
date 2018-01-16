@@ -190,8 +190,14 @@ parsed. This expedites parsing by skipping unwanted features.
   my $Data = Bio::ToolBox::Data->new(db => $dbname, win => $integer);
 
 If generating a list of genomic intervals, optionally provide 
-the window and step values. Default values are defined in 
-the Bio::ToolBox configuration file C<.biotoolbox.cfg>.
+the window and step values. The default is 500 bp.
+
+=item chrskip
+
+Provide a regular expression compatible or C<qr> string for skipping or 
+excluding specific or classes of chromosomes, for example the mitochondrial 
+chromosome or unmapped contigs. This works with both feature collection 
+and genomic intervals. The default is to take all chromosomes.
 
 =item columns
 
@@ -219,7 +225,12 @@ to selectively copy rows from one Data object to another.
 =item parse_table
 
   $Data->parse_table($file)
-  $Data->parse_table($file, $feature, $subfeature)
+  $Data->parse_table( {
+         file => $file, 
+         feature => 'gene',
+         subfeature => 'exon',
+         chrskip => 'chrM|contig',
+  } );
 
 This will parse a gene annotation table into SeqFeature objects. 
 If this is called from an empty Data object, then the table will 
@@ -227,28 +238,39 @@ be filled with the SeqFeature object names and IDs. If this is
 called from a non-empty Data object, then the table's contents 
 will be associated with the SeqFeature objects using their name and 
 ID. The stored SeqFeature objects can be retrieved using the 
-get_seqfeature() method.
+L</get_seqfeature> method.
 
-Pass the method the gene table filename to be parsed. This may 
-be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
-These will be parsed using Bio::ToolBox::parser::* adapters.
-
-One or two additional options may be passed in addition. Both 
-are text strings that will be used in a case-insensitive regular 
-expression, so 'rna' will match all RNA types (mRNA, snRNA, etc).
+Pass the method a single argument. This may be either a simple 
+scalar to a filename to be parsed, or a reference to hash of 
+one or more argument options. Possible options include:
 
 =over 4
 
-=item 1. C<$feature>
+=item file
 
-The primary_tag or feature type of the top features from the table.
-The default value is 'gene'.
+The file name of the gene table to be parsed. This may 
+be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
+These will be parsed using Bio::ToolBox::parser::* adapters.
 
-=item 2. C<$subfeature>
+=item feature
 
-The primary_tag or feature type  of any subfeatures to additionally 
-be parsed. Typically these include exon, CDS, or UTR. The default is 
-nothing.
+A regular expression compatible string or C<qr> string to match 
+the top features C<primary_tag> to keep. The C<source_tag> is not 
+checked. The default is 'gene', although a transcript type could 
+alternatively be specified (in which case transcripts are not 
+parsed in gene features).
+
+=item subfeature
+
+A regular expression compatible string or C<qr> string to match 
+any sub features C<primary_tag> to parse. The C<source_tag> is not checked.
+Typically these include exon, CDS, or UTR. The default is nothing.
+
+=item chrskip
+
+A regular expression compatible string or C<qr> string to match 
+chromosomes to be skipped or excluded. Any feature with a matching 
+C<seq_id> chromosome name will be skipped.
 
 =back
 
@@ -1061,15 +1083,16 @@ sub new {
 	# prepare a new table based on the provided arguments
 	if ($args{file} and $args{parse}) {
 		# parse from file
-		my $subfeature = $args{subfeature} || '';
-		unless ( $self->parse_table($args{file}, $args{features}, $subfeature) ) {
+		$args{subfeature} ||= '';
+		unless ( $self->parse_table(\%args) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
 			if ($self->database =~ /^Parsed:(.+)$/) {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
 				# this may die if it doesn't work
-				$self->parse_table($1, $args{features}, $subfeature); 
+				$args{file} = $1;
+				$self->parse_table(\%args); 
 			}
 		}
 	}
@@ -1141,13 +1164,24 @@ sub duplicate {
 
 sub parse_table {
 	my $self = shift;
-	my $file = shift;
+	my $args = shift;
+	my ($file, $feature, $subfeature);
+	if (ref $args) {
+		$file = $args->{file} || '';
+		$feature = $args->{feature} || 'gene';
+		$subfeature = $args->{subfeature} || '';
+	}
+	else {
+		# no hash reference, assume just a file name
+		$file = $args;
+		undef $args;
+		$feature = 'gene';
+		$subfeature = '';
+	}
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
-	my $feature = shift || 'gene';
-	my $subfeature = shift || '';
 	
 	# the file format determines the parser class
 	my $flavor = $self->taste_file($file) or return;
@@ -1206,7 +1240,18 @@ PARSEFAIL
 		$self->add_column('Primary_ID');
 		$self->add_column('Name');
 		$self->add_column('Type');
+		
+		# check for chromosome exclude
+		my $chr_exclude;
+		if ($args) {
+			$chr_exclude = $args->{chrskip} || '';
+		}
+		
+		# fill table with features
 		while (my $f = $parser->next_top_feature) {
+			if ($chr_exclude) {
+				next if $f->seq_id =~ $chr_exclude;
+			}
 			my $type = $f->type;
 			if ($f->type =~ /$feature/i) {
 				my $index = $self->add_row(
