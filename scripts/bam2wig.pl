@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.53';
+my $VERSION = '1.54';
 	
 	
 
@@ -1129,7 +1129,8 @@ sub open_wig_file {
 	if ($bigwig and $do_bw) {
 		print " Writing directly to bigWig converter\n";
 		$name .= '.bw' unless $name =~ /\.bw$/;
-		$chromo_file = generate_chromosome_file($sams[0]) unless $chromo_file;
+		$chromo_file = generate_chromosome_file($sams[0], $chr_exclude) 
+			unless $chromo_file;
 		my $fh = open_wig_to_bigwig_fh(
 			file      => $name,
 			chromo    => $chromo_file,
