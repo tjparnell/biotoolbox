@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
 );
-my $VERSION =  '1.42';
+my $VERSION =  '1.54';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -43,6 +43,7 @@ my (
 	$stop_index,
 	$score_index,
 	@score_indices,
+	$no_header,
 	$attribute_name,
 	$track_name,
 	$use_track,
@@ -73,6 +74,7 @@ GetOptions(
 	'start|pos=i' => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
 	'index|score=s' => \$score_index, # index for the score column
+	'noheader'  => \$no_header, # source has no header line
 	'attrib=s'  => \$attribute_name, # gff or vcf attribute name to use 
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
@@ -119,7 +121,7 @@ unless (defined $use_track) {
 
 
 ### Load input file
-my $Input = Bio::ToolBox::Data::Stream->new(file => $infile) or
+my $Input = Bio::ToolBox::Data::Stream->new(file => $infile, noheader => $no_header) or
 	die "Unable to open file '$infile'!\n";
 
 
@@ -724,6 +726,7 @@ data2wig.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
+  --noheader
   --fast
   --step [fixed | variable | bed]
   --bed | --bdg
@@ -768,6 +771,11 @@ be gzipped compressed.
 
 Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.
+
+=item --noheader
+
+The input file does not have column headers, often found with UCSC 
+derived annotation data tables. 
 
 =item --fast
 
