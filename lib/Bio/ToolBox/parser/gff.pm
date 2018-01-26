@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -1011,10 +1011,10 @@ sub _gtf_to_seqf_simple {
 	
 	# extract essential tags
 	my ($gene_id, $transcript_id);
-	if ($group =~ /gene_id "([^"]+)";?/) {
+	if ($group =~ /gene_id "([^"]+)";?/i) {
 		$gene_id = $1;
 	}
-	if ($group =~ /transcript_id "([^"]+)";?/) {
+	if ($group =~ /transcript_id "([^"]+)";?/i) {
 		$transcript_id = $1;
 	}
 	unless ($gene_id and $transcript_id) {
@@ -1027,7 +1027,7 @@ sub _gtf_to_seqf_simple {
 		$feature->add_tag_value('Parent', $transcript_id);
 		
 		# exon id if present
-		if ($fields->[2] eq 'exon' and $group =~ /exon_id "([^"]+)";?/) {
+		if ($fields->[2] eq 'exon' and $group =~ /exon_id "([^"]+)";?/i) {
 			$feature->primary_id($1);
 		}
 		
@@ -1053,13 +1053,13 @@ sub _gtf_to_seqf_simple {
 	}
 	
 	# a transcript feature
-	elsif ($fields->[2] =~ /rna|transcript/) {
+	elsif ($fields->[2] =~ /rna|transcript/i) {
 		# these are sometimes present in GTF files, such as from Ensembl
 		# but are not required and often absent
 		$feature->primary_id($transcript_id);
 		
 		# transcript information
-		if ($group =~ /transcript_name "([^"]+)";?/) {
+		if ($group =~ /transcript_name "([^"]+)";?/i) {
 			$feature->display_name($1);
 		}
 		
@@ -1079,7 +1079,7 @@ sub _gtf_to_seqf_simple {
 		# these are sometimes present in GTF files, such as from Ensembl
 		# but are not required and often absent
 		$feature->primary_id($gene_id);
-		if ($group =~ /gene_name "([^"]+)";?/) {
+		if ($group =~ /gene_name "([^"]+)";?/i) {
 			$feature->display_name($1);
 		}
 	}
@@ -1139,7 +1139,7 @@ sub _gtf_to_seqf_full {
 	}
 	
 	# transcript
-	elsif ($fields->[2] =~ /transcript|rna/) {
+	elsif ($fields->[2] =~ /transcript|rna/i) {
 		# these are sometimes present in GTF files, such as from Ensembl
 		
 		# transcript information
