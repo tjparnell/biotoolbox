@@ -8,8 +8,9 @@ use Config::Simple;
 our $VERSION = '1.54';
 
 # variables
-our $default;
-our $config_path;
+my $default;
+my $default_path;
+my $config_path;
 our $BTB_CONFIG;
 
 
@@ -18,7 +19,7 @@ our $BTB_CONFIG;
 BEGIN {
 	
 	# the default configuration
-	$default = <<DEFAULT
+	$default = <<DEFAULT;
 #### BioToolBox Default Config file ####
 
 [default_db]
@@ -39,51 +40,28 @@ dsn                      = /path/to/example.sqlite
 [applications]
 
 DEFAULT
-;
+
 	
 	# possible paths
-	my $new  = File::Spec->catdir($ENV{HOME}, '.biotoolbox.cfg');
-	my $old  = File::Spec->catdir($ENV{HOME}, 'biotoolbox.cfg');
+	$default_path  = File::Spec->catdir($ENV{HOME}, '.biotoolbox.cfg');
 	my $var = $ENV{'BIOTOOLBOX'} || undef;
 	
-	# check for file in home directory
-	if (-s $new) {
-		$config_path = $new;
+	# check for file possible paths
+	if (-s $default_path) {
+		$config_path = $default_path;
 	}
-	
-	elsif (-s $old) {
-		$config_path = $old;
-
-		# upgrade the name
-		my $m;
-		eval {
-			use File::Copy;
-			$m = move($old, $new);
-		};
-		if ($m) {
-			$config_path = $new;
-			warn "### Updated $old to $new ###\n";
-		}
-	}
-	
-	# check for environment variable
 	elsif (defined $var and -s $var) {
 		$config_path = $var;
 	}	
 
-	# finally, when all else fails, write a new file
-	else {
-		open(FH, '>', $new) or confess 
-			"Cannot write biotoolbox configuration file $new!\n$!\n";
-		print FH $default;
-		close FH;
-		$config_path = $new;
-	}
-	
 	# Open the configuration file
-	$BTB_CONFIG = Config::Simple->new($config_path);
-	confess "could not read biotoolbox configuration file $config_path\n" 
-		unless $BTB_CONFIG;
+	if ($config_path) {
+		$BTB_CONFIG = Config::Simple->new($config_path);
+	} else {
+		# no path, open empty object
+		# this should still work, it just won't return anything useful
+		$BTB_CONFIG = Config::Simple->new(syntax => 'ini');
+	}
 }
 
 # Exported names
@@ -103,6 +81,11 @@ sub add_database {
 	croak "no dsn provided for new database configuration\n" unless 
 		($args{dsn} || $args{dsn_prefix});
 	
+	# check that we have config file to update
+	unless ($config_path) {
+		_write_new_config();
+	}
+	
 	# set name
 	my $name = $args{name};
 	delete $args{name};
@@ -119,11 +102,26 @@ sub add_program {
 		return;
 	}
 	
+	# check that we have config file to update
+	unless ($config_path) {
+		_write_new_config();
+	}
+	
 	# add parameter
 	my ($vol, $dir, $file) = File::Spec->splitpath($path);
 	$BTB_CONFIG->param('applications.' . $file, $path);
 	return _rewrite_config();
 }
+
+sub _write_new_config {
+	open(FH, '>', $default_path) or croak 
+		"Cannot write biotoolbox configuration file $default_path!\n$!\n";
+	print FH $default;
+	close FH;
+	$config_path = $default_path;
+	$BTB_CONFIG->read($default_path);
+}
+
 
 sub _rewrite_config {
 	# write new config file
@@ -160,6 +158,11 @@ helper applications.
 The default location for the file is in the user's home directory. 
 Alternatively, the location of the file may be referenced through an 
 Environment setting under the key C<BIOTOOLBOX>.
+
+Versions prior to 1.54 automatically wrote a config file in every user's 
+home directory, whether it was needed or wanted or not. With version 
+1.54, a config file is B<only> written when necessary by adding a program 
+path or database entry.
 
 The file is intended to be edited by the user for their custom installation. 
 The file is a simple INI style text file. The format is detailed below.
