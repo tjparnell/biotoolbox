@@ -7,6 +7,7 @@ use Module::Load; # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
 use Bio::ToolBox::db_helper::constants;
+use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
@@ -77,14 +78,6 @@ sub open_store_db {
 		# open the connection using parameters from the configuration file
 		# we'll try to use database specific parameters first, else use 
 		# the db_default parameters
-		unless ($CONFIG_OK) {
-			eval {
-				my $class = 'Bio::ToolBox::db_helper::config';
-				load $class;
-				$class->import;
-				$CONFIG_OK = 1;
-			};
-		}
 		my $adaptor = $BTB_CONFIG->param($database . '.adaptor') || 
 			$BTB_CONFIG->param('default_db.adaptor');
 		my $user = $BTB_CONFIG->param($database . '.user') || 
