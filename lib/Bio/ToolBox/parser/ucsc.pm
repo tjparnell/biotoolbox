@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -318,6 +318,12 @@ Otherwise the first match is returned.
 
 This method will return a hash of the number of genes and RNA types that 
 have been parsed.
+
+=item typelist
+
+This method will return a comma-delimited list of the feature types or 
+C<primary_tag>s found in the parsed file. Returns a generic list if a 
+file has not been parsed.
 
 =item from_ucsc_string
 
@@ -719,6 +725,21 @@ sub load_extra_data {
 	
 	$fh->close;
 	return $count;
+}
+
+sub typelist {
+	my $self = shift;
+	my @items;
+	foreach my $k (%{$self->{counts}}) {
+		push @items, $k if $self->{counts}{$k} > 0;
+	}
+	if (@items) {
+		return join(',', @items);
+	}
+	else {
+		# return generic list
+		return 'gene,mRNA,ncRNA,exon,CDS';
+	}
 }
 
 sub next_feature {
