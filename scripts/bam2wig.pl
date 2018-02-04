@@ -204,7 +204,7 @@ my @seq_list;
 my %seq_name2length;
 for my $tid (0 .. $sams[0]->n_targets - 1) {
 	my $chr = $sams[0]->target_name($tid);
-	if ($chr_exclude and $chr =~ $chr_exclude) {
+	if ($chr_exclude and $chr =~ /$chr_exclude/i) {
 		print "  skipping sequence $chr\n" if $verbose;
 		next;
 	}

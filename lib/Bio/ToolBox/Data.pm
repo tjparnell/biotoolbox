@@ -1244,13 +1244,13 @@ PARSEFAIL
 		# check for chromosome exclude
 		my $chr_exclude;
 		if ($args) {
-			$chr_exclude = $args->{chrskip} || '';
+			$chr_exclude = $args->{chrskip} || undef;
 		}
 		
 		# fill table with features
 		while (my $f = $parser->next_top_feature) {
 			if ($chr_exclude) {
-				next if $f->seq_id =~ $chr_exclude;
+				next if $f->seq_id =~ /$chr_exclude/i;
 			}
 			my $type = $f->type;
 			if ($f->type =~ /$feature/i) {

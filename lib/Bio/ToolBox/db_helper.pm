@@ -2044,7 +2044,7 @@ sub get_chromosome_list {
 		for my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chr =~ $chr_exclude);
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my ($seqf) = $db->get_features_by_name($chr);
