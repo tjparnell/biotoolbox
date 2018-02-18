@@ -444,6 +444,21 @@ only the retained transcripts as subfeatures. If an array reference of
 transcripts was provided, then an array reference of the filtered 
 transcripts is returned.
 
+=item filter_transcript_gencode_basic
+
+	my $new_gene = filter_transcript_gencode_basic($gene);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts);
+
+This will filter a gene object for transcripts for the Ensembl GENCODE 
+tag "basic", which indicates that a transcript is tagged as GENCODE Basic 
+transcript. 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+ 
+
 =back
 
 =head1 SEE ALSO
@@ -492,6 +507,7 @@ our @EXPORT_OK = qw(
 	gtf_string
 	ucsc_string
 	filter_transcript_support_level
+	filter_transcript_gencode_basic
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -1537,6 +1553,13 @@ sub filter_transcript_support_level {
 	
 	# return
 	if (ref($gene) =~ /seqfeature/i) {
+		# first check if we were only given a transcript 
+		if ($gene->primary_tag =~ /transcript|rna/i) {
+			# we must have been given a single transcript to check, so return it
+			$keepers[0] ||= undef;
+			return $keepers[0];
+		}
+		
 		# we can't delete subfeatures, so we're forced to create a new 
 		# parent gene and reattach the filtered transcripts
 		my %attributes = $gene->attributes;
@@ -1558,6 +1581,59 @@ sub filter_transcript_support_level {
 	}
 }
 
+sub filter_transcript_gencode_basic {
+	my $gene = shift;
+
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene$/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	foreach my $t (@transcripts) {
+		my ($basic) = $t->get_tag_values('tag');
+		if ($basic and $basic eq 'basic') {
+			push @keepers, $t;
+		}
+	}
+	
+	# return
+	if (ref($gene) =~ /seqfeature/i) {
+		# first check if we were only given a transcript 
+		if ($gene->primary_tag =~ /transcript|rna/i) {
+			# we must have been given a single transcript to check, so return it
+			$keepers[0] ||= undef;
+			return $keepers[0];
+		}
+		
+		# we can't delete subfeatures, so we're forced to create a new 
+		# parent gene and reattach the filtered transcripts
+		my %attributes = $gene->attributes;
+		return $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => $gene->primary_tag,
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-id             => $gene->primary_id,
+			-attributes     => \%attributes,
+			-segments       => \@keepers,
+		);
+	}
+	else {
+		return \@keepers;
+	}
+}
 
 
 
