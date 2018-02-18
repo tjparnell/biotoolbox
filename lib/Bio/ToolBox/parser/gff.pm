@@ -1017,8 +1017,8 @@ sub _gtf_to_seqf_simple {
 	if ($group =~ /transcript_id "([^"]+)";?/i) {
 		$transcript_id = $1;
 	}
-	unless ($gene_id and $transcript_id) {
-		# improperly formatted GTF file without these two items, nothing more to do
+	unless ($gene_id or $transcript_id) {
+		# improperly formatted GTF file without one of these two items, nothing more to do
 		return $feature;
 	}
 	
