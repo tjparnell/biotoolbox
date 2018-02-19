@@ -1887,13 +1887,14 @@ sub bed_string {
 	croak "bed count must be at least 3!" unless $args{bed} >= 3;
 	
 	# coordinate information
+	$self->seqfeature; # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
 	unless ($chr and defined $start) {
-		carp "Not enough information to generate bed string. Need identifiable" . 
-			"chromosome and start columns";
+		carp "Not enough information to generate bed string. Need identifiable " . 
+			"chromosome and start columns or SeqFeature object";
 		return;
 	}
 	$start -= 1; # 0-based coordinates
@@ -1925,12 +1926,13 @@ sub gff_string {
 	my %args = @_;
 	
 	# coordinate information
+	$self->seqfeature; # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
 	unless ($chr and defined $start) {
-		carp "Not enough information to generate GFF string. Need identifiable" . 
+		carp "Not enough information to generate GFF string. Need identifiable " . 
 			"chromosome and start columns";
 		return;
 	}
