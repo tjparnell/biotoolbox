@@ -1246,13 +1246,17 @@ sub seqfeature {
 	my $self = shift;
 	my $force = shift || 0;
 	carp "feature is a read only method" if @_;
+	return $self->{feature} if exists $self->{feature};
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
 	return unless $self->feature_type eq 'named' or $force;
 	
-	return $self->{feature} if exists $self->{feature};
+	# retrieve from main Data store
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
-	return $f if $f;
+	if ($f) {
+		$self->{feature} = $f;
+		return $f;
+	}
 	
 	# retrieve the feature from the database
 	return unless $self->{data}->database;
@@ -1616,7 +1620,7 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $self->strand;
 	
 	# get the subfeatures
 	my @subfeatures;
