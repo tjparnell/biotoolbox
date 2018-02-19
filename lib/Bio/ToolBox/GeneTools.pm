@@ -1552,33 +1552,7 @@ sub filter_transcript_support_level {
 	@keepers = @{ $results{'Missing'} } unless @keepers;
 	
 	# return
-	if (ref($gene) =~ /seqfeature/i) {
-		# first check if we were only given a transcript 
-		if ($gene->primary_tag =~ /transcript|rna/i) {
-			# we must have been given a single transcript to check, so return it
-			$keepers[0] ||= undef;
-			return $keepers[0];
-		}
-		
-		# we can't delete subfeatures, so we're forced to create a new 
-		# parent gene and reattach the filtered transcripts
-		my %attributes = $gene->attributes;
-		return $gene->new(
-			-seq_id         => $gene->seq_id,
-			-start          => $gene->start,
-			-end            => $gene->end,
-			-strand         => $gene->strand,
-			-primary_tag    => $gene->primary_tag,
-			-source         => $gene->source_tag,
-			-name           => $gene->display_name,
-			-id             => $gene->primary_id,
-			-attributes     => \%attributes,
-			-segments       => \@keepers,
-		);
-	}
-	else {
-		return \@keepers;
-	}
+	return _return_filtered_transcripts($gene, \@keepers);
 }
 
 sub filter_transcript_gencode_basic {
@@ -1606,33 +1580,7 @@ sub filter_transcript_gencode_basic {
 	}
 	
 	# return
-	if (ref($gene) =~ /seqfeature/i) {
-		# first check if we were only given a transcript 
-		if ($gene->primary_tag =~ /transcript|rna/i) {
-			# we must have been given a single transcript to check, so return it
-			$keepers[0] ||= undef;
-			return $keepers[0];
-		}
-		
-		# we can't delete subfeatures, so we're forced to create a new 
-		# parent gene and reattach the filtered transcripts
-		my %attributes = $gene->attributes;
-		return $gene->new(
-			-seq_id         => $gene->seq_id,
-			-start          => $gene->start,
-			-end            => $gene->end,
-			-strand         => $gene->strand,
-			-primary_tag    => $gene->primary_tag,
-			-source         => $gene->source_tag,
-			-name           => $gene->display_name,
-			-id             => $gene->primary_id,
-			-attributes     => \%attributes,
-			-segments       => \@keepers,
-		);
-	}
-	else {
-		return \@keepers;
-	}
+	return _return_filtered_transcripts($gene, \@keepers);
 }
 
 
@@ -1712,6 +1660,38 @@ sub _process_ucsc_transcript {
 	}
 	
 	return $ucsc;
+}
+
+sub _return_filtered_transcripts {
+	my ($gene, $keepers) = @_;
+	
+	if (ref($gene) =~ /seqfeature/i) {
+		# first check if we were only given a transcript 
+		if ($gene->primary_tag =~ /transcript|rna/i) {
+			# we must have been given a single transcript to check, so return it
+			$keepers->[0] ||= undef;
+			return $keepers->[0];
+		}
+		
+		# we can't delete subfeatures, so we're forced to create a new 
+		# parent gene and reattach the filtered transcripts
+		my %attributes = $gene->attributes;
+		return $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => $gene->primary_tag,
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-id             => $gene->primary_id,
+			-attributes     => \%attributes,
+			-segments       => $keepers,
+		);
+	}
+	else {
+		return $keepers;
+	}
 }
 
 
