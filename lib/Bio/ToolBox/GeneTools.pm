@@ -1487,7 +1487,7 @@ sub filter_transcript_support_level {
 	
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene$/i) {
+	if (ref($gene) =~ /seqfeature/i) {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif (ref($gene) eq 'ARRAY') {
@@ -1560,7 +1560,7 @@ sub filter_transcript_gencode_basic {
 
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene$/i) {
+	if (ref($gene) =~ /seqfeature/i) {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif (ref($gene) eq 'ARRAY') {
