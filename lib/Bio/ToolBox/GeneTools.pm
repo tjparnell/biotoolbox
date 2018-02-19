@@ -458,6 +458,19 @@ only the retained transcripts as subfeatures. If an array reference of
 transcripts was provided, then an array reference of the filtered 
 transcripts is returned.
  
+=item filter_transcript_biotype
+
+	my $new_gene = filter_transcript_gencode_basic($gene, $biotype);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts, 'miRNA');
+
+This will filter a gene object for transcripts for specific biotype values 
+using the C<transcript_biotype> or C<biotype> attribute tags, commonly found 
+in Ensembl annotation.
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
 
 =back
 
@@ -508,6 +521,7 @@ our @EXPORT_OK = qw(
 	ucsc_string
 	filter_transcript_support_level
 	filter_transcript_gencode_basic
+	filter_transcript_biotype
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -1575,6 +1589,37 @@ sub filter_transcript_gencode_basic {
 	foreach my $t (@transcripts) {
 		my ($basic) = $t->get_tag_values('tag');
 		if ($basic and $basic eq 'basic') {
+			push @keepers, $t;
+		}
+	}
+	
+	# return
+	return _return_filtered_transcripts($gene, \@keepers);
+}
+
+
+sub filter_transcript_biotype {
+	my $gene = shift;
+	my $check = shift; 
+	
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	foreach my $t (@transcripts) {
+		my ($value) = $t->get_tag_values('transcript_biotype') || 
+			$t->get_tag_values('biotype');
+		if ($value and $value =~ /$check/i) {
 			push @keepers, $t;
 		}
 	}
