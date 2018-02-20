@@ -1396,6 +1396,9 @@ sub delete_row {
 		my $d = shift @deleted;
 		splice( @{ $self->{data_table} }, $d, 1);
 		$self->{last_row}--;
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( @{ $self->{SeqFeatureObjects} }, $d, 1);
+		}
 	}
 	return 1;
 }
