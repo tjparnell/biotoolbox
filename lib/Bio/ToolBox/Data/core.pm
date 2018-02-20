@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -995,7 +995,7 @@ sub database {
 	if (@_) {
 		$self->{db} = shift;
 		if (exists $self->{db_connection}) {
-			my $db = open_db_connection($self->{db});
+			my $db = open_db_connection($self->{db}) if $self->{db_connection};
 			$self->{db_connection} = $db if $db;
 		}
 	}
