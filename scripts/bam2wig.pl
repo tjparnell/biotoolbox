@@ -492,6 +492,13 @@ sub check_defaults {
 	# set coverage dump size and subroutine code global values
 	# this is for processing the coverage dump array
 	if ($use_coverage) {
+		print " ignoring duplicate read filters with coverage\n" if not $duplicate;
+		print " ignoring supplementary read filters with coverage\n" if not $supplementary;
+		print " ignoring secondary read filters with coverage\n" if not $secondary;
+		print " ignoring map quality filter with coverage\n" if $min_mapq;
+		print " ignoring paired-end option with coverage\n" if $paired;
+		print " ignoring RPM option with coverage\n" if $rpm;
+		print " ignoring custom scale option with coverage\n" if @scale_values;
 		if ($bin_size > 1) {
 			$coverage_dump = int(1000 / $bin_size) * $bin_size;
 			$coverage_dump = $bin_size if $coverage_dump == 0;
