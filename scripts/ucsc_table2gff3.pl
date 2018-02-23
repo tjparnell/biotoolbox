@@ -6,14 +6,14 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Net::FTP;
-use Bio::SeqFeature::Lite;
 use Bio::ToolBox::utility qw(
 	format_with_commas
 	open_to_read_fh
 	open_to_write_fh
 );
 use Bio::ToolBox::parser::ucsc;
-my $VERSION = '1.33';
+use Bio::ToolBox::GeneTools qw(gtf_string);
+my $VERSION = '1.54';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -51,6 +51,7 @@ my (
 	$do_codon,
 	$share,
 	$do_name,
+	$do_gtf,
 	$gz,
 	$help,
 	$print_version,
@@ -75,6 +76,7 @@ GetOptions(
 	'codon!'     => \$do_codon, # include start & stop codons in output
 	'share!'     => \$share, # share common exons and UTRs
 	'name!'      => \$do_name, # assign names to CDSs, UTRs, and exons
+	'gtf!'       => \$do_gtf, # write a gtf file instead
 	'gz!'        => \$gz, # compress file
 	'help'       => \$help, # request help
 	'version'    => \$print_version, # print the version
@@ -183,6 +185,7 @@ if ($ftp_file) {
 ### Initiate the parser
 my $ucsc = Bio::ToolBox::parser::ucsc->new(
 	do_gene     => $do_gene,
+	do_exon     => 1, # always
 	do_cds      => $do_cds,
 	do_utr      => $do_utr,
 	do_codon    => $do_codon,
@@ -223,9 +226,6 @@ if ($kgxreff) {
 
 
 
-# initialize globals
-my $chromosome_done = 0; # boolean indicating chromosomes are written
-
 # walk through the input tables
 foreach my $file (@genetables) {
 	
@@ -233,34 +233,10 @@ foreach my $file (@genetables) {
 	my ($outfile, $gff_fh) = open_output_gff($file);
 	
 	# process chromosome
-	if ($chromof and !$chromosome_done) {
-		# if there is only one genetable, we will prepend the chromosomes 
-		# to that output file, otherwise we'll make a separate gff file
-		# I'm making this assumption because the chromosomes only need to be 
-		# defined once when loading Bio::DB::SeqFeature::Store database
-		# If user is collecting multiple gene tables, then separate files 
-		# are ok, probably preferable, than a gigantic one
-		print " Writing chromosome features....\n";
-		
-		if (scalar @genetables > 1) {
-			# let's write a separate chromosome gff file
-			
-			# open new filehandle
-			my ($chromo_outfile, $chromo_gff_fh) = open_output_gff($chromof);
-			
-			# convert the chromosomes
-			print_chromosomes($chromo_gff_fh);
-			
-			# done
-			$chromo_gff_fh->close;
-			print " Wrote chromosome GFF file '$chromo_outfile'\n"; 
-			$chromosome_done = 1;
-		}
-		else {
-			# let's write to one gff file
-			print_chromosomes($gff_fh);
-			$chromosome_done = 1;
-		}
+	if ($chromof) {
+		# we will write sequence-region pragmas for every gff file automatically
+		# the current gff parser and Bio::DB::SeqFeature will correctly parse them
+		print_chromosomes($gff_fh);
 	}	
 	
 	# convert the table
@@ -428,7 +404,7 @@ sub open_output_gff {
 	my $file = shift;
 	my $outfile = $file;
 	$outfile =~ s/\.txt(?:\.gz)?$//i; # remove the extension
-	$outfile .= '.gff3';
+	$outfile .= $do_gtf ? '.gtf' : '.gff3';
 	if ($gz) {
 		$outfile .= '.gz';
 	}
@@ -438,9 +414,9 @@ sub open_output_gff {
 		die " unable to open file '$outfile' for writing!\n";
 	
 	# print comments
-	$fh->print( "##gff-version 3\n");
-	$fh->print( "##genome-build UCSC $database\n") if $database;
-	$fh->print( "# UCSC table file $file\n");
+	$fh->printf("##gff-version %s\n", $do_gtf ? '2.5' : '3');
+	$fh->print("##genome-build UCSC $database\n") if $database;
+	$fh->print("# UCSC table file $file\n");
 	
 	# finish
 	return ($outfile, $fh);
@@ -495,28 +471,46 @@ sub print_current_gene_list {
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'numeric_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'numeric_chr'}{$chr} }) {
 			# print the seqfeature recursively
-			$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1));
-			
-			# print directive to close out all previous features
-			$gff_fh->print("\n###\n"); 
+			if ($do_gtf) {
+				$gff_fh->print(gtf_string($pos2seqf{'numeric_chr'}{$chr}{$start}));
+			}
+			else {
+				$gff_fh->print( $pos2seqf{'numeric_chr'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print("###\n");
+			} 
 		}
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other_chr'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_chr'}{$chr} }) {
-			$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1));
-			$gff_fh->print("\n###\n"); 
+			if ($do_gtf) {
+				$gff_fh->print(gtf_string($pos2seqf{'other_chr'}{$chr}{$start}));
+			}
+			else {
+				$gff_fh->print( $pos2seqf{'other_chr'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print("###\n");
+			} 
 		}
 	}
 	foreach my $chr (sort {$a <=> $b} keys %{$pos2seqf{'other_numeric'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other_numeric'}{$chr} }) {
-			$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1));
-			$gff_fh->print("\n###\n"); 
+			if ($do_gtf) {
+				$gff_fh->print(gtf_string($pos2seqf{'other_numeric'}{$chr}{$start}));
+			}
+			else {
+				$gff_fh->print( $pos2seqf{'other_numeric'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print("###\n");
+			} 
 		}
 	}
 	foreach my $chr (sort {$a cmp $b} keys %{$pos2seqf{'other'}} ) {
 		foreach my $start (sort {$a <=> $b} keys %{ $pos2seqf{'other'}{$chr} }) {
-			$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1));
-			$gff_fh->print("\n###\n"); 
+			if ($do_gtf) {
+				$gff_fh->print(gtf_string($pos2seqf{'other'}{$chr}{$start}));
+			}
+			else {
+				$gff_fh->print( $pos2seqf{'other'}{$chr}{$start}->gff3_string(1));
+				$gff_fh->print("###\n");
+			} 
 		}
 	}
 }
@@ -543,29 +537,18 @@ sub print_chromosomes {
 			die " format of chromsome doesn't seem right! Are you sure?\n";
 		}
 		
-		# generate seqfeature
-		my $chrom = Bio::SeqFeature::Lite->new(
-			-seq_id        => $chr,
-			-source        => 'UCSC', # using a generic source here
-			-primary_tag   => $chr =~ m/^chr/i ? 'chromosome' : 'scaffold',
-			-start         => 1,
-			-end           => $end,
-			-primary_id    => $chr,
-			-display_name  => $chr,
-		);
-		
 		# store the chromosome according to name
 		if ($chr =~ /^chr(\d+)$/i) {
-			$chromosomes{'numeric_chr'}{$1} = $chrom;
+			$chromosomes{'numeric_chr'}{$1} = "$chr 1 $end";
 		}
 		elsif ($chr =~ /^chr(\w+)$/i) {
-			$chromosomes{'other_chr'}{$1} = $chrom;
+			$chromosomes{'other_chr'}{$1} = "$chr 1 end";
 		}
 		elsif ($chr =~ /(\d+)$/) {
-			$chromosomes{'other_numeric'}{$1} = $chrom;
+			$chromosomes{'other_numeric'}{$1} = "$chr 1 end";
 		}
 		else {
-			$chromosomes{'other'}{$chr} = $chrom;
+			$chromosomes{'other'}{$chr} = "$chr 1 end";
 		}
 	}
 	$chromo_fh->close;
@@ -573,27 +556,20 @@ sub print_chromosomes {
 	# print the chromosomes
 	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'numeric_chr'} }) {
 		# numeric chromosomes
-		$chromosomes{'numeric_chr'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'numeric_chr'}{$key}->gff_string . "\n" );
+		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'numeric_chr'}{$key});
 	}
 	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other_chr'} }) {
 		# other chromosomes
-		$chromosomes{'other_chr'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other_chr'}{$key}->gff_string . "\n" );
+		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_chr'}{$key});
 	}
 	foreach my $key (sort {$a <=> $b} keys %{ $chromosomes{'other_numeric'} }) {
 		# numbered contigs, etc
-		$chromosomes{'other_numeric'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other_numeric'}{$key}->gff_string . "\n" );
+		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other_numeric'}{$key});
 	}
 	foreach my $key (sort {$a cmp $b} keys %{ $chromosomes{'other'} }) {
 		# contigs, etc
-		$chromosomes{'other'}{$key}->version(3);
-		$out_fh->print( $chromosomes{'other'}{$key}->gff_string . "\n" );
+		$out_fh->printf("##sequence-region  %s\n", $chromosomes{'other'}{$key});
 	}
-	
-	# finished
-	$out_fh->print( "###\n" );
 }
 
 
@@ -615,7 +591,7 @@ A script to convert UCSC gene tables to GFF3 annotation.
   
   Options:
   --ftp [refgene|ensgene|xenorefgene|known|all]
-  --db <text>
+  --db <text>               e.g. hg19,hg38,danRer7
   --host <text>
   --table <filename>
   --status <filename>
@@ -625,13 +601,14 @@ A script to convert UCSC gene tables to GFF3 annotation.
   --kgxref <filename>
   --chromo <filename>
   --source <text>
-  --(no)chr             (true)
-  --(no)gene            (true)
-  --(no)cds             (true)
-  --(no)utr             (false)
-  --(no)codon           (false)
-  --(no)share           (true)
-  --(no)name            (false)
+  --chr   | --nochr         (true)
+  --gene  | --nogene        (true)
+  --cds   | --nocds         (true)
+  --utr   | --noutr         (false)
+  --codon | --nocodon       (false)
+  --share | --noshare       (true)
+  --name  | --noname        (false)
+  --gtf
   --gz
   --version
   --help
@@ -756,13 +733,20 @@ subfeature will be represented individually. This will reduce the size of
 the GFF3 file at the expense of increased complexity. If your parser 
 cannot handle multiple parents, set this to --noshare. Due to the 
 possibility of multiple translation start sites, CDS features are never 
-shared. The default is true.
+shared. This will have no effect with GTF output. The default is true. 
 
 =item --(no)name
 
 Specify whether you want subfeatures, including exons, CDSs, UTRs, and 
 start and stop codons to have display names. In most cases, this 
-information is not necessary. The default is false.
+information is not necessary. This will have no effect with GTF output. 
+The default is false.
+
+=item --gtf
+
+Specify that a GTF (version 2.5) format file should be written instead of 
+GFF3. Yes, the name of the program says GFF3, but now we can output GTF 
+too, and changing the name of the program is too late now.
 
 =item --gz
 
@@ -781,11 +765,11 @@ Display the POD documentation
 =head1 DESCRIPTION
 
 This program will convert a UCSC gene or gene prediction table file into a
-GFF3 format file. It will build canonical gene-E<gt>transcript-E<gt>[exon, 
-CDS, UTR] heirarchical structures. It will attempt to identify non-coding genes
-as to type using the gene name as inference. Various additional
-informational attributes may also be included with the gene and transcript
-features, which are derived from supporting table files.
+GFF3 (or optionally GTF) format file. It will build canonical 
+gene-E<gt>transcript-E<gt>[exon, CDS, UTR] heirarchical structures. It will 
+attempt to identify non-coding genesas to type using the gene name as inference. 
+Various additional informational attributes may also be included with the gene 
+and transcriptfeatures, which are derived from supporting table files.
 
 Four table files are supported. Gene prediction tables, including I<refGene>, 
 I<xenoRefGene>, and I<ensGene>, are supported. The UCSC I<knownGene> gene 
@@ -806,10 +790,8 @@ let the program obtain the necessary files using the C<--ftp> option, as
 using the wrong file format or manipulating the tables may prevent the 
 program from working properly.
 
-If provided, chromosome and/or scaffold features may also be written to a 
-GFF file. If only one table is being converted, then the chromosome features 
-are prepended to the GFF file; otherwise, a separate chromosome GFF file is 
-written.
+If provided, chromosome and/or scaffold features will be written as GFF3-style 
+sequence-region pragmas (even for GTF files, just in case).
 
 If you need to set up a database using UCSC annotation, you should first 
 take a look at the BioToolBox script B<db_setup.pl>, which provides a 
