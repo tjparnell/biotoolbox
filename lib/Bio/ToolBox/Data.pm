@@ -1087,11 +1087,12 @@ sub new {
 		unless ( $self->parse_table(\%args) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
-			if ($self->database =~ /^Parsed:(.+)$/) {
+			if ($self->database =~ /^Parsed:(.+)$/ and $self->feature_type eq 'named') {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
 				# this may die if it doesn't work
 				$args{file} = $1;
+				$args{feature} = $self->feature;
 				$self->parse_table(\%args); 
 			}
 		}
@@ -1165,11 +1166,13 @@ sub duplicate {
 sub parse_table {
 	my $self = shift;
 	my $args = shift;
-	my ($file, $feature, $subfeature);
+	my ($file, $feature, $subfeature, $simplify);
 	if (ref $args) {
 		$file = $args->{file} || '';
 		$feature = $args->{feature} || 'gene';
 		$subfeature = $args->{subfeature} || '';
+		$simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
+			$args->{simplify} : 1; # default is to simplify
 	}
 	else {
 		# no hash reference, assume just a file name
@@ -1177,6 +1180,7 @@ sub parse_table {
 		undef $args;
 		$feature = 'gene';
 		$subfeature = '';
+		$simplify = 1;
 	}
 	unless ($file) {
 		carp "no annotation file provided to parse!";
@@ -1192,9 +1196,12 @@ sub parse_table {
 		return;
 	}
 	
-	# set parser parameters
+	# open parser
 	my $parser = $class->new() or return;
-	$parser->simplify(1);
+	$parser->open_file($file) or return;
+	
+	# set parser parameters
+	$parser->simplify($simplify);
 	if ($subfeature) {
 		$parser->do_exon(1) if $subfeature =~ /exon/i;
 		$parser->do_cds(1) if $subfeature =~ /cds/i;
@@ -1206,9 +1213,16 @@ sub parse_table {
 	else {
 		$parser->do_gene(0);
 	}
+	my $mrna_check = 0;
+	if (lc($feature) eq 'mrna' and $parser->typelist !~ /mrna/i and not $self->last_row) {
+		# user requested mRNA for a new data file but it's not present in the type list
+		# look for it the hard way by parsing CDS too - sigh
+		load('Bio::ToolBox::GeneTools', 'is_coding');
+		$parser->do_cds(1);
+		$mrna_check = 1;
+	}
 	
 	# parse the table
-	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
@@ -1253,14 +1267,19 @@ PARSEFAIL
 				next if $f->seq_id =~ /$chr_exclude/i;
 			}
 			my $type = $f->type;
-			if ($f->type =~ /$feature/i) {
+			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
 				my $index = $self->add_row(
 					[ $f->primary_id, $f->display_name, $f->type,] 
 				);
 				$self->store_seqfeature($index, $f);
 			}
 		}
+		unless ($self->last_row) {
+			printf " Zero '%s' features found!\n Check your feature or try generic features like gene, mRNA, or transcript\n",
+				$feature;
+		}
 		$self->database("Parsed:$file");
+		$self->feature($feature);
 	}
 	return 1;
 }
