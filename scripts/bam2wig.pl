@@ -130,7 +130,7 @@ GetOptions(
 	'fraction!'  => \$multi_hit_scale, # scale by number of hits
 	'rpm!'      => \$rpm, # calculate reads per million
 	'separate|mean!' => \$do_mean, # rpm scale separately
-	'scale=f'   => \@scale_values, # user specified scale value
+	'scale=s'   => \@scale_values, # user specified scale value
 	'chrskip=s' => \$chr_exclude, # regex for skipping chromosomes
 	'blacklist=s' => \$black_list, # file for skipping regions
 	'bin=i'     => \$bin_size, # size for binning the data
@@ -2730,8 +2730,8 @@ Legacy option for supporting previous versions of bam2wig.
 Indicate that the bam file contains alignments with splices, such as 
 from RNASeq experiments. Alignments will be split on cigar N operations 
 and each sub fragment will be recorded. This only works with single-end 
-alignments, and is disabled for paired-end reads. Only start and span 
-recording options are supported.
+alignments, and is disabled for paired-end reads (just treat as single-end). 
+Only start and span recording options are supported.
 
 =item --strand
 
