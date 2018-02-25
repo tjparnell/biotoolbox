@@ -1193,7 +1193,6 @@ sub get_stop_codon {
 sub get_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# collect the various types of subfeatures
 	my @exons;
@@ -1316,7 +1315,6 @@ sub get_transcript_utr_length {
 sub get_5p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
@@ -1329,7 +1327,6 @@ sub get_5p_utrs {
 sub get_3p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
