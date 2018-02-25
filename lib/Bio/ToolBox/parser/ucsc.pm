@@ -441,28 +441,28 @@ sub new {
 				$self->load_extra_data($options{refseqsum}, 'refseqsum');
 			}
 			elsif (exists $options{summary}) {
-				$self->load_extra_data($options{refseqsum}, 'refseqsum');
+				$self->load_extra_data($options{summary}, 'refseqsum');
 			}
 			if (exists $options{refseqstat}) {
 				$self->load_extra_data($options{refseqstat}, 'refseqstat');
 			}
 			elsif (exists $options{status}) {
-				$self->load_extra_data($options{refseqstat}, 'refseqstat');
+				$self->load_extra_data($options{status}, 'refseqstat');
 			}
 			if (exists $options{kgxref}) {
 				$self->load_extra_data($options{kgxref}, 'kgxref');
 			}
 			if (exists $options{ensembltogenename}) {
-				$self->load_extra_data($options{ensembltogene}, 'ensembltogene');
+				$self->load_extra_data($options{ensembltogenename}, 'ensembltogene');
 			}
 			elsif (exists $options{ensname}) {
-				$self->load_extra_data($options{ensembltogene}, 'ensembltogene');
+				$self->load_extra_data($options{ensname}, 'ensembltogene');
 			}
 			if (exists $options{ensemblsource}) {
 				$self->load_extra_data($options{ensemblsource}, 'ensemblsource');
 			}
 			elsif (exists $options{enssrc}) {
-				$self->load_extra_data($options{ensemblsource}, 'ensemblsource');
+				$self->load_extra_data($options{enssrc}, 'ensemblsource');
 			}
 			if (exists $options{class}) {
 				$self->{sfclass} = $options{class};
