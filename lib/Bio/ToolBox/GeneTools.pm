@@ -1616,6 +1616,7 @@ sub filter_transcript_biotype {
 	foreach my $t (@transcripts) {
 		my ($value) = $t->get_tag_values('transcript_biotype') || 
 			$t->get_tag_values('biotype');
+		$value ||= $t->primary_tag;
 		if ($value and $value =~ /$check/i) {
 			push @keepers, $t;
 		}
