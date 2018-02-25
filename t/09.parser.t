@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 239;
+	plan tests => 243;
 }
 else {
-	plan tests => 145;
+	plan tests => 147;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -187,6 +187,7 @@ sub test_ucsc {
 	is($t->stop, 398466, 'transcript stop');
 	is($t->primary_tag, 'mRNA', 'transcript primary_tag');
 	is($t->display_name, 'ENST00000411647', 'transcript display_name');
+	is( ($t->get_tag_values('biotype'))[0], 'protein_coding', 'transcript biotype');
 
 	# first transcript exons
 	my @exons = sort {$a->start <=> $b} $t->get_SeqFeatures; # make sure in order
@@ -231,8 +232,9 @@ sub test_ucsc {
 	$t = pop @transcripts; 
 	is($t->start, 402798, 'last transcript start');
 	is($t->stop, 411610, 'last transcript stop');
-	is($t->primary_tag, 'retained_intron', 'last transcript primary_tag');
+	is($t->primary_tag, 'transcript', 'last transcript primary_tag');
 	is($t->display_name, 'ENST00000468272', 'last transcript display_name');
+	is( ($t->get_tag_values('biotype'))[0], 'retained_intron', 'last transcript biotype');
 
 	# last transcript exons
 	@exons = sort {$a->start <=> $b} $t->get_SeqFeatures; # make sure in order
@@ -269,9 +271,9 @@ sub test_ucsc {
 	# foreach (keys %counts) {print "$_ => $counts{$_}\n"}
 	is(scalar keys %counts, 10, "count hash keys");
 	is($counts{gene}, 5, "count hash gene number");
-	is($counts{mrna}, 10, "count hash mRNA number");
+	is($counts{mrna}, 8, "count hash mRNA number");
 	is($counts{snrna}, 1, "count hash snRNA number");
-	is($counts{other}, 5, "count hash other number");
+	is($counts{other}, 7, "count hash other number");
 
 }
 
