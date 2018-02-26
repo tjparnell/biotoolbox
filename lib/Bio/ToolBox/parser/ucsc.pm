@@ -730,7 +730,7 @@ sub load_extra_data {
 sub typelist {
 	my $self = shift;
 	my @items;
-	foreach my $k (%{$self->{counts}}) {
+	foreach my $k (keys %{$self->{counts}}) {
 		push @items, $k if $self->{counts}{$k} > 0;
 	}
 	if (@items) {
