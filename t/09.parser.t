@@ -370,6 +370,8 @@ sub test_parsed_ucsc_table {
 	# reparse with mRNA feature
 	undef $Data;
 	undef $f;
+	undef @subf;
+	undef $f2;
 	$Data = Bio::ToolBox::Data->new(
 		file => $ucscfile,
 		parse => 1,
@@ -387,9 +389,9 @@ sub test_parsed_ucsc_table {
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'ENST00000411647', 'SeqFeature display name');
 	is($f->start, 388142, 'SeqFeature start position');
-	my @subf = $f->get_SeqFeatures;
+	@subf = $f->get_SeqFeatures;
 	is(scalar @subf, 5, 'Number of SeqFeature sub features');
-	my $f2 = shift @subf;
+	$f2 = shift @subf;
 	is($f2->type, 'exon:EnsGene', 'Sub feature type');
 	is($f2->name, 'ENST00000411647.exon0', 'Sub feature name');
 }
