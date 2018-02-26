@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 243;
+	plan tests => 254;
 }
 else {
-	plan tests => 147;
+	plan tests => 158;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -366,6 +366,32 @@ sub test_parsed_ucsc_table {
 	my $f2 = shift @subf;
 	is($f2->type, 'mRNA:EnsGene', 'Sub feature type');
 	is($f2->name, 'ENST00000411647', 'Sub feature name');
+	
+	# reparse with mRNA feature
+	undef $Data;
+	undef $f;
+	$Data = Bio::ToolBox::Data->new(
+		file => $ucscfile,
+		parse => 1,
+		feature => 'mRNA',
+		subfeature => 'exon'
+	);
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	is($Data->last_row, 10, 'number of rows');
+		# technically there should be 8 mRNAs, not 10, but nonsense_mediated_decay
+		# appears as an mRNA without the extra ensemblSource data
+	is($Data->value(1,0), 'ENST00000411647', 'First row ID');
+	is($Data->value(1,1), 'ENST00000411647', 'First row Name');
+	is($Data->value(1,2), 'mRNA:EnsGene', 'First row Type');
+	$f = $Data->get_seqfeature(1);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
+	is($f->display_name, 'ENST00000411647', 'SeqFeature display name');
+	is($f->start, 388142, 'SeqFeature start position');
+	my @subf = $f->get_SeqFeatures;
+	is(scalar @subf, 5, 'Number of SeqFeature sub features');
+	my $f2 = shift @subf;
+	is($f2->type, 'exon:EnsGene', 'Sub feature type');
+	is($f2->name, 'ENST00000411647.exon0', 'Sub feature name');
 }
 
 
