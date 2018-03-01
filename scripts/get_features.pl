@@ -240,7 +240,8 @@ sub load_from_database {
 	) or die " unable to generate new feature list\n";
 	
 	if ($D->last_row) {
-		printf " Loaded %s features from $input.\n", format_with_commas($D->last_row);
+		printf " Loaded %s features from %s.\n", format_with_commas($D->last_row), 
+			$input ? $input : $database;
 	}
 	else {
 		die " No features loaded!\n";
@@ -280,7 +281,7 @@ sub filter_features {
 			my @unwanted;
 			$Data->iterate( sub {
 				my $row = shift;
-				my ($v) = $row->seqfeature->get_tag_values($k);
+				my ($v) = $row->seqfeature(1)->get_tag_values($k);
 				if ($v =~ /$check/i) {
 					# the tag matches, so discard
 					push @unwanted, $row->row_index;
@@ -290,6 +291,7 @@ sub filter_features {
 				$Data->delete_row(@unwanted);
 			}
 		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
 	}
 	
 	# filter on gencode
@@ -298,7 +300,7 @@ sub filter_features {
 		my @unwanted;
 		$Data->iterate( sub {
 			my $row = shift;
-			my $good = filter_transcript_biotype($row->seqfeature, $tbiotype);
+			my $good = filter_transcript_biotype($row->seqfeature(1), $tbiotype);
 			if ($good) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -309,6 +311,7 @@ sub filter_features {
 		if (@unwanted) {
 			$Data->delete_row(@unwanted);
 		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
 	}
 	
 	# filter on tsl
@@ -317,7 +320,7 @@ sub filter_features {
 		my @unwanted;
 		$Data->iterate( sub {
 			my $row = shift;
-			my $good = filter_transcript_support_level($row->seqfeature, $tsl);
+			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
 			if ($good) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -328,6 +331,7 @@ sub filter_features {
 		if (@unwanted) {
 			$Data->delete_row(@unwanted);
 		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
 	}
 	
 	# filter on gencode
@@ -336,7 +340,7 @@ sub filter_features {
 		my @unwanted;
 		$Data->iterate( sub {
 			my $row = shift;
-			my $good = filter_transcript_support_level($row->seqfeature, $tsl);
+			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
 			if ($good) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -347,6 +351,7 @@ sub filter_features {
 		if (@unwanted) {
 			$Data->delete_row(@unwanted);
 		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
 	}
 	
 	# collapse transcripts
@@ -354,7 +359,7 @@ sub filter_features {
 		print " Collapsing alternate transcripts...\n";
 		$Data->iterate( sub {
 			my $row = shift;
-			my $gene = collapse_transcripts($row->seqfeature);
+			my $gene = collapse_transcripts($row->seqfeature(1));
 			if ($gene) {
 				$Data->store_seqfeature($row->row_index, $gene);
 			}
@@ -376,7 +381,8 @@ sub export_to_bed {
 	if ($start_adj or $stop_adj) {
 		$Data->iterate( sub {
 			my $row = shift;
-			my ($start, $stop) = adjust_coordinates($row); 
+			my $f = $row->seqfeature(1); # make sure we get the seqfeature
+			my ($start, $stop) = adjust_coordinates($f); 
 			my $string = $row->bed_string(
 				start => $start,
 				end   => $stop,
@@ -387,6 +393,7 @@ sub export_to_bed {
 	else {
 		$Data->iterate( sub {
 			my $row = shift;
+			my $f = $row->seqfeature(1); # make sure we get the seqfeature
 			$fh->print( $row->bed_string . "\n" );
 		});
 	}
@@ -409,7 +416,7 @@ sub export_to_gff {
 	# write to gff3
 	$Data->iterate( sub {
 		my $row = shift;
-		my $string = $row->seqfeature->gff_string(1);
+		my $string = $row->seqfeature(1)->gff_string(1);
 		$fh->print( $string . "###\n"); # should already have a newline
 	});
 	
@@ -432,7 +439,7 @@ sub export_to_gtf {
 	# write to GTF
 	$Data->iterate( sub {
 		my $row = shift;
-		my $string = gtf_string( $row->seqfeature );
+		my $string = gtf_string( $row->seqfeature(1) );
 		$fh->print( $string);
 	});
 	
@@ -443,7 +450,11 @@ sub export_to_gtf {
 
 sub export_to_txt {
 	# adjust coordinates as necessary
-	if ($start_adj or $stop_adj or $include_coordinates) {
+	if (($start_adj or $stop_adj) or $include_coordinates) {
+		
+		# make sure we establish the feature type first, before we add 
+		# coordinate columns, otherwise features might not be returned properly
+		my $ftype = $Data->feature_type;
 		
 		# add coordinate columns
 		my $seq_i    = $Data->add_column('Chromosome');
@@ -454,11 +465,12 @@ sub export_to_txt {
 		# iterate
 		$Data->iterate( sub {
 			my $row = shift;
-			my ($start, $stop) = adjust_coordinates($row); 
-			$row->value($seq_i, $row->seq_id);
+			my $f = $row->seqfeature(1);
+			my ($start, $stop) = adjust_coordinates($f); 
+			$row->value($seq_i, $f->seq_id);
 			$row->value($start_i, $start);
 			$row->value($stop_i, $stop);
-			$row->value($strand_i, $row->strand);
+			$row->value($strand_i, $f->strand);
 		});
 	}
 	
@@ -497,7 +509,7 @@ sub export_to_ucsc {
 	# write to gff3
 	$Data->iterate( sub {
 		my $row = shift;
-		my $string = ucsc_string( $row->seqfeature );
+		my $string = ucsc_string( $row->seqfeature(1) );
 		$fh->print($string);
 	});
 	
@@ -510,10 +522,11 @@ sub adjust_coordinates {
 	
 	# we will always adjust relative coordinates based on strand
 	# and not absolute coordinates
+	my ($start, $end);
 	
 	# get the original coordinates
-	my $start = $feature->start;
-	my $end   = $feature->end;
+	my $fstart = $feature->start;
+	my $fend   = $feature->end;
 	
 	# adjust from 5' end
 	if ($position eq '5') {
@@ -521,19 +534,19 @@ sub adjust_coordinates {
 		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$start = $start + $start_adj;
+				$start = $fstart + $start_adj;
 			}
 			if ($stop_adj) {
-				$end = $start + $stop_adj;
+				$end = $fstart + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$end = $end - $start_adj;
+				$end = $fend - $start_adj;
 			}
 			if ($stop_adj) {
-				$start = $end - $stop_adj;
+				$start = $fend - $stop_adj;
 			}
 		}
 	}
@@ -544,19 +557,19 @@ sub adjust_coordinates {
 		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$end = $end + $start_adj;
+				$end = $fend + $start_adj;
 			}
 			if ($stop_adj) {
-				$start = $end + $stop_adj;
+				$start = $fend + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$start = $start - $start_adj;
+				$start = $fstart - $start_adj;
 			}
 			if ($stop_adj) {
-				$end = $start - $stop_adj;
+				$end = $fstart - $stop_adj;
 			}
 		}
 	}
@@ -564,7 +577,7 @@ sub adjust_coordinates {
 	# adjust from middle position
 	elsif ($position eq 'm' or $position eq '4') {
 		
-		my $midpoint = int( ( ($start + $end) / 2) + 0.5);
+		my $midpoint = int( ( ($fstart + $fend) / 2) + 0.5);
 		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
@@ -591,19 +604,19 @@ sub adjust_coordinates {
 		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$start = $start + $start_adj;
+				$start = $fstart + $start_adj;
 			}
 			if ($stop_adj) {
-				$end = $end + $stop_adj;
+				$end = $fend + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$end = $end - $start_adj;
+				$end = $fend - $start_adj;
 			}
 			if ($stop_adj) {
-				$start = $start - $stop_adj;
+				$start = $fstart - $stop_adj;
 			}
 		}
 	}
