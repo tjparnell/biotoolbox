@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.51';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -172,23 +172,19 @@ sub taste_file {
 
 sub sample_gff_type_list {
 	my ($self, $file) = @_;
-	my $Check = $self->new;
-	my $filename = $Check->check_file($file) or return;
-	$Check->add_file_metadata($filename);
-	$Check->open_to_read_fh or return;
-	$Check->parse_headers;
-	return unless $Check->gff;
+	return unless $file =~ /\.g[tf]f\d?(?:\.gz)?$/i; # assume extension is accurate
+	my $fh = $self->open_to_read_fh($file) or die "can't open $file!\n";
 	my %types;
 	my $count = 0; 
 	while ($count < 1000) {
-		my $line = $Check->{fh}->getline or last;
+		my $line = $fh->getline or last;
 		next if $line !~ m/\w+/;
 		next if $line =~ /^#/;
 		my @fields = split('\t', $line);
 		$types{ $fields[2] } += 1;
 		$count++;
 	}
-	$Check->close_fh;
+	$fh->close;
 	return join(',', keys %types);
 }
 

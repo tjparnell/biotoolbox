@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
 );
-my $VERSION =  '1.42';
+my $VERSION =  '1.54';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -38,11 +38,13 @@ my (
 	$bedgraph,
 	$step_size,
 	$span,
+	$ask,
 	$chr_index,
 	$start_index,
 	$stop_index,
 	$score_index,
 	@score_indices,
+	$no_header,
 	$attribute_name,
 	$track_name,
 	$use_track,
@@ -69,10 +71,12 @@ GetOptions(
 	'bed|bdg!'  => \$bedgraph, # write a bedgraph file
 	'size=i'    => \$step_size, # wig step size
 	'span=i'    => \$span, # the wig span size
+	'ask'       => \$ask, # request help in assigning indices
 	'chr=i'     => \$chr_index, # index for the chromosome column
 	'start|pos=i' => \$start_index, # index for the start column
 	'stop|end=i'=> \$stop_index, # index for the stop column
 	'index|score=s' => \$score_index, # index for the score column
+	'noheader'  => \$no_header, # source has no header line
 	'attrib=s'  => \$attribute_name, # gff or vcf attribute name to use 
 	'name=s'    => \$track_name, # name string for the track
 	'track!'    => \$use_track, # boolean to include a track line
@@ -119,7 +123,7 @@ unless (defined $use_track) {
 
 
 ### Load input file
-my $Input = Bio::ToolBox::Data::Stream->new(file => $infile) or
+my $Input = Bio::ToolBox::Data::Stream->new(file => $infile, noheader => $no_header) or
 	die "Unable to open file '$infile'!\n";
 
 
@@ -135,15 +139,27 @@ check_step();
 set_bigwig_options() if $bigwig;
 
 if ($fast) {
-	warn "cannot use --midpoint with --fast option!\n" if $midpoint;
-	warn "cannot use --attribute with --fast option!\n" if $attribute_name;
-	warn "cannot use --format with --fast option!\n" if $format;
-	warn "cannot use --method with --fast option!\n" if 
-		($method and not @score_indices);
-	warn "cannot use multiple score indices with --fast option!\n" 
-		if @score_indices;
-	warn "running in slow mode...\n";
-	$fast = 0;
+	if ($midpoint) {
+		warn "cannot use --midpoint with --fast option!\nrunning in slow mode...\n";
+		$fast = 0;
+	}
+	if ($attribute_name) {
+		warn "cannot use --attribute with --fast option!\nrunning in slow mode...\n";
+		$fast = 0;
+	}
+	if ($format) {
+		warn "cannot use --format with --fast option!\nrunning in slow mode...\n";
+		$fast = 0;
+	}
+	if ($method and not @score_indices) {
+		warn "cannot use --method with --fast option!\nrunning in slow mode...\n" ;
+		$fast = 0;
+	}
+	if (@score_indices) {
+		warn "cannot use multiple score indices with --fast option!\nrunning in slow mode...\n";
+		$fast = 0;
+	}
+	# otherwise we must be good to run in fast mode
 }
 
 my $method_sub = set_method_sub();
@@ -158,6 +174,7 @@ if ($format) {
 unless ($outfile) {
 	# automatically generate output file name based on track name
 	$outfile = $track_name;
+	$outfile =~ s/\(\) /_/g; # strip parentheses and spaces from column name
 }
 my $out_fh;
 if ($bigwig) {
@@ -226,15 +243,14 @@ print " finished! wrote file '$outfile'\n";
 sub check_indices {
 	
 	# check coordinates
-	unless (defined $chr_index or defined $Input->chromo_column) {
+	if ($ask or not defined $chr_index or not defined $Input->chromo_column) {
 		$chr_index = ask_user_for_index($Input, 
 			" Enter the index for the chromosome column  ");
 		unless (defined $chr_index) {
 			die " No identifiable chromosome column index!\n";
 		}
 	}
-	$start_index = $Input->start_column unless defined $start_index;
-	unless (defined $start_index) {
+	if ($ask or not defined $start_index or not defined $Input->start_column) {
 		$start_index = ask_user_for_index($Input, 
 			" Enter the index for the start or position column  ");
 		unless (defined $start_index) {
@@ -248,10 +264,10 @@ sub check_indices {
 	# stop column is optional	
 	
 	# score
-	unless (defined $score_index) {
+	if (not defined $score_index) {
 		$score_index = 	$Input->gff ? 5 : $Input->bed >= 5 ? 4 : undef;
 	}
-	unless (defined $score_index) {
+	if ($ask or not defined $score_index) {
 		# first look for a generic score index
 		$score_index = ask_user_for_index($Input, 
 			" Enter the index for the score column  ");
@@ -724,11 +740,13 @@ data2wig.pl [--options...] <filename>
   Options:
   --in <filename>
   --out <filename> 
+  --noheader
   --fast
   --step [fixed | variable | bed]
   --bed | --bdg
   --size <integer>
   --span <integer>
+  --ask
   --index | --score <column_index or list of indices>
   --chr <column_index>
   --start | --pos <column_index>
@@ -768,6 +786,11 @@ be gzipped compressed.
 
 Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.
+
+=item --noheader
+
+The input file does not have column headers, often found with UCSC 
+derived annotation data tables. 
 
 =item --fast
 
@@ -816,6 +839,13 @@ should be assigned. The same size is assigned to all data values in the
 wig file. This is useful, for example, with microarray data where all of 
 the oligo probes are the same length and you wish to assign the value 
 across the oligo rather than the midpoint. The default is inherently 1 bp. 
+
+=item --ask
+
+Indicate that the program should interactively ask for column indices or
+text strings for the GFF attributes, including coordinates, source, type, 
+etc. It will present a list of the column names to choose from. Enter 
+nothing for non-relevant columns or to accept default values.
 
 =item --index <column_index>
 

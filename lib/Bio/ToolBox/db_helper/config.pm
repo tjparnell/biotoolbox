@@ -5,11 +5,12 @@ require Exporter;
 use File::Spec;
 use Carp;
 use Config::Simple;
-our $VERSION = '1.14';
+our $VERSION = '1.54';
 
 # variables
-our $default;
-our $config_path;
+my $default;
+my $default_path;
+my $config_path;
 our $BTB_CONFIG;
 
 
@@ -18,7 +19,7 @@ our $BTB_CONFIG;
 BEGIN {
 	
 	# the default configuration
-	$default = <<DEFAULT
+	$default = <<DEFAULT;
 #### BioToolBox Default Config file ####
 
 [default_db]
@@ -26,8 +27,6 @@ user                     = nobody
 pass                     = hello
 adaptor                  = DBI::mysql
 dsn_prefix               = dbi:mysql:
-chromosome_exclude       = chrMito, chrMT, 2-micron
-window                   = 500
 
 [example_remote]
 user                     = me
@@ -38,62 +37,31 @@ dsn                      = dbi:mysql:host=127.0.0.1;port=3306;database=example
 adaptor                  = DBI::SQLite
 dsn                      = /path/to/example.sqlite
 
-[features]
-rna         = ncRNA, snRNA, snoRNA, tRNA
-orf         = gene, ORF
-repeat      = repeat_region, long_terminal_repeat, transposable_element_gene, LTR_retrotransposon
-
-[exclude_tags]
-orf_classification    = Dubious
-
 [applications]
 
 DEFAULT
-;
+
 	
 	# possible paths
-	my $new  = File::Spec->catdir($ENV{HOME}, '.biotoolbox.cfg');
-	my $old  = File::Spec->catdir($ENV{HOME}, 'biotoolbox.cfg');
+	$default_path  = File::Spec->catdir($ENV{HOME}, '.biotoolbox.cfg');
 	my $var = $ENV{'BIOTOOLBOX'} || undef;
 	
-	# check for file in home directory
-	if (-s $new) {
-		$config_path = $new;
+	# check for file possible paths
+	if (-s $default_path) {
+		$config_path = $default_path;
 	}
-	
-	elsif (-s $old) {
-		$config_path = $old;
-
-		# upgrade the name
-		my $m;
-		eval {
-			use File::Copy;
-			$m = move($old, $new);
-		};
-		if ($m) {
-			$config_path = $new;
-			warn "### Updated $old to $new ###\n";
-		}
-	}
-	
-	# check for environment variable
 	elsif (defined $var and -s $var) {
 		$config_path = $var;
 	}	
 
-	# finally, when all else fails, write a new file
-	else {
-		open(FH, '>', $new) or confess 
-			"Cannot write biotoolbox configuration file $new!\n$!\n";
-		print FH $default;
-		close FH;
-		$config_path = $new;
-	}
-	
 	# Open the configuration file
-	$BTB_CONFIG = Config::Simple->new($config_path);
-	confess "could not read biotoolbox configuration file $config_path\n" 
-		unless $BTB_CONFIG;
+	if ($config_path) {
+		$BTB_CONFIG = Config::Simple->new($config_path);
+	} else {
+		# no path, open empty object
+		# this should still work, it just won't return anything useful
+		$BTB_CONFIG = Config::Simple->new(syntax => 'ini');
+	}
 }
 
 # Exported names
@@ -113,6 +81,11 @@ sub add_database {
 	croak "no dsn provided for new database configuration\n" unless 
 		($args{dsn} || $args{dsn_prefix});
 	
+	# check that we have config file to update
+	unless ($config_path) {
+		_write_new_config();
+	}
+	
 	# set name
 	my $name = $args{name};
 	delete $args{name};
@@ -129,11 +102,26 @@ sub add_program {
 		return;
 	}
 	
+	# check that we have config file to update
+	unless ($config_path) {
+		_write_new_config();
+	}
+	
 	# add parameter
 	my ($vol, $dir, $file) = File::Spec->splitpath($path);
 	$BTB_CONFIG->param('applications.' . $file, $path);
 	return _rewrite_config();
 }
+
+sub _write_new_config {
+	open(FH, '>', $default_path) or croak 
+		"Cannot write biotoolbox configuration file $default_path!\n$!\n";
+	print FH $default;
+	close FH;
+	$config_path = $default_path;
+	$BTB_CONFIG->read($default_path);
+}
+
 
 sub _rewrite_config {
 	# write new config file
@@ -164,14 +152,17 @@ Bio::ToolBox::db_helper::config
 =head1 DESCRIPTION
 
 This module accesses the biotoolbox configuration file. This file stores 
-multiple database connection settings, as well as default behaviors when 
-accessing information from the database, such as excluded attribute tags, 
-reference sequence GFF type, etc. It also stores the paths to various 
+multiple database connection settings. It also stores the paths to various 
 helper applications. 
 
 The default location for the file is in the user's home directory. 
 Alternatively, the location of the file may be referenced through an 
 Environment setting under the key C<BIOTOOLBOX>.
+
+Versions prior to 1.54 automatically wrote a config file in every user's 
+home directory, whether it was needed or wanted or not. With version 
+1.54, a config file is B<only> written when necessary by adding a program 
+path or database entry.
 
 The file is intended to be edited by the user for their custom installation. 
 The file is a simple INI style text file. The format is detailed below.
@@ -194,8 +185,6 @@ These are default settings that are shared by all databases.
   pass                     = hello
   adaptor                  = DBI::mysql
   dsn_prefix               = dbi:mysql:
-  chromosome_exclude       = chrMito, chrMT, 2-micron
-  window                   = 500
 
 The user and password keys are for authenticating to a relational 
 database. B<WARNING!>
@@ -222,43 +211,9 @@ with any database name.
 See the documentation for L<Bio::DB::SeqFeature::Store> for syntax of 
 C<adaptor> and C<dsn_prefix> keys. 
 
-The C<chromosome_exclude> key provides a list of chromosomes to avoid when 
-generating either a list of genomic window intervals or genes. For 
-example, the mitochondrial chromosome is usually not included when 
-performing analyses. 
-
-The window is the size in bp when generating genomic window intervals. It 
-is used by the <<Bio::ToolBox::db_helper/get_new_genome_list> function.
-
 Multiple database sections may be included. Simply name the section after the 
 name of the database. Database specific keys may be included, and missing 
 keys will default to the C<default_db> values. 
-
-=item Feature Alias Lists
-
-These are aliases for one or more GFF feature types when searching 
-for these features in the database.
-
-Specify as either the GFF "type" or "type:source". These represent GFF 
-columns 3 and 2:3, respectively.
-
-  [features]
-  rna         = ncRNA, snRNA, snoRNA, tRNA
-  orf         = gene, ORF
-  repeat      = repeat_region, long_terminal_repeat, transposable_element_gene, LTR_retrotransposon
-
-=item Exclude Tags
-
-Some features in the database you simply don't want in your list. For 
-example, in the cerevisiaie GFF3 annotation, dubious genes are included 
-as gene features, but have the GFF "orf_classification" tag value of 
-"Dubious". I don't want these features. Ever. These tags are checked 
-using the L<Bio::ToolBox::db_helper/get_new_feature_list> function.
-
-Specify the tag key and the tag value(s) to be excluded
-
-  [exclude_tags]
-  orf_classification    = Dubious
 
 =item Applications
 
@@ -268,8 +223,7 @@ may also be automatically found in the system path.
 
   [applications]
   wigToBigWig      = /usr/local/bin/wigToBigWig
-  java             = /usr/bin/java
-  Bar2Gr           = /usr/local/USeq/Apps/Bar2Gr
+  bedToBigBed      = /usr/local/bin/bedToBigBed
 
 =back
 

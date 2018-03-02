@@ -1,5 +1,5 @@
 package Bio::ToolBox::big_helper;
-our $VERSION = '1.45';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -178,11 +178,15 @@ current directory with a name of F<chr_sizesXXXXX>, where X are random
 characters as defined by L<File::Temp>. 
 
 The chromosome names and lengths are obtained from a C<Bio::DB> 
-database using the C<Bio::ToolBox::db_helper/get_chromosome_list> 
+database using the L<Bio::ToolBox::db_helper/get_chromosome_list> 
 subroutine.
 
 Pass the subroutine a database name, path to a supported database file, 
-or opened C<Bio::DB> object.
+or opened C<Bio::DB> object. 
+
+Optionally pass a second value, a regular expression compatible string 
+or C<qr> for skipping specific chromosomes or chromosome classes, such as 
+mitochondrial or unmapped contigs. The default is to return all chromosomes. 
 
 The file will be written, closed, and the filename returned.
 
@@ -505,10 +509,11 @@ sub bed_to_bigbed_conversion {
 sub generate_chromosome_file {
 	
 	my $database = shift;
+	my $chr_exclude = shift || undef;
 	print " generating chromosome file....\n";
 	
 	# generate chromosome lengths file
-	my @chromosomes = get_chromosome_list($database);
+	my @chromosomes = get_chromosome_list($database, $chr_exclude);
 	unless (@chromosomes) {
 		carp " no chromosome sequences identified in database!\n";
 		return;

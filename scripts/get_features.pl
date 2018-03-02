@@ -6,17 +6,16 @@ use strict;
 use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data;
-use Bio::ToolBox::db_helper qw(
-	open_db_connection
-	verify_or_request_feature_types
-	validate_included_feature
+use Bio::ToolBox::db_helper qw(verify_or_request_feature_types);
+use Bio::ToolBox::GeneTools qw(
+	:export 
+	collapse_transcripts
+	filter_transcript_support_level
+	filter_transcript_gencode_basic
+	filter_transcript_biotype
 );
-use Bio::ToolBox::utility qw(
-	format_with_commas
-	open_to_write_fh
-);
-use Bio::ToolBox::db_helper::config;
-my $VERSION = '1.44';
+use Bio::ToolBox::utility;
+my $VERSION = '1.54';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -34,34 +33,53 @@ unless (@ARGV) {
 
 ### Get command line options and initialize values
 my (
+	$input,
 	$database,
-	$all,
 	$get_subfeatures,
 	$include_coordinates,
 	$start_adj,
 	$stop_adj,
 	$position,
+	$tsl,
+	$gencode,
+	$tbiotype,
+	$collapse,
+	$chromosome_exclude,
 	$convert_to_bed,
 	$convert_to_gff,
+	$convert_to_gtf,
+	$convert_to_refflat,
 	$outfile,
 	$gz,
 	$help,
 	$print_version,
 );
 my @features;
+my @include_tags;
+my @exclude_tags;
+my %exclude_tag2value;
 
 # Command line options
 GetOptions( 
+	'in=s'      => \$input, # input table
 	'db=s'      => \$database, # source annotation database
 	'feature=s' => \@features, # the features to collect from the database
-	'all!'      => \$all, # all features must be collected
 	'sub!'      => \$get_subfeatures, # collect subfeatures
 	'coord!'    => \$include_coordinates, # collect coordinates
 	'start=i'   => \$start_adj, # start coordinate adjustment
 	'stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'pos=s'     => \$position, # relative position to adjust coordinates
+	'tag=s'     => \@include_tags, # attributes to include
+	'exclude=s' => \@exclude_tags, # attribute and keys to exclude
+	'tsl=s'     => \$tsl, # filter on transcript support level
+	'gencode!'  => \$gencode, # filter on gencode basic tag
+	'biotype=s' => \$tbiotype, # filter on transcript biotype
+	'collapse!' => \$collapse, # collapse multi-transcript genes
+	'chrskip=s' => \$chromosome_exclude, # skip chromosomes
 	'bed!'      => \$convert_to_bed, # convert to bed format
-	'gff!'      => \$convert_to_gff, # convert to GFF3 format
+	'gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
+	'gtf!'      => \$convert_to_gtf, # convert to gtf format
+	'ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
 	'out=s'     => \$outfile, # name of output file 
 	'gz!'       => \$gz, # compress output
 	'help'      => \$help, # request help
@@ -86,363 +104,449 @@ if ($print_version) {
 
 
 ### Check for requirements
-unless ($database) {
-	die " must provide a database name! use --help for more information\n";
-}
-unless (defined $gz) {
-	$gz = 0;
-}
-unless (defined $convert_to_bed) {
-	$convert_to_bed = 0;
-}
-unless (defined $convert_to_gff) {
-	$convert_to_gff = 0;
-}
-unless (defined $get_subfeatures) {
-	$get_subfeatures = 0;
-}
-if ($convert_to_bed and $convert_to_gff) {
-	die " cannot convert to both GFF and BED formats!\n";
-}
-if ($start_adj or $stop_adj) {
-	# automatically include coordinates if we're adjusting them
-	$include_coordinates = 1;
-}
-if ($position) {
-	unless ($position =~ /[543m]{1,2}/) {
-		die " unrecognized position value '$position'! see help\n";
-	}
-}
-else {
-	# default is from both ends
-	$position = '53';
+check_requirements();
+
+
+### Fill Data object
+my $Data;
+if ($input) {
+	$Data = load_from_infile();
+} else {
+	$Data = load_from_database();
 }
 
 
-### Open database
-my $db = open_db_connection($database) or 
-	die " unable to open database connection to '$database'!\n";
-# check database
-{
-	my $db_ref = ref $db;
-	unless ($db_ref =~ m/Bio::DB::SeqFeature::Store/) {
-		die " $db_ref databases are not supported! sorry\n";
-	}
+### Filter
+filter_features();
+
+
+### Write out file
+if ($convert_to_bed) {
+	print " Writing to bed file...\n";
+	export_to_bed();
+} elsif ($convert_to_gff) {
+	print " Writing to GFF3 file...\n";
+	export_to_gff();
+} elsif ($convert_to_gtf) {
+	print " Writing to GTF file...\n";
+	export_to_gtf();
+} elsif ($convert_to_refflat) {
+	print " Writing to refFlat file...\n";
+	export_to_ucsc();
+} else {
+	print " Writing to text file...\n";
+	export_to_txt();
 }
 
-
-### Get features
-# check if it is a comma delimited list
-if (scalar @features == 1 and $features[0] =~ /,/) {
-	@features = split /,/, shift @features;
-}
-
-# validate and/or request features
-@features = verify_or_request_feature_types(
-	'db'      => $db,
-	'feature' => [ @features ],
-	'prompt'  => " Enter the feature(s) to collect." . 
-			" A comma de-limited list or range may be given\n",
-) or die " no valid features were provided! see help\n";
-
-
-
-### Prepare data structure and/or output file
-my ($Data, $out_fh) = prepare_data_structure_or_output();
-
-
-
-### Collect features
-my $count;
-if ($convert_to_gff) {
-	print " Collecting features as GFF...\n";
-	$count = collect_features(\&record_gff_feature);
-}
-elsif ($convert_to_bed) {
-	print " Collecting features as BED...\n";
-	$count = collect_features(\&record_bed_feature);
-}
-else {
-	print " Collecting features...\n";
-	if ($include_coordinates) {
-		$count = collect_features(\&record_standard_coordinate_feature);
-	}
-	else {
-		$count = collect_features(\&record_standard_feature);
-	}
-}
-print "  Collected " . format_with_commas($count) . " features\n";
-
-
-
-### Print output
-if ($convert_to_gff) {
-	$out_fh->close;
-	print " Wrote file '$outfile'\n";
-}
-else {
-	unless ($outfile) {
-		$outfile = generate_file_name();
-	}
-	my $success = $Data->write_file(
-		'filename' => $outfile,
-		'gz'       => $gz,
-	);
-	if ($success) {
-		print " Wrote file '$success'\n";
-	}
-	else {
-		print " Failed to write file!\n";
-	}
-}
 
 
 
 
 ########################   Subroutines   ###################################
 
-sub prepare_data_structure_or_output {
-	# how we prepare the structure is dependent on the output format
-	my ($Data, $fh);
+sub check_requirements {
 	
-	if ($convert_to_gff) {
-		# no need for a data structure
-		# we will be printing directly to outfile
-		
-		# check filename
-		unless ($outfile) {
-			$outfile = generate_file_name();
-		}
-		unless ($outfile =~ /\.gff3?(?:\.gz)?$/i) {
-			$outfile .= '.gff3';
-		}
-		
-		# open file handle
-		$fh = open_to_write_fh($outfile, $gz) or 
-			die " unable to open output file for writing!\n";
-		
-		# print GFF headers
-		$fh->print("##gff-version 3\n");
-		$fh->print("# Features collected from database $database\n");
+	# check input
+	unless ($database or $input) {
+		die " Must provide an input file or database name! use --help for more information\n";
 	}
-	else {		
-		# structure dependent on output format
-		if ($convert_to_bed) {
-			# bed structure
-			$Data = Bio::ToolBox::Data->new(
-				feature   => 'region', 
-				datasets  => [qw(Chromosome Start0 End Name Score Strand)],
-			);
-			$Data->bed(6); # set the bed parameter
-			
-			# position adjustments
-			if ($start_adj) {
-				$Data->metadata(1, 'start_adjustment', $start_adj);
-				$Data->metadata(1, 'position', $position);
-			}
-			if ($stop_adj) {
-				$Data->metadata(2, 'start_adjustment', $start_adj);
-				$Data->metadata(2, 'position', $position);
-			}
-		}
-		
-		elsif ($include_coordinates) {
-			# generic tim data structure with coordinates
-			
-			$Data = Bio::ToolBox::Data->new(
-				feature   => 'region', 
-				datasets  => [qw(Name Type Chromosome Start End Strand)],
-			);
-		
-			# position adjustments
-			if ($start_adj) {
-				$Data->metadata(4, 'start_adjustment', $start_adj);
-				$Data->metadata(4, 'position', $position);
-			}
-			if ($stop_adj) {
-				$Data->metadata(5, 'start_adjustment', $start_adj);
-				$Data->metadata(5, 'position', $position);
-			}
-		}
-			
-		else {
-			# just name and type, thank you very much
-			$Data = Bio::ToolBox::Data->new(
-				feature   => join(',', @features), 
-				datasets  => [qw(Primary_ID Name Type)],
-			);
-		}
-		
-		# add database
-		$Data->database($database);
-		$Data->program("$0, v $VERSION");
-	}
-	return ($Data, $fh);
-}
-
-
-
-sub collect_features {
-	
-	# collection method
-	my $method = shift;
-	
-	# Get the names of chromosomes to avoid
-	my @excluded_chromosomes = 
-		$BTB_CONFIG->param("$database\.chromosome_exclude");
-	unless (@excluded_chromosomes) {
-		@excluded_chromosomes = 
-			$BTB_CONFIG->param('default_db.chromosome_exclude');
-	}
-	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
-	
-	# generate a seqfeature stream
-	my $iterator = $db->features(
-		-type     => \@features,
-		-iterator => 1,
-	);
-	
-	# process the features
-	my $count = 0;
-	while (my $seqfeat = $iterator->next_seq) {
-		
-		# skip it unless it is validated
-		unless ($all) {
-			# pass the validation attributes
-			next unless validate_included_feature($seqfeat);
-			
-			# not on excluded chromosome
-			next if (exists $excluded_chr_lookup{ $seqfeat->seq_id });
-		}
-		
-		# record each feature according to the method
-		&{$method}($seqfeat);
-		$count++;
+	if ($input =~ /\.(?:sqlite|db)$/i) {
+		# whoops! specifiying a database file as input
+		$database = $input;
+		undef $input;
 	}
 	
-	return $count;	
-}
-
-
-
-sub record_gff_feature {
-	my $seqfeature = shift;
+	# check if feature is a comma delimited list
+	if (scalar @features == 1 and $features[0] =~ /,/) {
+		@features = split ',', shift @features;
+	}
+	if (scalar(@features) > 1 and $input) {
+		warn sprintf(" Only one feature allowed when parsing an input file! Using %s",
+			$features[0]);
+	}
+	if (not @features and $input) {
+		print " using default feature of 'gene'\n";
+		$features[0] = 'gene';
+	}
 	
-	# directly print the feature
-	# do or do not include subfeatures
-	$out_fh->print( $seqfeature->gff3_string($get_subfeatures) . "\n" );
-}
-
-
-
-sub record_bed_feature {
-	my $seqfeature = shift;
+	# check conversions
+	my $conversions = $convert_to_bed + $convert_to_gff + $convert_to_gtf + $convert_to_refflat;
+	if ($conversions > 1) {
+		die " Too many bed/gff/gtf/refFlat conversions specified!\n";
+	}
+	if ($convert_to_gff or $convert_to_gtf or $convert_to_refflat) {
+		$get_subfeatures = 1 if ($input and not defined $get_subfeatures);
+	}
 	
-	# adjust coordinates if requested
+	# check collapse
+	if ($collapse) {
+		unless ($convert_to_gff or $convert_to_gtf or $convert_to_refflat) {
+			die " Cannot collapse transcripts unless writing to GFF/GTF/refFlat!\n";
+		}
+	}
+	
+	# check adjustments
 	if ($start_adj or $stop_adj) {
-		adjust_coordinates($seqfeature);
+		# automatically include coordinates if we're adjusting them
+		if ($convert_to_gff or $convert_to_gtf or $convert_to_refflat) {
+			die " Cannot adjust coordinates when converting to GFF/GTF/refFlat!\n";
+		}
+		$include_coordinates = 1;
+	}
+	if ($position) {
+		unless ($position =~ /[543m]{1,2}/) {
+			die " unrecognized position value '$position'! see help\n";
+		}
+	}
+	else {
+		# default is from both ends
+		$position = '53';
 	}
 	
-	# record the feature
-	my @fdata = (
-		$seqfeature->seq_id,
-		$seqfeature->start - 1,
-		$seqfeature->end,
-		$seqfeature->display_name || $seqfeature->primary_id || 'region',
-		$seqfeature->score || 0,
-		$seqfeature->strand || 1, # this will be converted to + or - upon writing
-	);
-	$Data->add_row(\@fdata);
+	# check include tags
+	if (@include_tags and scalar(@include_tags) == 1 and $include_tags[0] =~ /,/) {
+		@include_tags = split /,/, shift @include_tags;
+	}
 	
-	# record subfeatures if requested
-	if ($get_subfeatures) {
-		foreach my $subfeat ($seqfeature->get_SeqFeatures) {
-			record_bed_feature($subfeat);
+	# exclude tags
+	if (@exclude_tags) {
+		foreach (@exclude_tags) {
+			my ($k, $v) = split /[,=]/, $_;
+			$exclude_tag2value{$k} = $v;
 		}
+	}
+	
+	# check output
+	unless ($outfile) {
+		die " Must provide an output file!\n";
 	}
 }
 
 
-
-sub record_standard_coordinate_feature {
-	my $seqfeature = shift;
+sub load_from_database {
+	# validate and/or request features
+	@features = verify_or_request_feature_types(
+		'db'      => $database,
+		'feature' => [ @features ],
+		'prompt'  => " Enter the feature(s) to collect." . 
+				" A comma de-limited list or range may be given\n",
+	) or die " no valid features were provided! see help\n";
 	
-	# adjust coordinates if requested
+	# generate a list from the database
+	my $D = Bio::ToolBox::Data->new(
+		db         => $database,
+		feature    => join(',', @features),
+		chrskip    => $chromosome_exclude,
+	) or die " unable to generate new feature list\n";
+	
+	if ($D->last_row) {
+		printf " Loaded %s features from %s.\n", format_with_commas($D->last_row), 
+			$input ? $input : $database;
+	}
+	else {
+		die " No features loaded!\n";
+	}
+	return $D;
+}
+
+
+sub load_from_infile {
+	# parse file
+	my $D = Bio::ToolBox::Data->new(
+		file       => $input, 
+		parse      => 1,
+		simplify   => 0, # we want everything!
+		feature    => $features[0],
+		subfeature => $get_subfeatures ? 'exon,cds,utr' : '',
+		chrskip    => $chromosome_exclude,
+	) or die " unable to load input file '$input'\n";
+	
+	if ($D->last_row) {
+		printf " Loaded %s features from $input.\n", format_with_commas($D->last_row);
+	}
+	else {
+		die " No features loaded! Re-check your feature type. If you are attempting to \n" . 
+			" parse subfeatures like exon or CDS, try the program get_gene_regions instead.\n";
+	}
+	return $D;
+}
+
+
+sub filter_features {
+	# filter on specific tags
+	if (%exclude_tag2value) {
+		foreach my $k (keys %exclude_tag2value) {
+			my $check = $exclude_tag2value{$k};
+			print " Filtering tag $k for $check...\n";
+			my @unwanted;
+			$Data->iterate( sub {
+				my $row = shift;
+				my ($v) = $row->seqfeature(1)->get_tag_values($k);
+				if ($v =~ /$check/i) {
+					# the tag matches, so discard
+					push @unwanted, $row->row_index;
+				}
+			});
+			if (@unwanted) {
+				$Data->delete_row(@unwanted);
+			}
+		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+	}
+	
+	# filter on gencode
+	if ($tbiotype) {
+		print " Filtering transcript biotype for $tbiotype...\n";
+		my @unwanted;
+		$Data->iterate( sub {
+			my $row = shift;
+			my $good = filter_transcript_biotype($row->seqfeature(1), $tbiotype);
+			if ($good) {
+				$Data->store_seqfeature($row->row_index, $good);
+			}
+			else {
+				push @unwanted, $row->row_index;
+			}
+		});
+		if (@unwanted) {
+			$Data->delete_row(@unwanted);
+		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+	}
+	
+	# filter on tsl
+	if ($tsl) {
+		print " Filtering for transcript support level of $tsl...\n";
+		my @unwanted;
+		$Data->iterate( sub {
+			my $row = shift;
+			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
+			if ($good) {
+				$Data->store_seqfeature($row->row_index, $good);
+			}
+			else {
+				push @unwanted, $row->row_index;
+			}
+		});
+		if (@unwanted) {
+			$Data->delete_row(@unwanted);
+		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+	}
+	
+	# filter on gencode
+	if ($gencode) {
+		print " Filtering for GENCODE transcripts...\n";
+		my @unwanted;
+		$Data->iterate( sub {
+			my $row = shift;
+			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
+			if ($good) {
+				$Data->store_seqfeature($row->row_index, $good);
+			}
+			else {
+				push @unwanted, $row->row_index;
+			}
+		});
+		if (@unwanted) {
+			$Data->delete_row(@unwanted);
+		}
+		printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+	}
+	
+	# collapse transcripts
+	if ($collapse) {
+		print " Collapsing alternate transcripts...\n";
+		$Data->iterate( sub {
+			my $row = shift;
+			my $gene = collapse_transcripts($row->seqfeature(1));
+			if ($gene) {
+				$Data->store_seqfeature($row->row_index, $gene);
+			}
+		});
+	}
+}
+
+
+sub export_to_bed {
+	# prepare output
+	unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
+		$outfile .= '.bed';
+	}
+	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+		die "unable to open '$outfile' for writing! $!\n";
+	
+	# adjust coordinates as necessary and write
 	if ($start_adj or $stop_adj) {
-		adjust_coordinates($seqfeature);
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature(1); # make sure we get the seqfeature
+			my ($start, $stop) = adjust_coordinates($f); 
+			my $string = $row->bed_string(
+				start => $start,
+				end   => $stop,
+			);
+			$fh->print( $string . "\n" );
+		});
 	}
+	else {
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature(1); # make sure we get the seqfeature
+			$fh->print( $row->bed_string . "\n" );
+		});
+	}
+	$fh->close;
+	printf " wrote file $outfile\n";
+}
+
+
+sub export_to_gff {
+	# prepare output
+	unless ($outfile =~ /\.gff3?(?:\.gz)?$/i) {
+		$outfile .= '.gff3';
+	}
+	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+		die "unable to open '$outfile' for writing! $!\n";
+	$fh->print("##gff-version 3\n");
+	$fh->printf("# exported from %s\n", $database ? $database : $input);
+	
+	# write to gff3
+	$Data->iterate( sub {
+		my $row = shift;
+		my $string = $row->seqfeature(1)->gff_string(1);
+		$fh->print( $string . "###\n"); # should already have a newline
+	});
+	
+	$fh->close;
+	printf " wrote file $outfile\n";
+}
+
+
+sub export_to_gtf {
+	# prepare output
+	unless ($outfile =~ /\.gtf(?:\.gz)?$/i) {
+		$outfile .= '.gtf';
+	}
+	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+		die "unable to open '$outfile' for writing! $!\n";
+	$fh->print("##gff-version 2.5\n");
+	$fh->printf("# exported from %s\n", $database ? $database : $input);
+	
+	# write to GTF
+	$Data->iterate( sub {
+		my $row = shift;
+		my $string = gtf_string( $row->seqfeature(1) );
+		$fh->print( $string);
+	});
+	
+	$fh->close;
+	printf " wrote file $outfile\n";
+}
+
+
+sub export_to_txt {
+	# adjust coordinates as necessary
+	if (($start_adj or $stop_adj) or $include_coordinates) {
 		
-	# record the feature
-	my @fdata = (
-		$seqfeature->display_name,
-		$seqfeature->type,
-		$seqfeature->seq_id,
-		$seqfeature->start,
-		$seqfeature->end,
-		$seqfeature->strand,
-	);
-	$Data->add_row(\@fdata);
+		# make sure we establish the feature type first, before we add 
+		# coordinate columns, otherwise features might not be returned properly
+		my $ftype = $Data->feature_type;
+		
+		# add coordinate columns
+		my $seq_i    = $Data->add_column('Chromosome');
+		my $start_i  = $Data->add_column('Start');
+		my $stop_i   = $Data->add_column('Stop');
+		my $strand_i = $Data->add_column('Strand');
+		
+		# iterate
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature(1);
+			my ($start, $stop) = adjust_coordinates($f); 
+			$row->value($seq_i, $f->seq_id);
+			$row->value($start_i, $start);
+			$row->value($stop_i, $stop);
+			$row->value($strand_i, $f->strand);
+		});
+	}
 	
-	# record subfeatures if requested
-	if ($get_subfeatures) {
-		foreach my $subfeat ($seqfeature->get_SeqFeatures) {
-			record_standard_coordinate_feature($subfeat);
+	# collect attribute tags, this does not recurse
+	if (@include_tags) {
+		foreach my $t (@include_tags) {
+			my $i = $Data->add_column($t);
+			$Data->iterate( sub {
+				my $row = shift;
+				# get the tag value from the feature and record it, null if not present
+				my @v = $row->seqfeature->get_tag_values($t); # could be more than 1
+				$row->value($i, @v ? join(',', @v) : '.');
+			});
 		}
 	}
+	
+	# write the output
+	my $success = $Data->write_file(
+		filename => $outfile,
+		gz       => $gz,
+	);
+	printf " wrote file $success\n" if $success;
 }
 
 
-
-sub record_standard_feature {
-	my $seqfeature = shift;
-	
-	# record the feature
-	my @fdata = (
-		$seqfeature->primary_id,
-		$seqfeature->display_name,
-		$seqfeature->type,
-	);
-	$Data->add_row(\@fdata);
-	
-	# record subfeatures if requested
-	if ($get_subfeatures) {
-		foreach my $subfeat ($seqfeature->get_SeqFeatures) {
-			record_standard_feature($subfeat);
-		}
+sub export_to_ucsc {
+	# prepare output
+	unless ($outfile =~ /\.(?:refflat|ucsc)(?:\.gz)?$/i) {
+		$outfile .= '.refFlat';
 	}
+	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+		die "unable to open '$outfile' for writing! $!\n";
+	$fh->printf("# exported from %s\n", $database ? $database : $input);
+	
+	# write to gff3
+	$Data->iterate( sub {
+		my $row = shift;
+		my $string = ucsc_string( $row->seqfeature(1) );
+		$fh->print($string);
+	});
+	
+	$fh->close;
+	printf " wrote file $outfile\n";
 }
-
-
 
 sub adjust_coordinates {
-	my $seqfeature = shift;
+	my $feature = shift;
 	
 	# we will always adjust relative coordinates based on strand
 	# and not absolute coordinates
+	my ($start, $end);
 	
 	# get the original coordinates
-	my $start = $seqfeature->start;
-	my $end   = $seqfeature->end;
+	my $fstart = $feature->start;
+	my $fend   = $feature->end;
 	
 	# adjust from 5' end
 	if ($position eq '5') {
 	
-		if ($seqfeature->strand >= 0) {
+		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$seqfeature->start($start + $start_adj);
+				$start = $fstart + $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->end($start + $stop_adj);
+				$end = $fstart + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$seqfeature->end($end - $start_adj);
+				$end = $fend - $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->start($end - $stop_adj);
+				$start = $fend - $stop_adj;
 			}
 		}
 	}
@@ -450,22 +554,22 @@ sub adjust_coordinates {
 	# adjust from 3' end
 	elsif ($position eq '3') {
 	
-		if ($seqfeature->strand >= 0) {
+		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$seqfeature->end($end + $start_adj);
+				$end = $fend + $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->start($end + $stop_adj);
+				$start = $fend + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$seqfeature->start($start - $start_adj);
+				$start = $fstart - $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->end($start - $stop_adj);
+				$end = $fstart - $stop_adj;
 			}
 		}
 	}
@@ -473,23 +577,23 @@ sub adjust_coordinates {
 	# adjust from middle position
 	elsif ($position eq 'm' or $position eq '4') {
 		
-		my $midpoint = int( ( ($start + $end) / 2) + 0.5);
-		if ($seqfeature->strand >= 0) {
+		my $midpoint = int( ( ($fstart + $fend) / 2) + 0.5);
+		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$seqfeature->start($midpoint + $start_adj);
+				$start = $midpoint + $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->end($midpoint + $stop_adj);
+				$end = $midpoint + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$seqfeature->end($midpoint - $start_adj);
+				$end = $midpoint - $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->start($midpoint - $stop_adj);
+				$start = $midpoint - $stop_adj;
 			}
 		}
 	}
@@ -497,62 +601,43 @@ sub adjust_coordinates {
 	# adjust from both ends
 	elsif ($position eq '53') {
 	
-		if ($seqfeature->strand >= 0) {
+		if ($feature->strand >= 0) {
 			# forward strand
 			if ($start_adj) {
-				$seqfeature->start($start + $start_adj);
+				$start = $fstart + $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->end($end + $stop_adj);
+				$end = $fend + $stop_adj;
 			}
 		}
 		else {
 			# reverse strand
 			if ($start_adj) {
-				$seqfeature->end($end - $start_adj);
+				$end = $fend - $start_adj;
 			}
 			if ($stop_adj) {
-				$seqfeature->start($start - $stop_adj)
+				$start = $fstart - $stop_adj;
 			}
 		}
-	}
-	
-	# something else?
-	else {
-		die "unrecognized position value '$position'! see help\n";
 	}
 	
 	# flip coordinates to make start and stop consistent with strand
 	# sometimes when only one coordinate is changed, it flips the orientation
 	# start must always be less than the stop coordinate
 	# but always respect the given strand
-	if ($seqfeature->start > $seqfeature->end) {
-		my $start = $seqfeature->end;
-		my $end   = $seqfeature->start;
-		$seqfeature->start($start);
-		$seqfeature->end($end);
+	if ($start > $end) {
+		my $newstart = $end;
+		my $newend   = $start;
+		$start = $newstart;
+		$end = $newend;
 	}
 	
 	# make sure no negative coordinates sneak through
-	$seqfeature->start(1) if $seqfeature->start < 1;
+	$start = 1 if $start < 1;
+	
+	# return
+	return ($start, $end);
 }
-
-
-sub generate_file_name {
-	my $filename = join(',', @features);
-	$filename =~ s/:/_/g; # 
-	if ($convert_to_gff) {
-		$filename .= '.gff';
-	}
-	elsif ($convert_to_bed) {
-		$filename .= '.bed';
-	}
-	else {
-		$filename .= '.txt';
-	}
-	return $filename;
-}
-
 
 
 __END__
@@ -561,24 +646,45 @@ __END__
 
 get_features.pl
 
-A script to collect features from a BioPerl SeqFeature::Store database.
+A script to collect and filter annotated features from source files.
 
 =head1 SYNOPSIS
 
-get_features.pl --db <text> [--options...]
+get_features.pl --in E<lt>filenameE<gt> --out E<lt>filenameE<gt>
+
+get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
-  Options:
-  --db <text>
-  --feature <type | type:source>
-  --all
+  Source data:
+  --db <name | filename>    (name, file.db, or file.sqlite)
+  --in <filename>           (gff, gtf, genePred, etc)
+  
+  Selection:
+  --feature <type>          (gene, mRNA, transcript, etc)
   --sub
-  --coord
+  
+  Filter features:
+  --exclude <tag=value>
+  --biotype <regex>
+  --tsl [best|best1|best2|best3|best4|best5|1|2|3|4|5|NA]
+  --gencode
+  --chrskip <regex>
+  
+  Adjustments:
+  --collapse
   --start=<integer>
   --stop=<integer>
   --pos [ 5 | m | 3 | 53 ]
-  --out <filename>
+  
+  Report format options:
+  --coord
+  --tag <text>
   --bed
-  --gff 
+  --gff or --gff3
+  --gtf
+  --refflat or --ucsc
+  
+  General options:
+  --out <filename>
   --gz
   --version
   --help
@@ -589,39 +695,92 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --db <text>
+=item --db E<lt>textE<gt>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. A database is 
-required for generating new data files with features. For more information 
-about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+from which gene or feature annotation may be derived. A SQLite file 
+or a named relational database may be provided. Used as an alternate 
+to an input file.
 
-=item --feature <type | type:source>
+=item --in E<lt>filenameE<gt>
 
-Optionally specify the type of the feature(s) to collect. The GFF 
-primary_tag or primary_tag:source_tag should be specified. More than 
-one feature may be specified at a time, either as a comma de-limited 
-list or separate options. If not specified, then an interactive list 
-will be presented to the user for selection.
+Specify the filename of a gene annotation file, including GTF, GFF3, 
+or a UCSC-formatted file including, refFlat, genePred, or knownGene.
+The file may be gzip compressed. Used as an alternate to a database.
 
-=item --all
+=item --feature E<lt>typeE<gt>
 
-Optionally indicate that all features present in the database must 
-be included. By default, certain features may be excluded based on 
-parameters defined in the BioToolBox configuration file. See below 
-for details.
+Provide a feature type to collect. Typically, this corresponds to the 
+GFF type, or 3rd column in a GFF3 or GTF file. Examples include 
+C<gene>, C<mRNA>, or C<transcript>. The default value for input files 
+is 'C<gene>'. For databases, an interactive list will be presented 
+from which one or more may be chosen.
 
 =item --sub
 
-Optionally include all subfeatures in the output. For example, 
-transcript, CDS, and/or exon subfeatures of a gene.
+Optionally include all child subfeatures in the output. For example, 
+transcript, CDS, and/or exon subfeatures of a gene. This option is 
+automatically enabled with GFF, GTF, or refFlat output; it may be 
+turned off with "--nosub". It has no effect with standard text or BED output.
 
-=item --coord
+=item --exclude E<lt>tag=valueE<gt>
 
-When writing a standard format file, optionally include the chromosome, 
-start, stop, and strand coordinates. These are automatically included 
-when writing a BED or GFF format.
+Provide a GFF/GTF attribute tag on which to filter out the features 
+matching the indicated value. For example, to filter on protein 
+coding genes using C<gene_biotype>, specify "gene_biotype=protein_coding". 
+This filter does not descend into subfeatures. More than one exclusion 
+tag may be specified with multiple options or a comma-delimited list. 
+
+=item --biotype E<lt>regex<gt> 
+
+Filter transcripts using the C<transcript_biotype> or C<biotype> 
+GTF/GFF3 attribute, typically found in Ensembl annotation files. Provide 
+a regex compatible string which must match the biotype value to keep the 
+transcripts. For example, to keep specify "miRNA" to keep all micro-RNA 
+transcripts. This works on a subfeature level as well, so that C<gene> 
+may be specified as the feature to collect, and only the gene transcripts 
+belonging to the indicating biotype are retained.
+
+=item --tsl E<lt>levelE<gt>
+
+Filter transcripts on the Ensembl GTF/GFF3 attribute C<transcript_support_level>, 
+which is described at L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>.
+Provide a level of support to filter. Values include: 
+    
+    1       All splice junctions supported by evidence
+    2       Transcript flagged as suspect or only support from multiple ESTs
+    3       Only support from single EST
+    4       Best supporting EST is suspect
+    5       No support
+    best    Transcripts at the best (lowest) available level are taken
+    best1   The word followed by a digit 1-5, indicating any transcript 
+            at or better (lower) than the indicated level
+    NA      Only transcripts without a level (NA) are retained.
+
+=item --gencode
+
+Boolean option to filter transcripts as part of the GENCODE specification. 
+These are marked in Ensembl GTF/GFF3 annotation files as the C<tag> attribute 
+with value "basic". Typically, at least one transcript for every gene is 
+marked as part of the GENCODE set. Transcripts not marked as such usually 
+lack sufficient experimental evidence.
+
+=item --chrskip E<lt>regexE<gt>
+
+Exclude features from the output whose sequence ID or chromosome matches 
+the provided regex-compatible string. Expressions should be quoted or 
+properly escaped on the command line. Examples might be 
+    
+    'chrM'
+    'scaffold.+'
+    'chr.+alt|chrUn.+|chr.+_random'
+
+=item --collapse
+
+Boolean option to collapse multiple alternate transcripts of a gene into 
+a single artificial transcript, merging overlapping exons and minimizing 
+introns, where appropriate. Genes without alternate transcripts are not 
+collapsed.
 
 =item --start=<integer>
 
@@ -632,7 +791,8 @@ end coordinates of the collected regions. A negative value is shifted
 upstream (towards the 5 prime end), and a positive value is shifted 
 downstream (towards the 3 prime end). Adjustments are made relative 
 to the indicated position (--pos option, below) based on the feature 
-strand. Adjustments are ignored if a GFF file is written.
+strand. Adjustments are only allowed when writing BED or standard 
+text files.
 
 =item --pos [ 5 | m | 3 | 53 ]
 
@@ -643,25 +803,45 @@ value. Alternatively, specify '53' to indicate that the start adjustment
 adjusts the 5 prime end and the stop adjustment adjusts the 3 prime end. 
 The default is '53'.
 
+=item --coord
+
+When writing a standard text file, optionally include the chromosome, 
+start, stop, and strand coordinates. These are automatically included 
+in other formats. This is automatically included when adjusting 
+coordinate positions.
+
+=item --tag E<lt>textE<gt>
+
+When writing a standard text file, optionally include additional 
+GFF/GTF attribute tags. Specify as a comma-delimited list or as 
+separate options.
+
+=item --bed
+
+Write a standard 6-column BED format file. Subfeatures are not included.
+
+=item --gff
+
+Write a GFF version 3 (GFF3) format output file. Subfeatures are 
+automatically included and coordinate adjustments ignored.
+
+=item --gtf
+
+Write a GTF format (GFF version 2.2 or 2.5) output file. Subfeatures are 
+automatically included and coordinate adjustments ignored.
+
+=item --refflat or --ucsc
+
+Write a UCSC-style refFlat format (10 columns) gene annotation table. 
+Subfeatures are automatically included and coordinate adjustments ignored.
+
 =item --out <filename>
 
 Specify the output file name. Default is the joined list of features. 
 
-=item --bed
-
-Optionally indicate that a 6-column BED format file should be 
-written. Currently, 12-column BED formats with exon information is 
-not supported (yet).
-
-=item --gff
-
-Optionally indicate that a GFF3 format file should be written. This 
-option enables the database features to be written completely with 
-all attributes. Coordinate adjustments are ignored.
-
 =item --gz
 
-Specify whether (or not) the output file should be compressed with gzip.
+Specify whether the output file should be compressed with gzip.
 
 =item --version
 
@@ -675,30 +855,30 @@ Display this POD documentation.
 
 =head1 DESCRIPTION
 
-This program will extract a list of features from a database and 
-write them out to a file. Specifically, the requested features in 
-a Bio::DB::SeqFeature::Store schema database are pulled and written 
-as either a list of named features with or without coordinate information, 
-a BED-style formatted file, or a GFF3-formatted file. The GFF option 
-is essentially a database dump, as it enables a low-level option to 
-write the features as original GFF3 lines complete with all attributes.
+This program will extract a list of features from a database or input 
+annotation file and write them out to a file. Features may be selected 
+using their feature type (the 3rd column in a GFF or GTF file). When 
+selecting features from a database, types may be selected interactively 
+from a presented list. Features may be filtered based on various 
+GFF attributes typically found in Ensembl annotation, including 
+C<transcript_biotype>, C<transcript_support_level>, and GENCODE basic 
+tags. Features may also be filtered by chromosome. 
 
-Features may be specified through their GFF type or primary_tag. They
-may be specified as a command-line option or selected interactively
-from a presented list. They may be restricted through two options
-defined in the BioToolBox configuration file, biotoolbox.cfg. These
-include a database-specific or default database option,
-"chromosome_exclude", which excludes features located on the listed
-chromosomes (such as the mitochondrial chromosome), and the
-"exclude_tags", which are attribute keys and values to be avoided.
-More information may be found in the configuration file itself.
+Collected features may be written to a variety of formats, including 
+GFF3, GTF, refFlat, simple 6-column BED, or a simple text format. With 
+GFF, GTF, and refFlat formats, subfeatures such as exons are automatically 
+included (which may also be turned off). With a simple text format, 
+the source database or parsed input file are recorded in the header 
+metadata for use in subsequent programs. Coordinates may be optionally 
+included in the text file, which preempts using parsed features in other 
+tools. 
 
 =head1 COORDINATE ADJUSTMENTS
 
-Coordinates of the features may be adjusted as desired. Adjustments 
-may be made relative to either the 5 prime, 3 prime, both ends, or the 
-feature midpoint. Positions are based on the feature strand. Use the 
-following examples as a guide. 
+Coordinates of the features may be adjusted as desired when writing to 
+text or BED file formats. Adjustments may be made relative to either 
+the 5 prime, 3 prime, both ends, or the feature midpoint. Positions 
+are based on the feature strand. Use the following examples as a guide. 
 
 =over 4
 

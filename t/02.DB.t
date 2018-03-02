@@ -42,7 +42,7 @@ is($Data->filename, undef, 'filename');
 
 # check data table
 is($Data->number_columns, 3, 'number of columns');
-is($Data->last_row, 26, 'last row');
+is($Data->last_row, 33, 'last row'); # this now includes dubious genes as of 1.54
 
 # columns
 is($Data->id_column, 0, 'primary ID column');

@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -430,17 +430,18 @@ This is required.
 
 =item features
 
-A scalar value containing a name representing the type(s) of
-feature(s) to collect. This name will be parsed into an actual list
-with the internal subroutine L</_features_to_classes>. This is required.
+A scalar value containing a name representing the feature type(s) of
+feature(s) to collect. The type may be a C<primary_tag> or C<primary_tag:source_tag>.
+It may be a single element or a comma-delimited list. This is required.
+
+=item chrskip
+
+Provide a regular-expression compatible string for skipping features from 
+specific chromosomes, for example mitochondrial or unmapped contigs.
 
 =back
 
-The collected lists are subject to filtering, including excluded 
-chromosomes and excluded attribute tags. These are obtained from the 
-configuration file F<.biotoolbox.cfg> under the headings C<chromosome_exclude> 
-and C<exclude_tags>. See L<Bio::ToolBox::Data::db_helper::config> for 
-information regarding the configuration file. Status messages are always 
+Status messages, including the number of features found and kept, are always 
 printed to C<STDOUT>. 
 
 =item get_new_genome_list
@@ -477,31 +478,26 @@ are supported. Required.
 =item win
 
 A scalar value containing an integer representing the size of the
-window in basepairs. The default value is defined in the F<.biotoolbox.cfg>
-configuration file.
+window in basepairs. The default value is 500 bp.
 
 =item step
 
 A scalar value containing an integer representing the step size for
 advancing the window across the genome. The default is the window size.
 
+=item chrskip
+
+=item skip
+
+=item exclude
+
+Provide a regular expression compatible string for excluding specific 
+chromosomes or classes of chromosomes, such as the mitochondrial or 
+unmapped contigs. 
+
 =back
 
 Status messages are printed to C<STDOUT>. 
-
-=item validate_included_feature
-
-  my $status = validate_included_feature($seqfeature);
-
-This subroutine will validate a database feature to make sure it is 
-useable. It will check feature attributes and compare them against 
-a list of attributes and values to be avoided. The list of unwanted 
-attributes and values is stored in the BioToolBox configuration file 
-F<.biotoolbox.cfg>. 
-
-Pass the subroutine a L<Bio::DB::SeqFeature::Store> database feature. 
-It will return true (1) if the feature passes validation and false 
-(undefined) if it contains an excluded attribute and value.
 
 =item get_db_feature
 
@@ -687,12 +683,9 @@ information.
 Pass the subroutine either the name of the database, the path to the 
 database file, or an opened database object.
 
-Optionally pass a second value, a boolean argument to limit and exclude 
-unwanted chromosomes as defined by the C<chromosome_exclude> option in 
-the BioToolBox configuration file, F<.biotoolbox.cfg>. A true value limits 
-chromosomes, and false includes all chromosomes. Sometimes some sequences 
-are simply not wanted in analysis, like the mitochondrial chromosome or 
-unmapped contigs. The default is to return all chromosomes. 
+Optionally pass a second value, a regular expression compatible string 
+for skipping specific chromosomes or chromosome classes, such as mitochondrial 
+or unmapped contigs. The default is to return all chromosomes. 
 
 The subroutine will return an array, with each element representing each 
 chromosome or reference sequence in the database. Each element is an anonymous 
@@ -751,30 +744,6 @@ so that at least some of us know what is going on.
 
 =over 4
 
-=item _features_to_classes
-
-This internal subroutine provides a conveniant look up and conversion of a 
-single-word description of a category of features into a list of actual
-feature classes in the database. For example, the word 'gene' may include
-all ORFs, snRNAs, snoRNAs, and ncRNAs.
-
-Pass the subroutine the feature category name as a scalar value. The 
-actual list of feature types will be collected and returned as an array. 
-Multiple values may be passed as a comma-delimited string (no spaces).
-
-The aliases and feature lists are specified in the L<Bio::ToolBox::db_helper> 
-configuration file, C<biotoolbox.cfg>. Additional lists and aliases 
-may be placed there. The lists are database specific, or they can be 
-added to the default database.
-
-If the passed category name does not match an alias in the config file, 
-then it is assumed to be a feature in the database. No further validation 
-will be done (if it's not valid, simply no features would be returned from 
-the database). 
-
-Also, feature types may be passed as the GFF's method:source, in which case 
-they are assumed to be valid and not checked.
-
 =item _lookup_db_method
 
 Internal method for determining which database adapter and method call 
@@ -811,7 +780,6 @@ use Carp qw(carp cluck croak confess);
 use Module::Load; # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median range stddevp);
-use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
 
@@ -1659,11 +1627,11 @@ sub get_new_feature_list {
 	# Open a db connection 
 	$args{'db'} ||= undef;
 	my $db = open_db_connection($args{'db'});
-	my $db_name = get_db_name($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
 	}
+	my $db_name = get_db_name($args{'db'});
 
 	# Verify a SeqFeature::Store database
 	my $db_ref = ref $db;
@@ -1672,36 +1640,26 @@ sub get_new_feature_list {
 		return;
 	}
 	
-	# Translate the features into a list of classes
-	my @classes = _features_to_classes($args{'features'});
-	unless (@classes) {
-		carp "no or unknown features passed!";
+	# Features to search for
+	my $searchFeature = $args{'feature'} || $args{'features'} || undef;
+	unless ($searchFeature) {
+		carp "no search feature types passed!";
 		return;
 	}
+	my @classes = split(',', $searchFeature); # it may or may not be a list
+	
+	# chromosomes to skip
+	my $chr_exclude = $args{'chrskip'} || undef;
 	
 	# Add table columns
 	my $pid_i  = $data->add_column('Primary_ID');
 	my $name_i = $data->add_column('Name');
 	my $type_i = $data->add_column('Type');
 	
-	# List of types
-	if (scalar @classes > 1) {
-		$data->metadata($name_i, 'include', join(",", @classes));
-	}
-	
-	# Get the names of chromosomes to avoid
-	my @excluded_chromosomes = 
-		$BTB_CONFIG->param("$db_name\.chromosome_exclude");
-	unless (@excluded_chromosomes) {
-		@excluded_chromosomes = 
-			$BTB_CONFIG->param('default_db.chromosome_exclude');
-	}
-	my %excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
-	
 	# Set up the database iterator
-	print "   Searching for " . join(", ", @classes) . "\n";
+	print "   Searching for $searchFeature features\n";
 	my $iterator = $db->get_seq_stream(
-			-types    => \@classes
+			-types    => scalar @classes ? \@classes : $searchFeature,
 	); 
 	unless ($iterator) {
 		# there should be some features found in the database
@@ -1715,10 +1673,7 @@ sub get_new_feature_list {
 		$total_count++;
 		
 		# skip genes from excluded chromosomes
-		next if exists $excluded_chr_lookup{ $feature->seq_id };
-		
-		# skip anything that matches the tag exceptions
-		next unless validate_included_feature($feature);
+		next if (defined $chr_exclude and $feature->seq_id =~ $chr_exclude);
 		
 		# Record the feature information
 		# in the B::DB::SF::S database, the primary_ID is a number unique to the 
@@ -1766,13 +1721,7 @@ sub get_new_genome_list {
 	}
 	
 	# Determine win and step sizes
-	$args{'win'} ||= undef;
-	unless ($args{'win'}) {
-		$args{'win'} = 
-			$BTB_CONFIG->param("$db_name\.window") ||
-			$BTB_CONFIG->param('default_db.window');
-		print "  Using default window size $args{win} bp\n";
-	}
+	$args{'win'} ||= 500; # hard coded default size
 	$args{'step'} ||= $args{'win'};
 		
 	
@@ -1784,9 +1733,8 @@ sub get_new_genome_list {
 	$data->metadata($start_i, 'step', $args{'step'});
 	
 	# Collect the chromosomes
-	# include option to exclude those listed in biotoolbox.cfg that
-	# we don't want
-	my @chromosomes = get_chromosome_list($db, 1);
+	my $chr_exclude = $args{'skip'} || $args{'chrskip'} || undef;
+	my @chromosomes = get_chromosome_list($db, $chr_exclude);
 	unless (@chromosomes) {
 		carp " no sequence IDs were found in the database!\n";
 		return;
@@ -1811,49 +1759,6 @@ sub get_new_genome_list {
 	print "   Kept " . $data->{'last_row'} . " windows.\n";
 	
 	# Return the data structure
-	return 1;
-}
-
-
-sub validate_included_feature {
-	
-	# feature to check
-	my $feature = shift;
-	
-	# get the list of feature exclusion tags
-	unless (defined $TAG_EXCEPTIONS) {
-		$TAG_EXCEPTIONS = $BTB_CONFIG->get_block('exclude_tags');
-	}
-	
-	# Check the tag exceptions
-	# we will check for the presence of the exception tag
-	# if the feature tag value matches the exception tag value
-	# then the feature should be excluded
-	foreach my $key (keys %{ $TAG_EXCEPTIONS }) {
-		if ($feature->has_tag($key)) {
-			# first check that the feature has this tag
-			my @tag_values = $feature->get_tag_values($key);
-			if (ref $TAG_EXCEPTIONS->{$key} eq 'ARRAY') {
-				# there's more than one exception value!
-				# need to check them all
-				foreach my $exception (@{ $TAG_EXCEPTIONS->{$key} }) {
-					if (grep {$_ eq $exception} @tag_values) {
-						# this feature should be excluded
-						return;
-					}
-				}
-			}
-			else {
-				# single tag exception value
-				if (grep {$_ eq $TAG_EXCEPTIONS->{$key}} @tag_values) {
-					# this feature should be excluded
-					return;
-				}
-			}
-		}
-	}
-	
-	# if we've made it thus far, the feature is good
 	return 1;
 }
 
@@ -2102,7 +2007,7 @@ sub get_chromosome_list {
 	
 	# options
 	my $database = shift;
-	my $limit = shift || 0;
+	my $chr_exclude = shift || undef;
 	
 	# Open a db connection 
 	my $db = open_db_connection($database);
@@ -2122,21 +2027,6 @@ sub get_chromosome_list {
 		$db = open_db_connection($bw_file);
 	}
 	
-	# Get chromosome exclusion list
-	# these are chromosomes that we do not want to include in the final 
-	# list
-	# they must be explicitly requested to ignore
-	my %excluded_chr_lookup;
-	if ($limit) {
-		my @excluded_chromosomes = 
-			$BTB_CONFIG->param("$db_name\.chromosome_exclude");
-		unless (@excluded_chromosomes) {
-			@excluded_chromosomes = 
-				$BTB_CONFIG->param('default_db.chromosome_exclude');
-		}
-		%excluded_chr_lookup = map {$_ => 1} @excluded_chromosomes;
-	}
-		
 	
 	# Collect chromosome lengths
 	# we want to maintain the original order of the chromosomes so we 
@@ -2154,7 +2044,7 @@ sub get_chromosome_list {
 		for my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			next if (exists $excluded_chr_lookup{$chr} );
+			next if (defined $chr_exclude and $chr =~ /$chr_exclude/i);
 			
 			# get chromosome size
 			my ($seqf) = $db->get_features_by_name($chr);
@@ -2170,9 +2060,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 			
 			# check for excluded chromosomes
-			if (exists $excluded_chr_lookup{$chr} ) {
-				next;
-			}
+			next if (defined $chr_exclude and $chr =~ $chr_exclude);
 			
 			# get chromosome size
 			my $length = $db->length($chr);
@@ -2195,7 +2083,7 @@ sub get_chromosome_list {
 			my $length = $db->target_len($tid);
 			
 			# check for excluded chromosomes
-			next if (exists $excluded_chr_lookup{$chr} );
+			next if (defined $chr_exclude and $chr =~ $chr_exclude);
 			
 			# store
 			push @chrom_lengths, [ $chr, $length ];
@@ -2206,7 +2094,7 @@ sub get_chromosome_list {
 	elsif ($type eq 'Bio::DB::HTS::Faidx') {
 		for my $chr ($db->get_all_sequence_ids) {
 			# check for excluded
-			next if exists $excluded_chr_lookup{$chr};
+			next if (defined $chr_exclude and $chr =~ $chr_exclude);
 			
 			# get length and store it
 			my $length = $db->length($chr);
@@ -2219,7 +2107,7 @@ sub get_chromosome_list {
 		for my $chr ($db->get_all_ids) {
 			
 			# check for excluded chromosomes
-			next if (exists $excluded_chr_lookup{$chr} );
+			next if (defined $chr_exclude and $chr =~ $chr_exclude);
 			
 			# get chromosome size
 			my $seq = $db->get_Seq_by_id($chr);
@@ -2235,7 +2123,7 @@ sub get_chromosome_list {
 		foreach my $chr ($db->seq_ids) {
 		
 			# check for excluded chromosomes
-			next if (exists $excluded_chr_lookup{$chr} );
+			next if (defined $chr_exclude and $chr =~ $chr_exclude);
 		
 			# generate a segment representing the chromosome
 			# due to fuzzy name matching, we may get more than one back
@@ -2342,34 +2230,11 @@ sub get_genomic_sequence {
 }
 
 
-
-### Internal subroutine to convert a feature category into a list of classes
-sub _features_to_classes {
-	my $feature = shift;
-	my @types;
-		
-	my $alias2types = $BTB_CONFIG->get_block('features');
-	if (exists $alias2types->{$feature} ) {
-		# looks like the feature is an alias for a list of features
-		# defined in the config file
-		if (ref $alias2types->{$feature} eq 'ARRAY') {
-			# there's a list of them
-			@types = @{ $alias2types->{$feature} };
-		}
-		else {
-			# only one
-			$types[0] = $alias2types->{$feature};
-		}
-	}
-	else { 
-		# We'll assume this is a specific feature in the database.
-		# It may be provided as type:source or type.
-		# We'll pass these on directly to the originating subroutine
-		# more than one may be passed delimited by commas, but no spaces
-		@types = split /,/, $feature;
-	} 
-	
-	return @types;
+### deprecated methods
+# just in case
+sub validate_included_feature {
+	confess "validate_included_feature() is no longer a valid method. " . 
+		"Please update your script to the current API.\n";
 }
 
 

@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -319,6 +319,12 @@ Otherwise the first match is returned.
 This method will return a hash of the number of genes and RNA types that 
 have been parsed.
 
+=item typelist
+
+This method will return a comma-delimited list of the feature types or 
+C<primary_tag>s found in the parsed file. Returns a generic list if a 
+file has not been parsed.
+
 =item from_ucsc_string
 
 A bare bones method that will convert a tab-delimited text line from a UCSC 
@@ -435,28 +441,28 @@ sub new {
 				$self->load_extra_data($options{refseqsum}, 'refseqsum');
 			}
 			elsif (exists $options{summary}) {
-				$self->load_extra_data($options{refseqsum}, 'refseqsum');
+				$self->load_extra_data($options{summary}, 'refseqsum');
 			}
 			if (exists $options{refseqstat}) {
 				$self->load_extra_data($options{refseqstat}, 'refseqstat');
 			}
 			elsif (exists $options{status}) {
-				$self->load_extra_data($options{refseqstat}, 'refseqstat');
+				$self->load_extra_data($options{status}, 'refseqstat');
 			}
 			if (exists $options{kgxref}) {
 				$self->load_extra_data($options{kgxref}, 'kgxref');
 			}
 			if (exists $options{ensembltogenename}) {
-				$self->load_extra_data($options{ensembltogene}, 'ensembltogene');
+				$self->load_extra_data($options{ensembltogenename}, 'ensembltogene');
 			}
 			elsif (exists $options{ensname}) {
-				$self->load_extra_data($options{ensembltogene}, 'ensembltogene');
+				$self->load_extra_data($options{ensname}, 'ensembltogene');
 			}
 			if (exists $options{ensemblsource}) {
 				$self->load_extra_data($options{ensemblsource}, 'ensemblsource');
 			}
 			elsif (exists $options{enssrc}) {
-				$self->load_extra_data($options{ensemblsource}, 'ensemblsource');
+				$self->load_extra_data($options{enssrc}, 'ensemblsource');
 			}
 			if (exists $options{class}) {
 				$self->{sfclass} = $options{class};
@@ -719,6 +725,21 @@ sub load_extra_data {
 	
 	$fh->close;
 	return $count;
+}
+
+sub typelist {
+	my $self = shift;
+	my @items;
+	foreach my $k (keys %{$self->{counts}}) {
+		push @items, $k if $self->{counts}{$k} > 0;
+	}
+	if (@items) {
+		return join(',', @items);
+	}
+	else {
+		# return generic list
+		return 'gene,mRNA,ncRNA,exon,CDS';
+	}
 }
 
 sub next_feature {
@@ -1178,23 +1199,16 @@ sub new {
 	$self{exonEnds}   = [ ( split ",", $self{exonEnds} ) ];
 	
 	# Attempt to identify the transcript type
+	my $type = $ucsc->{ensembldata}->{ $self{name} }->[1] || undef;
+		# check if we have loaded ensembl source data and use that if available
 	if ( $self{cdsStart} - 1 == $self{cdsEnd} ) {
-		
 		# there appears to be no coding potential when 
 		# txEnd = cdsStart = cdsEnd
 		# if you'll look, all of the exon phases should also be -1
 		
-		# check if we have a ensGene transcript, we may have the type
-		if (
-			exists $ucsc->{ensembldata}->{ $self{name} } and
-			defined $ucsc->{ensembldata}->{ $self{name} }->[1]
-		) {
-			# this looks like an ensGene transcript
-			# we just go ahead and check the ensembl data for a match
-			# since not all ensGene names use the ENS prefix and are easily identified
-			# these should be fairly typical standards
-			# snRNA, rRNA, pseudogene, etc
-			$self{type} = $ucsc->{ensembldata}->{ $self{name} }->[1];
+		if ($type) {
+			# we have an ensembl source type, so prefer to use that
+			$self{type} = $type;
 		}
 		
 		# otherwise, we may be able to infer some certain 
@@ -1217,8 +1231,8 @@ sub new {
 		}
 	}
 	else {
-		# the transcript has an identifiable CDS
-		$self{type} = 'mRNA';
+		# the transcript has an identifiable CDS so likely a mRNA
+		$self{type} = defined $type ? $type : 'mRNA';
 	}
 	
 	# add the ucsc object 
@@ -1394,11 +1408,35 @@ sub build_transcript {
 		$id2count->{lc $id} = 0;
 	}
 	
+	# identify the primary_tag value
+	my ($type, $biotype);
+	if (exists $ensembldata->{$id}) {
+		my $t = $ensembldata->{$id}->[1] || undef;
+		if ($t and $t =~ /protein.coding/i) {
+			$type = 'mRNA';
+			$biotype = $t;
+		}
+		elsif ($t and $t =~ /rna|transcript/i) {
+			$type = $t;
+			$biotype = $t;
+		}
+		elsif ($t) {
+			$type = 'transcript';
+			$biotype = $t;
+		}
+		else {
+			$type = $self->type;
+		}
+	}
+	else {
+		$type = $self->type;
+	}
+	
 	# Generate the transcript SeqFeature object
 	my $transcript = $SFCLASS->new(
 		-seq_id        => $self->chrom,
 		-source        => $ucsc->source,
-		-primary_tag   => $self->type,
+		-primary_tag   => $type,
 		-start         => $self->txStart,
 		-end           => $self->txEnd,
 		-strand        => $self->strand,
@@ -1422,6 +1460,9 @@ sub build_transcript {
 	if (defined $self->status ) {
 		$transcript->add_tag_value( 'status', $self->status );
 	}
+	if ($biotype) {
+		$transcript->add_tag_value( 'biotype', $biotype);
+	}
 	
 	# add the exons
 	if ($ucsc->do_exon) {
@@ -1429,7 +1470,7 @@ sub build_transcript {
 	}
 	
 	# add CDS, UTRs, and codons if necessary
-	if ($transcript->primary_tag eq 'mRNA') {
+	if ( $self->cdsStart - 1 != $self->cdsEnd ) {
 		
 		if ($ucsc->do_utr) {
 			$self->add_utrs($transcript, $gene);
@@ -1445,28 +1486,28 @@ sub build_transcript {
 	}
 	
 	# record the type of transcript
-	if ($self->type eq 'mRNA') { 
+	if ($type eq 'mRNA') { 
 		$counts->{mrna}++;
 	}
-	elsif ($self->type eq 'pseudogene') {
+	elsif ($type eq 'pseudogene') {
 		$counts->{pseudogene}++;
 	}
-	elsif ($self->type eq 'ncRNA') {
+	elsif ($type eq 'ncRNA') {
 		$counts->{ncrna}++;
 	}
-	elsif ($self->type eq 'miRNA') {
+	elsif ($type eq 'miRNA') {
 		$counts->{mirna}++;
 	}
-	elsif ($self->type eq 'snRNA') {
+	elsif ($type eq 'snRNA') {
 		$counts->{snrna}++;
 	}
-	elsif ($self->type eq 'snoRNA') {
+	elsif ($type eq 'snoRNA') {
 		$counts->{snorna}++;
 	}
-	elsif ($self->type eq 'tRNA') {
+	elsif ($type eq 'tRNA') {
 		$counts->{trna}++;
 	}
-	elsif ($self->type eq 'rRNA') {
+	elsif ($type eq 'rRNA') {
 		$counts->{rrna}++;
 	}
 	else {

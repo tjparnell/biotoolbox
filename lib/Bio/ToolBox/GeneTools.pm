@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -444,6 +444,34 @@ only the retained transcripts as subfeatures. If an array reference of
 transcripts was provided, then an array reference of the filtered 
 transcripts is returned.
 
+=item filter_transcript_gencode_basic
+
+	my $new_gene = filter_transcript_gencode_basic($gene);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts);
+
+This will filter a gene object for transcripts for the Ensembl GENCODE 
+tag "basic", which indicates that a transcript is tagged as GENCODE Basic 
+transcript. 
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+ 
+=item filter_transcript_biotype
+
+	my $new_gene = filter_transcript_gencode_basic($gene, $biotype);
+	my @good_transcripts = filter_transcript_gencode_basic(\@transcripts, 'miRNA');
+
+This will filter a gene object for transcripts for specific biotype values 
+using the C<transcript_biotype> or C<biotype> attribute tags, commonly found 
+in Ensembl annotation.
+
+If a gene object was provided, a new gene object will be returned with 
+only the retained transcripts as subfeatures. If an array reference of 
+transcripts was provided, then an array reference of the filtered 
+transcripts is returned.
+
 =back
 
 =head1 SEE ALSO
@@ -492,6 +520,8 @@ our @EXPORT_OK = qw(
 	gtf_string
 	ucsc_string
 	filter_transcript_support_level
+	filter_transcript_gencode_basic
+	filter_transcript_biotype
 );
 our %EXPORT_TAGS = (
 	all => \@EXPORT_OK,
@@ -822,16 +852,20 @@ sub _get_alt_common_things {
 sub get_transcripts {
 	my $gene = shift;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
-	return $gene if ( $gene->primary_tag !~ /gene$/i and 
-		$gene->primary_tag =~ /rna|transcript/i);
+	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
 	my @exons;
+	my @other;
 	foreach my $subf ($gene->get_SeqFeatures) {
-		if ($subf->primary_tag =~ /rna|transcript/i) {
+		if ($subf->primary_tag =~ /rna|transcript|\bprocessed/i) {
 			push @transcripts, $subf;
 		}
-		elsif ($subf->primary_tag =~ /^(?:cds|exon)$/i) {
+		elsif ($subf->primary_tag =~ /^(?:cds|exon|\w+codon)$/i) {
 			push @exons, $subf;
+		}
+		else {
+			# wierdo subfeature types like unprocessed_pseudogene
+			push @other, $subf;
 		}
 	}
 	if (not @transcripts and @exons) {
@@ -849,6 +883,11 @@ sub get_transcripts {
 		);
 		push @transcripts, $transcript;
 	}
+	elsif (not @transcripts and not @exons and @other) {
+		# well, what choice do we have? 
+		# we can assume these are transcripts, because what else could they be?
+		@transcripts = @other;
+	} 
 	@transcripts = map { $_->[0] }
 		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
 		map { [$_, $_->start, $_->length] } 
@@ -969,6 +1008,7 @@ sub get_transcript_length {
 sub is_coding {
 	my $transcript = shift;
 	return unless $transcript;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	if ($transcript->primary_tag =~ /gene$/i) {
 		# someone passed a gene, check its subfeatures
 		my $code_potential = 0;
@@ -1005,6 +1045,8 @@ sub is_coding {
 
 sub get_cds {
 	my $transcript = shift;
+	return unless $transcript;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my @cds;
 	foreach my $subfeat ($transcript->get_SeqFeatures) {
 		push @cds, $subfeat if $subfeat->primary_tag eq 'CDS';
@@ -1151,7 +1193,6 @@ sub get_stop_codon {
 sub get_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# collect the various types of subfeatures
 	my @exons;
@@ -1274,7 +1315,6 @@ sub get_transcript_utr_length {
 sub get_5p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
@@ -1287,7 +1327,6 @@ sub get_5p_utrs {
 sub get_3p_utrs {
 	my $transcript = shift;
 	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
-	return unless is_coding($transcript);
 	
 	# get all UTRs
 	my $utrs = get_utrs($transcript);
@@ -1459,7 +1498,7 @@ sub filter_transcript_support_level {
 	
 	# get transcripts
 	my @transcripts;
-	if (ref($gene) =~ /seqfeature/i and $gene->primary_tag =~ /gene$/i) {
+	if (ref($gene) =~ /seqfeature/i) {
 		@transcripts = get_transcripts($gene);
 	}
 	elsif (ref($gene) eq 'ARRAY') {
@@ -1524,28 +1563,68 @@ sub filter_transcript_support_level {
 	@keepers = @{ $results{'Missing'} } unless @keepers;
 	
 	# return
-	if (ref($gene) =~ /seqfeature/i) {
-		# we can't delete subfeatures, so we're forced to create a new 
-		# parent gene and reattach the filtered transcripts
-		my %attributes = $gene->attributes;
-		return $gene->new(
-			-seq_id         => $gene->seq_id,
-			-start          => $gene->start,
-			-end            => $gene->end,
-			-strand         => $gene->strand,
-			-primary_tag    => $gene->primary_tag,
-			-source         => $gene->source_tag,
-			-name           => $gene->display_name,
-			-id             => $gene->primary_id,
-			-attributes     => \%attributes,
-			-segments       => \@keepers,
-		);
-	}
-	else {
-		return \@keepers;
-	}
+	return _return_filtered_transcripts($gene, \@keepers);
 }
 
+sub filter_transcript_gencode_basic {
+	my $gene = shift;
+
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	foreach my $t (@transcripts) {
+		my ($basic) = $t->get_tag_values('tag');
+		if ($basic and $basic eq 'basic') {
+			push @keepers, $t;
+		}
+	}
+	
+	# return
+	return _return_filtered_transcripts($gene, \@keepers);
+}
+
+
+sub filter_transcript_biotype {
+	my $gene = shift;
+	my $check = shift; 
+	
+	# get transcripts
+	my @transcripts;
+	if (ref($gene) =~ /seqfeature/i) {
+		@transcripts = get_transcripts($gene);
+	}
+	elsif (ref($gene) eq 'ARRAY') {
+		@transcripts = @$gene;
+	}
+	else {
+		return;
+	}
+	
+	# take appropriate transcripts
+	my @keepers;
+	foreach my $t (@transcripts) {
+		my ($value) = $t->get_tag_values('transcript_biotype') || 
+			$t->get_tag_values('biotype');
+		$value ||= $t->primary_tag;
+		if ($value and $value =~ /$check/i) {
+			push @keepers, $t;
+		}
+	}
+	
+	# return
+	return _return_filtered_transcripts($gene, \@keepers);
+}
 
 
 
@@ -1624,6 +1703,38 @@ sub _process_ucsc_transcript {
 	}
 	
 	return $ucsc;
+}
+
+sub _return_filtered_transcripts {
+	my ($gene, $keepers) = @_;
+	
+	if (ref($gene) =~ /seqfeature/i) {
+		# first check if we were only given a transcript 
+		if ($gene->primary_tag =~ /transcript|rna/i) {
+			# we must have been given a single transcript to check, so return it
+			$keepers->[0] ||= undef;
+			return $keepers->[0];
+		}
+		
+		# we can't delete subfeatures, so we're forced to create a new 
+		# parent gene and reattach the filtered transcripts
+		my %attributes = $gene->attributes;
+		return $gene->new(
+			-seq_id         => $gene->seq_id,
+			-start          => $gene->start,
+			-end            => $gene->end,
+			-strand         => $gene->strand,
+			-primary_tag    => $gene->primary_tag,
+			-source         => $gene->source_tag,
+			-name           => $gene->display_name,
+			-id             => $gene->primary_id,
+			-attributes     => \%attributes,
+			-segments       => $keepers,
+		);
+	}
+	else {
+		return $keepers;
+	}
 }
 
 

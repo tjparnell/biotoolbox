@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.53';
+my $VERSION = '1.54';
 	
 	
 
@@ -130,7 +130,7 @@ GetOptions(
 	'fraction!'  => \$multi_hit_scale, # scale by number of hits
 	'rpm!'      => \$rpm, # calculate reads per million
 	'separate|mean!' => \$do_mean, # rpm scale separately
-	'scale=f'   => \@scale_values, # user specified scale value
+	'scale=s'   => \@scale_values, # user specified scale value
 	'chrskip=s' => \$chr_exclude, # regex for skipping chromosomes
 	'blacklist=s' => \$black_list, # file for skipping regions
 	'bin=i'     => \$bin_size, # size for binning the data
@@ -204,7 +204,7 @@ my @seq_list;
 my %seq_name2length;
 for my $tid (0 .. $sams[0]->n_targets - 1) {
 	my $chr = $sams[0]->target_name($tid);
-	if ($chr_exclude and $chr =~ $chr_exclude) {
+	if ($chr_exclude and $chr =~ /$chr_exclude/i) {
 		print "  skipping sequence $chr\n" if $verbose;
 		next;
 	}
@@ -492,6 +492,13 @@ sub check_defaults {
 	# set coverage dump size and subroutine code global values
 	# this is for processing the coverage dump array
 	if ($use_coverage) {
+		print " ignoring duplicate read filters with coverage\n" if not $duplicate;
+		print " ignoring supplementary read filters with coverage\n" if not $supplementary;
+		print " ignoring secondary read filters with coverage\n" if not $secondary;
+		print " ignoring map quality filter with coverage\n" if $min_mapq;
+		print " ignoring paired-end option with coverage\n" if $paired;
+		print " ignoring RPM option with coverage\n" if $rpm;
+		print " ignoring custom scale option with coverage\n" if @scale_values;
 		if ($bin_size > 1) {
 			$coverage_dump = int(1000 / $bin_size) * $bin_size;
 			$coverage_dump = $bin_size if $coverage_dump == 0;
@@ -1129,7 +1136,8 @@ sub open_wig_file {
 	if ($bigwig and $do_bw) {
 		print " Writing directly to bigWig converter\n";
 		$name .= '.bw' unless $name =~ /\.bw$/;
-		$chromo_file = generate_chromosome_file($sams[0]) unless $chromo_file;
+		$chromo_file = generate_chromosome_file($sams[0], $chr_exclude) 
+			unless $chromo_file;
 		my $fh = open_wig_to_bigwig_fh(
 			file      => $name,
 			chromo    => $chromo_file,
@@ -2722,8 +2730,8 @@ Legacy option for supporting previous versions of bam2wig.
 Indicate that the bam file contains alignments with splices, such as 
 from RNASeq experiments. Alignments will be split on cigar N operations 
 and each sub fragment will be recorded. This only works with single-end 
-alignments, and is disabled for paired-end reads. Only start and span 
-recording options are supported.
+alignments, and is disabled for paired-end reads (just treat as single-end). 
+Only start and span recording options are supported.
 
 =item --strand
 

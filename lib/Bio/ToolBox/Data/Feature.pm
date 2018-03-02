@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -1246,27 +1246,28 @@ sub seqfeature {
 	my $self = shift;
 	my $force = shift || 0;
 	carp "feature is a read only method" if @_;
+	return $self->{feature} if exists $self->{feature};
 	# normally this is only for named features in a data table
 	# skip this for coordinate features like bed files
 	return unless $self->feature_type eq 'named' or $force;
 	
-	return $self->{feature} if exists $self->{feature};
+	# retrieve from main Data store
 	my $f = $self->{data}->get_seqfeature( $self->{'index'} );
-	return $f if $f;
+	if ($f) {
+		$self->{feature} = $f;
+		return $f;
+	}
 	
 	# retrieve the feature from the database
 	return unless $self->{data}->database;
-	my $id   = $self->id;
-	my $name = $self->name;
-	my $type = $self->type || $self->{data}->feature;
-	return unless ($id or ($name and $type));
 	$f = get_db_feature(
 		'db'    => $self->{data}->open_meta_database,
-		'id'    => $id,
-		'name'  => $name, # we can handle "name; alias" lists later
-		'type'  => $type,
+		'id'    => $self->id || undef,
+		'name'  => $self->name || undef, 
+		'type'  => $self->type || $self->{data}->feature,
 	);
-	$self->{feature} = $f if $f;
+	return unless $f;
+	$self->{feature} = $f;
 	return $f;
 }
 
@@ -1429,9 +1430,6 @@ sub _get_subfeature_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if ($feature->primary_tag =~ /gene$/i) {
-		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
-	}
 	
 	# get the subfeatures
 	my @subfeatures;
@@ -1450,7 +1448,9 @@ sub _get_subfeature_scores {
 	else {
 		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
 	}
-	# collect over each exon
+	# it's possible nothing is returned, which means no score will be calculated
+	
+	# collect over each subfeature
 	my @scores;
 	foreach my $exon (@subfeatures) {
 		my $exon_scores = get_segment_score(
@@ -1620,10 +1620,7 @@ sub _get_subfeature_position_scores {
 		carp "no SeqFeature available! Cannot collect exon data!";
 		return;
 	}
-	if ($feature->primary_tag =~ /gene$/i) {
-		croak "subfeature options only work with transcript, not gene, SeqFeature objects!\n";
-	}
-	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $self->strand;
 	
 	# get the subfeatures
 	my @subfeatures;
@@ -1642,6 +1639,11 @@ sub _get_subfeature_position_scores {
 	}
 	else {
 		croak "unrecognized subfeature parameter '$subf'!";
+	}
+	
+	# it's possible no subfeatures are returned
+	unless (@subfeatures) {
+		return;
 	}
 	
 	# reset the practical start and stop to the actual subfeatures' final start and stop
@@ -1889,13 +1891,14 @@ sub bed_string {
 	croak "bed count must be at least 3!" unless $args{bed} >= 3;
 	
 	# coordinate information
+	$self->seqfeature; # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
 	unless ($chr and defined $start) {
-		carp "Not enough information to generate bed string. Need identifiable" . 
-			"chromosome and start columns";
+		carp "Not enough information to generate bed string. Need identifiable " . 
+			"chromosome and start columns or SeqFeature object";
 		return;
 	}
 	$start -= 1; # 0-based coordinates
@@ -1927,12 +1930,13 @@ sub gff_string {
 	my %args = @_;
 	
 	# coordinate information
+	$self->seqfeature; # retrieve the seqfeature object first
 	my $chr   = $args{chromo} || $args{seq_id} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
 	unless ($chr and defined $start) {
-		carp "Not enough information to generate GFF string. Need identifiable" . 
+		carp "Not enough information to generate GFF string. Need identifiable " . 
 			"chromosome and start columns";
 		return;
 	}

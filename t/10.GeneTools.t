@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 79;
+	plan tests => 81;
 }
 
 BEGIN {
@@ -18,12 +18,15 @@ BEGIN {
 
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.txt");
+my $enssrc = File::Spec->catfile($Bin, "Data", "ensemblSource.txt");
 
 my $ucsc = Bio::ToolBox::parser::ucsc->new(
 	file    => $ucscfile,
+	enssrc  => $enssrc,
 	do_gene => 1,
 	do_cds  => 1,
  	do_exon => 1,
+ 	do_utr  => 1,
 );
 
 # parse first feature line
@@ -41,6 +44,13 @@ is($gene->primary_id, 'ENSG00000125826', 'gene primary_id');
 # gene transcript functions
 my @transcripts = get_transcripts($gene);
 is(scalar @transcripts, 13, 'get_transcripts method');
+
+# filter transcript
+my $filt_gene1 = filter_transcript_biotype($gene, 'processed_transcript');
+isa_ok($filt_gene1, 'Bio::ToolBox::SeqFeature', 'first filtered gene transcript');
+my @filt_gene1_trx = get_transcripts($filt_gene1);
+is(scalar @filt_gene1_trx, 2, 'number filtered processed_transcripts');
+
 
 # gene exons
 my @common_exons = get_common_exons($gene);
@@ -115,7 +125,7 @@ is(get_transcript_utr_length($t1), 241, 'combined UTR length');
 my $t2 = shift @transcripts;
 isa_ok($t2, 'Bio::ToolBox::SeqFeature', 'second transcript object');
 is(is_coding($t2), 0, 'transcript2 is_coding');
-is($t2->primary_tag, 'ncRNA', 'transcript2 primary_tag');
+is($t2->primary_tag, 'processed_transcript', 'transcript2 primary_tag');
 is($t2->primary_id, 'ENST00000465226', 'transcript2 primary_id');
 is(get_transcript_length($t2), 372, 'transcript2 get_transcript_length');
 my @t2_exons = get_exons($t2);
@@ -134,8 +144,8 @@ is(scalar @t2_utrs, 0, 'transcript2 UTR number');
 
 # third transcript
 my $t3 = shift @transcripts;
-is(is_coding($t3), 1, 'transcript3 is_coding');
-is($t3->primary_tag, 'mRNA', 'transcript3 primary_tag');
+is(is_coding($t3), 0, 'transcript3 is_coding');
+is($t3->primary_tag, 'transcript', 'transcript3 primary_tag');
 is($t3->primary_id, 'ENST00000382214', 'transcript3 primary_id');
 is(get_transcript_length($t3), 2752, 'transcript3 get_transcript_length');
 my @t3_exons = get_exons($t3);

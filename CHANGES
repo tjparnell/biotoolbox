@@ -1,5 +1,29 @@
 ######## Bio::ToolBox revision history #############
 
+v1.54
+	- Update config module to stop writing unnecessary config files.
+	Config file will only be written when updating database or 
+	application paths. Removed outdated validation, exclude tags, feature 
+	classes, and default window values used by old db_helper methods.
+	- Complete rewrite of get_features script to handle annotation 
+	files such as GFF3/GTF/UCSC formats in addition to SeqFeature::Lite 
+	databases. Includes additional feature filters based on tags.
+	- Add additional transcript filter methods to GeneTools library, 
+	including GENCODE basic tags and transcript_biotype.
+	- Update Data parse_table API, now allows for chromosome skip regex, 
+	control simplify option, and explicitly search for mRNAs. 
+	- Allow SeqFeature transcript collapsing and length determination 
+	to work with features from a database. 
+	- Tolerate weird transcript types when collecting subfeatures in 
+	various GeneTools functions.
+	- Removed unnecessary primary_tag gene checks when collecting scores.
+	- Record extra ensemblSource data as transcript biotype when 
+	parsing UCSC files
+	- Add chromosome skip regex to db_helper and big_helper methods
+	- Add no header options to data convertor scripts
+	- Long overdue update of POD and Readme.
+	
+
 v1.53
 	- Significantly streamlined GTF and GFF3 parsing to improve 
 	loading times. By default, no subfeatures are parsed and must 

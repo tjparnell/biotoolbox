@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.53';
+our $VERSION = '1.54';
 
 =head1 NAME
 
@@ -190,8 +190,14 @@ parsed. This expedites parsing by skipping unwanted features.
   my $Data = Bio::ToolBox::Data->new(db => $dbname, win => $integer);
 
 If generating a list of genomic intervals, optionally provide 
-the window and step values. Default values are defined in 
-the Bio::ToolBox configuration file C<.biotoolbox.cfg>.
+the window and step values. The default is 500 bp.
+
+=item chrskip
+
+Provide a regular expression compatible or C<qr> string for skipping or 
+excluding specific or classes of chromosomes, for example the mitochondrial 
+chromosome or unmapped contigs. This works with both feature collection 
+and genomic intervals. The default is to take all chromosomes.
 
 =item columns
 
@@ -219,7 +225,12 @@ to selectively copy rows from one Data object to another.
 =item parse_table
 
   $Data->parse_table($file)
-  $Data->parse_table($file, $feature, $subfeature)
+  $Data->parse_table( {
+         file => $file, 
+         feature => 'gene',
+         subfeature => 'exon',
+         chrskip => 'chrM|contig',
+  } );
 
 This will parse a gene annotation table into SeqFeature objects. 
 If this is called from an empty Data object, then the table will 
@@ -227,28 +238,39 @@ be filled with the SeqFeature object names and IDs. If this is
 called from a non-empty Data object, then the table's contents 
 will be associated with the SeqFeature objects using their name and 
 ID. The stored SeqFeature objects can be retrieved using the 
-get_seqfeature() method.
+L</get_seqfeature> method.
 
-Pass the method the gene table filename to be parsed. This may 
-be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
-These will be parsed using Bio::ToolBox::parser::* adapters.
-
-One or two additional options may be passed in addition. Both 
-are text strings that will be used in a case-insensitive regular 
-expression, so 'rna' will match all RNA types (mRNA, snRNA, etc).
+Pass the method a single argument. This may be either a simple 
+scalar to a filename to be parsed, or a reference to hash of 
+one or more argument options. Possible options include:
 
 =over 4
 
-=item 1. C<$feature>
+=item file
 
-The primary_tag or feature type of the top features from the table.
-The default value is 'gene'.
+The file name of the gene table to be parsed. This may 
+be a GFF, GFF3, GTF, or any of the UCSC gene table formats. 
+These will be parsed using Bio::ToolBox::parser::* adapters.
 
-=item 2. C<$subfeature>
+=item feature
 
-The primary_tag or feature type  of any subfeatures to additionally 
-be parsed. Typically these include exon, CDS, or UTR. The default is 
-nothing.
+A regular expression compatible string or C<qr> string to match 
+the top features C<primary_tag> to keep. The C<source_tag> is not 
+checked. The default is 'gene', although a transcript type could 
+alternatively be specified (in which case transcripts are not 
+parsed in gene features).
+
+=item subfeature
+
+A regular expression compatible string or C<qr> string to match 
+any sub features C<primary_tag> to parse. The C<source_tag> is not checked.
+Typically these include exon, CDS, or UTR. The default is nothing.
+
+=item chrskip
+
+A regular expression compatible string or C<qr> string to match 
+chromosomes to be skipped or excluded. Any feature with a matching 
+C<seq_id> chromosome name will be skipped.
 
 =back
 
@@ -1019,6 +1041,7 @@ use Module::Load;
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list 
 	get_new_genome_list 
+	get_db_feature
 );
 
 1;
@@ -1060,15 +1083,17 @@ sub new {
 	# prepare a new table based on the provided arguments
 	if ($args{file} and $args{parse}) {
 		# parse from file
-		my $subfeature = $args{subfeature} || '';
-		unless ( $self->parse_table($args{file}, $args{features}, $subfeature) ) {
+		$args{subfeature} ||= '';
+		unless ( $self->parse_table(\%args) ) {
 			my $l = $self->load_file($args{file});
 			return unless $l;
-			if ($self->database =~ /^Parsed:(.+)$/) {
+			if ($self->database =~ /^Parsed:(.+)$/ and $self->feature_type eq 'named') {
 				# looks like the loaded file was from a previously parsed table
 				# let's try this again
 				# this may die if it doesn't work
-				$self->parse_table($1, $args{features}, $subfeature); 
+				$args{file} = $1;
+				$args{feature} = $self->feature;
+				$self->parse_table(\%args); 
 			}
 		}
 	}
@@ -1140,13 +1165,27 @@ sub duplicate {
 
 sub parse_table {
 	my $self = shift;
-	my $file = shift;
+	my $args = shift;
+	my ($file, $feature, $subfeature, $simplify);
+	if (ref $args) {
+		$file = $args->{file} || '';
+		$feature = $args->{feature} || 'gene';
+		$subfeature = $args->{subfeature} || '';
+		$simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
+			$args->{simplify} : 1; # default is to simplify
+	}
+	else {
+		# no hash reference, assume just a file name
+		$file = $args;
+		undef $args;
+		$feature = 'gene';
+		$subfeature = '';
+		$simplify = 1;
+	}
 	unless ($file) {
 		carp "no annotation file provided to parse!";
 		return;
 	}
-	my $feature = shift || 'gene';
-	my $subfeature = shift || '';
 	
 	# the file format determines the parser class
 	my $flavor = $self->taste_file($file) or return;
@@ -1157,9 +1196,12 @@ sub parse_table {
 		return;
 	}
 	
-	# set parser parameters
+	# open parser
 	my $parser = $class->new() or return;
-	$parser->simplify(1);
+	$parser->open_file($file) or return;
+	
+	# set parser parameters
+	$parser->simplify($simplify);
 	if ($subfeature) {
 		$parser->do_exon(1) if $subfeature =~ /exon/i;
 		$parser->do_cds(1) if $subfeature =~ /cds/i;
@@ -1171,9 +1213,16 @@ sub parse_table {
 	else {
 		$parser->do_gene(0);
 	}
+	my $mrna_check = 0;
+	if (lc($feature) eq 'mrna' and $parser->typelist !~ /mrna/i and not $self->last_row) {
+		# user requested mRNA for a new data file but it's not present in the type list
+		# look for it the hard way by parsing CDS too - sigh
+		load('Bio::ToolBox::GeneTools', 'is_coding');
+		$parser->do_cds(1);
+		$mrna_check = 1;
+	}
 	
 	# parse the table
-	$parser->open_file($file) or return;
 	$parser->parse_file or return;
 	
 	# store the SeqFeature objects
@@ -1205,16 +1254,32 @@ PARSEFAIL
 		$self->add_column('Primary_ID');
 		$self->add_column('Name');
 		$self->add_column('Type');
+		
+		# check for chromosome exclude
+		my $chr_exclude;
+		if ($args) {
+			$chr_exclude = $args->{chrskip} || undef;
+		}
+		
+		# fill table with features
 		while (my $f = $parser->next_top_feature) {
+			if ($chr_exclude) {
+				next if $f->seq_id =~ /$chr_exclude/i;
+			}
 			my $type = $f->type;
-			if ($f->type =~ /$feature/i) {
+			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
 				my $index = $self->add_row(
 					[ $f->primary_id, $f->display_name, $f->type,] 
 				);
 				$self->store_seqfeature($index, $f);
 			}
 		}
+		unless ($self->last_row) {
+			printf " Zero '%s' features found!\n Check your feature or try generic features like gene, mRNA, or transcript\n",
+				$feature;
+		}
 		$self->database("Parsed:$file");
+		$self->feature($feature);
 	}
 	return 1;
 }
@@ -1350,6 +1415,9 @@ sub delete_row {
 		my $d = shift @deleted;
 		splice( @{ $self->{data_table} }, $d, 1);
 		$self->{last_row}--;
+		if (exists $self->{SeqFeatureObjects}) {
+			splice( @{ $self->{SeqFeatureObjects} }, $d, 1);
+		}
 	}
 	return 1;
 }
@@ -1391,20 +1459,20 @@ sub iterate {
 #### Stored SeqFeature manipulation
 
 sub store_seqfeature {
-	my ($self, $row, $seqfeature) = @_;
-	unless (defined $row and ref($seqfeature)) {
+	my ($self, $row_i, $seqfeature) = @_;
+	unless (defined $row_i and ref($seqfeature)) {
 		confess "must provide a row index and SeqFeature object!";
 	}
-	confess "invalid row index" unless ($row <= $self->last_row);
+	confess "invalid row index" unless ($row_i <= $self->last_row);
 	$self->{SeqFeatureObjects} ||= [];
-	$self->{SeqFeatureObjects}->[$row] = $seqfeature;
+	$self->{SeqFeatureObjects}->[$row_i] = $seqfeature;
 	return 1;
 }
 
 sub collapse_gene_transcripts {
 	my $self = shift;
-	unless (exists $self->{SeqFeatureObjects}) {
-		carp "no SeqFeature objects stored for collapsing!";
+	unless ($self->feature_type eq 'named') {
+		carp "Table does not contain named features!";
 		return;
 	}
 	
@@ -1418,11 +1486,34 @@ sub collapse_gene_transcripts {
 	
 	# collapse the transcripts
 	my $success = 0;
-	for (my $i = 1; $i <= $self->last_row; $i++) {
-		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
-		my $collSeqFeat = collapse_transcripts($feature) or next;
-		$success += $self->store_seqfeature($i, $collSeqFeat);
+	if (exists $self->{SeqFeatureObjects}) {
+		# we should have stored SeqFeature objects, probably from parsed table
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+			my $collSeqFeat = collapse_transcripts($feature) or next;
+			$success += $self->store_seqfeature($i, $collSeqFeat);
+		}
 	}
+	else {
+		# no stored SeqFeature objects, probably names pointing to a database
+		# we will have to fetch the feature from a database
+		my $db = $self->open_meta_database(1) or  # force open a new db connection
+			confess "No SeqFeature objects stored and no database connection!";
+		my $name_i = $self->name_column;
+		my $id_i = $self->id_column;
+		my $type_i = $self->type_column;
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = get_db_feature(
+				db    => $db,
+				name  => $self->value($i, $name_i) || undef,
+				type  => $self->value($i, $type_i) || undef,
+				id    => $self->value($i, $id_i) || undef,
+			) or next;
+			my $collSeqFeat = collapse_transcripts($feature) or next;
+			$success += $self->store_seqfeature($i, $collSeqFeat);
+		}
+	}
+	
 	return $success;
 }
 
@@ -1469,10 +1560,35 @@ sub add_transcript_length {
 	
 	# add new column and calculate
 	my $length_i = $self->add_column($length_name);
-	for (my $i = 1; $i <= $self->last_row; $i++) {
-		my $feature = $self->{SeqFeatureObjects}->[$i] or next;
-		my $length = &$length_calculator($feature);
-		$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+	if (exists $self->{SeqFeatureObjects}) {
+		# we should have stored SeqFeature objects, probably from parsed table
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = $self->{SeqFeatureObjects}->[$i] or next;
+			my $length = &$length_calculator($feature);
+			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+		}
+	}
+	else {
+		# no stored SeqFeature objects, probably names pointing to a database
+		# we will have to fetch the feature from a database
+		my $db = $self->open_meta_database(1) or  # force open a new db connection
+			confess "No SeqFeature objects stored and no database connection!";
+		my $name_i = $self->name_column;
+		my $id_i = $self->id_column;
+		my $type_i = $self->type_column;
+		for (my $i = 1; $i <= $self->last_row; $i++) {
+			my $feature = get_db_feature(
+				db    => $db,
+				name  => $self->value($i, $name_i) || undef,
+				type  => $self->value($i, $type_i) || undef,
+				id    => $self->value($i, $id_i) || undef,
+			) or next;
+			my $length = &$length_calculator($feature);
+			$self->{data_table}->[$i][$length_i] = $length || $feature->length;
+			$self->store_seqfeature($i, $feature);
+				# to store or not to store? May explode memory, but could save from 
+				# expensive db calls later
+		}
 	}
 	
 	return $length_i;

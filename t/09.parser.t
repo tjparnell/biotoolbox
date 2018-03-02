@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 239;
+	plan tests => 254;
 }
 else {
-	plan tests => 145;
+	plan tests => 158;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -187,6 +187,7 @@ sub test_ucsc {
 	is($t->stop, 398466, 'transcript stop');
 	is($t->primary_tag, 'mRNA', 'transcript primary_tag');
 	is($t->display_name, 'ENST00000411647', 'transcript display_name');
+	is( ($t->get_tag_values('biotype'))[0], 'protein_coding', 'transcript biotype');
 
 	# first transcript exons
 	my @exons = sort {$a->start <=> $b} $t->get_SeqFeatures; # make sure in order
@@ -231,8 +232,9 @@ sub test_ucsc {
 	$t = pop @transcripts; 
 	is($t->start, 402798, 'last transcript start');
 	is($t->stop, 411610, 'last transcript stop');
-	is($t->primary_tag, 'retained_intron', 'last transcript primary_tag');
+	is($t->primary_tag, 'transcript', 'last transcript primary_tag');
 	is($t->display_name, 'ENST00000468272', 'last transcript display_name');
+	is( ($t->get_tag_values('biotype'))[0], 'retained_intron', 'last transcript biotype');
 
 	# last transcript exons
 	@exons = sort {$a->start <=> $b} $t->get_SeqFeatures; # make sure in order
@@ -269,9 +271,9 @@ sub test_ucsc {
 	# foreach (keys %counts) {print "$_ => $counts{$_}\n"}
 	is(scalar keys %counts, 10, "count hash keys");
 	is($counts{gene}, 5, "count hash gene number");
-	is($counts{mrna}, 10, "count hash mRNA number");
+	is($counts{mrna}, 8, "count hash mRNA number");
 	is($counts{snrna}, 1, "count hash snRNA number");
-	is($counts{other}, 5, "count hash other number");
+	is($counts{other}, 7, "count hash other number");
 
 }
 
@@ -364,6 +366,34 @@ sub test_parsed_ucsc_table {
 	my $f2 = shift @subf;
 	is($f2->type, 'mRNA:EnsGene', 'Sub feature type');
 	is($f2->name, 'ENST00000411647', 'Sub feature name');
+	
+	# reparse with mRNA feature
+	undef $Data;
+	undef $f;
+	undef @subf;
+	undef $f2;
+	$Data = Bio::ToolBox::Data->new(
+		file => $ucscfile,
+		parse => 1,
+		feature => 'mRNA',
+		subfeature => 'exon'
+	);
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	is($Data->last_row, 10, 'number of rows');
+		# technically there should be 8 mRNAs, not 10, but nonsense_mediated_decay
+		# appears as an mRNA without the extra ensemblSource data
+	is($Data->value(1,0), 'ENST00000411647', 'First row ID');
+	is($Data->value(1,1), 'ENST00000411647', 'First row Name');
+	is($Data->value(1,2), 'mRNA:EnsGene', 'First row Type');
+	$f = $Data->get_seqfeature(1);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
+	is($f->display_name, 'ENST00000411647', 'SeqFeature display name');
+	is($f->start, 388142, 'SeqFeature start position');
+	@subf = $f->get_SeqFeatures;
+	is(scalar @subf, 5, 'Number of SeqFeature sub features');
+	$f2 = shift @subf;
+	is($f2->type, 'exon:EnsGene', 'Sub feature type');
+	is($f2->name, 'ENST00000411647.exon0', 'Sub feature name');
 }
 
 

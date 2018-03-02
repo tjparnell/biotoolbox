@@ -6,13 +6,15 @@ use strict;
 use Module::Load; # for dynamic loading during runtime
 use List::Util qw(min max sum);
 use Statistics::Lite qw(median);
-use Bio::ToolBox::db_helper::config;
 use Bio::ToolBox::db_helper::constants;
+use Bio::ToolBox::db_helper::config;
 use Bio::DB::Fasta;
 use Bio::DB::SeqFeature::Store;
 
-our $VERSION = '1.51';
+our $VERSION = '1.54';
 our $WIGGLE_OK = 0;
+our $CONFIG_OK = 0;
+our $BTB_CONFIG;
 
 # Exported names
 our @ISA = qw(Exporter);

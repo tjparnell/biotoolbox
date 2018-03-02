@@ -7,7 +7,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.40';
+my $VERSION =  '1.54';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -28,6 +28,7 @@ unless (@ARGV) {
 my (
 	$infile, 
 	$outfile,
+	$no_header,
 	$chr_index,
 	$start_index,
 	$stop_index,
@@ -52,6 +53,7 @@ my (
 GetOptions( 
 	'in=s'      => \$infile, # specify the input data file
 	'out=s'     => \$outfile, # name of output gff file 
+	'noheader'  => \$no_header, # source has no header line
 	'chr=i'     => \$chr_index, # index of the chromosome column
 	'start=i'   => \$start_index, # index of the start position column
 	'stop|end=i'=> \$stop_index, # index of the stop position coloumn
@@ -150,7 +152,7 @@ if ($tag) {
 
 
 ### Load file
-my $Input = Bio::ToolBox::Data::Stream->new(in => $infile) or
+my $Input = Bio::ToolBox::Data::Stream->new(in => $infile, noheader => $no_header) or
 	die "Unable to open file '$infile'!\n";
 
 ### Determine indices
@@ -439,6 +441,11 @@ genomic coordinates for which to convert to GFF format. The file should be a
 tab-delimited text file, one row per feature, with columns representing 
 feature identifiers, attributes, coordinates, and/or data values. Files may 
 be gzipped compressed.
+
+=item --noheader
+
+The input file does not have column headers, often found with UCSC 
+derived annotation data tables. 
 
 =item --ask
 
