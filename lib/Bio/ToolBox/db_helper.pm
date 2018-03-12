@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.54';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -791,6 +791,7 @@ our $BIGWIG_OK   = 0;
 our $SEQFASTA_OK = 0;
 our $USEQ_OK     = 0;
 our $BAM_ADAPTER = undef; # preference for which bam adapter to use
+our $BIG_ADAPTER = undef;
 
 # define reusable variables
 our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
@@ -895,7 +896,7 @@ sub open_db_connection {
 			}
 			else {
 				$error = " BigBed database cannot be loaded because\n" . 
-					" Bio::DB::BigBed is not installed\n";
+					" Bio::DB::Big or Bio::DB::BigBed is not installed\n";
 			}
 		}
 		
@@ -913,7 +914,7 @@ sub open_db_connection {
 			}
 			else {
 				$error = " BigWig database cannot be loaded because\n" . 
-					" Bio::DB::BigWig is not installed\n";
+					" Bio::DB::Big or Bio::DB::BigWig is not installed\n";
 			}
 		}
 		
@@ -988,7 +989,7 @@ sub open_db_connection {
 				}
 				else {
 					$error = " BigBed database cannot be loaded because\n" . 
-						" Bio::DB::BigBed is not installed\n";
+						" Big::DB::Big or Bio::DB::BigBed is not installed\n";
 				}
 			}
 			
@@ -1007,7 +1008,7 @@ sub open_db_connection {
 				}
 				else {
 					$error = " BigWig database cannot be loaded because\n" . 
-						" Bio::DB::BigWig is not installed\n";
+						" Big::DB::Big or Bio::DB::BigWig is not installed\n";
 				}
 			}
 			
@@ -1102,7 +1103,7 @@ sub open_db_connection {
 		}
 		else {
 			$error = " Presumed BigWigSet database cannot be loaded because\n" . 
-				" Bio::DB::BigWigSet is not installed\n";
+				" Bio::DB::Big or Bio::DB::BigWigSet is not installed\n";
 		}
 		
 		# try opening with the Fasta adaptor
@@ -1228,7 +1229,7 @@ sub get_dataset_list {
 	}
 	
 	# a BigWigSet database
-	elsif ($db_ref eq 'Bio::DB::BigWigSet') {
+	elsif ($db_ref =~ /BigWigSet/i) {
 		
 		# get the metadata
 		my $metadata = $db->metadata;
@@ -2019,7 +2020,7 @@ sub get_chromosome_list {
 	
 	# Check for BigWigSet database
 	# these need to be handled a little differently
-	if (ref $db eq 'Bio::DB::BigWigSet') {
+	if (ref($db) =~ /BigWigSet/) {
 		# BigWigSet databases are the only databases that don't 
 		# support the seq_ids method
 		# instead we have to look at one of the bigwigs in the set
@@ -2055,7 +2056,25 @@ sub get_chromosome_list {
 		}
 	}
 	
-	# Bigfile
+	# libBigWig Bigfile, including both bigWig and bigBed
+	elsif ($type eq 'Bio::DB::Big') {
+		# this doesn't follow the typical BioPerl convention
+		my $chroms = $db->chroms();
+		foreach my $chr (keys %$chroms) {
+			my $chrname = $chr->{name};
+			
+			# check for excluded chromosomes
+			next if (defined $chr_exclude and $chrname =~ $chr_exclude);
+			
+			# get chromosome size
+			my $length = $chr->{length};
+			
+			# store
+			push @chrom_lengths, [ $chrname, $length ];
+		}
+	}
+	
+	# UCSC kent Bigfile
 	elsif ($type eq 'Bio::DB::BigWig' or $type eq 'Bio::DB::BigBed') {
 		foreach my $chr ($db->seq_ids) {
 			
@@ -2251,28 +2270,31 @@ sub _lookup_db_method {
 		if ($param->[DATA] =~ /\.(?:bw|bigwig)$/i) {
 			# file is in bigwig format
 			# get the dataset scores using Bio::ToolBox::db_helper::bigwig
-			# this uses the Bio::DB::BigWig adaptor
+			# this uses either Bio::DB::BigWig or Bio::DB::Big
 			
 			# check that we have bigwig support
-			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-				unless $BIGWIG_OK;
-			if ($BIGWIG_OK) {
+			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
+			if ($BIGBED_OK) {
 				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigwig_position_scores;
 				}
 				elsif ($param->[RETT] == 1) {
 					$score_method = \&collect_bigwig_scores;
 				}
-				elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
-					$score_method = \&collect_bigwig_score;
+				elsif ($param->[METH] =~ /min|max|mean/) {
+					$score_method = \&collect_bigwigset_score;
+				}
+				elsif ($param->[METH] =~ /sum|count/) {
+					# difference between ucsc and libBigWig libraries
+					$score_method = $BIG_ADAPTER eq 'ucsc' ? 
+						\&collect_bigwigset_score : \&collect_bigwigset_scores;
 				}
 				else {
 					$score_method = \&collect_bigwig_scores;
 				}
 			}
 			else {
-				croak " BigWig support is not enabled! " . 
-					"Is Bio::DB::BigWig installed?\n";
+				croak " BigWig support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?";
 			}
 		}		
 		
@@ -2280,11 +2302,10 @@ sub _lookup_db_method {
 		elsif ($param->[DATA] =~ /\.(?:bb|bigbed)$/i) {
 			# data is in bigbed format
 			# get the dataset scores using Bio::ToolBox::db_helper::bigbed
-			# this uses the Bio::DB::BigBed adaptor
+			# this uses either Bio::DB::BigBed or Bio::DB::Big
 			
 			# check that we have bigbed support
-			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
-				unless $BIGBED_OK;
+			$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigbed_position_scores;
@@ -2294,8 +2315,7 @@ sub _lookup_db_method {
 				}
 			}
 			else {
-				croak " BigBed support is not enabled! " . 
-					"Is Bio::DB::BigBed installed?\n";
+				croak " BigBed support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?";
 			}
 		}
 		
@@ -2303,7 +2323,7 @@ sub _lookup_db_method {
 		elsif ($param->[DATA] =~ /\.bam$/i) {
 			# data is in bam format
 			# get the dataset scores using Bio::ToolBox::db_helper::bam
-			# this uses the Bio::DB::Sam adaptor
+			# this uses the Bio::DB::Sam or Bio::DB::HTS adaptor
 			
 			# check that we have Bam support
 			_load_bam_helper_module() unless $BAM_OK;
@@ -2348,14 +2368,14 @@ sub _lookup_db_method {
 	
 	
 	### BigWigSet database
-	elsif (ref($param->[DB]) =~ m/^Bio::DB::BigWigSet/) {
+	elsif (ref($param->[DB]) =~ m/BigWigSet/i) {
 		# calling features from a BigWigSet database object
+		# this uses either Bio::DB::BigWig or Bio::DB::Big
 		
 		# check that we have bigwig support
 		# duh! we should, we probably opened the stupid database!
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-			unless $BIGWIG_OK;
-		croak " BigWigSet support is not enabled! Is Bio::DB::BigFile installed?" 
+		$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
+		croak " BigWigSet support is not enabled! Is Bio::DB::Big or Bio::DB::BigFile installed?" 
 			unless $BIGWIG_OK;
 		
 		# the data collection depends on the method
@@ -2365,8 +2385,13 @@ sub _lookup_db_method {
 		elsif ($param->[RETT] == 1) {
 			$score_method = \&collect_bigwigset_scores;
 		}
-		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
+		elsif ($param->[METH] =~ /min|max|mean/) {
 			$score_method = \&collect_bigwigset_score;
+		}
+		elsif ($param->[METH] =~ /sum|count/) {
+			# difference between ucsc and libBigWig libraries
+			$score_method = $BIG_ADAPTER eq 'ucsc' ? 
+				\&collect_bigwigset_score : \&collect_bigwigset_scores;
 		}
 		else {
 			$score_method = \&collect_bigwigset_scores;
@@ -2438,7 +2463,7 @@ sub _load_bam_helper_module {
 	}
 	elsif ($BAM_ADAPTER =~ /none/i) {
 		# basically for testing purposes, don't use a module
-		return;
+		return 0;
 	}
 	else {
 		# try hts first, then sam
@@ -2454,6 +2479,69 @@ sub _load_bam_helper_module {
 	}
 # 	print " using $BAM_ADAPTER bam adaptor\n";
 	return $BAM_OK;
+}
+
+
+sub _load_bigwig_helper_module {
+	if ($BIG_ADAPTER =~ /ucsc|kent/i) {
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+		$BIG_ADAPTER = 'ucsc'; # for internal consistency
+	}
+	elsif ($BIG_ADAPTER =~ /big/i) {
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+		$BIGBED_OK = $BIGWIG_OK; # bigbed too!
+		$BIG_ADAPTER = 'big'; # for internal consistency
+	}
+	elsif ($BIG_ADAPTER =~ /none/i) {
+		# basically for testing purposes, don't use a module
+		return 0;
+	}
+	else {
+		# we have to try each one out
+		# try the modern big adapter first
+		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+		if ($BIGWIG_OK) {
+			# success! 
+			$BIGBED_OK = $BIGWIG_OK; # bigbed too!
+			$BIG_ADAPTER = 'big' if $BIGWIG_OK; 
+		}
+		else {
+			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+			$BIG_ADAPTER = 'ucsc' if $BIGWIG_OK; 
+		}
+	}
+	return $BIGWIG_OK;
+}
+
+sub _load_bigbed_helper_module {
+	if ($BIG_ADAPTER =~ /ucsc|kent/i) {
+		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+		$BIG_ADAPTER = 'ucsc'; # for internal consistency
+	}
+	elsif ($BIG_ADAPTER =~ /big/i) {
+		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+		$BIGWIG_OK = $BIGBED_OK; # bigwig too!
+		$BIG_ADAPTER = 'big'; # for internal consistency
+	}
+	elsif ($BIG_ADAPTER =~ /none/i) {
+		# basically for testing purposes, don't use a module
+		return 0;
+	}
+	else {
+		# we have to try each one out
+		# try the modern big adapter first
+		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::big');
+		if ($BIGBED_OK) {
+			# success! 
+			$BIGWIG_OK = $BIGBED_OK; # bigwig too!
+			$BIG_ADAPTER = 'big' if $BIGBED_OK; 
+		}
+		else {
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+			$BIG_ADAPTER = 'ucsc' if $BIGBED_OK; 
+		}
+	}
+	return $BIGBED_OK;
 }
 
 =head1 AUTHOR
