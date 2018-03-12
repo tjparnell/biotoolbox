@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.54';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -20,6 +20,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	$BAM_ADAPTER
+	$BIG_ADAPTER
 );
 
 1;
@@ -1010,6 +1011,14 @@ sub bam_adapter {
 	return $BAM_ADAPTER;
 }
 
+sub big_adapter {
+	my $self = shift;
+	if (@_) {
+		$BIG_ADAPTER = shift;
+	}
+	return $BIG_ADAPTER;
+}
+
 sub gff {
 	my $self = shift;
 	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.5|3)$/) {
@@ -1415,7 +1424,8 @@ For quick reference only. Please see L<Bio::ToolBox::Data> for implementation.
 
 =item new
 
-Generate new object. 
+Generate new object. Used as a common base for L<Bio::ToolBox::Data> 
+and L<Bio::ToolBox::Data::Stream>.
 
 =item verify
 
@@ -1476,6 +1486,15 @@ Returns or sets the program string in the metadata.
 =item database
 
 Returns or sets the name of the database in the metadata.
+
+=item bam_adapter
+
+Returns or sets the short name of bam adapter being used: "sam" or "hts".
+
+=item big_adapter
+
+Returns or sets the short name of the bigWig and bigBed adapter being 
+used: "ucsc" or "big".
 
 =item gff
 

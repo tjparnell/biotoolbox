@@ -794,7 +794,6 @@ our $BAM_ADAPTER = undef; # preference for which bam adapter to use
 our $BIG_ADAPTER = undef;
 
 # define reusable variables
-our $TAG_EXCEPTIONS; # for repeated use with validate_included_feature()
 our %total_read_number; # for rpm calculations
 our $primary_id_warning; # for out of date primary IDs
 our %OPENED_DB; # cache for some opened Bio::DB databases
@@ -805,6 +804,7 @@ our @ISA = qw(Exporter);
 our @EXPORT = qw();
 our @EXPORT_OK = qw(
 	$BAM_ADAPTER
+	$BIG_ADAPTER
 	open_db_connection
 	get_dataset_list 
 	verify_or_request_feature_types 
