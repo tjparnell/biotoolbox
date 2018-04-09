@@ -129,8 +129,9 @@ sub collect_bigwig_scores {
 		# only one, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
-		my $scores = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
-		return wantarray ? @$scores : $scores;
+		my $raw_scores = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
+		my @scores = grep {defined} @$raw_scores;
+		return wantarray ? @scores : \@scores;
 	}
 	else {
 		# we have multiple bigwigs
@@ -138,8 +139,8 @@ sub collect_bigwig_scores {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
-			my $s = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
-			push @scores, @$s if scalar(@$s);
+			my $raw = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
+			push @scores, grep {defined} @$raw;
 		}
 		return wantarray ? @scores : \@scores;
 	}
@@ -161,7 +162,7 @@ sub collect_bigwig_position_scores {
 		
 		# record intervals into hash
 		foreach my $i (@$intervals) {
-			for (my $p = $i->{start} + 1; $p <= $i->{end}; $i++) {
+			for (my $p = $i->{start} + 1; $p <= $i->{end}; $p++) {
 				$pos2score{$p} = $i->{value};
 			}
 		}
@@ -178,7 +179,7 @@ sub collect_bigwig_position_scores {
 		
 			# record intervals into hash
 			foreach my $i (@$intervals) {
-				for (my $p = $i->{start} + 1; $p <= $i->{end}; $i++) {
+				for (my $p = $i->{start} + 1; $p <= $i->{end}; $p++) {
 					# check every position to see if it's a duplicate
 					if (exists $pos2score{$p} ) {
 						if (exists $duplicates{$p} ) {
@@ -529,8 +530,8 @@ sub _record_seqids {
 	my ($file, $big) = @_;
 	$BIG_CHROMOS{$file} = {};
 	my $chroms = $big->chroms(); # returns hash seq_id => length
-	foreach my $h (keys %$chroms) {
-		my $chr = $h->{name};
+	foreach my $c (keys %$chroms) {
+		my $chr = $chroms->{$c}{name};
 		$BIG_CHROMOS{$file}{$chr} = $chr; # itself
 		# now store alternate names, with or without chr prefix
 		if ($chr =~ /^chr(.+)$/) {
@@ -666,7 +667,7 @@ sub new {
 	undef $D;
 	
 	# fill out the metadata
-	foreach my $f (keys %{$self->bwfiles}) {
+	foreach my $f (keys %{$self->{bwfiles}}) {
 		# a genuine metadata file isn't absolutely required
 		# therefore we will always put in our own metadata gleaned from file name 
 		# do a regex to pull out basename and possibly strand information from filename
@@ -697,7 +698,7 @@ sub new {
 
 sub bigwig_names {
 	my $self = shift;
-	my @b = keys %{ $self-> {bwfiles} };
+	my @b = keys %{ $self->{bwfiles} };
 	return wantarray ? @b : \@b;
 }
 
@@ -705,7 +706,7 @@ sub bigwigs {
 	# to maintain compatiblity with the old BigWigSet, we will return the full path
 	# of all the bigwig files
 	my $self = shift;
-	my @b = values %{ $self-> {bwfiles} };
+	my @b = values %{ $self->{bwfiles} };
 	return wantarray ? @b : \@b;
 }
 
@@ -826,7 +827,7 @@ sub new {
 	
 	# check the bigBed object
 	my $bb = shift;
-	unless (ref($bb) eq 'Bio::DB::Big' and $bb->is_big_bed) {
+	unless (ref($bb) eq 'Bio::DB::Big::File' and $bb->is_big_bed) {
 		confess "passed big object is not a bigBed file!";
 	}
 	
@@ -837,8 +838,8 @@ sub new {
 	
 	# create an iterator
 	# include all string entries and just one per iteration
-	# presumably could go faster if we return more....
-	my $iterator = $bb->get_entries_iterator($seqid, $start, $end, 1, 1);
+	# return 10 at a time, not too many, not too little
+	my $iterator = $bb->get_entries_iterator($seqid, $start, $end, 1, 10);
 	
 	# return object wrapper
 	my $self = {
@@ -847,13 +848,19 @@ sub new {
 		seqid   => $seqid,
 		start   => $start,
 		end     => $end,
+		entries => [],
 	};
 	return bless $self, $class;
 }
 
 sub next_seq {
 	my $self = shift;
-	my $entry = $self->{iter}->next || undef;
+	my $entry = shift @{ $self->{entries} } || undef;
+	unless ($entry) {
+		$self->{entries} = $self->{iter}->next || undef;
+		return unless $self->{entries};
+		$entry = shift @{ $self->{entries} } || undef;
+	}
 	return unless $entry;
 	my @bits = split('\t', $entry->{string});
 	return Bio::ToolBox::SeqFeature->new(

@@ -2269,7 +2269,7 @@ sub _lookup_db_method {
 			
 			# check that we have bigwig support
 			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
-			if ($BIGBED_OK) {
+			if ($BIGWIG_OK) {
 				if ($param->[RETT] == 2) {
 					$score_method = \&collect_bigwig_position_scores;
 				}
@@ -2277,12 +2277,12 @@ sub _lookup_db_method {
 					$score_method = \&collect_bigwig_scores;
 				}
 				elsif ($param->[METH] =~ /min|max|mean/) {
-					$score_method = \&collect_bigwigset_score;
+					$score_method = \&collect_bigwig_score;
 				}
 				elsif ($param->[METH] =~ /sum|count/) {
 					# difference between ucsc and libBigWig libraries
 					$score_method = $BIG_ADAPTER eq 'ucsc' ? 
-						\&collect_bigwigset_score : \&collect_bigwigset_scores;
+						\&collect_bigwig_score : \&collect_bigwig_scores;
 				}
 				else {
 					$score_method = \&collect_bigwig_scores;
@@ -2363,7 +2363,7 @@ sub _lookup_db_method {
 	
 	
 	### BigWigSet database
-	elsif (ref($param->[DB]) =~ m/BigWigSet/i) {
+	elsif (ref($param->[DB]) =~ m/BigWigSet/) {
 		# calling features from a BigWigSet database object
 		# this uses either Bio::DB::BigWig or Bio::DB::Big
 		
@@ -2380,11 +2380,10 @@ sub _lookup_db_method {
 		elsif ($param->[RETT] == 1) {
 			$score_method = \&collect_bigwigset_scores;
 		}
-		elsif ($param->[METH] =~ /min|max|mean/) {
-			$score_method = \&collect_bigwigset_score;
-		}
-		elsif ($param->[METH] =~ /sum|count/) {
+		elsif ($param->[METH] =~ /min|max|mean|sum|count/) {
 			# difference between ucsc and libBigWig libraries
+			# the ucsc library works with summaries and we can handle multiple of these
+			# but the big adapter doesn't
 			$score_method = $BIG_ADAPTER eq 'ucsc' ? 
 				\&collect_bigwigset_score : \&collect_bigwigset_scores;
 		}
@@ -2510,7 +2509,7 @@ sub _load_bigwig_helper_module {
 
 sub _load_bigbed_helper_module {
 	if ($BIG_ADAPTER =~ /ucsc|kent/i) {
-		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+		$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
 		$BIG_ADAPTER = 'ucsc'; # for internal consistency
 	}
 	elsif ($BIG_ADAPTER =~ /big/i) {
@@ -2532,7 +2531,7 @@ sub _load_bigbed_helper_module {
 			$BIG_ADAPTER = 'big' if $BIGBED_OK; 
 		}
 		else {
-			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig');
+			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed');
 			$BIG_ADAPTER = 'ucsc' if $BIGBED_OK; 
 		}
 	}
