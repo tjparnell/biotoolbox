@@ -837,7 +837,7 @@ sub open_db_connection {
 	
 	# first check if it is a database reference
 	my $db_ref = ref $database;
-	if ($db_ref =~ /DB/) {
+	if ($db_ref =~ /DB|big::BigWigSet/) {
 		# the provided database is already an open database object
 		# nothing to open, return as is
 		return $database;
@@ -885,8 +885,7 @@ sub open_db_connection {
 		# a remote BigBed database
 		elsif ($database =~ /\.(?:bb|bigbed)$/i) {
 			# open using BigBed adaptor
-			$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
-				unless $BIGBED_OK;
+			$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
 			if ($BIGBED_OK) {
 				$db = open_bigbed_db($database);
 				unless ($db) {
@@ -903,8 +902,7 @@ sub open_db_connection {
 		# a remote BigWig database
 		elsif ($database =~ /\.(?:bw|bigwig)$/i) {
 			# open using BigWig adaptor
-			$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-				unless $BIGWIG_OK;
+			$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 			if ($BIGWIG_OK) {
 				$db = open_bigwig_db($database);
 				unless ($db) {
@@ -977,8 +975,7 @@ sub open_db_connection {
 			# a BigBed database
 			elsif ($database =~ /\.(?:bb|bigbed)$/i) {
 				# open using BigBed adaptor
-				$BIGBED_OK = _load_helper_module('Bio::ToolBox::db_helper::bigbed') 
-					unless $BIGBED_OK;
+				$BIGBED_OK = _load_bigbed_helper_module() unless $BIGBED_OK;
 				if ($BIGBED_OK) {
 					undef $@;
 					$db = open_bigbed_db($database);
@@ -996,8 +993,7 @@ sub open_db_connection {
 			# a BigWig database
 			elsif ($database =~ /\.(?:bw|bigwig)$/i) {
 				# open using BigWig adaptor
-				$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-					unless $BIGWIG_OK;
+				$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 				if ($BIGWIG_OK) {
 					undef $@;
 					$db = open_bigwig_db($database);
@@ -1091,8 +1087,7 @@ sub open_db_connection {
 	# a directory, presumably of bigwig files
 	elsif (-d $database) {
 		# try opening using the BigWigSet adaptor
-		$BIGWIG_OK = _load_helper_module('Bio::ToolBox::db_helper::bigwig') 
-			unless $BIGWIG_OK;
+		$BIGWIG_OK = _load_bigwig_helper_module() unless $BIGWIG_OK;
 		if ($BIGWIG_OK) {
 			$db = open_bigwigset_db($database);
 			unless ($db) {
