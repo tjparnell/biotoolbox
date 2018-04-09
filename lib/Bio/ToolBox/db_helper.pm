@@ -2052,17 +2052,17 @@ sub get_chromosome_list {
 	}
 	
 	# libBigWig Bigfile, including both bigWig and bigBed
-	elsif ($type eq 'Bio::DB::Big') {
+	elsif ($type eq 'Bio::DB::Big::File') {
 		# this doesn't follow the typical BioPerl convention
 		my $chroms = $db->chroms();
 		foreach my $chr (keys %$chroms) {
-			my $chrname = $chr->{name};
+			my $chrname = $chroms->{$chr}{name};
 			
 			# check for excluded chromosomes
 			next if (defined $chr_exclude and $chrname =~ $chr_exclude);
 			
 			# get chromosome size
-			my $length = $chr->{length};
+			my $length = $chroms->{$chr}{length};
 			
 			# store
 			push @chrom_lengths, [ $chrname, $length ];
