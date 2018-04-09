@@ -1200,7 +1200,6 @@ sub get_dataset_list {
 	
 	# Open a db connection 
 	my $db = open_db_connection($database);
-	my $db_name = get_db_name($database);
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -1627,7 +1626,6 @@ sub get_new_feature_list {
 		carp 'no database connected!';
 		return;
 	}
-	my $db_name = get_db_name($args{'db'});
 
 	# Verify a SeqFeature::Store database
 	my $db_ref = ref $db;
@@ -1710,7 +1708,6 @@ sub get_new_genome_list {
 	# Open a db connection 
 	$args{'db'} ||= undef;
 	my $db = open_db_connection($args{'db'});
-	my $db_name = get_db_name($args{'db'});
 	unless ($db) {
 		carp 'no database connected!';
 		return;
@@ -2007,7 +2004,6 @@ sub get_chromosome_list {
 	
 	# Open a db connection 
 	my $db = open_db_connection($database);
-	my $db_name = get_db_name($database);
 	unless ($db) {
 		carp 'no database connected!';
 		return;
