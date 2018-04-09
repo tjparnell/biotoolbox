@@ -450,6 +450,8 @@ sub collect_bigwigset_score {
 	# lookup the bigWig files based on the parameters
 	my $ids = _lookup_bigwigset_wigs($param);
 	return unless scalar(@$ids) > 0;
+	croak("multiple selected bigWig files from a BigWigSet is not supported with single score method")
+		if scalar(@$ids) > 1;
 	push @$param, @$ids;
 	
 	# use the low level single bigWig API 
