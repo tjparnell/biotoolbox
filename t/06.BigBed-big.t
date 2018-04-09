@@ -9,11 +9,11 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	if (eval {require Bio::DB::BigBed; 1}) {
-		plan tests => 38;
+	if (eval {require Bio::DB::Big; 1}) {
+		plan tests => 36;
 	}
 	else {
-		plan skip_all => 'Optional module Bio::DB::BigBed not available';
+		plan skip_all => 'Optional module Bio::DB::Big not available';
 	}
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
@@ -31,11 +31,11 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
-is($Data->big_adapter('ucsc'), 'ucsc', 'set preferred database adapter to ucsc');
+is($Data->big_adapter('big'), 'big', 'set preferred database adapter to big');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
-isa_ok($db, 'Bio::DB::BigBed', 'connected database');
+isa_ok($db, 'Bio::DB::Big::File', 'connected database');
 
 # check chromosomes
 my @chromos = get_chromosome_list($db);
@@ -45,7 +45,7 @@ is($chromos[0][1], 230208, 'length of first chromosome');
 
 # check total mapped alignments
 my $total = check_dataset_for_rpm_support($dataset);
-is($total, 1414, "number of features in BigBed");
+is($total, undef, "number of features in BigBed");
 
 
 
@@ -56,11 +56,6 @@ isa_ok($stream, 'Bio::ToolBox::Data::Iterator', 'row stream iterator');
 # First row is YAL047C
 my $row = $stream->next_row;
 is($row->name, 'YAL047C', 'row name');
-
-# try a segment
-my $segment = $row->segment;
-isa_ok($segment, 'Bio::DB::BigFile::Segment', 'row segment');
-is($segment->start, 54989, 'segment start');
 
 # read count sum
 my $score = $row->get_score(
