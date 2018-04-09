@@ -119,19 +119,33 @@ sub check_sam {
 
 
 sub check_big {
+	# we now support two different big file adapters
+	# we're going to prefer the newer one based on libBigWig, simply because it's 
+	# way easier to install than the old UCSC Kent based one
 	
-	# check to see if it is installed
-	my $big_ok;
-	eval {require Bio::DB::BigFile; $big_ok = 1;};
-	if ($big_ok) {
-		# BigFile support is currently installed
+	# check to see if either are installed
 		# request a minimum version
 		# if they don't meet this minimim, let's hope the user
 		# knows how to rectify it.....
+	my ($big_ok,$ucsc_ok);
+	eval {require Bio::DB::BigFile; $ucsc_ok = 1;};
+	eval {require Bio::DB::Big; $big_ok = 1;};
+	if ($big_ok and $ucsc_ok) {
+		# Both of the them installed
+		$options->{'requires'}{'Bio::DB::BigFile'} = 1.07;
+		$options->{'requires'}{'Bio::DB::Big'} = 1.0;
+	}
+	elsif ($big_ok) {
+		# libBigWig Big support is currently installed
+		$options->{'requires'}{'Bio::DB::Big'} = 1.0;
+	}
+	elsif ($ucsc_ok) {
+		# UCSC Kent BigFile support is currently installed
 		$options->{'requires'}{'Bio::DB::BigFile'} = 1.07;
 	}
 	else {
-		$options->{'recommends'}{'Bio::DB::BigFile'} = 1.07;
+		# recommend the new adapter and skip the old one
+		$options->{'recommends'}{'Bio::DB::Big'} = 1.0;
 	}
 }
 
