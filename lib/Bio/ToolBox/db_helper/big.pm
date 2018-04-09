@@ -424,7 +424,13 @@ sub collect_bigbed_position_scores {
 	return wantarray ? %pos2data : \%pos2data;
 }
 
-
+sub sum_total_bigbed_features {
+	# there is no easy way to do this with this adapter, except to literally 
+	# walk through the entire file.
+	# well, we do this with bam files, I guess we could do the same here
+	# honestly, who uses this????? it's legacy. skip for now until someone complains
+	return undef;
+}
 
 
 
