@@ -2388,9 +2388,46 @@ sub se_strand_center_span {
 }
 
 sub se_shift_center_span{
+	my ($a, $data, $score) = @_;	
+	my $mid = int( ($a->pos + $a->calend -1) / 2);
+	if ($a->reversed) {
+		$mid -= $shift_value;
+	}
+	else {
+		$mid += $shift_value;
+	}
+	my $start = $mid - $half_extend + 1;
+	$start = 0 if $start < 0;
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
+	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
+		$data->{f}->[$_] += $score;
+	}
 }
 
 sub se_shift_strand_center_span{
+	my ($a, $data, $score) = @_;	
+	my $mid = int( ($a->pos + $a->calend -1) / 2);
+	if ($a->reversed) {
+		$mid -= $shift_value;
+	}
+	else {
+		$mid += $shift_value;
+	}
+	my $start = $mid - $half_extend + 1;
+	$start = 0 if $start < 0;
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
+	if ($a->reversed) {
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
+			$data->{r}->[$_] += $score;
+		}
+	}
+	else {
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
+			$data->{f}->[$_] += $score;
+		}
+	}
 }
 
 sub se_extend {
