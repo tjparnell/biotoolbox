@@ -2011,7 +2011,13 @@ sub merge_wig_files {
 	my ($filename1, $fh) = open_wig_file($outfile, 1);
 	while (@files) {
 		my $file = shift @files;
-		my $in = open_to_read_fh($file);
+		my $in = open_to_read_fh($file); 
+		unless ($in) {
+			warn "one or more sub-process forks failed! Check your parameters and input file.\nAttempting to clean up\n";
+			foreach (@files) {unlink $_;}
+			unlink $chromo_file if $chromo_file;
+			exit 1;
+		}
 		while (<$in>) {$fh->print($_)}
 		$in->close;
 		unlink $file;
