@@ -441,6 +441,11 @@ sub check_defaults {
 		$zmax ||= 10;
 	}
 	
+	# center span should have extend value
+	if ($use_cspan and !$extend_value) {
+		die " please use the --extval option to define an extend value when using center span\n";
+	}
+	
 	# check mapping quality
 	if (defined $min_mapq) {
 		die " quality score must be 0-255!\n" if $min_mapq > 255;
