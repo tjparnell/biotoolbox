@@ -624,7 +624,6 @@ use Carp;
 use IO::Dir;
 use IO::File;
 use File::Spec;
-use List::Util qw(any);
 
 sub new {
 	my ($class, $dir) = @_;
@@ -749,7 +748,11 @@ sub filter_bigwigs {
 	my $start_list = $self->bigwig_names;
 	my $md = $self->metadata;
 	my @filtered;
-	foreach my $b (@$start_list) {
+	
+	foreach my $name (@names) {
+		# there may be more than one name of a dataset passed
+		# in all likelihood, probably not, but just in case....
+		
 		# we are filtering on basically any value that matches and are not really 
 		# restricting on a specific attribute key
 		# so type, name, display_name, or primary_tag are all checked in that order
@@ -758,20 +761,21 @@ sub filter_bigwigs {
 		# most users won't even bother with a genuine metadata file
 		# in fact, why am I even bothering with this at all?
 		# because they are a cool concept and I occasionally use them. huh.
-		if (exists $md->{$b}{type}) {
-			push @filtered, $b if any {$_ eq $md->{$b}{type}} @names;
-		} 
-		elsif (exists $md->{$b}{name}) {
-			push @filtered, $b if any {$_ eq $md->{$b}{name}} @names;
-		} 
-		elsif (exists $md->{$b}{display_name}) {
-			push @filtered, $b if any {$_ eq $md->{$b}{display_name}} @names;
-		} 
-		elsif (exists $md->{$b}{primary_tag}) {
-			push @filtered, $b if any {$_ eq $md->{$b}{primary_tag}} @names;
-		} 
+		foreach my $b (@$start_list) {
+			if (exists $md->{$b}{type}) {
+				push @filtered, $b if $name eq $md->{$b}{type};
+			} 
+			elsif (exists $md->{$b}{name}) {
+				push @filtered, $b if $name eq $md->{$b}{name};
+			} 
+			elsif (exists $md->{$b}{display_name}) {
+				push @filtered, $b if $name eq $md->{$b}{display_name};
+			} 
+			elsif (exists $md->{$b}{primary_tag}) {
+				push @filtered, $b if $name eq $md->{$b}{primary_tag};
+			} 
+		}
 	}
-	
 	return wantarray ? @filtered : \@filtered;
 }
 
