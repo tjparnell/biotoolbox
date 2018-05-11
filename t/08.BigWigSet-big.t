@@ -84,7 +84,7 @@ my %pos2scores2 = $row->get_region_position_scores(
 # 	print "  $_ => $pos2scores2{$_}\n";
 # }
 is(scalar(keys %pos2scores2), 434, 'position scores');
-is($pos2scores2{1671}, 2.71577191352844, 'score at position 1671');
+is(sprintf("%.2f", $pos2scores2{1671}), 2.72, 'score at position 1671');
 is($pos2scores2{1787}, 0, 'score at position 1787');
 
 # min score
@@ -101,7 +101,7 @@ $score = $row->get_score(
 	'dataset'  => 'sample3',
 	'method'   => 'max',
 );
-is($score, 4.57067108154297, 'maximum score');
+is(sprintf("%.2f", $score), 4.57, 'maximum score');
 
 
 
