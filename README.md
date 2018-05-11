@@ -27,37 +27,21 @@ bigWig, Bam), one script can now work with any data format.
 
 # INSTALLATION
 
-Installation is simple with the standard Perl incantation.
+Basic installation is simple with the standard [Module::Build](https://metacpan.org/pod/Module::Build) 
+incantation. This will get you a minimal installation that will work with 
+text files (BED, GFF, GTF, etc), but not binary files. 
 
     perl ./Build.PL
     ./Build
     ./Build test
     ./Build install
 
-Released versions may be obtained though the CPAN repository using 
-your favorite package manager. 
+To work with binary Bam and BigWig files, see the ["advanced installation"](#advanced-installation) 
+below for further guidance. Most scripts should fail gently with warnings about 
+if required modules are missing.
 
-
-## Additional external modules
-
-To make the installation as lean and simple as possible, only the minimal 
-additional Perl modules are required, while the remainder are only 
-recommended. These can be installed subsequently as necessary as the need 
-arises. Most of the database adapters, including those for Bam, BigWig, 
-and BigBed, require external C library dependencies that must be compiled 
-separately. See the respective modules for installation instructions.
-
-Most scripts should fail gently with warnings about missing modules.
-
-Suggested modules and adapters include the following:
-
-- [Bio::Perl](https://metacpan.org/pod/Bio::Perl)
-- [Bio::DB::BigWig](https://metacpan.org/pod/Bio::DB::BigWig)
-- [Bio::DB::BigBed](https://metacpan.org/pod/Bio::DB::BigBed)
-- [Bio::DB::Sam](https://metacpan.org/pod/Bio::DB::Sam)
-- [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS)
-- [Bio::DB::USeq](https://metacpan.org/pod/Bio::DB::USeq)
-- [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
+Released versions may be obtained though the CPAN repository using your favorite 
+package manager. 
 
 # LIBRARIES
 
@@ -145,8 +129,116 @@ a synopsis of available options, or add `--help` to print the full documentation
 
 # CONFIGURATION
 
-There is a small INI-style configuration file, `.biotoolbox.cfg`, written in your 
-home directory, which can include paths to helper files and database configurations.
+There is a small INI-style configuration file, `.biotoolbox.cfg`, that may be written 
+in your home directory, which can include paths to helper files and database 
+configurations.
+
+# ADVANCED INSTALLATION
+
+This is a brief, advanced installation guide for getting a complete installation. I 
+recommend using a simple CPAN package manager such as [cpanm](https://metacpan.org/pod/App::cpanminus).
+
+## Locations
+
+For privileged installations (requiring `root` access or `sudo` privilege) you probably 
+already know what to do. You can use the `--sudo` or `-S` option to `cpanm`.
+
+For home directory installations using the system perl, you should probably first install 
+[local::lib](https://metacpan.org/pod/local::lib), and set the appropriate incantation 
+in your `.bash_profile`, `.bashrc`, or other equivalent file as described. For example,
+
+    curl -L https://cpanmin.us | perl - local::lib App::cpanminus \
+    && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.bash_profile \
+    && . ~/bash_profile
+
+For home directory installations using a newer, modern perl (because many OS Perl 
+installations are sadly out of date), please investigate installing your own Perl using 
+[PerlBrew](https://perlbrew.pl). The older a Perl installation is, the more stuff has 
+to be updated.
+
+## External libraries
+
+There are two external C libraries that are required for reading and writing Bam and 
+BigWig files. Note that both [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS) and 
+[Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big) include `INSTALL.pl` scripts within 
+their bundles that can compile these external libraries for you in a semi-automated 
+control. Proceed here if you wish to have more control on where these are installed.
+
+- [HTSlib](https://github.com/samtools/htslib)
+
+   Follow the directions within for installation. [Version 1.5](https://github.com/samtools/htslib/releases/download/1.5/htslib-1.5.tar.bz2) 
+   is known to work well, although newer versions may work as well too. By default, it 
+   installs into `/usr/local`, or it may be set to another directory (`$HOME` for example) 
+   by adding `--prefix=$HOME` option to the `configure` step. This may also be available 
+   via other package managers.
+
+- [libBigWig](https://github.com/dpryan79/libBigWig)
+
+    Follow the directions within for installation. By default, it installs into 
+    `/usr/local`. To change to a different location, manually edit the `Makefile`
+    to change `prefix` to your desired location, and run `make && make install`.
+
+## Perl modules
+
+The following Perl packages should be explicitly installed. Most of these will 
+bring along a number of dependencies (which in turn bring along more dependencies). In 
+the end you will install dozens of packages, some of which are needed only for testing. 
+
+
+- [Bio::Perl](https://metacpan.org/pod/Bio::Perl)
+
+    The Bio::Perl package is a large bundle that brings along a number of extraneous 
+    modules and bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
+    If you build this manually, or run `cpanm` with the `--interactive` option, you 
+    can interactively choose what scripts to include or not include. By default, it 
+    installs all additional scripts, potentially cluttering your `bin` folder.
+
+- [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS)
+
+    It should be able to identify HTSLIB in standard library locations, like `/usr/local` 
+    for example, on its own. For non-standard locations, specify the location of the 
+    HTSlib path to `Build.PL` using the `--htslib` option. 
+
+- [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big)
+
+    As with HTSlib, this should be able to identify the libBigWig library in standard 
+    locations, but with non-standard locations, you may specify with the `--libbigwig` 
+    option to `Build.PL`. 
+    
+    Note that on MacOS X, the bundle may not be linked properly to the shared library. 
+    This will be apparent when the `./Build test` fails dramatically. You will have to 
+    manually re-link the bundle to the shared library file with the following command.
+    
+        install_name_tool -change libBigWig.so /path/to/lib/libBigWig.so blib/arch/auto/Bio/DB/Big/Big.bundle
+        
+- [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
+
+    This is highly recommended to get multi-cpu support. It can get a bit slow otherwise.
+
+- [Set::IntervalTree](https://metacpan.org/pod/Set::IntervalTree)
+- [DBD::SQLite](https://metacpan.org/pod/DBD::SQLite)
+
+    If you plan on using BioPerl [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
+    databases for annotation then installing SQLite support is suggested. For larger, 
+    shared databases, [DBD::mysql](https://metacpan.org/pod/DBD::mysql) is also supported.
+
+An example of installing these with cpanm in your home directory is below.
+
+    cpanm -L $HOME/perl5 Bio::Perl
+    cpanm -L $HOME/perl5 --configure-args="--htslib $HOME" Bio::DB::HTS
+    cpanm -L $HOME/perl5 --configure-args="--libbigwig $HOME" Bio::DB::Big
+    cpanm -L $HOME/perl5 Parallel::ForkManager Set::IntervalTree Bio::ToolBox
+
+## Legacy Perl modules
+
+These are additional legacy Perl modules that are supported, but are not required or 
+have been superseded by other modules.
+
+- [Bio::DB::BigWig](https://metacpan.org/pod/Bio::DB::BigWig)
+- [Bio::DB::BigBed](https://metacpan.org/pod/Bio::DB::BigBed)
+- [Bio::DB::Sam](https://metacpan.org/pod/Bio::DB::Sam)
+- [Bio::DB::USeq](https://metacpan.org/pod/Bio::DB::USeq)
+- [Bio::Graphics::Wiggle](https://metacpan.org/pod/Bio::Graphics::Wiggle)
 
 # AUTHOR
 
