@@ -37,6 +37,9 @@ sub get_base_options {
 		configure_requires => {
 			'Module::Build'           => 0,
 		},
+		test_requires     => {
+			'Test::More'              => 0,
+		},
 		meta_merge        => {
 			resources     => {
 				repository     => 'https://github.com/tjparnell/biotoolbox'
