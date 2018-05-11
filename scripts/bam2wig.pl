@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.54';
+my $VERSION = '1.55';
 	
 	
 
@@ -439,6 +439,11 @@ sub check_defaults {
 		$chr_number ||= 4;
 		$zmin ||= 3;
 		$zmax ||= 10;
+	}
+	
+	# center span should have extend value
+	if ($use_cspan and !$extend_value) {
+		die " please use the --extval option to define an extend value when using center span\n";
 	}
 	
 	# check mapping quality
@@ -2011,7 +2016,13 @@ sub merge_wig_files {
 	my ($filename1, $fh) = open_wig_file($outfile, 1);
 	while (@files) {
 		my $file = shift @files;
-		my $in = open_to_read_fh($file);
+		my $in = open_to_read_fh($file); 
+		unless ($in) {
+			warn "one or more sub-process forks failed! Check your parameters and input file.\nAttempting to clean up\n";
+			foreach (@files) {unlink $_;}
+			unlink $chromo_file if $chromo_file;
+			exit 1;
+		}
 		while (<$in>) {$fh->print($_)}
 		$in->close;
 		unlink $file;
@@ -2209,7 +2220,7 @@ sub se_shift_start {
 	}
 	else {
 		my $pos = int( ($a->pos + $shift_value) / $bin_size);
-		$data->{f}->[$pos - $data->{f_offset}] += $score;
+		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 }
 
@@ -2233,7 +2244,7 @@ sub se_shift_strand_start {
 	}
 	else {
 		my $pos = int( ($a->pos + $shift_value) / $bin_size);
-		$data->{f}->[$pos - $data->{f_offset}] += $score;
+		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 }
 
@@ -2252,7 +2263,7 @@ sub se_shift_mid {
 	}
 	else {
 		my $pos = int( ($mid + $shift_value) / $bin_size);
-		$data->{f}->[$pos - $data->{f_offset}] += $score;
+		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 }
 
@@ -2276,7 +2287,7 @@ sub se_shift_strand_mid {
 	}
 	else {
 		my $pos = int( ($mid + $shift_value) / $bin_size);
-		$data->{f}->[$pos - $data->{f_offset}] += $score;
+		$data->{f}->[$pos - $data->{f_offset}] += $score if $pos >= 0;
 	}
 }
 
@@ -2308,16 +2319,18 @@ sub se_strand_span {
 sub se_shift_span {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		my $s = int( ($a->pos - $shift_value) / $bin_size);
-		my $e = int( ($a->calend - 1 - $shift_value) / $bin_size);
-		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
+		my $start = int( ($a->pos - $shift_value) / $bin_size);
+		my $end = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		$start = 0 if $start < 0;
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score if $_ >= 0;
 		}
 	}
 	else {
-		my $s = int( ($a->pos + $shift_value) / $bin_size);
-		my $e = int( ($a->calend - 1 + $shift_value) / $bin_size);
-		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
+		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		my $end = int( ($a->calend - 1 + $shift_value) / $bin_size);
+		$start = 0 if $start < 0;
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2326,16 +2339,18 @@ sub se_shift_span {
 sub se_shift_strand_span {
 	my ($a, $data, $score) = @_;
 	if ($a->reversed) {
-		my $s = int( ($a->pos - $shift_value) / $bin_size);
-		my $e = int( ($a->calend - 1 - $shift_value) / $bin_size);
-		foreach ($s - $data->{r_offset} .. $e - $data->{r_offset} ) {
+		my $start = int( ($a->pos - $shift_value) / $bin_size);
+		$start = 0 if $start < 0;
+		my $end = int( ($a->calend - 1 - $shift_value) / $bin_size);
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
 			$data->{r}->[$_] += $score if $_ >= 0;
 		}
 	}
 	else {
-		my $s = int( ($a->pos + $shift_value) / $bin_size);
-		my $e = int( ($a->calend - 1 + $shift_value) / $bin_size);
-		foreach ($s - $data->{f_offset} .. $e - $data->{f_offset} ) {
+		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		my $end = int( ($a->calend - 1 + $shift_value) / $bin_size);
+		$start = 0 if $start < 0;
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
 		}
 	}
@@ -2373,9 +2388,46 @@ sub se_strand_center_span {
 }
 
 sub se_shift_center_span{
+	my ($a, $data, $score) = @_;	
+	my $mid = int( ($a->pos + $a->calend -1) / 2);
+	if ($a->reversed) {
+		$mid -= $shift_value;
+	}
+	else {
+		$mid += $shift_value;
+	}
+	my $start = $mid - $half_extend + 1;
+	$start = 0 if $start < 0;
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
+	foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
+		$data->{f}->[$_] += $score;
+	}
 }
 
 sub se_shift_strand_center_span{
+	my ($a, $data, $score) = @_;	
+	my $mid = int( ($a->pos + $a->calend -1) / 2);
+	if ($a->reversed) {
+		$mid -= $shift_value;
+	}
+	else {
+		$mid += $shift_value;
+	}
+	my $start = $mid - $half_extend + 1;
+	$start = 0 if $start < 0;
+	$start = int($start/$bin_size);
+	my $end = int( ($mid + $half_extend) / $bin_size);
+	if ($a->reversed) {
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
+			$data->{r}->[$_] += $score;
+		}
+	}
+	else {
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
+			$data->{f}->[$_] += $score;
+		}
+	}
 }
 
 sub se_extend {
@@ -2411,6 +2463,7 @@ sub se_strand_extend {
 	}
 	else {
 		my $start = int($a->pos / $bin_size);
+		$start = 0 if $start < 0;
 		my $end = int( ($a->pos + $extend_value - 1) / $bin_size);
 		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset}) {
 			$data->{f}->[$_] += $score;
@@ -2431,6 +2484,7 @@ sub se_shift_extend {
 	}
 	else {
 		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		$start = 0 if $start < 0; 
 		my $end = int( ($a->pos + $shift_value + $extend_value - 1) / $bin_size);
 		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;
@@ -2451,6 +2505,7 @@ sub se_shift_strand_extend {
 	}
 	else {
 		my $start = int( ($a->pos + $shift_value) / $bin_size);
+		$start = 0 if $start < 0; 
 		my $end = int( ($a->pos + $shift_value + $extend_value - 1) / $bin_size);
 		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
 			$data->{f}->[$_] += $score;

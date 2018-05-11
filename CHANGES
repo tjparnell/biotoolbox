@@ -1,5 +1,9 @@
 ######## Bio::ToolBox revision history #############
 
+v1.55
+	- Fix bugs in bam2wig script when using negative shift values.
+	Thanks to Piotr for reporting.
+
 v1.54
 	- Update config module to stop writing unnecessary config files.
 	Config file will only be written when updating database or 
