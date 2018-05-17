@@ -806,7 +806,7 @@ sub determine_shift_value {
 		for my $tid (@chromosomes) {
 			
 			# calculate the correlation
-			my $result = calculate_strand_correlation($tid);
+			my $result = calculate_strand_correlation($sam, $tid);
 			
 			# record the results for this chromosome
 			push @shift_values, @{ $result->[0] }; # push the actual values
