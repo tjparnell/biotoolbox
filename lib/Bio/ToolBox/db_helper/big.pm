@@ -39,9 +39,15 @@ my %BIG_CHROMOS;
 	# sometimes user may request a chromosome that's not in the bigfile
 	# that could lead to an exception
 	# we will record the chromosomes list in this hash
-	# $BIG_CHROMOS{bigfile}{chromos}
+	# $BIG_CHROMOS{bigfile}{altchromo} = chromo
 	# we also record the chromosome name variant with or without chr prefix
 	# to accommodate different naming conventions
+
+# Hash of Bigfile chromosome lengths
+my %BIG_CHROMOLENGTHS;
+	# since libBigWig doesn't internally clip chromosome lengths
+	# we will cache chromosome lengths and check them before it leads to an exception
+	# $BIG_CHROMOLENGTHS{bigfile}{chromo} = length
 
 # Opened bigFile db objects
 my %OPENED_BIG;
@@ -86,12 +92,14 @@ sub collect_bigwig_score {
 	
 	# adjust old method name for compatibility 
 	$param->[METH] = 'std' if $param->[METH] eq 'stddev';
-	
+		
 	# check how many features we have
 	if (scalar @$param == 9) {
 		# only one bw, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		return $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
 			$param->[METH]);
 	}
@@ -101,6 +109,8 @@ sub collect_bigwig_score {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $s = $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
 				$param->[METH]);
 			push @scores, $s if defined $s;
@@ -129,6 +139,8 @@ sub collect_bigwig_scores {
 		# only one, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		my $raw_scores = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
 		my @scores = grep {defined} @$raw_scores;
 		return wantarray ? @scores : \@scores;
@@ -139,6 +151,8 @@ sub collect_bigwig_scores {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $raw = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
 			push @scores, grep {defined} @$raw;
 		}
@@ -158,6 +172,8 @@ sub collect_bigwig_position_scores {
 		# only one, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		my $intervals = $bw->get_intervals($chromo, $param->[STRT] - 1, $param->[STOP]);
 		
 		# record intervals into hash
@@ -175,6 +191,8 @@ sub collect_bigwig_position_scores {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $intervals = $bw->get_intervals($chromo, $param->[STRT] - 1, $param->[STOP]);
 		
 			# record intervals into hash
@@ -241,8 +259,10 @@ sub collect_bigbed_scores {
 		# open the bedfile
 		my $bb = _get_bigbed($param->[$d]);
 			
-		# first check that the chromosome is present
+		# first check chromosome is present
 		my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		
 		# collect the features overlapping the region
 			# we are using the high level API rather than the low-level
@@ -308,6 +328,8 @@ sub collect_bigbed_position_scores {
 			
 		# first check that the chromosome is present
 		my $chromo = $BIG_CHROMOS{$param->[$i]}{$param->[CHR]} or next;
+		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		
 		# collect the features overlapping the region
 		my $bb_stream = Bio::ToolBox::db_helper::big::BedIteratorWrapper->new(
@@ -540,9 +562,12 @@ sub _record_seqids {
 	my $chroms = $big->chroms(); # returns hash seq_id => length
 	foreach my $c (keys %$chroms) {
 		my $chr = $chroms->{$c}{name};
+		my $len = $chroms->{$c}{length};
+		# store length
+		$BIG_CHROMOLENGTHS{$file}{$chr} = $len;
 		$BIG_CHROMOS{$file}{$chr} = $chr; # itself
 		# now store alternate names, with or without chr prefix
-		if ($chr =~ /^chr(.+)$/) {
+		if ($chr =~ /^chr(.+)$/i) {
 			$BIG_CHROMOS{$file}{$1} = $chr;
 		}
 		else {
