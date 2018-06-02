@@ -100,8 +100,9 @@ sub collect_bigwig_score {
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
-		return $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
+		my $s = $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
 			$param->[METH]);
+		return $s->[0];
 	}
 	else {
 		# we have multiple bigwigs
@@ -113,7 +114,7 @@ sub collect_bigwig_score {
 				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $s = $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
 				$param->[METH]);
-			push @scores, $s if defined $s;
+			push @scores, $s->[0];
 		}
 		if ($param->[METH] eq 'min') {
 			return min(@scores);
