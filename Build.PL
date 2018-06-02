@@ -99,24 +99,30 @@ sub check_sam {
 	# check to see if it is installed
 	# request a minimum version if it is, otherwise recommend
 	# we're going to prefer the new modern HTS library, but old sam one is ok
+	
+	# Bio::DB::HTS made a naive mistake in numbering their modules, and released 
+	# version 2.11 (two point eleven), which is numerically less than my original required 
+	# version 2.5, which means I have to drop my minimum version down to 2.1 so it 
+	# doesn't fail and hope for the best
+	
 	my ($sam_ok, $hts_ok);
 	eval {require Bio::DB::Sam; $sam_ok = 1;};
 	eval {require Bio::DB::HTS; $hts_ok = 1;};
 	if ($sam_ok and $hts_ok) {
 		$options->{'requires'}{'Bio::DB::Sam'} = 1.36;
-		$options->{'requires'}{'Bio::DB::HTS'} = 2.5;
+		$options->{'requires'}{'Bio::DB::HTS'} = 2.1;
 	}
 	elsif ($sam_ok and not $hts_ok) {
 		# only old version, recommend new one
 		$options->{'requires'}{'Bio::DB::Sam'} = 1.36;
-		$options->{'recommends'}{'Bio::DB::HTS'} = 2.5;
+		$options->{'recommends'}{'Bio::DB::HTS'} = 2.1;
 	}
 	elsif (not $sam_ok and $hts_ok) {
 		# skip the old adapter
-		$options->{'requires'}{'Bio::DB::HTS'} = 2.5;
+		$options->{'requires'}{'Bio::DB::HTS'} = 2.1;
 	}
 	else {
-		$options->{'recommends'}{'Bio::DB::HTS'} = 2.5;
+		$options->{'recommends'}{'Bio::DB::HTS'} = 2.1;
 	}
 }
 
