@@ -51,10 +51,10 @@ sub get_base_options {
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 			'List::Util'              => 0,
+			'File::Which'             => 0,
 		},
 		recommends        => {
 			'DBD::SQLite'             => 0,
-			'File::Which'             => 0,
 			'Net::FTP'                => 0,
 			'Bio::Root::Version'      => '1.0069023',
 			'Parallel::ForkManager'   => 1.02,

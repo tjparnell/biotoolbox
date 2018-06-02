@@ -1,5 +1,5 @@
 package Bio::ToolBox::big_helper;
-our $VERSION = '1.54';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -200,9 +200,10 @@ require Exporter;
 use strict;
 use Carp qw(carp cluck);
 use File::Temp;
+use File::Which;
 use IO::File;
 use Bio::ToolBox::db_helper qw(get_chromosome_list);
-use Bio::ToolBox::db_helper::config qw($BTB_CONFIG add_program);
+use Bio::ToolBox::db_helper::config qw($BTB_CONFIG);
 
 
 
@@ -247,13 +248,8 @@ sub wig_to_bigwig_conversion {
 				undef;
 	}
 	unless ($args{bwapppath}) {
-		# try checking the system path as a final resort
-		eval {
-			require File::Which;
-			File::Which->import;
-			$args{bwapppath} = which('wigToBigWig');
-		};
-		add_program($args{bwapppath}) if $args{bwapppath};
+		# try checking the system path
+		$args{bwapppath} = which('wigToBigWig');
 	}
 	unless ($args{bwapppath}) {
 		# last attempt to use Bio::DB::BigFile
@@ -366,13 +362,8 @@ sub open_wig_to_bigwig_fh {
 		$args{bwapppath} = $BTB_CONFIG->param("applications.wigToBigWig") || undef;
 	}
 	unless ($args{bwapppath}) {
-		# try checking the system path as a final resort
-		eval {
-			require File::Which;
-			File::Which->import;
-			$args{bwapppath} = which('wigToBigWig');
-		};
-		add_program($args{bwapppath}) if $args{bwapppath};
+		# try checking the system path
+		$args{bwapppath} = which('wigToBigWig');
 	}
 	unless ($args{bwapppath} =~ /ToBigWig$/) {
 		warn " Utility 'wigToBigWig' not specified and can not be found!" . 
@@ -437,13 +428,8 @@ sub bed_to_bigbed_conversion {
 			undef;
 	}
 	unless ($args{bbapppath}) {
-		# try checking the system path as a final resort
-		eval {
-			require File::Which;
-			File::Which->import;
-			$args{bbapppath} = which('bedToBigBed');
-		};
-		add_program($args{bbapppath}) if $args{bbapppath};
+		# try checking the system path
+		$args{bbapppath} = which('bedToBigBed');
 	}
 	unless ($args{bbapppath}) {
 		carp " Utility 'bedToBigBed' not specified and can not be found!" . 
