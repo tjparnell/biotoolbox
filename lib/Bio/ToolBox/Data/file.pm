@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.54';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -16,11 +16,15 @@ directly. See the respective modules for more information.
 use strict;
 use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
+use File::Which;
 use IO::File;
 use Statistics::Lite qw(mean min);
 
 # List of acceptable filename extensions
 our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc|maf)(?:\.gz)?/i;
+
+# gzip application
+our $gzip_app;
 
 
 ### The True Statement
@@ -939,10 +943,22 @@ sub open_to_write_fh {
 		}
 	}
 	
-	# add gz extension if necessary
-	if ($gz and $filename !~ m/\.gz$/i) {
-		$filename .= '.gz';
+	# gzip compression options
+	if ($gz and not $gzip_app) {
+		# use parallel gzip if possible
+		$gzip_app = which 'pigz';
+		if ($gzip_app) {
+			$gzip_app .= ' -p 3'; # use a conservative 3 processes, plus perl, so 4 total
+		}
+		else {
+			# default is the standard gzip application
+			$gzip_app = which("gzip");
+		}
 	}
+	
+	# add gz extension if necessary
+	$filename .= '.gz' if ($gzip_app and $filename !~ m/\.gz$/i);
+	
 	
 	# check file append mode
 	unless (defined $append) {
@@ -953,20 +969,20 @@ sub open_to_write_fh {
 	
 	# Generate appropriate filehandle object
 	my $fh;
-	if (not $gz and not $append) {
+	if (not $gzip_app and not $append) {
 		$fh = IO::File->new($filename, 'w') or 
 			carp "cannot write to file '$filename' $!\n";
 	}
-	elsif ($gz and !$append) {
-		$fh = IO::File->new("| gzip >$filename") or 
+	elsif ($gzip_app and !$append) {
+		$fh = IO::File->new("| $gzip_app >$filename") or 
 			carp "cannot write to compressed file '$filename' $!\n";
 	}
-	elsif (not $gz and $append) {
+	elsif (not $gzip_app and $append) {
 		$fh = IO::File->new(">> $filename") or 
 			carp "cannot append to file '$filename' $!\n";
 	}
-	elsif ($gz and $append) {
-		$fh = IO::File->new("| gzip >>$filename") or 
+	elsif ($gzip_app and $append) {
+		$fh = IO::File->new("| $gzip_app >>$filename") or 
 			carp "cannot append to compressed file '$filename' $!\n";
 	}
 	return $fh if defined $fh;
