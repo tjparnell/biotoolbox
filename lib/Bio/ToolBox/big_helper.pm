@@ -12,7 +12,25 @@ bigBed files, respectively. It uses external applications to
 accomplish this, taking care of generating a chromosome file from a 
 database if necessary. 
 
-Two exported subroutines are available for wig and bed conversions. 
+For wig to bigWig conversion, see the UCSC 
+documentation regarding L<wig|http://genome.ucsc.edu/goldenPath/help/wiggle.html>
+and L<bigWig|http://genome.ucsc.edu/goldenPath/help/bigWig.html> file formats. 
+It uses the UCSC I<wigToBigWig> utility to perform the conversion. The utility 
+must be available on the system for the conversion to succeed. It may be downloaded 
+from the L<UCSC Genome utilities|http://hgdownload.soe.ucsc.edu/admin/exe/> page.
+
+For bed to bigBed conversion, See the UCSC 
+documentation regarding L<bed|http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED>
+and L<bigBed|http://genome.ucsc.edu/goldenPath/help/bigBed.html> file formats. 
+It uses the UCSC I<bedToBigBed> utility to perform the conversion. This 
+must be present on the system for the conversion to succeed. It may be downloaded 
+from the L<UCSC Genome utilities|http://hgdownload.soe.ucsc.edu/admin/exe/> page.
+
+In both cases, the conversion requires a list of chromosome name and sizes in a 
+simple text file, where each line is comprised of two columns, "C<chromosome_name> 
+<size_in_bases>". This file may be specified, or automatically generated if 
+given a C<Bio::DB> database name (preferred to ensure genome version 
+compatibility).
 
 =head1 USAGE
 
@@ -21,27 +39,18 @@ names of the subroutines to export. None are automatically exported.
 
 	use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 
+There are are four available exported subroutines.
 
 =over
 
 =item wig_to_bigwig_conversion
 
-This subroutine will convert a wig file to a bigWig file. See the UCSC 
-documentation regarding L<wig|http://genome.ucsc.edu/goldenPath/help/wiggle.html>
-and L<bigWig|http://genome.ucsc.edu/goldenPath/help/bigWig.html> file formats. 
-It uses the UCSC I<wigToBigWig> utility to perform the conversion. The utility 
-must be available on the system for the conversion to succeed. 
+This subroutine will convert a wig file to a bigWig file. 
 
 For bedGraph format wig files, the utility I<bedGraphToBigWig> may be substituted 
 if desired, but I<wigToBigWig> can sufficiently handle all wig formats. When 
 no utility is available but L<Bio::DB::BigFile> is installed, then the module 
 may be used for generating the bigWig file.
-
-The conversion requires a list of chromosome name and sizes in a simple text 
-file, where each line is comprised of two columns, "C<chromosome_name> 
-<size_in_bases>". This file may be specified, or automatically generated if 
-given a C<Bio::DB> database name (preferred to ensure genome version 
-compatibility).
 
 After running the utility, the existence of a non-zero byte bigWig file 
 is checked. If it does, then the name of the file is returned. If not, 
@@ -57,7 +66,7 @@ following:
   Optional: 
   chromo      => The name of the chromosome sizes text file, described 
                  above, as an alternative to providing the database name.
-  bwapppath   => Provide the full path to Jim Kent's wigToBigWig 
+  bwapppath   => Provide the full path to the UCSC wigToBigWig 
                  utility. This parameter may instead be defined in the 
                  configuration file C<biotoolbox.cfg>. 
 
@@ -124,17 +133,7 @@ I<wigToBigWig> utility will generate the bigWig file.
 
 =item bed_to_bigbed_conversion
 
-This subroutine will convert a bed file to a bigBed file. See the UCSC 
-documentation regarding L<bed|http://genome.ucsc.edu/goldenPath/help/customTrack.html#BED>
-and L<bigBed|http://genome.ucsc.edu/goldenPath/help/bigBed.html> file formats. 
-It uses the UCSC I<bedToBigBed> utility to perform the conversion. This 
-must be present on the system for the conversion to succeed. 
-
-The conversion requires a list of chromosome name and sizes in a simple text 
-file, where each line is comprised of two columns, "C<chromosome_name> 
-C<size_in_bases>". This file may be specified, or automatically generated if 
-given a C<Bio::DB> database name (preferred to ensure genome version 
-compatibility).
+This subroutine will convert a bed file to a bigBed file. 
 
 After running the utility, the existence of a non-zero byte bigBed file 
 is checked. If it does, then the name of the file is returned. If not, 
