@@ -53,6 +53,7 @@ sub get_base_options {
 			'Statistics::Descriptive' => 3.0,
 			'List::Util'              => 0,
 			'File::Which'             => 0,
+			'Getopt::Long'            => 2.24,
 		},
 		recommends        => {
 			'DBD::SQLite'             => 0,
