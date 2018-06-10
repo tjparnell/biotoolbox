@@ -34,6 +34,8 @@ my (
 	$infile,
 	$outfile,
 	$database,
+	$feature,
+	$subfeature,
 	$id_i,
 	$desc_i,
 	$seq_i,
@@ -54,6 +56,8 @@ GetOptions(
 	'i|in=s'          => \$infile, # the solexa data file
 	'O|out=s'         => \$outfile, # name of output file 
 	'd|db|fasta=s'    => \$database, # database name or genomic fasta file
+	'f|feature=s'     => \$feature, # feature from input file
+	'u|subfeature=s'  => \$subfeature, # subfeature to collect sequence
 	'n|name|id=i'     => \$id_i, # id index
 	'desc=i'          => \$desc_i, # description index
 	's|seq=i'         => \$seq_i, # sequence index
@@ -113,23 +117,27 @@ unless (defined $gz) {
 
 
 ### Open file ####
-my $Input = Bio::ToolBox::Data->new(in => $infile, stream => 1) or 
-	die "unable to open input file!\n";
+my $Data = Bio::ToolBox::Data->new(
+	file       => $infile, 
+	parse      => 1,
+	feature    => $feature,
+	subfeature => $subfeature,
+) or die " unable to load input file '$infile'\n";
 unless ($database) {
-	$database = $Input->database;
+	$database = $Data->database;
 }
 
 
 
 ### Identify columns ####
 unless (defined $id_i) {
-	$id_i = $Input->name_column;
+	$id_i = $Data->name_column;
 }
 unless (defined $seq_i) {
-	$seq_i = $Input->find_column('sequence');
+	$seq_i = $Data->find_column('sequence');
 }
 unless (defined $desc_i) {
-	$desc_i = $Input->find_column('description|note');
+	$desc_i = $Data->find_column('description|note');
 }
 my $coords;
 my $do_feature;
@@ -137,11 +145,11 @@ if (defined $chr_i and defined $start_i and defined $stop_i) {
 	# user defined coordinates
 	$coords = 1;
 }
-elsif ($Input->feature_type eq 'coordinate') {
+elsif ($Data->feature_type eq 'coordinate') {
 	# Input has coordinate columns
 	$coords = 1;
 }
-elsif ($Input->feature_type eq 'named') {
+elsif ($Data->feature_type eq 'named') {
 	# Input has named features that presumably have coordinates in a database
 	$coords = 1;
 	$do_feature = 1;
@@ -188,14 +196,14 @@ print " wrote file '$outfile'\n";
 sub write_direct_single_fasta {
 	# concatenate each of the provided sequences
 	my $concat_seq;
-	while (my $row = $Input->next_row) {
+	while (my $row = $Data->next_row) {
 		$concat_seq .= $row->value($seq_i);
 		$concat_seq .= 'N' x $pad if $pad;
 	}
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
-		-id     => $Input->basename,
+		-id     => $Data->basename,
 		-desc   => "Concatenated sequences",
 		-seq    => $concat_seq,
 	);
@@ -209,7 +217,7 @@ sub write_direct_single_fasta {
 sub write_direct_multi_fasta {
 	# write multi-fasta with the provided sequences
 	my $seq_io = open_output_fasta();
-	while (my $row = $Input->next_row) {
+	while (my $row = $Data->next_row) {
 		# create seq object
 		my $seq = Bio::Seq->new(
 			-id     => $row->value($id_i),
@@ -229,12 +237,12 @@ sub fetch_seq_and_write_single_fasta {
 	# Open fasta database
 	my $db;
 	if ($database) {
-		$db = $Input->open_new_database($database);
+		$db = $Data->open_new_database($database);
 		unless ($db) {
 			die " Could not open database '$database' to use!\n";
 		}
 	}
-	elsif ($Input->database) {
+	elsif ($Data->database) {
 		# cool, database defined in metadata, we'll use that
 		# hope it works....
 	}
@@ -244,7 +252,7 @@ sub fetch_seq_and_write_single_fasta {
 	
 	# collect concatenated sequences and write
 	my $concat_seq;
-	while (my $row = $Input->next_row) {
+	while (my $row = $Data->next_row) {
 		
 		# make sure we parse and/or fetch the seqfeature if need be
 		# this isn't necessarily automatic....
@@ -274,7 +282,7 @@ sub fetch_seq_and_write_single_fasta {
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
-		-id     => $Input->basename,
+		-id     => $Data->basename,
 		-desc   => "Concatenated sequences",
 		-seq    => $concat_seq,
 	);
@@ -292,12 +300,12 @@ sub fetch_seq_and_write_multi_fasta {
 	# Open fasta database
 	my $db;
 	if ($database) {
-		$db = $Input->open_new_database($database);
+		$db = $Data->open_new_database($database);
 		unless ($db) {
 			die " Could not open database '$database' to use!\n";
 		}
 	}
-	elsif ($Input->database) {
+	elsif ($Data->database) {
 		# cool, database defined in metadata, we'll use that
 		# hope it works....
 	}
@@ -309,7 +317,7 @@ sub fetch_seq_and_write_multi_fasta {
 	my $seq_io = open_output_fasta();
 	
 	# collect sequences and write
-	while (my $row = $Input->next_row) {
+	while (my $row = $Data->next_row) {
 		
 		# make sure we parse and/or fetch the seqfeature if need be
 		# this isn't necessarily automatic....
@@ -317,6 +325,7 @@ sub fetch_seq_and_write_multi_fasta {
 		
 		# collect provided arguments for generating sequence
 		my @args;
+		push @args, ('subfeature', $subfeature) if $subfeature;
 		push @args, ('db', $db) if $db;
 		push @args, ('start', $row->value($start_i)) if defined $start_i;
 		push @args, ('stop', $row->value($stop_i)) if defined $stop_i;
@@ -351,7 +360,7 @@ sub open_output_fasta {
 	
 	# get filename
 	unless ($outfile) {
-		$outfile = $Input->path . $Input->basename . '.fa';
+		$outfile = $Data->path . $Data->basename . '.fa';
 	}
 	unless ($outfile =~ /\.fa(?:sta)?(?:\.gz)?/i) {
 		$outfile .= '.fasta';
@@ -392,6 +401,11 @@ data2fasta.pl [--options...] <filename>
   Database:
   -d --db <name|fasta>              annotation database with sequence or fasta
   
+  Feature selection:
+  -f --feature <text>               feature when parsing gff3, gtf, or ucsc input
+  -u --subfeature [exon|cds|        collect over subfeatures 
+        5p_utr|3p_utr] 
+  
   Column indices:
   -n --name --id <index>            name or ID column
   -s --seq <index>                  column with sequence
@@ -419,10 +433,15 @@ The command line flags and descriptions:
 
 =item --in <filename>
 
-Specify the input data file. The file should be a tab-delimited text file 
-with columns representing the sequence id or name, sequence, description, 
-chromosome, start, stop, and/or strand information. The file may be 
-compressed with gzip.
+Specify the input data file. The file may be a tab-delimited text file 
+with coordinate columns for fetching genomic sequence. Alternatively it 
+may be an annotation file such as GFF3, GTF, refFlat, genePred, etc, 
+in which case sequence may be selected from certain features and 
+subfeatures, for example mRNA and CDS. B<Note> that no collapsing of 
+redundant or overlapping subfeatures is performed; see L<get_features.pl>. 
+Finally, text files with sequence in a column, for example oligo sequences, 
+may be used, skipping the need for database sequence retrieval.
+The file may be compressed with gzip.
 
 =item --db <name|fasta>
 
@@ -438,7 +457,18 @@ annotation database that contains genomic sequence may also be provided.
 The database name may be obtained from the input file metadata. 
 Required only if collecting sequence from genomic coordinates.
 
-=item --id <index>
+=item --feature <text>
+
+When parsing a gene annotation file such as a GFF3, GTF, or UCSC format 
+file, provide a feature type to select features if desired.
+
+=item --subfeature [exon|cds|5p_utr|3p_utr]
+
+When collecting from subfeatures, indicate the subfeature type from 
+list available. No merging of overlapping or redundant subfeatures 
+is performed here. See L<get_features.pl>.
+
+=item --name --id <index>
 
 Optionally specify the index for the name or ID column. It may be 
 automatically determined from the column header.
