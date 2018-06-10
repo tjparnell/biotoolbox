@@ -12,6 +12,7 @@ use Module::Build;
 my $options = get_base_options();
 
 # Check for additional Modules to install
+check_bio();
 check_useq();
 check_sam();
 check_big();
@@ -56,7 +57,6 @@ sub get_base_options {
 		recommends        => {
 			'DBD::SQLite'             => 0,
 			'Net::FTP'                => 0,
-			'Bio::Root::Version'      => '1.0069023',
 			'Parallel::ForkManager'   => 1.02,
 			'Set::IntervalTree'       => 0.10,
 		},
@@ -84,6 +84,18 @@ sub get_base_options {
 		],
 	);
 	return \%options;
+}
+
+
+sub check_bio {
+	my $bio_ok;
+	eval {require Bio::Root::Version; $bio_ok = 1;};
+	if ($bio_ok) {
+		$options->{'requires'}{'Bio::Root::Version'} = 1.0069023;
+	}
+	else {
+		$options->{'recommends'}{'Bio::Perl'} = 1.0069023;
+	}
 }
 
 
