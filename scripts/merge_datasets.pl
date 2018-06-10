@@ -3,10 +3,10 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
-my $VERSION = '1.53';
+my $VERSION = '1.60';
 
 print "\n A progam to merge datasets from two files\n";
 
@@ -37,16 +37,16 @@ my @order_requests;
 
 # Command line options
 GetOptions( 
-	'lookup!'   => \$lookup, # force merging by value lookup
-	'auto!'     => \$automatic, # select columns automatically
-	'manual!'   => \$manual, # always run interactively
-	'lookupname|lun=s' => \$user_lookup_name, # alternate lookup column name
-	'coordinate!' => \$use_coordinate, # use coordinates for lookup
-	'index=s'   => \@order_requests, # determine order in advance
-	'out=s'     => \$outfile, # name of output file 
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'l|lookup!'   => \$lookup, # force merging by value lookup
+	'a|auto!'     => \$automatic, # select columns automatically
+	'm|manual!'   => \$manual, # always run interactively
+	'n|lookupname|lun=s' => \$user_lookup_name, # alternate lookup column name
+	'c|coordinate!' => \$use_coordinate, # use coordinates for lookup
+	'x|index=s'   => \@order_requests, # determine order in advance
+	'o|out=s'     => \$outfile, # name of output file 
+	'z|gz!'       => \$gz, # compress output
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -1155,23 +1155,25 @@ __END__
 
 merge_datasets.pl
 
-A program to merge two or more data files by appending columns.
+A program to merge columns of two or more data files.
 
 =head1 SYNOPSIS
 
 merge_datasets.pl [--options...] <file1> <file2> ...
   
-  Options:
-  --lookup
-  --auto
-  --manual
-  --index <number,letter,range>
-  --lookupname | --lun <text>
-  --coordinate
-  --out <filename> 
-  --gz
-  --version
-  --help
+  Merge options:
+  -l --lookup                      lookup rows by specific value
+  -a --auto                        automatically select unique columns
+  -m --manual                      manually select lookup and each data column
+  -x --index <number,letter,range> specify columns: 1st file numbers, 2nd letters 
+  -n --lookupname <text>           name of lookup column
+  -c --coordinate                  use coordinate string as lookup
+  
+  General options:
+  -o --out <filename>              default first file
+  -z --gz                          compress output
+  -v --version                     print version and exit
+  -h --help                        show full documentation
 
 =head1 OPTIONS
 

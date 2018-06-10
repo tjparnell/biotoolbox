@@ -4,10 +4,10 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.41';
+my $VERSION =  '1.60';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -38,14 +38,14 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'        => \$infile, # specify the input data file
-	'index|col=i' => \$index, # index for the column to use for splitting
-	'tag=s'       => \$tag, # attribute tag name
-	'max=i'       => \$max, # maximum number of lines per file
-	'prefix=s'    => \$prefix, # output file prefix
-	'gz!'         => \$gz, # compress output files
-	'help'        => \$help, # request help
-	'version'     => \$print_version, # print the version
+	'i|in=s'        => \$infile, # specify the input data file
+	'x|index|col=i' => \$index, # index for the column to use for splitting
+	't|tag=s'       => \$tag, # attribute tag name
+	'm|max=i'       => \$max, # maximum number of lines per file
+	'p|prefix=s'    => \$prefix, # output file prefix
+	'z|gz!'         => \$gz, # compress output files
+	'h|help'        => \$help, # request help
+	'v|version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -246,15 +246,19 @@ A script to split a data file by rows based on common data values.
 
 split_data_file.pl [--options] <filename>
   
-  Options:
-  --in <filename>               (txt bed gff gtf vcf refFlat ucsc etc)
-  --index <column_index>
-  --tag <text>
-  --max <integer>
-  --prefix <text>
-  --gz
-  --version
-  --help                        show extended documentation
+  File options:
+  -i --in <filename>                (txt bed gff gtf vcf refFlat ucsc etc)
+  -p --prefix <text>                output file prefix (input basename)
+  
+  Splitting options:
+  -x --index <column_index>         column with values to split upon
+  -t --tag <text>                   use VCF/GFF attribute
+  -m --max <integer>                maximum number of items per output file
+  
+  General options:
+  -z --gz                           compress output file
+  -v --version                      print version and exit
+  -h --help                         show extended documentation
 
 =head1 OPTIONS
 

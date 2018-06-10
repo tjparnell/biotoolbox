@@ -4,12 +4,14 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	calculate_score
+	$BAM_ADAPTER
+	$BIG_ADAPTER
 );
 use Bio::ToolBox::utility;
 my $parallel;
@@ -18,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.54';
+my $VERSION = '1.60';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -63,29 +65,31 @@ my (
 
 ## Command line options
 GetOptions( 
-	'in=s'        => \$infile, # input file
-	'out=s'       => \$outfile, # name of outfile
-	'db=s'        => \$main_database, # main or annotation database name
-	'ddb=s'       => \$data_database, # data database
-	'data=s'      => \$dataset, # dataset name
-	'feature=s'   => \$feature, # what type of feature to work with
-	'subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
-	'exons!'      => \$exon_subfeature, # old parameter
-	'method=s'    => \$method, # method for collecting the data
-	'strand=s'    => \$stranded, # indicate whether stranded data should be taken
-	'bins=i'      => \$bins, # number of bins
-	'ext=i'       => \$extension, # number of bins to extend beyond the feature
-	'extsize=i'   => \$extension_size, # explicit size of extended bins
-	'min=i'       => \$min_length, # minimum feature size
-	'long!'       => \$long_data, # collecting long data features
-	'smooth!'     => \$smooth, # do not interpolate over missing values
-	'sum'         => \$sum, # determine a final average for all the features
+	'i|in=s'         => \$infile, # input file
+	'o|out=s'        => \$outfile, # name of outfile
+	'd|db=s'         => \$main_database, # main or annotation database name
+	'D|ddb=s'        => \$data_database, # data database
+	'a|data=s'       => \$dataset, # dataset name
+	'f|feature=s'    => \$feature, # what type of feature to work with
+	'u|subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
+	'exons!'         => \$exon_subfeature, # old parameter
+	'm|method=s'     => \$method, # method for collecting the data
+	't|strand=s'     => \$stranded, # indicate whether stranded data should be taken
+	'b|bins=i'       => \$bins, # number of bins
+	'x|ext=i'        => \$extension, # number of bins to extend beyond the feature
+	'X|extsize=i'    => \$extension_size, # explicit size of extended bins
+	'min=i'          => \$min_length, # minimum feature size
+	'long!'          => \$long_data, # collecting long data features
+	'smooth!'        => \$smooth, # do not interpolate over missing values
+	'U|sum'            => \$sum, # determine a final average for all the features
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'gz!'         => \$gz, # compress the output file
-	'cpu=i'       => \$cpu, # number of execution threads
-	'help'        => \$help, # print the help
-	'version'     => \$print_version, # print the version
+	'z|gz!'          => \$gz, # compress the output file
+	'c|cpu=i'        => \$cpu, # number of execution threads
+	'h|help'         => \$help, # print the help
+	'v|version'      => \$print_version, # print the version
+	'bam=s'          => \$BAM_ADAPTER, # explicitly set the bam adapter
+	'big=s'          => \$BIG_ADAPTER, # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
@@ -843,38 +847,40 @@ A program to collect data in bins across a list of features.
  get_binned_data.pl [--options] <filename>
   
   Options for existing files:
-  --in <filename>                  (txt bed gff gtf refFlat ucsc)
+  -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
   
   Options for new files:
-  --db <name | filename>
-  --feature <type | type:source | alias>, ...
+  -d --db <name>                      annotation database: mysql sqlite
+  -f --feature <type>                 one or more feature types from db or gff
   
   Options for data collection:
-  --ddb <name | filename>
-  --data <dataset_name | filename>
-  --method [mean|median|stddev|min|max|range|sum|          (mean)
-            count|pcount|ncount]
-  --strand [all|sense|antisense]                            (all)
-  --force_strand
-  --subfeature [exon|cds|5p_utr|3p_utr]
-  --long
+  -D --ddb <name|file>                data or BigWigSet database
+  -a --data <dataset|filename>        data from which to collect: bw bam etc
+  -m --method [mean|median|stddev|    statistical method for collecting data
+        min|max|range|sum|count|      default mean
+        pcount|ncount]
+  -t --strand [all|sense|antisense]   strand of data relative to feature (all)
+  -u --subfeature [exon|cds|          collect over gene subfeatures 
+        5p_utr|3p_utr] 
+  --force_strand                      use the specified strand in input file
+  --long                              assume long features to collect
   
   Bin specification:
-  --bins <integer>                                          (10)
-  --ext <integer>                                           (0)
-  --extsize <integer>
-  --min <integer>
+  -b --bins <integer>                 number of bins feature is divided (10)
+  -x --ext <integer>                  number of extended bind outside feature
+  -X --extsize <integer>              size of extended bins
+  --min <integer>                     minimum size of feature to divide
   
   Post-processing:
-  --sum
-  --smooth
+  -U --sum                            generate summary file
+  --smooth                            smoothen sparse data
   
   General options:
-  --out <filename>
-  --gz
-  --cpu <integer>                                           (2)
-  --version
-  --help                              show extended documentation
+  -o --out <filename>                 optional output file, default overwrite 
+  -z --gz                             compress output file
+  -c --cpu <integer>                  number of threads, default 4
+  -v --version                        print version and exit
+  -h --help                           show extended documentation
 
 =head1 OPTIONS
 

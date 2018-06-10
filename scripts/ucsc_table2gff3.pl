@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Net::FTP;
 use Bio::ToolBox::utility qw(
@@ -13,7 +13,7 @@ use Bio::ToolBox::utility qw(
 );
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::GeneTools qw(gtf_string);
-my $VERSION = '1.54';
+my $VERSION = '1.60';
 
 print "\n A script to convert UCSC tables to GFF3 files\n\n";
 
@@ -58,28 +58,28 @@ my (
 );
 my @genetables;
 GetOptions( 
-	'ftp=s'      => \$ftp_file, # which database table to retrieve
-	'db=s'       => \$database, # which ucsc genome to use
-	'host=s'     => \$host, # the ftp server to connect to
-	'chr!'       => \$do_chromo, # include the chromosome file from ftp
-	'table=s'    => \@genetables, # the input gene table files
-	'status=s'   => \$refseqstatusf, # the refseqstatus file
-	'sum=s'      => \$refseqsumf, # the refseqsummary file
-	'kgxref=s'   => \$kgxreff, # the kgXref info file
-	'ensname=s'  => \$ensemblnamef, # the ensemblToGeneName file
-	'enssrc=s'   => \$ensemblsourcef, # the ensemblSource file
-	'chromo=s'   => \$chromof, # a chromosome file
-	'source=s'   => \$user_source, # user provided source
-	'gene!'      => \$do_gene, # include genes in output
-	'cds!'       => \$do_cds, # include CDS in output
-	'utr!'       => \$do_utr, # include UTRs in output
-	'codon!'     => \$do_codon, # include start & stop codons in output
-	'share!'     => \$share, # share common exons and UTRs
-	'name!'      => \$do_name, # assign names to CDSs, UTRs, and exons
-	'gtf!'       => \$do_gtf, # write a gtf file instead
-	'gz!'        => \$gz, # compress file
-	'help'       => \$help, # request help
-	'version'    => \$print_version, # print the version
+	'f|ftp=s'      => \$ftp_file, # which database table to retrieve
+	'd|db=s'       => \$database, # which ucsc genome to use
+	'h|host=s'     => \$host, # the ftp server to connect to
+	'chr!'         => \$do_chromo, # include the chromosome file from ftp
+	't|table=s'    => \@genetables, # the input gene table files
+	'a|status=s'   => \$refseqstatusf, # the refseqstatus file
+	's|sum=s'      => \$refseqsumf, # the refseqsummary file
+	'k|kgxref=s'   => \$kgxreff, # the kgXref info file
+	'n|ensname=s'  => \$ensemblnamef, # the ensemblToGeneName file
+	'r|enssrc=s'   => \$ensemblsourcef, # the ensemblSource file
+	'c|chromo=s'   => \$chromof, # a chromosome file
+	'source=s'     => \$user_source, # user provided source
+	'gene!'        => \$do_gene, # include genes in output
+	'cds!'         => \$do_cds, # include CDS in output
+	'utr!'         => \$do_utr, # include UTRs in output
+	'codon!'       => \$do_codon, # include start & stop codons in output
+	'share!'       => \$share, # share common exons and UTRs
+	'name!'        => \$do_name, # assign names to CDSs, UTRs, and exons
+	'g|gtf!'       => \$do_gtf, # write a gtf file instead
+	'z|gz!'        => \$gz, # compress file
+	'h|help'       => \$help, # request help
+	'v|version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -581,7 +581,7 @@ __END__
 
 ucsc_table2gff3.pl
 
-A script to convert UCSC gene tables to GFF3 annotation.
+A program to convert UCSC gene tables to GFF3 or GTF annotation.
 
 =head1 SYNOPSIS
 
@@ -589,29 +589,36 @@ A script to convert UCSC gene tables to GFF3 annotation.
    
    ucsc_table2gff3.pl [--options] --table <filename>
   
-  Options:
-  --ftp [refgene|ensgene|xenorefgene|known|all]
-  --db <text>               e.g. hg19,hg38,danRer7
-  --host <text>
-  --table <filename>
-  --status <filename>
-  --sum <filename>
-  --ensname <filename>
-  --enssrc <filename>
-  --kgxref <filename>
-  --chromo <filename>
-  --source <text>
-  --chr   | --nochr         (true)
-  --gene  | --nogene        (true)
-  --cds   | --nocds         (true)
-  --utr   | --noutr         (false)
-  --codon | --nocodon       (false)
-  --share | --noshare       (true)
-  --name  | --noname        (false)
-  --gtf
-  --gz
-  --version
-  --help
+  UCSC database options:
+  -f --ftp [refgene|ensgene|            specify what tables to retrieve from UCSC
+            xenorefgene|known|all]
+  -d --db <text>                        UCSC database name: hg19,hg38,danRer7, etc
+  -h --host <text>                      specify UCSC hostname
+  
+  Input file options:
+  -t --table <filename>                 name of table, repeat or comma list
+  -a --status <filename>                refSeqStatus file
+  -s --sum <filename>                   refSeqSummary file
+  -n --ensname <filename>               ensemblToGeneName file
+  -r --enssrc <filename>                ensemblSource file
+  -k --kgxref <filename>                kgXref file
+  -c --chromo <filename>                chromosome file
+  
+  Conversion options:
+  --source <text>                       source text, default UCSC
+  --chr   | --nochr         (true)      include chromosomes in output
+  --gene  | --nogene        (true)      assemble into genes
+  --cds   | --nocds         (true)      include CDS subfeatures
+  --utr   | --noutr         (false)     include UTR subfeatures
+  --codon | --nocodon       (false)     include start and stop codons
+  --share | --noshare       (true)      share subfeatures
+  --name  | --noname        (false)     include name
+  -g --gtf                              convert to GTF instead of GFF3
+  
+  General options:
+  -z --gz                               compress output
+  -v --version                          print version and exit
+  -h --help                             show extended documentation
 
 =head1 OPTIONS
 
@@ -794,10 +801,8 @@ If provided, chromosome and/or scaffold features will be written as GFF3-style
 sequence-region pragmas (even for GTF files, just in case).
 
 If you need to set up a database using UCSC annotation, you should first 
-take a look at the BioToolBox script B<db_setup.pl>, which provides a 
-convenient automated database setup based on UCSC annotation. You can also 
-find more information about loading a database in a How To document at 
-L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+take a look at the BioToolBox script L<db_setup.pl>, which provides a 
+convenient automated database setup based on UCSC annotation.  
 
 =head1 AUTHOR
 

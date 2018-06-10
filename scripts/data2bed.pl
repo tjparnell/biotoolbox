@@ -3,12 +3,12 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.54';
+my $VERSION =  '1.60';
 
 print "\n This program will write a BED file\n";
 
@@ -48,24 +48,24 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # the solexa data file
-	'out=s'     => \$outfile, # name of output file 
-	'noheader'  => \$no_header, # source has no header line
-	'ask'       => \$ask, # request help in assigning indices
-	'chr=i'     => \$chr_index, # index of the chromosome column
-	'start=i'   => \$start_index, # index of the start position column
-	'stop|end=i'=> \$stop_index, # index of the stop position coloumn
-	'name=s'    => \$name, # index for the name column
-	'score=i'   => \$score_index, # index for the score column
-	'strand=i'  => \$strand_index, # index for the strand column
-	'zero!'     => \$zero_based, # source is 0-based numbering, convert
-	'bigbed|bb' => \$bigbed, # generate a binary bigbed file
-	'db=s'      => \$database, # database for bigbed file generation
-	'chromof=s' => \$chromo_file, # name of a chromosome file
-	'bbapp=s'   => \$bb_app_path, # path to bedToBigBed utility
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'           => \$infile, # the solexa data file
+	'o|out=s'          => \$outfile, # name of output file 
+	'H|noheader'       => \$no_header, # source has no header line
+	'a|ask'            => \$ask, # request help in assigning indices
+	'c|chr=i'          => \$chr_index, # index of the chromosome column
+	'b|begin|start=i'  => \$start_index, # index of the start position column
+	'e|stop|end=i'     => \$stop_index, # index of the stop position coloumn
+	'n|name=s'         => \$name, # index for the name column
+	's|score=i'        => \$score_index, # index for the score column
+	't|strand=i'       => \$strand_index, # index for the strand column
+	'0|zero!'          => \$zero_based, # source is 0-based numbering, convert
+	'B|bigbed|bb'      => \$bigbed, # generate a binary bigbed file
+	'd|db=s'           => \$database, # database for bigbed file generation
+	'chromof=s'        => \$chromo_file, # name of a chromosome file
+	'bbapp=s'          => \$bb_app_path, # path to bedToBigBed utility
+	'z|gz!'            => \$gz, # compress output
+	'h|help'           => \$help, # request help
+	'v|version'        => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -340,25 +340,31 @@ A script to convert a data file to a bed file.
 
 data2bed.pl [--options...] <filename>
   
-  Options:
-  --in <filename>
-  --noheader
-  --ask
-  --chr <column_index>
-  --start <column_index>
-  --stop | --end <column_index>
-  --name <column_index | base_text>
-  --score <column_index>
-  --strand <column_index>
-  --zero
-  --out <filename> 
-  --bigbed | --bb
-  --chromof <filename>
-  --db <database>
-  --bbapp </path/to/bedToBigBed>
-  --gz
-  --version
-  --help
+  File Options:
+  -i --in <filename>                    input file: txt, gff, vcf, etc
+  -o --out <filename>                   output file name
+  -H --noheader                         input file has no header row
+  -0 --zero                             file is in 0-based coordinate system
+  
+  Column indices:
+  -a --ask                              interactive selection of columns
+  -c --chr <index>                      chromosome column
+  -b --begin --start <index>            start coordinate column
+  -e --end --stop <index>               stop coordinate column
+  -n --name <text | index>              name column or base name text
+  -s --score <index>                    score column
+  -t --strand <index>                   strand column
+  
+  BigBed options:
+  -B --bb --bigbed                      generate a bigBed file
+  -d --db <database>                    database to collect chromosome lengths
+  --chromof <filename>                  specify a chromosome file
+  --bwapp </path/to/bedToBigBed>        specify path to bedToBigBed
+  
+  General Options:
+  -z --gz                               compress output text files
+  -v --version                          print version and exit
+  -h --help                             show extended documentation
 
 =head1 OPTIONS
 
@@ -395,6 +401,8 @@ as the chromosome or sequence ID column in the BED data.
 
 =item --start <column_index>
 
+=item --begin <column_index>
+
 The index of the dataset in the data table to be used 
 as the start position column in the BED data.
 
@@ -423,8 +431,7 @@ Name attribute.
 
 The index of the dataset in the data table to be used
 for strand information. Accepted values might include
-any of the following "f(orward), r(everse), w(atson),
-c(rick), +, -, 1, -1, 0, .".
+any of the following: +, -, 1, -1, 0, .
 
 =item --zero
 
@@ -462,7 +469,7 @@ may be supplied from the input file metadata.
 
 =item --bbapp </path/to/bedToBigBed>
 
-Specify the path to the Jim Kent's bedToBigBed conversion utility. The 
+Specify the path to the UCSC bedToBigBed conversion utility. The 
 default is to first check the BioToolBox  configuration 
 file C<biotoolbox.cfg> for the application path. Failing that, it will 
 search the default environment path for the utility. If found, it will 

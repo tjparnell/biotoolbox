@@ -4,7 +4,7 @@
 
 use strict;
 use warnings;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::Range;
 use Bio::ToolBox::Data;
@@ -14,7 +14,7 @@ use Bio::ToolBox::db_helper qw(
 	get_chromosome_list
 );
 use Bio::ToolBox::utility;
-my $VERSION = 1.54;
+my $VERSION = 1.60;
 
 
 print "\n A script to pull out overlapping features\n\n";
@@ -47,18 +47,18 @@ my (
 );
 my @search_features;
 GetOptions( 
-	'in=s'       => \$infile, # the input nucleosome data file
-	'db=s'       => \$database, # the name of the database
-	'feature=s'  => \@search_features, # the feature(s) to look for
-	'start=i'    => \$start, # the relative start position
-	'stop=i'     => \$stop, # the relative stop position
-	'pos=s'      => \$adjustment_position, # the coordinate to make start and stop adjustments
-	'extend=i'   => \$extend, # extend lookup-feature by this amount
-	'ref=s'      => \$reference_position, # relative position when calc distance
-	'out=s'      => \$outfile, # output file name
-	'gz!'        => \$gz, # compress file
-	'help'       => \$help, # request help
-	'version'    => \$print_version, # print the version
+	'i|in=s'          => \$infile, # the input nucleosome data file
+	'd|db=s'          => \$database, # the name of the database
+	'f|feature=s'     => \@search_features, # the feature(s) to look for
+	'b|begin|start=i' => \$start, # the relative start position
+	'e|end|stop=i'    => \$stop, # the relative stop position
+	'p|pos=s'         => \$adjustment_position, # the coordinate to make start and stop adjustments
+	'x|extend=i'      => \$extend, # extend lookup-feature by this amount
+	'r|ref=s'         => \$reference_position, # relative position when calc distance
+	'o|out=s'         => \$outfile, # output file name
+	'z|gz!'           => \$gz, # compress file
+	'h|help'          => \$help, # request help
+	'v|version'       => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -656,25 +656,31 @@ __END__
 
 get_intersecting_features.pl
 
-A script to pull out overlapping features from the database.
+A program to pull out overlapping features from the database.
 
 =head1 SYNOPSIS
 
 get_intersecting_features.pl [--options] <filename>
   
-  Options:
-  --in <filename>
-  --db <database>
-  --feature <text>
-  --start <integer>
-  --stop <integer>
-  --pos [5 | m | 3]
-  --extend <integer>
-  --ref [start | mid]
-  --out <filename>
-  --gz
-  --version
-  --help
+  File options:
+  -i --in <filename>
+  -o --out <filename>
+  
+  Database options:
+  -d --db <database>
+  -f --feature <text>
+  
+  Modify search range:
+  -b --begin --start <integer>
+  -e --end --stop <integer>
+  -p --pos [5 | m | 3]
+  -x --extend <integer>
+  -r --ref [start | mid]
+  
+  General options:
+  -z --gz
+  -v --version
+  -h --help
 
 =head1 OPTIONS
 
@@ -694,13 +700,12 @@ gzipped compressed.
 
 =item --db <database>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. A database is 
 required for generating new data files with features. This option may 
 skipped when using coordinate information from an input file (e.g. BED 
 file), or when using an existing input file with the database indicated 
-in the metadata. For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+in the metadata.  
 
 =item --feature <text>
 
@@ -780,7 +785,7 @@ of the features, or optionally the midpoints. Note that the distance
 measurement is relative to the coordinates after adjustment with the --start, 
 --stop, and --extend options.
 
-A standard tim data text file is written.
+A standard BioToolBox data text file is written.
 
 =head1 AUTHOR
 

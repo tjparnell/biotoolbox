@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use File::Spec;
 use FindBin qw($Bin);
@@ -21,7 +21,7 @@ eval {
 
 
 
-my $VERSION = '1.19';
+my $VERSION = '1.60';
 
 print "\n This program will set up an annotation database\n\n";
 
@@ -50,13 +50,13 @@ my @tables;
 
 # Command line options
 GetOptions( 
-	'db=s'      => \$ucscdb, # the UCSC database shortname
-	'path=s'    => \$path, # the optional path for the database
-	'table=s'   => \@tables, # which tables to collect
-	'keep!'     => \$keep, # keep the annotation files
-	'verbose!'  => \$verbose, # show db loading
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'd|db=s'      => \$ucscdb, # the UCSC database shortname
+	'p|path=s'    => \$path, # the optional path for the database
+	't|table=s'   => \@tables, # which tables to collect
+	'k|keep!'     => \$keep, # keep the annotation files
+	'V|verbose!'  => \$verbose, # show db loading
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -216,18 +216,20 @@ __END__
 
 db_setup.pl
 
+A program to setup a SeqFeature::Store SQLite database from UCSC data
+
 =head1 SYNOPSIS
 
 db_setup.pl [--options...] <UCSC database>
   
   Options:
-  --db <UCSC database>
-  --path </path/to/store/database> 
-  --table [refGene|ensGene|knownGene|xenoRefGene|all]
-  --keep
-  --verbose
-  --version
-  --help
+  -d --db <UCSC database>
+  -p --path </path/to/store/database> 
+  -t --table [refGene|ensGene|knownGene|xenoRefGene|all]
+  -k --keep
+  -V --verbose
+  -v --version
+  -h --help
 
 
 =head1 OPTIONS

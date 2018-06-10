@@ -3,11 +3,11 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.53';
+my $VERSION =  '1.60';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -41,20 +41,20 @@ my (
 	$print_version,
 );
 GetOptions( 
-	'data=s'     => \$datafile, # the input data file
-	'list=s'     => \$listfile, # the list file
-	'out=s'      => \$outfile, # the new output file name
-	'dindex=i'   => \$data_index, # index to look up in the data file
-	'lindex=i'   => \$list_index, # index of look up values in list file
-	'gindex=i'   => \$group_index, # index of group in list file
-	'order=s'    => \$order, # the order to keep the values
-	'sum!'       => \$sum, # flag to re-sum the pulled values
-	'sumonly!'   => \$sum_only, # only save the summary file
-	'starti=i'   => \$startcolumn, # index of column to start summarizing
-	'stopi=i'    => \$stopcolumn, # index of column to stop summarizing
-	'log!'       => \$log, # values are in log, respect log status
-	'help'       => \$help, # flag to print help
-	'version'    => \$print_version, # print the version
+	'd|data=s'     => \$datafile, # the input data file
+	'l|list=s'     => \$listfile, # the list file
+	'o|out=s'      => \$outfile, # the new output file name
+	'x|dindex=i'   => \$data_index, # index to look up in the data file
+	'X|lindex=i'   => \$list_index, # index of look up values in list file
+	'g|gindex=i'   => \$group_index, # index of group in list file
+	'r|order=s'    => \$order, # the order to keep the values
+	'U|sum!'       => \$sum, # flag to re-sum the pulled values
+	'sumonly!'     => \$sum_only, # only save the summary file
+	'starti=i'     => \$startcolumn, # index of column to start summarizing
+	'stopi=i'      => \$stopcolumn, # index of column to stop summarizing
+	'log!'         => \$log, # values are in log, respect log status
+	'h|help'       => \$help, # flag to print help
+	'v|version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 if ($help) {
@@ -510,21 +510,27 @@ A script to pull out a specific list of data rows from a data file.
 
 pull_features.pl --data <filename> --list <filename> --out <filename>
   
-  Options:
-  --data <filename>
-  --list <filename>
-  --out <filename>
-  --dindex <integer>
-  --lindex <integer>
-  --gindex <index>
-  --order [list | data]
-  --sum
-  --sumonly
-  --starti <integer>
-  --stopi <integer>
+  File options:
+  -d --data <filename>          Source of all data rows or features
+  -l --list <filename>          List of specific row or feature names
+  -o --out <filename>           Output file, or basename for group files
+  
+  Column index options:
+  -x --dindex <index>           Data column index of row name to lookup
+  -X --lindex <index>           List column index of row name to lookup
+  -g --gindex <index>           Group column index for lookup
+  
+  Output options:
+  -r --order [list | data]      Order of items in output based on
+  -U --sum                      Generate a summary file
+  --sumonly                     Skip output, just make a summary file
+  --start <integer>             First data column to make a summary file
+  --stopi <integer>             Last data column to make a summary file
   --log
-  --version
-  --help
+  
+  General options:
+  -v --version                  print version and exit
+  -h --help                     show full documentation
 
 =head1 OPTIONS
 

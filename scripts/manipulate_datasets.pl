@@ -4,11 +4,11 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.53';
+my $VERSION = '1.60';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -47,23 +47,23 @@ my ( # command line option variables
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # name of input file
-	'out=s'     => \$outfile, # name of new output file 
-	'func=s'    => \$function, # name of the function to  perform
-	'index=s'   => \$opt_index, # index number(s) of the dataset to work on
-	'exp|num=i' => \$opt_numerator, # index number of numerator dataset
-	'con|den=i' => \$opt_denominator, # index number of denominator dataset
-	'target=s'  => \$opt_target, # target
-	'place=s'   => \$opt_placement, # placement of transformed dataset
-	'except=s'  => \$opt_exception, # old argument exception to deal with 0 values
-	'zero!'     => \$opt_zero, # include 0 values
-	'dir=s'     => \$opt_direction, # sort order
-	'name=s'    => \$opt_name, # new dataset name
-	'log!'      => \$opt_log, # data values are in log2 space
-	'noheader'  => \$noheader, # file has no headers
-	'gz!'       => \$gz, # write gzipped data file
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'      => \$infile, # name of input file
+	'o|out=s'     => \$outfile, # name of new output file 
+	'f|func=s'    => \$function, # name of the function to  perform
+	'x|index=s'   => \$opt_index, # index number(s) of the dataset to work on
+	'n|exp|num=i' => \$opt_numerator, # index number of numerator dataset
+	'd|con|den=i' => \$opt_denominator, # index number of denominator dataset
+	't|target=s'  => \$opt_target, # target
+	'place=s'     => \$opt_placement, # placement of transformed dataset
+	'except=s'    => \$opt_exception, # old argument exception to deal with 0 values
+	'zero!'       => \$opt_zero, # include 0 values
+	'dir=s'       => \$opt_direction, # sort order
+	'name=s'      => \$opt_name, # new dataset name
+	'log!'        => \$opt_log, # data values are in log2 space
+	'H|noheader'  => \$noheader, # file has no headers
+	'z|gz!'       => \$gz, # write gzipped data file
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Get file name
@@ -3203,29 +3203,34 @@ A progam to manipulate tab-delimited data files.
 
 manipulate_datasets.pl [--options ...] <input_filename> 
 
-  Options:
-  --in <input_filename>
-  --func [ reorder | delete | rename | new | number | concatenate | split | 
+  File:
+  -i --in <input_filename>
+  -o --out <filename>
+  -H --noheader
+  
+  Functions:
+  -f --func [ reorder | delete | rename | new | number | concatenate | split | 
            sort | gsort | null | duplicate | above | below | specific | keep
            coordinate | cnull | absolute | minimum | maximum | log | delog | 
            format | pr | add | subtract | multiply | divide | combine | scale | 
            zscore | ratio | diff | normdiff | center | rewrite | export | 
            treeview | summary | stat ]
-  --index <integers>
-  --exp | --num <integer>
-  --con | --den <integer>
-  --target <text> or <number>
+  -x --index <integers>
+  
+  Options:
+  -n --exp --num <integer>
+  -d --con --den <integer>
+  -t --target <text> or <number>
   --place [r | n]
   --(no)zero
   --dir [i | d]
   --name <text>
-  --out <filename>
   --log
-  --gz
-  --noheader
-  --version
-  --help
-  --doc
+  
+  General Options:
+  -z --gz
+  -v --version
+  -h --help
 
 =head1 OPTIONS
 

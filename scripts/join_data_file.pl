@@ -3,11 +3,11 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.35';
+my $VERSION =  '1.60';
 
 print "\n This script will concatenate two or more data files\n\n";
 
@@ -34,10 +34,10 @@ my (
 
 # Command line options
 GetOptions( 
-	'out=s'     => \$outfile, # specify the input data file
-	'gz!'       => \$gz, # compress output files
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'o|out=s'     => \$outfile, # specify the input data file
+	'z|gz!'       => \$gz, # compress output files
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -196,17 +196,17 @@ __END__
 
 join_data_file.pl
 
-A script to join two or more data files and concatenate rows.
+A program to join two or more data files and concatenate rows.
 
 =head1 SYNOPSIS
 
 join_data_file.pl [--options] <file1> <file2> ...
   
   Options:
-  --out <filename>
-  --gz
-  --version
-  --help
+  -o --out <filename>
+  -z --gz
+  -v --version
+  -h --help
 
 =head1 OPTIONS
 

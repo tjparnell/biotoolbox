@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 my $bio;
@@ -13,7 +13,7 @@ eval {
 	$bio = 1;
 };
 
-my $VERSION =  '1.50';
+my $VERSION =  '1.60';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -51,22 +51,22 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # the solexa data file
-	'out=s'     => \$outfile, # name of output file 
-	'db|fasta=s'=> \$database, # database name or genomic fasta file
-	'id=i'      => \$id_i, # id index
-	'desc=i'    => \$desc_i, # description index
-	'seq=i'     => \$seq_i, # sequence index
-	'chr=i'     => \$chr_i, # chromosome index
-	'start=i'   => \$start_i, # start index
-	'stop|end=i' => \$stop_i, # stop index
-	'strand=i'  => \$strand_i, # strand index
-	'extend=i'  => \$extend, # extend sequence by given bp
-	'cat!'      => \$concatenate, # concatenate sequences into one
-	'pad=i'     => \$pad, # pad concatenate sequences with given N bp
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'          => \$infile, # the solexa data file
+	'O|out=s'         => \$outfile, # name of output file 
+	'd|db|fasta=s'    => \$database, # database name or genomic fasta file
+	'n|name|id=i'     => \$id_i, # id index
+	'desc=i'          => \$desc_i, # description index
+	's|seq=i'         => \$seq_i, # sequence index
+	'c|chr=i'         => \$chr_i, # chromosome index
+	'b|begin|start=i' => \$start_i, # start index
+	'e|stop|end=i'    => \$stop_i, # stop index
+	't|strand=i'      => \$strand_i, # strand index
+	'x|extend=i'      => \$extend, # extend sequence by given bp
+	'cat!'            => \$concatenate, # concatenate sequences into one
+	'pad=i'           => \$pad, # pad concatenate sequences with given N bp
+	'z|gz!'           => \$gz, # compress output
+	'h|help'          => \$help, # request help
+	'v|version'       => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -385,23 +385,31 @@ A script to retrieve sequences from a list of features
 
 data2fasta.pl [--options...] <filename>
   
-  Options:
-  --in <filename>
-  --db <name|fasta>
-  --id <index>
-  --seq <index>
-  --desc <index>
-  --chr <index>
-  --start <index>
-  --stop <index>
-  --strand <index>
-  --extend <integer>
-  --cat
-  --pad <integer>
-  --out <filename> 
-  --gz
-  --version
-  --help
+  File Options:
+  -i --in <filename>                input file: txt, gff, bed, ucsc, vcf, etc
+  -o --out <filename>               output file name
+  
+  Database:
+  -d --db <name|fasta>              annotation database with sequence or fasta
+  
+  Column indices:
+  -n --name --id <index>            name or ID column
+  -s --seq <index>                  column with sequence
+  -c --chr <index>                  chromosome column
+  -b --begin --start <index>        start coordinate column
+  -e --end --stop <index>           stop coordinate column
+  -t --strand <index>               strand column
+  -x --extend <integer>             extend coordinates in both directions
+  --desc <index>                    description column
+  
+  Fasta output options:
+  --cat                             concatenate all sequences into one
+  --pad <integer>                   pad concatenated sequences with Ns
+  
+  General options:
+  -z --gz                           compress output fasta file
+  -v --version                      print version and exit
+  -h --help                         show extended documentation
 
 =head1 OPTIONS
 
@@ -450,12 +458,12 @@ automatically determined from the column header.
 Optionally specify the index for the chromosome column. It may be 
 automatically determined from the column header.
 
-=item --start <index>
+=item --start --begin <index>
 
 Optionally specify the index for the start position column. It may be 
 automatically determined from the column header.
 
-=item --stop <index>
+=item --stop --end <index>
 
 Optionally specify the index for the stop position column. It may be 
 automatically determined from the column header.

@@ -3,11 +3,11 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.54';
+my $VERSION =  '1.60';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -51,25 +51,25 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # specify the input data file
-	'out=s'     => \$outfile, # name of output gff file 
-	'noheader'  => \$no_header, # source has no header line
-	'chr=i'     => \$chr_index, # index of the chromosome column
-	'start=i'   => \$start_index, # index of the start position column
-	'stop|end=i'=> \$stop_index, # index of the stop position coloumn
-	'score=i'   => \$score_index, # index for the score column
-	'strand=i'  => \$strand_index, # index for the strand column
-	'name=s'    => \$name, # index for the name column or the name text
-	'id=i'      => \$id_index, # index for the ID column
-	'source=s'  => \$source, # text to put in the source column
-	'type=s'    => \$type, # test to put in the type column
-	'tag|tags=s'=> \$tag, # comma list of tag column indices
-	'ask'       => \$ask, # request help in assigning indices
-	'unique!'   => \$unique, # make the names unique
-	'zero!'     => \$interbase, # input file is interbase format
-	'gz!'       => \$gz, # boolean to compress output file
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'      => \$infile, # specify the input data file
+	'o|out=s'     => \$outfile, # name of output gff file 
+	'H|noheader'  => \$no_header, # source has no header line
+	'c|chr=i'     => \$chr_index, # index of the chromosome column
+	'b|begin|start=i'   => \$start_index, # index of the start position column
+	'e|stop|end=i'=> \$stop_index, # index of the stop position coloumn
+	's|score=i'   => \$score_index, # index for the score column
+	't|strand=i'  => \$strand_index, # index for the strand column
+	'n|name=s'    => \$name, # index for the name column or the name text
+	'd|id=i'      => \$id_index, # index for the ID column
+	'r|source=s'  => \$source, # text to put in the source column
+	'y|type=s'    => \$type, # test to put in the type column
+	'g|tag|tags=s'=> \$tag, # comma list of tag column indices
+	'a|ask'       => \$ask, # request help in assigning indices
+	'unique!'     => \$unique, # make the names unique
+	'0|zero!'     => \$interbase, # input file is interbase format
+	'z|gz!'       => \$gz, # boolean to compress output file
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -402,31 +402,36 @@ __END__
 
 data2gff.pl
 
-A script to convert a generic data file to GFF format.
+A program to convert a generic data file to GFF format.
 
 =head1 SYNOPSIS
 
 data2gff.pl [--options...] <filename>
   
-  Options:
-  --in <filename>
-  --ask
-  --chr <column_index>
-  --start <column_index>
-  --stop | --end <column_index>
-  --score <column_index>
-  --strand <column_index>
-  --name <text | column_index>
-  --id <column_index>
-  --tags <column_index,column_index,...>
-  --source <text | column_index>
-  --type <text | column_index>
-  --unique
-  --zero
-  --out <filename> 
-  --gz
-  --version
-  --help
+  File options:
+  -i --in <filename>                    input file: txt
+  -o --out <filename>                   output file name
+  -H --noheader                         input file has no header row
+  -0 --zero                             file is in 0-based coordinate system
+  
+  Column indices:
+  -a --ask                              interactive selection of columns
+  -c --chr <index>                      chromosome column
+  -b --begin --start <index>            start coordinate column
+  -e --end --stop <index>               stop coordinate column
+  -s --score <index>                    score column
+  -t --strand <index>                   strand column
+  -n --name <text | index>              name column or base name text
+  -d --id <index>                       primary ID column
+  -g --tags <index,index,...>           zero or more columns for tag attributes
+  -r --source <text | index>            source column or text
+  -y --type <text | index>              type column or text
+  
+  General options:
+  --unique                              make IDs unique
+  -z --gz                               compress output text file
+  -v --version                          print version and exit
+  -h --help                             show extended documentation
 
 =head1 OPTIONS
 
@@ -461,10 +466,13 @@ as the chromosome or sequence ID column in the gff data.
 
 =item --start <column_index>
 
+=item --begin <column_index>
+
 The index of the dataset in the data table to be used 
 as the start position column in the gff data.
 
 =item --stop <column_index>
+
 =item --end <column_index>
 
 The index of the dataset in the data table to be used 

@@ -4,12 +4,14 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	calculate_score
+	$BAM_ADAPTER
+	$BIG_ADAPTER
 );
 use Bio::ToolBox::utility;
 my $parallel;
@@ -25,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.54';
+my $VERSION = '1.60';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -70,28 +72,30 @@ my (
 
 ## Command line options
 GetOptions( 
-	'out=s'      => \$outfile, # output file name
-	'in=s'       => \$infile, # input file name
-	'db=s'       => \$main_database, # main or annotation database name
-	'ddb=s'      => \$data_database, # data database
-	'data=s'     => \$dataset, # dataset name
-	'feature=s'  => \$feature, # type of feature
-	'method=s'   => \$method, # method to combine data
-	'window=i'   => \$win, # window size
-	'number=i'   => \$number, # number of windows
-	'position=s' => \$position, # indicate relative location of the feature
-	'strand=s'   => \$strand_sense, # collected stranded data
+	'o|out=s'      => \$outfile, # output file name
+	'i|in=s'       => \$infile, # input file name
+	'd|db=s'       => \$main_database, # main or annotation database name
+	'D|ddb=s'      => \$data_database, # data database
+	'a|data=s'     => \$dataset, # dataset name
+	'f|feature=s'  => \$feature, # type of feature
+	'm|method=s'   => \$method, # method to combine data
+	'w|window=i'   => \$win, # window size
+	'n|number=i'   => \$number, # number of windows
+	'p|position=s' => \$position, # indicate relative location of the feature
+	't|strand=s'   => \$strand_sense, # collected stranded data
 	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'avoid!'     => \$avoid, # avoid conflicting features
-	'avtype=s'   => \$avoidtype, # type of feature to avoid
-	'long!'      => \$long_data, # collecting long data features
-	'smooth!'    => \$smooth, # smooth by interpolation
-	'sum!'       => \$sum, # generate average profile
-	'gz!'        => \$gz, # compress the output file
-	'cpu=i'      => \$cpu, # number of execution threads
-	'help'       => \$help, # print help
-	'version'    => \$print_version, # print the version
+	'avoid!'       => \$avoid, # avoid conflicting features
+	'avtype=s'     => \$avoidtype, # type of feature to avoid
+	'long!'        => \$long_data, # collecting long data features
+	'smooth!'      => \$smooth, # smooth by interpolation
+	'U|sum!'         => \$sum, # generate average profile
+	'z|gz!'        => \$gz, # compress the output file
+	'c|cpu=i'      => \$cpu, # number of execution threads
+	'h|help'       => \$help, # print help
+	'v|version'    => \$print_version, # print the version
+	'bam=s'        => \$BAM_ADAPTER, # explicitly set the bam adapter
+	'big=s'        => \$BIG_ADAPTER, # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
@@ -739,45 +743,46 @@ __END__
 
 get_relative_data.pl
 
-A script to collect data in bins around a relative position.
+A program to collect data in bins around a relative position.
 
 =head1 SYNOPSIS
  
 get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   
   Options for existing files:
-  --in <filename>                  (txt bed gff gtf refFlat ucsc)
+  -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
   
-  Options for new files:
-  --db <name|file>
-  --feature <type | type:source | alias>, ...
+  Options for new files
+  -d --db <name>                      annotation database: mysql sqlite
+  -f --feature <type>                 one or more feature types from db or gff
   
   Options for data collection:
-  --ddb <name|file>
-  --data <dataset_name | filename>
-  --method [mean|median|stddev|min|max|range|sum|          (mean)
-            count|pcount|ncount]
-  --strand [all|sense|antisense]                            (all)
-  --force_strand
-  --avoid
-  --avtype [type,type,...]
-  --long
+  -D --ddb <name|file>                data or BigWigSet database
+  -a --data <dataset|filename>        data from which to collect: bw bam etc
+  -m --method [mean|median|stddev|    statistical method for collecting data
+            min|max|range|sum|count|   default mean
+            pcount|ncount]
+  -t --strand [all|sense|antisense]   strand of data relative to feature (all)
+  --force_strand                      use the specified strand in input file
+  --avoid                             avoid neighboring features
+  --avtype [type,type,...]            alternative types of feature to avoid
+  --long                              assume long features to collect
   
   Bin specification:
-  --win <integer>                                           (50)
-  --num <integer>                                           (20)
-  --pos [5|m|3]                                             (5)
+  -w --win <integer>                  size of windows, default 50 bp
+  -n --num <integer>                  number of windows flanking reference, 20
+  -p --pos [5|m|3]                    reference position, default 5'
   
   Post-processing:
-  --(no)sum                                                 (true)
-  --smooth
+  -U --sum                            generate summary file
+  --smooth                            smoothen sparse data
   
   General Options:
-  --out <filename>
-  --gz
-  --cpu <integer>                                           (2)
-  --version
-  --help                              show extended documentation
+  -o --out <filename>                 optional output file, default overwrite 
+  -z --gz                             compress output file
+  -c --cpu <integer>                  number of threads, default 4
+  -v --version                        print version and exit
+  -h --help                           show extended documentation
 
 =head1 OPTIONS
 
@@ -802,13 +807,12 @@ input files will be overwritten unless specified.
 
 =item --db <name | filename>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. A database is 
 required for generating new data files with features. This option may 
 skipped when using coordinate information from an input file (e.g. BED 
 file), or when using an existing input file with the database indicated 
-in the metadata. For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+in the metadata.  
 
 =item --feature [type, type:source]
 
@@ -821,7 +825,7 @@ This is only required when an input file is not specified.
 
 If the data to be collected is from a second database that is separate 
 from the annotation database, provide the name of the data database here. 
-Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
+Typically, a second L<Bio::DB::SeqFeature::Store> or BigWigSet database 
 is provided here. 
 
 =item --data <dataset_name | filename>

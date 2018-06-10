@@ -3,14 +3,14 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.52';
+my $VERSION = '1.60';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -43,14 +43,14 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'     => \$infile, # input file
-	'attrib=s' => \$attrib_request, # attribute
-	'out=s'    => \$outfile, # output filename
-	'db=s'     => \$database, # database name
-	'type=s'   => \$use_type, # force a type
-	'gz!'      => \$gz, # gzip status
-	'help'     => \$help, # help
-	'version'  => \$print_version, # print the version
+	'i|in=s'     => \$infile, # input file
+	'a|attrib=s' => \$attrib_request, # attribute
+	'o|out=s'    => \$outfile, # output filename
+	'd|db=s'     => \$database, # database name
+	't|type=s'   => \$use_type, # force a type
+	'z|gz!'      => \$gz, # gzip status
+	'h|help'     => \$help, # help
+	'v|version'  => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
@@ -666,21 +666,25 @@ __END__
 
 get_feature_info.pl
 
-A script to collect feature information from a BioPerl SeqFeature::Store db.
+A program to collect feature information from a BioPerl SeqFeature::Store db.
 
 =head1 SYNOPSIS
 
 get_feature_info.pl <filename> 
 
-  Options:
-  --in <filename> 
-  --db <name>
-  --attrib <attribute1,attribute2,...>
-  --type <primary_tag>
-  --out <filename>
-  --gz
-  --version
-  --help
+  File options:
+  -i --in <filename>                        input file of list db features
+  -o --out <filename>                       optional output file
+  
+  Database options:
+  -d --db <name>                            annotation database: mysql sqlite
+  -a --attrib <attribute1,attribute2,...>   list of attributes to collect
+  -t --type <primary_tag>                   specify a feature type as needed
+  
+  General options:
+  -z --gz                                   compress output file
+  -v --version                              print version and exit
+  -h --help                                 show extended documentation
   
   Attributes include:
    Chromosome
