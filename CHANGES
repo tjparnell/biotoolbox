@@ -16,6 +16,7 @@ v1.60
 	explicit, and bundling is available. 
 	- Add simple menu descriptions and option grouping to the Synopsis 
 	section of every script POD documentation.
+	- Add new script manipulate_wig.pl.
 
 v1.55
 	- Fix bugs in bam2wig script when using negative shift values;
