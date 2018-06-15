@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.41';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -713,6 +713,9 @@ sub new {
 		if (exists $args{gz} and $args{gz} and $self->extension !~ /gz$/) {
 			$self->{extension} .= '.gz';
 		}
+		
+		# rebuild the filename after modifying the extension
+		$self->{filename} = $self->{path} . $self->{basename} . $self->{extension};
 		
 		# add feature
 		$args{feature} ||= $args{features} || undef;
