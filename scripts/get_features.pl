@@ -695,6 +695,8 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
 
 The command line flags and descriptions:
 
+=head2 Source data
+
 =over 4
 
 =item --db E<lt>textE<gt>
@@ -710,6 +712,12 @@ Specify the filename of a gene annotation file, including GTF, GFF3,
 or a UCSC-formatted file including, refFlat, genePred, or knownGene.
 The file may be gzip compressed. Used as an alternate to a database.
 
+=back
+
+=head2 Selection
+
+=over 4
+
 =item --feature E<lt>typeE<gt>
 
 Provide a feature type to collect. Typically, this corresponds to the 
@@ -724,6 +732,12 @@ Optionally include all child subfeatures in the output. For example,
 transcript, CDS, and/or exon subfeatures of a gene. This option is 
 automatically enabled with GFF, GTF, or refFlat output; it may be 
 turned off with C<--nosub>. It has no effect with standard text or BED output.
+
+=back
+
+=head2 Filter features
+
+=over 4
 
 =item --chrskip E<lt>regexE<gt>
 
@@ -777,6 +791,12 @@ with value "basic". Typically, at least one transcript for every gene is
 marked as part of the GENCODE set. Transcripts not marked as such usually 
 lack sufficient experimental evidence.
 
+=back
+
+=head2 Adjustments
+
+=over 4
+
 =item --start=<integer>
 
 =item --stop=<integer>
@@ -805,6 +825,12 @@ a single artificial transcript, merging overlapping exons and minimizing
 introns, where appropriate. Genes without alternate transcripts are not 
 collapsed.
 
+=back
+
+=head2 Report format options
+
+=over 4
+
 =item --bed
 
 Write a standard 6-column BED format file. Subfeatures are not included.
@@ -819,7 +845,9 @@ automatically included and coordinate adjustments ignored.
 Write a GTF format (GFF version 2.2 or 2.5) output file. Subfeatures are 
 automatically included and coordinate adjustments ignored.
 
-=item --refflat or --ucsc
+=item --refflat 
+
+=item --ucsc
 
 Write a UCSC-style refFlat format (10 columns) gene annotation table. 
 Subfeatures are automatically included and coordinate adjustments ignored.
@@ -837,7 +865,13 @@ start, stop, and strand coordinates. These are automatically included
 in other formats. This is automatically included when adjusting 
 coordinate positions.
 
-=item --out <filename>
+=back
+
+=head2 General options
+
+=over 4
+
+=item --out E<lt>filenameE<gt>
 
 Specify the output file name. Default is the joined list of features. 
 
@@ -875,7 +909,7 @@ metadata for use in subsequent programs. Coordinates may be optionally
 included in the text file, which preempts using parsed features in other 
 tools. 
 
-=head1 COORDINATE ADJUSTMENTS
+=head2 Coordinate adjustments
 
 Coordinates of the features may be adjusted as desired when writing to 
 text or BED file formats. Adjustments may be made relative to either 

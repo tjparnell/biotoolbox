@@ -437,9 +437,11 @@ data2gff.pl [--options...] <filename>
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify an input file containing either a list of database features or 
 genomic coordinates for which to convert to GFF format. The file should be a 
@@ -447,10 +449,27 @@ tab-delimited text file, one row per feature, with columns representing
 feature identifiers, attributes, coordinates, and/or data values. Files may 
 be gzipped compressed.
 
+=item --out E<lt>filenameE<gt>
+
+Optionally specify the name of of the output file. The default is to use 
+the input file base name. The '.gff' extension is automatically
+added if required.
+
 =item --noheader
 
 The input file does not have column headers, often found with UCSC 
 derived annotation data tables. 
+
+=item --zero
+
+Input file is in interbase or 0-based coordinates. This should be 
+automatically detected for most known file formats, e.g. BED.
+
+=back
+
+=head2 Column indices
+
+=over 4
 
 =item --ask
 
@@ -459,38 +478,44 @@ text strings for the GFF attributes, including coordinates, source, type,
 etc. It will present a list of the column names to choose from. Enter 
 nothing for non-relevant columns or to accept default values.
 
-=item --chr <column_index>
+=item --chr E<lt>column_indexE<gt>
 
 The index of the dataset in the data table to be used 
 as the chromosome or sequence ID column in the gff data.
 
-=item --start <column_index>
+=item --start E<lt>column_indexE<gt>
 
-=item --begin <column_index>
+=item --begin E<lt>column_indexE<gt>
 
 The index of the dataset in the data table to be used 
 as the start position column in the gff data.
 
-=item --stop <column_index>
+=item --stop E<lt>column_indexE<gt>
 
-=item --end <column_index>
+=item --end E<lt>column_indexE<gt>
 
 The index of the dataset in the data table to be used 
 as the stop or end position column in the gff data.
 
-=item --score <column_index>
+=item --score E<lt>column_indexE<gt>
 
 The index of the dataset in the data table to be used 
 as the score column in the gff data.
 
-=item --name <text | column_index>
+=item --strand E<lt>column_indexE<gt>
+
+The index of the dataset in the data table to be used
+for strand information. Accepted values might include
+any of the following "+, -, 1, -1, 0, .".
+
+=item --name E<lt>text | column_indexE<gt>
 
 Enter either the text that will be shared name among 
 all the features, or the index of the dataset in the data 
 table to be used as the name of each gff feature. This 
 information will be used in the 'group' column.
 
-=item --id <column_index>
+=item --id E<lt>column_indexE<gt>
 
 The index of the dataset in the data table to be used
 as the unique ID of each gff feature. This information
@@ -498,25 +523,19 @@ will be used in the 'group' column of GFF v3 files
 only. The default is to automatically generate a 
 unique identifier.
 
-=item --strand <column_index>
-
-The index of the dataset in the data table to be used
-for strand information. Accepted values might include
-any of the following "+, -, 1, -1, 0, .".
-
-=item --tags <column_indices>
+=item --tags E<lt>column_indicesE<gt>
 
 Provide a comma delimited list of column indices that contain 
 values to be included as group tags in the GFF features. The 
 key will be the column name.
 
-=item --source <text | column_index>
+=item --source E<lt>text | column_indexE<gt>
 
 Enter either a text string or a column index representing the 
 GFF source that should be used for the features. The default is 
 'data'.
 
-=item --type <text | column_index>
+=item --type E<lt>text | column_indexE<gt>
 
 Enter either a text string or a column index representing the 
 GFF 'type' or 'method' that should be used for the features. If 
@@ -524,23 +543,18 @@ not defined, it will use the column name for either
 the 'score' or 'name' column, if defined. As a last resort, it 
 will use the most creative method of 'Experiment'.
 
+=back
+
+=head2 General options
+
+=over 4
+
 =item --unique
 
 Indicate whether the feature names should be made unique. A count 
 number is appended to the name of subsequent features to make them 
 unique. Using a base text string for the name will automatically 
 generate unique names.
-
-=item --zero
-
-Input file is in interbase or 0-based coordinates. This should be 
-automatically detected for most known file formats, e.g. BED.
-
-=item --out <filename>
-
-Optionally specify the name of of the output file. The default is to use 
-the input file base name. The '.gff' extension is automatically
-added if required.
 
 =item --gz
 

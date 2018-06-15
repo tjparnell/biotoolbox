@@ -3201,23 +3201,23 @@ A progam to manipulate tab-delimited data files.
 
 =head1 SYNOPSIS
 
-manipulate_datasets.pl [--options ...] <input_filename> 
+manipulate_datasets.pl [--options ...] <filename> 
 
-  File:
-  -i --in <input_filename>
-  -o --out <filename>
-  -H --noheader
+  File options:
+  -i --in <filename>        input data file
+  -o --out <filename>       optional output file, default overwrite
+  -H --noheader             input file has no header row
   
-  Functions:
+  Non-interactive functions:
   -f --func [ reorder | delete | rename | new | number | concatenate | split | 
            sort | gsort | null | duplicate | above | below | specific | keep
            coordinate | cnull | absolute | minimum | maximum | log | delog | 
            format | pr | add | subtract | multiply | divide | combine | scale | 
            zscore | ratio | diff | normdiff | center | rewrite | export | 
            treeview | summary | stat ]
-  -x --index <integers>
+  -x --index <integers>     column index to work on
   
-  Options:
+  Operation options:
   -n --exp --num <integer>
   -d --con --den <integer>
   -t --target <text> or <number>
@@ -3236,9 +3236,11 @@ manipulate_datasets.pl [--options ...] <input_filename>
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <input_filename>
+=item --in E<lt>filenameE<gt>
 
 Provide the name of an input file. The file must be a tab-delimited text file,
 with each row specifiying a genomic feature (gene) or region, and each column
@@ -3254,7 +3256,25 @@ recorded upon file write.
 The input file may be compressed using the gzip program and recognized with 
 the extension '.gz'.  
 
-=item --func <function>
+=item --out E<lt>filenameE<gt>
+
+Optionally provide an alternative output file name. If no name is provided, 
+then the input file will be overwritten with a new file. Appropriate 
+extensions will be appended as necessary.
+
+=item --noheader
+
+Indicate that the input file has no column header line, and that dummy 
+headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
+file formats.
+
+=back
+
+=head2 Non-interactive functions
+
+=over 4
+
+=item --func E<lt>functionE<gt>
 
 The program is designed to be run interactively. However, single manipulations 
 may be performed on single datasets by specifying a function name and any 
@@ -3268,7 +3288,7 @@ B<rewrite> B<export> B<treeview> B<summary> B<stat>
   
 Refer to the FUNCTIONS section for details.
 
-=item --index <integers>
+=item --index E<lt>integersE<gt>
 
 Provide the 0-based index number of the column(s) on which to perform the 
 function(s). Multiple indices may also be specified using a comma delimited 
@@ -3276,23 +3296,29 @@ list without spaces. Ranges of contiguous indices may be specified using a
 dash between the start and stop. For example, '1,2,5-7,9' would indicate 
 datasets '1, 2, 5, 6, 7, and 9'. 
 
-=item --exp <integer>
+=back
 
-=item --num <integer>
+=head2 Operation options
+
+=over 4
+
+=item --exp E<lt>integerE<gt>
+
+=item --num E<lt>integerE<gt>
 
 Specify the 0-based index number to be used for the experiment or numerator 
 column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
-=item --con <integer>
+=item --con E<lt>integerE<gt>
 
-=item --den <integer>
+=item --den E<lt>integerE<gt>
 
 Specify the 0-based index number to be used for the control or denominator 
 column with the 'ratio' or 'difference' functions. Both flags are aliases
 for the same thing.
 
-=item --target <string> or <number>
+=item --target E<lt>stringE<gt> or <number>
 
 Specify the target value when using various functions. This is a catch-all 
 option for a number of functions. Please refer to the function description 
@@ -3323,18 +3349,12 @@ Specify the direction of a sort:
   - (i)ncreasing
   - (d)ecreasing
   
-=item --name <string>
+=item --name E<lt>stringE<gt>
 
 Specify a new column name when re-naming a column using the rename function 
 from the command line. Also, when generating a new column using a defined 
 function (--func <function>) from the command line, the new column will use 
 this name.
-
-=item --out <filename>
-
-Optionally provide an alternative output file name. If no name is provided, 
-then the input file will be overwritten with a new file. Appropriate 
-extensions will be appended as necessary.
 
 =item --log 
 
@@ -3342,11 +3362,11 @@ Indicate whether the data is (not) in log2 space. This is required to ensure
 accurate mathematical calculations in some manipulations. This is not necessary 
 when the log status is appropriately recorded in the dataset metadata.
 
-=item --noheader
+=back
 
-Indicate that the input file has no column header line, and that dummy 
-headers will be provided. Not necessary for BED, GFF, or recognized UCSC 
-file formats.
+=head2 General options
+
+=over 4
 
 =item --gz 
 

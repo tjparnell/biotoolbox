@@ -1179,6 +1179,8 @@ merge_datasets.pl [--options...] <file1> <file2> ...
 
 The command line flags and descriptions:
 
+=head2 Merge options
+
 =over 4
 
 =item --lookup
@@ -1210,9 +1212,9 @@ provided as "start-stop". To indicate indices from subsequent files,
 provide separate --index options for each subsequent file. The default 
 is to run the program interactively.
 
-=item --lookupname <text>
+=item --lookupname E<lt>textE<gt>
 
-=item --lun <text>
+=item --lun E<lt>textE<gt>
 
 Provide an alternate column name to identify the columns automatically 
 in the input files containing the lookup values when performing the 
@@ -1229,7 +1231,13 @@ names but will have unique coordinates. This may be disabled, for example
 to force using a BED feature name as the lookup value, by specifying 
 --nocoordinate.
 
-=item --out <filename>
+=back
+
+=head2 General options
+
+=over 4
+
+=item --out E<lt>filenameE<gt>
 
 Specify the output filename. By default it uses the first file name.
 Required in automatic mode.

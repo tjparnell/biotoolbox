@@ -624,6 +624,8 @@ A program to convert UCSC gene tables to GFF3 or GTF annotation.
 
 The command line flags and descriptions:
 
+=head2 UCSC database options
+
 =over 4
 
 =item --ftp [refgene|ensgene|xenorefgene|known|all]
@@ -634,19 +636,25 @@ including I<refGene>, I<ensGene>, I<xenoRefGene> mRNA gene prediction
 tables, and the UCSC I<knownGene> table (if available). Specify all to 
 download all four tables. A comma delimited list may also be provided.
 
-=item --db <text>
+=item --db E<lt>textE<gt>
 
 Specify the genome version database from which to download the requested 
 table files. See L<http://genome.ucsc.edu/FAQ/FAQreleases.html> for a 
 current list of available UCSC genomes. Examples included hg19, mm9, and 
 danRer7.
 
-=item --host <text>
+=item --host E<lt>textE<gt>
 
 Optionally provide the host FTP address for downloading the current 
 gene table files. The default is 'hgdownload.cse.ucsc.edu'.
 
-=item --table <filename>
+=back
+
+=head2 Input file options
+
+=over 4
+
+=item --table E<lt>filenameE<gt>
 
 Provide the name of a UCSC gene or gene prediction table. Tables known 
 to work include the I<refGene>, I<ensGene>, I<xenoRefGene>, and UCSC 
@@ -655,48 +663,54 @@ well as refFlat tables are supported. The file may be gzipped. When
 converting multiple tables, use this option repeatedly for each table. 
 The C<--ftp> option is recommended over using this one.
 
-=item --status <filename>
+=item --status E<lt>filenameE<gt>
 
 Optionally provide the name of the I<refSeqStatus> table file. This file 
 provides additional information for the I<refSeq>-based gene prediction 
 tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. 
 The file may be gzipped. The C<--ftp> option is recommended over using this.
 
-=item --sum <filename>
+=item --sum E<lt>filenameE<gt>
 
 Optionally provide the name of the I<refSeqSummary> file. This file 
 provides additional information for the I<refSeq>-based gene prediction 
 tables, including I<refGene>, I<xenoRefGene>, and I<knownGene> tables. The 
 file may be gzipped. The C<--ftp> option is recommended over using this.
 
-=item --ensname <filename>
+=item --ensname E<lt>filenameE<gt>
 
 Optionally provide the name of the I<ensemblToGeneName> file. This file 
 provides a key to translate the Ensembl unique gene identifier to the 
 common gene name. The file may be gzipped. The C<--ftp> option is 
 recommended over using this.
 
-=item --enssrc <filename>
+=item --enssrc E<lt>filenameE<gt>
 
 Optionally provide the name of the I<ensemblSource> file. This file 
 provides a key to translate the Ensembl unique gene identifier to the 
 type of transcript, provided by Ensembl as the source. The file may be 
 gzipped. The C<--ftp> option is recommended over using this.
 
-=item --kgxref <filename>
+=item --kgxref E<lt>filenameE<gt>
 
 Optionally provide the name of the I<kgXref> file. This file 
 provides additional information for the UCSC I<knownGene> gene table.
 The file may be gzipped.
 
-=item --chromo <filename>
+=item --chromo E<lt>filenameE<gt>
 
 Optionally provide the name of the chromInfo text file. Chromosome 
 and/or scaffold features will then be written at the beginning of the 
 output GFF file (when processing a single table) or written as a 
 separate file (when processing multiple tables). The file may be gzipped.
 
-=item --source <text>
+=back
+
+=head2 Conversion options
+
+=over 4
+
+=item --source E<lt>textE<gt>
 
 Optionally provide the text to be used as the GFF source. The default is 
 automatically derived from the source table file name, if recognized, or 
@@ -754,6 +768,12 @@ The default is false.
 Specify that a GTF (version 2.5) format file should be written instead of 
 GFF3. Yes, the name of the program says GFF3, but now we can output GTF 
 too, and changing the name of the program is too late now.
+
+=back
+
+=head2 General options
+
+=over 4
 
 =item --gz
 

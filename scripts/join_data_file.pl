@@ -203,10 +203,10 @@ A program to join two or more data files and concatenate rows.
 join_data_file.pl [--options] <file1> <file2> ...
   
   Options:
-  -o --out <filename>
-  -z --gz
-  -v --version
-  -h --help
+  -o --out <filename>       provide output file name, default file1
+  -z --gz                   compress output
+  -v --version              print version and exit
+  -h --help                 show extended documentation
 
 =head1 OPTIONS
 
@@ -214,7 +214,7 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --out <filename>
+=item --out E<lt>filenameE<gt>
 
 Provide the name of the output file. If the input files were 
 split using 'split_data_file.pl', then the original base name 

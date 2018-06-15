@@ -157,7 +157,7 @@ __END__
 
 db_types.pl
 
-A script to print out the available feature types in a database.
+A program to print out the available feature types in a database.
 
 =head1 SYNOPSIS
 
@@ -174,15 +174,12 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --db <database>
+=item --db E<lt>databaseE<gt>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. If not specified, 
 then a list of known databases in the BioToolBox configuration file 
 F<.biotoolbox.cfg> will be presented as a list to the user.
-
-For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
 
 =item --version
 
@@ -197,7 +194,7 @@ Display this POD documentation.
 =head1 DESCRIPTION
 
 This program will print a list of all of the known feature types present 
-in a Bio::DB::SeqFeature::Store database. The types are organized into 
+in a L<Bio::DB::SeqFeature::Store> database. The types are organized into 
 groups by their source tag.
 
 BigWigSet databases, comprised of a directory of BigWig files and a 

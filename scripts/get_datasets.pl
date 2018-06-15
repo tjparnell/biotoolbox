@@ -863,12 +863,13 @@ A program to collect data for a list of features
 
 =head1 SYNOPSIS
 
-get_datasets.pl [--options...] [<filename>]
+get_datasets.pl [--options...] <filename>
 
 get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   
-  Options for existing files:
+  Options for data files:
   -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
+  -o --out <filename>                 optional output file, default overwrite 
   
   Options for new files:
   -d --db <name>                      annotation database: mysql sqlite
@@ -900,7 +901,6 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --limit <integer>                   minimum size to take fractional window
   
   General options:
-  -o --out <filename>                 optional output file, default overwrite 
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
   -v --version                        print version and exit
@@ -910,9 +910,11 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
 
 The command line flags and descriptions:
 
+=head2 Options for data files
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify an input file containing either a list of database features or 
 genomic coordinates for which to collect data. Any tab-delimited text 
@@ -922,13 +924,19 @@ UCSC native formats such as gene prediction tables are all supported.
 Gene annotation files will be parsed as sequence features. 
 Files may be gzipped compressed.
 
-=item --out <filename>
+=item --out E<lt>filenameE<gt>
 
 Specify the output file name. Required for new feature tables; optional for 
 current files. If this is argument is not specified then the input file is 
 overwritten.
 
-=item --db <name | filename>
+=back
+
+=head2 Options for new files
+
+=over 4
+
+=item --db E<lt>name | filenameE<gt>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. A database is 
@@ -939,28 +947,40 @@ in the metadata.
 
 =item --feature <type | type:source | alias>,...
 
-=item --feature genome
-
 Specify the type of feature from which to collect values. This is required 
 only for new feature tables. Three types of values may be passed: the 
 feature type, feature type and source expressed as 'type:source', or an 
 alias to one or more feature types. More than one feature may be included 
 as a comma-delimited list (no spaces). 
 
+=back
+
+=head2 Options for feature "genome"
+
+=over 4
+
+=item --feature genome
+
 To collect genomic intervals (or regions) simply specify 'genome' as 
 the feature type.
 
-=item --win <integer>
+=item --win E<lt>integerE<gt>
 
 When generating a new genome interval list (feature type 'genome'), 
 optionally specify the window size.  
 
-=item --step <integer>
+=item --step E<lt>integerE<gt>
 
 Optionally indicate the step size when generating a new list of intervals 
 across the genome. The default is equal to the window size.
 
-=item --ddb <name | filename>
+=back
+
+=head2 Options for data collection
+
+=over 4
+
+=item --ddb E<lt>nameE<gt>
 
 If the data to be collected is from a second database that is separate 
 from the annotation database, provide the name of the data database here. 
@@ -993,7 +1013,7 @@ be local or remote (specified with a http: or ftp: prefix).
 To force the program to simply write out the list of collected features 
 without collecting data, provide the dataset name of "none".
 
-=item --method <text>
+=item --method E<lt>textE<gt>
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -1090,18 +1110,24 @@ tables or other Seq types, such as ChIPSeq. This option can only be used
 with one of the count methods (count, ncount, pcount). The FPKM values 
 are appended as additional columns in the output table.
 
-=item --extend <integer>
+=back
+
+=head2 Adjustments to features
+
+=over 4
+
+=item --extend E<lt>integerE<gt>
 
 Optionally specify the bp extension that will be added to both sides of the 
 feature's region.
 
-=item --start <integer>
+=item --start E<lt>integerE<gt>
 
-=item --stop <integer>
+=item --stop E<lt>integerE<gt>
 
-=item --begin <integer>
+=item --begin E<lt>integerE<gt>
 
-=item --end <integer>
+=item --end E<lt>integerE<gt>
 
 Optionally specify adjustment values to adjust the region to collect values 
 relative to the feature position defined by the C<--pos> option (default is 
@@ -1109,6 +1135,15 @@ the 5' position). A negative value is shifted upstream (5' direction),
 and a positive value is shifted downstream. Adjustments are always made 
 relative to the feature's strand. Both options must be applied; one is 
 not allowed.
+
+=item --pos [5|m|3]
+
+Indicate the relative position of the feature with which the 
+data is collected when combined with the "start" and "stop" or "fstart" 
+and "fstop" options. Three values are accepted: "5" indicates the 
+5' prime end is used, "3" indicates the 3' end is used, and "m" 
+indicates the middle of the feature is used. The default is to 
+use the 5' end, or the start position of unstranded features. 
 
 =item --fstart=<number>
 
@@ -1121,20 +1156,17 @@ fraction should be presented as a decimal number, e.g. 0.25. Prefix a
 negative sign to specify an upstream position. Both options must be 
 applied; one is not allowed. 
 
-=item --pos [5|m|3]
-
-Indicate the relative position of the feature with which the 
-data is collected when combined with the "start" and "stop" or "fstart" 
-and "fstop" options. Three values are accepted: "5" indicates the 
-5' prime end is used, "3" indicates the 3' end is used, and "m" 
-indicates the middle of the feature is used. The default is to 
-use the 5' end, or the start position of unstranded features. 
-
-=item --limit <integer>
+=item --limit E<lt>integerE<gt>
 
 Optionally specify the minimum size limit for subfractionating a feature's 
 region. Used in combination with fstart and fstop to prevent taking a 
 subregion from a region too small to support it. The default is 10 bp.
+
+=back
+
+=head2 General options
+
+=over 4
 
 =item --gz
 
@@ -1142,7 +1174,7 @@ Indicate whether the output file should (not) be compressed by gzip.
 If compressed, the extension F<.gz> is appended to the filename. If a compressed 
 file is opened, the compression status is preserved unless specified otherwise.
 
-=item --cpu <integer>
+=item --cpu E<lt>integerE<gt>
 
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of L<Parallel::ForkManager>. With support enabled, the 

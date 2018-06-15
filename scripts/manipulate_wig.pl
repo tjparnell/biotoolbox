@@ -383,9 +383,11 @@ manipulate_wig.pl [options] -i <file1.wig> -o <file1.out.wig>
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <file>
+=item --in E<lt>fileE<gt>
 
 Specify the input wig file. All three formats, variableStep, fixedStep, and 
 bedGraph, are supported. Files may be gzipped. Alternatively, the input 
@@ -394,7 +396,7 @@ bigWig files, you may use a pipe as shown below
 
     bigWigToWig file1.bw stdout | manipulate_wig.pl -i stdin 
 
-=item --out <file>
+=item --out E<lt>fileE<gt>
 
 Specify the output wig file. The output format will be the same format as the 
 input. The file may be gzipped by appending F<.gz> to the name. Alternatively, 
@@ -403,17 +405,29 @@ name. For writing to bigWig files, use a pipe as show below
 
     manipulate_wig.pl -o stdout | wigToBigWig stdin chroms.txt file.bw
 
-=item --skip <regex>
+=back
+
+=head2 Selection functions
+
+=over 4
+
+=item --skip E<lt>regexE<gt>
 
 Selectively skip (discard) lines corresponding to certain chromosomes that 
 match the provided regular expression. For example, skip the 
 mitochondrial and random contigs, use "chrM|chrUn|random".
 
-=item --apply <regex>
+=item --apply E<lt>regexE<gt>
 
 Selectively apply manipulation functions to certain chromosomes that match 
 provided regular expression, leaving remaining lines untouched. For example, 
 to apply a normalization to the X chromosome, use 'chrX'.
+
+=back
+
+=head2 Manipulation functions
+
+=over 4
 
 =item --null
 
@@ -428,11 +442,11 @@ Convert lines from log space in the indicated base.
 
 Convert line scores to absolute values.
 
-=item --mult <float>
+=item --mult E<lt>floatE<gt>
 
 Multiply line scores by the indicated value.
 
-=item --add <float>
+=item --add E<lt>floatE<gt>
 
 Add the indicated value to each line score.
 
@@ -440,23 +454,29 @@ Add the indicated value to each line score.
  
 Convert the line score to a log equivalent in the indicated base space.
 
-=item --min <float>
+=item --min E<lt>floatE<gt>
 
 Set the minimum floor score. Any score below the indicated value 
 will be set to the indicated value.
 
-=item --max <float>
+=item --max E<lt>floatE<gt>
 
 Set the maximum ceiling score. Any score above the indicated value 
 will be set to the indicated value.
 
-=item --place <integer>
+=item --place E<lt>integerE<gt>
 
 Format the score value to the indicated number of decimal positions.
 
 =item --zero 
 
 Discard lines with a score value of zero.
+
+=back
+
+=head2 General functions
+
+=over 4
 
 =item --stats
 

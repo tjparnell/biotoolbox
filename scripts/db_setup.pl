@@ -238,14 +238,14 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --db <UCSC database>
+=item --db E<lt>UCSC databaseE<gt>
 
 Provide the short UCSC database name for the species and version you want 
 to use. See L<http://genome.ucsc.edu/FAQ/FAQreleases.html> for a current 
 list of available UCSC genomes. Examples include hg19, mm10, danRer7, 
 sacCer3, etc.
 
-=item --path </path/to/store/database>
+=item --path E<lt>/path/to/store/databaseE<gt>
 
 Specify the optional path to store the SQLite database file. The default 
 path is the C<~/lib>.

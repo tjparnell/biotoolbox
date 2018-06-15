@@ -111,14 +111,14 @@ GetOptions(
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
 	'p|pe!'        => \$paired, # paired-end alignments
-	'h|shift!'     => \$shift, # shift coordinates 3'
+	'I|shift!'     => \$shift, # shift coordinates 3'
 	'H|shiftval=i' => \$shift_value, # value to shift coordinates
 	'x|extval=i'   => \$extend_value, # value to extend reads
 	'chrom=i'      => \$chr_number, # number of chromosomes to sample
 	'minr=f'       => \$correlation_min, # R minimum value for shift
 	'zmin=f'       => \$zmin, # minimum z-score interval for calculating shift
 	'zmax=f'       => \$zmax, # maximum z-score interval for calculating shift
-	'model!'       => \$model, # write the strand shift model data
+	'M|model!'       => \$model, # write the strand shift model data
 	't|strand!'    => \$do_strand, # separate strands
 	'flip!'        => \$flip, # flip the strands
 	'q|qual=i'     => \$min_mapq, # minimum mapping quality
@@ -2652,11 +2652,11 @@ __END__
 
 bam2wig.pl
 
-A script to convert Bam alignments into a wig representation file.
+A program to convert Bam alignments into a wig representation file.
 
 =head1 SYNOPSIS
 
-bam2wig.pl [--options...] <file.bam>
+bam2wig.pl [--options...] E<lt>file.bamE<gt>
 
 bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
@@ -2690,14 +2690,14 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -U --nosupplementary          ignore supplementary alignments (false)
   
   Shift options:
-  -h --shift                    shift reads in the 3' direction
+  -I --shift                    shift reads in the 3' direction
   -x --extval <integer>         explicit extension size in bp (default is to calculate)
   -H --shiftval <integer>       explicit shift value in bp (default is to calculate) 
   --chrom <integer>             number of chromosomes to sample (4)
   --minr <float>                minimum pearson correlation to calculate shift (0.5)
   --zmin <float>                minimum z-score from average to test peak for shift (3)
   --zmax <float>                maximum z-score from average to test peak for shift (10)
-  --model                       write peak shift model file for graphing
+  -M --model                    write peak shift model file for graphing
   
  Score options:
   -r --rpm                      scale depth to Reads Per Million mapped
@@ -2719,9 +2719,9 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --var                         varStep, default for start, mid
   
  General options:
-  -c --cpu <integer>            number of parallel processes (2)
-  -v --verbose                  report additional information
-  -V --version                  print version information
+  -c --cpu <integer>            number of parallel processes (4)
+  -V --verbose                  report additional information
+  -v --version                  print version information
   -h --help                     show full documentation
 
 =head1 OPTIONS
@@ -2732,7 +2732,7 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify the input Bam alignment file. More than one file may be 
 specified, either with repeated options, a comma-delimited list, 
@@ -2823,12 +2823,12 @@ include FR reads on the same chromosome, and not FF, RR, RF, or
 pairs aligning to separate chromosomes. The default is to 
 treat all alignments as single-end.
 
-=item --minsize <integer>
+=item --minsize E<lt>integerE<gt>
 
 Specify the minimum paired-end fragment size in bp to accept for recording. 
 Default is 30 bp.
 
-=item --maxsize <integer>
+=item --maxsize E<lt>integerE<gt>
 
 Specify the maximum paired-end fragment size in bp to accept for recording. 
 Default is 600 bp.
@@ -2839,7 +2839,7 @@ Default is 600 bp.
 
 =over 4
 
-=item --qual <integer>
+=item --qual E<lt>integerE<gt>
 
 Set a minimum mapping quality score of alignments to count. The mapping 
 quality is a range from 0-255, with higher numbers indicating lower 
@@ -2866,7 +2866,7 @@ the alignment bit flag 0x800. Supplementary alignments are typically
 associated with chimeric fragments. By default, supplementary alignments 
 are included.
 
-=item --chrskip <regex>
+=item --chrskip E<lt>regexE<gt>
 
 Provide a regular expression to skip certain chromosomes. Perl-based 
 regular expressions are employed. Expressions should be quoted or 
@@ -2876,7 +2876,7 @@ properly escaped on the command line. Examples might be
     'scaffold.+'
     'chr.+alt|chrUn.+|chr.+_random'
 
-=item --blacklist <file>
+=item --blacklist E<lt>fileE<gt>
 
 Provide a file of genomic intervals from which to exclude alignments. 
 Examples might include repeats, ribosomal RNA, or heterochromatic regions.
@@ -2897,20 +2897,20 @@ the fragments are counted and often seen as separated discrete peaks
 on opposite strands flanking the true target site. This option is 
 disabled with paired-end and spliced reads (where it is not needed). 
 
-=item --shiftval <integer>
+=item --shiftval E<lt>integerE<gt>
 
 Provide the value in bp that the recorded position should be shifted. 
 The value should be 1/2 the average length of the library insert size.
 The default is to automatically and empirically determine the 
 appropriate shift value using cross-strand correlation (recommended). 
 
-=item --extval <integer>
+=item --extval E<lt>integerE<gt>
 
 Manually set the length for reads to be extended. By default, the shift 
 value is determined empirically and extension is set to 2X the shift 
 value. This is also used for the cspan mode.
 
-=item --chrom <integer>
+=item --chrom E<lt>integerE<gt>
 
 Indicate the number of sequences or chromosomes to sample when 
 empirically determining the shift value. The reference sequences 
@@ -2918,21 +2918,21 @@ listed in the Bam file header are taken in order of decreasing
 length, and one or more are taken as a representative sample of 
 the genome. The default value is 4. 
 
-=item --minr <float>
+=item --minr E<lt>floatE<gt>
 
 Provide the minimum Pearson correlation value to accept a shift 
 value when empirically determining the shift value. Enter a decimal value 
 between 0 and 1. Higher values are more stringent. The default 
 is 0.5.
 
-=item --zmin <float>
+=item --zmin E<lt>floatE<gt>
 
 Specify the minimum z-score (or number of standard deviations) from 
 the chromosomal mean depth to test for a peak shift. Increase this 
 number to test for strong robust peaks, which give a better estimations 
 of the shift value. Default is 3.
 
-=item --zmax <float> 
+=item --zmax E<lt>floatE<gt> 
 
 Specify the maximum z-score (or number of standard deviations) from 
 the chromosomal mean depth to test for a peak shift. This excludes 
@@ -2961,7 +2961,7 @@ Convert the data to Reads (or Fragments) Per Million mapped. This is useful
 for comparing read coverage between different datasets. The default is 
 no RPM conversion. 
 
-=item --scale <float>
+=item --scale E<lt>floatE<gt>
 
 Optionally provide your own scaling factor. This will be multiplied with 
 every position when generating the wig file. This may be combined with the 
@@ -2987,7 +2987,7 @@ instead of full counts. The number of alignments is determined using the
 NH alignment tag. If a read has 10 alignments, then each alignment is 
 given a count of 0.1. 
 
-=item --format <integer>
+=item --format E<lt>integerE<gt>
 
 Indicate the number of decimal postions reported in the wig file. This 
 is only applicable when rpm, scale, or fraction options are provided. 
@@ -2999,13 +2999,13 @@ The default value is 4 decimal positions.
 
 =over 4
 
-=item --out <filename>
+=item --out E<lt>filenameE<gt>
 
 Specify the output base filename. An appropriate extension will be 
 added automatically. By default it uses the base name of the 
 input file.
 
-=item --bin <integer>
+=item --bin E<lt>integerE<gt>
 
 Specify the bin size in bp for the output wig file. In general, specifying 
 a larger bin size will decrease the run time and memory requirements in 
@@ -3056,11 +3056,11 @@ the default format for start and midpoint modes of operation.
 
 =over 4
 
-=item --cpu <integer>
+=item --cpu E<lt>integerE<gt>
 
 Specify the number of parallel instances to run simultaneously. This requires 
 the installation of L<Parallel::ForkManager>. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
+default is 4. Disable multi-threaded execution by setting to 1. 
 
 =item --verbose
 

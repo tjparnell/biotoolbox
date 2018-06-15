@@ -504,7 +504,7 @@ __END__
 
 pull_features.pl
 
-A script to pull out a specific list of data rows from a data file.
+A program to pull out a specific list of data rows from a data file.
 
 =head1 SYNOPSIS
 
@@ -526,7 +526,7 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
   --sumonly                     Skip output, just make a summary file
   --start <integer>             First data column to make a summary file
   --stopi <integer>             Last data column to make a summary file
-  --log
+  --log                         Summarized data is in log2 space
   
   General options:
   -v --version                  print version and exit
@@ -535,6 +535,8 @@ pull_features.pl --data <filename> --list <filename> --out <filename>
 =head1 OPTIONS
 
 The command line flags and descriptions:
+
+=head2 File options
 
 =over 4
 
@@ -555,9 +557,15 @@ from a Cluster k-means analysis may be used.
 
 Specify the output file name. 
 
-=item --dindex <integer>
+=back
 
-=item --lindex <integer>
+=head2 Column index options
+
+=over 4
+
+=item --dindex E<lt>integerE<gt>
+
+=item --lindex E<lt>integerE<gt>
 
 Specify the index numbers of the columns in the data and list 
 files, respectively, containing the identifiers to match features. 
@@ -566,12 +574,18 @@ appropriate matching columns with the same header name. If none
 are specified, the user must select interactively from a list of 
 available column names. 
 
-=item --gindex <integer>
+=item --gindex E<lt>integerE<gt>
 
 Specify the group column from the list file. This allows the data 
 file to be split into multiple output group files. A column named 
 'group' will automatically be identified. A .kgg file will 
 automatically use the Cluster column as the group index.
+
+=back
+
+=head2 Output options
+
+=over 4
 
 =item --order [list | data]
 
@@ -592,14 +606,14 @@ Indicate that only a summary file should be written, and that the
 pulled data file should be skipped. Useful if you're just after 
 the summary for graphing purposes.
 
-=item --starti <integer>
+=item --starti E<lt>integerE<gt>
 
 When re-summarizing the pulled data, indicate the start column 
 index that begins the range of datasets to summarize. Defaults 
 to the leftmost column without a standard feature description
 name.
 
-=item --stopi <integer>
+=item --stopi E<lt>integerE<gt>
 
 When re-summarizing the pulled data, indicate the stop column
 index the ends the range of datasets to summarize. Defaults
@@ -609,6 +623,12 @@ to the last or rightmost column.
 
 The data is in log2 space. Only necessary when re-summarizing the
 pulled data.
+
+=back
+
+=head2 General options
+
+=over 4
 
 =item --version
 

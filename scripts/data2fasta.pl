@@ -388,7 +388,7 @@ __END__
 
 data2fasta.pl
 
-A script to retrieve sequences from a list of features
+A program to retrieve sequences from a list of features
 
 =head1 SYNOPSIS
 
@@ -429,9 +429,11 @@ data2fasta.pl [--options...] <filename>
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify the input data file. The file may be a tab-delimited text file 
 with coordinate columns for fetching genomic sequence. Alternatively it 
@@ -443,7 +445,17 @@ Finally, text files with sequence in a column, for example oligo sequences,
 may be used, skipping the need for database sequence retrieval.
 The file may be compressed with gzip.
 
-=item --db <name|fasta>
+=item --out E<lt>filenameE<gt>
+
+Specify the output filename. By default it uses the input file basename.
+
+=back
+
+=head2 Database
+
+=over 4
+
+=item --db E<lt>name|fastaE<gt>
 
 Provide the name of an uncompressed Fasta file (multi-fasta is ok) or 
 directory containing multiple fasta files representing the genomic 
@@ -457,7 +469,13 @@ annotation database that contains genomic sequence may also be provided.
 The database name may be obtained from the input file metadata. 
 Required only if collecting sequence from genomic coordinates.
 
-=item --feature <text>
+=back
+
+=head2 Feature selection
+
+=over 4
+
+=item --feature E<lt>textE<gt>
 
 When parsing a gene annotation file such as a GFF3, GTF, or UCSC format 
 file, provide a feature type to select features if desired.
@@ -468,47 +486,63 @@ When collecting from subfeatures, indicate the subfeature type from
 list available. No merging of overlapping or redundant subfeatures 
 is performed here. See L<get_features.pl>.
 
-=item --name --id <index>
+=back
+
+=head2 Column indices
+
+=over 4
+
+=item --name --id <column_index>
 
 Optionally specify the index for the name or ID column. It may be 
 automatically determined from the column header.
 
-=item --seq <index>
+=item --seq E<lt>column_indexE<gt>
 
 Optionally specify the index for the sequence column. It may be 
 automatically determined from the column header.
 
-=item --desc <index>
-
-Optionally specify the index of the description column. It may be 
-automatically determined from the column header.
-
-=item --chr <index>
+=item --chr E<lt>column_indexE<gt>
 
 Optionally specify the index for the chromosome column. It may be 
 automatically determined from the column header.
 
-=item --start --begin <index>
+=item --start E<lt>column_indexE<gt>
+
+=item --begin E<lt>column_indexE<gt>
 
 Optionally specify the index for the start position column. It may be 
 automatically determined from the column header.
 
-=item --stop --end <index>
+=item --stop E<lt>column_indexE<gt>
+
+=item --end E<lt>column_indexE<gt>
 
 Optionally specify the index for the stop position column. It may be 
 automatically determined from the column header.
 
-=item --strand <index>
+=item --strand E<lt>column_indexE<gt>
 
 Optionally specify the index for the strand column. It may be 
 automatically determined from the column header.
 
-=item --extend <integer>
+=item --extend E<lt>integerE<gt>
 
 Optionally provide the number of extra base pairs to extend the start 
 and stop positions. This will then include the given number of base 
 pairs of flanking sequence from the database. This only applies when 
 sequence is obtained from the database.
+
+=item --desc E<lt>column_indexE<gt>
+
+Optionally specify the index of the description column. It may be 
+automatically determined from the column header.
+
+=back
+
+=head2 Fasta output options
+
+=over 4
 
 =item --cat
 
@@ -516,15 +550,17 @@ Optionally indicate that all of the sequences should be concatenated
 into a single Fasta sequence. The default is to write a multi-fasta 
 file with separate sequences.
 
-=item --pad <integer>
+=item --pad E<lt>integerE<gt>
 
 When concatenating sequences into a single Fasta sequence, optionally 
 indicate the number of 'N' bases to insert between the individual 
 sequences. The default is zero.
 
-=item --out <filename>
+=back
 
-Specify the output filename. By default it uses the input file basename.
+=head2 General options
+
+=over 4
 
 =item --gz
 
