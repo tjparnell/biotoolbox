@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.54';
+our $VERSION = '1.60';
 
 =head1 NAME
 
@@ -320,13 +320,45 @@ An alternate database object to collect from.
 Fetches genomic sequence based on the coordinates of the current seqfeature 
 or interval in the current Feature. This requires a database that 
 contains the genomic sequence, either the database specified in the 
-Data table metadata or an external indexed genomic fasta file. The 
-sequence is returned as simple string. If the feature is on the reverse 
+Data table metadata or an external indexed genomic fasta file. 
+
+If the Feature represents a transcript or gene, then a concatenated 
+sequence of the selected subfeatures may be generated and returned. B<Note> 
+that redundant or overlapping subfeatures are B<NOT> merged, and 
+unexpected results may be obtained.
+
+The sequence is returned as simple string. If the feature is on the reverse 
 strand, then the reverse complement sequence is automatically returned. 
+
 Pass an array of key value pairs to specify alternate coordinates if so 
 desired. Potential keys include
 
 =over 4
+
+=item subfeature 
+
+Pass a text string representing the type of subfeature from which to collect 
+the sequence. Acceptable values include 
+
+=over 4 
+
+=item * exon
+
+All exons included
+
+=item * cds
+
+The CDS or coding sequence are extracted from mRNA
+
+=item * 5p_utr
+
+The 5' UTR of mRNA
+
+=item * 3p_utr
+
+The 3' UTR of mRNA
+
+=back
 
 =item seq_id
 
@@ -1312,6 +1344,16 @@ sub get_sequence {
 	my $self = shift;
 	my %args = @_;
 	my $db = $args{db} || $args{database} || $self->{data}->open_meta_database || undef;
+		# this will fail immediately if user doesn't provide valid database
+	
+	# get sequence over subfeatures
+	$args{subfeature} ||= undef;
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
+		# this is more complicated so we have a dedicated method
+		return $self->_get_subfeature_sequence($db, \%args);
+	}
+	
+	# get coordinates
 	my $seqid = $args{seq_id} || $args{chromo} || $self->seq_id;
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->end;
@@ -1326,12 +1368,77 @@ sub get_sequence {
 		$stop += $args{extend};
 	}
 	return unless (defined $seqid and defined $start and defined $stop);
+	
+	# retrieve and return sequence
 	my $seq = get_genomic_sequence($db, $seqid, $start, $stop);
 	if ($strand == -1) {
 		$seq =~ tr/gatcGATC/ctagCTAG/;
 		$seq = reverse $seq;
 	}
 	return $seq;
+}
+
+sub _get_subfeature_sequence {
+	my ($self, $db, $args) = @_;
+	
+	# load GeneTools
+	unless ($GENETOOL_LOADED) {
+		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
+		if ($@) {
+			croak "missing required modules! $@";
+		}
+		else {
+			$GENETOOL_LOADED = 1;
+		}
+	}
+	
+	# feature
+	my $feature = $self->seqfeature;
+	unless ($feature) {
+		carp "no SeqFeature available! Cannot collect subfeature sequence!";
+		return;
+	}
+	
+	# get the subfeatures
+	my @subfeatures;
+	if ($args->{subfeature} eq 'exon') {
+		@subfeatures = get_exons($feature);
+	}
+	elsif ($args->{subfeature} eq 'cds') {
+		@subfeatures = get_cds($feature);
+	}
+	elsif ($args->{subfeature} eq '5p_utr') {
+		@subfeatures = get_5p_utrs($feature);
+	}
+	elsif ($args->{subfeature} eq '3p_utr') {
+		@subfeatures = get_3p_utrs($feature);
+	}
+	else {
+		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
+	}
+	# it's possible nothing is returned, which means no sequence will be retrieved
+	
+	# sort subfeatures
+	# this should be done by GeneTools in most cases but just to be sure
+	# note that this does NOT merge redundant or overlapping exons!!!!
+	my @sorted = 	map { $_->[0] }
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
+					@subfeatures;
+	
+	# collect sequence
+	my $sequence;
+	foreach my $subf (@sorted) {
+		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
+		$sequence .= $seq;
+	}
+	
+	# flip the sequence
+	if ($feature->strand == -1) {
+		$sequence =~ tr/gatcGATC/ctagCTAG/;
+		$sequence = reverse $sequence;
+	}
+	return $sequence;
 }
 
 sub get_score {

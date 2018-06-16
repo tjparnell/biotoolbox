@@ -4,12 +4,14 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	calculate_score
+	$BAM_ADAPTER
+	$BIG_ADAPTER
 );
 use Bio::ToolBox::utility;
 my $parallel;
@@ -18,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.54';
+my $VERSION = '1.60';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -63,29 +65,31 @@ my (
 
 ## Command line options
 GetOptions( 
-	'in=s'        => \$infile, # input file
-	'out=s'       => \$outfile, # name of outfile
-	'db=s'        => \$main_database, # main or annotation database name
-	'ddb=s'       => \$data_database, # data database
-	'data=s'      => \$dataset, # dataset name
-	'feature=s'   => \$feature, # what type of feature to work with
-	'subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
-	'exons!'      => \$exon_subfeature, # old parameter
-	'method=s'    => \$method, # method for collecting the data
-	'strand=s'    => \$stranded, # indicate whether stranded data should be taken
-	'bins=i'      => \$bins, # number of bins
-	'ext=i'       => \$extension, # number of bins to extend beyond the feature
-	'extsize=i'   => \$extension_size, # explicit size of extended bins
-	'min=i'       => \$min_length, # minimum feature size
-	'long!'       => \$long_data, # collecting long data features
-	'smooth!'     => \$smooth, # do not interpolate over missing values
-	'sum'         => \$sum, # determine a final average for all the features
+	'i|in=s'         => \$infile, # input file
+	'o|out=s'        => \$outfile, # name of outfile
+	'd|db=s'         => \$main_database, # main or annotation database name
+	'D|ddb=s'        => \$data_database, # data database
+	'a|data=s'       => \$dataset, # dataset name
+	'f|feature=s'    => \$feature, # what type of feature to work with
+	'u|subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
+	'exons!'         => \$exon_subfeature, # old parameter
+	'm|method=s'     => \$method, # method for collecting the data
+	't|strand=s'     => \$stranded, # indicate whether stranded data should be taken
+	'b|bins=i'       => \$bins, # number of bins
+	'x|ext=i'        => \$extension, # number of bins to extend beyond the feature
+	'X|extsize=i'    => \$extension_size, # explicit size of extended bins
+	'min=i'          => \$min_length, # minimum feature size
+	'long!'          => \$long_data, # collecting long data features
+	'smooth!'        => \$smooth, # do not interpolate over missing values
+	'U|sum'            => \$sum, # determine a final average for all the features
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'gz!'         => \$gz, # compress the output file
-	'cpu=i'       => \$cpu, # number of execution threads
-	'help'        => \$help, # print the help
-	'version'     => \$print_version, # print the version
+	'z|gz!'          => \$gz, # compress the output file
+	'c|cpu=i'        => \$cpu, # number of execution threads
+	'h|help'         => \$help, # print the help
+	'v|version'      => \$print_version, # print the version
+	'bam=s'          => \$BAM_ADAPTER, # explicitly set the bam adapter
+	'big=s'          => \$BIG_ADAPTER, # explicitly set the big adapter
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 
@@ -842,47 +846,51 @@ A program to collect data in bins across a list of features.
  
  get_binned_data.pl [--options] <filename>
   
-  Options for existing files:
-  --in <filename>                  (txt bed gff gtf refFlat ucsc)
+  Options for data files:
+  -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
+  -o --out <filename>                 optional output file, default overwrite 
   
   Options for new files:
-  --db <name | filename>
-  --feature <type | type:source | alias>, ...
+  -d --db <name>                      annotation database: mysql sqlite
+  -f --feature <type>                 one or more feature types from db or gff
   
   Options for data collection:
-  --ddb <name | filename>
-  --data <dataset_name | filename>
-  --method [mean|median|stddev|min|max|range|sum|          (mean)
-            count|pcount|ncount]
-  --strand [all|sense|antisense]                            (all)
-  --force_strand
-  --subfeature [exon|cds|5p_utr|3p_utr]
-  --long
+  -D --ddb <name|file>                data or BigWigSet database
+  -a --data <dataset|filename>        data from which to collect: bw bam etc
+  -m --method [mean|median|stddev|    statistical method for collecting data
+        min|max|range|sum|count|      default mean
+        pcount|ncount]
+  -t --strand [all|sense|antisense]   strand of data relative to feature (all)
+  -u --subfeature [exon|cds|          collect over gene subfeatures 
+        5p_utr|3p_utr] 
+  --force_strand                      use the specified strand in input file
+  --long                              assume long features to collect
   
   Bin specification:
-  --bins <integer>                                          (10)
-  --ext <integer>                                           (0)
-  --extsize <integer>
-  --min <integer>
+  -b --bins <integer>                 number of bins feature is divided (10)
+  -x --ext <integer>                  number of extended bind outside feature
+  -X --extsize <integer>              size of extended bins
+  --min <integer>                     minimum size of feature to divide
   
   Post-processing:
-  --sum
-  --smooth
+  -U --sum                            generate summary file
+  --smooth                            smoothen sparse data
   
   General options:
-  --out <filename>
-  --gz
-  --cpu <integer>                                           (2)
-  --version
-  --help                              show extended documentation
+  -z --gz                             compress output file
+  -c --cpu <integer>                  number of threads, default 4
+  -v --version                        print version and exit
+  -h --help                           show extended documentation
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
+=head2 Options for data files
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify an input file containing either a list of database features or 
 genomic coordinates for which to collect data. Any tab-delimited text 
@@ -892,51 +900,58 @@ UCSC native formats such as gene prediction tables are all supported.
 Gene annotation files will be parsed as sequence features. 
 Files may be gzipped compressed.
 
-=item --db <name | filename>
+=item --out E<lt>filenameE<gt>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. A database is 
-required for generating new data files with features. This option may 
-skipped when using coordinate information from an input file (e.g. BED 
-file), or when using an existing input file with the database indicated 
-in the metadata. For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+Specify the output file name. Default is to overwrite the input text 
+file. Required if generating a new file from a database.
+
+=back
+
+=head2 Options for new files
+
+=over 4
+
+=item --db E<lt>nameE<gt>
+
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
+from which gene or feature annotation may be collected rather than providing 
+an input file. The name may be that of a MySQL database or a SQLite file. 
 
 =item --feature <type | type:source | alias>,...
 
 Specify the type of feature from which to collect values. This is required 
 only for new feature tables. Three types of values may be passed: the 
-feature type, feature type and source expressed as 'type:source', or an 
-alias to one or more feature types. Aliases are specified in the 
-C<biotoolbox.cfg> file and provide a shortcut to a list of one or more 
-database features. More than one feature may be included as a 
-comma-delimited list (no spaces). 
+feature type, feature type and source expressed as 'type:source'. 
+More than one feature may be included as a comma-delimited list (no spaces). 
   
-=item --ddb <name | filename>
+=back
+
+=head2 Options for data collection
+
+=over 4
+
+=item --ddb E<lt>name | filenameE<gt>
 
 If the data to be collected is from a second database that is separate 
 from the annotation database, provide the name of the data database here. 
-Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
+Typically, a second L<Bio::DB::SeqFeature::Store> or BigWigSet database 
 is provided here. 
 
-=item --data <dataset_name | filename>
+=item --data E<lt>dataset_name | filenameE<gt>
 
 Provide the name of the dataset to collect the values. If no 
 dataset is specified on the command line, then the program will 
 interactively present a list of datasets from the database to select. 
 
-The dataset may be a feature type in a BioPerl Bio::DB::SeqFeature::Store 
-or Bio::DB::BigWigSet database. Provide either the feature type or 
-type:source. The feature may point to another data file whose path is 
-stored in the feature's attribute tag (for example a binary 
-Bio::Graphics::Wiggle .wib file, a bigWig file, or Bam file), or the 
-features' scores may be used in data collection.
-
-Alternatively, the dataset may be a database file, including bigWig (.bw), 
+The dataset may be a database file, including bigWig (.bw), 
 bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
 remote (specified with a http: or ftp: prefix).
 
-=item --method <text>
+Alternatively, the dataset may be a feature type in a BioPerl L<Bio::DB::SeqFeature::Store> 
+or L<Bio::DB::BigWigSet> database. Provide either the feature type or 
+C<type:source>. 
+
+=item --method E<lt>textE<gt>
 
 Specify the method for combining all of the dataset values within the 
 genomic region of the feature. Accepted values include:
@@ -1013,30 +1028,42 @@ at each window, rather than once for each file feature or region and
 subsequently assigning scores to windows. Execution times may be 
 longer than otherwise. Default is false.
 
-=item --bins <integer>
+=back
+
+=head2 Bin specification
+
+=over 4
+
+=item --bins E<lt>integerE<gt>
 
 Specify the number of bins that will be generated over the length 
 of the feature. The size of the feature is a percentage of the 
 feature length. The default number is 10, which results in bins of 
 size equal to 10% of the feature length. 
 
-=item --ext <integer>
+=item --ext E<lt>integerE<gt>
 
 Specify the number of extended bins on either side of the feature. 
 The bins are of the same size as determined by the feature 
 length and the --bins value. The default is 0. 
 
-=item --extsize <integer>
+=item --extsize E<lt>integerE<gt>
 
 Specify the exact bin size in bp of the extended bins rather than
 using a percentage of feature of length.
 
-=item --min <integer>
+=item --min E<lt>integerE<gt>
 
 Specify the minimum feature size to be averaged. Features with a
 length below this value will not be skipped (all bins will have
 null values). This is to avoid having bin sizes below the average 
 microarray tiling distance. The default is undefined (no limit).
+
+=back
+
+=head2 Post-processing
+
+=over 4
 
 =item --sum
 
@@ -1050,19 +1077,21 @@ is false.
 Indicate that windows without values should (not) be interpolated
 from neighboring values. The default is false.
 
-=item --out <filename>
+=back
 
-Specify the output file name. 
+=head2 General options
+
+=over 4
 
 =item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
 
-=item --cpu <integer>
+=item --cpu E<lt>integerE<gt>
 
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of Parallel::ForkManager. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
+default is 4. Disable multi-threaded execution by setting to 1. 
 
 =item --version
 

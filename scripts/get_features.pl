@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(verify_or_request_feature_types);
@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(
 	filter_transcript_biotype
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.54';
+my $VERSION = '1.60';
 
 print "\n This program will collect features from a database\n\n";
 
@@ -61,29 +61,29 @@ my %exclude_tag2value;
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$input, # input table
-	'db=s'      => \$database, # source annotation database
-	'feature=s' => \@features, # the features to collect from the database
-	'sub!'      => \$get_subfeatures, # collect subfeatures
+	'i|in=s'      => \$input, # input table
+	'd|db=s'      => \$database, # source annotation database
+	'f|feature=s' => \@features, # the features to collect from the database
+	'u|sub!'      => \$get_subfeatures, # collect subfeatures
 	'coord!'    => \$include_coordinates, # collect coordinates
-	'start=i'   => \$start_adj, # start coordinate adjustment
-	'stop=i'    => \$stop_adj, # stop coordinate adjustment
-	'pos=s'     => \$position, # relative position to adjust coordinates
-	'tag=s'     => \@include_tags, # attributes to include
-	'exclude=s' => \@exclude_tags, # attribute and keys to exclude
+	'b|start=i'   => \$start_adj, # start coordinate adjustment
+	'e|stop=i'    => \$stop_adj, # stop coordinate adjustment
+	'p|pos=s'     => \$position, # relative position to adjust coordinates
+	't|tag=s'     => \@include_tags, # attributes to include
+	'x|exclude=s' => \@exclude_tags, # attribute and keys to exclude
 	'tsl=s'     => \$tsl, # filter on transcript support level
 	'gencode!'  => \$gencode, # filter on gencode basic tag
 	'biotype=s' => \$tbiotype, # filter on transcript biotype
 	'collapse!' => \$collapse, # collapse multi-transcript genes
-	'chrskip=s' => \$chromosome_exclude, # skip chromosomes
-	'bed!'      => \$convert_to_bed, # convert to bed format
-	'gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
-	'gtf!'      => \$convert_to_gtf, # convert to gtf format
-	'ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
-	'out=s'     => \$outfile, # name of output file 
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'K|chrskip=s' => \$chromosome_exclude, # skip chromosomes
+	'B|bed!'      => \$convert_to_bed, # convert to bed format
+	'G|gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
+	'g|gtf!'      => \$convert_to_gtf, # convert to gtf format
+	'r|ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
+	'o|out=s'     => \$outfile, # name of output file 
+	'z|gz!'       => \$gz, # compress output
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -646,7 +646,7 @@ __END__
 
 get_features.pl
 
-A script to collect and filter annotated features from source files.
+A program to collect and filter annotated features from source files.
 
 =head1 SYNOPSIS
 
@@ -655,49 +655,53 @@ get_features.pl --in E<lt>filenameE<gt> --out E<lt>filenameE<gt>
 get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
   Source data:
-  --db <name | filename>    (name, file.db, or file.sqlite)
-  --in <filename>           (gff, gtf, genePred, etc)
+  -d --db <name | filename>     database: name, file.db, or file.sqlite
+  -i --in <filename>            input annotation: GFF3, GTF, genePred, etc
   
   Selection:
-  --feature <type>          (gene, mRNA, transcript, etc)
-  --sub
+  -f --feature <type>           feature: gene, mRNA, transcript, etc
+  -u --sub                      include subfeatures (true if gff, gtf, refFlat out)
   
   Filter features:
-  --exclude <tag=value>
-  --biotype <regex>
-  --tsl [best|best1|best2|best3|best4|best5|1|2|3|4|5|NA]
-  --gencode
-  --chrskip <regex>
+  -K --chrskip <regex>          skip features from certain chromosomes
+  -x --exclude <tag=value>      exclude features with specific attribute value
+  --biotype <regex>             include specific biotype
+  --tsl [best|best1|best2|      specify minimum transcript support level 
+         best3|best4|best5|       primarily Ensembl annotation 
+         1|2|3|4|5|NA]  
+  --gencode                     
   
   Adjustments:
-  --collapse
-  --start=<integer>
-  --stop=<integer>
-  --pos [ 5 | m | 3 | 53 ]
+  -b --start=<integer>          modify start positions
+  -e --stop=<integer>           modify stop positions
+  -p --pos [ 5 | m | 3 | 53 ]   relative position from which to modify
+  --collapse                    collapse subfeatures from alt transcripts
   
   Report format options:
-  --coord
-  --tag <text>
-  --bed
-  --gff or --gff3
-  --gtf
-  --refflat or --ucsc
+  -B --bed                      BED6 format
+  -G --gff                      GFF3 format
+  -g --gtf                      GTF format
+  -r --refflat                  UCSC refFLat
+  -t --tag <text>               include specific GFF attributes in text output
+  --coord                       include coordinates in text output
   
   General options:
-  --out <filename>
-  --gz
-  --version
-  --help
+  -o --out <filename>           output file name
+  -z --gz                       compress output
+  -v --version                  print version and exit
+  -h --help                     show full documentation
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
+=head2 Source data
+
 =over 4
 
 =item --db E<lt>textE<gt>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. A SQLite file 
 or a named relational database may be provided. Used as an alternate 
 to an input file.
@@ -707,6 +711,12 @@ to an input file.
 Specify the filename of a gene annotation file, including GTF, GFF3, 
 or a UCSC-formatted file including, refFlat, genePred, or knownGene.
 The file may be gzip compressed. Used as an alternate to a database.
+
+=back
+
+=head2 Selection
+
+=over 4
 
 =item --feature E<lt>typeE<gt>
 
@@ -721,7 +731,23 @@ from which one or more may be chosen.
 Optionally include all child subfeatures in the output. For example, 
 transcript, CDS, and/or exon subfeatures of a gene. This option is 
 automatically enabled with GFF, GTF, or refFlat output; it may be 
-turned off with "--nosub". It has no effect with standard text or BED output.
+turned off with C<--nosub>. It has no effect with standard text or BED output.
+
+=back
+
+=head2 Filter features
+
+=over 4
+
+=item --chrskip E<lt>regexE<gt>
+
+Exclude features from the output whose sequence ID or chromosome matches 
+the provided regex-compatible string. Expressions should be quoted or 
+properly escaped on the command line. Examples might be 
+    
+    'chrM'
+    'scaffold.+'
+    'chr.+alt|chrUn.+|chr.+_random'
 
 =item --exclude E<lt>tag=valueE<gt>
 
@@ -765,22 +791,11 @@ with value "basic". Typically, at least one transcript for every gene is
 marked as part of the GENCODE set. Transcripts not marked as such usually 
 lack sufficient experimental evidence.
 
-=item --chrskip E<lt>regexE<gt>
+=back
 
-Exclude features from the output whose sequence ID or chromosome matches 
-the provided regex-compatible string. Expressions should be quoted or 
-properly escaped on the command line. Examples might be 
-    
-    'chrM'
-    'scaffold.+'
-    'chr.+alt|chrUn.+|chr.+_random'
+=head2 Adjustments
 
-=item --collapse
-
-Boolean option to collapse multiple alternate transcripts of a gene into 
-a single artificial transcript, merging overlapping exons and minimizing 
-introns, where appropriate. Genes without alternate transcripts are not 
-collapsed.
+=over 4
 
 =item --start=<integer>
 
@@ -803,18 +818,18 @@ value. Alternatively, specify '53' to indicate that the start adjustment
 adjusts the 5 prime end and the stop adjustment adjusts the 3 prime end. 
 The default is '53'.
 
-=item --coord
+=item --collapse
 
-When writing a standard text file, optionally include the chromosome, 
-start, stop, and strand coordinates. These are automatically included 
-in other formats. This is automatically included when adjusting 
-coordinate positions.
+Boolean option to collapse multiple alternate transcripts of a gene into 
+a single artificial transcript, merging overlapping exons and minimizing 
+introns, where appropriate. Genes without alternate transcripts are not 
+collapsed.
 
-=item --tag E<lt>textE<gt>
+=back
 
-When writing a standard text file, optionally include additional 
-GFF/GTF attribute tags. Specify as a comma-delimited list or as 
-separate options.
+=head2 Report format options
+
+=over 4
 
 =item --bed
 
@@ -830,12 +845,33 @@ automatically included and coordinate adjustments ignored.
 Write a GTF format (GFF version 2.2 or 2.5) output file. Subfeatures are 
 automatically included and coordinate adjustments ignored.
 
-=item --refflat or --ucsc
+=item --refflat 
+
+=item --ucsc
 
 Write a UCSC-style refFlat format (10 columns) gene annotation table. 
 Subfeatures are automatically included and coordinate adjustments ignored.
 
-=item --out <filename>
+=item --tag E<lt>textE<gt>
+
+When writing a standard text file, optionally include additional 
+GFF/GTF attribute tags. Specify as a comma-delimited list or as 
+separate options.
+
+=item --coord
+
+When writing a standard text file, optionally include the chromosome, 
+start, stop, and strand coordinates. These are automatically included 
+in other formats. This is automatically included when adjusting 
+coordinate positions.
+
+=back
+
+=head2 General options
+
+=over 4
+
+=item --out E<lt>filenameE<gt>
 
 Specify the output file name. Default is the joined list of features. 
 
@@ -873,7 +909,7 @@ metadata for use in subsequent programs. Coordinates may be optionally
 included in the text file, which preempts using parsed features in other 
 tools. 
 
-=head1 COORDINATE ADJUSTMENTS
+=head2 Coordinate adjustments
 
 Coordinates of the features may be adjusted as desired when writing to 
 text or BED file formats. Adjustments may be made relative to either 

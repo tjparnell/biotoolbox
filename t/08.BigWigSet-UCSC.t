@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigWigSet; 1}) {
-		plan tests => 25;
+		plan tests => 31;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigWigSet not available';
@@ -31,6 +31,7 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
+is($Data->big_adapter('ucsc'), 'ucsc', 'set preferred database adapter to ucsc');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
@@ -66,6 +67,8 @@ my $score = $row->get_score(
 # print "count sum for ", $row->name, " is $score\n";
 is($score, 435, 'row sum of count') or 
 	diag("if this test fails, try updating your UCSC kent source library and rebuild");
+	# this number is erroneous, the actual value is 434, but the summaries count returns 
+	# 435 for whatever reason - sigh
 
 # score mean coverage
 $score = $row->get_score(
@@ -76,6 +79,34 @@ $score = $row->get_score(
 # print "mean coverage for ", $row->name, " is $score\n";
 is(sprintf("%.2f", $score), 1.19, 'row mean score') or 
 	diag("if this test fails, try updating your UCSC kent source library and rebuild");
+
+# postion scores
+my %pos2scores2 = $row->get_region_position_scores(
+	'dataset'  => 'sample3',
+);
+# print "found ", scalar keys %pos2scores2, " positions with reads\n";
+# foreach (sort {$a <=> $b} keys %pos2scores2) {
+# 	print "  $_ => $pos2scores2{$_}\n";
+# }
+is(scalar(keys %pos2scores2), 434, 'position scores');
+is(sprintf("%.2f", $pos2scores2{1671}), 2.72, 'score at position 1671');
+is($pos2scores2{1787}, 0, 'score at position 1787');
+
+# min score
+$score = $row->get_score(
+	'db'       => $db,
+	'dataset'  => 'sample3',
+	'method'   => 'min',
+);
+is($score, 0, 'minimum score');
+
+# max score
+$score = $row->get_score(
+	'db'       => $db,
+	'dataset'  => 'sample3',
+	'method'   => 'max',
+);
+is(sprintf("%.2f", $score), 4.57, 'maximum score');
 
 
 

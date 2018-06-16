@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigWig; 1}) {
-		plan tests => 24;
+		plan tests => 27;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigWig not available';
@@ -31,6 +31,7 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
+is($Data->big_adapter('ucsc'), 'ucsc', 'set preferred database adapter to ucsc');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
@@ -75,6 +76,22 @@ $score = $row->get_score(
 # print "mean coverage for ", $row->name, " is $score\n";
 is(sprintf("%.2f", $score), -0.12, 'row mean score') or 
 	diag("if this test fails, try updating your UCSC kent source library and rebuild");
+
+# score min coverage
+$score = $row->get_score(
+	'db'       => $db,
+	'dataset'  => $dataset,
+	'method'   => 'min',
+);
+is(sprintf("%.2f", $score), -0.62, 'row min score');
+
+# score max coverage
+$score = $row->get_score(
+	'db'       => $db,
+	'dataset'  => $dataset,
+	'method'   => 'max',
+);
+is(sprintf("%.2f", $score), 0.52, 'row max score');
 
 
 

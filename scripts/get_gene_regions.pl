@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.53';
+my $VERSION = '1.60';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -1340,59 +1340,79 @@ __END__
 
 get_gene_regions.pl
 
-A script to collect specific, often un-annotated regions from genes.
+A program to collect specific, often un-annotated, regions from genes.
 
 =head1 SYNOPSIS
 
-get_gene_regions.pl [--options...] --in <filename> --out <filename>
+get_gene_regions.pl [--options...] --in E<lt>filenameE<gt> --out E<lt>filenameE<gt>
   
-get_gene_regions.pl [--options...] --db <text> --out <filename>
+get_gene_regions.pl [--options...] --db <text> --out E<lt>filenameE<gt>
 
-  Options:
-  --in <filename>  (gff,gtf,gff3,refFlat,genePred,knownGene)
-  --db <text>
-  --out <filename> 
-  --feature <type | type:source>
-  --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
-  --region [tss|tts|cdsStart|cdsStop|splice|UTR|exon|collapsedExon|
-            altExon|uncommonExon|commonExon|firstExon|lastExon|
-            intron|collapsedIntron|altIntron|uncommonIntron|commonIntron|
-            firstIntron|lastIntron]
-  --start=<integer>
-  --stop=<integer>
-  --unique
-  --slop <integer>
-  --tsl [best|best1|best2|best3|best4|best5|1|2|3|4|5|NA]
-  --bed
-  --gz
-  --version
-  --help
+  Source data:
+  -i --in <filename>            input annotation: GFF3, GTF, genePred, etc
+  -d --db <name | filename>     database: name, file.db, or file.sqlite
+  
+  Feature selection:
+  -f --feature <type>           optionally specify gene type or type:source
+  -t --transcript               specify the transcript type
+       [all|mRNA|ncRNA|snRNA|
+       snoRNA|tRNA|rRNA|miRNA|
+       lincRNA|misc_RNA]
+  -r --region                   specify the gene region to collect
+       [tss|tts|cdsStart|cdsStop|
+       splice|UTR|exon|
+       collapsedExon|altExon|
+       uncommonExon|commonExon|
+       firstExon|lastExon|intron|
+       collapsedIntron|altIntron|
+       uncommonIntron|commonIntron|
+       firstIntron|lastIntron]
+  --tsl                         select transcript support level
+       [best|best1|best2|best3|
+       best4|best5|1|2|3|4|5|NA]
+  -u --unique                   select only unique regions
+  -l --slop <integer>           duplicate region if within X bp
+  
+  Adjustments:
+  -b --begin --start integer     specify adjustment to start coordinate
+  -e --end --stop integer        specify adjustment to stop coordinate
+  
+  General options:
+  --bed                         output as a bed6 format
+  -o --out <filename>              specify output name
+  -z --gz                          compress output
+  -v --version                     print version and exit
+  -h --help
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
+=head2 Source data
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Provide a gene table or annotation file, including GTF, GFF, GFF3, UCSC 
 refFlat, UCSC genePred or genePredExt, or UCSC knownGene table. Files 
 may be gzipped.
 
-=item --db <text>
+=item --db E<lt>textE<gt>
 
 Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be obtained. Only required if 
 an input gene table is not provided.
 
-=item --out <filename>
+=back
 
-Specify the output filename.
+=head2 Feature selection
 
-=item --feature <type | type:source>
+=over 4
 
-Specify the parental gene feature type (primary_tag) or type:source when
+=item --feature E<lt>typeE<gt>
+
+Specify the parental gene feature type (C<primary_tag>) or C<type:source> when
 using a database. If not specified, a list of available types will be
 presented interactively to the user for selection. This is not relevant for
 GFF3 source files (all gene or transcript features are considered). This is 
@@ -1400,14 +1420,25 @@ helpful when gene annotation from multiple sources are present in the same
 database, e.g. refSeq and ensembl sources. More than one feature may be 
 included, either as a comma-delimited list or multiple options.
 
-=item --transcript [all|mRNA|ncRNA|snRNA|snoRNA|tRNA|rRNA|miRNA|lincRNA|misc_RNA]
+=item --transcript E<lt>typeE<gt>
 
 Specify the transcript type (usually a gene subfeature) from which to  
 collect the regions. Multiple types may be specified as a comma-delimited 
 list, or 'all' may be specified. If not specified, an interactive list 
-will be presented from which the user may select.
+will be presented from which the user may select. Available options include:
 
-=item --region <region>
+  all
+  mRNA
+  ncRNA
+  snRNA
+  snoRNA
+  tRNA
+  rRNA
+  miRNA
+  lincRNA
+  misc_RNA
+ 
+=item --region E<lt>regionE<gt>
 
 Specify the type of region to retrieve. If not specified on the command 
 line, the list is presented interactively to the user for selection. The 
@@ -1434,36 +1465,7 @@ possibilities are listed below.
   cdsStart      The first base of the CDS
   cdsStop       The last base of the CDS
 
-=item --start=<integer>
-
-=item --stop=<integer>
-
-Optionally specify adjustment values to adjust the reported start and 
-end coordinates of the collected regions. A negative value is shifted 
-upstream (5' direction), and a positive value is shifted downstream.
-Adjustments are made relative to the feature's strand, such that 
-a start adjustment will always modify the feature's 5'end, either 
-the feature startpoint or endpoint, depending on its orientation. 
-
-=item --unique
-
-Compare start and stop coordinates of each collected region from 
-each feature and remove duplicate regions. When the --slop option 
-is provided, only the start coordinate plus/minus the slop factor 
-is checked. 
-
-=item --slop <integer>
-
-When identifying unique regions, specify the number of bp to 
-add and subtract to the start position (the slop or fudge factor) 
-of the regions when considering duplicates. Any other region 
-within this window will be considered a duplicate. Useful, for 
-example, when start sites of transcription are not precisely mapped, 
-but not useful with defined introns and exons. This does not take 
-into consideration transcripts from other genes, only the current 
-gene. The default is 0 (no sloppiness).
-
-=item --tsl <level>
+=item --tsl E<lt>levelE<gt>
 
 Filter transcripts on the Ensembl GTF/GFF3 attribute 'transcript_support_level', 
 which is described at L<Ensembl TSL glossary entry|http://uswest.ensembl.org/info/website/glossary.html>.
@@ -1479,9 +1481,58 @@ Provide a level of support to filter. Values include:
             at or better (lower) than the indicated level
     NA      Only transcripts without a level (NA) are retained.
 
+=item --unique
+
+Compare start and stop coordinates of each collected region from 
+each feature and remove duplicate regions. When the --slop option 
+is provided, only the start coordinate plus/minus the slop factor 
+is checked. 
+
+=item --slop E<lt>integerE<gt>
+
+When identifying unique regions, specify the number of bp to 
+add and subtract to the start position (the slop or fudge factor) 
+of the regions when considering duplicates. Any other region 
+within this window will be considered a duplicate. Useful, for 
+example, when start sites of transcription are not precisely mapped, 
+but not useful with defined introns and exons. This does not take 
+into consideration transcripts from other genes, only the current 
+gene. The default is 0 (no sloppiness).
+
+=back
+
+=head2 Adjustments
+
+=over 4
+
+=item --start E<lt>integerE<gt>
+
+=item --begin E<lt>integerE<gt>
+
+=item --stop E<lt>integerE<gt>
+
+=item --end E<lt>integerE<gt>
+
+Optionally specify adjustment values to adjust the reported start and 
+end coordinates of the collected regions. A negative value is shifted 
+upstream (5' direction), and a positive value is shifted downstream.
+Adjustments are made relative to the feature's strand, such that 
+a start adjustment will always modify the feature's 5'end, either 
+the feature startpoint or endpoint, depending on its orientation. 
+
+=back
+
+=head2 General options
+
+=over 4
+
 =item --bed
 
 Automatically convert the output file to a BED file.
+
+=item --out E<lt>filenameE<gt>
+
+Specify the output filename.
 
 =item --gz
 

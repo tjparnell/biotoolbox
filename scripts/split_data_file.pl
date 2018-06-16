@@ -4,10 +4,10 @@
 
 use strict;
 use Pod::Usage;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.41';
+my $VERSION =  '1.60';
 
 print "\n This script will split a data file by features\n\n";
 
@@ -38,14 +38,14 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'        => \$infile, # specify the input data file
-	'index|col=i' => \$index, # index for the column to use for splitting
-	'tag=s'       => \$tag, # attribute tag name
-	'max=i'       => \$max, # maximum number of lines per file
-	'prefix=s'    => \$prefix, # output file prefix
-	'gz!'         => \$gz, # compress output files
-	'help'        => \$help, # request help
-	'version'     => \$print_version, # print the version
+	'i|in=s'        => \$infile, # specify the input data file
+	'x|index|col=i' => \$index, # index for the column to use for splitting
+	't|tag=s'       => \$tag, # attribute tag name
+	'm|max=i'       => \$max, # maximum number of lines per file
+	'p|prefix=s'    => \$prefix, # output file prefix
+	'z|gz!'         => \$gz, # compress output files
+	'h|help'        => \$help, # request help
+	'v|version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -240,58 +240,76 @@ __END__
 
 split_data_file.pl
 
-A script to split a data file by rows based on common data values.
+A program to split a data file by rows based on common data values.
 
 =head1 SYNOPSIS
 
 split_data_file.pl [--options] <filename>
   
-  Options:
-  --in <filename>               (txt bed gff gtf vcf refFlat ucsc etc)
-  --index <column_index>
-  --tag <text>
-  --max <integer>
-  --prefix <text>
-  --gz
-  --version
-  --help                        show extended documentation
+  File options:
+  -i --in <filename>                (txt bed gff gtf vcf refFlat ucsc etc)
+  -p --prefix <text>                output file prefix (input basename)
+  
+  Splitting options:
+  -x --index <column_index>         column with values to split upon
+  -t --tag <text>                   use VCF/GFF attribute
+  -m --max <integer>                maximum number of items per output file
+  
+  General options:
+  -z --gz                           compress output file
+  -v --version                      print version and exit
+  -h --help                         show extended documentation
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify the file name of a data file. It must be a tab-delimited text file. 
 The file may be compressed with gzip.
 
-=item --index <column_index>
+=item --prefix E<lt>textE<gt>
+
+Optionally provide a filename prefix for the output files. The default 
+prefix is the input filename base name. If no prefix is desired, using 
+just the values as filenames, then set the prefix to 'none'.
+
+=back
+
+=head2 Splitting options
+
+=over 4
+
+=item --index E<lt>column_indexE<gt>
 
 Provide the index number of the column or dataset containing the values 
 used to split the file. If not specified, then the index is requested 
 from the user in an interactive mode.
 
-=item --tag <text>
+=item --tag E<lt>textE<gt>
 
 Provide the attribute tag name that contains the values to split the 
 file. Attributes are supported by GFF and VCF files. If splitting a 
 VCF file, please also provide the column index. The INFO column is 
 index 7, and sample columns begin at index 9.
 
-=item --max <integer>
+=item --max E<lt>integerE<gt>
 
 Optionally specify the maximum number of data lines to write to each 
 file. Each group of specific value data is written to one or more files. 
 Enter as an integer; underscores may be used as thousands separator, e.g. 
 100_000. 
 
-=item --prefix <text>
+=back
 
-Optionally provide a filename prefix for the output files. The default 
-prefix is the input filename base name. If no prefix is desired, using 
-just the values as filenames, then set the prefix to 'none'.
+=head2 General options
+
+=over 4
 
 =item --gz
 

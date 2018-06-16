@@ -10,7 +10,7 @@ use FindBin '$Bin';
 
 BEGIN {
 	if (eval {require Bio::DB::BigBed; 1}) {
-		plan tests => 37;
+		plan tests => 38;
 	}
 	else {
 		plan skip_all => 'Optional module Bio::DB::BigBed not available';
@@ -31,6 +31,7 @@ my $Data = Bio::ToolBox::Data->new(file => $infile);
 isa_ok($Data, 'Bio::ToolBox::Data', 'BED Data');
 
 # add a database
+is($Data->big_adapter('ucsc'), 'ucsc', 'set preferred database adapter to ucsc');
 $Data->database($dataset);
 is($Data->database, $dataset, 'get database');
 my $db = $Data->open_database;
@@ -77,7 +78,7 @@ $score = $row->get_score(
 	'method'   => 'mean',
 );
 # print "mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 143.81, 'row mean score');
+is(sprintf("%.1f", $score), 143.8, 'row mean score');
 
 # read precise count sum
 $score = $row->get_score(
@@ -138,7 +139,7 @@ $score = $row->get_score(
 	'stranded' => 'sense',
 );
 # print "sense mean coverage for ", $row->name, " is $score\n";
-is(sprintf("%.2f", $score), 146.88, 'row mean score for sense strand');
+is(sprintf("%.1f", $score), 146.9, 'row mean score for sense strand');
 
 $score = $row->get_score(
 	'dataset'  => $dataset,

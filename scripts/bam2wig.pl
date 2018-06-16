@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use List::Util qw(sum);
 use List::MoreUtils qw(natatime);
@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.55';
+my $VERSION = '1.60';
 	
 	
 
@@ -70,9 +70,9 @@ my (
 	$do_strand,
 	$flip,
 	$min_mapq,
-	$secondary,
-	$duplicate,
-	$supplementary,
+	$nosecondary,
+	$noduplicate,
+	$nosupplementary,
 	$max_isize,
 	$min_isize,
 	$multi_hit_scale,
@@ -100,54 +100,54 @@ my @scale_values;
 
 # Command line options
 GetOptions( 
-	'in=s'      => \@bamfiles, # one or more bam files
-	'out=s'     => \$outfile, # name of output file 
-	'start!'    => \$use_start, # record start point
-	'mid!'      => \$use_mid, # record mid point
-	'span!'     => \$use_span, # record span
-	'cspan!'    => \$use_cspan, # record center span
-	'extend!'   => \$use_extend, # extend read
-	'coverage!' => \$use_coverage, # calculate coverage
-	'position=s' => \$position, # legacy option
-	'splice|split!'   => \$splice, # split splices
-	'pe!'       => \$paired, # paired-end alignments
-	'shift!'    => \$shift, # shift coordinates 3'
-	'shiftval=i' => \$shift_value, # value to shift coordinates
-	'extval=i'  => \$extend_value, # value to extend reads
-	'chrom=i'   => \$chr_number, # number of chromosomes to sample
-	'minr=f'    => \$correlation_min, # R minimum value for shift
-	'zmin=f'    => \$zmin, # minimum z-score interval for calculating shift
-	'zmax=f'    => \$zmax, # maximum z-score interval for calculating shift
-	'model!'    => \$model, # write the strand shift model data
-	'strand!'   => \$do_strand, # separate strands
-	'flip!'     => \$flip, # flip the strands
-	'qual=i'    => \$min_mapq, # minimum mapping quality
-	'secondary!' => \$secondary, # take secondary alignments
-	'duplicate!' => \$duplicate, # include duplicate alignments
-	'supplementary!' => \$supplementary, # include supplementary alignments
-	'maxsize=i' => \$max_isize, # maximum paired insert size to accept
-	'minsize=i' => \$min_isize, # minimum paired insert size to accept
-	'fraction!'  => \$multi_hit_scale, # scale by number of hits
-	'rpm!'      => \$rpm, # calculate reads per million
-	'separate|mean!' => \$do_mean, # rpm scale separately
-	'scale=s'   => \@scale_values, # user specified scale value
-	'chrskip=s' => \$chr_exclude, # regex for skipping chromosomes
-	'blacklist=s' => \$black_list, # file for skipping regions
-	'bin=i'     => \$bin_size, # size for binning the data
-	'format=i'  => \$dec_precison, # format to number of decimal positions
-	'bw!'       => \$bigwig, # generate bigwig file
-	'bwapp=s'   => \$bwapp, # utility to generate a bigwig file
-	'bdg!'      => \$do_bedgraph, # write a bedgraph output
-	'fix!'      => \$do_fixstep, # write a fixedStep output
-	'var!'      => \$do_varstep, # write a varStep output
-	'gz!'       => \$gz, # compress text output
-	'cpu=i'     => \$cpu, # number of cpu cores to use
-	'intron=i'  => \$max_intron, # maximum intron size to allow
-	'window=i'  => \$window, # window size to control memory usage
-	'verbose!'  => \$verbose, # print sample correlations
-	'adapter=s' => \$BAM_ADAPTER, # explicitly set the adapter version
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'       => \@bamfiles, # one or more bam files
+	'o|out=s'      => \$outfile, # name of output file 
+	's|start!'     => \$use_start, # record start point
+	'm|mid!'       => \$use_mid, # record mid point
+	'a|span!'      => \$use_span, # record span
+	'cspan!'       => \$use_cspan, # record center span
+	'e|extend!'    => \$use_extend, # extend read
+	'coverage!'    => \$use_coverage, # calculate coverage
+	'position=s'   => \$position, # legacy option
+	'l|splice|split!'   => \$splice, # split splices
+	'p|pe!'        => \$paired, # paired-end alignments
+	'I|shift!'     => \$shift, # shift coordinates 3'
+	'H|shiftval=i' => \$shift_value, # value to shift coordinates
+	'x|extval=i'   => \$extend_value, # value to extend reads
+	'chrom=i'      => \$chr_number, # number of chromosomes to sample
+	'minr=f'       => \$correlation_min, # R minimum value for shift
+	'zmin=f'       => \$zmin, # minimum z-score interval for calculating shift
+	'zmax=f'       => \$zmax, # maximum z-score interval for calculating shift
+	'M|model!'       => \$model, # write the strand shift model data
+	't|strand!'    => \$do_strand, # separate strands
+	'flip!'        => \$flip, # flip the strands
+	'q|qual=i'     => \$min_mapq, # minimum mapping quality
+	'S|nosecondary'  => \$nosecondary, # skip secondary alignments
+	'D|noduplicate!' => \$noduplicate, # skip duplicate alignments
+	'U|nosupplementary!' => \$nosupplementary, # skip supplementary alignments
+	'maxsize=i'    => \$max_isize, # maximum paired insert size to accept
+	'minsize=i'    => \$min_isize, # minimum paired insert size to accept
+	'fraction!'    => \$multi_hit_scale, # scale by number of hits
+	'r|rpm!'       => \$rpm, # calculate reads per million
+	'm|separate|mean!' => \$do_mean, # rpm scale separately
+	'scale=s'      => \@scale_values, # user specified scale value
+	'K|chrskip=s'  => \$chr_exclude, # regex for skipping chromosomes
+	'B|blacklist=s' => \$black_list, # file for skipping regions
+	'bin=i'        => \$bin_size, # size for binning the data
+	'format=i'     => \$dec_precison, # format to number of decimal positions
+	'b|bw!'        => \$bigwig, # generate bigwig file
+	'bwapp=s'      => \$bwapp, # utility to generate a bigwig file
+	'bdg!'         => \$do_bedgraph, # write a bedgraph output
+	'fix!'         => \$do_fixstep, # write a fixedStep output
+	'var!'         => \$do_varstep, # write a varStep output
+	'z|gz!'        => \$gz, # compress text output
+	'c|cpu=i'      => \$cpu, # number of cpu cores to use
+	'intron=i'     => \$max_intron, # maximum intron size to allow
+	'window=i'     => \$window, # window size to control memory usage
+	'V|verbose!'   => \$verbose, # print sample correlations
+	'adapter=s'    => \$BAM_ADAPTER, # explicitly set the adapter version
+	'h|help'       => \$help, # request help
+	'v|version'    => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -253,6 +253,7 @@ if ($use_cspan) {
 	print " $items will be center extended by $half_extend bp both directions\n";
 }
 
+
 ### Process bam file
 # process according to type of data collected and alignment type
 if ($cpu > 1) {
@@ -325,7 +326,7 @@ sub check_defaults {
 	# check parallel support
 	if ($parallel) {
 		# conservatively enable 2 cores
-		$cpu ||= 2;
+		$cpu ||= 4;
 	}
 	else {
 		# disable cores
@@ -463,14 +464,10 @@ sub check_defaults {
 	}
 	
 	# check flag parameters
-	unless (defined $secondary) {
-		$secondary = 1;
-	}
-	unless (defined $supplementary) {
-		$supplementary = 1;
-	}
-	unless (defined $duplicate) {
-		$duplicate = 1;
+	if ($verbose) {
+		printf "  %s secondary 0x100 reads\n", $nosecondary ? 'Skipping' : 'Including';
+		printf "  %s duplicate 0x400 reads\n", $noduplicate ? 'Skipping' : 'Including';
+		printf "  %s supplementary 0x800 reads\n", $nosupplementary ? 'Skipping' : 'Including';
 	}
 	
 	# set bin size
@@ -497,9 +494,9 @@ sub check_defaults {
 	# set coverage dump size and subroutine code global values
 	# this is for processing the coverage dump array
 	if ($use_coverage) {
-		print " ignoring duplicate read filters with coverage\n" if not $duplicate;
-		print " ignoring supplementary read filters with coverage\n" if not $supplementary;
-		print " ignoring secondary read filters with coverage\n" if not $secondary;
+		print " ignoring duplicate read filters with coverage\n" if $noduplicate;
+		print " ignoring supplementary read filters with coverage\n" if $nosupplementary;
+		print " ignoring secondary read filters with coverage\n" if $nosecondary;
 		print " ignoring map quality filter with coverage\n" if $min_mapq;
 		print " ignoring paired-end option with coverage\n" if $paired;
 		print " ignoring RPM option with coverage\n" if $rpm;
@@ -1165,8 +1162,10 @@ sub open_wig_file {
 	unless ($name =~ /\.(?:bdg|wig)(?:\.gz)?$/i) {
 		$name .= $do_bedgraph ? '.bdg' : '.wig';
 	}
-	$name .= '.gz' if ($gz and $name !~ /\.gz$/i);
-	my $fh = open_to_write_fh($name, $gz) or 
+	my $do_gz = ($gz and $do_bw) ? 1 : 0; 
+		# using the do_bw value because that tells us if it's a temp file or not
+	$name .= '.gz' if ($do_gz and $name !~ /\.gz$/i);
+	my $fh = open_to_write_fh($name, $do_gz) or 
 		die " unable to open output wig file '$name'!\n";
 		
 	# finished
@@ -1593,7 +1592,7 @@ sub parallel_process_alignments {
 		# otherwise we just normalize
 		else {
 			# determine scaling factor
-			my $scale_factor;
+			my $scale_factor = 1;
 			if ($rpm) {
 				printf " Normalizing depth based on %s total counted alignments\n",
 					format_with_commas($totals[0]); 
@@ -1602,12 +1601,7 @@ sub parallel_process_alignments {
 			if (scalar @scale_values) {
 				# user supplied scaling factor
 				print " Scaling depth with user-supplied factor\n";
-				if ($scale_factor) {
-					$scale_factor *= $scale_values[0];
-				}
-				else {
-					$scale_factor = $scale_values[0];
-				}
+				$scale_factor *= $scale_values[0];
 			}
 			
 			# normalize the wig files
@@ -1833,16 +1827,30 @@ sub write_final_wig_file {
 	
 	# assemble into a hash
 	my %files;
+	my $f_total = 0;
+	my $r_total = 0;
 	foreach my $file (@filelist) {
-		# each file name is basename.samid.seqid.count.strand.temp.wig.gz
-		if ($file =~ /$outbase\.\d+\.(.+)\.\d+\.([fr])\.temp\.wig\Z/) {
+		# each file name is basename.samid.seqid.count.strand.temp.wig
+		if ($file =~ /$outbase\.\d+\.(.+)\.(\d+)\.([fr])\.temp\.wig\Z/) {
 			my $seq_id = $1;
-			my $strand = $2;
+			my $total  = $2;
+			my $strand = $3;
 			$files{$seq_id}{$strand} = $file;
+			$f_total += $total if $strand eq 'f';
+			$r_total += $total if $strand eq 'r';
 		}
 	}
 	my @f_filelist = map { $files{$_}{f} } @seq_list;
 	my @r_filelist = map { $files{$_}{r} } @seq_list;
+	
+	# print total alignment summaries
+	if ($r_total) {
+		printf " %s total forward alignments\n", format_with_commas($f_total);
+		printf " %s total reverse alignments\n", format_with_commas($r_total);
+	}
+	else {
+		printf " %s total alignments\n", format_with_commas($f_total);
+	}
 	
 	# write wig files with the appropriate wig writer
 	if ($do_strand and !$flip) {
@@ -2037,10 +2045,10 @@ sub se_callback {
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if (not $secondary and $flag & 0x0100); # secondary alignment
-	return if (not $duplicate and $flag & 0x0400); # marked duplicate
+	return if ($nosecondary and $flag & 0x0100); # secondary alignment
+	return if ($noduplicate and $flag & 0x0400); # marked duplicate
 	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if (not $supplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
 	
 	# filter black listed regions
 	if (defined $data->{black_list}) {
@@ -2094,10 +2102,10 @@ sub pe_callback {
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if (not $secondary and $flag & 0x0100); # secondary alignment
-	return if (not $duplicate and $flag & 0x0400); # marked duplicate
+	return if ($nosecondary and $flag & 0x0100); # secondary alignment
+	return if ($noduplicate and $flag & 0x0400); # marked duplicate
 	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if (not $supplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
 	
 	# filter black listed regions
 	if ($data->{black_list}) {
@@ -2644,66 +2652,66 @@ __END__
 
 bam2wig.pl
 
-A script to convert Bam alignments into a wig representation file.
+A program to convert Bam alignments into a wig representation file.
 
 =head1 SYNOPSIS
 
-bam2wig.pl [--options...] <file.bam>
+bam2wig.pl [--options...] E<lt>file.bamE<gt>
 
-bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
+bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
  Required options:
-  --in <filename.bam>           repeat if multiple bams, or comma-delimited list
+  -i --in <filename.bam>           repeat if multiple bams, or comma-delimited list
  
  Reporting options (pick one):
-  --start                       record at 5' position
-  --mid                         record at midpoint of alignment or pair
-  --span                        record across entire alignment or pair
-  --extend                      extend alignment (record predicted fragment)
+  -s --start                    record at 5' position
+  -d --mid                      record at midpoint of alignment or pair
+  -a --span                     record across entire alignment or pair
+  -e --extend                   extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
   --coverage                    raw alignment coverage
  
  Alignment reporting options:
-  --splice                      split alignment at N splices
-  --strand                      record separate strands
+  -l --splice                   split alignment at N splices
+  -t --strand                   record separate strands as two wig files
   --flip                        flip the strands for convenience
   
  Paired-end alignments:
-  --pe                          treat as paired-end alignments
+  -p --pe                       treat as paired-end alignments
   --minsize <integer>           minimum allowed insertion size (30)
   --maxsize <integer>           maximum allowed insertion size (600)
   
  Alignment filtering options:
-  --qual <integer>              minimum mapping quality (0)          
-  --nosecondary                 skip secondary alignments (false)
-  --noduplicate                 skip marked duplicate alignments (false)
-  --nosupplementary             skip supplementary alignments (false)
-  --chrskip <regex>             regular expression to skip chromosomes
-  --blacklist <file>            interval file of regions to skip (bed, gff, txt)
+  -K --chrskip <regex>          regular expression to skip chromosomes
+  -B --blacklist <file>         interval file of regions to skip (bed, gff, txt)
+  -q --qual <integer>           minimum mapping quality (0)          
+  -S --nosecondary              ignore secondary alignments (false)
+  -D --noduplicate              ignore marked duplicate alignments (false)
+  -U --nosupplementary          ignore supplementary alignments (false)
   
   Shift options:
-  --shift                       shift reads in the 3' direction
-  --shiftval <integer>          explicit shift value in bp (default is to calculate) 
-  --extval <integer>            explicit extension size in bp (default is to calculate)
+  -I --shift                    shift reads in the 3' direction
+  -x --extval <integer>         explicit extension size in bp (default is to calculate)
+  -H --shiftval <integer>       explicit shift value in bp (default is to calculate) 
   --chrom <integer>             number of chromosomes to sample (4)
   --minr <float>                minimum pearson correlation to calculate shift (0.5)
   --zmin <float>                minimum z-score from average to test peak for shift (3)
   --zmax <float>                maximum z-score from average to test peak for shift (10)
-  --model                       write peak shift model file for graphing
+  -M --model                    write peak shift model file for graphing
   
  Score options:
-  --rpm                         scale depth to Reads Per Million mapped
+  -r --rpm                      scale depth to Reads Per Million mapped
+  -m --mean                     average multiple bams (default is addition)
   --scale <float>               explicit scaling factor, repeat for each bam file
-  --mean or --separate          scale multiple bams independently before averaging
-  --fraction                    assign fractional counts to all multi-mapped alignments                    
+  --fraction                    assign fractional counts to multi-mapped alignments                    
   --format <integer>            number of decimal positions (4)
  
  Output options:
-  --out <filename>              output file name, default is bam file basename
+  -o --out <filename>           output file name, default is bam file basename
+  -b --bw                       convert to bigWig format
   --bin <integer>               bin size for span or extend mode (10)
-  --bw                          convert to bigWig format
   --bwapp /path/to/wigToBigWig  path to external converter
-  --gz                          gzip compress output
+  -z --gz                       gzip compress output
   
  Wig format:
   --bdg                         bedGraph, default for span and extend at bin 1
@@ -2711,10 +2719,10 @@ bam2wig.pl --extend --rpm --separate --out file --bw file1.bam file2.bam
   --var                         varStep, default for start, mid
   
  General options:
-  --cpu <integer>               number of parallel processes (2)
-  --verbose                     report additional information
-  --version                     print version information
-  --help                        show full documentation
+  -c --cpu <integer>            number of parallel processes (4)
+  -V --verbose                  report additional information
+  -v --version                  print version information
+  -h --help                     show full documentation
 
 =head1 OPTIONS
 
@@ -2724,7 +2732,7 @@ The command line flags and descriptions:
 
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify the input Bam alignment file. More than one file may be 
 specified, either with repeated options, a comma-delimited list, 
@@ -2815,12 +2823,12 @@ include FR reads on the same chromosome, and not FF, RR, RF, or
 pairs aligning to separate chromosomes. The default is to 
 treat all alignments as single-end.
 
-=item --minsize <integer>
+=item --minsize E<lt>integerE<gt>
 
 Specify the minimum paired-end fragment size in bp to accept for recording. 
 Default is 30 bp.
 
-=item --maxsize <integer>
+=item --maxsize E<lt>integerE<gt>
 
 Specify the maximum paired-end fragment size in bp to accept for recording. 
 Default is 600 bp.
@@ -2831,34 +2839,34 @@ Default is 600 bp.
 
 =over 4
 
-=item --qual <integer>
+=item --qual E<lt>integerE<gt>
 
 Set a minimum mapping quality score of alignments to count. The mapping 
 quality is a range from 0-255, with higher numbers indicating lower 
 probability of a mapping error. Multi-mapping alignments often have a 
 map quality of 0. The default is 0 (accept everything).
 
-=item --secondary | --nosecondary
+=item --nosecondary
 
-Boolean flag to accept or skip secondary alignments, indicated by the 
+Boolean flag to skip secondary alignments, indicated by the 
 alignment bit flag 0x100. Secondary alignments typically represent 
-alternative mapping locations, or multi-mapping events. By default, all 
-alignments are accepted. 
+alternative mapping locations, or multi-mapping events. By default,  
+secondary alignments are included. 
 
-=item --duplicate | --noduplicate
+=item ---noduplicate
 
-Boolean flag to accept or skip duplicate alignments, indicated by the 
+Boolean flag to skip duplicate alignments, indicated by the 
 alignment bit flag 0x400. Duplicates alignments may represent a PCR or 
-optical duplication. By default, all alignments are accepted. 
+optical duplication. By default, duplicate alignments are included. 
 
-=item --supplementary | --nosupplementary
+=item --nosupplementary
 
-Boolean flag to accept or skip supplementary alignments, indicated by 
+Boolean flag to skip supplementary alignments, indicated by 
 the alignment bit flag 0x800. Supplementary alignments are typically 
-associated with chimeric fragments. By default, all alignments are 
-accepted.
+associated with chimeric fragments. By default, supplementary alignments 
+are included.
 
-=item --chrskip <regex>
+=item --chrskip E<lt>regexE<gt>
 
 Provide a regular expression to skip certain chromosomes. Perl-based 
 regular expressions are employed. Expressions should be quoted or 
@@ -2868,7 +2876,7 @@ properly escaped on the command line. Examples might be
     'scaffold.+'
     'chr.+alt|chrUn.+|chr.+_random'
 
-=item --blacklist <file>
+=item --blacklist E<lt>fileE<gt>
 
 Provide a file of genomic intervals from which to exclude alignments. 
 Examples might include repeats, ribosomal RNA, or heterochromatic regions.
@@ -2889,20 +2897,20 @@ the fragments are counted and often seen as separated discrete peaks
 on opposite strands flanking the true target site. This option is 
 disabled with paired-end and spliced reads (where it is not needed). 
 
-=item --shiftval <integer>
+=item --shiftval E<lt>integerE<gt>
 
 Provide the value in bp that the recorded position should be shifted. 
 The value should be 1/2 the average length of the library insert size.
 The default is to automatically and empirically determine the 
 appropriate shift value using cross-strand correlation (recommended). 
 
-=item --extval <integer>
+=item --extval E<lt>integerE<gt>
 
 Manually set the length for reads to be extended. By default, the shift 
 value is determined empirically and extension is set to 2X the shift 
 value. This is also used for the cspan mode.
 
-=item --chrom <integer>
+=item --chrom E<lt>integerE<gt>
 
 Indicate the number of sequences or chromosomes to sample when 
 empirically determining the shift value. The reference sequences 
@@ -2910,21 +2918,21 @@ listed in the Bam file header are taken in order of decreasing
 length, and one or more are taken as a representative sample of 
 the genome. The default value is 4. 
 
-=item --minr <float>
+=item --minr E<lt>floatE<gt>
 
 Provide the minimum Pearson correlation value to accept a shift 
 value when empirically determining the shift value. Enter a decimal value 
 between 0 and 1. Higher values are more stringent. The default 
 is 0.5.
 
-=item --zmin <float>
+=item --zmin E<lt>floatE<gt>
 
 Specify the minimum z-score (or number of standard deviations) from 
 the chromosomal mean depth to test for a peak shift. Increase this 
 number to test for strong robust peaks, which give a better estimations 
 of the shift value. Default is 3.
 
-=item --zmax <float> 
+=item --zmax E<lt>floatE<gt> 
 
 Specify the maximum z-score (or number of standard deviations) from 
 the chromosomal mean depth to test for a peak shift. This excludes 
@@ -2953,7 +2961,7 @@ Convert the data to Reads (or Fragments) Per Million mapped. This is useful
 for comparing read coverage between different datasets. The default is 
 no RPM conversion. 
 
-=item --scale <float>
+=item --scale E<lt>floatE<gt>
 
 Optionally provide your own scaling factor. This will be multiplied with 
 every position when generating the wig file. This may be combined with the 
@@ -2979,7 +2987,7 @@ instead of full counts. The number of alignments is determined using the
 NH alignment tag. If a read has 10 alignments, then each alignment is 
 given a count of 0.1. 
 
-=item --format <integer>
+=item --format E<lt>integerE<gt>
 
 Indicate the number of decimal postions reported in the wig file. This 
 is only applicable when rpm, scale, or fraction options are provided. 
@@ -2991,13 +2999,13 @@ The default value is 4 decimal positions.
 
 =over 4
 
-=item --out <filename>
+=item --out E<lt>filenameE<gt>
 
 Specify the output base filename. An appropriate extension will be 
 added automatically. By default it uses the base name of the 
 input file.
 
-=item --bin <integer>
+=item --bin E<lt>integerE<gt>
 
 Specify the bin size in bp for the output wig file. In general, specifying 
 a larger bin size will decrease the run time and memory requirements in 
@@ -3048,11 +3056,11 @@ the default format for start and midpoint modes of operation.
 
 =over 4
 
-=item --cpu <integer>
+=item --cpu E<lt>integerE<gt>
 
 Specify the number of parallel instances to run simultaneously. This requires 
 the installation of L<Parallel::ForkManager>. With support enabled, the 
-default is 2. Disable multi-threaded execution by setting to 1. 
+default is 4. Disable multi-threaded execution by setting to 1. 
 
 =item --verbose
 

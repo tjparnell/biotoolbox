@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Statistics::Lite qw(mean median sum max);
 use Bio::ToolBox::Data::Stream;
@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
 );
-my $VERSION =  '1.54';
+my $VERSION =  '1.60';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -64,33 +64,33 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # name of input file
-	'out=s'     => \$outfile, # name of output gff file 
-	'fast!'     => \$fast, # fast mode without checks and stuff
-	'step=s'    => \$step, # wig step method
-	'bed|bdg!'  => \$bedgraph, # write a bedgraph file
-	'size=i'    => \$step_size, # wig step size
-	'span=i'    => \$span, # the wig span size
-	'ask'       => \$ask, # request help in assigning indices
-	'chr=i'     => \$chr_index, # index for the chromosome column
-	'start|pos=i' => \$start_index, # index for the start column
-	'stop|end=i'=> \$stop_index, # index for the stop column
-	'index|score=s' => \$score_index, # index for the score column
-	'noheader'  => \$no_header, # source has no header line
-	'attrib=s'  => \$attribute_name, # gff or vcf attribute name to use 
-	'name=s'    => \$track_name, # name string for the track
-	'track!'    => \$use_track, # boolean to include a track line
-	'mid!'      => \$midpoint, # boolean to use the midpoint
-	'zero|inter!' => \$interbase, # shift from interbase
-	'format=i'  => \$format, # format output to indicated number of places
-	'method=s'  => \$method, # method for combining duplicate values
-	'bigwig|bw' => \$bigwig, # generate a binary bigwig file
-	'db=s'      => \$database, # database for bigwig file generation
-	'chromof=s' => \$chromo_file, # name of a chromosome file
-	'bwapp=s'   => \$bw_app_path, # path to wigToBigWig utility
-	'gz!'       => \$gz, # boolean to compress output file
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'      => \$infile, # name of input file
+	'o|out=s'     => \$outfile, # name of output gff file 
+	'f|fast!'     => \$fast, # fast mode without checks and stuff
+	'p|step=s'    => \$step, # wig step method
+	'bed|bdg!'    => \$bedgraph, # write a bedgraph file
+	'size=i'      => \$step_size, # wig step size
+	'span=i'      => \$span, # the wig span size
+	'a|ask'       => \$ask, # request help in assigning indices
+	'c|chr=i'     => \$chr_index, # index for the chromosome column
+	'b|begin|start|pos=i' => \$start_index, # index for the start column
+	'e|stop|end=i'=> \$stop_index, # index for the stop column
+	's|index|score=s' => \$score_index, # index for the score column
+	'H|noheader'  => \$no_header, # source has no header line
+	'attrib=s'    => \$attribute_name, # gff or vcf attribute name to use 
+	'name=s'      => \$track_name, # name string for the track
+	'track!'      => \$use_track, # boolean to include a track line
+	'mid!'        => \$midpoint, # boolean to use the midpoint
+	'0|zero|inter!' => \$interbase, # shift from interbase
+	'format=i'    => \$format, # format output to indicated number of places
+	'method=s'    => \$method, # method for combining duplicate values
+	'B|bigwig|bw' => \$bigwig, # generate a binary bigwig file
+	'd|db=s'      => \$database, # database for bigwig file generation
+	'chromof=s'   => \$chromo_file, # name of a chromosome file
+	'bwapp=s'     => \$bw_app_path, # path to wigToBigWig utility
+	'z|gz!'       => \$gz, # boolean to compress output file
+	'h|help'      => \$help, # request help
+	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -731,48 +731,60 @@ __END__
 
 data2wig.pl
 
-A script to convert a generic data file into a wig file.
+A program to convert a generic data file into a wig file.
 
 =head1 SYNOPSIS
 
 data2wig.pl [--options...] <filename> 
   
-  Options:
-  --in <filename>
-  --out <filename> 
-  --noheader
-  --fast
-  --step [fixed | variable | bed]
-  --bed | --bdg
-  --size <integer>
-  --span <integer>
-  --ask
-  --index | --score <column_index or list of indices>
-  --chr <column_index>
-  --start | --pos <column_index>
-  --stop | --end <column_index>
-  --attrib <attribute_name>
-  --name <text>
-  --(no)track
-  --mid
-  --inter | --zero
-  --format [0 | 1 | 2 | 3]
-  --method [mean | median | sum | max]
-  --bigwig | --bw
-  --chromof <filename>
-  --db <database>
-  --bwapp </path/to/wigToBigWig>
-  --gz
-  --version
-  --help
+  File options:
+  -i --in <filename>                    input file: txt, gff, bed, vcf, etc
+  -o --out <filename>                   output file name
+  -H --noheader                         input file has no header row
+  -0 --zero                             file is in 0-based coordinate system
+  
+  Column indices:
+  -a --ask                              interactive selection of columns
+  -s --score <index>                    score column, may be comma list
+  -c --chr <index>                      chromosome column
+  -b --begin --start <index>            start coordinate column
+  -e --end --stop <index>               stop coordinate column
+  --attrib <name>                       GFF or VCF attribute name of score
+  
+  Wig options:
+  -p --step [fixed|variable|bed]        type of wig file 
+  --bed --bdg                           alternative shortcut for bedGraph
+  --size <integer>                      step size for fixedStep
+  --span <integer>                      span size for fixed and variable
+  
+  Conversion options:
+  -f --fast                             fast mode, no error checking
+  --name <text>                         optional track name
+  --(no)track                           generate a track line
+  --mid                                 use the midpoint of feature intervals
+  --format [0 | 1 | 2 | 3]              format decimal points of scores
+  --method [mean | median | sum | max]  combine multiple score columns
+  
+  BigWig options:
+  -B  --bw --bigwig                     generate a bigWig file
+  -d --db <database>                    database to collect chromosome lengths
+  --chromof <filename>                  specify a chromosome file
+  --bwapp </path/to/wigToBigWig>        specify path to wigToBigWig
+  
+  General options:
+  -z --gz                               compress output text files
+  -v --version                          print version and exit
+  -h --help                             show extended documentation
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
 
+=head2 File options
+
 =over 4
 
-=item --in <filename>
+=item --in E<lt>filenameE<gt>
 
 Specify an input file containing either a list of database features or 
 genomic coordinates for which to collect data. The file should be a 
@@ -782,7 +794,7 @@ coordinates are required. The first row should be column headers. Text
 files generated by other B<BioToolBox> scripts are acceptable. Files may 
 be gzipped compressed.
 
-=item --out <filename>
+=item --out E<lt>filenameE<gt>
 
 Optionally specify the name of of the output file. The track name is 
 used as default. The '.wig' extension is automatically added if required.
@@ -792,13 +804,70 @@ used as default. The '.wig' extension is automatically added if required.
 The input file does not have column headers, often found with UCSC 
 derived annotation data tables. 
 
-=item --fast
+=item --zero
 
-Disable checks for overlapping or duplicated intervals, unsorted data, 
-scores from attributes, formatted score values, valid score values, and 
-calculated midpoint positions. Requires setting the chromosome, start, end 
-(for bedGraph files only), and score column indices. Use only if you trust 
-your input file format and content.
+Source data is in interbase coordinate (0-base) system. Shift the 
+start position to base coordinate (1-base) system. Wig files are by 
+definition 1-based. This is automatically handled for most input  
+files. Default is false.
+
+=back
+
+=head2 Column indices
+
+=over 4
+
+=item --ask
+
+Indicate that the program should interactively ask for column indices or
+text strings for the GFF attributes, including coordinates, source, type, 
+etc. It will present a list of the column names to choose from. Enter 
+nothing for non-relevant columns or to accept default values.
+
+=item --score E<lt>column_index or list of column indicesE<gt>
+
+Indicate the column index (0-based) of the dataset in the data table 
+to be used for the score. If a GFF file is used as input, the score column is 
+automatically selected. If not defined as an option, then the program will
+interactively ask the user for the column index from a list of available
+columns. More than one column may be specified, in which case the scores 
+are combined using the method specified.
+
+=item --chr E<lt>column_indexE<gt>
+
+Optionally specify the column index (0-based) of the chromosome or 
+sequence identifier. This is required to generate the wig file. It may be 
+identified automatically from the column header names.
+
+=item --start E<lt>column_indexE<gt>
+
+=item --begin E<lt>column_indexE<gt>
+
+Optionally specify the column index (0-based) of the start or chromosome 
+position. This is required to generate the wig file. It may be 
+identified automatically from the column header names.
+
+=item --stop E<lt>column_indexE<gt>
+
+=item --end E<lt>column_indexE<gt>
+
+Optionally specify the column index (0-based) of the stop or end 
+position. It may be identified automatically from the column header names.
+
+=item --attrib E<lt>attribute_nameE<gt>
+
+Optionally provide the name of the attribute key which represents the score 
+value to put into the wig file. Both GFF and VCF attributes are supported. 
+GFF attributes are automatically taken from the attribute column (index 8).
+For VCF columns, provide the (0-based) index number of the sample column 
+from which to take the value (usually 9 or higher) using the --index option. 
+INFO field attributes can also be taken, if desired (use --index 7).
+
+=back
+
+=head2 Wig options
+
+=over 4
 
 =item --step [fixed | variable | bed]
 
@@ -823,7 +892,7 @@ metadata of the file.
 Convenience option to specify a bedGraph file should be written. Same as 
 specifying --step=bed.
 
-=item --size <integer>
+=item --size E<lt>integerE<gt>
 
 Optionally define the step size in bp for 'fixedStep' wig file. This 
 value is automatically determined from the table's metadata, if available. 
@@ -832,7 +901,7 @@ size may also be explicitly defined. If this value is not explicitly
 defined or automatically determined, the variableStep format is used by
 default.
 
-=item --span <integer>
+=item --span E<lt>integerE<gt>
 
 Optionally indicate the size of the region in bp to which the data value 
 should be assigned. The same size is assigned to all data values in the 
@@ -840,55 +909,21 @@ wig file. This is useful, for example, with microarray data where all of
 the oligo probes are the same length and you wish to assign the value 
 across the oligo rather than the midpoint. The default is inherently 1 bp. 
 
-=item --ask
+=back
 
-Indicate that the program should interactively ask for column indices or
-text strings for the GFF attributes, including coordinates, source, type, 
-etc. It will present a list of the column names to choose from. Enter 
-nothing for non-relevant columns or to accept default values.
+=head2 Conversion options
 
-=item --index <column_index>
+=over 4
 
-=item --score <column_index or list of column indices>
+=item --fast
 
-Indicate the column index (0-based) of the dataset in the data table 
-to be used for the score. If a GFF file is used as input, the score column is 
-automatically selected. If not defined as an option, then the program will
-interactively ask the user for the column index from a list of available
-columns. More than one column may be specified, in which case the scores 
-are combined using the method specified.
+Disable checks for overlapping or duplicated intervals, unsorted data, 
+scores from attributes, formatted score values, valid score values, and 
+calculated midpoint positions. Requires setting the chromosome, start, end 
+(for bedGraph files only), and score column indices. Use only if you trust 
+your input file format and content.
 
-=item --chr <column_index>
-
-Optionally specify the column index (0-based) of the chromosome or 
-sequence identifier. This is required to generate the wig file. It may be 
-identified automatically from the column header names.
-
-=item --start <column_index>
-
-=item --pos <column_index>
-
-Optionally specify the column index (0-based) of the start or chromosome 
-position. This is required to generate the wig file. It may be 
-identified automatically from the column header names.
-
-=item --start <column_index>
-
-=item --end <column_index>
-
-Optionally specify the column index (0-based) of the stop or end 
-position. It may be identified automatically from the column header names.
-
-=item --attrib <attribute_name>
-
-Optionally provide the name of the attribute key which represents the score 
-value to put into the wig file. Both GFF and VCF attributes are supported. 
-GFF attributes are automatically taken from the attribute column (index 8).
-For VCF columns, provide the (0-based) index number of the sample column 
-from which to take the value (usually 9 or higher) using the --index option. 
-INFO field attributes can also be taken, if desired (use --index 7).
-
-=item --name <text>
+=item --name E<lt>textE<gt>
 
 The name of the track defined in the wig file. The default is to use 
 the name of the chosen score column, or, if the input file is a GFF file, 
@@ -908,15 +943,6 @@ A boolean value to indicate whether the
 midpoint between the actual 'start' and 'stop' values
 should be used. The default is to use only the 'start' position. 
 
-=item --zero
-
-=item --inter
-
-Source data is in interbase coordinate (0-base) system. Shift the 
-start position to base coordinate (1-base) system. Wig files are by 
-definition 1-based. This is automatically handled for most input  
-files. Default is false.
-
 =item --format [0 | 1 | 2 | 3]
 
 Indicate the number of decimal places the score value should
@@ -929,6 +955,12 @@ Define the method used to combine multiple data values at a single
 position. Wig files do not tolerate multiple identical positions. 
 Default is mean.
 
+=back
+
+=head2 BigWig options
+
+=over 4
+
 =item --bigwig
 
 =item --bw
@@ -936,18 +968,18 @@ Default is mean.
 Indicate that a binary BigWig file should be generated instead of 
 a text wiggle file. 
 
-=item --chromof <filename>
+=item --db E<lt>databaseE<gt>
+
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
+or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
+length information may be obtained. It may be supplied from the input 
+file metadata.
+
+=item --chromof E<lt>filenameE<gt>
 
 When converting to a BigWig file, provide a two-column tab-delimited 
 text file containing the chromosome names and their lengths in bp. 
 Alternatively, provide a name of a database, below.
-
-=item --db <database>
-
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-or other indexed data file, e.g. Bam or bigWig file, from which chromosome 
-length information may be obtained. It may be supplied from the input 
-file metadata.
 
 =item --bwapp </path/to/wigToBigWig>
 
@@ -956,6 +988,12 @@ is to first check the BioToolBox configuration file C<biotoolbox.cfg> for
 the application path. Failing that, it will search the default 
 environment path for the utility. If found, it will automatically 
 execute the utility to convert the wig file.
+
+=back 
+
+=head2 General options
+
+=over 4
 
 =item --gz
 
@@ -985,7 +1023,7 @@ The wig file format is specified by documentation supporting the UCSC
 Genome Browser and detailed here: http://genome.ucsc.edu/goldenPath/help/wiggle.html.
 Three formats are supported, 'fixedStep', 'variableStep', and 'bedGraph'. 
 The format may be requested or determined empirically from the input file 
-metadata. Genomic bin files generated with C<BioToolBox> scripts record 
+metadata. Genomic bin files generated with BioToolBox scripts record 
 the window and step values in the metadata, which are used to determine 
 the span and step wig values, respectively. The variableStep format 
 is otherwise generated by default. The span is, by default, 1 bp.

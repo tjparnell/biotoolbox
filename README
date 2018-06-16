@@ -22,7 +22,7 @@ nor guaranteed.
 
 INSTALLATION
 
-Installation is simple with the standard Perl incantation.
+Installation is simple with the Perl Module::Build incantation.
 
     perl ./Build.PL
     ./Build
@@ -44,7 +44,7 @@ separately. See the respective modules for installation instructions.
 
 Most scripts should fail gently with warnings about missing modules.
 
-
+Advanced installation notes are provided at the project repository.
 
 PROJECT WEBSITE
 
@@ -52,4 +52,12 @@ The BioToolBox project repository may be found at
 https://github.com/tjparnell/biotoolbox. 
 
 
+LICENSE
 
+This package is free software; you can redistribute it and/or modify
+it under the terms of the Artistic License 2.0. For details, see the
+full text of the license in the file LICENSE.
+
+This package is distributed in the hope that it will be useful, but it
+is provided “as is” and without any express or implied warranties. For
+details, see the full text of the license in the file LICENSE.
