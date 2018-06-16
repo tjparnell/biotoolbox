@@ -78,6 +78,7 @@ sub get_base_options {
 			'scripts/get_relative_data.pl',
 			'scripts/join_data_file.pl',
 			'scripts/manipulate_datasets.pl',
+			'scripts/manipulate_wig.pl',
 			'scripts/merge_datasets.pl',
 			'scripts/pull_features.pl',
 			'scripts/split_data_file.pl',
