@@ -15,8 +15,9 @@ v1.60
 	but now single letters (case sensitive) for common options are 
 	explicit, and bundling is available. 
 	- Add simple menu descriptions and option grouping to the Synopsis 
-	section of every script POD documentation.
+	section of every script POD documentation (about time!).
 	- Add new script manipulate_wig.pl.
+	- Add chromosome-specific normalization to bam2wig.
 
 v1.55
 	- Fix bugs in bam2wig script when using negative shift values;
