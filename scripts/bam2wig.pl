@@ -1681,6 +1681,11 @@ sub process_alignments_on_chromosome {
 		$data->{rpack} .= pack("$binpack*", @{$data->{r}});
 	}
 	
+	# round the final count to a solid integer as necessary
+	if ($multi_hit_scale) {
+		$data->{count} = sprintf("%.0f", $data->{count});
+	}
+	
 	# write out file
 	# we always write the forward strand, and reverse strand if stranded data
 	if ($do_temp_bin) {
@@ -2075,7 +2080,8 @@ sub se_callback {
 	# scale by number of hits
 	my $score; 
 	if ($multi_hit_scale) {
-		my $nh = $a->aux_get('NH') || 1;
+		# preferentially use the number of included hits, then number of hits
+		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
 		$data->{count} += $score; # record fractional alignment counts
 		$score *= $data->{score}; # multiply by chromosome scaling factor
@@ -2149,9 +2155,12 @@ sub pe_callback {
 		# scale by number of hits
 		my $score;
 		if ($multi_hit_scale) {
-			my $r_nh = $a->aux_get('NH') || 1;
-			my $f_nh = $f->aux_get('NH') || 1;
-			if ($f_nh < $r_nh) {
+			my $r_nh = $r->aux_get('IH') || $r->aux_get('NH') || 1;
+			my $f_nh = $f->aux_get('IH') || $f->aux_get('NH') || 1;
+			if ($f_nh == $r_nh) {
+				$score = 1/$f_nh;
+			}
+			elsif ($f_nh < $r_nh) {
 				# take the lowest number of hits recorded
 				$score = $f_nh > 1 ? 1/$f_nh : 1;
 			}
