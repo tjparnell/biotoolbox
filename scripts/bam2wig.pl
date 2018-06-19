@@ -2155,7 +2155,7 @@ sub pe_callback {
 		# scale by number of hits
 		my $score;
 		if ($multi_hit_scale) {
-			my $r_nh = $r->aux_get('IH') || $r->aux_get('NH') || 1;
+			my $r_nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 			my $f_nh = $f->aux_get('IH') || $f->aux_get('NH') || 1;
 			if ($f_nh == $r_nh) {
 				$score = 1/$f_nh;
