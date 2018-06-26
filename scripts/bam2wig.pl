@@ -78,6 +78,8 @@ my (
 	$multi_hit_scale,
 	$rpm,
 	$do_mean,
+	$chrnorm,
+	$chrapply,
 	$chr_exclude,
 	$black_list,
 	$bin_size,
@@ -131,6 +133,8 @@ GetOptions(
 	'r|rpm!'       => \$rpm, # calculate reads per million
 	'm|separate|mean!' => \$do_mean, # rpm scale separately
 	'scale=s'      => \@scale_values, # user specified scale value
+	'chrnorm=f'    => \$chrnorm, # chromosome-specific normalization
+	'chrapply=s'   => \$chrapply, # chromosome-specific normalization regex
 	'K|chrskip=s'  => \$chr_exclude, # regex for skipping chromosomes
 	'B|blacklist=s' => \$black_list, # file for skipping regions
 	'bin=i'        => \$bin_size, # size for binning the data
@@ -463,6 +467,13 @@ sub check_defaults {
 		$max_isize = 30;
 	}
 	
+	# chromosome-specific normalization
+	if ($chrnorm or $chrapply) {
+		# must have both of these parameters
+		die "missing --chrnorm value a for specific-chromosome normalization!\n" unless $chrnorm;
+		die "missing --chrapply regex for specific-chromosome normalization!\n" unless $chrapply;
+	}
+	
 	# check flag parameters
 	if ($verbose) {
 		printf "  %s secondary 0x100 reads\n", $nosecondary ? 'Skipping' : 'Including';
@@ -480,7 +491,7 @@ sub check_defaults {
 	}
 	
 	# determine binary file packing and length
-	if ($multi_hit_scale or ($use_coverage and $bin_size > 1)) {
+	if ($multi_hit_scale or $chrnorm or ($use_coverage and $bin_size > 1)) {
 		# pack as floating point values
 		$binpack = 'f';
 	}
@@ -501,6 +512,7 @@ sub check_defaults {
 		print " ignoring paired-end option with coverage\n" if $paired;
 		print " ignoring RPM option with coverage\n" if $rpm;
 		print " ignoring custom scale option with coverage\n" if @scale_values;
+		print " ignoring chromosome-specific normalization with coverage\n" if $chrnorm;
 		if ($bin_size > 1) {
 			$coverage_dump = int(1000 / $bin_size) * $bin_size;
 			$coverage_dump = $bin_size if $coverage_dump == 0;
@@ -1435,7 +1447,7 @@ sub process_alignments {
 		# otherwise we just normalize
 		else {
 			# determine scaling factor
-			my $scale_factor;
+			my $scale_factor = 1;
 			if ($rpm) {
 				printf " Normalizing depth based on %s total counted $items\n",
 					format_with_commas($totals[0]); 
@@ -1444,12 +1456,7 @@ sub process_alignments {
 			if (scalar @scale_values) {
 				# user supplied scaling factor
 				print " Scaling depth with user-supplied factor\n";
-				if ($scale_factor) {
-					$scale_factor *= $scale_values[0];
-				}
-				else {
-					$scale_factor = $scale_values[0];
-				}
+				$scale_factor *= $scale_values[0];
 			}
 			
 			# normalize the wig files
@@ -1643,7 +1650,13 @@ sub process_alignments_on_chromosome {
 		black_list      => undef,
 		count           => 0,
 		sam             => $sam,
+		score           => 1,
 	};
+	
+	# chromosome specific normalization
+	if ($chrapply and $seq_id =~ /$chrapply/i) {
+		$data->{score} = $chrnorm;
+	}
 	
 	# process black lists for this chromosome
 	# since we're using external interval tree module that is not fork-safe, must 
@@ -1666,6 +1679,11 @@ sub process_alignments_on_chromosome {
 	if ($do_strand) {
 		my $rdiff = int($seq_length/$bin_size) - $data->{r_offset};
 		$data->{rpack} .= pack("$binpack*", @{$data->{r}});
+	}
+	
+	# round the final count to a solid integer as necessary
+	if ($multi_hit_scale) {
+		$data->{count} = sprintf("%.0f", $data->{count});
 	}
 	
 	# write out file
@@ -1691,6 +1709,9 @@ sub process_alignments_on_chromosome {
 	if ($verbose) {
 		printf "  Converted %s $items on $seq_id in %d seconds\n", 
 			format_with_commas( $data->{count}), time - $chr_start_time;
+		if ($chrapply and $seq_id =~ /$chrapply/i) {
+			printf "   Scaled counts by $chrnorm\n";
+		}
 		if ($paired and keys %{$data->{pair}}) {
 			printf "   %d orphan paired alignments were left behind and not counted!\n", 
 				scalar keys %{$data->{pair}};
@@ -2057,12 +2078,18 @@ sub se_callback {
 	}
 	
 	# scale by number of hits
-	my $score = 1;
+	my $score; 
 	if ($multi_hit_scale) {
-		my $nh = $a->aux_get('NH') || 1;
+		# preferentially use the number of included hits, then number of hits
+		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
+		$data->{count} += $score; # record fractional alignment counts
+		$score *= $data->{score}; # multiply by chromosome scaling factor
 	}
-	$data->{count} += $score;
+	else {
+		$data->{count} += 1; # always record one alignment
+		$score = $data->{score}; # probably 1, but may be chromosome scaled
+	}
 	
 	# pass checks
 	if ($splice and $a->cigar_str =~ /N/) {
@@ -2126,21 +2153,29 @@ sub pe_callback {
 		delete $data->{pair}->{$a->qname};
 		
 		# scale by number of hits
-		my $score = 1;
+		my $score;
 		if ($multi_hit_scale) {
-			my $r_nh = $a->aux_get('NH') || 1;
-			my $f_nh = $f->aux_get('NH') || 1;
-			if ($f_nh < $r_nh) {
+			my $r_nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
+			my $f_nh = $f->aux_get('IH') || $f->aux_get('NH') || 1;
+			if ($f_nh == $r_nh) {
+				$score = 1/$f_nh;
+			}
+			elsif ($f_nh < $r_nh) {
 				# take the lowest number of hits recorded
 				$score = $f_nh > 1 ? 1/$f_nh : 1;
 			}
 			else {
 				$score = $r_nh > 1 ? 1/$r_nh : 1;
 			}
+			$data->{count} += $score; # record fractional alignment counts
+			$score *= $data->{score}; # multiply by chromosome scaling factor
+		}
+		else {
+			$data->{count} += 1; # always record one alignment
+			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
 		# record based only on the forward read
-		$data->{count}++;
 		&$callback($f, $data, $score);
 	}
 	else {
@@ -2703,8 +2738,10 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -r --rpm                      scale depth to Reads Per Million mapped
   -m --mean                     average multiple bams (default is addition)
   --scale <float>               explicit scaling factor, repeat for each bam file
-  --fraction                    assign fractional counts to multi-mapped alignments                    
+  --fraction                    assign fractional counts to multi-mapped alignments
   --format <integer>            number of decimal positions (4)
+  --chrnorm <float>             use chromosome-specific normalization factor
+  --chrapply <regex>            regular expression to apply chromosome-specific factor
  
  Output options:
   -o --out <filename>           output file name, default is bam file basename
@@ -2992,6 +3029,18 @@ given a count of 0.1.
 Indicate the number of decimal postions reported in the wig file. This 
 is only applicable when rpm, scale, or fraction options are provided. 
 The default value is 4 decimal positions.
+
+=item --chrnorm E<lt>floatE<gt>
+
+Apply a normalization factor to the counts on specific chromosomes only. 
+Usually this is to normalize, for example, variable copy-number chromosomes, 
+such as transfected vector sequences, or haploid sex chromosomes. 
+
+=item --chrapply E<lt>regexE<gt>
+
+Specify the Perl-based regular expression to match the chromosome(s) to 
+apply the specific normalization factor. For example, 'chrX$' to specify 
+the X chromosome only.
 
 =back
 
