@@ -17,7 +17,7 @@ use Bio::ToolBox::GeneTools qw(
 use Bio::ToolBox::utility;
 my $VERSION = '1.60';
 
-print "\n This program will collect features from a database\n\n";
+print "\n This program will collect features from annotation sources\n\n";
 
 ### Quick help
 unless (@ARGV) { 
@@ -665,11 +665,11 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   Filter features:
   -K --chrskip <regex>          skip features from certain chromosomes
   -x --exclude <tag=value>      exclude features with specific attribute value
-  --biotype <regex>             include specific biotype
+  --biotype <regex>             include only specific biotype
   --tsl [best|best1|best2|      specify minimum transcript support level 
          best3|best4|best5|       primarily Ensembl annotation 
          1|2|3|4|5|NA]  
-  --gencode                     
+  --gencode                     include only GENCODE tagged genes
   
   Adjustments:
   -b --start=<integer>          modify start positions
@@ -678,10 +678,10 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   --collapse                    collapse subfeatures from alt transcripts
   
   Report format options:
-  -B --bed                      BED6 format
-  -G --gff                      GFF3 format
-  -g --gtf                      GTF format
-  -r --refflat                  UCSC refFLat
+  -B --bed                      write in BED6 format
+  -G --gff                      write in GFF3 format
+  -g --gtf                      write in GTF format
+  -r --refflat                  write in UCSC refFlat format
   -t --tag <text>               include specific GFF attributes in text output
   --coord                       include coordinates in text output
   

@@ -892,7 +892,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --fpkm [region|genome]              convert count data to depth normalized
   
   Adjustments to features:
-  -s --extend <integer>               extend the feature in both directions
+  -x --extend <integer>               extend the feature in both directions
   -b --begin --start <integer>        adjust relative start coordinate
   -e --end --stop <integer>           adjust relative stop coordinate
   -p --pos [5|m|3]                    define the relative position to adjust
