@@ -7,7 +7,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.60';
+my $VERSION =  '1.61';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -44,6 +44,7 @@ my (
 	$unique,
 	$interbase,
 	$gz,
+	$bgz,
 	$help,
 	$print_version,
 );
@@ -68,6 +69,7 @@ GetOptions(
 	'unique!'     => \$unique, # make the names unique
 	'0|zero!'     => \$interbase, # input file is interbase format
 	'z|gz!'       => \$gz, # boolean to compress output file
+	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
 	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -291,7 +293,7 @@ unless ($outfile) {
 my $Output = Bio::ToolBox::Data::Stream->new(
 	out     => $outfile,
 	gff     => 3,        # default, only one
-	gz      => $gz
+	gz      => $bgz ? 2 : $gz ? 1 : 0,
 ) or die " unable to create output file $outfile!";
 
 
@@ -429,7 +431,8 @@ data2gff.pl [--options...] <filename>
   
   General options:
   --unique                              make IDs unique
-  -z --gz                               compress output text file
+  -z --gz                               compress output file
+  -Z --bgz                              bgzip compress output file
   -v --version                          print version and exit
   -h --help                             show extended documentation
 
@@ -558,7 +561,12 @@ generate unique names.
 
 =item --gz
 
-Indicate whether the output file should (not) be compressed with gzip.
+Indicate whether the output file should be compressed with gzip.
+
+=item --bgz
+
+Specify whether the output file should be compressed with block gzip 
+(bgzip) for tabix compatibility.
 
 =item --version
 

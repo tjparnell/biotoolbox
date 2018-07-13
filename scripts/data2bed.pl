@@ -8,7 +8,7 @@ use Pod::Usage;
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.60';
+my $VERSION =  '1.61';
 
 print "\n This program will write a BED file\n";
 
@@ -42,6 +42,7 @@ my (
 	$database,
 	$chromo_file,
 	$gz,
+	$bgz,
 	$help,
 	$print_version,
 );
@@ -64,6 +65,7 @@ GetOptions(
 	'chromof=s'        => \$chromo_file, # name of a chromosome file
 	'bbapp=s'          => \$bb_app_path, # path to bedToBigBed utility
 	'z|gz!'            => \$gz, # compress output
+	'Z|bgz!'           => \$bgz, # compress with bgzip
 	'h|help'           => \$help, # request help
 	'v|version'        => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -95,11 +97,13 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-if ($bigbed and $gz) {
+if ($bigbed and ($gz or $bgz)) {
 	# do not allow compression even if requested when converting to bigbed
 	warn " compression not allowed when converting to BigBed format\n";
 	$gz = 0;
+	$bgz = 0;
 }
+
 
 # define name base or index
 my $name_index;
@@ -226,7 +230,7 @@ unless ($outfile) {
 my $Output = Bio::ToolBox::Data::Stream->new(
 	out     => $outfile,
 	bed     => 6,
-	gz      => $gz
+	gz      => $bgz ? 2 : $gz ? 1 : 0,
 ) or die " unable to create output file $outfile!";
 
 
@@ -362,7 +366,8 @@ data2bed.pl [--options...] <filename>
   --bwapp </path/to/bedToBigBed>        specify path to bedToBigBed
   
   General Options:
-  -z --gz                               compress output text files
+  -z --gz                               compress output file
+  -Z --bgz                              bgzip compress output file
   -v --version                          print version and exit
   -h --help                             show extended documentation
 
@@ -497,7 +502,12 @@ automatically execute the utility to convert the bed file.
 
 =item --gz
 
-Specify whether (or not) the output file should be compressed with gzip.
+Specify whether the output file should be compressed with gzip.
+
+=item --bgz
+
+Specify whether the output file should be compressed with block gzip 
+(bgzip) for tabix compatibility.
 
 =item --version
 

@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(
 	filter_transcript_biotype
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+my $VERSION = '1.61';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -51,6 +51,7 @@ my (
 	$convert_to_refflat,
 	$outfile,
 	$gz,
+	$bgz,
 	$help,
 	$print_version,
 );
@@ -82,6 +83,7 @@ GetOptions(
 	'r|ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
 	'o|out=s'     => \$outfile, # name of output file 
 	'z|gz!'       => \$gz, # compress output
+	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
 	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -220,6 +222,7 @@ sub check_requirements {
 	unless ($outfile) {
 		die " Must provide an output file!\n";
 	}
+	$gz = 2 if $bgz;
 }
 
 
@@ -688,6 +691,7 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   General options:
   -o --out <filename>           output file name
   -z --gz                       compress output
+  -Z --bgz                      bgzip compress output
   -v --version                  print version and exit
   -h --help                     show full documentation
 
@@ -878,6 +882,11 @@ Specify the output file name. Default is the joined list of features.
 =item --gz
 
 Specify whether the output file should be compressed with gzip.
+
+=item --bgz
+
+Specify whether the output file should be compressed with block gzip 
+(bgzip) for tabix compatibility.
 
 =item --version
 

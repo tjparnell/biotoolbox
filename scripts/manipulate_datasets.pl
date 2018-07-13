@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+my $VERSION = '1.61';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -41,6 +41,7 @@ my ( # command line option variables
 	$opt_log, 
 	$noheader,
 	$gz, 
+	$bgz,
 	$help,
 	$print_version,
 );
@@ -62,6 +63,7 @@ GetOptions(
 	'log!'        => \$opt_log, # data values are in log2 space
 	'H|noheader'  => \$noheader, # file has no headers
 	'z|gz!'       => \$gz, # write gzipped data file
+	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
 	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -330,7 +332,7 @@ sub write_and_quit_function {
 		# write the file
 		my $write_results = $Data->write_file(
 			'filename'  => $outfile,
-			'gz'        => $gz,
+			'gz'        => $bgz ? 2 : $gz ? 1 : 0,
 		);
 	
 		# report write results
