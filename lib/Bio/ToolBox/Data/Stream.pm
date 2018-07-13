@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.60';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -170,8 +170,11 @@ for internal use. Acceptable values include 10 (refFlat without gene names),
 
 =item gz
 
-Optional boolean value that indicates whether the output file should be 
-written with compression. This can also be inferred from the file name.
+Boolean value to change the compression status of the output file. If 
+overwriting an input file, the default is maintain the compression status, 
+otherwise no compression. Pass a 0 for no compression, 1 for standard 
+gzip compression, or 2 for block gzip (bgzip) compression for tabix 
+compatibility.
 
 =back
 

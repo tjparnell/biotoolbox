@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.60';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -25,7 +25,7 @@ our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|
 
 # gzip application
 our $gzip_app;
-
+our $bgzip_app;
 
 ### The True Statement
 1; 
@@ -655,6 +655,10 @@ sub write_file {
 	unless (defined $args{'gz'}) {
 		# look at filename extension as a clue
 		# in case we're overwriting the input file, keep the zip status
+		if ($extension =~ m/\.vcf\.gz/i) {
+			# vcf requires bgzip
+			$args{'gz'} = 2;
+		}
 		if ($extension =~ m/\.gz$/i) {
 			$args{'gz'} = 1;
 		}
@@ -668,19 +672,6 @@ sub write_file {
 		$extension .= '.gz';
 	}
 	elsif (not $args{'gz'} and $extension =~ /\.gz$/i) {
-		$extension =~ s/\.gz$//i;
-	}
-	
-	# additional check for vcf.gz files
-	# vcf.gz typically use bgzip for tabix purposes, but there is no guarantee 
-	# that bgzip is in the path, unlike the universal gzip
-	# this may change in the future as we implement smarter tests to incorporate
-	# custom bgzip paths probably from biotoolbox.cfg config file....
-	if ($self->vcf and $args{gz}) {
-		# turn off compression to avoid gzip'ing when we really should use 
-		# bgzip instead
-		warn " turning off unsupported gzip/bgzip for vcf files\n";
-		$args{gz} = 0;
 		$extension =~ s/\.gz$//i;
 	}
 	
@@ -935,30 +926,50 @@ sub open_to_write_fh {
 	unless (defined $gz) {
 		# look at filename extension as a clue
 		# in case we're overwriting the input file, keep the zip status
+		if ($filename =~ m/\.vcf(\.gz)?$/i) {
+			$gz = 2; # bgzip
+		}
 		if ($filename =~ m/\.gz$/i) {
-			$gz = 1;
+			$gz = 1; # regular gzip
 		}
 		else {
 			$gz = 0; # default
 		}
 	}
 	
-	# gzip compression options
-	if ($gz and not $gzip_app) {
+	# gzip compression application
+	if ($gz == 1 and not $gzip_app) {
 		# use parallel gzip if possible
-		$gzip_app = which 'pigz';
+		# this is stored in a global variable so we only have to look once
+		$gzip_app = which('pigz');
 		if ($gzip_app) {
 			$gzip_app .= ' -p 3'; # use a conservative 3 processes, plus perl, so 4 total
 		}
 		else {
 			# default is the standard gzip application
-			$gzip_app = which("gzip");
+			# should be available in any application
+			$gzip_app = which('gzip');
+		}
+		unless ($gzip_app) {
+			croak "no gzip application in PATH to open compressed file handle output!\n";
 		}
 	}
-	
-	# add gz extension if necessary
-	$filename .= '.gz' if ($gzip_app and $filename !~ m/\.gz$/i);
-	
+	elsif ($gz == 2 and not $bgzip_app) {
+		# use parallel bgzip if possible
+		# this is stored in a global variable so we only have to look once
+		$bgzip_app = which('pbgzip');
+		if ($bgzip_app) {
+			$bgzip_app .= ' -n 3'; # use a conservative 3 processes, plus perl, so 4 total
+		}
+		else {
+			# default is the standard bgzip application
+			$bgzip_app = which('bgzip');
+		}
+		unless ($bgzip_app) {
+			croak "no bgzip application in PATH to open compressed file handle output!\n";
+		}
+	}
+	my $zapp = $gz == 1 ? $gzip_app : $gz == 2 ? $bgzip_app : undef;
 	
 	# check file append mode
 	unless (defined $append) {
@@ -969,20 +980,20 @@ sub open_to_write_fh {
 	
 	# Generate appropriate filehandle object
 	my $fh;
-	if (not $gzip_app and not $append) {
+	if (not $zapp and not $append) {
 		$fh = IO::File->new($filename, 'w') or 
 			carp "cannot write to file '$filename' $!\n";
 	}
-	elsif ($gzip_app and !$append) {
-		$fh = IO::File->new("| $gzip_app >$filename") or 
+	elsif ($zapp and !$append) {
+		$fh = IO::File->new("| $zapp >$filename") or 
 			carp "cannot write to compressed file '$filename' $!\n";
 	}
-	elsif (not $gzip_app and $append) {
+	elsif (not $zapp and $append) {
 		$fh = IO::File->new(">> $filename") or 
 			carp "cannot append to file '$filename' $!\n";
 	}
-	elsif ($gzip_app and $append) {
-		$fh = IO::File->new("| $gzip_app >>$filename") or 
+	elsif ($zapp and $append) {
+		$fh = IO::File->new("| $zapp >>$filename") or 
 			carp "cannot append to compressed file '$filename' $!\n";
 	}
 	return $fh if defined $fh;
@@ -1676,11 +1687,13 @@ Keys include the following:
               extension of the passed filename will be used as a
               guide. The default behavior is to write standard text
               files.
-  gz       => A boolean value (1 or 0) indicating whether the file 
+  gz       => A value (2, 1, or 0) indicating whether the file 
               should be written through a gzip filter to compress. If 
               this value is undefined, then the file name is checked 
               for the presence of the '.gz' extension and the value 
-              set appropriately. Default is false.
+              set appropriately. Default is false (no compression).
+              Set to 1 to use ordinary gzip, or set to 2 to use block 
+              gzip (bgzip) compression for tabix compatibility.
   simple   => A boolean value (1 or 0) indicating whether a simple 
               tab-delimited text data file should be written. This is 
               an old alias for setting 'format' to 'simple'.

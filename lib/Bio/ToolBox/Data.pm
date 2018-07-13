@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.54';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -899,8 +899,11 @@ a path is not provided, the current working directory is used.
 
 =item gz
 
-Boolean value to change the compression status of the output file. The 
-default is to maintain the status of the original opened file.
+Boolean value to change the compression status of the output file. If 
+overwriting an input file, the default is maintain the compression status, 
+otherwise no compression. Pass a 0 for no compression, 1 for standard 
+gzip compression, or 2 for block gzip (bgzip) compression for tabix 
+compatibility.
 
 =back
 
