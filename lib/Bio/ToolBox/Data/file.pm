@@ -957,19 +957,17 @@ sub open_to_write_fh {
 	elsif ($gz == 2 and not $bgzip_app) {
 		# use parallel bgzip if possible
 		# this is stored in a global variable so we only have to look once
-		$bgzip_app = which('pbgzip');
+		$bgzip_app = which('bgzip');
 		if ($bgzip_app) {
-			$bgzip_app .= ' -n 3'; # use a conservative 3 processes, plus perl, so 4 total
-		}
-		else {
-			# default is the standard bgzip application
-			$bgzip_app = which('bgzip');
+			# I'm going to assume this is a recent bgzip with multi-threading
+			# use 3 threads, same as with pigz
+			$bgzip_app .= ' -@ 3 -c';
 		}
 		unless ($bgzip_app) {
 			croak "no bgzip application in PATH to open compressed file handle output!\n";
 		}
 	}
-	my $zapp = $gz == 1 ? $gzip_app : $gz == 2 ? $bgzip_app : undef;
+	my $gzipper = $gz == 1 ? $gzip_app : $gz == 2 ? $bgzip_app : undef;
 	
 	# check file append mode
 	unless (defined $append) {
@@ -980,20 +978,20 @@ sub open_to_write_fh {
 	
 	# Generate appropriate filehandle object
 	my $fh;
-	if (not $zapp and not $append) {
+	if (not $gzipper and not $append) {
 		$fh = IO::File->new($filename, 'w') or 
 			carp "cannot write to file '$filename' $!\n";
 	}
-	elsif ($zapp and !$append) {
-		$fh = IO::File->new("| $zapp >$filename") or 
+	elsif ($gzipper and !$append) {
+		$fh = IO::File->new("| $gzipper >$filename") or 
 			carp "cannot write to compressed file '$filename' $!\n";
 	}
-	elsif (not $zapp and $append) {
+	elsif (not $gzipper and $append) {
 		$fh = IO::File->new(">> $filename") or 
 			carp "cannot append to file '$filename' $!\n";
 	}
-	elsif ($zapp and $append) {
-		$fh = IO::File->new("| $zapp >>$filename") or 
+	elsif ($gzipper and $append) {
+		$fh = IO::File->new("| $gzipper >>$filename") or 
 			carp "cannot append to compressed file '$filename' $!\n";
 	}
 	return $fh if defined $fh;
