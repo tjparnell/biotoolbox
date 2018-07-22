@@ -699,6 +699,12 @@ object can be stored per row.
 
 Retrieves the SeqFeature object for the given row index.
 
+=item delete_seqfeature
+
+  $Data->store_seqfeature($row_index);
+
+Removes the SeqFeature object for the given row index. 
+
 =item collapse_gene_transcripts
 
   my $success = $Data->collapse_gene_transcripts;
@@ -1470,6 +1476,13 @@ sub store_seqfeature {
 	$self->{SeqFeatureObjects} ||= [];
 	$self->{SeqFeatureObjects}->[$row_i] = $seqfeature;
 	return 1;
+}
+
+sub delete_seqfeature {
+	my ($self, $row_i) = @_;
+	confess "invalid row index" unless ($row_i <= $self->last_row);
+	return unless $self->{SeqFeatureObjects};
+	undef $self->{SeqFeatureObjects}->[$row_i];
 }
 
 sub collapse_gene_transcripts {

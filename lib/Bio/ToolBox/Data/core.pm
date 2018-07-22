@@ -1405,6 +1405,12 @@ sub score_column {
 
 #### Special Row methods ####
 
+# Why is this in core and not in Data? I keep asking myself.
+# Because this can get called from a Data::Feature object, which might be 
+# associated with a Data::Stream object. No, Stream objects don't have stored 
+# SeqFeatures, but I don't want the entire program to crash because of an 
+# undefined method because some doofus forgot. Since both Data and Stream 
+# objects inherit from Data::core, this is in here.
 sub get_seqfeature {
 	my ($self, $row) = @_;
 	return unless ($row and $row <= $self->{last_row});
