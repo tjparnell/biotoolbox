@@ -199,16 +199,38 @@ excluding specific or classes of chromosomes, for example the mitochondrial
 chromosome or unmapped contigs. This works with both feature collection 
 and genomic intervals. The default is to take all chromosomes.
 
+=back
+
+When no file is given or database given to search, then a new, 
+empty Data object is returned. In this case, you may optionally 
+specify the names of the columns or indicate a specific file 
+format structure to assign column names. The following options can 
+then be provided.
+
+=over 4
+
 =item columns
 
 =item datasets
 
   my $Data = Bio::ToolBox::Data->new(columns => [qw(Column1 Column2 ...)] );
 
-When no file is given or database given to search, then a new, 
-empty Data object is returned. In this case, you may optionally 
-provide the column names in advance as an anonymous array. You 
-may also optionally provide a general feature name, if desired.
+Provide the column names in advance as an anonymous array. 
+
+=item gff
+
+Pass the GFF version of the file: 1, 2, 2.5 (GTF), or 3.
+
+=item bed
+
+Pass the number of BED columns (3-12).
+
+=item ucsc 
+
+Pass the number of columns to indicate the type of UCSC format. These 
+include 10 (refFlat without gene names), 11 (refFlat with gene names), 
+12 (knownGene gene prediction table), and 15 
+(an extended gene prediction or genePredExt table).
 
 =back
 
@@ -1131,16 +1153,47 @@ sub new {
 	}
 	else {
 		# a new empty structure
-		my @datasets;
-		if (exists $args{datasets}) {
-			@datasets = @{ $args{datasets} };
+		
+		# check to see if user provided column names
+		$args{columns} ||= $args{datasets} || undef;
+		if (defined $args{columns}) {
+			 foreach my $d ( @{ $args{datasets} } ) {
+			 	$self->add_column($d);
+			 }
+			 $self->{feature} = $args{feature} if exists $args{feature};
 		}
-		elsif (exists $args{columns}) {
-			@datasets = @{ $args{columns} };
+		
+		# or possibly a specified format structure 
+		elsif (exists $args{gff} and $args{gff}) {
+			# use standard names for the number of columns indicated
+			# we trust that the user knows the subtle difference between gff versions
+			$self->add_gff_metadata($args{gff});
+			unless ($self->extension =~ /g[tf]f/) {
+				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
+					$args{gff} == 3 ? '.gff3' : '.gff';
+			}
 		}
-		my $feature = $args{features} || 'feature';
-		foreach my $d (@datasets) {
-			$self->add_column($d);
+		elsif (exists $args{bed} and $args{bed}) {
+			# use standard names for the number of columns indicated
+			unless ($args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3) {
+				carp "bed parameter must be an integer 3-12!";
+				return;
+			}	
+			$self->add_bed_metadata($args{bed});
+			unless ($self->extension =~ /bed|peak/) {
+				$self->{extension} = '.bed';
+			}
+		}
+		elsif (exists $args{ucsc} and $args{ucsc}) {
+			# a ucsc format such as refFlat, genePred, or genePredExt
+			my $u = $self->add_ucsc_metadata($args{ucsc});
+			unless ($u) {
+				carp "unrecognized number of columns for ucsc format!";
+				return;
+			};
+			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
+				$self->{extension} = '.ucsc';
+			}
 		}
 	}
 	
