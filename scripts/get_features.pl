@@ -9,6 +9,7 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(verify_or_request_feature_types);
 use Bio::ToolBox::GeneTools qw(
 	:export 
+	get_transcripts
 	collapse_transcripts
 	filter_transcript_support_level
 	filter_transcript_gencode_basic
@@ -309,7 +310,8 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_biotype($row->seqfeature(1), $tbiotype);
-			if ($good) {
+			my @t = get_transcripts($good);
+			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
 			else {
@@ -329,7 +331,8 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
-			if ($good) {
+			my @t = get_transcripts($good);
+			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
 			else {
@@ -348,8 +351,9 @@ sub filter_features {
 		my @unwanted;
 		$Data->iterate( sub {
 			my $row = shift;
-			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
-			if ($good) {
+			my $good = filter_transcript_gencode_basic($row->seqfeature(1));
+			my @t = get_transcripts($good);
+			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
 			else {
