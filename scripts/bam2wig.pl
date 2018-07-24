@@ -105,7 +105,7 @@ GetOptions(
 	'i|in=s'       => \@bamfiles, # one or more bam files
 	'o|out=s'      => \$outfile, # name of output file 
 	's|start!'     => \$use_start, # record start point
-	'm|mid!'       => \$use_mid, # record mid point
+	'd|mid!'         => \$use_mid, # record mid point
 	'a|span!'      => \$use_span, # record span
 	'cspan!'       => \$use_cspan, # record center span
 	'e|extend!'    => \$use_extend, # extend read
@@ -2723,6 +2723,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -S --nosecondary              ignore secondary alignments (false)
   -D --noduplicate              ignore marked duplicate alignments (false)
   -U --nosupplementary          ignore supplementary alignments (false)
+  --intron <integer>            maximum allowed intron size in bp (50000)
   
   Shift options:
   -I --shift                    shift reads in the 3' direction
