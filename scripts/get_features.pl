@@ -50,6 +50,7 @@ my (
 	$convert_to_gtf,
 	$convert_to_refflat,
 	$outfile,
+	$sort_data,
 	$gz,
 	$bgz,
 	$help,
@@ -82,6 +83,7 @@ GetOptions(
 	'g|gtf!'      => \$convert_to_gtf, # convert to gtf format
 	'r|ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
 	'o|out=s'     => \$outfile, # name of output file 
+	'sort!'       => \$sort_data, # sort the output file
 	'z|gz!'       => \$gz, # compress output
 	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
@@ -222,7 +224,10 @@ sub check_requirements {
 	unless ($outfile) {
 		die " Must provide an output file!\n";
 	}
-	$gz = 2 if $bgz;
+	if ($bgz) {
+		$gz = 2;
+		$sort_data = 1;
+	}
 }
 
 
@@ -373,12 +378,9 @@ sub filter_features {
 
 sub export_to_bed {
 	# prepare output
-	unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
-		$outfile .= '.bed';
-	}
-	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
-	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
-		die "unable to open '$outfile' for writing! $!\n";
+	my $outData = Bio::ToolBox::Data->new(
+		bed => 6,
+	) or die "unable to create output Data structure!\n";
 	
 	# adjust coordinates as necessary and write
 	if ($start_adj or $stop_adj) {
@@ -390,63 +392,140 @@ sub export_to_bed {
 				start => $start,
 				end   => $stop,
 			);
-			$fh->print( $string . "\n" );
+			$outData->add_row($string);
+			$Data->delete_seqfeature($row->row_index);
 		});
 	}
 	else {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $f = $row->seqfeature(1); # make sure we get the seqfeature
-			$fh->print( $row->bed_string . "\n" );
+			my $string = $row->bed_string;
+			$outData->add_row($string);
+			$Data->delete_seqfeature($row->row_index);
 		});
 	}
-	$fh->close;
-	printf " wrote file $outfile\n";
+	
+	# sort as necessary
+	if ($sort_data) {
+		print " Sorting data...\n";
+		$outData->gsort_data;
+	}
+	
+	# write
+	unless ($outfile =~ /\.bed(?:\.gz)?$/i) {
+		$outfile .= '.bed';
+	}
+	$outfile = $outData->write_file(
+		filename => $outfile, 
+		gz       => $gz,
+	);
+	print " wrote file $outfile\n";
 }
 
 
 sub export_to_gff {
-	# prepare output
+	# check output filename
 	unless ($outfile =~ /\.gff3?(?:\.gz)?$/i) {
 		$outfile .= '.gff3';
 	}
-	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
-	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
-		die "unable to open '$outfile' for writing! $!\n";
-	$fh->print("##gff-version 3\n");
-	$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	# write to gff3
-	$Data->iterate( sub {
-		my $row = shift;
-		my $string = $row->seqfeature(1)->gff_string(1);
-		$fh->print( $string . "###\n"); # should already have a newline
-	});
+	# how we write the output depends on whether we need to sort the file or not
+	if ($sort_data) {
+		# we need to keep all gff lines in memory so that we can sort the lines
+		
+		my $outData = Bio::ToolBox::Data->new(
+			gff => 3,
+		) or die "unable to create output Data structure!\n";
+		$outData->add_comment( sprintf("exported from %s\n", 
+			$database ? $database : $input) );
+		
+		# iterate
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = $row->seqfeature(1)->gff_string(1);
+				# force retrieving the seqfeature, and recurse through subfeature
+			foreach (split /\n/, $string) {
+				$outData->add_row($_);
+			}
+			$Data->delete_seqfeature($row->row_index);
+		});
+		print " Sorting data...\n";
+		$outData->gsort_data;
+		$outfile = $outData->write_file(
+			filename => $outfile, 
+			gz       => $gz,
+		);
+	}
+	else {
+		# we can simply write out gff directly
+		$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+		my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+			die "unable to open '$outfile' for writing! $!\n";
+		$fh->print("##gff-version 3\n");
+		$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	$fh->close;
+		# write to GFF
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = $row->seqfeature(1)->gff_string(1);
+				# force retrieving the seqfeature, and recurse through subfeature
+			$fh->print( $string . "###\n"); # include pragma close lines
+		});
+		$fh->close;
+	}
 	printf " wrote file $outfile\n";
 }
 
 
 sub export_to_gtf {
-	# prepare output
-	unless ($outfile =~ /\.gtf(?:\.gz)?$/i) {
+	# check output filename
+	unless ($outfile =~ /\.gtf?(?:\.gz)?$/i) {
 		$outfile .= '.gtf';
 	}
-	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
-	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
-		die "unable to open '$outfile' for writing! $!\n";
-	$fh->print("##gff-version 2.5\n");
-	$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	# write to GTF
-	$Data->iterate( sub {
-		my $row = shift;
-		my $string = gtf_string( $row->seqfeature(1) );
-		$fh->print( $string);
-	});
+	# how we write the output depends on whether we need to sort the file or not
+	if ($sort_data) {
+		# we need to keep all gff lines in memory so that we can sort the lines
+		
+		my $outData = Bio::ToolBox::Data->new(
+			gff => 2.5,
+		) or die "unable to create output Data structure!\n";
+		$outData->add_comment( sprintf("exported from %s\n", 
+			$database ? $database : $input) );
+		
+		# iterate
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = gtf_string( $row->seqfeature(1) );
+			foreach (split /\n/, $string) {
+				$outData->add_row($_);
+			}
+			$Data->delete_seqfeature($row->row_index);
+		});
+		print " Sorting data...\n";
+		$outData->gsort_data;
+		$outfile = $outData->write_file(
+			filename => $outfile, 
+			gz       => $gz,
+		);
+	}
+	else {
+		# we can simply write out gff directly
+		$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+		my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+			die "unable to open '$outfile' for writing! $!\n";
+		$fh->print("##gff-version 2.5\n");
+		$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	$fh->close;
+		# write to GTF
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = gtf_string( $row->seqfeature(1) );
+			$fh->print($string);
+		});
+		$fh->close;
+	}
 	printf " wrote file $outfile\n";
 }
 
@@ -490,6 +569,12 @@ sub export_to_txt {
 		}
 	}
 	
+	# sort if requested
+	if ($sort_data and $include_coordinates) {
+		print " Sorting data...\n";
+		$Data->gsort_data;
+	}
+	
 	# write the output
 	my $success = $Data->write_file(
 		filename => $outfile,
@@ -500,23 +585,52 @@ sub export_to_txt {
 
 
 sub export_to_ucsc {
-	# prepare output
+	# check output filename
 	unless ($outfile =~ /\.(?:refflat|ucsc)(?:\.gz)?$/i) {
 		$outfile .= '.refFlat';
 	}
-	$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
-	my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
-		die "unable to open '$outfile' for writing! $!\n";
-	$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	# write to gff3
-	$Data->iterate( sub {
-		my $row = shift;
-		my $string = ucsc_string( $row->seqfeature(1) );
-		$fh->print($string);
-	});
+	# how we write the output depends on whether we need to sort the file or not
+	if ($sort_data) {
+		# we need to keep all gff lines in memory so that we can sort the lines
+		
+		my $outData = Bio::ToolBox::Data->new(
+			ucsc => 11,
+		) or die "unable to create output Data structure!\n";
+		$outData->add_comment( sprintf("exported from %s\n", 
+			$database ? $database : $input) );
+		
+		# iterate
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = ucsc_string( $row->seqfeature(1) );
+			foreach (split /\n/, $string) {
+				$outData->add_row($_);
+			}
+			$Data->delete_seqfeature($row->row_index);
+		});
+		print " Sorting data...\n";
+		$outData->gsort_data;
+		$outfile = $outData->write_file(
+			filename => $outfile, 
+			gz       => $gz,
+		);
+	}
+	else {
+		# we can simply write out gff directly
+		$outfile .= '.gz' if ($gz and $outfile !~ /\.gz$/i);
+		my $fh = Bio::ToolBox::Data->open_to_write_fh($outfile, $gz) or 
+			die "unable to open '$outfile' for writing! $!\n";
+		$fh->printf("# exported from %s\n", $database ? $database : $input);
 	
-	$fh->close;
+		# write to UCSC file
+		$Data->iterate( sub {
+			my $row = shift;
+			my $string = ucsc_string( $row->seqfeature(1) );
+			$fh->print($string);
+		});
+		$fh->close;
+	}
 	printf " wrote file $outfile\n";
 }
 
@@ -690,6 +804,7 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
   General options:
   -o --out <filename>           output file name
+  --sort                        sort output by genomic coordinates
   -z --gz                       compress output
   -Z --bgz                      bgzip compress output
   -v --version                  print version and exit
@@ -878,6 +993,11 @@ coordinate positions.
 =item --out E<lt>filenameE<gt>
 
 Specify the output file name. Default is the joined list of features. 
+
+=item --sort
+
+Sort the output file by genomic coordinates. Automatically enabled 
+when compressing with bgzip. This may require more memory.
 
 =item --gz
 
