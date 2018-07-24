@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Bio::ToolBox::Data::Stream;
+use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 my $VERSION =  '1.61';
 
@@ -43,6 +43,7 @@ my (
 	$ask,
 	$unique,
 	$interbase,
+	$sort_data,
 	$gz,
 	$bgz,
 	$help,
@@ -68,6 +69,7 @@ GetOptions(
 	'a|ask'       => \$ask, # request help in assigning indices
 	'unique!'     => \$unique, # make the names unique
 	'0|zero!'     => \$interbase, # input file is interbase format
+	'sort!'       => \$sort_data, # sort the output file
 	'z|gz!'       => \$gz, # boolean to compress output file
 	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
@@ -103,6 +105,10 @@ unless ($infile) {
 }
 unless (defined $gz) {
 	$gz = 0;
+}
+if ($bgz) {
+	$gz = 2;
+	$sort_data = 1;
 }
 
 # define name base or index
@@ -154,8 +160,11 @@ if ($tag) {
 
 
 ### Load file
-my $Input = Bio::ToolBox::Data::Stream->new(in => $infile, noheader => $no_header) or
-	die "Unable to open file '$infile'!\n";
+my $Input = Bio::ToolBox::Data->new(
+	in       => $infile, 
+	noheader => $no_header,
+	stream   => 1,
+) or die "Unable to open file '$infile'!\n";
 
 ### Determine indices
 if ($ask) {
@@ -286,15 +295,10 @@ else {
 
 
 
-### Open output stream
-unless ($outfile) {
-	$outfile = $Input->path . $Input->basename;
-}
-my $Output = Bio::ToolBox::Data::Stream->new(
-	out     => $outfile,
-	gff     => 3,        # default, only one
-	gz      => $bgz ? 2 : $gz ? 1 : 0,
-) or die " unable to create output file $outfile!";
+### Open output data
+my $Output = Bio::ToolBox::Data->new(
+	gff     => 3,
+) or die " unable to create output data strucutre!\n";
 
 
 
@@ -361,9 +365,12 @@ while (my $row = $Input->next_row) {
 	if (@tag_indices) {
 		push @args, 'attributes', \@tag_indices;
 	}
-			
-	# write
+	
+		
+	# add to output
 	$Output->add_row( $row->gff_string(@args) );
+		# weirdly, this should work, as the add_row will split the columns of 
+		# the gff string automatically
 	$count++;
 }
 
@@ -372,9 +379,21 @@ while (my $row = $Input->next_row) {
 
 ### Finish
 $Input->close_fh;
-$Output->close_fh;
+if ($sort_data) {
+	print " Sorting data...\n";
+	$Output->gsort_data;
+}
+unless ($outfile) {
+	$outfile = $Input->path . $Input->basename;
+}
+$outfile = $Output->write_file(
+	filename => $outfile, 
+	gz       => $gz,
+);
+
+
 printf " Converted %s lines of input data to GFF file '%s'\n", 
-	format_with_commas($count), $Output->filename;
+	format_with_commas($count), $outfile;
 
 
 sub generate_unique_name {
@@ -431,6 +450,7 @@ data2gff.pl [--options...] <filename>
   
   General options:
   --unique                              make IDs unique
+  --sort                                sort output by genomic coordinates
   -z --gz                               compress output file
   -Z --bgz                              bgzip compress output file
   -v --version                          print version and exit
@@ -558,6 +578,11 @@ Indicate whether the feature names should be made unique. A count
 number is appended to the name of subsequent features to make them 
 unique. Using a base text string for the name will automatically 
 generate unique names.
+
+=item --sort
+
+Sort the output file by genomic coordinates. Automatically enabled 
+when compressing with bgzip. 
 
 =item --gz
 

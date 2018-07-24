@@ -5,7 +5,7 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Bio::ToolBox::Data::Stream;
+use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
 my $VERSION =  '1.61';
@@ -41,6 +41,7 @@ my (
 	$bb_app_path,
 	$database,
 	$chromo_file,
+	$sort_data,
 	$gz,
 	$bgz,
 	$help,
@@ -64,6 +65,7 @@ GetOptions(
 	'd|db=s'           => \$database, # database for bigbed file generation
 	'chromof=s'        => \$chromo_file, # name of a chromosome file
 	'bbapp=s'          => \$bb_app_path, # path to bedToBigBed utility
+	'sort!'            => \$sort_data, # sort the output file
 	'z|gz!'            => \$gz, # compress output
 	'Z|bgz!'           => \$bgz, # compress with bgzip
 	'h|help'           => \$help, # request help
@@ -97,11 +99,15 @@ unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
 }
-if ($bigbed and ($gz or $bgz)) {
-	# do not allow compression even if requested when converting to bigbed
-	warn " compression not allowed when converting to BigBed format\n";
+if ($bigbed) {
+	# do not allow compression when converting to bigbed
 	$gz = 0;
 	$bgz = 0;
+	$sort_data = 1;
+}
+if ($bgz) {
+	$gz = 2;
+	$sort_data = 1;
 }
 
 
@@ -122,8 +128,11 @@ if (defined $name) {
 
 
 ### Load file
-my $Input = Bio::ToolBox::Data::Stream->new(file => $infile, noheader => $no_header) or
-	die "Unable to open file '$infile'!\n";
+my $Input = Bio::ToolBox::Data->new(
+	in       => $infile, 
+	noheader => $no_header,
+	stream   => 1,
+) or die "Unable to open file '$infile'!\n";
 
 if ($bigbed) {
 	# identify database if needed
@@ -223,16 +232,12 @@ else {
 }
 
 
-# Open output stream
-unless ($outfile) {
-	$outfile = $Input->path . $Input->basename;
-}
-my $Output = Bio::ToolBox::Data::Stream->new(
-	out     => $outfile,
-	bed     => 6,
-	gz      => $bgz ? 2 : $gz ? 1 : 0,
-) or die " unable to create output file $outfile!";
 
+
+### Open output data
+my $Output = Bio::ToolBox::Data->new(
+	bed     => 6,
+) or die " unable to create output data strucutre!\n";
 
 
 # Convert the input stream
@@ -246,8 +251,6 @@ printf " Converting using \n  - chromosome index %s\n  - start index %s\n" .
 	defined $strand_index ? $strand_index : defined $Input->strand_column ? $Input->strand_column : '-';
 
 my $count = 0; # the number of lines processed
-my $notsorted = 0; # flag to set 
-my ($prev_chr, $prev_start);
 if (defined $start_index and substr($Input->name($start_index), -1) eq '0') {
 	$zero_based = 1; # name suggests 0-based indexing
 }
@@ -256,17 +259,6 @@ while (my $row = $Input->next_row) {
 	
 	# get the feature from the db if necessary
 	my $f = $row->feature if $do_feature;
-	
-	# check if it's sorted
-	if ($bigbed and not $notsorted) {
-		$prev_chr ||= $row->value($chr_index);
-		$prev_start ||= $row->value($start_index);
-		if ($row->value($chr_index) ne $prev_chr) {
-			$prev_chr = $row->value($chr_index);
-			$prev_start = 1;
-		}
-		$notsorted++ if $row->value($start_index) < $prev_start;
-	}
 	
 	# build the arguments
 	# retrieve information from row object if indices were provided
@@ -296,9 +288,27 @@ while (my $row = $Input->next_row) {
 			
 	# write
 	$Output->add_row( $row->bed_string(@args) );
+		# weirdly, this should work, as the add_row will split the columns of 
+		# the gff string automatically
 	$count++;
 }
-$Output->close_fh;
+
+
+
+### Finish
+$Input->close_fh;
+if ($sort_data) {
+	print " Sorting data...\n";
+	$Output->gsort_data;
+}
+unless ($outfile) {
+	$outfile = $Input->path . $Input->basename;
+}
+$outfile = $Output->write_file(
+	filename => $outfile, 
+	gz       => $gz,
+);
+
 
 
 ### Convert to BigBed format
@@ -328,7 +338,7 @@ if ($bigbed) {
 }
 else {
 	printf " wrote %s lines to BED file '%s'\n", format_with_commas($count), 
-		$Output->filename;
+		$outfile;
 }
 
 
@@ -366,6 +376,7 @@ data2bed.pl [--options...] <filename>
   --bwapp </path/to/bedToBigBed>        specify path to bedToBigBed
   
   General Options:
+  --sort                                sort output by genomic coordinates
   -z --gz                               compress output file
   -Z --bgz                              bgzip compress output file
   -v --version                          print version and exit
@@ -499,6 +510,11 @@ automatically execute the utility to convert the bed file.
 =head2 General options
 
 =over 4
+
+=item --sort
+
+Sort the output file by genomic coordinates. Automatically enabled 
+when compressing with bgzip or saving to bigBed. 
 
 =item --gz
 
