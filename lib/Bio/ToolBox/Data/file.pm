@@ -18,7 +18,6 @@ use Carp qw(carp cluck croak confess);
 use File::Basename qw(fileparse);
 use File::Which;
 use IO::File;
-use Statistics::Lite qw(mean min);
 
 # List of acceptable filename extensions
 our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc|maf)(?:\.gz)?/i;
