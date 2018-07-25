@@ -1069,11 +1069,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Module::Load;
-use Bio::ToolBox::db_helper qw(
-	get_new_feature_list 
-	get_new_genome_list 
-	get_db_feature
-);
+my $db_loaded;
 
 1;
 
@@ -1139,6 +1135,11 @@ sub new {
 		$self->feature($args{features});
 		$self->database($args{db});
 		$args{data} = $self;
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $result;
 		if ($args{features} eq 'genome') {
 			$result = get_new_genome_list(%args);
@@ -1566,6 +1567,11 @@ sub collapse_gene_transcripts {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
 		my $name_i = $self->name_column;
@@ -1595,11 +1601,10 @@ sub add_transcript_length {
 	}
 	
 	# load module
-	my $class = "Bio::ToolBox::GeneTools";
-	eval {load $class, qw(get_transcript_length get_transcript_cds_length
+	eval {load "Bio::ToolBox::GeneTools", qw(get_transcript_length get_transcript_cds_length
 		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
 	if ($@) {
-		carp "unable to load $class! cannot collapse transcripts!";
+		carp "unable to load Bio::ToolBox::GeneTools! cannot collapse transcripts!";
 		return;
 	}
 	
@@ -1642,6 +1647,11 @@ sub add_transcript_length {
 		# we will have to fetch the feature from a database
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $name_i = $self->name_column;
 		my $id_i = $self->id_column;
 		my $type_i = $self->type_column;
