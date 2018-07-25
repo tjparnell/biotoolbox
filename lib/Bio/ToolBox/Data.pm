@@ -1157,8 +1157,8 @@ sub new {
 		# check to see if user provided column names
 		$args{columns} ||= $args{datasets} || undef;
 		if (defined $args{columns}) {
-			 foreach my $d ( @{ $args{datasets} } ) {
-			 	$self->add_column($d);
+			 foreach my $c ( @{ $args{columns} } ) {
+			 	$self->add_column($c);
 			 }
 			 $self->{feature} = $args{feature} if exists $args{feature};
 		}
