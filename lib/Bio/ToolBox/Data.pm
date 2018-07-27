@@ -1316,7 +1316,6 @@ PARSEFAIL
 		# create a new table
 		$self->add_column('Primary_ID');
 		$self->add_column('Name');
-		$self->add_column('Type');
 		
 		# check for chromosome exclude
 		my $chr_exclude;
@@ -1331,9 +1330,7 @@ PARSEFAIL
 			}
 			my $type = $f->type;
 			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
-				my $index = $self->add_row(
-					[ $f->primary_id, $f->display_name, $f->type,] 
-				);
+				my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
 				$self->store_seqfeature($index, $f);
 			}
 		}
@@ -1343,6 +1340,7 @@ PARSEFAIL
 		}
 		$self->database("Parsed:$file");
 		$self->feature($feature);
+		$self->add_comment("Chromosomes excluded: $chr_exclude") if $chr_exclude;
 	}
 	return 1;
 }
