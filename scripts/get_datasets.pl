@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.60';
+my $VERSION = '1.61';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -736,11 +736,14 @@ sub add_new_dataset {
 	
 	# generate column name
 	my $column_name;
-	if ($dataset =~ /^file|http|ftp/) {
+	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
+		my $d = $1;
 		# a specified file
 		# we just want the file name, split it from the path
-		foreach (split /&/, $dataset) {
+		foreach (split /&/, $d) {
 			my (undef, undef, $file_name) = File::Spec->splitpath($_);
+			# clean up extensions and stuff
+			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
 			if ($column_name) {
 				$column_name .= '&' . $file_name;
 			}
