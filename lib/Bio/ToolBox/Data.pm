@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.54';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -199,16 +199,38 @@ excluding specific or classes of chromosomes, for example the mitochondrial
 chromosome or unmapped contigs. This works with both feature collection 
 and genomic intervals. The default is to take all chromosomes.
 
+=back
+
+When no file is given or database given to search, then a new, 
+empty Data object is returned. In this case, you may optionally 
+specify the names of the columns or indicate a specific file 
+format structure to assign column names. The following options can 
+then be provided.
+
+=over 4
+
 =item columns
 
 =item datasets
 
   my $Data = Bio::ToolBox::Data->new(columns => [qw(Column1 Column2 ...)] );
 
-When no file is given or database given to search, then a new, 
-empty Data object is returned. In this case, you may optionally 
-provide the column names in advance as an anonymous array. You 
-may also optionally provide a general feature name, if desired.
+Provide the column names in advance as an anonymous array. 
+
+=item gff
+
+Pass the GFF version of the file: 1, 2, 2.5 (GTF), or 3.
+
+=item bed
+
+Pass the number of BED columns (3-12).
+
+=item ucsc 
+
+Pass the number of columns to indicate the type of UCSC format. These 
+include 10 (refFlat without gene names), 11 (refFlat with gene names), 
+12 (knownGene gene prediction table), and 15 
+(an extended gene prediction or genePredExt table).
 
 =back
 
@@ -699,6 +721,12 @@ object can be stored per row.
 
 Retrieves the SeqFeature object for the given row index.
 
+=item delete_seqfeature
+
+  $Data->store_seqfeature($row_index);
+
+Removes the SeqFeature object for the given row index. 
+
 =item collapse_gene_transcripts
 
   my $success = $Data->collapse_gene_transcripts;
@@ -899,8 +927,11 @@ a path is not provided, the current working directory is used.
 
 =item gz
 
-Boolean value to change the compression status of the output file. The 
-default is to maintain the status of the original opened file.
+Boolean value to change the compression status of the output file. If 
+overwriting an input file, the default is maintain the compression status, 
+otherwise no compression. Pass a 0 for no compression, 1 for standard 
+gzip compression, or 2 for block gzip (bgzip) compression for tabix 
+compatibility.
 
 =back
 
@@ -1038,11 +1069,7 @@ use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Module::Load;
-use Bio::ToolBox::db_helper qw(
-	get_new_feature_list 
-	get_new_genome_list 
-	get_db_feature
-);
+my $db_loaded;
 
 1;
 
@@ -1108,6 +1135,11 @@ sub new {
 		$self->feature($args{features});
 		$self->database($args{db});
 		$args{data} = $self;
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $result;
 		if ($args{features} eq 'genome') {
 			$result = get_new_genome_list(%args);
@@ -1122,16 +1154,47 @@ sub new {
 	}
 	else {
 		# a new empty structure
-		my @datasets;
-		if (exists $args{datasets}) {
-			@datasets = @{ $args{datasets} };
+		
+		# check to see if user provided column names
+		$args{columns} ||= $args{datasets} || undef;
+		if (defined $args{columns}) {
+			 foreach my $c ( @{ $args{columns} } ) {
+			 	$self->add_column($c);
+			 }
+			 $self->{feature} = $args{feature} if exists $args{feature};
 		}
-		elsif (exists $args{columns}) {
-			@datasets = @{ $args{columns} };
+		
+		# or possibly a specified format structure 
+		elsif (exists $args{gff} and $args{gff}) {
+			# use standard names for the number of columns indicated
+			# we trust that the user knows the subtle difference between gff versions
+			$self->add_gff_metadata($args{gff});
+			unless ($self->extension =~ /g[tf]f/) {
+				$self->{extension} = $args{gff} == 2.5 ? '.gtf' : 
+					$args{gff} == 3 ? '.gff3' : '.gff';
+			}
 		}
-		my $feature = $args{features} || 'feature';
-		foreach my $d (@datasets) {
-			$self->add_column($d);
+		elsif (exists $args{bed} and $args{bed}) {
+			# use standard names for the number of columns indicated
+			unless ($args{bed} =~ /^\d{1,2}$/ and $args{bed} >= 3) {
+				carp "bed parameter must be an integer 3-12!";
+				return;
+			}	
+			$self->add_bed_metadata($args{bed});
+			unless ($self->extension =~ /bed|peak/) {
+				$self->{extension} = '.bed';
+			}
+		}
+		elsif (exists $args{ucsc} and $args{ucsc}) {
+			# a ucsc format such as refFlat, genePred, or genePredExt
+			my $u = $self->add_ucsc_metadata($args{ucsc});
+			unless ($u) {
+				carp "unrecognized number of columns for ucsc format!";
+				return;
+			};
+			unless ($self->extension =~ /ucsc|ref+lat|genepred/) {
+				$self->{extension} = '.ucsc';
+			}
 		}
 	}
 	
@@ -1253,7 +1316,6 @@ PARSEFAIL
 		# create a new table
 		$self->add_column('Primary_ID');
 		$self->add_column('Name');
-		$self->add_column('Type');
 		
 		# check for chromosome exclude
 		my $chr_exclude;
@@ -1268,9 +1330,7 @@ PARSEFAIL
 			}
 			my $type = $f->type;
 			if ($f->type =~ /$feature/i or ($mrna_check and is_coding($f)) ) {
-				my $index = $self->add_row(
-					[ $f->primary_id, $f->display_name, $f->type,] 
-				);
+				my $index = $self->add_row([ $f->primary_id, $f->display_name ]);
 				$self->store_seqfeature($index, $f);
 			}
 		}
@@ -1280,6 +1340,7 @@ PARSEFAIL
 		}
 		$self->database("Parsed:$file");
 		$self->feature($feature);
+		$self->add_comment("Chromosomes excluded: $chr_exclude") if $chr_exclude;
 	}
 	return 1;
 }
@@ -1469,6 +1530,13 @@ sub store_seqfeature {
 	return 1;
 }
 
+sub delete_seqfeature {
+	my ($self, $row_i) = @_;
+	confess "invalid row index" unless ($row_i <= $self->last_row);
+	return unless $self->{SeqFeatureObjects};
+	undef $self->{SeqFeatureObjects}->[$row_i];
+}
+
 sub collapse_gene_transcripts {
 	my $self = shift;
 	unless ($self->feature_type eq 'named') {
@@ -1497,6 +1565,11 @@ sub collapse_gene_transcripts {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
 		my $name_i = $self->name_column;
@@ -1526,11 +1599,10 @@ sub add_transcript_length {
 	}
 	
 	# load module
-	my $class = "Bio::ToolBox::GeneTools";
-	eval {load $class, qw(get_transcript_length get_transcript_cds_length
+	eval {load "Bio::ToolBox::GeneTools", qw(get_transcript_length get_transcript_cds_length
 		get_transcript_5p_utr_length get_transcript_3p_utr_length)};
 	if ($@) {
-		carp "unable to load $class! cannot collapse transcripts!";
+		carp "unable to load Bio::ToolBox::GeneTools! cannot collapse transcripts!";
 		return;
 	}
 	
@@ -1573,6 +1645,11 @@ sub add_transcript_length {
 		# we will have to fetch the feature from a database
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
+		unless ($db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
+				get_new_genome_list get_db_feature));
+			$db_loaded = 1;
+		}
 		my $name_i = $self->name_column;
 		my $id_i = $self->id_column;
 		my $type_i = $self->type_column;

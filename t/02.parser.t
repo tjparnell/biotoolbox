@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 254;
+	plan tests => 249;
 }
 else {
-	plan tests => 158;
+	plan tests => 153;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -285,15 +285,13 @@ sub test_parsed_gff_table {
 	is($flavor, 'gff', 'GFF file flavor');
 	my $p = $Data->parse_table($gfffile);
 	is($p, 1, 'parsed GFF table');
-	is($Data->number_columns, 3, 'number of columns');
+	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 33, 'number of rows');
 	is($Data->database, "Parsed:$gfffile", 'database source');
 	is($Data->name(0), 'Primary_ID', 'First column name');
 	is($Data->name(1), 'Name', 'Second column name');
-	is($Data->name(2), 'Type', 'Third column name');
 	is($Data->value(1,0), 'YAL069W', 'First row ID');
 	is($Data->value(1,1), 'YAL069W', 'First row Name');
-	is($Data->value(1,2), 'gene:SGD', 'First row Type');
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'Fifth row SeqFeature object');
 	is($f->display_name, 'YAL069W', 'SeqFeature display name');
@@ -348,15 +346,13 @@ sub test_parsed_ucsc_table {
 	is($flavor, 'ucsc', 'UCSC file flavor');
 	my $p = $Data->parse_table($ucscfile);
 	is($p, 1, 'parsed UCSC table');
-	is($Data->number_columns, 3, 'number of columns');
+	is($Data->number_columns, 2, 'number of columns');
 	is($Data->last_row, 5, 'number of rows');
 	is($Data->database, "Parsed:$ucscfile", 'database source');
 	is($Data->name(0), 'Primary_ID', 'First column name');
 	is($Data->name(1), 'Name', 'Second column name');
-	is($Data->name(2), 'Type', 'Third column name');
 	is($Data->value(1,0), 'ENSG00000125826', 'First row ID');
 	is($Data->value(1,1), 'ENSG00000125826', 'First row Name');
-	is($Data->value(1,2), 'gene:EnsGene', 'First row Type');
 	my $f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'ENSG00000125826', 'SeqFeature display name');
@@ -384,7 +380,6 @@ sub test_parsed_ucsc_table {
 		# appears as an mRNA without the extra ensemblSource data
 	is($Data->value(1,0), 'ENST00000411647', 'First row ID');
 	is($Data->value(1,1), 'ENST00000411647', 'First row Name');
-	is($Data->value(1,2), 'mRNA:EnsGene', 'First row Type');
 	$f = $Data->get_seqfeature(1);
 	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
 	is($f->display_name, 'ENST00000411647', 'SeqFeature display name');

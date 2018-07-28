@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.60';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -16,12 +16,8 @@ should not be used directly. See the respective modules for more information.
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::file';
-use Bio::ToolBox::db_helper qw(
-	open_db_connection
-	verify_or_request_feature_types
-	$BAM_ADAPTER
-	$BIG_ADAPTER
-);
+use Module::Load;
+my $core_db_loaded = 0;
 
 1;
 
@@ -812,6 +808,11 @@ sub open_meta_database {
 	if (exists $self->{db_connection}) {
 		return $self->{db_connection} unless $force;
 	}
+	unless ($core_db_loaded) {
+		load('Bio::ToolBox::db_helper', qw(open_db_connection 
+			verify_or_request_feature_types use_bam_adapter use_big_adapter));
+		$core_db_loaded = 1;
+	}
 	my $db = open_db_connection($self->{db}, $force);
 	return unless $db;
 	$self->{db_connection} = $db;
@@ -822,6 +823,11 @@ sub open_new_database {
 	my $self = shift;
 	my $database = shift;
 	my $force = shift || 0;
+	unless ($core_db_loaded) {
+		load('Bio::ToolBox::db_helper', qw(open_db_connection 
+			verify_or_request_feature_types use_bam_adapter use_big_adapter));
+		$core_db_loaded = 1;
+	}
 	return open_db_connection($database, $force);
 }
 
@@ -838,6 +844,11 @@ sub verify_dataset {
 			return $dataset;
 		}
 		$database ||= $self->open_meta_database;
+		unless ($core_db_loaded) {
+			load('Bio::ToolBox::db_helper', qw(open_db_connection 
+				verify_or_request_feature_types use_bam_adapter use_big_adapter));
+			$core_db_loaded = 1;
+		}
 		my ($verified) = verify_or_request_feature_types(
 			# normally returns an array of verified features, we're only checking one
 			db      => $database,
@@ -995,9 +1006,8 @@ sub database {
 	my $self = shift;
 	if (@_) {
 		$self->{db} = shift;
-		if (exists $self->{db_connection}) {
-			my $db = open_db_connection($self->{db}) if $self->{db_connection};
-			$self->{db_connection} = $db if $db;
+		if (exists $self->{db_connection} and $self->{db_connection}) {
+			$self->open_meta_database(1);
 		}
 	}
 	return $self->{db};
@@ -1005,18 +1015,22 @@ sub database {
 
 sub bam_adapter {
 	my $self = shift;
-	if (@_) {
-		$BAM_ADAPTER = shift;
+	unless ($core_db_loaded) {
+		load('Bio::ToolBox::db_helper', qw(open_db_connection 
+			verify_or_request_feature_types use_bam_adapter use_big_adapter));
+		$core_db_loaded = 1;
 	}
-	return $BAM_ADAPTER;
+	return use_bam_adapter(@_);
 }
 
 sub big_adapter {
 	my $self = shift;
-	if (@_) {
-		$BIG_ADAPTER = shift;
+	unless ($core_db_loaded) {
+		load('Bio::ToolBox::db_helper', qw(open_db_connection 
+			verify_or_request_feature_types use_bam_adapter use_big_adapter));
+		$core_db_loaded = 1;
 	}
-	return $BIG_ADAPTER;
+	return use_big_adapter(@_);
 }
 
 sub gff {
@@ -1405,6 +1419,12 @@ sub score_column {
 
 #### Special Row methods ####
 
+# Why is this in core and not in Data? I keep asking myself.
+# Because this can get called from a Data::Feature object, which might be 
+# associated with a Data::Stream object. No, Stream objects don't have stored 
+# SeqFeatures, but I don't want the entire program to crash because of an 
+# undefined method because some doofus forgot. Since both Data and Stream 
+# objects inherit from Data::core, this is in here.
 sub get_seqfeature {
 	my ($self, $row) = @_;
 	return unless ($row and $row <= $self->{last_row});

@@ -1,5 +1,17 @@
 ######## Bio::ToolBox revision history #############
 
+v1.61
+	- Added genomic sort and bgzip file compression support when 
+	writing files for tabix compatibility with several scripts, 
+	including those that write gene tables.
+	- Tables generated from parsed gene annotation files (GFF, etc) 
+	no longer write a Type column.
+	- Simplified dataset column names in script get_datasets.
+	- Fix transcript filtering bugs in script get_features.
+	- Add helper methods for setting bam and big adapters to db_helper.
+	- Optimized run time by loading db_helper only on demand. 
+	- Fix numerous POD bugs.
+
 v1.60
 	- Major update to using Bio::DB::Big module for bigWig and 
 	bigBed file support. This should be much easier to install and 

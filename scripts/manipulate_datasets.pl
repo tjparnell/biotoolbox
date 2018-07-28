@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+my $VERSION = '1.61';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -41,6 +41,7 @@ my ( # command line option variables
 	$opt_log, 
 	$noheader,
 	$gz, 
+	$bgz,
 	$help,
 	$print_version,
 );
@@ -62,6 +63,7 @@ GetOptions(
 	'log!'        => \$opt_log, # data values are in log2 space
 	'H|noheader'  => \$noheader, # file has no headers
 	'z|gz!'       => \$gz, # write gzipped data file
+	'Z|bgz!'      => \$bgz, # compress with bgzip
 	'h|help'      => \$help, # request help
 	'v|version'   => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -330,7 +332,7 @@ sub write_and_quit_function {
 		# write the file
 		my $write_results = $Data->write_file(
 			'filename'  => $outfile,
-			'gz'        => $gz,
+			'gz'        => $bgz ? 2 : $gz ? 1 : 0,
 		);
 	
 		# report write results
@@ -3204,33 +3206,35 @@ A progam to manipulate tab-delimited data files.
 manipulate_datasets.pl [--options ...] <filename> 
 
   File options:
-  -i --in <filename>        input data file
-  -o --out <filename>       optional output file, default overwrite
-  -H --noheader             input file has no header row
+  -i --in <filename>                input data file
+  -o --out <filename>               output file, default overwrite
+  -H --noheader                     input file has no header row
   
   Non-interactive functions:
-  -f --func [ reorder | delete | rename | new | number | concatenate | split | 
-           sort | gsort | null | duplicate | above | below | specific | keep
-           coordinate | cnull | absolute | minimum | maximum | log | delog | 
-           format | pr | add | subtract | multiply | divide | combine | scale | 
-           zscore | ratio | diff | normdiff | center | rewrite | export | 
-           treeview | summary | stat ]
-  -x --index <integers>     column index to work on
+  -f --func [ reorder | delete | rename | new | number | concatenate | 
+              split | sort | gsort | null | duplicate | above | below | 
+              specific | keepcoordinate | cnull | absolute | minimum | 
+              maximum | log | delog | format | pr | add | subtract | 
+              multiply | divide | combine | scale | zscore | ratio | 
+              diff | normdiff | center | rewrite | export | treeview | 
+              summary | stat ]
+  -x --index <integers>             column index to work on
   
   Operation options:
-  -n --exp --num <integer>
-  -d --con --den <integer>
-  -t --target <text> or <number>
-  --place [r | n]
-  --(no)zero
-  --dir [i | d]
-  --name <text>
-  --log
+  -n --exp --num <integer>          numerator column index for ratio
+  -d --con --den <integer>          denominator column index for ratio
+  -t --target <text> or <number>    target value for certain functions
+  --place [r | n]                   replace column contents or new column
+  --(no)zero                        include zero in certain functions
+  --dir [i | d]                     sort order: increase or decrease
+  --name <text>                     name of new column
+  --log                             values are in log scale
   
   General Options:
-  -z --gz
-  -v --version
-  -h --help
+  -z --gz                           compress output file
+  -Z --bgz                          bgzip compress output file
+  -v --version                      print version and exit
+  -h --help                         show extended documentation
 
 =head1 OPTIONS
 
@@ -3370,9 +3374,13 @@ when the log status is appropriately recorded in the dataset metadata.
 
 =item --gz 
 
-Indicate whether the output file should (not) be compressed. The appropriate extension will be 
-added. If this option is not specified, then the compression status of the input file will be 
-preserved.
+Indicate whether the output file should be gzip compressed. The compression 
+status of the input file will be preserved if overwriting.
+
+=item --bgz
+
+Specify whether the output file should be compressed with block gzip 
+(bgzip) for tabix compatibility.
 
 =item --version
 

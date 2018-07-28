@@ -201,8 +201,8 @@ CDS features.
 Special attributes are key value pairs that do not fall under the above 
 conventions. It is possible to have more than one value assigned to a 
 given key. In a GFF file, this corresponds to the attributes in the 9th 
-field, with the exception of special reserved attributes such as Name, 
-ID, and Parent.
+field, with the exception of special reserved attributes such as C<Name>, 
+C<ID>, and C<Parent>.
 
 =over 4
 
@@ -211,7 +211,7 @@ ID, and Parent.
     $seqf->add_tag_value($key, $value);
 
 Sets the special attribute C<$key> to C<$value>. If you have more than one 
-value, $value should be an anonymous array of text values. Following 
+value, C<$value> should be an anonymous array of text values. Following 
 GFF convention, C<$key> should not comprise of special characters, including 
 ";,= ".
 

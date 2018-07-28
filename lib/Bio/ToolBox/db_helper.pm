@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.60';
+our $VERSION = '1.61';
 
 =head1 NAME
 
@@ -52,9 +52,11 @@ BigWig files (F<.bw> and F<.bigwig>) are compressed, binary, indexed
 versions of text wig files and may be accessed either locally or remotely. 
 They support extremely  fast score retrieval from any genomic location of 
 any size without sacrificing resolution (spatial and numeric). See
-L<http://genome.ucsc.edu/goldenPath/help/bigWig.html> for more information. 
-BigWig files are supported by the L<Bio::DB::BigWig> adapter, based on the 
-UCSC library; see the documentation for more information.
+L<bigWig description|http://genome.ucsc.edu/goldenPath/help/bigWig.html> for more information. 
+BigWig files are supported by either the L<Bio::DB::Big> or the 
+L<Bio::DB::BigWig> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
+or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
+respectively; see their respective documentation for more information.
 
 =item Directory of BigWig files
 
@@ -62,15 +64,18 @@ A directory containing two or more BigWig files is assembled into a
 BigWigSet, allowing for metadata, such as strand, to be associated with 
 BigWig files. Additional metadata beyond the filename may be included in 
 text file F<metadata.txt> within the directory. See the 
-L<Bio::DB::BigWigSet> adapter documentation for more information.
+L<Bio::DB::BigWigSet> adapter documentation for more information. When using  
+L<Bio::DB::Big> adapters, BigWigSet support is natively supported by 
+the BioToolBox package.
 
 =item BigBed files
 
 BigBed files are compressed, binary, indexed versions of text BED files. See
-L<http://genome.ucsc.edu/goldenPath/help/bigBed.html> for more information.
+L<bigBed description|http://genome.ucsc.edu/goldenPath/help/bigBed.html> for more information.
 Both local and remote files may be accessed. BigBed files are supported by 
-L<Bio::DB::BigBed> adapter, based on the UCSC library; see the adapter 
-documentation for more information.
+either the L<Bio::DB::Big> or the L<Bio::DB::BigBed> adapter, based on either L<libBigWig|https://github.com/dpryan79/libBigWig> 
+or the L<UCSC|http://hgdownload.soe.ucsc.edu/downloads.html#source_downloads> libraries, 
+respectively; see their respective documentation for more information.
 
 =item Bam files
 
@@ -149,6 +154,41 @@ Their usage is detailed below.
 =head1 EXPORTED SUBROUTINES
 
 =over 4
+
+=item C<$BAM_ADAPTER> variable
+
+=item C<$BIG_ADAPTER> variable
+
+These variables control which Bam and bigWig/bigBed adapters are used
+during execution in installations where both adapters are present. These
+variables are not set initially; adapters are chosen automatically when an
+adapter is requested during execution and modules are evaluated for loading. 
+
+=item use_bam_adapter
+
+=item use_big_adapter
+
+These are convenience methods for explicitly setting and retrieving the 
+C<$BAM_ADAPTER> and C<$BIG_ADAPTER> variables, respectively. 
+
+Optionally pass the value to set. It will always return the value being used. 
+Values include the following:
+
+=over 4
+
+=item Bam adapter
+
+   * hts     Bio::DB::HTS (default if available)
+   * sam     Bio::DB::Sam
+   * none    no adapters allowed
+
+=item Big adapter
+
+   * big     Bio::DB::Big (default if available)
+   * ucsc    Bio::DB::BigWig and Bio::DB::BigBed
+   * none    no adapters allowed
+
+=back
 
 =item open_db_connection
 
@@ -265,8 +305,8 @@ For L<Bio::DB::SeqFeature::Store> databases, the type is represented as
 respectively. The types are sorted alphabetically first by source, 
 then by method.
 
-For L<Bio::DB::BigWigSet> databases, the type, primary_tag, method, or 
-display_name attribute may be used, in that respective order of 
+For L<Bio::DB::BigWigSet> databases, the C<type>, C<primary_tag>, C<method>, 
+or C<display_name> attribute may be used, in that respective order of 
 availability. The list is sorted alphabetically.
 
 =item verify_or_request_feature_types
@@ -370,7 +410,7 @@ from a database list. The default is to list all available feature
 types.
 
 =back
-	
+
 =item check_dataset_for_rpm_support($dataset, [$cpu])
 
    # count the total number of alignments
@@ -805,6 +845,8 @@ our @EXPORT = qw();
 our @EXPORT_OK = qw(
 	$BAM_ADAPTER
 	$BIG_ADAPTER
+	use_bam_adapter
+	use_big_adapter
 	open_db_connection
 	get_dataset_list 
 	verify_or_request_feature_types 
@@ -826,6 +868,20 @@ our @EXPORT_OK = qw(
 
 
 ### Open a connection to the SeqFeature Store MySQL database
+
+sub use_bam_adapter {
+	my $a = shift || undef;
+	$BAM_ADAPTER = $a if $a;
+	return $BAM_ADAPTER;
+}
+
+
+sub use_big_adapter {
+	my $a = shift || undef;
+	$BIG_ADAPTER = $a if $a;
+	return $BIG_ADAPTER;
+}
+
 
 sub open_db_connection {
 	my $database = shift;
