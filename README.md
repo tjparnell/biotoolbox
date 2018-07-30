@@ -281,9 +281,10 @@ options shown and not shown.
     
     This script is designed to run interactively, allowing you to choose functions via 
     letter options from a menu. Alternatively, functions can be specified on the 
-    command line for a programmatic approach in a `bash` script, for example.
+    command line for a programmatic approach in a `bash` script, for example. Note that 
+    column indexes are numbered from 0.
     
-        manipulate_datasets.pl --in file.txt --func multiply --index --target 0.0133
+        manipulate_datasets.pl --in file.txt --func multiply --index 5 --target 0.0133
     
 
 # ADVANCED INSTALLATION
