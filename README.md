@@ -90,8 +90,9 @@ of the primary user-oriented libraries that are available.
 
     - [Bio::ToolBox::parser::ucsc](https://metacpan.org/pod/Bio::ToolBox::parser::ucsc)
 
-        This parses various UCSC file formats, including different refFlat, GenePred, 
-        and knownGene flavors. Genes, transcripts, and exons are assembled into 
+        This parses various [UCSC file formats](http://genome.ucsc.edu/FAQ/FAQformat.html#format9), 
+        including different refFlat, GenePred, and knownGene flavors. 
+        Genes, transcripts, and exons are assembled into 
         hierarchical child-parent relationships as desired.
 
 - [Bio::ToolBox::SeqFeature](https://metacpan.org/pod/Bio::ToolBox::SeqFeature)
@@ -130,11 +131,161 @@ A sampling of what can be done include the following:
 Scripts have built-in documentation. Execute the script without any options to print 
 a synopsis of available options, or add `--help` to print the full documentation.
 
-# CONFIGURATION
+## Examples
 
-There is a small INI-style configuration file, `.biotoolbox.cfg`, that may be written 
-in your home directory, which can include paths to helper files and database 
-configurations.
+The following are just a few examples of highlighted scripts and their usage for 
+solutions to common situations. Refer to the scripts' documentation for details on 
+options shown and not shown.
+
+- Convert or extract gene annotation
+
+    Gene annotation from [UCSC](http://genome.ucsc.edu) frequently come in UCSC 
+    [specific formats](http://genome.ucsc.edu/FAQ/FAQformat.html#format9), including
+    refFlat and genePred, whereas gene annotation from [Ensembl](http://ensembl.org) 
+    frequently come in GTF or GFF3 formats. At some point, some tool will specifically 
+    need annotation in a different format than what you have (since most of 
+    bioinformatics seem to be converting from one format to another), 
+    [get_features.pl](https://metacpan.org/pod/get_features.pl) can help here.
+    
+    Simple conversion:
+    
+         get_features.pl --in file.gff3.gz --refflat
+    
+    Extract only protein-coding genes, collapsing alternate transcripts into one 
+    combined meta-transcript, as a GTF:
+    
+         get_features.pl --in file.gff3.gz --feature mRNA --collapse --gtf
+    
+    Pull specific biotype `lincRNA` transcripts from standard chromosomes:
+    
+         get_features.pl --in file.gff3 --feature transcript --biotype lincRNA \
+         --chrskip 'contig|scaffold|unmapped' --gtf
+    
+    Pull annotation from a [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
+    SQLite database for use in downstream applications:
+    
+         get_features.pl --db annotation.sqlite --feature gene --out genes.txt 
+
+- Extract specific gene regions
+
+    Not all parts of genes that you might be interested in are explicitly defined 
+    or encoded into a gene annotation table; rather, they are inferred. The 
+    [get_gene_regions.pl](https://metacpan.org/pod/get_gene_regions.pl) script can 
+    extract these inferred regions.
+    
+    Extract only the alternate exons from multi-transcript genes:
+    
+        get_gene_regions.pl --region altExon --in genes.gtf --out altExons
+    
+    Extract all the transcription start sites of protein coding transcripts, but only 
+    report those of alternate transcripts once if they're within 200 bp, and 
+    expand the site by 200 bp in both directions, as a bed file:
+    
+        get_gene_regions.pl --region tss --in genes.gtf --bed --out tss200.bed \
+        --feature gene --transcript mRNA --unique --slop 200 --start -200 --end 200 
+
+- Generate wig file representation of a bam file
+
+    Lots of existing programs can generate a coverage file from a bam file, but 
+    [bam2wig.pl](https://metacpan.org/pod/bam2wig.pl) will generate wig files in 
+    every which way imaginable. Some common scenarios include:
+    
+    ChIPSeq normalized fragment coverage with empirical fragment size determination (single-end):
+    
+        bam2wig.pl --extend --shift --model --rpm --bw --in file1.bam --out file1.bw
+    
+    ChIPSeq normalized fragment coverage with explicit extension, explicit scaling factor, 
+    averaged over 3 replicates, excluding repeat elements and certain chromosomes:
+    
+        bam2wig.pl --extend --extval 200 --bw --out file.bw --rpm --mean \
+        --scale 0.0133 --blacklist repeats.bed.gz --chrskip 'chrM|contig|scaffold' \
+        --cpu 12 replicate1.bam replicate2.bam replicate3.bam 
+    
+    ATACSeq cut sites, where cut sites are represented by 50 bp pileup centered over the 
+    cut site at the 5' end:
+    
+        bam2wig.pl --shift --shiftval -25 --extend --extval 50 --in file1.bam
+    
+    RNASeq stranded coverage, where 2 wig files are generated for each strand, 
+    ignoring multi-mappers, with output basename of 'experiment':
+    
+        bam2wig.pl --span --splice --strand --nosecondary --rpm --bw \
+        --in file1.bam --out experiment
+    
+    Simple point representation of all fragments for counting:
+    
+        bam2wig.pl --start --bw --in file1.bam --out file1.bw
+
+- Simple data collection
+
+    Sometimes you just need simple, summarized scores over a list of genes or regions. 
+    The [get_datasets.pl](https://metacpan.org/pod/get_datasets.pl) script can collect 
+    data summarized data from bigWig, bigBed, Bam, USeq, and more.
+    
+    Collect mean values over Bed intervals:
+    
+        get_datasets.pl --in file.bed --method mean score1.bw score2.bw score3.bw
+    
+    In general, [bam2wig.pl](https://metacpan.org/pod/bam2wig.pl) has much better 
+    controls for filtering and scoring bam alignments, but in a pinch 
+    [get_datasets.pl](https://metacpan.org/pod/get_datasets.pl)
+    will also work with bam files. A method of `mean` or `median` will work with 
+    raw coverage, while `count`, name count (`ncount`), or precise count (`pcount`) 
+    will work with alignment counts.
+    
+        get_datasets.pl --in file.bed --method ncount file1.bam file2.bam
+    
+    Collect mean sense RNASeq coverage from a collection of stranded bigWig files in 
+    a folder (as shown above) over transcript exons:
+    
+        get_datasets.pl --in annotation.gtf --feature transcript --subfeature exon \
+        --strand sense --ddb /path/to/stranded/bigWigs/ --data experiment --out file.txt
+    
+- Collect data around a reference point
+
+    Rather than collect a single score for region, you need to collect a range of scores 
+    relative to a single reference point, for example a transcription start site.
+    The [get_relative_data.pl](https://metacpan.org/pod/get_relative_data.pl) script will 
+    collect data in a defined number of windows on both sides of a specified reference 
+    point.
+    
+    Collect mean values in twenty 500 bp windows (+/- 10 kb) from the transcription 
+    start site:
+    
+        get_relative_data.pl --in mRNA.gtf --method mean --win 500 --num 20 \
+        --pos 5 --data scores.bw --out mRNA_TSS_10kb.txt
+
+- Collect profile data across an region
+
+    Instead of collecting a single score for a region, you need to generate a profile 
+    across a region. The [get_binned_data.pl](https://metacpan.org/pod/get_binned_data.pl)
+    script will collect scores in defined fractional windows across a region, setting 
+    length to each region an artificial 1000 bp. 
+    
+    To collect an average profile expression across transcripts, excluding introns, 
+    and generate a summary (average profile):
+    
+        get_binned_data.pl --in mRNA.gtf --method mean --subfeature exon --bins 50 \
+        --strand sense --ddb /path/to/stranded/bigWigs/ --data experiment \
+        --sum --out mRNA_sense_profile.txt
+
+- Manipulate collected dataset file
+
+    Inevitably, you need to manipulate your data files: add or remove columns, perform 
+    mathematical functions on columns, etc. You could open the file in a spreadsheet 
+    application, or in an R session, or get creative with `cut`, `sed`, or `awk` commands 
+    in the terminal, or just simply run 
+    [manipulate_datasets.pl](https://metacpan.org/pod/manipulate_datasets.pl).
+    
+        manipulate_datasets.pl file.txt
+    
+    This script is designed to run interactively, allowing you to choose functions via 
+    letter options from a menu. Alternatively, functions can be specified on the 
+    command line for a programmatic approach in a `bash` script, for example. Note that 
+    column indexes are numbered from 0.
+    
+        manipulate_datasets.pl --in file.txt --func multiply --index 5 --target 0.0133
+    
 
 # ADVANCED INSTALLATION
 
@@ -182,7 +333,7 @@ installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
 
-   Follow the directions within for installation. [Version 1.5](https://github.com/samtools/htslib/releases/download/1.5/htslib-1.5.tar.bz2) 
+   Follow the directions within for installation. [Version 1.8](https://github.com/samtools/htslib/releases/download/1.8/htslib-1.8.tar.bz2) 
    is known to work well, although newer versions should work too. By default, it 
    installs into `/usr/local`, or it may be set to another directory (`$HOME` for example) 
    by adding `--prefix=$HOME` option to the `configure` step. This may also be available 
@@ -200,6 +351,12 @@ The following Perl packages should be explicitly installed. Most of these will
 bring along a number of dependencies (which in turn bring along more dependencies). In 
 the end you will have installed dozens of packages. 
 
+
+- [Module::Build](https://metacpan.org/pod/Module::Build)
+
+    This may or may not need to be installed, depending on the age of your Perl 
+    installation and how much else has been installed. It was part of the standard 
+    Perl distribution up until version 5.21. 
 
 - [Bio::Perl](https://metacpan.org/pod/Bio::Perl)
 
@@ -226,15 +383,7 @@ the end you will have installed dozens of packages.
     As with HTSlib, this should be able to identify the libBigWig library in standard 
     locations, but with non-standard locations, you may specify the path with the 
     `--libbigwig` option to `Build.PL`. 
-    
-    Note that on MacOS X, the bundle may not be linked properly to the shared library. 
-    This will be apparent when the `./Build test` fails dramatically. You will have to 
-    manually re-link the bundle to the shared library file with the following command.
-    See this [link](https://stackoverflow.com/questions/33275605/el-capitan-perl-dbd-unsafe-use-of-relative-path) 
-    regarding a solution.
-    
-        install_name_tool -change libBigWig.so /path/to/lib/libBigWig.so blib/arch/auto/Bio/DB/Big/Big.bundle
-        
+
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
     This is highly recommended to get multi-cpu support for some of the data collection 
@@ -250,10 +399,10 @@ the end you will have installed dozens of packages.
     databases for annotation, then installing SQLite support is suggested. For larger, 
     shared databases, [DBD::mysql](https://metacpan.org/pod/DBD::mysql) is also supported.
 
-An example of installing these Perl modules with cpanm in your home directory is below.
+An example of installing these Perl modules with `cpanm` in your home directory is below.
 Adjust accordingly.
 
-    cpanm -L $HOME/perl5 Bio::Perl
+    cpanm -L $HOME/perl5 Module::Build Bio::Perl
     cpanm -L $HOME/perl5 --configure-args="--htslib $HOME" Bio::DB::HTS
     cpanm -L $HOME/perl5 --configure-args="--libbigwig $HOME" Bio::DB::Big
     cpanm -L $HOME/perl5 Parallel::ForkManager Set::IntervalTree Bio::ToolBox
@@ -266,13 +415,18 @@ download these from the UCSC Genome Browser utilities section for either
 [linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or 
 [MacOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/). Copy them to your 
 `bin` directory in your `PATH`, for example `$HOME/bin`, `$HOME/perl5/bin`, or 
-`/usr/local/bin`. 
+`/usr/local/bin`. Be sure to make them executable by running `chmod +x` on each file.
 
 - wigToBigWig
 - bedGraphToBigWig
 - bedToBigBed
 
-Be sure to make them executable by running `chmod +x` on each file. 
+An example for downloading on linux:
+
+    for name in wigToBigWig bedGraphToBigWig bedToBigBed; \
+    do curl http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name > $HOME/bin/$name \
+    && chmod +x $HOME/bin/$name; done;
+
 
 ## Legacy Perl modules
 
@@ -286,6 +440,75 @@ or have been superseded by other modules.
 - [Bio::DB::USeq](https://metacpan.org/pod/Bio::DB::USeq)
 - [Bio::Graphics::Wiggle](https://metacpan.org/pod/Bio::Graphics::Wiggle)
 
+## MacOS specific notes
+
+While Macs have a Unix-compatible command-line environment, there are a few issues 
+and solutions that I have encountered that may be useful to someone.
+
+- Install XCode command line tools
+
+    You don't need the full blown XCode installed, just the command line tools. 
+    Running the following command in terminal will prompt to install them.
+    
+        xcode-select --install
+
+- Installing your own Perl
+
+    Apple is generally a little slow in updating their Perl compared to the latest 
+    available versions, and it is compiled for backwards compatibility with 32-bit 
+    `i386` processors (!), at least as of High Sierra (10.13). Some of the errors below will go away if you compile your 
+    own Perl, but your success may vary.
+    
+    While using [PerlBrew](https://perlbrew.pl) generally works well in most cases, I 
+    have found the recommendations described [here](https://karl.kornel.us/2015/12/perl-osx-1011-warnings/), 
+    with modifications, work well for me. Here is my example for installing version 5.26 
+    on a MacOS 10.13 machine.
+    
+        perlbrew install 5.26.2 --as 5.26 --thread --multi --64all -j 8 \
+        -Dccflags="-mmacosx-version=10.13" -Dccdlflags="-mmacosx-version-min=10.13" \
+        -Dldflags="-mmacosx-version-min=10.13" -Dlddflags="-mmacosx-version-min=10.13"
+
+    You may adjust options as necessary.
+
+- Linking errors
+
+    When linking Perl modules with XS code (compiled C extensions), especially when using 
+    the system Perl, you may see the following errors.
+    
+        ld: warning: object file was built for newer OSX version (10.13) than being linked (10.4)
+    
+    This is due to Apple compiling their system Perl with far-reaching backwards 
+    compatibility; the Perl binary was compiled for both `i386` and `x86_64`, but in 
+    all likelihood your XS was compiled only for `x86_64`. In some cases, this is a 
+    harmless error; in other cases, it's a deal breaker. The best solution is to 
+    install your own Perl.
+
+- rpath errors
+
+    This is especially notable with the [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big) installation as described 
+    above, where the `./Build test` fails dramatically because a shared library can not 
+    be loaded by the bundle, usually with an error message including this:
+    
+        Reason: unsafe use of relative rpath libBigWig.so in blib/arch/auto/Bio/DB/Big/Big.bundle with restricted binary
+    
+    The solution is to manually re-link the bundle to the shared library file with the 
+    following command. See this [link](https://stackoverflow.com/questions/33275605/el-capitan-perl-dbd-unsafe-use-of-relative-path) 
+    for the source of the  solution.
+    
+        install_name_tool -change libBigWig.so /path/to/lib/libBigWig.so blib/arch/auto/Bio/DB/Big/Big.bundle
+
+- DB_File errors
+
+    There are [reports of issues](https://github.com/bioperl/bioperl-live/issues/267) 
+    regarding certain BioPerl modules that rely on the Berkley database module 
+    [DB_File](https://metacpan.org/pod/DB_File). This appears to stem from an issue with 
+    the Apple-supplied library in High Sierra as described 
+    [here](https://discussions.apple.com/thread/8125401). The best solution is to 
+    install your own `berkley-db` library. 
+    
+    For BioToolBox users, the biggest effect appears to be exceptionally long times 
+    when using the in-memory database adapater, which is employed in the the included 
+    test file `04.DB.t`.
 
 # AUTHOR
 
