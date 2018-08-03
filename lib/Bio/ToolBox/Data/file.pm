@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.61';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -658,7 +658,7 @@ sub write_file {
 			# vcf requires bgzip
 			$args{'gz'} = 2;
 		}
-		if ($extension =~ m/\.gz$/i) {
+		elsif ($extension =~ m/\.gz$/i) {
 			$args{'gz'} = 1;
 		}
 		else {

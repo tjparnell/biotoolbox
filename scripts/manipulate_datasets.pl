@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.61';
+my $VERSION = '1.62';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -332,7 +332,7 @@ sub write_and_quit_function {
 		# write the file
 		my $write_results = $Data->write_file(
 			'filename'  => $outfile,
-			'gz'        => $bgz ? 2 : $gz ? 1 : 0,
+			'gz'        => $bgz ? 2 : $gz ? 1 : undef,
 		);
 	
 		# report write results

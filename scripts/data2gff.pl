@@ -7,7 +7,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.61';
+my $VERSION =  '1.62';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -102,9 +102,6 @@ if ($print_version) {
 unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use $0 --help\n";
-}
-unless (defined $gz) {
-	$gz = 0;
 }
 if ($bgz) {
 	$gz = 2;
