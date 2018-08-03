@@ -1,5 +1,5 @@
 package Bio::ToolBox::big_helper;
-our $VERSION = '1.60';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -197,7 +197,7 @@ The file will be written, closed, and the filename returned.
 ### modules
 require Exporter;
 use strict;
-use Carp qw(carp cluck);
+use Carp qw(carp cluck confess);
 use File::Temp;
 use File::Which;
 use IO::File;
@@ -365,8 +365,7 @@ sub open_wig_to_bigwig_fh {
 		$args{bwapppath} = which('wigToBigWig');
 	}
 	unless ($args{bwapppath} =~ /ToBigWig$/) {
-		warn " Utility 'wigToBigWig' not specified and can not be found!" . 
-			" Conversion failed!\n";
+		carp " Utility 'wigToBigWig' not specified and can not be found!\n";
 		return;
 	}
 
@@ -377,13 +376,13 @@ sub open_wig_to_bigwig_fh {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ($args{db}) {
-			carp " No requisite database or chromosome info file provided!" .
+			cluck " No requisite database or chromosome info file provided!" .
 				" Conversion failed\n";
 			return;
 		}
 		$args{chromo} = generate_chromosome_file($args{db});
 		unless ($args{chromo}) {
-			carp " Cannot generate chromosome info file! Conversion failed\n";
+			cluck " Cannot generate chromosome info file! Conversion failed\n";
 			return;
 		}
 	}
@@ -392,10 +391,13 @@ sub open_wig_to_bigwig_fh {
 	my $command = sprintf "%s stdin %s %s", $args{bwapppath}, $args{chromo}, 
 		$args{bw};
 	my $bwfh = IO::File->new("| $command") or 
-		die sprintf("cannot open %s!\n", $args{bwapppath});
+		confess sprintf("cannot open %s!\n", $args{bwapppath});
 		# wigToBigWig will always die anyway if something is wrong
 		# cannot trap it with an eval, since it doesn't just error out
 		# but actually exits, dragging the whole Perl process with it
+	# printf "we have a filehandle %s\n", ref($bwfh);
+	confess "unable to execute command '$command'" unless ref($bwfh);
+	# we will still get an IO::File handle back even with a failed convertor - sigh
 	return $bwfh;
 }
 
@@ -414,7 +416,7 @@ sub bed_to_bigbed_conversion {
 	# bedfile
 	$args{bed} ||= undef;
 	unless ($args{bed}) {
-		carp "no bed file passed!";
+		cluck "no bed file passed!";
 		return;
 	}
 	
@@ -431,8 +433,7 @@ sub bed_to_bigbed_conversion {
 		$args{bbapppath} = which('bedToBigBed');
 	}
 	unless ($args{bbapppath}) {
-		carp " Utility 'bedToBigBed' not specified and can not be found!" . 
-			" Conversion failed!\n";
+		carp " Utility 'bedToBigBed' not specified and can not be found!\n";
 		return;
 	}
 	
@@ -444,13 +445,12 @@ sub bed_to_bigbed_conversion {
 		# need to generate one from the database
 		$args{db} ||= undef;
 		unless ($args{db}) {
-			carp " No requisite database or chromosome info file provided!" .
-				" Conversion failed\n";
+			cluck " No requisite database or chromosome info file provided!\n";
 			return;
 		}
 		$args{chromo} = generate_chromosome_file($args{db});
 		unless ($args{chromo}) {
-			carp " Cannot generate chromosome info file! Conversion failed\n";
+			carp " Cannot generate chromosome info file!\n";
 			return;
 		}
 	}
@@ -476,14 +476,14 @@ sub bed_to_bigbed_conversion {
 		return $bb_file;
 	}
 	else {
-		warn " Conversion failed. You should try manually and watch for errors\n";
+		carp " Conversion failed. You should try manually and watch for errors\n";
 		if (-e $bb_file) {
 			# 0-byte file was created
 			unlink $bb_file;
 		}
 		if ($args{chromo} =~ /^chr_sizes_\w{5}/) {
 			# leave the temp chromosome file as a courtesy
-			warn " Leaving temporary chromosome file '$args{chromo}'\n";
+			print STDERR " Leaving temporary chromosome file '$args{chromo}'\n";
 		}
 		return;
 	}
