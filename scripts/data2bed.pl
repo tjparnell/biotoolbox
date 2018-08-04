@@ -8,7 +8,7 @@ use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.61';
+my $VERSION =  '1.62';
 
 print "\n This program will write a BED file\n";
 
@@ -264,12 +264,15 @@ while (my $row = $Input->next_row) {
 	# retrieve information from row object if indices were provided
 	my @args;
 	if (defined $chr_index) {
-		push @args, 'chromo', $row->value($chr_index);
+		my $c = $row->value($chr_index);
+		next if $c eq '.';
+		push @args, 'chromo', $c; 
 	}
 	if (defined $start_index) {
-		push @args, 'start';
-		push @args, $zero_based ? $row->value($start_index) + 1 : 
-			$row->value($start_index);
+		my $s = $row->value($start_index);
+		next if $s eq '.';
+		$s += 1 if $zero_based;
+		push @args, 'start', $s;
 	}
 	if (defined $stop_index) {
 		push @args, 'stop', $row->value($stop_index);
@@ -278,7 +281,9 @@ while (my $row = $Input->next_row) {
 		push @args, 'strand', $row->value($strand_index);
 	}
 	if (defined $score_index) {
-		push @args, 'score', $row->value($score_index);
+		my $s = $row->value($score_index);
+		$s = 0 if $s !~ /^[\d\.\-]+$/;
+		push @args, 'score', $s;
 	}
 	if (defined $name_index) {
 		push @args, 'name', $row->value($name_index);
@@ -287,7 +292,8 @@ while (my $row = $Input->next_row) {
 	}
 			
 	# write
-	$Output->add_row( $row->bed_string(@args) );
+	my $string = $row->bed_string(@args);
+	$Output->add_row($string) if length($string);
 		# weirdly, this should work, as the add_row will split the columns of 
 		# the gff string automatically
 	$count++;

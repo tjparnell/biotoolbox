@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.60';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -991,7 +991,7 @@ sub value {
 		$self->{data}->{data_table}->[$row][$column] = $value;
 	}
 	my $v = $self->{data}->{data_table}->[$row][$column];
-	return defined $v ? $v : '.'; # internal null value
+	return length($v) ? $v : '.'; # internal null value, inherited from GFF definition
 }
 
 sub seq_id {
@@ -2003,9 +2003,8 @@ sub bed_string {
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
-	unless ($chr and defined $start) {
-		carp "Not enough information to generate bed string. Need identifiable " . 
-			"chromosome and start columns or SeqFeature object";
+	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
+		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
 	}
 	$start -= 1; # 0-based coordinates
@@ -2042,9 +2041,8 @@ sub gff_string {
 	my $start = $args{start} || $self->start;
 	my $stop  = $args{stop} || $args{end} || $self->stop || 
 		$start + $self->length - 1 || $start;
-	unless ($chr and defined $start) {
-		carp "Not enough information to generate GFF string. Need identifiable " . 
-			"chromosome and start columns";
+	if ($chr eq '.' or not CORE::length($chr) or $start eq '.' or not CORE::length($start)) {
+		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
 	}
 	my $strand = $args{strand} || $self->strand;

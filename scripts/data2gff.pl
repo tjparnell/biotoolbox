@@ -7,7 +7,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.61';
+my $VERSION =  '1.62';
 
 print "\n This script will convert a data file to a GFF\n\n";
 
@@ -102,9 +102,6 @@ if ($print_version) {
 unless ($infile) {
 	$infile = shift @ARGV or
 		die "  OOPS! No source data file specified! \n use $0 --help\n";
-}
-unless (defined $gz) {
-	$gz = 0;
 }
 if ($bgz) {
 	$gz = 2;
@@ -324,10 +321,13 @@ while (my $row = $Input->next_row) {
 	# retrieve information from row object if indices were provided
 	my @args;
 	if (defined $chr_index) {
-		push @args, 'chromo', $row->value($chr_index);
+		my $c = $row->value($chr_index);
+		next if $c eq '.';
+		push @args, 'chromo', $c; 
 	}
 	if (defined $start_index) {
 		my $s = $row->value($start_index);
+		next if $s eq '.';
 		$s += 1 if $interbase;
 		push @args, 'start', $s;
 	}
@@ -368,7 +368,8 @@ while (my $row = $Input->next_row) {
 	
 		
 	# add to output
-	$Output->add_row( $row->gff_string(@args) );
+	my $string = $row->gff_string(@args);
+	$Output->add_row($string) if length($string);
 		# weirdly, this should work, as the add_row will split the columns of 
 		# the gff string automatically
 	$count++;

@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
 );
-my $VERSION =  '1.60';
+my $VERSION =  '1.62';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -206,7 +206,7 @@ else {
 
 ### Start the conversion 
 printf " converting '%s'....\n", 
-	@score_indices ? 
+	scalar(@score_indices) ? 
 	join(", ", map { $Input->name($_) } @score_indices) :
 	$Input->name($score_index);
 
@@ -243,14 +243,20 @@ print " finished! wrote file '$outfile'\n";
 sub check_indices {
 	
 	# check coordinates
-	if ($ask or not defined $chr_index or not defined $Input->chromo_column) {
+	if (not defined $chr_index) {
+		$chr_index = $Input->chromo_column;
+	}
+	if ($ask or not defined $chr_index) {
 		$chr_index = ask_user_for_index($Input, 
 			" Enter the index for the chromosome column  ");
 		unless (defined $chr_index) {
 			die " No identifiable chromosome column index!\n";
 		}
 	}
-	if ($ask or not defined $start_index or not defined $Input->start_column) {
+	if (not defined $start_index) {
+		$start_index = $Input->start_column;
+	}
+	if ($ask or not defined $start_index) {
 		$start_index = ask_user_for_index($Input, 
 			" Enter the index for the start or position column  ");
 		unless (defined $start_index) {
