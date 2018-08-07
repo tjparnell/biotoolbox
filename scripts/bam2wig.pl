@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.60';
+my $VERSION = '1.62';
 	
 	
 
@@ -1923,7 +1923,7 @@ sub write_bedgraph {
 		# note that $data is a reference
 	
 	# set the printf formatter for decimal or integer
-	my $formatter = $dec_precison ? 
+	my $formatter = length($dec_precison) ? 
 		"$seq_id\t%d\t%d\t%." . $dec_precison. "f\n" : "$seq_id\t%d\t%d\t%s\n";
 	
 	# work though chromosome
@@ -1977,7 +1977,7 @@ sub write_fixstep {
 		# note that $data is a reference
 
 	# set the printf formatter for decimal or integer
-	my $formatter = $dec_precison ? "%." . $dec_precison . "f\n" : "%s\n";
+	my $formatter = length($dec_precison) ? "%." . $dec_precison . "f\n" : "%s\n";
 	
 	# write fixStep header
 	my $out_string = "fixedStep chrom=$seq_id start=1 step=$bin_size span=$bin_size\n";
@@ -2010,7 +2010,7 @@ sub write_varstep {
 		# note that $data is a reference
 
 	# set the printf formatter for decimal or integer
-	my $formatter = $dec_precison ? "%d\t%." . $dec_precison. "f\n" : "%d\t%s\n";
+	my $formatter = length($dec_precison) ? "%d\t%." . $dec_precison. "f\n" : "%d\t%s\n";
 	
 	# write fixStep header
 	# we are only supporting bin_size of 1 bp for varStep
