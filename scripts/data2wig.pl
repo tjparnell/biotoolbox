@@ -607,7 +607,7 @@ sub convert_to_bedgraph {
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = $row->value($start_index);
 		my $stop  = defined $stop_index ? $row->value($stop_index) : 
-			$row->stop || $row->start;
+			$row->stop || $row->start || $start;
 		
 		# adjust start position
 		unless ($interbase) {
