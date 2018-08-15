@@ -620,9 +620,13 @@ sub convert_to_bedgraph {
 			if ($current_chr eq $chromosome) {
 				# check for overlap
 				if ($start < $previous_pos) {
-					die " There are overlapping intervals or the file is not sorted by" .
+					warn " There are overlapping intervals or the file is not sorted by" .
 						" coordinates!\n Compare $chromosome:$start" . 
 						" with previous stop position $previous_pos\n";
+					# die if bigwig
+					if ($bigwig) {
+						die " bigWig conversion will fail with overlapping coordinates!\n Fix your file!\n";
+					}
 				}
 				# otherwise it is ok
 				$previous_pos = $stop;
