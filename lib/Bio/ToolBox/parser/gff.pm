@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.54';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -286,9 +286,8 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, L<Bio::Tools::GFF>
 use strict;
 use Carp qw(carp cluck croak);
 use Bio::ToolBox::Data::file; 
-our $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
+my $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
 eval "require $SFCLASS" or croak $@;
-our $gff_convertor_sub; # reference to the gff convertor subroutine
 
 1;
 
@@ -312,6 +311,7 @@ sub new {
 		'seq_ids'       => {},
 		'simplify'      => 0,
 		'typelist'      => '',
+		'convertor_sub' => undef,
 	};
 	bless $self, $class;
 	
@@ -499,7 +499,7 @@ sub next_feature {
 	return if $self->{'eof'};
 	
 	# check convertor
-	unless (defined $gff_convertor_sub) {
+	unless (defined $self->{convertor_sub}) {
 		$self->_assign_gff_converter;
 	}
 	
@@ -552,41 +552,41 @@ sub next_feature {
 		my $type = lc $fields[2];
 		if ($type eq 'cds') {
 			if ($self->do_cds) {
-				return &$gff_convertor_sub($self, \@fields);
+				return &{$self->{convertor_sub}}($self, \@fields);
 			} else {
 				next;
 			}
 		}
 		elsif ($type eq 'exon') {
 			if ($self->do_exon) {
-				return &$gff_convertor_sub($self, \@fields);
+				return &{$self->{convertor_sub}}($self, \@fields);
 			} else {
 				next;
 			}
 		}
 		elsif ($type =~ /utr|untranslated/) {
 			if ($self->do_utr) {
-				return &$gff_convertor_sub($self, \@fields);
+				return &{$self->{convertor_sub}}($self, \@fields);
 			} else {
 				next;
 			}
 		}
 		elsif ($type =~ /codon/) {
 			if ($self->do_codon) {
-				return &$gff_convertor_sub($self, \@fields);
+				return &{$self->{convertor_sub}}($self, \@fields);
 			} else {
 				next;
 			}
 		}
 		elsif ($type =~ /gene$/) {
 			if ($self->do_gene) {
-				return &$gff_convertor_sub($self, \@fields);
+				return &{$self->{convertor_sub}}($self, \@fields);
 			} else {
 				next;
 			}
 		}
 		elsif ($type =~ /transcript|rna/) {
-			return &$gff_convertor_sub($self, \@fields);
+			return &{$self->{convertor_sub}}($self, \@fields);
 		}
 		elsif ($type =~ /chromosome|contig|scaffold/) {
 			# gff3 files can record the chromosome as a gff record
@@ -597,7 +597,7 @@ sub next_feature {
 		else {
 			# everything else must be some non-standard weird element
 			# only process this if the user wants everything
-			return &$gff_convertor_sub($self, \@fields) unless $self->simplify;
+			return &{$self->{convertor_sub}}($self, \@fields) unless $self->simplify;
 		}
 	}
 	
@@ -924,26 +924,26 @@ sub from_gff_string {
 	my @fields = split('\t', $string);
 	
 	# check convertor
-	unless (defined $gff_convertor_sub) {
+	unless (defined $self->{convertor_sub}) {
 		$self->_assign_gff_converter;
 	}
 	
 	# parse appropriately
-	return &$gff_convertor_sub($self, \@fields);
+	return &{$self->{convertor_sub}}($self, \@fields);
 }
 
 
 sub _assign_gff_converter {
 	my $self = shift;
 	if ($self->{gff3}) {
-		$gff_convertor_sub =\&_gff3_to_seqf;
+		$self->{convertor_sub} = \&_gff3_to_seqf;
 	}
 	elsif ($self->{gtf}) {
 		if ($self->simplify) {
-			$gff_convertor_sub = \&_gtf_to_seqf_simple;
+			$self->{convertor_sub} = \&_gtf_to_seqf_simple;
 		}
 		else {
-			$gff_convertor_sub = \&_gtf_to_seqf_full;
+			$self->{convertor_sub} = \&_gtf_to_seqf_full;
 		}
 		# double check we have transcript information
 		if ($self->typelist !~ /transcript|rna/i) {
@@ -957,7 +957,7 @@ sub _assign_gff_converter {
 		}
 	}
 	else {
-		$gff_convertor_sub = \&_gff2_to_seqf;
+		$self->{convertor_sub} = \&_gff2_to_seqf;
 	}
 }
 
