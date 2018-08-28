@@ -220,7 +220,7 @@ the options to the new method.
 =item fh
 
 Set or retrieve the file handle of the current table. This module uses 
-IO::Handle objects. Be careful manipulating file handles of open tables!
+L<IO::Handle> objects. Be careful manipulating file handles of open tables!
 
 =item open_file
 
@@ -558,6 +558,28 @@ sub open_file {
 	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
 	
+	# check number of columns
+	my $ncol;
+	while (my $line = $fh->getline) {
+		next if $line =~ /^#/;
+		next unless $line =~ /\w+/;
+		my @fields = split "\t", $line;
+		$ncol = scalar(@fields);
+		last;
+	}
+	unless ($ncol == 16 or $ncol == 15 or $ncol == 12 or $ncol == 11 or $ncol == 10) {
+		carp " File '$filename' doesn't have recognizable number of columns! It has $ncol.";
+		return;
+	}
+	if ($ncol == 10) {
+		# turn off gene processing for simple genePred which has no gene names
+		$self->do_gene(0);
+	}
+	
+	# reopen file handle
+	$fh->close;
+	$fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
+	
 	# reset source as necessary
 	if ($filename =~ /ensgene/i and $self->source eq 'UCSC') {
 		$self->source('EnsGene');
@@ -576,6 +598,9 @@ sub open_file {
 	}
 	
 	# check existing data
+	# the reason this parser can handle reading a second file without having to make a 
+	# new parser object (like gff and bed) is so that we can potentially recycle the 
+	# extra UCSC information 
 	if ($self->fh) {
 		# close existing
 		$self->fh->close;
@@ -718,7 +743,7 @@ sub typelist {
 	}
 	else {
 		# return generic list
-		return 'gene,mRNA,ncRNA,exon,CDS';
+		return $self->do_gene ? 'gene,mRNA,ncRNA,exon,CDS' : 'mRNA,ncRNA,exon,CDS';
 	}
 }
 
