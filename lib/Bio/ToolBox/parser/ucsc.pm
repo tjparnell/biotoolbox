@@ -1415,8 +1415,8 @@ sub build_transcript {
 	
 	# identify the primary_tag value
 	my ($type, $biotype);
-	if (exists $ensembldata->{$id}) {
-		my $t = $ensembldata->{$id}->[1] || undef;
+	if (exists $ensembldata->{$self->name}) {
+		my $t = $ensembldata->{$self->name}->[1] || undef;
 		if ($t and $t =~ /protein.coding/i) {
 			$type = 'mRNA';
 			$biotype = $t;
@@ -1587,7 +1587,7 @@ sub add_exons {
 		
 		# add name if requested
 		if ($ucsc->do_name) {
-			$exon->display_name( $transcript->primary_id . ".exon$number" );
+			$exon->display_name( $transcript->display_name . ".exon$number" );
 		}
 		
 		# associate with transcript
@@ -1737,7 +1737,7 @@ sub add_utrs {
 				-primary_tag   => $tag,
 				-primary_id    => $transcript->primary_id . ".utr$number",
 			);
-			$utr->display_name( $transcript->primary_id . ".utr$number" ) if 
+			$utr->display_name( $transcript->display_name . ".utr$number" ) if 
 				$ucsc->do_name;
 		}
 		
@@ -1765,7 +1765,7 @@ sub add_utrs {
 					-primary_tag   => $tag2,
 					-primary_id    => $transcript->primary_id . ".utr$number" . "a",
 				);
-				$utr2->display_name( $transcript->primary_id . ".utr$number" . "a" ) 
+				$utr2->display_name( $transcript->display_name . ".utr$number" . "a" ) 
 					if $ucsc->do_name;
 			}
 		
@@ -1900,7 +1900,7 @@ sub add_cds {
 			-phase         => $phase,
 			-primary_tag   => 'CDS',
 			-primary_id    => $transcript->primary_id . ".cds$i", 
-			-display_name  => $transcript->primary_id . ".cds$i",
+			-display_name  => $transcript->display_name . ".cds$i",
 		);
 		# the id and name still use $i for labeling to ensure numbering from 0
 		
@@ -1949,7 +1949,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.start_codon',
 			);
-			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+			$start_codon->display_name( $transcript->display_name . '.start_codon' ) if 
 				$ucsc->do_name;
 		}
 		
@@ -1965,7 +1965,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
-			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+			$stop_codon->display_name( $transcript->display_name . '.stop_codon' ) if 
 				$ucsc->do_name;
 		}
 	}
@@ -1993,7 +1993,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
-			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+			$stop_codon->display_name( $transcript->display_name . '.stop_codon' ) if 
 				$ucsc->do_name;
 		}
 		
@@ -2010,7 +2010,7 @@ sub add_codons {
 					-primary_id    => $transcript->primary_id . '.start_codon',
 					-display_name  => $transcript->primary_id . '.start_codon',
 			);
-			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+			$start_codon->display_name( $transcript->display_name . '.start_codon' ) if 
 				$ucsc->do_name;
 		}
 	}
