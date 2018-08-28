@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.54';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -370,18 +370,7 @@ sub new {
 		'top_features'  => [],
 		'gene2seqf'     => {},
 		'id2count'      => {},
-		'counts'        => {
-			'gene'       => 0,
-			'mrna'       => 0,
-			'pseudogene' => 0,
-			'ncrna'      => 0,
-			'mirna'      => 0,
-			'snrna'      => 0,
-			'snorna'     => 0,
-			'trna'       => 0,
-			'rrna'       => 0,
-			'other'      => 0,
-		},
+		'counts'        => {},
 		'do_gene'       => 1, 
 		'do_exon'       => 0,
 		'do_cds'        => 0, 
@@ -596,16 +585,7 @@ sub open_file {
 		$self->{'duplicate_ids'} = {};
 		$self->{'gene2seqf'}     = {};
 		$self->{'id2count'}      = {};
-		$self->{'counts'}{'gene'}       = 0;
-		$self->{'counts'}{'mrna'}       = 0;
-		$self->{'counts'}{'pseudogene'} = 0;
-		$self->{'counts'}{'ncrna'}      = 0;
-		$self->{'counts'}{'mirna'}      = 0;
-		$self->{'counts'}{'snrna'}      = 0;
-		$self->{'counts'}{'snorna'}     = 0;
-		$self->{'counts'}{'trna'}       = 0;
-		$self->{'counts'}{'rrna'}       = 0;
-		$self->{'counts'}{'other'}      = 0;
+		$self->{'counts'}        = {};
 		$self->{'eof'}           = 0;
 		$self->{'line_count'}    = 0;
 	}
@@ -1486,33 +1466,7 @@ sub build_transcript {
 	}
 	
 	# record the type of transcript
-	if ($type eq 'mRNA') { 
-		$counts->{mrna}++;
-	}
-	elsif ($type eq 'pseudogene') {
-		$counts->{pseudogene}++;
-	}
-	elsif ($type eq 'ncRNA') {
-		$counts->{ncrna}++;
-	}
-	elsif ($type eq 'miRNA') {
-		$counts->{mirna}++;
-	}
-	elsif ($type eq 'snRNA') {
-		$counts->{snrna}++;
-	}
-	elsif ($type eq 'snoRNA') {
-		$counts->{snorna}++;
-	}
-	elsif ($type eq 'tRNA') {
-		$counts->{trna}++;
-	}
-	elsif ($type eq 'rRNA') {
-		$counts->{rrna}++;
-	}
-	else {
-		$counts->{other}++;
-	}
+	$counts->{$type} += 1;
 	
 	# transcript is complete
 	return $transcript;
