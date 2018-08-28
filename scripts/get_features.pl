@@ -190,16 +190,21 @@ sub check_requirements {
 	
 	# check collapse
 	if ($collapse) {
-		unless ($convert_to_gff or $convert_to_gtf or $convert_to_refflat) {
-			die " Cannot collapse transcripts unless writing to GFF/GTF/refFlat!\n";
+		unless ($get_subfeatures) {
+			die " Cannot collapse transcript unless subfeatures are turned on!\n";
+		}
+		unless ($convert_to_gff or $convert_to_gtf or $convert_to_refflat or 
+				$convert_to_bed
+		) {
+			die " Cannot collapse transcripts unless writing to BED12/GFF/GTF/refFlat!\n";
 		}
 	}
 	
 	# check adjustments
 	if ($start_adj or $stop_adj) {
 		# automatically include coordinates if we're adjusting them
-		if ($convert_to_gff or $convert_to_gtf or $convert_to_refflat) {
-			die " Cannot adjust coordinates when converting to GFF/GTF/refFlat!\n";
+		if ($get_subfeatures) {
+			die " Cannot adjust coordinates when including subfeatures!\n";
 		}
 		$include_coordinates = 1;
 	}
@@ -241,7 +246,7 @@ sub load_from_database {
 	# validate and/or request features
 	@features = verify_or_request_feature_types(
 		'db'      => $database,
-		'feature' => [ @features ],
+		'feature' => \@features,
 		'prompt'  => " Enter the feature(s) to collect." . 
 				" A comma de-limited list or range may be given\n",
 	) or die " no valid features were provided! see help\n";
@@ -388,11 +393,12 @@ sub filter_features {
 sub export_to_bed {
 	# prepare output
 	my $outData = Bio::ToolBox::Data->new(
-		bed => 6,
+		bed => $get_subfeatures ? 12 : 6,
 	) or die "unable to create output Data structure!\n";
 	
 	# Write method based on subfeatures or coordinate adjustment
 	if ($start_adj or $stop_adj) {
+		# adjust coordinates as necessary and write a BED6 file
 		$Data->iterate( sub {
 			my $row = shift;
 			my $f = $row->seqfeature(1); # make sure we get the seqfeature
@@ -405,7 +411,23 @@ sub export_to_bed {
 			$Data->delete_seqfeature($row->row_index);
 		});
 	}
+	elsif ($get_subfeatures) {
+		# write transcripts as BED12
+		if ($features[0] =~ /gene/i) {
+			print " NOTE: gene information is discarded when writing BED12\n";
+		}
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature(1); # make sure we get the seqfeature
+			my $string = bed_string($f);
+			foreach (split /\n/, $string) {
+				$outData->add_row($_);
+			}
+			$Data->delete_seqfeature($row->row_index);
+		});
+	}
 	else {
+		# write ordinary BED6
 		$Data->iterate( sub {
 			my $row = shift;
 			my $f = $row->seqfeature(1); # make sure we get the seqfeature
@@ -414,6 +436,7 @@ sub export_to_bed {
 			$Data->delete_seqfeature($row->row_index);
 		});
 	}
+	print " done\n";
 	
 	# sort as necessary
 	if ($sort_data) {
@@ -809,7 +832,7 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   
   Selection:
   -f --feature <type>           feature: gene, mRNA, transcript, etc
-  -u --sub                      include subfeatures (true if gff, gtf, refFlat out)
+  -u --sub                      include subfeatures (true if gff, gtf, refFlat)
   
   Filter features:
   -K --chrskip <regex>          skip features from certain chromosomes
@@ -827,10 +850,10 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   --collapse                    collapse subfeatures from alt transcripts
   
   Report format options:
-  -B --bed                      write in BED6 format
-  -G --gff                      write in GFF3 format
-  -g --gtf                      write in GTF format
-  -r --refflat                  write in UCSC refFlat format
+  -B --bed                      write BED6 (no --sub) or BED12 (--sub) format
+  -G --gff                      write GFF3 format
+  -g --gtf                      write GTF format
+  -r --refflat                  write UCSC refFlat format
   -t --tag <text>               include specific GFF attributes in text output
   --coord                       include coordinates in text output
   
@@ -882,7 +905,8 @@ from which one or more may be chosen.
 Optionally include all child subfeatures in the output. For example, 
 transcript, CDS, and/or exon subfeatures of a gene. This option is 
 automatically enabled with GFF, GTF, or refFlat output; it may be 
-turned off with C<--nosub>. It has no effect with standard text or BED output.
+turned off with C<--nosub>. With BED output, it will force a BED12 
+file to be written. It has no effect with standard text. 
 
 =back
 
@@ -957,8 +981,8 @@ end coordinates of the collected regions. A negative value is shifted
 upstream (towards the 5 prime end), and a positive value is shifted 
 downstream (towards the 3 prime end). Adjustments are made relative 
 to the indicated position (--pos option, below) based on the feature 
-strand. Adjustments are only allowed when writing BED or standard 
-text files.
+strand. Adjustments are only allowed when writing standard BED6 or 
+standard text files.
 
 =item --pos [ 5 | m | 3 | 53 ]
 
@@ -984,7 +1008,8 @@ collapsed.
 
 =item --bed
 
-Write a standard 6-column BED format file. Subfeatures are not included.
+With subfeatures enabled, write a BED12 (12-column BED) file. 
+Otherwise, write a standard 6-column BED format file. 
 
 =item --gff
 
