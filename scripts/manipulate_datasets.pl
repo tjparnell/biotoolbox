@@ -188,6 +188,7 @@ Row manipulation
   B  Delete rows with values (B)elow threshold
   S  Delete rows with (S)pecific values
   K  (K)eep only rows with specific values
+  M  Add new unique na(M)e to each row
 Conversions
   U  Convert n(U)ll values to a specific value
   G  Convert si(G)ned values to an absolute value
@@ -222,7 +223,7 @@ Other
   Q  (Q)uit without saving changes
 MENU
 	# unlisted option: print this (m)enu
-	# unused letters: E F H jJ k M 
+	# unused letters: E F H jJ k 
 	return; # return 0, nothing done
 }
 
@@ -2826,6 +2827,52 @@ sub new_column_function {
 	return 1;
 }
 
+sub addname_function {
+	# this will add a name column and uniquely name the rows
+	
+	# request column name
+	my $name;
+	if (defined $opt_name) {
+		# command line option
+		$name = $opt_name;
+	}
+	else {
+		$name = 'Name';
+	}
+	
+	# request value
+	my $prefix;
+	if (defined $opt_target) {
+		# command line option
+		$prefix = $opt_target;
+	}
+	elsif ($function) {
+		$prefix = $Data->feature || 'feature'; 
+	}
+	else {
+		# interactively ask the user
+		print " Enter the name prefix for each feature  ";
+		$prefix = <STDIN>;
+		chomp $prefix;
+	}
+	
+	# identify how many positions to format the number
+	my $n = length($Data->last_row);
+	my $format = "%s_%0" . $n . "d";
+	
+	# generate the new names
+	my $new_position = $Data->add_column($name);
+	my $number = 1;
+	$Data->iterate( sub {
+		shift->value($new_position, sprintf($format, $prefix, $number));
+		$number++;
+	} );
+	
+	# done
+	print " Added new feature names to index $new_position\n";
+	return 1;
+}
+
 
 
 sub rewrite_function {
@@ -2939,6 +2986,7 @@ sub _get_letter_to_function_hash {
 		'B' => "below",
 		'S' => "specific",
 		'K' => "keep",
+		'M' => "addname",
 		'U' => "cnull",
 		'G' => "absolute",
 		'I' => "minimum",
@@ -2992,6 +3040,7 @@ sub _get_function_to_subroutine_hash {
 		'below'       => \&toss_below_threshold_function,
 		'specific'    => \&toss_specific_values_function,
 		'keep'        => \&keep_specific_values_function,
+		'addname'     => \&addname_function,
 		'cnull'       => \&convert_nulls_function,
 		'absolute'    => \&convert_absolute_function,
 		'minimum'     => \&minimum_function,
@@ -3213,7 +3262,7 @@ manipulate_datasets.pl [--options ...] <filename>
   Non-interactive functions:
   -f --func [ reorder | delete | rename | new | number | concatenate | 
               split | sort | gsort | null | duplicate | above | below | 
-              specific | keepcoordinate | cnull | absolute | minimum | 
+              specific | keep | coordinate | cnull | absolute | minimum | 
               maximum | log | delog | format | pr | add | subtract | 
               multiply | divide | combine | scale | zscore | ratio | 
               diff | normdiff | center | rewrite | export | treeview | 
