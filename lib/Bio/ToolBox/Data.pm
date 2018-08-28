@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.61';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -1232,7 +1232,7 @@ sub parse_table {
 	my ($file, $feature, $subfeature, $simplify);
 	if (ref $args) {
 		$file = $args->{file} || '';
-		$feature = $args->{feature} || 'gene';
+		$feature = $args->{feature} || '';
 		$subfeature = $args->{subfeature} || '';
 		$simplify = (exists $args->{simplify} and defined $args->{simplify}) ? 
 			$args->{simplify} : 1; # default is to simplify
@@ -1241,7 +1241,7 @@ sub parse_table {
 		# no hash reference, assume just a file name
 		$file = $args;
 		undef $args;
-		$feature = 'gene';
+		$feature = undef;
 		$subfeature = '';
 		$simplify = 1;
 	}
@@ -1262,6 +1262,20 @@ sub parse_table {
 	# open parser
 	my $parser = $class->new() or return;
 	$parser->open_file($file) or return;
+	my $typelist = $parser->typelist;
+	
+	# set feature based on the type list from the parser
+	unless ($feature) {
+		if ($typelist =~ /gene/i) {
+			$feature = 'gene';
+		}
+		elsif ($typelist eq 'region') {
+			$feature = 'region';
+		}
+		else {
+			$feature = 'rna'; # generic RNA
+		}
+	}
 	
 	# set parser parameters
 	$parser->simplify($simplify);
