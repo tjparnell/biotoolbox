@@ -20,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.60';
+my $VERSION = '1.62';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -40,6 +40,7 @@ unless (@ARGV) { # when no command line options are present
 ## Initialize values
 my (
 	$infile,
+	$parse,
 	$outfile,
 	$main_database,
 	$data_database,
@@ -66,6 +67,7 @@ my (
 ## Command line options
 GetOptions( 
 	'i|in=s'         => \$infile, # input file
+	'parse!'         => \$parse, # parse input file
 	'o|out=s'        => \$outfile, # name of outfile
 	'd|db=s'         => \$main_database, # main or annotation database name
 	'D|ddb=s'        => \$data_database, # data database
@@ -126,7 +128,7 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
 		file       => $infile, 
-		parse      => 1,
+		parse      => $parse,
 		feature    => $feature,
 		subfeature => $subfeature,
 	) or die " unable to load input file '$infile'\n";
@@ -266,10 +268,8 @@ sub check_defaults {
 		# a tim data file used as an input file would also define one
 		die " You must define a database or input file!\n";
 	}
-	unless ($main_database) {
-		$feature ||= 'gene';
-	}
-
+	$parse = 1 if ($infile and not defined $parse);
+	
 	unless ($outfile or $infile) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
@@ -879,6 +879,7 @@ A program to collect data in bins across a list of features.
   General options:
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
+  --noparse                           do not parse input file into SeqFeatures
   -v --version                        print version and exit
   -h --help                           show extended documentation
 
@@ -1092,6 +1093,12 @@ Specify whether (or not) the output file should be compressed with gzip.
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of Parallel::ForkManager. With support enabled, the 
 default is 4. Disable multi-threaded execution by setting to 1. 
+
+=item --noparse
+
+Prevent input annotation files from being automatically parsed into sequence 
+features. Coordinates will be used as is and new data columns will be appended 
+to the input file. 
 
 =item --version
 
