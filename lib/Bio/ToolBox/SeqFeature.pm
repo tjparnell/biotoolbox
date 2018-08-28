@@ -342,12 +342,12 @@ boolean value if you wish to recurse through the hierarchy and
 print subfeatures as a multi-line string. Child-Parent ID attributes 
 are smartly handled, including multiple parentage. 
 
-Currently no support is available for other GFF formats.
+See L<Bio::ToolBox::GeneTools> for methods for printing GTF transcript models.
 
 =item bed_string
 
-Exports the SeqFeature object as a BED6 formatted string. Currently 
-no support is available for recursive printing or BED12 formats. 
+Exports the SeqFeature object as a simple BED6 formatted string. 
+See L<Bio::ToolBox::GeneTools> for methods for printing BED12 transcript models.
 
 =back
 
