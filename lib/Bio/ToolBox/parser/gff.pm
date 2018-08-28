@@ -404,6 +404,16 @@ sub do_codon {
 	return $self->{'do_codon'};
 }	
 
+sub do_name {
+	# this does nothing other than maintain compatibility with ucsc parser
+	return 0;
+}	
+
+sub share {
+	# this does nothing other than maintain compatibility with ucsc parser
+	return 1;
+}	
+
 sub simplify {
 	my $self = shift;
 	if (defined $_[0]) {
