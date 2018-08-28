@@ -1,5 +1,20 @@
 ######## Bio::ToolBox revision history #############
 
+v1.62
+	- Added Bed parser with support for bed3-12, bedgraph, narrowPeak,
+	and broadPeak files. Data collection files will now parse bed 
+	files and write a table with ID and name only, instead of 
+	appending data columns to the original file structure. Parsing 
+	can be turned off if you prefer the old way.
+	- Added support for writing bed12 transcript models to GeneTools 
+	library and get_features script.
+	- Add new method to manipulate_datasets to name features, useful 
+	for naming bed3 files.
+	- Fix bugs with parsing gff and gtf files at same time
+	- Fix bugs with detecting null and/or empty values, especially when 
+	converting data formats
+	- other miscellaneous bug fixes
+
 v1.61
 	- Added genomic sort and bgzip file compression support when 
 	writing files for tabix compatibility with several scripts, 
