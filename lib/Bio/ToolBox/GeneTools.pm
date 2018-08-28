@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.54';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -386,6 +386,16 @@ Prediction line (11 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#fo
 for details. Multiple transcript genes are exported as multiple text lines 
 concatenated together.
 
+=item bed_string
+
+	my $string = bed_string($gene);
+
+This will export a gene or transcript model as a UCSC Bed formatted transcript 
+line (12 columns). See L<http://genome.ucsc.edu/FAQ/FAQformat.html#format1>
+for details. Multiple transcript genes are exported as multiple text lines 
+concatenated together. Note that gene information is not preserved with Bed12 
+files; only the transcript name is used. The C<RGB> value is set to 0.
+
 =back
 
 =head2 Filter methods
@@ -519,6 +529,7 @@ our @EXPORT_OK = qw(
 	gff_string
 	gtf_string
 	ucsc_string
+	bed_string
 	filter_transcript_support_level
 	filter_transcript_gencode_basic
 	filter_transcript_biotype
@@ -565,6 +576,7 @@ our %EXPORT_TAGS = (
 		gff_string
 		gtf_string
 		ucsc_string
+		bed_string
 	) ],
 );
 
@@ -1487,6 +1499,53 @@ sub ucsc_string {
 	return $string;
 }
 
+sub bed_string {
+	my $feature = shift;
+	confess "not a SeqFeature object!" unless ref($feature) =~ /seqfeature/i;
+	my @ucsc_list;
+	
+	# process according to type
+	if ($feature->primary_tag =~ /gene$/i) {
+		# a gene object, we will need to process it's transcript subfeatures
+		foreach my $transcript (get_transcripts($feature)) {
+			my $ucsc = _process_ucsc_transcript($transcript, $feature);
+			push @ucsc_list, $ucsc if $ucsc;
+		}
+	}
+	elsif ($feature->primary_tag =~ /rna|transcript/i) {
+		# some sort of RNA transcript
+		my $ucsc = _process_ucsc_transcript($feature);
+		push @ucsc_list, $ucsc if $ucsc;
+	}
+	else {
+		return;
+	}
+	
+	# return strings
+	my $string;
+	foreach my $ucsc (@ucsc_list) {
+		# exon sizes
+		my @sizes;
+		for (my $i = 0; $i < scalar( @{$ucsc->{'exonStarts'}} ); $i++) {
+			push @sizes, $ucsc->{'exonEnds'}->[$i] - $ucsc->{'exonStarts'}->[$i];
+		}
+		$string .= sprintf("%s\t%d\t%d\t%s\t%s\t%s\t%d\t%d\t%d\t%d\t%s\t%s\n", 
+			$ucsc->{'chr'},
+			$ucsc->{'txStart'},
+			$ucsc->{'txEnd'},
+			$ucsc->{'name'},
+			$ucsc->{'score'},
+			$ucsc->{'strand'},
+			$ucsc->{'cdsStart'},
+			$ucsc->{'cdsEnd'},
+			0,
+			$ucsc->{'exonCount'},
+			join(",", @sizes), 
+			join(",", map {$_ - $ucsc->{'txStart'} } @{$ucsc->{'exonStarts'}} ),
+		);
+	}
+	return $string;
+}
 
 
 #### filter methods
@@ -1662,6 +1721,7 @@ sub _process_ucsc_transcript {
 		'exonCount'    => 0,
 		'exonStarts'   => [],
 		'exonEnds'     => [],
+		'score'        => $transcript->score || 1000,
 	};
 	
 	# determine gene name
