@@ -16,7 +16,7 @@ use Bio::ToolBox::GeneTools qw(
 	filter_transcript_biotype
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.61';
+my $VERSION = '1.62';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -391,7 +391,7 @@ sub export_to_bed {
 		bed => 6,
 	) or die "unable to create output Data structure!\n";
 	
-	# adjust coordinates as necessary and write
+	# Write method based on subfeatures or coordinate adjustment
 	if ($start_adj or $stop_adj) {
 		$Data->iterate( sub {
 			my $row = shift;
@@ -541,7 +541,7 @@ sub export_to_gtf {
 
 sub export_to_txt {
 	# adjust coordinates as necessary
-	if (($start_adj or $stop_adj) or $include_coordinates) {
+	if ($start_adj or $stop_adj) {
 		
 		# make sure we establish the feature type first, before we add 
 		# coordinate columns, otherwise features might not be returned properly
@@ -561,6 +561,29 @@ sub export_to_txt {
 			$row->value($seq_i, $f->seq_id);
 			$row->value($start_i, $start);
 			$row->value($stop_i, $stop);
+			$row->value($strand_i, $f->strand);
+		});
+	}
+	elsif ($include_coordinates) {
+		# just include original coordinates
+		
+		# make sure we establish the feature type first, before we add 
+		# coordinate columns, otherwise features might not be returned properly
+		my $ftype = $Data->feature_type;
+		
+		# add coordinate columns
+		my $seq_i    = $Data->add_column('Chromosome');
+		my $start_i  = $Data->add_column('Start');
+		my $stop_i   = $Data->add_column('Stop');
+		my $strand_i = $Data->add_column('Strand');
+		
+		# iterate
+		$Data->iterate( sub {
+			my $row = shift;
+			my $f = $row->seqfeature(1);
+			$row->value($seq_i, $f->seq_id);
+			$row->value($start_i, $f->start);
+			$row->value($stop_i, $f->stop);
 			$row->value($strand_i, $f->strand);
 		});
 	}
