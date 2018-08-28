@@ -6,6 +6,22 @@ our $VERSION = '1.62';
 
 Bio::ToolBox::parser::gff - parse GFF3, GTF, and GFF files 
 
+=head1 SYNOPSIS
+
+  use Bio::ToolBox::parser::gff;
+  my $filename = 'file.gff3';
+  
+  my $parser = Bio::ToolBox::parser::gff->new(
+  	file    => $filename,
+  	do_gene => 1,
+  	do_exon => 1,
+  ) or die "unable to open gff file!\n";
+  
+  while (my $feature = $parser->next_top_feature() ) {
+	# each $feature is a SeqFeature object
+	my @children = $feature->get_SeqFeatures();
+  }
+
 =head1 DESCRIPTION
 
 This module parses a GFF file into SeqFeature objects. It natively 
@@ -28,22 +44,6 @@ Embedded Fasta sequences are ignored, as are most comment and pragma lines.
 
 The SeqFeature objects that are returned are L<Bio::ToolBox::SeqFeature> 
 objects. Refer to that documentation for more information.
-
-=head1 SYNOPSIS
-
-  use Bio::ToolBox::parser::gff;
-  my $filename = 'file.gff3';
-  
-  my $parser = Bio::ToolBox::parser::gff->new(
-  	file    => $filename,
-  	do_gene => 1,
-  	do_exon => 1,
-  ) or die "unable to open gff file!\n";
-  
-  while (my $feature = $parser->next_top_feature() ) {
-	# each $feature is a SeqFeature object
-	my @children = $feature->get_SeqFeatures();
-  }
 
 =head1 METHODS
 
