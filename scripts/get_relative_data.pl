@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.60';
+my $VERSION = '1.62';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -48,6 +48,7 @@ unless (@ARGV) { # when no command line options are present
 ## Initialize values
 my (
 	$infile, 
+	$parse,
 	$outfile, 
 	$main_database, 
 	$data_database,
@@ -74,6 +75,7 @@ my (
 GetOptions( 
 	'o|out=s'      => \$outfile, # output file name
 	'i|in=s'       => \$infile, # input file name
+	'parse!'       => \$parse, # parse input file
 	'd|db=s'       => \$main_database, # main or annotation database name
 	'D|ddb=s'      => \$data_database, # data database
 	'a|data=s'     => \$dataset, # dataset name
@@ -136,7 +138,7 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
 		file       => $infile, 
-		parse      => 1,
+		parse      => $parse,
 		feature    => $feature || 'gene',
 	) or die " unable to load input file '$infile'\n";
 	if ($Data->last_row) {
@@ -290,14 +292,12 @@ sub check_defaults {
 	unless ($main_database or $infile) {
 		die " You must define a database or input file!\n Use --help for more information\n";
 	}
+	$parse = 1 if ($infile and not defined $parse);
 
 	unless ($outfile or $infile) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
 
-	unless ($feature or $infile) {
-		die " You must define a feature or use an input file!\n Use --help for more information\n";
-	}
 
 	unless ($win) {
 		print " Using default window size of 50 bp\n";
@@ -772,7 +772,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   Bin specification:
   -w --win <integer>                  size of windows, default 50 bp
   -n --num <integer>                  number of windows flanking reference, 20
-  -p --pos [5|m|3]                    reference position, default 5'
+  -p --pos [5|m|3|p]                  reference position, default 5'
   
   Post-processing:
   -U --sum                            generate summary file
@@ -781,6 +781,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   General Options:
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
+  --noparse                           do not parse input file into SeqFeatures
   -v --version                        print version and exit
   -h --help                           show extended documentation
 
@@ -996,6 +997,12 @@ Specify whether (or not) the output file should be compressed with gzip.
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of Parallel::ForkManager. With support enabled, the 
 default is 2. Disable multi-threaded execution by setting to 1. 
+
+=item --noparse
+
+Prevent input annotation files from being automatically parsed into sequence 
+features. Coordinates will be used as is and new data columns will be appended 
+to the input file. 
 
 =item --version
 

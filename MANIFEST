@@ -20,6 +20,7 @@ lib/Bio/ToolBox/db_helper/hts.pm
 lib/Bio/ToolBox/db_helper/seqfasta.pm
 lib/Bio/ToolBox/db_helper/useq.pm
 lib/Bio/ToolBox/db_helper/wiggle.pm
+lib/Bio/ToolBox/parser/bed.pm
 lib/Bio/ToolBox/parser/gff.pm
 lib/Bio/ToolBox/parser/ucsc.pm
 lib/Bio/ToolBox/SeqFeature.pm
@@ -69,6 +70,9 @@ t/Data/chrI.gff3
 t/Data/ensemblSource.txt
 t/Data/ensemblToGeneName.txt
 t/Data/ensGene.txt
+t/Data/ensGene.bed
+t/Data/ensGene.gtf
+t/Data/H3K4me3.narrowPeak
 t/Data/sample.bed
 t/Data/sample1.bam
 t/Data/sample1.bam.bai

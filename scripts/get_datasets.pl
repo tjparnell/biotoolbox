@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.61';
+my $VERSION = '1.62';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -44,6 +44,7 @@ unless (@ARGV) {
 my (  
 	$infile,
 	$new,
+	$parse,
 	$outfile,
 	$main_database,
 	$data_database,
@@ -75,6 +76,7 @@ my @datasets; # an array of names of dataset values to be retrieved
 GetOptions( 
 	'i|in=s'           => \$infile, # load a pre-existing file
 	'new'              => \$new, # generate a new file
+	'parse!'           => \$parse, # parse input file
 	'o|out=s'          => \$outfile, # name of new output file 
 	'd|db=s'           => \$main_database, # main or annotation database name
 	'D|ddb=s'          => \$data_database, # data database
@@ -140,7 +142,7 @@ my $Data;
 if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
 		file       => $infile, 
-		parse      => 1,
+		parse      => $parse,
 		feature    => $feature,
 		subfeature => $subfeature,
 	) or die " unable to load input file '$infile'\n";
@@ -307,9 +309,7 @@ sub set_defaults {
 	# command line
 	
 	# Check for required values
-	unless ($main_database) {
-		$feature ||= 'gene';
-	}
+	# we will let the parser set the feature value
 	unless ($infile) {
 		if (@ARGV and not $feature) {
 			# making an assumption that first unnamed variable is input file
@@ -321,6 +321,7 @@ sub set_defaults {
 			$new = 1;
 		}
 	}
+	$parse = 1 if ($infile and not defined $parse);
 	if ($new) {
 		unless ($outfile) {
 			die " You must define an output filename!";
@@ -906,6 +907,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   General options:
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
+  --noparse                           do not parse input file into SeqFeatures
   -v --version                        print version and exit
   -h --help                           show extended documentation
 
@@ -1182,6 +1184,12 @@ file is opened, the compression status is preserved unless specified otherwise.
 Specify the number of CPU cores to execute in parallel. This requires 
 the installation of L<Parallel::ForkManager>. With support enabled, the 
 default is 4. Disable multi-threaded execution by setting to 1. 
+
+=item --noparse
+
+Prevent input annotation files from being automatically parsed into sequence 
+features. Coordinates will be used as is and new data columns will be appended 
+to the input file. 
 
 =item --version
 

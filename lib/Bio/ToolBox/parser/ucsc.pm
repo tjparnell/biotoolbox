@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.54';
+our $VERSION = '1.62';
 
 =head1 NAME
 
@@ -220,7 +220,7 @@ the options to the new method.
 =item fh
 
 Set or retrieve the file handle of the current table. This module uses 
-IO::Handle objects. Be careful manipulating file handles of open tables!
+L<IO::Handle> objects. Be careful manipulating file handles of open tables!
 
 =item open_file
 
@@ -370,18 +370,7 @@ sub new {
 		'top_features'  => [],
 		'gene2seqf'     => {},
 		'id2count'      => {},
-		'counts'        => {
-			'gene'       => 0,
-			'mrna'       => 0,
-			'pseudogene' => 0,
-			'ncrna'      => 0,
-			'mirna'      => 0,
-			'snrna'      => 0,
-			'snorna'     => 0,
-			'trna'       => 0,
-			'rrna'       => 0,
-			'other'      => 0,
-		},
+		'counts'        => {},
 		'do_gene'       => 1, 
 		'do_exon'       => 0,
 		'do_cds'        => 0, 
@@ -569,6 +558,28 @@ sub open_file {
 	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
 	
+	# check number of columns
+	my $ncol;
+	while (my $line = $fh->getline) {
+		next if $line =~ /^#/;
+		next unless $line =~ /\w+/;
+		my @fields = split "\t", $line;
+		$ncol = scalar(@fields);
+		last;
+	}
+	unless ($ncol == 16 or $ncol == 15 or $ncol == 12 or $ncol == 11 or $ncol == 10) {
+		carp " File '$filename' doesn't have recognizable number of columns! It has $ncol.";
+		return;
+	}
+	if ($ncol == 10) {
+		# turn off gene processing for simple genePred which has no gene names
+		$self->do_gene(0);
+	}
+	
+	# reopen file handle
+	$fh->close;
+	$fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
+	
 	# reset source as necessary
 	if ($filename =~ /ensgene/i and $self->source eq 'UCSC') {
 		$self->source('EnsGene');
@@ -587,6 +598,9 @@ sub open_file {
 	}
 	
 	# check existing data
+	# the reason this parser can handle reading a second file without having to make a 
+	# new parser object (like gff and bed) is so that we can potentially recycle the 
+	# extra UCSC information 
 	if ($self->fh) {
 		# close existing
 		$self->fh->close;
@@ -596,16 +610,7 @@ sub open_file {
 		$self->{'duplicate_ids'} = {};
 		$self->{'gene2seqf'}     = {};
 		$self->{'id2count'}      = {};
-		$self->{'counts'}{'gene'}       = 0;
-		$self->{'counts'}{'mrna'}       = 0;
-		$self->{'counts'}{'pseudogene'} = 0;
-		$self->{'counts'}{'ncrna'}      = 0;
-		$self->{'counts'}{'mirna'}      = 0;
-		$self->{'counts'}{'snrna'}      = 0;
-		$self->{'counts'}{'snorna'}     = 0;
-		$self->{'counts'}{'trna'}       = 0;
-		$self->{'counts'}{'rrna'}       = 0;
-		$self->{'counts'}{'other'}      = 0;
+		$self->{'counts'}        = {};
 		$self->{'eof'}           = 0;
 		$self->{'line_count'}    = 0;
 	}
@@ -738,7 +743,7 @@ sub typelist {
 	}
 	else {
 		# return generic list
-		return 'gene,mRNA,ncRNA,exon,CDS';
+		return $self->do_gene ? 'gene,mRNA,ncRNA,exon,CDS' : 'mRNA,ncRNA,exon,CDS';
 	}
 }
 
@@ -1410,8 +1415,8 @@ sub build_transcript {
 	
 	# identify the primary_tag value
 	my ($type, $biotype);
-	if (exists $ensembldata->{$id}) {
-		my $t = $ensembldata->{$id}->[1] || undef;
+	if (exists $ensembldata->{$self->name}) {
+		my $t = $ensembldata->{$self->name}->[1] || undef;
 		if ($t and $t =~ /protein.coding/i) {
 			$type = 'mRNA';
 			$biotype = $t;
@@ -1486,33 +1491,7 @@ sub build_transcript {
 	}
 	
 	# record the type of transcript
-	if ($type eq 'mRNA') { 
-		$counts->{mrna}++;
-	}
-	elsif ($type eq 'pseudogene') {
-		$counts->{pseudogene}++;
-	}
-	elsif ($type eq 'ncRNA') {
-		$counts->{ncrna}++;
-	}
-	elsif ($type eq 'miRNA') {
-		$counts->{mirna}++;
-	}
-	elsif ($type eq 'snRNA') {
-		$counts->{snrna}++;
-	}
-	elsif ($type eq 'snoRNA') {
-		$counts->{snorna}++;
-	}
-	elsif ($type eq 'tRNA') {
-		$counts->{trna}++;
-	}
-	elsif ($type eq 'rRNA') {
-		$counts->{rrna}++;
-	}
-	else {
-		$counts->{other}++;
-	}
+	$counts->{$type} += 1;
 	
 	# transcript is complete
 	return $transcript;
@@ -1608,7 +1587,7 @@ sub add_exons {
 		
 		# add name if requested
 		if ($ucsc->do_name) {
-			$exon->display_name( $transcript->primary_id . ".exon$number" );
+			$exon->display_name( $transcript->display_name . ".exon$number" );
 		}
 		
 		# associate with transcript
@@ -1758,7 +1737,7 @@ sub add_utrs {
 				-primary_tag   => $tag,
 				-primary_id    => $transcript->primary_id . ".utr$number",
 			);
-			$utr->display_name( $transcript->primary_id . ".utr$number" ) if 
+			$utr->display_name( $transcript->display_name . ".utr$number" ) if 
 				$ucsc->do_name;
 		}
 		
@@ -1786,7 +1765,7 @@ sub add_utrs {
 					-primary_tag   => $tag2,
 					-primary_id    => $transcript->primary_id . ".utr$number" . "a",
 				);
-				$utr2->display_name( $transcript->primary_id . ".utr$number" . "a" ) 
+				$utr2->display_name( $transcript->display_name . ".utr$number" . "a" ) 
 					if $ucsc->do_name;
 			}
 		
@@ -1921,7 +1900,7 @@ sub add_cds {
 			-phase         => $phase,
 			-primary_tag   => 'CDS',
 			-primary_id    => $transcript->primary_id . ".cds$i", 
-			-display_name  => $transcript->primary_id . ".cds$i",
+			-display_name  => $transcript->display_name . ".cds$i",
 		);
 		# the id and name still use $i for labeling to ensure numbering from 0
 		
@@ -1970,7 +1949,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.start_codon',
 			);
-			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+			$start_codon->display_name( $transcript->display_name . '.start_codon' ) if 
 				$ucsc->do_name;
 		}
 		
@@ -1986,7 +1965,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
-			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+			$stop_codon->display_name( $transcript->display_name . '.stop_codon' ) if 
 				$ucsc->do_name;
 		}
 	}
@@ -2014,7 +1993,7 @@ sub add_codons {
 					-phase         => 0,
 					-primary_id    => $transcript->primary_id . '.stop_codon',
 			);
-			$stop_codon->display_name( $transcript->primary_id . '.stop_codon' ) if 
+			$stop_codon->display_name( $transcript->display_name . '.stop_codon' ) if 
 				$ucsc->do_name;
 		}
 		
@@ -2031,7 +2010,7 @@ sub add_codons {
 					-primary_id    => $transcript->primary_id . '.start_codon',
 					-display_name  => $transcript->primary_id . '.start_codon',
 			);
-			$start_codon->display_name( $transcript->primary_id . '.start_codon' ) if 
+			$start_codon->display_name( $transcript->display_name . '.start_codon' ) if 
 				$ucsc->do_name;
 		}
 	}
