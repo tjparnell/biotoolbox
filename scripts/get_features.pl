@@ -131,6 +131,12 @@ filter_features();
 
 
 ### Write out file
+if ($start_adj or $stop_adj) {
+	printf " Adjusting start by %s bp and stop by %s bp relative to position %s\n",
+		$start_adj, $stop_adj, $position eq '5' ? 'start' : $position eq '3' ? 'end' : 
+		$position eq '4' or $position eq 'm' ? 'middle' : $position eq '53' ? 'both ends' :
+		'neither';
+}
 if ($convert_to_bed) {
 	print " Writing to bed file...\n";
 	export_to_bed();
@@ -708,8 +714,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$start = $fstart + $start_adj;
 			}
+			else {
+				$start = $fstart;
+			}
 			if ($stop_adj) {
 				$end = $fstart + $stop_adj;
+			}
+			else {
+				$end = $fstart;
 			}
 		}
 		else {
@@ -717,8 +729,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$end = $fend - $start_adj;
 			}
+			else {
+				$end = $fend;
+			}
 			if ($stop_adj) {
 				$start = $fend - $stop_adj;
+			}
+			else {
+				$start = $fend;
 			}
 		}
 	}
@@ -731,8 +749,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$end = $fend + $start_adj;
 			}
+			else {
+				$end = $fend;
+			}
 			if ($stop_adj) {
 				$start = $fend + $stop_adj;
+			}
+			else {
+				$start = $fend;
 			}
 		}
 		else {
@@ -740,8 +764,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$start = $fstart - $start_adj;
 			}
+			else {
+				$start = $fstart;
+			}
 			if ($stop_adj) {
 				$end = $fstart - $stop_adj;
+			}
+			else {
+				$end = $fstart;
 			}
 		}
 	}
@@ -755,8 +785,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$start = $midpoint + $start_adj;
 			}
+			else {
+				$start = $midpoint;
+			}
 			if ($stop_adj) {
 				$end = $midpoint + $stop_adj;
+			}
+			else {
+				$end = $midpoint;
 			}
 		}
 		else {
@@ -764,8 +800,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$end = $midpoint - $start_adj;
 			}
+			else {
+				$end = $midpoint;
+			}
 			if ($stop_adj) {
 				$start = $midpoint - $stop_adj;
+			}
+			else {
+				$start = $midpoint;
 			}
 		}
 	}
@@ -778,8 +820,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$start = $fstart + $start_adj;
 			}
+			else {
+				$start = $fstart;
+			}
 			if ($stop_adj) {
 				$end = $fend + $stop_adj;
+			}
+			else {
+				$end = $fend;
 			}
 		}
 		else {
@@ -787,8 +835,14 @@ sub adjust_coordinates {
 			if ($start_adj) {
 				$end = $fend - $start_adj;
 			}
+			else {
+				$end = $fend;
+			}
 			if ($stop_adj) {
 				$start = $fstart - $stop_adj;
+			}
+			else {
+				$start = $fstart;
 			}
 		}
 	}
