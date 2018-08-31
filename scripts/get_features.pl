@@ -9,11 +9,8 @@ use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(verify_or_request_feature_types);
 use Bio::ToolBox::GeneTools qw(
 	:export 
-	get_transcripts
-	collapse_transcripts
-	filter_transcript_support_level
-	filter_transcript_gencode_basic
-	filter_transcript_biotype
+	:filter
+	:transcript
 );
 use Bio::ToolBox::utility;
 my $VERSION = '1.62';
