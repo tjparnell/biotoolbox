@@ -5,7 +5,7 @@ require Exporter;
 use strict;
 use Carp;
 use Bio::ToolBox::db_helper::constants;
-our $VERSION = '1.51';
+our $VERSION = '1.62';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -339,11 +339,16 @@ sub assign_callback {
 
 sub _all_count_indexed {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($a->reversed) {
+	if ($flag & 0x10) { 
+		# reversed
 		$data->{'index'}{$e}++;
 	}
 	else {
@@ -353,9 +358,14 @@ sub _all_count_indexed {
 
 sub _all_precise_count_indexed {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	my $s = $a->pos + 1;
 	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
-	if ($a->reversed) {
+	if ($flag & 0x10) {
+		# reversed
 		$data->{'index'}{$s}++;
 	}
 	else {
@@ -365,26 +375,35 @@ sub _all_precise_count_indexed {
 
 sub _all_name_indexed {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($a->reversed) {
+	if ($flag & 0x10) { 
+		# reversed
 		# since we're working with names, only record the 5' end of fragment
-		return if ($a->paired and $a->proper_pair); # not the end we're looking for
+		return if (($flag & 0x1) and ($flag & 0x2)); 
+			# paired and proper
+			# not the end we're looking for
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
 	}
 	else {
 		$data->{'index'}{$s} ||= [];
 		push @{ $data->{'index'}{$s} }, $a->qname;
-# 		$data->{'index'}{$s} .= $a->qname . "\t";
-# 		$data->{'index'}{$a->qname} = $s;
 	}
 }
 
 sub _all_count_array {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
@@ -394,12 +413,20 @@ sub _all_count_array {
 
 sub _all_precise_count_array {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
 }
 
 sub _all_name_array {
 	my ($a, $data) = @_;
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
@@ -409,20 +436,25 @@ sub _all_name_array {
 
 sub _forward_count_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $r);
-		return if (not $first and not $r);
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed
+	if ($flag & 0x1) { 
+		# paired
+		my $first = $flag & 0x40; # true if FIRST_MATE
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $r;
+		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$e}++;
 	}
 	else {
@@ -432,18 +464,23 @@ sub _forward_count_indexed {
 
 sub _forward_precise_count_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
-		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $r);
-		return if (not $first and not $r);
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
+		my $first = $flag & 0x40; # true if FIRST_MATE
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $r;
+		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$s}++;
 	}
 	else {
@@ -453,20 +490,25 @@ sub _forward_precise_count_indexed {
 
 sub _forward_name_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $r);
-		return if (not $first and not $r);
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $r;
+		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
 	}
@@ -478,13 +520,19 @@ sub _forward_name_indexed {
 
 sub _forward_count_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -495,13 +543,19 @@ sub _forward_count_array {
 
 sub _forward_precise_count_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $reversed;
 	}
 	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
@@ -509,13 +563,19 @@ sub _forward_precise_count_array {
 
 sub _forward_name_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and $a->reversed);
-		return if (not $first and not $a->reversed);
+		return if ($first and $reversed);
+		return if (not $first and not $reversed);
 	}
 	else {
-		return if $a->reversed;
+		return if $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -526,20 +586,25 @@ sub _forward_name_array {
 
 sub _reverse_count_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $r);
-		return if (not $first and $r);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $r;
+		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$e}++;
 	}
 	else {
@@ -549,18 +614,23 @@ sub _reverse_count_indexed {
 
 sub _reverse_precise_count_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $r);
-		return if (not $first and $r);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $r;
+		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	return unless ($s >= $data->{start} and $a->calend <= $data->{stop} );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$s}++;
 	}
 	else {
@@ -570,20 +640,25 @@ sub _reverse_precise_count_indexed {
 
 sub _reverse_name_indexed {
 	my ($a, $data) = @_;
-	my $r = $a->reversed;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $r);
-		return if (not $first and $r);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $r;
+		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
 	return unless ( ($s >= $data->{start} and $s <= $data->{stop}) or 
 					($e >= $data->{start} and $e <= $data->{stop}) );
-	if ($r) {
+	if ($reversed) {
 		$data->{'index'}{$e} ||= [];
 		push @{ $data->{'index'}{$e} }, $a->qname;
 	}
@@ -595,13 +670,19 @@ sub _reverse_name_indexed {
 
 sub _reverse_count_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;
@@ -612,13 +693,19 @@ sub _reverse_count_array {
 
 sub _reverse_precise_count_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $reversed;
 	}
 	return unless ($a->pos + 1 >= $data->{start} and $a->calend <= $data->{stop} );
 	push @{$data->{scores}}, 1;
@@ -626,13 +713,19 @@ sub _reverse_precise_count_array {
 
 sub _reverse_name_array {
 	my ($a, $data) = @_;
-	if ($a->paired) {
+	my $flag = $a->flag;
+	return if $flag & 0x0100; # secondary alignment
+	return if $flag & 0x0400; # marked duplicate
+	return if $flag & 0x0800; # supplementary hit
+	my $reversed = $flag & 0x10; # reversed;
+	if ($flag & 0x1) {
+		# paired
 		my $first = $a->flag & 0x40; # true if FIRST_MATE
-		return if ($first and not $a->reversed);
-		return if (not $first and $a->reversed);
+		return if ($first and not $reversed);
+		return if (not $first and $reversed);
 	}
 	else {
-		return unless $a->reversed;
+		return unless $reversed;
 	}
 	my $s = $a->pos + 1;
 	my $e = $a->calend;

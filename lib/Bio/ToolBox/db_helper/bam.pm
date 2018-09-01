@@ -14,7 +14,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.51';
+our $VERSION = '1.62';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -284,9 +284,17 @@ sub sum_total_bam_alignments {
 				sub {
 					my ($a, $number) = @_;
 					
+					# check alignment
+					my $flag = $a->flag;
+					return if $flag & 0x4; # unmapped
+					return if $flag & 0x0100; # secondary alignment
+					return if $flag & 0x0400; # marked duplicate
+					return if $flag & 0x0800; # supplementary hit
+					
 					# check paired alignment
-					return unless $a->proper_pair;
-					return if $a->reversed; # only count left alignments
+					return unless $flag & 0x2; # proper_pair;
+					return if $flag & 0x8; # mate unmapped
+					return if $flag & 0x10; # reversed, only count left alignments
 					return if $a->qual < $min_mapq;
 					
 					# count this fragment
@@ -307,7 +315,11 @@ sub sum_total_bam_alignments {
 					my ($a, $number) = @_;
 					
 					# check alignment
-					return if $a->unmapped;
+					my $flag = $a->flag;
+					return if $flag & 0x4; # unmapped
+					return if $flag & 0x0100; # secondary alignment
+					return if $flag & 0x0400; # marked duplicate
+					return if $flag & 0x0800; # supplementary hit
 					return if $a->qual < $min_mapq;
 					
 					# count this fragment
