@@ -8,8 +8,11 @@ v1.62
 	can be turned off if you prefer the old way.
 	- Added support for writing bed12 transcript models to GeneTools 
 	library and get_features script.
+	- Bam file alignment counting now automatically excludes all 
+	secondary, duplicate, and supplementary marked alignments.
 	- Add new method to manipulate_datasets to name features, useful 
 	for naming bed3 files.
+	- Added TPM option to get_datasets script.
 	- Fix bugs with parsing gff and gtf files at same time
 	- Fix bugs with detecting null and/or empty values, especially when 
 	converting data formats
