@@ -578,7 +578,7 @@ sub collect_dataset {
 	}
 	elsif (defined $fstart and defined $fstop) {
 		# use a subfraction of the region
-		get_fractionated_genome_dataset($dataset, $index);
+		get_fractionated_dataset($dataset, $index);
 	}
 	else {
 		# everything else
