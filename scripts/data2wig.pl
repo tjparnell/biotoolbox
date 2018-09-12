@@ -607,7 +607,7 @@ sub convert_to_bedgraph {
 		my $chromosome = defined $chr_index ? $row->value($chr_index) : $row->seq_id;
 		my $start = $row->value($start_index);
 		my $stop  = defined $stop_index ? $row->value($stop_index) : 
-			$row->stop || $row->start;
+			$row->stop || $row->start || $start;
 		
 		# adjust start position
 		unless ($interbase) {
@@ -620,9 +620,13 @@ sub convert_to_bedgraph {
 			if ($current_chr eq $chromosome) {
 				# check for overlap
 				if ($start < $previous_pos) {
-					die " There are overlapping intervals or the file is not sorted by" .
+					warn " There are overlapping intervals or the file is not sorted by" .
 						" coordinates!\n Compare $chromosome:$start" . 
 						" with previous stop position $previous_pos\n";
+					# die if bigwig
+					if ($bigwig) {
+						die " bigWig conversion will fail with overlapping coordinates!\n Fix your file!\n";
+					}
 				}
 				# otherwise it is ok
 				$previous_pos = $stop;

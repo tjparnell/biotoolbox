@@ -12,7 +12,7 @@ Bio::ToolBox::GeneTools - SeqFeature agnostic methods for working with gene mode
     my $gene; # a SeqFeatureI compliant gene object obtained elsewhere
               # for example, from Bio::DB::SeqFeature::Store database
               # or parsed from a GFF3, GTF, or UCSC-style gene table using 
-              # Bio::ToolBox::parser::(gff,ucsc) parsers
+              # Bio::ToolBox parsers
     
     if (is_coding($gene)) { # boolean test
     	
@@ -49,7 +49,7 @@ not be present. Furthermore, the C<primary_tag> or type may not follow
 Sequence Ontology terms. Regular expressions are deployed to handle 
 varying naming schemes and exceptions.
 
-These functions should work with most or all <Bio::SeqFeatureI> compliant 
+These functions should work with most or all L<Bio::SeqFeatureI> compliant 
 objects. It has been tested with L<Bio::ToolBox::SeqFeature>, 
 L<Bio::SeqFeature::Lite>, and L<Bio::DB::SeqFeature> classes.
 
@@ -92,7 +92,12 @@ L</get_cdsStart>, L</get_cdsEnd>, L</get_transcript_cds_length>, and L</get_utrs
 =item :export
 
 Import all of the export methods, including L</gff_string>, L</gtf_string>, 
-and L</ucsc_string>;
+L</ucsc_string>, and L</bed_string>;
+
+=item :filter
+
+Import all of the transcript filter methods, including L</filter_transcript_biotype>,
+L</filter_transcript_gencode_basic>, and L</filter_transcript_support_level>.
 
 =back
 
@@ -487,8 +492,8 @@ transcripts is returned.
 =head1 SEE ALSO
 
 L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, 
-L<Bio::ToolBox::parser::ucsc>, L<Bio::Tools::GFF>,
-L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>
+L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parser::bed>, L<Bio::Tools::GFF>,
+L<Bio::SeqFeature::Lite>, L<Bio::DB::SeqFeature>, L<Bio::SeqFeatureI>
 
 =cut
 
@@ -578,6 +583,11 @@ our %EXPORT_TAGS = (
 		ucsc_string
 		bed_string
 	) ],
+	filter => [ qw(
+		filter_transcript_biotype
+		filter_transcript_gencode_basic
+		filter_transcript_support_level
+	)]
 );
 
 

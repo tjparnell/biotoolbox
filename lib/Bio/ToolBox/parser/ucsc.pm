@@ -851,9 +851,6 @@ sub parse_table {
 sub find_gene {
 	my $self = shift;
 	
-	# go no further unless genes are requested
-	return unless $self->do_gene;
-	
 	# get the name and coordinates from arguments
 	my ($name, $id, $chrom, $start, $end, $strand);
 	if (scalar @_ == 0) {
