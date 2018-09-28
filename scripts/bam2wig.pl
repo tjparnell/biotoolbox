@@ -494,13 +494,14 @@ sub check_defaults {
 	
 	# determine binary file packing and length
 	if ($multi_hit_scale or $chrnorm or ($use_coverage and $bin_size > 1)) {
-		# pack as floating point values
+		# pack as floating point values, this is 32 bit
 		$binpack = 'f';
 	}
 	else {
 		# dealing only with integers here
-		# let's hope we never have depth greater than 65,536
-		$binpack = 'S';
+		# yes we do occasionally have depth greater than 65,536
+		# originally short (16 bits), now long (32 bits)
+		$binpack = 'L';
 	}
 	$buflength = length(pack($binpack, 1));
 	
