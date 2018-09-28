@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.62';
+my $VERSION = '1.63';
 	
 	
 
@@ -59,6 +59,7 @@ my (
 	$use_coverage,
 	$splice,
 	$paired,
+	$fastpaired,
 	$shift,
 	$shift_value,
 	$extend_value,
@@ -113,6 +114,7 @@ GetOptions(
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
 	'p|pe!'        => \$paired, # paired-end alignments
+	'P|fastpe'     => \$fastpaired, # fast paired-end alignments
 	'I|shift!'     => \$shift, # shift coordinates 3'
 	'H|shiftval=i' => \$shift_value, # value to shift coordinates
 	'x|extval=i'   => \$extend_value, # value to extend reads
@@ -604,7 +606,8 @@ sub check_defaults {
 	}
 	
 	# set the initial main callback for processing alignments
-	$main_callback = $paired ? \&pe_callback : \&se_callback;
+	$main_callback = $fastpaired ? \&fast_pe_callback : $paired ? \&pe_callback : 
+		\&se_callback;
 	
 	
 	### Determine the alignment recording callback method
@@ -2111,6 +2114,58 @@ sub se_callback {
 	}
 }
 
+sub fast_pe_callback {
+	my ($a, $data) = @_;
+	
+	# check paired status
+	return unless $a->proper_pair; # both alignments are mapped
+	return if $a->reversed; # only look at forward alignments, that's why it's fast
+	return unless $a->tid == $a->mtid; # same chromosome?
+	my $isize = abs($a->isize); 
+	return if $isize > $max_isize;
+	return if $isize < $min_isize; 
+	
+	# check alignment quality and flags
+	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
+	my $flag = $a->flag;
+	return if ($nosecondary and $flag & 0x0100); # secondary alignment
+	return if ($noduplicate and $flag & 0x0400); # marked duplicate
+	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	
+	# filter black listed regions
+	if ($data->{black_list}) {
+		my $results = $data->{black_list}->fetch($a->pos, $a->pos + $isize);
+		return if @$results;
+	}
+	
+	# scale by number of hits
+	my $score;
+	if ($multi_hit_scale) {
+		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
+		$score = $nh > 1 ? 1/$nh : 1;
+		$data->{count} += $score; # record fractional alignment counts
+		$score *= $data->{score}; # multiply by chromosome scaling factor
+	}
+	else {
+		$data->{count} += 1; # always record one alignment
+		$score = $data->{score}; # probably 1, but may be chromosome scaled
+	}
+	
+	# record based on the forward read
+	&$callback($a, $data, $score);
+	
+	# check data size
+	if (scalar(@{$data->{f}}) > 600_000) {
+		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
+		$data->{f_offset} += 500_000;
+	}
+	if (scalar(@{$data->{r}}) > 600_000) {
+		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
+		$data->{r_offset} += 500_000;
+	}
+}
+
 sub pe_callback {
 	my ($a, $data) = @_;
 	
@@ -2712,7 +2767,8 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --flip                        flip the strands for convenience
   
  Paired-end alignments:
-  -p --pe                       treat as paired-end alignments
+  -p --pe                       process paired-end alignments, both are checked
+  -P --fastpe                   process paired-end alignments, only F are checked
   --minsize <integer>           minimum allowed insertion size (30)
   --maxsize <integer>           maximum allowed insertion size (600)
   
@@ -2814,7 +2870,8 @@ The span is defined by the extension value.
 
 Specify that the raw alignment coverage be calculated and reported 
 in the wig file. This utilizes a special low-level operation and 
-precludes any alignment filtering or post-normalization methods.
+precludes any alignment filtering or post-normalization methods. 
+Overlapping bases in paired-end alignments are double-counted.
 
 =item --position [start|mid|span|extend|cspan|coverage]
 
@@ -2858,8 +2915,16 @@ coding sequence, depending on the library preparation method.
 The Bam file consists of paired-end alignments, and only properly 
 mapped pairs of alignments will be counted. Properly mapped pairs 
 include FR reads on the same chromosome, and not FF, RR, RF, or 
-pairs aligning to separate chromosomes. The default is to 
-treat all alignments as single-end.
+pairs aligning to separate chromosomes. Both alignments are required 
+to be present before the pair is counted. The default is to treat 
+all alignments as single-end.
+
+=item --fastpe
+
+The Bam file consists of paired-end alignments, but to increase processing 
+time and be more tolerant of weird pairings, only the forward alignment is 
+required and considered; all reverse alignments are ignored. The default is 
+to treat all alignments as single-end.
 
 =item --minsize E<lt>integerE<gt>
 
