@@ -77,6 +77,7 @@ my (
 	$max_isize,
 	$min_isize,
 	$multi_hit_scale,
+	$splice_scale,
 	$rpm,
 	$do_mean,
 	$chrnorm,
@@ -114,7 +115,7 @@ GetOptions(
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
 	'p|pe!'        => \$paired, # paired-end alignments
-	'P|fastpe'     => \$fastpaired, # fast paired-end alignments
+	'P|fastpe!'    => \$fastpaired, # fast paired-end alignments
 	'I|shift!'     => \$shift, # shift coordinates 3'
 	'H|shiftval=i' => \$shift_value, # value to shift coordinates
 	'x|extval=i'   => \$extend_value, # value to extend reads
@@ -127,11 +128,12 @@ GetOptions(
 	'flip!'        => \$flip, # flip the strands
 	'q|qual=i'     => \$min_mapq, # minimum mapping quality
 	'S|nosecondary'  => \$nosecondary, # skip secondary alignments
-	'D|noduplicate!' => \$noduplicate, # skip duplicate alignments
-	'U|nosupplementary!' => \$nosupplementary, # skip supplementary alignments
+	'D|noduplicate' => \$noduplicate, # skip duplicate alignments
+	'U|nosupplementary' => \$nosupplementary, # skip supplementary alignments
 	'maxsize=i'    => \$max_isize, # maximum paired insert size to accept
 	'minsize=i'    => \$min_isize, # minimum paired insert size to accept
 	'fraction!'    => \$multi_hit_scale, # scale by number of hits
+	'splfrac!'     => \$splice_scale, # divide counts by number of spliced segments
 	'r|rpm!'       => \$rpm, # calculate reads per million
 	'm|separate|mean!' => \$do_mean, # rpm scale separately
 	'scale=s'      => \@scale_values, # user specified scale value
@@ -493,7 +495,9 @@ sub check_defaults {
 	}
 	
 	# determine binary file packing and length
-	if ($multi_hit_scale or $chrnorm or ($use_coverage and $bin_size > 1)) {
+	if ($multi_hit_scale or $splice_scale or $chrnorm or 
+		($use_coverage and $bin_size > 1)
+	) {
 		# pack as floating point values, this is 32 bit
 		$binpack = 'f';
 	}
@@ -515,7 +519,10 @@ sub check_defaults {
 		print " ignoring paired-end option with coverage\n" if $paired;
 		print " ignoring RPM option with coverage\n" if $rpm;
 		print " ignoring custom scale option with coverage\n" if @scale_values;
+		print " ignoring multi-hit fractional counting with coverage\n" if $multi_hit_scale;
+		print " ignoring splice segment fractional counting with coverage\n" if $splice_scale;
 		print " ignoring chromosome-specific normalization with coverage\n" if $chrnorm;
+		
 		if ($bin_size > 1) {
 			$coverage_dump = int(1000 / $bin_size) * $bin_size;
 			$coverage_dump = $bin_size if $coverage_dump == 0;
@@ -2264,6 +2271,11 @@ sub se_spliced_callback {
 	}
 	return if $size > $max_intron; # exceed maximum intron size
 	
+	# adjust score
+	if ($splice_scale) {
+		$score /= scalar(@segments);
+	}
+	
 	# record
 	if ($use_start) {
 		foreach my $segment (@segments) {
@@ -2797,6 +2809,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -m --mean                     average multiple bams (default is addition)
   --scale <float>               explicit scaling factor, repeat for each bam file
   --fraction                    assign fractional counts to multi-mapped alignments
+  --splfrac                     assign fractional count to each spliced segment
   --format <integer>            number of decimal positions (4)
   --chrnorm <float>             use chromosome-specific normalization factor
   --chrapply <regex>            regular expression to apply chromosome-specific factor
@@ -3090,6 +3103,13 @@ Indicate that multi-mapping alignments should be given fractional counts
 instead of full counts. The number of alignments is determined using the 
 NH alignment tag. If a read has 10 alignments, then each alignment is 
 given a count of 0.1. 
+
+=item --splfrac
+
+Indicate that spliced segments should be given a fractional count. This 
+allows a count to be assigned to each spliced segment while avoiding 
+double-counting. Best used with RNASeq spliced point data (--start or 
+--mid); not recommended for --span.
 
 =item --format E<lt>integerE<gt>
 
