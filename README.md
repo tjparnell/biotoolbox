@@ -77,12 +77,27 @@ of the primary user-oriented libraries that are available.
 
 - Annotation parsers
 
-    Included are two generic parsers for loading an entire genome-worth of 
-    annotation into memory within a reasonably short amount of time. 
+    Included are three generic parsers for loading an entire genome-worth of 
+    annotation into memory within a reasonably short amount of time. In each case 
+    these load features into a SeqFeature object, 
+    [Bio::ToolBox::SeqFeature](https://metacpan.org/pod/Bio::ToolBox::SeqFeature) by 
+    default.
+
+    - [Bio::ToolBox::parser::bed](https://metacpan.org/pod/Bio::ToolBox::parser::bed)
+
+        This parses [BED file](http://genome.ucsc.edu/FAQ/FAQformat.html#format1) and 
+        related formats, including BED files with 3-12 columns 
+        (BED3, BED6, BED12, and in between), [bedGraph](http://genome.ucsc.edu/FAQ/FAQformat.html#format1.8), 
+        [narrowPeak](http://genome.ucsc.edu/FAQ/FAQformat.html#format12), and 
+        [broadPeak](http://genome.ucsc.edu/FAQ/FAQformat.html#format13). For 
+        proper BED12 files, transcripts are parsed with child subfeatures including exon 
+        and CDS subfeatures.
 
     - [Bio::ToolBox::parser::gff](https://metacpan.org/pod/Bio::ToolBox::parser::gff)
 
-        This parses both GTF and GFF3 file formats. Unlike most other GFF parsers 
+        This parses both [GTF](http://mblab.wustl.edu/GTF22.html) and 
+        [GFF3](https://github.com/The-Sequence-Ontology/Specifications/blob/master/gff3.md) 
+        file formats. Unlike most other GFF parsers 
         that work line-by-line only, this maintains parent and child hierarchical 
         relationships as parent feature and child subfeatures. To further maintain 
         control and reduce unnecessary parsing, unwanted feature types can be 

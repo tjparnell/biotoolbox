@@ -29,7 +29,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.62';
+my $VERSION = '1.63';
 	
 	
 
@@ -59,6 +59,7 @@ my (
 	$use_coverage,
 	$splice,
 	$paired,
+	$fastpaired,
 	$shift,
 	$shift_value,
 	$extend_value,
@@ -76,6 +77,7 @@ my (
 	$max_isize,
 	$min_isize,
 	$multi_hit_scale,
+	$splice_scale,
 	$rpm,
 	$do_mean,
 	$chrnorm,
@@ -113,6 +115,7 @@ GetOptions(
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
 	'p|pe!'        => \$paired, # paired-end alignments
+	'P|fastpe!'    => \$fastpaired, # fast paired-end alignments
 	'I|shift!'     => \$shift, # shift coordinates 3'
 	'H|shiftval=i' => \$shift_value, # value to shift coordinates
 	'x|extval=i'   => \$extend_value, # value to extend reads
@@ -125,11 +128,12 @@ GetOptions(
 	'flip!'        => \$flip, # flip the strands
 	'q|qual=i'     => \$min_mapq, # minimum mapping quality
 	'S|nosecondary'  => \$nosecondary, # skip secondary alignments
-	'D|noduplicate!' => \$noduplicate, # skip duplicate alignments
-	'U|nosupplementary!' => \$nosupplementary, # skip supplementary alignments
+	'D|noduplicate' => \$noduplicate, # skip duplicate alignments
+	'U|nosupplementary' => \$nosupplementary, # skip supplementary alignments
 	'maxsize=i'    => \$max_isize, # maximum paired insert size to accept
 	'minsize=i'    => \$min_isize, # minimum paired insert size to accept
 	'fraction!'    => \$multi_hit_scale, # scale by number of hits
+	'splfrac!'     => \$splice_scale, # divide counts by number of spliced segments
 	'r|rpm!'       => \$rpm, # calculate reads per million
 	'm|separate|mean!' => \$do_mean, # rpm scale separately
 	'scale=s'      => \@scale_values, # user specified scale value
@@ -491,14 +495,17 @@ sub check_defaults {
 	}
 	
 	# determine binary file packing and length
-	if ($multi_hit_scale or $chrnorm or ($use_coverage and $bin_size > 1)) {
-		# pack as floating point values
+	if ($multi_hit_scale or $splice_scale or $chrnorm or 
+		($use_coverage and $bin_size > 1)
+	) {
+		# pack as floating point values, this is 32 bit
 		$binpack = 'f';
 	}
 	else {
 		# dealing only with integers here
-		# let's hope we never have depth greater than 65,536
-		$binpack = 'S';
+		# yes we do occasionally have depth greater than 65,536
+		# originally short (16 bits), now long (32 bits)
+		$binpack = 'L';
 	}
 	$buflength = length(pack($binpack, 1));
 	
@@ -512,7 +519,10 @@ sub check_defaults {
 		print " ignoring paired-end option with coverage\n" if $paired;
 		print " ignoring RPM option with coverage\n" if $rpm;
 		print " ignoring custom scale option with coverage\n" if @scale_values;
+		print " ignoring multi-hit fractional counting with coverage\n" if $multi_hit_scale;
+		print " ignoring splice segment fractional counting with coverage\n" if $splice_scale;
 		print " ignoring chromosome-specific normalization with coverage\n" if $chrnorm;
+		
 		if ($bin_size > 1) {
 			$coverage_dump = int(1000 / $bin_size) * $bin_size;
 			$coverage_dump = $bin_size if $coverage_dump == 0;
@@ -604,7 +614,8 @@ sub check_defaults {
 	}
 	
 	# set the initial main callback for processing alignments
-	$main_callback = $paired ? \&pe_callback : \&se_callback;
+	$main_callback = $fastpaired ? \&fast_pe_callback : $paired ? \&pe_callback : 
+		\&se_callback;
 	
 	
 	### Determine the alignment recording callback method
@@ -2111,6 +2122,58 @@ sub se_callback {
 	}
 }
 
+sub fast_pe_callback {
+	my ($a, $data) = @_;
+	
+	# check paired status
+	return unless $a->proper_pair; # both alignments are mapped
+	return if $a->reversed; # only look at forward alignments, that's why it's fast
+	return unless $a->tid == $a->mtid; # same chromosome?
+	my $isize = abs($a->isize); 
+	return if $isize > $max_isize;
+	return if $isize < $min_isize; 
+	
+	# check alignment quality and flags
+	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
+	my $flag = $a->flag;
+	return if ($nosecondary and $flag & 0x0100); # secondary alignment
+	return if ($noduplicate and $flag & 0x0400); # marked duplicate
+	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	
+	# filter black listed regions
+	if ($data->{black_list}) {
+		my $results = $data->{black_list}->fetch($a->pos, $a->pos + $isize);
+		return if @$results;
+	}
+	
+	# scale by number of hits
+	my $score;
+	if ($multi_hit_scale) {
+		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
+		$score = $nh > 1 ? 1/$nh : 1;
+		$data->{count} += $score; # record fractional alignment counts
+		$score *= $data->{score}; # multiply by chromosome scaling factor
+	}
+	else {
+		$data->{count} += 1; # always record one alignment
+		$score = $data->{score}; # probably 1, but may be chromosome scaled
+	}
+	
+	# record based on the forward read
+	&$callback($a, $data, $score);
+	
+	# check data size
+	if (scalar(@{$data->{f}}) > 600_000) {
+		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
+		$data->{f_offset} += 500_000;
+	}
+	if (scalar(@{$data->{r}}) > 600_000) {
+		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
+		$data->{r_offset} += 500_000;
+	}
+}
+
 sub pe_callback {
 	my ($a, $data) = @_;
 	
@@ -2207,6 +2270,11 @@ sub se_spliced_callback {
 		$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
 	}
 	return if $size > $max_intron; # exceed maximum intron size
+	
+	# adjust score
+	if ($splice_scale) {
+		$score /= scalar(@segments);
+	}
 	
 	# record
 	if ($use_start) {
@@ -2712,7 +2780,8 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --flip                        flip the strands for convenience
   
  Paired-end alignments:
-  -p --pe                       treat as paired-end alignments
+  -p --pe                       process paired-end alignments, both are checked
+  -P --fastpe                   process paired-end alignments, only F are checked
   --minsize <integer>           minimum allowed insertion size (30)
   --maxsize <integer>           maximum allowed insertion size (600)
   
@@ -2740,6 +2809,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -m --mean                     average multiple bams (default is addition)
   --scale <float>               explicit scaling factor, repeat for each bam file
   --fraction                    assign fractional counts to multi-mapped alignments
+  --splfrac                     assign fractional count to each spliced segment
   --format <integer>            number of decimal positions (4)
   --chrnorm <float>             use chromosome-specific normalization factor
   --chrapply <regex>            regular expression to apply chromosome-specific factor
@@ -2814,7 +2884,8 @@ The span is defined by the extension value.
 
 Specify that the raw alignment coverage be calculated and reported 
 in the wig file. This utilizes a special low-level operation and 
-precludes any alignment filtering or post-normalization methods.
+precludes any alignment filtering or post-normalization methods. 
+Overlapping bases in paired-end alignments are double-counted.
 
 =item --position [start|mid|span|extend|cspan|coverage]
 
@@ -2858,8 +2929,16 @@ coding sequence, depending on the library preparation method.
 The Bam file consists of paired-end alignments, and only properly 
 mapped pairs of alignments will be counted. Properly mapped pairs 
 include FR reads on the same chromosome, and not FF, RR, RF, or 
-pairs aligning to separate chromosomes. The default is to 
-treat all alignments as single-end.
+pairs aligning to separate chromosomes. Both alignments are required 
+to be present before the pair is counted. The default is to treat 
+all alignments as single-end.
+
+=item --fastpe
+
+The Bam file consists of paired-end alignments, but to increase processing 
+time and be more tolerant of weird pairings, only the forward alignment is 
+required and considered; all reverse alignments are ignored. The default is 
+to treat all alignments as single-end.
 
 =item --minsize E<lt>integerE<gt>
 
@@ -3024,6 +3103,13 @@ Indicate that multi-mapping alignments should be given fractional counts
 instead of full counts. The number of alignments is determined using the 
 NH alignment tag. If a read has 10 alignments, then each alignment is 
 given a count of 0.1. 
+
+=item --splfrac
+
+Indicate that spliced segments should be given a fractional count. This 
+allows a count to be assigned to each spliced segment while avoiding 
+double-counting. Best used with RNASeq spliced point data (--start or 
+--mid); not recommended for --span.
 
 =item --format E<lt>integerE<gt>
 
