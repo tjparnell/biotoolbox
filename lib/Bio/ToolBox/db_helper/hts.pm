@@ -87,16 +87,16 @@ sub check_bam_index {
 	# HTSlib can accept either .bam.bai or .bai
 	my $bamfile = shift;
 	
-	# optional index names
-	my $bam_index = "$bamfile.bai"; # .bam.bai
+	# check for possible index names
+	return if -e "$bamfile.bai"; # .bam.bai
+	return if -e "$bamfile.crai"; # .cram.crai
+	return if -e "$bamfile.csi"; # .bam.csi
 	my $alt_index = $bamfile;
-	$alt_index =~ s/bam$/bai/i; # .bai
+	$alt_index =~ s/m$/i/i; # change bam to bai or cram to crai
+	return if -e $alt_index;
 	
-	# check for existing index
-	if (not -e $bam_index and not -e $alt_index)  {
-		# make a new index
-		Bio::DB::HTSfile->reindex($bamfile);
-	}
+	# existing index can't be found, so make one
+	Bio::DB::HTSfile->reindex($bamfile);
 }
 
 

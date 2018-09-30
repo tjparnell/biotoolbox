@@ -93,6 +93,13 @@ The L<Bio::DB::Sam> adapter is an older interface to the Bam alignment
 file. This is based on the samtools C library version E<lt>= 0.1.19. While 
 this adapter is still supported, the above should be used for new installs.
 
+=item Cram files
+
+Cram files (F<.cram>) are similar to Bam files, but are much smaller due to 
+only storing sequence differences for each alignment. As such, they require 
+an indexed, reference fasta to regenerate the complete alignment. Cram files 
+are only supported by the L<Bio::DB::HTS> adapter.
+
 =item USeq files
 
 USeq files (F<.useq>) are compressed, binary, indexed files that support 
@@ -244,6 +251,12 @@ Provide the path to the F<.bam> file. This may be a local file, or a remote
 URL (generally supported by the adapter). If a local F<.bam.bai> index file 
 is not present, it will automatically be built prior to opening; this may 
 fail if the bam file is not sorted. Remote files are not indexed.
+
+=item Cram file database
+
+Provide the path to the local F<.cram> file. Currently, supplementary fasta 
+files are not supported, so the Cram file header must point to a valid 
+reference. Cram files will be indexed automatically if an index is not available.
 
 =item BigWig file database
 
@@ -619,7 +632,9 @@ handling packages are loaded during run time and the appropriate
 methods are called. Essentially, this is where the magic happens.
 
 Pass the method an array of nine (or more) parameters. The parameters 
-are not keyed as a hash, and the order is explicit. The order is as follows.
+are not keyed as a hash, and the order is explicit. However, see the 
+L<Bio::ToolBox::db_helper::constants> module for named index positions. 
+The order is as follows.
 
 =over 4
 
@@ -1005,7 +1020,7 @@ sub open_db_connection {
 	}
 	
 	# check for a known file type
-	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig/i) {
+	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig|cram/i) {
 		
 		# first check that it exists
 		if (-e $database) {
@@ -1128,6 +1143,27 @@ sub open_db_connection {
 				}
 			}
 			
+			# a cram database
+			if ($database =~ /\.cram$/i) {
+				# open using HTS bam adaptor only
+				$BAM_ADAPTER ||= 'hts';
+				if ($BAM_ADAPTER eq 'sam') {
+					$error .= " ERROR: Only HTS adapters support Cram files!\n";
+				}
+				_load_bam_helper_module() unless $BAM_OK;
+				if ($BAM_OK) {
+					undef $@;
+					$db = open_bam_db($database);
+					unless ($db) {
+						$error = " ERROR: could not open local Cram file" .
+							" '$database'! $@\n";
+					}
+				}
+				else {
+					$error = " Cram database cannot be loaded because\n" . 
+						" Bio::DB::HTS is not installed\n";
+				}
+			}
 			else {
 				$error .= " Programmer error! Cannot interpret database type for $database!\n";
 			}
