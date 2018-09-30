@@ -4,7 +4,6 @@ package Bio::ToolBox::db_helper::hts;
 require Exporter;
 use strict;
 use Carp;
-use File::Copy;
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::db_helper::alignment_callbacks;
 use Bio::DB::HTS;
@@ -14,7 +13,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-our $VERSION = '1.62';
+our $VERSION = '1.63';
 
 # Exported names
 our @ISA = qw(Exporter);
@@ -78,7 +77,6 @@ sub open_indexed_fasta {
 	my $fasta = shift;
 	eval {require Bio::DB::HTS::Faidx}; # this should be available
 	my $fai = Bio::DB::HTS::Faidx->new($fasta);
-# 	eval {$fai};
 		# this should automatically build the fai index if possible
 	return $fai if defined $fai;
 }
@@ -86,36 +84,16 @@ sub open_indexed_fasta {
 
 ### Check for a bam index 
 sub check_bam_index {
-	# HTSlib can accept either .bam.bai or .bai, but the Perl adapter 
-	# still accepts just .bam.bai, I think....
+	# HTSlib can accept either .bam.bai or .bai
 	my $bamfile = shift;
-	
-	# we will check the modification time to make sure index is newer
-	my $bam_mtime = (stat($bamfile))[9];
 	
 	# optional index names
 	my $bam_index = "$bamfile.bai"; # .bam.bai
 	my $alt_index = $bamfile;
-	$alt_index =~ s/bam$/bai/i; # picard uses .bai instead of .bam.bai as samtools does
+	$alt_index =~ s/bam$/bai/i; # .bai
 	
 	# check for existing index
-	if (-e $bam_index) {
-		if ( (stat($bam_index))[9] < $bam_mtime) {
-			# index is older than bam file
-			print " index $bam_index is old. Attempting to update time stamp.\n";
-			my $now = time;
-			utime($now, $now, $bam_index) || Bio::DB::HTSfile->reindex($bamfile);
-		}
-	}
-	elsif (-e $alt_index) {
-		if ( (stat($alt_index))[9] < $bam_mtime) {
-			# index is older than bam file
-			print " index $alt_index is old.\n";
-		}
-		# reuse this index
-		copy($alt_index, $bam_index);
-	}
-	else {
+	if (not -e $bam_index and not -e $alt_index)  {
 		# make a new index
 		Bio::DB::HTSfile->reindex($bamfile);
 	}
