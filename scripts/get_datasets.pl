@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.62';
+my $VERSION = '1.63';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -457,6 +457,9 @@ sub set_defaults {
 	if ($exon_subfeature) {
 		# legacy option
 		$subfeature = 'exon';
+	}
+	if ($subfeature and (defined $fstart or defined $start_adj)) {
+		die " Cannot modify coordinates when subfeatures are requested!\n";
 	}
 	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
 		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
