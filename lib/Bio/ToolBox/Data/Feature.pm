@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.62';
+our $VERSION = '1.63';
 
 =head1 NAME
 
@@ -2081,8 +2081,8 @@ sub gff_string {
 	}
 	
 	# done
-	my $string = join("\t", $chr, $source, $primary_tag, $start, $stop, $strand, 
-		$score, $phase, $attributes);
+	my $string = join("\t", $chr, $source, $primary_tag, $start, $stop, $score, 
+		$strand, $phase, $attributes);
 	return $string;
 }
 
