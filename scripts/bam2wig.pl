@@ -6,6 +6,8 @@ use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use List::Util qw(sum);
+use File::Spec;
+use File::Temp;
 use List::MoreUtils qw(natatime);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -96,6 +98,7 @@ my (
 	$max_intron,
 	$window,
 	$verbose,
+	$tempdir,
 	$help,
 	$print_version,
 );
@@ -153,6 +156,7 @@ GetOptions(
 	'intron=i'     => \$max_intron, # maximum intron size to allow
 	'window=i'     => \$window, # window size to control memory usage
 	'V|verbose!'   => \$verbose, # print sample correlations
+	'temp=s'       => \$tempdir, # directory to write temp files
 	'adapter=s'    => \$BAM_ADAPTER, # explicitly set the adapter version
 	'h|help'       => \$help, # request help
 	'v|version'    => \$print_version, # print the version
@@ -185,6 +189,7 @@ if ($print_version) {
 my ($main_callback, $callback, $wig_writer, $outbase, $chromo_file,
 	$binpack, $buflength, $coverage_dump, $coverage_sub);
 check_defaults();
+print " writing temp files to $tempdir\n" if $verbose;
 my $items = $paired ? 'fragments' : 'alignments';
 
 # record start time
@@ -616,6 +621,23 @@ sub check_defaults {
 	# set the initial main callback for processing alignments
 	$main_callback = $fastpaired ? \&fast_pe_callback : $paired ? \&pe_callback : 
 		\&se_callback;
+	
+	
+	# set output temporary directory
+	if ($tempdir) {
+		unless (-x $tempdir and -d _ and -w _ ) {
+			die " Specified temp directory '$tempdir' either does not exist or is not writeable!\n";
+		}
+		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$tempdir, CLEANUP=>1);
+	}
+	else {
+		# use the base path of the output bam file
+		my (undef, $dir, $file) = File::Spec->splitpath($outfile);
+		unless ($dir) {
+			$dir = File::Spec->curdir;
+		}
+		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$dir, CLEANUP=>1);
+	}
 	
 	
 	### Determine the alignment recording callback method
@@ -1217,7 +1239,7 @@ sub process_bam_coverage {
 		
 		# find the children
 		my %files;
-		my @filelist = glob "$outbase.*.temp.bin";
+		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1284,7 +1306,7 @@ sub parallel_process_bam_coverage {
 		
 		# find the children
 		my %files;
-		my @filelist = glob "$outbase.*.temp.bin";
+		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1341,11 +1363,15 @@ sub process_bam_coverage_on_chromosome {
 	# write out chromosome binary file, set count to arbitrary 0
 	if ($do_temp_bin) {
 		write_bin_file(\$chrom_data, 
-			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin') );
+			File::Spec->catfile($tempdir, 
+			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin'))
+		);
 	}
 	else {
 		&$wig_writer(\$chrom_data, $binpack, $seq_id, $seq_length, 
-			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig') );
+			File::Spec->catfile($tempdir,
+			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig') )
+		);
 	}
 	
 	# verbose status line 
@@ -1380,7 +1406,7 @@ sub process_alignments {
 		my @totals;
 		my %seq_totals;
 		my %files;
-		my @filelist = glob "$outbase.*.temp.bin";
+		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1526,7 +1552,7 @@ sub parallel_process_alignments {
 		my @totals;
 		my %seq_totals;
 		my %files;
-		my @filelist = glob "$outbase.*.temp.bin";
+		my @filelist = glob(File::Spec->catfile($tempdir,"$outbase.*.temp.bin"));
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1702,18 +1728,24 @@ sub process_alignments_on_chromosome {
 	if ($do_temp_bin) {
 		# write a temporary binary file for merging later
 		write_bin_file(\$data->{fpack}, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') );
+			File::Spec->catfile($tempdir,
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') )
+		);
 		write_bin_file(\$data->{rpack}, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin') ) 
-			if $do_strand;
+			File::Spec->catfile($tempdir,
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin') )
+		) if $do_strand;
 	}
 	else {
 		# write a chromosome specific wig file
 		&$wig_writer(\$data->{fpack}, $binpack, $seq_id, $seq_length, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') );
+			File::Spec->catfile($tempdir,
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') )
+		);
 		&$wig_writer(\$data->{rpack}, $binpack, $seq_id, $seq_length, 
+			File::Spec->catfile($tempdir,
 			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.wig') ) 
-			if $do_strand;
+		) if $do_strand;
 	}
 	
 	# verbose status line 
@@ -1808,7 +1840,9 @@ sub merge_bin_files {
 	
 	# now rewrite the merged bin file
 	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, 
-		join('.', $outbase, '0', $seq_id, $total, $strand, 'temp.wig') );
+		File::Spec->catfile($tempdir,
+		join('.', $outbase, '0', $seq_id, $total, $strand, 'temp.wig') )
+	);
 	if ($verbose) {
 		printf "  Merged%s $seq_id temp files in %d seconds\n", 
 			defined $norm_factors->[0] ? " and normalized" : "", time - $merge_start_time;
@@ -1852,7 +1886,7 @@ sub normalize_bin_file {
 sub write_final_wig_file {
 	
 	# find children files
-	my @filelist = glob "$outbase.*.temp.wig";
+	my @filelist = glob( File::Spec->catfile($tempdir, "$outbase.*.temp.wig"));
 	unless (scalar @filelist) {
 		die " can't find children file!\n";
 	}
@@ -2828,6 +2862,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
  General options:
   -c --cpu <integer>            number of parallel processes (4)
+  --temp <directory>            directory to write temporary files (output path)
   -V --verbose                  report additional information
   -v --version                  print version information
   -h --help                     show full documentation
@@ -3197,6 +3232,13 @@ the default format for start and midpoint modes of operation.
 Specify the number of parallel instances to run simultaneously. This requires 
 the installation of L<Parallel::ForkManager>. With support enabled, the 
 default is 4. Disable multi-threaded execution by setting to 1. 
+
+=item --temp E<lt>directoryE<gt>
+
+Optionally specify an alternate temporary directory path where the temporary 
+files will be written. The default is the specified output file path, or the 
+current directory. Temporary files will always be written in a subdirectory of 
+the path specified with the template "bam2wigTEMP_XXXX".
 
 =item --verbose
 
