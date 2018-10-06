@@ -189,7 +189,7 @@ if ($print_version) {
 my ($main_callback, $callback, $wig_writer, $outbase, $chromo_file,
 	$binpack, $buflength, $coverage_dump, $coverage_sub);
 check_defaults();
-print " writing temp files to $tempdir\n" if $verbose;
+print " Writing temp files to $tempdir\n" if $verbose;
 my $items = $paired ? 'fragments' : 'alignments';
 
 # record start time
@@ -201,6 +201,7 @@ my $start_time = time;
 
 ### Open files
 my @sams;
+printf " Processing files %s...\n", join(", ", @bamfiles);
 foreach (@bamfiles) {
 	# this will open each bam file using the high level API
 	# with the appropriate installed adapter
@@ -645,92 +646,119 @@ sub check_defaults {
 	if ($use_coverage) {
 		# does not use a callback subroutine
 		undef $callback;
+		print " Recording raw alignment coverage\n";
 	}
 	# start
 	elsif (not $paired and not $do_strand and not $shift and $use_start) {
 		$callback = \&se_start;
+		print " Recording single-end alignment starts\n";
 	}
 	elsif (not $paired and not $do_strand and $shift and $use_start) {
 		$callback = \&se_shift_start;
+		print " Recording single-end shifted alignment starts\n";
 	}
 	elsif (not $paired and $do_strand and not $shift and $use_start) {
 		$callback = \&se_strand_start;
+		print " Recording single-end stranded alignment starts\n";
 	}
 	elsif (not $paired and $do_strand and $shift and $use_start) {
 		$callback = \&se_shift_strand_start;
+		print " Recording single-end shifted, stranded alignment starts\n";
 	}
 	# midpoint
 	elsif (not $paired and not $do_strand and not $shift and $use_mid) {
 		$callback = \&se_mid;
+		print " Recording single-end alignment midpoints\n";
 	}
 	elsif (not $paired and not $do_strand and $shift and $use_mid) {
 		$callback = \&se_shift_mid;
+		print " Recording single-end shifted alignment midpoints\n";
 	}
 	elsif (not $paired and $do_strand and not $shift and $use_mid) {
 		$callback = \&se_strand_mid;
+		print " Recording single-end stranded alignment midpoints\n";
 	}
 	elsif (not $paired and $do_strand and $shift and $use_mid) {
 		$callback = \&se_shift_strand_mid;
+		print " Recording single-end shifted, stranded alignment midpoints\n";
 	}
 	# span
 	elsif (not $paired and not $do_strand and not $shift and $use_span) {
 		$callback = \&se_span;
+		print " Recording single-end alignment span\n";
 	}
 	elsif (not $paired and not $do_strand and $shift and $use_span) {
 		$callback = \&se_shift_span;
+		print " Recording single-end shifted alignment span\n";
 	}
 	elsif (not $paired and $do_strand and not $shift and $use_span) {
 		$callback = \&se_strand_span;
+		print " Recording single-end stranded alignment span\n";
 	}
 	elsif (not $paired and $do_strand and $shift and $use_span) {
 		$callback = \&se_shift_strand_span;
+		print " Recording single-end shifted, stranded alignment span\n";
 	}
 	# center span
 	elsif (not $paired and not $do_strand and not $shift and $use_cspan) {
 		$callback = \&se_center_span;
+		print " Recording single-end alignment center-span\n";
 	}
 	elsif (not $paired and not $do_strand and $shift and $use_cspan) {
 		$callback = \&se_shift_center_span;
+		print " Recording single-end shifted alignment center-span\n";
 	}
 	elsif (not $paired and $do_strand and not $shift and $use_cspan) {
 		$callback = \&se_strand_center_span;
+		print " Recording single-end stranded alignment center-span\n";
 	}
 	elsif (not $paired and $do_strand and $shift and $use_cspan) {
 		$callback = \&se_shift_strand_center_span;
+		print " Recording single-end shifted, stranded alignment center-span\n";
 	}
 	# extend
 	elsif (not $paired and not $do_strand and not $shift and $use_extend) {
 		$callback = \&se_extend;
+		print " Recording single-end extended alignment span\n";
 	}
 	elsif (not $paired and not $do_strand and $shift and $use_extend) {
 		$callback = \&se_shift_extend;
+		print " Recording single-end shifted, extended alignment span\n";
 	}
 	elsif (not $paired and $do_strand and not $shift and $use_extend) {
 		$callback = \&se_strand_extend;
+		print " Recording single-end stranded, extended alignment span\n";
 	}
 	elsif (not $paired and $do_strand and $shift and $use_extend) {
 		$callback = \&se_shift_strand_extend;
+		print " Recording single-end shifted, stranded, extended alignment span\n";
 	}
 	# paired-end midpoint
 	elsif ($paired and not $do_strand and $use_mid) {
 		$callback = \&pe_mid;
+		print " Recording paired-end fragment midpoint\n";
 	}
 	elsif ($paired and $do_strand and $use_mid) {
 		$callback = \&pe_strand_mid;
+		print " Recording paired-end stranded fragment midpoint\n";
 	}
 	# paired-end span
 	elsif ($paired and not $do_strand and $use_span) {
 		$callback = \&pe_span;
+		print " Recording paired-end fragment span\n";
 	}
 	elsif ($paired and $do_strand and $use_span) {
 		$callback = \&pe_strand_span;
+		print " Recording paired-end stranded, fragment span\n";
 	}
 	# paired-end span
 	elsif ($paired and not $do_strand and $use_cspan) {
 		$callback = \&pe_center_span;
+		print " Recording paired-end fragment center-span\n";
 	}
 	elsif ($paired and $do_strand and $use_cspan) {
 		$callback = \&pe_strand_center_span;
+		print " Recording paired-end stranded, fragment center-span\n";
 	}
 	else {
 		die "programmer error!\n" unless $shift; # special exception
@@ -1638,7 +1666,7 @@ sub parallel_process_alignments {
 			# determine scaling factor
 			my $scale_factor = 1;
 			if ($rpm) {
-				printf " Normalizing depth based on %s total counted alignments\n",
+				printf " Normalizing depth based on %s total counted $items\n",
 					format_with_commas($totals[0]); 
 				$scale_factor = 1_000_000 / $totals[0];
 			}
@@ -1911,11 +1939,11 @@ sub write_final_wig_file {
 	
 	# print total alignment summaries
 	if ($r_total) {
-		printf " %s total forward alignments\n", format_with_commas($f_total);
-		printf " %s total reverse alignments\n", format_with_commas($r_total);
+		printf " %s total forward $items\n", format_with_commas($f_total);
+		printf " %s total reverse $items\n", format_with_commas($r_total);
 	}
 	else {
-		printf " %s total alignments\n", format_with_commas($f_total);
+		printf " %s total $items\n", format_with_commas($f_total);
 	}
 	
 	# write wig files with the appropriate wig writer
