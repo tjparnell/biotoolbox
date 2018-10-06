@@ -5,9 +5,9 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use List::Util qw(sum);
 use File::Spec;
 use File::Temp;
+use List::Util qw(sum0);
 use List::MoreUtils qw(natatime);
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -1005,8 +1005,8 @@ sub scan_high_coverage {
 	# score 500 bp intervals for coverage
 	my %pos2depth;
 	for (my $start = 0; $start < int($chr_length/10); $start += 50) {
-		my $readsum = sum( map { $data{f}->[$_] || 0 } ($start .. $start + 49) );
-		my $readsum += sum( map { $data{r}->[$_] || 0 } ($start .. $start + 49) );
+		my $readsum = sum0( map { $data{f}->[$_] || 0 } ($start .. $start + 49) );
+		my $readsum += sum0( map { $data{r}->[$_] || 0 } ($start .. $start + 49) );
 		next if $readsum == 0;
 		$pos2depth{$start} = $readsum;
 	}
@@ -1173,7 +1173,7 @@ sub write_model_file {
 
 
 sub mean {
-	return sum(@_) / scalar(@_);
+	return sum0(@_) / scalar(@_);
 }
 
 sub open_wig_file {
@@ -1440,7 +1440,7 @@ sub process_alignments {
 			}
 			elsif ($rpm and not $do_mean) {
 				# scale them all the same
-				my $factor = 1_000_000 / ( sum(@totals) * scalar(@sams) );
+				my $factor = 1_000_000 / ( sum0(@totals) * scalar(@sams) );
 				foreach (@sams) {
 					push @norms, $factor;
 				}
@@ -1589,7 +1589,7 @@ sub parallel_process_alignments {
 			}
 			elsif ($rpm and not $do_mean) {
 				# scale them all the same
-				my $factor = 1_000_000 / ( sum(@totals) * scalar(@sams) );
+				my $factor = 1_000_000 / ( sum0(@totals) * scalar(@sams) );
 				foreach (@sams) {
 					push @norms, $factor;
 				}
