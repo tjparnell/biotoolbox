@@ -2717,24 +2717,19 @@ sub pe_strand_mid {
 	my ($a, $data, $score) = @_;
 	my $mid = int( ($a->pos + int( $a->isize / 2 ) ) / $bin_size);
 	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
 	if ($flag & 0x0040) {
-		# first read
-		if ($a->reversed) {
-			$data->{r}->[$mid - $data->{r_offset}] += $score;
-		}
-		else {
-			$data->{f}->[$mid - $data->{f_offset}] += $score;
-		}
+		# first read, forward
+		$data->{f}->[$mid - $data->{f_offset}] += $score;
 	}
 	elsif ($flag & 0x0080) {
-		# second read
-		if ($a->reversed) {
-			$data->{f}->[$mid - $data->{f_offset}] += $score;
-		}
-		else {
-			$data->{r}->[$mid - $data->{r_offset}] += $score;
-		}
+		# second read, reverse
+		$data->{r}->[$mid - $data->{r_offset}] += $score;
 	} 
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 sub pe_span {
@@ -2751,32 +2746,23 @@ sub pe_strand_span {
 	my $start = int($a->pos / $bin_size);
 	my $end = int( ($a->pos + $a->isize) / $bin_size);
 	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
 	if ($flag & 0x0040) {
-		# first read
-		if ($a->reversed) {
-			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
-				$data->{r}->[$_] += $score;
-			}
-		}
-		else {
-			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
-				$data->{f}->[$_] += $score;
-			}
+		# first read, forward
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
+			$data->{f}->[$_] += $score;
 		}
 	}
 	elsif ($flag & 0x0080) {
-		# second read
-		if ($a->reversed) {
-			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
-				$data->{f}->[$_] += $score;
-			}
-		}
-		else {
-			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
-				$data->{r}->[$_] += $score;
-			}
+		# second read, reverse
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
+			$data->{r}->[$_] += $score;
 		}
 	} 
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 sub pe_center_span {
@@ -2797,32 +2783,23 @@ sub pe_strand_center_span {
 	$start = 0 if $start < 0;
 	my $end = int( ($position + $half_extend) / $bin_size);
 	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
 	if ($flag & 0x0040) {
-		# first read
-		if ($a->reversed) {
-			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
-				$data->{r}->[$_] += $score;
-			}
-		}
-		else {
-			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
-				$data->{f}->[$_] += $score;
-			}
+		# first read, forward
+		foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
+			$data->{f}->[$_] += $score;
 		}
 	}
 	elsif ($flag & 0x0080) {
-		# second read
-		if ($a->reversed) {
-			foreach ($start - $data->{f_offset} .. $end - $data->{f_offset} ) {
-				$data->{f}->[$_] += $score;
-			}
-		}
-		else {
-			foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
-				$data->{r}->[$_] += $score;
-			}
+		# second read, reverse
+		foreach ($start - $data->{r_offset} .. $end - $data->{r_offset} ) {
+			$data->{r}->[$_] += $score;
 		}
 	} 
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 
