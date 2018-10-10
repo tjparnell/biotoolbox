@@ -574,8 +574,27 @@ sub check_defaults {
 			die " Please define an output filename when providing multiple bam files!\n";
 		}
 	}
-	$outbase = $outfile;
+	(undef, my $outdir, $outbase) = File::Spec->splitpath($outfile);
 	$outbase =~ s/\.(?:wig|bdg|bedgraph|bw|bigwig)(?:\.gz)?$//i; # strip extension if present
+	$outfile =~ s/\.(?:wig|bdg|bedgraph|bw|bigwig)(?:\.gz)?$//i; # strip extension if present
+	
+	
+	# set output temporary directory
+	if ($tempdir) {
+		unless (-x $tempdir and -d _ and -w _ ) {
+			die " Specified temp directory '$tempdir' either does not exist or is not writeable!\n";
+		}
+		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$tempdir, CLEANUP=>1);
+	}
+	else {
+		# use the base path of the output wig file identified above
+		unless ($outdir) {
+			$outdir = File::Spec->curdir;
+		}
+		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$outdir, CLEANUP=>1);
+	}
+	# reassemble outbase file
+	$outbase = File::Spec->catfile($tempdir, $outbase);
 	
 	
 	# determine output format
@@ -622,25 +641,7 @@ sub check_defaults {
 	# set the initial main callback for processing alignments
 	$main_callback = $fastpaired ? \&fast_pe_callback : $paired ? \&pe_callback : 
 		\&se_callback;
-	
-	
-	# set output temporary directory
-	if ($tempdir) {
-		unless (-x $tempdir and -d _ and -w _ ) {
-			die " Specified temp directory '$tempdir' either does not exist or is not writeable!\n";
-		}
-		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$tempdir, CLEANUP=>1);
-	}
-	else {
-		# use the base path of the output bam file
-		my (undef, $dir, $file) = File::Spec->splitpath($outfile);
-		unless ($dir) {
-			$dir = File::Spec->curdir;
-		}
-		$tempdir = File::Temp->newdir("bam2wigTEMP_XXXX", DIR=>$dir, CLEANUP=>1);
-	}
-	
-	
+		
 	### Determine the alignment recording callback method
 	# coverage
 	if ($use_coverage) {
@@ -1267,7 +1268,7 @@ sub process_bam_coverage {
 		
 		# find the children
 		my %files;
-		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
+		my @filelist = glob("$outbase.*.temp.bin");
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1334,7 +1335,7 @@ sub parallel_process_bam_coverage {
 		
 		# find the children
 		my %files;
-		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
+		my @filelist = glob("$outbase.*.temp.bin");
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1391,15 +1392,11 @@ sub process_bam_coverage_on_chromosome {
 	# write out chromosome binary file, set count to arbitrary 0
 	if ($do_temp_bin) {
 		write_bin_file(\$chrom_data, 
-			File::Spec->catfile($tempdir, 
-			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin'))
-		);
+			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.bin'));
 	}
 	else {
 		&$wig_writer(\$chrom_data, $binpack, $seq_id, $seq_length, 
-			File::Spec->catfile($tempdir,
-			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig') )
-		);
+			join('.', $outbase, $samid, $seq_id, 0, 'f', 'temp.wig'));
 	}
 	
 	# verbose status line 
@@ -1434,7 +1431,7 @@ sub process_alignments {
 		my @totals;
 		my %seq_totals;
 		my %files;
-		my @filelist = glob(File::Spec->catfile($tempdir, "$outbase.*.temp.bin"));
+		my @filelist = glob("$outbase.*.temp.bin");
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1580,7 +1577,7 @@ sub parallel_process_alignments {
 		my @totals;
 		my %seq_totals;
 		my %files;
-		my @filelist = glob(File::Spec->catfile($tempdir,"$outbase.*.temp.bin"));
+		my @filelist = glob("$outbase.*.temp.bin");
 		die " unable to find children files!\n" unless @filelist;
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
@@ -1756,23 +1753,17 @@ sub process_alignments_on_chromosome {
 	if ($do_temp_bin) {
 		# write a temporary binary file for merging later
 		write_bin_file(\$data->{fpack}, 
-			File::Spec->catfile($tempdir,
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') )
-		);
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') );
 		write_bin_file(\$data->{rpack}, 
-			File::Spec->catfile($tempdir,
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin') )
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin')
 		) if $do_strand;
 	}
 	else {
 		# write a chromosome specific wig file
 		&$wig_writer(\$data->{fpack}, $binpack, $seq_id, $seq_length, 
-			File::Spec->catfile($tempdir,
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') )
-		);
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') );
 		&$wig_writer(\$data->{rpack}, $binpack, $seq_id, $seq_length, 
-			File::Spec->catfile($tempdir,
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.wig') ) 
+			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.wig') 
 		) if $do_strand;
 	}
 	
@@ -1868,9 +1859,7 @@ sub merge_bin_files {
 	
 	# now rewrite the merged bin file
 	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, 
-		File::Spec->catfile($tempdir,
-		join('.', $outbase, '0', $seq_id, $total, $strand, 'temp.wig') )
-	);
+		join('.', $outbase, '0', $seq_id, $total, $strand, 'temp.wig') );
 	if ($verbose) {
 		printf "  Merged%s $seq_id temp files in %d seconds\n", 
 			defined $norm_factors->[0] ? " and normalized" : "", time - $merge_start_time;
@@ -1914,7 +1903,7 @@ sub normalize_bin_file {
 sub write_final_wig_file {
 	
 	# find children files
-	my @filelist = glob( File::Spec->catfile($tempdir, "$outbase.*.temp.wig"));
+	my @filelist = glob("$outbase.*.temp.wig");
 	unless (scalar @filelist) {
 		die " can't find children file!\n";
 	}
@@ -1948,21 +1937,22 @@ sub write_final_wig_file {
 	
 	# write wig files with the appropriate wig writer
 	if ($do_strand and !$flip) {
+		
 		if ($cpu > 1) {
 			# we can fork this!!!!
 			my $pm = Parallel::ForkManager->new(2);
 			for my $i (1 .. 2) {
 				$pm->start and next;
-				merge_wig_files("$outbase\_f", @f_filelist) if $i == 1;
-				merge_wig_files("$outbase\_r", @r_filelist) if $i == 2;
+				merge_wig_files("$outfile\_f", @f_filelist) if $i == 1;
+				merge_wig_files("$outfile\_r", @r_filelist) if $i == 2;
 				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
 		}
 		else {
-			merge_wig_files("$outbase\_f", @f_filelist);
-			merge_wig_files("$outbase\_r", @r_filelist);
+			merge_wig_files("$outfile\_f", @f_filelist);
+			merge_wig_files("$outfile\_r", @r_filelist);
 			unlink $chromo_file if $chromo_file;
 		}
 	}
@@ -1972,21 +1962,21 @@ sub write_final_wig_file {
 			my $pm = Parallel::ForkManager->new(2);
 			for my $i (1..2) {
 				$pm->start and next;
-				merge_wig_files("$outbase\_r", @f_filelist) if $i == 1;
-				merge_wig_files("$outbase\_f", @r_filelist) if $i == 2;
+				merge_wig_files("$outfile\_r", @f_filelist) if $i == 1;
+				merge_wig_files("$outfile\_f", @r_filelist) if $i == 2;
 				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
 		}
 		else {
-			merge_wig_files("$outbase\_r", @f_filelist);
-			merge_wig_files("$outbase\_f", @r_filelist);
+			merge_wig_files("$outfile\_r", @f_filelist);
+			merge_wig_files("$outfile\_f", @r_filelist);
 			unlink $chromo_file if $chromo_file;
 		}
 	}
 	else {
-		merge_wig_files($outbase, @f_filelist);
+		merge_wig_files($outfile, @f_filelist);
 		unlink $chromo_file if $chromo_file;
 	}
 }
@@ -2113,9 +2103,9 @@ sub write_varstep {
 }
 
 sub merge_wig_files {
-	my ($outfile, @files) = @_;
+	my ($ofile, @files) = @_;
 	
-	my ($filename1, $fh) = open_wig_file($outfile, 1);
+	my ($filename1, $fh) = open_wig_file($ofile, 1);
 	while (@files) {
 		my $file = shift @files;
 		my $in = open_to_read_fh($file); 
