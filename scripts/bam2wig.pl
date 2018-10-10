@@ -355,6 +355,7 @@ sub check_defaults {
 	if ($extend_value and !$use_extend) {
 		$use_extend = 1 unless ($use_cspan or $position);
 	}
+	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
 
 	
 	# check position
