@@ -412,11 +412,6 @@ sub check_defaults {
 	$max_intron ||= 50000;
 	
 	# incompatible options
-	if ($paired and $use_start) {
-		warn " using start with paired-end reads is not recommended, recording midpoint\n";
-		undef $use_start;
-		$use_mid   = 1;
-	}
 	if ($splice and ($use_extend or $extend_value)) {
 		warn " disabling splices when extend is defined\n";
 		$splice = 0;
@@ -735,6 +730,15 @@ sub check_defaults {
 		$callback = \&se_shift_strand_extend;
 		print " Recording single-end shifted, stranded, extended alignment span\n";
 	}
+	# paired-end start
+	elsif ($paired and not $do_strand and $use_start) {
+		$callback = \&pe_start;
+		print " Recording paired-end fragment start\n";
+	}
+	elsif ($paired and $do_strand and $use_start) {
+		$callback = \&pe_strand_start;
+		print " Recording paired-end stranded fragment start\n";
+	}
 	# paired-end midpoint
 	elsif ($paired and not $do_strand and $use_mid) {
 		$callback = \&pe_mid;
@@ -753,7 +757,7 @@ sub check_defaults {
 		$callback = \&pe_strand_span;
 		print " Recording paired-end stranded, fragment span\n";
 	}
-	# paired-end span
+	# paired-end center span
 	elsif ($paired and not $do_strand and $use_cspan) {
 		$callback = \&pe_center_span;
 		print " Recording paired-end fragment center-span\n";
@@ -2678,9 +2682,29 @@ sub se_shift_strand_extend {
 }
 
 sub pe_start {
+	# this essentially just records the forward start position
+	# it ignores sequencing orientation
+	my ($a, $data, $score) = @_;
+	$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
 }
 
 sub pe_strand_start {
+	my ($a, $data, $score) = @_;
+	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
+	if ($flag & 0x0040) {
+		# first read, forward
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	}
+	elsif ($flag & 0x0080) {
+		# second read, reverse
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{r}->[$pos - $data->{r_offset}] += $score;
+	}
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 sub pe_mid {
