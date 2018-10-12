@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.52';
+our $VERSION = '1.63';
 
 =head1 NAME
 
@@ -116,6 +116,14 @@ Provide an anonymous array of SeqFeature objects to add as child
 objects. 
 
 =back
+
+=item duplicate
+
+This method will duplicate a SeqFeature object as a new object, with 
+limitations. The C<primary_id> tag, attribute key/values, and subfeatures 
+are B<not> duplicated. This basically limits the object to coordinates, 
+C<primary_tag>, C<source_tag>, C<display_name>, C<score>, and C<phase>. 
+Remaining attributes should be explicitly set by the user.
 
 =head2 Accession methods
 
@@ -267,6 +275,11 @@ Pass one or more SeqFeature objects to be associated as children.
 =item segments
 
 Returns an array of all sub SeqFeature objects.
+
+=item delete_SeqFeature($id)
+
+This method will delete a specific child SeqFeature. Pass the method the 
+C<primary_id> of the SeqFeature. All SeqFeatures will have a C<primary_id>. 
 
 =back
 
@@ -597,6 +610,22 @@ sub phase {
 	return defined $self->[PHASE] ? $self->[PHASE] : undef;
 }
 
+sub duplicate {
+	my $self = shift;
+	my $n = $self->new(
+		-seq_id         => $self->[SEQID],
+		-start          => $self->[START],
+		-end            => $self->[STOP],
+		-strand         => $self->strand,
+		-type           => $self->primary_tag,
+		-source         => $self->source_tag,
+		-display_name   => $self->name
+	);
+	$n->score( $self->[SCORE] ) if defined $self->[SCORE];
+	$n->phase( $self->[PHASE] ) if defined $self->[PHASE];
+	return $n;
+}
+
 sub add_SeqFeature {
 	my $self = shift;
 	$self->[SUBF] ||= [];
@@ -624,6 +653,26 @@ sub get_SeqFeatures {
 		push @children, $_;
 	}
 	return wantarray ? @children : \@children;
+}
+
+sub delete_SeqFeature {
+	my $self = shift;
+	return unless $self->[SUBF];
+	my $id = shift;
+	my $d;
+	my $i = 0;
+	foreach (@{ $self->[SUBF] }) {
+		if ($_->[ID] eq $id) {
+			$d = $i;
+			last;
+		}
+		$i++;
+	}
+	if (defined $d) {
+		splice(@{$self->[SUBF]}, $d, 1);
+		return 1;
+	}
+	return;
 }
 
 sub add_tag_value {
