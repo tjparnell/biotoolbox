@@ -1185,7 +1185,7 @@ sub get_stop_codon {
 	return $stop_codon if $stop_codon;
 	
 	# otherwise we have to build one
-	# this entirely presumes that the stop codon is inclusive to the last cds
+	# this entirely presumes that the stop codon is exclusive to the last cds
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
 	if ($transcript->strand >= 0) {
@@ -1193,8 +1193,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[-1]->end - 2,
-				-end           => $cdss->[-1]->end,
+				-start         => $cdss->[-1]->end + 1,
+				-end           => $cdss->[-1]->end + 3,
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1205,8 +1205,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[0]->start,
-				-end           => $cdss->[0]->start + 2,
+				-start         => $cdss->[0]->start - 3,
+				-end           => $cdss->[0]->start - 1,
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
