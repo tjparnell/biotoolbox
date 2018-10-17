@@ -33,7 +33,7 @@ my $PARAMETRIC    = 1;
 my $ORDINAL       = 0;
 	
 use constant LOG10 => log(10);
-my $VERSION = '1.33';
+my $VERSION = '1.63';
 
 print "\n This program will correlate positions of occupancy between two datasets\n\n";
 
@@ -204,10 +204,10 @@ sub check_defaults {
 	if (defined $position) {
 		# check the position value
 		unless (
+			$position eq 'm' or
 			$position == 5 or
 			$position == 3 or
-			$position == 4 or
-			$position eq 'm'
+			$position == 4
 		) {
 			die " Unknown relative position '$position'!\n";
 		}
@@ -219,7 +219,7 @@ sub check_defaults {
 	}
 
 	unless (defined $interpolate) {
-		$interpolate = 1;
+		$interpolate = 0;
 	}
 
 	if ($norm_method) {
@@ -241,8 +241,7 @@ sub check_defaults {
 	}
 
 	if ($parallel) {
-		# conservatively enable 2 cores
-		$cpu ||= 2;
+		$cpu ||= 4;
 	}
 	else {
 			# disable cores
@@ -407,20 +406,6 @@ sub collect_correlations {
 	my $stream = $Data->row_stream;
 	while (my $row = $stream->next_row) {
 		
-		
-		# determine reference point
-		my $ref_point;
-		if ($position == 5) {
-			$ref_point = $row->strand >= 0 ? $row->start : $row->end;
-		}
-		elsif ($position == 4) {
-			$ref_point = int( ( ( $row->start + $row->end ) / 2 ) + 0.5);
-		}
-		elsif ($position == 3) {
-			$ref_point = $row->strand >= 0 ? $row->end : $row->start;
-		}
-		
-		
 		# Collect positioned data
 		my %ref_pos2data;
 		my %test_pos2data;
@@ -428,37 +413,31 @@ sub collect_correlations {
 			# collecting data in a radius around a reference point
 			
 			# collect data
-			%ref_pos2data = $row->get_position_scores(
-				'ddb'       => $ddb,
-				'dataset'   => $refDataSet,
-				'start'     => $ref_point - (2 * $radius),
-				'stop'      => $ref_point + (2 * $radius),
-				'position'  => $position, 
-				'value'     => 'score',
+			%ref_pos2data = $row->get_relative_point_position_scores(
+				ddb       => $ddb,
+				dataset   => $refDataSet,
+				position  => $position,
+				extend    => (2 * $radius),
 			);
-			%test_pos2data = $row->get_position_scores(
-				'ddb'       => $ddb,
-				'dataset'   => $testDataSet,
-				'start'     => $ref_point - (2 * $radius),
-				'stop'      => $ref_point + (2 * $radius),
-				'position'  => $position, 
-				'value'     => 'score',
+			%test_pos2data = $row->get_relative_point_position_scores(
+				ddb       => $ddb,
+				dataset   => $testDataSet,
+				position  => $position,
+				extend    => (2 * $radius),
 			);
 		}
 		else {
 			# just collect data over the region
 			# collect data
-			%ref_pos2data = $row->get_position_scores(
-				'ddb'       => $ddb,
-				'dataset'   => $refDataSet,
-				'position'  => $position, 
-				'value'     => 'score',
+			%ref_pos2data = $row->get_region_position_scores(
+				ddb       => $ddb,
+				dataset   => $refDataSet,
+				position  => $position,
 			);
-			%test_pos2data = $row->get_position_scores(
-				'ddb'       => $ddb,
-				'dataset'   => $testDataSet,
-				'position'  => $position, 
-				'value'     => 'score',
+			%test_pos2data = $row->get_region_position_scores(
+				ddb       => $ddb,
+				dataset   => $testDataSet,
+				position  => $position,
 			);
 		}
 		
@@ -511,19 +490,19 @@ sub collect_correlations {
 			# convert to rank values
 			# essentially a Spearman's rank correlation
 			normalize_values_by_rank(\%ref_pos2data);
-			normalize_values_by_rank(\%ref_pos2data);
+			normalize_values_by_rank(\%test_pos2data);
 		}
 		elsif ($norm_method =~ /sum/i) {
 			# normalize the sums of both
 			# good for read counts
 			normalize_values_by_sum(\%ref_pos2data);
-			normalize_values_by_sum(\%ref_pos2data);
+			normalize_values_by_sum(\%test_pos2data);
 		}
 # 		elsif ($norm_method =~ /median/i) {
 # 			# median scale the values to normalize
 # 			# just another way
 # 			normalize_values_by_median(\%ref_pos2data);
-# 			normalize_values_by_median(\%ref_pos2data);
+# 			normalize_values_by_median(\%test_pos2data);
 # 		}
 		
 		
@@ -766,33 +745,39 @@ sub calculate_optimum_shift {
 	# we will calculate a Pearson correlation for each shift
 	# calculating window of 2*radius, shifting 2*radius across region
 	my %shift2pearson;
-	for (
-		my $shift = 0 - $radius; 
-		$shift <= $radius;
-		$shift++
-	) {
-		# shift is from -1radius to +1radius
-		# starting point is at -1radius to +1radius
-		# so adding together we get first window from -2radius to 0
-		# and last window is from 0 to +2radius
-		# this will be compared to the reference window, which does not move
+	for my $shift (1 .. $radius) {
+		# we will test shifts incrementally from 0 to radius in both directions
 		
-		# generate the array of test values
-		my @test_data; 
+		## forward shift
+		my @test_data;
 		for my $i ((0 - $radius + $shift) .. ($radius + $shift)) {
 			push @test_data, $test_pos2data->{$i} || 0;
 		}
-		
 		# check the test array
 		if ( min(@test_data) == max(@test_data) ) {
 			# no variance!
 			next;
 		}
-		
 		# calculate Pearson correlation
 		my $pearson = calculate_pearson($ref_data, \@test_data); 
-		if (defined $pearson and $pearson > 0.6) {
+		if (defined $pearson and $pearson > 0.5) {
 			$shift2pearson{$shift} = $pearson;
+		}
+		
+		## Reverse shift
+		@test_data = ();
+		for my $i ((0 - $radius - $shift) .. ($radius - $shift)) {
+			push @test_data, $test_pos2data->{$i} || 0;
+		}
+		# check the test array
+		if ( min(@test_data) == max(@test_data) ) {
+			# no variance!
+			next;
+		}
+		# calculate Pearson correlation
+		my $pearson = calculate_pearson($ref_data, \@test_data); 
+		if (defined $pearson and $pearson > 0.5) {
+			$shift2pearson{$shift * -1} = $pearson;
 		}
 	}
 	
@@ -802,7 +787,7 @@ sub calculate_optimum_shift {
 	foreach my $shift (keys %shift2pearson) {
 		if ($shift2pearson{$shift} == $best_r) {
 			# same as before
-			if ($best_shift != 1000000 and $shift < $best_shift) {
+			if ($best_shift != 1000000 and abs($shift) < abs($best_shift)) {
 				# if it's a lower shift, then keep it, 
 				# but not if it's original
 				$best_r = $shift2pearson{$shift};
@@ -1007,7 +992,7 @@ The command line flags and descriptions:
 Specify the input file of features. The features may be comprised of 
 name and type, or chromosome, start, and stop. Strand information is 
 optional, but is respected if included. A feature list may be 
-generated with the program B<get_features.pl>. The file may be 
+generated with the program L<get_features.pl>. The file may be 
 compressed with gzip.
 
 =item --out <filename>
@@ -1016,19 +1001,18 @@ Specify the output filename. By default it rewrites the input file.
 
 =item --db <name | filename>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
+Specify the name of a L<Bio::DB::SeqFeature::Store> annotation database 
 from which gene or feature annotation may be derived. A database is 
 required for generating new data files with features. This option may 
 skipped when using coordinate information from an input file (e.g. BED 
 file), or when using an existing input file with the database indicated 
-in the metadata. For more information about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+in the metadata. 
 
 =item --ddb <name | filename>
 
 If the data to be collected is from a second database that is separate 
 from the annotation database, provide the name of the data database here. 
-Typically, a second C<Bio::DB::SeqFeature::Store> or BigWigSet database 
+Typically, a second L<Bio::DB::SeqFeature::Store> or BigWigSet database 
 is provided here. 
 
 =item --ref <type | filename>
@@ -1044,7 +1028,7 @@ not provided, they may be interactively chosen from the database.
 
 Perform an ANOVA analysis between the test and reference data sets and 
 report a P-value. By default, this performs a dependent, parametric 
-ANOVA. This requires the C<Statistic::ANOVA> module to be installed. 
+ANOVA. This requires the L<Statistic::ANOVA> module to be installed. 
 Please refer to the module documentation for details. If your needs 
 require a change to the test, you may edit the parameters at the top 
 of this script. For convenience, the P-values are reported as -Log10(P) 
@@ -1092,11 +1076,11 @@ the direction of the reported shift. This requires the presence of a
 data column in the input file with strand information. The default is 
 no enforcement of strand.
 
-=item --(no)interpolate
+=item --interpolate
 
 Interpolate missing or zero positioned values in each window for both 
-reference and test data. This will improve the Pearson correlation 
-values, especially for sparse data. Enabled by default.
+reference and test data. This may improve the Pearson correlation 
+values, particularly for sparse point data.
 
 =item --gz
 
