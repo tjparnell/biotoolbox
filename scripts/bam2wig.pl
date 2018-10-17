@@ -564,7 +564,7 @@ sub check_defaults {
 	unless ($outfile) {
 		if (scalar @bamfiles == 1) {
 			$outfile = $bamfiles[0];
-			$outfile =~ s/\.bam$//;
+			$outfile =~ s/\.(?:b|cr)am$//;
 		}
 		else {
 			die " Please define an output filename when providing multiple bam files!\n";
