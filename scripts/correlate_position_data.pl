@@ -63,7 +63,6 @@ my (
 	$position,
 	$set_strand,
 	$norm_method,
-	$interpolate,
 	$gz,
 	$cpu,
 	$help,
@@ -85,7 +84,6 @@ GetOptions(
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
 	'norm=s'      => \$norm_method, # method of normalization
-	'interpolate!' => \$interpolate, # interpolate the position data
 	'gz!'         => \$gz, # compress output
 	'cpu=i'       => \$cpu, # number of execution threads
 	'help'        => \$help, # request help
@@ -216,10 +214,6 @@ sub check_defaults {
 	else {
 		# default position to use the midpoint
 		$position = 4;
-	}
-
-	unless (defined $interpolate) {
-		$interpolate = 0;
 	}
 
 	if ($norm_method) {
@@ -443,17 +437,8 @@ sub collect_correlations {
 		
 		# Verify minimum data count 
 		if (
-			(
-				not $interpolate and (
-					scalar(keys %ref_pos2data) < 5 or 
-					scalar(keys %test_pos2data) < 5
-					# 5 is an arbitrary minimum number
-				)
-			) or
-			(
 				sum( map {abs $_} values %ref_pos2data ) == 0 or 
 				sum( map {abs $_} values %test_pos2data ) == 0
-			)
 		) {
 			# not enough data points to work with
 			$row->value($r_i, '.');
@@ -474,16 +459,6 @@ sub collect_correlations {
 		}
 		
 		
-		# Interpolate data points
-		# this will improve calculating Pearson values 
-		# especially when data is sparse
-		if ($interpolate) {
-			# pass the data reference and the region length
-			interpolate_values(\%ref_pos2data, $row->length);
-			interpolate_values(\%test_pos2data, $row->length);
-		}
-		
-		
 		# Normalize the data
 		# there are couple ways to do this
 		if ($norm_method =~ /rank/i) {
@@ -498,12 +473,6 @@ sub collect_correlations {
 			normalize_values_by_sum(\%ref_pos2data);
 			normalize_values_by_sum(\%test_pos2data);
 		}
-# 		elsif ($norm_method =~ /median/i) {
-# 			# median scale the values to normalize
-# 			# just another way
-# 			normalize_values_by_median(\%ref_pos2data);
-# 			normalize_values_by_median(\%test_pos2data);
-# 		}
 		
 		
 		# Collect the (normalized) data from the position data
@@ -607,7 +576,6 @@ sub add_new_columns {
 	# extra information
 	$Data->metadata($r_i, 'data_database', $data_database) if $data_database;
 	$Data->metadata($r_i, 'normalization', $norm_method) if $norm_method;
-	$Data->metadata($r_i, 'interpolate', 1) if $interpolate;
 	if ($radius) {
 		$Data->metadata($r_i, 'radius', $radius);
 		$Data->metadata($r_i, 'reference_point', $position == 5 ? 
@@ -650,90 +618,6 @@ sub add_new_columns {
 	# record the indices
 	return ($r_i, $p_i, $shift_i, $shiftr_i);
 }
-
-
-sub interpolate_values {
-	# the point of this is to interpolate scores at positions where no 
-	# actual score was collected
-	
-	# the actual size of the collected data region is determined by the 
-	# radius value, in other words whether we collected data in radius 
-	# around a reference point or just for the requested region
-	
-	# initiate
-	my $data = shift;
-	my $length = shift;
-	my $limit; # the length of the data requested
-	if ($radius) {
-		$limit = 2 * $radius; # hard encoded, that's what we're working with
-	}
-	else {
-		$limit = $length;
-	}
-	
-	# Fill out the data so that we have all elements filled
-	for (
-		my $i = $radius ? 0 - $limit : 1;
-		# the starting point depends on whether we collected in a 
-		# radius or just the region itself
-		$i <= $limit; 
-		$i++
-	) {
-		unless (exists $data->{$i}) {
-			# using default value of zero
-			$data->{$i} = 0;
-		}
-	}
-	
-	# Interpolate data
-	my $i = $radius ? 0 - $limit : 1; # starting point
-	while ($i <= $limit) {
-		# walk through the data
-		# we're not using a for loop here because we may interpolate
-		# more than one element at a time
-		
-		
-		# Look for zero values
-		if ($data->{$i} == 0) {
-			# we have a zero value
-			
-			# find the next non-zero value to interpolate
-			my $next = $i + 1;
-			while ($next < $limit) {
-				last if ($data->{$next} != 0); # we found it
-				$next++;
-			}
-			
-			# check if we reached the limit
-			if ($next == $limit) {
-				# that's it, nothing left to interpolate
-				# return what we have
-				return;
-			}
-			
-			# determine fractional number
-			# difference between next non-zero number and previous number
-			# divided by the number of elements in between
-			my $fraction = ($data->{$next} - $data->{$i - 1}) / 
-				(abs($next - $i) + 1);
-			
-			# apply fractions
-			for (my $n = $i; $n < $next; $n++) {
-				$data->{$n} = $data->{$i - 1} + ($fraction * (abs($n - $i) + 1));
-			}
-			
-			# reset for next round
-			$i = $next + 1;
-		}
-		
-		else {
-			# a non-zero number, no interpolation necessary, next please
-			$i++;
-		}
-	}
-	# done, just return
-}
-
 
 
 sub calculate_optimum_shift {
@@ -975,7 +859,6 @@ correlate_position_data.pl [--options] <filename>
   --pos [5|m|3]                 (m)
   --norm [rank|sum]
   --force_strand
-  --(no)interpolate
   --cpu                         (2)
   --gz
   --version
@@ -1076,12 +959,6 @@ the direction of the reported shift. This requires the presence of a
 data column in the input file with strand information. The default is 
 no enforcement of strand.
 
-=item --interpolate
-
-Interpolate missing or zero positioned values in each window for both 
-reference and test data. This may improve the Pearson correlation 
-values, particularly for sparse point data.
-
 =item --gz
 
 Specify whether (or not) the output file should be compressed with gzip.
@@ -1109,26 +986,32 @@ genomic position, indicating a change in nucleosome position.
 Two statistics may be calculated. First, it will calculate a a Pearson
 linear correlation coefficient (r value) between the datasets (default). 
 Additionally, an ANOVA analysis may be performed between the datasets and 
-generate a P-value.  
+generate a P-value. 
 
 By default, the correlation is determined between the data points 
 collected over the entire length of the feature. Alternatively, a 
 radius and reference point (default is midpoint) may be provided 
 that sets the window for collecting scores and calculating a correlation.
 
-To ensure a more reliable Pearson value, missing values or values of 
-zero are interpolated from neighboring values, when possible. Also, 
-values may be normalized using one of two methods. The values may be 
+In general, to ensure a more reliable Pearson value, fragment ChIP or 
+nucleosome coverage should be used rather than point (start or midpoint) 
+data, as it will give more reliable results. Fragment coverage is more 
+akin to smoothened data and gives better results than interpolated point 
+data. 
+
+Normalized read-depth data should be used when possible. If necessary, 
+Values can be normalized using one of two methods. The values may be 
 converted to rank positions (compare to Kendall's tau), or scaled such 
 that the absolute sum values are equal (for example, when working with 
 sequence tag read counts).
 
 In addition to calculating a correlation coefficient, an optimal shift 
 may also be calculated. This essentially shifts the data, 1 bp at a time, 
-in order to identify a shift that would produce a higher correlation. 
-The window is shifted from -2 radius to +2 radius relative to the 
-reference point, and the highest correlation is reported along with the 
-shift value that generated it.
+in order to identify a shift that would produce a higher correlation. In 
+other words, what amount of movement to the left or right would make the 
+test data look like the reference data? The window is shifted from -2 
+radius to +2 radius relative to the reference point, and the highest 
+correlation is reported along with the shift value that generated it. 
 
 =head1 AUTHOR
 
