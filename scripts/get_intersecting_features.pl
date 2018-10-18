@@ -91,7 +91,7 @@ unless ($reference_position) {
 	$reference_position = 'start';
 }
 unless ($adjustment_position) {
-	$reference_position = '5';
+	$adjustment_position = '5';
 }
 unless (defined $gz) {
 	$gz = 0;
@@ -296,12 +296,11 @@ sub intersect_named_features {
 			# this segment will have strand
 		}
 		
-		# sanity check
-		$region->start(1) if $region->start <= 0;
 		
 		# check region
 		if ($region) {
 			# succesfully established a region, find features
+			$region->start(1) if $region->start <= 0; # sanity check
 			process_region(
 				$region,
 				$feature->strand, 	# the region may not support strand

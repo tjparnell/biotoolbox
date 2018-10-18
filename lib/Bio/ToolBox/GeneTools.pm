@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.62';
+our $VERSION = '1.63';
 
 =head1 NAME
 
@@ -631,8 +631,12 @@ sub get_exons {
 	}
 	elsif (@cdss) {
 		# duplicate the CDSs as exons
-		@list = map { _duplicate($_) } @cdss;
-		foreach (@list) {$_->primary_tag('exon')} # reset tag
+		foreach (@cdss) {
+			my $e = $_->duplicate;
+			$e->primary_tag('exon'); # reset tag
+			$e->phase('.'); # no phase
+			push @list, $e;
+		}
 		
 		# make sure to merge adjacent exons
 		@list = map { $_->[0] } # must sort first
@@ -837,8 +841,7 @@ sub _get_alt_common_things {
 	foreach my $t (@transcripts) {
 		my @things = $do_exon ? get_exons($t) : get_introns($t);
 		foreach my $e (@things) {
-			my $new_e =  _duplicate($e);
-			$new_e->display_name( $e->display_name ); # keep the exon name
+			my $new_e =  $e->duplicate;
 			$pos2things{$e->start}{$e->end}{$t->display_name} = $new_e;
 		}
 		$tx2things{ $t->display_name } = [];
@@ -1182,7 +1185,7 @@ sub get_stop_codon {
 	return $stop_codon if $stop_codon;
 	
 	# otherwise we have to build one
-	# this entirely presumes that the stop codon is inclusive to the last cds
+	# this entirely presumes that the stop codon is exclusive to the last cds
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
 	if ($transcript->strand >= 0) {
@@ -1190,8 +1193,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[-1]->end - 2,
-				-end           => $cdss->[-1]->end,
+				-start         => $cdss->[-1]->end + 1,
+				-end           => $cdss->[-1]->end + 3,
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1202,8 +1205,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[0]->start,
-				-end           => $cdss->[0]->start + 2,
+				-start         => $cdss->[0]->start - 3,
+				-end           => $cdss->[0]->start - 1,
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1267,7 +1270,7 @@ sub get_utrs {
 			my $exon = shift @exons;
 			if ($exon->end < $firstCDS->start) {
 				# whole exon is UTR
-				my $utr = _duplicate($exon);
+				my $utr = $exon->duplicate;
 				$utr->primary_tag( 
 					$transcript->strand >= 0 ? 'five_prime_UTR' : 'three_prime_UTR' );
 				$utr->display_name( $exon->display_name . '.utr' );
@@ -1303,7 +1306,7 @@ sub get_utrs {
 			}
 			elsif ($exon->start > $lastCDS->end) {
 				# whole exon is UTR
-				my $utr = _duplicate($exon);
+				my $utr = $exon->duplicate;
 				$utr->primary_tag( 
 					$transcript->strand >= 0 ? 'three_prime_UTR' : 'five_prime_UTR' );
 				$utr->display_name( $exon->display_name . '.utr' );
@@ -1699,20 +1702,6 @@ sub filter_transcript_biotype {
 
 
 #### internal methods
-
-# internal method to duplicate a seqfeature object with just the essential stuff
-# sometimes we just don't want to bring along all this cruft....
-sub _duplicate {
-	my $f = shift;
-	return $f->new(
-		-seq_id         => $f->seq_id,
-		-start          => $f->start,
-		-end            => $f->end,
-		-strand         => $f->strand,
-		-primary_tag    => $f->primary_tag,
-		-source         => $f->source_tag,
-	);
-}
 
 sub _process_ucsc_transcript {
 	my $transcript = shift;

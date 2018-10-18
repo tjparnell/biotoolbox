@@ -1,5 +1,22 @@
 ######## Bio::ToolBox revision history #############
 
+v1.63
+	- Added minimal Cram file support through the HTS adapter. 
+	Currently only supports the reference fasta listed in the Cram 
+	file header. 
+	- Added fast paired-end option and paired-end start point options 
+	to script bam2wig. Temporary files now written to a temporary 
+	subdirectory, which can be specified. Extreme depth can now be 
+	handled properly by using 32 bit integers instead of 16. Splice 
+	segments can now be fractionally counted. 
+	- Brought back and updated old script correlate_position_data to 
+	identify positional shifts in nucleosome or ChIP signal peaks.
+	- Added new SeqFeature methods to duplicate objects and delete 
+	subfeatures.
+	- Added option to format result numbers in script get_datasets.
+	- Fix numerous small bugs in scripts data2gff, data2fasta, 
+	get_intersecting_features, get_relative_data, and more
+
 v1.62
 	- Added Bed parser with support for bed3-12, bedgraph, narrowPeak,
 	and broadPeak files. Data collection files will now parse bed 

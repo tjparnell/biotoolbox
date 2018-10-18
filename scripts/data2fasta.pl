@@ -13,7 +13,7 @@ eval {
 	$bio = 1;
 };
 
-my $VERSION =  '1.60';
+my $VERSION =  '1.63';
 
 print "\n This program will convert a data file to fasta\n\n";
 
@@ -54,7 +54,7 @@ my (
 # Command line options
 GetOptions( 
 	'i|in=s'          => \$infile, # the solexa data file
-	'O|out=s'         => \$outfile, # name of output file 
+	'o|out=s'         => \$outfile, # name of output file 
 	'd|db|fasta=s'    => \$database, # database name or genomic fasta file
 	'f|feature=s'     => \$feature, # feature from input file
 	'u|subfeature=s'  => \$subfeature, # subfeature to collect sequence
@@ -196,10 +196,12 @@ print " wrote file '$outfile'\n";
 sub write_direct_single_fasta {
 	# concatenate each of the provided sequences
 	my $concat_seq;
-	while (my $row = $Data->next_row) {
+	
+	$Data->iterate( sub {
+		my $row = shift;
 		$concat_seq .= $row->value($seq_i);
 		$concat_seq .= 'N' x $pad if $pad;
-	}
+	} );
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
@@ -217,7 +219,8 @@ sub write_direct_single_fasta {
 sub write_direct_multi_fasta {
 	# write multi-fasta with the provided sequences
 	my $seq_io = open_output_fasta();
-	while (my $row = $Data->next_row) {
+	$Data->iterate( sub {
+		my $row = shift;
 		# create seq object
 		my $seq = Bio::Seq->new(
 			-id     => $row->value($id_i),
@@ -227,7 +230,7 @@ sub write_direct_multi_fasta {
 			$seq->desc( $row->value($desc_i) );
 		}
 		$seq_io->write_seq($seq);
-	}
+	} );
 }
 
 
@@ -252,7 +255,8 @@ sub fetch_seq_and_write_single_fasta {
 	
 	# collect concatenated sequences and write
 	my $concat_seq;
-	while (my $row = $Data->next_row) {
+	$Data->iterate( sub {
+		my $row = shift;
 		
 		# make sure we parse and/or fetch the seqfeature if need be
 		# this isn't necessarily automatic....
@@ -278,7 +282,7 @@ sub fetch_seq_and_write_single_fasta {
 		# concatenate the sequence
 		$concat_seq .= $sequence;
 		$concat_seq .= 'N' x $pad if $pad;
-	}
+	} );
 	
 	# create final sequence object
 	my $seq = Bio::Seq->new(
@@ -317,7 +321,8 @@ sub fetch_seq_and_write_multi_fasta {
 	my $seq_io = open_output_fasta();
 	
 	# collect sequences and write
-	while (my $row = $Data->next_row) {
+	$Data->iterate( sub {
+		my $row = shift;
 		
 		# make sure we parse and/or fetch the seqfeature if need be
 		# this isn't necessarily automatic....
@@ -352,7 +357,7 @@ sub fetch_seq_and_write_multi_fasta {
 		
 		# write out
 		$seq_io->write_seq($seq);
-	}
+	} );
 }
 
 

@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.62';
+my $VERSION = '1.63';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -62,6 +62,7 @@ my (
 	$position,
 	$fpkm_method,
 	$tpm,
+	$format,
 	$win,
 	$step,
 	$set_strand,
@@ -96,6 +97,7 @@ GetOptions(
 	'p|pos=s'          => \$position, # set the relative feature position
 	'fpkm|rpkm=s'      => \$fpkm_method, # set the fpkm method  
 	'tpm!'             => \$tpm, # calculate a tpm
+	'r|format=i'       => \$format, # decimal formatting
 	'win=i'            => \$win, # indicate the size of genomic intervals
 	'step=i'           => \$step, # step size for genomic intervals
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
@@ -129,6 +131,7 @@ if ($print_version) {
 }
 
 # Assign default values
+my $formatter;
 set_defaults();
 my $start_time = time;
 my $collapsed = 0; # global value to indicate transcripts are collapsed
@@ -458,9 +461,17 @@ sub set_defaults {
 		# legacy option
 		$subfeature = 'exon';
 	}
+	if ($subfeature and (defined $fstart or defined $start_adj)) {
+		die " Cannot modify coordinates when subfeatures are requested!\n";
+	}
 	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
 		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
 	} 
+	
+	# generate formatter
+	if ($format) {
+		$formatter = '%.' . $format . 'f';
+	}
 }
 
 
@@ -601,6 +612,7 @@ sub get_dataset {
 			'extend'    => $extend,
 			'subfeature' => $subfeature,
 		);
+		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 		$row->value($index, $score);
 	} );
 }
@@ -661,6 +673,7 @@ sub get_adjusted_dataset {
 			'method'    => $method,
 			'stranded'  => $stranded,
 		);
+		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 		$row->value($index, $score);
 	} );
 }
@@ -729,6 +742,7 @@ sub get_fractionated_dataset {
 			'method'    => $method,
 			'stranded'  => $stranded,
 		);
+		$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 		$row->value($index, $score);
 	} );
 }
@@ -929,6 +943,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --force_strand                      use the specified strand in input file
   --fpkm [region|genome]              calculate FPKM using which total count
   --tpm                               calculate TPM values
+  -r --format <integer>               number of decimal places for numbers
   
   Adjustments to features:
   -x --extend <integer>               extend the feature in both directions
@@ -1156,7 +1171,14 @@ are appended as additional columns in the output table.
 =item --tpm
 
 Calculate Transcripts Per Million, a normalization method analogous to FPKM 
-but less biased to sequencing depth. This uses explicitly 
+but less biased to sequencing depth. This uses explicitly the counts collected 
+over the input regions, and not the entire genome.
+
+=item --format E<lt>integerE<gt>
+
+Specify the number of decimal positions to format the collected scores. 
+Default is not to format, often leading to more than the intended 
+significant digits.
 
 =back
 
