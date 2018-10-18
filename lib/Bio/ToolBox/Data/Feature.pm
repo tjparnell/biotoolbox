@@ -126,11 +126,11 @@ The name of the feature.
 
 =item coordinate
 
-Returns a coordinate string formatted as "seqid:start-stop".
+Returns a coordinate string formatted as C<seqid:start-stop>.
 
 =item type
 
-The type of feature. Typically either primary_tag or primary_tag:source_tag. 
+The type of feature. Typically either C<primary_tag> or C<primary_tag:source_tag>. 
 In a GFF3 file, this represents columns 3 and 2, respectively. In annotation 
 databases such as L<Bio::DB::SeqFeature::Store>, the type is used to restrict 
 to one of many different types of features, e.g. gene, mRNA, or exon.
@@ -139,7 +139,7 @@ to one of many different types of features, e.g. gene, mRNA, or exon.
 
 =item primary_id
 
-Here, this represents the primary_ID in the database. Note that this number 
+Here, this represents the C<primary_ID> in the database. Note that this number 
 is generally unique to a specific database, and not portable between databases.
 
 =item length
@@ -178,19 +178,19 @@ in the current data row.
 
 =head2 Special feature attributes
 
-GFF and VCF files have special attributes in the form of key = value pairs. 
+GFF and VCF files have special attributes in the form of key =E<gt> value pairs. 
 These are stored as specially formatted, character-delimited lists in 
 certain columns. These methods will parse this information and return as 
 a convenient hash reference. The keys and values of this hash may be 
 changed, deleted, or added to as desired. To write the changes back to 
-the file, use the rewrite_attributes() to properly write the attributes 
+the file, use the L</rewrite_attributes> to properly write the attributes 
 back to the file with the proper formatting.
 
 =over 4
 
 =item attributes
 
-Generic method that calls either gff_attributes() or vcf_attributes() 
+Generic method that calls either L</gff_attributes> or L</vcf_attributes> 
 depending on the data table format. 
 
 =item gff_attributes
@@ -252,18 +252,18 @@ module.
 
 Returns a SeqFeature object representing the feature or item in 
 the current row. If the SeqFeature object is stored in the parent 
-$Data object, it is retrieved from there. Otherwise, the SeqFeature 
+C<$Data> object, it is retrieved from there. Otherwise, the SeqFeature 
 object is retrieved from the database using the name and 
 type values in the current Data table row. The SeqFeature object 
 is requested from the database named in the general metadata. If 
 an alternate database is desired, you should change it first using  
-the $Data-E<gt>database() method. If the feature name or type is not 
+the C<$Data>-E<gt>database() method. If the feature name or type is not 
 present in the table, then nothing is returned.
 
 See L<Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
 information about working with these objects.
 
-This method normally only works with "named" feature_types in a 
+This method normally only works with "named" feature types in a 
 L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
 information, i.e. chromosome, start, and stop columns, then it will 
 likely be recognized as a "coordinate" feature_type and not work.
@@ -281,7 +281,7 @@ present instead of coordinates, then the feature is first automatically
 retrieved and a Segment returned based on its coordinates. The 
 database named in the general metadata is used to establish the 
 Segment object. If a different database is desired, it should be 
-changed first using the general database() method. 
+changed first using the general L</database> method. 
 
 See L<Bio::DB::SeqFeature::Segment> and L<Bio::RangeI> for more information 
 about working with Segment objects.
@@ -413,7 +413,7 @@ database.
 =item dataset 
 
 Specify the name of the dataset. If a database was specified, then this 
-value would be the I<primary_tag> or I<type:source> feature found in the 
+value would be the C<primary_tag> or C<type:source> feature found in the 
 database. Otherwise, the name of a data file, such as a bam, bigWig, 
 bigBed, or USeq file, would be provided here. This options is required!
 
@@ -559,14 +559,14 @@ database.
 =item dataset 
 
 Specify the name of the dataset. If a database was specified, then this 
-value would be the I<primary_tag> or I<type:source> feature found in the 
+value would be the C<primary_tag> or C<type:source> feature found in the 
 database. Otherwise, the name of a data file, such as a bam, bigWig, 
 bigBed, or USeq file, would be provided here. This options is required!
 
 =item position
 
 Indicate the position of the reference point relative to the Data table 
-Feature. 5 is the 5C<'> coordinate, 3 is the 3C<'> coordinate, and 4 is the 
+Feature. 5 is the 5' coordinate, 3 is the 3' coordinate, and 4 is the 
 midpoint (get it? it's between 5 and 3). Default is 5.
 
 =item extend
@@ -586,7 +586,7 @@ chromosomal coordinates.
 
 =item avoid
 
-Provide a I<primary_tag:source> database feature type to avoid overlapping 
+Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
 scores. Each found score is checked for overlapping features and is 
 discarded if found to do so. The database should be set to use this.
 
@@ -665,7 +665,7 @@ database.
 =item dataset 
 
 Specify the name of the dataset. If a database was specified, then this 
-value would be the I<primary_tag> or I<type:source> feature found in the 
+value would be the C<primary_tag> or C<type:source> feature found in the 
 database. Otherwise, the name of a data file, such as a bam, bigWig, 
 bigBed, or USeq file, would be provided here. This options is required!
 
@@ -737,7 +737,7 @@ chromosomal coordinates.
 
 =item avoid
 
-Provide a I<primary_tag:source> database feature type to avoid overlapping 
+Provide a C<primary_tag> or C<type:source> database feature type to avoid overlapping 
 scores. Each found score is checked for overlapping features and is 
 discarded if found to do so. The database should be set to use this.
 
