@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Statistics::Lite qw(sum min max mean median stddevp);
 use Statistics::Descriptive;
@@ -71,23 +71,23 @@ my (
 
 # Command line options
 GetOptions( 
-	'in=s'        => \$infile, # the input data file
-	'out=s'       => \$outfile, # name of output file 
-	'db=s'        => \$database, # name of database
-	'ddb=s'       => \$data_database, # database containing datasets
-	'ref=s'       => \$refDataSet, # reference dataset
-	'test=s'      => \$testDataSet, # test dataset
-	'pval!'       => \$find_pvalue, # calculate student t-test
-	'shift!'      => \$find_shift, # calculate optimum shift
-	'radius=i'    => \$radius, # for collecting data when shifting
-	'pos=s'       => \$position, # set the relative feature position
+	'i|in=s'        => \$infile, # the input data file
+	'o|out=s'       => \$outfile, # name of output file 
+	'd|db=s'        => \$database, # name of database
+	'D|ddb=s'       => \$data_database, # database containing datasets
+	'r|ref=s'       => \$refDataSet, # reference dataset
+	't|test=s'      => \$testDataSet, # test dataset
+	'pval!'         => \$find_pvalue, # calculate student t-test
+	'shift!'        => \$find_shift, # calculate optimum shift
+	'radius=i'      => \$radius, # for collecting data when shifting
+	'p|pos=s'       => \$position, # set the relative feature position
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
-	'norm=s'      => \$norm_method, # method of normalization
-	'gz!'         => \$gz, # compress output
-	'cpu=i'       => \$cpu, # number of execution threads
-	'help'        => \$help, # request help
-	'version'     => \$print_version, # print the version
+	'norm=s'        => \$norm_method, # method of normalization
+	'z|gz!'         => \$gz, # compress output
+	'c|cpu=i'       => \$cpu, # number of execution threads
+	'h|help'        => \$help, # request help
+	'v|version'     => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
@@ -151,7 +151,7 @@ validate_or_request_dataset();
 my $start_time = time;
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
-	while ($cpu > 1 and $Data->last_row / $cpu < 1000) {
+	while ($cpu > 1 and $Data->last_row / $cpu < 100) {
 		# We need at least 1000 lines in each fork split to make 
 		# it worthwhile to do the split, otherwise, reduce the number of 
 		# splits to something more worthwhile
@@ -846,27 +846,35 @@ A script to calculate correlations between two datasets along the length of a fe
 
 correlate_position_data.pl [--options] <filename>
   
-  Options:
-  --in <filename>
-  --out <filename> 
-  --db <name | filename>
-  --ddb <name | filename>
-  --ref <type | filename>
-  --test <type | filename>
-  --pval
-  --shift
-  --radius <integer>
-  --pos [5|m|3]                 (m)
-  --norm [rank|sum]
-  --force_strand
-  --cpu                         (2)
-  --gz
-  --version
-  --help
+  Options for data files:
+  -i --in <filename>               input file: txt bed etc
+  -o --out <filename>              optional output file, default overwrite 
+  -d --db <name>                   alternate annotation database
+  
+  Options for data sources
+  -D --ddb <name|file>             data or BigWigSet database
+  -r --ref <dataset|filename>      reference data: bw, name, etc
+  -t --test <dataset|filename>     test data: bw, name, etc
+  
+  Options for correlating data
+  --pval                           calculate P-value by ANOVA
+  --shift                          determine optimal shift to match datasets
+  --radius <integer>               radius in bp around reference point to calculate
+  -p --pos [5|m|3]                 reference point to measure correlation (m)
+  --norm [rank|sum]                normalization method between datasets
+  --force_strand                   force an alternate strand
+  
+  General options:
+  -c --cpu <interger>              number of threads (4)
+  -z --gz                          compress output with gz
+  -v --version                     print version and exit
+  -h --help                        show extended documentation
 
 =head1 OPTIONS
 
 The command line flags and descriptions:
+
+=head2 Options for data files
 
 =over 4
 
@@ -891,6 +899,12 @@ skipped when using coordinate information from an input file (e.g. BED
 file), or when using an existing input file with the database indicated 
 in the metadata. 
 
+=back
+
+=head2 Options for data sources
+
+=over 4
+
 =item --ddb <name | filename>
 
 If the data to be collected is from a second database that is separate 
@@ -906,6 +920,12 @@ Define both the reference and test datasets with which to compare and
 correlate. These may be GFF type or name in a database or BigWigSet, or 
 they may be a BigWig or even Bam file. Both options are required. If 
 not provided, they may be interactively chosen from the database.
+
+=back
+
+=head2 Options for correlating data
+
+=over 4
 
 =item --pval
 
@@ -958,6 +978,12 @@ optimal shift. This does not affect the correlation calculation, only
 the direction of the reported shift. This requires the presence of a 
 data column in the input file with strand information. The default is 
 no enforcement of strand.
+
+=back
+
+=head2 General options
+
+=over 4
 
 =item --gz
 
