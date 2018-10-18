@@ -63,6 +63,7 @@ sub get_base_options {
 		},
 		script_files => [
 			'scripts/bam2wig.pl',
+			'scripts/correlate_position_data.pl',
 			'scripts/data2bed.pl',
 			'scripts/data2fasta.pl',
 			'scripts/data2gff.pl',
