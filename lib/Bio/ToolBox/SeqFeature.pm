@@ -117,7 +117,7 @@ objects.
 
 =back
 
-=item duplicate
+=head2 duplicate
 
 This method will duplicate a SeqFeature object as a new object, with 
 limitations. The C<primary_id> tag, attribute key/values, and subfeatures 
