@@ -327,9 +327,9 @@ For home directory installations using the system perl, you should first install
 in your `.bash_profile`, `.bashrc`, or other equivalent file as described. This can 
 also be used for targeted, standalone installations; adjust accordingly. For example,
 
-    curl -L https://cpanmin.us | perl - local::lib App::cpanminus \
+    curl -L https://cpanmin.us | perl - -l $HOME/perl5 local::lib App::cpanminus \
     && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.bash_profile \
-    && . ~/bash_profile
+    && . ~/.bash_profile
 
 For home directory installations using a newer, modern perl (because many vendor OS Perl 
 installations are sadly out of date), please investigate installing your own Perl using 
@@ -398,6 +398,9 @@ the end you will have installed dozens of packages.
     As with HTSlib, this should be able to identify the libBigWig library in standard 
     locations, but with non-standard locations, you may specify the path with the 
     `--libbigwig` option to `Build.PL`. 
+    
+    *NOTE*: The distribution from CPAN will install dozens of unnecessary modules for 
+    remote URL testing. You may be better off installing from [source](https://github.com/Ensembl/Bio-DB-Big/archive/master.zip).
 
 - [Parallel::ForkManager](https://metacpan.org/pod/Parallel::ForkManager)
 
@@ -522,8 +525,10 @@ and solutions that I have encountered that may be useful to someone.
     install your own `berkley-db` library. 
     
     For BioToolBox users, the biggest effect appears to be exceptionally long times 
-    when using the in-memory database adapater, which is employed in the the included 
-    test file `04.DB.t`.
+    during `Build` tests, specifically file `04.DB.t` that uses the in-memory database 
+    adapater (maybe 20-30 seconds instead of 1), and excruciatingly long 
+    [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
+    database builds (possibly days or weeks, I give up). 
 
 # AUTHOR
 
