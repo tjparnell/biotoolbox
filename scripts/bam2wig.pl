@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.63';
+my $VERSION = '1.64';
 	
 	
 
@@ -1715,7 +1715,8 @@ sub process_alignments_on_chromosome {
 		r_offset        => 0,
 		pair            => {},
 		black_list      => undef,
-		count           => 0,
+		f_count         => 0,
+		r_count         => 0,
 		sam             => $sam,
 		score           => 1,
 	};
@@ -1750,7 +1751,8 @@ sub process_alignments_on_chromosome {
 	
 	# round the final count to a solid integer as necessary
 	if ($multi_hit_scale) {
-		$data->{count} = sprintf("%.0f", $data->{count});
+		$data->{f_count} = sprintf("%.0f", $data->{f_count});
+		$data->{r_count} = sprintf("%.0f", $data->{r_count}) if $do_strand;
 	}
 	
 	# write out file
@@ -1758,24 +1760,24 @@ sub process_alignments_on_chromosome {
 	if ($do_temp_bin) {
 		# write a temporary binary file for merging later
 		write_bin_file(\$data->{fpack}, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.bin') );
+			join('.', $outbase, $samid, $seq_id, $data->{f_count}, 'f', 'temp.bin') );
 		write_bin_file(\$data->{rpack}, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.bin')
+			join('.', $outbase, $samid, $seq_id, $data->{r_count}, 'r', 'temp.bin')
 		) if $do_strand;
 	}
 	else {
 		# write a chromosome specific wig file
 		&$wig_writer(\$data->{fpack}, $binpack, $seq_id, $seq_length, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'f', 'temp.wig') );
+			join('.', $outbase, $samid, $seq_id, $data->{f_count}, 'f', 'temp.wig') );
 		&$wig_writer(\$data->{rpack}, $binpack, $seq_id, $seq_length, 
-			join('.', $outbase, $samid, $seq_id, $data->{count}, 'r', 'temp.wig') 
+			join('.', $outbase, $samid, $seq_id, $data->{r_count}, 'r', 'temp.wig') 
 		) if $do_strand;
 	}
 	
 	# verbose status line 
 	if ($verbose) {
 		printf "  Converted %s $items on $seq_id in %d seconds\n", 
-			format_with_commas( $data->{count}), time - $chr_start_time;
+			format_with_commas( $data->{f_count} + $data->{r_count} ), time - $chr_start_time;
 		if ($chrapply and $seq_id =~ /$chrapply/i) {
 			printf "   Scaled counts by $chrnorm\n";
 		}
@@ -2151,11 +2153,23 @@ sub se_callback {
 		# preferentially use the number of included hits, then number of hits
 		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
-		$data->{count} += $score; # record fractional alignment counts
+		# record fractional alignment counts
+		if ($do_strand and $a->reversed) {
+			$data->{r_count} += $score; 
+		}
+		else {
+			$data->{f_count} += $score;
+		}
 		$score *= $data->{score}; # multiply by chromosome scaling factor
 	}
 	else {
-		$data->{count} += 1; # always record one alignment
+		 # always record one alignment
+		if ($do_strand and $a->reversed) {
+			$data->{r_count} += 1; 
+		}
+		else {
+			$data->{f_count} += 1;
+		}
 		$score = $data->{score}; # probably 1, but may be chromosome scaled
 	}
 	
@@ -2209,11 +2223,27 @@ sub fast_pe_callback {
 	if ($multi_hit_scale) {
 		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
-		$data->{count} += $score; # record fractional alignment counts
+		# record fractional alignment counts
+		if ($do_strand and $flag && 0x80) {
+			# second mate, so must be reverse strand
+			$data->{r_count} += $score; 
+		}
+		else {
+			# presume first mate or unstranded analysis defaults to forward strand
+			$data->{f_count} += $score;
+		}
 		$score *= $data->{score}; # multiply by chromosome scaling factor
 	}
 	else {
-		$data->{count} += 1; # always record one alignment
+		 # always record one alignment
+		if ($do_strand and $flag && 0x80) {
+			# second mate, so must be reverse strand
+			$data->{r_count} += 1; 
+		}
+		else {
+			# presume first mate or unstranded analysis defaults to forward strand
+			$data->{f_count} += 1;
+		}
 		$score = $data->{score}; # probably 1, but may be chromosome scaled
 	}
 	
@@ -2287,11 +2317,27 @@ sub pe_callback {
 			else {
 				$score = $r_nh > 1 ? 1/$r_nh : 1;
 			}
-			$data->{count} += $score; # record fractional alignment counts
+			# record fractional alignment counts
+			if ($do_strand and $flag && 0x80) {
+				# second mate, so must be reverse strand
+				$data->{r_count} += $score; 
+			}
+			else {
+				# presume first mate or unstranded analysis defaults to forward strand
+				$data->{f_count} += $score;
+			}
 			$score *= $data->{score}; # multiply by chromosome scaling factor
 		}
 		else {
-			$data->{count} += 1; # always record one alignment
+			# always record one alignment
+			if ($do_strand and $flag && 0x80) {
+				# second mate, so must be reverse strand
+				$data->{r_count} += 1; 
+			}
+			else {
+				# presume first mate or unstranded analysis defaults to forward strand
+				$data->{f_count} += 1;
+			}
 			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
