@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.63';
+my $VERSION = '1.64';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -469,7 +469,7 @@ sub set_defaults {
 	} 
 	
 	# generate formatter
-	if ($format) {
+	if (defined $format) {
 		$formatter = '%.' . $format . 'f';
 	}
 }
