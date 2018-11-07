@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.63';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -876,6 +876,7 @@ sub _get_alt_common_things {
 
 sub get_transcripts {
 	my $gene = shift;
+	return unless $gene;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
 	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
@@ -1565,6 +1566,7 @@ sub bed_string {
 
 sub filter_transcript_support_level {
 	my $gene = shift;
+	return unless $gene;
 	my $min_tsl = shift || 'best'; 
 	my @list = qw(1 2 3 4 5 NA Missing);
 	
@@ -1579,6 +1581,7 @@ sub filter_transcript_support_level {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# categorize transcripts
 	my %results = map { $_ => [] } @list;
@@ -1640,6 +1643,7 @@ sub filter_transcript_support_level {
 
 sub filter_transcript_gencode_basic {
 	my $gene = shift;
+	return unless $gene;
 
 	# get transcripts
 	my @transcripts;
@@ -1652,6 +1656,7 @@ sub filter_transcript_gencode_basic {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# take appropriate transcripts
 	my @keepers;
@@ -1669,7 +1674,9 @@ sub filter_transcript_gencode_basic {
 
 sub filter_transcript_biotype {
 	my $gene = shift;
+	return unless $gene;
 	my $check = shift; 
+	confess "no biotype value to check provided!" unless $check;
 	
 	# get transcripts
 	my @transcripts;
@@ -1682,6 +1689,7 @@ sub filter_transcript_biotype {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# take appropriate transcripts
 	my @keepers;
