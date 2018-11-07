@@ -857,6 +857,15 @@ sub calculate_fpkm_values {
 			} );
 		}
 		
+		# standard lengths
+		my ($standard_length, $fractional_length);
+		if (defined $start_adj and defined $stop_adj) {
+			$standard_length = abs($stop_adj - $start_adj);
+		}
+		if (defined $fstart and defined $fstop) {
+			$fractional_length = $fstop - $fstart;
+		}
+		
 		# add FPKM column
 		if ($fpkm_method) {
 			# add new column
@@ -864,12 +873,32 @@ sub calculate_fpkm_values {
 			$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
 			$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
 			$Data->metadata($fpkm_index, 'total_count', $total); 
+			
 	
 			# calculate and store the fpkms
 			$Data->iterate( sub {
 				my $row = shift;
-				my $length = defined $length_i ? $row->value($length_i) : $row->length;
+				my $length;
+				if ($standard_length) {
+					$length = $standard_length;
+				}
+				elsif (defined $length_i) {
+					$length = $row->value($length_i);
+				}
+				else {
+					my $feature = $row->seqfeature; # force feature to be retrieved
+					$length = $row->length;
+				}
 				$length ||= 1; # why would the length be zero?
+				if ($fractional_length) {
+					if (defined $limit) {
+						$length = int($length * $fractional_length) if $length >= $limit;
+					}
+					else {
+						$length = int($length * $fractional_length);
+					}
+				}
+				
 				my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
 				# this is equivalent to traditional way: count / ( (total/1e6) * (length/1000) )
 				$row->value($fpkm_index, sprintf("%.3f", $fpkm));
@@ -886,8 +915,26 @@ sub calculate_fpkm_values {
 			my $tpm_total = 0;
 			$Data->iterate( sub {
 				my $row = shift;
-				my $length = defined $length_i ? $row->value($length_i) : $row->length;
+				my $length;
+				if ($standard_length) {
+					$length = $standard_length;
+				}
+				elsif (defined $length_i) {
+					$length = $row->value($length_i);
+				}
+				else {
+					my $feature = $row->seqfeature; # force feature to be retrieved
+					$length = $row->length;
+				}
 				$length ||= 1; # why would the length be zero?
+				if ($fractional_length) {
+					if (defined $limit) {
+						$length = int($length * $fractional_length) if $length >= $limit;
+					}
+					else {
+						$length = int($length * $fractional_length);
+					}
+				}
 				my $tpm_value = $row->value($index) / ($length / 1000);
 				$row->value($tpm_index, $tpm_value);
 				$tpm_total += $tpm_value;
