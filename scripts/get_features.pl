@@ -13,7 +13,7 @@ use Bio::ToolBox::GeneTools qw(
 	:transcript
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.62';
+my $VERSION = '1.64';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -323,7 +323,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_biotype($row->seqfeature(1), $tbiotype);
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -344,7 +348,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -365,7 +373,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_gencode_basic($row->seqfeature(1));
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
