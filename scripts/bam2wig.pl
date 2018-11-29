@@ -469,8 +469,8 @@ sub check_defaults {
 	unless (defined $max_isize) {
 		$max_isize = 600;
 	}
-	unless (defined $max_isize) {
-		$max_isize = 30;
+	unless (defined $min_isize) {
+		$min_isize = 30;
 	}
 	
 	# chromosome-specific normalization
