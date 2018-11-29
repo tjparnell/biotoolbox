@@ -279,7 +279,7 @@ sub load_from_infile {
 		parse      => 1,
 		simplify   => 0, # we want everything!
 		feature    => $features[0],
-		subfeature => $get_subfeatures ? 'exon,cds,utr' : '',
+		subfeature => $get_subfeatures ? 'exon,cds,utr,codon' : '',
 		chrskip    => $chromosome_exclude,
 	) or die " unable to load input file '$input'\n";
 	

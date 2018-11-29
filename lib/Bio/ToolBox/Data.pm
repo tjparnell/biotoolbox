@@ -1287,6 +1287,7 @@ sub parse_table {
 		$parser->do_exon(1) if $subfeature =~ /exon/i;
 		$parser->do_cds(1) if $subfeature =~ /cds/i;
 		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+		$parser->do_codon(1) if $subfeature =~/codon/i;
 	}
 	if ($feature =~ /gene$/i) {
 		$parser->do_gene(1);
