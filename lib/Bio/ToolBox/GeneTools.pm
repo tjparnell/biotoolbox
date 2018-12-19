@@ -1135,7 +1135,6 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
-	return unless is_coding($transcript);
 	my $start_codon;
 	
 	# look for existing one
@@ -1176,7 +1175,6 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
-	return unless is_coding($transcript);
 	my $stop_codon;
 	
 	# look for existing one
@@ -1445,14 +1443,12 @@ sub gtf_string {
 	$string .= "\n";
 	
 	# convert exon subfeatures collected above
-	if (is_coding($feature)) {
-		my @cds = get_cds($feature);
-		push @cds, get_stop_codon($feature);
-		push @cds, get_start_codon($feature);
-		@exons = map { $_->[0] } 
-			sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-			map { [$_, $_->start, $_->end] } ( @exons, @cds );
-	}
+	my @cds = get_cds($feature);
+	push @cds, get_stop_codon($feature);
+	push @cds, get_start_codon($feature);
+	@exons = map { $_->[0] } 
+		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+		map { [$_, $_->start, $_->end] } ( @exons, @cds );
 	foreach my $subf (@exons) {
 		$string .= join("\t", (
 			$subf->seq_id || '.',
