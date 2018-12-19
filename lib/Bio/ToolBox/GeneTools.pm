@@ -1087,6 +1087,7 @@ sub get_cds {
 
 sub get_cdsStart {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ($transcript->strand >= 0) {
@@ -1107,6 +1108,7 @@ sub get_cdsStart {
 
 sub get_cdsEnd {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ($transcript->strand >= 0) {
@@ -1125,6 +1127,7 @@ sub get_cdsEnd {
 
 sub get_transcript_cds_length {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $subf ($transcript->get_SeqFeatures) {
 		next unless $subf->primary_tag eq 'CDS';
@@ -1135,6 +1138,7 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $start_codon;
 	
 	# look for existing one
@@ -1175,6 +1179,7 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $stop_codon;
 	
 	# look for existing one
@@ -1328,6 +1333,7 @@ sub get_utrs {
 
 sub get_transcript_utr_length {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $utrs = get_utrs($transcript);
 	my $total = 0;
 	foreach my $utr (@$utrs) {
