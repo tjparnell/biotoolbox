@@ -313,8 +313,12 @@ not explicitly defined in the hierarchy, then a new object is generated.
 	my $stop_codon = get_stop_codon($transcript);
 
 Returns a SeqFeature object representing the stop codon. If one is 
-not defined in the hierarchy, then a new object is created. <BNote> that 
-this assumes that the stop codon is inclusive to the defined CDS.
+not defined in the hierarchy, then a new object is created. B<Note> that 
+this assumes that the stop codon is inclusive to the defined CDS, which is 
+the case with GFF3 and UCSC gene table derived features. On the other hand, 
+features derived from GTF is defined with the stop codon exclusive to the CDS. 
+This shouldn't matter with GTF, however, since GTF usually explicitly includes 
+stop codon features, whereas the other two formats do not.
 
 =item get_transcript_cds_length
 
@@ -1190,6 +1194,7 @@ sub get_stop_codon {
 	
 	# otherwise we have to build one
 	# this entirely presumes that the stop codon is inclusive to the last cds
+	# this is the case with GFF3 and UCSC tables, but not GTF
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
 	if ($transcript->strand >= 0) {
