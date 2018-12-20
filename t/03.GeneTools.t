@@ -102,7 +102,7 @@ is(scalar @t1_cds, 4, 'transcript1 cds number');
 my @t1_introns = get_introns($t1);
 is(scalar @t1_introns, 4, 'transcript1 intron number');
 is(get_cdsStart($t1), 389402, 'transcript1 CDS start');
-is(get_cdsEnd($t1), 398469, 'transcript1 CDS stop');
+is(get_cdsEnd($t1), 398466, 'transcript1 CDS stop');
 is(get_transcript_cds_length($t1), 352, 'transcript1 CDS length');
 my @t1_utrs = get_utrs($t1);
 is(scalar @t1_utrs, 2, 'transcript UTR number');
