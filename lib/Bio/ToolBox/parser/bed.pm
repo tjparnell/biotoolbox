@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::bed;
-our $VERSION = '1.62';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -477,9 +477,17 @@ sub open_file {
 	foreach my $c ($Stream->comments) {
 		# these may or may not be present
 		# if so, we can check for a track type which may hint at what the file is
-		if ($c =~ /^track.+type=(?:narrow|broad)peak/i) {
-			# looks like we have a peak file
-			$peak = $bed;
+		if ($c =~ /^track.+type=gappedpeak/i) {
+			# looks like we have a gappedPeak file
+			$peak = 15;
+		}
+		elsif ($c =~ /^track.+type=narrowpeak/i) {
+			# looks like we have a narrowPeak file
+			$peak = 10;
+		}
+		elsif ($c =~ /^track.+type=broadpeak/i) {
+			# looks like we have a broadPeak file
+			$peak = 9;
 		}
 		elsif ($c =~ /^track.+type=bedgraph/i) {
 			# this is unlikely to occur, but you never know
@@ -498,7 +506,25 @@ sub open_file {
 	$self->source( $Stream->basename );
 	
 	# assign the parsing subroutine
-	if ($peak == 10) {
+	if ($peak == 15) {
+		# gappedPeak file
+		$self->{version} = 'gappedPeak';
+		$self->{convertor_sub} = \&_parse_gappedPeak; 
+		$self->do_exon(1); # always parse sub peaks as exons
+		
+		# gappedPeak is essentially bed12 with extra columns
+		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
+		# we need more object stuff that the ucsc parser expects
+		eval "require Bio::ToolBox::parser::ucsc;";
+		$self->{id2count}    = {};
+		$self->{refseqsum}   = {};
+		$self->{refseqstat}  = {};
+		$self->{kgxref}      = {};
+		$self->{ensembldata} = {};
+		$self->{gene2seqf}   = {};
+		$self->{sfclass}     = $SFCLASS;
+	}
+	elsif ($peak == 10) {
 		# narrowPeak file
 		$self->{version} = 'narrowPeak';
 		$self->{convertor_sub} = \&_parse_narrowPeak; 
@@ -793,6 +819,58 @@ sub _parse_bed12 {
 	$feature->score($data[4]);
 	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
 		# change the primary ID to match other bed file behavior, not UCSC files'
+	return $feature;
+}
+
+sub _parse_gappedPeak {
+	my ($self, $line) = @_;
+	my @data = split /\t/, $line;
+	unless (scalar(@data) == 15) {
+		croak sprintf("GappedPeak line %d '%s' doesn't have 15 elements!", 
+			$self->{line_count}, $line);
+	}
+	
+	# we will take advantage of pre-existing code in the UCSC parser to convert 
+	# a gappedPeak line into main peak with subpeaks.
+	# we just have to go through a genePred format first
+	# fortunately, the two are pretty similar in structure
+	
+	# calculate exons, er, sub peaks
+	my @exonSizes  = split(',', $data[10]);
+	my @exonStarts = map {$data[1] + $_} split(',', $data[11]);
+	my @exonEnds;
+	for (my $i = 0; $i < $data[9]; $i++) {
+		push @exonEnds, $exonStarts[$i] + $exonSizes[$i];
+	}
+	
+	# calculate new genePred elements
+	my @new = (
+		$data[3], # name
+		$data[0], # chrom
+		'+',      # strand is typically unstranded, so just pretend to be 
+		$data[1], # txStart
+		$data[2], # txStop
+		$data[6], # cdsStart
+		$data[7], # cdsEnd
+		$data[9], # exonCount
+		join(',', @exonStarts), # exonStarts
+		join(',', @exonEnds), # exonEnds
+	);
+	
+	# create builder and process
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new(join("\t", @new), $self);
+	my $feature = $builder->build_transcript;
+	
+	# clean up feature and add extra values
+	$feature->add_tag_value('itemRGB', $data[8]);
+	$feature->score($data[4]);
+	$feature->strand($data[5]);
+	$feature->primary_tag('region'); # it is not a RNA
+	$feature->primary_id(sprintf("%s:%d-%d", $data[0], $data[1], $data[2]));
+		# change the primary ID to match other bed file behavior, not UCSC files'
+	$feature->add_tag_value('signalValue', $data[12]);
+	$feature->add_tag_value('pValue', $data[13]);
+	$feature->add_tag_value('qValue', $data[14]);
 	return $feature;
 }
 
