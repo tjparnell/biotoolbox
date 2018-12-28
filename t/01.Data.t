@@ -8,7 +8,7 @@ use File::Spec;
 use FindBin '$Bin';
 
 BEGIN {
-	plan tests => 145;
+	plan tests => 169;
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
 
@@ -27,6 +27,7 @@ isa_ok($Data, 'Bio::ToolBox::Data', 'GFF3 Data');
 # test general metadata
 is($Data->gff, 3, 'gff version');
 is($Data->bed, 0, 'bed version');
+is($Data->format, 'gff3', 'GFF3 format');
 is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
@@ -226,6 +227,7 @@ $Data = Bio::ToolBox::Data->new(file => $file);
 isa_ok($Data, 'Bio::ToolBox::Data', 'Bed Data');
 is($Data->gff, 0, 'gff version');
 is($Data->bed, 4, 'bed version');
+is($Data->format, 'bed', 'bed format');
 is($Data->program, undef, 'program name');
 is($Data->feature, 'region', 'general feature');
 is($Data->feature_type, 'coordinate', 'feature type');
@@ -345,6 +347,46 @@ ok($Data->verify, 'verify data structure');
 is($Data->last_row, 117, 'reloaded last row index');
 is($Data->number_columns, 4, 'reloaded number of columns');
 
-END {
-	# unlink($file, $outfile, $outfile2);
-}
+
+### Open a narrowPeak test file
+undef $Data;
+$infile = File::Spec->catfile($Bin, "Data", "H3K4me3.narrowPeak");
+$Data = Bio::ToolBox::Data->new(
+	file => $infile,
+);
+isa_ok($Data, 'Bio::ToolBox::Data', 'narrowPeak Data');
+# test general metadata
+is($Data->gff, 0, 'gff version');
+is($Data->bed, 10, 'bed version');
+is($Data->format, 'narrowPeak', 'narrowPeak format');
+is($Data->feature, 'region', 'general feature');
+is($Data->feature_type, 'coordinate', 'feature type');
+is($Data->extension, '.narrowPeak', 'narrowPeak extension');
+is($Data->number_columns, 10, 'number of columns');
+is($Data->start_column, 1, 'start column');
+is($Data->stop_column, 2, 'stop column');
+is($Data->find_column('pValue'), 7, 'find column pValue');
+
+
+
+### Open a gappedPeak test file
+undef $Data;
+$infile = File::Spec->catfile($Bin, "Data", "H3K27ac.bed");
+$Data = Bio::ToolBox::Data->new(
+	file => $infile,
+);
+isa_ok($Data, 'Bio::ToolBox::Data', 'gappedPeak bed Data');
+# test general metadata
+is($Data->gff, 0, 'gff version');
+is($Data->bed, 15, 'bed version');
+is($Data->format, 'gappedPeak', 'gappedPeak format');
+is($Data->feature, 'region', 'general feature');
+is($Data->feature_type, 'coordinate', 'feature type');
+is($Data->extension, '.bed', 'gappedPeak bed extension');
+is($Data->number_columns, 15, 'number of columns');
+is($Data->start_column, 1, 'start column');
+is($Data->stop_column, 2, 'stop column');
+is($Data->find_column('pValue'), 13, 'find column pValue');
+
+
+

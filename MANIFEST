@@ -74,6 +74,7 @@ t/Data/ensGene.txt
 t/Data/ensGene.bed
 t/Data/ensGene.gtf
 t/Data/H3K4me3.narrowPeak
+t/Data/H3K27ac.bed
 t/Data/sample.bed
 t/Data/sample1.bam
 t/Data/sample1.bam.bai
