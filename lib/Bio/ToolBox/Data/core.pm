@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.61';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -37,6 +37,7 @@ sub new {
 		'feature'        => undef,
 		'feature_type'   => undef,
 		'db'             => undef,
+		'format'         => '',
 		'gff'            => 0,
 		'bed'            => 0,
 		'ucsc'           => 0,
@@ -1031,6 +1032,14 @@ sub big_adapter {
 		$core_db_loaded = 1;
 	}
 	return use_big_adapter(@_);
+}
+
+sub format {
+	my $self = shift;
+	if (defined $_[0]) {
+		$self->{format} = $_[0];
+	}
+	return $self->{format};
 }
 
 sub gff {
