@@ -3,7 +3,7 @@
 # documentation at end of file
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use FindBin qw($Bin);
 use Bio::ToolBox::Data;
@@ -15,7 +15,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+my $VERSION = '1.64';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -52,21 +52,21 @@ my @features;
 
 # Command line options
 GetOptions( 
-	'in=s'      => \$infile, # the input data file
-	'out=s'     => \$outfile, # name of output file 
-	'db=s'      => \$database, # source annotation database
-	'feature=s' => \@features, # the gene feature from the database
-	'region=s'  => \$request, # the region requested
-	'transcript=s' => \$transcript_type, # which transcripts to take
-	'start=i'   => \$start_adj, # start coordinate adjustment
-	'stop=i'    => \$stop_adj, # stop coordinate adjustment
-	'unique!'   => \$unique, # boolean to ensure uniqueness
-	'slop=i'    => \$slop, # slop factor in bp to identify uniqueness
-	'tsl=s'     => \$tsl, # filter transcript support level
-	'bed!'      => \$bed, # convert the output to bed format
-	'gz!'       => \$gz, # compress output
-	'help'      => \$help, # request help
-	'version'   => \$print_version, # print the version
+	'i|in=s'          => \$infile, # the input data file
+	'o|out=s'         => \$outfile, # name of output file 
+	'd|db=s'          => \$database, # source annotation database
+	'f|feature=s'     => \@features, # the gene feature from the database
+	'r|region=s'      => \$request, # the region requested
+	't|transcript=s'  => \$transcript_type, # which transcripts to take
+	'b|begin|start=i' => \$start_adj, # start coordinate adjustment
+	'e|end|stop=i'    => \$stop_adj, # stop coordinate adjustment
+	'u|unique!'       => \$unique, # boolean to ensure uniqueness
+	'l|slop=i'        => \$slop, # slop factor in bp to identify uniqueness
+	'tsl=s'           => \$tsl, # filter transcript support level
+	'bed!'            => \$bed, # convert the output to bed format
+	'z|gz!'           => \$gz, # compress output
+	'h|help'          => \$help, # request help
+	'v|version'       => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
 
 # Print help
