@@ -1,5 +1,20 @@
 ######## Bio::ToolBox revision history #############
 
+v1.64
+	- Added support for Encode gappedPeak files. Also support for 
+	gleaning file formats from bed track lines. This should make 
+	future file formats easier to support in the future.
+	- Fix critical bug with skipping duplicate features from GTF 
+	files, particularly from Ensembl where exons share the same exon ID.
+	- Fix double-counting of stranded alignments in bam2wig script. 
+    Also correctly set minimum paired-end size.
+	- Fix bug to correctly count FPKM and TPM over length-adjusted 
+	features in script get_datasets.
+	- Fix bug with filtering transcripts in script get_features.
+	- Reset and clarify behavior regarding stop codons when parsing 
+	and exporting transcript features for various annotation formats.
+	- Add single-letter option support to script get_gene_regions.
+
 v1.63
 	- Added minimal Cram file support through the HTS adapter. 
 	Currently only supports the reference fasta listed in the Cram 
