@@ -3107,6 +3107,8 @@ extended alignments.
 
 =head2 Shift options
 
+=over 4
+
 =item --shift
 
 Specify that the positions of the alignment should be shifted towards 
