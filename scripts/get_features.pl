@@ -13,7 +13,7 @@ use Bio::ToolBox::GeneTools qw(
 	:transcript
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.64';
+my $VERSION = '1.65';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -79,7 +79,7 @@ GetOptions(
 	'B|bed!'      => \$convert_to_bed, # convert to bed format
 	'G|gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
 	'g|gtf!'      => \$convert_to_gtf, # convert to gtf format
-	'r|ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
+	'r|refflat!'  => \$convert_to_refflat, # convert to refFlat format
 	'o|out=s'     => \$outfile, # name of output file 
 	'sort!'       => \$sort_data, # sort the output file
 	'z|gz!'       => \$gz, # compress output
