@@ -52,6 +52,7 @@ sub get_base_options {
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 			'List::Util'              => 0,
+			'List::MoreUtils'         => 0,
 			'File::Which'             => 0,
 			'Getopt::Long'            => 2.24,
 		},
