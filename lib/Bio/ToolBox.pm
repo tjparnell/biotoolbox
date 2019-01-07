@@ -1,6 +1,6 @@
 package Bio::ToolBox;
 
-our $VERSION = '1.64';
+our $VERSION = '1.65';
 
 =head1 NAME
 

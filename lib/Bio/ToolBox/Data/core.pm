@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.64';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -764,7 +764,8 @@ sub _column_is_numeric {
 	}
 	for my $row (1 .. $self->{last_row}) {
 		for my $i (@index) {
-			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d\-\.,eE]+$/);
+			# we have a very loose definition of numeric: exponents, signs, commas
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d\-\+\.,eE]+$/);
 		}
 	}
 	return 1;
