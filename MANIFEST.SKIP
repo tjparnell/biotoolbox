@@ -78,3 +78,6 @@
 # Avoid Markdown
 \.md$
 
+# Avoid the docs folder
+\bdocs/
+
