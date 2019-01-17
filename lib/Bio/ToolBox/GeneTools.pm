@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.64';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -1451,7 +1451,7 @@ sub gtf_string {
 	$string .= "; transcript_biotype \"$biotype\"" if $biotype;
 	my ($tsl) = $feature->get_tag_values('transcript_support_level');
 	$string .= "; transcript_support_level \"$tsl\"" if $tsl;
-	$string .= "\n";
+	$string .= ";\n";
 	
 	# convert exon subfeatures collected above
 	my @cds = get_cds($feature);
