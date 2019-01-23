@@ -241,7 +241,14 @@ use Bio::ToolBox::Data;
 
 sub load_file {
 	my $self = shift;
-	return Bio::ToolBox::Data->new(@_);
+	if (scalar(@_) == 1) {
+		return Bio::ToolBox::Data->new(
+			file   => $_[0],
+		);
+	}
+	else {
+		return Bio::ToolBox::Data->new(@_);
+	}
 }
 
 sub parse_file {
