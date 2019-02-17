@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.64';
+my $VERSION = '1.65';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -167,8 +167,8 @@ if ($infile) {
 			$Data->database($main_database);
 		}
 	}
-	else {
-		$main_database = $Data->database;
+	elsif ($Data->database) {
+		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
 	
 	# update feature type as necessary

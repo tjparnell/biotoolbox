@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.63';
+my $VERSION = '1.65';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -150,16 +150,15 @@ if ($infile) {
 	
 	# update main database as necessary
 	if ($main_database) {
-		if (defined $Data->database and $Data->database ne $main_database) {
+		if ($main_database ne $Data->database) {
 			# update with new database
 			printf " updating main database name from '%s' to '%s'\n", 
 				$Data->database, $main_database;
-# 			print "   Re-run without --db option if you do not want this to happen\n";
 			$Data->database($main_database);
 		}
 	}
-	else {
-		$main_database = $Data->database;
+	elsif ($Data->database) {
+		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
 	
 	# update feature type as necessary

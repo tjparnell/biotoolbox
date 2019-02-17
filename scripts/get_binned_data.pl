@@ -20,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.62';
+my $VERSION = '1.65';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -148,8 +148,8 @@ if ($infile) {
 			$Data->database($main_database);
 		}
 	}
-	else {
-		$main_database = $Data->database;
+	elsif ($Data->database) {
+		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
 	
 	# update feature type as necessary
