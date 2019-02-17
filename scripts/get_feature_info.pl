@@ -10,7 +10,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.60';
+my $VERSION = '1.65';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -117,17 +117,58 @@ if ($use_type) {
 
 
 ### Establish database connection
+my $db;
 if ($database) {
 	if ($Data->database and $Data->database ne $database) {
-		warn " provided database '$database' does not match file metadata!\n" . 
-			" overriding metadata and using '$database'\n";
+		print " Using provided database '$database' instead of metadata-specified database\n";
 	}
-	$Data->database($database);
+	
+	# check if we have a real file
+	if (-e $database) {
+		if ($database =~ /(?:db|database|sqlite)$/i) {
+			# looks like maybe a SQLite file
+			$Data->database($database);
+			$db = $Data->open_meta_database or die "unable to open database!\n";
+		}
+		elsif ($Data->taste_file($database)) {
+			# looks like a parsable annotation file
+			# parse the file and associate with the table
+			$Data->parse_table( {
+				file     => $database,
+				feature  => $Data->feature, # may be explicitly set by use_type above
+				simplify => 0,
+			} ) or die " unable to parse annotation file '$database'!\n";
+			# this may fail if not everything can be loaded
+		}
+		else {
+			die " unrecognized database file!\n";
+		}
+	}
+	else {
+		# maybe the name of a database
+		# attempt to open
+		$Data->database($database);
+		$db = $Data->open_meta_database or die "unable to open database!\n";
+	}
 }
-elsif (not $Data->database) {
+elsif ($Data->database) {
+	# use metadata-specified database
+	if ($Data->database =~ /^Parsed:(.+)$/) {
+		# there was a parsed annotation file, try and re-parse it
+		$Data->parse_table( {
+			file     => $1,
+			feature  => $Data->feature, # may be explicitly set by use_type above
+			simplify => 0,
+		} ) or die " unable to parse annotation file '$1' in metadata!\n try specifying a new database or annoation file\n";
+		# this may fail if not everything can be loaded
+	}
+	else {
+		$db = $Data->open_meta_database or die "unable to open database!\n";
+	}
+}
+else {
 	die "No database defined! See help\n";
 }
-my $db = $Data->open_database;
 
 
 
@@ -589,29 +630,31 @@ sub get_exon_number {
 sub get_parent {
 	my $feature = shift;
 	return '.' unless $feature;
+	# this is tricky, because it's not always recorded in the SeqFeature object itself
+	# and we can't easily recurse in memory an object and what it is linked to 
+	# 
 	if ($feature->has_tag('parent_id')) {
-		# feature has a parent
-		my ($parent_id) = $feature->get_tag_values('parent_id');
-		# unfortunately we have to do a slow lookup through the database 
-		# using the attribute load_id
-		# this seems to be the only way to get to the parent name
-		my @parents = $db->get_features_by_attribute('load_id' => $parent_id);
-		if (@parents) {
-			my $parent = shift @parents;
-			if (@parents) {
-				warn " more than feature found with load_id $parent_id!\n";
+		# feature has a parent in a database
+		my @parent_ids = $feature->get_tag_values('parent_id');
+		if ($db) {
+			# looks like we have SeqFeature database
+			# unfortunately we have to do a slow lookup through the database 
+			# using the attribute load_id
+			# this seems to be the only way to get to the parent name
+			my @parents;
+			foreach my $id (@parent_ids) {
+				foreach my $p ($db->get_features_by_attribute('load_id' => $id)) {
+					push @parents, $p->display_name;
+				}
 			}
-			return $parent->display_name;
-		}
-		else {
-			warn " can't find a parent with load_id '$parent_id' for " . 
-				$feature->display_name . "!\n";
-			return '.';
+			return join(',', @parents);
 		}
 	}
-	else {
-		return '.';
+	if ($feature->has_tag('Parent')) {
+		my @parents = $feature->get_tag_values('Parent');
+		return join(',', @parents);
 	}
+	return '.';
 }
 
 
@@ -678,6 +721,7 @@ get_feature_info.pl <filename>
   
   Database options:
   -d --db <name>                            annotation database: mysql sqlite
+                                              or annotation file: gtf gff ucsc
   -a --attrib <attribute1,attribute2,...>   list of attributes to collect
   -t --type <primary_tag>                   specify a feature type as needed
   
@@ -739,11 +783,18 @@ overwrite the input file.
 
 =item --db E<lt>nameE<gt>
 
-Specify the name of a C<Bio::DB::SeqFeature::Store> annotation database 
-from which gene or feature annotation may be derived. A database is 
-required for generating new data files with features. For more information 
-about using annotation databases, 
-see L<https://code.google.com/p/biotoolbox/wiki/WorkingWithDatabases>. 
+Specify the name or SQLite file of a L<Bio::DB::SeqFeature::Store> 
+annotation database from which the information may be derived. This may 
+be stored in the metadata comments of the input file, or an alternative 
+file may be provided. 
+
+Alternatively, specify an annotation file, e.g. GTF, GFF3, or UCSC gene 
+table, that may be parsed into memory. 
+
+The input file should include Name or ID columns that match features in the 
+provided database. If a Type column is not present, then a type should be 
+provided with the C<--type> option. Note that mixing and matching files and  
+databases may not always work as well as intended.
 
 =item --attrib E<lt>attributeE<gt>
 
