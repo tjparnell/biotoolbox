@@ -139,7 +139,7 @@ if ($infile) {
 	$Data = Bio::ToolBox::Data->new(
 		file       => $infile, 
 		parse      => $parse,
-		feature    => $feature || 'gene',
+		feature    => $feature,
 	) or die " unable to load input file '$infile'\n";
 	if ($Data->last_row) {
 		printf " Loaded %s features from $infile.\n", format_with_commas( $Data->last_row );
