@@ -25,4 +25,10 @@ General documentation and usage notes for using the BioToolBox package.
 	documentation that can be used in custom scripts. This is a brief explanation of 
 	what is available.
 
+- [FAQ](FAQ.md)
 
+	Frequently Asked Questions. OK, maybe not frequently, but this is basically a 
+	list of questions, tips, and hints that only the programmer knows but would be 
+	useful for others to know.
+
+	
