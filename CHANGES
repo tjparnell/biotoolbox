@@ -1,5 +1,15 @@
 ######## Bio::ToolBox revision history #############
 
+v1.65
+	- Added options for filtering transcript Gencode or biotype 
+	in script get_gene_regions.
+	- Added option to discard low count features from script 
+	get_datasets.
+	- Update script get_feature_info to work with annotation files
+	- Optimize data2wig to handle fast option in more scenarios
+	- Bug fixes in Bio::ToolBox, get_relative_data, more
+	- 
+
 v1.64
 	- Added support for Encode gappedPeak files. Also support for 
 	gleaning file formats from bed track lines. This should make 
