@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use FindBin qw($Bin);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -15,7 +14,7 @@ use Bio::ToolBox::GeneTools qw(:all);
 use Bio::ToolBox::parser::gff;
 use Bio::ToolBox::parser::ucsc;
 use Bio::ToolBox::utility;
-my $VERSION = '1.64';
+my $VERSION = '1.65';
 
 print "\n This program will get specific regions from features\n\n";
 
@@ -38,11 +37,13 @@ my (
 	$database,
 	$request,
 	$transcript_type,
+	$tsl,
+	$gencode,
+	$tbiotype,
 	$start_adj,
 	$stop_adj,
 	$unique,
 	$slop,
-	$tsl,
 	$bed,
 	$gz,
 	$help,
@@ -58,11 +59,13 @@ GetOptions(
 	'f|feature=s'     => \@features, # the gene feature from the database
 	'r|region=s'      => \$request, # the region requested
 	't|transcript=s'  => \$transcript_type, # which transcripts to take
+	'tsl=s'           => \$tsl, # filter on transcript support level
+	'gencode!'        => \$gencode, # filter on gencode basic tag
+	'biotype=s'       => \$tbiotype, # filter on transcript biotype
 	'b|begin|start=i' => \$start_adj, # start coordinate adjustment
 	'e|end|stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'u|unique!'       => \$unique, # boolean to ensure uniqueness
 	'l|slop=i'        => \$slop, # slop factor in bp to identify uniqueness
-	'tsl=s'           => \$tsl, # filter transcript support level
 	'bed!'            => \$bed, # convert the output to bed format
 	'z|gz!'           => \$gz, # compress output
 	'h|help'          => \$help, # request help
@@ -643,9 +646,23 @@ sub process_gene {
 	}
 	return unless @transcripts;
 	
+	# filter for gencode transcripts if requested
+	if ($gencode) {
+		my $new_transcripts = filter_transcript_gencode_basic(\@transcripts);
+		return unless scalar @$new_transcripts;
+		@transcripts = @$new_transcripts;
+	}
+	
 	# filter for transcript support level if requested
 	if ($tsl) {
 		my $new_transcripts = filter_transcript_support_level(\@transcripts, $tsl);
+		return unless scalar @$new_transcripts;
+		@transcripts = @$new_transcripts;
+	}
+	
+	# filter for biotype if requested
+	if ($tbiotype) {
+		my $new_transcripts = filter_transcript_biotype(\@transcripts, $tbiotype);
 		return unless scalar @$new_transcripts;
 		@transcripts = @$new_transcripts;
 	}
@@ -683,8 +700,29 @@ sub process_transcript {
 	# passed objects
 	my ($transcript, $method) = @_;
 	
-	# call appropriate method
+	# filter transcripts
 	return unless acceptable_transcript($transcript);
+	
+	# filter for gencode transcripts if requested
+	if ($gencode) {
+		$transcript = filter_transcript_gencode_basic($transcript);
+		return unless $transcript;
+	}
+	
+	# filter for transcript support level if requested
+	if ($tsl) {
+		$transcript = filter_transcript_support_level($transcript, $tsl);;
+		return unless $transcript;
+	}
+	
+	# filter for biotype if requested
+	if ($tbiotype) {
+		$transcript = filter_transcript_biotype($transcript, $tbiotype);
+		return unless $transcript;
+	}
+	
+	
+	# call appropriate method
 	my @regions = &$method($transcript);
 	
 	# add non-existent gene name
@@ -1367,6 +1405,8 @@ get_gene_regions.pl [--options...] --db <text> --out E<lt>filenameE<gt>
        collapsedIntron|altIntron|
        uncommonIntron|commonIntron|
        firstIntron|lastIntron]
+  --gencode                     include only GENCODE tagged genes
+  --biotype <regex>             include only specific biotype
   --tsl                         select transcript support level
        [best|best1|best2|best3|
        best4|best5|1|2|3|4|5|NA]
@@ -1464,6 +1504,24 @@ possibilities are listed below.
   UTR           The untranslated regions of each coding transcript
   cdsStart      The first base of the CDS
   cdsStop       The last base of the CDS
+
+=item --gencode
+
+Boolean option to filter transcripts as part of the GENCODE specification. 
+These are marked in Ensembl GTF/GFF3 annotation files as the C<tag> attribute 
+with value "basic". Typically, at least one transcript for every gene is 
+marked as part of the GENCODE set. Transcripts not marked as such usually 
+lack sufficient experimental evidence.
+
+=item --biotype E<lt>regex<gt> 
+
+Filter transcripts using the C<transcript_biotype> or C<biotype> 
+GTF/GFF3 attribute, typically found in Ensembl annotation files. Provide 
+a regex compatible string which must match the biotype value to keep the 
+transcripts. For example, to keep specify "miRNA" to keep all micro-RNA 
+transcripts. This works on a subfeature level as well, so that C<gene> 
+may be specified as the feature to collect, and only the gene transcripts 
+belonging to the indicating biotype are retained.
 
 =item --tsl E<lt>levelE<gt>
 
