@@ -18,12 +18,11 @@ versions, and it is compiled for multiple architectures with backwards compatibi
 32-bit `i386` processors (!), at least as of High Sierra (10.13). Some of the errors below
 will go away if you compile your own Perl, but your success may vary.
 
-On Mojave (10.14), the system Perl appears to be broken in that the development headers
-are not included, preventing the compilation of XS modules, including the binary file
-adaptors for Bam and bigWig. The headers are present in the SDK under the CommandLineTools
-installation, but Perl evidently can't find them. Consequently, the *ONLY* solution I've
-found is to install your own, either through [Homebrew](https::/brew.sh) or via
-[PerlBrew](https://perlbrew.pl).
+On Mojave (10.14), the system Perl appears to be ~~broken~~ fixed as of 10.14.3 with 
+regards to compiling XS modules. 
+
+For installing your own Perl, the easiest route is to use either [Homebrew](https::/brew.sh) 
+or [PerlBrew](https://perlbrew.pl). 
 
 Be sure to use a recent version of PerlBrew. Older versions sometimes fails to set the 
 minimum MacOS version. In such cases, I have found the recommendations described 
@@ -74,4 +73,11 @@ during `Build` tests, specifically file `04.DB.t` that uses the in-memory databa
 adapater (maybe 20-30 seconds instead of 1), and excruciatingly long 
 [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
 database builds (possibly days or weeks, I give up). 
+
+## Bio-DB-HTS installs
+
+The current version of Bio-DB-HTS (2.11) does not install on macOS Mojave (10.14) with 
+HTSlib v1.9. It fails with test 05vcf. Unless you need VCF functionality, you can 
+safely force install the module, as BioToolBox currently doesn't use that module.
+
 
