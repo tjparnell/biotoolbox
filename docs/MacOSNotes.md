@@ -74,10 +74,5 @@ adapater (maybe 20-30 seconds instead of 1), and excruciatingly long
 [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store) 
 database builds (possibly days or weeks, I give up). 
 
-## Bio-DB-HTS installs
-
-The current version of Bio-DB-HTS (2.11) does not install on macOS Mojave (10.14) with 
-HTSlib v1.9. It fails with test 05vcf. Unless you need VCF functionality, you can 
-safely force install the module, as BioToolBox currently doesn't use that module.
 
 

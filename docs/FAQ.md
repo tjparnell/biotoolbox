@@ -75,7 +75,7 @@ programmer understands but a casual user might not, as well as rationale.
 	A BigWigSet is a collection of bigWig files in a folder, with which you can associate 
 	metadata by using a `metadata.txt` file, including but not limited to sample name, 
 	source, strand, etc. It was a concept developed by Lincoln Stein, implemented in his 
-	[Bio::DB::BigFile](https://metacpan.org/pod/Bio::DB::BigFile) adapter, for use with 
+	[Bio::DB::BigWigSet](https://metacpan.org/pod/Bio::DB::BigWigSet) adapter, for use with 
 	the [GBrowse](http://gmod.org/wiki/GBrowse) genome viewer. It has been 
 	re-implemented in 
 	[Bio::ToolBox::db_helper::big](https://metacpan.org/pod/Bio::ToolBox::db_helper::big)

@@ -15,8 +15,8 @@ For additional guidance when working on MacOS, see [MacOS Notes](MacOSNotes.md).
 ## Perl installations and locations
 
 As a Perl package, BioToolBox needs to be installed under a Perl installation. It is 
-not dependent on a specific Perl release version, although later releases (5.2x 
-or later) are preferred. Nearly every unix-like OS (Linux, MacOS) includes a system Perl 
+not dependent on a specific Perl release version, although later releases (5.16 
+or newer) are preferred. Nearly every unix-like OS (Linux, MacOS) includes a system Perl 
 installation. If not, one can be installed, either from the OS package manager or 
 from source.
 
@@ -47,11 +47,10 @@ wherever. While a new Perl version can be manually downloaded and installed from
 main [Perl](https://www.perl.org) site, there are easier ways.
 
 An alternate package manager may be used to install a Perl version in a generally
-available location. For example, MacOS users can easily install a functional Perl
-(particularly on the latest Mojave release) using [Homebrew](https://brew.sh). Similarly,
-Linux (and evidently Microsoft Windows Subsystem for Linux) users can use
-[Linuxbrew](http://linuxbrew.sh). These typically install the latest production release,
-currently `5.28`, with a single command.
+available location. For example, MacOS users can easily install a modern Perl using
+[Homebrew](https://brew.sh). Similarly, Linux (and evidently Microsoft Windows Subsystem
+for Linux) users can use [Linuxbrew](http://linuxbrew.sh). These typically install the
+latest production release, currently `5.28`, with a single command.
 
 To install a Perl in your home directory (or other location) with a simple, but powerful,
 tool, use the excellent [PerlBrew](https://perlbrew.pl). This tool can painlessly compile,
@@ -84,11 +83,12 @@ installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
 
-   Follow the directions within for installation. [Version 1.8](https://github.com/samtools/htslib/releases/download/1.8/htslib-1.8.tar.bz2) 
-   is known to work well, although newer versions should work too. By default, it 
-   installs into `/usr/local`, or it may be set to another directory (`$HOME` for example) 
-   by adding `--prefix=$HOME` option to the `configure` step. This may also be available 
-   via OS or other package managers.
+   Follow the directions within for installation. [Version
+   1.8](https://github.com/samtools/htslib/releases/download/1.8/htslib-1.8.tar.bz2) is
+   known to work well, although newer versions should work too. By default, it installs
+   into `/usr/local`, or it may be set to another directory (`$HOME` for example) by
+   adding `--prefix=$HOME` option to the `configure` step. This may also be available via
+   OS or other package managers.
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
@@ -109,12 +109,11 @@ the end you will have installed dozens of packages.
     installation and how much else has been installed. It was part of the standard 
     Perl distribution up until version 5.21. 
 
-- [Bio::Perl](https://metacpan.org/pod/Bio::Perl)
+- [BioPerl](https://metacpan.org/pod/BioPerl)
 
-    The Bio::Perl package is a large bundle that brings along a number of extraneous 
+    The BioPerl package is a large bundle that brings along a number of extraneous 
     modules and bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
-    This is required by Bio::DB::HTS and all of the legacy adapters. It's also 
-    needed for using annotation SQL databases, if desired.
+    This is required by Bio::DB::HTS and all of the legacy adapters. 
     
     If you build this manually, or run `cpanm` with the `--interactive` option, you 
     can interactively choose what scripts to include or not include. By default, it 
@@ -150,20 +149,24 @@ the end you will have installed dozens of packages.
     This is necessary for optional functionality (quick intersection of genomic 
     intervals, such as black lists) for a few scripts, namely `bam2wig.pl`.
 
-- [DBD::SQLite](https://metacpan.org/pod/DBD::SQLite)
+- [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
 
-    If you plan on using BioPerl
-    [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
-    databases for annotation, then installing SQLite support is suggested. For larger,
-    shared databases, [DBD::mysql](https://metacpan.org/pod/DBD::mysql) is also supported.
+	This used to be part of the BioPerl distribution prior to release 1.7, but is now
+	split into its own distribution. If you wish to use annotation databases, install
+	this, along with a SQL driver, such as
+	[DBD::SQLite](https://metacpan.org/pod/DBD::SQLite) (recommended) or
+	[DBD::mysql](https://metacpan.org/pod/DBD::mysql) (fancy multi-user installations).
+
 
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
-    $ cpanm Module::Build Bio::Perl
+    $ cpanm Module::Build BioPerl
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
     $ cpanm --configure-args="--libbigwig $HOME" Bio::DB::Big
-    $ cpanm Parallel::ForkManager Set::IntervalTree Bio::ToolBox
+    $ cpanm Parallel::ForkManager Set::IntervalTree
+    $ cpanm Bio::DB::SeqFeature::Store DBD::SQLite
+    $ cpanm Bio::ToolBox
 
 ## External applications
 
@@ -177,11 +180,12 @@ download these from the UCSC Genome Browser utilities section for either
 
 - wigToBigWig
 - bedGraphToBigWig
+- bigWigToWig
 - bedToBigBed
 
 An example for downloading on linux:
 
-    $ for name in wigToBigWig bedGraphToBigWig bedToBigBed; \
+    $ for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
     do curl http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name > $HOME/bin/$name \
     && chmod +x $HOME/bin/$name; done;
 
