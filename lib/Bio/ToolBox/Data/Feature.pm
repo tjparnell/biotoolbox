@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.63';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -1086,7 +1086,12 @@ sub display_name {
 sub coordinate {
 	my $self = shift;
 	carp "name is a read only method" if @_;
-	my $coord = sprintf("%s:%d", $self->seq_id, $self->start);
+	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
+	# we will take the start value as is when it's available, otherwise calculate start
+	my $start_i = $self->{data}->start_column;
+	my $coord = sprintf("%s:%d", $self->seq_id, 
+		defined $start_i ? $self->value($start_i) : 
+		exists $self->{feature} ? $self->{feature}->start : 0);
 	my $end = $self->end;
 	$coord .= "-$end" if $end;
 	return CORE::length($coord) > 2 ? $coord : undef;
