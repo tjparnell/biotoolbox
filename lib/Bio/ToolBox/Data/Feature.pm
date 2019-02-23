@@ -2013,7 +2013,8 @@ sub bed_string {
 		$string .= "\t$name";
 	}
 	if ($args{bed} >= 5) {
-		my $score = exists $args{score} ? $args{score} : 1;
+		my $score = exists $args{score} ? $args{score} : $self->score;
+		$score = 1 unless defined $score;
 		$string .= "\t$score";
 	}
 	if ($args{bed} >= 6) {
@@ -2059,7 +2060,8 @@ sub gff_string {
 	}
 	
 	# score
-	my $score = exists $args{score} ? $args{score} : '.';
+	my $score = exists $args{score} ? $args{score} : $self->score;
+	$score = '.' unless defined $score;
 	my $phase = '.'; # do not even bother!!!!
 	
 	# attributes
