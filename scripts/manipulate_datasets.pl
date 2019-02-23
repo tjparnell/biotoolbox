@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.62';
+my $VERSION = '1.65';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -449,6 +449,12 @@ sub reorder_function {
 	else {
 		# explicit user request, print completion statement
 		print " re-ordered data as '" . join(", ", @order) . "\n";
+		# reset structure
+		$Data->gff(0);
+		$Data->bed(0);
+		$Data->vcf(0);
+		$Data->ucsc(0);
+		$Data->format('');
 		return 1;
 	}
 }
@@ -476,6 +482,12 @@ sub delete_function {
 	
 	$Data->delete_column(@deletion_list);
 	print " datasets '" . join(", ", @deletion_list) . "' deleted\n";
+	# reset structure
+	$Data->gff(0);
+	$Data->bed(0);
+	$Data->vcf(0);
+	$Data->ucsc(0);
+	$Data->format('');
 	return 1;
 }
 
@@ -669,11 +681,8 @@ sub split_function {
 sub coordinate_function {
 	# this subroutine will generate a coordinate string from coordinate values
 	
-	# identify the coordinates
-	my $chr_i   = $Data->chromo_column;
-	my $start_i = $Data->start_column;
-	my $stop_i  = $Data->stop_column;
-	unless (defined $chr_i and defined $start_i) {
+	# check for coordinates
+	unless ($Data->feature_type eq 'coordinate') {
 		# cannot add coordinate column, do without ?
 		warn " cannot generate coordinates, no chromosome or start column found\n";
 		return;
@@ -1881,7 +1890,8 @@ sub format_function {
 			}
 		});
 	
-		$Data->metadata($index, 'formatted', $positions);
+		$Data->metadata($index, 'formatted', $positions) unless 
+			$Data->metadata($index, 'AUTO');;
 		push @datasets_modified, $Data->name($index);
 	}
 	
