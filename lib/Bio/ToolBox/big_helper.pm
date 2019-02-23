@@ -1,5 +1,5 @@
 package Bio::ToolBox::big_helper;
-our $VERSION = '1.62';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -39,7 +39,7 @@ names of the subroutines to export. None are automatically exported.
 
 	use Bio::ToolBox::big_helper qw(wig_to_bigwig_conversion);
 
-There are are four available exported subroutines.
+There are are five available exported subroutines.
 
 =over
 
@@ -131,6 +131,47 @@ I<wigToBigWig> utility will generate the bigWig file.
 		# the bigWig file, which may take a few seconds to minutes
 	unlink $chromo_file;
 
+=item open_bigwig_to_wig_fh
+
+This subroutine will open a forked process from the UCSC F<bigWigToWig> utility 
+as a file handle, allowing a bigWig file to be converted to standard text 
+wig format and processed as an input stream. Note that the entire file will 
+be converted in this manner, not specific locations. This is intended for 
+working with the wig file as a whole. 
+
+Note that the F<bigWigToWig> utility does not handle errors gracefully 
+and will immediately fail upon encountering errors, usually also bringing 
+the main Perl process with it. 
+
+Pass the function an array of key =E<gt> value arguments. An L<IO::File> 
+object will be returned.
+
+=over 4
+
+=item bw
+
+The output file name for the bigWig file. Also accepts the keys C<file> 
+and C<wig>. This is required.
+ 
+=item bwapppath
+
+Provide the full path to the UCSC F<bigWigToWig> utility. If not provided, the 
+default C<PATH> will be searched for the utility. The path may also 
+be defined in the configuration file F<.biotoolbox.cfg>. 
+
+=back
+
+Example:
+
+	my $bw_file = 'example.bw';
+	my $bwfh = open_bigwig_to_wig_fh(
+		bw    => $bw_file,
+	);
+	while (my $line = $bwfh->getline) {
+		# do something with wig line
+	}
+	$bwfh->close;
+
 =item bed_to_bigbed_conversion
 
 This subroutine will convert a bed file to a bigBed file. 
@@ -213,6 +254,7 @@ our @EXPORT = qw(
 our @EXPORT_OK = qw(
 	wig_to_bigwig_conversion
 	open_wig_to_bigwig_fh
+	open_bigwig_to_wig_fh
 	bed_to_bigbed_conversion
 	generate_chromosome_file
 );
@@ -380,7 +422,8 @@ sub open_wig_to_bigwig_fh {
 				" Conversion failed\n";
 			return;
 		}
-		$args{chromo} = generate_chromosome_file($args{db});
+		$args{chrskip} ||= undef;
+		$args{chromo} = generate_chromosome_file($args{db}, $args{chrskip});
 		unless ($args{chromo}) {
 			cluck " Cannot generate chromosome info file! Conversion failed\n";
 			return;
@@ -401,6 +444,55 @@ sub open_wig_to_bigwig_fh {
 	return $bwfh;
 }
 
+
+
+### Open a file handle from bigWigToWig
+sub open_bigwig_to_wig_fh {
+	
+	# Collect passed arguments
+	my %args = @_; 
+	unless (%args) {
+		cluck "no arguments passed!";
+		return;
+	}
+	
+	# bigWig output file
+	$args{bw} ||= $args{wig} || $args{file} || undef;
+	unless ($args{bw}) {
+		cluck "no input bw file name passed!";
+		return;
+	}
+	unless ($args{bw} =~ /\.bw$/i) {
+		$args{bw} .= '.bw';
+	}
+	
+	# Identify bigwig conversion utility
+	$args{bwapppath} ||= undef;
+	unless ($args{bwapppath}) {
+		# check for an entry in the configuration file
+		$args{bwapppath} = $BTB_CONFIG->param("applications.bigWigToWig") || undef;
+	}
+	unless ($args{bwapppath}) {
+		# try checking the system path
+		$args{bwapppath} = which('bigWigToWig');
+	}
+	unless ($args{bwapppath} =~ /bigWigToWig$/) {
+		carp " Utility 'bigWigToWig' not specified and can not be found!\n";
+		return;
+	}
+
+	# open the filehandle
+	my $command = sprintf "%s %s stdout", $args{bwapppath}, $args{bw};
+	my $bwfh = IO::File->new("$command |") or 
+		confess sprintf("cannot open %s!\n", $args{bwapppath});
+		# bigWigToWig will always die anyway if something is wrong
+		# cannot trap it with an eval, since it doesn't just error out
+		# but actually exits, dragging the whole Perl process with it
+	# printf "we have a filehandle %s\n", ref($bwfh);
+	confess "unable to execute command '$command'" unless ref($bwfh);
+	# we will still get an IO::File handle back even with a failed convertor - sigh
+	return $bwfh;
+}
 
 
 ### Bed to BigBed file conversion
