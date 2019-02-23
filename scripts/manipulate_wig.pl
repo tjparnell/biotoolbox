@@ -6,8 +6,13 @@ use strict;
 use Pod::Usage;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use IO::Handle;
-use Bio::ToolBox::Data::file;
-my $VERSION = 1.60;
+use Bio::ToolBox;
+use Bio::ToolBox::big_helper qw(
+	open_wig_to_bigwig_fh 
+	open_bigwig_to_wig_fh
+	generate_chromosome_file
+);
+my $VERSION = 1.65;
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -35,6 +40,10 @@ my $minValue;
 my $maxValue;
 my $noZeroes;
 my $doStats;
+my $bw2wig_app;
+my $wig2bw_app;
+my $chromofile;
+my $database;
 my $help;
 my $print_version;
 
@@ -57,6 +66,10 @@ GetOptions(
 	'x|maximum=f'     => \$maxValue, # 
 	'z|zero'          => \$noZeroes,
 	't|stats!'        => \$doStats,
+	'bw2w=s'          => \$bw2wig_app,
+	'w2bw=s'          => \$wig2bw_app,
+	'chromo=s'        => \$chromofile,
+	'db=s'            => \$database,
 	'h|help'          => \$help, # request help
 	'v|version'       => \$print_version, # print the version
 ) or die " unrecognized option(s)!! please refer to the help documentation\n\n";
@@ -74,11 +87,7 @@ if ($help) {
 ### Print version
 if ($print_version) {
 	print " Biotoolbox script manipulate_datasets.pl, version $VERSION\n";
-	eval {
-		require Bio::ToolBox;
-		my $v = Bio::ToolBox->VERSION;
-		print " Biotoolbox package version $v\n";
-	};
+	printf " Biotoolbox package version %s\n", Bio::ToolBox->VERSION;
 	exit;
 }
 
@@ -109,25 +118,59 @@ if ($apply) {
 
 
 ### Open file handles
+# Input
 my ($infh, $outfh);
 if ($infile =~ /^stdin$/i) {
 	$infh = IO::Handle->new;
 	$infh->fdopen(fileno(STDIN), 'r');
 }
+elsif ($infile =~ /(?:bw|bigwig)$/i and -e $infile) {
+	$infh = open_bigwig_to_wig_fh(
+		bw        => $infile,
+		bwapppath => $bw2wig_app,
+	) or die "unable to open input bigWig file '$infile'!\n";
+} 
 elsif (-e $infile) {
-	$infh = Bio::ToolBox::Data::file->open_to_read_fh($infile) or 
+	$infh = Bio::ToolBox->open_file($infile) or 
 		die "can't open $infile! $!";
 }
 else {
 	die "unrecognized $infile!";
 }
 
+# Output
 if ($outfile =~ /^stdout$/i) {
 	$outfh = IO::Handle->new;
 	$outfh->fdopen(fileno(STDOUT), 'w');
 }
+elsif ($outfile =~ /(?:bw|bigwig)$/i) {
+	# check for chromosome file
+	if ($chromofile and -e $chromofile) {
+		# user provided a chromosome file
+		$outfh = open_wig_to_bigwig_fh(
+			bw        => $outfile,
+			chromo    => $chromofile,
+			bwapppath => $wig2bw_app,
+		) or die "unable to open output bigWig file '$outfile'!\n";
+	}
+	elsif ($infile =~ /(?:bw|bigwig)$/i or $database) {
+		# we can use the input bigWig as a database source if one isn't provided
+		$database ||= $infile;
+		$chromofile = generate_chromosome_file($database, $skip) or 
+			die "unable to generate chromosome file from '$database'!\n";
+		$outfh = open_wig_to_bigwig_fh(
+			bw        => $outfile,
+			chromo    => $chromofile,
+			bwapppath => $wig2bw_app,
+		) or die "unable to open output bigWig file '$outfile'!\n";
+	}
+	else {
+		die "unable to open output bigWig file handle without chromosome information!\n";
+	}
+	
+} 
 elsif ($outfile) {
-	$outfh = Bio::ToolBox::Data::file->open_to_write_fh($outfile) or 
+	$outfh = Bio::ToolBox->write_file($outfile) or 
 		die "can't open $outfile! $!";
 }
 
@@ -169,14 +212,12 @@ while (my $line = $infh->getline) {
 			# check the chromosome
 			my $chrom = $1;
 			if ($skip_regex and $chrom =~ $skip_regex) {
-				print STDERR "skipping chromosome $chrom\n";
 				$chrom_skip = 1;
 			}
 			else {
 				$chrom_skip = 0;
 			}
 			if ($apply and $chrom !~ $apply_regex) {
-				print STDERR "ignoring chromosome $chrom\n";
 				$chrom_ignore = 1;
 			}
 			else {
@@ -209,12 +250,15 @@ while (my $line = $infh->getline) {
 	unless (defined $wig_process_sub) {
 		my @data = split /\s+/, $line;
 		if (scalar @data == 4) {
+			print STDERR " processing bedGraph...\n";
 			$wig_process_sub = \&process_bedGraph;
 		}
 		elsif (scalar @data == 2) {
+			print STDERR " processing variableStep...\n";
 			$wig_process_sub = \&process_variableStep;
 		}
 		elsif (scalar @data == 1) {
+			print STDERR " processing fixedStep...\n";
 			$wig_process_sub = \&process_fixedStep;
 		}
 	}
@@ -229,6 +273,9 @@ while (my $line = $infh->getline) {
 ### close filehandles
 $infh->close;
 $outfh->close if $outfh;
+# remove chromosome file if we generated it
+unlink $chromofile if ($outfile =~ /(?:bw|bigwig)$/i and 
+						$database and $chromofile =~ /^chr_sizes_\w{5}$/);
 
 
 
@@ -362,7 +409,7 @@ manipulate_wig.pl [options] -i <file1.wig> -o <file1.out.wig>
   -k --skip <regex>         Skip lines where chromosomes match regex 
   -y --apply <regex>        Only apply manipulations to matching chromosomes 
   
-  Manipulation functions:
+  Manipulation functions (in order of execution):
   -u --null                 Convert null, NA, N/A, NaN, inf values to 0
   -d --delog [2|10]         Delog values of given base 
   -a --abs                  Convert to the absolute value 
@@ -374,6 +421,12 @@ manipulate_wig.pl [options] -i <file1.wig> -o <file1.out.wig>
   -p --place <int>          Format score to decimal positions
   -z --zero                 Discard lines with zero values
 
+  BigWig support:
+  --chromo <file>           Chromosome sizes file for writing bigWig
+  --db <file>               Indexed file to obtain chromosome info
+  --bw2w <path>             Path to UCSC bigWigToWig utility
+  --w2bw <path>             Path to UCSC wigToBigWig utility
+  
   General functions:
   -t --stats                Calculate statistics 
   -v --version              print version and exit
@@ -390,20 +443,17 @@ The command line flags and descriptions:
 =item --in E<lt>fileE<gt>
 
 Specify the input wig file. All three formats, variableStep, fixedStep, and 
-bedGraph, are supported. Files may be gzipped. Alternatively, the input 
-may be read from standard input by specifying 'stdin' as the file name. For 
-bigWig files, you may use a pipe as shown below
-
-    bigWigToWig file1.bw stdout | manipulate_wig.pl -i stdin 
+bedGraph, are supported. Files may be gzipped. BigWig files are supported, 
+so long as the UCSC bigWigToWig utility is available. Alternatively, the input 
+may be read from standard input by specifying 'stdin' as the file name. 
 
 =item --out E<lt>fileE<gt>
 
-Specify the output wig file. The output format will be the same format as the 
-input. The file may be gzipped by appending F<.gz> to the name. Alternatively, 
-the output may be sent to standard output by specifying 'stdout' as the file 
-name. For writing to bigWig files, use a pipe as show below
-
-    manipulate_wig.pl -o stdout | wigToBigWig stdin chroms.txt file.bw
+Specify the output wig file. The output format will be the same format as the
+input. The file may be gzipped by appending F<.gz> to the name. BigWig files are
+supported, so long as the UCSC wigToBigWig utility is available and a chromosome
+file is provided. Alternatively, the output may be sent to standard output by
+specifying 'stdout' as the file name. 
 
 =back
 
@@ -474,6 +524,37 @@ Discard lines with a score value of zero.
 
 =back
 
+=head2 BigWig support
+
+=over 4
+
+=item chromo E<lt>fileE<gt>
+
+When writing to a bigWig output file, provide a chromosome sizes text 
+file for use with the F<wigToBigWig> utility. Alternatively, use a 
+database file, below.
+
+=item db E<lt>fileE<gt>
+
+When writing to a bigWig output file, provide an indexed database file, 
+such as another bigWig file, Bam, indexed Fasta, etc, for automatically 
+generating a chromosome sizes text file to use with the F<wigToBigWig> 
+utility. If a bigWig input file was specified, it will be conveniently 
+substituted as a database. B<Note> that the C<--skip> option will be 
+applied to the generated chromosome file.
+
+=item bw2w E<lt>pathE<gt>
+
+If the UCSC F<bigWigToWig> utility is not in your environment C<PATH>, 
+provide the path with this option.
+
+=item w2bw E<lt>pathE<gt>
+
+If the UCSC F<wigToBigWig> utility is not in your environment C<PATH>, 
+provide the path with this option.
+
+=back
+
 =head2 General functions
 
 =over 4
@@ -499,12 +580,13 @@ Display the POD documentation using perldoc.
 
 A program to manipulate the score value of wig files. This will process all 
 forms of text based wig files, including fixedStep, variableStep, and bedGraph. 
-Files can be gzipped. 
+Files may be gzip compressed. BigWig files are also transparently supported as 
+both input and output, provided that the appropriate UCSC utility files are 
+available.
 
-NOTE: More than one option may be specified! The options above are the order 
+B<NOTE:> More than one option may be specified! The options above are the order 
 in which the score is manipulated. If they are not in the order you want, you 
 may have to pipe to sequential instances. Use 'stdin' and 'stdout' for filenames.
-Use an equal sign to define options with negative values, e.g. --mult=-1
 
 =head1 AUTHOR
 
