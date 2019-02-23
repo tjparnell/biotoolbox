@@ -5,10 +5,11 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
+use List::MoreUtils qw(mesh);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.62';
+my $VERSION =  '1.65';
 
 print "\n This program will write a BED file\n";
 
@@ -28,6 +29,7 @@ unless (@ARGV) {
 my (
 	$infile,
 	$outfile,
+	$bed,
 	$chr_index,
 	$start_index,
 	$stop_index,
@@ -53,6 +55,7 @@ GetOptions(
 	'i|in=s'           => \$infile, # the solexa data file
 	'o|out=s'          => \$outfile, # name of output file 
 	'H|noheader'       => \$no_header, # source has no header line
+	'bed=i'            => \$bed, # number of bed columns
 	'a|ask'            => \$ask, # request help in assigning indices
 	'c|chr=i'          => \$chr_index, # index of the chromosome column
 	'b|begin|start=i'  => \$start_index, # index of the start position column
@@ -98,6 +101,11 @@ if ($print_version) {
 unless ($infile) {
 	$infile = shift @ARGV or
 		die " no input file! use --help for more information\n";
+}
+if ($bed) {
+	unless ($bed == 3 or $bed == 4 or $bed == 5 or $bed == 6) {
+		die " bed must be 3, 4, 5, or 6!\n";
+	}
 }
 if ($bigbed) {
 	# do not allow compression when converting to bigbed
@@ -234,27 +242,79 @@ else {
 
 
 
-### Open output data
-my $Output = Bio::ToolBox::Data->new(
-	bed     => 6,
-) or die " unable to create output data strucutre!\n";
-
-
-# Convert the input stream
+# print summary of columns
 printf " Converting using \n  - chromosome index %s\n  - start index %s\n" . 
 	"  - stop index %s\n  - name index %s\n  - score index %s\n  - strand index %s\n",
 	defined $chr_index ? $chr_index : defined $Input->chromo_column ? $Input->chromo_column : '-',
 	defined $start_index ? $start_index : defined $Input->start_column ? $Input->start_column : '-',
 	defined $stop_index ? $stop_index : defined $Input->stop_column ? $Input->stop_column : '-',
 	defined $name_index ? $name_index : defined $name_base ? $name_base : defined $Input->name_column ? $Input->name_column : '-',
-	defined $score_index ? $score_index : '-',
+	defined $score_index ? $score_index : defined $Input->score_column ? $Input->score_column : '-',
 	defined $strand_index ? $strand_index : defined $Input->strand_column ? $Input->strand_column : '-';
 
-my $count = 0; # the number of lines processed
+# generate arguments list
+my @arg_keys;
+my @arg_indices;
+if (defined $chr_index) {
+	push @arg_keys, 'chromo';
+	push @arg_indices, $chr_index;
+}
+if (defined $start_index) {
+	push @arg_keys, 'start';
+	push @arg_indices, $start_index;
+}
+if (defined $stop_index) {
+	push @arg_keys, 'stop';
+	push @arg_indices, $stop_index;
+}
+if (defined $name_index) {
+	push @arg_keys, 'name';
+	push @arg_indices, $name_index;
+}
+if (defined $score_index) {
+	push @arg_keys, 'score';
+	push @arg_indices, $score_index;
+}
+if (defined $strand_index) {
+	push @arg_keys, 'strand';
+	push @arg_indices, $strand_index;
+}
+
+# determine minimum bed
+unless ($bed) {
+	if (defined $strand_index or defined $Input->strand_column) {
+		$bed = 6;
+	}
+	elsif (defined $score_index) {
+		$bed = 5;
+	}
+	elsif (defined $name_index or defined $name_base or defined $Input->name_column) {
+		$bed = 4;
+	}
+	else {
+		$bed = 3;
+	}
+}
+printf " Writing as bed%d\n", $bed;
+
+# check for zero start
 if (defined $start_index and substr($Input->name($start_index), -1) eq '0') {
 	$zero_based = 1; # name suggests 0-based indexing
 }
+
+# check for named features
 my $do_feature = $Input->feature_type eq 'named' ? 1 : 0; # get features from db?
+
+
+
+
+### Convert the input stream
+# Open output data
+my $Output = Bio::ToolBox::Data->new(
+	bed     => $bed,
+) or die " unable to create output data strucutre!\n";
+
+my $count = 0; # the number of lines processed
 while (my $row = $Input->next_row) {
 	
 	# get the feature from the db if necessary
@@ -262,37 +322,20 @@ while (my $row = $Input->next_row) {
 	
 	# build the arguments
 	# retrieve information from row object if indices were provided
-	my @args;
-	if (defined $chr_index) {
-		my $c = $row->value($chr_index);
-		next if $c eq '.';
-		push @args, 'chromo', $c; 
+	my @values = map {$row->value($_)} @arg_indices;
+	my %args = mesh(@arg_keys, @values);
+	$args{bed} = $bed;
+	
+	# extras
+	if (defined $name_base) {
+		$args{name} = sprintf("%s_%07d", $name_base, $count);
 	}
-	if (defined $start_index) {
-		my $s = $row->value($start_index);
-		next if $s eq '.';
-		$s += 1 if $zero_based;
-		push @args, 'start', $s;
+	if ($zero_based and defined $start_index) {
+		$args{start} += 1;
 	}
-	if (defined $stop_index) {
-		push @args, 'stop', $row->value($stop_index);
-	}
-	if (defined $strand_index) {
-		push @args, 'strand', $row->value($strand_index);
-	}
-	if (defined $score_index) {
-		my $s = $row->value($score_index);
-		$s = 0 if $s !~ /^[\d\.\-]+$/;
-		push @args, 'score', $s;
-	}
-	if (defined $name_index) {
-		push @args, 'name', $row->value($name_index);
-	} elsif (defined $name_base) {
-		push @args, 'name', sprintf("%s_%07d", $name_base, $count);
-	}
-			
+	
 	# write
-	my $string = $row->bed_string(@args);
+	my $string = $row->bed_string(%args);
 	$Output->add_row($string) if length($string);
 		# weirdly, this should work, as the add_row will split the columns of 
 		# the gff string automatically
@@ -367,6 +410,7 @@ data2bed.pl [--options...] <filename>
   -0 --zero                             file is in 0-based coordinate system
   
   Column indices:
+  --bed [3|4|5|6]                       type of bed to write
   -a --ask                              interactive selection of columns
   -c --chr <index>                      chromosome column
   -b --begin --start <index>            start coordinate column
@@ -428,6 +472,12 @@ BioPerl (and, by extension, all biotoolbox) scripts are base
 =head2 Column indices
 
 =over 4
+
+=item --bed [3|4|5|6]
+
+Explicitly set the number of bed columns in the output file. Otherwise, 
+it will attempt to write as many columns as available, filling in mock 
+data as needed.
 
 =item --ask
 
