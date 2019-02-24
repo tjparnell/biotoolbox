@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.62';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -20,7 +20,7 @@ use File::Which;
 use IO::File;
 
 # List of acceptable filename extensions
-our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|reff?lat|genepred|ucsc|maf)(?:\.gz)?/i;
+our $SUFFIX = qr/\.(?:txt|gff3?|gtf|bed|bg|bdg|bedgraph|sgr|kgg|cdt|vcf|narrowpeak|broadpeak|gappedpeak|reff?lat|genepred|ucsc|maf)(?:\.gz|\.bz2)?/i;
 
 # gzip application
 our $gzip_app;
@@ -307,6 +307,9 @@ sub parse_headers {
 		elsif ($line =~ /^(?:track|browser)\s+/i) {
 			# common with wig, bed, or bedgraph files for use with UCSC genome browser
 			# treat as a comment line, there's not that much useful info here
+			if ($line =~ /type=(\w+)/i) {
+				$self->format($1);
+			}
 			$self->add_comment($line);
 			$header_line_count++;
 		}
@@ -329,33 +332,35 @@ sub parse_headers {
 				$self->add_standard_metadata( pop @{ $self->{'comments'} } );
 			}
 			# we will continue here in case the commented header line was part of a 
-			# formatted file type, which will be checked by extension below
+			# formatted file type, which will be checked by extension or possibly 
+			# the format (if determined) below
+			my $format = $self->format || $self->extension;
 			
 			### a GFF file
-			if ($self->extension =~ /g[tf]f/i) {
+			if ($format =~ /g[tf]f/i) {
 				$self->add_gff_metadata;
 			}
 			
-			### a Bed or BedGraph file
-			elsif ($self->extension =~ /bdg|bed/i) {
-				my $count = scalar(split '\t', $line);
-				$self->add_bed_metadata($count);
-			}
-			
 			### a peak file
-			elsif ($self->extension =~ /peak/i) {
+			elsif ($format =~ /peak/i) {
 				my $count = scalar(split '\t', $line);
 				$self->add_peak_metadata($count);
 			}
 			
+			### a Bed or BedGraph file
+			elsif ($format =~ /bg|bdg|bed/i) {
+				my $count = scalar(split '\t', $line);
+				$self->add_bed_metadata($count);
+			}
+			
 			### a UCSC gene table
-			elsif ($self->extension =~ /ref+lat|genepred|ucsc/i) {
+			elsif ($format =~ /ref+lat|genepred|ucsc/i) {
 				my $count = scalar(split '\t', $line);
 				$self->add_ucsc_metadata($count);
 			}
 			
 			### a SGR file
-			elsif ($self->extension =~ /sgr/i) {
+			elsif ($format =~ /sgr/i) {
 				$self->add_sgr_metadata;
 			}
 			
@@ -1114,11 +1119,19 @@ sub add_gff_metadata {
 	my $force = shift || 0;
 	
 	# set the gff version based on the extension if it isn't already
-	unless ($self->gff) {
-		$self->{gff} = defined $version ? $version :
-			$self->extension =~ /gtf/  ? 2.5 :
-			$self->extension =~ /gff3/ ? 3   :
-			2;
+	if (not($self->gff) or $force) {
+		if (defined $version) {
+			$self->gff($version);
+		}
+		elsif ($self->extension =~ /gtf/i) {
+			$self->gff(2.5);
+		}
+		elsif ($self->exteions =~ /gff3/i) {
+			$self->gff(3);
+		}
+		else {
+			$self->gff(2); # hope for the best
+		}
 	}
 	
 	# set the metadata for the each column
@@ -1171,15 +1184,20 @@ sub add_gff_metadata {
 sub add_bed_metadata {
 	my ($self, $column_count) = @_;
 	my $force = shift || 0;
-
-	$self->{'number_columns'} = $column_count; 
-	$self->{'bed'} = $column_count;
 	
-	# set column names
-	my $bed_names = $self->standard_column_names(
-		# try to get this from the file extension if available
-		$self->extension =~ /bdg|graph/i ? 'bdg' : 'bed12'
-	);
+	# check bed type and set metadata appropriately
+	my $bed_names;
+	if ($self->format =~ /bedgraph/i or $self->extension =~ /bg|bdg|graph/i) {
+		$self->format('bedGraph'); # possibly redundant
+		$self->bed($column_count);
+		$bed_names = $self->standard_column_names('bdg');
+	}
+	else {
+		$self->format('bed');
+		$self->bed($column_count);
+		$bed_names = $self->standard_column_names('bed12');
+	}
+	$self->{'number_columns'} = $column_count; 
 	
 	# set the metadata for each column
 		# some of these may already be defined if there was a 
@@ -1217,16 +1235,30 @@ sub add_peak_metadata {
 	my ($self, $column_count) = @_;
 	my $force = shift || 0;
 
+	# check bed type and set metadata appropriately
+	# most of these are bed6 plus extra columns
+	my $column_names;
+	if ($self->format =~ /narrow/i or $self->extension =~ /narrow/i) {
+		$self->format('narrowPeak'); 
+		$self->bed($column_count);
+		$column_names = $self->standard_column_names('narrowpeak');
+	}
+	elsif ($self->format =~ /broad/i or $self->extension =~ /broad/i) {
+		$self->format('broadPeak'); # possibly redundant
+		$self->bed($column_count);
+		$column_names = $self->standard_column_names('broadpeak');
+	}
+	elsif ($self->format =~ /gapped/i or $self->extension =~ /gapped/i) {
+		$self->format('gappedPeak'); # possibly redundant
+		$self->bed($column_count);
+		$column_names = $self->standard_column_names('gappedpeak');
+	}
+	else {
+		# how did we get here???? Hope for the best.....
+		$self->bed($column_count);
+		$column_names = $self->standard_column_names('bed12');
+	}
 	$self->{'number_columns'} = $column_count; 
-	$self->{'bed'} = $column_count;
-		# technically this is called bed6+4 or bed6+3, but for our 
-		# purposes here, we will stick to column count to avoid breaking stuff
-	
-	# column names determined by extension
-	my $column_names = $self->standard_column_names(
-		$self->extension =~ /narrowpeak/i ? 'narrowpeak' :
-		$self->{extension} =~ /broadpeak/i ? 'broadpeak' : 'bed6'
-	);
 	
 	# add metadata
 	for (my $i = 0; $i < $column_count; $i++) {
@@ -1263,11 +1295,32 @@ sub add_ucsc_metadata {
 	my ($self, $column_count) = @_;
 	my $force = shift || 0;
 	
+	# set metadata
 	$self->{'number_columns'} = $column_count; 
 	$self->{'ucsc'} = $column_count;
 	
-	# set names based on column count
-	my $column_names = $self->standard_column_names('ucsc' . $column_count);
+	# set format and determine column names;
+	my $column_names;
+	if ($column_count == 16) {
+		$self->format('genePredExt with bin');
+		$column_names = $self->standard_column_names('ucsc16');
+	}
+	elsif ($column_count == 15) {
+		$self->format('genePredExt');
+		$column_names = $self->standard_column_names('ucsc15');
+	}
+	elsif ($column_count == 12) {
+		$self->format('knownGene');
+		$column_names = $self->standard_column_names('ucsc12');
+	}
+	elsif ($column_count == 11) {
+		$self->format('refFlat');
+		$column_names = $self->standard_column_names('ucsc11');
+	}
+	elsif ($column_count == 10) {
+		$self->format('genePred');
+		$column_names = $self->standard_column_names('ucsc10');
+	}
 	
 	# assign the column names and metadata
 	for (my $i = 0; $i < $column_count; $i++) {
@@ -1405,6 +1458,11 @@ sub standard_column_names {
 	elsif ($type eq 'broadpeak') {
 		return [qw(Chromosome Start0 End Name Score Strand signalValue 
 			pValue qValue)];
+	}
+	elsif ($type eq 'gappedpeak') {
+		return [qw(Chromosome Start0 End Name Score Strand  
+			thickStart0 thickEnd itemRGB blockCount blockSizes blockStarts0
+			signalValue pValue qValue)];
 	}
 	elsif ($type eq 'sgr') {
 		return [qw(Chromo Start Score)];

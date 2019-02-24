@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::ucsc;
-our $VERSION = '1.62';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -1379,6 +1379,7 @@ sub build_gene {
 	# now build the transcript for the gene
 	my $transcript = $self->build_transcript($gene);
 	$gene->add_SeqFeature($transcript);
+	$transcript->add_tag_value('Parent', $gene->primary_id);
 	
 	# update extra attributes as necessary
 	$self->update_attributes($gene);

@@ -13,7 +13,7 @@ use Bio::ToolBox::GeneTools qw(
 	:transcript
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.62';
+my $VERSION = '1.65';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -79,7 +79,7 @@ GetOptions(
 	'B|bed!'      => \$convert_to_bed, # convert to bed format
 	'G|gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
 	'g|gtf!'      => \$convert_to_gtf, # convert to gtf format
-	'r|ucsc|refFlat!' => \$convert_to_refflat, # convert to refFlat format
+	'r|refflat!'  => \$convert_to_refflat, # convert to refFlat format
 	'o|out=s'     => \$outfile, # name of output file 
 	'sort!'       => \$sort_data, # sort the output file
 	'z|gz!'       => \$gz, # compress output
@@ -279,7 +279,7 @@ sub load_from_infile {
 		parse      => 1,
 		simplify   => 0, # we want everything!
 		feature    => $features[0],
-		subfeature => $get_subfeatures ? 'exon,cds,utr' : '',
+		subfeature => $get_subfeatures ? 'exon,cds,utr,codon' : '',
 		chrskip    => $chromosome_exclude,
 	) or die " unable to load input file '$input'\n";
 	
@@ -323,7 +323,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_biotype($row->seqfeature(1), $tbiotype);
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -344,7 +348,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_support_level($row->seqfeature(1), $tsl);
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}
@@ -365,7 +373,11 @@ sub filter_features {
 		$Data->iterate( sub {
 			my $row = shift;
 			my $good = filter_transcript_gencode_basic($row->seqfeature(1));
-			my @t = get_transcripts($good);
+			unless (defined $good) {
+				push @unwanted, $row->row_index;
+				next;
+			}
+			my @t = get_transcripts($good); # verify we have transcripts
 			if (scalar @t) {
 				$Data->store_seqfeature($row->row_index, $good);
 			}

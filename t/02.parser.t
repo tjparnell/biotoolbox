@@ -10,10 +10,10 @@ use FindBin '$Bin';
 my $lite = 0;
 if (eval {require Bio::SeqFeature::Lite; 1}) {
 	$lite = 1;
-	plan tests => 535;
+	plan tests => 580;
 }
 else {
-	plan tests => 335;
+	plan tests => 380;
 }
 $ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 
@@ -37,6 +37,7 @@ my $ucscfile = File::Spec->catfile($Bin, "Data", "ensGene.txt");
 my $bed6file = File::Spec->catfile($Bin, "Data", "sample.bed");
 my $bed12file = File::Spec->catfile($Bin, "Data", "ensGene.bed");
 my $peakfile = File::Spec->catfile($Bin, "Data", "H3K4me3.narrowPeak");
+my $gapfile = File::Spec->catfile($Bin, "Data", "H3K27ac.bed");
 my $outfile = File::Spec->catfile($Bin, "Data", "tempout.txt");
 
 ### Testing with standard BioPerl Bio::SeqFeature::Lite class
@@ -56,6 +57,7 @@ test_ucsc('Bio::ToolBox::SeqFeature');
 test_bed6('Bio::ToolBox::SeqFeature');
 test_bed12('Bio::ToolBox::SeqFeature');
 test_narrowPeak();
+test_gappedPeak();
 
 ### Testing Data with gene table parsing
 test_parsed_gff_table();
@@ -63,6 +65,7 @@ test_parsed_ucsc_table();
 test_parsed_bed6_table();
 test_parsed_bed12_table();
 test_parsed_narrowPeak_table();
+test_parsed_gappedPeak_table();
 
 
 
@@ -574,6 +577,72 @@ sub test_narrowPeak {
 }
 
 
+sub test_gappedPeak {
+	# get the seqfeature class to test
+	print " >> Testing gappedPeak parser\n";
+	my $sfclass = 'Bio::ToolBox::SeqFeature';
+	
+	# open and check parser
+	my $bed = Bio::ToolBox::parser::bed->new(
+		file => $gapfile,
+	);
+	isa_ok($bed, 'Bio::ToolBox::parser::bed', 'Bed Parser');
+	my $fh = $bed->fh;
+	isa_ok($fh, 'IO::File', 'IO filehandle');
+	is($bed->version, 'gappedPeak', 'bed version string');
+	
+	# parse first feature line
+	my $f = $bed->next_feature;
+	isa_ok($f, $sfclass, 'first feature object');
+	is($f->seq_id, 'chr1', 'feature seq_id');
+	is($f->start, 5056, 'feature start');
+	is($f->stop, 5366, 'feature stop');
+	is($f->primary_tag, 'region', 'feature primary_tag');
+	is($f->display_name, 'peak_1', 'feature display_name');
+	is($f->primary_id, 'chr1:5055-5366', 'feature primary_id');
+	is($f->strand, 0, 'feature strand');
+	is($f->source, 'H3K27ac', 'feature source');
+	is($f->score, 53, 'feature score');
+	is($f->get_tag_values('signalValue'), 4.21044, 'feature signalValue');
+	is($f->get_tag_values('qValue'), '5.32258', 'feature qvalue');
+	my @subpeaks = $f->get_SeqFeatures;
+	is(scalar(@subpeaks), 2, 'number of sub peak features');
+	
+	# sub peaks
+	my $first = $subpeaks[0];
+	isa_ok($first, $sfclass, 'first subpeak feature object');
+	is($first->start, 5056, 'first subpeak start');
+	is($first->stop, 5056, 'first subpeak stop');
+	
+	# reload the table
+	undef $first;
+	undef @subpeaks;
+	undef $f;
+	undef $bed;
+	$bed = Bio::ToolBox::parser::bed->new(
+		file => $gapfile,
+	);
+	
+	# top features
+	my @top = $bed->top_features;
+	is(scalar @top, 5, 'bed top features');
+
+	# find gene
+	$f = $bed->find_gene('peak_4');
+	isa_ok($f, $sfclass, 'found peak4 object');
+	is($f->start, 88948, 'peak4 start');
+	is($f->stop, 89987, 'peak4 stop');
+	is($f->primary_tag, 'region', 'peak4 primary_tag');
+	is($f->display_name, 'peak_4', 'peak4 display_name');
+	is($f->primary_id, 'chr1:88947-89987', 'peak4 primary_id');
+	@subpeaks = $f->get_SeqFeatures;
+	is(scalar(@subpeaks), '3', 'number of peak4 sub peaks');
+}
+
+
+
+
+
 
 sub test_parsed_gff_table {
 	print " >> Testing parsed GFF data file\n";
@@ -804,4 +873,42 @@ sub test_parsed_narrowPeak_table {
 	unlink $outfile;
 }
 
+
+sub test_parsed_gappedPeak_table {
+	print " >> Testing parsed gappedPeak data file\n";
+	my $Data = Bio::ToolBox::Data->new();
+	isa_ok($Data, 'Bio::ToolBox::Data', 'New Data object');
+	my $flavor = $Data->taste_file($gapfile);
+	is($flavor, 'bed', 'gappedPeak file flavor');
+	my $p = $Data->parse_table($gapfile);
+	is($p, 1, 'parsed gappedPeak table');
+	
+	is($Data->number_columns, 2, 'number of columns');
+	is($Data->last_row, 5, 'number of rows');
+	is($Data->database, "Parsed:$gapfile", 'database source');
+	is($Data->name(0), 'Primary_ID', 'First column name');
+	is($Data->name(1), 'Name', 'Second column name');
+	is($Data->value(1,0), 'chr1:5055-5366', 'First row ID');
+	is($Data->value(1,1), 'peak_1', 'First row Name');
+	
+	my $f = $Data->get_seqfeature(1);
+	isa_ok($f, 'Bio::ToolBox::SeqFeature', 'First row SeqFeature object');
+	is($f->display_name, 'peak_1', 'SeqFeature display name');
+	is($f->start, 5056, 'SeqFeature start position');
+	
+	# attempt to reload the file
+	my $s = $Data->save($outfile);
+	is($s, $outfile, 'Saved temporary file');
+	undef $Data;
+	$Data = Bio::ToolBox::Data->new(
+		file    => $outfile,
+		parse   => 1,
+	);
+	isa_ok($Data, 'Bio::ToolBox::Data', 'Reloaded file');
+	is($Data->basename, 'tempout', 'file basename');
+	my $f2 = $Data->get_seqfeature(4);
+	isa_ok($f2, 'Bio::ToolBox::SeqFeature', 'Reloaded fourth row SeqFeature object');
+	is($f2->display_name, 'peak_4', 'SeqFeature display name');
+	unlink $outfile;
+}
 

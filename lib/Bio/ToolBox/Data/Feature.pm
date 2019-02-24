@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.63';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -91,6 +91,11 @@ a named database object, try calling the L</feature> method first.
 This will retrieve the database SeqFeature object, and the attributes 
 can then be retrieved using the methods below or on the actual 
 database SeqFeature object.
+
+In cases where there is a table column and a corresponding SeqFeature 
+object, for example a start column and a parsed SeqFeature object, the 
+table value takes precedence and is returned. You can always obtain the 
+SeqFeature's value separately and directly.
 
 These methods do not set attribute values. If you need to change the 
 values in a table, use the L</value> method below.
@@ -200,20 +205,22 @@ back to text. Returns a hash reference of key =E<gt> value pairs.
 
 =item vcf_attributes
 
-Parses the INFO (8th column) and all sample columns (10th and higher 
-columns) in a version 4 VCF file. The Sample columns use the FORMAT 
+Parses the C<INFO> (8th column) and all sample columns (10th and higher 
+columns) in a version 4 VCF file. The Sample columns use the C<FORMAT> 
 column (9th column) as keys. The returned hash reference has two levels:
 The first level keys are both the column names and index (0-based). The 
 second level keys are the individual attribute keys to each value. 
 For example:
 
    my $attr = $row->vcf_attributes;
+   
    # access by column name
    my $genotype = $attr->{sample1}{GT};
-   my $depth = $attr->{INFO}{ADP};
+   my $depth    = $attr->{INFO}{ADP};
+   
    # access by 0-based column index 
    my $genotype = $attr->{9}{GT};
-   my $depth = $attr->{7}{ADP}
+   my $depth    = $attr->{7}{ADP}
 
 =item rewrite_attributes
 
@@ -229,7 +236,7 @@ contents of the attributes hash.
 
 =item rewrite_vcf_attributes
 
-Rewrite the VCF attributes for the INFO (8th column), FORMAT (9th 
+Rewrite the VCF attributes for the C<INFO> (8th column), C<FORMAT> (9th 
 column), and sample columns (10th and higher columns) based on the 
 contents of the attributes hash that was previously generated with 
 the L</vcf_attributes> method. Useful when you have modified the 
@@ -252,7 +259,8 @@ module.
 
 Returns a SeqFeature object representing the feature or item in 
 the current row. If the SeqFeature object is stored in the parent 
-C<$Data> object, it is retrieved from there. Otherwise, the SeqFeature 
+C<$Data> object (usually from parsing an annotation file), it is 
+immediately returned. Otherwise, the SeqFeature 
 object is retrieved from the database using the name and 
 type values in the current Data table row. The SeqFeature object 
 is requested from the database named in the general metadata. If 
@@ -261,7 +269,8 @@ the C<$Data>-E<gt>database() method. If the feature name or type is not
 present in the table, then nothing is returned.
 
 See L<Bio::ToolBox::SeqFeature> and L<Bio::SeqFeatureI> for more 
-information about working with these objects.
+information about working with these objects. See L<Bio::DB::SeqFeature::Store> 
+about working with database features.
 
 This method normally only works with "named" feature types in a 
 L<Bio::ToolBox::Data> Data table. If your Data table has coordinate 
@@ -1077,7 +1086,12 @@ sub display_name {
 sub coordinate {
 	my $self = shift;
 	carp "name is a read only method" if @_;
-	my $coord = sprintf("%s:%d", $self->seq_id, $self->start);
+	# to avoid auto-converting start0 coordinates, which might confuse people or programs,
+	# we will take the start value as is when it's available, otherwise calculate start
+	my $start_i = $self->{data}->start_column;
+	my $coord = sprintf("%s:%d", $self->seq_id, 
+		defined $start_i ? $self->value($start_i) : 
+		exists $self->{feature} ? $self->{feature}->start : 0);
 	my $end = $self->end;
 	$coord .= "-$end" if $end;
 	return CORE::length($coord) > 2 ? $coord : undef;
@@ -1999,7 +2013,8 @@ sub bed_string {
 		$string .= "\t$name";
 	}
 	if ($args{bed} >= 5) {
-		my $score = exists $args{score} ? $args{score} : 1;
+		my $score = exists $args{score} ? $args{score} : $self->score;
+		$score = 1 unless defined $score;
 		$string .= "\t$score";
 	}
 	if ($args{bed} >= 6) {
@@ -2045,7 +2060,8 @@ sub gff_string {
 	}
 	
 	# score
-	my $score = exists $args{score} ? $args{score} : '.';
+	my $score = exists $args{score} ? $args{score} : $self->score;
+	$score = '.' unless defined $score;
 	my $phase = '.'; # do not even bother!!!!
 	
 	# attributes

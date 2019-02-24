@@ -11,6 +11,7 @@ use Bio::ToolBox::db_helper qw(
 	open_db_connection
 	verify_or_request_feature_types
 	check_dataset_for_rpm_support
+	calculate_score
 	$BAM_ADAPTER
 	$BIG_ADAPTER
 );
@@ -23,7 +24,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.63';
+my $VERSION = '1.65';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -66,6 +67,7 @@ my (
 	$win,
 	$step,
 	$set_strand,
+	$discard,
 	$gz,
 	$cpu,
 	$help,
@@ -102,6 +104,7 @@ GetOptions(
 	'step=i'           => \$step, # step size for genomic intervals
 	'force_strand|set_strand' => \$set_strand, # enforce a specific strand
 				# force_strand is preferred option, but respect the old option
+	'discard=f'        => \$discard, # discard feature below threshold
 	'z|gz!'            => \$gz, # compress output file
 	'c|cpu=i'          => \$cpu, # number of execution threads
 	'h|help'           => \$help, # request help
@@ -167,8 +170,8 @@ if ($infile) {
 			$Data->database($main_database);
 		}
 	}
-	else {
-		$main_database = $Data->database;
+	elsif ($Data->database) {
+		$main_database = $Data->database if $Data->database !~ /^Parsed/;
 	}
 	
 	# update feature type as necessary
@@ -279,6 +282,10 @@ else {
 	# single threaded execution
 	single_execution();
 }
+
+
+# filter out unwanted features
+discard_features() if defined $discard; # handle zero
 
 
 # calculate normalized values
@@ -469,8 +476,13 @@ sub set_defaults {
 	} 
 	
 	# generate formatter
-	if ($format) {
+	if (defined $format) {
 		$formatter = '%.' . $format . 'f';
+	}
+	
+	# discard features
+	if ($discard and $method !~ /count/) {
+		print " discard features best intended for count data, not $method data\n";
 	}
 }
 
@@ -812,6 +824,34 @@ sub add_new_dataset {
 
 
 
+sub discard_features {
+	print " Discarding features with sum below $discard....\n";
+	
+	# calculate which indices;
+	my @indices = ($Data->number_columns - scalar @datasets) .. $Data->last_column;
+	
+	# identify features to delete
+	my @to_delete;
+	$Data->iterate( sub {
+		my $row = shift;
+		my $value = calculate_score('sum', [ map {$row->value($_)} @indices ]);
+		push @to_delete, $row->row_index if $value < $discard;
+	});
+	
+	# delete the features
+	if (@to_delete) {
+		$Data->delete_row(@to_delete);
+		printf "   discarded %d features, %d remaining.\n", scalar(@to_delete), 
+			$Data->last_row;
+	}
+	
+	# add metadata
+	foreach my $i (@indices) {
+		$Data->metadata($i, 'Discarded_below', $discard);
+	}
+}
+
+
 sub calculate_fpkm_values {
 	print " Calculating FPKM values....\n" if $fpkm_method;
 	print " Calculating TPM values....\n" if $tpm;
@@ -857,6 +897,15 @@ sub calculate_fpkm_values {
 			} );
 		}
 		
+		# standard lengths
+		my ($standard_length, $fractional_length);
+		if (defined $start_adj and defined $stop_adj) {
+			$standard_length = abs($stop_adj - $start_adj);
+		}
+		if (defined $fstart and defined $fstop) {
+			$fractional_length = $fstop - $fstart;
+		}
+		
 		# add FPKM column
 		if ($fpkm_method) {
 			# add new column
@@ -864,12 +913,32 @@ sub calculate_fpkm_values {
 			$Data->metadata($fpkm_index, 'dataset', $Data->metadata($index, 'dataset'));
 			$Data->metadata($fpkm_index, 'fpkm_method', $fpkm_method);
 			$Data->metadata($fpkm_index, 'total_count', $total); 
+			
 	
 			# calculate and store the fpkms
 			$Data->iterate( sub {
 				my $row = shift;
-				my $length = defined $length_i ? $row->value($length_i) : $row->length;
+				my $length;
+				if ($standard_length) {
+					$length = $standard_length;
+				}
+				elsif (defined $length_i) {
+					$length = $row->value($length_i);
+				}
+				else {
+					my $feature = $row->seqfeature; # force feature to be retrieved
+					$length = $row->length;
+				}
 				$length ||= 1; # why would the length be zero?
+				if ($fractional_length) {
+					if (defined $limit) {
+						$length = int($length * $fractional_length) if $length >= $limit;
+					}
+					else {
+						$length = int($length * $fractional_length);
+					}
+				}
+				
 				my $fpkm = ($row->value($index) * 1_000_000_000) / ($length * $total);
 				# this is equivalent to traditional way: count / ( (total/1e6) * (length/1000) )
 				$row->value($fpkm_index, sprintf("%.3f", $fpkm));
@@ -886,8 +955,26 @@ sub calculate_fpkm_values {
 			my $tpm_total = 0;
 			$Data->iterate( sub {
 				my $row = shift;
-				my $length = defined $length_i ? $row->value($length_i) : $row->length;
+				my $length;
+				if ($standard_length) {
+					$length = $standard_length;
+				}
+				elsif (defined $length_i) {
+					$length = $row->value($length_i);
+				}
+				else {
+					my $feature = $row->seqfeature; # force feature to be retrieved
+					$length = $row->length;
+				}
 				$length ||= 1; # why would the length be zero?
+				if ($fractional_length) {
+					if (defined $limit) {
+						$length = int($length * $fractional_length) if $length >= $limit;
+					}
+					else {
+						$length = int($length * $fractional_length);
+					}
+				}
 				my $tpm_value = $row->value($index) / ($length / 1000);
 				$row->value($tpm_index, $tpm_value);
 				$tpm_total += $tpm_value;
@@ -944,6 +1031,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
   --fpkm [region|genome]              calculate FPKM using which total count
   --tpm                               calculate TPM values
   -r --format <integer>               number of decimal places for numbers
+  --discard <number>                  discard features where sum below threshold
   
   Adjustments to features:
   -x --extend <integer>               extend the feature in both directions
@@ -1179,6 +1267,15 @@ over the input regions, and not the entire genome.
 Specify the number of decimal positions to format the collected scores. 
 Default is not to format, often leading to more than the intended 
 significant digits.
+
+=item --discard E<lt>numberE<gt>
+
+Discard features whose sum of newly collected datasets are less than the 
+indicated value. This is intended as a time-saving feature when collecting 
+alignment counts over features or genomic windows, where some features are 
+expected to return a zero count. Note that this only checks the datasets 
+that were newly collected. For more advanced filtering, see 
+L<manipulate_datasets.pl>.
 
 =back
 

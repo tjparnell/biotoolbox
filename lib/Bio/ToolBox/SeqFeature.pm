@@ -68,9 +68,14 @@ ideas, which this module tries to implement.
 
 =head2 Creating new SeqFeature objects
 
-New, empty SeqFeature objects can be generated, but in general they should be  
-generated with location and other attributes. Pass an array of key =E<gt> value 
-pairs. Most of the accession methods may be used as key tags to the new method. 
+=over 4
+
+=item new
+
+Generate a new SeqFeature object. Pass an array of key =E<gt> value pairs 
+with the feature parameters. At a minimum, location information (C<seq_id>, 
+C<start>, and C<stop>) should be provided, with name and ID recommended. 
+Most of the accession methods may be used as key tags to the C<new> method. 
 The following attribute keys are accepted.
 
 =over 4
@@ -124,6 +129,8 @@ limitations. The C<primary_id> tag, attribute key/values, and subfeatures
 are B<not> duplicated. This basically limits the object to coordinates, 
 C<primary_tag>, C<source_tag>, C<display_name>, C<score>, and C<phase>. 
 Remaining attributes should be explicitly set by the user.
+
+=back
 
 =head2 Accession methods
 

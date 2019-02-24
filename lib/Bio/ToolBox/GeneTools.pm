@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.63';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -313,8 +313,12 @@ not explicitly defined in the hierarchy, then a new object is generated.
 	my $stop_codon = get_stop_codon($transcript);
 
 Returns a SeqFeature object representing the stop codon. If one is 
-not defined in the hierarchy, then a new object is created. <BNote> that 
-this assumes that the stop codon is inclusive to the defined CDS.
+not defined in the hierarchy, then a new object is created. B<Note> that 
+this assumes that the stop codon is inclusive to the defined CDS, which is 
+the case with GFF3 and UCSC gene table derived features. On the other hand, 
+features derived from GTF is defined with the stop codon exclusive to the CDS. 
+This shouldn't matter with GTF, however, since GTF usually explicitly includes 
+stop codon features, whereas the other two formats do not.
 
 =item get_transcript_cds_length
 
@@ -876,6 +880,7 @@ sub _get_alt_common_things {
 
 sub get_transcripts {
 	my $gene = shift;
+	return unless $gene;
 	confess "not a SeqFeature object!" unless ref($gene) =~ /seqfeature/i;
 	return $gene if ($gene->primary_tag =~ /rna|transcript/i);
 	my @transcripts;
@@ -1086,6 +1091,7 @@ sub get_cds {
 
 sub get_cdsStart {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ($transcript->strand >= 0) {
@@ -1106,6 +1112,7 @@ sub get_cdsStart {
 
 sub get_cdsEnd {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $cds = get_cds($transcript);
 	return unless $cds;
 	if ($transcript->strand >= 0) {
@@ -1124,6 +1131,7 @@ sub get_cdsEnd {
 
 sub get_transcript_cds_length {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $total = 0;
 	foreach my $subf ($transcript->get_SeqFeatures) {
 		next unless $subf->primary_tag eq 'CDS';
@@ -1134,7 +1142,7 @@ sub get_transcript_cds_length {
 
 sub get_start_codon {
 	my $transcript = shift;
-	return unless is_coding($transcript);
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $start_codon;
 	
 	# look for existing one
@@ -1175,7 +1183,7 @@ sub get_start_codon {
 
 sub get_stop_codon {
 	my $transcript = shift;
-	return unless is_coding($transcript);
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $stop_codon;
 	
 	# look for existing one
@@ -1185,7 +1193,8 @@ sub get_stop_codon {
 	return $stop_codon if $stop_codon;
 	
 	# otherwise we have to build one
-	# this entirely presumes that the stop codon is exclusive to the last cds
+	# this entirely presumes that the stop codon is inclusive to the last cds
+	# this is the case with GFF3 and UCSC tables, but not GTF
 	my $cdss = get_cds($transcript);
 	return unless $cdss;
 	if ($transcript->strand >= 0) {
@@ -1193,8 +1202,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[-1]->end + 1,
-				-end           => $cdss->[-1]->end + 3,
+				-start         => $cdss->[-1]->end - 2,
+				-end           => $cdss->[-1]->end,
 				-strand        => 1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1205,8 +1214,8 @@ sub get_stop_codon {
 				-seq_id        => $transcript->seq_id,
 				-source        => $transcript->source,
 				-primary_tag   => 'stop_codon',
-				-start         => $cdss->[0]->start - 3,
-				-end           => $cdss->[0]->start - 1,
+				-start         => $cdss->[0]->start,
+				-end           => $cdss->[0]->start + 2,
 				-strand        => -1,
 				-phase         => 0,
 				-primary_id    => $transcript->primary_id . '.stop_codon',
@@ -1329,6 +1338,7 @@ sub get_utrs {
 
 sub get_transcript_utr_length {
 	my $transcript = shift;
+	confess "not a SeqFeature object!" unless ref($transcript) =~ /seqfeature/i;
 	my $utrs = get_utrs($transcript);
 	my $total = 0;
 	foreach my $utr (@$utrs) {
@@ -1441,17 +1451,15 @@ sub gtf_string {
 	$string .= "; transcript_biotype \"$biotype\"" if $biotype;
 	my ($tsl) = $feature->get_tag_values('transcript_support_level');
 	$string .= "; transcript_support_level \"$tsl\"" if $tsl;
-	$string .= "\n";
+	$string .= ";\n";
 	
 	# convert exon subfeatures collected above
-	if (is_coding($feature)) {
-		my @cds = get_cds($feature);
-		push @cds, get_stop_codon($feature);
-		push @cds, get_start_codon($feature);
-		@exons = map { $_->[0] } 
-			sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-			map { [$_, $_->start, $_->end] } ( @exons, @cds );
-	}
+	my @cds = get_cds($feature);
+	push @cds, get_stop_codon($feature);
+	push @cds, get_start_codon($feature);
+	@exons = map { $_->[0] } 
+		sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+		map { [$_, $_->start, $_->end] } ( @exons, @cds );
 	foreach my $subf (@exons) {
 		$string .= join("\t", (
 			$subf->seq_id || '.',
@@ -1565,6 +1573,7 @@ sub bed_string {
 
 sub filter_transcript_support_level {
 	my $gene = shift;
+	return unless $gene;
 	my $min_tsl = shift || 'best'; 
 	my @list = qw(1 2 3 4 5 NA Missing);
 	
@@ -1579,6 +1588,7 @@ sub filter_transcript_support_level {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# categorize transcripts
 	my %results = map { $_ => [] } @list;
@@ -1640,6 +1650,7 @@ sub filter_transcript_support_level {
 
 sub filter_transcript_gencode_basic {
 	my $gene = shift;
+	return unless $gene;
 
 	# get transcripts
 	my @transcripts;
@@ -1652,6 +1663,7 @@ sub filter_transcript_gencode_basic {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# take appropriate transcripts
 	my @keepers;
@@ -1669,7 +1681,9 @@ sub filter_transcript_gencode_basic {
 
 sub filter_transcript_biotype {
 	my $gene = shift;
+	return unless $gene;
 	my $check = shift; 
+	confess "no biotype value to check provided!" unless $check;
 	
 	# get transcripts
 	my @transcripts;
@@ -1682,6 +1696,7 @@ sub filter_transcript_biotype {
 	else {
 		return;
 	}
+	return unless @transcripts;
 	
 	# take appropriate transcripts
 	my @keepers;

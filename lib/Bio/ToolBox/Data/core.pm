@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.61';
+our $VERSION = '1.65';
 
 =head1 NAME
 
@@ -37,6 +37,7 @@ sub new {
 		'feature'        => undef,
 		'feature_type'   => undef,
 		'db'             => undef,
+		'format'         => '',
 		'gff'            => 0,
 		'bed'            => 0,
 		'ucsc'           => 0,
@@ -247,12 +248,9 @@ sub verify {
 		my $bed_check = 1; # start with assumption it is correct
 		
 		# check number of columns
-		if (
-			$self->{'number_columns'} < 3 or 
-			$self->{'number_columns'} > 12 
-		) {
+		if ($self->{'number_columns'} < 3) {
 			$bed_check = 0;
-			$error .= " Number of columns not 3-12.";
+			$error .= " Number of columns not at least 3.";
 		}
 		
 		# check column index names
@@ -287,7 +285,7 @@ sub verify {
 		}
 		if (
 			exists $self->{6} and
-			$self->{'extension'} !~ /peak/i and
+			$self->{'format'} !~ /narrow|broad/i and
 			$self->{6}{'name'} !~ m/start|thick|cds/i
 		) {
 			$bed_check = 0;
@@ -295,7 +293,7 @@ sub verify {
 		}
 		if (
 			exists $self->{7} and
-			$self->{'extension'} !~ /peak/i and
+			$self->{'format'} !~ /narrow|broad/i and
 			$self->{7}{'name'} !~ m/end|stop|thick|cds/i
 		) {
 			$bed_check = 0;
@@ -303,7 +301,7 @@ sub verify {
 		}
 		if (
 			exists $self->{8} and
-			$self->{'extension'} !~ /peak/i and
+			$self->{'format'} !~ /narrow|broad/i and
 			$self->{8}{'name'} !~ m/item|rgb|color/i
 		) {
 			$bed_check = 0;
@@ -311,7 +309,7 @@ sub verify {
 		}
 		if (
 			exists $self->{9} and
-			$self->{'extension'} !~ /peak/i and
+			$self->{'format'} !~ /narrow|broad/i and
 			$self->{9}{'name'} !~ m/count|number|block|exon/i
 		) {
 			$bed_check = 0;
@@ -351,8 +349,8 @@ sub verify {
 				$error .= " Column 5 not strand values.";
 			}
 		}
-		if ($self->{'extension'} and 
-			$self->{'extension'} =~ /peak/i) {
+		if ($self->{'format'} and 
+			$self->{'format'} =~ /narrow|broad/i) {
 			unless ($self->_column_is_numeric(6,7,8) ) {
 				$bed_check = 0;
 				$error .= " Columns 6,7,8 not numeric.";
@@ -369,21 +367,46 @@ sub verify {
 				$error .= " Column 10,11 not comma-delimited integers.";
 			}
 		}
+		if (
+			$self->{'number_columns'} == 15 and
+			$self->{'format'} =~ /gapped/i
+		) {
+			# gappedPeak has extra special limitations
+			unless ($self->_column_is_integers(6,7,9) ) {
+				$bed_check = 0;
+				$error .= " Column 6,7,9 not integers.";
+			}
+			unless ($self->_column_is_comma_integers(10,11) ) {
+				$bed_check = 0;
+				$error .= " Column 10,11 not comma-delimited integers.";
+			}
+			unless ($self->_column_is_numeric(12,13,14) ) {
+				$bed_check = 0;
+				$error .= " Columns 12,13,14 not numeric.";
+			}
+		}
 		
 		# peak file format
-		if ($self->{'extension'} and 
-			$self->{'extension'} =~ /narrowpeak/i and 
+		if ($self->{'format'} and 
+			$self->{'format'} =~ /narrowpeak/i and 
 			$self->{'number_columns'} != 10
 		) {
 			$bed_check = 0;
 			$error .= " NarrowPeak has 10 columns only.";
 		}
-		if ($self->{'extension'} and 
-			$self->{'extension'} =~ /broadpeak/i and 
+		if ($self->{'format'} and 
+			$self->{'format'} =~ /broadpeak/i and 
 			$self->{'number_columns'} != 9
 		) {
 			$bed_check = 0;
 			$error .= " BroadPeak has 9 columns only.";
+		}
+		if ($self->{'format'} and 
+			$self->{'format'} =~ /gappedpeak/i and 
+			$self->{'number_columns'} != 15
+		) {
+			$bed_check = 0;
+			$error .= " GappeddPeak has 15 columns only.";
 		}
 		
 		# reset the BED tag value as appropriate
@@ -741,7 +764,8 @@ sub _column_is_numeric {
 	}
 	for my $row (1 .. $self->{last_row}) {
 		for my $i (@index) {
-			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d\-\.,eE]+$/);
+			# we have a very loose definition of numeric: exponents, signs, commas
+			return 0 unless ($self->{data_table}->[$row][$i] =~ /^[\d\-\+\.,eE]+$/);
 		}
 	}
 	return 1;
@@ -1033,10 +1057,28 @@ sub big_adapter {
 	return use_big_adapter(@_);
 }
 
+sub format {
+	my $self = shift;
+	if (defined $_[0]) {
+		$self->{format} = $_[0];
+	}
+	return $self->{format};
+}
+
 sub gff {
 	my $self = shift;
-	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.5|3)$/) {
+	if (defined $_[0] and $_[0] =~ /^(?:0|1|2|2\.[2|5]|3)$/) {
 		$self->{gff} = $_[0];
+		if ($_[0] eq '2.2' or $_[0] eq '2.5') {
+			$self->format('gtf');
+		}
+		elsif ($_[0] eq '3') {
+			$self->format('gff3');
+		}
+		else {
+			$self->format('gff');
+		}
+		
 	}
 	return $self->{gff};
 }

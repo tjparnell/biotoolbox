@@ -1,17 +1,82 @@
 package Bio::ToolBox;
 
-our $VERSION = '1.63';
-
-1;
+our $VERSION = '1.65';
 
 =head1 NAME
 
 Bio::ToolBox - Tools for querying and analysis of genomic data
 
+=head1 USAGE
+
+This module provides a handful of commonly used convenience methods 
+as entry points to working with data files. Most of them use or 
+return a L<Bio::ToolBox::Data> object.
+
+=head2 Methods
+
+=over 4
+
+=item load_file
+
+Open a tab-delimited text file as a L<Bio::ToolBox::Data> object. 
+Simply pass the file path as a single argument. It assumes the first 
+row is the column headers, and comment lines begin with C<#>. 
+Compressed files are transparently handled. See the 
+L<Bio::ToolBox::Data> C<new> method for more details or options.
+
+  $Data = Bio::ToolBox->load_file('myfile.txt');
+
+=item parse_file
+
+Parse an annotation file, such as BED, GTF, GFF3, UCSC genePred or 
+refFlat file, into a L<Bio::ToolBox::Data> table. Each row in the 
+resulting table is linked to a parsed SeqFeature gene object. See 
+the L<Bio::ToolBox::Data> C<new> method for more details or options.
+
+  $Data = Bio::ToolBox->parse_file('genes.gtf.gz');
+    
+=item new_data
+
+Generate a new, empty L<Bio::ToolBox::Data> table with the given column 
+names. Pass the names of the columns in the new table.
+
+  $Data = Bio::ToolBox->new_data( qw(Name ID Score) );
+    
+=item open_file
+
+Open a generic file handle for reading. It transparently handles 
+compression as necessary. Returns an L<IO::File> object. Pass the 
+file path as an argument. 
+    
+  $fh = Bio::ToolBox->open_file('mydata.txt.gz');
+    
+=item write_file
+
+Open a generic file handle for writing. It transparently handles 
+compression as necessary based on filename extension or passed 
+options. It will use the C<pigz> multi-threaded, external, compression
+utility if available. See the C<open_to_write_fh> method in 
+<Bio::ToolBox::Data::file> for more information.
+
+  $fh = Bio::ToolBox->write_file('mynewdata.txt.gz');
+
+=item open_database
+
+Open a binary database file, including Bam, bigWig, bigBed, Fasta, 
+L<Bio::DB::SeqFeature::Store> SQLite file or named MySQL connection, 
+USeq file, or any other supported binary or indexed file formats. 
+Database type is transparently and automatically checked by looking for 
+common file extensions, if present. See the C<open_db_connection> in 
+L<Bio::ToolBox::db_helper> for more information.
+
+  $db = Bio::ToolBox->open_database($database);
+    
+=back
+
 =head1 DESCRIPTION
 
-These libraries provide a useful interface for working with 
-bioinformatic data. Many bioinformatic data analysis revolves 
+The Bio::ToolBox libraries provide a useful interface for working 
+with bioinformatic data. Many bioinformatic data analysis revolves 
 around working with tables of information, including lists of 
 genomic annotation (genes, promoters, etc.) or defined regions 
 of interest (epigenetic enrichment, transcription factor binding 
@@ -152,6 +217,7 @@ L<Bio::Perl>, L<Bio::DB::SeqFeature::Store>, L<Bio::SeqFeatureI>, L<Bio::DB::Big
 L<Bio::DB::BigBed>, L<Bio::DB::Sam>, L<Bio::DB::HTS>, L<Bio::DB::USeq>, 
 L<Bio::ViennaNGS>
 
+
 =head1 AUTHOR
 
  Timothy J. Parnell, PhD
@@ -164,3 +230,81 @@ L<Bio::ViennaNGS>
 
 This package is free software; you can redistribute it and/or modify
 it under the terms of the Artistic License 2.0. 
+
+
+=cut
+
+use strict;
+use Bio::ToolBox::Data;
+
+1;
+
+sub load_file {
+	my $self = shift;
+	if (scalar(@_) == 1) {
+		return Bio::ToolBox::Data->new(
+			file   => $_[0],
+		);
+	}
+	else {
+		return Bio::ToolBox::Data->new(@_);
+	}
+}
+
+sub parse_file {
+	my $self = shift;
+	if (scalar(@_) == 1) {
+		return Bio::ToolBox::Data->new(
+			file   => $_[0],
+			parse  => 1,
+		);
+	}
+	else {
+		my %args = @_;
+		$args{parse} ||= 1; # make sure this is present
+		return Bio::ToolBox::Data->new(%args);
+	}
+}
+
+sub new_data {
+	my $self = shift;
+	if ($_[0] =~ /^(?:columns|datasets)$/) {
+		# looks like a correctly formatted list
+		return Bio::ToolBox::Data->new(@_);
+	}
+	else {
+		# put provided list into an array
+		return Bio::ToolBox::Data->new(
+			columns => [@_]
+		);
+	}
+}
+
+sub open_file {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_to_read_fh(@_);
+}
+
+sub write_file {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_to_write_fh(@_);
+}
+
+sub open_database {
+	my $self = shift;
+	return Bio::ToolBox::Data->open_new_database(@_);
+}
+
+sub bam_adapter {
+	my $self = shift;
+	return Bio::ToolBox::Data->bam_adapter(@_);
+}
+
+sub big_adapter {
+	my $self = shift;
+	return Bio::ToolBox::Data->big_adapter(@_);
+}
+
+__END__
+
+

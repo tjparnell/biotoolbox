@@ -52,11 +52,11 @@ sub get_base_options {
 			'Statistics::Lite'        => 3.2,
 			'Statistics::Descriptive' => 3.0,
 			'List::Util'              => 0,
+			'List::MoreUtils'         => 0,
 			'File::Which'             => 0,
 			'Getopt::Long'            => 2.24,
 		},
 		recommends        => {
-			'DBD::SQLite'             => 0,
 			'Net::FTP'                => 0,
 			'Parallel::ForkManager'   => 1.02,
 			'Set::IntervalTree'       => 0.10,
@@ -91,13 +91,26 @@ sub get_base_options {
 
 
 sub check_bio {
+	# they are splitting up and refactoring BioPerl, no longer recommend checking for 
+	# Bio::Root::Version as each module is now getting it's own version number - huh
+	# plus Bio::DB::SeqFeature::Store is being split off as its own package, so need 
+	# to check for that separately
 	my $bio_ok;
-	eval {require Bio::Root::Version; $bio_ok = 1;};
+	eval {require Bio::Root::Root; $bio_ok = 1;};
 	if ($bio_ok) {
-		$options->{'requires'}{'Bio::Root::Version'} = 1.0069023;
+		# version numbers gone to hell, hope for the best
+		$options->{'requires'}{'Bio::Root::Root'} = 0; # ideally 1.7.x, minimally 1.69
+		my $sfdb;
+		eval {require Bio::DB::SeqFeature::Store; $sfdb = 1;};
+		unless ($sfdb) {
+			$options->{'recommends'}{'Bio::DB::SeqFeature::Store'} = 0;
+			$options->{'recommends'}{'DBD::SQLite'} = 0;
+		}
 	}
 	else {
-		$options->{'recommends'}{'Bio::Perl'} = 1.0069023;
+		$options->{'recommends'}{'BioPerl'} = 0;
+		$options->{'recommends'}{'Bio::DB::SeqFeature::Store'} = 0;
+		$options->{'recommends'}{'DBD::SQLite'} = 0;
 	}
 }
 

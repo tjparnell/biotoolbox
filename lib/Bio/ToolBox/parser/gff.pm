@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.62';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -673,42 +673,19 @@ sub parse_file {
 			if (exists $self->{loaded}{$id}) {
 				# this ID should be unique in the GFF file
 				# otherwise it might be a shared duplicate or a malformed GFF file
-				my $existing = $self->{loaded}{$id};
-				if ($existing->primary_tag eq $feature->primary_tag and
-					$existing->start == $feature->start and 
-					$existing->end   == $feature->end
-				) {
-					# definitely looks like a duplicate feature
-					my ($p) = $feature->get_tag_values('Parent');
-					if ($p and exists $self->{loaded}{$p}) {
-						# excellent! add this parent to the original existing feature
-						$existing->add_tag_value('Parent', $p);
-						next TOP_FEATURE_LOOP;
-					}
-					else {
-						# duplicate without a parent! not good
-						my $tag = $feature->primary_tag;
-						$self->{duplicate_ids}{$id}++ unless 
-							$tag eq 'CDS' or $tag eq 'exon'; # Ensembl CDS recycle IDs
-						# either way, add this as an orphan
-						$self->_add_orphan($feature);
-						next TOP_FEATURE_LOOP;
-					}
+				# generally only a concern for top level features
+				if ($feature->primary_tag =~ /gene|rna|transcript/) {
+					$self->{duplicate_ids}{$id} += 1;
+				}
+				
+				# store all of the features as an array
+				if (ref($self->{loaded}{$id}) eq 'ARRAY') {
+					# there's more than two duplicates! pile it on!
+					push @{ $self->{loaded}{$id} }, $feature; 
 				}
 				else {
-					# definitely not a duplicate feature
-					# record how many times we've seen this
-					my $tag = $feature->primary_tag;
-					$self->{duplicate_ids}{$id}++ unless 
-						$tag eq 'CDS' or $tag eq 'exon'; # Ensembl CDS recycle IDs
-					
-					# check to see if this is child feature
-					unless ($feature->has_tag('Parent')) {
-						# without a parent, this must be an orphan, or a malformed GFF3 file
-						# anyway, keep this as an orphan
-						$self->_add_orphan($feature);
-						next TOP_FEATURE_LOOP;
-					}
+					my $existing = $self->{loaded}{$id};
+					$self->{loaded}{$id} = [$existing, $feature];
 				}
 			} 
 			else {

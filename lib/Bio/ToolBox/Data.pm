@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.62';
+our $VERSION = '1.64';
 
 =head1 NAME
 
@@ -1053,7 +1053,11 @@ analogy to the C<seq_stream()> method.
   }
 
 Called from a C<Bio::ToolBox::Data::Iterator> object, it returns a 
-L<Bio::ToolBox::Data::Feature> object. 
+L<Bio::ToolBox::Data::Feature> row object. If SeqFeature objects are 
+associated with the row, perhaps from a parsed input annotation file, 
+then they are automatically associated with the row object. (Previous 
+versions required separately calling the seqfeature() row method to 
+perform this.)
 
 =back
 
@@ -1283,6 +1287,7 @@ sub parse_table {
 		$parser->do_exon(1) if $subfeature =~ /exon/i;
 		$parser->do_cds(1) if $subfeature =~ /cds/i;
 		$parser->do_utr(1) if $subfeature =~ /utr|untranslated/i;
+		$parser->do_codon(1) if $subfeature =~/codon/i;
 	}
 	if ($feature =~ /gene$/i) {
 		$parser->do_gene(1);
@@ -2252,10 +2257,15 @@ sub next_row {
 	return if $self->{'index'} > $self->{data}->{last_row}; # no more
 	my $i = $self->{'index'};
 	$self->{'index'}++;
-	return Bio::ToolBox::Data::Feature->new(
+	my @options = (
 		'data'      => $self->{data},
 		'index'     => $i,
-	);	
+	);
+	if (exists $self->{data}->{SeqFeatureObjects}) {
+		push @options, 'feature', $self->{data}->{SeqFeatureObjects}->[$i]
+			if defined $self->{data}->{SeqFeatureObjects}->[$i];
+	}
+	return Bio::ToolBox::Data::Feature->new(@options);	
 }
 
 sub row_index {
