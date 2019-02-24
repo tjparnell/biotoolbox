@@ -1,13 +1,20 @@
 ######## Bio::ToolBox revision history #############
 
 v1.65
+	- Add function to read directly from bigWig files, and add 
+	support for bigWig files to script manipulate_wig
 	- Added options for filtering transcript Gencode or biotype 
 	in script get_gene_regions.
 	- Added option to discard low count features from script 
 	get_datasets.
+	- Add option to explicitly set number of columns of output 
+	bed file in script data2bed
 	- Update script get_feature_info to work with annotation files
 	- Optimize data2wig to handle fast option in more scenarios
-	- Bug fixes in Bio::ToolBox, get_relative_data, more
+	- Coordinate string generation in manipulate_datasets takes 
+	start values as is
+	- Bug fixes in Bio::ToolBox, get_relative_data, 
+	manipulate_datasets, more
 	- 
 
 v1.64
