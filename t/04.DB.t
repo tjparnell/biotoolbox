@@ -15,7 +15,7 @@ BEGIN {
 		plan tests => 88;
 	}
 	else {
-		plan skip_all => 'Bio::DB::SeqFeature::Store::memory or DB_File not available';
+		plan skip_all => 'Bio::DB::SeqFeature::Store not available';
 	}
 	$ENV{'BIOTOOLBOX'} = File::Spec->catfile($Bin, "Data", "biotoolbox.cfg");
 }
