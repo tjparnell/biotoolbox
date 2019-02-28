@@ -1,5 +1,5 @@
 package Bio::ToolBox::parser::bed;
-our $VERSION = '1.64';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -298,150 +298,14 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::gff>, L<Bio::ToolBox::parse
 
 use strict;
 use Carp qw(carp cluck croak confess);
+use base 'Bio::ToolBox::Parser'; 
 use Bio::ToolBox::Data::Stream; 
-
-my $SFCLASS = 'Bio::ToolBox::SeqFeature'; 
-eval "require $SFCLASS" or croak $@;
 
 1;
 
 sub new {
 	my $class = shift;
-	my $self = {
-		'stream'        => undef,
-		'fh'            => undef,
-		'version'       => undef,
-		'bed'           => undef,
-		'convertor_sub' => undef,
-		'source'        => '.',
-		'top_features'  => [],
-		'do_gene'       => 0, 
-		'do_exon'       => 0,
-		'do_cds'        => 0, 
-		'do_utr'        => 0, 
-		'do_codon'      => 0,
-		'share'         => 0, 
-		'eof'           => 0,
-		'line_count'    => 0,
-		'seq_ids'       => {},
-	};
-	bless $self, $class;
-	
-	# check for options
-	if (@_) {
-		if (scalar(@_) == 1) {
-			# short and sweet, just a file, we assume
-			my $file = shift @_;
-			$self->open_file($file);
-		}
-		else {
-			my %options = @_;
-			if (exists $options{file} or $options{table}) {
-				$options{file} ||= $options{table};
-				$self->open_file( $options{file} );
-			}
-			if (exists $options{do_exon}) {
-				$self->do_exon($options{do_exon});
-			}
-			if (exists $options{do_cds}) {
-				$self->do_cds($options{do_cds});
-			}
-			if (exists $options{do_utr}) {
-				$self->do_utr($options{do_utr});
-			}
-			if (exists $options{do_codon}) {
-				$self->do_codon($options{do_codon});
-			}
-			if (exists $options{source}) {
-				$self->source($options{source});
-			}
-			if (exists $options{class}) {
-				my $class = $options{class};
-				if (eval "require $class; 1") {
-					$SFCLASS = $class;
-				}
-				else {
-					croak $@;
-				}
-			}
-		}
-	}
-	
-	# done
-	return $self;
-}
-
-sub version {
-	return shift->{version};
-}
-
-sub source {
-	my $self = shift;
-	if (@_) {
-		$self->{'source'} = shift;
-	}
-	return $self->{'source'};
-}
-
-sub simplify {
-	# this doesn't do anything, for now, but maintain compatibility with gff parser
-	return 0;
-}
-
-sub do_gene {
-	# this does nothing
-	return 0;
-}	
-
-sub do_exon {
-	# this only pertains to bed-12 files
-	my $self = shift;
-	if (@_) {
-		$self->{'do_exon'} = shift;
-	}
-	return $self->{'do_exon'};
-}	
-
-sub do_cds {
-	# this only pertains to bed-12 files
-	my $self = shift;
-	if (@_) {
-		$self->{'do_cds'} = shift;
-	}
-	return $self->{'do_cds'};
-}	
-
-sub do_utr {
-	# this only pertains to bed-12 files
-	my $self = shift;
-	if (@_) {
-		$self->{'do_utr'} = shift;
-	}
-	return $self->{'do_utr'};
-}	
-
-sub do_codon {
-	# this only pertains to bed-12 files
-	my $self = shift;
-	if (@_) {
-		$self->{'do_codon'} = shift;
-	}
-	return $self->{'do_codon'};
-}	
-
-sub do_name {
-	# this does nothing
-	return 0;
-}	
-
-sub share {
-	# this does nothing as we do not parse genes, so no opportunity for sharing
-	return 0;
-}	
-
-sub fh {
-	my $self = shift;
-	return $self->{'fh'};
+	return $class->SUPER::new(@_);
 }
 
 sub open_file {
@@ -522,7 +386,6 @@ sub open_file {
 		$self->{kgxref}      = {};
 		$self->{ensembldata} = {};
 		$self->{gene2seqf}   = {};
-		$self->{sfclass}     = $SFCLASS;
 	}
 	elsif ($peak == 10) {
 		# narrowPeak file
@@ -553,7 +416,6 @@ sub open_file {
 		$self->{kgxref}      = {};
 		$self->{ensembldata} = {};
 		$self->{gene2seqf}   = {};
-		$self->{sfclass}     = $SFCLASS;
 	}
 	else {
 		# an ordinary bed file
@@ -613,27 +475,6 @@ sub next_feature {
 	return;
 }
 
-sub next_top_feature {
-	my $self = shift;
-	# check that we have an open filehandle
-	unless ($self->fh) {
-		croak("no Bed file loaded to parse!");
-	}
-	unless ($self->{'eof'}) {
-		$self->parse_file or croak "unable to parse file!";
-	}
-	return shift @{ $self->{top_features} };
-}
-
-sub top_features {
-	my $self = shift;
-	unless ($self->{'eof'}) {
-		$self->parse_file;
-	}
-	my @features = @{ $self->{top_features} };
-	return wantarray ? @features : \@features;
-}
-
 *parse_table = \&parse_file;
 
 sub parse_file {
@@ -672,7 +513,7 @@ sub _parse_narrowPeak {
 	}
 	
 	# generate the basic SeqFeature
-	my $feature = $SFCLASS->new(
+	my $feature = $self->{sfclass}->new(
 		-seq_id         => $data[0],
 		-start          => $data[1] + 1,
 		-end            => $data[2],
@@ -702,7 +543,7 @@ sub _parse_broadPeak {
 	}
 	
 	# generate the basic SeqFeature
-	my $feature = $SFCLASS->new(
+	my $feature = $self->{sfclass}->new(
 		-seq_id         => $data[0],
 		-start          => $data[1] + 1,
 		-end            => $data[2],
@@ -731,7 +572,7 @@ sub _parse_bedGraph {
 	}
 	
 	# generate the basic SeqFeature
-	return $SFCLASS->new(
+	return $self->{sfclass}->new(
 		-seq_id         => $data[0],
 		-start          => $data[1] + 1,
 		-end            => $data[2],
@@ -751,7 +592,7 @@ sub _parse_bed {
 	}
 	
 	# generate the basic SeqFeature
-	return $SFCLASS->new(
+	return $self->{sfclass}->new(
 		-seq_id         => $data[0],
 		-start          => $data[1] + 1,
 		-end            => $data[2],
@@ -813,7 +654,7 @@ sub _parse_bed12 {
 	);
 	
 	# create builder
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new(join("\t", @new), $self);
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@new, $self);
 	my $feature = $builder->build_transcript;
 	$feature->add_tag_value('itemRGB', $data[8]);
 	$feature->score($data[4]);
@@ -858,7 +699,7 @@ sub _parse_gappedPeak {
 	);
 	
 	# create builder and process
-	my $builder = Bio::ToolBox::parser::ucsc::builder->new(join("\t", @new), $self);
+	my $builder = Bio::ToolBox::parser::ucsc::builder->new(\@new, $self);
 	my $feature = $builder->build_transcript;
 	
 	# clean up feature and add extra values
@@ -872,36 +713,6 @@ sub _parse_gappedPeak {
 	$feature->add_tag_value('pValue', $data[13]);
 	$feature->add_tag_value('qValue', $data[14]);
 	return $feature;
-}
-
-sub seq_ids {
-	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
-	my @s = keys %{$self->{seq_ids}};
-	return wantarray ? @s : \@s;
-}
-
-
-sub seq_id_lengths {
-	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
-	return $self->{seq_ids};
-}
-
-sub _get_seq_ids {
-	my $self = shift;
-	return unless $self->{'eof'};
-	foreach (@{ $self->{top_features} }) {
-		my $s = $_->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
-			$self->{seq_ids}{$s} = 1;
-		}
-		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
-	}
 }
 
 sub comments {

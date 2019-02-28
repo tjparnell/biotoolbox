@@ -129,7 +129,7 @@ sub test_gff {
 
 	# top features
 	my @tops = $gff->top_features;
-	is(scalar @tops, 32, 'number of top features');
+	is(scalar @tops, 33, 'number of top features');
 
 	# find gene
 	$f = $gff->find_gene('YAL055W');

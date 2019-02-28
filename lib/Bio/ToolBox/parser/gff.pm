@@ -1,6 +1,6 @@
 package Bio::ToolBox::parser::gff;
 
-our $VERSION = '1.64';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -285,164 +285,16 @@ L<Bio::ToolBox::SeqFeature>, L<Bio::ToolBox::parser::ucsc>, L<Bio::Tools::GFF>
 
 use strict;
 use Carp qw(carp cluck croak);
-use Bio::ToolBox::Data::file; 
-my $SFCLASS = 'Bio::ToolBox::SeqFeature'; # alternative to Bio::SeqFeature::Lite
-eval "require $SFCLASS" or croak $@;
+use base 'Bio::ToolBox::Parser'; 
+use Bio::ToolBox::Data; 
 
 1;
 
 sub new {
 	my $class = shift;
-	my $self = {
-		'fh'            => undef,
-		'top_features'  => [],
-		'orphans'       => [],
-		'duplicate_ids' => {},
-		'loaded'        => {},
-		'eof'           => 0,
-		'do_gene'       => 1, 
-		'do_exon'       => 0,
-		'do_cds'        => 0, 
-		'do_utr'        => 0, 
-		'do_codon'      => 0,
-		'gff3'          => 0,
-		'gtf'           => 0,
-		'comments'      => [],
-		'seq_ids'       => {},
-		'simplify'      => 0,
-		'typelist'      => '',
-		'convertor_sub' => undef,
-	};
-	bless $self, $class;
-	
-	# check for options
-	if (@_) {
-		if (scalar @_ == 1) {
-			$self->open_file($_[0]) or croak "unable to open file!";
-		}
-		else {
-			my %options = @_;
-			if (exists $options{simplify}) {
-				$self->simplify( $options{simplify} );
-			}
-			if (exists $options{do_gene}) {
-				$self->do_gene($options{do_gene});
-			}
-			if (exists $options{do_exon}) {
-				$self->do_exon($options{do_exon});
-			}
-			if (exists $options{do_cds}) {
-				$self->do_cds($options{do_cds});
-			}
-			if (exists $options{do_utr}) {
-				$self->do_utr($options{do_utr});
-			}
-			if (exists $options{do_codon}) {
-				$self->do_codon($options{do_codon});
-			}
-			if (exists $options{version}) {
-				$self->version($options{version});
-			}
-			if (exists $options{file} or $options{table}) {
-				$options{file} ||= $options{table};
-				$self->open_file( $options{file} ) or 
-				croak "unable to open file!";
-			}
-			if (exists $options{class}) {
-				my $class = $options{class};
-				if (eval "require $class; 1") {
-					$SFCLASS = $class;
-				}
-				else {
-					croak $@;
-				}
-			}
-		}
-	}
-	
-	# done
-	return $self;
+	return $class->SUPER::new(@_);
 }
 
-sub do_gene {
-	my $self = shift;
-	if (@_) {
-		$self->{'do_gene'} = shift;
-	}
-	return $self->{'do_gene'};
-}	
-
-sub do_exon {
-	my $self = shift;
-	if (@_) {
-		$self->{'do_exon'} = shift;
-	}
-	return $self->{'do_exon'};
-}	
-
-sub do_cds {
-	my $self = shift;
-	if (@_) {
-		$self->{'do_cds'} = shift;
-	}
-	return $self->{'do_cds'};
-}	
-
-sub do_utr {
-	my $self = shift;
-	if (@_) {
-		$self->{'do_utr'} = shift;
-	}
-	return $self->{'do_utr'};
-}	
-
-sub do_codon {
-	my $self = shift;
-	if (@_) {
-		$self->{'do_codon'} = shift;
-	}
-	return $self->{'do_codon'};
-}	
-
-sub do_name {
-	# this does nothing other than maintain compatibility with ucsc parser
-	return 0;
-}	
-
-sub share {
-	# this does nothing other than maintain compatibility with ucsc parser
-	return 1;
-}	
-
-sub simplify {
-	my $self = shift;
-	if (defined $_[0]) {
-		$self->{simplify} = shift;
-	}
-	return $self->{simplify};
-}
-
-sub version {
-	my $self = shift;
-	if (@_) {
-		my $v = shift;
-		if ($v eq '3') {
-			$self->{version} = $v;
-			$self->{gff3} = 1;
-		}
-		elsif ($v eq '2.5' or $v eq '2.2') {
-			$self->{version} = '2.5';
-			$self->{gtf} = 1;
-		}
-		elsif ($v eq '2' or $v eq '1') {
-			$self->{version} = $v;
-		}
-		else {
-			warn "unrecognized GFF version '$v'!\n";
-		}
-	}
-	return $self->{version};
-}
 
 sub open_file {
 	my $self = shift;
@@ -455,7 +307,7 @@ sub open_file {
 	}
 	
 	# check type list
-	my $typelist = Bio::ToolBox::Data::file->sample_gff_type_list($filename);
+	my $typelist = Bio::ToolBox::Data->sample_gff_type_list($filename);
 	if ($typelist !~ /\w+/) {
 		print "GFF file has no evident types!? $filename may not be a valid GFF file\n";
 		return;
@@ -463,7 +315,7 @@ sub open_file {
 	$self->{typelist} = $typelist;
 	
 	# Open filehandle object 
-	my $fh = Bio::ToolBox::Data::file->open_to_read_fh($filename) or
+	my $fh = Bio::ToolBox::Data->open_to_read_fh($filename) or
 		croak " cannot open file '$filename'!\n";
 	
 	# check gff version pragma
@@ -471,28 +323,24 @@ sub open_file {
 	if ($first =~ /^##gff.version\s+([\d\.]+)\s*$/i) {
 		# override any version that may have been inferred from the extension
 		# based on the assumption that this pragma is correct
-		$self->version($1);
+		$self->{version} = $1;
 	}
 	else {
 		# no pragma, reopen the file
 		$fh->close;
-		$fh = Bio::ToolBox::Data::file->open_to_read_fh($filename);
+		$fh = Bio::ToolBox::Data->open_to_read_fh($filename);
 		# set version based on file type extension????
 		if ($filename =~ /\.gtf.*$/i) {
-			$self->version('2.5');
+			$self->{version} = '2.5';
 			$self->{gtf} = 1;
 		}
 		elsif ($filename =~ /\.gff3.*$/i) {
-			$self->version('3');
+			$self->{version} = '3';
 			$self->{gff3} = 1;
 		}
 	}
 	$self->{fh} = $fh;
 	return 1;
-}
-
-sub fh {
-	return shift->{fh};
 }
 
 sub typelist {
@@ -616,27 +464,6 @@ sub next_feature {
 	return;
 }
 
-sub next_top_feature {
-	my $self = shift;
-	# check that we have an open filehandle
-	unless ($self->fh) {
-		croak("no GFF3 file loaded to parse!");
-	}
-	unless ($self->{'eof'}) {
-		$self->parse_file or croak "unable to parse file!";
-	}
-	return shift @{ $self->{top_features} };
-}
-
-sub top_features {
-	my $self = shift;
-	unless ($self->{'eof'}) {
-		$self->parse_file;
-	}
-	my @features = @{ $self->{top_features} };
-	return wantarray ? @features : \@features;
-}
-
 *parse_table = \&parse_file;
 
 sub parse_file {
@@ -655,8 +482,8 @@ sub parse_file {
 	# top-level features.
 	
 	printf "  Parsing %s format file....\n", 
-		$self->version eq '3' ? 'GFF3' : 
-		$self->version =~ /2\../ ? 'GTF' : 'GFF';
+		$self->{version} eq '3' ? 'GFF3' : 
+		$self->{version} =~ /2\../ ? 'GTF' : 'GFF';
 	
 	
 	TOP_FEATURE_LOOP:
@@ -756,7 +583,7 @@ sub parse_file {
 sub _make_gene_parent {
 	# for generating GTF gene parent features
 	my ($self, $fields, $gene_id) = @_;
-	my $gene = $SFCLASS->new(
+	my $gene = $self->{sfclass}->new(
 		-seq_id         => $fields->[0],
 		-primary_tag    => 'gene',
 		-start          => $fields->[3],
@@ -778,7 +605,7 @@ sub _make_gene_parent {
 sub _make_rna_parent {
 	# for generating GTF gene parent features
 	my ($self, $fields, $transcript_id) = @_;
-	my $rna = $SFCLASS->new(
+	my $rna = $self->{sfclass}->new(
 		-seq_id         => $fields->[0],
 		-primary_tag    => 'transcript',
 		-start          => $fields->[3],
@@ -922,10 +749,12 @@ sub from_gff_string {
 
 sub _assign_gff_converter {
 	my $self = shift;
-	if ($self->{gff3}) {
+	if ($self->{version} eq '3') {
+		$self->{gff3} = 1;
 		$self->{convertor_sub} = \&_gff3_to_seqf;
 	}
-	elsif ($self->{gtf}) {
+	elsif ($self->{version} eq '2.5' or $self->{version} eq '2.2') {
+		$self->{gtf} = 1;
 		if ($self->simplify) {
 			$self->{convertor_sub} = \&_gtf_to_seqf_simple;
 		}
@@ -1191,7 +1020,7 @@ sub _gff_to_seqf {
 	my ($self, $fields) = @_;
 	
 	# generate the basic SeqFeature
-	my $feature = $SFCLASS->new(
+	my $feature = $self->{sfclass}->new(
 		-seq_id         => $fields->[0],
 		-source         => $fields->[1],
 		-primary_tag    => $fields->[2],
@@ -1280,36 +1109,6 @@ sub comments {
 	return wantarray ? @comments : \@comments;
 }
 
-
-sub seq_ids {
-	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
-	my @s = keys %{$self->{seq_ids}};
-	return wantarray ? @s : \@s;
-}
-
-
-sub seq_id_lengths {
-	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
-	return $self->{seq_ids};
-}
-
-sub _get_seq_ids {
-	my $self = shift;
-	return unless $self->{'eof'};
-	foreach (@{ $self->{top_features} }) {
-		my $s = $_->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
-			$self->{seq_ids}{$s} = 1;
-		}
-		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
-	}
-}
 
 __END__
 
