@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.63';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -454,8 +454,8 @@ sub new {
 	# primary options
 	$self->[SEQID] = $args{-seq_id} || $args{-seqid} || $args{'-ref'} || 
 		$args{chrom} || undef;
-	$self->[START] = $args{-start} || undef;
-	$self->[STOP] = $args{-end} || $args{-stop} || undef;
+	$self->[START] = int $args{-start} || undef;
+	$self->[STOP] = int $args{-end} || $args{-stop} || undef;
 	$self->strand($args{-strand}) if exists $args{-strand};
 	$self->[NAME] = $args{-display_name} || $args{-name} || undef;
 	$self->[ID] = $args{-primary_id} || $args{-id} || undef;
@@ -515,7 +515,7 @@ sub seq_id {
 sub start {
 	my $self = shift;
 	if (@_) {
-		$self->[START] = $_[0];
+		$self->[START] = int $_[0];
 	}
 	return defined $self->[START] ? $self->[START] : undef;
 }
@@ -523,7 +523,7 @@ sub start {
 sub end {
 	my $self = shift;
 	if (@_) {
-		$self->[STOP] = $_[0];
+		$self->[STOP] = int $_[0];
 	}
 	return defined $self->[STOP] ? $self->[STOP] : undef;
 }
