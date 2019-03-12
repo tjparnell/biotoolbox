@@ -5,14 +5,15 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use Statistics::Lite qw(mean median sum max);
+use List::Util qw(sum0 max);
+use Statistics::Lite qw(median);
 use Bio::ToolBox::Data::Stream;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(
 	open_wig_to_bigwig_fh 
 	generate_chromosome_file
 );
-my $VERSION =  '1.65';
+my $VERSION =  '1.66';
 
 print "\n This script will export a data file to a wig file\n\n";
 
@@ -119,7 +120,7 @@ unless (defined $use_track) {
 	# default is to write a track
 	$use_track = $bigwig ? 0 : 1;
 }
-
+$method ||= 'mean';
 
 
 ### Load input file
@@ -146,7 +147,11 @@ my $printer = set_print_string();
 
 if ($fast) {
 	if ($midpoint) {
-		warn "cannot use --midpoint with --fast option!\nrunning in slow mode...\n";
+		warn "cannot use midpoint position in fast mode!\nrunning in slow mode...\n";
+		$fast = 0;
+	}
+	if ($attribute_name) {
+		warn "cannot use GFF or VCF attribute score in fast mode!\nrunning in slow mode...\n";
 		$fast = 0;
 	}
 }
@@ -410,20 +415,19 @@ sub set_bigwig_options {
 sub set_method_sub {
 	# for combining values from duplicate positions we need a method
 	if ($method eq 'mean') {
-		return \&mean;
+		return sub {return sum0(@_)/scalar(@_);};
 	}
 	elsif ($method eq 'median') {
 		return \&median;
 	}
 	elsif ($method eq 'sum') {
-		return \&sum;
+		return \&sum0;
 	}
 	elsif ($method eq 'max') {
 		return \&max;
 	}
 	else {
-		# default is mean
-		return \&mean;
+		die " unrecognized method 'method'!\n",
 	}
 }
 
@@ -438,35 +442,56 @@ sub set_score_sub {
 			return if $score eq '.';
 			# format as necessary
 			$score =~ s/\%$//; # remove stupid percents if present
-			if ($format) {
-				return sprintf $format, $score;
-			}
 			return $score;
 		};
 	}
-	elsif ($attribute_name and $Input->vcf) {
-		# a VCF attribute
+	elsif ($attribute_name and $Input->vcf and defined $score_index) {
+		# a VCF attribute from one sample
 		return sub {
 			my $row = shift;
 			my $attribs = $row->vcf_attributes;
 			my $score = $attribs->{$score_index}{$attribute_name} || 0;
-			return if $score eq '.';
+			return 0 if $score eq '.';
 			# format as necessary
 			$score =~ s/\%$//; # remove stupid percents if present
-			if ($format) {
-				return sprintf $format, $score;
-			}
 			return $score;
 		};
 	}
-	elsif (@score_indices) {
-		# collect over multiple score columns
+	elsif ($attribute_name and $Input->vcf and @score_indices) {
+		# a VCF attribute from many samples
+		return sub {
+			my $row = shift;
+			my $attribs = $row->vcf_attributes;
+			my @scores;
+			foreach (@score_indices) {
+				my $s = $attribs->{$_}{$attribute_name} || 0;
+				$s =~ s/\%$//; # remove stupid percents if present
+				push @scores, $s;
+			}
+			return &{$method_sub}(@scores);
+		};
+	}
+	elsif (@score_indices and $fast) {
+		# collect over multiple score columns from array reference
+		return sub {
+			my $data = shift;
+			return &{$method_sub}(map { $data->[$_] } @score_indices);
+		};
+	}
+	elsif (@score_indices and not $fast) {
+		# collect over multiple score columns from Feature row object
 		return sub {
 			my $row = shift;
 			return &{$method_sub}(map {$row->value($_)} @score_indices);
 		};
 	}
-	elsif (defined $score_index) {
+	elsif (defined $score_index and $fast) {
+		# collect from a single score column
+		return sub {
+			return shift->[$score_index] || 0;
+		};
+	}
+	elsif (defined $score_index and not $fast) {
 		# collect from a single score column
 		return sub {
 			my $row = shift;
@@ -545,11 +570,13 @@ sub fast_convert_to_fixedStep {
 		(defined $chr_index and defined $start_index);
 	die "no score column defined!\n" unless (defined $score_index);
 	
-	# simplified loop for conversion
-	while (my $row = $Input->next_row) {
-		# coordinates
-		my $chromosome = $row->value($chr_index);
-		my $start = $row->value($start_index);
+	# use direct file handle and skip the Stream and row objects
+	my $fh = $Input->fh;
+	while (my $line = $fh->getline) {
+		chomp $line;
+		my @data = split('\t', $line);
+		my $chromosome = $data[$chr_index];
+		my $start = $data[$start_index];
 		$start++ if $interbase;
 		
 		# write definition line if necessary
@@ -560,7 +587,7 @@ sub fast_convert_to_fixedStep {
 		}
 		
 		# print the score
-		$out_fh->printf($printer, &{$score_sub}($row));
+		$out_fh->printf($printer, &{$score_sub}(\@data));
 	}
 }
 
@@ -641,11 +668,13 @@ sub fast_convert_to_variableStep {
 		(defined $chr_index and defined $start_index);
 	die "no score column defined!\n" unless (defined $score_index);
 	
-	# simplified loop for conversion
-	while (my $row = $Input->next_row) {
-		# coordinates
-		my $chromosome = $row->value($chr_index);
-		my $start = $row->value($start_index);
+	# use direct file handle and skip the Stream and row objects
+	my $fh = $Input->fh;
+	while (my $line = $fh->getline) {
+		chomp $line;
+		my @data = split('\t', $line);
+		my $chromosome = $data[$chr_index];
+		my $start = $data[$start_index];
 		$start++ if $interbase;
 		
 		# write definition line if necessary
@@ -655,7 +684,7 @@ sub fast_convert_to_variableStep {
 		}
 		
 		# collect the score
-		$out_fh->printf($printer, $start, &{$score_sub}($row));
+		$out_fh->printf($printer, $start, &{$score_sub}(\@data));
 	}
 }
 
@@ -725,14 +754,17 @@ sub fast_convert_to_bedgraph {
 		(defined $chr_index and defined $start_index and defined $stop_index);
 	die "no score column defined!\n" unless (defined $score_index);
 	
-	while (my $row = $Input->next_row) {
+	# use direct file handle and skip the Stream and row objects
+	my $fh = $Input->fh;
+	while (my $line = $fh->getline) {
+		chomp $line;
+		my @data = split('\t', $line);
 		# adjust start position
-		my $start = $row->value($start_index);
-		$start-- unless ($interbase);
+		$data[$start_index]-- unless ($interbase);
 		
 		# write the feature line
-		$out_fh->printf($printer, $row->value($chr_index), $start, 
-			$row->value($stop_index), &{$score_sub}($row));
+		$out_fh->printf($printer, $data[$chr_index], $data[$start_index], 
+			$data[$stop_index], &{$score_sub}(\@data));
 	}
 }
 
