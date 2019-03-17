@@ -237,7 +237,7 @@ immediately return it.
 =item next_top_feature
 
 This method will first parse the entire file into memory. It will then return each 
-feature one at a time. Call this method repeatedly using a while loop to get all features.
+feature one at a time. Call this method repeatedly using a C<while> loop to get all features.
 
 =item top_features
 
@@ -257,19 +257,14 @@ SeqFeature objects.
 
 Parses the entire file into memory without returning any objects.
 
-=item find_gene
+=item fetch
 
-	my $gene = $bed->find_gene(
-		display_name => 'ABC1',
-		primary_id   => 'chr1:123-456',
-	);
+  my $gene = $parser->fetch($primary_id) or 
+     warn "gene $display_name can not be found!";
 
-Pass a feature name, or an array of key =E<gt> values (name, display_name, 
-ID, primary_ID, and/or coordinate information), that can be used 
-to find a feature already loaded into memory. Only really successful if the 
-entire table is loaded into memory. Features with a matching name are 
-confirmed by a matching ID or overlapping coordinates, if available. 
-Otherwise the first match is returned.
+Fetch a loaded top feature from memory using the C<primary_id> tag, which 
+should be unique. Returns the SeqFeature object or C<undef> if not present.
+Only useful after </parse_file> is called. 
 
 =item comments
 
@@ -379,13 +374,12 @@ sub open_file {
 		# gappedPeak is essentially bed12 with extra columns
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
-		eval "require Bio::ToolBox::parser::ucsc;";
+		eval "require Bio::ToolBox::parser::ucsc::builder;";
 		$self->{id2count}    = {};
 		$self->{refseqsum}   = {};
 		$self->{refseqstat}  = {};
 		$self->{kgxref}      = {};
 		$self->{ensembldata} = {};
-		$self->{gene2seqf}   = {};
 	}
 	elsif ($peak == 10) {
 		# narrowPeak file
@@ -409,13 +403,12 @@ sub open_file {
 		
 		# we will use existing code from the ucsc parser to convert bed12 to seqfeatures
 		# we need more object stuff that the ucsc parser expects
-		eval "require Bio::ToolBox::parser::ucsc;";
+		eval "require Bio::ToolBox::parser::ucsc::builder;";
 		$self->{id2count}    = {};
 		$self->{refseqsum}   = {};
 		$self->{refseqstat}  = {};
 		$self->{kgxref}      = {};
 		$self->{ensembldata} = {};
-		$self->{gene2seqf}   = {};
 	}
 	else {
 		# an ordinary bed file
@@ -489,8 +482,22 @@ sub parse_file {
 	
 	while (my $feature = $self->next_feature) {
 		# there are possibly lots and lots of features here
-		# we are not going to bother checking IDs for uniqueness or sort them
-		# especially since we don't have to assign subfeatures to them
+		# we shouldn't have to check IDs for uniqueness, but to maintain compatibility
+		# with other parsers and for consistency, we do
+		my $id = $feature->primary_id;
+		if (exists $self->{loaded}{$id}) {
+			my $i = 1;
+			$id = $feature->primary_id . ".$i";
+			while (exists $self->{loaded}{$id}) {
+				$i++;
+				$id = $feature->primary_id . ".$i";
+			}
+			# we have a unique id, now change it
+			$feature->primary_id($id);
+		}
+		
+		# record the feature
+		$self->{loaded}{$id} = $feature;
 		push @{ $self->{top_features} }, $feature;
 		
 		# check chromosome
@@ -719,96 +726,6 @@ sub comments {
 	my $self = shift;
 	return unless $self->{stream};
 	return $self->{stream}->comments;
-}
-
-
-sub find_gene {
-	my $self = shift;
-	
-	# check that we have id2seqf table
-	# we lazy load this as it might not be needed every time
-	unless (exists $self->{id2seqf}) {
-		croak "must parse file first!" unless $self->{'eof'};
-		$self->{id2seqf} = {};
-		foreach (@{ $self->{top_features} }) {
-			my $name = lc $_->display_name;
-			if (exists $self->{id2seqf}->{$name}) {
-				push @{ $self->{id2seqf}->{$name} }, $_;
-			}
-			else {
-				$self->{id2seqf}->{$name} = [$_];
-			}
-		}
-	}
-	
-	# get the name and coordinates from arguments
-	my ($name, $id, $chrom, $start, $end, $strand);
-	if (scalar @_ == 0) {
-		carp "must provide information to find_gene method!";
-		return;
-	}
-	elsif (scalar @_ == 1) {
-		$name = $_[0];
-	}
-	else {
-		my %opt = @_;
-		$name  = $opt{name} || $opt{display_name} || undef;
-		$id    = $opt{id} || $opt{primary_id} || undef;
-		$chrom = $opt{chrom} || $opt{seq_id} || undef;
-		$start = $opt{start} || undef;
-		$end   = $opt{stop} || $opt{end} || undef;
-		$strand = $opt{strand} || 0;
-	}
-	unless ($name) {
-		carp "name is required for find_gene!";
-		return;
-	}
-	
-	# check if a gene with this name exists
-	if (exists $self->{id2seqf}->{lc $name} ) {
-		# we found a matching gene
-		
-		# pull out the gene seqfeature(s) array reference
-		# there may be more than one gene
-		my $genes = $self->{id2seqf}->{ lc $name };
-		
-		# go through a series of checks to find the appropriate 
-		if ($id) {
-			foreach my $g (@$genes) {
-				if ($g->primary_id eq $id) {
-					return $g;
-				}
-			}
-			return; # none of these matched despite having an ID
-		}
-		if ($chrom and $start and $end) {
-			foreach my $g (@$genes) {
-				if ( 
-					# overlap method borrowed from Bio::RangeI
-					($g->strand == $strand) and not (
-						$g->start > $end or 
-						$g->end < $start
-					)
-				) {
-					# gene and transcript overlap on the same strand
-					# we found the intersecting gene
-					return $g;
-				}
-			}
-			return; # none of these matched despite having coordinate info
-		}
-		if (scalar @$genes == 1) {
-			# going on trust here that this is the one
-			return $genes->[0];
-		}
-		elsif (scalar @$genes > 1) {
-			carp "more than one gene named $name found!";
-			return $genes->[0];
-		}
-		
-		# nothing suitable found
-		return;
-	}
 }
 
 

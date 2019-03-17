@@ -39,19 +39,19 @@ Bio::ToolBox::Parser - generic parsing tool for GFF, UCSC, BED
 
 This module is a generic wrapper around the three main annotation file 
 parsers. It will taste test the file and choose the appropriate parser and 
-open it automatically. These parsers include 
+open it automatically. These parsers include the following.
 
 =over 4
 
 =item L<Bio::ToolBox::parser::bed>
 
 Parses most Bed file formats, including 3-12 column Bed formats, and some 
-specific Encode Bed6+? formats, including C<narrowPeak>, C<broadPeak>, and 
+specific Encode formats, including C<narrowPeak>, C<broadPeak>, and 
 C<gappedPeak>. 
 
 =item L<Bio::ToolBox::parser::gff>
 
-Parses any GFF flavor, including GTF and GFF3.
+Parses any GFF flavor, including GTF and GFF3. 
 
 =item L<Bio::ToolBox::parser::ucsc>
 
@@ -69,6 +69,9 @@ L<Bio::ToolBox::SeqFeature>, an efficient L<Bio::SeqFeatureI> compliant
 object class.
 
 =head1 METHODS
+
+The parser sub classes each contain documentation, but for the most part, they 
+all behave similarly with similar methods. 
 
 
 
@@ -139,6 +142,7 @@ sub new {
 		'source'        => undef,
 		'typelist'      => '',
 		'seq_ids'       => {},
+		'loaded'        => {},
 		'top_features'  => [],
 		'eof'           => 0,
 		'comments'      => [],
@@ -156,15 +160,12 @@ sub new {
 	elsif ($flavor eq 'gff') {
 		$self->{gff3}           = 0;
 		$self->{gtf}            = 0;
-		$self->{typelist}       = '';
 		$self->{orphans}        = [];
-		$self->{loaded}         = {};
 		$self->{duplicate_ids}  = {};
 	}
 	elsif ($flavor eq 'ucsc') {
-		$self->{share}          = 1;
+		$self->{share}          = 1; # always true
 		$self->{source}         = 'UCSC';
-		$self->{gene2seqf}      = {};
 		$self->{id2count}       = {};
 		$self->{counts}         = {};
 		$self->{refseqsum}      = {};
@@ -342,31 +343,13 @@ sub fh {
 
 sub seq_ids {
 	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
 	my @s = keys %{$self->{seq_ids}};
 	return wantarray ? @s : \@s;
 }
 
 sub seq_id_lengths {
 	my $self = shift;
-	unless (scalar keys %{$self->{seq_ids}}) {
-		$self->_get_seq_ids;
-	}
 	return $self->{seq_ids};
-}
-
-sub _get_seq_ids {
-	my $self = shift;
-	return unless $self->{'eof'};
-	foreach (@{ $self->{top_features} }) {
-		my $s = $_->seq_id;
-		unless (exists $self->{seq_ids}{$s}) {
-			$self->{seq_ids}{$s} = 1;
-		}
-		$self->{seq_ids}{$s} = $_->end if $_->end > $self->{seq_ids}{$s};
-	}
 }
 
 sub next_top_feature {
@@ -408,6 +391,18 @@ sub top_features {
 	return wantarray ? @features : \@features;
 }
 
+
+sub fetch {
+	my ($self, $id) = @_;
+	unless ($self->{'eof'}) {
+		croak "parse file first before fetching features by ID!";
+	}
+	return $self->{loaded}{$id} || undef;
+}
+
+sub find_gene {
+	confess "The find_gene() method is deprecated. Please use fetch().";
+}
 
 
 __END__

@@ -300,19 +300,14 @@ Parses the table into memory. If a table wasn't provided using the
 L</new> or L</open_file> methods, then a filename can be passed to this 
 method and it will automatically be opened for you. 
 
-=item find_gene
+=item fetch
 
-	my $gene = $ucsc->find_gene(
-		display_name => 'ABC1',
-		primary_id   => 'gene000001',
-	);
+  my $gene = $parser->fetch($primary_id) or 
+     warn "gene $display_name can not be found!";
 
-Pass a gene name, or an array of key =E<gt> values (name, display_name, 
-ID, primary_ID, and/or coordinate information), that can be used 
-to find a gene already loaded into memory. Only really successful if the 
-entire table is loaded into memory. Genes with a matching name are 
-confirmed by a matching ID or overlapping coordinates, if available. 
-Otherwise the first match is returned.
+Fetch a loaded top feature from memory using the C<primary_id> tag, which 
+should be unique. Returns the SeqFeature object or C<undef> if not present.
+Only useful after </parse_table> is called. 
 
 =item counts
 
@@ -429,14 +424,13 @@ sub open_file {
 		# close existing
 		$self->fh->close;
 		# go ahead and clear out existing data
-		$self->{'version'}       = undef;
-		$self->{'top_features'}  = [];
-		$self->{'duplicate_ids'} = {};
-		$self->{'gene2seqf'}     = {};
-		$self->{'id2count'}      = {};
-		$self->{'counts'}        = {};
-		$self->{'eof'}           = 0;
-		$self->{'line_count'}    = 0;
+		$self->{version}       = undef;
+		$self->{top_features}  = [];
+		$self->{loaded}        = {};
+		$self->{id2count}      = {};
+		$self->{counts}        = {};
+		$self->{'eof'}         = 0;
+		$self->{line_count}    = 0;
 	}
 	
 	$self->fh($fh);
@@ -594,17 +588,13 @@ sub next_feature {
 			next;
 		}
 		
-		# generate the feature from the line
-		my $feature;
+		# generate and return the feature from the line
 		if ($self->do_gene) {
-			$feature = $builder->build_gene;
+			return $builder->build_gene;
 		}
 		else {
-			$feature = $builder->build_transcript;
+			return $builder->build_transcript;
 		}
-		
-		# return the object, we do this while loop once per valid line
-		return $feature;
 	}
 	
 	# presumed end of file
@@ -629,11 +619,15 @@ sub parse_table {
 	print "  Parsing UCSC gene table....\n";
 	while (my $feature = $self->next_feature) {
 		
-		# add to gene2seqf hash
-		my $gene = $self->find_gene($feature); 
-		unless ($gene) {
-			# the current feature is not in the hash, so add it
-			$self->{gene2seqf}->{ lc $feature->display_name } = [ $feature ];
+		# record this top feature
+		my $id = $feature->primary_id;
+		unless (exists $self->{loaded}{$id}) {
+			# the builder should have checked and made this ID unique
+			# for alternate transcripts of existing genes it will not be unique
+			# and we can safely skip it
+			# for unique gene/transcript we record it in the array
+			$self->{loaded}{$id} = $feature;
+			push @{ $self->{top_features} }, $feature;
 		}
 		
 		# check chromosome
@@ -644,89 +638,8 @@ sub parse_table {
 		$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
 	}
 	
-	# add to the top list of features, Schwartzian transform and sort
-	# based on the genes found in the gene2seqf hash
-	push @{ $self->{top_features} }, 
-		map {$_->[2]}
-		sort {$a->[0] cmp $b->[0] or $a->[1] <=> $b->[1]}
-		map [$_->seq_id, $_->start, $_],
-		map @{ $self->{gene2seqf}->{$_} },
-		keys %{$self->{gene2seqf}};
-	
+	# finished parsing, eof should be set to true by next_feature()
 	return 1;
-}
-
-sub find_gene {
-	my $self = shift;
-	
-	# get the name and coordinates from arguments
-	my ($name, $id, $chrom, $start, $end, $strand);
-	if (scalar @_ == 0) {
-		carp "must provide information to find_gene method!";
-		return;
-	}
-	elsif (scalar @_ == 1) {
-		$name = $_[0];
-	}
-	else {
-		my %opt = @_;
-		$name  = $opt{name} || $opt{display_name} || undef;
-		$id    = $opt{id} || $opt{primary_id} || undef;
-		$chrom = $opt{chrom} || $opt{seq_id} || undef;
-		$start = $opt{start} || undef;
-		$end   = $opt{stop} || $opt{end} || undef;
-		$strand = $opt{strand} || 0;
-	}
-	unless ($name) {
-		carp "name is required for find_gene!";
-		return;
-	}
-	
-	# check if a gene with this name exists
-	if (exists $self->{gene2seqf}->{lc $name} ) {
-		# we found a matching gene
-		
-		# pull out the gene seqfeature(s) array reference
-		# there may be more than one gene
-		my $genes = $self->{gene2seqf}->{ lc $name };
-		
-		# go through a series of checks to find the appropriate 
-		if ($id) {
-			foreach my $g (@$genes) {
-				if ($g->primary_id eq $id) {
-					return $g;
-				}
-			}
-			return; # none of these matched despite having an ID
-		}
-		if ($chrom and $start and $end) {
-			foreach my $g (@$genes) {
-				if ( 
-					# overlap method borrowed from Bio::RangeI
-					($g->strand == $strand) and not (
-						$g->start > $end or 
-						$g->end < $start
-					)
-				) {
-					# gene and transcript overlap on the same strand
-					# we found the intersecting gene
-					return $g;
-				}
-			}
-			return; # none of these matched despite having coordinate info
-		}
-		if (scalar @$genes == 1) {
-			# going on trust here that this is the one
-			return $genes->[0];
-		}
-		elsif (scalar @$genes > 1) {
-			carp "more than one gene named $name found!";
-			return $genes->[0];
-		}
-		
-		# nothing suitable found
-		return;
-	}
 }
 
 sub counts {

@@ -376,23 +376,68 @@ sub build_gene {
 	# shortcuts
 	my $ucsc = $self->ucsc;
 	my $id2count = $ucsc->{id2count};
-	my $ensembldata = $ucsc->{ensembldata};
 	
 	# find a pre-existing gene to update or build a new one
-	my $gene = $self->find_gene;
+	my $id = $self->name2;
+	my $gene;
+	if (exists $ucsc->{loaded}{$id}) {
+		# check to see if this gene overlaps the current transcript, it may not
+		my $g = $ucsc->{loaded}{$id};
+		if ($g->seq_id eq $self->chrom and
+			$g->strand == $self->strand and 
+			not ($g->start > $self->txEnd or $g->end < $self->txStart)
+		) {
+			# gene and transcript coordinates overlap, presume it's the same gene
+			$gene = $g;
+		}
+		
+		if (not $gene) {
+			# the first one didn't match
+			if (exists $id2count->{$id}) {
+				# we've seen this id before
+				# go through all the possibilities and look for a coordinate overlap
+				for my $i (1 .. $id2count->{$id}) {
+					my $g = $ucsc->{loaded}{$id . ".$i"};
+					if ($g->seq_id eq $self->chrom and
+						$g->strand == $self->strand and 
+						not ($g->start > $self->txEnd or $g->end < $self->txStart)
+					) {
+						# gene and transcript coordinates overlap
+						# presume it's the same gene
+						$gene = $g;
+						last;
+					}
+				}
+		
+				unless ($gene) {
+					# ok, we've gone through all the possibilities and still no match
+					# must make a new unique ID
+					$id2count->{$id} += 1;
+					$id .= '.' . $id2count->{$id};
+					# make a new gene below
+				}
+			}
+			else {
+				# this must be a new one
+				$id2count->{$id} = 1;
+				$id .= '.1';
+				# make a new gene below
+			}
+		}
+	}
+	
+	# process the gene
 	if ($gene) {
-		# update as necessary
+		# update coordinates as necessary
 		if ( ($self->txStart) < $gene->start) {
-			# update the transcription start position
 			$gene->start( $self->txStart );
 		}
 		if ($self->txEnd > $gene->end) {
-			# update the transcription stop position
 			$gene->end( $self->txEnd );
 		}
 	}
 	else {
-		# build a new gene
+		# build a new gene object
 		$gene = $ucsc->{sfclass}->new(
 			-seq_id        => $self->chrom,
 			-source        => $ucsc->source,
@@ -402,35 +447,22 @@ sub build_gene {
 			-strand        => $self->strand,
 			-phase         => '.',
 			-display_name  => $self->gene_name,
+			-primary_id    => $id,
 		);
-		$ucsc->{counts}->{gene} += 1;
-	
-		# Add a unique primary ID
-		my $id = $self->name2;
-		if (exists $id2count->{ lc $id }) {
-			# we've encountered this gene ID before
-		
-			# then make name unique by appending the count number
-			$id2count->{ lc $id } += 1;
-			$id .= '.' . $id2count->{ lc $id };
-		}
-		else {
-			# this is the first transcript with this id
-			# set the id counter
-			$id2count->{lc $id} = 0;
-		}
-		$gene->primary_id($id);
 		
 		# Add an alias
 		if ($self->name2 ne $self->gene_name) {
 			$gene->add_tag_value('Alias', $self->name2);
 		}
+		
+		# add to the gene count
+		$ucsc->{counts}{'gene'} += 1;
 	}
 	
 	# now build the transcript for the gene
 	my $transcript = $self->build_transcript($gene);
 	$gene->add_SeqFeature($transcript);
-	$transcript->add_tag_value('Parent', $gene->primary_id);
+	$transcript->add_tag_value('Parent', $id);
 	
 	# update extra attributes as necessary
 	$self->update_attributes($gene);
@@ -444,22 +476,22 @@ sub build_transcript {
 	
 	# shortcuts
 	my $ucsc = $self->ucsc;
-	my $id2count = $ucsc->{id2count};
 	my $ensembldata = $ucsc->{ensembldata};
-	my $counts = $ucsc->{counts};
 	
-	# Uniqueify the transcript ID and name
+	# Uniqueify the transcript ID but only if a gene is not present
 	my $id = $self->name;
-	if (exists $id2count->{ lc $id } ) {
-		# we've encountered this transcript ID before
-		
-		# now need to make ID unique by appending a number
-		$id2count->{ lc $id } += 1;
-		$id .= '.' . $id2count->{ lc $id };
-	}
-	else {
-		# this is the first transcript with this id
-		$id2count->{lc $id} = 0;
+	unless ($gene) {
+		if (exists $ucsc->{loaded}{$id} ) {
+			# we've encountered this transcript ID before
+			# now need to make ID unique by appending a number
+			my $i = 1;
+			$id = $self->name . ".$i";
+			while (exists $self->{loaded}{$id}) {
+				$i++;
+				$id = $self->name . ".$i";
+			}
+			# we now have a unique id
+		}
 	}
 	
 	# identify the primary_tag value
@@ -540,7 +572,7 @@ sub build_transcript {
 	}
 	
 	# record the type of transcript
-	$counts->{$type} += 1;
+	$ucsc->{counts}{$type} += 1;
 	
 	# transcript is complete
 	return $transcript;
@@ -1068,38 +1100,6 @@ sub add_codons {
 	# associate with transcript
 	$transcript->add_SeqFeature($start_codon);
 	$transcript->add_SeqFeature($stop_codon);
-}
-
-sub find_gene {
-	my $self = shift;
-	
-	# check if a gene with this name exists
-	if (exists $self->ucsc->{gene2seqf}->{lc $self->gene_name} ) {
-		# we found a gene with the same name
-		# pull out the gene seqfeature(s) array reference
-		# there may be more than one gene
-		my $genes = $self->ucsc->{gene2seqf}->{ lc $self->gene_name };
-		
-		# check that the current transcript intersects with the gene
-		# sometimes we can have two separate transcripts with the 
-		# same gene name, but located on opposite ends of the chromosome
-		# part of a gene family, but unlikely the same gene 200 Mb in 
-		# length
-		foreach my $g (@$genes) {
-			if ( 
-				# overlap method borrowed from Bio::RangeI
-				($g->strand == $self->strand) and not (
-					$g->start > $self->txEnd or 
-					$g->end < $self->txStart
-				)
-			) {
-				# gene and transcript overlap on the same strand
-				# we found the intersecting gene
-				return $g;
-			}
-		}
-	}
-	return;
 }
 
 sub find_existing_subfeature {

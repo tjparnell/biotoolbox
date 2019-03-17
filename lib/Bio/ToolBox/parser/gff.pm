@@ -209,18 +209,14 @@ This method returns the L<IO::File> object of the opened GFF file.
 Parses the entire file into memory. This is automatically called when 
 either L</top_features> or L</next_top_feature> is called. 
 
-=item find_gene
+=item fetch
 
-  my $gene = $parser->find_gene(
-       name => $display_name,
-       id   => $primary_id,
-  ) or warn "gene $display_name can not be found!";
+  my $gene = $parser->fetch($primary_id) or 
+     warn "gene $display_name can not be found!";
 
-Pass a gene name, or an array of key =E<gt> values (C<name>, C<display_name>, 
-C<ID>, C<primary_ID>, and/or coordinate information), that can be used 
-to find a gene already loaded into memory. Only useful after </parse_file> 
-is called. Genes with a matching name are confirmed by a matching ID or 
-overlapping coordinates, if available. Otherwise the first match is returned.
+Fetch a loaded top feature from memory using the C<primary_id> tag, which 
+should be unique. Returns the SeqFeature object or C<undef> if not present.
+Only useful after </parse_file> is called. 
 
 =item orphans
 
@@ -490,20 +486,16 @@ sub parse_file {
 	while (my $feature = $self->next_feature) {
 		
 		### Process the feature
-		# check the ID
-		my $id = $feature->primary_id;
-			# if the seqfeature didn't have an ID specified from the file, then 
-			# Bio::ToolBox::SeqFeature will autogenerate one, but Bio::SeqFeature::Lite
-			# will not - so we will likely lose that feature
-		if ($id) {
+		if ($feature->primary_tag =~ /gene|rna|transcript/) {
+			# remember this feature as it likely will have children features
+			
+			my $id = $feature->primary_id;
 			# remember this feature since we have an ID
 			if (exists $self->{loaded}{$id}) {
 				# this ID should be unique in the GFF file
 				# otherwise it might be a shared duplicate or a malformed GFF file
 				# generally only a concern for top level features
-				if ($feature->primary_tag =~ /gene|rna|transcript/) {
-					$self->{duplicate_ids}{$id} += 1;
-				}
+				$self->{duplicate_ids}{$id} += 1;
 				
 				# store all of the features as an array
 				if (ref($self->{loaded}{$id}) eq 'ARRAY') {
@@ -556,6 +548,13 @@ sub parse_file {
 		else {
 			# must be a parent
 			push @{ $self->{top_features} }, $feature;
+			
+			# check chromosome
+			my $s = $feature->seq_id;
+			unless (exists $self->{seq_ids}{$s}) {
+				$self->{seq_ids}{$s} = $feature->end;
+			}
+			$self->{seq_ids}{$s} = $feature->end if $feature->end > $self->{seq_ids}{$s};
 		}
 	}
 	# Finished loading the GFF lines
@@ -633,96 +632,8 @@ sub _make_rna_parent {
 			$rna->source($1);
 		}
 	}
+	
 	return $rna;
-}
-
-
-sub find_gene {
-	my $self = shift;
-	
-	# check that we have gene2seqf table
-	unless (exists $self->{gene2seqf}) {
-		croak "must parse file first!" unless $self->{'eof'};
-		$self->{gene2seqf} = {};
-		foreach (@{ $self->{top_features} }) {
-			my $name = lc $_->display_name;
-			if (exists $self->{gene2seqf}->{$name}) {
-				push @{ $self->{gene2seqf}->{$name} }, $_;
-			}
-			else {
-				$self->{gene2seqf}->{$name} = [$_];
-			}
-		}
-	}
-	
-	# get the name and coordinates from arguments
-	my ($name, $id, $chrom, $start, $end, $strand);
-	if (scalar @_ == 0) {
-		carp "must provide information to find_gene method!";
-		return;
-	}
-	elsif (scalar @_ == 1) {
-		$name = $_[0];
-	}
-	else {
-		my %opt = @_;
-		$name  = $opt{name} || $opt{display_name} || undef;
-		$id    = $opt{id} || $opt{primary_id} || undef;
-		$chrom = $opt{chrom} || $opt{seq_id} || undef;
-		$start = $opt{start} || undef;
-		$end   = $opt{stop} || $opt{end} || undef;
-		$strand = $opt{strand} || 0;
-	}
-	unless ($name) {
-		carp "name is required for find_gene!";
-		return;
-	}
-	
-	# check if a gene with this name exists
-	if (exists $self->{gene2seqf}->{lc $name} ) {
-		# we found a matching gene
-		
-		# pull out the gene seqfeature(s) array reference
-		# there may be more than one gene
-		my $genes = $self->{gene2seqf}->{ lc $name };
-		
-		# go through a series of checks to find the appropriate 
-		if ($id) {
-			foreach my $g (@$genes) {
-				if ($g->primary_id eq $id) {
-					return $g;
-				}
-			}
-			return; # none of these matched despite having an ID
-		}
-		if ($chrom and $start and $end) {
-			foreach my $g (@$genes) {
-				if ( 
-					# overlap method borrowed from Bio::RangeI
-					($g->strand == $strand) and not (
-						$g->start > $end or 
-						$g->end < $start
-					)
-				) {
-					# gene and transcript overlap on the same strand
-					# we found the intersecting gene
-					return $g;
-				}
-			}
-			return; # none of these matched despite having coordinate info
-		}
-		if (scalar @$genes == 1) {
-			# going on trust here that this is the one
-			return $genes->[0];
-		}
-		elsif (scalar @$genes > 1) {
-			carp "more than one gene named $name found!";
-			return $genes->[0];
-		}
-		
-		# nothing suitable found
-		return;
-	}
 }
 
 
@@ -919,6 +830,7 @@ sub _gtf_to_seqf_full {
 		$value =~ s/[";]//g; # remove the flanking double quotes, assume no internal quotes
 		$attributes{$tag} = $value;
 	}
+	my $transcript_id = $attributes{transcript_id} || undef;
 	
 	# assign special tags based on the feature type
 	if ($fields->[2] =~ /cds|exon|utr|codon|untranslated/i) {
@@ -940,7 +852,6 @@ sub _gtf_to_seqf_full {
 		}
 		
 		# check transcript parent
-		my $transcript_id = $attributes{transcript_id} || undef;
 		if ($transcript_id and not exists $self->{loaded}{$transcript_id}) {
 			my $rna = $self->_make_rna_parent($fields, $transcript_id);
 			$self->{loaded}{$transcript_id} = $rna;
@@ -959,7 +870,7 @@ sub _gtf_to_seqf_full {
 		# these are sometimes present in GTF files, such as from Ensembl
 		
 		# transcript information
-		$feature->primary_id($attributes{transcript_id});
+		$feature->primary_id($transcript_id);
 		delete $attributes{transcript_id};
 		if (exists $attributes{transcript_name}) {
 			$feature->display_name($attributes{transcript_name});
