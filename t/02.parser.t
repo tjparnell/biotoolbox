@@ -132,8 +132,8 @@ sub test_gff {
 	is(scalar @tops, 33, 'number of top features');
 
 	# find gene
-	$f = $gff->find_gene('YAL055W');
-	isa_ok($f, $sfclass, 'found gene object');
+	$f = $gff->fetch('YAL055W');
+	isa_ok($f, $sfclass, 'fetched gff seqfeature object');
 	is($f->start, 42177, 'feature3 start');
 	is($f->stop, 42719, 'feature3 stop');
 	is($f->primary_tag, 'gene', 'feature3 primary_tag');
@@ -234,8 +234,8 @@ sub test_gtf {
 	is($e->primary_tag, 'exon', 'exon primary_tag');
 	
 	# find a gene
-	$f = $gtf->find_gene('Y_RNA');
-	isa_ok($f, $sfclass, 'found feature object');
+	$f = $gtf->fetch('ENSG00000206797');
+	isa_ok($f, $sfclass, 'fetched gtf seqfeature object');
 	is($f->seq_id, 'chr20', 'feature seq_id');
 	is($f->start, 431307, 'feature start');
 	is($f->stop, 431406, 'feature stop');
@@ -370,8 +370,8 @@ sub test_ucsc {
 	undef $e;
 
 	# find a gene
-	$f = $ucsc->find_gene('Y_RNA');
-	isa_ok($f, $sfclass, 'first feature object');
+	$f = $ucsc->fetch('ENSG00000206797');
+	isa_ok($f, $sfclass, 'fetched ucsc seqfeature object');
 	is($f->seq_id, 'chr20', 'feature seq_id');
 	is($f->start, 431307, 'feature start');
 	is($f->stop, 431406, 'feature stop');
@@ -437,8 +437,8 @@ sub test_bed6 {
 	is(scalar @top, 5, 'bed top features');
 
 	# find gene
-	$f = $bed->find_gene('YAL044C');
-	isa_ok($f, $sfclass, 'found gene object');
+	$f = $bed->fetch('chrI:57949-58462');
+	isa_ok($f, $sfclass, 'fetched bed6 seqfeature object');
 	is($f->start, 57950, 'feature2 start');
 	is($f->stop, 58462, 'feature2 stop');
 	is($f->primary_tag, 'region', 'feature2 primary_tag');
@@ -515,8 +515,8 @@ sub test_bed12 {
 	is($e->primary_tag, 'exon', 'exon primary_tag');
 	
 	# find gene
-	$f = $bed->find_gene('ENST00000384070');
-	isa_ok($f, $sfclass, 'found transcript object');
+	$f = $bed->fetch('chr20:431306-431406');
+	isa_ok($f, $sfclass, 'fetched bed12 transcript object');
 	is($f->start, 431307, 'transcript start');
 	is($f->stop, 431406, 'transcript stop');
 	is($f->primary_tag, 'ncRNA', 'transcript primary_tag');
@@ -567,8 +567,8 @@ sub test_narrowPeak {
 	is(scalar @top, 5, 'bed top features');
 
 	# find gene
-	$f = $bed->find_gene('narrowPeak210');
-	isa_ok($f, $sfclass, 'found gene object');
+	$f = $bed->fetch('chr1:11979800-11981570');
+	isa_ok($f, $sfclass, 'fetched narrowPeak object feature2');
 	is($f->start, 11979801, 'feature2 start');
 	is($f->stop, 11981570, 'feature2 stop');
 	is($f->primary_tag, 'region', 'feature2 primary_tag');
@@ -628,8 +628,8 @@ sub test_gappedPeak {
 	is(scalar @top, 5, 'bed top features');
 
 	# find gene
-	$f = $bed->find_gene('peak_4');
-	isa_ok($f, $sfclass, 'found peak4 object');
+	$f = $bed->fetch('chr1:88947-89987');
+	isa_ok($f, $sfclass, 'fetched gappedPeak object peak4');
 	is($f->start, 88948, 'peak4 start');
 	is($f->stop, 89987, 'peak4 stop');
 	is($f->primary_tag, 'region', 'peak4 primary_tag');

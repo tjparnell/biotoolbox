@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.64';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -1313,10 +1313,7 @@ sub parse_table {
 		my $count = 0;
 		$self->iterate( sub {
 			my $row = shift;
-			my $f = $parser->find_gene(
-				name  => $row->name,
-				id    => $row->id,
-			);
+			my $f = $parser->fetch($row->id);
 			if ($f) {
 				$self->store_seqfeature($row->row_index, $f);
 				$count++;
