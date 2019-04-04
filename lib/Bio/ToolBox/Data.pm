@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.64';
+our $VERSION = '1.66';
 
 =head1 NAME
 
@@ -1072,8 +1072,12 @@ L<Bio::DB::SeqFeature::Store>, L<Bio::Perl>
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
+use Bio::ToolBox::db_helper qw(
+	get_new_feature_list  
+	get_new_genome_list
+	get_db_feature
+);
 use Module::Load;
-my $db_loaded;
 
 1;
 
@@ -1093,19 +1097,9 @@ sub new {
 	
 	# check for stream
 	if ($args{stream}) {
-		my $obj;
-		eval {
-			$class = "Bio::ToolBox::Data::Stream";
-			load $class;
-			$obj = $class->new(@_);
-		};
-		if ($obj) {
-			return $obj;
-		}
-		else {
-			carp "cannot load Stream object $@";
-			return;
-		}
+		$class = "Bio::ToolBox::Data::Stream";
+		load($class);
+		return $class->new(@_);
 	}
 	
 	# initialize
@@ -1139,11 +1133,6 @@ sub new {
 		$self->feature($args{features});
 		$self->database($args{db});
 		$args{data} = $self;
-		unless ($db_loaded) {
-			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
-				get_new_genome_list get_db_feature));
-			$db_loaded = 1;
-		}
 		my $result;
 		if ($args{features} eq 'genome') {
 			$result = get_new_genome_list(%args);
@@ -1584,11 +1573,6 @@ sub collapse_gene_transcripts {
 	else {
 		# no stored SeqFeature objects, probably names pointing to a database
 		# we will have to fetch the feature from a database
-		unless ($db_loaded) {
-			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
-				get_new_genome_list get_db_feature));
-			$db_loaded = 1;
-		}
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
 		my $name_i = $self->name_column;
@@ -1664,11 +1648,6 @@ sub add_transcript_length {
 		# we will have to fetch the feature from a database
 		my $db = $self->open_meta_database(1) or  # force open a new db connection
 			confess "No SeqFeature objects stored and no database connection!";
-		unless ($db_loaded) {
-			load('Bio::ToolBox::db_helper', qw(get_new_feature_list  
-				get_new_genome_list get_db_feature));
-			$db_loaded = 1;
-		}
 		my $name_i = $self->name_column;
 		my $id_i = $self->id_column;
 		my $type_i = $self->type_column;

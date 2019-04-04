@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::core;
-our $VERSION = '1.65';
+our $VERSION = '1.66';
 
 =head1 NAME
 
@@ -16,8 +16,13 @@ should not be used directly. See the respective modules for more information.
 use strict;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::file';
+use Bio::ToolBox::db_helper qw(
+	open_db_connection 
+	verify_or_request_feature_types
+	use_bam_adapter
+	use_big_adapter
+);
 use Module::Load;
-my $core_db_loaded = 0;
 
 1;
 
@@ -832,11 +837,6 @@ sub open_meta_database {
 	if (exists $self->{db_connection}) {
 		return $self->{db_connection} unless $force;
 	}
-	unless ($core_db_loaded) {
-		load('Bio::ToolBox::db_helper', qw(open_db_connection 
-			verify_or_request_feature_types use_bam_adapter use_big_adapter));
-		$core_db_loaded = 1;
-	}
 	my $db = open_db_connection($self->{db}, $force);
 	return unless $db;
 	$self->{db_connection} = $db;
@@ -847,11 +847,6 @@ sub open_new_database {
 	my $self = shift;
 	my $database = shift;
 	my $force = shift || 0;
-	unless ($core_db_loaded) {
-		load('Bio::ToolBox::db_helper', qw(open_db_connection 
-			verify_or_request_feature_types use_bam_adapter use_big_adapter));
-		$core_db_loaded = 1;
-	}
 	return open_db_connection($database, $force);
 }
 
@@ -868,11 +863,6 @@ sub verify_dataset {
 			return $dataset;
 		}
 		$database ||= $self->open_meta_database;
-		unless ($core_db_loaded) {
-			load('Bio::ToolBox::db_helper', qw(open_db_connection 
-				verify_or_request_feature_types use_bam_adapter use_big_adapter));
-			$core_db_loaded = 1;
-		}
 		my ($verified) = verify_or_request_feature_types(
 			# normally returns an array of verified features, we're only checking one
 			db      => $database,
@@ -1039,21 +1029,11 @@ sub database {
 
 sub bam_adapter {
 	my $self = shift;
-	unless ($core_db_loaded) {
-		load('Bio::ToolBox::db_helper', qw(open_db_connection 
-			verify_or_request_feature_types use_bam_adapter use_big_adapter));
-		$core_db_loaded = 1;
-	}
 	return use_bam_adapter(@_);
 }
 
 sub big_adapter {
 	my $self = shift;
-	unless ($core_db_loaded) {
-		load('Bio::ToolBox::db_helper', qw(open_db_connection 
-			verify_or_request_feature_types use_bam_adapter use_big_adapter));
-		$core_db_loaded = 1;
-	}
 	return use_big_adapter(@_);
 }
 
