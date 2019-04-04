@@ -1,12 +1,13 @@
 # ADVANCED INSTALLATION
 
-This is a brief, advanced installation guide for getting a complete installation. I 
-recommend using a simple CPAN package manager such as [CPAN Minus](https://metacpan.org/pod/App::cpanminus) 
-or `cpanm`. Note that in the following example commands, `cpanm` is given a Perl module name, 
-which is used to query [CPAN](https://metacpan.org), but it can also easily take a URL or 
-a downloaded archive file. 
+This is a brief, advanced installation guide for getting a complete installation. I
+recommend using a simple CPAN package manager such as [CPAN
+Minus](https://metacpan.org/pod/App::cpanminus) or `cpanm`. Note that in the
+following example commands, `cpanm` is given a Perl module name, which is used to
+query [CPAN](https://metacpan.org), but it can also easily take a URL or a downloaded
+archive file. 
 
-Note that `Make` and compilation tools, e.g. `GCC` or `clang`, are required. Most linux 
+Note that `Make` and compilation tools, e.g. `GCC` or `clang`, are required. Most Linux 
 distributions have these available as an optional install if they're not already 
 available. On MacOS, install the Xcode Command Line Tools. 
 
@@ -31,7 +32,7 @@ sets up a `perl5` directory for local (home) module installations. The path is s
 appropriately by adding a statement to your home `.profile` or other equivalent file as 
 described in the documentation. This can also be used for targeted, standalone 
 installations; adjust accordingly. For example, the following command will install 
-`local::lib` and the CPAN Minus
+`local::lib` and the CPAN Minus application
 
     $ curl -L https://cpanmin.us | perl - -l $HOME/perl5 local::lib App::cpanminus \
     && echo 'eval "$(perl -I$HOME/perl5/lib/perl5 -Mlocal::lib)"' >> ~/.profile \
@@ -78,7 +79,7 @@ There are two external C libraries that are required for reading Bam and BigWig 
 Note that both Perl modules [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS) and 
 [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big) include `INSTALL.pl` scripts within 
 their bundles that can compile these external libraries for you in a semi-automated 
-control. Proceed here if you wish to have more control over what and where these are 
+fashion. Proceed here if you wish to have more control over what and where these are 
 installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
@@ -113,12 +114,18 @@ the end you will have installed dozens of packages.
 
     The BioPerl package is a large bundle that brings along a number of extraneous 
     modules and bundled scripts, the vast majority of which is not needed by Bio::ToolBox.
-    This is required by Bio::DB::HTS and all of the legacy adapters. 
+    However, it is required by Bio::DB::HTS and all of the legacy adapters (see below). 
     
-    If you build this manually, or run `cpanm` with the `--interactive` option, you 
-    can interactively choose what scripts to include or not include. By default, it 
-    installs all additional scripts. None of the included scripts are required by 
-    BioToolBox.
+    *NOTE*: With recent changes in version 1.7.3 and later, BioPerl is being
+    refactored and split into smaller packages, such as the legacy SeqFeature
+    database module (see below). While this may be good in the long run, the latest
+    CPAN release now forces the installation of an extraordinary number of
+    prerequisites. Installation of an older version is highly recommended for sanity
+    purposes. 
+    
+    [Release
+    1.7.2](https://github.com/bioperl/bioperl-live/archive/release-1-7-2.tar.gz) is
+    the last, convenient, monolithic release and is recommended in most situations.
 
 - [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS)
 
@@ -127,6 +134,10 @@ the end you will have installed dozens of packages.
     library locations, such as `/usr/local` for example, on its own. For non-standard 
     locations, specify the location of the HTSlib path to `Build.PL` using the 
     `--htslib` option. 
+    
+    *NOTE*: The latest CPAN release (v2.11) is old. If it fails to install correctly,
+    try the current development
+    [version](https://github.com/Ensembl/Bio-DB-HTS/archive/master.zip). 
 
 - [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big)
 
@@ -149,31 +160,20 @@ the end you will have installed dozens of packages.
     This is necessary for optional functionality (quick intersection of genomic 
     intervals, such as black lists) for a few scripts, namely `bam2wig.pl`.
 
-- [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
-
-	This used to be part of the BioPerl distribution prior to release 1.7, but is now
-	split into its own distribution. If you wish to use annotation databases, install
-	this, along with a SQL driver, such as
-	[DBD::SQLite](https://metacpan.org/pod/DBD::SQLite) (recommended) or
-	[DBD::mysql](https://metacpan.org/pod/DBD::mysql) (fancy multi-user installations).
-
-
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
-    $ cpanm Module::Build BioPerl
+    $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
     $ cpanm --configure-args="--libbigwig $HOME" Bio::DB::Big
-    $ cpanm Parallel::ForkManager Set::IntervalTree
-    $ cpanm Bio::DB::SeqFeature::Store DBD::SQLite
-    $ cpanm Bio::ToolBox
+    $ cpanm Parallel::ForkManager Set::IntervalTree Bio::ToolBox
 
 ## External applications
 
 Some programs, notably [bam2wig.pl](https://metacpan.org/pod/distribution/Bio-ToolBox/scripts/bam2wig.pl) 
 among others, requires external UCSC utilities for converting wig files to bigWig. You may 
 download these from the UCSC Genome Browser utilities section for either 
-[linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or 
+[Linux](http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/) or 
 [MacOS](http://hgdownload.soe.ucsc.edu/admin/exe/macOSX.x86_64/). Copy them to your 
 `bin` directory in your `PATH`, for example `$HOME/bin`, `$HOME/perl5/bin`, or 
 `/usr/local/bin`. Be sure to make them executable by running `chmod +x` on each file.
@@ -183,7 +183,7 @@ download these from the UCSC Genome Browser utilities section for either
 - bigWigToWig
 - bedToBigBed
 
-An example for downloading on linux:
+An example for downloading on Linux:
 
     $ for name in wigToBigWig bedGraphToBigWig bigWigToWig bedToBigBed; \
     do curl http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64/$name > $HOME/bin/$name \
@@ -196,6 +196,7 @@ These are additional legacy Perl modules that are supported (for example, if you
 have a [GBrowse](http://gmod.org/wiki/GBrowse) installation), but are either not required 
 or have been superseded by other modules. 
 
+- [Bio::DB::SeqFeature::Store](https://metacpan.org/pod/Bio::DB::SeqFeature::Store)
 - [Bio::DB::Sam](https://metacpan.org/pod/Bio::DB::Sam)
 - [Bio::DB::BigWig](https://metacpan.org/pod/Bio::DB::BigWig)
 - [Bio::DB::BigBed](https://metacpan.org/pod/Bio::DB::BigBed)
@@ -203,6 +204,15 @@ or have been superseded by other modules.
 - [Bio::Graphics::Wiggle](https://metacpan.org/pod/Bio::Graphics::Wiggle)
 
 Some notes are below for anyone who may need to install these. 
+
+### Database support
+
+The Bio::DB::SeqFeature::Store is a convenient SeqFeature annotation database backed
+by a SQL engine. It used to be part of the BioPerl distribution prior to release
+1.7.3, but is now split into its own distribution. If you wish to use annotation
+databases, you will need a SQL driver, such as
+[DBD::SQLite](https://metacpan.org/pod/DBD::SQLite) (recommended for individuals) or
+[DBD::mysql](https://metacpan.org/pod/DBD::mysql) (for fancy multi-user installations). 
 
 ### Sam library
 
@@ -245,8 +255,8 @@ To simplify compilation, you can skip the main Makefile and simply compile only 
 libraries that you need. First, export the `MACHTYPE` environment variable to an 
 acceptable simple value, usually `x86_64`.
 
-Next, move to the included `kent/src/htslib`, and compile this library by issuing the 
-`make` command.
+Next, move to the included `kent/src/htslib` directory, and compile this library by
+issuing the `make` command.
 
 Move to the `kent/src/lib` directory, and compile the library by issuing the `make` 
 command. If it compiles successfully, you should get a `jkweb.a` file in the `lib/x86_64` 

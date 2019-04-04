@@ -73,7 +73,21 @@ object class.
 The parser sub classes each contain documentation, but for the most part, they 
 all behave similarly with similar methods. 
 
+=head2 Initiate new parser
 
+=over 4
+
+=item new
+
+Initiate a new parser object. Since this is a wrapper around a specific 
+parser sub class, this is best used when the user doesn't necessarily know 
+a priori what class to invoke. In other words, if you have a file but don't 
+know what to open it with, use the generic Parser and let it pick for you.
+
+    my $file; # obtained from the user, unknown format
+    my $parser = Bio::ToolBox::Parser->new($file);
+    
+Pass the 
 
 
 
@@ -392,12 +406,21 @@ sub top_features {
 }
 
 
+*get_feature_by_id = \&fetch;
+
 sub fetch {
 	my ($self, $id) = @_;
 	unless ($self->{'eof'}) {
 		croak "parse file first before fetching features by ID!";
 	}
 	return $self->{loaded}{$id} || undef;
+}
+
+sub find_feature_by_location {
+}
+
+sub _index_chromosome {
+
 }
 
 sub find_gene {

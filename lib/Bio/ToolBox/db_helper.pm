@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.61';
+our $VERSION = '1.66';
 
 =head1 NAME
 
@@ -833,7 +833,7 @@ use strict;
 require Exporter;
 use Carp qw(carp cluck croak confess);
 use Module::Load; # for dynamic loading during runtime
-use List::Util qw(min max sum);
+use List::Util qw(min max sum0);
 use Statistics::Lite qw(median range stddevp);
 use Bio::ToolBox::db_helper::constants;
 use Bio::ToolBox::utility;
@@ -2022,30 +2022,25 @@ sub get_segment_score {
 
 sub calculate_score {
 	my ($method, $scores) = @_;
-	
-	# empty score
-	if (not defined $scores or scalar @$scores == 0) {
-		return 0 if $method =~ /count|sum/;
-		return '.';	
-	}
+	$scores ||= []; # just in case
 	
 	# calculate a score based on the method
 	if ($method eq 'mean') {
-		my $n = scalar(@$scores);
-		return 0 if $n == 0;
-		return $scores->[0] if $n == 1;
-		return sum(@$scores)/$n;
+		return sum0(@$scores)/scalar(@$scores);
 	} 
 	elsif ($method eq 'sum') {
-		return sum(@$scores);
+		return sum0(@$scores);
 	}
 	elsif ($method eq 'median') {
+		return '.' unless scalar(@$scores);
 		return median(@$scores);
 	}
 	elsif ($method eq 'min') {
+		return '.' unless scalar(@$scores);
 		return min(@$scores);
 	}
 	elsif ($method eq 'max') {
+		return '.' unless scalar(@$scores);
 		return max(@$scores);
 	}
 	elsif ($method eq 'count' or $method eq 'pcount') {
@@ -2069,11 +2064,13 @@ sub calculate_score {
 	}
 	elsif ($method eq 'range') {
 		# the range value is 'min-max'
+		return '.' unless scalar(@$scores);
 		return range(@$scores);
 	}
 	elsif ($method eq 'stddev') {
 		# we are using the standard deviation of the population, 
 		# since these are the only scores we are considering
+		return '.' unless scalar(@$scores);
 		return stddevp(@$scores);
 	}
 	elsif ($method =~ /rpk?m/) {

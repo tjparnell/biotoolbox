@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Stream;
-our $VERSION = '1.61';
+our $VERSION = '1.66';
 
 =head1 NAME
 
@@ -798,13 +798,11 @@ sub add_column {
 sub copy_column {
 	my $self = shift;
 	unless ($self->mode) {
-		cluck "We have a read-only Stream object, cannot add columns";
-		return;
+		confess "We have a read-only Stream object, cannot add columns";
 	}
 	if (defined $self->{fh}) {
 		# Stream file handle is opened
-		cluck "Cannot modify columns when a Stream file handle is opened!";
-		return;
+		confess "Cannot modify columns when a Stream file handle is opened!";
 	}
 	my $index = shift;
 	return unless defined $index;
@@ -822,16 +820,13 @@ sub copy_column {
 
 sub next_row {
 	my $self = shift;
-	if ($self->mode) {
-		cluck "Stream object is write-only! cannot read";
-		return;
+	if ($self->{mode}) {
+		confess "Stream object is write-only! cannot read";
 	}
 	
 	# read and add the next line in the file
-	my $line = $self->{fh}->getline;
-	return unless $line;
+	my $line = $self->{fh}->getline or return;
 	$self->{line_count}++;
-	return $self->next_row unless $line =~ /\w+/;
 	if (substr($line,0,1) eq '#') {
 		# we shouldn't have internal comment lines, but just in case....
 		# could be a gff3 pragma
@@ -856,9 +851,8 @@ sub next_row {
 sub write_row {
 	my $self = shift;
 	my $data = shift;
-	unless ($self->mode) {
-		cluck "Stream object is read-only! cannot write";
-		return;
+	unless ($self->{mode}) {
+		confess "Stream object is read-only! cannot write";
 	}
 	
 	# open the file handle if it hasn't been opened yet
