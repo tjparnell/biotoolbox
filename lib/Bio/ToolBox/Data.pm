@@ -1070,12 +1070,14 @@ L<Bio::DB::SeqFeature::Store>, L<Bio::Perl>
 =cut
 
 use strict;
+use File::Spec;
 use Carp qw(carp cluck croak confess);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list  
 	get_new_genome_list
 	get_db_feature
+	calculate_score
 );
 use Module::Load;
 
@@ -2066,16 +2068,6 @@ sub summary_file {
 	# Collect passed arguments
 	my %args = @_; 
 	
-	# load modules
-	eval {
-		my $class = 'Statistics::Lite';
-		load($class, qw(min mean));
-	};
-	if ($@) {
-		carp "missing required modules! $@";
-		return;
-	}
-	
 	# parameters
 	my $outfile =        $args{'filename'}    || undef;
 	my $dataset =        $args{'dataset'}     || undef;
@@ -2132,8 +2124,6 @@ sub summary_file {
 		# the original dataset name (i.e. the name of the dataset in the 
 		# database from which the column's data was derived) 
 		$dataset = $self->metadata($startcolumn, 'dataset') || undef;
-		$dataset =~ s/^(?:file|http|ftp):\/*//;
-		$dataset =~ s/\.(?:bw|bam|bb|big.*|useq)$//;
 	}
 	unless (defined $log) {
 		# the log flag should be set in the column metadata and should be the
@@ -2142,7 +2132,31 @@ sub summary_file {
 	}
 	
 	# Prepare score column name
-	my $data_name = $dataset ? $dataset : $self->basename ? $self->basename : 'dataset';
+	my $data_name;
+	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
+		my $d = $1;
+		# a specified file
+		# we just want the file name, split it from the path
+		foreach (split /&/, $d) {
+			my (undef, undef, $file_name) = File::Spec->splitpath($_);
+			# clean up extensions and stuff
+			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
+			if ($data_name) {
+				$data_name .= '&' . $file_name;
+			}
+			else {
+				$data_name = $file_name;
+			}
+		}
+	}
+	elsif ($dataset) {
+		# a feature type, take as is
+		$data_name = $dataset;
+	}
+	else {
+		# super generic, what else to do?
+		$data_name = 'dataset';
+	}
 	
 	# Prepare array to store the summed data
 	my $summed_data = $self->new(
@@ -2165,11 +2179,11 @@ sub summary_file {
 	) { 
 		
 		# determine the midpoint position of the window
-		my $midpoint = int mean(
+		my $midpoint = int calculate_score('mean',
 			# this assumes the column metadata has start and stop
 			$self->metadata($column, 'start'),	
-			$self->metadata($column, 'stop'),	
-		) or undef; 
+			$self->metadata($column, 'stop')
+		)/2 or undef; 
 		
 		# convert midpoint to fraction of 1000 for plotting if necessary
 		if (substr($self->name($column), -1) eq '%') {
@@ -2194,7 +2208,7 @@ sub summary_file {
 		}
 		
 		# determine mean value
-		my $window_mean = mean(@values);
+		my $window_mean = calculate_score('mean', \@values);
 		if ($log) { 
 			$window_mean = log($window_mean) / log(2);
 		}
