@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.66';
+our $VERSION = '1.70';
 
 =head1 NAME
 
@@ -1859,15 +1859,13 @@ sub get_db_feature {
 	my $db = open_db_connection($args{db});
 	my $db_ref = ref $db;
 	
-	# get the name of the feature
-	my $name = $args{'name'} || undef; 
-	
 	# check for values and internal nulls
-	$args{'id'} = exists $args{'id'} ? $args{'id'} : undef;
+	$args{'id'}   ||= undef;
+	$args{'name'} ||= undef;
 	$args{'type'} ||= undef;
-	undef $name         if $name and $name eq '.';
-	undef $args{'id'}   if $args{'id'} and $args{'id'} eq '.';
-	undef $args{'type'} if $args{'type'} and $args{'type'} eq '.';
+	undef $args{'name'} if $args{'name'} eq '.';
+	undef $args{'id'}   if $args{'id'} eq '.';
+	undef $args{'type'} if $args{'type'} eq '.';
 	
 	# quick method for feature retrieval
 	if (defined $args{'id'} and $db->can('fetch')) {
@@ -1878,7 +1876,7 @@ sub get_db_feature {
 		# check that the feature we pulled out is what we want
 		my $check = $feature ? 1 : 0;
 		if ($check) {
-			$check = 0 if (defined $name and $feature->display_name ne $name);
+			$check = 0 if (defined $args{'name'} and $feature->display_name ne $args{'name'});
 			$check = 0 if (defined $args{'type'} and $feature->type ne $args{'type'});
 		}
 		
@@ -1896,9 +1894,9 @@ sub get_db_feature {
 	}
 	
 	# otherwise use name and type 
-	return unless $name; # otherwise db will return all features! Not what we want!
+	return unless $args{'name'}; # otherwise db will return all features! Not what we want!
 	my @features = $db->features( 
-		-name       => $name, # we assume this name will be unique
+		-name       => $args{'name'}, # we assume this name will be unique
 		-aliases    => 0, 
 		-type       => $args{'type'},
 	);
@@ -1907,15 +1905,15 @@ sub get_db_feature {
 	unless (@features) {
 		# try again with aliases enabled
 		@features = $db->features( 
-			-name       => $name,
+			-name       => $args{'name'},
 			-aliases    => 1, 
 			-type       => $args{'type'},
 		);
 	}
-	unless (@features and $name =~ /[;,\|]/) {
+	unless (@features and $args{'name'} =~ /[;,\|]/) {
 		# I used to append aliases to the end of the name in old versions of biotoolbox
 		# crazy, I know, but just in case this happened, let's try breaking them apart
-		my $name2 = (split(/\s*[;,\|]\s*/, $name))[0];
+		my $name2 = (split(/\s*[;,\|]\s*/, $args{'name'}))[0];
 			 # multiple names present using common delimiters ;,|
 			 # take the first name only, assume others are aliases that we don't need
 			@features = $db->features( 
@@ -1957,11 +1955,12 @@ sub get_db_feature {
 		}
 		
 		# warn the user, this should be fixed
-		printf "  Found %s %s features named '$name' in the database! Using first one.\n", 
-			scalar(@features), $args{'type'};
+		printf "  Found %s %s features named '%s' in the database! Using first one.\n", 
+			scalar(@features), $args{'type'}, $args{'name'};
 	}
 	elsif (!@features) {
-		printf "  Found no %s features named '$name' in the database!\n", $args{'type'};
+		printf "  Found no %s features named '%s' in the database!\n", $args{'type'}, 
+			$args{'name'};
 		return;
 	}
 	
