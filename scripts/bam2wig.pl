@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.64';
+my $VERSION = '1.66';
 	
 	
 
@@ -1446,7 +1446,7 @@ sub process_alignments {
 				my $count = $3;
 				my $strand = $4;
 				$totals[$samid] += $count;
-				$seq_totals{$seq_id} += $count;
+				$seq_totals{$seq_id}{$strand} += $count;
 				$files{$seq_id}{$strand}{$samid} = $file;
 			}
 		}
@@ -1499,7 +1499,7 @@ sub process_alignments {
 			foreach my $seq_id (@seq_list) {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
-					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}, 
+					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}{$strand}, 
 						$files{$seq_id}{$strand}, \@norms);
 				}
 			}
@@ -1592,7 +1592,7 @@ sub parallel_process_alignments {
 				my $count = $3;
 				my $strand = $4;
 				$totals[$samid] += $count;
-				$seq_totals{$seq_id} += $count;
+				$seq_totals{$seq_id}{$strand} += $count;
 				$files{$seq_id}{$strand}{$samid} = $file;
 			}
 		}
@@ -1649,7 +1649,7 @@ sub parallel_process_alignments {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
 					$pm->start and next;
-					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}, 
+					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}{$strand}, 
 						$files{$seq_id}{$strand}, \@norms);
 					$pm->finish;
 				}
@@ -1934,7 +1934,11 @@ sub write_final_wig_file {
 	my @r_filelist = map { $files{$_}{r} } @seq_list;
 	
 	# print total alignment summaries
-	if ($r_total) {
+	if ($r_total and $flip) {
+		printf " %s total forward $items\n", format_with_commas($r_total);
+		printf " %s total reverse $items\n", format_with_commas($f_total);
+	}
+	elsif ($r_total) {
 		printf " %s total forward $items\n", format_with_commas($f_total);
 		printf " %s total reverse $items\n", format_with_commas($r_total);
 	}
