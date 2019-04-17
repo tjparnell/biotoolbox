@@ -7,7 +7,7 @@ use Carp;
 use List::Util qw(min max sum);
 use Bio::ToolBox::db_helper::constants;
 use Bio::DB::Big;
-our $VERSION = '1.60';
+our $VERSION = '1.66';
 
 # Initialize CURL buffers
 BEGIN {
@@ -98,6 +98,8 @@ sub collect_bigwig_score {
 		# only one bw, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		my $s = $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
@@ -110,6 +112,8 @@ sub collect_bigwig_score {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $s = $bw->get_stats($chromo, $param->[STRT] - 1, $param->[STOP], 1, 
@@ -140,6 +144,8 @@ sub collect_bigwig_scores {
 		# only one, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		my $raw_scores = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
@@ -152,6 +158,8 @@ sub collect_bigwig_scores {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $raw = $bw->get_values($chromo, $param->[STRT] - 1, $param->[STOP]);
@@ -173,6 +181,8 @@ sub collect_bigwig_position_scores {
 		# only one, great!
 		my $bw = _get_bigwig($param->[DATA]);
 		my $chromo = $BIG_CHROMOS{$param->[DATA]}{$param->[CHR]} or return;
+		$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		my $intervals = $bw->get_intervals($chromo, $param->[STRT] - 1, $param->[STOP]);
@@ -192,6 +202,8 @@ sub collect_bigwig_position_scores {
 		for (my $d = DATA; $d < scalar @$param; $d++) {
 			my $bw = _get_bigwig($param->[$d]);
 			my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+			$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+				$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 				$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 			my $intervals = $bw->get_intervals($chromo, $param->[STRT] - 1, $param->[STOP]);
@@ -262,6 +274,8 @@ sub collect_bigbed_scores {
 			
 		# first check chromosome is present
 		my $chromo = $BIG_CHROMOS{$param->[$d]}{$param->[CHR]} or next;
+		$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		
@@ -329,6 +343,8 @@ sub collect_bigbed_position_scores {
 			
 		# first check that the chromosome is present
 		my $chromo = $BIG_CHROMOS{$param->[$i]}{$param->[CHR]} or next;
+		$param->[STRT] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
+			$param->[STRT] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		$param->[STOP] = $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo} if 
 			$param->[STOP] > $BIG_CHROMOLENGTHS{$param->[DATA]}{$chromo};
 		
