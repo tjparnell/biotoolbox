@@ -1956,7 +1956,6 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outfile\_f", @f_filelist) if $i == 1;
 				merge_wig_files("$outfile\_r", @r_filelist) if $i == 2;
-				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1964,7 +1963,6 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outfile\_f", @f_filelist);
 			merge_wig_files("$outfile\_r", @r_filelist);
-			unlink $chromo_file if $chromo_file;
 		}
 	}
 	elsif ($do_strand and $flip) {
@@ -1975,7 +1973,6 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outfile\_r", @f_filelist) if $i == 1;
 				merge_wig_files("$outfile\_f", @r_filelist) if $i == 2;
-				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1983,13 +1980,14 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outfile\_r", @f_filelist);
 			merge_wig_files("$outfile\_f", @r_filelist);
-			unlink $chromo_file if $chromo_file;
 		}
 	}
 	else {
 		merge_wig_files($outfile, @f_filelist);
-		unlink $chromo_file if $chromo_file;
 	}
+	
+	# clean up 
+	unlink $chromo_file if $chromo_file;
 }
 
 sub write_bedgraph {
