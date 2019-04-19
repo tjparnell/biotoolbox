@@ -2026,7 +2026,7 @@ sub calculate_score {
 	
 	# calculate a score based on the method
 	if ($method eq 'mean') {
-		return sum0(@$scores)/scalar(@$scores);
+		return sum0(@$scores)/(scalar(@$scores) || 1);
 	} 
 	elsif ($method eq 'sum') {
 		return sum0(@$scores);
