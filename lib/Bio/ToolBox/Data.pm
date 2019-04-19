@@ -2181,9 +2181,8 @@ sub summary_file {
 		# determine the midpoint position of the window
 		my $midpoint = int calculate_score('mean',
 			# this assumes the column metadata has start and stop
-			$self->metadata($column, 'start'),	
-			$self->metadata($column, 'stop')
-		)/2 or undef; 
+			[$self->metadata($column, 'start'), $self->metadata($column, 'stop')]
+		); 
 		
 		# convert midpoint to fraction of 1000 for plotting if necessary
 		if (substr($self->name($column), -1) eq '%') {
