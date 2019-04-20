@@ -2114,7 +2114,7 @@ sub summary_file {
 		# acceptable_indices array.
 		# Assuming, of course, that feature descriptor datasets (columns) are
 		# leftmost only.
-		$startcolumn = min(@acceptable_indices);
+		$startcolumn = calculate_score('min', \@acceptable_indices);
 	}
 	unless (defined $endcolumn) {
 		# take the last or rightmost column
