@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.65';
+our $VERSION = '1.66';
 
 =head1 NAME
 
@@ -1419,41 +1419,37 @@ sub gtf_string {
 	return unless @exons; # no exon subfeatures? must not be a transcript....
 	
 	# mandatory identifiers
-	my ($gene_id, $gene_name);
+	my ($gene_id, $gene_name, $gene_biotype);
 	if ($gene) {
 		$gene_id = $gene->primary_id || $gene->display_name;
 		$gene_name = $gene->display_name;
+		($gene_biotype) = $gene->get_tag_values('gene_biotype') || 
+			$gene->get_tag_values('biotype') || undef;
 	}
 	my $trx_id = $feature->primary_id || $feature->display_name;
 	my $trx_name = $feature->display_name;
-	my $group = "gene_id \"$gene_id\"; transcript_id \"$trx_id\""; 
-	my $name = "gene_name \"$gene_name\"; transcript_name \"$trx_name\"";
-	
-	# convert transcript 
-	# transcript is technically not part of the GTF standard....
-	# but it's mostly harmless and generally helpful
-	my $string = join("\t", (
-		$feature->seq_id || '.',
-		$feature->source_tag || '.',
-		$feature->primary_tag =~ /transcript|rna/i ? 'transcript' : 
-			$feature->primary_tag, # something else not recognizable
-		$feature->start,
-		$feature->end,
-		defined $feature->score ? $feature->score : '.',
-		$feature->strand < 0 ? '-' : '+',
-		'.',
-		"$group; $name"
-	) );
+	my $group = sprintf(
+		"gene_id \"%s\"; transcript_id \"%s\"; gene_name \"%s\"; transcript_name \"%s\";",
+		$gene_id, $trx_id, $gene_name, $trx_name);
 	
 	# add additional transcript attributes that might be interesting to keep
+	if ($gene_biotype) {
+		$group .= " gene_biotype \"$gene_biotype\";";
+	}
 	my ($biotype) = $feature->get_tag_values('transcript_biotype') || 
 		$feature->get_tag_values('biotype') || $feature->primary_tag;
-	$string .= "; transcript_biotype \"$biotype\"" if $biotype;
+	if ($biotype) {
+		$group .= " transcript_biotype \"$biotype\";" ;
+	}
 	my ($tsl) = $feature->get_tag_values('transcript_support_level');
-	$string .= "; transcript_support_level \"$tsl\"" if $tsl;
-	$string .= ";\n";
+	if ($tsl) {
+		$group .= " transcript_support_level \"$tsl\";";
+	}
+	
+	# skip transcript as it is technically not part of the GTF standard....
 	
 	# convert exon subfeatures collected above
+	my $string;
 	my @cds = get_cds($feature);
 	push @cds, get_stop_codon($feature);
 	push @cds, get_start_codon($feature);
