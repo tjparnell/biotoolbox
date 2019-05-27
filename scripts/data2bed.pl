@@ -9,7 +9,7 @@ use List::MoreUtils qw(mesh);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
 use Bio::ToolBox::big_helper qw(bed_to_bigbed_conversion);
-my $VERSION =  '1.65';
+my $VERSION =  '1.66';
 
 print "\n This program will write a BED file\n";
 
@@ -111,11 +111,11 @@ if ($bigbed) {
 	# do not allow compression when converting to bigbed
 	$gz = 0;
 	$bgz = 0;
-	$sort_data = 1;
+	$sort_data = 1 if not defined $sort_data;
 }
 if ($bgz) {
 	$gz = 2;
-	$sort_data = 1;
+	$sort_data = 1 if not defined $sort_data;
 }
 
 
