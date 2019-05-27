@@ -2101,7 +2101,8 @@ sub summary_file {
 		my @acceptable_indices; # array of acceptable indices
 		my %skip = map {$_ => 1} qw (systematicname name id alias aliases type class 
 				geneclass chromosome chromo seq_id seqid start stop end gene strand 
-				length primary_id);
+				length primary_id merged_transcript_length transcript_cds_length 
+				transcript_5p_utr_length transcript_3p_utr_length);
 		
 		# walk through the dataset names
 		for (my $i = 0; $i < $self->number_columns; $i++) {
