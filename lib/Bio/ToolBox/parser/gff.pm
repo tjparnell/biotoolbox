@@ -721,7 +721,7 @@ sub parse_file {
 						if ($parent->has_tag('Parent')) {
 							# in all likelihood parent is a transcript and there is a 
 							# gene that probably also needs fixin'
-							my $grandparent_id = $parent->get_tag_values('Parent');
+							my ($grandparent_id) = $parent->get_tag_values('Parent');
 							my $grandparent = $self->{loaded}{$grandparent_id};
 							if ($feature->start < $grandparent->start) {
 								$grandparent->start( $feature->start );
