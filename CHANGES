@@ -2,10 +2,17 @@
 
 v1.66
 	- Optimize data2wig fast mode, about 3 times faster
-	- Summary files now use a cleaned-up column name 
+	- Summary files now use a cleaned-up column name. Fix 
+	bugs with summary file generation.
 	- Bam2wig now properly reports alignment counts for each 
 	strand when provided with multiple input bam files 
 	(previously reported the same number). 
+	- Fix bug where the Big adapter would crash when search 
+	coordinate was out of bound, unlike UCSC, HTS, and Sam.
+	- Improve GTF export with correct formatting and no longer 
+	export transcript lines.
+	- Improve GTF parsing where both transcripts and genes are 
+	inferred but coordinates where not updated correctly.
 
 v1.65
 	- Add function to read directly from bigWig files, and add 
