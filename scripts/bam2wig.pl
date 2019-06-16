@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.66';
+my $VERSION = '1.67';
 	
 	
 
@@ -2226,24 +2226,26 @@ sub fast_pe_callback {
 		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
 		# record fractional alignment counts
-		if ($do_strand and $flag && 0x80) {
-			# second mate, so must be reverse strand
+		if ($do_strand and $flag & 0x80) {
+			# this alignment is forward and second mate, so must be reverse strand
 			$data->{r_count} += $score; 
 		}
 		else {
-			# presume first mate or unstranded analysis defaults to forward strand
+			# otherwise this forward alignment must be first mate
+			# or unstranded analysis defaults to forward strand
 			$data->{f_count} += $score;
 		}
 		$score *= $data->{score}; # multiply by chromosome scaling factor
 	}
 	else {
 		 # always record one alignment
-		if ($do_strand and $flag && 0x80) {
-			# second mate, so must be reverse strand
+		if ($do_strand and $flag & 0x80) {
+			# this alignment is forward and second mate, so must be reverse strand
 			$data->{r_count} += 1; 
 		}
 		else {
-			# presume first mate or unstranded analysis defaults to forward strand
+			# otherwise this forward alignment is second mate
+			# or unstranded analysis defaults to forward strand
 			$data->{f_count} += 1;
 		}
 		$score = $data->{score}; # probably 1, but may be chromosome scaled
@@ -2320,24 +2322,26 @@ sub pe_callback {
 				$score = $r_nh > 1 ? 1/$r_nh : 1;
 			}
 			# record fractional alignment counts
-			if ($do_strand and $flag && 0x80) {
-				# second mate, so must be reverse strand
+			if ($do_strand and $flag & 0x40) {
+				# this alignment is reverse and first mate, so must be reverse strand
 				$data->{r_count} += $score; 
 			}
 			else {
-				# presume first mate or unstranded analysis defaults to forward strand
+				# otherwise this reverse alignment is second mate
+				# or unstranded analysis defaults to forward strand
 				$data->{f_count} += $score;
 			}
 			$score *= $data->{score}; # multiply by chromosome scaling factor
 		}
 		else {
 			# always record one alignment
-			if ($do_strand and $flag && 0x80) {
-				# second mate, so must be reverse strand
+			if ($do_strand and $flag & 0x40) {
+				# this alignment is reverse and first mate, so must be reverse strand
 				$data->{r_count} += 1; 
 			}
 			else {
-				# presume first mate or unstranded analysis defaults to forward strand
+				# otherwise this reverse alignment is second mate
+				# or unstranded analysis defaults to forward strand
 				$data->{f_count} += 1;
 			}
 			$score = $data->{score}; # probably 1, but may be chromosome scaled
