@@ -2403,11 +2403,9 @@ sub se_spliced_callback {
 	elsif ($use_span) {
 		foreach my $segment (@segments) {
 			my $start = int( ($segment->start - 1) / $bin_size);
-			my $end = int($segment->end / $bin_size);
+			my $end = int( ($segment->end - 1) / $bin_size);
 			if ($do_strand and $a->reversed) {
 				# reverse strand
-				my $start = int( ($segment->start - 1) / $bin_size);
-				my $end = int($segment->end / $bin_size);
 				foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
 					$data->{r}->[$_] += $score;
 				}
