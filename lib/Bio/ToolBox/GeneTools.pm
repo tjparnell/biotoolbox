@@ -1,5 +1,5 @@
 package Bio::ToolBox::GeneTools;
-our $VERSION = '1.66';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -1426,6 +1426,12 @@ sub gtf_string {
 		($gene_biotype) = $gene->get_tag_values('gene_biotype') || 
 			$gene->get_tag_values('biotype') || undef;
 	}
+	else {
+		# these attributes might still be present for transcripts
+		($gene_id) = $feature->get_tag_values('gene_id') || undef;
+		($gene_name) = $feature->get_tag_values('gene_name') || undef;
+		($gene_biotype) = $feature->get_tag_values('gene_biotype') || undef;
+	}
 	my $trx_id = $feature->primary_id || $feature->display_name;
 	my $trx_name = $feature->display_name;
 	my $group = sprintf(
@@ -1437,7 +1443,7 @@ sub gtf_string {
 		$group .= " gene_biotype \"$gene_biotype\";";
 	}
 	my ($biotype) = $feature->get_tag_values('transcript_biotype') || 
-		$feature->get_tag_values('biotype') || $feature->primary_tag;
+		$feature->get_tag_values('biotype');
 	if ($biotype) {
 		$group .= " transcript_biotype \"$biotype\";" ;
 	}
