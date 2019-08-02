@@ -1898,7 +1898,10 @@ sub normalize_bin_file {
 		$chrom_data .= pack("f*", map {$_ * $scale_factor} unpack("$binpack*", $string));
 	}
 	
+	# finish
+	$fh->close;
 	unlink $file;
+	
 	# now write the wig file
 	$file =~ s/\.bin$/.wig/;
 	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file);
