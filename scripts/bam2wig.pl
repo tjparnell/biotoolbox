@@ -57,6 +57,7 @@ my (
 	$use_span, 
 	$use_cspan,
 	$use_extend,
+	$use_smartpe,
 	$position,
 	$use_coverage,
 	$splice,
@@ -114,6 +115,7 @@ GetOptions(
 	'a|span!'      => \$use_span, # record span
 	'cspan!'       => \$use_cspan, # record center span
 	'e|extend!'    => \$use_extend, # extend read
+	'smartcov!'    => \$use_smartpe, # smart paired coverage
 	'coverage!'    => \$use_coverage, # calculate coverage
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
@@ -228,12 +230,12 @@ for my $tid (0 .. $sams[0]->n_targets - 1) {
 # set the wrapper reference
 # this depends on which adapter was opened
 my $wrapper_ref;
-if ($splice) {
+if ($splice or $use_smartpe) {
 	$wrapper_ref = ref($sams[0]) eq 'Bio::DB::Sam' ? 'Bio::DB::Bam::AlignWrapper' : 
-		'Bio::DB::HTS::AlignWrapper';
+		ref($sams[0]) eq 'Bio::DB::HTS' ? 'Bio::DB::HTS::AlignWrapper' : 'none';
 	eval { require $wrapper_ref; 1 };
 }
-printf " Using the %s Bam adapter\n", ref($sams[0]) if $verbose;
+printf " Using the %s Bam adapter and align wrapper $wrapper_ref\n", ref($sams[0]) if $verbose;
 
 ### Process user provided black lists
 my $black_list_hash = process_black_list();
@@ -355,7 +357,6 @@ sub check_defaults {
 	if ($extend_value and !$use_extend) {
 		$use_extend = 1 unless ($use_cspan or $position);
 	}
-	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
 
 	
 	# check position
@@ -379,22 +380,28 @@ sub check_defaults {
 			# for backwards compatibility
 			$use_coverage = 1;
 		}
+		elsif ($position eq 'smartcov') { 
+			# for backwards compatibility
+			$use_smartpe = 1;
+			$paired = 1;
+			$splice = 1;
+		}
 		else {
 			die " unrecognized position value '$position'! see help\n";
 		}
 	}
 	my $position_check = $use_start + $use_mid + $use_span + $use_cspan + $use_extend + 
-		$use_coverage;
+		$use_coverage + $use_smartpe;
 	if ( $position_check > 1) {
 		die " Modes are mutually exclusive! Please select only one of\n" . 
-			" --start, --mid, --span, --cpsan, --extend, or --coverage\n";
+			" --start, --mid, --span, --cpsan, --extend, --smartcov, or --coverage\n";
 	}
 	elsif (not $position_check) {
 		# we allow no position if user has selected shift so that we can calculate
 		# the shift value without running through entire wig conversion
 		unless ($shift) {
 			die " Please select one of the following modes:\n" . 
-				" --start, --mid, --span, --cspan, --extend, or --coverage\n";
+				" --start, --mid, --span, --cspan, --extend, --smartcov, or --coverage\n";
 		}
 	}
 	
@@ -403,13 +410,43 @@ sub check_defaults {
 		$splice = 0;
 	}
 	if ($paired and $splice) {
-		# kind of redundant to have spliced reads with paired-end alignments
-		# plus this poses problems with the bam adaptor - getting substr errors
-		# in Bio::DB::Bam::AlignWrapper
-		warn " disabling splices with paired-end reads\n";
-		undef $splice;
+		if ($use_span) {
+			print " switching mode to smart paired coverage with paired and splice enabled\n";
+			$use_span = 0;
+			$use_smartpe = 1;
+		}
+		elsif ($use_smartpe) {
+			# perfect
+		}
+		else {
+			die " incompatible mode with paired and splices enabled! Try --smartcov\n";
+		}
 	}
-	$max_intron ||= 50000;
+	$max_intron ||= 0;
+	
+	# check paired-end requirements
+	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
+	if ($use_smartpe) {
+		$paired = 1;
+		$splice = 1;
+		
+		# warnings
+		if ($fastpaired) {
+			warn " disabling fast-paired mode with smart-paired coverage\n";
+			$fastpaired = 0;
+		}
+		if ($splice_scale) {
+			warn " disabling splice scaling with smart-paired coverage\n";
+			$splice_scale = 0;
+		}
+		
+		# required modules
+		eval {
+			# required for conveniently assembling overlapping and spliced coverage
+			require Set::IntSpan::Fast;
+		};
+		die " Module Set::IntSpan::Fast is required for smart-paired coverage\n" if $@;
+	}
 	
 	# incompatible options
 	if ($splice and ($use_extend or $extend_value)) {
@@ -467,7 +504,17 @@ sub check_defaults {
 	
 	# check paired-end insert size
 	unless (defined $max_isize) {
-		$max_isize = 600;
+		if ($use_smartpe) {
+			# Smart paired-end coverage doesn't care at all about the size of 
+			# the insertion, but it is nevertheless tested in the pe_callback to 
+			# accomodate other functions. So set this to a reasonably really high number.
+			$max_isize = 100000; # 100 kb should be sufficiently high
+		}
+		else {
+			# vast majority of paired-end fragments are less than 600 bp
+			# really, really big fragments are most likely mapping errors
+			$max_isize = 600;
+		}
 	}
 	unless (defined $min_isize) {
 		$min_isize = 30;
@@ -492,8 +539,8 @@ sub check_defaults {
 		die "bin size cannot be negative!\n" if $bin_size < 0;
 	}
 	else {
-		# set default to 10 bp
-		$bin_size = ($use_span or $use_cspan or $use_extend) ? 10 : 1;
+		# set default to 10 bp for any span or coverage, or 1 bp for point data
+		$bin_size = ($use_start or $use_mid) ? 1 : 10;
 	}
 	
 	# determine binary file packing and length
@@ -596,7 +643,7 @@ sub check_defaults {
 	# determine output format
 	unless ($do_bedgraph or $do_varstep or $do_fixstep) {
 		# pick an appropriate format for the user
-		if ($use_span or $use_extend or $use_cspan or $use_coverage) {
+		if ($use_span or $use_extend or $use_cspan or $use_coverage or $use_smartpe) {
 			if ($bin_size > 1) {
 				$do_fixstep = 1;
 			}
@@ -765,6 +812,15 @@ sub check_defaults {
 	elsif ($paired and $do_strand and $use_cspan) {
 		$callback = \&pe_strand_center_span;
 		print " Recording paired-end stranded, fragment center-span\n";
+	}
+	# paired-end smart coverage
+	elsif ($paired and not $do_strand and $use_smartpe) {
+		$callback = \&smart_pe;
+		print " Recording smart paired-end coverage\n";
+	}
+	elsif ($paired and $do_strand and $use_smartpe) {
+		$callback = \&smart_stranded_pe;
+		print " Recording stranded, smart paired-end coverage\n";
 	}
 	else {
 		die "programmer error!\n" unless $shift; # special exception
@@ -2350,8 +2406,9 @@ sub pe_callback {
 			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
-		# record based only on the forward read
-		&$callback($f, $data, $score);
+		# record based primarily on the forward read, but pass reverse read at end
+		# for use in smart pairing
+		&$callback($f, $data, $score, $a);
 	}
 	else {
 		# store until we find it's mate
@@ -2372,16 +2429,20 @@ sub pe_callback {
 sub se_spliced_callback {
 	my ($a, $data, $score) = @_;
 	my $aw = $wrapper_ref->new($a, $data->{sam});
-	my @segments = $aw->get_SeqFeatures;
 	
 	# check intron size from the cigar string
-	my $size = 1;
-	my $cigars = $aw->cigar_array;
-	foreach my $c (@$cigars) {
-		# each element is [operation, size]
-		$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+	if ($max_intron) {
+		my $size = 1;
+		my $cigars = $aw->cigar_array;
+		foreach my $c (@$cigars) {
+			# each element is [operation, size]
+			$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+		}
+		return if $size > $max_intron; # exceed maximum intron size
 	}
-	return if $size > $max_intron; # exceed maximum intron size
+	
+	# get exon segments
+	my @segments = $aw->get_SeqFeatures;
 	
 	# adjust score
 	if ($splice_scale) {
@@ -2855,6 +2916,98 @@ sub pe_strand_center_span {
 	}
 }
 
+sub smart_pe {
+	my ($f, $data, $score, $r) = @_;
+	my $set = Set::IntSpan::Fast->new;
+	
+	# process both reads, adding to the integer set
+	foreach my $a ($f, $r) {
+		if ($a->cigar_str =~ /N/) {
+			my $aw = $wrapper_ref->new($a, $data->{sam});
+			
+			# check intron size from the cigar string
+			if ($max_intron) {
+				my $size = 1;
+				my $cigars = $aw->cigar_array;
+				foreach my $c (@$cigars) {
+					# each element is [operation, size]
+					$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+				}
+				return if $size > $max_intron; # exceed maximum intron size
+			}
+			
+			# record
+			foreach my $segment ($aw->get_SeqFeatures) {
+				$set->add_range(
+					int( ($segment->start - 1) / $bin_size), 
+					int( ($segment->end - 1) / $bin_size)
+				);
+			}
+		}
+		else {
+			$set->add_range( int($a->pos / $bin_size), int(($a->calend - 1) / $bin_size) );
+		}
+	}
+	
+	# record
+	foreach my $pos ($set->as_array) {
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+}
+
+sub smart_stranded_pe {
+	my ($f, $data, $score, $r) = @_;
+	my $set = Set::IntSpan::Fast->new;
+	
+	# determine strand based on the forward alignment
+	my ($strand, $offset);
+	my $flag = $f->flag;
+	if ($flag & 0x0040) {
+		# it's the first read, therefore fragment is forward
+		$strand = 'f';
+		$offset = 'f_offset';
+	}
+	elsif ($flag & 0x0080) {
+		# it's the second read, therefore fragment is reverse
+		$strand = 'r';
+		$offset = 'r_offset';
+	}
+	
+	# process both reads, adding to the integer set
+	foreach my $a ($f, $r) {
+		if ($a->cigar_str =~ /N/) {
+			my $aw = $wrapper_ref->new($a, $data->{sam});
+			
+			# check intron size from the cigar string
+			if ($max_intron) {
+				my $size = 1;
+				my $cigars = $aw->cigar_array;
+				foreach my $c (@$cigars) {
+					# each element is [operation, size]
+					$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+				}
+				return if $size > $max_intron; # exceed maximum intron size
+			}
+			
+			# record
+			foreach my $segment ($aw->get_SeqFeatures) {
+				$set->add_range(
+					int( ($segment->start - 1) / $bin_size), 
+					int( ($segment->end - 1) / $bin_size)
+				);
+			}
+		}
+		else {
+			$set->add_range( int($a->pos / $bin_size), int(($a->calend - 1) / $bin_size) );
+		}
+	}
+	
+	# record
+	foreach my $pos ($set->as_array) {
+		$data->{$strand}->[$pos - $data->{$offset}] += $score;
+	}
+}
+
 
 __END__
 
@@ -2879,6 +3032,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -a --span                     record across entire alignment or pair
   -e --extend                   extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
+  --smartcov                    record paired coverage without overlaps, splices
   --coverage                    raw alignment coverage
  
  Alignment reporting options:
@@ -2899,7 +3053,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -S --nosecondary              ignore secondary alignments (false)
   -D --noduplicate              ignore marked duplicate alignments (false)
   -U --nosupplementary          ignore supplementary alignments (false)
-  --intron <integer>            maximum allowed intron size in bp (50000)
+  --intron <integer>            maximum allowed intron size in bp (none)
   
   Shift options:
   -I --shift                    shift reads in the 3' direction
@@ -2988,12 +3142,18 @@ Specify that a defined span centered at the alignment (single-end)
 or fragment (paired-end) midpoint will be recorded in the wig file.
 The span is defined by the extension value.
 
+=item --smartcov
+
+Smart alignment coverage of paired-end alignments without 
+double-counting overlaps or recording gaps (intron splices). 
+
 =item --coverage
 
 Specify that the raw alignment coverage be calculated and reported 
 in the wig file. This utilizes a special low-level operation and 
 precludes any alignment filtering or post-normalization methods. 
-Overlapping bases in paired-end alignments are double-counted.
+Counting overlapping bases in paired-end alignments are dependent on 
+the bam adapter (older versions would double-count).
 
 =item --position [start|mid|span|extend|cspan|coverage]
 
@@ -3109,6 +3269,12 @@ The file should be any text file interpretable by L<Bio::ToolBox::Data>
 with chromosome, start, and stop coordinates, including BED and GFF formats.
 Note that this only excludes overlapping alignments, and does not include 
 extended alignments.
+
+=item --intron E<lt>integerE<gt>
+
+Provide a positive integer as the maximum intron size allowed in an alignment 
+when splitting on splices. If an N operation in the CIGAR string exceeds this 
+limit, the alignment is skipped. Default is 0 (no filtering).
 
 =back
 
@@ -3266,7 +3432,7 @@ an indexed, compressed, binary BigWig file. The default is false.
 =item --bwapp /path/to/wigToBigWig
 
 Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
-utility. The application path may be set in the .biotoolbox.cfg file 
+utility. The application path may be set in the F<.biotoolbox.cfg> file 
 or found in the default executable path, which makes this option 
 unnecessary. 
 
@@ -3373,10 +3539,23 @@ the wig or bigWig file.
 =item Straight coverage
 
 To generate a straight-forward coverage map, similar to what most genome 
-browsers display when using a Bam file as source, use the following 
-settings:
+browsers display when using a Bam file as source. B<NOTE> that this mode 
+is pure raw coverage, and does not include any filtering methods. The other 
+modes allow alignment filtering.
  
  bam2wig.pl --coverage --in <bamfile>
+
+=item Smart paired-end coverage
+
+When you have paired-end alignments and need explicit alignment coverage
+without double-counting overlaps (as would occur if you counted as
+single-end span) or uncovered insertion (as would occur if you counted as 
+paired-end span) and not counting gaps (e.g. intron splices, as would occur
+with span mode), use the smart paired-end coverage mode. This properly
+assembles coverage from paired-end alignments taking into account overlaps
+and gaps.
+
+ bam2wig --smartcov --in <bamfile>
 
 =item Single-end ChIP-Seq
 
@@ -3409,7 +3588,7 @@ normalize read counts.
 If both ends of the ChIP eluate fragments are sequenced, then we do not 
 need to calculate a shift value. Instead, we will simply count at the 
 midpoint of each properly-mapped sequence pair, or record the defined 
-fragment span.
+fragment span. 
  
  bam2wig.pl --mid --pe --rpm --in <bamfile>
  
@@ -3440,15 +3619,16 @@ alignments in a genome browser to confirm the orientation relative to
 coding sequences. If alignments are opposite to the direction of 
 transcription, you can include the --flip option to switch the output.
  
- bam2wig --span ---splice -strand --rpm --in <bamfile>
+ bam2wig --span ---splice --strand --rpm --in <bamfile>
 
  bam2wig --pos mid --strand --rpm --in <bamfile>
  
 =item Paired-end RNA-Seq
 
-Since paired-end mode of bam2wig interprets pairs as a single fragment, 
-and splices are disable with paired-end alignments, paired-end RNAseq 
-may be best treated as single-end RNAseq.
+Use the smart paired-end coverage mode to properly record paired-end 
+alignments with splice junctions. 
+
+ bam2wig --smartcov --strand --rpm --in <bamfile>
  
 =back
 
