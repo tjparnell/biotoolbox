@@ -10,7 +10,7 @@ use Bio::ToolBox::db_helper qw(
 );
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 print "\n This script will collect information for a list of features\n\n";
 
@@ -137,6 +137,7 @@ if ($database) {
 				file     => $database,
 				feature  => $Data->feature, # may be explicitly set by use_type above
 				simplify => 0,
+				subfeature => 'exon,cds,utr,codon',
 			} ) or die " unable to parse annotation file '$database'!\n";
 			# this may fail if not everything can be loaded
 		}
@@ -159,6 +160,7 @@ elsif ($Data->database) {
 			file     => $1,
 			feature  => $Data->feature, # may be explicitly set by use_type above
 			simplify => 0,
+			subfeature => 'exon,cds,utr,codon',
 		} ) or die " unable to parse annotation file '$1' in metadata!\n try specifying a new database or annoation file\n";
 		# this may fail if not everything can be loaded
 	}
