@@ -1746,7 +1746,7 @@ sub process_alignments_on_chromosome {
 	$data->{fpack} .= pack("$binpack$fdiff", @{$data->{f}});
 	if ($do_strand) {
 		my $rdiff = int($seq_length/$bin_size) - $data->{r_offset};
-		$data->{rpack} .= pack("$binpack*", @{$data->{r}});
+		$data->{rpack} .= pack("$binpack$rdiff", @{$data->{r}});
 	}
 	
 	# round the final count to a solid integer as necessary
