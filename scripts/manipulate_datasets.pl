@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -1266,6 +1266,7 @@ sub do_specific_values_function {
 	
 	# Identify rows to delete
 	my @todelete;
+	my $start_number = $Data->last_row;
 	if ($toss) {
 		# we are tossing lines that contain the specific value
 		$Data->iterate( sub {
@@ -1309,9 +1310,19 @@ sub do_specific_values_function {
 	}
 	
 	# report
-	printf " %s rows with specific values in %s were deleted.\n", scalar(@todelete), 
-		join(', ', map {$Data->name($_)} @list);
-	printf " %s data lines are remaining\n", $Data->last_row;
+	if ($toss) {
+		printf " %s rows with specific values of %s in columns %s were deleted.\n", 
+			format_with_commas(scalar(@todelete)), join(', ', keys %wanted),
+			join(', ', map {$Data->name($_)} @list),
+	}
+	else {
+		printf " %s rows with specific values of %s in columns %s were retained.\n", 
+			format_with_commas( $start_number - scalar(@todelete) ), 
+			join(', ', keys %wanted),
+			join(', ', map {$Data->name($_)} @list),
+		printf " %s rows were deleted", format_with_commas(scalar(@todelete));
+	}
+	printf " %s data lines are remaining\n", format_with_commas($Data->last_row);
 	return 1;
 }
 
