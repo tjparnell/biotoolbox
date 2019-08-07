@@ -890,6 +890,7 @@ sub determine_shift_value {
 	my @r_profile;
 	my @shifted_profile;
 	my @r_values;
+	my @all_r_values;
 	my @regions; 
 	
 	# look for high coverage regions to sample
@@ -912,8 +913,9 @@ sub determine_shift_value {
 			push @f_profile, @{ $result->[1] }; 
 			push @r_profile, @{ $result->[2] };
 			push @shifted_profile, @{ $result->[3] };
-			push @r_values, @{ $result->[4] };
+			push @all_r_values, @{ $result->[4] };
 			push @regions, @{ $result->[5] };
+			push @r_values, @{ $result->[6] };
 		} );
 		
 		# scan the chromosomes in parallel
@@ -945,8 +947,9 @@ sub determine_shift_value {
 			push @f_profile, @{ $result->[1] }; 
 			push @r_profile, @{ $result->[2] };
 			push @shifted_profile, @{ $result->[3] };
-			push @r_values, @{ $result->[4] };
+			push @all_r_values, @{ $result->[4] };
 			push @regions, @{ $result->[5] };
+			push @r_values, @{ $result->[6] };
 		}
 	}
 	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
@@ -967,14 +970,16 @@ sub determine_shift_value {
 	my @trimmed_shifted_profile;
 	my @trimmed_r_values;
 	my @trimmed_regions;
+	my @trimmed_bestr;
 	foreach my $i (0 .. $#shift_values) {
 		if ($shift_values[$i] >= $raw_min and $shift_values[$i] <= $raw_max) {
 			push @trimmed_shift_values, $shift_values[$i];
 			push @trimmed_f_profile, $f_profile[$i];
 			push @trimmed_r_profile, $r_profile[$i];
 			push @trimmed_shifted_profile, $shifted_profile[$i];
-			push @trimmed_r_values, $r_values[$i];
+			push @trimmed_r_values, $all_r_values[$i];
 			push @trimmed_regions, $regions[$i];
+			push @trimmed_bestr, $r_values[$i];
 		}
 	}
 	$stat->clear;
@@ -987,7 +992,8 @@ sub determine_shift_value {
 	# write out the shift model data file
 	if ($model) {
 		write_model_file($best_value, \@trimmed_f_profile, \@trimmed_r_profile, 
-			\@trimmed_shifted_profile, \@trimmed_r_values, \@trimmed_regions);
+			\@trimmed_shifted_profile, \@trimmed_r_values, \@trimmed_regions, 
+			\@trimmed_shift_values, \@trimmed_bestr);
 	}
 	
 	# done
@@ -1001,6 +1007,7 @@ sub calculate_strand_correlation {
 	my ($collected, $data) = scan_high_coverage($sam, $tid);
 	
 	my @shift_values;
+	my @bestr_values;
 	my @all_r_values;
 	my @f_profile;
 	my @r_profile;
@@ -1073,12 +1080,13 @@ sub calculate_strand_correlation {
 				push @shifted_profile, \@best_profile;
 				push @all_r_values, \@r_values;
 				push @regions, $region;
+				push @bestr_values, $best_r;
 			}
 		}
 	}
 	
 	return [ \@shift_values, \@f_profile, \@r_profile, 
-		\@shifted_profile, \@all_r_values, \@regions];
+		\@shifted_profile, \@all_r_values, \@regions, \@bestr_values ];
 }
 
 sub scan_high_coverage {
@@ -1152,7 +1160,8 @@ sub shift_value_callback {
 
 ### Write a text data file with the shift model data
 sub write_model_file {
-	my ($value, $f_profile, $r_profile, $shifted_profile, $r_valuess, $regions) = @_;
+	my ($value, $f_profile, $r_profile, $shifted_profile, $r_valuess, 
+		$regions, $region_shifts, $region_bestr) = @_;
 	
 	# check Data
 	my $data_good;
@@ -1259,6 +1268,22 @@ sub write_model_file {
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $success\n" if $success;
+	
+	
+	### Write regions
+	undef $Data;
+	$Data = Bio::ToolBox::Data->new(
+		feature  => 'Correlated regions',
+		datasets => ['Region', 'Shift', 'BestCorrelation']
+	);
+	for my $i (0 ..  $#{$regions}) {
+		$Data->add_row( [ $regions->[$i], $region_shifts->[$i], $region_bestr->[$i] ] );
+	}
+	$success = $Data->write_file(
+		'filename' => "$outfile\_correlated_regions.txt",
+		'gz'       => 0
+	);
+	print "  Wrote correlated regions data file $success\n" if $success;
 }
 
 
