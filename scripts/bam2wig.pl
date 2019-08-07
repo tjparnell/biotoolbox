@@ -1355,7 +1355,11 @@ sub process_bam_coverage {
 		# find the children
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/) {
@@ -1422,7 +1426,11 @@ sub parallel_process_bam_coverage {
 		# find the children
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/) {
@@ -1518,7 +1526,11 @@ sub process_alignments {
 		my %seq_totals;
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/) {
@@ -1664,7 +1676,11 @@ sub parallel_process_alignments {
 		my %seq_totals;
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/) {
@@ -1995,8 +2011,10 @@ sub write_final_wig_file {
 	
 	# find children files
 	my @filelist = glob("$outbase.*.temp.wig");
-	unless (scalar @filelist) {
-		die " can't find children file!\n";
+	my $expected = scalar(@seq_list) * ($do_strand ? 2 : 1);
+	if (scalar(@filelist) != $expected) {
+		die sprintf(" unable to find all the children wig files! Only found %d, expected %d\n",
+			scalar(@filelist), $expected);
 	}
 	
 	# assemble into a hash
