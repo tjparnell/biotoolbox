@@ -909,17 +909,17 @@ sub sort_function {
 	# This will sort the entire data table by the values in one dataset
 	
 	# Request dataset
-	my $index;
+	my @indices;
 	if (@_) {
 		# from another subroutine
-		$index = shift @_;
+		@indices = @_;
 	}
 	else {
-		$index = _request_index(
-		" Enter the index number of a column to sort by  ");
+		@indices = _request_indices(
+		" Enter column index number (or column ranges for mean) to sort by  ");
 	}
-	if ($index == -1) {
-		warn " unknown index number. nothing done\n";
+	unless (scalar(@indices)) {
+		warn " no index provided. nothing done\n";
 		return;
 	}
 	
@@ -940,22 +940,41 @@ sub sort_function {
 		}
 	}
 	
+	
+	
 	# sort
-	$Data->sort_data($index, $direction);
+	if (scalar(@indices) == 1) {
+		# excellent! only one column index to sort by
+		$Data->sort_data($indices[0], $direction);
+	}
+	else {
+		# need to sort by the mean of provided column indices
+		# we will generate a temporary column of the mean
+		# first need to set the target of mean which is needed by combine function
+		my $original = $opt_target; # keep a backup just in case
+		$opt_target = 'mean';
+		combine_function(@indices);
+		my $i = $Data->last_column;
+		$opt_target = $original; # restore backup just in case
+		$Data->sort_data($i, $direction);
+		$Data->delete_column($i); # delete the temporary column
+	}
 	
 	# remove any pre-existing sorted metadata since no longer valid
 	for (my $i = 0; $i < $Data->number_columns; $i++) {
 		$Data->delete_metadata($i, 'sorted');
 	}
 	
-	# annotate metadata
-	if ($direction =~ /i/i) {
-		$Data->metadata($index, 'sorted', "increasing")
-			unless $Data->metadata($index, 'AUTO'); # internal flag to not accept metadata
-	}
-	else {
-		$Data->metadata($index, 'sorted', "decreasing")
-			unless $Data->metadata($index, 'AUTO'); # internal flag to not accept metadata
+	# annotate metadata, but only if there was one index
+	if (scalar(@indices) == 1) {
+		if ($direction =~ /i/i) {
+			$Data->metadata($indices[0], 'sorted', "increasing")
+				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+		}
+		else {
+			$Data->metadata($indices[0], 'sorted', "decreasing")
+				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+		}
 	}
 	
 	return 1;
