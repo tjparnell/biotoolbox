@@ -3307,12 +3307,12 @@ manipulate_datasets.pl [--options ...] <filename>
   
   Non-interactive functions:
   -f --func [ reorder | delete | rename | new | number | concatenate | 
-              split | sort | gsort | null | duplicate | above | below | 
-              specific | keep | coordinate | cnull | absolute | minimum | 
-              maximum | log | delog | format | pr | add | subtract | 
-              multiply | divide | combine | scale | zscore | ratio | 
-              diff | normdiff | center | rewrite | export | treeview | 
-              summary | stat ]
+              split | coordinate | sort | gsort | null | duplicate | 
+              above | below | specific | keep | addname | cnull | 
+              absolute | minimum | maximum | log | delog | format | pr | 
+              add | subtract | multiply | divide | combine | scale | 
+              zscore | ratio | diff | normdiff | center | rewrite | 
+              export | treeview | summary | stat ]
   -x --index <integers>             column index to work on
   
   Operation options:
@@ -3379,11 +3379,12 @@ The program is designed to be run interactively. However, single manipulations
 may be performed on single datasets by specifying a function name and any 
 other required options. These functions include the following.
   
-B<reorder> B<delete> B<rename> B<new> B<number> B<concatenate> B<split> B<coordinate>
-B<sort> B<gsort> B<null> B<duplicate> B<above> B<below> B<specific> B<keep>
-B<cnull> B<absolute> B<minimum> B<maximum> B<log> B<delog> B<format> B<pr>
-B<add> B<subtract> B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff> B<normdiff> B<center>
-B<rewrite> B<export> B<treeview> B<summary> B<stat>
+B<reorder> B<delete> B<rename> B<new> B<number> B<concatenate>
+B<split> B<coordinate> B<sort> B<gsort> B<null> B<duplicate> B<above>
+B<below> B<specific> B<keep> B<cnull> B<absolute> B<minimum>
+B<maximum> B<log> B<delog> B<format> B<pr> B<add> B<subtract>
+B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff>
+B<normdiff> B<center> B<rewrite> B<export> B<treeview> B<summary> B<stat>
   
 Refer to the FUNCTIONS section for details.
 
@@ -3573,10 +3574,10 @@ in making unique identifiers or working with genome browsers.
 
 =item B<sort> (menu option B<o>)
 
-The entire data table is sorted by a specific column. The first
+The entire data table is sorted by a specific column, or by the 
+mean of a list of columns if more than one is provided. The first
 datapoint is checked for the presence of letters, and the data 
-table is then sorted either asciibetically or numerically. If the 
-sort method cannot be automatically determined, it will ask. The 
+table is then sorted either asciibetically or numerically. The 
 direction of sort, (i)ncreasing or (d)ecreasing, is requested. 
 
 =item B<gsort> (menu option B<g>)
@@ -3627,6 +3628,15 @@ Keep only those rows with values that contain a specific value,
 either text or number. One or more columns may be selected to check 
 for values. The specific values may be selected interactively from a 
 list or specified with the --target option.
+
+=item B<addname> (menu option B<M>)
+
+Add or update the name of each feature or row. If the data table 
+already has a Name column, the value will be updated. Otherwise a 
+new column will be added. The name will be a text prefix followed 
+by an integer (row index). The prefix may be defined by setting the 
+--target option, interactively provided by the user, or taken from 
+the general table feature metadata.
 
 =item B<cnull> (menu option B<U>)
 
