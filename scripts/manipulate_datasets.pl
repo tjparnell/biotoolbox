@@ -2871,14 +2871,6 @@ sub addname_function {
 	# this will add a name column and uniquely name the rows
 	
 	# request column name
-	my $name;
-	if (defined $opt_name) {
-		# command line option
-		$name = $opt_name;
-	}
-	else {
-		$name = 'Name';
-	}
 	
 	# request value
 	my $prefix;
@@ -2896,20 +2888,34 @@ sub addname_function {
 		chomp $prefix;
 	}
 	
-	# identify how many positions to format the number
-	my $n = length($Data->last_row);
-	my $format = "%s_%0" . $n . "d";
+	# Identify column
+	my $idx = $Data->name_column;
+	if (defined $idx) {
+		# we are updating an existing column
+	}
+	else {
+		# we are adding a new column
+		my $name;
+		if (defined $opt_name) {
+			# command line option
+			$name = $opt_name;
+		}
+		else {
+			$name = 'Name';
+		}
+		$idx = $Data->add_column($name);
+	}
+	
 	
 	# generate the new names
-	my $new_position = $Data->add_column($name);
 	my $number = 1;
 	$Data->iterate( sub {
-		shift->value($new_position, sprintf($format, $prefix, $number));
+		shift->value($idx, sprintf("%s%d", $prefix, $number));
 		$number++;
 	} );
 	
 	# done
-	print " Added new feature names to index $new_position\n";
+	print " Added feature names to index $idx\n";
 	return 1;
 }
 
