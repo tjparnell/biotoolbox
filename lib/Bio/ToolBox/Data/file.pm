@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.64';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -584,19 +584,29 @@ sub write_file {
 			$extension = $self->gff == 3 ? '.gff3' : $self->gff == 2.5 ? '.gtf' : '.gff';
 		} 
 		elsif ($self->bed) {
-			if (
+			if ($self->format) {
+				# re-use the format value as the extension
+				$extension = sprintf(".%s", $self->format);
+			}
+			elsif (
 				$self->number_columns == 4 and 
 				$self->name(3) =~ /score/i
 			) {
-				$extension = '.bdg'; # a bedGraph file
+				$extension = '.bdg'; # looks like a bedGraph file
 			}
 			else {
 				$extension = '.bed'; # a regular bed file
 			}
 		}
 		elsif ($self->ucsc) {
-			# use a generic ucsc format, don't bother to customize it
-			$extension = '.ucsc';
+			if ($self->format) {
+				# re-use the format value as the extension
+				$extension = sprintf(".%s", $self->format);
+			}
+			else {
+				# use a generic ucsc format
+				$extension = '.ucsc';
+			}
 		}
 		elsif ($self->vcf) {
 			$extension = '.vcf';
