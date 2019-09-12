@@ -1136,7 +1136,7 @@ sub add_gff_metadata {
 		elsif ($self->extension =~ /gtf/i) {
 			$self->gff(2.5);
 		}
-		elsif ($self->exteions =~ /gff3/i) {
+		elsif ($self->extension =~ /gff3/i) {
 			$self->gff(3);
 		}
 		else {
@@ -1312,7 +1312,7 @@ sub add_ucsc_metadata {
 	# set format and determine column names;
 	my $column_names;
 	if ($column_count == 16) {
-		$self->format('genePredExt with bin');
+		$self->format('genePredExt');
 		$column_names = $self->standard_column_names('ucsc16');
 	}
 	elsif ($column_count == 15) {
