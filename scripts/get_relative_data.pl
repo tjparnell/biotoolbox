@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 20001;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -57,6 +57,8 @@ my (
 	$method,
 	$win, 
 	$number,
+	$up_number,
+	$down_number,
 	$position, 
 	$strand_sense,
 	$set_strand,
@@ -83,6 +85,8 @@ GetOptions(
 	'm|method=s'   => \$method, # method to combine data
 	'w|window=i'   => \$win, # window size
 	'n|number=i'   => \$number, # number of windows
+	'up=i'         => \$up_number, # number of windows upstream
+	'down=i'       => \$down_number, # number of windows downstream
 	'p|position=s' => \$position, # indicate relative location of the feature
 	't|strand=s'   => \$strand_sense, # collected stranded data
 	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
@@ -296,16 +300,27 @@ sub check_defaults {
 	unless ($outfile or $infile) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
-
-
+	
+	# window size
 	unless ($win) {
 		print " Using default window size of 50 bp\n";
 		$win = 50;
 	}
-
-	unless ($number) {
+	
+	# number of windows
+	if ($up_number or $down_number) {
+		# either one could be set, assume the other is zero
+		$up_number ||= 0;
+		$down_number ||= 0;
+	}
+	elsif ($number) {
+		$up_number = $number;
+		$down_number = $number;
+	}
+	else {
 		print " Using default window number of 20 per side\n";
-		$number = 20;
+		$up_number = 20;
+		$down_number = 20;
 	}
 
 	if (defined $method) {
@@ -486,9 +501,9 @@ sub single_execution {
 sub prepare_window_datasets {
 	
 	# Determine starting and ending points
-	my $starting_point = 0 - ($win * $number); 
+	my $starting_point = 0 - ($win * $up_number); 
 		# default values will give startingpoint of -1000
-	my $ending_point = $win * $number; 
+	my $ending_point = $win * $down_number; 
 		# likewise default values will give endingpoint of 1000
 	
 	# Print collection statement
@@ -772,6 +787,8 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   Bin specification:
   -w --win <integer>                  size of windows, default 50 bp
   -n --num <integer>                  number of windows flanking reference, 20
+  --up <integer>                        or number of windows upstream
+  --down <integer>                      and number of windows downstream
   -p --pos [5|m|3|p]                  reference position, default 5'
   
   Post-processing:
@@ -955,6 +972,14 @@ Specify the window size. The default is 50 bp.
 Specify the number of windows on either side of the feature position 
 (total number will be 2 x [num]). The default is 20, or 1 kb on either 
 side of the reference position if the default window size is used.
+
+=item --up E<lt>integerE<gt>
+
+=item --down E<lt>integerE<gt>
+
+Alternatively specify the exact number of windows upstream and 
+downstream of the reference position. If only one option is set, 
+then the other option is assumed to be zero. 
 
 =item --pos [5|m|3]
 
