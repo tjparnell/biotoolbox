@@ -52,7 +52,6 @@ my (
 	$outfile, 
 	$main_database, 
 	$data_database,
-	$dataset, 
 	$feature, 
 	$method,
 	$win, 
@@ -72,6 +71,7 @@ my (
 	$help,
 	$print_version,
 ); # command line variables
+my @datasets;
 
 ## Command line options
 GetOptions( 
@@ -80,7 +80,7 @@ GetOptions(
 	'parse!'       => \$parse, # parse input file
 	'd|db=s'       => \$main_database, # main or annotation database name
 	'D|ddb=s'      => \$data_database, # data database
-	'a|data=s'     => \$dataset, # dataset name
+	'a|data=s'     => \@datasets, # dataset name
 	'f|feature=s'  => \$feature, # type of feature
 	'm|method=s'   => \$method, # method to combine data
 	'w|window=i'   => \$win, # window size
@@ -180,8 +180,21 @@ else {
 }
 $Data->program("$0, v $VERSION");
 
+
 # the number of columns already in the data array
-my $startcolumn = $Data->number_columns; 
+my $startcolumn; # this is now calculated separately for each datasets
+
+
+# Check output file name
+unless ($outfile) {
+	if ($Data->basename) {
+		$outfile = $Data->path . $Data->basename;
+	}
+	else {
+		die " No output file provided!\n";
+	}
+}
+
 
 # make sure data table supports avoid option
 if ($avoid) {
@@ -212,20 +225,32 @@ if (defined $data_database) {
 }
 
 # Check the dataset
-$dataset = verify_or_request_feature_types(
+@datasets = verify_or_request_feature_types(
 	'db'      => $ddb || $Data->database,
-	'feature' => $dataset,
-	'single'  => 1,
-	'prompt'  => " Enter the number of the feature or dataset from which to" . 
-					" collect data   ",
+	'feature' => \@datasets,
+	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
+				" to collect data. Comma delimited or range is acceptable\n",
 );
-unless ($dataset) {
-	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
+unless (@datasets) {
+	die " No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
 } 
 
 
 
 ## Collect the relative data
+
+# Determine starting and ending points
+my $starting_point = 0 - ($win * $up_number); 
+	# default values will give startingpoint of -1000
+my $ending_point = $win * $down_number; 
+	# likewise default values will give endingpoint of 1000
+
+# Print collection statement
+printf " Collecting $method data between %d..%d at the %s in %d bp windows from %s\n", 
+	$starting_point, $ending_point, 
+	$position == 3 ? "3' end" : $position == 4 ? "midpoint" : "5' end", 
+	$win, join(', ', @datasets), ;
+
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
@@ -251,11 +276,10 @@ else {
 ## Generate summed data 
 # an average across all features at each position suitable for plotting
 if ($sum) {
-	print " Generating final summed data....\n";
+	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
 		'filename'    => $outfile,
-		'startcolumn' => $startcolumn,
-		'dataset'     => $dataset,
+		'dataset'     => \@datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -267,9 +291,6 @@ if ($sum) {
 
 
 ## Output the data
-unless ($outfile) {
-	$outfile = $Data->path . $Data->basename;
-}
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -299,6 +320,19 @@ sub check_defaults {
 
 	unless ($outfile or $infile) {
 		die " You must define an output filename !\n Use --help for more information\n";
+	}
+	
+	# check datasets
+	if (not @datasets and @ARGV) {
+		@datasets = @ARGV;
+	}
+	if ($datasets[0] =~ /,/) {
+		# seems to be a comma delimited list, possibly more than one?????
+		my @list;
+		foreach my $d (@datasets) {
+			push @list, (split /,/, $d);
+		}
+		@datasets = @list;
 	}
 	
 	# window size
@@ -413,28 +447,34 @@ sub parallel_execution {
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}
+	
+		# work through each dataset
+		foreach my $dataset (@datasets) {
 		
-		# Add the columns for each window 
-		# and calculate the relative starting and ending points
-		my ($starting_point, $ending_point) = prepare_window_datasets();
+			# new start column for this dataset
+			$startcolumn = $Data->number_columns; 
+		
+			# Add the columns for each window 
+			# and calculate the relative starting and ending points
+			prepare_window_datasets($dataset);
 	
-		# determine long data collection for very large regions
-		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-			$long_data = 1;
-		}
+			# determine long data collection for very large regions
+			if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+				$long_data = 1;
+			}
 	
-		# Select the appropriate method for data collection
-		if ($long_data) {
-			map_relative_long_data($starting_point, $ending_point);
-		}
-		else {
-			map_relative_data($starting_point, $ending_point);
-		}
+			# Select the appropriate method for data collection
+			if ($long_data) {
+				map_relative_long_data($dataset);
+			}
+			else {
+				map_relative_data($dataset);
+			}
 
-		# Interpolate values
-		if ($smooth) {
-			print " Interpolating missing values....\n";
-			go_interpolate_values();
+			# Interpolate values
+			if ($smooth) {
+				go_interpolate_values();
+			}
 		}
 		
 		# write out result
@@ -472,45 +512,46 @@ sub parallel_execution {
 ## Run in single thread
 sub single_execution {
 	
-	# Add the columns for each window 
-	# and calculate the relative starting and ending points
-	my ($starting_point, $ending_point) = prepare_window_datasets();
+	# work through each dataset
+	foreach my $dataset (@datasets) {
+	
+		# new start column for this dataset
+		$startcolumn = $Data->number_columns; 
+	
+		# Add the columns for each window 
+		# and calculate the relative starting and ending points
+		prepare_window_datasets($dataset);
 
-	# determine long data collection for very large regions
-	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-		$long_data = 1;
-	}
+		# determine long data collection for very large regions
+		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+			$long_data = 1;
+		}
 
-	# Select the appropriate method for data collection
-	if ($long_data) {
-		map_relative_long_data($starting_point, $ending_point);
-	}
-	else {
-		map_relative_data($starting_point, $ending_point);
-	}
+		# Select the appropriate method for data collection
+		if ($long_data) {
+			map_relative_long_data($dataset);
+		}
+		else {
+			map_relative_data($dataset);
+		}
 
-	# Interpolate values
-	if ($smooth) {
-		print " Interpolating missing values....\n";
-		go_interpolate_values();
+		# Interpolate values
+		if ($smooth) {
+			print " Interpolating missing values....\n";
+			go_interpolate_values();
+		}
 	}
 }
 
 
 ## Prepare columns for each window
 sub prepare_window_datasets {
+	my $dataset = shift;
 	
-	# Determine starting and ending points
-	my $starting_point = 0 - ($win * $up_number); 
-		# default values will give startingpoint of -1000
-	my $ending_point = $win * $down_number; 
-		# likewise default values will give endingpoint of 1000
 	
-	# Print collection statement
-	print " ";
-	printf " Collecting data from %d to %d at the %s in %d bp windows...\n", 
-		$starting_point, $ending_point, $position == 3 ? "3' end" : 
-		$position == 4 ? "midpoint" : "5' end", $win;
+	# generate a simplified new name
+	my $new_name = simplify_dataset_name($dataset);
+	
 	
 	# Prepare and annotate the header names and metadata
 	for (my $start = $starting_point; $start < $ending_point; $start += $win) {
@@ -542,11 +583,8 @@ sub prepare_window_datasets {
 			}
 		}
 		
-		# the new name
-		my $new_name = $start . '..' . $stop;
-		
 		# add new column
-		my $new_index = $Data->add_column($new_name);
+		my $new_index = $Data->add_column(sprintf("%s:%d", $new_name, $start));
 		
 		# set the metadata
 		$Data->metadata($new_index, 'start' , $start);
@@ -578,14 +616,12 @@ sub prepare_window_datasets {
 			);
 		}
 	}
-	
-	return ($starting_point, $ending_point);
 }
 
 
 ## Collect relative scores using single database call
 sub map_relative_data {
-	my ($starting_point, $ending_point) = @_;
+	my $dataset = shift;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
@@ -634,7 +670,7 @@ sub map_relative_data {
 
 ## Collect relative data using individual window database calls
 sub map_relative_long_data {
-	my ($starting_point, $ending_point) = @_;
+	my $dataset = shift;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
@@ -762,7 +798,9 @@ A program to collect data in bins around a relative position.
 
 =head1 SYNOPSIS
  
-get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
+get_relative_data.pl [--options] --in <filename> --out <filename>
+  
+get_relative_data.pl [--options] -i <filename> <data1> <data2...>
   
   Options for data files:
   -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
