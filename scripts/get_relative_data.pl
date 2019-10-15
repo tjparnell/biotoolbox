@@ -900,14 +900,20 @@ is provided here.
 
 =item --data E<lt>dataset_name | filenameE<gt>
 
-Specify the name of the data set from which you wish to 
-collect data. If not specified, the data set may be chosen
-interactively from a presented list. Other
-features may be collected, and should be specified using the type 
-(GFF type:source), especially when collecting alternative data values. 
-Alternatively, the name of a data file may be provided. Supported 
-file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
-(.bam). The file may be local or remote.
+Provide the name of the dataset to collect the values. If no 
+dataset is specified on the command line, then the program will 
+interactively present a list of datasets from the data database to select. 
+
+The dataset may be a database file, including bigWig (.bw), 
+bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
+remote (specified with a http: or ftp: prefix).
+
+Alternatively, the dataset may be a feature type in a BioPerl 
+L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> database. Provide 
+either the feature type or C<type:source>. 
+
+More than one datasource may be provided; use multiple data options or list 
+the datasets at the end of the command.
 
 =item --method E<lt>textE<gt>
 

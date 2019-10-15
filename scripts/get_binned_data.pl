@@ -974,15 +974,18 @@ is provided here.
 
 Provide the name of the dataset to collect the values. If no 
 dataset is specified on the command line, then the program will 
-interactively present a list of datasets from the database to select. 
+interactively present a list of datasets from the data database to select. 
 
 The dataset may be a database file, including bigWig (.bw), 
 bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
 remote (specified with a http: or ftp: prefix).
 
-Alternatively, the dataset may be a feature type in a BioPerl L<Bio::DB::SeqFeature::Store> 
-or L<Bio::DB::BigWigSet> database. Provide either the feature type or 
-C<type:source>. 
+Alternatively, the dataset may be a feature type in a BioPerl 
+L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> database. Provide 
+either the feature type or C<type:source>. 
+
+More than one datasource may be provided; use multiple data options or list 
+the datasets at the end of the command.
 
 =item --method E<lt>textE<gt>
 
@@ -1043,8 +1046,8 @@ Optionally specify the type of subfeature to collect from, rather than
 the entire gene. If the parent feature is gene and the subfeature is exon, 
 then all transcripts of the gene will be collapsed. The other subfeatures 
 (cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
-coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
-and fstop are ignored. Default is null. 
+coding mRNA transcripts. Note that the long option is incompatible. 
+Default is null. 
 
 =item --exons
 
