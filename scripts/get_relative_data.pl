@@ -20,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant DATASET_HASH_LIMIT => 20001;
+use constant DATASET_HASH_LIMIT => 4999;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
