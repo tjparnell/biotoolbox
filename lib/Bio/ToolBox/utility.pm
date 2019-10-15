@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.36';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -54,6 +54,18 @@ or a generic one is used. The list of indices are validated, and a warning print
 for invalid responses. The responses are then returned as a single value or array, 
 depending on context.
 
+=item simplify_dataset_name
+
+	my $simple_name = simplify_dataset_name($dataset);
+
+This subroutine will take a dataset name and simplify it. Dataset names may 
+often be file names of data files, such as Bam and bigWig files. These may 
+include a C<file:>, C<http:>, or C<ftp:> prefix, one or more directory paths, 
+and one or more file name extensions. Additionally, more than one dataset 
+may be combined, for example two stranded bigWig files, with an ampersand. 
+This function will safely remove the prefix, directories, and everything after 
+the first period. 
+
 =back
 
 =head1 LEGACY SUBROUTINES
@@ -95,6 +107,7 @@ it could be opened. Useful, for example, if you forget the F<.txt> or F<.gz> ext
 
 use strict;
 use Carp;
+use File::Spec;
 require Exporter;
 use Bio::ToolBox::Data::file;
 
@@ -106,6 +119,7 @@ our @EXPORT = qw(
 	parse_list
 	format_with_commas
 	ask_user_for_index
+	simplify_dataset_name
 );
 our @EXPORT_OK = qw(
 	open_to_read_fh
@@ -241,6 +255,35 @@ sub ask_user_for_index {
 		}
 	}
 	return wantarray ? @good : $good[0];
+}
+
+
+sub simplify_dataset_name {
+	my $dataset = shift;
+	
+	# generate new name
+	my $new_name;
+	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
+		my $d = $1;
+		# a specified file
+		# we just want the file name, split it from the path
+		foreach (split /&/, $d) {
+			my (undef, undef, $file_name) = File::Spec->splitpath($_);
+			# clean up extensions and stuff
+			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
+			if ($new_name) {
+				$new_name .= '&' . $file_name;
+			}
+			else {
+				$new_name = $file_name;
+			}
+		}
+	}
+	else {
+		# a feature type, take as is
+		$new_name = $dataset;
+	}
+	return $new_name;
 }
 
 
