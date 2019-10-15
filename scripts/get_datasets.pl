@@ -283,8 +283,8 @@ if ($cpu > 1) {
 if ($cpu > 1) {
 	# parallel execution
 	# print statements here before we fork, less we have duplicate statements!
-	print " Collecting $method scores from datasets @datasets...\n";
-	print " Forking into $cpu children for parallel data collection\n";
+	print " Collecting $method scores from datasets @datasets\n";
+	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
 }
 else {

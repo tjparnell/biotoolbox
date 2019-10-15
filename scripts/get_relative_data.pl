@@ -264,7 +264,7 @@ if ($cpu > 1) {
 
 if ($cpu > 1) {
 	# parallel execution
-	print " Forking into $cpu children for parallel data collection\n";
+	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
 }
 else {
