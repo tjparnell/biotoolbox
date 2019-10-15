@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use File::Spec;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -24,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -196,6 +195,16 @@ elsif ($new) {
 $Data->program("$0, v $VERSION");
 
 
+# Check output file name
+unless ($outfile) {
+	if ($Data->basename) {
+		$outfile = $Data->path . $Data->basename;
+	}
+	else {
+		die " No output file provided!\n";
+	}
+}
+
 
 # Open data database
 my $ddb;
@@ -297,9 +306,6 @@ calculate_fpkm_values() if ($fpkm_method or $tpm);
 # write the output file
 # we will rewrite the file after each collection
 # appropriate extensions and compression should be taken care of
-unless ($outfile) {
-	$outfile = $Data->path . $Data->basename;
-}
 my $success = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -766,28 +772,7 @@ sub add_new_dataset {
 	my $dataset = shift;
 	
 	# generate column name
-	my $column_name;
-	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
-		my $d = $1;
-		# a specified file
-		# we just want the file name, split it from the path
-		foreach (split /&/, $d) {
-			my (undef, undef, $file_name) = File::Spec->splitpath($_);
-			# clean up extensions and stuff
-			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-			if ($column_name) {
-				$column_name .= '&' . $file_name;
-			}
-			else {
-				$column_name = $file_name;
-			}
-		}
-	}
-	else {
-		# a feature type, take as is
-		$column_name = $dataset;
-	}
-	
+	my $column_name = simplify_dataset_name($dataset);
 	
 	# add new column
 	my $index = $Data->add_column($column_name);
