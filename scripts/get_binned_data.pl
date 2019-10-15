@@ -896,7 +896,7 @@ A program to collect data in bins across a list of features.
   -u --subfeature [exon|cds|          collect over gene subfeatures 
         5p_utr|3p_utr] 
   --force_strand                      use the specified strand in input file
-  --long                              assume long features to collect
+  --long                              collect each window independently
   
   Bin specification:
   -b --bins <integer>                 number of bins feature is divided (10)
@@ -1055,14 +1055,14 @@ Legacy option for specifying --subfeature exon.
 
 =item --long
 
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. Execution times may be 
-longer than otherwise. Default is false.
+Indicate that data should be collected independently for each long 
+window. This may be enabled automatically if the sum of the entire 
+window length passes a predefined threshold. The default for 'short' 
+windows is to collect all of the point data from the dataset first, and 
+then divide the results into the different windows. Datasets consisting 
+of "long" features, for example long alignments, may be counted more 
+than once in long mode when they span multiple windows. Not compatible 
+when subfeatures are enabled.
 
 =back
 

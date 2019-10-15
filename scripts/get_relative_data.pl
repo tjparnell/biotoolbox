@@ -820,7 +820,7 @@ get_relative_data.pl [--options] -i <filename> <data1> <data2...>
   --force_strand                      use the specified strand in input file
   --avoid                             avoid neighboring features
   --avtype [type,type,...]            alternative types of feature to avoid
-  --long                              assume long features to collect
+  --long                              collect each window independently
   
   Bin specification:
   -w --win <integer>                  size of windows, default 50 bp
@@ -990,16 +990,13 @@ other features too, such as 'tRNA' or 'repeat'.
 
 =item --long
 
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. This may result in counting 
-features more than once if it overlaps more than one window, a result 
-that may or may not be desired. Execution time will likely increase. 
-Default is false.
+Indicate that data should be collected independently for each long 
+window. This may be enabled automatically if the sum of the entire 
+window length passes a predefined threshold. The default for 'short' 
+windows is to collect all of the point data from the dataset first, and 
+then divide the results into the different windows. Datasets consisting 
+of "long" features, for example long alignments, may be counted more 
+than once in long mode when they span multiple windows.
 
 =back
 
