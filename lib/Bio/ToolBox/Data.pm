@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.66';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -1070,15 +1070,15 @@ L<Bio::DB::SeqFeature::Store>, L<Bio::Perl>
 =cut
 
 use strict;
-use File::Spec;
 use Carp qw(carp cluck croak confess);
+use List::Util qw(sum0);
 use base 'Bio::ToolBox::Data::core';
 use Bio::ToolBox::db_helper qw(
 	get_new_feature_list  
 	get_new_genome_list
 	get_db_feature
-	calculate_score
 );
+use Bio::ToolBox::utility qw(simplify_dataset_name);
 use Module::Load;
 
 1;
@@ -2069,11 +2069,31 @@ sub summary_file {
 	my %args = @_; 
 	
 	# parameters
-	my $outfile =        $args{'filename'}    || undef;
-	my $dataset =        $args{'dataset'}     || undef;
-	my $startcolumn =    $args{'startcolumn'} || undef;
-	my $endcolumn =      $args{'endcolumn'}   || $args{'stopcolumn'}  || undef;
-	my $log =            $args{'log'}         || undef;
+	# either one or more datasets can be summarized
+	my $outfile = $args{'filename'} || undef;
+	my @datasets;
+	if ($args{dataset} and ref $args{dataset} eq 'ARRAY') {
+		@datasets = @{ $args{dataset} };
+	}
+	elsif ($args{dataset} and ref $args{dataset} eq 'SCALAR') {
+		push @datasets, $args{dataset};
+	}
+	my @startcolumns;
+	if ($args{startcolumn} and ref $args{startcolumn} eq 'ARRAY') {
+		@startcolumns = @{ $args{startcolumn} };
+	}
+	elsif ($args{startcolumn} and ref $args{startcolumn} eq 'SCALAR') {
+		push @startcolumns, $args{startcolumn};
+	}
+	my @endcolumns;
+	$args{endcolumn} ||= $args{stopcolumn};
+	if ($args{endcolumn} and ref $args{endcolumn} eq 'ARRAY') {
+		@endcolumns = @{ $args{endcolumn} };
+	}
+	elsif ($args{endcolumn} and ref $args{endcolumn} eq 'SCALAR') {
+		push @endcolumns, $args{endcolumn};
+	}
+	
 	
 	# Check required values
 	unless ($self->verify) {
@@ -2093,134 +2113,145 @@ sub summary_file {
 		}
 	}
 	
-	# Auto calculate missing arguments
-	unless (defined $startcolumn) {
-		# we will attempt to determine where to start the summing process
-		# we will skip those columns with common feature-description names
-		
-		my @acceptable_indices; # array of acceptable indices
-		my %skip = map {$_ => 1} qw (systematicname name id alias aliases type class 
-				geneclass chromosome chromo seq_id seqid start stop end gene strand 
-				length primary_id merged_transcript_length transcript_cds_length 
-				transcript_5p_utr_length transcript_3p_utr_length);
-		
-		# walk through the dataset names
-		for (my $i = 0; $i < $self->number_columns; $i++) {
-			unless (exists $skip{ lc $self->{$i}{'name'} } ) {
-				push @acceptable_indices, $i;
-			}
-		}
-		
-		# The start column should be the lowest index number in the list of
-		# acceptable_indices array.
-		# Assuming, of course, that feature descriptor datasets (columns) are
-		# leftmost only.
-		$startcolumn = calculate_score('min', \@acceptable_indices);
-	}
-	unless (defined $endcolumn) {
-		# take the last or rightmost column
-		$endcolumn = $self->last_column;
-	}
-	unless ($dataset) {
-		# the original dataset name (i.e. the name of the dataset in the 
-		# database from which the column's data was derived) 
-		$dataset = $self->metadata($startcolumn, 'dataset') || undef;
-	}
-	unless (defined $log) {
-		# the log flag should be set in the column metadata and should be the
-		# same in all
-		$log = $self->metadata($startcolumn, 'log2') || 0;
-	}
-	
-	# Prepare score column name
-	my $data_name;
-	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
-		my $d = $1;
-		# a specified file
-		# we just want the file name, split it from the path
-		foreach (split /&/, $d) {
-			my (undef, undef, $file_name) = File::Spec->splitpath($_);
-			# clean up extensions and stuff
-			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-			if ($data_name) {
-				$data_name .= '&' . $file_name;
+	# Identify possible dataset columns
+	my %possibles;
+	my %skip = map {$_ => 1} qw (systematicname name id alias aliases type class 
+			geneclass chromosome chromo seq_id seqid start stop end gene strand 
+			length primary_id merged_transcript_length transcript_cds_length 
+			transcript_5p_utr_length transcript_3p_utr_length);
+	# walk through the dataset names
+	$possibles{unknown} = [];
+	for (my $i = 0; $i < $self->number_columns; $i++) {
+		if (not exists $skip{ lc $self->{$i}{'name'} }) {
+			my $d = $self->metadata($i, 'dataset') || undef;
+			if (defined $d) {
+				# we have what appears to be a dataset column
+				$possibles{$d} ||= [];
+				push @{$possibles{$d}}, $i;
 			}
 			else {
-				$data_name = $file_name;
+				# still an unknown possibility
+				push @{$possibles{unknown}}, $i;
 			}
 		}
 	}
-	elsif ($dataset) {
-		# a feature type, take as is
-		$data_name = $dataset;
-	}
-	else {
-		# super generic, what else to do?
-		$data_name = 'dataset';
+	
+	# check datasets
+	unless (@datasets) {
+		if (scalar keys %possibles > 1) {
+			# we will always have the unknown category, so anything more than one 
+			# means we found legitimate dataset columns
+			delete $possibles{unknown};
+		}
+		@datasets = sort {$a cmp $b} keys %possibles;
 	}
 	
-	# Prepare array to store the summed data
+	# check starts
+	if (scalar @startcolumns != scalar @datasets) {
+		@startcolumns = (); # ignore what we were given?
+		foreach my $d (@datasets) {
+			# take the first column with this dataset
+			push @startcolumns, $possibles{$d}->[0];
+		}
+	}
+	
+	# check stops
+	if (scalar @endcolumns != scalar @datasets) {
+		@endcolumns = (); # ignore what we were given?
+		foreach my $d (@datasets) {
+			# take the last column with this dataset
+			push @endcolumns, $possibles{$d}->[-1];
+		}
+	}
+	
+	
+	# Prepare Data object to store the summed data
 	my $summed_data = $self->new(
 		feature => 'averaged_windows', 
-		columns => ['Window','Midpoint', $data_name],
+		columns => ['Window','Midpoint'],
 	);
-	$summed_data->database($self->database);
-	$summed_data->metadata(0, 'number_features', $self->last_row);
-	$summed_data->metadata(2, 'log2', $log) if $log;
-	$summed_data->metadata(2, 'dataset', $dataset) if $dataset;
-	
-	# tag for remembering we're working with percentile bins
-	my $do_percentile = 0;
-	
-	# Collect summarized data
-	for (
-		my $column = $startcolumn;
-		$column <= $endcolumn;
-		$column++
-	) { 
+
+	# Go through each dataset
+	foreach my $d (0 .. $#datasets) {
 		
-		# determine the midpoint position of the window
-		my $midpoint = int calculate_score('mean',
+		# Prepare score column name
+		my $data_name = simplify_dataset_name($datasets[$d]);
+		
+		# add column
+		my $i = $summed_data->add_column($data_name);
+		$summed_data->metadata($i, 'dataset', $datasets[$d]);
+		
+		# tag for remembering we're working with percentile bins
+		my $do_percentile = 0;
+		
+		# remember the row
+		my $row = 1;
+		
+		# Collect summarized data
+		for (
+			my $column = $startcolumns[$d];
+			$column <= $endcolumns[$d];
+			$column++
+		) { 
+		
+			# determine the midpoint position of the window
 			# this assumes the column metadata has start and stop
-			[$self->metadata($column, 'start'), $self->metadata($column, 'stop')]
-		); 
+			my $midpoint = int(sum0($self->metadata($column, 'start'), 
+				$self->metadata($column, 'stop')) / 2); 
 		
-		# convert midpoint to fraction of 1000 for plotting if necessary
-		if (substr($self->name($column), -1) eq '%') {
-			$midpoint *= 10; # midpoint * 0.01 * 1000 bp
-			$do_percentile++;
-		}
-		if ($do_percentile and substr($self->name($column), -2) eq 'bp') {
-			# working on the extension after the percentile bins
-			$midpoint += 1000;
-		}
+			# convert midpoint to fraction of 1000 for plotting if necessary
+			if (substr($self->name($column), -1) eq '%') {
+				$midpoint *= 10; # midpoint * 0.01 * 1000 bp
+				$do_percentile++;
+			}
+			if ($do_percentile and substr($self->name($column), -2) eq 'bp') {
+				# working on the extension after the percentile bins
+				$midpoint += 1000;
+			}
 		
-		# collect the values in the column
-		my @values;
-		for my $row (1..$self->last_row) {
-			my $v = $self->value($row, $column);
-			push @values, $v eq '.' ? 0 : $v;  # treat nulls as zero
-		}
+			# collect the values in the column
+			my @values;
+			for my $row (1..$self->last_row) {
+				my $v = $self->value($row, $column);
+				push @values, $v eq '.' ? 0 : $v;  # treat nulls as zero
+			}
 		
-		# adjust if log value
-		if ($log) {
-			@values = map { 2 ** $_ } @values;
-		}
+			# adjust if log value
+			my $log = $self->metadata($column, 'log2') || 0;
+			if ($log) {
+				@values = map { 2 ** $_ } @values;
+			}
 		
-		# determine mean value
-		my $window_mean = calculate_score('mean', \@values);
-		if ($log) { 
-			$window_mean = log($window_mean) / log(2);
-		}
+			# determine mean value
+			my $window_mean = sum0(@values) / scalar(@values);
+			if ($log) { 
+				$window_mean = log($window_mean) / log(2);
+			}
 		
-		# push to summed output
-		$summed_data->add_row( [ $self->{$column}{'name'}, $midpoint, $window_mean ] );
+			# push to summed output
+			if ($d == 0) {
+				# this is the first dataset, so we need to add a row
+				$summed_data->add_row( [ $self->{$column}{'name'}, $midpoint, $window_mean ] );
+			}
+			else {
+				# we're summarizing multiple datasets, we already have name midpoint
+				# first do sanity check
+				if ($summed_data->value($row, 1) != $midpoint) {
+					carp("unable to summarize multiple datasets with nonequal columns of data!");
+					return;
+				}
+				$summed_data->value($row, $i, $window_mean);
+			}
+			$row++;
+		}
 	}
 	
+	
+	
 	# Write summed data
-	$outfile =~ s/\.txt(\.gz)?$//; # strip any .txt or .gz extensions if present
+	$outfile =~ s/\.txt(\.gz)?$//i; # strip any .txt or .gz extensions if present
 	my $written_file = $summed_data->write_file(
-		'filename'  => $outfile . '_summed',
+		'filename'  => $outfile . '_summary.txt',
 		'gz'        => 0,
 	);
 	return $written_file;
