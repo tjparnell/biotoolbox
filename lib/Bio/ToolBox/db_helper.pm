@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.66';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -730,10 +730,10 @@ This subroutine will collect a list of chromosomes or reference sequences
 in a Bio::DB database and return the list along with their sizes in bp. 
 Many BioPerl-based databases are supported, including 
 L<Bio::DB::SeqFeature::Store>, L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
-L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, and 
-L<Bio::DB::BigBed>, or any others that support the 
-C<seq_ids> method. See the L</open_db_connection> subroutine for more 
-information.
+L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, 
+L<Bio::DB::BigBed>, or any others that support the C<seq_ids> method. 
+L<Bio::DB::Big> adapters for big files are also supported, though see note 
+below. See the L</open_db_connection> subroutine for more information.
 
 Pass the subroutine either the name of the database, the path to the 
 database file, or an opened database object.
@@ -745,6 +745,10 @@ or unmapped contigs. The default is to return all chromosomes.
 The subroutine will return an array, with each element representing each 
 chromosome or reference sequence in the database. Each element is an anonymous 
 array of two elements, the chromosome name and length in bp.
+
+B<NOTE>: L<Bio::DB::Big> databases for bigWig and bigBed files do 
+not return chromosomes in the original order as the file, and are returned 
+in a sorted manner that may not be the original order.
 
 =item low_level_bam_coverage
 
@@ -2139,18 +2143,34 @@ sub get_chromosome_list {
 	# libBigWig Bigfile, including both bigWig and bigBed
 	elsif ($type eq 'Bio::DB::Big::File') {
 		# this doesn't follow the typical BioPerl convention
+		# it's a hash, so randomly sorted!!!!! Never will be in same order as file!!!!
 		my $chroms = $db->chroms();
+		
+		# sort the chromosomes smartly - this may not actually be the same as the 
+		# original file, but better than random!
+		my (%numchr, %textchr);
 		foreach my $chr (keys %$chroms) {
 			my $chrname = $chroms->{$chr}{name};
+			my $length = $chroms->{$chr}{length};
 			
 			# check for excluded chromosomes
 			next if (defined $chr_exclude and $chrname =~ $chr_exclude);
 			
-			# get chromosome size
-			my $length = $chroms->{$chr}{length};
-			
-			# store
-			push @chrom_lengths, [ $chrname, $length ];
+			# check name
+			if ($chrname =~ /^(?:chr)?(\d+)$/) {
+				$numchr{$1} = [ $chrname, $length ];
+			}
+			else {
+				$textchr{$chrname} = [ $chrname, $length ];
+			}
+		}
+		
+		# final sort
+		foreach my $c (sort {$a <=> $b} keys %numchr) {
+			push @chrom_lengths, $numchr{$c};
+		}
+		foreach my $c (sort {$a cmp $b} keys %textchr) {
+			push @chrom_lengths, $textchr{$c};
 		}
 	}
 	
