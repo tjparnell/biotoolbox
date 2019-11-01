@@ -496,9 +496,6 @@ sub set_defaults {
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
