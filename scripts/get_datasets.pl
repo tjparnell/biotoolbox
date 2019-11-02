@@ -786,6 +786,7 @@ sub add_new_dataset {
 	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
 	$Data->metadata($index, 'subfeature', $subfeature) if $subfeature;	
 	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
+	$Data->metadata($index, 'decimal_format', $format) if defined $format;
 	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
 		exists $dataset2sum{$dataset};
 	if ($position == 3) {
@@ -829,7 +830,7 @@ sub discard_features {
 	
 	# add metadata
 	foreach my $i (@indices) {
-		$Data->metadata($i, 'Discarded_below', $discard);
+		$Data->metadata($i, 'discarded_below', $discard);
 	}
 }
 
