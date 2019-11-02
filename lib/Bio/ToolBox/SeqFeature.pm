@@ -1,5 +1,5 @@
 package Bio::ToolBox::SeqFeature;
-our $VERSION = '1.63';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -531,10 +531,22 @@ sub end {
 sub strand {
 	my $self = shift;
 	if (@_) {
-		$self->[STRND] = $_[0];
-		$self->[STRND] = 1 if $self->[STRND] eq '+';
-		$self->[STRND] = -1 if $self->[STRND] eq '-';
-		$self->[STRND] = 0 if $self->[STRND] eq '.';
+		my $str = $_[0];
+		if ($str eq '+') {
+			$self->[STRND] = 1;
+		}
+		elsif ($str eq '-') {
+			$self->[STRND] = -1;
+		}
+		elsif ($str eq '.') {
+			$self->[STRND] = 0;
+		}
+		elsif ($str =~ /^[\+\-]?1$/) {
+			$self->[STRND] = $str;
+		}
+		elsif ($str eq '0') {
+			$self->[STRND] = 0;
+		}
 	}
 	return defined $self->[STRND] ? $self->[STRND] : 0;
 }
