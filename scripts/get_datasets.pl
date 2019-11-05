@@ -668,7 +668,7 @@ sub get_adjusted_dataset {
 		}
 		elsif ($position == 4) {
 			# middle position
-			my $middle = int( ($feature->end - $feature->start) / 2);
+			my $middle = int( ($feature->start + $feature->end) / 2);
 			if ($row->strand >= 0) {
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
