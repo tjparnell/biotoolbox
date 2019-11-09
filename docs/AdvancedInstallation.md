@@ -2,7 +2,7 @@
 
 This is a brief, advanced installation guide for getting a complete installation. I
 recommend using a simple CPAN package manager such as [CPAN
-Minus](https://metacpan.org/pod/App::cpanminus) or `cpanm`. Note that in the
+Minus](https://metacpan.org/pod/App::cpanminus), i.e. `cpanm`. Note that in the
 following example commands, `cpanm` is given a Perl module name, which is used to
 query [CPAN](https://metacpan.org), but it can also easily take a URL or a downloaded
 archive file. 
@@ -76,6 +76,9 @@ or modules to be present. It's best to use one of the other two methods.
 ## External libraries
 
 There are two external C libraries that are required for reading Bam and BigWig files. 
+These are commonly used bioinformatics tools maintained by separate organizations, and 
+the Perl modules only provide the XS bindings to these libraries. As such, it's best 
+to install these up front separately before attempting the Perl module installation. 
 Note that both Perl modules [Bio::DB::HTS](https://metacpan.org/pod/Bio::DB::HTS) and 
 [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big) include `INSTALL.pl` scripts within 
 their bundles that can compile these external libraries for you in a semi-automated 
@@ -84,12 +87,12 @@ installed.
 
 - [HTSlib](https://github.com/samtools/htslib)
 
-   Follow the directions within for installation. [Version
-   1.8](https://github.com/samtools/htslib/releases/download/1.8/htslib-1.8.tar.bz2) is
-   known to work well, although newer versions should work too. By default, it installs
-   into `/usr/local`, or it may be set to another directory (`$HOME` for example) by
-   adding `--prefix=$HOME` option to the `configure` step. This may also be available via
-   OS or other package managers.
+    Follow the directions within for installation. 
+    [Version 1.9](https://github.com/samtools/htslib/releases/download/1.9/htslib-1.9.tar.bz2) 
+    is the latest supported version. By default, it installs into `/usr/local`, or it 
+    may be set to another directory (`$HOME` for example) by adding `--prefix=$HOME` 
+    option to the `configure` step. This may also be available via OS or other package 
+    managers.
 
 - [libBigWig](https://github.com/dpryan79/libBigWig)
 
@@ -135,10 +138,6 @@ the end you will have installed dozens of packages.
     locations, specify the location of the HTSlib path to `Build.PL` using the 
     `--htslib` option. 
     
-    *NOTE*: The latest CPAN release (v2.11) is old. If it fails to install correctly,
-    try the current development
-    [version](https://github.com/Ensembl/Bio-DB-HTS/archive/master.zip). 
-
 - [Bio::DB::Big](https://metacpan.org/pod/Bio::DB::Big)
 
     This provides a perl interface to the UCSC-style bigWig and bigBed formats. 
@@ -160,13 +159,18 @@ the end you will have installed dozens of packages.
     This is necessary for optional functionality (quick intersection of genomic 
     intervals, such as black lists) for a few scripts, namely `bam2wig.pl`.
 
+- [Set::IntSpan::Fast](https://metacpan.org/pod/Set::IntSpan::Fast)
+
+    This is necessary for optional functionality in the `bam2wig.pl` script. Install the 
+    [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS) if possible.
+
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
 
     $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
     $ cpanm --configure-args="--libbigwig $HOME" Bio::DB::Big
-    $ cpanm Parallel::ForkManager Set::IntervalTree Bio::ToolBox
+    $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
 
 ## External applications
 
