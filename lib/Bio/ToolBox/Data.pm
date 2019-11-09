@@ -1351,6 +1351,13 @@ PARSEFAIL
 		$self->database("Parsed:$file");
 		$self->feature($feature);
 		$self->add_comment("Chromosomes excluded: $chr_exclude") if $chr_exclude;
+		
+		# add input parsed file metadata
+		$self->add_file_metadata($file);
+		# but delete some stuff, just want basename
+		undef $self->{extension};
+		undef $self->{filename};
+		undef $self->{path};
 	}
 	return 1;
 }
