@@ -1,5 +1,27 @@
 ######## Bio::ToolBox revision history #############
 
+v1.67
+	- Add new option of smart coverage to script bam2wig that
+	smartly handles pair-end alignments with gaps (introns)
+	- Add capability to collect from multiple datasets at once 
+	for scripts get_binned_data and get_relative_data. Summary 
+	files can now handle multiple datasets.
+	- Allow specific number of up and down windows in 
+	script get_relative_data.
+	- Add option to provide list of specific feature IDs to 
+	script get_features.
+	- Write shift correlation region data from bam2wig.
+	- Improve GTF export.
+	- Add utility function to simplify dataset names, used in 
+	data collection scripts. Strips path and everything after 
+	first period from dataset file names. 
+	- Improve sort function in manipulate_datasets by taking a 
+	range of columns and sort by mean. Also addname function will 
+	overwrite a feature name if present.
+	- Adjust logic for setting a file extension when none is 
+	provided. 
+	- Lots of additional minor fixes and changes
+
 v1.66
 	- Optimize data2wig fast mode, about 3 times faster
 	- Summary files now use a cleaned-up column name. Fix 
