@@ -2145,32 +2145,16 @@ sub get_chromosome_list {
 		# this doesn't follow the typical BioPerl convention
 		# it's a hash, so randomly sorted!!!!! Never will be in same order as file!!!!
 		my $chroms = $db->chroms();
-		
-		# sort the chromosomes smartly - this may not actually be the same as the 
-		# original file, but better than random!
-		my (%numchr, %textchr);
-		foreach my $chr (keys %$chroms) {
-			my $chrname = $chroms->{$chr}{name};
-			my $length = $chroms->{$chr}{length};
-			
+		# so we'll sort the chromosomes by decreasing length
+		# this is common for a lot of genomes anyway, except for yeast 
+		foreach (
+			sort { $b->[1] <=> $a->[1] }
+			map { [$_->{name}, $_->{length}] } 
+			values %$chroms
+		) {
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chrname =~ $chr_exclude);
-			
-			# check name
-			if ($chrname =~ /^(?:chr)?(\d+)$/) {
-				$numchr{$1} = [ $chrname, $length ];
-			}
-			else {
-				$textchr{$chrname} = [ $chrname, $length ];
-			}
-		}
-		
-		# final sort
-		foreach my $c (sort {$a <=> $b} keys %numchr) {
-			push @chrom_lengths, $numchr{$c};
-		}
-		foreach my $c (sort {$a cmp $b} keys %textchr) {
-			push @chrom_lengths, $textchr{$c};
+			next if (defined $chr_exclude and $_->[0] =~ /$chr_exclude/i);
+			push @chrom_lengths, $_;
 		}
 	}
 	
