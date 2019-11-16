@@ -161,8 +161,12 @@ the end you will have installed dozens of packages.
 
 - [Set::IntSpan::Fast](https://metacpan.org/pod/Set::IntSpan::Fast)
 
-    This is necessary for optional functionality in the `bam2wig.pl` script. Install the 
-    [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS) if possible.
+    This is necessary for optional functionality in the `bam2wig.pl` script. For a slight 
+    speed boost, install the [XS version](https://metacpan.org/pod/Set::IntSpan::Fast::XS)
+    if possible. Note that the XS version requires
+    [Data::Swap](https://metacpan.org/pod/Data::Swap), which may [fail to
+    install](http://matrix.cpantesters.org/?dist=Data-Swap+0.08) on recent Perl versions.
+    It's a fairly innocuous test fail, so either skip the tests or force install it.
 
 An example of installing these Perl modules with `cpanm` is below. This assumes that 
 you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust accordingly.
@@ -170,6 +174,7 @@ you have `local::lib` or a writable Perl installation in your `$PATH`. Adjust ac
     $ cpanm Module::Build http://cpan.metacpan.org/authors/id/C/CJ/CJFIELDS/BioPerl-1.007002.tar.gz
     $ cpanm --configure-args="--htslib $HOME" Bio::DB::HTS
     $ cpanm --configure-args="--libbigwig $HOME" Bio::DB::Big
+    $ cpanm --notest Data::Swap
     $ cpanm Parallel::ForkManager Set::IntervalTree Set::IntSpan::Fast::XS Bio::ToolBox
 
 ## External applications
