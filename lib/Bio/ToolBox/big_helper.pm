@@ -1,5 +1,5 @@
 package Bio::ToolBox::big_helper;
-our $VERSION = '1.65';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -175,7 +175,12 @@ wig format and processed as an input stream. Note that the entire file will
 be converted in this manner, not specific locations. This is intended for 
 working with the wig file as a whole. 
 
-Note that the F<bigWigToWig> utility does not handle errors gracefully 
+Note that F<bigWigToWig> will output a wig file in whatever format as the 
+bigWig was originally generated with, i.e. fixedStep, varStep, or bedGraph. To 
+export explicitly as a bedGraph, which may be useful in certain circumstances, 
+the UCSC F<bigWigToBedGraph> utility is also supported.
+
+Note that the UCSC utilities do not always handle errors gracefully 
 and will immediately fail upon encountering errors, usually also bringing 
 the main Perl process with it. 
 
@@ -191,9 +196,9 @@ and C<wig>. This is required.
  
 =item bwapppath
 
-Provide the full path to the UCSC F<bigWigToWig> utility. If not provided, the 
-default C<PATH> will be searched for the utility. The path may also 
-be defined in the configuration file F<.biotoolbox.cfg>. 
+Provide the full path to the UCSC F<bigWigToWig> or F<bigWigToBedGraph> utility. 
+If not provided, the default C<PATH> will be searched for the utility. The path may 
+also be defined in the configuration file F<.biotoolbox.cfg>. 
 
 =back
 
@@ -527,9 +532,9 @@ sub open_bigwig_to_wig_fh {
 	}
 	unless ($args{bwapppath}) {
 		# try checking the system path
-		$args{bwapppath} = which('bigWigToWig');
+		$args{bwapppath} = which('bigWigToWig') || which('bigWigToBedGraph');
 	}
-	unless ($args{bwapppath} =~ /bigWigToWig$/) {
+	unless ($args{bwapppath} =~ /bigWigTo(?:Wig|BedGraph)$/) {
 		carp " Utility 'bigWigToWig' not specified and can not be found!\n";
 		return;
 	}
