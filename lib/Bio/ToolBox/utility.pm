@@ -1,5 +1,5 @@
 package Bio::ToolBox::utility;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -260,27 +260,32 @@ sub ask_user_for_index {
 
 sub simplify_dataset_name {
 	my $dataset = shift;
-	
-	# generate new name
 	my $new_name;
-	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
-		my $d = $1;
-		# a specified file
-		# we just want the file name, split it from the path
-		foreach (split /&/, $d) {
-			my (undef, undef, $file_name) = File::Spec->splitpath($_);
-			# clean up extensions and stuff
-			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
+	
+	# strip any file prefix
+	$dataset =~ s/^(?:file|http|ftp):\/*//;
+	
+	if ($dataset =~ /&/) {
+		# a combination dataset
+		foreach (split /&/, $dataset) {
+			my $n = simplify_dataset_name($_);
 			if ($new_name) {
-				$new_name .= '&' . $file_name;
+				$new_name .= '&' . $n;
 			}
 			else {
-				$new_name = $file_name;
+				$new_name = $n;
 			}
 		}
 	}
+	elsif ($dataset =~ m|/|) {
+		# appears to have paths
+		my (undef, undef, $file_name) = File::Spec->splitpath($dataset);
+		$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
+		$new_name = $file_name;
+	}
 	else {
-		# a feature type, take as is
+		# strip everything after first period, like above
+		$dataset =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
 		$new_name = $dataset;
 	}
 	return $new_name;
