@@ -20,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -57,6 +57,7 @@ my (
 	$smooth,
 	$sum,
 	$set_strand,
+	$groupcol,
 	$gz,
 	$cpu,
 	$help,
@@ -86,6 +87,7 @@ GetOptions(
 	'U|sum'            => \$sum, # determine a final average for all the features
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
+	'g|groups'       => \$groupcol, # write group column file
 	'z|gz!'          => \$gz, # compress the output file
 	'c|cpu=i'        => \$cpu, # number of execution threads
 	'h|help'         => \$help, # print the help
@@ -168,6 +170,7 @@ else {
 $Data->program("$0, v $VERSION");
 
 # the number of columns already in the data array
+my $beginningcolumn = $Data->last_column; 
 my $startcolumn; # this is now calculated separately for each datasets
 
 
@@ -260,6 +263,23 @@ if ($written_file) {
 else {
 	print " unable to write data file!\n";
 }
+
+# write the column group file
+if ($groupcol) {
+	my $groupfile = $written_file;
+	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
+	$fh->print("Name\tDataset\n");
+	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
+		my $name = $Data->name($i);
+		my $dataset = $name;
+		$dataset =~ s/:[\-\d%bp]+$//;
+		$fh->print("$name\t$dataset\n");
+	}
+	$fh->close;
+	print " wrote group column file $groupfile\n";
+}
+
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 # done
 
@@ -906,6 +926,7 @@ A program to collect data in bins across a list of features.
   --smooth                            smoothen sparse data
   
   General options:
+  -g --groups                         write columns group index file for plotting
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
   --noparse                           do not parse input file into SeqFeatures
@@ -1115,6 +1136,13 @@ from neighboring values. The default is false.
 =head2 General options
 
 =over 4
+
+=item --groups
+
+Optionally write a secondary file with the list of column group names and 
+their corresponding dataset group. This can be used to assist in designating 
+the metadata when plotting files, for example in R with pheatmap. The 
+file is named the output basename appended with F<.groups.txt>.
 
 =item --gz
 

@@ -27,7 +27,7 @@ use constant DATASET_HASH_LIMIT => 4999;
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -66,6 +66,7 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
+	$groupcol,
 	$gz,
 	$cpu,
 	$help,
@@ -95,7 +96,8 @@ GetOptions(
 	'avtype=s'     => \$avoidtype, # type of feature to avoid
 	'long!'        => \$long_data, # collecting long data features
 	'smooth!'      => \$smooth, # smooth by interpolation
-	'U|sum!'         => \$sum, # generate average profile
+	'U|sum!'       => \$sum, # generate average profile
+	'g|groups'     => \$groupcol, # write group column file
 	'z|gz!'        => \$gz, # compress the output file
 	'c|cpu=i'      => \$cpu, # number of execution threads
 	'h|help'       => \$help, # print help
@@ -182,7 +184,8 @@ $Data->program("$0, v $VERSION");
 
 
 # the number of columns already in the data array
-my $startcolumn; # this is now calculated separately for each datasets
+my $beginningcolumn = $Data->last_column; 
+my $startcolumn; # this is now calculated separately for each dataset
 
 
 # Check output file name
@@ -303,6 +306,23 @@ else {
 	# failure! the subroutine will have printed error messages
 	print " unable to write output file!\n";
 }
+
+# write the column group file
+if ($groupcol) {
+	my $groupfile = $written_file;
+	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
+	$fh->print("Name\tDataset\n");
+	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
+		my $name = $Data->name($i);
+		my $dataset = $name;
+		$dataset =~ s/:[\-\d]+$//;
+		$fh->print("$name\t$dataset\n");
+	}
+	$fh->close;
+	print " wrote group column file $groupfile\n";
+}
+
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 
@@ -831,6 +851,7 @@ get_relative_data.pl [--options] -i <filename> <data1> <data2...>
   --smooth                            smoothen sparse data
   
   General Options:
+  -g --groups                         write columns group index file for plotting
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
   --noparse                           do not parse input file into SeqFeatures
@@ -1050,6 +1071,13 @@ from neighboring values. The default is false (nosmooth).
 =head2 General options
 
 =over 4
+
+=item --groups
+
+Optionally write a secondary file with the list of column group names and 
+their corresponding dataset group. This can be used to assist in designating 
+the metadata when plotting files, for example in R with pheatmap. The 
+file is named the output basename appended with F<.groups.txt>.
 
 =item --gz
 
