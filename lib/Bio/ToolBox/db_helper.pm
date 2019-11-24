@@ -1,5 +1,5 @@
 package Bio::ToolBox::db_helper;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -1025,6 +1025,9 @@ sub open_db_connection {
 	
 	# check for a known file type
 	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig|cram/i) {
+		
+		# remove prefix, just in case
+		$database =~ s/^file://;
 		
 		# first check that it exists
 		if (-e $database) {
