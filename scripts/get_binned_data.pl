@@ -56,6 +56,7 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
+	$format,
 	$set_strand,
 	$groupcol,
 	$gz,
@@ -84,7 +85,8 @@ GetOptions(
 	'min=i'          => \$min_length, # minimum feature size
 	'long!'          => \$long_data, # collecting long data features
 	'smooth!'        => \$smooth, # do not interpolate over missing values
-	'U|sum'            => \$sum, # determine a final average for all the features
+	'U|sum'          => \$sum, # determine a final average for all the features
+	'r|format=i'     => \$format, # decimal formatting
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
 	'g|groups'       => \$groupcol, # write group column file
@@ -120,6 +122,7 @@ if ($print_version) {
 
 
 ### Check for required values
+my $formatter;
 check_defaults();
 my $start_time = time;
 my $length_i; # global value for the merged transcript length
@@ -371,6 +374,11 @@ sub check_defaults {
 		$smooth = 0;
 	}
 
+	# generate formatter
+	if (defined $format) {
+		$formatter = '%.' . $format . 'f';
+	}
+	
 	if ($parallel) {
 		$cpu ||= 4;
 	}
@@ -662,6 +670,7 @@ sub collect_binned_long_data {
 				'method'      => $method,
 				'stranded'    => $stranded,
 			);
+			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 			$row->value($column, $score);
 		}
 	}	
@@ -727,6 +736,8 @@ sub record_the_bin_values {
 		
 		# calculate the value
 		my $window_score = calculate_score($method, \@scores);
+		$window_score = sprintf($formatter, $window_score) 
+			if ($formatter and $window_score ne '.');
 		
 		# record the value
 		$row->value($column, $window_score);
@@ -772,7 +783,9 @@ sub go_interpolate_values {
 				
 				# apply fractional values
 				for (my $n = $col; $n < $next_i; $n++) {
-					$row->value($n, $initial + ($fraction * ($n - $col + 1)) );
+					my $score = $initial + ($fraction * ($n - $col + 1));
+					$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
+					$row->value($n, $score);
 				}
 				
 				# jump ahead
@@ -869,6 +882,7 @@ sub _set_metadata {
 	$Data->metadata($new_index, 'method' , $method);
 	$Data->metadata($new_index, 'bin_size' , $binsize . $unit);
 	$Data->metadata($new_index, 'strand' , $stranded);
+	$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
 	if ($set_strand) {
 		$Data->metadata($new_index, 'strand_implied', 1);
 	}
@@ -914,6 +928,7 @@ A program to collect data in bins across a list of features.
         5p_utr|3p_utr] 
   --force_strand                      use the specified strand in input file
   --long                              collect each window independently
+  -r --format <integer>               number of decimal places for numbers
   
   Bin specification:
   -b --bins <integer>                 number of bins feature is divided (10)
@@ -1081,6 +1096,12 @@ then divide the results into the different windows. Datasets consisting
 of "long" features, for example long alignments, may be counted more 
 than once in long mode when they span multiple windows. Not compatible 
 when subfeatures are enabled.
+
+=item --format E<lt>integerE<gt>
+
+Specify the number of decimal positions to format the collected scores. 
+Default is not to format, often leading to more than the intended 
+significant digits.
 
 =back
 
