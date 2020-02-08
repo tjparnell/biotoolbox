@@ -8,7 +8,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Statistics::Lite qw(:all);
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 print "\n A tool for manipulating datasets in data files\n";
 
@@ -909,17 +909,17 @@ sub sort_function {
 	# This will sort the entire data table by the values in one dataset
 	
 	# Request dataset
-	my $index;
+	my @indices;
 	if (@_) {
 		# from another subroutine
-		$index = shift @_;
+		@indices = @_;
 	}
 	else {
-		$index = _request_index(
-		" Enter the index number of a column to sort by  ");
+		@indices = _request_indices(
+		" Enter column index number (or column ranges for mean) to sort by  ");
 	}
-	if ($index == -1) {
-		warn " unknown index number. nothing done\n";
+	unless (scalar(@indices)) {
+		warn " no index provided. nothing done\n";
 		return;
 	}
 	
@@ -940,22 +940,41 @@ sub sort_function {
 		}
 	}
 	
+	
+	
 	# sort
-	$Data->sort_data($index, $direction);
+	if (scalar(@indices) == 1) {
+		# excellent! only one column index to sort by
+		$Data->sort_data($indices[0], $direction);
+	}
+	else {
+		# need to sort by the mean of provided column indices
+		# we will generate a temporary column of the mean
+		# first need to set the target of mean which is needed by combine function
+		my $original = $opt_target; # keep a backup just in case
+		$opt_target = 'mean';
+		combine_function(@indices);
+		my $i = $Data->last_column;
+		$opt_target = $original; # restore backup just in case
+		$Data->sort_data($i, $direction);
+		$Data->delete_column($i); # delete the temporary column
+	}
 	
 	# remove any pre-existing sorted metadata since no longer valid
 	for (my $i = 0; $i < $Data->number_columns; $i++) {
 		$Data->delete_metadata($i, 'sorted');
 	}
 	
-	# annotate metadata
-	if ($direction =~ /i/i) {
-		$Data->metadata($index, 'sorted', "increasing")
-			unless $Data->metadata($index, 'AUTO'); # internal flag to not accept metadata
-	}
-	else {
-		$Data->metadata($index, 'sorted', "decreasing")
-			unless $Data->metadata($index, 'AUTO'); # internal flag to not accept metadata
+	# annotate metadata, but only if there was one index
+	if (scalar(@indices) == 1) {
+		if ($direction =~ /i/i) {
+			$Data->metadata($indices[0], 'sorted', "increasing")
+				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+		}
+		else {
+			$Data->metadata($indices[0], 'sorted', "decreasing")
+				unless $Data->metadata($indices[0], 'AUTO'); # internal flag to not accept metadata
+		}
 	}
 	
 	return 1;
@@ -1266,6 +1285,7 @@ sub do_specific_values_function {
 	
 	# Identify rows to delete
 	my @todelete;
+	my $start_number = $Data->last_row;
 	if ($toss) {
 		# we are tossing lines that contain the specific value
 		$Data->iterate( sub {
@@ -1309,9 +1329,20 @@ sub do_specific_values_function {
 	}
 	
 	# report
-	printf " %s rows with specific values in %s were deleted.\n", scalar(@todelete), 
-		join(', ', map {$Data->name($_)} @list);
-	printf " %s data lines are remaining\n", $Data->last_row;
+	if ($toss) {
+		printf " %s rows with specific values of %s were deleted in columns %s.\n", 
+			format_with_commas(scalar(@todelete)), join(', ', keys %wanted),
+			join(', ', map {$Data->name($_)} @list),
+		printf " %s data lines are remaining\n", format_with_commas($Data->last_row);
+	}
+	else {
+		printf " %s rows were deleted in columns %s\n",
+			format_with_commas(scalar(@todelete)),
+			join(', ', map {$Data->name($_)} @list);
+		printf " %s rows with specific values of %s were retained.\n",
+			format_with_commas( $start_number - scalar(@todelete) ), 
+			join(', ', keys %wanted);
+	}
 	return 1;
 }
 
@@ -2841,14 +2872,6 @@ sub addname_function {
 	# this will add a name column and uniquely name the rows
 	
 	# request column name
-	my $name;
-	if (defined $opt_name) {
-		# command line option
-		$name = $opt_name;
-	}
-	else {
-		$name = 'Name';
-	}
 	
 	# request value
 	my $prefix;
@@ -2866,20 +2889,34 @@ sub addname_function {
 		chomp $prefix;
 	}
 	
-	# identify how many positions to format the number
-	my $n = length($Data->last_row);
-	my $format = "%s_%0" . $n . "d";
+	# Identify column
+	my $idx = $Data->name_column;
+	if (defined $idx) {
+		# we are updating an existing column
+	}
+	else {
+		# we are adding a new column
+		my $name;
+		if (defined $opt_name) {
+			# command line option
+			$name = $opt_name;
+		}
+		else {
+			$name = 'Name';
+		}
+		$idx = $Data->add_column($name);
+	}
+	
 	
 	# generate the new names
-	my $new_position = $Data->add_column($name);
 	my $number = 1;
 	$Data->iterate( sub {
-		shift->value($new_position, sprintf($format, $prefix, $number));
+		shift->value($idx, sprintf("%s%d", $prefix, $number));
 		$number++;
 	} );
 	
 	# done
-	print " Added new feature names to index $new_position\n";
+	print " Added feature names to index $idx\n";
 	return 1;
 }
 
@@ -3271,12 +3308,12 @@ manipulate_datasets.pl [--options ...] <filename>
   
   Non-interactive functions:
   -f --func [ reorder | delete | rename | new | number | concatenate | 
-              split | sort | gsort | null | duplicate | above | below | 
-              specific | keep | coordinate | cnull | absolute | minimum | 
-              maximum | log | delog | format | pr | add | subtract | 
-              multiply | divide | combine | scale | zscore | ratio | 
-              diff | normdiff | center | rewrite | export | treeview | 
-              summary | stat ]
+              split | coordinate | sort | gsort | null | duplicate | 
+              above | below | specific | keep | addname | cnull | 
+              absolute | minimum | maximum | log | delog | format | pr | 
+              add | subtract | multiply | divide | combine | scale | 
+              zscore | ratio | diff | normdiff | center | rewrite | 
+              export | treeview | summary | stat ]
   -x --index <integers>             column index to work on
   
   Operation options:
@@ -3343,11 +3380,12 @@ The program is designed to be run interactively. However, single manipulations
 may be performed on single datasets by specifying a function name and any 
 other required options. These functions include the following.
   
-B<reorder> B<delete> B<rename> B<new> B<number> B<concatenate> B<split> B<coordinate>
-B<sort> B<gsort> B<null> B<duplicate> B<above> B<below> B<specific> B<keep>
-B<cnull> B<absolute> B<minimum> B<maximum> B<log> B<delog> B<format> B<pr>
-B<add> B<subtract> B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff> B<normdiff> B<center>
-B<rewrite> B<export> B<treeview> B<summary> B<stat>
+B<reorder> B<delete> B<rename> B<new> B<number> B<concatenate>
+B<split> B<coordinate> B<sort> B<gsort> B<null> B<duplicate> B<above>
+B<below> B<specific> B<keep> B<cnull> B<absolute> B<minimum>
+B<maximum> B<log> B<delog> B<format> B<pr> B<add> B<subtract>
+B<multiply> B<divide> B<combine> B<scale> B<zscore> B<ratio> B<diff>
+B<normdiff> B<center> B<rewrite> B<export> B<treeview> B<summary> B<stat>
   
 Refer to the FUNCTIONS section for details.
 
@@ -3537,10 +3575,10 @@ in making unique identifiers or working with genome browsers.
 
 =item B<sort> (menu option B<o>)
 
-The entire data table is sorted by a specific column. The first
+The entire data table is sorted by a specific column, or by the 
+mean of a list of columns if more than one is provided. The first
 datapoint is checked for the presence of letters, and the data 
-table is then sorted either asciibetically or numerically. If the 
-sort method cannot be automatically determined, it will ask. The 
+table is then sorted either asciibetically or numerically. The 
 direction of sort, (i)ncreasing or (d)ecreasing, is requested. 
 
 =item B<gsort> (menu option B<g>)
@@ -3591,6 +3629,15 @@ Keep only those rows with values that contain a specific value,
 either text or number. One or more columns may be selected to check 
 for values. The specific values may be selected interactively from a 
 list or specified with the --target option.
+
+=item B<addname> (menu option B<M>)
+
+Add or update the name of each feature or row. If the data table 
+already has a Name column, the value will be updated. Otherwise a 
+new column will be added. The name will be a text prefix followed 
+by an integer (row index). The prefix may be defined by setting the 
+--target option, interactively provided by the user, or taken from 
+the general table feature metadata.
 
 =item B<cnull> (menu option B<U>)
 

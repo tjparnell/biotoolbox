@@ -7,7 +7,7 @@ use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::utility;
-my $VERSION =  '1.60';
+my $VERSION =  '1.67';
 
 print "\n A script to pull out specific features from a data file\n";
 
@@ -271,6 +271,10 @@ sub identify_indices {
 		}
 		# do we ask for a group or not????? probably not.... keep original functionality
 	}
+	if (defined $group_index and not $List->name($group_index)) {
+		die " invalid group index!\n";
+	}
+	
 	
 	# End automatic guessing of index numbers, ask the user
 	unless (defined $list_index) {
@@ -283,6 +287,9 @@ sub identify_indices {
 	}
 	printf " We are using list lookup index $list_index, %s, and data lookup index $data_index, %s\n",
 		$List->name($list_index), $Data->name($data_index);
+	if (defined $group_index) {
+		printf "  and group index %s\n", $List->name($group_index);
+	}
 }
 
 

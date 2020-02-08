@@ -45,6 +45,11 @@ gently with warnings if required modules are missing.
 Released versions may be obtained though the CPAN repository using your favorite 
 package manager. 
 
+## Docker
+
+For those so inclined, a [dockerfile](Docker/ReadMe.md) is provided for your convenience 
+in building a Docker image following the advanced installation guide.
+
 # LIBRARIES
 
 Several user-oriented library modules are included in this distribution for 

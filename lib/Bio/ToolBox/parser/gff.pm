@@ -528,13 +528,26 @@ sub parse_file {
 					
 					# check boundaries for gtf genes
 					# gtf genes may not be explicitly defined so must correct as necessary
-					# gff3 files won't have this issue
+					# gff3 files shouldn't have this issue
 					if ($self->{gtf}) {
 						if ($feature->start < $parent->start) {
 							$parent->start( $feature->start );
 						}
 						if ($feature->end > $parent->end) {
 							$parent->end( $feature->end );
+						}
+						# check parent's parent too
+						if ($parent->has_tag('Parent')) {
+							# in all likelihood parent is a transcript and there is a 
+							# gene that probably also needs fixin'
+							my ($grandparent_id) = $parent->get_tag_values('Parent');
+							my $grandparent = $self->{loaded}{$grandparent_id};
+							if ($feature->start < $grandparent->start) {
+								$grandparent->start( $feature->start );
+							}
+							if ($feature->end > $grandparent->end) {
+								$grandparent->end( $feature->end );
+							}
 						}
 					}
 				}
@@ -596,6 +609,19 @@ sub _make_gene_parent {
 	}
 	else {
 		$gene->display_name($gene_id);
+	}
+	
+	# add extra information if possible
+	unless ($self->simplify) {
+		if ($fields->[8] =~ /gene_biotype "([^"]+)";?/) {
+			$gene->add_tag_value('gene_biotype', $1);
+		}
+		elsif ($fields->[8] =~ /gene_type "([^"]+)";?/) {
+			$gene->add_tag_value('gene_type', $1);
+		}
+		if ($fields->[8] =~ /gene_source "([^"]+)";?/) {
+			$gene->source($1);
+		}
 	}
 	$gene->add_tag_value('autogenerate', 1); # extra key for auto-generation
 	return $gene;

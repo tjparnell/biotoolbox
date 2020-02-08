@@ -60,6 +60,7 @@ sub get_base_options {
 			'Net::FTP'                => 0,
 			'Parallel::ForkManager'   => 1.02,
 			'Set::IntervalTree'       => 0.10,
+			'Set::IntSpan::Fast::XS'  => 0,
 		},
 		script_files => [
 			'scripts/bam2wig.pl',

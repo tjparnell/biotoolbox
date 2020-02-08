@@ -425,6 +425,7 @@ sub verify {
 			my $ext = $self->{'extension'};
 			$self->{'filename'} =~ s/$ext/.txt/;
 			$self->{'extension'} = '.txt';
+			$self->{'format'} = '';
 			
 			# remove the AUTO key from the metadata
 			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
@@ -615,6 +616,7 @@ sub verify {
 			$self->{'filename'} =~ s/$ext/.txt/;
 			$self->{'extension'} = '.txt';
 			$self->{'ucsc'} = 0;
+			$self->{'format'} = '';
 			
 			# remove the AUTO key
 			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
@@ -659,12 +661,14 @@ sub verify {
 		
 		# reset the vcf tag value as appropriate
 		if ($vcf_check) {
-			$self->{'vcf'} = 4; # in case we had a fake true, not that it matters here
+			# in case we had a fake true set it to a more reasonable value?
+			$self->{'vcf'} = 4 if $self->{'vcf'} == 1; 
 		}
 		else {
 			# reset metadata
 			$self->{'vcf'} = 0;
 			$self->{'headers'} = 1;
+			$self->{'format'} = '';
 			
 			# remove the AUTO key from the metadata
 			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {
@@ -708,6 +712,7 @@ sub verify {
 			$self->{'extension'} =~ s/sgr/txt/i;
 			$self->{'filename'}  =~ s/sgr/txt/i;
 			$self->{'headers'} = 1;
+			$self->{'format'} = '';
 			
 			# remove the AUTO key from the metadata
 			for (my $i = 0; $i < $self->{'number_columns'}; $i++) {

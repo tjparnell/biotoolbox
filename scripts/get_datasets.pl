@@ -5,7 +5,6 @@
 use strict;
 use Getopt::Long qw(:config no_ignore_case bundling);
 use Pod::Usage;
-use File::Spec;
 use Bio::ToolBox::Data;
 use Bio::ToolBox::db_helper qw(
 	open_db_connection
@@ -24,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -196,6 +195,16 @@ elsif ($new) {
 $Data->program("$0, v $VERSION");
 
 
+# Check output file name
+unless ($outfile) {
+	if ($Data->basename) {
+		$outfile = $Data->path . $Data->basename;
+	}
+	else {
+		die " No output file provided!\n";
+	}
+}
+
 
 # Open data database
 my $ddb;
@@ -274,8 +283,8 @@ if ($cpu > 1) {
 if ($cpu > 1) {
 	# parallel execution
 	# print statements here before we fork, less we have duplicate statements!
-	print " Collecting $method scores from datasets @datasets...\n";
-	print " Forking into $cpu children for parallel data collection\n";
+	print " Collecting $method scores from datasets @datasets\n";
+	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
 }
 else {
@@ -297,9 +306,6 @@ calculate_fpkm_values() if ($fpkm_method or $tpm);
 # write the output file
 # we will rewrite the file after each collection
 # appropriate extensions and compression should be taken care of
-unless ($outfile) {
-	$outfile = $Data->path . $Data->basename;
-}
 my $success = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -490,9 +496,6 @@ sub set_defaults {
 
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -665,7 +668,7 @@ sub get_adjusted_dataset {
 		}
 		elsif ($position == 4) {
 			# middle position
-			my $middle = int( ($feature->end - $feature->start) / 2);
+			my $middle = int( ($feature->start + $feature->end) / 2);
 			if ($row->strand >= 0) {
 				$start = $middle + $start_adj;
 				$stop  = $middle + $stop_adj;
@@ -766,28 +769,7 @@ sub add_new_dataset {
 	my $dataset = shift;
 	
 	# generate column name
-	my $column_name;
-	if ($dataset =~ /^(?:file|http|ftp):\/*(.+)$/) {
-		my $d = $1;
-		# a specified file
-		# we just want the file name, split it from the path
-		foreach (split /&/, $d) {
-			my (undef, undef, $file_name) = File::Spec->splitpath($_);
-			# clean up extensions and stuff
-			$file_name =~ s/^([\w\d\-\_]+)\..+$/$1/i; # take everything up to first .
-			if ($column_name) {
-				$column_name .= '&' . $file_name;
-			}
-			else {
-				$column_name = $file_name;
-			}
-		}
-	}
-	else {
-		# a feature type, take as is
-		$column_name = $dataset;
-	}
-	
+	my $column_name = simplify_dataset_name($dataset);
 	
 	# add new column
 	my $index = $Data->add_column($column_name);
@@ -804,6 +786,7 @@ sub add_new_dataset {
 	$Data->metadata($index, 'limit', $limit)     if defined $limit;	
 	$Data->metadata($index, 'subfeature', $subfeature) if $subfeature;	
 	$Data->metadata($index, 'forced_strand', 'yes') if $set_strand;	
+	$Data->metadata($index, 'decimal_format', $format) if defined $format;
 	$Data->metadata($index, 'total_reads', $dataset2sum{$dataset}) if 
 		exists $dataset2sum{$dataset};
 	if ($position == 3) {
@@ -847,7 +830,7 @@ sub discard_features {
 	
 	# add metadata
 	foreach my $i (@indices) {
-		$Data->metadata($i, 'Discarded_below', $discard);
+		$Data->metadata($i, 'discarded_below', $discard);
 	}
 }
 

@@ -81,3 +81,6 @@
 # Avoid the docs folder
 \bdocs/
 
+# Avoid Docker
+\bDocker/
+

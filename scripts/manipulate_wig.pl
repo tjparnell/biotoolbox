@@ -12,7 +12,7 @@ use Bio::ToolBox::big_helper qw(
 	open_bigwig_to_wig_fh
 	generate_chromosome_file
 );
-my $VERSION = 1.65;
+my $VERSION = 1.67;
 
 ### Quick help
 unless (@ARGV) { # when no command line options are present
@@ -249,17 +249,24 @@ while (my $line = $infh->getline) {
 	# determine format
 	unless (defined $wig_process_sub) {
 		my @data = split /\s+/, $line;
+		my $statement;
 		if (scalar @data == 4) {
-			print STDERR " processing bedGraph...\n";
+			$statement = " processing bedGraph...\n";
 			$wig_process_sub = \&process_bedGraph;
 		}
 		elsif (scalar @data == 2) {
-			print STDERR " processing variableStep...\n";
+			$statement = " processing variableStep...\n";
 			$wig_process_sub = \&process_variableStep;
 		}
 		elsif (scalar @data == 1) {
-			print STDERR " processing fixedStep...\n";
+			$statement = " processing fixedStep...\n";
 			$wig_process_sub = \&process_fixedStep;
+		}
+		if ($outfile =~ /stdout/i) {
+			print STDERR $statement;
+		}
+		else {
+			print STDOUT $statement;
 		}
 	}
 	

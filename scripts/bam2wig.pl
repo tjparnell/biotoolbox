@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.64';
+my $VERSION = '1.67';
 	
 	
 
@@ -57,6 +57,7 @@ my (
 	$use_span, 
 	$use_cspan,
 	$use_extend,
+	$use_smartpe,
 	$position,
 	$use_coverage,
 	$splice,
@@ -114,6 +115,7 @@ GetOptions(
 	'a|span!'      => \$use_span, # record span
 	'cspan!'       => \$use_cspan, # record center span
 	'e|extend!'    => \$use_extend, # extend read
+	'smartcov!'    => \$use_smartpe, # smart paired coverage
 	'coverage!'    => \$use_coverage, # calculate coverage
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
@@ -228,12 +230,12 @@ for my $tid (0 .. $sams[0]->n_targets - 1) {
 # set the wrapper reference
 # this depends on which adapter was opened
 my $wrapper_ref;
-if ($splice) {
+if ($splice or $use_smartpe) {
 	$wrapper_ref = ref($sams[0]) eq 'Bio::DB::Sam' ? 'Bio::DB::Bam::AlignWrapper' : 
-		'Bio::DB::HTS::AlignWrapper';
+		ref($sams[0]) eq 'Bio::DB::HTS' ? 'Bio::DB::HTS::AlignWrapper' : 'none';
 	eval { require $wrapper_ref; 1 };
 }
-printf " Using the %s Bam adapter\n", ref($sams[0]) if $verbose;
+printf " Using the %s Bam adapter and align wrapper $wrapper_ref\n", ref($sams[0]) if $verbose;
 
 ### Process user provided black lists
 my $black_list_hash = process_black_list();
@@ -355,7 +357,6 @@ sub check_defaults {
 	if ($extend_value and !$use_extend) {
 		$use_extend = 1 unless ($use_cspan or $position);
 	}
-	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
 
 	
 	# check position
@@ -379,22 +380,28 @@ sub check_defaults {
 			# for backwards compatibility
 			$use_coverage = 1;
 		}
+		elsif ($position eq 'smartcov') { 
+			# for backwards compatibility
+			$use_smartpe = 1;
+			$paired = 1;
+			$splice = 1;
+		}
 		else {
 			die " unrecognized position value '$position'! see help\n";
 		}
 	}
 	my $position_check = $use_start + $use_mid + $use_span + $use_cspan + $use_extend + 
-		$use_coverage;
+		$use_coverage + $use_smartpe;
 	if ( $position_check > 1) {
 		die " Modes are mutually exclusive! Please select only one of\n" . 
-			" --start, --mid, --span, --cpsan, --extend, or --coverage\n";
+			" --start, --mid, --span, --cpsan, --extend, --smartcov, or --coverage\n";
 	}
 	elsif (not $position_check) {
 		# we allow no position if user has selected shift so that we can calculate
 		# the shift value without running through entire wig conversion
 		unless ($shift) {
 			die " Please select one of the following modes:\n" . 
-				" --start, --mid, --span, --cspan, --extend, or --coverage\n";
+				" --start, --mid, --span, --cspan, --extend, --smartcov, or --coverage\n";
 		}
 	}
 	
@@ -403,13 +410,43 @@ sub check_defaults {
 		$splice = 0;
 	}
 	if ($paired and $splice) {
-		# kind of redundant to have spliced reads with paired-end alignments
-		# plus this poses problems with the bam adaptor - getting substr errors
-		# in Bio::DB::Bam::AlignWrapper
-		warn " disabling splices with paired-end reads\n";
-		undef $splice;
+		if ($use_span) {
+			print " switching mode to smart paired coverage with paired and splice enabled\n";
+			$use_span = 0;
+			$use_smartpe = 1;
+		}
+		elsif ($use_smartpe) {
+			# perfect
+		}
+		else {
+			die " incompatible mode with paired and splices enabled! Try --smartcov\n";
+		}
 	}
-	$max_intron ||= 50000;
+	$max_intron ||= 0;
+	
+	# check paired-end requirements
+	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
+	if ($use_smartpe) {
+		$paired = 1;
+		$splice = 1;
+		
+		# warnings
+		if ($fastpaired) {
+			warn " disabling fast-paired mode with smart-paired coverage\n";
+			$fastpaired = 0;
+		}
+		if ($splice_scale) {
+			warn " disabling splice scaling with smart-paired coverage\n";
+			$splice_scale = 0;
+		}
+		
+		# required modules
+		eval {
+			# required for conveniently assembling overlapping and spliced coverage
+			require Set::IntSpan::Fast;
+		};
+		die " Module Set::IntSpan::Fast is required for smart-paired coverage\n" if $@;
+	}
 	
 	# incompatible options
 	if ($splice and ($use_extend or $extend_value)) {
@@ -467,7 +504,17 @@ sub check_defaults {
 	
 	# check paired-end insert size
 	unless (defined $max_isize) {
-		$max_isize = 600;
+		if ($use_smartpe) {
+			# Smart paired-end coverage doesn't care at all about the size of 
+			# the insertion, but it is nevertheless tested in the pe_callback to 
+			# accomodate other functions. So set this to a reasonably really high number.
+			$max_isize = 100000; # 100 kb should be sufficiently high
+		}
+		else {
+			# vast majority of paired-end fragments are less than 600 bp
+			# really, really big fragments are most likely mapping errors
+			$max_isize = 600;
+		}
 	}
 	unless (defined $min_isize) {
 		$min_isize = 30;
@@ -492,8 +539,8 @@ sub check_defaults {
 		die "bin size cannot be negative!\n" if $bin_size < 0;
 	}
 	else {
-		# set default to 10 bp
-		$bin_size = ($use_span or $use_cspan or $use_extend) ? 10 : 1;
+		# set default to 10 bp for any span or coverage, or 1 bp for point data
+		$bin_size = ($use_start or $use_mid) ? 1 : 10;
 	}
 	
 	# determine binary file packing and length
@@ -596,7 +643,7 @@ sub check_defaults {
 	# determine output format
 	unless ($do_bedgraph or $do_varstep or $do_fixstep) {
 		# pick an appropriate format for the user
-		if ($use_span or $use_extend or $use_cspan or $use_coverage) {
+		if ($use_span or $use_extend or $use_cspan or $use_coverage or $use_smartpe) {
 			if ($bin_size > 1) {
 				$do_fixstep = 1;
 			}
@@ -766,6 +813,15 @@ sub check_defaults {
 		$callback = \&pe_strand_center_span;
 		print " Recording paired-end stranded, fragment center-span\n";
 	}
+	# paired-end smart coverage
+	elsif ($paired and not $do_strand and $use_smartpe) {
+		$callback = \&smart_pe;
+		print " Recording smart paired-end coverage\n";
+	}
+	elsif ($paired and $do_strand and $use_smartpe) {
+		$callback = \&smart_stranded_pe;
+		print " Recording stranded, smart paired-end coverage\n";
+	}
 	else {
 		die "programmer error!\n" unless $shift; # special exception
 	}
@@ -834,6 +890,7 @@ sub determine_shift_value {
 	my @r_profile;
 	my @shifted_profile;
 	my @r_values;
+	my @all_r_values;
 	my @regions; 
 	
 	# look for high coverage regions to sample
@@ -856,8 +913,9 @@ sub determine_shift_value {
 			push @f_profile, @{ $result->[1] }; 
 			push @r_profile, @{ $result->[2] };
 			push @shifted_profile, @{ $result->[3] };
-			push @r_values, @{ $result->[4] };
+			push @all_r_values, @{ $result->[4] };
 			push @regions, @{ $result->[5] };
+			push @r_values, @{ $result->[6] };
 		} );
 		
 		# scan the chromosomes in parallel
@@ -889,8 +947,9 @@ sub determine_shift_value {
 			push @f_profile, @{ $result->[1] }; 
 			push @r_profile, @{ $result->[2] };
 			push @shifted_profile, @{ $result->[3] };
-			push @r_values, @{ $result->[4] };
+			push @all_r_values, @{ $result->[4] };
 			push @regions, @{ $result->[5] };
+			push @r_values, @{ $result->[6] };
 		}
 	}
 	printf "  %s regions found with a correlative shift in %.1f minutes\n", 
@@ -911,14 +970,16 @@ sub determine_shift_value {
 	my @trimmed_shifted_profile;
 	my @trimmed_r_values;
 	my @trimmed_regions;
+	my @trimmed_bestr;
 	foreach my $i (0 .. $#shift_values) {
 		if ($shift_values[$i] >= $raw_min and $shift_values[$i] <= $raw_max) {
 			push @trimmed_shift_values, $shift_values[$i];
 			push @trimmed_f_profile, $f_profile[$i];
 			push @trimmed_r_profile, $r_profile[$i];
 			push @trimmed_shifted_profile, $shifted_profile[$i];
-			push @trimmed_r_values, $r_values[$i];
+			push @trimmed_r_values, $all_r_values[$i];
 			push @trimmed_regions, $regions[$i];
+			push @trimmed_bestr, $r_values[$i];
 		}
 	}
 	$stat->clear;
@@ -931,7 +992,8 @@ sub determine_shift_value {
 	# write out the shift model data file
 	if ($model) {
 		write_model_file($best_value, \@trimmed_f_profile, \@trimmed_r_profile, 
-			\@trimmed_shifted_profile, \@trimmed_r_values, \@trimmed_regions);
+			\@trimmed_shifted_profile, \@trimmed_r_values, \@trimmed_regions, 
+			\@trimmed_shift_values, \@trimmed_bestr);
 	}
 	
 	# done
@@ -945,6 +1007,7 @@ sub calculate_strand_correlation {
 	my ($collected, $data) = scan_high_coverage($sam, $tid);
 	
 	my @shift_values;
+	my @bestr_values;
 	my @all_r_values;
 	my @f_profile;
 	my @r_profile;
@@ -1017,12 +1080,13 @@ sub calculate_strand_correlation {
 				push @shifted_profile, \@best_profile;
 				push @all_r_values, \@r_values;
 				push @regions, $region;
+				push @bestr_values, $best_r;
 			}
 		}
 	}
 	
 	return [ \@shift_values, \@f_profile, \@r_profile, 
-		\@shifted_profile, \@all_r_values, \@regions];
+		\@shifted_profile, \@all_r_values, \@regions, \@bestr_values ];
 }
 
 sub scan_high_coverage {
@@ -1096,7 +1160,8 @@ sub shift_value_callback {
 
 ### Write a text data file with the shift model data
 sub write_model_file {
-	my ($value, $f_profile, $r_profile, $shifted_profile, $r_valuess, $regions) = @_;
+	my ($value, $f_profile, $r_profile, $shifted_profile, $r_valuess, 
+		$regions, $region_shifts, $region_bestr) = @_;
 	
 	# check Data
 	my $data_good;
@@ -1203,6 +1268,22 @@ sub write_model_file {
 		'gz'       => 0,
 	);
 	print "  Wrote shift correlation data file $success\n" if $success;
+	
+	
+	### Write regions
+	undef $Data;
+	$Data = Bio::ToolBox::Data->new(
+		feature  => 'Correlated regions',
+		datasets => ['Region', 'Shift', 'BestCorrelation']
+	);
+	for my $i (0 ..  $#{$regions}) {
+		$Data->add_row( [ $regions->[$i], $region_shifts->[$i], $region_bestr->[$i] ] );
+	}
+	$success = $Data->write_file(
+		'filename' => "$outfile\_correlated_regions.txt",
+		'gz'       => 0
+	);
+	print "  Wrote correlated regions data file $success\n" if $success;
 }
 
 
@@ -1274,7 +1355,11 @@ sub process_bam_coverage {
 		# find the children
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/) {
@@ -1341,7 +1426,11 @@ sub parallel_process_bam_coverage {
 		# find the children
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.0\.f\.temp\.bin\Z/) {
@@ -1437,7 +1526,11 @@ sub process_alignments {
 		my %seq_totals;
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/) {
@@ -1446,7 +1539,7 @@ sub process_alignments {
 				my $count = $3;
 				my $strand = $4;
 				$totals[$samid] += $count;
-				$seq_totals{$seq_id} += $count;
+				$seq_totals{$seq_id}{$strand} += $count;
 				$files{$seq_id}{$strand}{$samid} = $file;
 			}
 		}
@@ -1499,7 +1592,7 @@ sub process_alignments {
 			foreach my $seq_id (@seq_list) {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
-					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}, 
+					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}{$strand}, 
 						$files{$seq_id}{$strand}, \@norms);
 				}
 			}
@@ -1583,7 +1676,11 @@ sub parallel_process_alignments {
 		my %seq_totals;
 		my %files;
 		my @filelist = glob("$outbase.*.temp.bin");
-		die " unable to find children files!\n" unless @filelist;
+		my $expected = scalar(@sams) * scalar(@seq_list) * ($do_strand ? 2 : 1);
+		if (scalar(@filelist) != $expected) {
+			die sprintf(" unable to find all the temporary binary children files! Only found %d, expected %d\n",
+				scalar(@filelist), $expected);
+		}
 		foreach my $file (@filelist) {
 			# each file name is basename.samid.seqid.count.strand.bin.gz
 			if ($file =~ /$outbase\.(\d+)\.(.+)\.(\d+)\.([fr])\.temp\.bin\Z/) {
@@ -1592,7 +1689,7 @@ sub parallel_process_alignments {
 				my $count = $3;
 				my $strand = $4;
 				$totals[$samid] += $count;
-				$seq_totals{$seq_id} += $count;
+				$seq_totals{$seq_id}{$strand} += $count;
 				$files{$seq_id}{$strand}{$samid} = $file;
 			}
 		}
@@ -1649,7 +1746,7 @@ sub parallel_process_alignments {
 				foreach my $strand (qw(f r)) {
 					next unless defined $files{$seq_id}{$strand};
 					$pm->start and next;
-					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}, 
+					merge_bin_files($seq_id, $strand, $seq_totals{$seq_id}{$strand}, 
 						$files{$seq_id}{$strand}, \@norms);
 					$pm->finish;
 				}
@@ -1746,7 +1843,7 @@ sub process_alignments_on_chromosome {
 	$data->{fpack} .= pack("$binpack$fdiff", @{$data->{f}});
 	if ($do_strand) {
 		my $rdiff = int($seq_length/$bin_size) - $data->{r_offset};
-		$data->{rpack} .= pack("$binpack*", @{$data->{r}});
+		$data->{rpack} .= pack("$binpack$rdiff", @{$data->{r}});
 	}
 	
 	# round the final count to a solid integer as necessary
@@ -1898,7 +1995,10 @@ sub normalize_bin_file {
 		$chrom_data .= pack("f*", map {$_ * $scale_factor} unpack("$binpack*", $string));
 	}
 	
+	# finish
+	$fh->close;
 	unlink $file;
+	
 	# now write the wig file
 	$file =~ s/\.bin$/.wig/;
 	&$wig_writer(\$chrom_data, 'f', $seq_id, $seq_name2length{$seq_id}, $file);
@@ -1911,8 +2011,10 @@ sub write_final_wig_file {
 	
 	# find children files
 	my @filelist = glob("$outbase.*.temp.wig");
-	unless (scalar @filelist) {
-		die " can't find children file!\n";
+	my $expected = scalar(@seq_list) * ($do_strand ? 2 : 1);
+	if (scalar(@filelist) != $expected) {
+		die sprintf(" unable to find all the children wig files! Only found %d, expected %d\n",
+			scalar(@filelist), $expected);
 	}
 	
 	# assemble into a hash
@@ -1934,7 +2036,11 @@ sub write_final_wig_file {
 	my @r_filelist = map { $files{$_}{r} } @seq_list;
 	
 	# print total alignment summaries
-	if ($r_total) {
+	if ($r_total and $flip) {
+		printf " %s total forward $items\n", format_with_commas($r_total);
+		printf " %s total reverse $items\n", format_with_commas($f_total);
+	}
+	elsif ($r_total) {
 		printf " %s total forward $items\n", format_with_commas($f_total);
 		printf " %s total reverse $items\n", format_with_commas($r_total);
 	}
@@ -1952,7 +2058,6 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outfile\_f", @f_filelist) if $i == 1;
 				merge_wig_files("$outfile\_r", @r_filelist) if $i == 2;
-				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1960,7 +2065,6 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outfile\_f", @f_filelist);
 			merge_wig_files("$outfile\_r", @r_filelist);
-			unlink $chromo_file if $chromo_file;
 		}
 	}
 	elsif ($do_strand and $flip) {
@@ -1971,7 +2075,6 @@ sub write_final_wig_file {
 				$pm->start and next;
 				merge_wig_files("$outfile\_r", @f_filelist) if $i == 1;
 				merge_wig_files("$outfile\_f", @r_filelist) if $i == 2;
-				unlink $chromo_file if $chromo_file;
 				$pm->finish;
 			}
 			$pm->wait_all_children;
@@ -1979,13 +2082,14 @@ sub write_final_wig_file {
 		else {
 			merge_wig_files("$outfile\_r", @f_filelist);
 			merge_wig_files("$outfile\_f", @r_filelist);
-			unlink $chromo_file if $chromo_file;
 		}
 	}
 	else {
 		merge_wig_files($outfile, @f_filelist);
-		unlink $chromo_file if $chromo_file;
 	}
+	
+	# clean up 
+	unlink $chromo_file if $chromo_file;
 }
 
 sub write_bedgraph {
@@ -2224,24 +2328,26 @@ sub fast_pe_callback {
 		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
 		$score = $nh > 1 ? 1/$nh : 1;
 		# record fractional alignment counts
-		if ($do_strand and $flag && 0x80) {
-			# second mate, so must be reverse strand
+		if ($do_strand and $flag & 0x80) {
+			# this alignment is forward and second mate, so must be reverse strand
 			$data->{r_count} += $score; 
 		}
 		else {
-			# presume first mate or unstranded analysis defaults to forward strand
+			# otherwise this forward alignment must be first mate
+			# or unstranded analysis defaults to forward strand
 			$data->{f_count} += $score;
 		}
 		$score *= $data->{score}; # multiply by chromosome scaling factor
 	}
 	else {
 		 # always record one alignment
-		if ($do_strand and $flag && 0x80) {
-			# second mate, so must be reverse strand
+		if ($do_strand and $flag & 0x80) {
+			# this alignment is forward and second mate, so must be reverse strand
 			$data->{r_count} += 1; 
 		}
 		else {
-			# presume first mate or unstranded analysis defaults to forward strand
+			# otherwise this forward alignment is second mate
+			# or unstranded analysis defaults to forward strand
 			$data->{f_count} += 1;
 		}
 		$score = $data->{score}; # probably 1, but may be chromosome scaled
@@ -2318,31 +2424,34 @@ sub pe_callback {
 				$score = $r_nh > 1 ? 1/$r_nh : 1;
 			}
 			# record fractional alignment counts
-			if ($do_strand and $flag && 0x80) {
-				# second mate, so must be reverse strand
+			if ($do_strand and $flag & 0x40) {
+				# this alignment is reverse and first mate, so must be reverse strand
 				$data->{r_count} += $score; 
 			}
 			else {
-				# presume first mate or unstranded analysis defaults to forward strand
+				# otherwise this reverse alignment is second mate
+				# or unstranded analysis defaults to forward strand
 				$data->{f_count} += $score;
 			}
 			$score *= $data->{score}; # multiply by chromosome scaling factor
 		}
 		else {
 			# always record one alignment
-			if ($do_strand and $flag && 0x80) {
-				# second mate, so must be reverse strand
+			if ($do_strand and $flag & 0x40) {
+				# this alignment is reverse and first mate, so must be reverse strand
 				$data->{r_count} += 1; 
 			}
 			else {
-				# presume first mate or unstranded analysis defaults to forward strand
+				# otherwise this reverse alignment is second mate
+				# or unstranded analysis defaults to forward strand
 				$data->{f_count} += 1;
 			}
 			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
-		# record based only on the forward read
-		&$callback($f, $data, $score);
+		# record based primarily on the forward read, but pass reverse read at end
+		# for use in smart pairing
+		&$callback($f, $data, $score, $a);
 	}
 	else {
 		# store until we find it's mate
@@ -2363,16 +2472,20 @@ sub pe_callback {
 sub se_spliced_callback {
 	my ($a, $data, $score) = @_;
 	my $aw = $wrapper_ref->new($a, $data->{sam});
-	my @segments = $aw->get_SeqFeatures;
 	
 	# check intron size from the cigar string
-	my $size = 1;
-	my $cigars = $aw->cigar_array;
-	foreach my $c (@$cigars) {
-		# each element is [operation, size]
-		$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+	if ($max_intron) {
+		my $size = 1;
+		my $cigars = $aw->cigar_array;
+		foreach my $c (@$cigars) {
+			# each element is [operation, size]
+			$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+		}
+		return if $size > $max_intron; # exceed maximum intron size
 	}
-	return if $size > $max_intron; # exceed maximum intron size
+	
+	# get exon segments
+	my @segments = $aw->get_SeqFeatures;
 	
 	# adjust score
 	if ($splice_scale) {
@@ -2397,11 +2510,9 @@ sub se_spliced_callback {
 	elsif ($use_span) {
 		foreach my $segment (@segments) {
 			my $start = int( ($segment->start - 1) / $bin_size);
-			my $end = int($segment->end / $bin_size);
+			my $end = int( ($segment->end - 1) / $bin_size);
 			if ($do_strand and $a->reversed) {
 				# reverse strand
-				my $start = int( ($segment->start - 1) / $bin_size);
-				my $end = int($segment->end / $bin_size);
 				foreach ($start - $data->{r_offset} .. $end - $data->{r_offset}) {
 					$data->{r}->[$_] += $score;
 				}
@@ -2848,6 +2959,98 @@ sub pe_strand_center_span {
 	}
 }
 
+sub smart_pe {
+	my ($f, $data, $score, $r) = @_;
+	my $set = Set::IntSpan::Fast->new;
+	
+	# process both reads, adding to the integer set
+	foreach my $a ($f, $r) {
+		if ($a->cigar_str =~ /N/) {
+			my $aw = $wrapper_ref->new($a, $data->{sam});
+			
+			# check intron size from the cigar string
+			if ($max_intron) {
+				my $size = 1;
+				my $cigars = $aw->cigar_array;
+				foreach my $c (@$cigars) {
+					# each element is [operation, size]
+					$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+				}
+				return if $size > $max_intron; # exceed maximum intron size
+			}
+			
+			# record
+			foreach my $segment ($aw->get_SeqFeatures) {
+				$set->add_range(
+					int( ($segment->start - 1) / $bin_size), 
+					int( ($segment->end - 1) / $bin_size)
+				);
+			}
+		}
+		else {
+			$set->add_range( int($a->pos / $bin_size), int(($a->calend - 1) / $bin_size) );
+		}
+	}
+	
+	# record
+	foreach my $pos ($set->as_array) {
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+}
+
+sub smart_stranded_pe {
+	my ($f, $data, $score, $r) = @_;
+	my $set = Set::IntSpan::Fast->new;
+	
+	# determine strand based on the forward alignment
+	my ($strand, $offset);
+	my $flag = $f->flag;
+	if ($flag & 0x0040) {
+		# it's the first read, therefore fragment is forward
+		$strand = 'f';
+		$offset = 'f_offset';
+	}
+	elsif ($flag & 0x0080) {
+		# it's the second read, therefore fragment is reverse
+		$strand = 'r';
+		$offset = 'r_offset';
+	}
+	
+	# process both reads, adding to the integer set
+	foreach my $a ($f, $r) {
+		if ($a->cigar_str =~ /N/) {
+			my $aw = $wrapper_ref->new($a, $data->{sam});
+			
+			# check intron size from the cigar string
+			if ($max_intron) {
+				my $size = 1;
+				my $cigars = $aw->cigar_array;
+				foreach my $c (@$cigars) {
+					# each element is [operation, size]
+					$size = $c->[1] if ($c->[0] eq 'N' and $c->[1] > $size);
+				}
+				return if $size > $max_intron; # exceed maximum intron size
+			}
+			
+			# record
+			foreach my $segment ($aw->get_SeqFeatures) {
+				$set->add_range(
+					int( ($segment->start - 1) / $bin_size), 
+					int( ($segment->end - 1) / $bin_size)
+				);
+			}
+		}
+		else {
+			$set->add_range( int($a->pos / $bin_size), int(($a->calend - 1) / $bin_size) );
+		}
+	}
+	
+	# record
+	foreach my $pos ($set->as_array) {
+		$data->{$strand}->[$pos - $data->{$offset}] += $score;
+	}
+}
+
 
 __END__
 
@@ -2872,6 +3075,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -a --span                     record across entire alignment or pair
   -e --extend                   extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
+  --smartcov                    record paired coverage without overlaps, splices
   --coverage                    raw alignment coverage
  
  Alignment reporting options:
@@ -2892,7 +3096,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -S --nosecondary              ignore secondary alignments (false)
   -D --noduplicate              ignore marked duplicate alignments (false)
   -U --nosupplementary          ignore supplementary alignments (false)
-  --intron <integer>            maximum allowed intron size in bp (50000)
+  --intron <integer>            maximum allowed intron size in bp (none)
   
   Shift options:
   -I --shift                    shift reads in the 3' direction
@@ -2981,12 +3185,18 @@ Specify that a defined span centered at the alignment (single-end)
 or fragment (paired-end) midpoint will be recorded in the wig file.
 The span is defined by the extension value.
 
+=item --smartcov
+
+Smart alignment coverage of paired-end alignments without 
+double-counting overlaps or recording gaps (intron splices). 
+
 =item --coverage
 
 Specify that the raw alignment coverage be calculated and reported 
 in the wig file. This utilizes a special low-level operation and 
 precludes any alignment filtering or post-normalization methods. 
-Overlapping bases in paired-end alignments are double-counted.
+Counting overlapping bases in paired-end alignments are dependent on 
+the bam adapter (older versions would double-count).
 
 =item --position [start|mid|span|extend|cspan|coverage]
 
@@ -3102,6 +3312,12 @@ The file should be any text file interpretable by L<Bio::ToolBox::Data>
 with chromosome, start, and stop coordinates, including BED and GFF formats.
 Note that this only excludes overlapping alignments, and does not include 
 extended alignments.
+
+=item --intron E<lt>integerE<gt>
+
+Provide a positive integer as the maximum intron size allowed in an alignment 
+when splitting on splices. If an N operation in the CIGAR string exceeds this 
+limit, the alignment is skipped. Default is 0 (no filtering).
 
 =back
 
@@ -3259,7 +3475,7 @@ an indexed, compressed, binary BigWig file. The default is false.
 =item --bwapp /path/to/wigToBigWig
 
 Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
-utility. The application path may be set in the .biotoolbox.cfg file 
+utility. The application path may be set in the F<.biotoolbox.cfg> file 
 or found in the default executable path, which makes this option 
 unnecessary. 
 
@@ -3366,10 +3582,23 @@ the wig or bigWig file.
 =item Straight coverage
 
 To generate a straight-forward coverage map, similar to what most genome 
-browsers display when using a Bam file as source, use the following 
-settings:
+browsers display when using a Bam file as source. B<NOTE> that this mode 
+is pure raw coverage, and does not include any filtering methods. The other 
+modes allow alignment filtering.
  
  bam2wig.pl --coverage --in <bamfile>
+
+=item Smart paired-end coverage
+
+When you have paired-end alignments and need explicit alignment coverage
+without double-counting overlaps (as would occur if you counted as
+single-end span) or uncovered insertion (as would occur if you counted as 
+paired-end span) and not counting gaps (e.g. intron splices, as would occur
+with span mode), use the smart paired-end coverage mode. This properly
+assembles coverage from paired-end alignments taking into account overlaps
+and gaps.
+
+ bam2wig --smartcov --in <bamfile>
 
 =item Single-end ChIP-Seq
 
@@ -3402,7 +3631,7 @@ normalize read counts.
 If both ends of the ChIP eluate fragments are sequenced, then we do not 
 need to calculate a shift value. Instead, we will simply count at the 
 midpoint of each properly-mapped sequence pair, or record the defined 
-fragment span.
+fragment span. 
  
  bam2wig.pl --mid --pe --rpm --in <bamfile>
  
@@ -3433,15 +3662,16 @@ alignments in a genome browser to confirm the orientation relative to
 coding sequences. If alignments are opposite to the direction of 
 transcription, you can include the --flip option to switch the output.
  
- bam2wig --span ---splice -strand --rpm --in <bamfile>
+ bam2wig --span ---splice --strand --rpm --in <bamfile>
 
  bam2wig --pos mid --strand --rpm --in <bamfile>
  
 =item Paired-end RNA-Seq
 
-Since paired-end mode of bam2wig interprets pairs as a single fragment, 
-and splices are disable with paired-end alignments, paired-end RNAseq 
-may be best treated as single-end RNAseq.
+Use the smart paired-end coverage mode to properly record paired-end 
+alignments with splice junctions. 
+
+ bam2wig --smartcov --strand --rpm --in <bamfile>
  
 =back
 

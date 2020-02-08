@@ -20,7 +20,7 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-my $VERSION = '1.65';
+my $VERSION = '1.68';
 
 print "\n This script will collect binned values across features\n\n";
 
@@ -44,7 +44,6 @@ my (
 	$outfile,
 	$main_database,
 	$data_database,
-	$dataset,
 	$feature,
 	$subfeature,
 	$exon_subfeature,
@@ -57,12 +56,15 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
+	$format,
 	$set_strand,
+	$groupcol,
 	$gz,
 	$cpu,
 	$help,
 	$print_version,
 ); # command line variables
+my @datasets;
 
 ## Command line options
 GetOptions( 
@@ -71,7 +73,7 @@ GetOptions(
 	'o|out=s'        => \$outfile, # name of outfile
 	'd|db=s'         => \$main_database, # main or annotation database name
 	'D|ddb=s'        => \$data_database, # data database
-	'a|data=s'       => \$dataset, # dataset name
+	'a|data=s'       => \@datasets, # dataset name
 	'f|feature=s'    => \$feature, # what type of feature to work with
 	'u|subfeature=s' => \$subfeature, # indicate to restrict to subfeatures
 	'exons!'         => \$exon_subfeature, # old parameter
@@ -83,9 +85,11 @@ GetOptions(
 	'min=i'          => \$min_length, # minimum feature size
 	'long!'          => \$long_data, # collecting long data features
 	'smooth!'        => \$smooth, # do not interpolate over missing values
-	'U|sum'            => \$sum, # determine a final average for all the features
+	'U|sum'          => \$sum, # determine a final average for all the features
+	'r|format=i'     => \$format, # decimal formatting
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
+	'g|groups'       => \$groupcol, # write group column file
 	'z|gz!'          => \$gz, # compress the output file
 	'c|cpu=i'        => \$cpu, # number of execution threads
 	'h|help'         => \$help, # print the help
@@ -118,6 +122,7 @@ if ($print_version) {
 
 
 ### Check for required values
+my $formatter;
 check_defaults();
 my $start_time = time;
 my $length_i; # global value for the merged transcript length
@@ -168,7 +173,19 @@ else {
 $Data->program("$0, v $VERSION");
 
 # the number of columns already in the data array
-my $startcolumn = $Data->number_columns; 
+my $beginningcolumn = $Data->last_column; 
+my $startcolumn; # this is now calculated separately for each datasets
+
+
+# Check output file name
+unless ($outfile) {
+	if ($Data->basename) {
+		$outfile = $Data->path . $Data->basename;
+	}
+	else {
+		die " No output file provided!\n";
+	}
+}
 
 
 
@@ -181,23 +198,21 @@ if (defined $data_database) {
 }
 
 # Check for the dataset
-$dataset = verify_or_request_feature_types(
+@datasets = verify_or_request_feature_types(
 	'db'      => $ddb || $Data->database,
-	'feature' => $dataset,
-	'prompt'  => " Enter the number of the feature or dataset from which to" . 
-					" collect data   ",
-	'single'  => 1,
+	'feature' => \@datasets,
+	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
+				" to collect data. Comma delimited or range is acceptable\n",
 );
-unless ($dataset) {
-	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
+unless (@datasets) {
+	die " No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
 } 
 
 
 
-
 ## Collect the relative data
-printf " Collecting $method data from $dataset in %s bins....\n",
-	($bins + 2 * $extension); 
+printf " Collecting $method data in %d bins from %s\n",
+	($bins + 2 * $extension), join(", ", @datasets); 
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
@@ -211,7 +226,7 @@ if ($cpu > 1) {
 
 if ($cpu > 1) {
 	# parallel execution
-	print " Forking into $cpu children for parallel data collection\n";
+	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
 }
 
@@ -225,11 +240,10 @@ else {
 ## Generate summed data - 
 # an average across all features at each position suitable for plotting
 if ($sum) {
-	print " Generating final summed data....\n";
+	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
 		'filename'    => $outfile,
-		'startcolumn' => $startcolumn,
-		'dataset'     => $dataset,
+		'dataset'     => @datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -242,9 +256,6 @@ if ($sum) {
 
 
 ## Write main output
-unless ($outfile) {
-	$outfile = $Data->path . $Data->basename;
-}
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -255,6 +266,23 @@ if ($written_file) {
 else {
 	print " unable to write data file!\n";
 }
+
+# write the column group file
+if ($groupcol) {
+	my $groupfile = $written_file;
+	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
+	$fh->print("Name\tDataset\n");
+	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
+		my $name = $Data->name($i);
+		my $dataset = $name;
+		$dataset =~ s/:[\-\d%bp]+$//;
+		$fh->print("$name\t$dataset\n");
+	}
+	$fh->close;
+	print " wrote group column file $groupfile\n";
+}
+
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 # done
 
@@ -274,6 +302,20 @@ sub check_defaults {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
 
+	# check datasets
+	if (not @datasets and @ARGV) {
+		@datasets = @ARGV;
+	}
+	if ($datasets[0] =~ /,/) {
+		# seems to be a comma delimited list, possibly more than one?????
+		my @list;
+		foreach my $d (@datasets) {
+			push @list, (split /,/, $d);
+		}
+		@datasets = @list;
+	}
+	
+	# strand
 	if ($stranded) {
 		unless (
 			$stranded eq 'sense' or 
@@ -286,7 +328,8 @@ sub check_defaults {
 	else {
 		$stranded = 'all'; # default is no strand information
 	}
-
+	
+	# method
 	if (defined $method) {
 		unless (
 			$method eq 'mean' or 
@@ -307,7 +350,7 @@ sub check_defaults {
 	
 	# subfeatures
 	if ($subfeature and $long_data) {
-		die " Long data collection is incompatible with exon subfeatures\n Use --help for more information\n";
+		die " Long data collection is incompatible with subfeatures\n Use --help for more information\n";
 	}
 	if ($exon_subfeature) {
 		# legacy option
@@ -317,22 +360,25 @@ sub check_defaults {
 		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
 	}
 	
-	# assign default values
+	# assign default window bin values
 	unless (defined $bins) {
 		# dividing gene into 10 (10%) bins seems reasonable to me
 		$bins = 10;
 	} 
-
 	unless (defined $extension) {
 		# default is no extension
 		$extension = 0;
 	}
-
 	unless (defined $smooth) {
 		# default is to not include smoothing
 		$smooth = 0;
 	}
 
+	# generate formatter
+	if (defined $format) {
+		$formatter = '%.' . $format . 'f';
+	}
+	
 	if ($parallel) {
 		$cpu ||= 4;
 	}
@@ -348,9 +394,6 @@ sub check_defaults {
 ## Parallel execution for efficiency
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -379,24 +422,30 @@ sub parallel_execution {
 		# calculate length if necessary
 		if ($subfeature) {
 			$length_i = $Data->add_transcript_length($subfeature);
-			$startcolumn++;
-		}
-	
-		# Prepare the metadata and header names
-		my $binsize = (100/$bins); 
-		prepare_bins($binsize);
-		
-		# Collect the data
-		if ($long_data) {
-			collect_binned_long_data($binsize);
-		}
-		else {
-			collect_binned_data($binsize);
 		}
 		
-		# Interpolate values
-		if ($smooth) {
-			go_interpolate_values();
+		# work through each dataset
+		foreach my $dataset (@datasets) {
+		
+			# new start column for this dataset
+			$startcolumn = $Data->number_columns; 
+		
+			# Prepare the metadata and header names
+			my $binsize = (100/$bins); 
+			prepare_bins($binsize, $dataset);
+		
+			# Collect the data
+			if ($long_data) {
+				collect_binned_long_data($binsize, $dataset);
+			}
+			else {
+				collect_binned_data($binsize, $dataset);
+			}
+		
+			# Interpolate values
+			if ($smooth) {
+				go_interpolate_values();
+			}
 		}
 		
 		# write out result
@@ -442,32 +491,38 @@ sub single_execution {
 	# calculate length if necessary
 	if ($subfeature) {
 		$length_i = $Data->add_transcript_length($subfeature);
-		$startcolumn++;
 	}
 	
-	# Prepare the metadata and header names
-	my $binsize = (100/$bins); 
-	prepare_bins($binsize);
+	# work through each dataset
+	foreach my $dataset (@datasets) {
+		
+		# new start column for this dataset
+		$startcolumn = $Data->number_columns; 
 	
-	# Collect the data
-	if ($long_data) {
-		collect_binned_long_data($binsize);
-	}
-	else {
-		collect_binned_data($binsize);
-	}
+		# Prepare the metadata and header names
+		my $binsize = (100/$bins); 
+		prepare_bins($binsize, $dataset);
 	
-	# Interpolate values
-	if ($smooth) {
-		print " Smoothing data by interpolation....\n";
-		go_interpolate_values();
+		# Collect the data
+		if ($long_data) {
+			collect_binned_long_data($binsize, $dataset);
+		}
+		else {
+			collect_binned_data($binsize, $dataset);
+		}
+	
+		# Interpolate values
+		if ($smooth) {
+			print " Smoothing data by interpolation....\n";
+			go_interpolate_values();
+		}
 	}
 }
 
 
 
 sub collect_binned_data {	
-	my $binsize = shift;
+	my ($binsize, $dataset) = @_;
 	
 	## Collect the data
 	my $stream = $Data->row_stream;
@@ -523,7 +578,7 @@ sub collect_binned_data {
 
 
 sub collect_binned_long_data {	
-	my $binsize = shift;
+	my ($binsize, $dataset) = @_;
 	
 	## Collect the data
 	my $stream = $Data->row_stream;
@@ -615,6 +670,7 @@ sub collect_binned_long_data {
 				'method'      => $method,
 				'stranded'    => $stranded,
 			);
+			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 			$row->value($column, $score);
 		}
 	}	
@@ -680,6 +736,8 @@ sub record_the_bin_values {
 		
 		# calculate the value
 		my $window_score = calculate_score($method, \@scores);
+		$window_score = sprintf($formatter, $window_score) 
+			if ($formatter and $window_score ne '.');
 		
 		# record the value
 		$row->value($column, $window_score);
@@ -725,7 +783,9 @@ sub go_interpolate_values {
 				
 				# apply fractional values
 				for (my $n = $col; $n < $next_i; $n++) {
-					$row->value($n, $initial + ($fraction * ($n - $col + 1)) );
+					my $score = $initial + ($fraction * ($n - $col + 1));
+					$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
+					$row->value($n, $score);
 				}
 				
 				# jump ahead
@@ -740,7 +800,7 @@ sub go_interpolate_values {
 ### Prepare all of the bin columns and their metadata
 sub prepare_bins {
 	
-	my $binsize = shift;
+	my ($binsize, $dataset) = @_;
 	
 	# the size of the bin in percentage units, default would be 10%
 	# each bin will be titled the starting and ending point for that bin in 
@@ -758,7 +818,7 @@ sub prepare_bins {
 			for (my $i = $extension; $i > 0; $i--) { 
 				my $start = 0 - ($extension_size * $i);
 				my $stop = 0 - ($extension_size * ($i - 1));
-				_set_metadata($start, $stop, $extension_size, 'bp');
+				_set_metadata($start, $stop, $extension_size, 'bp', $dataset);
 			}
 		}
 		else {
@@ -766,7 +826,7 @@ sub prepare_bins {
 			for (my $i = $extension; $i > 0; $i--) { 
 				my $start = 0 - ($binsize * $i);
 				my $stop = 0 - ($binsize * ($i - 1));
-				_set_metadata($start, $stop, $binsize, '%');
+				_set_metadata($start, $stop, $binsize, '%', $dataset);
 			}
 		}
 	}
@@ -775,7 +835,7 @@ sub prepare_bins {
 	for (my $i = 0; $i < $bins; $i++) { 
 		my $start = ($i * $binsize );
 		my $stop = ($i + 1) * $binsize;
-		_set_metadata($start, $stop, $binsize, '%');
+		_set_metadata($start, $stop, $binsize, '%', $dataset);
 	}
 	
 	# bin(s) on 3' flank
@@ -786,7 +846,7 @@ sub prepare_bins {
 			for (my $i = 0; $i < $extension; $i++) { 
 				my $start = ($extension_size * $i);
 				my $stop = ($extension_size * ($i + 1));
-				_set_metadata($start, $stop, $extension_size, 'bp');
+				_set_metadata($start, $stop, $extension_size, 'bp', $dataset);
 			}
 		}
 		else {
@@ -794,7 +854,7 @@ sub prepare_bins {
 			for (my $i = 0; $i < $extension; $i++) { 
 				my $start = 100 + ($binsize * $i);
 				my $stop = 100 + ($binsize * ($i + 1));
-				_set_metadata($start, $stop, $binsize, '%');
+				_set_metadata($start, $stop, $binsize, '%', $dataset);
 			}
 		}
 	}
@@ -806,13 +866,13 @@ sub prepare_bins {
 ### Set the metadata for a new data table column (dataset)
 sub _set_metadata {
 	# the start and stop positions are passed
-	my ($start, $stop, $binsize, $unit) = @_;
+	my ($start, $stop, $binsize, $unit, $dataset) = @_;
 	
-	# set new name
-	my $name = sprintf "%s..%s%s", $start, $stop, $unit;
+	# generate a simplified new name
+	my $new_name = simplify_dataset_name($dataset);
 	
 	# set new index
-	my $new_index = $Data->add_column($name);
+	my $new_index = $Data->add_column(sprintf("%s:%d%s", $new_name, $start, $unit));
 	
 	# set the metadata using passed and global variables
 	# set the metadata
@@ -822,6 +882,7 @@ sub _set_metadata {
 	$Data->metadata($new_index, 'method' , $method);
 	$Data->metadata($new_index, 'bin_size' , $binsize . $unit);
 	$Data->metadata($new_index, 'strand' , $stranded);
+	$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
 	if ($set_strand) {
 		$Data->metadata($new_index, 'strand_implied', 1);
 	}
@@ -844,7 +905,9 @@ A program to collect data in bins across a list of features.
 
 =head1 SYNOPSIS
  
- get_binned_data.pl [--options] <filename>
+ get_binned_data.pl [--options] --in <filename> --out <filename>
+  
+ get_binned_data.pl [--options] -i <filename> <data1> <data2...>
   
   Options for data files:
   -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
@@ -864,7 +927,8 @@ A program to collect data in bins across a list of features.
   -u --subfeature [exon|cds|          collect over gene subfeatures 
         5p_utr|3p_utr] 
   --force_strand                      use the specified strand in input file
-  --long                              assume long features to collect
+  --long                              collect each window independently
+  -r --format <integer>               number of decimal places for numbers
   
   Bin specification:
   -b --bins <integer>                 number of bins feature is divided (10)
@@ -877,6 +941,7 @@ A program to collect data in bins across a list of features.
   --smooth                            smoothen sparse data
   
   General options:
+  -g --groups                         write columns group index file for plotting
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
   --noparse                           do not parse input file into SeqFeatures
@@ -942,15 +1007,18 @@ is provided here.
 
 Provide the name of the dataset to collect the values. If no 
 dataset is specified on the command line, then the program will 
-interactively present a list of datasets from the database to select. 
+interactively present a list of datasets from the data database to select. 
 
 The dataset may be a database file, including bigWig (.bw), 
 bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
 remote (specified with a http: or ftp: prefix).
 
-Alternatively, the dataset may be a feature type in a BioPerl L<Bio::DB::SeqFeature::Store> 
-or L<Bio::DB::BigWigSet> database. Provide either the feature type or 
-C<type:source>. 
+Alternatively, the dataset may be a feature type in a BioPerl 
+L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> database. Provide 
+either the feature type or C<type:source>. 
+
+More than one datasource may be provided; use multiple data options or list 
+the datasets at the end of the command.
 
 =item --method E<lt>textE<gt>
 
@@ -1011,8 +1079,8 @@ Optionally specify the type of subfeature to collect from, rather than
 the entire gene. If the parent feature is gene and the subfeature is exon, 
 then all transcripts of the gene will be collapsed. The other subfeatures 
 (cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
-coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
-and fstop are ignored. Default is null. 
+coding mRNA transcripts. Note that the long option is incompatible. 
+Default is null. 
 
 =item --exons
 
@@ -1020,14 +1088,20 @@ Legacy option for specifying --subfeature exon.
 
 =item --long
 
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. Execution times may be 
-longer than otherwise. Default is false.
+Indicate that data should be collected independently for each long 
+window. This may be enabled automatically if the sum of the entire 
+window length passes a predefined threshold. The default for 'short' 
+windows is to collect all of the point data from the dataset first, and 
+then divide the results into the different windows. Datasets consisting 
+of "long" features, for example long alignments, may be counted more 
+than once in long mode when they span multiple windows. Not compatible 
+when subfeatures are enabled.
+
+=item --format E<lt>integerE<gt>
+
+Specify the number of decimal positions to format the collected scores. 
+Default is not to format, often leading to more than the intended 
+significant digits.
 
 =back
 
@@ -1083,6 +1157,13 @@ from neighboring values. The default is false.
 =head2 General options
 
 =over 4
+
+=item --groups
+
+Optionally write a secondary file with the list of column group names and 
+their corresponding dataset group. This can be used to assist in designating 
+the metadata when plotting files, for example in R with pheatmap. The 
+file is named the output basename appended with F<.groups.txt>.
 
 =item --gz
 

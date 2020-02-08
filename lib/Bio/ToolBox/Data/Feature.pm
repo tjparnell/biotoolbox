@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.65';
+our $VERSION = '1.67';
 
 =head1 NAME
 
@@ -1054,17 +1054,32 @@ sub strand {
 	carp "strand is a read only method" if @_;
 	my $i = $self->{data}->strand_column;
 	if (defined $i) {
-		my $str = $self->value($i);
-		if (defined $str and $str !~ /^\-?[01]$/) {
-			$str = $str eq '+' ? 1 : $str eq '-' ? -1 : 0;
-		}
-		$str ||= 0;
-		return $str;
+		return $self->_strand( $self->value($i) );
 	}
 	elsif (exists $self->{feature}) {
 		return $self->{feature}->strand;
 	}
 	return 0;
+}
+
+sub _strand {
+	my $self = shift;
+	my $str = shift;
+	if ($str eq '+') {
+		return 1;
+	}
+	elsif ($str eq '-') {
+		return -1;
+	}
+	elsif ($str eq '.') {
+		return 0;
+	}
+	elsif ($str =~ /^[\+\-]?1$/) {
+		return $str;
+	}
+	else {
+		return 0;
+	}
 }
 
 *name = \&display_name;
@@ -2018,9 +2033,14 @@ sub bed_string {
 		$string .= "\t$score";
 	}
 	if ($args{bed} >= 6) {
-		my $strand = $args{strand} || $self->strand;
-		$strand = $strand == 0 ? '+' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
-		$string .= "\t$strand";
+		my $s;
+		if (exists $args{strand} and defined $args{strand}) {
+			$s = $self->_strand($args{strand});
+		}
+		else {
+			$s = $self->strand;
+		}
+		$string .= sprintf("\t%s", $s == -1 ? '-' : '+')
 	}
 	# we could go on with other columns, but there's no guarantee that additional 
 	# information is available, and we would have to implement user provided data 
@@ -2043,8 +2063,14 @@ sub gff_string {
 		carp sprintf("no valid seq_id or start for data line %d", $self->line_number);
 		return;
 	}
-	my $strand = $args{strand} || $self->strand;
-	$strand = $strand == 0 ? '.' : $strand == 1 ? '+' : $strand == -1 ? '-' : $strand;
+	my $strand;
+	if (exists $args{strand} and defined $args{strand}) {
+		$strand = $self->_strand($args{strand});
+	}
+	else {
+		$strand = $self->strand;
+	}
+	$strand = $strand == -1 ? '-' : $strand == 1 ? '+' : '.';
 	
 	# type information
 	my $type = $args{type} || $self->type || undef;

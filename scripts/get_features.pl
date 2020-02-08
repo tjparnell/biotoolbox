@@ -13,7 +13,7 @@ use Bio::ToolBox::GeneTools qw(
 	:transcript
 );
 use Bio::ToolBox::utility;
-my $VERSION = '1.65';
+my $VERSION = '1.67';
 
 print "\n This program will collect features from annotation sources\n\n";
 
@@ -33,6 +33,7 @@ unless (@ARGV) {
 my (
 	$input,
 	$database,
+	$id_list,
 	$get_subfeatures,
 	$include_coordinates,
 	$start_adj,
@@ -63,18 +64,19 @@ my %exclude_tag2value;
 GetOptions( 
 	'i|in=s'      => \$input, # input table
 	'd|db=s'      => \$database, # source annotation database
+	'l|list=s'    => \$id_list, # file of IDs to keep
 	'f|feature=s' => \@features, # the features to collect from the database
 	'u|sub!'      => \$get_subfeatures, # collect subfeatures
-	'coord!'    => \$include_coordinates, # collect coordinates
+	'coord!'      => \$include_coordinates, # collect coordinates
 	'b|start=i'   => \$start_adj, # start coordinate adjustment
 	'e|stop=i'    => \$stop_adj, # stop coordinate adjustment
 	'p|pos=s'     => \$position, # relative position to adjust coordinates
 	't|tag=s'     => \@include_tags, # attributes to include
 	'x|exclude=s' => \@exclude_tags, # attribute and keys to exclude
-	'tsl=s'     => \$tsl, # filter on transcript support level
-	'gencode!'  => \$gencode, # filter on gencode basic tag
-	'biotype=s' => \$tbiotype, # filter on transcript biotype
-	'collapse!' => \$collapse, # collapse multi-transcript genes
+	'tsl=s'       => \$tsl, # filter on transcript support level
+	'gencode!'    => \$gencode, # filter on gencode basic tag
+	'biotype=s'   => \$tbiotype, # filter on transcript biotype
+	'collapse!'   => \$collapse, # collapse multi-transcript genes
 	'K|chrskip=s' => \$chromosome_exclude, # skip chromosomes
 	'B|bed!'      => \$convert_to_bed, # convert to bed format
 	'G|gff|gff3!' => \$convert_to_gff, # convert to GFF3 format
@@ -167,6 +169,11 @@ sub check_requirements {
 		# whoops! specifiying a database file as input
 		$database = $input;
 		undef $input;
+	}
+	if ($id_list) {
+		unless (-e $id_list and -r _) {
+			die "unable to read list file '$id_list'!\n";
+		}
 	}
 	
 	# check if feature is a comma delimited list
@@ -295,6 +302,46 @@ sub load_from_infile {
 
 
 sub filter_features {
+	# filter on specified list
+	if ($id_list) {
+		print " Filtering IDs based on provided list from '$id_list'...\n";
+		# load the list file
+		my $List = Bio::ToolBox::Data->new(file => $id_list);
+		if ($List) {
+			# we've loaded the list
+			my $i = $List->id_column;
+			unless (defined $i) {
+				$i = ask_user_for_index($List, 
+					"provide the index for the ID column to filter on ");
+			}
+			
+			# generate hash
+			my %wanted;
+			$List->iterate( sub {
+				my $row = shift;
+				$wanted{ $row->value($i) } = 1;
+			});
+			
+			# now filter the genes
+			my @unwanted;
+			$Data->iterate( sub {
+				my $row = shift;
+				my $v = $row->primary_id;
+				if (not exists $wanted{$v}) {
+					# the tag doesn't match a wanted item, so discard
+					push @unwanted, $row->row_index;
+				}
+			});
+			if (@unwanted) {
+				$Data->delete_row(@unwanted);
+			}
+			printf "  Kept %s features.\n", format_with_commas($Data->last_row);
+		}
+		else {
+			print " unable to load list!\n";
+		}
+	}
+	
 	# filter on specific tags
 	if (%exclude_tag2value) {
 		foreach my $k (keys %exclude_tag2value) {
@@ -898,6 +945,7 @@ get_features.pl --db E<lt>nameE<gt> --out E<lt>filenameE<gt>
   -u --sub                      include subfeatures (true if gff, gtf, refFlat)
   
   Filter features:
+  -l --list <filename>          file of feature IDs to keep
   -K --chrskip <regex>          skip features from certain chromosomes
   -x --exclude <tag=value>      exclude features with specific attribute value
   --biotype <regex>             include only specific biotype
@@ -976,6 +1024,16 @@ file to be written. It has no effect with standard text.
 =head2 Filter features
 
 =over 4
+
+=item --list E<lt>fileE<gt>
+
+Provide a file containing a list of the feature IDs to keep from the 
+input annotation file. The file must have an C<ID> or C<Primary_ID> 
+column, otherwise an index will be requested interactively from the user. 
+Only those top features whose C<ID>, C<gene_id>, C<transcript_id>, or 
+otherwise SeqFeature C<primary_id> exactly matches one from the list 
+will be retained; C<names> are not checked. Useful if you need 
+to filter based on external criteria.
 
 =item --chrskip E<lt>regexE<gt>
 

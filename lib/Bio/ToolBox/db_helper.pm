@@ -730,10 +730,10 @@ This subroutine will collect a list of chromosomes or reference sequences
 in a Bio::DB database and return the list along with their sizes in bp. 
 Many BioPerl-based databases are supported, including 
 L<Bio::DB::SeqFeature::Store>, L<Bio::DB::Fasta>, L<Bio::DB::Sam>, 
-L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, and 
-L<Bio::DB::BigBed>, or any others that support the 
-C<seq_ids> method. See the L</open_db_connection> subroutine for more 
-information.
+L<Bio::DB::HTS>, L<Bio::DB::BigWig>, L<Bio::DB::BigWigSet>, 
+L<Bio::DB::BigBed>, or any others that support the C<seq_ids> method. 
+L<Bio::DB::Big> adapters for big files are also supported, though see note 
+below. See the L</open_db_connection> subroutine for more information.
 
 Pass the subroutine either the name of the database, the path to the 
 database file, or an opened database object.
@@ -745,6 +745,10 @@ or unmapped contigs. The default is to return all chromosomes.
 The subroutine will return an array, with each element representing each 
 chromosome or reference sequence in the database. Each element is an anonymous 
 array of two elements, the chromosome name and length in bp.
+
+B<NOTE>: L<Bio::DB::Big> databases for bigWig and bigBed files do 
+not return chromosomes in the original order as the file, and are returned 
+in a sorted manner that may not be the original order.
 
 =item low_level_bam_coverage
 
@@ -1021,6 +1025,9 @@ sub open_db_connection {
 	
 	# check for a known file type
 	elsif ($database =~ /gff|bw|bb|bam|useq|db|sqlite|fa|fasta|bigbed|bigwig|cram/i) {
+		
+		# remove prefix, just in case
+		$database =~ s/^file://;
 		
 		# first check that it exists
 		if (-e $database) {
@@ -2025,7 +2032,7 @@ sub calculate_score {
 	
 	# calculate a score based on the method
 	if ($method eq 'mean') {
-		return sum0(@$scores)/scalar(@$scores);
+		return sum0(@$scores)/(scalar(@$scores) || 1);
 	} 
 	elsif ($method eq 'sum') {
 		return sum0(@$scores);
@@ -2138,18 +2145,18 @@ sub get_chromosome_list {
 	# libBigWig Bigfile, including both bigWig and bigBed
 	elsif ($type eq 'Bio::DB::Big::File') {
 		# this doesn't follow the typical BioPerl convention
+		# it's a hash, so randomly sorted!!!!! Never will be in same order as file!!!!
 		my $chroms = $db->chroms();
-		foreach my $chr (keys %$chroms) {
-			my $chrname = $chroms->{$chr}{name};
-			
+		# so we'll sort the chromosomes by decreasing length
+		# this is common for a lot of genomes anyway, except for yeast 
+		foreach (
+			sort { $b->[1] <=> $a->[1] }
+			map { [$_->{name}, $_->{length}] } 
+			values %$chroms
+		) {
 			# check for excluded chromosomes
-			next if (defined $chr_exclude and $chrname =~ $chr_exclude);
-			
-			# get chromosome size
-			my $length = $chroms->{$chr}{length};
-			
-			# store
-			push @chrom_lengths, [ $chrname, $length ];
+			next if (defined $chr_exclude and $_->[0] =~ /$chr_exclude/i);
+			push @chrom_lengths, $_;
 		}
 	}
 	

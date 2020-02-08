@@ -20,14 +20,14 @@ eval {
 	require Parallel::ForkManager;
 	$parallel = 1;
 };
-use constant DATASET_HASH_LIMIT => 20001;
+use constant DATASET_HASH_LIMIT => 4999;
 		# This constant determines the maximum size of the dataset hash to be 
 		# returned from the get_region_dataset_hash(). To increase performance, 
 		# the program normally queries the database once for each feature or 
 		# region, and a hash returned with potentially a score for each basepair. 
 		# This may become unwieldy for very large regions, which may be better 
 		# served by separate database queries for each window.
-my $VERSION = '1.65';
+my $VERSION = '1.68';
 
 print "\n A script to collect windowed data flanking a relative position of a feature\n\n";
   
@@ -52,11 +52,12 @@ my (
 	$outfile, 
 	$main_database, 
 	$data_database,
-	$dataset, 
 	$feature, 
 	$method,
 	$win, 
 	$number,
+	$up_number,
+	$down_number,
 	$position, 
 	$strand_sense,
 	$set_strand,
@@ -65,11 +66,14 @@ my (
 	$long_data,
 	$smooth,
 	$sum,
+	$format,
+	$groupcol,
 	$gz,
 	$cpu,
 	$help,
 	$print_version,
 ); # command line variables
+my @datasets;
 
 ## Command line options
 GetOptions( 
@@ -78,11 +82,13 @@ GetOptions(
 	'parse!'       => \$parse, # parse input file
 	'd|db=s'       => \$main_database, # main or annotation database name
 	'D|ddb=s'      => \$data_database, # data database
-	'a|data=s'     => \$dataset, # dataset name
+	'a|data=s'     => \@datasets, # dataset name
 	'f|feature=s'  => \$feature, # type of feature
 	'm|method=s'   => \$method, # method to combine data
 	'w|window=i'   => \$win, # window size
 	'n|number=i'   => \$number, # number of windows
+	'up=i'         => \$up_number, # number of windows upstream
+	'down=i'       => \$down_number, # number of windows downstream
 	'p|position=s' => \$position, # indicate relative location of the feature
 	't|strand=s'   => \$strand_sense, # collected stranded data
 	'force_strand|set_strand' => \$set_strand, # enforce an artificial strand
@@ -91,7 +97,9 @@ GetOptions(
 	'avtype=s'     => \$avoidtype, # type of feature to avoid
 	'long!'        => \$long_data, # collecting long data features
 	'smooth!'      => \$smooth, # smooth by interpolation
-	'U|sum!'         => \$sum, # generate average profile
+	'U|sum!'       => \$sum, # generate average profile
+	'r|format=i'   => \$format, # decimal formatting
+	'g|groups'     => \$groupcol, # write group column file
 	'z|gz!'        => \$gz, # compress the output file
 	'c|cpu=i'      => \$cpu, # number of execution threads
 	'h|help'       => \$help, # print help
@@ -127,6 +135,7 @@ if ($print_version) {
 
 
 ## Check for required values
+my $formatter;
 check_defaults();
 my $start_time = time;
 
@@ -176,8 +185,22 @@ else {
 }
 $Data->program("$0, v $VERSION");
 
+
 # the number of columns already in the data array
-my $startcolumn = $Data->number_columns; 
+my $beginningcolumn = $Data->last_column; 
+my $startcolumn; # this is now calculated separately for each dataset
+
+
+# Check output file name
+unless ($outfile) {
+	if ($Data->basename) {
+		$outfile = $Data->path . $Data->basename;
+	}
+	else {
+		die " No output file provided!\n";
+	}
+}
+
 
 # make sure data table supports avoid option
 if ($avoid) {
@@ -208,20 +231,32 @@ if (defined $data_database) {
 }
 
 # Check the dataset
-$dataset = verify_or_request_feature_types(
+@datasets = verify_or_request_feature_types(
 	'db'      => $ddb || $Data->database,
-	'feature' => $dataset,
-	'single'  => 1,
-	'prompt'  => " Enter the number of the feature or dataset from which to" . 
-					" collect data   ",
+	'feature' => \@datasets,
+	'prompt'  => " Enter the dataset(s) or feature type(s) from which \n" . 
+				" to collect data. Comma delimited or range is acceptable\n",
 );
-unless ($dataset) {
-	die " No verifiable dataset provided. Check your file path, database, or dataset.\n";
+unless (@datasets) {
+	die " No verifiable dataset(s) provided. Check your file path, database, or dataset.\n";
 } 
 
 
 
 ## Collect the relative data
+
+# Determine starting and ending points
+my $starting_point = 0 - ($win * $up_number); 
+	# default values will give startingpoint of -1000
+my $ending_point = $win * $down_number; 
+	# likewise default values will give endingpoint of 1000
+
+# Print collection statement
+printf " Collecting $method data between %d..%d at the %s in %d bp windows from %s\n", 
+	$starting_point, $ending_point, 
+	$position == 3 ? "3' end" : $position == 4 ? "midpoint" : "5' end", 
+	$win, join(', ', @datasets), ;
+
 
 # check whether it is worth doing parallel execution
 if ($cpu > 1) {
@@ -235,7 +270,7 @@ if ($cpu > 1) {
 
 if ($cpu > 1) {
 	# parallel execution
-	print " Forking into $cpu children for parallel data collection\n";
+	print " Forking into $cpu children for parallel data collection...\n";
 	parallel_execution();
 }
 else {
@@ -247,11 +282,10 @@ else {
 ## Generate summed data 
 # an average across all features at each position suitable for plotting
 if ($sum) {
-	print " Generating final summed data....\n";
+	print " Generating summary file....\n";
 	my $sumfile = $Data->summary_file(
 		'filename'    => $outfile,
-		'startcolumn' => $startcolumn,
-		'dataset'     => $dataset,
+		'dataset'     => \@datasets,
 	);
 	if ($sumfile) {
 		print " Wrote summary file '$sumfile'\n";
@@ -263,9 +297,6 @@ if ($sum) {
 
 
 ## Output the data
-unless ($outfile) {
-	$outfile = $Data->path . $Data->basename;
-}
 my $written_file = $Data->save(
 	'filename' => $outfile,
 	'gz'       => $gz,
@@ -278,6 +309,23 @@ else {
 	# failure! the subroutine will have printed error messages
 	print " unable to write output file!\n";
 }
+
+# write the column group file
+if ($groupcol) {
+	my $groupfile = $written_file;
+	$groupfile =~ s/\.txt(?:\.gz)?$/.groups.txt/;
+	my $fh = Bio::ToolBox::Data->open_to_write_fh($groupfile);
+	$fh->print("Name\tDataset\n");
+	for (my $i = $beginningcolumn + 1; $i <= $Data->last_column; $i++) {
+		my $name = $Data->name($i);
+		my $dataset = $name;
+		$dataset =~ s/:[\-\d]+$//;
+		$fh->print("$name\t$dataset\n");
+	}
+	$fh->close;
+	print " wrote group column file $groupfile\n";
+}
+
 printf " Completed in %.1f minutes\n", (time - $start_time)/60;
 
 
@@ -296,16 +344,40 @@ sub check_defaults {
 	unless ($outfile or $infile) {
 		die " You must define an output filename !\n Use --help for more information\n";
 	}
-
-
+	
+	# check datasets
+	if (not @datasets and @ARGV) {
+		@datasets = @ARGV;
+	}
+	if ($datasets[0] =~ /,/) {
+		# seems to be a comma delimited list, possibly more than one?????
+		my @list;
+		foreach my $d (@datasets) {
+			push @list, (split /,/, $d);
+		}
+		@datasets = @list;
+	}
+	
+	# window size
 	unless ($win) {
 		print " Using default window size of 50 bp\n";
 		$win = 50;
 	}
-
-	unless ($number) {
+	
+	# number of windows
+	if ($up_number or $down_number) {
+		# either one could be set, assume the other is zero
+		$up_number ||= 0;
+		$down_number ||= 0;
+	}
+	elsif ($number) {
+		$up_number = $number;
+		$down_number = $number;
+	}
+	else {
 		print " Using default window number of 20 per side\n";
-		$number = 20;
+		$up_number = 20;
+		$down_number = 20;
 	}
 
 	if (defined $method) {
@@ -362,6 +434,11 @@ sub check_defaults {
 		$sum = 1;
 	}
 
+	# generate formatter
+	if (defined $format) {
+		$formatter = '%.' . $format . 'f';
+	}
+	
 	if ($parallel) {
 		$cpu ||= 4;
 	}
@@ -376,9 +453,6 @@ sub check_defaults {
 ## Run in parallel
 sub parallel_execution {
 	my $pm = Parallel::ForkManager->new($cpu);
-	$pm->run_on_start( sub { sleep 1; }); 
-		# give a chance for child to start up and open databases, files, etc 
-		# without creating race conditions
 	
 	# generate base name for child processes
 	my $child_base_name = $outfile . ".$$"; 
@@ -398,28 +472,34 @@ sub parallel_execution {
 		if ($data_database) {
 			$ddb = open_db_connection($data_database, 1);
 		}
+	
+		# work through each dataset
+		foreach my $dataset (@datasets) {
 		
-		# Add the columns for each window 
-		# and calculate the relative starting and ending points
-		my ($starting_point, $ending_point) = prepare_window_datasets();
+			# new start column for this dataset
+			$startcolumn = $Data->number_columns; 
+		
+			# Add the columns for each window 
+			# and calculate the relative starting and ending points
+			prepare_window_datasets($dataset);
 	
-		# determine long data collection for very large regions
-		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-			$long_data = 1;
-		}
+			# determine long data collection for very large regions
+			if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+				$long_data = 1;
+			}
 	
-		# Select the appropriate method for data collection
-		if ($long_data) {
-			map_relative_long_data($starting_point, $ending_point);
-		}
-		else {
-			map_relative_data($starting_point, $ending_point);
-		}
+			# Select the appropriate method for data collection
+			if ($long_data) {
+				map_relative_long_data($dataset);
+			}
+			else {
+				map_relative_data($dataset);
+			}
 
-		# Interpolate values
-		if ($smooth) {
-			print " Interpolating missing values....\n";
-			go_interpolate_values();
+			# Interpolate values
+			if ($smooth) {
+				go_interpolate_values();
+			}
 		}
 		
 		# write out result
@@ -457,45 +537,46 @@ sub parallel_execution {
 ## Run in single thread
 sub single_execution {
 	
-	# Add the columns for each window 
-	# and calculate the relative starting and ending points
-	my ($starting_point, $ending_point) = prepare_window_datasets();
+	# work through each dataset
+	foreach my $dataset (@datasets) {
+	
+		# new start column for this dataset
+		$startcolumn = $Data->number_columns; 
+	
+		# Add the columns for each window 
+		# and calculate the relative starting and ending points
+		prepare_window_datasets($dataset);
 
-	# determine long data collection for very large regions
-	if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
-		$long_data = 1;
-	}
+		# determine long data collection for very large regions
+		if ($ending_point - $starting_point > DATASET_HASH_LIMIT) {
+			$long_data = 1;
+		}
 
-	# Select the appropriate method for data collection
-	if ($long_data) {
-		map_relative_long_data($starting_point, $ending_point);
-	}
-	else {
-		map_relative_data($starting_point, $ending_point);
-	}
+		# Select the appropriate method for data collection
+		if ($long_data) {
+			map_relative_long_data($dataset);
+		}
+		else {
+			map_relative_data($dataset);
+		}
 
-	# Interpolate values
-	if ($smooth) {
-		print " Interpolating missing values....\n";
-		go_interpolate_values();
+		# Interpolate values
+		if ($smooth) {
+			print " Interpolating missing values....\n";
+			go_interpolate_values();
+		}
 	}
 }
 
 
 ## Prepare columns for each window
 sub prepare_window_datasets {
+	my $dataset = shift;
 	
-	# Determine starting and ending points
-	my $starting_point = 0 - ($win * $number); 
-		# default values will give startingpoint of -1000
-	my $ending_point = $win * $number; 
-		# likewise default values will give endingpoint of 1000
 	
-	# Print collection statement
-	print " ";
-	printf " Collecting data from %d to %d at the %s in %d bp windows...\n", 
-		$starting_point, $ending_point, $position == 3 ? "3' end" : 
-		$position == 4 ? "midpoint" : "5' end", $win;
+	# generate a simplified new name
+	my $new_name = simplify_dataset_name($dataset);
+	
 	
 	# Prepare and annotate the header names and metadata
 	for (my $start = $starting_point; $start < $ending_point; $start += $win) {
@@ -527,11 +608,8 @@ sub prepare_window_datasets {
 			}
 		}
 		
-		# the new name
-		my $new_name = $start . '..' . $stop;
-		
 		# add new column
-		my $new_index = $Data->add_column($new_name);
+		my $new_index = $Data->add_column(sprintf("%s:%d", $new_name, $start));
 		
 		# set the metadata
 		$Data->metadata($new_index, 'start' , $start);
@@ -539,6 +617,7 @@ sub prepare_window_datasets {
 		$Data->metadata($new_index, 'window' , $win);
 		$Data->metadata($new_index, 'dataset' , $dataset);
 		$Data->metadata($new_index, 'method' , $method);
+		$Data->metadata($new_index, 'decimal_format', $format) if defined $format;
 		if ($position == 5) {
 			$Data->metadata($new_index, 'relative_position', '5prime_end');
 		}
@@ -563,14 +642,12 @@ sub prepare_window_datasets {
 			);
 		}
 	}
-	
-	return ($starting_point, $ending_point);
 }
 
 
 ## Collect relative scores using single database call
 sub map_relative_data {
-	my ($starting_point, $ending_point) = @_;
+	my $dataset = shift;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
@@ -611,7 +688,9 @@ sub map_relative_data {
 							keys %$regionscores;
 			
 			# put the value into the data table
-			$row->value($column, calculate_score($method, \@scores) );
+			my $score = calculate_score($method, \@scores);
+			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
+			$row->value($column, $score);
 		}
 	}
 }
@@ -619,7 +698,7 @@ sub map_relative_data {
 
 ## Collect relative data using individual window database calls
 sub map_relative_long_data {
-	my ($starting_point, $ending_point) = @_;
+	my $dataset = shift;
 	
 	# Collect the data
 	my $stream = $Data->row_stream;
@@ -678,6 +757,7 @@ sub map_relative_long_data {
 				'method'      => $method,
 				'stranded'    => $strand_sense,
 			);
+			$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
 			$row->value($column, $score);
 		}
 	}
@@ -724,7 +804,9 @@ sub go_interpolate_values {
 				
 				# apply fractional values
 				for (my $n = $col; $n < $next_i; $n++) {
-					$row->value($n, $initial + ($fraction * ($n - $col + 1)) );
+					my $score = $initial + ($fraction * ($n - $col + 1));
+					$score = sprintf($formatter, $score) if ($formatter and $score ne '.');
+					$row->value($n, $score);
 				}
 				
 				# jump ahead
@@ -747,7 +829,9 @@ A program to collect data in bins around a relative position.
 
 =head1 SYNOPSIS
  
-get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
+get_relative_data.pl [--options] --in <filename> --out <filename>
+  
+get_relative_data.pl [--options] -i <filename> <data1> <data2...>
   
   Options for data files:
   -i --in <filename>                  input file: txt bed gff gtf refFlat ucsc
@@ -767,11 +851,14 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --force_strand                      use the specified strand in input file
   --avoid                             avoid neighboring features
   --avtype [type,type,...]            alternative types of feature to avoid
-  --long                              assume long features to collect
+  --long                              collect each window independently
+  -r --format <integer>               number of decimal places for numbers
   
   Bin specification:
   -w --win <integer>                  size of windows, default 50 bp
   -n --num <integer>                  number of windows flanking reference, 20
+  --up <integer>                        or number of windows upstream
+  --down <integer>                      and number of windows downstream
   -p --pos [5|m|3|p]                  reference position, default 5'
   
   Post-processing:
@@ -779,6 +866,7 @@ get_relative_data.pl --in <in_filename> --out <out_filename> [--options]
   --smooth                            smoothen sparse data
   
   General Options:
+  -g --groups                         write columns group index file for plotting
   -z --gz                             compress output file
   -c --cpu <integer>                  number of threads, default 4
   --noparse                           do not parse input file into SeqFeatures
@@ -845,14 +933,20 @@ is provided here.
 
 =item --data E<lt>dataset_name | filenameE<gt>
 
-Specify the name of the data set from which you wish to 
-collect data. If not specified, the data set may be chosen
-interactively from a presented list. Other
-features may be collected, and should be specified using the type 
-(GFF type:source), especially when collecting alternative data values. 
-Alternatively, the name of a data file may be provided. Supported 
-file types include BigWig (.bw), BigBed (.bb), or single-end Bam 
-(.bam). The file may be local or remote.
+Provide the name of the dataset to collect the values. If no 
+dataset is specified on the command line, then the program will 
+interactively present a list of datasets from the data database to select. 
+
+The dataset may be a database file, including bigWig (.bw), 
+bigBed (.bb), or Bam alignment (.bam) files. The files may be local or 
+remote (specified with a http: or ftp: prefix).
+
+Alternatively, the dataset may be a feature type in a BioPerl 
+L<Bio::DB::SeqFeature::Store> or L<Bio::DB::BigWigSet> database. Provide 
+either the feature type or C<type:source>. 
+
+More than one datasource may be provided; use multiple data options or list 
+the datasets at the end of the command.
 
 =item --method E<lt>textE<gt>
 
@@ -929,16 +1023,19 @@ other features too, such as 'tRNA' or 'repeat'.
 
 =item --long
 
-Indicate that the dataset from which scores are collected are 
-long features (counting genomic annotation for example) and not point 
-data (microarray data or sequence coverage). Normally long features are 
-only recorded at their midpoint, leading to inaccurate representation at 
-some windows. This option forces the program to collect data separately 
-at each window, rather than once for each file feature or region and 
-subsequently assigning scores to windows. This may result in counting 
-features more than once if it overlaps more than one window, a result 
-that may or may not be desired. Execution time will likely increase. 
-Default is false.
+Indicate that data should be collected independently for each long 
+window. This may be enabled automatically if the sum of the entire 
+window length passes a predefined threshold. The default for 'short' 
+windows is to collect all of the point data from the dataset first, and 
+then divide the results into the different windows. Datasets consisting 
+of "long" features, for example long alignments, may be counted more 
+than once in long mode when they span multiple windows.
+
+=item --format E<lt>integerE<gt>
+
+Specify the number of decimal positions to format the collected scores. 
+Default is not to format, often leading to more than the intended 
+significant digits.
 
 =back
 
@@ -955,6 +1052,14 @@ Specify the window size. The default is 50 bp.
 Specify the number of windows on either side of the feature position 
 (total number will be 2 x [num]). The default is 20, or 1 kb on either 
 side of the reference position if the default window size is used.
+
+=item --up E<lt>integerE<gt>
+
+=item --down E<lt>integerE<gt>
+
+Alternatively specify the exact number of windows upstream and 
+downstream of the reference position. If only one option is set, 
+then the other option is assumed to be zero. 
 
 =item --pos [5|m|3]
 
@@ -987,6 +1092,13 @@ from neighboring values. The default is false (nosmooth).
 =head2 General options
 
 =over 4
+
+=item --groups
+
+Optionally write a secondary file with the list of column group names and 
+their corresponding dataset group. This can be used to assist in designating 
+the metadata when plotting files, for example in R with pheatmap. The 
+file is named the output basename appended with F<.groups.txt>.
 
 =item --gz
 
