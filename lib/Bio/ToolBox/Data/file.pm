@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::file;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -945,7 +945,7 @@ sub open_to_write_fh {
 		if ($filename =~ m/\.vcf(\.gz)?$/i) {
 			$gz = 2; # bgzip
 		}
-		if ($filename =~ m/\.gz$/i) {
+		elsif ($filename =~ m/\.gz$/i) {
 			$gz = 1; # regular gzip
 		}
 		else {
