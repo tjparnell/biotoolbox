@@ -1151,7 +1151,7 @@ sub open_db_connection {
 			}
 			
 			# a cram database
-			if ($database =~ /\.cram$/i) {
+			elsif ($database =~ /\.cram$/i) {
 				# open using HTS bam adaptor only
 				$BAM_ADAPTER ||= 'hts';
 				if ($BAM_ADAPTER eq 'sam') {
@@ -1171,8 +1171,10 @@ sub open_db_connection {
 						" Bio::DB::HTS is not installed\n";
 				}
 			}
+			
+			# something unrecognized?
 			else {
-				$error .= " Programmer error! Cannot interpret database type for $database!\n";
+				$error .= " ERROR! Cannot identify database type for $database!\n";
 			}
 		}
 		
