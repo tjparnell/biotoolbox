@@ -2402,11 +2402,11 @@ sub fast_pe_callback {
 	&$callback($a, $data, $score);
 	
 	# check data size
-	if (scalar(@{$data->{f}}) > 600_000) {
+	if (scalar(@{$data->{f}}) > 1_000_000) {
 		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
 		$data->{f_offset} += 500_000;
 	}
-	if (scalar(@{$data->{r}}) > 600_000) {
+	if (scalar(@{$data->{r}}) > 1_000_000) {
 		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
 		$data->{r_offset} += 500_000;
 	}
@@ -2506,11 +2506,11 @@ sub pe_callback {
 	}
 	
 	# check data size
-	if (scalar(@{$data->{f}}) > 600_000) {
+	if (scalar(@{$data->{f}}) > 1_000_000) {
 		$data->{fpack} .= pack("$binpack*", splice(@{$data->{f}}, 0, 500_000));
 		$data->{f_offset} += 500_000;
 	}
-	if (scalar(@{$data->{r}}) > 600_000) {
+	if (scalar(@{$data->{r}}) > 1_000_000) {
 		$data->{rpack} .= pack("$binpack*", splice(@{$data->{r}}, 0, 500_000));
 		$data->{r_offset} += 500_000;
 	}
