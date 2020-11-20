@@ -80,6 +80,8 @@ my (
 	$nosupplementary,
 	$max_isize,
 	$min_isize,
+	$first,
+	$second,
 	$multi_hit_scale,
 	$splice_scale,
 	$rpm,
@@ -139,6 +141,8 @@ GetOptions(
 	'U|nosupplementary' => \$nosupplementary, # skip supplementary alignments
 	'maxsize=i'    => \$max_isize, # maximum paired insert size to accept
 	'minsize=i'    => \$min_isize, # minimum paired insert size to accept
+	'first!'       => \$first, # only take first read
+	'second!'      => \$second, # only take second read
 	'fraction!'    => \$multi_hit_scale, # scale by number of hits
 	'splfrac!'     => \$splice_scale, # divide counts by number of spliced segments
 	'r|rpm!'       => \$rpm, # calculate reads per million
@@ -432,6 +436,10 @@ sub check_defaults {
 	
 	# check paired-end requirements
 	$paired = 1 if $fastpaired; # for purposes here, fastpair is paired
+	if (($paired or $use_smartpe) and ($first or $second)) {
+		$paired = 0; # not necessary
+		$use_smartpe = 0;
+	}
 	if ($use_smartpe) {
 		$paired = 1;
 		$splice = 1;
@@ -2265,10 +2273,12 @@ sub se_callback {
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	return if ($first and not $flag & 0x40); # first read in pair
+	return if ($second and not $flag & 0x80); # second read in pair
 	
 	# filter black listed regions
 	if (defined $data->{black_list}) {
@@ -3165,6 +3175,8 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -P --fastpe                   process paired-end alignments, only F are checked
   --minsize <integer>           minimum allowed insertion size (30)
   --maxsize <integer>           maximum allowed insertion size (600)
+  --first                       only process paired first read (0x40) as single-end
+  --second                      only process paired second read (0x80) as single-end
   
  Alignment filtering options:
   -K --chrskip <regex>          regular expression to skip chromosomes
@@ -3345,6 +3357,18 @@ Default is 30 bp.
 
 Specify the maximum paired-end fragment size in bp to accept for recording. 
 Default is 600 bp.
+
+=item --first
+
+Take only the first read of a pair, indicated by flag 0x40, and record as 
+a single-end alignment. No test of insert size or proper pair status is 
+made.
+
+=item --second
+
+Take only the second read of a pair, indicated by flag 0x80, and record as 
+a single-end alignment. No test of insert size or proper pair status is 
+made.
 
 =back
 
