@@ -31,7 +31,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 	
 	
 
@@ -58,6 +58,7 @@ my (
 	$use_cspan,
 	$use_extend,
 	$use_smartpe,
+	$use_ends,
 	$position,
 	$use_coverage,
 	$splice,
@@ -116,6 +117,7 @@ GetOptions(
 	'cspan!'       => \$use_cspan, # record center span
 	'e|extend!'    => \$use_extend, # extend read
 	'smartcov!'    => \$use_smartpe, # smart paired coverage
+	'ends!'        => \$use_ends, # record paired-end endpoints 
 	'coverage!'    => \$use_coverage, # calculate coverage
 	'position=s'   => \$position, # legacy option
 	'l|splice|split!'   => \$splice, # split splices
@@ -386,22 +388,26 @@ sub check_defaults {
 			$paired = 1;
 			$splice = 1;
 		}
+		elsif ($position eq 'ends') {
+			$use_ends = 1;
+			$paired = 1;
+		}
 		else {
 			die " unrecognized position value '$position'! see help\n";
 		}
 	}
 	my $position_check = $use_start + $use_mid + $use_span + $use_cspan + $use_extend + 
-		$use_coverage + $use_smartpe;
+		$use_coverage + $use_smartpe + $use_ends;
 	if ( $position_check > 1) {
 		die " Modes are mutually exclusive! Please select only one of\n" . 
-			" --start, --mid, --span, --cpsan, --extend, --smartcov, or --coverage\n";
+			" --start, --mid, --span, --cpsan, --extend, --smartcov, --ends, or --coverage\n";
 	}
 	elsif (not $position_check) {
 		# we allow no position if user has selected shift so that we can calculate
 		# the shift value without running through entire wig conversion
 		unless ($shift) {
 			die " Please select one of the following modes:\n" . 
-				" --start, --mid, --span, --cspan, --extend, --smartcov, or --coverage\n";
+				" --start, --mid, --span, --cspan, --extend, --smartcov, --ends, or --coverage\n";
 		}
 	}
 	
@@ -447,6 +453,9 @@ sub check_defaults {
 		};
 		die " Module Set::IntSpan::Fast is required for smart-paired coverage\n" if $@;
 	}
+	if ($use_ends) {
+		$paired = 1;
+	}
 	
 	# incompatible options
 	if ($splice and ($use_extend or $extend_value)) {
@@ -459,6 +468,14 @@ sub check_defaults {
 	if ($shift and $paired) {
 		warn " disabling shift with paired reads\n";
 		undef $shift;
+	}
+	if ($use_ends and $shift) {
+		warn " disabling shift when recording paired endpoints\n";
+		undef $shift;
+	}
+	if ($use_ends and $splice) {
+		warn " disabling splices when recording paired endpoints\n";
+		undef $splice;
 	}
 	
 	# check to shift position or not
@@ -540,7 +557,7 @@ sub check_defaults {
 	}
 	else {
 		# set default to 10 bp for any span or coverage, or 1 bp for point data
-		$bin_size = ($use_start or $use_mid) ? 1 : 10;
+		$bin_size = ($use_start or $use_mid or $use_ends) ? 1 : 10;
 	}
 	
 	# determine binary file packing and length
@@ -651,7 +668,7 @@ sub check_defaults {
 				$do_bedgraph = 1;
 			}
 		}
-		elsif ($use_start or $use_mid) {
+		elsif ($use_start or $use_mid or $use_ends) {
 			if ($bin_size > 1) {
 				$do_fixstep = 1;
 			}
@@ -821,6 +838,14 @@ sub check_defaults {
 	elsif ($paired and $do_strand and $use_smartpe) {
 		$callback = \&smart_stranded_pe;
 		print " Recording stranded, smart paired-end coverage\n";
+	}
+	elsif ($paired and not $do_strand and $use_ends) {
+		$callback = \&pe_ends;
+		print " Recording paired-end fragment endpoints\n";
+	}
+	elsif ($paired and $do_strand and $use_ends) {
+		$callback = \&pe_strand_ends;
+		print " Recording stranded, paired-end fragment endpoints\n";
 	}
 	else {
 		die "programmer error!\n" unless $shift; # special exception
@@ -3051,6 +3076,45 @@ sub smart_stranded_pe {
 	}
 }
 
+sub pe_ends {
+	my ($a, $data, $score) = @_;
+	# we always receive the forward read, never reverse, from pe_callback
+	
+	# first position
+	$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	
+	# second position
+	my $pos = int(($a->pos + $a->isize) / $bin_size);
+	$data->{f}->[$pos - $data->{f_offset}] += $score;
+}
+
+sub pe_strand_ends {
+	my ($a, $data, $score) = @_;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
+	
+	# calculate both positions
+	my $flag = $a->flag;
+	if ($flag & 0x0040) {
+		# first read implies forward orientation
+		# first position is forward
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+		# second position is reverse
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{r}->[$pos - $data->{r_offset}] += $score;
+	}
+	elsif ($flag & 0x0080) {
+		# second read implies reverse orientation
+		# first position is reverse
+		$data->{r}->[int($a->pos / $bin_size) - $data->{r_offset}] += $score;
+		# second position is forward
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
+}
 
 __END__
 
@@ -3076,6 +3140,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -e --extend                   extend alignment (record predicted fragment)
   --cspan                       record a span centered on midpoint
   --smartcov                    record paired coverage without overlaps, splices
+  --ends                        record paired endpoints
   --coverage                    raw alignment coverage
  
  Alignment reporting options:
@@ -3189,6 +3254,14 @@ The span is defined by the extension value.
 
 Smart alignment coverage of paired-end alignments without 
 double-counting overlaps or recording gaps (intron splices). 
+
+=item --ends
+
+Record both endpoints of paired-end fragments, i.e. the outermost 
+or 5' ends of properly paired fragments. This may be useful with 
+ATAC-Seq, Cut&Run-Seq, or other cleavage experiments where you want 
+to record the locations of cutting yet retain the ability to filter 
+paired-end fragment sizes.
 
 =item --coverage
 
