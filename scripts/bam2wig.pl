@@ -96,6 +96,7 @@ my (
 	$do_fixstep,
 	$do_varstep,
 	$do_bedgraph,
+	$no_zero,
 	$bwapp,
 	$gz,
 	$cpu,
@@ -159,6 +160,7 @@ GetOptions(
 	'bdg!'         => \$do_bedgraph, # write a bedgraph output
 	'fix!'         => \$do_fixstep, # write a fixedStep output
 	'var!'         => \$do_varstep, # write a varStep output
+	'nozero!'       => \$no_zero, # do not write zero coverage
 	'z|gz!'        => \$gz, # compress text output
 	'c|cpu=i'      => \$cpu, # number of cpu cores to use
 	'intron=i'     => \$max_intron, # maximum intron size to allow
@@ -2156,8 +2158,14 @@ sub write_bedgraph {
 			else {
 				my $end = $cpos * $bin_size;
 				$end = $seq_length if $end > $seq_length;
-				$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
-					if $end; # this avoids writing nonexistent start 0 end 0 lines
+				if ($no_zero and $cval == 0) {
+					# we will skip the nonzero intervals 
+					# do nothing here
+				}
+				else {
+					$out_string .= sprintf($formatter, $lpos * $bin_size, $end, $cval) 
+						if $end; # this avoids writing nonexistent start 0 end 0 lines
+				}
 				$lpos = $cpos;
 				$cval = $value;
 				$cpos++;
@@ -3218,6 +3226,7 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --bdg                         bedGraph, default for span and extend at bin 1
   --fix                         fixedStep, default for bin > 1
   --var                         varStep, default for start, mid
+  --nozero                      do not write zero score intervals in bedGraph
   
  General options:
   -c --cpu <integer>            number of parallel processes (4)
@@ -3592,6 +3601,10 @@ unnecessary.
 
 Specify whether (or not) the output file should be compressed with 
 gzip. Disable with --nogz.
+=item --nozero
+
+When writing bedGraph format, skip (do not write) intervals with a value of 
+zero. Does not apply to fixedStep or variableStep formats.
 
 =back
 
