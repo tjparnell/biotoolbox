@@ -2347,17 +2347,19 @@ sub fast_pe_callback {
 	return unless $a->proper_pair; # both alignments are mapped
 	return if $a->reversed; # only look at forward alignments, that's why it's fast
 	return unless $a->tid == $a->mtid; # same chromosome?
-	my $isize = abs($a->isize); 
-	return if $isize > $max_isize;
-	return if $isize < $min_isize; 
 	
 	# check alignment quality and flags
 	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
 	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	
+	# check insertion size
+	my $isize = abs($a->isize); 
+	return if $isize > $max_isize;
+	return if $isize < $min_isize; 
 	
 	# filter black listed regions
 	if ($data->{black_list}) {
@@ -2416,6 +2418,16 @@ sub pe_callback {
 	# check paired status
 	return unless $a->proper_pair; # both alignments are mapped
 	return unless $a->tid == $a->mtid; # same chromosome?
+	
+	# check alignment quality and flags
+	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
+	my $flag = $a->flag;
+	return if ($nosecondary and $flag & 0x100); # secondary alignment
+	return if ($noduplicate and $flag & 0x400); # marked duplicate
+	return if ($flag & 0x200); # QC failed but still aligned? is this necessary?
+	return if ($nosupplementary and $flag & 0x800); # supplementary hit
+	
+	# check insertion size
 	my $isize = $a->isize; 
 	if ($a->reversed) {
 		# in proper FR pairs reverse alignments are negative
@@ -2424,14 +2436,6 @@ sub pe_callback {
 	}
 	return if $isize > $max_isize;
 	return if $isize < $min_isize; 
-	
-	# check alignment quality and flags
-	return if ($min_mapq and $a->qual < $min_mapq); # mapping quality
-	my $flag = $a->flag;
-	return if ($nosecondary and $flag & 0x0100); # secondary alignment
-	return if ($noduplicate and $flag & 0x0400); # marked duplicate
-	return if ($flag & 0x0200); # QC failed but still aligned? is this necessary?
-	return if ($nosupplementary and $flag & 0x0800); # supplementary hit
 	
 	# filter black listed regions
 	if ($data->{black_list}) {
