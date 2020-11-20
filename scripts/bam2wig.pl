@@ -2864,10 +2864,22 @@ sub se_shift_strand_extend {
 }
 
 sub pe_start {
-	# this essentially just records the forward start position
-	# it ignores sequencing orientation
 	my ($a, $data, $score) = @_;
-	$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	my $flag = $a->flag;
+	# we always receive the forward read, never reverse, from pe_callback
+	# therefore the first and second read flag indicates orientation
+	if ($flag & 0x0040) {
+		# first read implies forward orientation
+		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
+	}
+	elsif ($flag & 0x0080) {
+		# second read implies reverse orientation
+		my $pos = int(($a->pos + $a->isize) / $bin_size);
+		$data->{f}->[$pos - $data->{f_offset}] += $score;
+	}
+	else {
+		die " Paired-end flags are set incorrectly; neither 0x040 or 0x080 are set for paired-end.";
+	}
 }
 
 sub pe_strand_start {
@@ -2876,11 +2888,11 @@ sub pe_strand_start {
 	# we always receive the forward read, never reverse, from pe_callback
 	# therefore the first and second read flag indicates orientation
 	if ($flag & 0x0040) {
-		# first read, forward
+		# first read implies forward orientation
 		$data->{f}->[int($a->pos / $bin_size) - $data->{f_offset}] += $score;
 	}
 	elsif ($flag & 0x0080) {
-		# second read, reverse
+		# second read implies reverse orientation
 		my $pos = int(($a->pos + $a->isize) / $bin_size);
 		$data->{r}->[$pos - $data->{r_offset}] += $score;
 	}
