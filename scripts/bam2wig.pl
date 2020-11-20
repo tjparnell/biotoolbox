@@ -2295,32 +2295,23 @@ sub se_callback {
 	}
 	
 	# scale by number of hits
-	my $score; 
+	my $score = $data->{score}; # probably 1, but may be chromosome scaled
 	if ($multi_hit_scale) {
-		# preferentially use the number of included hits, then number of hits
-		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-		$score = $nh > 1 ? 1/$nh : 1;
-		# record fractional alignment counts
-		if ($do_strand and $a->reversed) {
-			$data->{r_count} += $score; 
+		my $nh = $a->aux_get('NH') || 1;
+		if ($nh > 1) {
+			$score /= $nh;
 		}
-		else {
-			$data->{f_count} += $score;
-		}
-		$score *= $data->{score}; # multiply by chromosome scaling factor
-	}
-	else {
-		 # always record one alignment
-		if ($do_strand and $a->reversed) {
-			$data->{r_count} += 1; 
-		}
-		else {
-			$data->{f_count} += 1;
-		}
-		$score = $data->{score}; # probably 1, but may be chromosome scaled
 	}
 	
-	# pass checks
+	# always record one alignment regardless of multiple hit status
+	if ($do_strand and $a->reversed) {
+		$data->{r_count} += 1; 
+	}
+	else {
+		$data->{f_count} += 1;
+	}
+	
+	# pass on to appropriate callback
 	if ($splice and $a->cigar_str =~ /N/) {
 		# check for splices
 		se_spliced_callback($a, $data, $score);
@@ -2368,34 +2359,23 @@ sub fast_pe_callback {
 	}
 	
 	# scale by number of hits
-	my $score;
+	my $score = $data->{score}; # probably 1, but may be chromosome scaled
 	if ($multi_hit_scale) {
-		my $nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-		$score = $nh > 1 ? 1/$nh : 1;
-		# record fractional alignment counts
-		if ($do_strand and $flag & 0x80) {
-			# this alignment is forward and second mate, so must be reverse strand
-			$data->{r_count} += $score; 
+		my $nh = $a->aux_get('NH') || 1;
+		if ($nh > 1) {
+			$score /= $nh;
 		}
-		else {
-			# otherwise this forward alignment must be first mate
-			# or unstranded analysis defaults to forward strand
-			$data->{f_count} += $score;
-		}
-		$score *= $data->{score}; # multiply by chromosome scaling factor
+	}
+	
+	# always record one alignment regardless of multiple hit status
+	if ($do_strand and $flag & 0x80) {
+		# this alignment is forward and second mate, so must be reverse strand
+		$data->{r_count} += 1; 
 	}
 	else {
-		 # always record one alignment
-		if ($do_strand and $flag & 0x80) {
-			# this alignment is forward and second mate, so must be reverse strand
-			$data->{r_count} += 1; 
-		}
-		else {
-			# otherwise this forward alignment is second mate
-			# or unstranded analysis defaults to forward strand
-			$data->{f_count} += 1;
-		}
-		$score = $data->{score}; # probably 1, but may be chromosome scaled
+		# otherwise this forward alignment must be first mate
+		# or unstranded analysis defaults to forward strand
+		$data->{f_count} += 1;
 	}
 	
 	# record based on the forward read
@@ -2456,46 +2436,30 @@ sub pe_callback {
 		delete $data->{pair}->{$a->qname};
 		
 		# scale by number of hits
-		my $score;
+		my $score = $data->{score}; # probably 1, but may be chromosome scaled
 		if ($multi_hit_scale) {
-			my $r_nh = $a->aux_get('IH') || $a->aux_get('NH') || 1;
-			my $f_nh = $f->aux_get('IH') || $f->aux_get('NH') || 1;
-			if ($f_nh == $r_nh) {
-				$score = 1/$f_nh;
-			}
-			elsif ($f_nh < $r_nh) {
-				# take the lowest number of hits recorded
-				$score = $f_nh > 1 ? 1/$f_nh : 1;
+			my $r_nh = $a->aux_get('NH') || 1;
+			my $f_nh = $f->aux_get('NH') || 1;
+			# use the lowest number of hits reported for either alignment
+			if ($f_nh <= $r_nh) {
+				$score /= $f_nh if $f_nh > 1; 
 			}
 			else {
-				$score = $r_nh > 1 ? 1/$r_nh : 1;
+				$score /= $r_nh if $r_nh > 1;
 			}
-			# record fractional alignment counts
-			if ($do_strand and $flag & 0x40) {
-				# this alignment is reverse and first mate, so must be reverse strand
-				$data->{r_count} += $score; 
-			}
-			else {
-				# otherwise this reverse alignment is second mate
-				# or unstranded analysis defaults to forward strand
-				$data->{f_count} += $score;
-			}
-			$score *= $data->{score}; # multiply by chromosome scaling factor
-		}
-		else {
-			# always record one alignment
-			if ($do_strand and $flag & 0x40) {
-				# this alignment is reverse and first mate, so must be reverse strand
-				$data->{r_count} += 1; 
-			}
-			else {
-				# otherwise this reverse alignment is second mate
-				# or unstranded analysis defaults to forward strand
-				$data->{f_count} += 1;
-			}
-			$score = $data->{score}; # probably 1, but may be chromosome scaled
 		}
 		
+		# always record one alignment regardless of multiple hit status
+		if ($do_strand and $flag & 0x40) {
+			# this alignment is reverse and first mate, so must be reverse strand
+			$data->{r_count} += 1; 
+		}
+		else {
+			# otherwise this reverse alignment is second mate
+			# or unstranded analysis defaults to forward strand
+			$data->{f_count} += 1;
+		}
+
 		# record based primarily on the forward read, but pass reverse read at end
 		# for use in smart pairing
 		&$callback($f, $data, $score, $a);
