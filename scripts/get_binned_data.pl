@@ -85,7 +85,7 @@ GetOptions(
 	'min=i'          => \$min_length, # minimum feature size
 	'long!'          => \$long_data, # collecting long data features
 	'smooth!'        => \$smooth, # do not interpolate over missing values
-	'U|sum'          => \$sum, # determine a final average for all the features
+	'U|sum!'         => \$sum, # determine a final average for all the features
 	'r|format=i'     => \$format, # decimal formatting
 	'force_strand|set_strand'  => \$set_strand, # enforce an artificial strand
 				# force_strand is preferred option, but respect the old option
