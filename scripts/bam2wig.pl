@@ -3165,7 +3165,7 @@ bam2wig.pl [--options...] E<lt>file.bamE<gt>
 bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   
  Required options:
-  -i --in <filename.bam>           repeat if multiple bams, or comma-delimited list
+  -i --in <filename.bam>        repeat if multiple bams, or comma-delimited list
  
  Reporting options (pick one):
   -s --start                    record at 5' position
@@ -3194,10 +3194,10 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   -K --chrskip <regex>          regular expression to skip chromosomes
   -B --blacklist <file>         interval file of regions to skip (bed, gff, txt)
   -q --qual <integer>           minimum mapping quality (0)          
-  -S --nosecondary              ignore secondary alignments (false)
-  -D --noduplicate              ignore marked duplicate alignments (false)
-  -U --nosupplementary          ignore supplementary alignments (false)
-  --intron <integer>            maximum allowed intron size in bp (none)
+  -S --nosecondary              ignore secondary (0x100) alignments (false)
+  -D --noduplicate              ignore duplicate (0x400) alignments (false)
+  -U --nosupplementary          ignore supplementary (0x800) alignments (false)
+  --intron <integer>            maximum allowed gap (intron) size in bp (none)
   
   Shift options:
   -I --shift                    shift reads in the 3' direction
@@ -3219,18 +3219,18 @@ bam2wig.pl --extend --rpm --mean --out file --bw file1.bam file2.bam
   --chrnorm <float>             use chromosome-specific normalization factor
   --chrapply <regex>            regular expression to apply chromosome-specific factor
  
- Output options:
-  -o --out <filename>           output file name, default is bam file basename
-  -b --bw                       convert to bigWig format
-  --bin <integer>               bin size for span or extend mode (10)
-  --bwapp /path/to/wigToBigWig  path to external converter
-  -z --gz                       gzip compress output
-  
  Wig format:
+  --bin <integer>               bin size for span or extend mode (10)
   --bdg                         bedGraph, default for span and extend at bin 1
   --fix                         fixedStep, default for bin > 1
   --var                         varStep, default for start, mid
   --nozero                      do not write zero score intervals in bedGraph
+  
+ Output options:
+  -o --out <filename>           output file name, default is bam file basename
+  -b --bw                       convert to bigWig format (supports bdg, fix, var)
+  --bwapp /path/to/wigToBigWig  path to external converter (default searches \$PATH)
+  -z --gz                       gzip compress text output 
   
  General options:
   -c --cpu <integer>            number of parallel processes (4)
@@ -3572,15 +3572,9 @@ the X chromosome only.
 
 =back
 
-=head2 Output Options
+=head2 Wig format
 
 =over 4
-
-=item --out E<lt>filenameE<gt>
-
-Specify the output base filename. An appropriate extension will be 
-added automatically. By default it uses the base name of the 
-input file.
 
 =item --bin E<lt>integerE<gt>
 
@@ -3588,33 +3582,6 @@ Specify the bin size in bp for the output wig file. In general, specifying
 a larger bin size will decrease the run time and memory requirements in 
 exchange for loss of resolution. The default for span, center span, or 
 extend mode is 10 bp; all other modes is 1 bp. 
-
-=item --bw
-
-Specify whether or not the wig file should be further converted into 
-an indexed, compressed, binary BigWig file. The default is false.
-
-=item --bwapp /path/to/wigToBigWig
-
-Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
-utility. The application path may be set in the F<.biotoolbox.cfg> file 
-or found in the default executable path, which makes this option 
-unnecessary. 
-
-=item --gz
-
-Specify whether (or not) the output file should be compressed with 
-gzip. Disable with --nogz.
-=item --nozero
-
-When writing bedGraph format, skip (do not write) intervals with a value of 
-zero. Does not apply to fixedStep or variableStep formats.
-
-=back
-
-=head2 Wig format
-
-=over 4
 
 =item --bdg
 
@@ -3630,6 +3597,40 @@ default format for coverage mode of operation.
 
 Specify that the output wig format is in variableStep wig format. This is 
 the default format for start and midpoint modes of operation.
+
+=item --nozero
+
+When writing bedGraph format, skip (do not write) intervals with a value of 
+zero. Does not apply to fixedStep or variableStep formats.
+
+=back
+
+=head2 Output Options
+
+=over 4
+
+=item --out E<lt>filenameE<gt>
+
+Specify the output base filename. An appropriate extension will be 
+added automatically. By default it uses the base name of the 
+input file.
+
+=item --bw
+
+Specify whether or not the wig file should be further converted into 
+an indexed, compressed, binary BigWig file. The default is false.
+
+=item --bwapp /path/to/wigToBigWig
+
+Optionally specify the full path to the UCSC I<wigToBigWig> conversion 
+utility. The application path may be set in the F<.biotoolbox.cfg> file 
+or found in the default environment C<$PATH>, which makes this option 
+mostly unnecessary. 
+
+=item --gz
+
+Specify whether (or not) the output text file should be compressed with 
+gzip. Disable with C<--nogz>. Does not apply to bigWig format.
 
 =back
 
