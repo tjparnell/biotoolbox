@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data::Feature;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -926,6 +926,7 @@ use Bio::ToolBox::db_helper qw(
 	get_segment_score
 	calculate_score
 	get_genomic_sequence
+	low_level_bam_fetch
 );
 use Bio::ToolBox::db_helper::constants;
 
@@ -1006,60 +1007,133 @@ sub value {
 
 sub seq_id {
 	my $self = shift;
-	carp "seq_id is a read only method" if @_;
-	my $i = $self->{data}->chromo_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->chromo_column;
+		if (defined $i) {
+			my $c = $self->value($i, $_[0]);
+			return $c;
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update seq_id for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Chromosome column to update!";
+		}
 	}
-	return $self->{feature}->seq_id if exists $self->{feature};
-	return undef;
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $c = $self->{feature}->seq_id;
+		return $c;
+	}
+	# collect from table
+	my $i = $self->{data}->chromo_column;
+	my $c = defined $i ? $self->value($i) : undef;
+	return $c;
 }
 
 sub start {
 	my $self = shift;
-	carp "start is a read only method" if @_;
-	my $i = $self->{data}->start_column;
-	if (defined $i) {
-		my $v = $self->value($i);
-		$v++ if (substr($self->{data}->name($i), -1) eq '0'); # compensate for 0-based
-		return $v < 1 ? 1 : $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->start_column;
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		if (defined $i and $d) {
+			if (substr($self->{data}->name($i), -1) eq '0') {
+				# compensate for 0-based, assuming we're always working with 1-based
+				my $n = $_[0] - 1;
+				return $self->value($i, $n);
+			}
+			else {
+				return $self->value($i, $_[0]);
+			}
+		}
+		elsif (not $d) {
+			carp "Start coordinate value is not an integer";
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update Start coordinate for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Start coordinate column to update!";
+		}
 	}
-	elsif (exists $self->{feature}) {
+	# seqfeature
+	if (exists $self->{feature}) {
 		return $self->{feature}->start;
 	}
-	else {
-		return;
+	# collect from table
+	my $i = $self->{data}->start_column;
+	if (defined $i) {
+		my $s = $self->value($i);
+		if (substr($self->{data}->name($i), -1) eq '0') {
+			# compensate for 0-based index
+			return $s + 1;
+		}
+		else {
+			return $s;
+		}
 	}
+	return;
 }
 
 *stop = \&end;
 sub end {
 	my $self = shift;
-	carp "end is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->stop_column;
+		my $d = $_[0] =~ /^\d+$/ ? 1 : 0;
+		if (defined $i and $d) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (not $d) {
+			carp "End coordinate value is not an integer";
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update End coordinate for parsed SeqFeature objects";
+		}
+		else {
+			carp "No End coordinate column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $e = $self->{feature}->end;
+		$self->{end} = $e;
+		return $e;
+	}
+	# collect from table
 	my $i = $self->{data}->stop_column;
-	if (defined $i) {
-		return $self->value($i);
-	}
-	elsif (exists $self->{feature}) {
-		return $self->{feature}->end;
-	}
-	else {
-		return;
-	}
+	my $e = defined $i ? $self->value($i) : undef;
+	$self->{end} = $e;
+	return $e;
 }
 
 sub strand {
 	my $self = shift;
-	carp "strand is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->strand_column;
+		if (defined $i) {
+			$self->value($i, $_[0]);
+			return $self->_strand($_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update Strand for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Strand column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		my $s = $self->{feature}->strand;
+		return $s;
+	}
+	# collect from table
 	my $i = $self->{data}->strand_column;
-	if (defined $i) {
-		return $self->_strand( $self->value($i) );
-	}
-	elsif (exists $self->{feature}) {
-		return $self->{feature}->strand;
-	}
-	return 0;
+	return defined $i ? $self->_strand( $self->value($i) ) : 0;
 }
 
 sub _strand {
@@ -1085,17 +1159,32 @@ sub _strand {
 *name = \&display_name;
 sub display_name {
 	my $self = shift;
-	carp "name is a read only method" if @_;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->name_column;
+		if (defined $i) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update display_name for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Name column to update!";
+		}
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		return $self->{feature}->display_name;
+	}
+	# collect from table
 	my $i = $self->{data}->name_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if (defined $i) {
+		return $self->value($i);
 	}
-	return $self->{feature}->display_name if exists $self->{feature};
-	if (my $att = $self->gff_attributes) {
-		return $att->{Name} || $att->{ID} || $att->{transcript_name};
+	elsif (my $att = $self->gff_attributes) {
+		return $att->{Name} || $att->{ID} || $att->{transcript_name} || 
+			$att->{gene_name} || undef;
 	}
-	return undef;
 }
 
 sub coordinate {
@@ -1114,14 +1203,32 @@ sub coordinate {
 
 sub type {
 	my $self = shift;
-	carp "type is a read only method" if @_;
-	my $i = $self->{data}->type_column;
-	my $v = $self->value($i) if defined $i;
-	if (defined $v and $v ne '.') {
-		return $v;
+	if ($_[0]) {
+		# update only if we have an actual column
+		my $i = $self->{data}->type_column;
+		if (defined $i) {
+			return $self->value($i, $_[0]);
+		}
+		elsif (exists $self->{feature}) {
+			carp "Unable to update primary_tag for parsed SeqFeature objects";
+		}
+		else {
+			carp "No Type column to update!";
+		}
 	}
-	return $self->{feature}->primary_tag if exists $self->{feature};
-	return $self->{data}->feature if $self->{data}->feature; # general metadata feature type
+	# collect from table
+	my $i = $self->{data}->type_column;
+	if (defined $i) {
+		return $self->value($i);
+	}
+	# seqfeature
+	if (exists $self->{feature}) {
+		return $self->{feature}->primary_tag;
+	}
+	# general metadata
+	if ($self->{data}->feature) {
+		return $self->{data}->feature;
+	}
 	return undef;
 }
 
