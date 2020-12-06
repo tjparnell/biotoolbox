@@ -776,6 +776,84 @@ Count overlapping unique names only.
 
 =back
 
+=item fetch_alignments
+
+  my $sam = $Data->open_database('/path/to/file.bam');
+  my $alignment_data = { mapq => [] };
+  my $callback = sub {
+     my ($a, $data) = @_;
+     push @{ $data->{mapq} }, $a->mapq;
+  };
+  while (my $row = $stream->next_row) {
+     $row->fetch_alignments(
+        'db'        => $sam,
+        'data'      => $alignment_data,
+        'callback'  => $callback,
+     );
+  }
+
+This function allows you to iterate over alignments in a Bam file, 
+allowing custom information to be collected based on a callback 
+code reference that is provided. 
+
+Three parameters are required: C<db>, C<data>, and C<callback>. A 
+true value (1) is returned upon success.
+
+=over 4
+
+=item db
+
+Provide an opened, high-level, Bam database object. 
+
+=item callback
+
+Provide a code callback reference to use when iterating over the 
+alignments. Two objects are passed to this code function: the 
+alignment object and the data structure that is provided. See the 
+Bam adapter documentation for details on low-level C<fetch> through 
+the Bam index object for details.
+
+=item data
+
+This is a reference to a C<HASH> data object for storing information. 
+It is passed to the callback function along with the alignment. Three 
+new key =E<gt> value pairs are automatically added: C<start>, C<end>, 
+and C<strand>. These correspond to the values for the current queried 
+interval. Coordinates are automatically transformed to 0-base coordinate 
+system to match low level alignment objects.
+
+=item subfeature
+
+If the feature has subfeatures, such as exons, introns, etc., pass 
+the name of the subfeature to restrict iteration only over the 
+indicated subfeatures. The C<data> object will inherit the coordinates 
+for each subfeatures. Allowed subfeatures include the following:
+
+=over 4 
+
+=item * exon
+
+=item * cds
+
+=item * 5p_utr
+
+=item * 3p_utr
+
+=item * intron
+
+=back
+
+=item start
+
+=item stop
+
+=item end
+
+Provide alternate, custom start and stop coordinates for the row 
+feature. Ignored with subfeatures.
+
+=back
+
 =back
 
 =head2 Feature Export
@@ -2044,6 +2122,82 @@ sub _process_exon_scores {
 		}
 	}
 }
+
+sub fetch_alignments {
+	my $self = shift;
+	my %args = @_;
+	$args{db} ||= $args{dataset} || undef;
+	$args{data} ||= undef;
+	$args{callback} ||= undef;
+	$args{subfeature} ||= q();
+	
+	# verify - trusting that these are valid, else they will fail lower down in the code
+	unless ($args{db}) {
+		croak "must provide a Bam object database to fetch alignments!\n";
+	}
+	unless ($args{data} and ref($args{data}) eq 'HASH') {
+		croak "must provide a data HASH for the fetch callback!\n";
+	}
+	unless ($args{callback}) {
+		croak "must provide a callback code reference!\n";
+	}
+	
+	# array of features to iterate, probably just one or subfeatures
+	my @intervals;
+	if ($self->feature_type eq 'named' and $args{subfeature}) {
+		# we have subfeatures to iterate over
+
+		# get the subfeatures
+		my $subfeatures = $self->_get_subfeatures($args{subfeature});
+		if (@$subfeatures) {
+			foreach my $sf (@$subfeatures) {
+				push @intervals, [
+					$sf->start - 1,
+					$sf->end
+				];
+			}
+		}
+		else {
+			# zere subfeatures? just take the parent then
+			push @intervals, [
+				($args{start} || $self->start) - 1,
+				$args{stop} || $args{end} || $self->end
+			];
+		}
+	}
+	else {
+		# take feature as is
+		push @intervals, [
+			($args{start} || $self->start) - 1,
+			$args{stop} || $args{end} || $self->end
+		];
+	}
+
+	# get the target id for the chromosome
+	# this will fail if the user didn't provide a real bam object!!!
+	my ($tid, undef, undef) = $args{db}->header->parse_region($self->seq_id);
+	return unless defined $tid;
+	
+	# now iterate over the intervals
+	foreach my $i (@intervals) {
+		$args{data}->{start}  = $i->[0];
+		$args{data}->{end}    = $i->[1];
+		$args{data}->{strand} = $self->strand;
+		low_level_bam_fetch(
+			$args{db}, 
+			$tid, 
+			$i->[0],
+			$i->[1], 
+			$args{callback}, 
+			$args{data}
+		);
+	}
+	
+	# nothing to return since we're using a data reference
+	return 1;
+}
+
+
 
 ### String export
 
