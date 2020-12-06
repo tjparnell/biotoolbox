@@ -664,7 +664,7 @@ sub generate_chromosome_file {
 	# write out
 	foreach my $chr (@chromosomes) {
 		# chromosome name and size
-		$chr_fh->print( $chr->[0] . "\t" . $chr->[1] . "\n");
+		$chr_fh->printf("%s\t%d\n", $chr->[0], $chr->[1]);
 	}
 	$chr_fh->close;
 	
