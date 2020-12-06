@@ -1,5 +1,5 @@
 package Bio::ToolBox::Data;
-our $VERSION = '1.67';
+our $VERSION = '1.68';
 
 =head1 NAME
 
@@ -36,7 +36,6 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   ### Get a specific value
   my $value = $Data->value($row, $column);
   
-  
   ### Replace or add a value
   $Data->value($row, $column, $new_value);
   
@@ -46,9 +45,13 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   ### Find a column
   my $old_index = $Data->find_column('Data1');
   
+  ### Return a specific row as an object
+  my $row = $Data->get_row($i); # Bio::ToolBox::Data::Feature
+  
   ### Iterate through a Data structure one row at a time
   my $stream = $Data->row_stream;
   while (my $row = $stream->next_row) {
+  	  # each row is returned as Bio::ToolBox::Data::Feature object
   	  # get the positional information from the file data
   	  # assuming that the input file had these identifiable columns
   	  my $seq_id = $row->seq_id;
@@ -67,6 +70,9 @@ Bio::ToolBox::Data - Reading, writing, and manipulating data structure
   	  my $new_value = $value + 1;
   	  $row->value($new_index, $new_value);
   }
+  
+  ### Iterate through a Data table with a code reference
+  $Data->iterate(\&my_code);
   
   
   ### write the data to file
@@ -558,6 +564,13 @@ Row object, such as one obtained from another Data object.
 If the number of columns do not match, the array is filled 
 up with null values for missing columns, or excess values 
 are dropped.
+
+=item get_row
+
+  $Data->get_row($i); # Bio::ToolBox::Data::Feature object
+
+Returns the specified row as a L<Bio::ToolBox::Data::Feature> 
+object.
 
 =item delete_row
 
@@ -1486,6 +1499,22 @@ sub add_row {
 	return $row_index;
 }
 
+sub get_row {
+	my ($self, $row_number) = @_;
+	return unless defined $self->{data_table}->[$row_number];
+	my @options = (
+		'data'      => $self,
+		'index'     => $row_number,
+	);
+	if (
+		exists $self->{data}->{SeqFeatureObjects} and
+		defined $self->{data}->{SeqFeatureObjects}->[$row_number] 
+	) {
+		push @options, 'feature', $self->{data}->{SeqFeatureObjects}->[$row_number];
+	}
+	return Bio::ToolBox::Data::Feature->new(@options);	
+}
+
 sub delete_row {
 	my $self = shift;
 	my @deleted = sort {$b <=> $a} @_;
@@ -2292,9 +2321,11 @@ sub next_row {
 		'data'      => $self->{data},
 		'index'     => $i,
 	);
-	if (exists $self->{data}->{SeqFeatureObjects}) {
-		push @options, 'feature', $self->{data}->{SeqFeatureObjects}->[$i]
-			if defined $self->{data}->{SeqFeatureObjects}->[$i];
+	if (
+		exists $self->{data}->{SeqFeatureObjects} and
+		defined $self->{data}->{SeqFeatureObjects}->[$i] 
+	) {
+		push @options, 'feature', $self->{data}->{SeqFeatureObjects}->[$i];
 	}
 	return Bio::ToolBox::Data::Feature->new(@options);	
 }
