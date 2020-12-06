@@ -353,19 +353,13 @@ the sequence. Acceptable values include
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -498,19 +492,13 @@ subfeature to use. Accepted values include the following.
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -692,19 +680,13 @@ Pass the name of the subfeature to use. Accepted values include the following.
 
 =item * exon
 
-All exons included
-
 =item * cds
-
-The CDS or coding sequence are extracted from mRNA
 
 =item * 5p_utr
 
-The 5' UTR of mRNA
-
 =item * 3p_utr
 
-The 3' UTR of mRNA
+=item * intron
 
 =back
 
@@ -1518,9 +1500,46 @@ sub get_sequence {
 sub _get_subfeature_sequence {
 	my ($self, $db, $args) = @_;
 	
+	# get the subfeatures
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent sequence!";
+		# just return the parent
+		undef $args->{subfeature};
+		return $self->get_sequence(@$args);
+	}
+	
+	# sort subfeatures
+	# this should be done by GeneTools in most cases but just to be sure
+	# note that this does NOT merge redundant or overlapping exons!!!!
+	my @sorted = 	map { $_->[0] }
+					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
+					map { [$_, $_->start, $_->end] } 
+					@$subfeatures;
+	
+	# collect sequence
+	my $sequence;
+	foreach my $subf (@sorted) {
+		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
+		$sequence .= $seq;
+	}
+	
+	# flip the sequence
+	if ($self->strand == -1) {
+		$sequence =~ tr/gatcGATC/ctagCTAG/;
+		$sequence = reverse $sequence;
+	}
+	return $sequence;
+}
+
+sub _get_subfeatures {
+	my $self = shift;
+	my $subf = lc shift;
+	
 	# load GeneTools
 	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
+		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs 
+			get_introns));
 		if ($@) {
 			croak "missing required modules! $@";
 		}
@@ -1531,51 +1550,30 @@ sub _get_subfeature_sequence {
 	
 	# feature
 	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect subfeature sequence!";
-		return;
-	}
+	return unless ($feature);
 	
 	# get the subfeatures
 	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
+	if ($subf eq 'exon') {
 		@subfeatures = get_exons($feature);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
+	elsif ($subf eq 'cds') {
 		@subfeatures = get_cds($feature);
 	}
-	elsif ($args->{subfeature} eq '5p_utr') {
+	elsif ($subf eq '5p_utr') {
 		@subfeatures = get_5p_utrs($feature);
 	}
-	elsif ($args->{subfeature} eq '3p_utr') {
+	elsif ($subf eq '3p_utr') {
 		@subfeatures = get_3p_utrs($feature);
 	}
+	elsif ($subf eq 'intron') {
+		@subfeatures = get_introns($feature);
+	}
 	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
-	}
-	# it's possible nothing is returned, which means no sequence will be retrieved
-	
-	# sort subfeatures
-	# this should be done by GeneTools in most cases but just to be sure
-	# note that this does NOT merge redundant or overlapping exons!!!!
-	my @sorted = 	map { $_->[0] }
-					sort { $a->[1] <=> $b->[1] or $a->[2] <=> $b->[2] }
-					map { [$_, $_->start, $_->end] } 
-					@subfeatures;
-	
-	# collect sequence
-	my $sequence;
-	foreach my $subf (@sorted) {
-		my $seq = get_genomic_sequence($db, $subf->seq_id, $subf->start, $subf->stop);
-		$sequence .= $seq;
+		croak "unrecognized subfeature parameter '$subf'!";
 	}
 	
-	# flip the sequence
-	if ($feature->strand == -1) {
-		$sequence =~ tr/gatcGATC/ctagCTAG/;
-		$sequence = reverse $sequence;
-	}
-	return $sequence;
+	return \@subfeatures;
 }
 
 sub get_score {
@@ -1590,7 +1588,7 @@ sub get_score {
 	}
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} ||= $args{exon} || q();
+	$args{subfeature} ||= q();
 	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_scores($db, \%args);
@@ -1656,46 +1654,19 @@ sub get_score {
 sub _get_subfeature_scores {
 	my ($self, $db, $args) = @_;
 	
-	# load GeneTools
-	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
-		if ($@) {
-			croak "missing required modules! $@";
-		}
-		else {
-			$GENETOOL_LOADED = 1;
-		}
-	}
-	
-	# feature
-	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect exon data!";
-		return;
-	}
-	
 	# get the subfeatures
-	my @subfeatures;
-	if ($args->{subfeature} eq 'exon') {
-		@subfeatures = get_exons($feature);
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent score data!";
+		# just return the parent
+		undef $args->{subfeature};
+		delete $args->{exon} if exists $args->{exon};
+		return $self->get_score(@$args);
 	}
-	elsif ($args->{subfeature} eq 'cds') {
-		@subfeatures = get_cds($feature);
-	}
-	elsif ($args->{subfeature} eq '5p_utr') {
-		@subfeatures = get_5p_utrs($feature);
-	}
-	elsif ($args->{subfeature} eq '3p_utr') {
-		@subfeatures = get_3p_utrs($feature);
-	}
-	else {
-		croak sprintf "unrecognized subfeature parameter '%s'!", $args->{subfeature};
-	}
-	# it's possible nothing is returned, which means no score will be calculated
-	
+		
 	# collect over each subfeature
 	my @scores;
-	foreach my $exon (@subfeatures) {
+	foreach my $exon (@$subfeatures) {
 		my @params; # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
 		$params[STRT] = $exon->start;
@@ -1787,13 +1758,12 @@ sub get_region_position_scores {
 	# assign some defaults here, in case we get passed on to subfeature method
 	$args{strandedness} ||= $args{stranded} || 'all';
 	$args{extend}       ||= 0;
-	$args{exon}         ||= 0;
 	$args{position}     ||= 5;
 	$args{'method'}     ||= 'mean'; # in most cases this doesn't do anything
 	$args{avoid} = undef unless ($args{db} or $self->{data}->open_meta_database);
 	
 	# get positioned scores over subfeatures only
-	$args{subfeature} ||= $args{exon} || q();
+	$args{subfeature} ||= q();
 	if ($self->feature_type eq 'named' and $args{subfeature}) {
 		# this is more complicated so we have a dedicated method
 		return $self->_get_subfeature_position_scores(\%args, $ddb);
@@ -1842,54 +1812,21 @@ sub get_region_position_scores {
 sub _get_subfeature_position_scores {
 	my ($self, $args, $ddb) = @_;
 	
-	# load GeneTools
-	unless ($GENETOOL_LOADED) {
-		load('Bio::ToolBox::GeneTools', qw(get_exons get_cds get_5p_utrs get_3p_utrs));
-		if ($@) {
-			croak "missing required modules! $@";
-		}
-		else {
-			$GENETOOL_LOADED = 1;
-		}
-	}
-	
-	# feature
-	my $feature = $self->seqfeature;
-	unless ($feature) {
-		carp "no SeqFeature available! Cannot collect exon data!";
-		return;
-	}
-	my $fstrand = defined $args->{strand} ? $args->{strand} : $feature->strand;
-	
 	# get the subfeatures
-	my @subfeatures;
-	my $subf = lc $args->{subfeature};
-	if ($subf eq 'exon') {
-		@subfeatures = get_exons($feature);
-	}
-	elsif ($subf eq 'cds') {
-		@subfeatures = get_cds($feature);
-	}
-	elsif ($subf eq '5p_utr') {
-		@subfeatures = get_5p_utrs($feature);
-	}
-	elsif ($subf eq '3p_utr') {
-		@subfeatures = get_3p_utrs($feature);
-	}
-	else {
-		croak "unrecognized subfeature parameter '$subf'!";
-	}
-	
-	# it's possible no subfeatures are returned
-	unless (@subfeatures) {
-		return;
+	my $subfeatures = $self->_get_subfeatures($args->{subfeature});
+	unless (@$subfeatures) {
+		carp "no subfeatures available! Returning parent score data!";
+		# just return the parent
+		undef $args->{subfeature};
+		delete $args->{exon} if exists $args->{exon};
+		return $self->get_sequence(@$args);
 	}
 	
 	# reset the practical start and stop to the actual subfeatures' final start and stop
 	# we can no longer rely on the feature start and stop, consider CDS
 	# these subfeatures should already be genomic sorted by GeneTools
-	my $practical_start = $subfeatures[0]->start;
-	my $practical_stop  = $subfeatures[-1]->end;
+	my $practical_start = $subfeatures->[0]->start;
+	my $practical_stop  = $subfeatures->[-1]->end;
 	
 	# collect over each exon
 	# we will adjust the positions of each reported score so that 
@@ -1899,7 +1836,8 @@ sub _get_subfeature_position_scores {
 	my $namecheck = {}; # to check unique names when using ncount method....
 	my $current_end = $practical_start;
 	my $adjustment = 0;
-	foreach my $exon (@subfeatures) {
+	my $fstrand = defined $args->{strand} ? $args->{strand} : $self->strand;
+	foreach my $exon (@$subfeatures) {
 		
 		my @params; # parameters to pass on to adapter
 		$params[CHR]  = $exon->seq_id;
@@ -1928,7 +1866,7 @@ sub _get_subfeature_position_scores {
 	if ($args->{extend}) {
 		# left side
 		my @params; # parameters to pass on to adapter
-		$params[CHR]  = $feature->seq_id;
+		$params[CHR]  = $self->seq_id;
 		$params[STRT] = $practical_start - $args->{extend};
 		$params[STOP] = $practical_start - 1;
 		$params[STR]  = $fstrand;
