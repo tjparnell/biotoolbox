@@ -255,8 +255,10 @@ sub parse_file {
 	my $self = shift;
 	if (scalar(@_) == 1) {
 		return Bio::ToolBox::Data->new(
-			file   => $_[0],
-			parse  => 1,
+			file       => $_[0],
+			parse      => 1,
+			simplify   => 1,
+			subfeature => 'exon,cds,utr',
 		);
 	}
 	else {
