@@ -2280,11 +2280,15 @@ sub low_level_bam_fetch {
 	}
 	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
-		return $sam->hts_index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
+		my $index = $sam->hts_index;
+		return unless $index;
+		return $index->fetch($sam->hts_file, $tid, $start, $stop, $callback, $data);
 	}
 	elsif ($BAM_ADAPTER eq 'sam') {
 		# using Bio::DB::Sam
-		return $sam->bam_index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
+		my $index = $sam->bam_index;
+		return unless $index;
+		return $index->fetch($sam->bam, $tid, $start, $stop, $callback, $data);
 	}
 	else {
 		confess "no bam adapter loaded!\n";
@@ -2301,11 +2305,15 @@ sub low_level_bam_coverage {
 	}
 	if ($BAM_ADAPTER eq 'hts') {
 		# using Bio::DB::HTS
-		return $sam->hts_index->coverage($sam->hts_file, $tid, $start, $stop);
+		my $index = $sam->hts_index;
+		return unless $index;
+		return $index->coverage($sam->hts_file, $tid, $start, $stop);
 	}
 	elsif ($BAM_ADAPTER eq 'sam') {
 		# using Bio::DB::Sam
-		return $sam->bam_index->coverage($sam->bam, $tid, $start, $stop);
+		my $index = $sam->bam_index;
+		return unless $index;
+		return $index->coverage($sam->bam, $tid, $start, $stop);
 	}
 	else {
 		confess "no bam adapter loaded!\n";
