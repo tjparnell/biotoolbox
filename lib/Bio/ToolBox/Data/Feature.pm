@@ -1199,7 +1199,10 @@ sub strand {
 sub _strand {
 	my $self = shift;
 	my $str = shift;
-	if ($str eq '+') {
+	if ($str eq '1' or $str eq '-1' or $str eq '0') {
+		return $str;
+	} 
+	elsif ($str eq '+') {
 		return 1;
 	}
 	elsif ($str eq '-') {
@@ -1208,8 +1211,13 @@ sub _strand {
 	elsif ($str eq '.') {
 		return 0;
 	}
-	elsif ($str =~ /^[\+\-]?1$/) {
-		return $str;
+	elsif ($str eq '2') {
+		# R packages use 1 for + and 2 for -
+		return -1;
+	}
+	elsif ($str eq '*') {
+		# R packages use * for .
+		return 0;
 	}
 	else {
 		return 0;
