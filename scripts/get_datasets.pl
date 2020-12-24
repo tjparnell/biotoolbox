@@ -23,7 +23,7 @@ eval {
 	$parallel = 1;
 };
 
-my $VERSION = '1.67';
+my $VERSION = '1.68';
 
 
 print "\n A program to collect data for a list of features\n\n";
@@ -477,8 +477,8 @@ sub set_defaults {
 	if ($subfeature and (defined $fstart or defined $start_adj)) {
 		die " Cannot modify coordinates when subfeatures are requested!\n";
 	}
-	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr)$/) {
-		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr or 3p_utr\n";
+	if ($subfeature and $subfeature !~ /^(?:exon|cds|5p_utr|3p_utr|intron)$/) {
+		die " unrecognized subfeature option '$subfeature'! Use exon, cds, 5p_utr 3p_utr, or intron\n";
 	} 
 	
 	# generate formatter
@@ -517,7 +517,7 @@ sub parallel_execution {
 		}
 		
 		# collapse transcripts if needed
-		if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+		if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
 			my $c = $Data->collapse_gene_transcripts;
 			if ($c != $Data->last_row) {
 				printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
@@ -563,7 +563,7 @@ sub parallel_execution {
 sub single_execution {
 	
 	# collapse transcripts if needed
-	if ($feature =~ /^gene/i and $subfeature eq 'exon') {
+	if ($feature =~ /^gene/i and $subfeature =~ /exon|intron/) {
 		my $c = $Data->collapse_gene_transcripts;
 		if ($c != $Data->last_row) {
 			printf " Not all row SeqFeatures could be collapsed, %d failed\n", 
@@ -1009,7 +1009,7 @@ get_datasets.pl [--options...] --in <filename> <data1> <data2...>
             pcount|ncount]
   -t --strand [all|sense|antisense]   strand of data relative to feature (all)
   -u --subfeature [exon|cds|          collect over gene subfeatures 
-        5p_utr|3p_utr] 
+        5p_utr|3p_utr|intron] 
   --force_strand                      use the specified strand in input file
   --fpkm [region|genome]              calculate FPKM using which total count
   --tpm                               calculate TPM values
@@ -1196,14 +1196,14 @@ presence of a "strand" column in the input data file. This option only
 works with input file lists of database features, not defined genomic
 regions (e.g. BED files). Default is false.
 
-=item --subfeature [ exon | cds | 5p_utr | 3p_utr ]
+=item --subfeature [ exon | cds | 5p_utr | 3p_utr | intron ]
 
 Optionally specify the type of subfeature to collect from, rather than 
-the entire gene. If the parent feature is gene and the subfeature is exon, 
-then all transcripts of the gene will be collapsed. The other subfeatures 
-(cds, 5p_utr, and 3p_utr) will not work with gene features but only with 
-coding mRNA transcripts. Note that the options extend, start, stop, fstart, 
-and fstop are ignored. Default is null. 
+the entire gene. If the parent feature is gene and the subfeature is exon
+or intron, then all transcripts of the gene will be collapsed. The other 
+subfeatures (cds, 5p_utr, and 3p_utr) will not work with gene features but 
+only with coding mRNA transcripts. Note that the options extend, start, stop, 
+fstart, and fstop are ignored. Default is null. 
 
 =item --exons
 
