@@ -782,7 +782,7 @@ Count overlapping unique names only.
   my $alignment_data = { mapq => [] };
   my $callback = sub {
      my ($a, $data) = @_;
-     push @{ $data->{mapq} }, $a->mapq;
+     push @{ $data->{mapq} }, $a->qual;
   };
   while (my $row = $stream->next_row) {
      $row->fetch_alignments(
